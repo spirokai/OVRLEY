@@ -53,7 +53,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
           min={1}
           max={20}
           step={0.5}
-          valueDisplay={`${tapeData.pixels_per_degree}px`}
+          valueDisplay={`${tapeData.pixels_per_degree}`}
+          suffix="px"
           onChange={(value) => updateTapeSize({ pixels_per_degree: value })}
           onCommit={() => commitWidgetSize(widget.id)}
         />
@@ -68,17 +69,20 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
               <ToggleField checked={showMajorTicks} onCheckedChange={(checked) => updateTape({ show_major_ticks: checked })} />
             </div>
             <SliderField
+              editable
               label={t('widget-editor.majorLength', 'Major Length')}
               value={tapeData.major_tick_length_pct}
               min={5}
               max={100}
               step={1}
               disabled={!showMajorTicks}
-              valueDisplay={`${tapeData.major_tick_length_pct}%`}
+              valueDisplay={`${tapeData.major_tick_length_pct}`}
+              suffix="%"
               onSliderChange={(value) => updateTapeSize({ major_tick_length_pct: value })}
               onSliderCommit={() => commitWidgetSize(widget.id)}
             />
             <SliderField
+              editable
               label={t('widget-editor.majorThickness', 'Major Thickness')}
               value={tapeData.major_tick_thickness}
               min={0.5}
@@ -86,7 +90,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
               step={0.5}
               disabled={!showMajorTicks}
               integerDisplay
-              valueDisplay={`${tapeData.major_tick_thickness}px`}
+              valueDisplay={`${tapeData.major_tick_thickness}`}
+              suffix="px"
               onSliderChange={(value) => updateTapeSize({ major_tick_thickness: value })}
               onSliderCommit={() => commitWidgetSize(widget.id)}
             />
@@ -97,17 +102,20 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
               <ToggleField checked={showMinorTicks} onCheckedChange={(checked) => updateTape({ show_minor_ticks: checked })} />
             </div>
             <SliderField
+              editable
               label={t('widget-editor.minorLength', 'Minor Length')}
               value={tapeData.minor_tick_length_pct}
               min={5}
               max={100}
               step={1}
               disabled={!showMinorTicks}
-              valueDisplay={`${tapeData.minor_tick_length_pct}%`}
+              valueDisplay={`${tapeData.minor_tick_length_pct}`}
+              suffix="%"
               onSliderChange={(value) => updateTapeSize({ minor_tick_length_pct: value })}
               onSliderCommit={() => commitWidgetSize(widget.id)}
             />
             <SliderField
+              editable
               label={t('widget-editor.minorThickness', 'Minor Thickness')}
               value={tapeData.minor_tick_thickness}
               min={0.5}
@@ -115,7 +123,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
               step={0.5}
               disabled={!showMinorTicks}
               integerDisplay
-              valueDisplay={`${tapeData.minor_tick_thickness}px`}
+              valueDisplay={`${tapeData.minor_tick_thickness}`}
+              suffix="px"
               onSliderChange={(value) => updateTapeSize({ minor_tick_thickness: value })}
               onSliderCommit={() => commitWidgetSize(widget.id)}
             />
@@ -181,18 +190,21 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
             min={6}
             max={36}
             step={1}
-            valueDisplay={`${tapeData.label_font_size}px`}
+            valueDisplay={`${tapeData.label_font_size}`}
+            suffix="px"
             onChange={(value) => updateTapeSize({ label_font_size: value })}
             onCommit={() => commitWidgetSize(widget.id)}
           />
           <SliderField
+            editable
             label={t('widget-editor.offset', 'Offset')}
             value={tapeData.label_offset}
             min={0}
             max={20}
             step={1}
             integerDisplay
-            valueDisplay={`${tapeData.label_offset}px`}
+            valueDisplay={`${tapeData.label_offset}`}
+            suffix="px"
             onSliderChange={(value) => updateTapeSize({ label_offset: value })}
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
@@ -232,7 +244,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
             min={4}
             max={40}
             step={1}
-            valueDisplay={`${tapeData.indicator_size}px`}
+            valueDisplay={`${tapeData.indicator_size}`}
+            suffix="px"
             onChange={(value) => updateTapeSize({ indicator_size: value })}
             onCommit={() => commitWidgetSize(widget.id)}
           />

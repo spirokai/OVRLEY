@@ -13,7 +13,7 @@
  */
 
 import { Label } from '@/components/ui/label'
-import { Slider } from '@/components/ui/slider'
+import { SliderField } from '@/features/widget-editor/components/widgetFormControls'
 import { Separator } from '@/components/ui/separator'
 import { Palette, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -115,64 +115,58 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
       </div>
 
       <div className="space-y-6 pt-2">
-        <div className="space-y-3 pt-2">
-          <div className="flex justify-between items-center">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.transparency', 'Transparency')}</Label>
-            <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[10px] text-muted-foreground">
-              {Math.round(globalDefaults.opacity * 100)}%
-            </span>
-          </div>
-          <Slider min={0} max={1} step={0.01} value={[globalDefaults.opacity]} onValueChange={([v]) => onGlobalDefaultChange('opacity', v)} />
-        </div>
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.scale', 'Scale')}</Label>
-            <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[10px] text-muted-foreground">{globalDefaults.scale.toFixed(2)}x</span>
-          </div>
-          <Slider min={0.5} max={2} step={0.01} value={[globalDefaults.scale]} onValueChange={([v]) => onGlobalDefaultChange('scale', v)} />
-        </div>
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.borderThickness', 'Border Thickness')}</Label>
-            <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[10px] text-muted-foreground">
-              {sceneStyleValue('border_thickness', 0)}px
-            </span>
-          </div>
-          <Slider
+        <SliderField
+          editable
+          label={t('scene-settings.transparency', 'Transparency')}
+          min={0}
+          max={1}
+          step={0.01}
+          value={globalDefaults.opacity}
+          valueScale={100}
+          valueDisplay={`${Math.round(globalDefaults.opacity * 100)}`}
+          suffix="%"
+          onSliderChange={(value) => onGlobalDefaultChange('opacity', value)}
+        />
+        <SliderField
+          editable
+          label={t('scene-settings.scale', 'Scale')}
+          min={0.5}
+          max={2}
+          step={0.01}
+          value={globalDefaults.scale}
+          valueDisplay={`${globalDefaults.scale.toFixed(2)}`}
+          suffix="x"
+          onSliderChange={(value) => onGlobalDefaultChange('scale', value)}
+        />
+        <SliderField
+          editable
+          label={t('scene-settings.borderThickness', 'Border Thickness')}
+          min={0}
+          max={20}
+          value={sceneStyleValue('border_thickness', 0)}
+          valueDisplay={`${sceneStyleValue('border_thickness', 0)}`}
+          suffix="px"
+          onSliderChange={(value) => onGlobalDefaultChange('border_thickness', value)}
+        />
+        <div className="grid grid-cols-2 gap-6">
+          <SliderField
+            editable
+            label={t('scene-settings.shadowStrength', 'Shadow Strength')}
             min={0}
             max={20}
-            step={1}
-            value={[sceneStyleValue('border_thickness', 0)]}
-            onValueChange={([v]) => onGlobalDefaultChange('border_thickness', v)}
+            value={sceneStyleValue('shadow_strength', 0)}
+            valueDisplay={String(sceneStyleValue('shadow_strength', 0))}
+            onSliderChange={(value) => onGlobalDefaultChange('shadow_strength', value)}
           />
-        </div>
-        <div className="grid grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.shadowStrength', 'Shadow Strength')}</Label>
-              <span className="text-[10px] text-muted-foreground">{sceneStyleValue('shadow_strength', 0)}</span>
-            </div>
-            <Slider
-              min={0}
-              max={20}
-              step={1}
-              value={[sceneStyleValue('shadow_strength', 0)]}
-              onValueChange={([v]) => onGlobalDefaultChange('shadow_strength', v)}
-            />
-          </div>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.shadowDistance', 'Shadow Distance')}</Label>
-              <span className="text-[10px] text-muted-foreground">{sceneStyleValue('shadow_distance', 0)}</span>
-            </div>
-            <Slider
-              min={0}
-              max={20}
-              step={1}
-              value={[sceneStyleValue('shadow_distance', 0)]}
-              onValueChange={([v]) => onGlobalDefaultChange('shadow_distance', v)}
-            />
-          </div>
+          <SliderField
+            editable
+            label={t('scene-settings.shadowDistance', 'Shadow Distance')}
+            min={0}
+            max={20}
+            value={sceneStyleValue('shadow_distance', 0)}
+            valueDisplay={String(sceneStyleValue('shadow_distance', 0))}
+            onSliderChange={(value) => onGlobalDefaultChange('shadow_distance', value)}
+          />
         </div>
       </div>
     </div>

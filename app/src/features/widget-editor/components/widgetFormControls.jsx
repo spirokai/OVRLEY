@@ -7,7 +7,9 @@
 
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
+import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
+import { useInlineNumberInput } from '@/hooks/useInlineNumberInput'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -246,6 +248,41 @@ export function ColorField({ label, labelKey = 'widget-editor.color', defaultLab
   )
 }
 
+// A separate child keeps draft keystrokes from rerendering the slider.
+function SliderValueInput({ valueDisplay, valueScale, value, min, max, step, disabled, onSliderChange, onSliderCommit, ...inputProps }) {
+  const draftProps = useInlineNumberInput({
+    value: Number((value * valueScale).toPrecision(12)),
+    onCommit: (displayValue) => {
+      const nextValue = displayValue / valueScale
+      onSliderChange(nextValue)
+      onSliderCommit?.(nextValue)
+    },
+  })
+
+  return (
+    <div className="group relative flex h-3.75 min-w-[5ch] shrink-0 items-center justify-end text-right text-[10px] leading-none font-mono text-muted-foreground">
+      <span
+        aria-hidden="true"
+        className={cn('pointer-events-none group-focus-within:invisible group-has-aria-invalid:invisible', disabled && 'opacity-50')}
+      >
+        {valueDisplay}
+      </span>
+      <Input
+        {...inputProps}
+        {...draftProps}
+        variant="inline"
+        type="number"
+        min={min * valueScale}
+        max={max * valueScale}
+        step={step * valueScale}
+        disabled={disabled}
+        required
+        className="absolute inset-x-0 top-1/2 -translate-y-1/2 opacity-0 focus:opacity-100 aria-invalid:opacity-100 disabled:opacity-0"
+      />
+    </div>
+  )
+}
+
 /**
  * Renders the slider field component.
  *
@@ -260,6 +297,9 @@ export function ColorField({ label, labelKey = 'widget-editor.color', defaultLab
  * @param {*} props.onSliderChange - Callback invoked to slider change.
  * @param {*} props.onSliderCommit - Callback invoked when slider interaction ends.
  * @param {*} props.valueDisplay - Value for value display.
+ * @param {string} [props.suffix=''] - Unit shown in the inactive readout.
+ * @param {boolean} [props.editable=false] - Enables editing the readout in scene settings and widget editors.
+ * @param {number} [props.valueScale=1] - Conversion from slider units into displayed input units.
  * @returns {JSX.Element} Rendered component output.
  */
 export function SliderField({
@@ -273,17 +313,35 @@ export function SliderField({
   onSliderChange,
   onSliderCommit,
   valueDisplay,
+  suffix = '',
   integerDisplay = false,
+  editable = false,
+  valueScale = 1,
 }) {
-  const displayValue = integerDisplay ? valueDisplay.replace(/^-?\d+(?:\.\d+)?/, String(Math.round(value))) : valueDisplay
+  const displayValue = (integerDisplay ? String(Math.round(value)) : valueDisplay) + suffix
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className={cn('flex justify-between gap-3', editable ? 'h-3.75 items-baseline' : 'items-center')}>
         <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
           {label}
         </Label>
-        <span className="text-[10px] font-mono text-muted-foreground">{displayValue}</span>
+        {editable ? (
+          <SliderValueInput
+            aria-label={label}
+            value={value}
+            valueDisplay={displayValue}
+            valueScale={valueScale}
+            min={min}
+            max={max}
+            step={step}
+            disabled={disabled}
+            onSliderChange={onSliderChange}
+            onSliderCommit={onSliderCommit}
+          />
+        ) : (
+          <span className={cn('text-[10px] font-mono text-muted-foreground', disabled && 'opacity-50')}>{displayValue}</span>
+        )}
       </div>
       <div className="flex items-center gap-3 px-1">
         <Slider
@@ -312,7 +370,7 @@ export function SliderField({
  * @returns {JSX.Element} Rendered size slider.
  */
 export function SizeSlider({ onChange, onCommit, ...props }) {
-  return <SliderField {...props} integerDisplay onSliderChange={onChange} onSliderCommit={onCommit} />
+  return <SliderField {...props} editable integerDisplay onSliderChange={onChange} onSliderCommit={onCommit} />
 }
 
 /**

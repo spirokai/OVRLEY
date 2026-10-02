@@ -18,12 +18,14 @@ export default function RasterWidgetEditor({ widget, updateWidgetSize, commitWid
         <DimensionsSection widget={widget} setNumericField={setNumericField} min={1} />
       </div>
       <SliderField
+        editable
         label={t('widget-editor.rotation', 'Rotation')}
         value={widget.data.rotation}
         min={-180}
         max={180}
         step={1}
-        valueDisplay={`${widget.data.rotation}°`}
+        valueDisplay={`${widget.data.rotation}`}
+        suffix="°"
         onSliderChange={(rotation) => updateWidgetSize(widget.id, { rotation })}
         onSliderCommit={() => commitWidgetSize(widget.id)}
       />

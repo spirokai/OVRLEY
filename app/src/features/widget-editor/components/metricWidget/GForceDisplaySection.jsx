@@ -32,7 +32,8 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
           value={data.diameter}
           min={20}
           max={600}
-          valueDisplay={`${data.diameter}px`}
+          valueDisplay={`${data.diameter}`}
+          suffix="px"
           onChange={handleDiameterChange}
           onCommit={() => commitWidgetSize(widget.id)}
         />
@@ -43,12 +44,15 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             onChange={(fill_color) => updateGForce({ fill_color })}
           />
           <SliderField
+            editable
             label={t('widget-editor.fillOpacity', 'Fill Opacity')}
             value={data.fill_opacity}
             min={0}
             max={1}
             step={0.05}
-            valueDisplay={`${Math.round(data.fill_opacity * 100)}%`}
+            valueScale={100}
+            valueDisplay={`${Math.round(data.fill_opacity * 100)}`}
+            suffix="%"
             onSliderChange={(fill_opacity) => updateGForce({ fill_opacity })}
           />
         </div>
@@ -59,12 +63,14 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             onChange={(border_color) => updateGForce({ border_color })}
           />
           <SliderField
+            editable
             label={t('widget-editor.borderThickness', 'Border Thickness')}
             value={data.border_thickness}
             min={0}
             max={borderMax}
             integerDisplay
-            valueDisplay={`${data.border_thickness}px`}
+            valueDisplay={`${data.border_thickness}`}
+            suffix="px"
             onSliderChange={(border_thickness) => updateGForceSize({ border_thickness })}
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
@@ -80,28 +86,35 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             value={data.marker_size}
             min={2}
             max={48}
-            valueDisplay={`${data.marker_size}px`}
+            valueDisplay={`${data.marker_size}`}
+            suffix="px"
             onChange={(marker_size) => updateGForceSize({ marker_size })}
             onCommit={() => commitWidgetSize(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField
+            editable
             label={t('widget-editor.markerOpacity', 'Marker Opacity')}
             value={data.marker_opacity}
             min={0}
             max={1}
             step={0.05}
-            valueDisplay={`${Math.round(data.marker_opacity * 100)}%`}
+            valueScale={100}
+            valueDisplay={`${Math.round(data.marker_opacity * 100)}`}
+            suffix="%"
             onSliderChange={(marker_opacity) => updateGForce({ marker_opacity })}
           />
           <SliderField
+            editable
             label={t('widget-editor.borderOpacity', 'Border Opacity')}
             value={data.border_opacity}
             min={0}
             max={1}
             step={0.05}
-            valueDisplay={`${Math.round(data.border_opacity * 100)}%`}
+            valueScale={100}
+            valueDisplay={`${Math.round(data.border_opacity * 100)}`}
+            suffix="%"
             onSliderChange={(border_opacity) => updateGForce({ border_opacity })}
           />
         </div>
@@ -124,7 +137,8 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             value={data.label_font_size}
             min={6}
             max={100}
-            valueDisplay={`${data.label_font_size}px`}
+            valueDisplay={`${data.label_font_size}`}
+            suffix="px"
             onChange={(label_font_size) => updateGForceSize({ label_font_size })}
             onCommit={() => commitWidgetSize(widget.id)}
           />
@@ -143,22 +157,26 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField
+            editable
             label={t('widget-editor.horizontalOffset', 'Horizontal Offset')}
             value={data.label_offset_x}
             min={-100}
             max={100}
             integerDisplay
-            valueDisplay={`${data.label_offset_x}px`}
+            valueDisplay={`${data.label_offset_x}`}
+            suffix="px"
             onSliderChange={(label_offset_x) => updateGForceSize({ label_offset_x })}
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
           <SliderField
+            editable
             label={t('widget-editor.verticalOffset', 'Vertical Offset')}
             value={data.label_offset_y}
             min={-100}
             max={100}
             integerDisplay
-            valueDisplay={`${data.label_offset_y}px`}
+            valueDisplay={`${data.label_offset_y}`}
+            suffix="px"
             onSliderChange={(label_offset_y) => updateGForceSize({ label_offset_y })}
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />

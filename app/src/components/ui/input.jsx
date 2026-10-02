@@ -12,19 +12,23 @@ import { cn } from '@/lib/utils'
  * @param {object} props - Component props.
  * @param {*} props.className - Additional class names to merge into the element.
  * @param {*} props.type - Widget or value type identifier.
+ * @param {'default'|'inline'} [props.variant='default'] - Input appearance.
  * @param {React.Ref<*>} ref - Forwarded React ref.
  * @returns {JSX.Element} Rendered component output.
  */
-const Input = React.forwardRef(({ className, type, ...props }, ref) => {
+const Input = React.forwardRef(({ className, type, variant = 'default', ...props }, ref) => {
   return (
     <input
       ref={ref}
       type={type}
       data-slot="input"
+      data-variant={variant}
       className={cn(
         'file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground border-input h-9 w-full min-w-0 rounded-sm border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
         'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-1',
         'aria-invalid:ring-destructive/20 aria-invalid:border-destructive',
+        variant === 'inline' &&
+          'rounded-xs h-4.75 border-transparent px-1 py-0 text-right text-[10px] leading-3.25 font-mono text-muted-foreground shadow-none focus:border-input focus:bg-surface focus:text-foreground md:text-[10px] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
         className,
       )}
       {...props}

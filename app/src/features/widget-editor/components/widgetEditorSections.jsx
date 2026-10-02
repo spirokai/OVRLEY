@@ -48,12 +48,14 @@ export function PositionSection({ widget, setNumericField, updateWidgetData, hea
         />
       </div>
       <SliderField
+        editable
         label={t('widget-editor.transparency', 'Transparency')}
         value={opacity}
         min={0}
         max={100}
         step={1}
-        valueDisplay={`${opacity}%`}
+        valueDisplay={`${opacity}`}
+        suffix="%"
         onSliderChange={(value) => updateWidgetData(widget.id, { opacity: value / 100 })}
       />
     </div>
@@ -167,7 +169,8 @@ export function FontSection({
         min={sizeMin}
         max={sizeMax}
         step={1}
-        valueDisplay={`${fontSize}px`}
+        valueDisplay={`${fontSize}`}
+        suffix="px"
         onChange={(value) => updateWidgetSize(widget.id, { font_size: value })}
         onCommit={() => commitWidgetSize(widget.id)}
       />
@@ -205,12 +208,14 @@ export function FontSection({
         ) : null}
         {widget.category === 'labels' ? (
           <SliderField
+            editable
             label={t('widget-editor.letterSpacing', 'Letter Spacing')}
             value={widget.data.letter_spacing}
             min={-35}
             max={35}
             step={0.5}
-            valueDisplay={`${widget.data.letter_spacing.toFixed(1)}%`}
+            valueDisplay={`${widget.data.letter_spacing.toFixed(1)}`}
+            suffix="%"
             onSliderChange={(value) => updateWidgetSize(widget.id, { letter_spacing: value })}
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
@@ -267,7 +272,8 @@ export function IconSection({
           min={0}
           max={100}
           step={1}
-          valueDisplay={`${iconSize}px`}
+          valueDisplay={`${iconSize}`}
+          suffix="px"
           onChange={(value) => updateWidgetSize(widget.id, { icon_size: value })}
           onCommit={() => commitWidgetSize(widget.id)}
         />

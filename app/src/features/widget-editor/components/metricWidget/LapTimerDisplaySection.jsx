@@ -75,7 +75,8 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
           min={6}
           max={100}
           step={0.5}
-          valueDisplay={`${widget.data.label_font_size}px`}
+          valueDisplay={`${widget.data.label_font_size}`}
+          suffix="px"
           onChange={(label_font_size) => updateWidgetSize(widget.id, { label_font_size })}
           onCommit={() => commitWidgetSize(widget.id)}
         />

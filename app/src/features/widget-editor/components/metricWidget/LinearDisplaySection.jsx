@@ -94,7 +94,8 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             min={widthSliderBounds.min}
             max={widthSliderBounds.max}
             step={1}
-            valueDisplay={`${linearData.width}px`}
+            valueDisplay={`${linearData.width}`}
+            suffix="px"
             onChange={(value) =>
               updateLinearSize({
                 width: value,
@@ -109,7 +110,8 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             min={heightSliderBounds.min}
             max={heightSliderBounds.max}
             step={1}
-            valueDisplay={`${linearData.height}px`}
+            valueDisplay={`${linearData.height}`}
+            suffix="px"
             onChange={(value) =>
               updateLinearSize({
                 height: value,
@@ -137,13 +139,15 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             widgetId={widget.id}
           />
           <SliderField
+            editable
             label={t('widget-editor.cornerRadius', 'Corner Radius')}
             value={linearData.track_corner_radius}
             min={0}
             max={cornerRadiusMax}
             step={1}
             integerDisplay
-            valueDisplay={`${linearData.track_corner_radius}px`}
+            valueDisplay={`${linearData.track_corner_radius}`}
+            suffix="px"
             onSliderChange={(value) => updateLinearSize({ track_corner_radius: Math.min(Math.max(0, value), cornerRadiusMax) })}
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
@@ -155,13 +159,15 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             onChange={(value) => updateLinear({ track_border_color: value })}
           />
           <SliderField
+            editable
             label={t('widget-editor.border', 'Border')}
             value={linearData.track_border_thickness}
             min={0}
             max={6}
             step={1}
             integerDisplay
-            valueDisplay={`${linearData.track_border_thickness}px`}
+            valueDisplay={`${linearData.track_border_thickness}`}
+            suffix="px"
             onSliderChange={(value) => updateLinearSize({ track_border_thickness: value })}
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
@@ -174,12 +180,15 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             onChange={(value) => updateLinear({ track_empty_color: value })}
           />
           <SliderField
+            editable
             label={t('widget-editor.emptyOpacity', 'Empty Opacity')}
             value={linearData.track_empty_opacity}
             min={0}
             max={1}
             step={0.05}
-            valueDisplay={`${Math.round(linearData.track_empty_opacity * 100)}%`}
+            valueScale={100}
+            valueDisplay={`${Math.round(linearData.track_empty_opacity * 100)}`}
+            suffix="%"
             onSliderChange={(value) => updateLinear({ track_empty_opacity: value })}
           />
         </div>
@@ -190,12 +199,15 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             onChange={(value) => updateLinear({ track_filled_color: value })}
           />
           <SliderField
+            editable
             label={t('widget-editor.filledOpacity', 'Filled Opacity')}
             value={linearData.track_filled_opacity}
             min={0}
             max={1}
             step={0.05}
-            valueDisplay={`${Math.round(linearData.track_filled_opacity * 100)}%`}
+            valueScale={100}
+            valueDisplay={`${Math.round(linearData.track_filled_opacity * 100)}`}
+            suffix="%"
             onSliderChange={(value) => updateLinear({ track_filled_opacity: value })}
           />
         </div>
@@ -226,7 +238,8 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             min={6}
             max={50}
             step={1}
-            valueDisplay={`${linearData.min_max_label_font_size}px`}
+            valueDisplay={`${linearData.min_max_label_font_size}`}
+            suffix="px"
             onChange={(value) => updateLinearSize({ min_max_label_font_size: value })}
             onCommit={() => commitWidgetSize(widget.id)}
           />

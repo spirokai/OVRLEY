@@ -58,13 +58,15 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
       <div className="space-y-4">
         <SectionHeading icon={Palette} title={t('widget-editor.lineStyling', 'Line Styling')} />
         <SliderField
+          editable
           label={t('widget-editor.thickness', 'Thickness')}
           value={lineWidth}
           min={0}
           max={20}
           step={1}
           integerDisplay
-          valueDisplay={`${lineWidth}px`}
+          valueDisplay={`${lineWidth}`}
+          suffix="px"
           onSliderChange={(value) =>
             updateWidgetSize(widget.id, {
               completed_line_width: value,
@@ -76,12 +78,14 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
 
         <div className="grid grid-cols-2 gap-4">
           <SliderField
+            editable
             label={t('widget-editor.smoothing', 'Smoothing')}
             value={simplifyTolerance}
             min={0}
             max={4}
             step={0.05}
-            valueDisplay={`${simplifyTolerance.toFixed(2)}px`}
+            valueDisplay={`${simplifyTolerance.toFixed(2)}`}
+            suffix="px"
             onSliderChange={(value) =>
               updateWidgetSize(widget.id, {
                 simplify_tolerance_px: Number(value.toFixed(2)),
@@ -90,12 +94,14 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
           <SliderField
+            editable
             label={t('widget-editor.profileDetail', 'Profile Detail')}
             value={targetDensity}
             min={0.25}
             max={1.5}
             step={0.05}
-            valueDisplay={`${targetDensity.toFixed(2)}x`}
+            valueDisplay={`${targetDensity.toFixed(2)}`}
+            suffix="x"
             onSliderChange={(value) =>
               updateWidgetSize(widget.id, {
                 target_density: Number(value.toFixed(2)),
@@ -123,32 +129,38 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField
+            editable
             label={t('widget-editor.finishedOpacity', 'Finished Opacity')}
             value={widget.data.completed_line_opacity}
             min={0}
             max={100}
             step={1}
-            valueDisplay={`${widget.data.completed_line_opacity}%`}
+            valueDisplay={`${widget.data.completed_line_opacity}`}
+            suffix="%"
             onSliderChange={(value) => updateWidgetData(widget.id, { completed_line_opacity: value })}
           />
           <SliderField
+            editable
             label={t('widget-editor.remainingOpacity', 'Remaining Opacity')}
             value={remainingLineOpacity}
             min={0}
             max={100}
             step={1}
-            valueDisplay={`${remainingLineOpacity}%`}
+            valueDisplay={`${remainingLineOpacity}`}
+            suffix="%"
             onSliderChange={(value) => updateWidgetData(widget.id, { remaining_line_opacity: value })}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField
+            editable
             label={t('widget-editor.verticalScale', 'Vertical Scale')}
             value={yScale}
             min={0.1}
             max={3}
             step={0.05}
-            valueDisplay={`${yScale.toFixed(2)}x`}
+            valueDisplay={`${yScale.toFixed(2)}`}
+            suffix="x"
             onSliderChange={(value) =>
               updateWidgetSize(widget.id, {
                 y_scale: Number(value.toFixed(2)),
@@ -183,21 +195,25 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
           </div>
           <div className="grid grid-cols-2 gap-4">
             <SliderField
+              editable
               label={t('widget-editor.finishedOpacity', 'Finished Opacity')}
               value={completedAreaOpacity}
               min={0}
               max={100}
               step={1}
-              valueDisplay={`${completedAreaOpacity}%`}
+              valueDisplay={`${completedAreaOpacity}`}
+              suffix="%"
               onSliderChange={(value) => updateWidgetData(widget.id, { area_completed_opacity: value })}
             />
             <SliderField
+              editable
               label={t('widget-editor.remainingOpacity', 'Remaining Opacity')}
               value={remainingAreaOpacity}
               min={0}
               max={100}
               step={1}
-              valueDisplay={`${remainingAreaOpacity}%`}
+              valueDisplay={`${remainingAreaOpacity}`}
+              suffix="%"
               onSliderChange={(value) => updateWidgetData(widget.id, { area_remaining_opacity: value })}
             />
           </div>
@@ -218,7 +234,8 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
             min={0}
             max={50}
             step={1}
-            valueDisplay={`${markerSize}px`}
+            valueDisplay={`${markerSize}`}
+            suffix="px"
             onChange={(value) => updateWidgetSize(widget.id, { marker_size: value })}
             onCommit={() => commitWidgetSize(widget.id)}
           />
@@ -229,12 +246,14 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
             onChange={(value) => updateWidgetData(widget.id, { marker_color: value })}
           />
           <SliderField
+            editable
             label={t('widget-editor.opacity', 'Opacity')}
             value={markerOpacity}
             min={0}
             max={100}
             step={1}
-            valueDisplay={`${markerOpacity}%`}
+            valueDisplay={`${markerOpacity}`}
+            suffix="%"
             onSliderChange={(value) => updateWidgetData(widget.id, { marker_opacity: value })}
           />
         </div>
@@ -246,7 +265,8 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               min={Math.max(Math.round(markerSize * 2), 4)}
               max={120}
               step={1}
-              valueDisplay={`${markerVariantDiameter}px`}
+              valueDisplay={`${markerVariantDiameter}`}
+              suffix="px"
               onChange={(value) => updateWidgetSize(widget.id, { marker_variant_diameter: value })}
               onCommit={() => commitWidgetSize(widget.id)}
             />
@@ -262,7 +282,8 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
           min={5}
           max={50}
           step={1}
-          valueDisplay={`${labelFontSize}px`}
+          valueDisplay={`${labelFontSize}`}
+          suffix="px"
           onChange={(value) => updateWidgetSize(widget.id, { point_label: { ...(widget.data.point_label ?? {}), font_size: value } })}
           onCommit={() => commitWidgetSize(widget.id)}
         />
@@ -281,6 +302,7 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               />
             </div>
             <SliderField
+              editable
               label={t('widget-editor.metricOffsetX', 'Metric Offset X')}
               disabled={!widget.data.show_elevation_metric}
               value={widget.data.metric_label_offset_x}
@@ -288,11 +310,13 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               max={100}
               step={1}
               integerDisplay
-              valueDisplay={`${widget.data.metric_label_offset_x}px`}
+              valueDisplay={`${widget.data.metric_label_offset_x}`}
+              suffix="px"
               onSliderChange={(value) => updateWidgetSize(widget.id, { metric_label_offset_x: value })}
               onSliderCommit={() => commitWidgetSize(widget.id)}
             />
             <SliderField
+              editable
               label={t('widget-editor.metricOffsetY', 'Metric Offset Y')}
               disabled={!widget.data.show_elevation_metric}
               value={widget.data.metric_label_offset_y}
@@ -300,7 +324,8 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               max={100}
               step={1}
               integerDisplay
-              valueDisplay={`${widget.data.metric_label_offset_y}px`}
+              valueDisplay={`${widget.data.metric_label_offset_y}`}
+              suffix="px"
               onSliderChange={(value) => updateWidgetSize(widget.id, { metric_label_offset_y: value })}
               onSliderCommit={() => commitWidgetSize(widget.id)}
             />
@@ -319,6 +344,7 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               />
             </div>
             <SliderField
+              editable
               label={t('widget-editor.imperialOffsetX', 'Imperial Offset X')}
               disabled={!widget.data.show_elevation_imperial}
               value={widget.data.imperial_label_offset_x}
@@ -326,11 +352,13 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               max={100}
               step={1}
               integerDisplay
-              valueDisplay={`${widget.data.imperial_label_offset_x}px`}
+              valueDisplay={`${widget.data.imperial_label_offset_x}`}
+              suffix="px"
               onSliderChange={(value) => updateWidgetSize(widget.id, { imperial_label_offset_x: value })}
               onSliderCommit={() => commitWidgetSize(widget.id)}
             />
             <SliderField
+              editable
               label={t('widget-editor.imperialOffsetY', 'Imperial Offset Y')}
               disabled={!widget.data.show_elevation_imperial}
               value={widget.data.imperial_label_offset_y}
@@ -338,7 +366,8 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               max={100}
               step={1}
               integerDisplay
-              valueDisplay={`${widget.data.imperial_label_offset_y}px`}
+              valueDisplay={`${widget.data.imperial_label_offset_y}`}
+              suffix="px"
               onSliderChange={(value) => updateWidgetSize(widget.id, { imperial_label_offset_y: value })}
               onSliderCommit={() => commitWidgetSize(widget.id)}
             />
