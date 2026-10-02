@@ -4,7 +4,6 @@ import { getPreviewFontFamily, getWidgetOpacity } from '../../shared/textMeasure
 import { headingOffset, headingTapeLayout, visibleLabels, visibleTicks } from './geometry'
 import { getTextShadowParts } from '../../shared/shadow'
 import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
-import { useFontMetrics } from '../../shared/useFontMetrics'
 
 /**
  * Builds the preview model for the heading-tape renderer.
@@ -32,7 +31,6 @@ import { useFontMetrics } from '../../shared/useFontMetrics'
 export function useHeadingPreviewModel({ widget, activity, previewSecond, globalOpacity, globalScale, sceneFont, valueFont, sceneStyle }) {
   // Typography: heading labels need font metrics ready before the tape is drawn.
   const labelFontFamily = getPreviewFontFamily(widget.data.label_font ?? valueFont ?? sceneFont)
-  useFontMetrics([{ fontId: widget.data.label_font ?? valueFont ?? sceneFont, fontSize: widget.data.label_font_size }])
 
   return useMemo(() => {
     // Viewport and opacity: boxed heading widgets guarantee geometry; clamp only invalid transient values.

@@ -2,20 +2,14 @@
  * Provides shared fonts utilities for the app.
  */
 
-const fontFamilies = new Map()
-const fontRequests = new Map()
-
 const FONT_EXTENSION_PATTERN = /\.(ttf|otf|ttc|woff2?|fon)$/i
 
+/** @param {string} value Font identity or display name. @returns {string} Name without a font-file extension. */
 export function stripFontExtension(value) {
-  const trimmed = String(value || '').trim()
+  const trimmed = value.trim()
   return trimmed.replace(FONT_EXTENSION_PATTERN, '')
 }
 
-/** @param {object} catalog Canonical backend catalog. @returns {void} */
-export function setFontCatalog(catalog) {
-  for (const font of [...catalog.recommendedFonts, ...catalog.systemFonts]) fontFamilies.set(font.id, font)
-}
 /**
  * Returns font family name.
  *
@@ -23,7 +17,7 @@ export function setFontCatalog(catalog) {
  * @returns {*} Requested value or structure.
  */
 export function getFontFamilyName(value) {
-  return fontFamilies.get(value)?.name ?? stripFontExtension(value)
+  return stripFontExtension(value)
 }
 
 /**
@@ -70,7 +64,8 @@ export function getFontWeightAxis(face) {
   return face.axes.find((axis) => axis.tag === 'wght' && !axis.hidden)
 }
 
-function hasItalicVariation(face) {
+/** @param {object} face Face metadata. @returns {boolean} Whether a variation axis can slant glyphs. */
+export function hasItalicVariation(face) {
   return face.axes.some((axis) => (axis.tag === 'ital' && axis.max > 0) || (axis.tag === 'slnt' && (axis.min < 0 || axis.max > 0)))
 }
 
@@ -79,23 +74,13 @@ export function supportsItalicFace(face) {
   return face.style === 'italic' || face.style === 'oblique' || hasItalicVariation(face)
 }
 
-function isSimulatedItalicFace(font, face) {
-  // Windows exposes simulated slants with the upright face's exact local name.
-  // Registering those regular glyphs as italic would prevent browser synthesis.
-  return (
-    face.file === null &&
-    face.style !== 'normal' &&
-    !hasItalicVariation(face) &&
-    font.faces.some((upright) => upright.style === 'normal' && upright.local_name === face.local_name)
-  )
-}
-
 /** @param {object} font Resolved family capabilities. @returns {boolean} Available italic/slant support. */
 export function supportsFontItalic(font) {
   return font.faces.some(supportsItalicFace)
 }
 
-function styleFaces(font, italic) {
+/** @param {object} font Capabilities. @param {boolean} italic Requested style. @returns {object[]} Faces eligible for style matching. */
+export function styleFaces(font, italic) {
   const slanted = italic && supportsFontItalic(font)
   const candidates = font.faces.filter((face) => (slanted ? supportsItalicFace(face) : face.style === 'normal'))
   if (slanted) {
@@ -104,20 +89,6 @@ function styleFaces(font, italic) {
     if (italics.length) return italics
   }
   return candidates
-}
-
-function styleVariations(face, italic) {
-  return (
-    face.axes
-      .filter((axis) => axis.tag !== 'wght')
-      .map((axis) => {
-        let value = axis.default
-        if (axis.tag === 'ital') value = italic ? Math.min(axis.max, Math.max(axis.min, 1)) : 0
-        if (axis.tag === 'slnt') value = italic ? Math.min(axis.max, Math.max(axis.min, axis.min < 0 ? -12 : 12)) : 0
-        return `"${axis.tag}" ${value}`
-      })
-      .join(', ') || 'normal'
-  )
 }
 
 function weightRank(requested, candidate) {
@@ -147,87 +118,32 @@ export function resolveFontStyle(font, requested, italic = false) {
   return { face: candidates[0].face, weight: candidates[0].weight, fontStyle: italic && supportsFontItalic(font) ? 'italic' : 'normal' }
 }
 
-/**
- * Uses the same supported-face matching as Rust. While discovery is pending,
- * the requested weight is used until font readiness refreshes measurements.
- * @param {string} id Canonical font ID.
- * @param {number} requested Validated weight.
- * @param {boolean} [italic=false] Requested italic state.
- * @returns {{ weight: number, fontStyle: string }} Supported rendering style.
- */
-export function getFontRenderStyle(id, requested, italic = false) {
-  const font = fontFamilies.get(id)
-  return font?.faces ? resolveFontStyle(font, requested, italic) : { weight: requested, fontStyle: 'normal' }
-}
-
 /** @param {object} font Capabilities. @param {number} requested Weight. @param {boolean} [italic=false] Style. @returns {object} Weight controls. */
 export function getFontWeightControl(font, requested, italic = false) {
   const matched = resolveFontStyle(font, requested, italic)
   return {
     weightAxis: getFontWeightAxis(matched.face),
     weight: matched.weight,
-    weightOptions: [...new Set(styleFaces(font, italic).map((face) => face.weight))]
-      .sort((a, b) => a - b)
-      .map((weight) => ({ value: String(weight), label: String(weight) })),
   }
 }
 
-/** @param {object} value Cloned saved input. @returns {void} Migrates changed font identities in place. */
-export function migrateSavedFontIdentities(value) {
-  for (const [key, item] of Object.entries(value)) {
-    if (
-      ['font', 'label_font', 'min_max_label_font', 'font_text', 'font_values'].includes(key) &&
-      ['Inter ExtraBold.ttf', 'Inter ExtraBold'].includes(item)
-    ) {
-      value[key] = 'Inter.ttf'
-    } else if (key === 'font_family' && item === 'Inter ExtraBold') {
-      value[key] = 'Inter'
-    } else if (item !== null && typeof item === 'object') {
-      migrateSavedFontIdentities(item)
+/** @param {object} font Prepared capabilities. @param {object} label Current label. @returns {object} Supported font selection. */
+export function createLabelFontSelection(font, label) {
+  const italic = label.italic && supportsFontItalic(font)
+  return { ...createFontSelection(font.id), italic, font_weight: resolveFontStyle(font, label.font_weight, italic).weight }
+}
+
+const FONT_KEYS = new Set(['font', 'label_font', 'min_max_label_font', 'font_text', 'font_values'])
+
+/** @param {object} value Config or widget updates. @param {object} [previous] When given, collects changed identities only. @returns {string[]} Font IDs, including inactive variants. */
+export function collectFontIds(value, previous) {
+  const ids = new Set()
+  function visit(record, previous) {
+    for (const [key, item] of Object.entries(record)) {
+      if (FONT_KEYS.has(key) && item !== undefined && item !== null && item !== previous?.[key]) ids.add(item)
+      else if (item !== null && typeof item === 'object') visit(item, previous?.[key])
     }
   }
-}
-
-/**
- * Registers physical faces and ital/slnt instances discovered by Skia. Windows
- * simulated slants use browser style synthesis; other axes keep defaults.
- * @param {string} id Canonical font ID.
- * @returns {Promise<object>} Registered family capabilities.
- */
-export function loadFont(id) {
-  if (!fontRequests.has(id)) {
-    const request = (async () => {
-      const backend = await import('@/api/backend')
-      await backend.listAvailableFonts()
-      let font = fontFamilies.get(id)
-      if (!font || font.faces === null) {
-        font = await backend.getFontCapabilities(id)
-        fontFamilies.set(id, font)
-      }
-      if (typeof FontFace !== 'undefined' && document.fonts) {
-        const italicFaces = supportsFontItalic(font) ? styleFaces(font, true) : []
-        await Promise.all(
-          font.faces.map(async (face, index) => {
-            if (isSimulatedItalicFace(font, face)) return
-            const axis = getFontWeightAxis(face)
-            const source = face.file === null ? `local(${JSON.stringify(face.local_name)})` : new Uint8Array(await backend.getFontData(id, index))
-            const styles = [...(face.style === 'normal' ? [false] : []), ...(italicFaces.includes(face) ? [true] : [])]
-            await Promise.all(
-              styles.map(async (italic) => {
-                const registered = new FontFace(`OVRLEY ${id}`, source, {
-                  style: italic ? 'italic' : 'normal',
-                  weight: axis ? `${axis.min} ${axis.max}` : String(face.weight),
-                  variationSettings: styleVariations(face, italic),
-                })
-                document.fonts.add(await registered.load())
-              }),
-            )
-          }),
-        )
-      }
-      return font
-    })()
-    fontRequests.set(id, request)
-  }
-  return fontRequests.get(id)
+  visit(value, previous)
+  return [...ids]
 }

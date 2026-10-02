@@ -31,7 +31,6 @@ use ovrley_core::render::widgets::heading::prepare::prepare_heading_cache;
 use ovrley_core::render::widgets::types::HeadingWidgetCache;
 use ovrley_core::types::DisplayType;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 // ── Geometry helpers ──────────────────────────────────────────────────────
 
@@ -240,10 +239,7 @@ fn visible_labels_respects_show_flags() {
 
 #[test]
 fn centered_heading_labels_use_tick_center_as_visual_center() {
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let workspace_root = common::test_config::repo_git_root();
     let font_dirs = vec![workspace_root.join("fonts")];
     let font = resolve_font(&font_dirs, Some("JetBrains Mono.ttf"), 36.0).unwrap();
     let center_x = 120.0;
@@ -362,8 +358,13 @@ fn prepare_heading_cache_produces_non_empty_tape() {
     let heading = default_heading();
     let mut profiler = RenderProfiler::default();
 
-    let cache =
-        prepare_heading_cache(&default_validated_scene(), &heading, &[], &mut profiler).unwrap();
+    let cache = prepare_heading_cache(
+        &default_validated_scene(),
+        &heading,
+        &[common::test_config::repo_git_root().join("fonts")],
+        &mut profiler,
+    )
+    .unwrap();
 
     assert!((cache.tape_width - 1800.0).abs() < 1.0);
     assert_eq!(cache.width, 400);
@@ -384,8 +385,13 @@ fn prepare_heading_cache_with_no_labels() {
     heading.show_minor_ticks = false;
     let mut profiler = RenderProfiler::default();
 
-    let cache =
-        prepare_heading_cache(&default_validated_scene(), &heading, &[], &mut profiler).unwrap();
+    let cache = prepare_heading_cache(
+        &default_validated_scene(),
+        &heading,
+        &[common::test_config::repo_git_root().join("fonts")],
+        &mut profiler,
+    )
+    .unwrap();
 
     assert_eq!(cache.width, 400);
     assert_eq!(cache.height, 80);
@@ -401,8 +407,13 @@ fn prepare_heading_cache_stores_indicator_config() {
     heading.indicator_size = 20.0;
     let mut profiler = RenderProfiler::default();
 
-    let cache =
-        prepare_heading_cache(&default_validated_scene(), &heading, &[], &mut profiler).unwrap();
+    let cache = prepare_heading_cache(
+        &default_validated_scene(),
+        &heading,
+        &[common::test_config::repo_git_root().join("fonts")],
+        &mut profiler,
+    )
+    .unwrap();
 
     assert!(cache.show_indicator);
     assert_eq!(cache.indicator_style, "highlight_bar");
@@ -419,8 +430,13 @@ fn prepare_heading_cache_indicator_size_pre_scaled() {
     heading.indicator_size = 10.0;
     let mut profiler = RenderProfiler::default();
 
-    let cache =
-        prepare_heading_cache(&default_validated_scene(), &heading, &[], &mut profiler).unwrap();
+    let cache = prepare_heading_cache(
+        &default_validated_scene(),
+        &heading,
+        &[common::test_config::repo_git_root().join("fonts")],
+        &mut profiler,
+    )
+    .unwrap();
 
     // With scale=1.0, indicator_size is unchanged
     assert!((cache.indicator_size - 10.0).abs() < f32::EPSILON);

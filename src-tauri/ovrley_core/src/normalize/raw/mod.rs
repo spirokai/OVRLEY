@@ -14,17 +14,30 @@ use crate::types::{BackdropType, DisplayType, MetricKind, TrackFillStyle};
 pub const TEMPLATE_FILE_FORMAT: &str = "ovrley-template";
 pub const TEMPLATE_FILE_VERSION: u32 = 3;
 
+/// One typography contract for render requests and saved-document ingress.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LabelTypography {
+    #[serde(deserialize_with = "deserialize_font_weight")]
+    pub font_weight: f32,
+    #[serde(deserialize_with = "deserialize_italic")]
+    pub italic: bool,
+    /// Percentage of font size between grapheme clusters; no trailing gap.
+    #[serde(deserialize_with = "deserialize_letter_spacing")]
+    pub letter_spacing: f32,
+}
+
 fn deserialize_font_weight<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<f32, D::Error> {
-    let weight = f32::deserialize(deserializer)
+    let weight = f64::deserialize(deserializer)
         .map_err(|error| serde::de::Error::custom(format!("font_weight: {error}")))?;
+    // Validate the original number before narrowing to Skia's f32 coordinates.
     if !weight.is_finite() || !(1.0..=1000.0).contains(&weight) {
         return Err(serde::de::Error::custom(
             "font_weight: must be a finite number from 1 to 1000",
         ));
     }
-    Ok(weight)
+    Ok(weight as f32)
 }
 
 fn deserialize_italic<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
@@ -35,14 +48,14 @@ fn deserialize_italic<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Resu
 fn deserialize_letter_spacing<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<f32, D::Error> {
-    let spacing = f32::deserialize(deserializer)
+    let spacing = f64::deserialize(deserializer)
         .map_err(|error| serde::de::Error::custom(format!("letter_spacing: {error}")))?;
-    if !spacing.is_finite() {
+    if !spacing.is_finite() || !(spacing as f32).is_finite() {
         return Err(serde::de::Error::custom(
-            "letter_spacing: must be a finite number",
+            "letter_spacing: must be a finite 32-bit number",
         ));
     }
-    Ok(spacing)
+    Ok(spacing as f32)
 }
 
 /// Global render settings shared by labels, metric values, plots, and ffmpeg.
@@ -126,13 +139,8 @@ pub struct LabelConfig {
     pub font_family: Option<String>,
     #[serde(default)]
     pub font_size: Option<f32>,
-    #[serde(deserialize_with = "deserialize_font_weight")]
-    pub font_weight: f32,
-    #[serde(deserialize_with = "deserialize_italic")]
-    pub italic: bool,
-    #[serde(deserialize_with = "deserialize_letter_spacing")]
-    /// Percentage of the label's font size, converted to pixels during layout.
-    pub letter_spacing: f32,
+    #[serde(flatten)]
+    pub typography: LabelTypography,
     #[serde(default)]
     pub color: Option<String>,
     #[serde(default)]
@@ -1007,38 +1015,8 @@ pub fn validate_saved_label_typography(config: &Value) -> CoreResult<()> {
         .and_then(Value::as_array)
         .ok_or_else(|| CoreError::Config("labels must be an array".into()))?;
     for (index, label) in labels.iter().enumerate() {
-        let spacing = label
-            .get("letter_spacing")
-            .and_then(Value::as_f64)
-            .ok_or_else(|| {
-                CoreError::Config(format!(
-                    "labels[{index}].letter_spacing: required numeric field"
-                ))
-            })?;
-        if !(spacing as f32).is_finite() {
-            return Err(CoreError::Config(format!(
-                "labels[{index}].letter_spacing: must be a finite number"
-            )));
-        }
-        label
-            .get("italic")
-            .and_then(Value::as_bool)
-            .ok_or_else(|| {
-                CoreError::Config(format!("labels[{index}].italic: required boolean field"))
-            })?;
-        let weight = label
-            .get("font_weight")
-            .and_then(Value::as_f64)
-            .ok_or_else(|| {
-                CoreError::Config(format!(
-                    "labels[{index}].font_weight: required numeric field"
-                ))
-            })?;
-        if !weight.is_finite() || !(1.0..=1000.0).contains(&weight) {
-            return Err(CoreError::Config(format!(
-                "labels[{index}].font_weight: must be a finite number from 1 to 1000"
-            )));
-        }
+        serde_json::from_value::<LabelTypography>(label.clone())
+            .map_err(|error| CoreError::Config(format!("labels[{index}].{error}")))?;
     }
     Ok(())
 }

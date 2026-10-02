@@ -3,24 +3,25 @@ import { beforeAll, expect, test, vi } from 'vitest'
 import { OverlayTextWidget } from '@/features/widget-preview/widgets/text/TextPreview'
 import { buildTextWidgetPreviewModel } from '@/features/widget-preview/widgets/text/model'
 import { resolveWidgetRenderGeometry } from '@/features/overlay-editor/utils/widgetRenderGeometry'
-import { setFontCatalog } from '@/lib/fonts'
 
-vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({ useFontMetrics: () => 0 }))
+vi.mock('@/lib/font-resources', () => ({
+  getPreparedFont: () =>
+    ({
+      recommendedFonts: [
+        {
+          id: 'Spacing',
+          name: 'Spacing',
+          faces: [
+            { style: 'normal', weight: 400, axes: [] },
+            { style: 'italic', weight: 537, axes: [] },
+          ],
+        },
+      ],
+      systemFonts: [],
+    }).recommendedFonts[0],
+}))
 
 beforeAll(() => {
-  setFontCatalog({
-    recommendedFonts: [
-      {
-        id: 'Spacing',
-        name: 'Spacing',
-        faces: [
-          { style: 'normal', weight: 400, axes: [] },
-          { style: 'italic', weight: 537, axes: [] },
-        ],
-      },
-    ],
-    systemFonts: [],
-  })
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     font: '',
     measureText(text) {

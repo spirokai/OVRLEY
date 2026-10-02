@@ -4,7 +4,7 @@ import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { useMemo } from 'react'
 import { SlidersHorizontal, Tags } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
-import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
+import { useAvailableFonts } from '@/hooks/useFonts'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
 import { getLinearBarGapMax, getLinearTrackCornerRadiusMax, getSuggestedLinearBarGeometry } from '@/features/widget-preview/shared/gaugeBarGeometry'
 import { useTranslation } from 'react-i18next'
@@ -40,8 +40,8 @@ const LABEL_POSITION_SWAP = {
 export default function LinearDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   const { t } = useTranslation()
   const linearData = useMemo(() => widget.data.display_variants?.linear ?? {}, [widget.data.display_variants?.linear])
-  const updateLinear = useDisplayVariantUpdater(widget, 'linear', linearData, updateWidgetData)
-  const updateLinearSize = useDisplayVariantUpdater(widget, 'linear', linearData, updateWidgetSize)
+  const updateLinear = useDisplayVariantUpdater(widget, 'linear', updateWidgetData)
+  const updateLinearSize = useDisplayVariantUpdater(widget, 'linear', updateWidgetSize)
   const availableFonts = useAvailableFonts()
   const orientationOptions = useMemo(() => translateOptions(ORIENTATION_OPTIONS, t), [t])
   const positionOptions = useMemo(() => translateOptions(POSITION_OPTIONS, t), [t])

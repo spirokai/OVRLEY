@@ -8,8 +8,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { ColorField, ContentAlignmentControl, NumberField, SelectField, SizeSlider, SliderField, TextField, ToggleField } from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
-import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
-import useLabelTypography from '../hooks/useLabelTypography'
+import { useAvailableFonts, useLabelTypography } from '@/hooks/useFonts'
 import { getWidgetFont } from '../utils/widgetUtils'
 import { getThemeColor } from '@/lib/theme'
 import { useTranslation } from 'react-i18next'
@@ -217,11 +216,6 @@ export function FontSection({
           />
         ) : null}
       </div>
-      {typography.error ? (
-        <p role="alert" className="text-xs text-destructive">
-          {typography.error.message}
-        </p>
-      ) : null}
     </div>
   )
 }

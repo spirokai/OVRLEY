@@ -48,11 +48,31 @@ pub struct FontCatalog {
     pub system_fonts: Vec<FontFamily>,
 }
 
-#[derive(Clone)]
+struct LoadedFace {
+    metadata: FontFace,
+    typeface: Typeface,
+    data: Option<Vec<u8>>,
+}
+
 struct LoadedFamily {
-    family: FontFamily,
-    typefaces: Vec<Typeface>,
-    data: Vec<Option<Vec<u8>>>,
+    id: String,
+    name: String,
+    faces: Vec<LoadedFace>,
+}
+
+impl LoadedFamily {
+    fn capabilities(&self) -> FontFamily {
+        FontFamily {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            faces: Some(
+                self.faces
+                    .iter()
+                    .map(|face| face.metadata.clone())
+                    .collect(),
+            ),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -198,17 +218,15 @@ fn discover_bundled(font_dirs: &[PathBuf]) -> CoreResult<Vec<LoadedFamily>> {
             }
         }
         let loaded = families.entry(id.clone()).or_insert_with(|| LoadedFamily {
-            family: FontFamily {
-                id,
-                name,
-                faces: Some(Vec::new()),
-            },
-            typefaces: Vec::new(),
-            data: Vec::new(),
+            id,
+            name,
+            faces: Vec::new(),
         });
-        loaded.family.faces.as_mut().unwrap().push(face);
-        loaded.typefaces.push(typeface);
-        loaded.data.push(Some(bytes));
+        loaded.faces.push(LoadedFace {
+            metadata: face,
+            typeface,
+            data: Some(bytes),
+        });
     }
     Ok(families.into_values().collect())
 }
@@ -222,10 +240,8 @@ pub fn font_catalog(font_dirs: &[PathBuf]) -> CoreResult<FontCatalog> {
     }
     let mut recommended_fonts = Vec::new();
     for loaded in discover_bundled(font_dirs)? {
-        recommended_fonts.push(loaded.family.clone());
-        session
-            .families
-            .insert(loaded.family.id.clone(), Arc::new(loaded));
+        recommended_fonts.push(loaded.capabilities());
+        session.families.insert(loaded.id.clone(), Arc::new(loaded));
     }
     let mut system_fonts: Vec<_> = FontMgr::default()
         .family_names()
@@ -266,7 +282,6 @@ fn loaded_family(font_dirs: &[PathBuf], id: &str) -> CoreResult<Arc<LoadedFamily
         .ok_or_else(|| CoreError::Config(format!("font family is unavailable: {id}")))?
         .font_style()
         .width();
-    let mut typefaces = Vec::new();
     let mut faces = Vec::new();
     for index in 0..styles.count() {
         let typeface = styles
@@ -275,8 +290,11 @@ fn loaded_family(font_dirs: &[PathBuf], id: &str) -> CoreResult<Arc<LoadedFamily
         if typeface.font_style().width() != default_width {
             continue;
         }
-        faces.push(describe_face(&typeface, None));
-        typefaces.push(typeface);
+        faces.push(LoadedFace {
+            metadata: describe_face(&typeface, None),
+            typeface,
+            data: None,
+        });
     }
     if faces.is_empty() {
         return Err(CoreError::Config(format!(
@@ -284,13 +302,9 @@ fn loaded_family(font_dirs: &[PathBuf], id: &str) -> CoreResult<Arc<LoadedFamily
         )));
     }
     let loaded = Arc::new(LoadedFamily {
-        family: FontFamily {
-            id: id.into(),
-            name: id.into(),
-            faces: Some(faces),
-        },
-        data: vec![None; typefaces.len()],
-        typefaces,
+        id: id.into(),
+        name: id.into(),
+        faces,
     });
     session.families.insert(id.into(), Arc::clone(&loaded));
     Ok(loaded)
@@ -298,15 +312,15 @@ fn loaded_family(font_dirs: &[PathBuf], id: &str) -> CoreResult<Arc<LoadedFamily
 
 /// Resolves and caches system capabilities on first use.
 pub fn font_capabilities(font_dirs: &[PathBuf], id: &str) -> CoreResult<FontFamily> {
-    Ok(loaded_family(font_dirs, id)?.family.clone())
+    Ok(loaded_family(font_dirs, id)?.capabilities())
 }
 
 /// Returns the same bundled bytes that Skia loaded, including after asset replacement.
 pub fn bundled_face_data(font_dirs: &[PathBuf], id: &str, index: usize) -> CoreResult<Vec<u8>> {
     loaded_family(font_dirs, id)?
-        .data
+        .faces
         .get(index)
-        .and_then(Clone::clone)
+        .and_then(|face| face.data.clone())
         .ok_or_else(|| CoreError::Config(format!("no bundled font data for {id} face {index}")))
 }
 
@@ -367,12 +381,13 @@ pub fn resolve_typeface(
     italic: bool,
 ) -> CoreResult<Typeface> {
     let loaded = loaded_family(font_dirs, id)?;
-    let faces = loaded.family.faces.as_ref().unwrap();
-    let italic = italic && faces.iter().any(supports_italic);
+    let faces = &loaded.faces;
+    let italic = italic && faces.iter().any(|face| supports_italic(&face.metadata));
     let (index, resolved_weight) = faces
         .iter()
         .enumerate()
         .filter(|(_, face)| {
+            let face = &face.metadata;
             if italic {
                 supports_italic(face)
             } else {
@@ -380,6 +395,7 @@ pub fn resolve_typeface(
             }
         })
         .map(|(index, face)| {
+            let face = &face.metadata;
             let candidate = match face.axes.iter().find(|axis| axis.tag == "wght") {
                 Some(axis) if !axis.hidden => weight.clamp(axis.min, axis.max),
                 Some(axis) => axis.default,
@@ -390,7 +406,7 @@ pub fn resolve_typeface(
         .min_by(|(a_index, a), (b_index, b)| {
             (
                 if italic {
-                    italic_rank(&faces[*a_index])
+                    italic_rank(&faces[*a_index].metadata)
                 } else {
                     0
                 },
@@ -398,7 +414,7 @@ pub fn resolve_typeface(
             )
                 .partial_cmp(&(
                     if italic {
-                        italic_rank(&faces[*b_index])
+                        italic_rank(&faces[*b_index].metadata)
                     } else {
                         0
                     },
@@ -407,8 +423,8 @@ pub fn resolve_typeface(
                 .unwrap()
         })
         .ok_or_else(|| CoreError::Config(format!("{id}: no matching font face")))?;
-    let face = &faces[index];
-    let typeface = &loaded.typefaces[index];
+    let face = &faces[index].metadata;
+    let typeface = &faces[index].typeface;
     if face.axes.is_empty() {
         return Ok(typeface.clone());
     }

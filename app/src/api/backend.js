@@ -2,8 +2,6 @@
  * Implements API helpers for backend.
  */
 
-import { setFontCatalog } from '@/lib/fonts'
-import { createCachedPromise } from '@/lib/cached-promise'
 import { rasterResourceIds } from '@/lib/widget/raster-resources'
 
 /**
@@ -266,13 +264,11 @@ export async function openHevcSupport() {
  * Lists available fonts.
  * @returns {Promise<object>} Canonical bundled and system family catalog.
  */
-export const listAvailableFonts = createCachedPromise(async () => {
+export async function listAvailableFonts() {
   // Font discovery is Rust-owned and unavailable in frontend-only development.
   if (!hasTauriRuntime()) return { recommendedFonts: [], systemFonts: [] }
-  const catalog = await apiCall('backend_list_system_fonts', {})
-  setFontCatalog(catalog)
-  return catalog
-})
+  return apiCall('backend_list_system_fonts', {})
+}
 
 /** @param {string} fontId Canonical font ID. @returns {Promise<object>} Resolved capabilities. */
 export function getFontCapabilities(fontId) {

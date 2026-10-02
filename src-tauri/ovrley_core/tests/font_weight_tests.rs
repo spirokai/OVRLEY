@@ -35,11 +35,11 @@ fn legacy_templates_upgrade_weight_and_changed_identity_without_rewriting_input(
         let source = json!({"format": "ovrley-template", "version": version, "config": config,
             "settings": { "globalDefaults": { "font_values": "Inter ExtraBold.ttf" } }});
         let loaded = parse_template_value(&source).unwrap();
-        assert_eq!(loaded.labels[0].font_weight, 400.0);
-        assert!(!loaded.labels[0].italic);
-        assert_eq!(loaded.labels[0].letter_spacing, 0.0);
-        assert_eq!(loaded.labels[1].letter_spacing, -1.25);
-        assert!(loaded.labels[1].italic);
+        assert_eq!(loaded.labels[0].typography.font_weight, 400.0);
+        assert!(!loaded.labels[0].typography.italic);
+        assert_eq!(loaded.labels[0].typography.letter_spacing, 0.0);
+        assert_eq!(loaded.labels[1].typography.letter_spacing, -1.25);
+        assert!(loaded.labels[1].typography.italic);
         assert_eq!(loaded.labels[0].font.as_deref(), Some("Inter.ttf"));
         assert_eq!(loaded.values[0].font.as_deref(), Some("Inter.ttf"));
         assert!(source["config"]["labels"][0].get("font_weight").is_none());
@@ -50,12 +50,20 @@ fn legacy_templates_upgrade_weight_and_changed_identity_without_rewriting_input(
         let saved = json!({"format": "ovrley-template", "version": 3, "config": loaded,
             "settings": { "globalDefaults": {} }});
         assert_eq!(
-            parse_template_value(&saved).unwrap().labels[0].font_weight,
+            parse_template_value(&saved).unwrap().labels[0]
+                .typography
+                .font_weight,
             400.0
         );
-        assert!(parse_template_value(&saved).unwrap().labels[1].italic);
+        assert!(
+            parse_template_value(&saved).unwrap().labels[1]
+                .typography
+                .italic
+        );
         assert_eq!(
-            parse_template_value(&saved).unwrap().labels[1].letter_spacing,
+            parse_template_value(&saved).unwrap().labels[1]
+                .typography
+                .letter_spacing,
             -1.25
         );
     }
@@ -113,7 +121,14 @@ fn canonical_render_rejects_missing_and_malformed_weights() {
         .unwrap()
         .to_string()
         .contains("font_weight"));
-    for weight in [json!("400"), json!(null), json!(0), json!(1001)] {
+    for weight in [
+        json!("400"),
+        json!(null),
+        json!(0),
+        json!(1001),
+        json!(1000.00001),
+        json!(0.99999999),
+    ] {
         let mut config = label_config(400.0);
         config["labels"][0]["font_weight"] = weight;
         assert!(validate_config_value(&config)
@@ -320,7 +335,7 @@ fn spacing_layout_uses_grapheme_gaps_without_trailing_advance_and_scales_with_te
     let config = validate_config_value(&input).unwrap();
     let measure = |text: &str, spacing: f32, font_size, scale| {
         let mut label = config.labels[0].clone();
-        label.letter_spacing = spacing;
+        label.typography.letter_spacing = spacing;
         label.font_size = font_size;
         let style = validated_label_style(&label, &config.scene, scale);
         measure_text(text, &style, &paths.font_dirs).unwrap()
@@ -370,8 +385,8 @@ fn spacing_invalidates_static_label_images_with_weight_italic_border_and_shadow(
         input["scene"]["shadow_distance"] = json!(3);
         input["scene"]["border_thickness"] = json!(1);
         let config = validate_config_value(&input).unwrap();
-        assert_eq!(config.labels[0].font_weight, 537.0);
-        assert!(config.labels[0].italic);
+        assert_eq!(config.labels[0].typography.font_weight, 537.0);
+        assert!(config.labels[0].typography.italic);
         StaticLayer {
             backdrops: &[],
             rasters: &[],

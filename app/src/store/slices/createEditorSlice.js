@@ -87,6 +87,7 @@ export function createEditorSlice(set, get) {
 
   return {
     editor: null,
+    editorDocumentRevision: 0,
     selectedWidgetId: null,
     selectedWidgetIds: [],
     previewInterpolationEnabled: true,

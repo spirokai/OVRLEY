@@ -1,7 +1,7 @@
 import { Compass, Ruler, Type, Target } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import { SectionHeading } from '@/components/ui/section-heading'
-import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
+import { useAvailableFonts } from '@/hooks/useFonts'
 import { ColorField, SizeSlider, SliderField, ToggleField, SelectField } from '../widgetFormControls'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { useMemo } from 'react'
@@ -34,8 +34,8 @@ const INDICATOR_PLACEMENT_OPTIONS = [
 export default function HeadingTapeDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   const { t } = useTranslation()
   const tapeData = useMemo(() => widget.data.display_variants?.heading_tape ?? {}, [widget.data.display_variants?.heading_tape])
-  const updateTape = useDisplayVariantUpdater(widget, 'heading_tape', tapeData, updateWidgetData)
-  const updateTapeSize = useDisplayVariantUpdater(widget, 'heading_tape', tapeData, updateWidgetSize)
+  const updateTape = useDisplayVariantUpdater(widget, 'heading_tape', updateWidgetData)
+  const updateTapeSize = useDisplayVariantUpdater(widget, 'heading_tape', updateWidgetSize)
   const availableFonts = useAvailableFonts()
   const showMajorTicks = tapeData.show_major_ticks
   const showMinorTicks = tapeData.show_minor_ticks

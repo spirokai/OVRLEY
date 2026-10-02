@@ -3,8 +3,9 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TimeWidgetEditor from '@/features/widget-editor/components/TimeWidgetEditor'
 
-vi.mock('@/features/scene-settings/hooks/useAvailableFonts', () => ({
-  default: () => ({ recommendedFonts: [], systemFonts: [] }),
+vi.mock('@/hooks/useFonts', async () => ({
+  ...(await vi.importActual('@/hooks/useFonts')),
+  useAvailableFonts: () => ({ recommendedFonts: [], systemFonts: [] }),
 }))
 
 beforeAll(() => {

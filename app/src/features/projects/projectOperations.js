@@ -3,6 +3,7 @@ import { replaceEditorDocument } from '@/features/undo-redo/undoHistory'
 import { createDurableEditorState } from '@/lib/widget/editor-state'
 import { attachRasterLoadResults } from '@/lib/widget/raster-resources'
 import useStore from '@/store/useStore'
+import { prepareDocumentFonts } from '@/lib/font-resources'
 import { applyNewProjectState, applyPreparedProjectState } from './utils/projectHydration'
 import { createProjectSnapshot, stringifyProject } from './utils/projectSnapshot'
 
@@ -25,6 +26,7 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
   const sourceLoadResults = await Promise.allSettled([
     sources.activityPath ? prepareActivityPath(sources.activityPath) : Promise.resolve(null),
     sources.videoPath ? prepareVideoPath(sources.videoPath) : Promise.resolve(null),
+    prepareDocumentFonts(project.editor),
   ])
   const failedSourceLoad = sourceLoadResults.find((result) => result.status === 'rejected')
   if (failedSourceLoad) throw failedSourceLoad.reason
@@ -62,6 +64,7 @@ export async function createNewProject({ clearImportedVideo }) {
   const templateState = state.lastSavedTemplateState
   if (templateSource && !templateState) throw new Error('the loaded template has no saved widget state')
 
+  if (templateState) await prepareDocumentFonts(templateState)
   await clearImportedVideo()
   replaceEditorDocument(useStore, () => applyNewProjectState(useStore, { templateSource, templateState }))
 }

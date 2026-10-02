@@ -1,5 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest'
-import { getFontRenderStyle, loadFont, setFontCatalog, supportsFontItalic } from '@/lib/fonts'
+import { resolveFontStyle, supportsFontItalic } from '@/lib/fonts'
+
+import { prepareFont } from '@/lib/font-resources'
 
 const catalog = vi.hoisted(() => ({ recommendedFonts: [], systemFonts: [] }))
 vi.mock('@/api/backend', () => ({ listAvailableFonts: async () => catalog }))
@@ -23,7 +25,6 @@ test('registers genuine ital and slnt instances while weight-only fonts remain u
     faces: [{ style: 'normal', weight: 400, axes: [weight], file: null, local_name: 'Upright' }],
   }
   catalog.recommendedFonts = [...fonts, upright]
-  setFontCatalog(catalog)
   const registered = []
   vi.stubGlobal(
     'FontFace',
@@ -41,8 +42,8 @@ test('registers genuine ital and slnt instances while weight-only fonts remain u
   try {
     for (const [index, font] of fonts.entries()) {
       expect(supportsFontItalic(font)).toBe(true)
-      await loadFont(font.id)
-      expect(getFontRenderStyle(font.id, 537, true)).toMatchObject({ weight: 537, fontStyle: 'italic' })
+      await prepareFont(font.id)
+      expect(resolveFontStyle(font, 537, true)).toMatchObject({ weight: 537, fontStyle: 'italic' })
       const faces = registered.filter((face) => face.family === `OVRLEY ${font.id}`)
       expect(faces.map((face) => face.style)).toEqual(['normal', 'italic'])
       expect(faces[0].variationSettings).toBe(`"${axisFonts[index].tag}" 0`)
@@ -50,7 +51,7 @@ test('registers genuine ital and slnt instances while weight-only fonts remain u
       expect(faces[1].weight).toBe('100 900')
     }
     expect(supportsFontItalic(upright)).toBe(false)
-    expect(getFontRenderStyle(upright.id, 537, true)).toMatchObject({ weight: 537, fontStyle: 'normal' })
+    expect(resolveFontStyle(upright, 537, true)).toMatchObject({ weight: 537, fontStyle: 'normal' })
   } finally {
     if (originalFonts) Object.defineProperty(document, 'fonts', originalFonts)
     else delete document.fonts

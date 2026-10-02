@@ -1,8 +1,10 @@
+vi.mock('@/lib/font-resources', () => ({ prepareDocumentFonts: vi.fn(async () => {}) }))
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createDurableTemplateState } from '@/lib/template/template-state'
 import { createDurableEditorState } from '@/lib/widget/editor-state'
 import { loadProject } from '@/features/projects/projectOperations'
+import { prepareDocumentFonts } from '@/lib/font-resources'
 import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlice'
 import useStore from '@/store/useStore'
 
@@ -174,6 +176,13 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     )
 
     let openPromise
+    let finishFonts
+    vi.mocked(prepareDocumentFonts).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishFonts = resolve
+        }),
+    )
     act(() => {
       openPromise = result.current.handleOpenProject()
     })
@@ -185,6 +194,10 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(useStore.getState().importedVideoPath).toBeNull()
     finishActivityPreparation()
     finishVideoPreparation()
+    await act(async () => Promise.resolve())
+    expect(boundaries.registerPreviewVideo).not.toHaveBeenCalled()
+    expect(useStore.getState().importedVideoPath).toBeNull()
+    finishFonts()
     await act(async () => openPromise)
 
     expect(boundaries.openSinglePath).toHaveBeenCalledWith(expect.any(Array), {

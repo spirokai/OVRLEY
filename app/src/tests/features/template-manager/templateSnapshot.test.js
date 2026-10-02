@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { loadSelectedRaster } from '@/api/backend'
+import { prepareDocumentFonts } from '@/lib/font-resources'
 import { TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template/template-constants'
 import {
   createTemplateFilePayload,
@@ -12,6 +13,8 @@ import {
 import { createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
 import { deepEqual } from '@/store/store-utils'
 
+vi.mock('@/lib/font-resources', () => ({ prepareDocumentFonts: vi.fn(async () => {}) }))
+
 vi.mock('@/api/backend', () => ({
   loadSelectedRaster: vi.fn(),
 }))
@@ -22,18 +25,39 @@ beforeEach(() => {
 
 describe('label font weight at template load', () => {
   test('rejects malformed present spacing rather than migrating it', () => {
-    for (const letter_spacing of ['0', null, undefined, NaN, Infinity, -Infinity]) {
-      expect(() => normalizeTemplateConfig({ scene: {}, rasters: [], labels: [{ text: 'Title', letter_spacing }] })).toThrow('letter_spacing')
+    for (const letter_spacing of ['0', null, undefined, NaN, Infinity, -Infinity, 1e100]) {
+      expect(() =>
+        normalizeTemplateFilePayload({
+          format: TEMPLATE_FILE_FORMAT,
+          version: TEMPLATE_FILE_VERSION,
+          config: { scene: {}, rasters: [], labels: [{ text: 'Title', letter_spacing }] },
+          settings: { globalDefaults: {} },
+        }),
+      ).toThrow('letter_spacing')
     }
   })
   test('rejects malformed present italic values rather than migrating them', () => {
     for (const italic of ['true', null, 0, 1, undefined]) {
-      expect(() => normalizeTemplateConfig({ scene: {}, rasters: [], labels: [{ text: 'Title', italic }] })).toThrow('italic')
+      expect(() =>
+        normalizeTemplateFilePayload({
+          format: TEMPLATE_FILE_FORMAT,
+          version: TEMPLATE_FILE_VERSION,
+          config: { scene: {}, rasters: [], labels: [{ text: 'Title', italic }] },
+          settings: { globalDefaults: {} },
+        }),
+      ).toThrow('italic')
     }
   })
   test('rejects malformed present weights rather than migrating them', () => {
-    for (const font_weight of ['400', null, 0, 1001, NaN]) {
-      expect(() => normalizeTemplateConfig({ scene: {}, rasters: [], labels: [{ text: 'Title', font_weight }] })).toThrow('font_weight')
+    for (const font_weight of ['400', null, 0, 1001, 1000.00001, NaN]) {
+      expect(() =>
+        normalizeTemplateFilePayload({
+          format: TEMPLATE_FILE_FORMAT,
+          version: TEMPLATE_FILE_VERSION,
+          config: { scene: {}, rasters: [], labels: [{ text: 'Title', font_weight }] },
+          settings: { globalDefaults: {} },
+        }),
+      ).toThrow('font_weight')
     }
   })
 
@@ -344,12 +368,19 @@ describe('template snapshot standard metric schema', () => {
     ).toThrow('Raster collection must be an array')
   })
 
-  test('prepares valid raster snapshots while retaining broken rasters as recoverable resources', async () => {
+  test('awaits fonts and raster snapshots while retaining broken rasters as recoverable resources', async () => {
+    let finishFonts
+    vi.mocked(prepareDocumentFonts).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishFonts = resolve
+        }),
+    )
     vi.mocked(loadSelectedRaster)
       .mockResolvedValueOnce({ width: 320, height: 180, resourceId: 'snapshot-1' })
       .mockRejectedValueOnce(Object.assign(new Error('The image file is missing.'), { code: 'missing' }))
 
-    const prepared = await prepareTemplateFilePayload({
+    const preparation = prepareTemplateFilePayload({
       format: TEMPLATE_FILE_FORMAT,
       version: 3,
       config: {
@@ -365,6 +396,16 @@ describe('template snapshot standard metric schema', () => {
       },
       settings: { globalDefaults: {} },
     })
+
+    let completed = false
+    preparation.then(() => {
+      completed = true
+    })
+    await Promise.resolve()
+    expect(completed).toBe(false)
+    expect(prepareDocumentFonts).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ labels: expect.any(Array) }) }))
+    finishFonts()
+    const prepared = await preparation
 
     expect(loadSelectedRaster).toHaveBeenCalledTimes(2)
     expect(prepared.templateState.config.rasters[1]).toMatchObject({ id: 'broken', x: 40, y: 50, width: 600, height: 400 })

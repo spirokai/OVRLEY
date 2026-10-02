@@ -46,6 +46,11 @@ const fonts = vi.hoisted(() => [
   },
 ])
 
+vi.mock('@/lib/font-resources', () => ({
+  getPreparedFont: (id) => fonts.find((font) => font.id === id),
+  getFontCatalog: async () => ({ recommendedFonts: fonts, systemFonts: [] }),
+}))
+
 vi.mock('@/api/backend', () => ({
   listAvailableFonts: async () => ({ recommendedFonts: fonts, systemFonts: [] }),
   getFontCapabilities: async (id) => fonts.find((font) => font.id === id),
@@ -80,9 +85,9 @@ describe('label weight controls', () => {
     await waitFor(() => expect(screen.getAllByRole('slider')).toHaveLength(3))
     const spacing = screen.getByRole('slider', { name: 'Letter Spacing' })
     expect(spacing).toHaveAttribute('aria-valuenow', '-1.25')
-    expect(screen.getByText('-1.25%')).toBeInTheDocument()
+    expect(screen.getByText('-1.3%')).toBeInTheDocument()
     fireEvent.keyDown(spacing, { key: 'ArrowRight' })
-    expect(updateWidgetSize).toHaveBeenCalledWith('title', { letter_spacing: -1.2 })
+    expect(updateWidgetSize).toHaveBeenCalledWith('title', { letter_spacing: -0.5 })
     expect(commitWidgetSize).toHaveBeenCalledWith('title')
     expect(updateWidgetData).not.toHaveBeenCalled()
     await waitFor(() => expect(screen.getAllByRole('slider')).toHaveLength(3))
@@ -110,7 +115,7 @@ describe('label weight controls', () => {
     expect(updateWidgetData).not.toHaveBeenCalled()
   })
 
-  test('adjusts an unsupported weight in the same committed action as changing font', async () => {
+  test('delegates font changes to the committed widget action', async () => {
     const updateWidgetData = vi.fn()
     render(
       <TextWidgetEditor
@@ -124,9 +129,7 @@ describe('label weight controls', () => {
     expect(screen.getAllByRole('slider')[1]).toHaveAttribute('aria-valuemax', '900')
     fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' })
     fireEvent.click(screen.getByRole('option', { name: 'Teko' }))
-    await waitFor(() =>
-      expect(updateWidgetData).toHaveBeenCalledWith('title', { font: 'Teko.ttf', font_family: 'Teko', font_weight: 700, italic: false }),
-    )
+    await waitFor(() => expect(updateWidgetData).toHaveBeenCalledWith('title', { font: 'Teko.ttf', font_family: 'Teko' }))
     expect(updateWidgetData).toHaveBeenCalledTimes(1)
   })
 
@@ -163,7 +166,7 @@ describe('label weight controls', () => {
     expect(weight).toHaveAttribute('aria-valuemax', '700')
     expect(screen.getByText('537')).toBeInTheDocument()
     fireEvent.keyDown(weight, { key: 'ArrowRight' })
-    expect(updateWidgetSize).toHaveBeenCalledWith('title', { font_weight: 538 })
+    expect(updateWidgetSize).toHaveBeenCalledWith('title', { font_weight: 600 })
     expect(commitWidgetSize).toHaveBeenCalledWith('title')
   })
 })

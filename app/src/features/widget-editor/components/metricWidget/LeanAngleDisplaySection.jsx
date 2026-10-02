@@ -5,7 +5,7 @@ import { buildUniformResizeUpdate } from '@/features/overlay-editor/utils/widget
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { ColorField, SizeSlider, SliderField } from '../widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
-import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
+import { useAvailableFonts } from '@/hooks/useFonts'
 import { useTranslation } from 'react-i18next'
 
 /**
@@ -19,8 +19,8 @@ import { useTranslation } from 'react-i18next'
 export default function LeanAngleDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   const { t } = useTranslation()
   const leanVariant = useMemo(() => widget.data.display_variants?.lean_angle ?? {}, [widget.data.display_variants?.lean_angle])
-  const updateLean = useDisplayVariantUpdater(widget, 'lean_angle', leanVariant, updateWidgetData)
-  const updateLeanSize = useDisplayVariantUpdater(widget, 'lean_angle', leanVariant, updateWidgetSize)
+  const updateLean = useDisplayVariantUpdater(widget, 'lean_angle', updateWidgetData)
+  const updateLeanSize = useDisplayVariantUpdater(widget, 'lean_angle', updateWidgetSize)
 
   const diameter = leanVariant.diameter
   const trackThicknessMax = Math.floor((diameter - 1) / 2)

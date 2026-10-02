@@ -13,7 +13,6 @@ use ovrley_core::standard_widgets::{
 };
 use ovrley_core::BackdropType;
 use serde_json::json;
-use std::path::PathBuf;
 
 #[test]
 fn standard_widgets_manifest_exposes_legacy_sections_through_definitions() {
@@ -596,10 +595,7 @@ fn rgba_at(pixels: &[u8], width: usize, x: usize, y: usize) -> [u8; 4] {
 }
 
 fn test_paths() -> AppPaths {
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let workspace_root = common::test_config::repo_git_root();
     AppPaths {
         repo_root: workspace_root.clone(),
         font_dirs: vec![workspace_root.join("fonts")],

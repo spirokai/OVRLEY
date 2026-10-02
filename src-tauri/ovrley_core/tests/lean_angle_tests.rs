@@ -8,7 +8,6 @@ use ovrley_core::paths::AppPaths;
 use ovrley_core::render::widgets::prepare_render_assets;
 use ovrley_core::render::widgets::types::PreparedValue;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 #[test]
 fn full_lean_angle_config_validates_and_prepares_one_static_cache() {
@@ -148,10 +147,7 @@ fn full_lean_angle_config() -> serde_json::Value {
 }
 
 fn test_paths() -> AppPaths {
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let workspace_root = common::test_config::repo_git_root();
     AppPaths {
         repo_root: workspace_root.clone(),
         font_dirs: vec![workspace_root.join("fonts")],

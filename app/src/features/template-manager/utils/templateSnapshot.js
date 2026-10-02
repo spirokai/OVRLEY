@@ -10,6 +10,7 @@ import { createDurableTemplateState } from '@/lib/template/template-state'
 import { RASTER_KEYS, TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template/template-constants'
 import { loadSelectedRaster } from '@/api/backend'
 import { attachRasterLoadResults } from '@/lib/widget/raster-resources'
+import { prepareDocumentFonts } from '@/lib/font-resources'
 
 export { normalizeTemplateConfig } from '@/lib/template/template-normalization'
 export { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
@@ -93,6 +94,39 @@ function validateTemplateRasters(config) {
   }
 }
 
+/** @param {object} value Cloned file input. @returns {void} Migrates legacy bundled font identities at ingress. */
+function migrateFontIdentities(value) {
+  for (const [key, item] of Object.entries(value)) {
+    if (
+      ['font', 'label_font', 'min_max_label_font', 'font_text', 'font_values'].includes(key) &&
+      ['Inter ExtraBold.ttf', 'Inter ExtraBold'].includes(item)
+    ) {
+      value[key] = 'Inter.ttf'
+    } else if (key === 'font_family' && item === 'Inter ExtraBold') {
+      value[key] = 'Inter'
+    } else if (item !== null && typeof item === 'object') {
+      migrateFontIdentities(item)
+    }
+  }
+}
+
+/** @param {object} payload Cloned template file input. @returns {void} Migrates documented legacy absence, then validates label typography once. */
+function normalizeTemplateFontInput(payload) {
+  migrateFontIdentities(payload)
+  for (const label of payload.config.labels ?? []) {
+    if (!Object.hasOwn(label, 'font_weight')) label.font_weight = 400
+    if (!Object.hasOwn(label, 'italic')) label.italic = false
+    if (!Object.hasOwn(label, 'letter_spacing')) label.letter_spacing = 0
+    if (!Number.isFinite(label.font_weight) || label.font_weight < 1 || label.font_weight > 1000) {
+      throw new Error('Label font_weight must be a finite number from 1 to 1000')
+    }
+    if (typeof label.italic !== 'boolean') throw new Error('Label italic must be a boolean')
+    if (!Number.isFinite(label.letter_spacing) || !Number.isFinite(Math.fround(label.letter_spacing))) {
+      throw new Error('Label letter_spacing must be a finite 32-bit number')
+    }
+  }
+}
+
 function migrateTemplatePayload(rawTemplate) {
   switch (rawTemplate.version) {
     case 2:
@@ -143,7 +177,8 @@ export function normalizeTemplateFilePayload(rawTemplate) {
     throw new Error('Template settings.globalDefaults must be an object.')
   }
 
-  const migratedTemplate = migrateTemplatePayload(rawTemplate)
+  const migratedTemplate = migrateTemplatePayload(structuredClone(rawTemplate))
+  normalizeTemplateFontInput(migratedTemplate)
   validateTemplateRasters(migratedTemplate.config)
   const normalizedState = createDurableTemplateState({
     config: migratedTemplate.config,
@@ -186,7 +221,7 @@ export async function prepareTemplateFilePayload(rawTemplate) {
     const pendingRaster = loadTemplateRaster(raster)
     pendingRasters.push(pendingRaster)
   }
-  const entries = await Promise.all(pendingRasters)
+  const [entries] = await Promise.all([Promise.all(pendingRasters), prepareDocumentFonts(templateState)])
   const rasterLoadResults = Object.fromEntries(entries)
   const config = attachRasterLoadResults(templateState.config, rasterLoadResults)
 

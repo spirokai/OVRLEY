@@ -9,7 +9,7 @@ import {
 } from '@/lib/widget/standard-metrics'
 import FontSelectField from '@/components/ui/font-select-field'
 import { SectionHeading } from '@/components/ui/section-heading'
-import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
+import { useAvailableFonts } from '@/hooks/useFonts'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { FontSection, UnitsControlRow } from '../widgetEditorSections'
 import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from '../widgetFormControls'
@@ -55,8 +55,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
   const displayType = widget.data.display_type
   const isCornerGauge = displayType === 'corner'
   const arcData = useMemo(() => widget.data.display_variants?.[displayType] ?? {}, [displayType, widget.data.display_variants])
-  const updateArc = useDisplayVariantUpdater(widget, displayType, arcData, updateWidgetData)
-  const updateArcSize = useDisplayVariantUpdater(widget, displayType, arcData, updateWidgetSize)
+  const updateArc = useDisplayVariantUpdater(widget, displayType, updateWidgetData)
+  const updateArcSize = useDisplayVariantUpdater(widget, displayType, updateWidgetSize)
   const availableFonts = useAvailableFonts()
   const definition = getStandardMetricDefinition(widget.type)
   const unitOptions = getStandardMetricUnitOptions(widget.type)

@@ -1,12 +1,19 @@
 import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
 import { createLabelDefaults, createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
-import { redoHistory, undoHistory } from '@/features/undo-redo/undoHistory'
+import { redoHistory, replaceEditorDocument, undoHistory } from '@/features/undo-redo/undoHistory'
 import { ensureWidgetIdsInConfig } from '@/lib/widget/widget-config'
 import useStore from '@/store/useStore'
 import { cloneSerializable, DEFAULT_CONFIG } from '@/store/store-utils'
+
+const fontRequests = vi.hoisted(() => new Map())
+vi.mock('@/lib/font-resources', () => ({
+  isFontPrepared: () => false,
+  getPreparedFont: (id) => ({ id, name: id, faces: [{ style: 'normal', weight: 700, axes: [] }] }),
+  prepareFont: vi.fn((id) => new Promise((resolve) => fontRequests.set(id, resolve))),
+}))
 
 function createWidgetLiveEdits(renderedContentWidth) {
   const snapshot = { activeWidgetInteraction: null, liveWidgetDrafts: {} }
@@ -23,9 +30,10 @@ function createWidgetLiveEdits(renderedContentWidth) {
 }
 
 describe('useWidgetManager alignment updates', () => {
-  test('previews spacing in drafts and commits one undoable edit while preserving label styles', () => {
+  test('preserves styles through draft edits and commits only the latest prepared font against current label state', async () => {
     const config = cloneSerializable(DEFAULT_CONFIG)
     config.labels = [{ ...createLabelDefaults(), id: 'label-spacing', letter_spacing: 0, font_weight: 537, italic: true }]
+    config.values = [{ ...createMetricValueDefaults('speed', undefined, { displayType: 'linear' }), id: 'speed-0' }]
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
     useStore.temporal.getState().clear()
     const { result } = renderHook(() => useWidgetManager({ widgetLiveEdits: useWidgetDraftState() }))
@@ -41,6 +49,28 @@ describe('useWidgetManager alignment updates', () => {
     expect(useStore.getState().config.labels[0]).toMatchObject({ letter_spacing: 0, font_weight: 537, italic: true })
     act(() => redoHistory(useStore))
     expect(useStore.getState().config.labels[0]).toMatchObject({ letter_spacing: -1.25, font_weight: 537, italic: true })
+
+    act(() => result.current.updateWidgetData('label-spacing', { font: 'Slow.ttf' }))
+    act(() => result.current.updateWidgetData('label-spacing', { font: 'Latest.ttf' }))
+    act(() => result.current.updateWidgetData('label-spacing', { font_weight: 900 }))
+    expect(useStore.getState().config.labels[0].font).not.toBe('Latest.ttf')
+    await act(async () => fontRequests.get('Latest.ttf')())
+    expect(useStore.getState().config.labels[0]).toMatchObject({ font: 'Latest.ttf', font_weight: 700, italic: false, letter_spacing: -1.25 })
+    await act(async () => fontRequests.get('Slow.ttf')())
+    expect(useStore.getState().config.labels[0].font).toBe('Latest.ttf')
+
+    act(() => result.current.updateWidgetData('speed-0', { display_variants: { linear: { min_max_label_font: 'Pending.ttf' } } }))
+    act(() => result.current.updateWidgetData('speed-0', { display_variants: { linear: { min_max_label_color: '#123456' } } }))
+    await act(async () => fontRequests.get('Pending.ttf')())
+    expect(useStore.getState().config.values[0].display_variants.linear).toMatchObject({
+      min_max_label_font: 'Pending.ttf',
+      min_max_label_color: '#123456',
+    })
+
+    act(() => result.current.updateWidgetData('label-spacing', { font: 'Obsolete.ttf' }))
+    act(() => replaceEditorDocument(useStore, useStore.getState().createNewTemplate))
+    await act(async () => fontRequests.get('Obsolete.ttf')())
+    expect(useStore.getState().config.labels).toEqual([])
   })
   beforeEach(() => {
     const config = cloneSerializable(DEFAULT_CONFIG)

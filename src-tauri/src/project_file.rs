@@ -1426,7 +1426,13 @@ mod tests {
                     .unwrap()
                     .contains("letter_spacing"));
             }
-            for weight in [Value::Null, Value::from("400"), Value::from(1001)] {
+            for weight in [
+                Value::Null,
+                Value::from("400"),
+                Value::from(1001),
+                Value::from(1000.00001),
+                Value::from(0.99999999),
+            ] {
                 let mut project: Value = serde_json::from_str(&source).unwrap();
                 project["editor"]["config"]["labels"][0]["font_weight"] = weight;
                 assert!(parse_project(&project.to_string())

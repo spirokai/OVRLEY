@@ -3,7 +3,7 @@ import { CircleGauge, Type } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { buildUniformResizeUpdate } from '@/features/overlay-editor/utils/widgetResizeScaling'
-import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
+import { useAvailableFonts } from '@/hooks/useFonts'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { ColorField, SizeSlider, SliderField } from '../widgetFormControls'
 import { useTranslation } from 'react-i18next'
@@ -12,8 +12,8 @@ import { useTranslation } from 'react-i18next'
 export default function GForceDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   const { t } = useTranslation()
   const data = useMemo(() => widget.data.display_variants.g_force, [widget.data.display_variants.g_force])
-  const updateGForce = useDisplayVariantUpdater(widget, 'g_force', data, updateWidgetData)
-  const updateGForceSize = useDisplayVariantUpdater(widget, 'g_force', data, updateWidgetSize)
+  const updateGForce = useDisplayVariantUpdater(widget, 'g_force', updateWidgetData)
+  const updateGForceSize = useDisplayVariantUpdater(widget, 'g_force', updateWidgetSize)
   const availableFonts = useAvailableFonts()
   const borderMax = Math.min(Math.floor((data.diameter - 1) / 2), 8)
 

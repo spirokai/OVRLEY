@@ -89,7 +89,7 @@ describe('OverlayLinearGaugeWidget', () => {
     )
 
     const label = screen.getByText('0')
-    expect(label).toHaveAttribute('font-family', '"Teko", "Arial Narrow", sans-serif')
+    expect(label).toHaveAttribute('font-family', '"OVRLEY Teko.ttf"')
   })
 
   test('renders the shadow as a separate layer behind the gauge body', () => {

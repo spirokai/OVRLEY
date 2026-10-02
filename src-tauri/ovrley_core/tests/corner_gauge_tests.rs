@@ -12,7 +12,6 @@ use ovrley_core::render::widgets::types::PreparedValue;
 use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
 use ovrley_core::types::{DisplayType, TrackFillStyle};
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 #[test]
 fn value_config_deserializes_corner_orientation() {
@@ -225,10 +224,7 @@ fn dense_speed_activity(speed: Vec<Option<f64>>) -> DenseActivityReport {
 }
 
 fn test_paths() -> AppPaths {
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let workspace_root = common::test_config::repo_git_root();
     AppPaths {
         repo_root: workspace_root.clone(),
         font_dirs: vec![workspace_root.join("fonts")],

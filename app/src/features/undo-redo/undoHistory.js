@@ -87,6 +87,7 @@ export function replaceEditorDocument(store, operation, ...args) {
 
   try {
     const result = operation(...args)
+    store.setState((state) => ({ editorDocumentRevision: state.editorDocumentRevision + 1 }))
     temporalState.clear()
     return result
   } finally {

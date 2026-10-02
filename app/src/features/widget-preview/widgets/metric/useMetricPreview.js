@@ -6,7 +6,6 @@ import { buildGradientTrianglePath, formatGradientValue, getGradientWidgetLayout
 import { getPreviewFontFamily, getWidgetOpacity, measurePreviewText } from '../../shared/textMeasurement'
 import { getTextShadowParts } from '../../shared/shadow'
 import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
-import { useFontMetrics } from '../../shared/useFontMetrics'
 
 function splitGradientUnitSuffix(text) {
   return text.endsWith('%') ? [text.slice(0, -1), '%'] : [text, '']
@@ -93,7 +92,6 @@ function buildMetricTextRuns({ widget, content, visualBounds, shadowFilterIds })
 export function useMetricPreviewPresentation({ widget, activity, previewSecond, globalOpacity, globalScale, metricPreviewModel, sceneStyle }) {
   // Typography: ensure font metrics are loaded before layout-dependent rendering.
   const fontFamily = getPreviewFontFamily(widget.data.font)
-  useFontMetrics([{ fontId: widget.data.font, fontSize: widget.data.font_size }])
   return useMemo(() => {
     // Shared presentation: these values apply to both metric and gradient modes.
     const widgetOpacity = getWidgetOpacity(widget.data, globalOpacity)

@@ -13,6 +13,13 @@ import { TEXT_DEFAULTS, BACKDROP_CIRCLE_DEFAULTS, BACKDROP_RECTANGLE_DEFAULTS } 
 import { getDefaultFrameDimensions, getDisplayTypeConfigDefaults } from './standard-metrics'
 import { getLeanAngleLayout } from '@/features/widget-preview/widgets/lean-angle/geometry'
 
+/** @param {object} variants Current variants. @param {object} updates Partial fields keyed by display type. @returns {object} Updated variants. */
+export function mergeDisplayVariantUpdates(variants, updates) {
+  const next = { ...variants }
+  for (const [type, fields] of Object.entries(updates)) next[type] = { ...variants?.[type], ...fields }
+  return next
+}
+
 // ---------------------------------------------------------------------------
 // Backdrop constants
 // ---------------------------------------------------------------------------

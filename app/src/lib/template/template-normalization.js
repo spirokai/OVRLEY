@@ -22,7 +22,6 @@
  */
 
 import { normalizeColorFields } from '@/lib/color-utils'
-import { migrateSavedFontIdentities } from '@/lib/fonts'
 import { ensureWidgetIdsInConfig } from '../widget/widget-config'
 import { initDisplayVariant } from '../widget/widget-resolver'
 import {
@@ -77,7 +76,6 @@ function pickDefined(source, keys) {
 export function normalizeGlobalDefaults(globalDefaults) {
   const pickedDefaults = pickDefined(cloneSerializable(globalDefaults) || {}, Object.keys(DEFAULT_GLOBAL_DEFAULTS))
   const mergedDefaults = { ...DEFAULT_GLOBAL_DEFAULTS, ...pickedDefaults }
-  migrateSavedFontIdentities(mergedDefaults)
   return normalizeColorFields(mergedDefaults)
 }
 
@@ -123,14 +121,6 @@ function normalizeScene(scene = {}) {
 
 function normalizeLabel(label = {}) {
   const pickedLabel = pickDefined(label, LABEL_KEYS)
-  pickedLabel.letter_spacing = Object.hasOwn(label, 'letter_spacing') ? label.letter_spacing : 0
-  if (!Number.isFinite(pickedLabel.letter_spacing)) throw new Error('Label letter_spacing must be a finite number')
-  pickedLabel.italic = Object.hasOwn(label, 'italic') ? label.italic : false
-  if (typeof pickedLabel.italic !== 'boolean') throw new Error('Label italic must be a boolean')
-  pickedLabel.font_weight = Object.hasOwn(label, 'font_weight') ? label.font_weight : 400
-  if (!Number.isFinite(pickedLabel.font_weight) || pickedLabel.font_weight < 1 || pickedLabel.font_weight > 1000) {
-    throw new Error('Label font_weight must be a finite number from 1 to 1000')
-  }
   return normalizeColorFields(pickedLabel)
 }
 
@@ -297,7 +287,6 @@ function normalizePlot(plot = {}, config, globalDefaults) {
 export function normalizeTemplateConfig(config, globalDefaults) {
   if (!config) throw new Error('Template config must be an object')
   const clonedConfig = cloneSerializable(config)
-  migrateSavedFontIdentities(clonedConfig)
   const nextConfig = ensureWidgetIdsInConfig(clonedConfig)
   const scene = normalizeScene(nextConfig.scene)
   const normalizedConfig = { scene, backdrops: [], rasters: [], labels: [], values: [], plots: [] }

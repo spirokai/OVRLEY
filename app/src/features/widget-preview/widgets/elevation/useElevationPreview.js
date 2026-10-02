@@ -1,7 +1,6 @@
 import { getPreviewTextBaseline, measurePreviewText } from '../../shared/textMeasurement'
 import { getTextShadowParts } from '../../shared/shadow'
 import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
-import { useFontMetrics } from '../../shared/useFontMetrics'
 import { useElevationPreviewGeometry } from './useElevationPreviewGeometry'
 import { buildElevationPreviewStyle } from './style'
 import { applyAltitudeOffset, getAltitudeCorrectionMeters, getElevationProfileSeries } from '@/lib/widget/altitude'
@@ -27,7 +26,6 @@ function getElevationLabelBaseline(top, fontSize, measurement) {
 /** Builds the preview model consumed by the elevation preview renderer. */
 export function useElevationPreview({ widget, activity, previewSecond, globalScale, sceneStyle, exportRange }) {
   const style = buildElevationPreviewStyle(widget.data, globalScale)
-  useFontMetrics([{ fontId: widget.data.point_label.font, fontSize: widget.data.point_label.font_size }])
   const geometry = useElevationPreviewGeometry({ activity, data: widget.data, exportRange, previewSecond, style })
 
   if (!geometry) return null

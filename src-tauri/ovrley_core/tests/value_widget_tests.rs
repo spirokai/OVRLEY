@@ -15,6 +15,8 @@
 //! - Non-numeric text using wrong vertical metrics (misaligned icons)
 //! - Icon placement math diverging from glyph-center anchoring
 
+mod common;
+
 use ovrley_core::render::text::MeasuredText;
 use ovrley_core::render::widgets::value::{
     gradient_triangle_height, metric_icon_top_from_value_layout, metric_vertical_metrics_text,
@@ -72,12 +74,8 @@ fn metric_icon_top_centers_on_value_glyph_box() {
 // Verifies stable numeric baseline measurement removes per-digit vertical drift.
 fn stable_numeric_vertical_metrics_keep_baseline_constant() {
     use ovrley_core::render::text::{baseline_for_text_top_with_line_height, resolve_font};
-    use std::path::PathBuf;
 
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let workspace_root = common::test_config::repo_git_root();
     let font_dirs = vec![workspace_root.join("fonts")];
     let font = resolve_font(&font_dirs, Some("JetBrains Mono.ttf"), 90.0).unwrap();
     let top = 100.0;

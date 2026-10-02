@@ -283,12 +283,7 @@ fn render_preserves_multiple_boxed_reports() {
     use ovrley_core::normalize::validate_render_config;
     use ovrley_core::paths::AppPaths;
     use ovrley_core::render::render_preview_with_report;
-    use std::path::PathBuf;
-
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let workspace_root = common::test_config::repo_git_root();
 
     let heading_tape = serde_json::from_value(full_heading_tape_config(10, 20)).unwrap();
 
@@ -378,12 +373,7 @@ fn render_reports_multiple_heading_tapes_with_identity() {
     use ovrley_core::normalize::validate_render_config;
     use ovrley_core::paths::AppPaths;
     use ovrley_core::render::render_preview_with_report;
-    use std::path::PathBuf;
-
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let workspace_root = common::test_config::repo_git_root();
 
     let heading_tape_left = serde_json::from_value(full_heading_tape_config(10, 20)).unwrap();
 

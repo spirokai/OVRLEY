@@ -11,14 +11,12 @@ import {
 import { getTextShadowParts } from '../../shared/shadow'
 import { normalizeSvgShadowColor } from '../../shared/svgPreviewUtils'
 import { getPreviewFontFamily } from '../../shared/textMeasurement'
-import { useFontMetrics } from '../../shared/useFontMetrics'
 import { formatGaugeBoundaryLabel } from '../../shared/gaugeLabelFormat'
 
 /** Builds all non-JSX state for a normalized linear-gauge preview. */
 export function useLinearGaugePreviewPresentation({ widget, activity, previewSecond, globalOpacity, sceneStyle }) {
   const maskId = useId()
   const labelFontFamily = getPreviewFontFamily(widget.data.min_max_label_font)
-  useFontMetrics([{ fontId: widget.data.min_max_label_font, fontSize: widget.data.min_max_label_font_size }])
 
   const displayActivity = getPreviewActivity(activity, previewSecond)
   const presentation = resolveMetricPresentationValues(widget, displayActivity, previewSecond)
