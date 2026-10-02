@@ -176,7 +176,20 @@
     "videoRequired": "Wymagane wideo",
     "videoResolutionMismatch": "Niezgodność rozdzielczości wideo",
     "videoResolutionMismatchMessage": "Rozdzielczość nakładki {{overlayResolution}} musi być zgodna z zaimportowanym wideo ({{videoResolution}}).",
-    "widgetUpdateRate": "Częstotliwość aktualizacji widżetów"
+    "widgetUpdateRate": "Częstotliwość aktualizacji widżetów",
+    "activityOverlay": "Nakładka aktywności",
+    "batch": "Wsadowo",
+    "currentVideo": "Bieżące wideo",
+    "lockedToEachVideoFps": "Zablokowano na FPS każdego wideo",
+    "checkingOverlap": "Sprawdzanie nakładania się...",
+    "chooseFolder": "Wybierz folder...",
+    "clearQueue": "Wyczyść kolejkę",
+    "close": "Zamknij",
+    "noVideosQueued": "Wybierz folder z filmami, aby dodać je do kolejki renderowania wsadowego.",
+    "outputFolder": "Folder wyjściowy",
+    "rendering": "Renderowanie...",
+    "startBatchRender": "Rozpocznij renderowanie wsadowe",
+    "videoFolder": "Folder z filmami"
   },
   "keyboard-shortcuts": {
     "generalCommands": "Polecenia ogólne",

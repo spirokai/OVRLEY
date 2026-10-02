@@ -52,24 +52,6 @@ fn cuda_frame_overhang(dimension: u32) -> u32 {
     (CUDA_FRAME_ALIGNMENT - dimension % CUDA_FRAME_ALIGNMENT) % CUDA_FRAME_ALIGNMENT
 }
 
-/// Chooses FFmpeg's raw-overlay input queue size from frame dimensions.
-///
-/// The queued units are raw RGBA frames, so memory cost scales with pixel area:
-/// 8K frames are large enough that FFmpeg should expose backpressure quickly.
-pub(super) fn composite_overlay_thread_queue_size(width: u32, height: u32) -> usize {
-    const FULL_HD_PIXELS: u64 = 1920 * 1080;
-    const UHD_4K_PIXELS: u64 = 3840 * 2160;
-
-    let pixels = u64::from(width) * u64::from(height);
-    if pixels <= FULL_HD_PIXELS {
-        64
-    } else if pixels <= UHD_4K_PIXELS {
-        16
-    } else {
-        4
-    }
-}
-
 /// Builds the selected profile's composite filter graph.
 ///
 /// Profile templates use `{base_video_filters}`, `{width}`, `{height}`,

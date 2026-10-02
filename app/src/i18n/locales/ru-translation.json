@@ -176,7 +176,20 @@
     "videoRequired": "Требуется видео",
     "videoResolutionMismatch": "Несоответствие разрешения видео",
     "videoResolutionMismatchMessage": "Разрешение оверлея {{overlayResolution}} должно совпадать с разрешением импортированного видео ({{videoResolution}}).",
-    "widgetUpdateRate": "Частота обновления виджетов"
+    "widgetUpdateRate": "Частота обновления виджетов",
+    "activityOverlay": "Оверлей активности",
+    "batch": "Пакет",
+    "currentVideo": "Текущее видео",
+    "lockedToEachVideoFps": "Привязано к FPS каждого видео",
+    "checkingOverlap": "Проверка пересечения...",
+    "chooseFolder": "Выбрать папку...",
+    "clearQueue": "Очистить очередь",
+    "close": "Закрыть",
+    "noVideosQueued": "Выберите папку с видео, чтобы поставить их в очередь пакетного рендеринга.",
+    "outputFolder": "Папка вывода",
+    "rendering": "Рендеринг...",
+    "startBatchRender": "Начать пакетный рендеринг",
+    "videoFolder": "Папка с видео"
   },
   "keyboard-shortcuts": {
     "generalCommands": "Общие команды",

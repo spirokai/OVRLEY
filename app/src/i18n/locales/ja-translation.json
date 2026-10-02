@@ -176,7 +176,20 @@
     "videoRequired": "動画が必要です",
     "videoResolutionMismatch": "動画の解像度が一致しません",
     "videoResolutionMismatchMessage": "オーバーレイの解像度 {{overlayResolution}} は、読み込んだ動画の解像度 ({{videoResolution}}) と一致している必要があります。",
-    "widgetUpdateRate": "ウィジェット更新頻度"
+    "widgetUpdateRate": "ウィジェット更新頻度",
+    "activityOverlay": "アクティビティオーバーレイ",
+    "batch": "一括",
+    "currentVideo": "現在の動画",
+    "lockedToEachVideoFps": "各動画のFPSに固定",
+    "checkingOverlap": "重なりを確認中...",
+    "chooseFolder": "フォルダーを選択...",
+    "clearQueue": "キューをクリア",
+    "close": "閉じる",
+    "noVideosQueued": "一括レンダリングする動画のフォルダーを選択してください。",
+    "outputFolder": "出力フォルダー",
+    "rendering": "レンダリング中...",
+    "startBatchRender": "一括レンダリングを開始",
+    "videoFolder": "動画フォルダー"
   },
   "keyboard-shortcuts": {
     "generalCommands": "一般コマンド",

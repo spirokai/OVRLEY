@@ -176,7 +176,20 @@
     "videoRequired": "Video vereist",
     "videoResolutionMismatch": "Videoresoluties komen niet overeen",
     "videoResolutionMismatchMessage": "Overlayresolutie {{overlayResolution}} moet overeenkomen met geïmporteerde video ({{videoResolution}}).",
-    "widgetUpdateRate": "Widgetupdatesnelheid"
+    "widgetUpdateRate": "Widgetupdatesnelheid",
+    "activityOverlay": "Activiteitsoverlay",
+    "batch": "Batch",
+    "currentVideo": "Huidige video",
+    "lockedToEachVideoFps": "Vergrendeld op de FPS van elke video",
+    "checkingOverlap": "Overlap controleren...",
+    "chooseFolder": "Map kiezen...",
+    "clearQueue": "Wachtrij wissen",
+    "close": "Sluiten",
+    "noVideosQueued": "Kies een videomap om video's in de wachtrij te zetten voor batchrendering.",
+    "outputFolder": "Uitvoermap",
+    "rendering": "Bezig met renderen...",
+    "startBatchRender": "Batchrendering starten",
+    "videoFolder": "Videomap"
   },
   "keyboard-shortcuts": {
     "generalCommands": "Algemene opdrachten",

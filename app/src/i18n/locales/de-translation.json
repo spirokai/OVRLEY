@@ -176,7 +176,20 @@
     "videoRequired": "Video erforderlich",
     "videoResolutionMismatch": "Abweichende Videoauflösung",
     "videoResolutionMismatchMessage": "Die Overlay-Auflösung {{overlayResolution}} muss mit dem importierten Video ({{videoResolution}}) übereinstimmen.",
-    "widgetUpdateRate": "Widget-Aktualisierungsrate"
+    "widgetUpdateRate": "Widget-Aktualisierungsrate",
+    "activityOverlay": "Aktivitäts-Overlay",
+    "batch": "Stapel",
+    "currentVideo": "Aktuelles Video",
+    "lockedToEachVideoFps": "Auf die FPS des jeweiligen Videos festgelegt",
+    "checkingOverlap": "Überschneidung wird geprüft...",
+    "chooseFolder": "Ordner auswählen...",
+    "clearQueue": "Warteschlange leeren",
+    "close": "Schließen",
+    "noVideosQueued": "Wählen Sie einen Videoordner, um Videos für das Stapel-Rendering einzureihen.",
+    "outputFolder": "Ausgabeordner",
+    "rendering": "Wird gerendert...",
+    "startBatchRender": "Stapel-Rendering starten",
+    "videoFolder": "Videoordner"
   },
   "keyboard-shortcuts": {
     "generalCommands": "Allgemeine Befehle",

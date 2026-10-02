@@ -176,7 +176,20 @@
     "videoRequired": "Vyžaduje video",
     "videoResolutionMismatch": "Neshoda rozlišení videa",
     "videoResolutionMismatchMessage": "Rozlišení grafiky ({{overlayResolution}}) se musí shodovat s rozlišením importovaného videa ({{videoResolution}}).",
-    "widgetUpdateRate": "Frekvence aktualizace widgetů"
+    "widgetUpdateRate": "Frekvence aktualizace widgetů",
+    "activityOverlay": "Grafika aktivity",
+    "batch": "Dávka",
+    "currentVideo": "Aktuální video",
+    "lockedToEachVideoFps": "Uzamčeno na snímkovou frekvenci každého videa",
+    "checkingOverlap": "Kontrola překryvu...",
+    "chooseFolder": "Vybrat složku...",
+    "clearQueue": "Vymazat frontu",
+    "close": "Zavřít",
+    "noVideosQueued": "Vyberte složku s videi a zařaďte je do fronty dávkového vykreslování.",
+    "outputFolder": "Výstupní složka",
+    "rendering": "Vykreslování...",
+    "startBatchRender": "Spustit dávkové vykreslování",
+    "videoFolder": "Složka s videi"
   },
   "keyboard-shortcuts": {
     "generalCommands": "Obecné příkazy",

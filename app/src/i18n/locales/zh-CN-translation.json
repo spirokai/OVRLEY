@@ -176,7 +176,20 @@
     "videoRequired": "需要视频",
     "videoResolutionMismatch": "视频分辨率不匹配",
     "videoResolutionMismatchMessage": "叠加层分辨率 {{overlayResolution}} 必须与导入视频的分辨率 ({{videoResolution}}) 匹配。",
-    "widgetUpdateRate": "小部件更新频率"
+    "widgetUpdateRate": "小部件更新频率",
+    "activityOverlay": "活动叠加层",
+    "batch": "批量",
+    "currentVideo": "当前视频",
+    "lockedToEachVideoFps": "锁定为每个视频的 FPS",
+    "checkingOverlap": "正在检查重叠...",
+    "chooseFolder": "选择文件夹...",
+    "clearQueue": "清空队列",
+    "close": "关闭",
+    "noVideosQueued": "选择视频文件夹，将视频加入批量渲染队列。",
+    "outputFolder": "输出文件夹",
+    "rendering": "正在渲染...",
+    "startBatchRender": "开始批量渲染",
+    "videoFolder": "视频文件夹"
   },
   "keyboard-shortcuts": {
     "generalCommands": "常规命令",

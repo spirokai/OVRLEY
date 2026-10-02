@@ -176,7 +176,20 @@
     "videoRequired": "Vidéo requise",
     "videoResolutionMismatch": "Résolution vidéo incompatible",
     "videoResolutionMismatchMessage": "La résolution de la superposition {{overlayResolution}} doit correspondre à celle de la vidéo importée ({{videoResolution}}).",
-    "widgetUpdateRate": "Fréquence de mise à jour des widgets"
+    "widgetUpdateRate": "Fréquence de mise à jour des widgets",
+    "activityOverlay": "Superposition d’activité",
+    "batch": "Lot",
+    "currentVideo": "Vidéo actuelle",
+    "lockedToEachVideoFps": "Verrouillé sur les FPS de chaque vidéo",
+    "checkingOverlap": "Vérification du chevauchement...",
+    "chooseFolder": "Choisir un dossier...",
+    "clearQueue": "Vider la file",
+    "close": "Fermer",
+    "noVideosQueued": "Choisissez un dossier de vidéos à mettre en file pour le rendu par lots.",
+    "outputFolder": "Dossier de sortie",
+    "rendering": "Rendu en cours...",
+    "startBatchRender": "Lancer le rendu par lots",
+    "videoFolder": "Dossier vidéo"
   },
   "keyboard-shortcuts": {
     "generalCommands": "Commandes générales",

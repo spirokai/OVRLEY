@@ -100,6 +100,7 @@ pub fn run() {
             file_ops::default_template_save_path,
             file_ops::read_selected_file_bytes,
             file_ops::selected_path_is_file,
+            file_ops::list_directory_video_files,
             file_ops::write_template_file,
             file_ops::write_parse_debug_file,
             project_file::default_project_directory,

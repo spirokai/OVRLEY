@@ -71,3 +71,41 @@ pub(crate) fn read_selected_file_bytes(path: String) -> Result<Vec<u8>, String> 
 pub(crate) fn selected_path_is_file(path: String) -> bool {
     PathBuf::from(path).is_file()
 }
+
+const BATCH_VIDEO_EXTENSIONS: [&str; 3] = ["mp4", "mov", "mkv"];
+
+/// Lists supported video files directly inside a directory, sorted by name.
+///
+/// Used by the batch-render folder picker — does not recurse into
+/// subdirectories.
+#[tauri::command]
+pub(crate) fn list_directory_video_files(directory: String) -> Result<Vec<String>, String> {
+    let directory = PathBuf::from(directory);
+    if !directory.is_absolute() {
+        return Err("Video directory must be an absolute path".into());
+    }
+
+    let mut paths = Vec::new();
+    for entry in std::fs::read_dir(&directory).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let path = entry.path();
+        let is_video = entry
+            .file_type()
+            .map_err(|error| error.to_string())?
+            .is_file()
+            && path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| {
+                    BATCH_VIDEO_EXTENSIONS
+                        .iter()
+                        .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+                });
+        if is_video {
+            paths.push(path.to_string_lossy().to_string());
+        }
+    }
+
+    paths.sort_by(|left, right| left.to_lowercase().cmp(&right.to_lowercase()));
+    Ok(paths)
+}

@@ -1,9 +1,10 @@
 /**
  * Renders the render video dialog portion of the application interface.
+ * Renders either the current video or, in batch mode, every video in a folder.
  * Pure presentational - all logic is in useRenderVideoDialogState.
  */
 
-import { AlertTriangle, FolderOpen, Play, Video } from 'lucide-react'
+import { AlertTriangle, FolderOpen, Loader2, Play, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -12,6 +13,7 @@ import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import BatchRenderQueue from './BatchRenderQueue'
 import ExportRangeSettings from './ExportRangeSettings'
 import RenderProgressPanel from './RenderProgressPanel'
 import useRenderVideoDialogState from '../hooks/useRenderVideoDialogState'
@@ -77,12 +79,12 @@ export default function RenderVideoDialog(props) {
         className="w-full max-w-xl rounded-sm border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
         aria-describedby={undefined}
         onEscapeKeyDown={(event) => {
-          if (ctx.isProgress || ctx.submissionPending) {
+          if (ctx.isProgress || ctx.submissionPending || ctx.batchRunning) {
             event.preventDefault()
           }
         }}
         onPointerDownOutside={(event) => {
-          if (ctx.isProgress || ctx.submissionPending) {
+          if (ctx.isProgress || ctx.submissionPending || ctx.batchRunning) {
             event.preventDefault()
           }
         }}
@@ -95,6 +97,7 @@ export default function RenderVideoDialog(props) {
         ) : hasBlockingResolutionMismatch ? (
           <div className="space-y-12 p-3">
             <DialogTitle className="sr-only">{t('render-video.videoResolutionMismatch', 'Video resolution mismatch')}</DialogTitle>
+            <RenderTargetTabs renderTarget={ctx.settings.renderTarget} onRenderTargetChange={ctx.handleRenderTargetChange} />
             <div className="space-y-8">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-10 w-10 shrink-0 text-red-500" />
@@ -139,10 +142,10 @@ export default function RenderVideoDialog(props) {
                 {ctx.showExportModeOverride ? (
                   <Tabs value={ctx.exportMode} onValueChange={ctx.handleExportModeChange}>
                     <TabsList className="h-7 bg-surface p-0.5" variant="toolbar">
-                      <TabsTrigger value="transparent" className="px-2 text-[10px]" variant="toolbar">
+                      <TabsTrigger value="transparent" className="px-2 text-[10px]" variant="toolbar" disabled={ctx.settingsLocked}>
                         {t('render-video.transparent', 'Transparent')}
                       </TabsTrigger>
-                      <TabsTrigger value="composite" className="px-2 text-[10px]" variant="toolbar">
+                      <TabsTrigger value="composite" className="px-2 text-[10px]" variant="toolbar" disabled={ctx.settingsLocked}>
                         {t('render-video.fullVideo', 'Full Video')}
                       </TabsTrigger>
                     </TabsList>
@@ -151,17 +154,25 @@ export default function RenderVideoDialog(props) {
               </div>
             </div>
 
+            <RenderTargetTabs
+              renderTarget={ctx.settings.renderTarget}
+              onRenderTargetChange={ctx.handleRenderTargetChange}
+              disabled={ctx.settingsLocked}
+            />
+
             <div className="grid gap-8 lg:grid-cols-1">
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   {t('render-video.framerate', 'Framerate')}
                 </Label>
-                {isCompositeExport && ctx.importedVideoFps ? (
+                {ctx.fpsLocked ? (
                   <div className="flex h-9 items-center rounded-sm border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground">
-                    {t('render-video.lockedToVideoFps', 'Locked to video FPS ({{fps}} fps)', { fps: Math.round(ctx.importedVideoFps) })}
+                    {ctx.isBatchTarget
+                      ? t('render-video.lockedToEachVideoFps', "Locked to each video's FPS")
+                      : t('render-video.lockedToVideoFps', 'Locked to video FPS ({{fps}} fps)', { fps: Math.round(ctx.lockedVideoFps) })}
                   </div>
                 ) : (
-                  <Select value={ctx.fpsMode} onValueChange={ctx.handleFpsModeChange}>
+                  <Select value={ctx.fpsMode} onValueChange={ctx.handleFpsModeChange} disabled={ctx.settingsLocked}>
                     <SelectTrigger className="h-9 text-xs">
                       <SelectValue />
                     </SelectTrigger>
@@ -175,7 +186,7 @@ export default function RenderVideoDialog(props) {
                 )}
               </div>
 
-              {(!isCompositeExport || !ctx.importedVideoFps) && ctx.fpsMode === 'custom' && (
+              {!ctx.fpsLocked && ctx.fpsMode === 'custom' && (
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                     {t('render-video.customFps', 'Custom FPS')}
@@ -193,6 +204,7 @@ export default function RenderVideoDialog(props) {
                     }}
                     onChange={(event) => ctx.handleCustomFpsChange(event.target.value)}
                     className="h-9 text-xs"
+                    disabled={ctx.settingsLocked}
                   />
                 </div>
               )}
@@ -211,15 +223,17 @@ export default function RenderVideoDialog(props) {
                     }}
                   >
                     {ctx.updateRateOptions.map((rate) => (
-                      <TabsTrigger key={rate} value={rate.toString()} className="text-[10px]">
+                      <TabsTrigger key={rate} value={rate.toString()} className="text-[10px]" disabled={ctx.settingsLocked}>
                         1/{rate}
                       </TabsTrigger>
                     ))}
                   </TabsList>
                 </Tabs>
-                <p className="text-[10px] text-muted-foreground">
-                  {t('render-video.outputContainerFps', 'Output container: {{fps}} fps', { fps: ctx.containerFps.toFixed(2).replace(/\.00$/, '') })}
-                </p>
+                {ctx.showContainerFps ? (
+                  <p className="text-[10px] text-muted-foreground">
+                    {t('render-video.outputContainerFps', 'Output container: {{fps}} fps', { fps: ctx.containerFps.toFixed(2).replace(/\.00$/, '') })}
+                  </p>
+                ) : null}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -227,7 +241,7 @@ export default function RenderVideoDialog(props) {
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                     {t('render-video.codecOutputFormat', 'Codec / Output Format')}
                   </Label>
-                  <Select value={ctx.selectedOutputFormatValue} onValueChange={ctx.handleOutputFormatChange}>
+                  <Select value={ctx.selectedOutputFormatValue} onValueChange={ctx.handleOutputFormatChange} disabled={ctx.settingsLocked}>
                     <SelectTrigger className="h-9 text-xs">
                       <SelectValue />
                     </SelectTrigger>
@@ -235,7 +249,7 @@ export default function RenderVideoDialog(props) {
                       <SelectGroup>
                         <SelectLabel className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest">
                           <span>{t('render-video.transparentCodecs', 'Transparent Codecs')}</span>
-                          {ctx.hasImportedVideo && (
+                          {ctx.showVideoImportedBadge && (
                             <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] normal-case tracking-normal text-primary">
                               {t('render-video.videoImported', 'Video imported')}
                             </span>
@@ -252,7 +266,7 @@ export default function RenderVideoDialog(props) {
                       <SelectGroup>
                         <SelectLabel className="mt-1 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest">
                           <span>{t('render-video.mp4Codecs', 'MP4 Codecs')}</span>
-                          {!ctx.hasImportedVideo && (
+                          {ctx.showVideoRequiredBadge && (
                             <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] normal-case tracking-normal text-primary">
                               {t('render-video.videoRequired', 'Video required')}
                             </span>
@@ -284,7 +298,7 @@ export default function RenderVideoDialog(props) {
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                     {t('render-video.hardwareAcceleration', 'Hardware Acceleration')}
                   </Label>
-                  <Select value={ctx.selectedAccelerationValue} onValueChange={ctx.handleAccelerationChange}>
+                  <Select value={ctx.selectedAccelerationValue} onValueChange={ctx.handleAccelerationChange} disabled={ctx.settingsLocked}>
                     <SelectTrigger className="h-9 text-xs">
                       <SelectValue />
                     </SelectTrigger>
@@ -322,6 +336,7 @@ export default function RenderVideoDialog(props) {
                     step={5}
                     value={[ctx.settings.exportBitrate ?? 20]}
                     onValueChange={([value]) => ctx.onSettingsChange({ exportBitrate: value })}
+                    disabled={ctx.settingsLocked}
                   />
                 </div>
               )}
@@ -335,56 +350,109 @@ export default function RenderVideoDialog(props) {
                 />
               )}
 
-              <div className="space-y-2 pt-4">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  {t('render-video.outputFile', 'Output file')}
-                </Label>
-                <ButtonGroup className="w-full">
-                  <BlurInput
-                    value={ctx.settings.outputPath}
-                    onBlur={(event) => ctx.handleOutputPathCommit(event.target.value)}
-                    className="h-9 min-w-0 flex-1 text-xs"
-                    aria-label={t('render-video.outputPath', 'Output path')}
-                  />
+              {ctx.isBatchTarget ? (
+                <BatchRenderQueue {...ctx} />
+              ) : (
+                <div className="space-y-2 pt-4">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    {t('render-video.outputFile', 'Output file')}
+                  </Label>
+                  <ButtonGroup className="w-full">
+                    <BlurInput
+                      value={ctx.settings.outputPath}
+                      onBlur={(event) => ctx.handleOutputPathCommit(event.target.value)}
+                      className="h-9 min-w-0 flex-1 text-xs"
+                      aria-label={t('render-video.outputPath', 'Output path')}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
+                      onClick={ctx.handleBrowse}
+                      disabled={ctx.submissionPending}
+                    >
+                      <FolderOpen className="h-4 w-4" />
+                    </Button>
+                  </ButtonGroup>
+                  {ctx.outputPathError ? <p className="text-xs text-red-500">{ctx.outputPathError}</p> : null}
+                </div>
+              )}
+            </div>
+
+            {ctx.isBatchTarget ? (
+              <div className="flex items-center justify-between gap-3 pt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
+                  onClick={ctx.clearBatchQueue}
+                  disabled={ctx.batchRunning || ctx.batchQueue.length === 0}
+                >
+                  {t('render-video.clearQueue', 'Clear queue')}
+                </Button>
+                <div className="flex items-center gap-3">
                   <Button
                     type="button"
                     variant="outline"
                     className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
-                    onClick={ctx.handleBrowse}
-                    disabled={ctx.submissionPending}
+                    onClick={ctx.batchRunning ? ctx.cancelBatch : ctx.onClose}
                   >
-                    <FolderOpen className="h-4 w-4" />
+                    {ctx.batchRunning ? t('render-video.cancel', 'Cancel') : t('render-video.close', 'Close')}
                   </Button>
-                </ButtonGroup>
-                {ctx.outputPathError ? <p className="text-xs text-red-500">{ctx.outputPathError}</p> : null}
+                  <Button
+                    type="button"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    onClick={ctx.runBatch}
+                    disabled={ctx.batchStartDisabled}
+                  >
+                    {ctx.batchRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                    {ctx.batchRunning ? t('render-video.rendering', 'Rendering...') : t('render-video.startBatchRender', 'Start Batch Render')}
+                  </Button>
+                </div>
               </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-6">
-              <Button
-                type="button"
-                variant="outline"
-                className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
-                onClick={ctx.onClose}
-                disabled={ctx.renderingVideo || ctx.submissionPending}
-              >
-                {t('render-video.cancel', 'Cancel')}
-              </Button>
-              <Button
-                type="button"
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={ctx.onConfirm}
-                disabled={ctx.renderStartDisabled}
-              >
-                <Play className="h-4 w-4" />
-                {t('render-video.startRender', 'Start Render')}
-              </Button>
-            </div>
+            ) : (
+              <div className="flex items-center justify-end gap-3 pt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
+                  onClick={ctx.onClose}
+                  disabled={ctx.renderingVideo || ctx.submissionPending}
+                >
+                  {t('render-video.cancel', 'Cancel')}
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  onClick={ctx.onConfirm}
+                  disabled={ctx.renderStartDisabled}
+                >
+                  <Play className="h-4 w-4" />
+                  {t('render-video.startRender', 'Start Render')}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </DialogContent>
       <OverwriteConfirmDialog {...ctx} />
     </Dialog>
+  )
+}
+
+function RenderTargetTabs({ renderTarget, onRenderTargetChange, disabled = false }) {
+  const { t } = useTranslation()
+  return (
+    <Tabs value={renderTarget} onValueChange={onRenderTargetChange}>
+      <TabsList className="grid h-8 w-full grid-cols-2 bg-surface p-0.5">
+        <TabsTrigger value="current" className="text-[10px]" disabled={disabled}>
+          {t('render-video.currentVideo', 'Current video')}
+        </TabsTrigger>
+        <TabsTrigger value="batch" className="text-[10px]" disabled={disabled}>
+          {t('render-video.batch', 'Batch')}
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
   )
 }
 

@@ -176,7 +176,20 @@
     "videoRequired": "Video gerekli",
     "videoResolutionMismatch": "Video çözünürlüğü eşleşmiyor",
     "videoResolutionMismatchMessage": "Kaplama çözünürlüğü {{overlayResolution}}, içe aktarılan videonun çözünürlüğüyle ({{videoResolution}}) eşleşmelidir.",
-    "widgetUpdateRate": "Widget güncelleme hızı"
+    "widgetUpdateRate": "Widget güncelleme hızı",
+    "activityOverlay": "Etkinlik kaplaması",
+    "batch": "Toplu",
+    "currentVideo": "Geçerli video",
+    "lockedToEachVideoFps": "Her videonun FPS değerine kilitli",
+    "checkingOverlap": "Çakışma kontrol ediliyor...",
+    "chooseFolder": "Klasör seç...",
+    "clearQueue": "Kuyruğu temizle",
+    "close": "Kapat",
+    "noVideosQueued": "Toplu işleme için videoları sıraya almak üzere bir video klasörü seçin.",
+    "outputFolder": "Çıktı klasörü",
+    "rendering": "İşleniyor...",
+    "startBatchRender": "Toplu işlemeyi başlat",
+    "videoFolder": "Video klasörü"
   },
   "keyboard-shortcuts": {
     "generalCommands": "Genel komutlar",
