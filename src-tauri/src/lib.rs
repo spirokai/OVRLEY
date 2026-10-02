@@ -74,6 +74,8 @@ pub fn run() {
             tauri_commands::backend_distribution_kind,
             tauri_commands::backend_open_hevc_support,
             tauri_commands::backend_list_system_fonts,
+            tauri_commands::backend_font_capabilities,
+            tauri_commands::backend_font_data,
             tauri_commands::backend_render,
             tauri_commands::backend_finalize_activity,
             tauri_commands::backend_parse_csv_activity,

@@ -20,6 +20,58 @@ beforeEach(() => {
   vi.resetAllMocks()
 })
 
+describe('label font weight at template load', () => {
+  test('rejects malformed present spacing rather than migrating it', () => {
+    for (const letter_spacing of ['0', null, undefined, NaN, Infinity, -Infinity]) {
+      expect(() => normalizeTemplateConfig({ scene: {}, rasters: [], labels: [{ text: 'Title', letter_spacing }] })).toThrow('letter_spacing')
+    }
+  })
+  test('rejects malformed present italic values rather than migrating them', () => {
+    for (const italic of ['true', null, 0, 1, undefined]) {
+      expect(() => normalizeTemplateConfig({ scene: {}, rasters: [], labels: [{ text: 'Title', italic }] })).toThrow('italic')
+    }
+  })
+  test('rejects malformed present weights rather than migrating them', () => {
+    for (const font_weight of ['400', null, 0, 1001, NaN]) {
+      expect(() => normalizeTemplateConfig({ scene: {}, rasters: [], labels: [{ text: 'Title', font_weight }] })).toThrow('font_weight')
+    }
+  })
+
+  test('migrates legacy templates in memory and preserves explicit weights through save/load', () => {
+    for (const version of [2, 3]) {
+      const source = {
+        format: TEMPLATE_FILE_FORMAT,
+        version,
+        config: {
+          scene: {},
+          labels: [
+            { id: 'title', text: 'Title', font: 'Teko.ttf', font_size: 60 },
+            { id: 'subtitle', text: 'Subtitle', font: 'Inter ExtraBold.ttf', font_weight: 537, italic: true, letter_spacing: -1.25 },
+            { id: 'upright', text: 'Upright', italic: false },
+          ],
+          values: [],
+          plots: [],
+        },
+        settings: { globalDefaults: { font_text: 'Inter ExtraBold.ttf' } },
+      }
+      if (version === 3) source.config.rasters = []
+      const loaded = normalizeTemplateFilePayload(source)
+      expect(loaded.config.labels[0].font_weight).toBe(400)
+      expect(loaded.config.labels[0].italic).toBe(false)
+      expect(loaded.config.labels[0].letter_spacing).toBe(0)
+      expect(loaded.config.labels[1]).toMatchObject({ font: 'Inter.ttf', font_weight: 537, italic: true, letter_spacing: -1.25 })
+      expect(loaded.config.labels[2].italic).toBe(false)
+      expect(loaded.settings.globalDefaults.font_text).toBe('Inter.ttf')
+      expect(source.config.labels[0]).not.toHaveProperty('font_weight')
+      expect(source.config.labels[0]).not.toHaveProperty('italic')
+      expect(source.config.labels[0]).not.toHaveProperty('letter_spacing')
+      expect(source.config.labels[1].font).toBe('Inter ExtraBold.ttf')
+      const saved = createTemplateFilePayload({ config: loaded.config, globalDefaults: loaded.settings.globalDefaults })
+      expect(normalizeTemplateFilePayload(saved)).toEqual(loaded)
+    }
+  })
+})
+
 describe('template snapshot standard metric schema', () => {
   test('creates standard metric defaults with display_unit as the canonical unit field', () => {
     const speedDefaults = createMetricValueDefaults('speed')

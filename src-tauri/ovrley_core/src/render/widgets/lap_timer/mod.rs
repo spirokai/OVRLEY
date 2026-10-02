@@ -64,6 +64,9 @@ mod tests {
     #[test]
     fn prepares_best_lap_text_as_a_positioned_widget_local_layer() {
         let style = ResolvedTextStyle {
+            font_weight: 400.0,
+            italic: false,
+            letter_spacing: 0.0,
             x: 900.0,
             y: 500.0,
             font_name: None,

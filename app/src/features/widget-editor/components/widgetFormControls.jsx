@@ -288,6 +288,7 @@ export function SliderField({
       <div className="flex items-center gap-3 px-1">
         <Slider
           dir={dir}
+          aria-label={label}
           min={min}
           max={max}
           step={step}

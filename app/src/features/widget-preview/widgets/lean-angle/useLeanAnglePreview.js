@@ -19,7 +19,7 @@ const GUIDE_OPACITY = 0.4
 export function useLeanAnglePreview({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle }) {
   const maskId = useId()
   const fontFamily = getPreviewFontFamily(widget.data.font)
-  useFontMetrics([{ fontFamily, fontSize: widget.data.font_size }])
+  useFontMetrics([{ fontId: widget.data.font, fontSize: widget.data.font_size }])
 
   return useMemo(() => {
     const layout = getLeanAngleLayout({

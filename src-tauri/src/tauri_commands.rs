@@ -126,9 +126,30 @@ pub(crate) async fn backend_open_hevc_support() -> Result<(), String> {
 /// Lists bundled and system fonts available to the backend renderer.
 #[tauri::command]
 pub(crate) async fn backend_list_system_fonts(app: AppHandle) -> Result<String, String> {
-    serialize_command_result(&commands::backend_list_system_fonts(
+    call_and_serialize(commands::backend_list_system_fonts(
         &runtime_paths::app_paths(&app)?,
     ))
+}
+
+#[tauri::command]
+pub(crate) async fn backend_font_capabilities(
+    app: AppHandle,
+    font_id: String,
+) -> Result<String, String> {
+    call_and_serialize(commands::backend_font_capabilities(
+        &runtime_paths::app_paths(&app)?,
+        &font_id,
+    ))
+}
+
+#[tauri::command]
+pub(crate) async fn backend_font_data(
+    app: AppHandle,
+    font_id: String,
+    face_index: usize,
+) -> Result<Vec<u8>, String> {
+    commands::backend_font_data(&runtime_paths::app_paths(&app)?, &font_id, face_index)
+        .map_err(|error| error.to_string())
 }
 
 /// Starts an overlay video render from serialized scene config and activity data.

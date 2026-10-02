@@ -12,20 +12,16 @@
  * @returns {JSX.Element} SVG element for text widget preview.
  */
 
-import { buildTextWidgetPreviewModel } from './model'
-import { getPreviewFontFamily, getWidgetOpacity } from '../../shared/textMeasurement'
-import { getTextShadowParts } from '../../shared/shadow'
+import { useTextPreview } from './useTextPreview'
 import { PreviewSvgText } from '../../shared/PreviewSvgComponents'
-import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
-import { useFontMetrics } from '../../shared/useFontMetrics'
 
 export function OverlayTextWidget({ widget, globalOpacity, sceneStyle, textPreviewModel }) {
-  const fontSize = widget.data.font_size
-  const fontFamily = getPreviewFontFamily(widget.data.font)
-  useFontMetrics([{ fontFamily, fontSize }])
-  const opacity = getWidgetOpacity(widget.data, globalOpacity)
-  const shadow = getTextShadowParts(sceneStyle)
-  const previewModel = textPreviewModel ?? buildTextWidgetPreviewModel({ widget })
+  const { fontSize, fontFamily, opacity, shadow, shadowFilterId, previewModel } = useTextPreview({
+    widget,
+    globalOpacity,
+    sceneStyle,
+    textPreviewModel,
+  })
   const visualBounds = previewModel.visualBounds
 
   return (
@@ -37,14 +33,18 @@ export function OverlayTextWidget({ widget, globalOpacity, sceneStyle, textPrevi
     >
       <PreviewSvgText
         text={previewModel.text}
+        textRuns={previewModel.measurement.runs}
+        preserveWhitespace
         x={visualBounds.offsetX}
         baseline={previewModel.baseline + visualBounds.offsetY}
         color={widget.data.color}
         fontFamily={fontFamily}
         fontSize={fontSize}
+        fontWeight={previewModel.fontWeight}
+        fontStyle={previewModel.fontStyle}
         opacity={opacity}
         shadow={shadow}
-        shadowFilterId={sanitizeSvgId(`${widget.id}-label-shadow`)}
+        shadowFilterId={shadowFilterId}
         borderColor={sceneStyle?.border_color}
         borderThickness={sceneStyle?.border_thickness}
         textTransform="none"

@@ -501,7 +501,7 @@ fn rejects_new_display_variants_on_the_wrong_metric() {
 }
 
 #[test]
-fn rejects_older_template_versions_explicitly() {
+fn rejects_unsupported_template_versions_explicitly() {
     let error = validate_template_contents(&format!(
         r#"{{
             "format": "ovrley-template",
@@ -517,14 +517,14 @@ fn rejects_older_template_versions_explicitly() {
                 "plots": []
             }}
         }}"#,
-        TEMPLATE_FILE_VERSION - 1
+        TEMPLATE_FILE_VERSION - 2
     ))
     .unwrap_err();
 
     assert!(
         error.to_string().contains(&format!(
             "unsupported template version: {}. expected {}",
-            TEMPLATE_FILE_VERSION - 1,
+            TEMPLATE_FILE_VERSION - 2,
             TEMPLATE_FILE_VERSION
         )),
         "got: '{error}'"

@@ -32,7 +32,7 @@ import { useFontMetrics } from '../../shared/useFontMetrics'
 export function useHeadingPreviewModel({ widget, activity, previewSecond, globalOpacity, globalScale, sceneFont, valueFont, sceneStyle }) {
   // Typography: heading labels need font metrics ready before the tape is drawn.
   const labelFontFamily = getPreviewFontFamily(widget.data.label_font ?? valueFont ?? sceneFont)
-  useFontMetrics([{ fontFamily: labelFontFamily, fontSize: widget.data.label_font_size }])
+  useFontMetrics([{ fontId: widget.data.label_font ?? valueFont ?? sceneFont, fontSize: widget.data.label_font_size }])
 
   return useMemo(() => {
     // Viewport and opacity: boxed heading widgets guarantee geometry; clamp only invalid transient values.

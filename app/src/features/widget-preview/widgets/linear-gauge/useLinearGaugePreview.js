@@ -18,7 +18,7 @@ import { formatGaugeBoundaryLabel } from '../../shared/gaugeLabelFormat'
 export function useLinearGaugePreviewPresentation({ widget, activity, previewSecond, globalOpacity, sceneStyle }) {
   const maskId = useId()
   const labelFontFamily = getPreviewFontFamily(widget.data.min_max_label_font)
-  useFontMetrics([{ fontFamily: labelFontFamily, fontSize: widget.data.min_max_label_font_size }])
+  useFontMetrics([{ fontId: widget.data.min_max_label_font, fontSize: widget.data.min_max_label_font_size }])
 
   const displayActivity = getPreviewActivity(activity, previewSecond)
   const presentation = resolveMetricPresentationValues(widget, displayActivity, previewSecond)

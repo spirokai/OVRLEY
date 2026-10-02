@@ -2835,6 +2835,7 @@ dependencies = [
  "telemetry-parser",
  "thiserror 2.0.17",
  "tzf-rs",
+ "unicode-segmentation",
 ]
 
 [[package]]

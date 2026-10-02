@@ -3,7 +3,7 @@ import { buildMetricWidgetPreviewModel } from '@/features/widget-preview/widgets
 import { buildLapTimerPreviewModel, prepareLapLogPreview } from '@/features/widget-preview/widgets/lap-timer/model'
 import { buildTextWidgetPreviewModel } from '@/features/widget-preview/widgets/text/model'
 import { isBoxedDisplayType } from '@/lib/widget/standard-metrics'
-import { getPreviewFontFamily } from '@/features/widget-preview/shared/textMeasurement'
+import { WIDGET_FONT_WEIGHT } from '@/lib/widget/standard-widgets'
 import { useFontMetrics } from '@/features/widget-preview/shared/useFontMetrics'
 
 const EMPTY_PREVIEW_MODELS = {}
@@ -43,7 +43,12 @@ function buildFontRequests(renderedWidgets) {
       (widget) =>
         widget.category === 'labels' || (widget.category === 'values' && widget.type !== 'gradient' && !isBoxedDisplayType(widget.data.display_type)),
     )
-    .map((widget) => ({ fontFamily: getPreviewFontFamily(widget.data.font), fontSize: widget.data.font_size }))
+    .map((widget) => ({
+      fontId: widget.data.font,
+      fontSize: widget.data.font_size,
+      fontWeight: widget.category === 'labels' ? widget.data.font_weight : WIDGET_FONT_WEIGHT,
+      italic: widget.category === 'labels' ? widget.data.italic : false,
+    }))
 }
 
 /**

@@ -14,6 +14,37 @@ use crate::types::{BackdropType, DisplayType, MetricKind, TrackFillStyle};
 pub const TEMPLATE_FILE_FORMAT: &str = "ovrley-template";
 pub const TEMPLATE_FILE_VERSION: u32 = 3;
 
+fn deserialize_font_weight<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<f32, D::Error> {
+    let weight = f32::deserialize(deserializer)
+        .map_err(|error| serde::de::Error::custom(format!("font_weight: {error}")))?;
+    if !weight.is_finite() || !(1.0..=1000.0).contains(&weight) {
+        return Err(serde::de::Error::custom(
+            "font_weight: must be a finite number from 1 to 1000",
+        ));
+    }
+    Ok(weight)
+}
+
+fn deserialize_italic<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
+    bool::deserialize(deserializer)
+        .map_err(|error| serde::de::Error::custom(format!("italic: {error}")))
+}
+
+fn deserialize_letter_spacing<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<f32, D::Error> {
+    let spacing = f32::deserialize(deserializer)
+        .map_err(|error| serde::de::Error::custom(format!("letter_spacing: {error}")))?;
+    if !spacing.is_finite() {
+        return Err(serde::de::Error::custom(
+            "letter_spacing: must be a finite number",
+        ));
+    }
+    Ok(spacing)
+}
+
 /// Global render settings shared by labels, metric values, plots, and ffmpeg.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SceneConfig {
@@ -95,6 +126,13 @@ pub struct LabelConfig {
     pub font_family: Option<String>,
     #[serde(default)]
     pub font_size: Option<f32>,
+    #[serde(deserialize_with = "deserialize_font_weight")]
+    pub font_weight: f32,
+    #[serde(deserialize_with = "deserialize_italic")]
+    pub italic: bool,
+    #[serde(deserialize_with = "deserialize_letter_spacing")]
+    /// Percentage of the label's font size, converted to pixels during layout.
+    pub letter_spacing: f32,
     #[serde(default)]
     pub color: Option<String>,
     #[serde(default)]
@@ -895,24 +933,114 @@ pub fn parse_template_value(value: &Value) -> CoreResult<RenderConfig> {
         return Err(CoreError::Config("template version missing".into()));
     };
 
-    if version != u64::from(TEMPLATE_FILE_VERSION) {
+    if version != 2 && version != u64::from(TEMPLATE_FILE_VERSION) {
         return Err(CoreError::Config(format!(
             "unsupported template version: {version}. expected {TEMPLATE_FILE_VERSION}"
         )));
     }
 
-    let mut config_value = value
+    let mut migrated = value.clone();
+    migrate_saved_font_input(&mut migrated);
+    let mut config_value = migrated
         .get("config")
         .cloned()
         .ok_or_else(|| CoreError::Config("template config missing".into()))?;
+    if version == 2 {
+        let config = config_value
+            .as_object_mut()
+            .ok_or_else(|| CoreError::Config("template config must be an object".into()))?;
+        if config.contains_key("rasters") {
+            return Err(CoreError::Config(
+                "version 2 template cannot contain rasters".into(),
+            ));
+        }
+        config.insert("rasters".into(), Value::Array(Vec::new()));
+    }
     config_value
         .get("rasters")
         .and_then(Value::as_array)
         .ok_or_else(|| CoreError::Config("template config.rasters must be an array".into()))?;
-    materialize_template_scene_defaults(&mut config_value, value);
+    materialize_template_scene_defaults(&mut config_value, &migrated);
     let mut config = parse_config_value(&config_value)?;
-    apply_template_global_defaults(&mut config, &value);
+    apply_template_global_defaults(&mut config, &migrated);
     Ok(config)
+}
+
+/// Upgrades legacy saved documents in memory, including development v3 files.
+/// Present typography values are preserved; validation belongs to the load boundary.
+pub fn migrate_saved_font_input(value: &mut Value) {
+    match value {
+        Value::Object(object) => {
+            if let Some(labels) = object.get_mut("labels").and_then(Value::as_array_mut) {
+                for label in labels {
+                    if let Some(label) = label.as_object_mut() {
+                        label.entry("font_weight").or_insert(Value::from(400));
+                        label.entry("italic").or_insert(Value::Bool(false));
+                        label.entry("letter_spacing").or_insert(Value::from(0));
+                    }
+                }
+            }
+            for (key, value) in object {
+                match (key.as_str(), value.as_str()) {
+                    (
+                        "font" | "label_font" | "min_max_label_font" | "font_text" | "font_values",
+                        Some("Inter ExtraBold.ttf" | "Inter ExtraBold"),
+                    ) => *value = Value::from("Inter.ttf"),
+                    ("font_family", Some("Inter ExtraBold")) => *value = Value::from("Inter"),
+                    _ => migrate_saved_font_input(value),
+                }
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                migrate_saved_font_input(item);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Validates project-owned label typography once at its JSON load boundary.
+pub fn validate_saved_label_typography(config: &Value) -> CoreResult<()> {
+    let labels = config
+        .get("labels")
+        .and_then(Value::as_array)
+        .ok_or_else(|| CoreError::Config("labels must be an array".into()))?;
+    for (index, label) in labels.iter().enumerate() {
+        let spacing = label
+            .get("letter_spacing")
+            .and_then(Value::as_f64)
+            .ok_or_else(|| {
+                CoreError::Config(format!(
+                    "labels[{index}].letter_spacing: required numeric field"
+                ))
+            })?;
+        if !(spacing as f32).is_finite() {
+            return Err(CoreError::Config(format!(
+                "labels[{index}].letter_spacing: must be a finite number"
+            )));
+        }
+        label
+            .get("italic")
+            .and_then(Value::as_bool)
+            .ok_or_else(|| {
+                CoreError::Config(format!("labels[{index}].italic: required boolean field"))
+            })?;
+        let weight = label
+            .get("font_weight")
+            .and_then(Value::as_f64)
+            .ok_or_else(|| {
+                CoreError::Config(format!(
+                    "labels[{index}].font_weight: required numeric field"
+                ))
+            })?;
+        if !weight.is_finite() || !(1.0..=1000.0).contains(&weight) {
+            return Err(CoreError::Config(format!(
+                "labels[{index}].font_weight: must be a finite number from 1 to 1000"
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn materialize_template_scene_defaults(config: &mut Value, template: &Value) {

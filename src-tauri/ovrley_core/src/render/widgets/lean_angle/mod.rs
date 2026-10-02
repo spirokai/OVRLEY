@@ -21,6 +21,7 @@ use crate::render::widgets::value::{
     METRIC_WIDGET_UNIT_RATIO, MIN_UNITS_FONT_SIZE,
 };
 use crate::standard_metrics::standard_metric_unit_label;
+use crate::standard_widgets::widget_font_weight;
 use crate::types::MetricKind;
 use skia_safe::{
     image_filters, paint::Style, BlendMode, Canvas, ClipOp, Paint, Path, PathBuilder, PathFillType,
@@ -322,6 +323,9 @@ fn draw_lean_angle_value(
     let unit_line_height = unit_font_size * METRIC_WIDGET_LINE_HEIGHT;
 
     let value_style = ResolvedTextStyle {
+        font_weight: widget_font_weight(),
+        italic: false,
+        letter_spacing: 0.0,
         x: 0.0,
         y: 0.0,
         font_name: Some(cache.font.clone()),

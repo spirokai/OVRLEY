@@ -40,11 +40,10 @@ function getLabelLayout(layout, minLabel, maxLabel, fontFamily, fontSize) {
  * @returns {object} Presentation model consumed by the gauge renderer.
  */
 export function useArcGaugePreviewPresentation({ widget, activity, previewSecond, globalOpacity, sceneStyle }) {
-  const valueFontFamily = getPreviewFontFamily(widget.data.font)
   const labelFontFamily = getPreviewFontFamily(widget.data.min_max_label_font)
   useFontMetrics([
-    { fontFamily: valueFontFamily, fontSize: widget.data.font_size },
-    { fontFamily: labelFontFamily, fontSize: widget.data.min_max_label_font_size },
+    { fontId: widget.data.font, fontSize: widget.data.font_size },
+    { fontId: widget.data.min_max_label_font, fontSize: widget.data.min_max_label_font_size },
   ])
 
   return useMemo(() => {

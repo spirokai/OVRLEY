@@ -3,12 +3,13 @@
  * Each section is a reusable UI block (Position, Dimensions, Font, Icon, Units).
  */
 
-import { Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
+import { Italic, Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { ColorField, ContentAlignmentControl, NumberField, SelectField, SizeSlider, SliderField, TextField, ToggleField } from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
-import { createFontSelection } from '@/lib/fonts'
+import useLabelTypography from '../hooks/useLabelTypography'
 import { getWidgetFont } from '../utils/widgetUtils'
 import { getThemeColor } from '@/lib/theme'
 import { useTranslation } from 'react-i18next'
@@ -122,6 +123,7 @@ export function FontSection({
   const { t } = useTranslation()
   const fontSize = widget.data.font_size
   const availableFonts = useAvailableFonts()
+  const typography = useLabelTypography(widget, updateWidgetData)
 
   return (
     <div className="space-y-4">
@@ -131,7 +133,19 @@ export function FontSection({
         titleKey="widget-editor.typography"
         defaultTitle="Typography"
         trailing={
-          showContentAlignment ? (
+          widget.category === 'labels' ? (
+            <ToggleGroup size="compact" type="multiple" value={typography.italic ? ['italic'] : []} onValueChange={typography.changeItalic}>
+              <ToggleGroupItem
+                value="italic"
+                size="compact"
+                disabled={!typography.italicSupported}
+                aria-label={t('widget-editor.italic', 'Italic')}
+                title={t('widget-editor.italic', 'Italic')}
+              >
+                <Italic />
+              </ToggleGroupItem>
+            </ToggleGroup>
+          ) : showContentAlignment ? (
             <ContentAlignmentControl
               value={widget.data.content_alignment}
               onValueChange={(value) => updateWidgetData(widget.id, { content_alignment: value })}
@@ -162,7 +176,7 @@ export function FontSection({
         <FontSelectField
           label={t('widget-editor.fontFamily', 'Font Family')}
           value={getWidgetFont(widget)}
-          onValueChange={(value) => updateWidgetData(widget.id, createFontSelection(value))}
+          onValueChange={typography.changeFont}
           recommendedFonts={availableFonts.recommendedFonts}
           systemFonts={availableFonts.systemFonts}
           triggerClassName="h-9 border-border/70 bg-surface text-xs"
@@ -176,6 +190,38 @@ export function FontSection({
           onChange={(value) => updateWidgetData(widget.id, { color: value })}
         />
       </div>
+      <div className="grid grid-cols-2 gap-4 items-end pt-2">
+        {widget.category === 'labels' && typography.font ? (
+          <SizeSlider
+            label={t('widget-editor.fontWeight', 'Font Weight')}
+            value={typography.weight}
+            min={typography.weightAxis?.min ?? 1}
+            max={typography.weightAxis?.max ?? 1000}
+            disabled={!typography.weightAxis}
+            step={100}
+            valueDisplay={String(typography.weight)}
+            onChange={(value) => updateWidgetSize(widget.id, { font_weight: value })}
+            onCommit={() => commitWidgetSize(widget.id)}
+          />
+        ) : null}
+        {widget.category === 'labels' ? (
+          <SliderField
+            label={t('widget-editor.letterSpacing', 'Letter Spacing')}
+            value={widget.data.letter_spacing}
+            min={-35}
+            max={35}
+            step={0.5}
+            valueDisplay={`${widget.data.letter_spacing.toFixed(1)}%`}
+            onSliderChange={(value) => updateWidgetSize(widget.id, { letter_spacing: value })}
+            onSliderCommit={() => commitWidgetSize(widget.id)}
+          />
+        ) : null}
+      </div>
+      {typography.error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {typography.error.message}
+        </p>
+      ) : null}
     </div>
   )
 }

@@ -27,7 +27,7 @@ function getElevationLabelBaseline(top, fontSize, measurement) {
 /** Builds the preview model consumed by the elevation preview renderer. */
 export function useElevationPreview({ widget, activity, previewSecond, globalScale, sceneStyle, exportRange }) {
   const style = buildElevationPreviewStyle(widget.data, globalScale)
-  useFontMetrics([{ fontFamily: style.labelFontFamily, fontSize: widget.data.point_label.font_size }])
+  useFontMetrics([{ fontId: widget.data.point_label.font, fontSize: widget.data.point_label.font_size }])
   const geometry = useElevationPreviewGeometry({ activity, data: widget.data, exportRange, previewSecond, style })
 
   if (!geometry) return null

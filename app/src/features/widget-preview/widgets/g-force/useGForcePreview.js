@@ -20,7 +20,7 @@ const GUIDE_RING_RADIUS_RATIOS = [0.33, 0.66]
 /** Builds the complete SVG presentation model for the current G-force frame. */
 export function useGForcePreviewModel({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle }) {
   const fontFamily = getPreviewFontFamily(widget.data.label_font)
-  const fontMetricsVersion = useFontMetrics([{ fontFamily, fontSize: widget.data.label_font_size }])
+  const fontMetricsVersion = useFontMetrics([{ fontId: widget.data.label_font, fontSize: widget.data.label_font_size }])
   const config = widget.data
   const { axis_horizontal, axis_vertical, clip_percentile, invert_horizontal, invert_vertical } = config
   const prepared = useMemo(

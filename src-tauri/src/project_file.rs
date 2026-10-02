@@ -624,6 +624,8 @@ fn validate_manual_video_sync(manual: &ProjectManualVideoSync) -> Result<(), Str
 }
 
 fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
+    ovrley_core::normalize::raw::validate_saved_label_typography(&editor.config)
+        .map_err(|error| error.to_string())?;
     let globals = &editor.global_defaults;
     for (label, value) in [
         (
@@ -678,7 +680,8 @@ fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
     Ok(())
 }
 
-fn migrate_project(version: u32, value: Value) -> Result<ProjectDocument, String> {
+fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, String> {
+    ovrley_core::normalize::raw::migrate_saved_font_input(&mut value);
     let mut legacy = match version {
         PROJECT_VERSION_V1 => {
             let project: ProjectDocumentV1 = serde_json::from_value(value)
@@ -1328,6 +1331,118 @@ mod tests {
         render.remove("qualityValue");
         render.insert("bitrateMbps".into(), Value::Null);
         project.to_string()
+    }
+
+    #[test]
+    fn label_typography_migrates_on_read_and_persists_on_save_without_rewriting_archives() {
+        let directory =
+            std::env::temp_dir().join(format!("ovrley-font-project-{}", Uuid::new_v4()));
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("weight.oly");
+        let resources = RasterResources::default();
+        for source in [
+            valid_v1_project_json(),
+            valid_v2_project_json(),
+            valid_project_json(),
+        ] {
+            for weight in [None, Some(537)] {
+                for italic in [None, Some(false), Some(true)] {
+                    let mut project: Value = serde_json::from_str(&source).unwrap();
+                    let label = project["editor"]["config"]["labels"][0]
+                        .as_object_mut()
+                        .unwrap();
+                    label.remove("font_weight");
+                    if let Some(weight) = weight {
+                        label.insert("font_weight".into(), Value::from(weight));
+                    }
+                    label.remove("italic");
+                    if let Some(italic) = italic {
+                        label.insert("italic".into(), Value::Bool(italic));
+                    }
+                    label.remove("letter_spacing");
+                    let spacing = italic.map(|italic| if italic { -1.25 } else { 0.0 });
+                    if let Some(spacing) = spacing {
+                        label.insert("letter_spacing".into(), Value::from(spacing));
+                    }
+                    label.insert("font".into(), Value::from("Inter ExtraBold.ttf"));
+                    project["editor"]["globalDefaults"]["font_text"] =
+                        Value::from("Inter ExtraBold.ttf");
+                    write_archive(&path, &project.to_string(), None, &BTreeMap::new()).unwrap();
+                    let original = fs::read(&path).unwrap();
+                    let loaded = read_project_file_sync(&resources, path_string(path.clone()))
+                        .unwrap()
+                        .project;
+                    assert_eq!(loaded.version, 3);
+                    assert_eq!(
+                        loaded.editor.config["labels"][0]["letter_spacing"],
+                        spacing.unwrap_or(0.0)
+                    );
+                    assert_eq!(
+                        loaded.editor.config["labels"][0]["italic"],
+                        italic.unwrap_or(false)
+                    );
+                    assert_eq!(
+                        loaded.editor.config["labels"][0]["font_weight"],
+                        weight.unwrap_or(400)
+                    );
+                    assert_eq!(loaded.editor.config["labels"][0]["font"], "Inter.ttf");
+                    assert_eq!(loaded.editor.global_defaults.font_text, "Inter.ttf");
+                    assert_eq!(fs::read(&path).unwrap(), original);
+                    let saved = serde_json::to_string(&loaded).unwrap();
+                    write_project_file_sync(
+                        path_string(path.clone()),
+                        saved.clone(),
+                        None,
+                        HashMap::new(),
+                    )
+                    .unwrap();
+                    let reloaded = read_project_file_sync(&resources, path_string(path.clone()))
+                        .unwrap()
+                        .project;
+                    assert_eq!(serde_json::to_string(&reloaded).unwrap(), saved);
+                }
+            }
+        }
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn label_typography_rejects_malformed_present_values_in_all_project_versions() {
+        for source in [
+            valid_v1_project_json(),
+            valid_v2_project_json(),
+            valid_project_json(),
+        ] {
+            for spacing in [
+                Value::Null,
+                Value::from("0"),
+                Value::Bool(false),
+                Value::from(1e100),
+            ] {
+                let mut project: Value = serde_json::from_str(&source).unwrap();
+                project["editor"]["config"]["labels"][0]["letter_spacing"] = spacing;
+                assert!(parse_project(&project.to_string())
+                    .err()
+                    .unwrap()
+                    .contains("letter_spacing"));
+            }
+            for weight in [Value::Null, Value::from("400"), Value::from(1001)] {
+                let mut project: Value = serde_json::from_str(&source).unwrap();
+                project["editor"]["config"]["labels"][0]["font_weight"] = weight;
+                assert!(parse_project(&project.to_string())
+                    .err()
+                    .unwrap()
+                    .contains("font_weight"));
+            }
+            for italic in [Value::Null, Value::from("true"), Value::from(1)] {
+                let mut project: Value = serde_json::from_str(&source).unwrap();
+                project["editor"]["config"]["labels"][0]["italic"] = italic;
+                assert!(parse_project(&project.to_string())
+                    .err()
+                    .unwrap()
+                    .contains("italic"));
+            }
+        }
     }
 
     fn bmp(pixel: [u8; 3]) -> Vec<u8> {

@@ -1,4 +1,7 @@
 {
+  "typography": {
+    "widgetFontWeight": 700
+  },
   "categories": {
     "general": "widgets.categories.general",
     "cycling": "widgets.categories.cycling",
@@ -173,6 +176,9 @@
           "font": "Arial.ttf",
           "font_size": 60,
           "text": "New Text",
+          "font_weight": 400,
+          "italic": false,
+          "letter_spacing": 0,
           "color": "#ffffff",
           "opacity": 1
         }

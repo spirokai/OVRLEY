@@ -2,10 +2,9 @@
  * Provides reusable font select field UI primitives for the application.
  */
 
-import { useMemo } from 'react'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { formatFontLabel, normalizeFontKey } from '@/lib/fonts'
+import { getFontSelectOptions } from '@/lib/fonts'
 import { useTranslation } from 'react-i18next'
 
 /**
@@ -32,40 +31,7 @@ export default function FontSelectField({
   labelClassName = 'text-[10px] text-muted-foreground uppercase font-bold',
 }) {
   const { t } = useTranslation()
-  const systemFontOptions = useMemo(() => systemFonts.map((fontName) => ({ id: fontName, name: fontName })), [systemFonts])
-  const mergedRecommendedFonts = useMemo(() => {
-    const byId = new Map()
-
-    recommendedFonts.forEach((font) => {
-      const id = String(font?.id || font?.name || '').trim()
-      if (!id) {
-        return
-      }
-
-      const option = {
-        id,
-        name: String(font?.name || formatFontLabel(id)).trim(),
-      }
-
-      const key = normalizeFontKey(option.id)
-      if (!byId.has(key)) {
-        byId.set(key, option)
-      }
-    })
-
-    return [...byId.values()]
-  }, [recommendedFonts])
-  const recommendedNameKeys = useMemo(() => new Set(mergedRecommendedFonts.map((font) => normalizeFontKey(font.name))), [mergedRecommendedFonts])
-  const currentValueKey = normalizeFontKey(value)
-
-  const hasKnownCurrentValue =
-    !currentValueKey ||
-    mergedRecommendedFonts.some((font) => normalizeFontKey(font.id) === currentValueKey || normalizeFontKey(font.name) === currentValueKey) ||
-    systemFontOptions.some((font) => normalizeFontKey(font.id) === currentValueKey || normalizeFontKey(font.name) === currentValueKey)
-
-  const recommendedOptions = hasKnownCurrentValue ? mergedRecommendedFonts : [{ id: value, name: formatFontLabel(value) }, ...mergedRecommendedFonts]
-
-  const filteredSystemFonts = systemFontOptions.filter((font) => !recommendedNameKeys.has(normalizeFontKey(font.name)))
+  const { recommendedOptions, filteredSystemFonts } = getFontSelectOptions(value, recommendedFonts, systemFonts)
 
   return (
     <div className="space-y-2">

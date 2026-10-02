@@ -28,4 +28,4 @@ export {
 
 export * from './data/overlayEditorConstants'
 
-export { FONT_FAMILY_MAP, WIDGET_ICONS, DEFAULT_ACTIVITY_PREVIEW } from './data/overlayEditorConfig'
+export { WIDGET_ICONS, DEFAULT_ACTIVITY_PREVIEW } from './data/overlayEditorConfig'

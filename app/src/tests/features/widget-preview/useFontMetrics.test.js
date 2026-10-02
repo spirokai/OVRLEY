@@ -26,8 +26,8 @@ describe('useFontMetrics', () => {
 
   test('loads the requested fonts and reuses the same request set', async () => {
     const initialRequests = [
-      { fontFamily: 'Arial', fontSize: 30 },
-      { fontFamily: 'Evogria', fontSize: 18 },
+      { fontId: 'Arial.ttf', fontSize: 30 },
+      { fontId: 'Evogria.ttf', fontSize: 18, fontWeight: 537 },
     ]
     const { result, rerender } = renderHook(({ requests }) => useFontMetrics(requests), {
       initialProps: { requests: initialRequests },
@@ -35,6 +35,8 @@ describe('useFontMetrics', () => {
 
     await waitFor(() => expect(result.current).toBe(1))
     expect(fonts.load).toHaveBeenCalledTimes(2)
+    expect(fonts.load).toHaveBeenCalledWith('700 30px "OVRLEY Arial.ttf"', '0123456789WBMPRK/H')
+    expect(fonts.load).toHaveBeenCalledWith('537 18px "OVRLEY Evogria.ttf"', '0123456789WBMPRK/H')
 
     rerender({ requests: initialRequests.map((request) => ({ ...request })) })
     expect(fonts.load).toHaveBeenCalledTimes(2)

@@ -4,9 +4,8 @@
 
 import { useEffect, useState } from 'react'
 import * as backend from '@/api/backend'
-import { createCachedPromise } from '@/lib/cached-promise'
 
-const loadAvailableFonts = createCachedPromise(() => backend.listAvailableFonts())
+const loadAvailableFonts = backend.listAvailableFonts
 const EMPTY_AVAILABLE_FONTS = {
   recommendedFonts: [],
   systemFonts: [],

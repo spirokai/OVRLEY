@@ -23,6 +23,8 @@ pub mod debug;
 pub mod encode;
 /// Structured error types and result alias used by all core modules.
 pub mod error;
+/// Font identities, face capabilities, and session resolution.
+pub mod fonts;
 /// Shared interpolation utilities used by activity and render modules.
 pub mod interpolation;
 /// Source media probing and embedded telemetry extraction.

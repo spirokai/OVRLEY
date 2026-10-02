@@ -1,3 +1,4 @@
+import { WIDGET_FONT_WEIGHT } from '@/lib/widget/standard-widgets'
 import { PreviewSvgShadowBlurFilter, PreviewSvgShadowOnlyFilter } from '../../shared/PreviewSvgComponents'
 import { useGForcePreviewModel } from './useGForcePreview'
 
@@ -26,6 +27,8 @@ function GForceLabel({ model, config }) {
           fill={model.shadow.color}
           fontFamily={model.fontFamily}
           fontSize={config.label_font_size}
+          fontWeight={WIDGET_FONT_WEIGHT}
+          style={{ fontOpticalSizing: 'none', fontSynthesis: 'none' }}
           opacity={model.opacity}
           filter={`url(#${model.labelShadowFilterId})`}
         >
@@ -40,6 +43,8 @@ function GForceLabel({ model, config }) {
         fill={config.label_color}
         fontFamily={model.fontFamily}
         fontSize={config.label_font_size}
+        fontWeight={WIDGET_FONT_WEIGHT}
+        style={{ fontOpticalSizing: 'none', fontSynthesis: 'none' }}
         opacity={model.opacity}
       >
         {label}

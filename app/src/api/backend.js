@@ -2,7 +2,8 @@
  * Implements API helpers for backend.
  */
 
-import { formatFontLabel, setBundledRecommendedFonts } from '@/lib/fonts'
+import { setFontCatalog } from '@/lib/fonts'
+import { createCachedPromise } from '@/lib/cached-promise'
 import { rasterResourceIds } from '@/lib/widget/raster-resources'
 
 /**
@@ -262,84 +263,25 @@ export async function openHevcSupport() {
 }
 
 /**
- * Sorts font names.
- *
- * @param {*} fonts - Value for fonts.
- * @returns {*} Result produced by the helper.
- */
-function sortFontNames(fonts) {
-  return [...new Set(fonts.filter(Boolean))]
-    .map((font) => font.trim())
-    .filter(Boolean)
-    .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }))
-}
-
-function sortFontOptions(fonts) {
-  const byId = new Map()
-
-  fonts.forEach((font) => {
-    const id = typeof font === 'string' ? font.trim() : String(font?.id || font?.name || '').trim()
-    if (!id) {
-      return
-    }
-
-    const option = {
-      id,
-      name: typeof font === 'object' && typeof font?.name === 'string' && font.name.trim() ? font.name.trim() : formatFontLabel(id),
-    }
-
-    const key = option.id.toLowerCase()
-    if (!byId.has(key)) {
-      byId.set(key, option)
-    }
-  })
-
-  return [...byId.values()].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }))
-}
-
-/**
  * Lists available fonts.
- * @returns {Promise<Array<*>>} Promise resolving to the operation result.
+ * @returns {Promise<object>} Canonical bundled and system family catalog.
  */
-export async function listAvailableFonts() {
-  const invoke = await getInvoke()
-  if (invoke) {
-    const payload = await invoke('backend_list_system_fonts')
-    const fonts = typeof payload === 'string' ? JSON.parse(payload) : payload
-    if (Array.isArray(fonts)) {
-      setBundledRecommendedFonts([])
-      return {
-        recommendedFonts: [],
-        systemFonts: sortFontNames(fonts),
-      }
-    }
+export const listAvailableFonts = createCachedPromise(async () => {
+  // Font discovery is Rust-owned and unavailable in frontend-only development.
+  if (!hasTauriRuntime()) return { recommendedFonts: [], systemFonts: [] }
+  const catalog = await apiCall('backend_list_system_fonts', {})
+  setFontCatalog(catalog)
+  return catalog
+})
 
-    const recommendedFonts = sortFontOptions(fonts?.recommendedFonts || fonts?.bundledFonts || [])
-    setBundledRecommendedFonts(recommendedFonts)
-    return {
-      recommendedFonts,
-      systemFonts: sortFontNames(fonts?.systemFonts || []),
-    }
-  }
+/** @param {string} fontId Canonical font ID. @returns {Promise<object>} Resolved capabilities. */
+export function getFontCapabilities(fontId) {
+  return apiCall('backend_font_capabilities', { fontId })
+}
 
-  if (typeof window !== 'undefined' && typeof window.queryLocalFonts === 'function') {
-    try {
-      const fonts = await window.queryLocalFonts()
-      setBundledRecommendedFonts([])
-      return {
-        recommendedFonts: [],
-        systemFonts: sortFontNames(fonts.map((font) => font.family || font.fullName || font.postscriptName || '')),
-      }
-    } catch (error) {
-      console.warn('Local font access unavailable in browser:', error)
-    }
-  }
-
-  setBundledRecommendedFonts([])
-  return {
-    recommendedFonts: [],
-    systemFonts: [],
-  }
+/** @param {string} fontId Canonical font ID. @param {number} faceIndex Catalog face index. @returns {Promise<number[]>} Font bytes. */
+export function getFontData(fontId, faceIndex) {
+  return invokeCommand('backend_font_data', { fontId, faceIndex })
 }
 
 /**

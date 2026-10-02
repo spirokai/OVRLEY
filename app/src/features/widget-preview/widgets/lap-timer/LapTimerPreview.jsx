@@ -15,8 +15,8 @@ export function OverlayLapTimerWidget({ widget, activity, previewSecond, globalO
   const fontFamily = getPreviewFontFamily(widget.data.font)
   const labelFontFamily = getPreviewFontFamily(widget.data.label_font)
   const fontMetricsVersion = useFontMetrics([
-    { fontFamily, fontSize: widget.data.font_size },
-    { fontFamily: labelFontFamily, fontSize: widget.data.label_font_size },
+    { fontId: widget.data.font, fontSize: widget.data.font_size },
+    { fontId: widget.data.label_font, fontSize: widget.data.label_font_size },
   ])
   const opacity = getWidgetOpacity(widget.data, globalOpacity)
   const shadow = getTextShadowParts(sceneStyle)

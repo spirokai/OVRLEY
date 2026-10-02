@@ -16,6 +16,7 @@
  * @returns {JSX.Element} SVG element for heading widget preview.
  */
 
+import { WIDGET_FONT_WEIGHT } from '@/lib/widget/standard-widgets'
 import { chevronVertices, headingLabelBaseline, headingTickPosition } from './geometry'
 import { useHeadingPreviewModel } from './useHeadingPreview'
 import { normalizeSvgShadowColor } from '../../shared/svgPreviewUtils'
@@ -49,6 +50,8 @@ function renderLabels(labels, topY, height, config, fontFamily) {
         fill={label.isMajorLabel ? config.cardinal_label_color : config.label_color}
         fontSize={config.label_font_size}
         fontFamily={fontFamily}
+        fontWeight={WIDGET_FONT_WEIGHT}
+        style={{ fontOpticalSizing: 'none', fontSynthesis: 'none' }}
       >
         {label.text}
       </text>,
