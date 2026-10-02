@@ -8,7 +8,7 @@
 import { useEffect } from 'react'
 import { OverlayEditor } from '@/features/overlay-editor'
 import { OverlayPlayer } from '@/features/player'
-import { BatchRenderDialog, RenderVideoDialog } from '@/features/render-video'
+import { RenderVideoDialog } from '@/features/render-video'
 import { WidgetDrawerContent } from '@/features/widget-drawer'
 import {
   ActivityDrawerContent,
@@ -167,7 +167,6 @@ function AppShell() {
           onOverwriteCancel={renderWorkflow.handleOverwriteCancel}
           submissionPending={renderWorkflow.submissionPending}
         />
-        <BatchRenderDialog />
         <UnsavedChangesDialog {...templateManagement.newTemplateConfirmDialog} />
         <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />
         <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />

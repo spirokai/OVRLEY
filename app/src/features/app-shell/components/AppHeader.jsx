@@ -8,7 +8,6 @@ import ActionButtons from './ActionButtons'
 import TemplateSection from './TemplateSection'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { isInteractiveElement } from '@/lib/utils'
-import useStore from '@/store/useStore'
 
 /**
  * Renders the app header component.
@@ -38,7 +37,6 @@ export default function AppHeader({
 }) {
   const rawAppVersion = import.meta.env.VITE_OVRLEY_VERSION?.trim() || '0.00.0'
   const appVersion = rawAppVersion.startsWith('v') ? rawAppVersion : `v${rawAppVersion}`
-  const openBatchDialog = useStore((state) => state.openBatchDialog)
 
   const handleHeaderMouseDown = (event) => {
     if (event.button !== 0 || event.defaultPrevented || isInteractiveElement(event.target)) {
@@ -85,7 +83,6 @@ export default function AppHeader({
         <ActionButtons
           onOpenKeyboardShortcuts={editorShell.openKeyboardShortcuts}
           onOpenRenderDialog={renderWorkflow.openRenderDialog}
-          onOpenBatchDialog={openBatchDialog}
           onRenderPreviewFrame={editorShell.debugModeEnabled ? renderWorkflow.handleRenderPreviewFrame : undefined}
           renderDisabled={renderWorkflow.renderDisabled}
           renderPreviewFrameDisabled={editorShell.debugModeEnabled ? renderWorkflow.renderPreviewFrameDisabled : undefined}

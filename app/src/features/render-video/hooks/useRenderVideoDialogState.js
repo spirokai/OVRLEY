@@ -4,10 +4,10 @@
  *
  * @param {object} props
  * @param {string} props.phase - Dialog phase ('closed'|'confirm'|'progress').
- * @param {object} props.settings - Current render settings draft.
+ * @param {object} props.settings - Current render settings draft; `renderTarget` selects the current video or a batch folder.
  * @param {function} props.onSettingsChange - Callback to update settings draft.
  * @param {function} props.onClose - Callback to close the dialog.
- * @param {function} props.onConfirm - Callback to start rendering.
+ * @param {function} props.onConfirm - Callback to start rendering the current video.
  * @returns {object} State and handlers for RenderVideoDialog.
  */
 
@@ -25,6 +25,7 @@ import {
   isOutputFormatAvailable,
 } from '../utils/codecUtils'
 import { getRenderOutputExtension } from '../utils/render-output'
+import useBatchRenderWorkflow from './useBatchRenderWorkflow'
 import useRenderVideoDerivedState from './useRenderVideoDerivedState'
 
 function getImportedVideoExportRange(durationSeconds, offsetSeconds) {
@@ -49,6 +50,7 @@ export default function useRenderVideoDialogState({
   submissionPending = false,
 }) {
   const derived = useRenderVideoDerivedState({ settings })
+  const batch = useBatchRenderWorkflow({ settings })
   const outputPath = settings?.outputPath
   const exportRange = settings?.exportRange
   const importedVideoRangePrefilledRef = useRef(false)
@@ -62,6 +64,8 @@ export default function useRenderVideoDialogState({
     importedVideoDuration,
     importedVideoFps,
     importedVideoResolution,
+    isBatchTarget,
+    lockedVideoFps,
     platformOs,
     renderProgress,
     renderStartDisabled,
@@ -162,9 +166,24 @@ export default function useRenderVideoDialogState({
     })
   }, [hasImportedVideo, importedVideoDuration, onSettingsChange, videoSyncOffsetSeconds])
 
+  const handleRenderTargetChange = useCallback(
+    (renderTarget) => {
+      // Composite output needs a source video; the current-video target falls
+      // back to transparent export when nothing is imported.
+      onSettingsChange(renderTarget === 'current' && !hasImportedVideo ? { renderTarget, exportMode: 'transparent' } : { renderTarget })
+    },
+    [hasImportedVideo, onSettingsChange],
+  )
+
   const handleExportModeChange = useCallback(
     (exportMode) => {
-      if (exportMode !== 'transparent' || !hasImportedVideo || importedVideoRangePrefilledRef.current || exportRange?.type === 'custom') {
+      if (
+        exportMode !== 'transparent' ||
+        isBatchTarget ||
+        !hasImportedVideo ||
+        importedVideoRangePrefilledRef.current ||
+        exportRange?.type === 'custom'
+      ) {
         onSettingsChange({ exportMode })
         return
       }
@@ -175,7 +194,7 @@ export default function useRenderVideoDialogState({
         exportRange: getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
       })
     },
-    [exportRange, hasImportedVideo, importedVideoDuration, onSettingsChange, videoSyncOffsetSeconds],
+    [exportRange, hasImportedVideo, importedVideoDuration, isBatchTarget, onSettingsChange, videoSyncOffsetSeconds],
   )
 
   const handleOutputPathCommit = useCallback(
@@ -231,11 +250,23 @@ export default function useRenderVideoDialogState({
     })
   }
 
+  const batchStartDisabled =
+    renderStartDisabled ||
+    batch.batchRunning ||
+    batch.batchQueue.length === 0 ||
+    !batch.batchOutputFolder ||
+    batch.batchQueue.some((item) => item.status === 'checking')
+
   return {
+    ...batch,
     availableCodecs,
+    batchStartDisabled,
     config,
     containerFps,
     exportMode,
+    // Composite output follows the source video's frame rate: the imported
+    // video's when rendering it, each queued video's own in batch mode.
+    fpsLocked: exportMode === 'composite' && (isBatchTarget || Boolean(lockedVideoFps)),
     fpsMode,
     handleAccelerationChange,
     handleApplyImportedVideoRange,
@@ -243,13 +274,16 @@ export default function useRenderVideoDialogState({
     handleCustomFpsChange,
     handleExportModeChange,
     handleFpsModeChange,
+    handleRenderTargetChange,
     handleOutputFormatChange,
     hasImportedVideo,
     importedVideoDuration,
     importedVideoFps,
     importedVideoResolution,
+    isBatchTarget,
     isProgress,
     isOutputFormatAvailable,
+    lockedVideoFps,
     onClose,
     onConfirm,
     onOverwriteCancel,
@@ -273,8 +307,12 @@ export default function useRenderVideoDialogState({
     overwriteOpen,
     pendingOverwritePath,
     submissionPending,
-    showExportModeOverride: hasImportedVideo,
-    showExportRangeSettings: exportMode !== 'composite',
+    settingsLocked: batch.batchRunning,
+    showContainerFps: !isBatchTarget || exportMode !== 'composite',
+    showExportModeOverride: hasImportedVideo || isBatchTarget,
+    showExportRangeSettings: exportMode !== 'composite' && !isBatchTarget,
+    showVideoImportedBadge: hasImportedVideo && !isBatchTarget,
+    showVideoRequiredBadge: !hasImportedVideo && !isBatchTarget,
     updateRateOptions,
   }
 }

@@ -4,8 +4,6 @@
  */
 
 export { default as RenderVideoDialog } from './components/RenderVideoDialog'
-export { default as BatchRenderDialog } from './components/BatchRenderDialog'
 export { default as RenderProgressPanel } from './components/RenderProgressPanel'
 export { default as ExportRangeSettings } from './components/ExportRangeSettings'
 export { default as useRenderWorkflow } from './hooks/useRenderWorkflow'
-export { default as useBatchRenderWorkflow } from './hooks/useBatchRenderWorkflow'

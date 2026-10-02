@@ -5,7 +5,7 @@
 
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
-import { CircleHelp, FolderOpen, ImageDown, Layers, Play } from 'lucide-react'
+import { CircleHelp, FolderOpen, ImageDown, Play } from 'lucide-react'
 import WindowControls from './WindowControls'
 import { useTranslation } from 'react-i18next'
 
@@ -22,7 +22,6 @@ import { useTranslation } from 'react-i18next'
  * @param {string} props.backendStatus - Current backend connection status.
  * @param {function} props.onOpenOutputDirectory - Opens the render output folder.
  * @param {function} props.onOpenKeyboardShortcuts - Opens the keyboard shortcuts dialog.
- * @param {function} props.onOpenBatchDialog - Opens the batch render dialog.
  * @returns {JSX.Element} Rendered component.
  */
 export default function ActionButtons({
@@ -35,7 +34,6 @@ export default function ActionButtons({
   backendStatus,
   onOpenOutputDirectory,
   onOpenKeyboardShortcuts,
-  onOpenBatchDialog,
 }) {
   const { t } = useTranslation()
   return (
@@ -77,16 +75,6 @@ export default function ActionButtons({
           <span>PNG</span>
         </Button>
       ) : null}
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-9 gap-2 border-accent-border/70 px-4 text-muted-foreground hover:border-accent-border hover:bg-surface-accent-soft hover:text-foreground"
-        disabled={backendStatus !== 'connected'}
-        onClick={onOpenBatchDialog}
-      >
-        <Layers className="h-3.5 w-3.5" />
-        <span>{t('render-video.batch', 'Batch')}</span>
-      </Button>
       <SimpleTooltip side="bottom" content={renderTooltipContent} className="pr-4">
         <Button
           size="sm"

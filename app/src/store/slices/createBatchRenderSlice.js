@@ -21,16 +21,11 @@ function buildQueueItem(path, previousItemsByPath) {
 
 export function createBatchRenderSlice(set) {
   return {
-    batchDialogOpen: false,
     batchVideoFolder: null,
     batchOutputFolder: null,
     batchQueue: [],
     batchRunning: false,
     batchActiveItemId: null,
-
-    openBatchDialog: () => set({ batchDialogOpen: true }),
-
-    closeBatchDialog: () => set({ batchDialogOpen: false }),
 
     setBatchVideoFolder: (path) => set({ batchVideoFolder: path || null }),
 

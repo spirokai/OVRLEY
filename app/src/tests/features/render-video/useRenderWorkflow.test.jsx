@@ -147,6 +147,22 @@ describe('useRenderWorkflow', () => {
     expect(result.current.renderSettingsDraft.exportMode).toBe('transparent')
   })
 
+  test('opens targeting the current video and stays open while a batch is running', async () => {
+    const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
+
+    await act(async () => result.current.openRenderDialog())
+    expect(result.current.renderSettingsDraft.renderTarget).toBe('current')
+
+    act(() => result.current.updateRenderSettingsDraft({ renderTarget: 'batch' }))
+    act(() => useStore.getState().setBatchRunning(true))
+    act(() => result.current.closeRenderDialog())
+    expect(result.current.renderDialogPhase).toBe('confirm')
+
+    act(() => useStore.getState().setBatchRunning(false))
+    act(() => result.current.closeRenderDialog())
+    expect(result.current.renderDialogPhase).toBe('closed')
+  })
+
   test('preserves an explicit transparent project setting when a video is present', async () => {
     useStore.setState({
       importedVideoPath: 'C:\\video.mp4',

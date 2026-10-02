@@ -3,6 +3,7 @@
  * Composed by useRenderWorkflow.
  *
  * @param {object} params
+ * @param {boolean} params.batchRunning - Whether a batch render is running from the dialog.
  * @param {function} params.buildRenderSettingsDraft - Builds the initial settings draft from store state.
  * @param {boolean} params.renderDisabled - Whether the render button is disabled.
  * @param {boolean} params.renderingVideo - Whether a render is currently active.
@@ -12,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 export default function useRenderDialogState({
+  batchRunning,
   buildRenderSettingsDraft,
   resolveRenderSettingsDraft,
   onOpenError,
@@ -57,12 +59,12 @@ export default function useRenderDialogState({
 
   // Closing is blocked while a render is being accepted or is already active.
   const closeRenderDialog = useCallback(() => {
-    if (submissionPending || renderDialogPhase === 'progress' || renderingVideo) {
+    if (submissionPending || batchRunning || renderDialogPhase === 'progress' || renderingVideo) {
       return
     }
 
     setRenderDialogPhase('closed')
-  }, [renderDialogPhase, renderingVideo, submissionPending])
+  }, [batchRunning, renderDialogPhase, renderingVideo, submissionPending])
 
   // Draft updates merge partial changes without mutating the current object.
   const updateRenderSettingsDraft = useCallback((updates) => {

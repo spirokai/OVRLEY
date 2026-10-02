@@ -35,6 +35,7 @@ export default function useRenderWorkflow({ backendStatus }) {
   } = useRenderStore()
   const globalDefaults = useStore((state) => state.globalDefaults)
   const importedVideoPath = useStore((state) => state.importedVideoPath)
+  const batchRunning = useStore((state) => state.batchRunning)
   const [renderingPreviewFrame, setRenderingPreviewFrame] = useState(false)
   const [submissionPending, setSubmissionPending] = useState(false)
   const [outputPathError, setOutputPathError] = useState(null)
@@ -70,6 +71,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     const draftExportRange = { ...DEFAULT_EXPORT_RANGE, ...renderSettings.range }
 
     return {
+      renderTarget: 'current',
       fps,
       updateRate: normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate),
       exportMode: importedVideoPath ? renderSettings.exportMode : 'transparent',
@@ -98,6 +100,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     closeRenderDialog,
     updateRenderSettingsDraft: updateDraftState,
   } = useRenderDialogState({
+    batchRunning,
     buildRenderSettingsDraft,
     onOpenError: (error) => setErrorMessage(error.message || 'Failed to prepare render output'),
     resolveRenderSettingsDraft,

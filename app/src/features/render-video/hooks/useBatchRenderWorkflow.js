@@ -1,32 +1,21 @@
 /**
  * Batch render workflow — imports videos from a folder one at a time into the
  * existing single-video import/sync pipeline, then renders each sequentially
- * into a shared output folder using the current template and render settings.
+ * into a shared output folder using the render dialog's settings draft.
+ * Composed by useRenderVideoDialogState when the dialog targets a batch.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 import { DEFAULT_EXPORT_RANGE } from '@/lib/template/template-constants'
 import { openDirectoryPath } from '@/lib/file-dialog'
-import { normalizeUpdateRateForFps, getUpdateRateOptions } from '@/lib/update-rate'
+import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { pathInDirectory } from '@/lib/utils'
-import { useFpsMode } from '@/hooks/useFpsMode'
 import useStore from '@/store/useStore'
 import { resolveVideoSyncState } from '@/store/slices/createVideoImportSlice'
 import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import useVideoImport, { prepareVideoPath } from '@/features/video-preview/hooks/useVideoImport'
-import { OUTPUT_FORMATS, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
-import { getDefaultBitrate } from '../data/bitrateDefaults'
 import { getRenderOutputExtension } from '../utils/render-output'
-import {
-  getAccelerationValueForSettings,
-  getExportCodecForSelection,
-  getFirstAvailableAcceleration,
-  getFirstAvailableMp4ExportCodec,
-  getOutputFormatForExportCodec,
-  getVisibleAccelerationOptions,
-  isMp4Codec,
-} from '../utils/codecUtils'
 
 function outputFilenameFor(filename, exportMode) {
   const stem = filename.replace(/\.[^.]*$/, '')
@@ -88,12 +77,12 @@ function waitForRenderCompletion(renderId) {
 
 /**
  * Provides batch-render queue actions and sequential render orchestration.
+ *
+ * @param {object} params
+ * @param {object|null} params.settings - Render dialog settings draft applied to every queued video.
  * @returns {object} Batch render workflow API.
  */
-export default function useBatchRenderWorkflow() {
-  const batchDialogOpen = useStore((state) => state.batchDialogOpen)
-  const openBatchDialog = useStore((state) => state.openBatchDialog)
-  const closeBatchDialog = useStore((state) => state.closeBatchDialog)
+export default function useBatchRenderWorkflow({ settings }) {
   const batchVideoFolder = useStore((state) => state.batchVideoFolder)
   const batchOutputFolder = useStore((state) => state.batchOutputFolder)
   const batchQueue = useStore((state) => state.batchQueue)
@@ -109,100 +98,11 @@ export default function useBatchRenderWorkflow() {
   const setBatchRunning = useStore((state) => state.setBatchRunning)
   const setBatchActiveItemId = useStore((state) => state.setBatchActiveItemId)
   const setErrorMessage = useStore((state) => state.setErrorMessage)
-  const renderSettings = useStore((state) => state.renderSettings)
   const setRenderSettings = useStore((state) => state.setRenderSettings)
-  const availableCodecs = useStore((state) => state.availableCodecs)
-  const platformOs = useStore((state) => state.platformOs)
-  const config = useStore((state) => state.config)
-  const importedVideoResolution = useStore((state) => state.importedVideoResolution)
 
   const { loadVideoPath, clearImportedVideo } = useVideoImport({})
   const [currentItemProgress, setCurrentItemProgress] = useState(null)
   const cancelRequestedRef = useRef(false)
-  const resolutionWidth = importedVideoResolution?.width || config?.scene?.width
-  const resolutionHeight = importedVideoResolution?.height || config?.scene?.height
-  const exportMode = renderSettings.exportMode || 'composite'
-  const isCompositeExport = exportMode === 'composite'
-
-  // Codec selection follows the active export pipeline, same as the single
-  // render dialog: composite exports must land on an MP4 codec, transparent
-  // exports must not.
-  useEffect(() => {
-    if (!batchDialogOpen) return
-    const codecIsMp4 = isMp4Codec(renderSettings.codec)
-
-    if (isCompositeExport && !codecIsMp4) {
-      const fallbackCodec = getFirstAvailableMp4ExportCodec(platformOs, availableCodecs)
-      if (!fallbackCodec) return
-      setRenderSettings({
-        ...renderSettings,
-        codec: fallbackCodec,
-        bitrateMbps: getDefaultBitrate(resolutionWidth, resolutionHeight, renderSettings.fps, fallbackCodec),
-      })
-      return
-    }
-
-    if (!isCompositeExport && codecIsMp4) {
-      setRenderSettings({ ...renderSettings, codec: 'prores_ks', bitrateMbps: null })
-    }
-  }, [availableCodecs, batchDialogOpen, isCompositeExport, platformOs, renderSettings, resolutionHeight, resolutionWidth, setRenderSettings])
-
-  const outputFormatOptions = useMemo(
-    () => OUTPUT_FORMATS.filter((format) => format.group === (isCompositeExport ? 'mp4' : 'transparent')),
-    [isCompositeExport],
-  )
-  const selectedOutputFormatValue = getOutputFormatForExportCodec(renderSettings.codec)?.value || (isCompositeExport ? 'h264' : 'prores')
-  const selectedAccelerationValue = getAccelerationValueForSettings({ exportCodec: renderSettings.codec })
-  const selectedAccelerationOptions = useMemo(
-    () => getVisibleAccelerationOptions(OUTPUT_FORMATS_BY_VALUE[selectedOutputFormatValue], platformOs, availableCodecs),
-    [availableCodecs, platformOs, selectedOutputFormatValue],
-  )
-  const updateRateOptions = useMemo(() => getUpdateRateOptions(renderSettings.fps), [renderSettings.fps])
-
-  const handleFormatChange = useCallback(
-    (formatValue) => {
-      const format = OUTPUT_FORMATS_BY_VALUE[formatValue]
-      const acceleration = getFirstAvailableAcceleration(format, platformOs, availableCodecs)
-      const codec = acceleration ? getExportCodecForSelection(formatValue, acceleration.value) : format.codecs.cpu
-      const nextIsMp4Codec = format.group === 'mp4'
-      setRenderSettings({
-        ...renderSettings,
-        codec,
-        bitrateMbps: nextIsMp4Codec ? getDefaultBitrate(resolutionWidth, resolutionHeight, renderSettings.fps, codec) : null,
-      })
-    },
-    [availableCodecs, platformOs, renderSettings, resolutionHeight, resolutionWidth, setRenderSettings],
-  )
-
-  const handleAccelerationChange = useCallback(
-    (accelerationValue) => {
-      const codec = getExportCodecForSelection(selectedOutputFormatValue, accelerationValue)
-      if (!codec) return
-      setRenderSettings({ ...renderSettings, codec })
-    },
-    [renderSettings, selectedOutputFormatValue, setRenderSettings],
-  )
-
-  const handleBitrateChange = useCallback(
-    (value) => setRenderSettings({ ...renderSettings, bitrateMbps: value }),
-    [renderSettings, setRenderSettings],
-  )
-
-  const handleUpdateRateChange = useCallback(
-    (value) => setRenderSettings({ ...renderSettings, widgetUpdateRate: value }),
-    [renderSettings, setRenderSettings],
-  )
-
-  const handleExportModeChange = useCallback(
-    (nextExportMode) => setRenderSettings({ ...renderSettings, exportMode: nextExportMode }),
-    [renderSettings, setRenderSettings],
-  )
-
-  const { fpsMode, handleFpsModeChange, handleCustomFpsChange } = useFpsMode({
-    fps: renderSettings.fps,
-    onFpsChange: (fps) =>
-      setRenderSettings({ ...renderSettings, fps, widgetUpdateRate: normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate) }),
-  })
 
   // Probes each queued video's creation time against the loaded activity so
   // the per-item overlay toggle defaults correctly without a manual render.
@@ -247,7 +147,7 @@ export default function useBatchRenderWorkflow() {
   }, [setBatchOutputFolder])
 
   const renderQueueItem = useCallback(
-    async (item, timezoneMode) => {
+    async (item, batchSettings, timezoneMode) => {
       setBatchActiveItemId(item.id)
       setBatchItemStatus(item.id, 'importing')
       setCurrentItemProgress(null)
@@ -266,19 +166,20 @@ export default function useBatchRenderWorkflow() {
         throw new Error('No template is loaded')
       }
 
-      const itemExportMode = state.renderSettings.exportMode || 'composite'
-      const shouldComposite = itemExportMode === 'composite'
-      const effectiveConfig = item.skipOverlay ? { ...state.config, values: [], plots: [] } : state.config
-      const outputPath = pathInDirectory(batchOutputFolder, outputFilenameFor(item.filename, itemExportMode))
-      const updateRate = normalizeUpdateRateForFps(state.importedVideoFps, state.renderSettings.widgetUpdateRate)
+      const { exportMode } = batchSettings
+      const shouldComposite = exportMode === 'composite'
+      const itemConfig = item.skipOverlay ? { ...state.config, values: [], plots: [] } : state.config
+      const effectiveConfig = { ...itemConfig, scene: { ...itemConfig.scene, fps: batchSettings.fps } }
+      const outputPath = pathInDirectory(batchOutputFolder, outputFilenameFor(item.filename, exportMode))
+      const updateRate = normalizeUpdateRateForFps(shouldComposite ? state.importedVideoFps : batchSettings.fps, batchSettings.updateRate)
 
       setBatchItemStatus(item.id, 'rendering')
       const { default: submitRenderVideo } = await import('@/features/render-video/utils/render-video')
       const result = await submitRenderVideo({
         config: effectiveConfig,
-        exportMode: itemExportMode,
-        exportCodec: state.renderSettings.codec,
-        exportBitrate: state.renderSettings.bitrateMbps ?? undefined,
+        exportMode,
+        exportCodec: batchSettings.exportCodec,
+        exportBitrate: batchSettings.exportBitrate,
         exportRange: DEFAULT_EXPORT_RANGE,
         updateRate,
         availableCodecs: state.availableCodecs,
@@ -296,7 +197,6 @@ export default function useBatchRenderWorkflow() {
         outputPath,
         overwrite: true,
       })
-
       let unlisten = null
       backend
         .subscribeRenderProgress((data) => {
@@ -326,8 +226,18 @@ export default function useBatchRenderWorkflow() {
     if (batchQueue.length === 0) return
 
     cancelRequestedRef.current = false
-    // Captured once: importing each queued video resets the editor's selection.
+    // Captured once: importing each queued video resets the editor's selection
+    // and may re-normalize the live dialog draft.
     const timezoneMode = selectedTimezoneMode(useStore.getState())
+    const batchSettings = settings
+    setRenderSettings({
+      ...useStore.getState().renderSettings,
+      fps: batchSettings.fps,
+      widgetUpdateRate: batchSettings.updateRate,
+      exportMode: batchSettings.exportMode,
+      codec: batchSettings.exportCodec,
+      bitrateMbps: batchSettings.exportBitrate ?? null,
+    })
     setBatchRunning(true)
     try {
       for (const item of batchQueue) {
@@ -336,7 +246,7 @@ export default function useBatchRenderWorkflow() {
           continue
         }
         try {
-          await renderQueueItem(item, timezoneMode)
+          await renderQueueItem(item, batchSettings, timezoneMode)
         } catch (error) {
           setBatchItemStatus(item.id, error?.code === 'cancelled' ? 'cancelled' : 'error', error?.message || 'Render failed')
           if (error?.code === 'cancelled') cancelRequestedRef.current = true
@@ -351,7 +261,18 @@ export default function useBatchRenderWorkflow() {
         // best-effort cleanup
       }
     }
-  }, [batchOutputFolder, batchQueue, clearImportedVideo, renderQueueItem, setBatchActiveItemId, setBatchItemStatus, setBatchRunning, setErrorMessage])
+  }, [
+    batchOutputFolder,
+    batchQueue,
+    clearImportedVideo,
+    renderQueueItem,
+    setBatchActiveItemId,
+    setBatchItemStatus,
+    setBatchRunning,
+    setErrorMessage,
+    setRenderSettings,
+    settings,
+  ])
 
   const cancelBatch = useCallback(async () => {
     cancelRequestedRef.current = true
@@ -363,9 +284,6 @@ export default function useBatchRenderWorkflow() {
   }, [])
 
   return {
-    batchDialogOpen,
-    openBatchDialog,
-    closeBatchDialog,
     batchVideoFolder,
     batchOutputFolder,
     batchQueue,
@@ -379,21 +297,5 @@ export default function useBatchRenderWorkflow() {
     setBatchItemSkipOverlay,
     runBatch,
     cancelBatch,
-    renderSettings,
-    exportMode,
-    isCompositeExport,
-    outputFormatOptions,
-    selectedOutputFormatValue,
-    selectedAccelerationValue,
-    selectedAccelerationOptions,
-    updateRateOptions,
-    handleFormatChange,
-    handleAccelerationChange,
-    handleBitrateChange,
-    handleUpdateRateChange,
-    handleExportModeChange,
-    fpsMode,
-    handleFpsModeChange,
-    handleCustomFpsChange,
   }
 }
