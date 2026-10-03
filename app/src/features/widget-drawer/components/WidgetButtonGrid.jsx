@@ -46,6 +46,7 @@ export function WidgetButtonGrid({ onAddWidget, availableMetrics }) {
   const availableAttributes = new Set(availableMetrics.map((metric) => metric.attribute))
   availableAttributes.add('label')
   availableAttributes.add('backdrop')
+  availableAttributes.add('raster')
 
   return (
     <div className="flex-1 overflow-y-auto thin-scrollbar pl-2 pr-1">

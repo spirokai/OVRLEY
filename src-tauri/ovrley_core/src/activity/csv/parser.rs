@@ -199,7 +199,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
-        "elapsed time" => (
+        "elapsed time" | "time s" => (
             Metric::ElapsedSeconds,
             SourcePriority::Preferred,
             Some(TimingKind::ExplicitElapsed),
@@ -222,7 +222,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
-        "speed" | "kph" => (Metric::Speed, SourcePriority::DirectSpeed, None, None, None),
+        "speed" | "kph" | "speed kmh" => (Metric::Speed, SourcePriority::DirectSpeed, None, None, None),
         "gspd" => (Metric::Speed, SourcePriority::DirectSpeed, None, None, None),
         "vehspd1" => (Metric::Speed, SourcePriority::Vehicle, None, None, None),
         "distance" | "trip distance" => {
@@ -333,7 +333,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         | "throttle position (manifold)"
         | "throttle position manifold"
         | "manifold throttle position"
-        | "relative throttle position" => (
+        | "relative throttle position" | "tps pct"=> (
             Metric::ThrottlePosition,
             SourcePriority::Direct,
             None,

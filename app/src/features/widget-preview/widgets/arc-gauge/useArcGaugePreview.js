@@ -7,7 +7,6 @@ import { getArcBarSegments, getBarFillCount } from '../../shared/gaugeBarGeometr
 import { buildArcGaugeInnerWidgetModel } from '../metric/model'
 import { getTextShadowParts } from '../../shared/shadow'
 import { getPreviewFontFamily, measureArcPreviewText } from '../../shared/textMeasurement'
-import { useFontMetrics } from '../../shared/useFontMetrics'
 import { formatGaugeBoundaryLabel } from '../../shared/gaugeLabelFormat'
 
 /** Returns the SVG text origin that centers measured text around an x-coordinate. */
@@ -40,12 +39,7 @@ function getLabelLayout(layout, minLabel, maxLabel, fontFamily, fontSize) {
  * @returns {object} Presentation model consumed by the gauge renderer.
  */
 export function useArcGaugePreviewPresentation({ widget, activity, previewSecond, globalOpacity, sceneStyle }) {
-  const valueFontFamily = getPreviewFontFamily(widget.data.font)
   const labelFontFamily = getPreviewFontFamily(widget.data.min_max_label_font)
-  useFontMetrics([
-    { fontFamily: valueFontFamily, fontSize: widget.data.font_size },
-    { fontFamily: labelFontFamily, fontSize: widget.data.min_max_label_font_size },
-  ])
 
   return useMemo(() => {
     const displayActivity = getPreviewActivity(activity, previewSecond)

@@ -60,6 +60,7 @@ fn validated_value(value: serde_json::Value) -> PreparedValue {
     let raw = RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
         backdrops: vec![],
+        rasters: vec![],
         labels: vec![],
         values: vec![serde_json::from_value(value).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -223,6 +224,7 @@ fn prepare_assets_distinct_caches_per_value_index() {
     let config = RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
         backdrops: vec![],
+        rasters: vec![],
         labels: vec![],
         values: vec![
             serde_json::from_value(heading_tape_at_pos_0).unwrap(),
@@ -281,12 +283,7 @@ fn render_preserves_multiple_boxed_reports() {
     use ovrley_core::normalize::validate_render_config;
     use ovrley_core::paths::AppPaths;
     use ovrley_core::render::render_preview_with_report;
-    use std::path::PathBuf;
-
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let workspace_root = common::test_config::repo_git_root();
 
     let heading_tape = serde_json::from_value(full_heading_tape_config(10, 20)).unwrap();
 
@@ -298,6 +295,7 @@ fn render_preserves_multiple_boxed_reports() {
     let config = RenderConfig {
         scene: serde_json::from_value(scene).unwrap(),
         backdrops: vec![],
+        rasters: vec![],
         labels: vec![],
         values: vec![heading_tape, speed_text],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -375,12 +373,7 @@ fn render_reports_multiple_heading_tapes_with_identity() {
     use ovrley_core::normalize::validate_render_config;
     use ovrley_core::paths::AppPaths;
     use ovrley_core::render::render_preview_with_report;
-    use std::path::PathBuf;
-
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let workspace_root = common::test_config::repo_git_root();
 
     let heading_tape_left = serde_json::from_value(full_heading_tape_config(10, 20)).unwrap();
 
@@ -393,6 +386,7 @@ fn render_reports_multiple_heading_tapes_with_identity() {
     let config = RenderConfig {
         scene: serde_json::from_value(scene).unwrap(),
         backdrops: vec![],
+        rasters: vec![],
         labels: vec![],
         values: vec![heading_tape_left, heading_tape_right],
         plots: serde_json::Value::Object(serde_json::Map::new()),

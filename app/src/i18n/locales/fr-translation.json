@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "Fichiers image",
+    "selectImage": "Choisir une image",
+    "replaceImage": "Remplacer l'image",
+    "errors": {
+      "missingAsset": "L'image intégrée manque dans ce projet. Choisissez une image de remplacement.",
+      "corruptAsset": "L'image intégrée est endommagée. Choisissez une image de remplacement.",
+      "relativePath": "Choisissez une image avec un chemin de fichier absolu.",
+      "missing": "Le fichier image est introuvable. Choisissez une autre image.",
+      "unreadable": "Le fichier image est illisible. Vérifiez ses autorisations ou choisissez une autre image.",
+      "unsupportedType": "Choisissez un fichier PNG, JPEG, BMP ou TIFF (.png, .jpeg, .jpg, .bmp, .tiff).",
+      "encodedSize": "Le fichier image dépasse 5 Mio. Choisissez un fichier plus petit.",
+      "resolution": "La résolution dépasse 25 mégapixels. Choisissez une image plus petite.",
+      "decode": "Impossible de décoder l'image. Choisissez une autre image.",
+      "noImage": "Aucune image n'est sélectionnée pour {{id}}. Choisissez-en une avant le rendu.",
+      "renderUnavailable": "L'image {{id}} ne peut pas encore être rendue.",
+      "invalidConfig": "La configuration de l'image est invalide."
+    }
+  },
   "app": {
     "importingYourVideo": "Importation de votre vidéo...",
     "loadingProject": "Chargement du projet...",
@@ -105,6 +124,10 @@
     "zoomOut": "Zoom arrière"
   },
   "projects": {
+    "archiveTooLarge": "Le projet dépasse la limite d'archive de 40 Mio. Supprimez ou remplacez une image.",
+    "invalidArchive": "L'archive du projet est invalide ou endommagée. Choisissez un autre fichier.",
+    "rasterUnavailable": "Une image est indisponible. Remplacez-la avant d'enregistrer.",
+    "saveFailed": "Impossible d'enregistrer le projet. Vérifiez la destination et réessayez.",
     "activity": "Activité",
     "cancel": "Annuler",
     "closeWithoutSaving": "Fermer sans enregistrer",
@@ -133,6 +156,11 @@
     "000000Or900": "00:00:00 ou 900",
     "backendOffline": "Backend hors ligne",
     "bitrate": "Débit",
+    "quality": "Qualité",
+    "better": "Meilleure",
+    "worse": "Moins bonne",
+    "smallerFile": "Fichier plus petit",
+    "largerFile": "Fichier plus grand",
     "cancel": "Annuler",
     "codecOutputFormat": "Codec / format de sortie",
     "custom": "Personnalisé",
@@ -459,6 +487,7 @@
       "lapLog": "Journal des tours"
     },
     "types": {
+      "raster": { "name": "Image", "shortName": "Image" },
       "air_pressure": { "name": "Pression atmosphérique", "shortName": "Press. atmos." },
       "altitude": { "name": "Altitude", "shortName": "Altitude" },
       "aperture": { "name": "Ouverture", "shortName": "Ouverture" },
@@ -547,6 +576,9 @@
     "flatTrack": "Remplissage plat",
     "fontFamily": "Police",
     "fontSize": "Taille de police",
+    "fontWeight": "Graisse",
+    "letterSpacing": "Espacement",
+    "italic": "Italique",
     "gaugeTrack": "Jauge linéaire",
     "gforcePlot": "Graphe de force G",
     "horizontalOffset": "Décalage X",
@@ -571,6 +603,7 @@
     "majorThickness": "Épaisseur majeure",
     "majorTicks": "Repères majeurs",
     "mapRotation": "Rotation carte",
+    "rotation": "Rotation",
     "markerColor": "Couleur marqueur",
     "markerOpacity": "Opacité marqueur",
     "markerSize": "Taille marqueur",

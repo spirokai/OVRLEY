@@ -7,7 +7,7 @@ import { Video } from 'lucide-react'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatClockDuration } from '@/lib/time-format'
 import { getClipGeometry, getExportRangeHighlightGeometry } from '../utils/timelineGeometry'
-import { getActivityAttributeLabel } from '@/lib/widget/widget-icons'
+import { getActivityAttributeLabel } from '@/lib/widget/widget-presentation'
 import i18next from 'i18next'
 
 const TEXT_HIDE_THRESHOLD_REM = 3

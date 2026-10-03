@@ -12,7 +12,51 @@ use crate::error::{CoreError, CoreResult};
 use crate::types::{BackdropType, DisplayType, MetricKind, TrackFillStyle};
 
 pub const TEMPLATE_FILE_FORMAT: &str = "ovrley-template";
-pub const TEMPLATE_FILE_VERSION: u32 = 2;
+pub const TEMPLATE_FILE_VERSION: u32 = 3;
+
+/// One typography contract for render requests and saved-document ingress.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LabelTypography {
+    #[serde(deserialize_with = "deserialize_font_weight")]
+    pub font_weight: f32,
+    #[serde(deserialize_with = "deserialize_italic")]
+    pub italic: bool,
+    /// Percentage of font size between grapheme clusters; no trailing gap.
+    #[serde(deserialize_with = "deserialize_letter_spacing")]
+    pub letter_spacing: f32,
+}
+
+fn deserialize_font_weight<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<f32, D::Error> {
+    let weight = f64::deserialize(deserializer)
+        .map_err(|error| serde::de::Error::custom(format!("font_weight: {error}")))?;
+    // Validate the original number before narrowing to Skia's f32 coordinates.
+    if !weight.is_finite() || !(1.0..=1000.0).contains(&weight) {
+        return Err(serde::de::Error::custom(
+            "font_weight: must be a finite number from 1 to 1000",
+        ));
+    }
+    Ok(weight as f32)
+}
+
+fn deserialize_italic<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
+    bool::deserialize(deserializer)
+        .map_err(|error| serde::de::Error::custom(format!("italic: {error}")))
+}
+
+fn deserialize_letter_spacing<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<f32, D::Error> {
+    let spacing = f64::deserialize(deserializer)
+        .map_err(|error| serde::de::Error::custom(format!("letter_spacing: {error}")))?;
+    if !spacing.is_finite() || !(spacing as f32).is_finite() {
+        return Err(serde::de::Error::custom(
+            "letter_spacing: must be a finite 32-bit number",
+        ));
+    }
+    Ok(spacing as f32)
+}
 
 /// Global render settings shared by labels, metric values, plots, and ffmpeg.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -36,8 +80,10 @@ pub struct SceneConfig {
     pub update_rate: Option<u32>,
     #[serde(default, skip_serializing)]
     pub composite_video_path: Option<String>,
-    #[serde(default, skip_serializing)]
-    pub composite_bitrate: Option<String>,
+    #[serde(default, rename = "qualityType", skip_serializing)]
+    pub quality_type: Option<crate::encode::quality::QualityType>,
+    #[serde(default, rename = "qualityValue", skip_serializing)]
+    pub quality_value: Option<f64>,
     #[serde(default, skip_serializing)]
     pub composite_sync_offset: Option<f64>,
     #[serde(default, skip_serializing)]
@@ -93,6 +139,8 @@ pub struct LabelConfig {
     pub font_family: Option<String>,
     #[serde(default)]
     pub font_size: Option<f32>,
+    #[serde(flatten)]
+    pub typography: LabelTypography,
     #[serde(default)]
     pub color: Option<String>,
     #[serde(default)]
@@ -439,10 +487,54 @@ fn promote_variant_keys(raw: &mut serde_json::Value, variant_key: &str) {
 
 /// Complete template render configuration.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RasterConfig {
+    pub id: String,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub rotation: f64,
+    pub opacity: f64,
+    #[serde(deserialize_with = "deserialize_raster_path")]
+    pub path: Option<String>,
+    #[serde(
+        default,
+        rename = "resourceId",
+        deserialize_with = "deserialize_present_resource",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub resource_id: Option<String>,
+    #[serde(
+        default,
+        rename = "resourceErrorCode",
+        deserialize_with = "deserialize_present_resource",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub resource_error_code: Option<crate::raster::RasterError>,
+}
+
+fn deserialize_present_resource<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
+}
+
+fn deserialize_raster_path<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error> {
+    Option::<String>::deserialize(deserializer)
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RenderConfig {
     pub scene: SceneConfig,
     #[serde(default)]
     pub backdrops: Vec<BackdropConfig>,
+    #[serde(default, deserialize_with = "deserialize_render_rasters")]
+    pub rasters: Vec<RasterConfig>,
     #[serde(default)]
     pub labels: Vec<LabelConfig>,
     #[serde(default)]
@@ -451,6 +543,17 @@ pub struct RenderConfig {
     pub plots: Value,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+fn deserialize_render_rasters<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<RasterConfig>, D::Error> {
+    use serde::de::Error;
+    Vec::<RasterConfig>::deserialize(deserializer).map_err(|error| {
+        D::Error::custom(format!(
+            "rasters: {error} [raster_error:invalid_config:configuration]"
+        ))
+    })
 }
 
 /// Shared polyline style fragment for plot widgets.
@@ -838,20 +941,84 @@ pub fn parse_template_value(value: &Value) -> CoreResult<RenderConfig> {
         return Err(CoreError::Config("template version missing".into()));
     };
 
-    if version != u64::from(TEMPLATE_FILE_VERSION) {
+    if version != 2 && version != u64::from(TEMPLATE_FILE_VERSION) {
         return Err(CoreError::Config(format!(
             "unsupported template version: {version}. expected {TEMPLATE_FILE_VERSION}"
         )));
     }
 
-    let mut config_value = value
+    let mut migrated = value.clone();
+    migrate_saved_font_input(&mut migrated);
+    let mut config_value = migrated
         .get("config")
         .cloned()
         .ok_or_else(|| CoreError::Config("template config missing".into()))?;
-    materialize_template_scene_defaults(&mut config_value, value);
+    if version == 2 {
+        let config = config_value
+            .as_object_mut()
+            .ok_or_else(|| CoreError::Config("template config must be an object".into()))?;
+        if config.contains_key("rasters") {
+            return Err(CoreError::Config(
+                "version 2 template cannot contain rasters".into(),
+            ));
+        }
+        config.insert("rasters".into(), Value::Array(Vec::new()));
+    }
+    config_value
+        .get("rasters")
+        .and_then(Value::as_array)
+        .ok_or_else(|| CoreError::Config("template config.rasters must be an array".into()))?;
+    materialize_template_scene_defaults(&mut config_value, &migrated);
     let mut config = parse_config_value(&config_value)?;
-    apply_template_global_defaults(&mut config, &value);
+    apply_template_global_defaults(&mut config, &migrated);
     Ok(config)
+}
+
+/// Upgrades legacy saved documents in memory, including development v3 files.
+/// Present typography values are preserved; validation belongs to the load boundary.
+pub fn migrate_saved_font_input(value: &mut Value) {
+    match value {
+        Value::Object(object) => {
+            if let Some(labels) = object.get_mut("labels").and_then(Value::as_array_mut) {
+                for label in labels {
+                    if let Some(label) = label.as_object_mut() {
+                        label.entry("font_weight").or_insert(Value::from(400));
+                        label.entry("italic").or_insert(Value::Bool(false));
+                        label.entry("letter_spacing").or_insert(Value::from(0));
+                    }
+                }
+            }
+            for (key, value) in object {
+                match (key.as_str(), value.as_str()) {
+                    (
+                        "font" | "label_font" | "min_max_label_font" | "font_text" | "font_values",
+                        Some("Inter ExtraBold.ttf" | "Inter ExtraBold"),
+                    ) => *value = Value::from("Inter.ttf"),
+                    ("font_family", Some("Inter ExtraBold")) => *value = Value::from("Inter"),
+                    _ => migrate_saved_font_input(value),
+                }
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                migrate_saved_font_input(item);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Validates project-owned label typography once at its JSON load boundary.
+pub fn validate_saved_label_typography(config: &Value) -> CoreResult<()> {
+    let labels = config
+        .get("labels")
+        .and_then(Value::as_array)
+        .ok_or_else(|| CoreError::Config("labels must be an array".into()))?;
+    for (index, label) in labels.iter().enumerate() {
+        serde_json::from_value::<LabelTypography>(label.clone())
+            .map_err(|error| CoreError::Config(format!("labels[{index}].{error}")))?;
+    }
+    Ok(())
 }
 
 fn materialize_template_scene_defaults(config: &mut Value, template: &Value) {

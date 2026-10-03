@@ -109,8 +109,9 @@ const OverlayCanvasWidget = memo(
         className={cn(
           'group absolute cursor-move select-none rounded-xl outline-1 outline-transparent transition-shadow',
           widget.category === 'backdrops' && 'z-1',
+          widget.category === 'rasters' && 'z-2',
           widget.category === 'labels' && 'z-20',
-          widget.category === 'plots' && 'z-2',
+          widget.category === 'plots' && 'z-3',
           widget.category === 'values' && 'z-10',
         )}
         style={{
@@ -153,7 +154,10 @@ const OverlayCanvasWidget = memo(
     previousProps.globalScale === nextProps.globalScale &&
     previousProps.globalOpacity === nextProps.globalOpacity &&
     previousProps.activity === nextProps.activity &&
-    (previousProps.widget.type === 'label' || previousProps.widget.type === 'backdrop' || previousProps.previewSecond === nextProps.previewSecond) &&
+    (previousProps.widget.type === 'label' ||
+      previousProps.widget.type === 'backdrop' ||
+      previousProps.widget.type === 'raster' ||
+      previousProps.previewSecond === nextProps.previewSecond) &&
     previousProps.metricPreviewModel === nextProps.metricPreviewModel &&
     previousProps.textPreviewModel === nextProps.textPreviewModel &&
     previousProps.renderGeometryModel === nextProps.renderGeometryModel &&

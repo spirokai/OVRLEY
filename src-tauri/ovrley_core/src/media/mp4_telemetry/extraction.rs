@@ -28,7 +28,7 @@ use telemetry_parser::tags_impl::{GroupId, Scalar, TagId, TagMap, TagValue};
 use telemetry_parser::util::SampleInfo;
 
 use crate::media::native_sample::NativeSample;
-use crate::media::telemetry_math::{finite_f64, g_force_from_components};
+use crate::media::telemetry_math::{finite_f64, g_force_from_components, haversine_distance};
 use crate::media::time::{
     sub_sample_timestamp_ms, unix_millis_plus_offset_ms_to_rfc3339, unix_seconds_to_rfc3339,
 };
@@ -44,23 +44,39 @@ use super::vendor::{
 };
 
 const GOPRO_GPS9_TAG: u32 = 0x4750_5339;
+const IMPOSSIBLE_GPS_JUMP_MPS: f64 = 1500.0 / 3.6;
 
 /// Converts telemetry-parser's grouped tag maps into the narrow raw-sample
 /// shape consumed by the importer.
 pub(crate) fn extract_native_samples(samples: &[SampleInfo]) -> Vec<NativeSample> {
     let mut result = Vec::new();
+    let mut last_no_fix_coordinate = None;
+    let mut acquired_gps = false;
 
-    for sample in samples {
+    for (packet_index, sample) in samples.iter().enumerate() {
         let Some(tag_map) = &sample.tag_map else {
             continue;
         };
 
         let base = NativeSample {
             timestamp_ms: sample.timestamp_ms,
+            gps_packet_index: Some(packet_index),
             ..NativeSample::default()
         };
 
+        if !acquired_gps {
+            if let Some(gps_map) = tag_map.get(&GroupId::GPS) {
+                if !gps5_fix_is_usable(gps_map) {
+                    last_no_fix_coordinate =
+                        last_scaled_gps5_coordinate(gps_map).or(last_no_fix_coordinate);
+                }
+            }
+        }
+        let before_gps = result.len();
         append_gps_samples(&mut result, &base, sample, tag_map);
+        acquired_gps |= result[before_gps..]
+            .iter()
+            .any(|native| native.gps_coordinates().is_some());
 
         append_camera_samples(&mut result, sample, tag_map);
 
@@ -69,7 +85,151 @@ pub(crate) fn extract_native_samples(samples: &[SampleInfo]) -> Vec<NativeSample
         }
     }
     result.sort_by(|left, right| left.timestamp_ms.total_cmp(&right.timestamp_ms));
+    discard_cached_gps_prefix(&mut result, last_no_fix_coordinate);
     result
+}
+
+fn last_scaled_gps5_coordinate(gps_map: &TagMap) -> Option<(f64, f64)> {
+    let scales = extract_tag_i32_vec(gps_map, &TagId::Scale)?;
+    if scales.len() < 2 || scales[0] == 0 || scales[1] == 0 {
+        return None;
+    }
+    let tag = gps_map.get(&TagId::Data)?;
+    let TagValue::Vec_Vec_i32(rows) = &tag.value else {
+        return None;
+    };
+    let row = rows.get().last()?;
+    Some((
+        *row.first()? as f64 / scales[0] as f64,
+        *row.get(1)? as f64 / scales[1] as f64,
+    ))
+}
+
+fn discard_cached_gps_prefix(samples: &mut [NativeSample], cached: Option<(f64, f64)>) {
+    let Some(cached) = cached else {
+        return;
+    };
+    let gps: Vec<_> = samples
+        .iter()
+        .enumerate()
+        .filter_map(|(index, sample)| sample.gps_coordinates().map(|_| index))
+        .collect();
+    let prefix_len = gps
+        .iter()
+        .take_while(|&&index| samples[index].latitude.zip(samples[index].longitude) == Some(cached))
+        .count();
+    if prefix_len == 0 || gps.len() == prefix_len {
+        return;
+    }
+
+    let stale = &samples[gps[prefix_len - 1]];
+    let first_route = &samples[gps[prefix_len]];
+    if gps_jump_is_possible(stale, first_route) {
+        return;
+    }
+
+    // A second row in the same packet does not confirm a new fix. If the next
+    // packet returns to the old location, the excursion was the bad position.
+    let confirmation = gps
+        .iter()
+        .enumerate()
+        .skip(prefix_len + 1)
+        .find(|entry| samples[*entry.1].gps_packet_index != first_route.gps_packet_index);
+    let (clear_start, clear_end) = match confirmation {
+        Some((_, &index)) if gps_jump_is_possible(first_route, &samples[index]) => (0, prefix_len),
+        Some((next, &index)) if gps_jump_is_possible(stale, &samples[index]) => (prefix_len, next),
+        Some((next, _)) => (0, next),
+        None => (0, gps.len()),
+    };
+
+    for &index in &gps[clear_start..clear_end] {
+        let sample = &mut samples[index];
+        sample.latitude = None;
+        sample.longitude = None;
+        sample.altitude = None;
+        sample.speed = None;
+        sample.heading = None;
+        sample.timestamp = None;
+    }
+}
+
+fn gps_jump_is_possible(from: &NativeSample, to: &NativeSample) -> bool {
+    let seconds = (to.timestamp_ms - from.timestamp_ms) / 1000.0;
+    seconds > 0.0
+        && haversine_distance(
+            from.latitude.unwrap(),
+            from.longitude.unwrap(),
+            to.latitude.unwrap(),
+            to.longitude.unwrap(),
+        ) <= seconds * IMPOSSIBLE_GPS_JUMP_MPS
+}
+
+#[cfg(test)]
+mod cached_gps_tests {
+    use super::*;
+
+    fn gps_sample(
+        timestamp_ms: f64,
+        latitude: f64,
+        longitude: f64,
+        packet_index: usize,
+    ) -> NativeSample {
+        NativeSample {
+            timestamp_ms,
+            gps_time_anchor: true,
+            gps_packet_index: Some(packet_index),
+            latitude: Some(latitude),
+            longitude: Some(longitude),
+            speed: Some(0.0),
+            ..NativeSample::default()
+        }
+    }
+
+    #[test]
+    fn discards_cached_fix_after_confirmed_impossible_jump() {
+        let cached = (12.7158364, 77.2275231);
+        let mut samples = vec![
+            NativeSample {
+                timestamp_ms: 0.0,
+                gps_time_anchor: true,
+                ..NativeSample::default()
+            },
+            NativeSample {
+                timestamp_ms: 500.0,
+                g_force: Some(1.2),
+                ..NativeSample::default()
+            },
+            gps_sample(24_960.0, cached.0, cached.1, 24),
+            gps_sample(25_900.0, cached.0, cached.1, 24),
+            gps_sample(26_000.0, 12.4198418, 76.6687983, 25),
+            gps_sample(26_100.0, 12.4198420, 76.6687990, 25),
+            gps_sample(27_040.0, 12.4198500, 76.6688000, 26),
+        ];
+
+        discard_cached_gps_prefix(&mut samples, Some(cached));
+
+        assert_eq!(samples.len(), 7);
+        assert!(samples[2..4]
+            .iter()
+            .all(|sample| sample.gps_time_anchor && !sample.has_gps_payload()));
+        assert_eq!(samples[1].g_force, Some(1.2));
+        assert_eq!(samples[4].latitude, Some(12.4198418));
+    }
+
+    #[test]
+    fn keeps_stationary_fix_when_later_movement_is_plausible() {
+        let cached = (12.7158364, 77.2275231);
+        let mut samples = vec![
+            gps_sample(1000.0, cached.0, cached.1, 1),
+            gps_sample(2000.0, cached.0, cached.1, 2),
+            gps_sample(3000.0, 12.7158400, 77.2275300, 3),
+            gps_sample(3100.0, 12.7158410, 77.2275310, 3),
+        ];
+
+        discard_cached_gps_prefix(&mut samples, Some(cached));
+
+        assert!(samples.iter().all(NativeSample::has_gps_payload));
+    }
 }
 
 /// Reports whether a sample contains one of the GPS groups handled below.
@@ -111,11 +271,18 @@ fn append_gps_group_samples(
                 let values = gps_values.get();
                 for (index, gps) in values.iter().enumerate() {
                     if !gps.is_acquired {
+                        result.push(NativeSample {
+                            timestamp_ms: sub_sample_timestamp_ms(sample, index, values.len()),
+                            gps_time_anchor: true,
+                            gps_packet_index: base.gps_packet_index,
+                            ..NativeSample::default()
+                        });
                         continue;
                     }
 
                     let mut native = base.clone();
                     native.timestamp_ms = sub_sample_timestamp_ms(sample, index, values.len());
+                    native.gps_time_anchor = true;
                     native.latitude = finite_f64(gps.lat);
                     native.longitude = finite_f64(gps.lon);
                     native.altitude = finite_f64(gps.altitude);
@@ -181,6 +348,14 @@ fn append_scaled_gps_rows(
         return;
     }
     if !gps5_fix_is_usable(gps_map) {
+        for index in 0..row_count {
+            result.push(NativeSample {
+                timestamp_ms: sub_sample_timestamp_ms(sample, index, row_count),
+                gps_time_anchor: true,
+                gps_packet_index: base.gps_packet_index,
+                ..NativeSample::default()
+            });
+        }
         return;
     }
     let Some(scales) = extract_tag_i32_vec(gps_map, &TagId::Scale).filter(|scales| {
@@ -229,6 +404,7 @@ fn append_scaled_gps_row(
 
     let mut native = base.clone();
     native.timestamp_ms = sub_sample_timestamp_ms(sample, index, row_count);
+    native.gps_time_anchor = true;
     native.latitude = finite_f64(latitude);
     native.longitude = finite_f64(longitude);
     native.altitude = finite_f64(row[2] / scales[2] as f64);

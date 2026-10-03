@@ -7,15 +7,18 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
-import { getWidgetTypeName } from '@/lib/widget/widget-icons'
 import { deleteWidgetInConfig, ensureWidgetIdsInConfig, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget/widget-config'
-import { buildConfigWidgets, groupWidgetsForSidebar, withAltitudeEditorPresentation } from '@/lib/widget/widget-presentation'
+import { buildConfigWidgets, getWidgetTypeName, groupWidgetsForSidebar, withAltitudeEditorPresentation } from '@/lib/widget/widget-presentation'
 import { isStandardMetricWidgetType } from '@/lib/widget/standard-metrics'
+import { RASTER_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { clamp } from '@/lib/utils'
 import { createBackdropDefaults, createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'
 import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
 import { updateLiveWidgetDraft } from '@/features/overlay-editor/utils/widgetDomHelpers'
 import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
+import { useFontPreparation } from '@/hooks/useFonts'
+import { collectFontIds, createLabelFontSelection } from '@/lib/fonts'
+import { getPreparedFont } from '@/lib/font-resources'
 
 const CONTENT_ALIGNMENT_FACTORS = {
   left: 0,
@@ -55,6 +58,7 @@ export function useWidgetManager({ widgetLiveEdits }) {
     })),
   )
   const liveEdits = useWidgetDraftView(widgetLiveEdits)
+  const prepareFontEdit = useFontPreparation()
 
   // Derived state — group and build the sidebar widget list from config
   const widgets = useMemo(() => {
@@ -80,7 +84,20 @@ export function useWidgetManager({ widgetLiveEdits }) {
       }
     }
 
-    setConfig(updateWidgetInConfig(config, id, nextUpdates))
+    const fontIds = collectFontIds(updates, widget.data)
+    if (Object.hasOwn(updates, 'font') && !fontIds.includes(updates.font)) fontIds.push(updates.font)
+    const commit = () => {
+      const state = useStore.getState()
+      const currentWidget = buildConfigWidgets(state.config).find((item) => item.id === id)
+      if (!currentWidget) return // A pending font edit may outlive a deleted widget.
+      const selection =
+        currentWidget.category === 'labels' && Object.hasOwn(updates, 'font')
+          ? createLabelFontSelection(getPreparedFont(updates.font), currentWidget.data)
+          : {}
+      state.setConfig(updateWidgetInConfig(state.config, id, { ...nextUpdates, ...selection }))
+    }
+    if (fontIds.length) prepareFontEdit(id, fontIds, commit)
+    else commit()
   }
 
   const updateWidgetSize = (id, updates) => {
@@ -126,42 +143,34 @@ export function useWidgetManager({ widgetLiveEdits }) {
 
   // Add widget — creates a new widget of the given type with defaults and appends to config
   const addWidget = ({ type, displayType, lapTimerMode }) => {
-    const nextConfig = structuredClone(config)
-    let targetCategory = null
-
+    let category
+    let data
     if (type === 'backdrop') {
-      if (!nextConfig.backdrops) nextConfig.backdrops = []
-      nextConfig.backdrops.push(createBackdropDefaults(displayType))
-      targetCategory = 'backdrops'
+      category = 'backdrops'
+      data = createBackdropDefaults(displayType)
+    } else if (type === 'raster') {
+      category = 'rasters'
+      data = { ...RASTER_DEFAULTS }
     } else if (type === 'label') {
-      if (!nextConfig.labels) nextConfig.labels = []
-      nextConfig.labels.push(createLabelDefaults(globalDefaults))
-      targetCategory = 'labels'
+      category = 'labels'
+      data = createLabelDefaults(globalDefaults)
     } else if (isStandardMetricWidgetType(type) || ['gradient', 'time'].includes(type)) {
-      if (!nextConfig.values) nextConfig.values = []
-      nextConfig.values.push(
-        createMetricValueDefaults(type, globalDefaults, {
-          displayType,
-          lapTimerMode,
-        }),
-      )
-      targetCategory = 'values'
+      category = 'values'
+      data = createMetricValueDefaults(type, globalDefaults, { displayType, lapTimerMode })
     } else if (['course', 'elevation'].includes(type)) {
-      if (!nextConfig.plots) nextConfig.plots = []
-      nextConfig.plots.push(
-        createPlotDefaults(type, globalDefaults, {
-          coursePoints: parsedActivity?.sample_course_points,
-          sceneFontSize: globalDefaults?.font_size,
-        }),
-      )
-      targetCategory = 'plots'
-    }
+      category = 'plots'
+      data = createPlotDefaults(type, globalDefaults, {
+        coursePoints: parsedActivity?.sample_course_points,
+        sceneFontSize: globalDefaults.font_size,
+      })
+    } else throw new Error(`Unknown widget type: ${type}`)
 
-    const normalizedConfig = ensureWidgetIdsInConfig(nextConfig)
-    const newId = targetCategory ? normalizedConfig[targetCategory]?.at(-1)?.id || null : null
-
-    setConfig(normalizedConfig)
-    if (newId) setSelectedWidgetId(newId)
+    prepareFontEdit(Symbol('add widget'), collectFontIds(data), () => {
+      const state = useStore.getState()
+      const nextConfig = ensureWidgetIdsInConfig({ ...state.config, [category]: [...state.config[category], data] })
+      state.setConfig(nextConfig)
+      state.setSelectedWidgetId(nextConfig[category].at(-1).id)
+    })
   }
 
   // Delete widget — removes the widget by id and updates config
@@ -174,31 +183,32 @@ export function useWidgetManager({ widgetLiveEdits }) {
     const widget = widgets.find((item) => item.id === id)
     if (!widget) return
 
-    if (widget.type === 'label') {
-      setConfig(replaceWidgetInConfig(config, id, createLabelDefaults(globalDefaults)))
+    const commitReset = (data) =>
+      prepareFontEdit(id, collectFontIds(data), () => {
+        const state = useStore.getState()
+        if (!buildConfigWidgets(state.config).some((item) => item.id === id)) return
+        state.setConfig(replaceWidgetInConfig(state.config, id, data))
+      })
+
+    if (widget.type === 'label') return commitReset(createLabelDefaults(globalDefaults))
+
+    if (widget.type === 'backdrop') {
+      commitReset(createBackdropDefaults())
       return
     }
 
-    if (widget.type === 'backdrop') {
-      setConfig(replaceWidgetInConfig(config, id, createBackdropDefaults()))
+    if (widget.type === 'raster') {
+      commitReset({ ...RASTER_DEFAULTS })
       return
     }
 
     if (widget.type === 'course' || widget.type === 'elevation') {
-      setConfig(
-        replaceWidgetInConfig(
-          config,
-          id,
-          createPlotDefaults(widget.type, globalDefaults, {
-            sceneFontSize: config?.scene?.font_size,
-          }),
-        ),
-      )
+      commitReset(createPlotDefaults(widget.type, globalDefaults, { sceneFontSize: config.scene.font_size }))
       return
     }
 
     const selection = widget.type === 'lap_timer' ? { lapTimerMode: 'current_lap' } : {}
-    setConfig(replaceWidgetInConfig(config, id, createMetricValueDefaults(widget.type, globalDefaults, selection)))
+    commitReset(createMetricValueDefaults(widget.type, globalDefaults, selection))
   }
 
   return {

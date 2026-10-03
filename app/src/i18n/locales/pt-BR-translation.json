@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "Arquivos de imagem",
+    "selectImage": "Selecionar imagem",
+    "replaceImage": "Substituir imagem",
+    "errors": {
+      "missingAsset": "A imagem incorporada está ausente deste projeto. Selecione uma substituta.",
+      "corruptAsset": "A imagem incorporada está danificada. Selecione uma substituta.",
+      "relativePath": "Selecione uma imagem usando um caminho absoluto.",
+      "missing": "O arquivo de imagem está ausente. Selecione outra imagem.",
+      "unreadable": "Não foi possível ler o arquivo de imagem. Verifique as permissões ou selecione outro.",
+      "unsupportedType": "Escolha um arquivo PNG, JPEG, BMP ou TIFF (.png, .jpeg, .jpg, .bmp, .tiff).",
+      "encodedSize": "O arquivo excede 5 MiB. Escolha um arquivo menor.",
+      "resolution": "A resolução excede 25 megapixels. Escolha uma imagem menor.",
+      "decode": "Não foi possível decodificar a imagem. Escolha outra imagem.",
+      "noImage": "A imagem {{id}} não tem um arquivo selecionado. Selecione um antes de renderizar.",
+      "renderUnavailable": "A imagem {{id}} ainda não pode ser renderizada.",
+      "invalidConfig": "A configuração da imagem é inválida."
+    }
+  },
   "app": {
     "importingYourVideo": "Importando seu vídeo...",
     "loadingProject": "Carregando projeto...",
@@ -105,6 +124,10 @@
     "zoomOut": "Reduzir"
   },
   "projects": {
+    "archiveTooLarge": "O projeto excede o limite de arquivo de 40 MiB. Remova ou substitua uma imagem.",
+    "invalidArchive": "O arquivo do projeto é inválido ou está danificado. Escolha outro arquivo.",
+    "rasterUnavailable": "Uma imagem está indisponível. Substitua-a antes de salvar.",
+    "saveFailed": "Não foi possível salvar o projeto. Verifique o destino e tente novamente.",
     "activity": "Atividade",
     "cancel": "Cancelar",
     "closeWithoutSaving": "Fechar sem salvar",
@@ -133,6 +156,11 @@
     "000000Or900": "00:00:00 ou 900",
     "backendOffline": "Backend offline",
     "bitrate": "Taxa de bits",
+    "quality": "Qualidade",
+    "better": "Melhor",
+    "worse": "Pior",
+    "smallerFile": "Arquivo menor",
+    "largerFile": "Arquivo maior",
     "cancel": "Cancelar",
     "codecOutputFormat": "Codec / formato de saída",
     "custom": "Personalizado",
@@ -459,6 +487,7 @@
       "lapLog": "Registro de voltas"
     },
     "types": {
+      "raster": { "name": "Imagem", "shortName": "Imagem" },
       "air_pressure": { "name": "Pressão do ar", "shortName": "Pressão" },
       "altitude": { "name": "Altitude", "shortName": "Altitude" },
       "aperture": { "name": "Abertura", "shortName": "Abertura" },
@@ -547,6 +576,9 @@
     "flatTrack": "Trilha plana",
     "fontFamily": "Família da fonte",
     "fontSize": "Tamanho da fonte",
+    "fontWeight": "Peso",
+    "letterSpacing": "Espaçamento",
+    "italic": "Itálico",
     "gaugeTrack": "Trilha do medidor",
     "gforcePlot": "Gráfico de força G",
     "horizontalOffset": "Ajuste horizontal",
@@ -571,6 +603,7 @@
     "majorThickness": "Espessura primária",
     "majorTicks": "Marcas principais",
     "mapRotation": "Rotação do mapa",
+    "rotation": "Rotação",
     "markerColor": "Cor do marcador",
     "markerOpacity": "Opacidade marcador",
     "markerSize": "Tamanho marcador",

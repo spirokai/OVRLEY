@@ -20,7 +20,7 @@
  * @module template-state
  */
 
-import { createFontSelection, getFontFamilyName } from '@/lib/fonts'
+import { createFontSelection, createLabelFontSelection, getFontFamilyName } from '@/lib/fonts'
 import { getThemeColor } from '@/lib/theme'
 import { resolveActiveBackdropData, resolveActiveMetricWidgetData } from '../widget/widget-resolver'
 import { DEFAULT_GLOBAL_DEFAULTS } from './template-constants'
@@ -109,6 +109,7 @@ export function createEditorEffectiveConfig({ config, globalDefaults }) {
     ...config,
     scene: buildEffectiveSceneData(config.scene, normalizedGlobals),
     backdrops: config.backdrops,
+    rasters: config.rasters,
     labels: config.labels,
     values: config.values,
     plots: config.plots,
@@ -136,14 +137,21 @@ export function applyGlobalDefaults(config, globalDefaults) {
   return createEditorEffectiveConfig({ config, globalDefaults })
 }
 
-export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null) {
+/**
+ * @param {object} config Committed widget config.
+ * @param {object} globals Canonical global defaults.
+ * @param {string[]|null} changedKeys Defaults to apply; null applies all.
+ * @param {object} labelFont Prepared text-family capabilities, required when applying font_text to labels.
+ * @returns {object} Config with global defaults applied to existing widgets.
+ */
+export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null, labelFont) {
   if (!config || !globals) return config
   const changedKeySet = changedKeys ? new Set(changedKeys) : null
   const shouldApply = (key) => !changedKeySet || changedKeySet.has(key)
   const nextConfig = JSON.parse(JSON.stringify(config))
   if (nextConfig.labels) {
     for (const label of nextConfig.labels) {
-      if (shouldApply('font_text')) Object.assign(label, createFontSelection(globals.font_text))
+      if (shouldApply('font_text')) Object.assign(label, createLabelFontSelection(labelFont, label))
       if (shouldApply('color_text')) label.color = globals.color_text
     }
   }

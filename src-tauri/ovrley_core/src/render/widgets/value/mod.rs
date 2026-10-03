@@ -168,6 +168,9 @@ mod tests {
     #[test]
     fn all_boxed_display_types_marked_handled() {
         let style = ResolvedTextStyle {
+            font_weight: 400.0,
+            italic: false,
+            letter_spacing: 0.0,
             x: 0.0,
             y: 0.0,
             font_name: None,
@@ -286,6 +289,9 @@ mod tests {
     #[test]
     fn text_display_type_marked_handled_when_formatter_exists() {
         let style = ResolvedTextStyle {
+            font_weight: 400.0,
+            italic: false,
+            letter_spacing: 0.0,
             x: 0.0,
             y: 0.0,
             font_name: None,

@@ -4,6 +4,7 @@
  */
 
 import { isFramedWidget } from '@/lib/widget/display-type-behavior'
+import { mergeDisplayVariantUpdates } from '@/lib/widget/widget-resolver'
 import { getLiveWidgetTransform } from './widgetInteractionGeometry'
 
 /**
@@ -148,6 +149,7 @@ export function updateLiveWidgetDraft({ draftWidgetsRef, setLiveWidgetDraft, wid
   const nextDraft = {
     ...currentDraft,
     ...updates,
+    ...(updates.display_variants ? { display_variants: mergeDisplayVariantUpdates(currentDraft.display_variants, updates.display_variants) } : {}),
   }
 
   setLiveWidgetDraft(widgetId, nextDraft, layout)

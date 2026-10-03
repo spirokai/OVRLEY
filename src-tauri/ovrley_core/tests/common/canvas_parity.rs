@@ -292,13 +292,18 @@ pub fn write_mock_data(
     let global_defaults = resolve_global_defaults(&config.scene, config_raw);
 
     // 1. template.json — ovrley-template envelope wrapping the config
-    let config_obj = config_raw
+    let mut config_obj = config_raw
         .get("config")
         .cloned()
         .unwrap_or_else(|| config_raw.clone());
+    config_obj
+        .as_object_mut()
+        .expect("canvas parity config must be an object")
+        .entry("rasters")
+        .or_insert_with(|| serde_json::json!([]));
     let template = serde_json::json!({
         "format": "ovrley-template",
-        "version": 2,
+        "version": 3,
         "name": "test",
         "savedAt": "2026-05-10T00:00:00.000Z",
         "config": config_obj,

@@ -4,7 +4,6 @@ import { getPreviewFontFamily, getWidgetOpacity } from '../../shared/textMeasure
 import { getTextShadowParts } from '../../shared/shadow'
 import { PreviewSvgText } from '../../shared/PreviewSvgComponents'
 import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
-import { useFontMetrics } from '../../shared/useFontMetrics'
 
 /**
  * Renders a lap timer text widget.
@@ -14,10 +13,6 @@ import { useFontMetrics } from '../../shared/useFontMetrics'
 export function OverlayLapTimerWidget({ widget, activity, previewSecond, globalOpacity, metricPreviewModel, sceneStyle }) {
   const fontFamily = getPreviewFontFamily(widget.data.font)
   const labelFontFamily = getPreviewFontFamily(widget.data.label_font)
-  const fontMetricsVersion = useFontMetrics([
-    { fontFamily, fontSize: widget.data.font_size },
-    { fontFamily: labelFontFamily, fontSize: widget.data.label_font_size },
-  ])
   const opacity = getWidgetOpacity(widget.data, globalOpacity)
   const shadow = getTextShadowParts(sceneStyle)
   const lapLogPreparation = useMemo(
@@ -25,9 +20,7 @@ export function OverlayLapTimerWidget({ widget, activity, previewSecond, globalO
       (metricPreviewModel === null || metricPreviewModel === undefined) && widget.data.lap_timer_mode === 'lap_log'
         ? prepareLapLogPreview({ widget, activity })
         : undefined,
-    // Font readiness changes canvas measurements without changing the preparation inputs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activity, fontMetricsVersion, metricPreviewModel, widget],
+    [activity, metricPreviewModel, widget],
   )
   const model = metricPreviewModel ?? buildLapTimerPreviewModel({ widget, activity, previewSecond, lapLogPreparation })
   const { content, visualBounds } = model

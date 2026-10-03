@@ -10,7 +10,7 @@ use crate::encode::fps::Fps;
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompositeRenderPlan {
     pub(crate) video_path: PathBuf,
-    pub(crate) bitrate: String,
+    pub quality: crate::encode::quality::EncodingQuality,
     pub(crate) sync_offset: f64,
     pub(crate) trim_start: f64,
     pub(crate) render_duration: f64,

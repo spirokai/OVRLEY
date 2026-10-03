@@ -23,6 +23,8 @@ pub mod debug;
 pub mod encode;
 /// Structured error types and result alias used by all core modules.
 pub mod error;
+/// Font identities, face capabilities, and session resolution.
+pub mod fonts;
 /// Shared interpolation utilities used by activity and render modules.
 pub mod interpolation;
 /// Source media probing and embedded telemetry extraction.
@@ -33,6 +35,8 @@ pub mod normalize;
 pub mod output;
 /// Application path configuration and resolution.
 pub mod paths;
+/// Validation and oriented preview decoding for user-selected bitmap resources.
+pub mod raster;
 /// Shared Ramer-Douglas-Peucker line simplification.
 pub mod rdp;
 /// Skia-based overlay rendering.

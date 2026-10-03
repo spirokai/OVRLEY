@@ -2,7 +2,7 @@
  * Implements API helpers for backend.
  */
 
-import { formatFontLabel, setBundledRecommendedFonts } from '@/lib/fonts'
+import { rasterResourceIds } from '@/lib/widget/raster-resources'
 
 /**
  * Shared Tauri runtime detection.
@@ -261,84 +261,23 @@ export async function openHevcSupport() {
 }
 
 /**
- * Sorts font names.
- *
- * @param {*} fonts - Value for fonts.
- * @returns {*} Result produced by the helper.
- */
-function sortFontNames(fonts) {
-  return [...new Set(fonts.filter(Boolean))]
-    .map((font) => font.trim())
-    .filter(Boolean)
-    .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }))
-}
-
-function sortFontOptions(fonts) {
-  const byId = new Map()
-
-  fonts.forEach((font) => {
-    const id = typeof font === 'string' ? font.trim() : String(font?.id || font?.name || '').trim()
-    if (!id) {
-      return
-    }
-
-    const option = {
-      id,
-      name: typeof font === 'object' && typeof font?.name === 'string' && font.name.trim() ? font.name.trim() : formatFontLabel(id),
-    }
-
-    const key = option.id.toLowerCase()
-    if (!byId.has(key)) {
-      byId.set(key, option)
-    }
-  })
-
-  return [...byId.values()].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }))
-}
-
-/**
  * Lists available fonts.
- * @returns {Promise<Array<*>>} Promise resolving to the operation result.
+ * @returns {Promise<object>} Canonical bundled and system family catalog.
  */
 export async function listAvailableFonts() {
-  const invoke = await getInvoke()
-  if (invoke) {
-    const payload = await invoke('backend_list_system_fonts')
-    const fonts = typeof payload === 'string' ? JSON.parse(payload) : payload
-    if (Array.isArray(fonts)) {
-      setBundledRecommendedFonts([])
-      return {
-        recommendedFonts: [],
-        systemFonts: sortFontNames(fonts),
-      }
-    }
+  // Font discovery is Rust-owned and unavailable in frontend-only development.
+  if (!hasTauriRuntime()) return { recommendedFonts: [], systemFonts: [] }
+  return apiCall('backend_list_system_fonts', {})
+}
 
-    const recommendedFonts = sortFontOptions(fonts?.recommendedFonts || fonts?.bundledFonts || [])
-    setBundledRecommendedFonts(recommendedFonts)
-    return {
-      recommendedFonts,
-      systemFonts: sortFontNames(fonts?.systemFonts || []),
-    }
-  }
+/** @param {string} fontId Canonical font ID. @returns {Promise<object>} Resolved capabilities. */
+export function getFontCapabilities(fontId) {
+  return apiCall('backend_font_capabilities', { fontId })
+}
 
-  if (typeof window !== 'undefined' && typeof window.queryLocalFonts === 'function') {
-    try {
-      const fonts = await window.queryLocalFonts()
-      setBundledRecommendedFonts([])
-      return {
-        recommendedFonts: [],
-        systemFonts: sortFontNames(fonts.map((font) => font.family || font.fullName || font.postscriptName || '')),
-      }
-    } catch (error) {
-      console.warn('Local font access unavailable in browser:', error)
-    }
-  }
-
-  setBundledRecommendedFonts([])
-  return {
-    recommendedFonts: [],
-    systemFonts: [],
-  }
+/** @param {string} fontId Canonical font ID. @param {number} faceIndex Catalog face index. @returns {Promise<number[]>} Font bytes. */
+export function getFontData(fontId, faceIndex) {
+  return invokeCommand('backend_font_data', { fontId, faceIndex })
 }
 
 /**
@@ -462,6 +401,19 @@ export async function selectedPathIsFile(path) {
   return invokeCommand('selected_path_is_file', { path })
 }
 
+/** @param {string} path - Absolute path returned by the native raster picker.
+ * @returns {Promise<{width: number, height: number, resourceId: string}>} Validated Rust-owned image.
+ * @throws {Error} Raster failures include a code; bridge failures propagate without a raster code.
+ */
+export async function loadSelectedRaster(path) {
+  return invokeCommand('load_selected_raster', { path })
+}
+
+/** @param {string} resourceId - Rust-owned immutable image identity. @returns {Promise<string>} Oriented PNG bytes encoded as base64. */
+export async function rasterPreviewPng(resourceId) {
+  return invokeCommand('raster_preview_png', { resourceId })
+}
+
 /** @returns {Promise<string>} Absolute Documents/OVRLEY/projects directory. */
 export async function getDefaultProjectDirectory() {
   return invokeCommand('default_project_directory')
@@ -506,10 +458,11 @@ export async function readProjectFile(path) {
  * Validates and atomically writes an OVRLEY project archive.
  * @param {string} path - Absolute `.oly` path.
  * @param {string} projectJson - Canonical project JSON.
+ * @param {object} config - Current editor config containing Rust resource identities.
  * @returns {Promise<string>} Written path.
  */
-export async function writeProjectFile(path, projectJson) {
-  return invokeCommand('write_project_file', { path, projectJson })
+export async function writeProjectFile(path, projectJson, config) {
+  return invokeCommand('write_project_file', { path, projectJson, rasterResourceIds: rasterResourceIds(config) })
 }
 
 /**

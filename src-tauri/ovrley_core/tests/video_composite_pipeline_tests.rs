@@ -85,7 +85,8 @@ fn test_4_3_derives_composite_shell_timing_without_rounding() {
 fn negative_sync_plan_keeps_full_video_output_and_limits_activity_overlap() {
     let mut config = mutable_recent_template_config(1920, 1080);
     config.scene.composite_video_path = Some("input.mp4".to_string());
-    config.scene.composite_bitrate = Some("20M".to_string());
+    config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    config.scene.quality_value = Some(20.0);
     config.scene.composite_sync_offset = Some(-5.0);
     config.scene.composite_video_fps_num = Some(30);
     config.scene.composite_video_fps_den = Some(1);
@@ -119,7 +120,8 @@ fn negative_sync_plan_keeps_full_video_output_and_limits_activity_overlap() {
 fn composite_plan_rejects_offset_at_video_duration_boundary() {
     let mut config = mutable_recent_template_config(1920, 1080);
     config.scene.composite_video_path = Some("input.mp4".to_string());
-    config.scene.composite_bitrate = Some("20M".to_string());
+    config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    config.scene.quality_value = Some(20.0);
     config.scene.composite_sync_offset = Some(-30.0);
     config.scene.composite_video_fps_num = Some(30);
     config.scene.composite_video_fps_den = Some(1);
@@ -273,7 +275,8 @@ fn test_5_5_aggressive_overlay_update_rate_renders_one_sixth_overlay_frames() {
 fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
     let mut config = mutable_recent_template_config(3840, 2160);
     config.scene.composite_video_path = Some("tmp/test-1080p.mp4".to_string());
-    config.scene.composite_bitrate = Some("20M".to_string());
+    config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    config.scene.quality_value = Some(20.0);
     config.scene.composite_sync_offset = Some(0.0);
     config.scene.composite_video_fps_num = Some(30000);
     config.scene.composite_video_fps_den = Some(1001);

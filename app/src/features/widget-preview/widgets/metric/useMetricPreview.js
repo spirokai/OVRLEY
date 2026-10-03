@@ -1,12 +1,11 @@
 import { useMemo } from 'react'
 import { getInterpolatedActivityValue } from '@/features/overlay-editor/utils/overlayEditorUtils'
 import { GRADIENT_ZERO_LINE_WIDTH_PX } from '@/features/overlay-editor/data/overlayEditorConstants'
-import { METRIC_ICON_SVGS } from '@/lib/widget/widget-icon-data'
+import { WIDGET_ICON_SVGS } from '@/lib/widget/widget-icons'
 import { buildGradientTrianglePath, formatGradientValue, getGradientWidgetLayout } from './format'
 import { getPreviewFontFamily, getWidgetOpacity, measurePreviewText } from '../../shared/textMeasurement'
 import { getTextShadowParts } from '../../shared/shadow'
 import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
-import { useFontMetrics } from '../../shared/useFontMetrics'
 
 function splitGradientUnitSuffix(text) {
   return text.endsWith('%') ? [text.slice(0, -1), '%'] : [text, '']
@@ -93,7 +92,6 @@ function buildMetricTextRuns({ widget, content, visualBounds, shadowFilterIds })
 export function useMetricPreviewPresentation({ widget, activity, previewSecond, globalOpacity, globalScale, metricPreviewModel, sceneStyle }) {
   // Typography: ensure font metrics are loaded before layout-dependent rendering.
   const fontFamily = getPreviewFontFamily(widget.data.font)
-  useFontMetrics([{ fontFamily, fontSize: widget.data.font_size }])
   return useMemo(() => {
     // Shared presentation: these values apply to both metric and gradient modes.
     const widgetOpacity = getWidgetOpacity(widget.data, globalOpacity)
@@ -138,7 +136,7 @@ export function useMetricPreviewPresentation({ widget, activity, previewSecond, 
         fontFamily,
         widgetOpacity,
         shadow,
-        iconSvg: METRIC_ICON_SVGS[widget.type],
+        iconSvg: WIDGET_ICON_SVGS[widget.type],
         metricLayout,
         textRuns: buildMetricTextRuns({
           widget,

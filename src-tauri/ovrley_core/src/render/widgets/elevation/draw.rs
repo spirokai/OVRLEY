@@ -21,6 +21,7 @@ use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::paths::AppPaths;
 use crate::render::text::{draw_text, parse_color, ResolvedTextStyle};
+use crate::standard_widgets::widget_font_weight;
 use skia_safe::Canvas;
 
 /// Draws the elevation widget for one frame and returns preview diagnostics.
@@ -179,6 +180,9 @@ fn elevation_label_style(
     scene_scale: f32,
 ) -> ResolvedTextStyle {
     ResolvedTextStyle {
+        font_weight: widget_font_weight(),
+        italic: false,
+        letter_spacing: 0.0,
         x,
         y,
         font_name: elevation_cache

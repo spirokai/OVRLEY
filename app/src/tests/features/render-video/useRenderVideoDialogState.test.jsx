@@ -28,6 +28,7 @@ describe('useRenderVideoDialogState', () => {
       availableCodecs: {
         proresKs: true,
         libx264: true,
+        libx265: true,
       },
       renderProgress: { ...DEFAULT_RENDER_PROGRESS },
     })
@@ -41,6 +42,8 @@ describe('useRenderVideoDialogState', () => {
       fps: 30,
       updateRate: 1,
       exportCodec: 'prores_ks',
+      qualityType: 'quality',
+      qualityValue: 18,
       exportAcceleration: 'cpu',
       exportRange: { ...DEFAULT_EXPORT_RANGE },
     }
@@ -89,10 +92,6 @@ describe('useRenderVideoDialogState', () => {
       importedVideoDuration: 12,
       importedVideoResolution: { width: 1920, height: 1080 },
       videoSyncOffsetSeconds: 5,
-      availableCodecs: {
-        proresKs: true,
-        libx264: true,
-      },
     })
 
     const { result } = renderHook(() => {
@@ -100,6 +99,8 @@ describe('useRenderVideoDialogState', () => {
         fps: 30,
         updateRate: 1,
         exportCodec: 'prores_ks',
+        qualityType: 'quality',
+        qualityValue: 18,
         exportAcceleration: 'cpu',
         exportRange: { ...DEFAULT_EXPORT_RANGE },
       })
@@ -117,7 +118,12 @@ describe('useRenderVideoDialogState', () => {
       expect(result.current.settings.exportCodec).toBe('libx264')
     })
     expect(result.current.exportMode).toBe('composite')
-    expect(result.current.settings.exportBitrate).toBeGreaterThan(0)
+    expect(result.current.settings.qualityType).toBe('quality')
+    expect(result.current.settings.qualityValue).toBe(21)
+    act(() => result.current.handleOutputFormatChange('hevc'))
+    expect(result.current.settings.qualityValue).toBe(26)
+    act(() => result.current.handleOutputFormatChange('h264'))
+    expect(result.current.settings.qualityValue).toBe(21)
 
     act(() => {
       result.current.handleExportModeChange('transparent')

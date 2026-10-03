@@ -11,8 +11,14 @@
 import standardWidgetsManifest from '../../../../assets/standard-widgets.json'
 import standardMetricsManifest from '../../../../assets/standard-metrics.json'
 
+/** Shared weight for text outside label widgets. */
+export const WIDGET_FONT_WEIGHT = standardWidgetsManifest.typography.widgetFontWeight
+
 /** Supported content modes for time widgets. */
 export const TIME_WIDGET_MODES = Object.freeze(standardWidgetsManifest.time.modes.map((mode) => Object.freeze(mode)))
+
+/** Defaults for an unselected raster widget. */
+export const RASTER_DEFAULTS = Object.freeze({ ...standardWidgetsManifest.raster.defaults })
 
 /** Supported zero-point choices for elapsed time widgets. */
 export const ELAPSED_TIME_ORIGINS = Object.freeze(standardWidgetsManifest.time.elapsedOrigins.map((origin) => Object.freeze(origin)))

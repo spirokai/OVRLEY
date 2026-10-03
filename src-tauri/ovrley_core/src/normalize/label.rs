@@ -9,7 +9,7 @@
 //! label contract — they belong to the scene validation contract.
 
 use super::helpers::rgba_from_hex;
-use super::raw::LabelConfig;
+use super::raw::{LabelConfig, LabelTypography};
 use crate::error::{CoreError, CoreResult};
 
 // ---------------------------------------------------------------------------
@@ -24,6 +24,7 @@ pub struct ValidatedLabel {
     pub y: f32,
     pub font_name: String,
     pub font_size: f32,
+    pub typography: LabelTypography,
     pub color: [u8; 4],
     pub opacity: f32,
 }
@@ -96,6 +97,7 @@ pub fn validate_label(label: &LabelConfig, index: usize) -> CoreResult<Validated
         y: label.y,
         font_name,
         font_size,
+        typography: label.typography.clone(),
         color,
         opacity,
     })

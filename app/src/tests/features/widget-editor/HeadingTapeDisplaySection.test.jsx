@@ -4,8 +4,9 @@ import userEvent from '@testing-library/user-event'
 import HeadingTapeDisplaySection from '@/features/widget-editor/components/metricWidget/HeadingTapeDisplaySection'
 import { HEADING_TAPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 
-vi.mock('@/features/scene-settings/hooks/useAvailableFonts', () => ({
-  default: () => ({
+vi.mock('@/hooks/useFonts', async () => ({
+  ...(await vi.importActual('@/hooks/useFonts')),
+  useAvailableFonts: () => ({
     recommendedFonts: [],
     systemFonts: [],
   }),

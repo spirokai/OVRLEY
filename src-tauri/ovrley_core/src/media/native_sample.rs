@@ -19,6 +19,9 @@
 #[derive(Debug, Clone, Default)]
 pub struct NativeSample {
     pub timestamp_ms: f64,
+    /// GPS packet time remains useful even when its measurements have no fix.
+    pub gps_time_anchor: bool,
+    pub gps_packet_index: Option<usize>,
     pub timestamp: Option<String>,
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,

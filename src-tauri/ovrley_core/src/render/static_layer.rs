@@ -1,16 +1,16 @@
-//! Shared static label and metric-part rendering for preview and video paths.
+//! Shared static backdrop, raster, label and metric rendering for preview and video.
 //!
 //! This module owns the reusable static overlay layer that is drawn before any
 //! per-frame metric values or plot widgets. It keeps the label-image cache
-//! private, exposes helper functions for preview/video preparation, and ensures
-//! the cached-image and base-RGBA paths use the same static drawing loop.
+//! private and derives preview images and video base pixels from one static draw.
 
 use super::LabelCacheStatus;
 use crate::debug::RenderProfiler;
-use crate::error::CoreResult;
+use crate::error::{CoreError, CoreResult};
 use crate::normalize::{ValidatedBackdrop, ValidatedLabel, ValidatedSceneConfig};
 use crate::paths::AppPaths;
-use crate::render::surface::{create_surface, wrap_native_surface};
+use crate::render::raster::{draw_rasters, PreparedRaster};
+use crate::render::surface::{create_surface, native_n32_image_info};
 use crate::render::text::{draw_text, validated_label_style, validated_value_style};
 use crate::render::widgets::types::PreparedValue;
 use crate::render::widgets::{
@@ -22,102 +22,127 @@ use std::hash::{Hash, Hasher};
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
-/// Returns a cached static label/metric-part image or renders and caches a new one.
-///
-/// The cache key covers every config input that can change static pixels, so
-/// different render configurations cannot reuse stale images across renders.
-pub(super) fn cached_labels_image(
-    paths: &AppPaths,
-    backdrops: &[ValidatedBackdrop],
-    labels: &[ValidatedLabel],
-    values: &[PreparedValue],
-    scene: &ValidatedSceneConfig,
-    prepare_profiler: &mut RenderProfiler,
-) -> CoreResult<(Option<Image>, LabelCacheStatus)> {
-    let width = scene.width;
-    let height = scene.height;
-    let scale = scene.scale;
-    if backdrops.is_empty() && labels.is_empty() && !config_has_static_metric_parts(values) {
-        return Ok((None, LabelCacheStatus::None));
-    }
-
-    static CACHE: OnceLock<Mutex<HashMap<u64, Image>>> = OnceLock::new();
-    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    let cache_key = labels_cache_key(backdrops, labels, values, scene, width, height, scale);
-
-    if let Ok(cache) = cache.lock() {
-        if let Some(image) = cache.get(&cache_key) {
-            return Ok((Some(image.clone()), LabelCacheStatus::Hit));
-        }
-    }
-
-    let prepare_started = Instant::now();
-    let mut surface =
-        prepare_profiler.measure("create_base_image", || create_surface(width, height))?;
-    prepare_profiler.measure("prepare.surface.clear", || {
-        surface.canvas().clear(skia_safe::Color::TRANSPARENT);
-    });
-    prepare_profiler.measure("text.static.cache", || {
-        draw_static_backdrops_text_and_icons(
-            surface.canvas(),
-            paths,
-            backdrops,
-            labels,
-            values,
-            scene,
-            scale,
-        )
-    })?;
-    let image = surface.image_snapshot();
-    prepare_profiler.record_ms(
-        "prepare_render_assets.total",
-        prepare_started.elapsed().as_secs_f64() * 1000.0,
-    );
-
-    if let Ok(mut cache) = cache.lock() {
-        cache.insert(cache_key, image.clone());
-    }
-
-    Ok((Some(image), LabelCacheStatus::Miss))
+/// Immutable inputs for the static layer, borrowed only during preparation.
+pub struct StaticLayer<'a> {
+    pub backdrops: &'a [ValidatedBackdrop],
+    pub rasters: &'a [PreparedRaster],
+    pub labels: &'a [ValidatedLabel],
+    pub values: &'a [PreparedValue],
+    pub scene: &'a ValidatedSceneConfig,
 }
 
-/// Pre-renders static labels and metric parts into a reusable RGBA base buffer.
-///
-/// Video rendering restores this buffer into each frame before drawing dynamic
-/// values so the hot path does not have to redraw static content repeatedly.
-pub fn prepare_base_rgba(
-    paths: &AppPaths,
-    backdrops: &[ValidatedBackdrop],
-    labels: &[ValidatedLabel],
-    values: &[PreparedValue],
-    scene: &ValidatedSceneConfig,
-    prepare_profiler: &mut RenderProfiler,
-) -> CoreResult<Option<Vec<u8>>> {
-    let width = scene.width;
-    let height = scene.height;
-    let scale = scene.scale;
-    let row_bytes = (width as usize) * 4;
-    let mut pixels = vec![0u8; row_bytes * (height as usize)];
-    if backdrops.is_empty() && labels.is_empty() && !config_has_static_metric_parts(values) {
-        return Ok(Some(pixels));
+/// Preview and video consume the same pixels produced by one static draw.
+pub struct PreparedStaticLayer {
+    pub image: Option<Image>,
+    pub base_rgba: Vec<u8>,
+    pub cache_status: LabelCacheStatus,
+}
+
+impl StaticLayer<'_> {
+    pub fn prepare(
+        &self,
+        paths: &AppPaths,
+        profiler: &mut RenderProfiler,
+    ) -> CoreResult<PreparedStaticLayer> {
+        let (image, cache_status) = self.cached_image(paths, profiler)?;
+        let frame_size = super::FrameSize {
+            width: self.scene.width,
+            height: self.scene.height,
+        };
+        let mut base_rgba = vec![0; frame_size.rgba_len()?];
+        if let Some(image) = &image {
+            let info = native_n32_image_info(frame_size.width, frame_size.height);
+            let copied = profiler.measure("prepare.base.read_pixels", || {
+                image.read_pixels(
+                    &info,
+                    &mut base_rgba,
+                    frame_size.width as usize * 4,
+                    (0, 0),
+                    skia_safe::image::CachingHint::Allow,
+                )
+            });
+            if !copied {
+                return Err(CoreError::Render(
+                    "Failed to read static layer pixels".into(),
+                ));
+            }
+        }
+        Ok(PreparedStaticLayer {
+            image,
+            base_rgba,
+            cache_status,
+        })
     }
 
-    let mut surface = prepare_profiler.measure("create_base_image", || {
-        wrap_native_surface(width, height, pixels.as_mut_slice())
-    })?;
-    prepare_profiler.measure("text.static.cache", || {
-        draw_static_backdrops_text_and_icons(
-            surface.canvas(),
-            paths,
-            backdrops,
-            labels,
-            values,
-            scene,
-            scale,
-        )
-    })?;
-    drop(surface);
-    Ok(Some(pixels))
+    fn cached_image(
+        &self,
+        paths: &AppPaths,
+        profiler: &mut RenderProfiler,
+    ) -> CoreResult<(Option<Image>, LabelCacheStatus)> {
+        if self.backdrops.is_empty()
+            && self.rasters.is_empty()
+            && self.labels.is_empty()
+            && !config_has_static_metric_parts(self.values)
+        {
+            return Ok((None, LabelCacheStatus::None));
+        }
+        static CACHE: OnceLock<Mutex<HashMap<u64, Image>>> = OnceLock::new();
+        let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+        let key = self.cache_key(&paths.font_dirs);
+        if let Some(image) = cache.lock().unwrap().get(&key) {
+            return Ok((Some(image.clone()), LabelCacheStatus::Hit));
+        }
+        let started = Instant::now();
+        let mut surface = profiler.measure("create_base_image", || {
+            create_surface(self.scene.width, self.scene.height)
+        })?;
+        profiler.measure("prepare.surface.clear", || {
+            surface.canvas().clear(skia_safe::Color::TRANSPARENT);
+        });
+        profiler.measure("text.static.cache", || {
+            self.draw(surface.canvas(), &paths.font_dirs)
+        })?;
+        let image = surface.image_snapshot();
+        profiler.record_ms(
+            "prepare_render_assets.total",
+            started.elapsed().as_secs_f64() * 1000.0,
+        );
+        cache.lock().unwrap().insert(key, image.clone());
+        Ok((Some(image), LabelCacheStatus::Miss))
+    }
+
+    fn draw(&self, canvas: &skia_safe::Canvas, font_dirs: &[std::path::PathBuf]) -> CoreResult<()> {
+        let scene = self.scene;
+        let scale = scene.scale;
+        draw_backdrops_static_layer(canvas, self.backdrops, scale);
+        draw_rasters(canvas, self.rasters, scale, scene.opacity);
+        for label in self.labels {
+            let style = validated_label_style(label, scene, scale);
+            draw_text(canvas, &label.text, &style, font_dirs)?;
+        }
+        for value in self.values.iter().filter_map(text_value) {
+            let parts = static_metric_parts_for_value(value);
+            if parts.icon || parts.unit {
+                let style = validated_value_style(value, scene, scale);
+                draw_static_metric_parts_for_value(canvas, value, &style, scale, font_dirs)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn cache_key(&self, font_dirs: &[std::path::PathBuf]) -> u64 {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        font_dirs.hash(&mut hasher);
+        format!("{:?}", self.scene).hash(&mut hasher);
+        format!("{:?}", self.backdrops).hash(&mut hasher);
+        for raster in self.rasters {
+            format!("{:?}", raster.geometry).hash(&mut hasher);
+            raster.content_hash.hash(&mut hasher);
+        }
+        format!("{:?}", self.labels).hash(&mut hasher);
+        format!("{:?}", self.values).hash(&mut hasher);
+        hasher.finish()
+    }
 }
 
 /// Returns whether any configured metric widget contributes a static part.
@@ -127,71 +152,6 @@ pub(super) fn config_has_static_metric_parts(values: &[PreparedValue]) -> bool {
         .filter_map(text_value)
         .map(static_metric_parts_for_value)
         .any(|parts| parts.icon || parts.unit)
-}
-
-/// Draws the full static text-and-metric-part layer shared by preview and video prep.
-///
-/// This shared loop is the single source of truth for static overlay content so
-/// cached preview images and copied RGBA base buffers cannot drift apart.
-fn draw_static_backdrops_text_and_icons(
-    canvas: &skia_safe::Canvas,
-    paths: &AppPaths,
-    backdrops: &[ValidatedBackdrop],
-    labels: &[ValidatedLabel],
-    values: &[PreparedValue],
-    scene: &ValidatedSceneConfig,
-    scale: f32,
-) -> CoreResult<()> {
-    draw_backdrops_static_layer(canvas, backdrops, scale);
-    for validated in labels {
-        let style = validated_label_style(validated, scene, scale);
-        draw_text(canvas, &validated.text, &style, &paths.font_dirs)?;
-    }
-    draw_static_metric_parts(canvas, paths, values, scene, scale)?;
-    Ok(())
-}
-
-/// Computes the cache key for the shared static label/metric-part layer.
-fn labels_cache_key(
-    backdrops: &[ValidatedBackdrop],
-    labels: &[ValidatedLabel],
-    values: &[PreparedValue],
-    scene: &ValidatedSceneConfig,
-    width: u32,
-    height: u32,
-    scale: f32,
-) -> u64 {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    width.hash(&mut hasher);
-    height.hash(&mut hasher);
-    scale.to_bits().hash(&mut hasher);
-    format!("{scene:?}").hash(&mut hasher);
-    format!("{backdrops:?}").hash(&mut hasher);
-    format!("{labels:?}").hash(&mut hasher);
-    format!("{values:?}").hash(&mut hasher);
-    hasher.finish()
-}
-
-/// Draws all metric parts whose pixels do not depend on the current frame.
-///
-/// Validates standard metric text widgets upfront so validated icons use
-/// zero backend-owned defaults.
-fn draw_static_metric_parts(
-    canvas: &skia_safe::Canvas,
-    paths: &AppPaths,
-    values: &[PreparedValue],
-    scene: &ValidatedSceneConfig,
-    scale: f32,
-) -> CoreResult<()> {
-    for validated in values.iter().filter_map(text_value) {
-        let parts = static_metric_parts_for_value(validated);
-        if !parts.icon && !parts.unit {
-            continue;
-        }
-        let style = validated_value_style(validated, scene, scale);
-        draw_static_metric_parts_for_value(canvas, validated, &style, scale, &paths.font_dirs)?;
-    }
-    Ok(())
 }
 
 fn text_value(value: &PreparedValue) -> Option<&crate::normalize::ValidatedValueWidget> {

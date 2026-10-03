@@ -72,8 +72,25 @@ fn trim_numeric_series(
         InterpolationStrategy::Hold => MissingSamplePolicy::Bridge,
         InterpolationStrategy::Numeric(policy) => policy,
     };
-    let start_value = interpolate_numeric_series_value(elapsed, data, start, missing_sample_policy);
-    let end_value = interpolate_numeric_series_value(elapsed, data, end, missing_sample_policy);
+    let first_observation = data
+        .iter()
+        .position(Option::is_some)
+        .map(|index| elapsed[index]);
+    let last_observation = data
+        .iter()
+        .rposition(Option::is_some)
+        .map(|index| elapsed[index]);
+    let boundary_value = |target| {
+        if first_observation.is_some_and(|first| target < first)
+            || last_observation.is_some_and(|last| target > last)
+        {
+            None
+        } else {
+            interpolate_numeric_series_value(elapsed, data, target, missing_sample_policy)
+        }
+    };
+    let start_value = boundary_value(start);
+    let end_value = boundary_value(end);
     trim_series(
         data,
         start_inner_index,

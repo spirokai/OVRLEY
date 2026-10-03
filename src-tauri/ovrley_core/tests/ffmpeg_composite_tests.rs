@@ -79,13 +79,6 @@ fn settings_for_codec_with_rotation(
     .unwrap()
 }
 
-/// Builds composite settings for tests that vary resolution-specific input args.
-fn settings_for_dimensions(width: u32, height: u32) -> CompositeFfmpegSettings {
-    let fps = Fps::new(30000, 1001).unwrap();
-    let render = render_plan("libx264", "60M", fps, fps, 0.0);
-    build_composite_ffmpeg_settings(&render, FrameSize { width, height }, true, None).unwrap()
-}
-
 fn cuda_settings_for_dimensions(codec: &str, width: u32, height: u32) -> CompositeFfmpegSettings {
     let fps = Fps::new(30000, 1001).unwrap();
     let render = render_plan(codec, "60M", fps, fps, 0.0);
@@ -103,7 +96,8 @@ fn render_plan(
         serde_json::from_value(common::seam::explicit_scene_json()).unwrap();
     scene.ffmpeg = json!({"codec": codec});
     scene.composite_video_path = Some("test.mp4".to_string());
-    scene.composite_bitrate = Some(bitrate.to_string());
+    scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    scene.quality_value = Some(bitrate.strip_suffix('M').unwrap().parse().unwrap());
     scene.composite_sync_offset = Some(0.0);
     let (fps_num, fps_den) = source_fps.components();
     scene.composite_video_fps_num = Some(fps_num);
@@ -114,7 +108,7 @@ fn render_plan(
     scene.composite_widget_update_rate =
         Some((source_fps.as_f64() / overlay_pipe_fps.as_f64()).round() as u32);
     let mut scene = validate_scene_config(scene).unwrap();
-    if codec == "qsv_full_h264" {
+    if matches!(codec, "qsv_full_h264" | "qsv_full_hevc") {
         scene.ffmpeg.qsv_full_init_args = vec![
             "-init_hw_device".to_string(),
             "dxva2=dx".to_string(),
@@ -218,8 +212,6 @@ fn test_2_5_rawvideo_pipe_input_has_expected_shape() {
     assert_eq!(
         built.input_1_args,
         vec![
-            "-thread_queue_size",
-            "16",
             "-f",
             "rawvideo",
             "-pix_fmt",
@@ -232,25 +224,6 @@ fn test_2_5_rawvideo_pipe_input_has_expected_shape() {
             "pipe:0"
         ]
     );
-}
-
-#[test]
-fn test_2_5a_rawvideo_pipe_queue_size_scales_with_resolution() {
-    for (width, height, expected_queue_size) in [
-        (1280, 720, "64"),
-        (1920, 1080, "64"),
-        (2560, 1440, "16"),
-        (3840, 2160, "16"),
-        (5120, 2880, "4"),
-        (7680, 4320, "4"),
-    ] {
-        let built = settings_for_dimensions(width, height);
-        assert_argument_pair(
-            &built.input_1_args,
-            "-thread_queue_size",
-            expected_queue_size,
-        );
-    }
 }
 
 #[test]
@@ -439,13 +412,23 @@ fn test_8_9_bitrate_override_is_respected_for_every_profile() {
         "libx264",
         "libx265",
         "h264_nvenc",
+        "hevc_nvenc",
+        "nnvgpu_h264",
+        "nnvgpu_hevc",
         "h264_qsv",
+        "hevc_qsv",
+        "qsv_full_h264",
+        "qsv_full_hevc",
         "h264_amf",
+        "hevc_amf",
+        "h264_vaapi",
+        "hevc_vaapi",
         "h264_videotoolbox",
+        "hevc_videotoolbox",
     ] {
         let low = settings_for_codec(
             codec,
-            "10M",
+            "12.5M",
             Fps::new(30, 1).unwrap(),
             Fps::new(30, 1).unwrap(),
             0.0,
@@ -458,8 +441,12 @@ fn test_8_9_bitrate_override_is_respected_for_every_profile() {
             0.0,
         );
 
-        assert_argument_pair(&low.output_args, "-b:v", "10M");
+        assert_argument_pair(&low.output_args, "-b:v", "12.5M");
+        assert_argument_pair(&low.output_args, "-maxrate", "18.75M");
+        assert_argument_pair(&low.output_args, "-bufsize", "25M");
         assert_argument_pair(&high.output_args, "-b:v", "60M");
+        assert_argument_pair(&high.output_args, "-maxrate", "90M");
+        assert_argument_pair(&high.output_args, "-bufsize", "120M");
     }
 }
 
@@ -710,4 +697,50 @@ fn test_9_7_safe_codec_names_do_not_select_experimental_profiles() {
     assert_eq!(qsv.codec_id, CompositeCodecId::QsvH264);
     assert!(!nvenc.filter_complex.contains("overlay_cuda"));
     assert!(!qsv.filter_complex.contains("overlay_qsv"));
+}
+
+#[test]
+fn quality_mode_selects_encoder_specific_args() {
+    use ovrley_core::encode::quality::EncodingQuality;
+    for (codec, flag, value) in [
+        ("libx264", "-crf", "18"),
+        ("libx265", "-crf", "18"),
+        ("h264_nvenc", "-cq:v", "18"),
+        ("hevc_nvenc", "-cq:v", "18"),
+        ("nnvgpu_h264", "-cq:v", "18"),
+        ("nnvgpu_hevc", "-cq:v", "18"),
+        ("h264_qsv", "-global_quality", "18"),
+        ("hevc_qsv", "-global_quality", "18"),
+        ("qsv_full_h264", "-global_quality", "18"),
+        ("qsv_full_hevc", "-global_quality", "18"),
+        ("h264_amf", "-qp_b", "18"),
+        ("hevc_amf", "-qp_p", "18"),
+        ("h264_vaapi", "-qp", "18"),
+        ("hevc_vaapi", "-qp", "18"),
+        ("h264_videotoolbox", "-global_quality", "67"),
+        ("hevc_videotoolbox", "-global_quality", "67"),
+    ] {
+        let fps = Fps::new(30, 1).unwrap();
+        let mut render = render_plan(codec, "60M", fps, fps, 0.0);
+        render.quality = EncodingQuality::Quality(18);
+        let built = build_composite_ffmpeg_settings(
+            &render,
+            FrameSize {
+                width: 1920,
+                height: 1080,
+            },
+            true,
+            None,
+        )
+        .unwrap();
+        assert_argument_pair(&built.output_args, flag, value);
+        assert!(!has_argument_pair(&built.output_args, "-b:v", "60M"));
+        assert!(!built.output_args.iter().any(|arg| matches!(
+            arg.as_str(),
+            "VBR" | "vbr_peak" | "-mbbrc" | "-maxrate" | "-bufsize"
+        )));
+        if codec == "hevc_amf" {
+            assert!(!built.output_args.iter().any(|arg| arg == "-qp_b"));
+        }
+    }
 }

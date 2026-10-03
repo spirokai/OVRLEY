@@ -8,6 +8,7 @@
 
 /// Value formatting and metric display helpers.
 pub mod format;
+pub mod raster;
 /// Shared static label/metric-part caching and base-layer preparation helpers.
 mod static_layer;
 /// Skia surface allocation and PNG output helpers.
@@ -24,7 +25,8 @@ use crate::normalize::ValidatedRenderConfig;
 use crate::normalize::ValidatedSceneConfig;
 use crate::paths::AppPaths;
 use crate::render::format::frame_index_for_second;
-use crate::render::static_layer::{cached_labels_image, config_has_static_metric_parts};
+use crate::render::raster::prepare_rasters;
+use crate::render::static_layer::config_has_static_metric_parts;
 use crate::render::surface::{create_surface, wrap_native_surface, write_surface_png};
 use crate::render::text::{
     validated_gradient_style, validated_lap_timer_style, validated_time_style,
@@ -44,7 +46,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::Instant;
 
-pub use self::static_layer::prepare_base_rgba;
+pub use self::static_layer::{PreparedStaticLayer, StaticLayer};
 
 /// Indicates whether the static label layer was not needed, reused, or rebuilt.
 #[derive(Clone, Copy, Debug, serde::Serialize)]
@@ -300,22 +302,18 @@ pub fn prepare_preview_assets(
         dense_activity,
         &mut prepare_profiler,
     )?;
-    let (labels_image, label_cache_status) = cached_labels_image(
-        paths,
-        &prepared_assets.backdrops,
-        &prepared_assets.labels,
-        &prepared_assets.values,
-        &prepared_assets.scene,
-        &mut prepare_profiler,
-    )?;
-    prepared_assets.base_rgba = prepare_base_rgba(
-        paths,
-        &prepared_assets.backdrops,
-        &prepared_assets.labels,
-        &prepared_assets.values,
-        &prepared_assets.scene,
-        &mut prepare_profiler,
-    )?;
+    let rasters = prepare_rasters(&config.rasters)?;
+    let static_layer = StaticLayer {
+        backdrops: &prepared_assets.backdrops,
+        rasters: &rasters,
+        labels: &prepared_assets.labels,
+        values: &prepared_assets.values,
+        scene: &prepared_assets.scene,
+    }
+    .prepare(paths, &mut prepare_profiler)?;
+    let labels_image = static_layer.image;
+    let label_cache_status = static_layer.cache_status;
+    prepared_assets.base_rgba = Some(static_layer.base_rgba);
     let prepare_timings = annotate_timing_aliases(
         prepare_profiler.summary(),
         &[("prepare.surface.clear", "surface.clear")],

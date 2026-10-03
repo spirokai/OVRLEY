@@ -55,6 +55,7 @@ export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updat
   return (
     <>
       <SliderField
+        editable
         label={t('widget-editor.barCount', 'Bar Count')}
         value={data.bar_count}
         min={2}
@@ -66,13 +67,15 @@ export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updat
         onSliderCommit={() => commitWidgetSize(widgetId)}
       />
       <SliderField
+        editable
         label={t('widget-editor.barGap', 'Bar Gap')}
         value={data.bar_gap}
         min={0}
         max={barGapMax}
         step={1}
         integerDisplay
-        valueDisplay={`${data.bar_gap}px`}
+        valueDisplay={`${data.bar_gap}`}
+        suffix="px"
         onSliderChange={(bar_gap) => updateVariantSize(buildBarGeometryUpdate(data, { bar_gap }, getCornerRadiusMax))}
         onSliderCommit={() => commitWidgetSize(widgetId)}
       />

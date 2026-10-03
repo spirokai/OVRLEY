@@ -1,3 +1,4 @@
+import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 /**
  * Integration tests for overlay-editor selection behavior.
  *
@@ -71,10 +72,6 @@ vi.mock('@/features/widget-preview/widgets/metric/model', () => ({
 
 vi.mock('@/features/widget-preview/widgets/text/model', () => ({
   buildTextWidgetPreviewModel: previewMocks.buildTextWidgetPreviewModel,
-}))
-
-vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({
-  useFontMetrics: () => 0,
 }))
 
 vi.mock('@/features/widget-preview/shared/textMeasurement', () => ({
@@ -183,7 +180,7 @@ describe('OverlayEditor selection flow', () => {
       <OverlayEditor
         config={config}
         editorShell={defaultEditorShell}
-        globalDefaults={{ opacity: 1, scale: 1 }}
+        globalDefaults={{ ...DEFAULT_GLOBAL_DEFAULTS, opacity: 1, scale: 1 }}
         onConfigChange={onConfigChange}
         zoomLevel={1}
         onZoomLevelChange={vi.fn()}
@@ -236,7 +233,7 @@ describe('OverlayEditor selection flow', () => {
       <OverlayEditor
         config={useStore.getState().config}
         editorShell={defaultEditorShell}
-        globalDefaults={{ opacity: 1, scale: 1 }}
+        globalDefaults={{ ...DEFAULT_GLOBAL_DEFAULTS, opacity: 1, scale: 1 }}
         onConfigChange={onConfigChange}
         zoomLevel={1}
         onZoomLevelChange={vi.fn()}
@@ -288,7 +285,7 @@ describe('OverlayEditor selection flow', () => {
       <OverlayEditor
         config={useStore.getState().config}
         editorShell={defaultEditorShell}
-        globalDefaults={{ opacity: 1, scale: 1 }}
+        globalDefaults={{ ...DEFAULT_GLOBAL_DEFAULTS, opacity: 1, scale: 1 }}
         onConfigChange={onConfigChange}
         zoomLevel={1}
         onZoomLevelChange={vi.fn()}
@@ -337,7 +334,7 @@ describe('OverlayEditor selection flow', () => {
       <OverlayEditor
         config={useStore.getState().config}
         editorShell={defaultEditorShell}
-        globalDefaults={{ opacity: 1, scale: 1 }}
+        globalDefaults={{ ...DEFAULT_GLOBAL_DEFAULTS, opacity: 1, scale: 1 }}
         onConfigChange={onConfigChange}
         zoomLevel={1}
         onZoomLevelChange={vi.fn()}
@@ -381,7 +378,7 @@ describe('OverlayEditor selection flow', () => {
       <OverlayEditor
         config={useStore.getState().config}
         editorShell={defaultEditorShell}
-        globalDefaults={{ opacity: 1, scale: 1 }}
+        globalDefaults={{ ...DEFAULT_GLOBAL_DEFAULTS, opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
         onZoomLevelChange={vi.fn()}
@@ -542,7 +539,7 @@ describe('OverlayEditor selection flow', () => {
       <OverlayEditor
         config={config}
         editorShell={defaultEditorShell}
-        globalDefaults={{ opacity: 1, scale: 1 }}
+        globalDefaults={{ ...DEFAULT_GLOBAL_DEFAULTS, opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
         onZoomLevelChange={vi.fn()}
@@ -594,7 +591,7 @@ describe('OverlayEditor selection flow', () => {
       <OverlayEditor
         config={config}
         editorShell={defaultEditorShell}
-        globalDefaults={{ opacity: 1, scale: 1 }}
+        globalDefaults={{ ...DEFAULT_GLOBAL_DEFAULTS, opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
         onZoomLevelChange={vi.fn()}
@@ -647,7 +644,7 @@ describe('OverlayEditor selection flow', () => {
       <OverlayEditor
         config={config}
         editorShell={defaultEditorShell}
-        globalDefaults={{ opacity: 1, scale: 1 }}
+        globalDefaults={{ ...DEFAULT_GLOBAL_DEFAULTS, opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
         onZoomLevelChange={vi.fn()}
@@ -680,7 +677,7 @@ describe('OverlayEditor selection flow', () => {
       <OverlayEditor
         config={config}
         editorShell={defaultEditorShell}
-        globalDefaults={{ opacity: 1, scale: 1 }}
+        globalDefaults={{ ...DEFAULT_GLOBAL_DEFAULTS, opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
         onZoomLevelChange={vi.fn()}
@@ -714,7 +711,7 @@ describe('OverlayEditor selection flow', () => {
       <OverlayEditor
         config={config}
         editorShell={defaultEditorShell}
-        globalDefaults={{ opacity: 1, scale: 1 }}
+        globalDefaults={{ ...DEFAULT_GLOBAL_DEFAULTS, opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
         onZoomLevelChange={vi.fn()}
@@ -740,7 +737,7 @@ describe('OverlayEditor selection flow', () => {
         <OverlayEditor
           config={nextConfig}
           editorShell={defaultEditorShell}
-          globalDefaults={{ opacity: 1, scale: 1 }}
+          globalDefaults={{ ...DEFAULT_GLOBAL_DEFAULTS, opacity: 1, scale: 1 }}
           onConfigChange={vi.fn()}
           zoomLevel={1}
           onZoomLevelChange={vi.fn()}
@@ -767,7 +764,7 @@ describe('OverlayEditor selection flow', () => {
       <OverlayEditor
         config={config}
         editorShell={defaultEditorShell}
-        globalDefaults={{ opacity: 1, scale: 1 }}
+        globalDefaults={{ ...DEFAULT_GLOBAL_DEFAULTS, opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
         onZoomLevelChange={vi.fn()}

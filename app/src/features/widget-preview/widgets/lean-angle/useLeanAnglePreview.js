@@ -3,7 +3,6 @@ import { getInterpolatedActivityValue } from '@/features/overlay-editor/utils/ov
 import { formatStandardMetricDisplay } from '../metric/format'
 import { getTextShadowParts } from '../../shared/shadow'
 import { getMetricWidgetLayout, getPreviewFontFamily } from '../../shared/textMeasurement'
-import { useFontMetrics } from '../../shared/useFontMetrics'
 import { getLeanAngleFillPath, getLeanAngleFillSweep, getLeanAngleInnerTrackPath, getLeanAngleLayout, getLeanAngleOuterTrackPath } from './geometry'
 
 const DEGREE_UNIT_CENTERING_OFFSET_RATIO = 0.1
@@ -19,7 +18,6 @@ const GUIDE_OPACITY = 0.4
 export function useLeanAnglePreview({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle }) {
   const maskId = useId()
   const fontFamily = getPreviewFontFamily(widget.data.font)
-  useFontMetrics([{ fontFamily, fontSize: widget.data.font_size }])
 
   return useMemo(() => {
     const layout = getLeanAngleLayout({

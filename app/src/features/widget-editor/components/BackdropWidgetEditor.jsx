@@ -162,26 +162,30 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
         <div className="grid h-32 grid-rows-2" data-testid="corner-control-rows">
           <div className="min-h-0">
             <SliderField
+              editable
               label={t('widget-editor.borderThickness', 'Border Thickness')}
               value={Math.min(widget.data.border_thickness ?? 0, borderMax)}
               min={0}
               max={borderMax}
               step={1}
               integerDisplay
-              valueDisplay={`${widget.data.border_thickness ?? 0}px`}
+              valueDisplay={`${widget.data.border_thickness ?? 0}`}
+              suffix="px"
               onSliderChange={(value) => updateWidgetSize(widget.id, { border_thickness: value })}
               onSliderCommit={() => commitWidgetSize(widget.id)}
             />
           </div>
           <div className="min-h-0">
             <SliderField
+              editable
               label={t('widget-editor.cornerRadius', 'Corner Radius')}
               value={cornerRadius}
               min={0}
               max={radiusMax}
               step={1}
               integerDisplay
-              valueDisplay={`${cornerRadius}px`}
+              valueDisplay={`${cornerRadius}`}
+              suffix="px"
               onSliderChange={(value) => updateActiveVariantSize({ corner_radius: Math.min(Math.max(0, value), radiusMax) })}
               onSliderCommit={() => commitWidgetSize(widget.id)}
             />
@@ -219,33 +223,41 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField
+            editable
             label={t('widget-editor.fillOpacity', 'Fill Opacity')}
             value={widget.data.fill_opacity}
             min={0}
             max={1}
             step={0.05}
-            valueDisplay={`${Math.round((widget.data.fill_opacity ?? 0) * 100)}%`}
+            valueScale={100}
+            valueDisplay={`${Math.round((widget.data.fill_opacity ?? 0) * 100)}`}
+            suffix="%"
             onSliderChange={(value) => updateWidgetData(widget.id, { fill_opacity: value })}
           />
           <SliderField
+            editable
             label={t('widget-editor.borderOpacity', 'Border Opacity')}
             value={widget.data.border_opacity}
             min={0}
             max={1}
             step={0.05}
-            valueDisplay={`${Math.round((widget.data.border_opacity ?? 0) * 100)}%`}
+            valueScale={100}
+            valueDisplay={`${Math.round((widget.data.border_opacity ?? 0) * 100)}`}
+            suffix="%"
             onSliderChange={(value) => updateWidgetData(widget.id, { border_opacity: value })}
           />
         </div>
         {displayType === 'circle' ? (
           <SliderField
+            editable
             label={t('widget-editor.borderThickness', 'Border Thickness')}
             value={Math.min(widget.data.border_thickness ?? 0, borderMax)}
             min={0}
             max={borderMax}
             step={1}
             integerDisplay
-            valueDisplay={`${widget.data.border_thickness ?? 0}px`}
+            valueDisplay={`${widget.data.border_thickness ?? 0}`}
+            suffix="px"
             onSliderChange={(value) => updateWidgetSize(widget.id, { border_thickness: value })}
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />

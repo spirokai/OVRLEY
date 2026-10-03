@@ -3,8 +3,9 @@ import { render, screen } from '@testing-library/react'
 import MetricWidgetEditor from '@/features/widget-editor/components/metricWidget/MetricWidgetEditor'
 import { createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
 
-vi.mock('@/features/scene-settings/hooks/useAvailableFonts', () => ({
-  default: () => ({ recommendedFonts: [], systemFonts: [] }),
+vi.mock('@/hooks/useFonts', async () => ({
+  ...(await vi.importActual('@/hooks/useFonts')),
+  useAvailableFonts: () => ({ recommendedFonts: [], systemFonts: [] }),
 }))
 
 vi.mock('@/features/widget-editor/components/widgetFormControls', async (importOriginal) => {

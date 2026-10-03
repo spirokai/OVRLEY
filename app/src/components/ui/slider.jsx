@@ -54,6 +54,7 @@ function Slider({ className, defaultValue, value, min = 0, max = 100, trackChild
       {Array.from({ length: _values.length }, (_, index) => (
         <SliderPrimitive.Thumb
           data-slot="slider-thumb"
+          aria-label={props['aria-label']}
           key={index}
           className="block size-4 shrink-0 rounded-full border border-primary bg-highlight-foreground shadow-sm ring-ring/50 transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
         />

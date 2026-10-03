@@ -8,13 +8,13 @@ use ovrley_core::paths::AppPaths;
 use ovrley_core::render::widgets::prepare_render_assets;
 use ovrley_core::render::widgets::types::PreparedValue;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 #[test]
 fn full_lean_angle_config_validates_and_prepares_one_static_cache() {
     let config = validate_render_config(RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
         backdrops: vec![],
+        rasters: vec![],
         labels: vec![],
         values: vec![serde_json::from_value(full_lean_angle_config()).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -111,6 +111,7 @@ fn render_config_with_lean_angle(value: serde_json::Value) -> RenderConfig {
     RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
         backdrops: vec![],
+        rasters: vec![],
         labels: vec![],
         values: vec![serde_json::from_value(value).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -146,10 +147,7 @@ fn full_lean_angle_config() -> serde_json::Value {
 }
 
 fn test_paths() -> AppPaths {
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let workspace_root = common::test_config::repo_git_root();
     AppPaths {
         repo_root: workspace_root.clone(),
         font_dirs: vec![workspace_root.join("fonts")],

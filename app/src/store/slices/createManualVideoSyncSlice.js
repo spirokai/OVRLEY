@@ -331,7 +331,7 @@ export function createManualVideoSyncSlice(set, get) {
     clearVideoSyncForVideo: () =>
       set((draft) => {
         draft.manualVideoSync.landmarks = []
-        resetDerivedState(draft)
+        draft.manualVideoSyncResults = createCandidateResults(draft.manualVideoSyncResults)
       }),
 
     clearVideoSyncForActivity: () =>

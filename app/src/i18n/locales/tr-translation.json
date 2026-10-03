@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "Görüntü dosyaları",
+    "selectImage": "Görüntü seç",
+    "replaceImage": "Görüntüyü değiştir",
+    "errors": {
+      "missingAsset": "Gömülü görüntü bu projede eksik. Yerine başka bir görüntü seçin.",
+      "corruptAsset": "Gömülü görüntü bozuk. Yerine başka bir görüntü seçin.",
+      "relativePath": "Mutlak dosya yoluyla bir görüntü seçin.",
+      "missing": "Görüntü dosyası bulunamadı. Başka bir görüntü seçin.",
+      "unreadable": "Görüntü dosyası okunamıyor. İzinleri kontrol edin veya başka bir görüntü seçin.",
+      "unsupportedType": "PNG, JPEG, BMP veya TIFF dosyası seçin (.png, .jpeg, .jpg, .bmp, .tiff).",
+      "encodedSize": "Dosya 5 MiB sınırını aşıyor. Daha küçük bir dosya seçin.",
+      "resolution": "Çözünürlük 25 megapikseli aşıyor. Daha küçük bir görüntü seçin.",
+      "decode": "Görüntü çözümlenemedi. Başka bir görüntü seçin.",
+      "noImage": "{{id}} için görüntü seçilmedi. İşlemeden önce bir görüntü seçin.",
+      "renderUnavailable": "{{id}} görüntüsü henüz işlenemiyor.",
+      "invalidConfig": "Görüntü yapılandırması geçersiz."
+    }
+  },
   "app": {
     "importingYourVideo": "Videonuz içe aktarılıyor...",
     "loadingProject": "Proje yükleniyor...",
@@ -105,6 +124,10 @@
     "zoomOut": "Uzaklaştır"
   },
   "projects": {
+    "archiveTooLarge": "Proje 40 MiB arşiv sınırını aşıyor. Bir görüntüyü kaldırın veya değiştirin.",
+    "invalidArchive": "Proje arşivi geçersiz veya bozuk. Başka bir proje dosyası seçin.",
+    "rasterUnavailable": "Görüntü kullanılamıyor. Kaydetmeden önce değiştirin.",
+    "saveFailed": "Proje kaydedilemedi. Hedefi kontrol edip yeniden deneyin.",
     "activity": "Etkinlik",
     "cancel": "İptal",
     "closeWithoutSaving": "Kaydetmeden kapat",
@@ -133,6 +156,11 @@
     "000000Or900": "00:00:00 veya 900",
     "backendOffline": "Arka uç çevrim dışı",
     "bitrate": "Bit hızı",
+    "quality": "Kalite",
+    "better": "Daha iyi",
+    "worse": "Daha kötü",
+    "smallerFile": "Daha küçük dosya",
+    "largerFile": "Daha büyük dosya",
     "cancel": "İptal",
     "codecOutputFormat": "Kodek / çıkış biçimi",
     "custom": "Özel",
@@ -459,6 +487,7 @@
       "lapLog": "Tur günlüğü"
     },
     "types": {
+      "raster": { "name": "Görüntü", "shortName": "Görüntü" },
       "air_pressure": { "name": "Hava basıncı", "shortName": "Hava bas." },
       "altitude": { "name": "Rakım", "shortName": "Rakım" },
       "aperture": { "name": "Diyafram", "shortName": "Diyafram" },
@@ -547,6 +576,9 @@
     "flatTrack": "Düz dolgu",
     "fontFamily": "Yazı tipi",
     "fontSize": "Yazı boyutu",
+    "fontWeight": "Kalınlık",
+    "letterSpacing": "Aralık",
+    "italic": "İtalik",
     "gaugeTrack": "Gösterge",
     "gforcePlot": "G-kuvveti grafiği",
     "horizontalOffset": "Yatay ofset",
@@ -571,6 +603,7 @@
     "majorThickness": "Ana kalınlık",
     "majorTicks": "Ana çizgiler",
     "mapRotation": "Harita dönüşü",
+    "rotation": "Dönüş",
     "markerColor": "İşaretçi rengi",
     "markerOpacity": "İşaretçi opaklığı",
     "markerSize": "İşaretçi boyutu",

@@ -58,5 +58,5 @@ export function isBoxedMetricWidget(widget) {
  * @returns {boolean} True when the widget renders as a fixed frame.
  */
 export function isFramedWidget(widget) {
-  return isBackdropWidget(widget) || isBoxedMetricWidget(widget)
+  return widget?.category === 'rasters' || isBackdropWidget(widget) || isBoxedMetricWidget(widget)
 }

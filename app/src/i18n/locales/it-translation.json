@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "File immagine",
+    "selectImage": "Seleziona immagine",
+    "replaceImage": "Sostituisci immagine",
+    "errors": {
+      "missingAsset": "L'immagine incorporata manca dal progetto. Seleziona un'immagine sostitutiva.",
+      "corruptAsset": "L'immagine incorporata è danneggiata. Seleziona un'immagine sostitutiva.",
+      "relativePath": "Seleziona un'immagine con un percorso assoluto.",
+      "missing": "Il file immagine non esiste. Seleziona un'altra immagine.",
+      "unreadable": "Impossibile leggere il file immagine. Controlla i permessi o selezionane un altro.",
+      "unsupportedType": "Scegli un file PNG, JPEG, BMP o TIFF (.png, .jpeg, .jpg, .bmp, .tiff).",
+      "encodedSize": "Il file supera 5 MiB. Scegli un file più piccolo.",
+      "resolution": "La risoluzione supera 25 megapixel. Scegli un'immagine più piccola.",
+      "decode": "Impossibile decodificare l'immagine. Scegline un'altra.",
+      "noImage": "Nessuna immagine selezionata per {{id}}. Selezionane una prima del rendering.",
+      "renderUnavailable": "L'immagine {{id}} non può ancora essere renderizzata.",
+      "invalidConfig": "La configurazione dell'immagine non è valida."
+    }
+  },
   "app": {
     "importingYourVideo": "Importazione del video in corso...",
     "loadingProject": "Caricamento del progetto...",
@@ -105,6 +124,10 @@
     "zoomOut": "Riduci"
   },
   "projects": {
+    "archiveTooLarge": "Il progetto supera il limite di archivio di 40 MiB. Rimuovi o sostituisci un'immagine.",
+    "invalidArchive": "L'archivio del progetto non è valido o è danneggiato. Scegli un altro file.",
+    "rasterUnavailable": "Un'immagine non è disponibile. Sostituiscila prima di salvare.",
+    "saveFailed": "Impossibile salvare il progetto. Controlla la destinazione e riprova.",
     "activity": "Attività",
     "cancel": "Annulla",
     "closeWithoutSaving": "Chiudi senza salvare",
@@ -133,6 +156,11 @@
     "000000Or900": "00:00:00 o 900",
     "backendOffline": "Backend non disponibile",
     "bitrate": "Bitrate",
+    "quality": "Qualità",
+    "better": "Migliore",
+    "worse": "Peggiore",
+    "smallerFile": "File più piccolo",
+    "largerFile": "File più grande",
     "cancel": "Annulla",
     "codecOutputFormat": "Codec / formato di output",
     "custom": "Personalizzato",
@@ -459,6 +487,7 @@
       "lapLog": "Registro giri"
     },
     "types": {
+      "raster": { "name": "Immagine", "shortName": "Immagine" },
       "air_pressure": { "name": "Pressione atmosferica", "shortName": "Pressione" },
       "altitude": { "name": "Altitudine", "shortName": "Altitudine" },
       "aperture": { "name": "Diaframma", "shortName": "Diaframma" },
@@ -547,6 +576,9 @@
     "flatTrack": "Stile piatto",
     "fontFamily": "Carattere",
     "fontSize": "Dimensione testo",
+    "fontWeight": "Peso",
+    "letterSpacing": "Spaziatura",
+    "italic": "Corsivo",
     "gaugeTrack": "Indicatore lineare",
     "gforcePlot": "Grafico forza G",
     "horizontalOffset": "Offset orizzontale",
@@ -571,6 +603,7 @@
     "majorThickness": "Spessore maggiore",
     "majorTicks": "Tacche principali",
     "mapRotation": "Rotazione mappa",
+    "rotation": "Rotazione",
     "markerColor": "Colore marcatore",
     "markerOpacity": "Opacità marcatore",
     "markerSize": "Misura marcatore",

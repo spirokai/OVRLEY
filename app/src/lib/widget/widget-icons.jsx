@@ -1,23 +1,52 @@
 /* eslint-disable react-refresh/only-export-components */
 
-import { Presentation, Timer, Type } from 'lucide-react'
-import {
-  CURRENT_STANDARD_METRIC_WIDGET_TYPES,
-  BACKDROP_TYPE_DEFINITIONS,
-  BACKDROP_TYPE_LABEL_KEYS,
-  DISPLAY_TYPE_LABEL_KEYS,
-  LAP_TIMER_MODES,
-  WIDGET_CATEGORY_NAME_KEYS,
-  WIDGET_TYPE_DEFINITIONS,
-  requireWidgetTypeDefinition,
-} from './standard-widgets'
+import { Image, Presentation, Timer, Type } from 'lucide-react'
+import { BACKDROP_TYPE_DEFINITIONS, DISPLAY_TYPE_DEFINITIONS, WIDGET_CATEGORY_NAME_KEYS, WIDGET_TYPE_DEFINITIONS } from './standard-widgets'
 import { getSupportedDisplayTypes, isStandardMetricWidgetType } from './standard-metrics'
-import { METRIC_ICON_SVGS, DISPLAY_TYPE_ICON_SVGS, getIconSvgByAssetFile } from './widget-icon-data'
 
-export { METRIC_ICON_SVGS, DISPLAY_TYPE_ICON_SVGS }
+const iconAssetModules = import.meta.glob('../../../../assets/widget-icons/*.svg', {
+  eager: true,
+  import: 'default',
+  query: '?raw',
+})
 
-function ParsedSvgIcon({ data, className, ...props }) {
-  if (!data?.innerMarkup) return null
+const iconSvgMarkupByAssetFile = {}
+for (const [path, svgMarkup] of Object.entries(iconAssetModules)) {
+  const assetFile = path.slice(path.lastIndexOf('/') + 1)
+  iconSvgMarkupByAssetFile[assetFile] = svgMarkup
+}
+const parsedIconAssets = new Map()
+
+const lucideIcons = { Image, Presentation, Timer, Type }
+
+function parseIconSvg(svgMarkup) {
+  const rootTag = svgMarkup.match(/<svg[^>]*>/i)?.[0]
+  if (!rootTag) throw new Error('Metric icon asset must contain an SVG root element')
+
+  const strokeWidthMatch = svgMarkup.match(/stroke-width="([^"]+)"/)
+  const innerMarkupMatch = svgMarkup.match(/<svg[^>]*>([\s\S]*?)<\/svg>/i)
+  const fill = rootTag.match(/\sfill="([^"]+)"/)?.[1]
+  const stroke = rootTag.match(/\sstroke="([^"]+)"/)?.[1]
+  if (!fill || !stroke) throw new Error('Metric icon SVG root must define fill and stroke')
+
+  return {
+    fill,
+    stroke,
+    strokeWidth: Number(strokeWidthMatch?.[1] || 2),
+    innerMarkup: (innerMarkupMatch?.[1] || '').trim(),
+  }
+}
+
+function getIconSvgByAssetFile(assetFile) {
+  if (!Object.hasOwn(iconSvgMarkupByAssetFile, assetFile)) throw new Error(`Unsupported icon asset: ${assetFile}`)
+  if (!parsedIconAssets.has(assetFile)) {
+    const data = parseIconSvg(iconSvgMarkupByAssetFile[assetFile])
+    parsedIconAssets.set(assetFile, data)
+  }
+  return parsedIconAssets.get(assetFile)
+}
+
+function ParsedSvgIcon(data, props) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -27,131 +56,77 @@ function ParsedSvgIcon({ data, className, ...props }) {
       strokeWidth={data.strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={className}
       {...props}
       dangerouslySetInnerHTML={{ __html: data.innerMarkup }}
     />
   )
 }
 
-export function WidgetIcon({ type, ...props }) {
-  return <ParsedSvgIcon data={METRIC_ICON_SVGS[type]} {...props} />
-}
-
-export function DisplayTypeIcon({ displayType, ...props }) {
-  return <ParsedSvgIcon data={DISPLAY_TYPE_ICON_SVGS[displayType]} {...props} />
-}
-
-function createLapTimerModeIcon({ source, name, assetFile }) {
-  if (source === 'lucide') {
-    if (name !== 'Timer') throw new Error(`Unsupported lap timer Lucide icon: ${name}`)
-    return Timer
+function materializeIcon(icon) {
+  if (icon.assetFile !== undefined) {
+    const data = getIconSvgByAssetFile(icon.assetFile)
+    return ParsedSvgIcon.bind(null, data)
   }
-
-  if (source !== 'shared' && source !== 'custom') throw new Error(`Unsupported lap timer icon source: ${source}`)
-
-  const data = getIconSvgByAssetFile(assetFile)
-  const Icon = (props) => <ParsedSvgIcon data={data} {...props} />
-  Icon.displayName = `LapTimerModeIcon.${assetFile}`
+  const Icon = lucideIcons[icon.name]
+  if (icon.source !== 'lucide' || !Icon) throw new Error('Unsupported manifest icon: ' + icon.name)
   return Icon
 }
 
-/**
- * Returns the canonical UI label for an available activity attribute.
- * Attributes without a widget definition remain visible with a human-readable
- * form of their backend identifier.
- *
- * @param {string} type - Canonical activity attribute identifier.
- * @param {import('i18next').TFunction} translate - Translation function.
- * @returns {string} Activity attribute label.
- */
-export function getActivityAttributeLabel(type, translate) {
-  const definition = WIDGET_TYPE_DEFINITIONS[type]
-  if (definition) return translate(definition.nameKey)
-
-  const words = []
-  for (const part of type.split('_')) words.push(part === 'gps' ? 'GPS' : part.charAt(0).toUpperCase() + part.slice(1))
-  return translate(`widgets.activityAttributes.${type}`, words.join(' '))
-}
-
-/**
- * Returns the translated long name for a configured widget type.
- * @param {string} type - Canonical widget type.
- * @param {import('i18next').TFunction} translate - Translation function.
- * @returns {string} Translated widget name.
- */
-export function getWidgetTypeName(type, translate) {
-  const definition = requireWidgetTypeDefinition(type)
-  return translate(definition.nameKey)
-}
-
-const widgetTypes = Object.keys(WIDGET_TYPE_DEFINITIONS).filter((type) => !['backdrop', 'label'].includes(type))
-
-const widgetIconComponents = {}
-widgetTypes.forEach((type) => {
-  const C = (props) => <WidgetIcon type={type} {...props} />
-  C.displayName = `WidgetIcon.${type}`
-  widgetIconComponents[type] = C
-})
-
-export const WIDGET_ICONS = {
-  backdrop: Presentation,
-  label: Type,
-  ...widgetIconComponents,
-}
-
-export const TYPE_ICONS = {
-  backdrop: Presentation,
-  label: Type,
-  ...widgetIconComponents,
-  lap_timer: Timer,
-}
-
-export const DISPLAY_TYPE_ICONS = Object.fromEntries(
-  Object.keys(DISPLAY_TYPE_ICON_SVGS).map((dt) => [dt, (props) => <DisplayTypeIcon displayType={dt} {...props} />]),
-)
-
-const BACKDROP_DISPLAY_TYPES = Object.keys(BACKDROP_TYPE_DEFINITIONS)
-
-export function getWidgetDisplayTypes(type) {
-  if (type === 'backdrop') return BACKDROP_DISPLAY_TYPES
-  if (isStandardMetricWidgetType(type)) return getSupportedDisplayTypes(type)
-  return ['text']
-}
-
-export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradient', 'backdrop', ...CURRENT_STANDARD_METRIC_WIDGET_TYPES]
-  .filter((type) => type !== 'lap_timer')
-  .map((type) => ({
-    type,
-    icon: TYPE_ICONS[type],
-    shortNameKey: requireWidgetTypeDefinition(type).shortNameKey,
-    category: requireWidgetTypeDefinition(type).category,
-    options: getWidgetDisplayTypes(type).map((value) => ({
-      value,
-      labelKey: type === 'backdrop' ? BACKDROP_TYPE_LABEL_KEYS[value] : DISPLAY_TYPE_LABEL_KEYS[value],
-      icon: DISPLAY_TYPE_ICONS[value],
-      selection: { displayType: value },
-    })),
-  }))
-  .concat({
-    type: 'lap_timer',
-    icon: Timer,
-    shortNameKey: requireWidgetTypeDefinition('lap_timer').shortNameKey,
-    category: requireWidgetTypeDefinition('lap_timer').category,
-    options: LAP_TIMER_MODES.map((mode) => ({ ...mode, icon: createLapTimerModeIcon(mode.icon), selection: { lapTimerMode: mode.value } })),
-  })
-
-export const GROUPED_QUICKMENU_ITEMS = (() => {
-  const groups = {}
-  for (const item of QUICKMENU_ITEMS) {
-    if (!groups[item.category]) groups[item.category] = []
-    groups[item.category].push(item)
+function createMenuOptions(type) {
+  let definitions
+  let displayTypes
+  if (type === 'backdrop') {
+    definitions = BACKDROP_TYPE_DEFINITIONS
+    displayTypes = Object.keys(definitions)
+  } else if (isStandardMetricWidgetType(type)) {
+    definitions = DISPLAY_TYPE_DEFINITIONS
+    displayTypes = getSupportedDisplayTypes(type)
+  } else {
+    return [{ selection: {} }]
   }
-  return Object.entries(WIDGET_CATEGORY_NAME_KEYS)
-    .map(([category, nameKey]) => ({
-      category,
-      nameKey,
-      items: groups[category] ?? [],
-    }))
-    .filter((group) => group.items.length > 0)
-})()
+
+  const options = []
+  for (const value of displayTypes) {
+    const definition = definitions[value]
+    if (definition.modes !== undefined) {
+      for (const mode of definition.modes) {
+        const icon = materializeIcon(mode.icon)
+        options.push({ value: mode.value, labelKey: mode.labelKey, icon, selection: { lapTimerMode: mode.value } })
+      }
+    } else {
+      const icon = materializeIcon(definition.icon)
+      options.push({ value, labelKey: definition.labelKey, icon, selection: { displayType: value } })
+    }
+  }
+  return options
+}
+
+export const WIDGET_ICON_SVGS = {}
+export const WIDGET_ICONS = {}
+for (const [type, definition] of Object.entries(WIDGET_TYPE_DEFINITIONS)) {
+  if (definition.icon.assetFile !== undefined) {
+    WIDGET_ICON_SVGS[type] = getIconSvgByAssetFile(definition.icon.assetFile)
+  }
+  WIDGET_ICONS[type] = materializeIcon(definition.icon)
+}
+
+const groups = {}
+for (const [category, nameKey] of Object.entries(WIDGET_CATEGORY_NAME_KEYS)) {
+  groups[category] = { category, nameKey, items: [] }
+}
+for (const [type, definition] of Object.entries(WIDGET_TYPE_DEFINITIONS)) {
+  if (isStandardMetricWidgetType(type) && !definition.current) continue
+  const options = createMenuOptions(type)
+  groups[definition.category].items.push({
+    type,
+    icon: WIDGET_ICONS[type],
+    shortNameKey: definition.shortNameKey,
+    category: definition.category,
+    options,
+  })
+}
+
+export const GROUPED_QUICKMENU_ITEMS = []
+for (const group of Object.values(groups)) {
+  if (group.items.length > 0) GROUPED_QUICKMENU_ITEMS.push(group)
+}

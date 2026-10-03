@@ -1,5 +1,5 @@
 /**
- * @file widget-presentation – Builds and groups widgets for sidebar rendering.
+ * @file widget-presentation – Labels, builds, and groups widgets for rendering.
  *
  * These functions are purely concerned with how widgets are displayed in the
  * sidebar (widget drawer, widget editor sidebar tabs). They do NOT mutate
@@ -8,6 +8,8 @@
  * What this module owns:
  * - buildConfigWidgets      flattens config categories into a uniform widget list
  * - groupWidgetsForSidebar  groups and sorts widgets for sidebar display
+ * - getWidgetTypeName       translates canonical widget names
+ * - getActivityAttributeLabel labels activity attributes, including those without widgets
  *
  * What widget-config.js owns:
  * - Widget CRUD (ensureWidgetIdsInConfig, findWidgetInConfig, updateWidgetInConfig,
@@ -19,6 +21,34 @@
 
 import { ensureWidgetIdsInConfig } from './widget-config'
 import { convertAltitudeValue, getElevationProfileSeries, getFirstAltitudeValue, getPreferredElevationSeries } from './altitude'
+import { WIDGET_TYPE_DEFINITIONS, requireWidgetTypeDefinition } from './standard-widgets'
+
+/**
+ * Returns a translated activity attribute label, including attributes without a widget definition.
+ * @param {string} type Activity attribute identifier.
+ * @param {import('i18next').TFunction} translate Translation function.
+ * @returns {string} Activity attribute label.
+ */
+export function getActivityAttributeLabel(type, translate) {
+  const definition = WIDGET_TYPE_DEFINITIONS[type]
+  if (definition) return translate(definition.nameKey)
+
+  const words = []
+  for (const part of type.split('_')) words.push(part === 'gps' ? 'GPS' : part.charAt(0).toUpperCase() + part.slice(1))
+  const defaultLabel = words.join(' ')
+  return translate(`widgets.activityAttributes.${type}`, defaultLabel)
+}
+
+/**
+ * Returns the translated name of a supported widget.
+ * @param {string} type Widget type.
+ * @param {import('i18next').TFunction} translate Translation function.
+ * @returns {string} Widget name.
+ */
+export function getWidgetTypeName(type, translate) {
+  const definition = requireWidgetTypeDefinition(type)
+  return translate(definition.nameKey)
+}
 
 /**
  * Flattens the config's backdrop/label/value/plot arrays into a uniform widget list
@@ -35,6 +65,9 @@ export function buildConfigWidgets(config) {
 
   ;(normalizedConfig.backdrops || []).forEach((item, index) => {
     widgets.push({ id: item.id, type: 'backdrop', category: 'backdrops', index, name: 'Backdrop', data: item })
+  })
+  ;(normalizedConfig.rasters || []).forEach((item, index) => {
+    widgets.push({ id: item.id, type: 'raster', category: 'rasters', index, name: 'Raster', data: item })
   })
   ;(normalizedConfig.labels || []).forEach((item, index) => {
     widgets.push({ id: item.id, type: 'label', category: 'labels', index, name: item.text || 'Text', data: item })

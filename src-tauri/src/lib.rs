@@ -40,6 +40,7 @@ mod file_ops;
 mod preview_import;
 mod progress_sink;
 mod project_file;
+mod raster_resources;
 mod runtime_paths;
 mod tauri_commands;
 
@@ -73,6 +74,8 @@ pub fn run() {
             tauri_commands::backend_distribution_kind,
             tauri_commands::backend_open_hevc_support,
             tauri_commands::backend_list_system_fonts,
+            tauri_commands::backend_font_capabilities,
+            tauri_commands::backend_font_data,
             tauri_commands::backend_render,
             tauri_commands::backend_finalize_activity,
             tauri_commands::backend_parse_csv_activity,
@@ -99,6 +102,8 @@ pub fn run() {
             tauri_commands::backend_build_route_geometry,
             file_ops::default_template_save_path,
             file_ops::read_selected_file_bytes,
+            file_ops::load_selected_raster,
+            file_ops::raster_preview_png,
             file_ops::selected_path_is_file,
             file_ops::write_template_file,
             file_ops::write_parse_debug_file,
@@ -109,6 +114,7 @@ pub fn run() {
         ])
         .setup(|app| {
             app.manage(distribution::detect()?);
+            app.manage(raster_resources::RasterResources::default());
 
             #[cfg(debug_assertions)]
             {

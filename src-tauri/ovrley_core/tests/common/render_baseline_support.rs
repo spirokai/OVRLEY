@@ -340,7 +340,16 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
         "composite_video_path".to_string(),
         json!(source_video.to_string_lossy().to_string()),
     );
-    scene.insert("composite_bitrate".to_string(), json!(case.bitrate.clone()));
+    scene.insert("qualityType".to_string(), json!("bitrate"));
+    scene.insert(
+        "qualityValue".to_string(),
+        json!(case
+            .bitrate
+            .strip_suffix('M')
+            .unwrap()
+            .parse::<f64>()
+            .unwrap()),
+    );
     scene.insert("composite_sync_offset".to_string(), json!(case.sync_offset));
     scene.insert("composite_video_fps_num".to_string(), json!(source_fps_num));
     scene.insert("composite_video_fps_den".to_string(), json!(source_fps_den));

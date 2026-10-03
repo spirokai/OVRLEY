@@ -26,7 +26,6 @@ use crate::normalize::{parse_config_json, parse_template_json};
 use crate::output::{RenderOutputKind, RenderOutputTarget};
 use serde::Serialize;
 use serde_json::{json, Value};
-use skia_safe::FontMgr;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -99,47 +98,28 @@ pub fn backend_parse_vbo_activity(
     Ok(response)
 }
 
-/// Lists bundled font filenames plus system font family names visible to Skia.
-pub fn backend_list_system_fonts(paths: &AppPaths) -> Value {
-    let mut fonts: Vec<String> = FontMgr::default()
-        .family_names()
-        .map(|name| name.trim().to_string())
-        .filter(|name| !name.is_empty())
-        .collect();
+/// Lists canonical bundled capabilities and lazy system font identities.
+pub fn backend_list_system_fonts(paths: &AppPaths) -> CoreResult<Value> {
+    Ok(serde_json::to_value(crate::fonts::font_catalog(
+        &paths.font_dirs,
+    )?)?)
+}
 
-    fonts.sort_by_key(|name| name.to_lowercase());
-    fonts.dedup_by(|current, next| current.eq_ignore_ascii_case(next));
+/// Resolves the selected font's actual faces, including italic availability.
+pub fn backend_font_capabilities(paths: &AppPaths, font_id: &str) -> CoreResult<Value> {
+    Ok(serde_json::to_value(crate::fonts::font_capabilities(
+        &paths.font_dirs,
+        font_id,
+    )?)?)
+}
 
-    let mut bundled_fonts = BTreeSet::new();
-    for dir in &paths.font_dirs {
-        if let Ok(entries) = fs::read_dir(dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                let is_supported_font = path
-                    .extension()
-                    .and_then(|value| value.to_str())
-                    .map(|extension| {
-                        extension.eq_ignore_ascii_case("ttf")
-                            || extension.eq_ignore_ascii_case("otf")
-                            || extension.eq_ignore_ascii_case("ttc")
-                    })
-                    .unwrap_or(false);
-
-                if !is_supported_font {
-                    continue;
-                }
-
-                if let Some(filename) = path.file_name().and_then(|value| value.to_str()) {
-                    bundled_fonts.insert(filename.to_string());
-                }
-            }
-        }
-    }
-
-    json!({
-        "recommendedFonts": bundled_fonts.into_iter().collect::<Vec<_>>(),
-        "systemFonts": fonts,
-    })
+/// Supplies the session's bundled face bytes for browser font registration.
+pub fn backend_font_data(
+    paths: &AppPaths,
+    font_id: &str,
+    face_index: usize,
+) -> CoreResult<Vec<u8>> {
+    crate::fonts::bundled_face_data(&paths.font_dirs, font_id, face_index)
 }
 
 /// Starts a background video render.
@@ -154,9 +134,11 @@ pub fn backend_render(
     parsed_activity_json: &str,
     output_path: &str,
     overwrite: bool,
+    raster_resources: Option<&dyn crate::raster::RasterResourceResolver>,
 ) -> CoreResult<Value> {
     let config = parse_config_json(config_json)?;
-    let validated = crate::normalize::validate_render_config(config)?;
+    let validated =
+        crate::normalize::validate_render_config_with_resources(config, raster_resources)?;
     let output_kind = if validated.scene.composite_video_path.is_some() {
         RenderOutputKind::Composite
     } else {
@@ -218,10 +200,12 @@ pub fn backend_render_preview_frame(
     config_json: &str,
     parsed_activity_json: &str,
     second: f64,
+    raster_resources: Option<&dyn crate::raster::RasterResourceResolver>,
 ) -> CoreResult<Value> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
-    let validated = crate::normalize::validate_render_config(config)?;
+    let validated =
+        crate::normalize::validate_render_config_with_resources(config, raster_resources)?;
     let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -698,7 +682,9 @@ pub fn backend_detect_codecs(paths: &AppPaths) -> CoreResult<Value> {
 /// This is the single entry point for write-time validation — callers never
 /// see `RenderConfig` or `ValidatedRenderConfig`.
 pub fn validate_template_contents(input: &str) -> CoreResult<()> {
-    let config = parse_template_json(input)?;
+    let mut config = parse_template_json(input)?;
+    crate::normalize::validate_template_rasters(&config.rasters)?;
+    config.rasters.clear();
     crate::normalize::validate_render_config(config)?;
     Ok(())
 }

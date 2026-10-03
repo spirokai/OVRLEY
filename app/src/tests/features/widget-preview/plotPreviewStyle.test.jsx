@@ -2,10 +2,6 @@ import { describe, expect, test, vi } from 'vitest'
 import { getRoutePreviewStyle } from '@/features/widget-preview/widgets/route/style'
 import { buildElevationPreviewStyle } from '@/features/widget-preview/widgets/elevation/style'
 
-vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({
-  useFontMetrics: () => 0,
-}))
-
 vi.mock('@/features/widget-preview/shared/textMeasurement', async () => {
   const actual = await vi.importActual('@/features/widget-preview/shared/textMeasurement')
   return {

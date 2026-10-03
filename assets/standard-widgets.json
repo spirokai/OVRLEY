@@ -1,4 +1,7 @@
 {
+  "typography": {
+    "widgetFontWeight": 700
+  },
   "categories": {
     "general": "widgets.categories.general",
     "cycling": "widgets.categories.cycling",
@@ -7,11 +10,28 @@
     "camera": "widgets.categories.camera",
     "other": "widgets.categories.other"
   },
+  "raster": {
+    "type": "raster",
+    "nameKey": "widgets.types.raster.name",
+    "shortNameKey": "widgets.types.raster.shortName",
+    "category": "general",
+    "icon": { "source": "lucide", "name": "Image" },
+    "defaults": {
+      "x": 100,
+      "y": 100,
+      "width": 320,
+      "height": 180,
+      "rotation": 0,
+      "opacity": 1,
+      "path": null
+    }
+  },
   "time": {
     "type": "time",
     "nameKey": "widgets.types.time.name",
     "shortNameKey": "widgets.types.time.shortName",
     "category": "general",
+    "icon": { "source": "shared", "assetFile": "widget-time.svg" },
     "modes": [
       {
         "value": "daytime",
@@ -44,6 +64,7 @@
         "nameKey": "widgets.types.course.name",
         "shortNameKey": "widgets.types.course.shortName",
         "category": "general",
+        "icon": { "source": "custom", "assetFile": "widget-course.svg" },
         "defaults": {
           "value": "course",
           "x": 100,
@@ -74,6 +95,7 @@
         "nameKey": "widgets.types.elevation.name",
         "shortNameKey": "widgets.types.elevation.shortName",
         "category": "general",
+        "icon": { "source": "custom", "assetFile": "widget-elevation.svg" },
         "defaults": {
           "value": "elevation",
           "x": 100,
@@ -126,6 +148,7 @@
         "nameKey": "widgets.types.gradient.name",
         "shortNameKey": "widgets.types.gradient.shortName",
         "category": "general",
+        "icon": { "source": "custom", "assetFile": "widget-gradient.svg" },
         "defaults": {
           "decimals": 1,
           "unit_color": "#ffffff",
@@ -146,12 +169,16 @@
         "nameKey": "widgets.types.label.name",
         "shortNameKey": "widgets.types.label.shortName",
         "category": "general",
+        "icon": { "source": "lucide", "name": "Type" },
         "defaults": {
           "x": 100,
           "y": 100,
           "font": "Arial.ttf",
           "font_size": 60,
           "text": "New Text",
+          "font_weight": 400,
+          "italic": false,
+          "letter_spacing": 0,
           "color": "#ffffff",
           "opacity": 1
         }
@@ -163,6 +190,7 @@
     "nameKey": "widgets.types.backdrop.name",
     "shortNameKey": "widgets.types.backdrop.shortName",
     "category": "general",
+    "icon": { "source": "lucide", "name": "Presentation" },
     "defaults": ["rectangle"],
     "definitions": {
       "circle": {

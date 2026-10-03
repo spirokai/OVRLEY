@@ -15,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import ExportRangeSettings from './ExportRangeSettings'
 import RenderProgressPanel from './RenderProgressPanel'
 import useRenderVideoDialogState from '../hooks/useRenderVideoDialogState'
+import { QUALITY_SLIDER_RANGE } from '../data/qualityDefaults'
 import { useTranslation } from 'react-i18next'
 
 /**
@@ -309,19 +310,37 @@ export default function RenderVideoDialog(props) {
               {ctx.selectedCodecIsMp4 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                      {t('render-video.bitrate', 'Bitrate')}
-                    </Label>
-                    <span className="rounded bg-surface-strong px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                      {ctx.settings.exportBitrate ?? 20} Mbps
+                    <Tabs value={ctx.settings.qualityType} onValueChange={ctx.handleQualityTypeChange}>
+                      <TabsList className="h-7 bg-surface p-0.5" variant="toolbar">
+                        <TabsTrigger value="quality" className="px-2 text-[10px]" variant="toolbar">
+                          {t('render-video.quality', 'Quality')}
+                        </TabsTrigger>
+                        <TabsTrigger value="bitrate" className="px-2 text-[10px]" variant="toolbar">
+                          {t('render-video.bitrate', 'Bitrate')}
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                    <span className="rounded bg-surface-strong px-2 py-0.5 text-[10px] font-semibold text-muted-foreground tabular-nums">
+                      {ctx.settings.qualityType === 'quality' ? 'CRF ' : ''}
+                      {ctx.settings.qualityValue}
+                      {ctx.settings.qualityType === 'bitrate' ? ' Mbps' : ''}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[10px] text-muted-foreground/70">
+                    <span>
+                      {ctx.settings.qualityType === 'quality' ? t('render-video.worse', 'Worse') : t('render-video.smallerFile', 'Smaller file')}
+                    </span>
+                    <span>
+                      {ctx.settings.qualityType === 'quality' ? t('render-video.better', 'Better') : t('render-video.largerFile', 'Larger file')}
                     </span>
                   </div>
                   <Slider
-                    min={5}
-                    max={100}
-                    step={5}
-                    value={[ctx.settings.exportBitrate ?? 20]}
-                    onValueChange={([value]) => ctx.onSettingsChange({ exportBitrate: value })}
+                    aria-label={ctx.settings.qualityType === 'quality' ? t('render-video.quality', 'Quality') : t('render-video.bitrate', 'Bitrate')}
+                    min={ctx.settings.qualityType === 'quality' ? QUALITY_SLIDER_RANGE.min : 5}
+                    max={ctx.settings.qualityType === 'quality' ? QUALITY_SLIDER_RANGE.max : 100}
+                    step={ctx.settings.qualityType === 'quality' ? 1 : 5}
+                    value={[ctx.qualitySliderValue]}
+                    onValueChange={ctx.handleQualityValueChange}
                   />
                 </div>
               )}

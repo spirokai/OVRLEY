@@ -9,11 +9,11 @@ import {
   METRIC_WIDGET_UNITS_GAP_PX,
   NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT,
 } from '@/features/overlay-editor/data/overlayEditorConstants'
-import { FONT_FAMILY_MAP } from '@/features/overlay-editor/data/overlayEditorConfig'
-import { getFontFamilyName } from '@/lib/fonts'
 import { clamp } from '@/lib/utils'
+import { WIDGET_FONT_WEIGHT } from '@/lib/widget/standard-widgets'
 
 let metricMeasureContext = null
+const graphemeSegmenter = new Intl.Segmenter('und', { granularity: 'grapheme' })
 const COORDINATE_PREVIEW_VERTICAL_METRICS_TEXT = 'NSEW88\u00B088.888\u203288\u2033'
 
 function createEmptyTextMeasure() {
@@ -43,23 +43,19 @@ function getMetricMeasureContext() {
   }
 
   const canvas = document.createElement('canvas')
+  canvas.style.fontOpticalSizing = 'none'
+  canvas.style.fontSynthesis = 'style'
   metricMeasureContext = canvas.getContext('2d')
   return metricMeasureContext
 }
 
 /**
- * Resolves a font name to its CSS font-family value via the FONT_FAMILY_MAP lookup.
- *
- * Falls back to the font name itself if not found in the map, and finally to
- * the first discovered bundled font family when available.
- *
- * @param {string} fontName - Font name key from FONT_FAMILY_MAP or a raw CSS font-family.
+ * Returns the CSS family registered from the canonical font catalog.
+ * @param {string} fontName - Canonical font ID.
  * @returns {string} CSS-compatible font-family string.
  */
 export function getPreviewFontFamily(fontName) {
-  const fontFamily = FONT_FAMILY_MAP[fontName] ?? getFontFamilyName(fontName)
-  if (!fontFamily) throw new Error(`Unknown preview font: ${fontName}`)
-  return fontFamily
+  return JSON.stringify(`OVRLEY ${fontName}`)
 }
 
 /**
@@ -71,9 +67,12 @@ export function getPreviewFontFamily(fontName) {
  * @param {string} text - Text to measure.
  * @param {number} fontSize - Font size in pixels.
  * @param {string} fontFamily - CSS font family.
+ * @param {number} [fontWeight=WIDGET_FONT_WEIGHT] - Supported weight; labels pass their resolved weight.
+ * @param {string} [fontStyle='normal'] - Resolved font style; style synthesis is permitted.
+ * @param {number} [letterSpacing=0] - Pixels between grapheme clusters, without a trailing gap.
  * @returns {{ width: number, glyphHeight: number, ascent: number, descent: number, boundsLeft: number, boundsRight: number }} Measurement results.
  */
-export function measurePreviewText(text, fontSize, fontFamily) {
+export function measurePreviewText(text, fontSize, fontFamily, fontWeight = WIDGET_FONT_WEIGHT, fontStyle = 'normal', letterSpacing = 0) {
   if (!text) {
     return createEmptyTextMeasure()
   }
@@ -83,7 +82,8 @@ export function measurePreviewText(text, fontSize, fontFamily) {
     return createEmptyTextMeasure()
   }
 
-  context.font = `${fontSize}px ${fontFamily}`
+  context.font = `${fontStyle === 'normal' ? '' : `${fontStyle} `}${fontWeight} ${fontSize}px ${fontFamily}`
+  if (letterSpacing !== 0) return measureSpacedText(text, context, letterSpacing)
   const metrics = context.measureText(text)
   const ascent = metrics.actualBoundingBoxAscent || 0
   const descent = metrics.actualBoundingBoxDescent || 0
@@ -99,7 +99,50 @@ export function measurePreviewText(text, fontSize, fontFamily) {
     fontAscent,
     fontDescent,
     boundsLeft: metrics.actualBoundingBoxLeft || 0,
-    boundsRight: metrics.actualBoundingBoxRight || metrics.width,
+    boundsRight: metrics.actualBoundingBoxRight ?? metrics.width,
+  }
+}
+
+// Nonzero spacing lays out intact grapheme runs in both canvas and SVG.
+// Advances may become negative; ink bounds are the union of all positioned runs.
+function measureSpacedText(text, context, letterSpacing) {
+  const runs = []
+  let width = 0
+  let minX = Infinity
+  let maxX = -Infinity
+  let ascent = -Infinity
+  let descent = -Infinity
+  let fontAscent = 0
+  let fontDescent = 0
+  for (const { segment } of graphemeSegmenter.segment(text)) {
+    if (runs.length > 0) width += letterSpacing
+    const metrics = context.measureText(segment)
+    runs.push({ text: segment, x: width })
+    if (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent > 0) {
+      minX = Math.min(minX, width - metrics.actualBoundingBoxLeft)
+      maxX = Math.max(maxX, width + metrics.actualBoundingBoxRight)
+      ascent = Math.max(ascent, metrics.actualBoundingBoxAscent)
+      descent = Math.max(descent, metrics.actualBoundingBoxDescent)
+    }
+    fontAscent = Math.max(fontAscent, metrics.fontBoundingBoxAscent ?? metrics.actualBoundingBoxAscent)
+    fontDescent = Math.max(fontDescent, metrics.fontBoundingBoxDescent ?? metrics.actualBoundingBoxDescent)
+    width += metrics.width
+  }
+  const hasInk = minX !== Infinity
+  if (!hasInk) {
+    ascent = 0
+    descent = 0
+  }
+  return {
+    width,
+    glyphHeight: ascent + descent,
+    ascent,
+    descent,
+    fontAscent,
+    fontDescent,
+    boundsLeft: hasInk ? -minX : 0,
+    boundsRight: hasInk ? maxX : 0,
+    runs,
   }
 }
 

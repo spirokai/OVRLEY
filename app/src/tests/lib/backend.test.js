@@ -49,6 +49,32 @@ describe('backend Tauri error normalization', () => {
     ).rejects.toMatchObject({ code: 'already_exists', message: 'Output already exists' })
   })
 
+  test('preserves a tagged backend rejection for an unselected raster in preview and export', async () => {
+    const backendMessage = 'Invalid configuration: Raster widget-1 has no selected image. [raster_error:no_image:widget-1]'
+    const invoke = vi.fn().mockRejectedValue(backendMessage)
+    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
+    const backend = await import('@/api/backend')
+    const config = { rasters: [{ id: 'widget-1', path: null }] }
+
+    await expect(backend.renderVideo(config, {}, { outputPath: 'C:\\renders\\overlay.mov' })).rejects.toThrow(backendMessage)
+    await expect(backend.renderPreviewFrame(config, {}, 0)).rejects.toThrow(backendMessage)
+    expect(invoke).toHaveBeenCalledTimes(2)
+  })
+
+  test('submits a selected raster resource for preview and export', async () => {
+    const invoke = vi.fn().mockResolvedValue('{}')
+    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
+    const backend = await import('@/api/backend')
+    const config = { rasters: [{ id: 'widget-1', path: 'C:\\image.png', resourceId: 'snapshot-1' }] }
+
+    await backend.renderPreviewFrame(config, {}, 0)
+    await backend.renderVideo(config, {}, { outputPath: 'C:\\renders\\overlay.mov' })
+    expect(invoke).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(invoke.mock.calls[0][1].configJson).rasters[0].resourceId).toBe('snapshot-1')
+    expect(JSON.parse(invoke.mock.calls[1][1].configJson).rasters[0].resourceId).toBe('snapshot-1')
+    expect(invoke.mock.calls[0][1]).not.toHaveProperty('rasterResourceIds')
+  })
+
   test('listProjectFiles accepts canonical optional thumbnail data', async () => {
     const projects = [
       {

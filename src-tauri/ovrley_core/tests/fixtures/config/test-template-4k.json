@@ -1,6 +1,6 @@
 {
   "format": "ovrley-template",
-  "version": 2,
+  "version": 3,
   "name": "recent-template",
   "savedAt": "2026-05-09T20:22:47.194Z",
   "config": {
@@ -10,11 +10,15 @@
       "fps": 30,
       "updateRate": 1
     },
+    "rasters": [],
     "labels": [
       {
         "x": 1215,
         "y": 72,
         "font": "Furore.otf",
+        "font_weight": 400,
+        "italic": false,
+        "letter_spacing": 0,
         "font_size": 158,
         "text": "Kokot",
         "color": "#ffffff",

@@ -30,7 +30,8 @@ test('project restoration changes only project-owned settings', () => {
       widgetUpdateRate: 2,
       exportMode: 'composite',
       codec: 'libx264',
-      bitrateMbps: 20,
+      qualityType: 'bitrate',
+      qualityValue: 20,
       range: { type: 'custom', from: 10, to: 80 },
     },
     timeline: { playheadSecond: 50, viewStart: 25, viewEnd: 75 },
@@ -48,7 +49,7 @@ test('project restoration changes only project-owned settings', () => {
   expect(state.videoSyncTimezoneMode).toBe('utc')
   expect(state.manualVideoSync.detectedLocationSecond).toBe(30)
   expect(state.manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 30 })
-  expect(state.renderSettings).toMatchObject({ fps: 60, codec: 'libx264' })
+  expect(state.renderSettings).toMatchObject({ fps: 60, codec: 'libx264', qualityType: 'bitrate', qualityValue: 20 })
   expect(state.selectedSecond).toBe(50)
   expect(state.timelineViewport).toEqual({ viewStart: 25, viewEnd: 75 })
   expect(state.previewPlaybackState).toBe('paused')
@@ -78,7 +79,8 @@ test('project hydration rejects landmarks without matching staged video bounds',
       widgetUpdateRate: 1,
       exportMode: 'composite',
       codec: 'libx264',
-      bitrateMbps: null,
+      qualityType: 'quality',
+      qualityValue: 18,
       range: { type: 'all', from: 0, to: 0 },
     },
     timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 30 },

@@ -39,9 +39,18 @@ use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::error::CoreError;
 use ovrley_core::normalize::raw::parse_config_json;
-use ovrley_core::normalize::raw::RenderConfig;
+use ovrley_core::normalize::raw::{RasterConfig, RenderConfig};
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
+use ovrley_core::raster::{RasterResourceResolver, SelectedRaster};
+
+struct EmptyRasterResources;
+
+impl RasterResourceResolver for EmptyRasterResources {
+    fn resolve(&self, _: &str) -> Option<std::sync::Arc<SelectedRaster>> {
+        None
+    }
+}
 
 /// Verifies the transparent render branch does not alter dense activity
 /// timing. A transparent config with 5–15s window at 30 FPS should produce
@@ -61,6 +70,42 @@ fn test_3_1_transparent_render_branch_keeps_original_dense_timing() {
     assert_eq!(dense.frame_elapsed_seconds.first().copied(), Some(0.0));
 }
 
+#[test]
+fn app_render_rejects_a_raster_without_its_loaded_resource() {
+    let mut config = transparent_config(0.0, 1.0, 30.0);
+    config.rasters.push(RasterConfig {
+        id: "one".into(),
+        x: 0.0,
+        y: 0.0,
+        width: 1.0,
+        height: 1.0,
+        rotation: 0.0,
+        opacity: 1.0,
+        path: Some(
+            std::env::current_dir()
+                .unwrap()
+                .join("source.bmp")
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        resource_id: None,
+        resource_error_code: None,
+    });
+    let error = backend_render(
+        &AppPaths::from_repo_root(PathBuf::from(".")),
+        &RenderController::default(),
+        &serde_json::to_string(&config).unwrap(),
+        &synthetic_activity_json(),
+        &render_output_path("missing-raster"),
+        false,
+        Some(&EmptyRasterResources),
+    )
+    .unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("raster_error:missing_resource:one"));
+}
+
 /// Verifies the composite branch gate: `backend_render` must
 /// activate the composite branch only when `composite_video_path` is set.
 /// Uses a synthetic activity and validates the render starts (controller
@@ -75,7 +120,7 @@ fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
         &composite_config_json(
             r#"
                 "composite_video_path": "input.mp4",
-                "composite_bitrate": "60M",
+                "qualityType": "bitrate", "qualityValue": 60.0,
                 "composite_sync_offset": 0.0,
                 "composite_video_fps_num": 30000,
                 "composite_video_fps_den": 1001,
@@ -88,6 +133,7 @@ fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
         &synthetic_activity_json(),
         &render_output_path("branch"),
         false,
+        None,
     )
     .unwrap();
 
@@ -115,6 +161,7 @@ fn output_rejection_precedes_malformed_activity_processing() {
         "not json",
         output_path.to_str().unwrap(),
         false,
+        None,
     )
     .unwrap_err();
 
@@ -133,7 +180,7 @@ fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
         &composite_config_json(
             r#"
                 "composite_video_path": "input.mp4",
-                "composite_bitrate": "60M",
+                "qualityType": "bitrate", "qualityValue": 60.0,
                 "composite_sync_offset": 0.0,
                 "composite_video_fps_num": 30,
                 "composite_video_fps_den": 1,
@@ -146,6 +193,7 @@ fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
         &short_fractional_activity_json(),
         &render_output_path("clamp"),
         false,
+        None,
     )
     .unwrap();
 
@@ -179,7 +227,7 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
         &composite_config_json(&format!(
             r#"
                 "composite_video_path": "{}",
-                "composite_bitrate": "60M",
+                "qualityType": "bitrate", "qualityValue": 60.0,
                 "composite_sync_offset": 300.0,
                 "composite_video_fps_num": 30000,
                 "composite_video_fps_den": 1001,
@@ -193,6 +241,7 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
         &synthetic_activity_json(),
         &render_output_path("pipeline"),
         false,
+        None,
     )
     .unwrap();
 
@@ -208,10 +257,10 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
         .starts_with("ovrley-command-pipeline-"));
 }
 
-/// Plan derivation must reject composite configs that omit `composite_bitrate`.
+/// Config ingress must reject composite configs that omit quality settings.
 #[test]
-fn test_3_3_missing_bitrate_validation() {
-    let mut scene = composite_validated_scene(
+fn test_3_3_missing_quality_validation() {
+    let config = composite_config(
         r#"
             "composite_video_path": "input.mp4",
             "composite_sync_offset": 0.0,
@@ -222,11 +271,11 @@ fn test_3_3_missing_bitrate_validation() {
             "composite_widget_update_rate": 1
             "#,
     );
-    let error = derive_composite_render_plan(&mut scene, None).unwrap_err();
+    let error = ovrley_core::normalize::validate_scene_config(config.scene).unwrap_err();
 
     assert_eq!(
         error.to_string(),
-        "Invalid configuration: scene.composite_bitrate required for composite render"
+        "Invalid configuration: scene.qualityType required for composite render"
     );
 }
 
@@ -237,7 +286,7 @@ fn test_3_4_missing_fps_validation() {
     let mut missing_num = composite_validated_scene(
         r#"
             "composite_video_path": "input.mp4",
-            "composite_bitrate": "60M",
+            "qualityType": "bitrate", "qualityValue": 60.0,
             "composite_sync_offset": 0.0,
             "composite_video_fps_den": 1001,
             "composite_video_duration": 20.0,
@@ -248,7 +297,7 @@ fn test_3_4_missing_fps_validation() {
     let mut missing_den = composite_validated_scene(
         r#"
             "composite_video_path": "input.mp4",
-            "composite_bitrate": "60M",
+            "qualityType": "bitrate", "qualityValue": 60.0,
             "composite_sync_offset": 0.0,
             "composite_video_fps_num": 30000,
             "composite_video_duration": 20.0,
@@ -286,7 +335,7 @@ fn test_3_5_dense_report_timing_for_sync_offset() {
     let config = composite_config(
         r#"
             "composite_video_path": "input.mp4",
-            "composite_bitrate": "60M",
+            "qualityType": "bitrate", "qualityValue": 60.0,
             "composite_sync_offset": 300.0,
             "composite_video_fps_num": 30000,
             "composite_video_fps_den": 1001,
@@ -321,7 +370,7 @@ fn test_3_6_dense_report_timing_for_lower_overlay_update_rate() {
     let config = composite_config(
         r#"
             "composite_video_path": "input.mp4",
-            "composite_bitrate": "60M",
+            "qualityType": "bitrate", "qualityValue": 60.0,
             "composite_sync_offset": 0.0,
             "composite_video_fps_num": 60000,
             "composite_video_fps_den": 1001,
@@ -347,7 +396,7 @@ fn test_3_7_render_duration_defaults_to_remaining_video_after_trim() {
     let config = composite_config(
         r#"
             "composite_video_path": "input.mp4",
-            "composite_bitrate": "60M",
+            "qualityType": "bitrate", "qualityValue": 60.0,
             "composite_sync_offset": 0.0,
             "composite_video_fps_num": 30000,
             "composite_video_fps_den": 1001,
@@ -370,7 +419,7 @@ fn test_3_8_rejects_impossible_trim() {
     let config = composite_config(
         r#"
             "composite_video_path": "input.mp4",
-            "composite_bitrate": "60M",
+            "qualityType": "bitrate", "qualityValue": 60.0,
             "composite_sync_offset": 0.0,
             "composite_video_fps_num": 30000,
             "composite_video_fps_den": 1001,

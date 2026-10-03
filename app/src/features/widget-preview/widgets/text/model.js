@@ -10,6 +10,8 @@
  */
 
 import { METRIC_WIDGET_LINE_HEIGHT } from '@/features/overlay-editor/data/overlayEditorConstants'
+import { resolveFontStyle } from '@/lib/fonts'
+import { getPreparedFont } from '@/lib/font-resources'
 import { getPreviewFontFamily, getPreviewTextBaseline, measurePreviewText } from '../../shared/textMeasurement'
 
 export function buildTextWidgetPreviewModel({ widget }) {
@@ -17,7 +19,9 @@ export function buildTextWidgetPreviewModel({ widget }) {
   const fontFamily = getPreviewFontFamily(widget.data.font)
   const text = widget.data.text
   const lineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
-  const measurement = measurePreviewText(text, fontSize, fontFamily)
+  const { weight: fontWeight, fontStyle } = resolveFontStyle(getPreparedFont(widget.data.font), widget.data.font_weight, widget.data.italic)
+  const letterSpacing = (fontSize * widget.data.letter_spacing) / 100
+  const measurement = measurePreviewText(text, fontSize, fontFamily, fontWeight, fontStyle, letterSpacing)
   const baseline = getPreviewTextBaseline({
     top: 0,
     lineHeight,
@@ -36,6 +40,8 @@ export function buildTextWidgetPreviewModel({ widget }) {
     baseline,
     fontFamily,
     fontSize,
+    fontWeight,
+    fontStyle,
     lineHeight,
     measurement,
     text,

@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "Bilddateien",
+    "selectImage": "Bild auswählen",
+    "replaceImage": "Bild ersetzen",
+    "errors": {
+      "missingAsset": "Das eingebettete Bild fehlt im Projekt. Wählen Sie ein Ersatzbild.",
+      "corruptAsset": "Das eingebettete Bild ist beschädigt. Wählen Sie ein Ersatzbild.",
+      "relativePath": "Wählen Sie ein Bild über einen absoluten Dateipfad aus.",
+      "missing": "Die Bilddatei fehlt. Wählen Sie ein anderes Bild.",
+      "unreadable": "Die Bilddatei kann nicht gelesen werden. Prüfen Sie die Berechtigungen oder wählen Sie ein anderes Bild.",
+      "unsupportedType": "Wählen Sie eine PNG-, JPEG-, BMP- oder TIFF-Datei (.png, .jpeg, .jpg, .bmp, .tiff).",
+      "encodedSize": "Die Bilddatei ist größer als 5 MiB. Wählen Sie eine kleinere Datei.",
+      "resolution": "Die Bildauflösung überschreitet 25 Megapixel. Wählen Sie ein kleineres Bild.",
+      "decode": "Das Bild konnte nicht dekodiert werden. Wählen Sie ein anderes Bild.",
+      "noImage": "Für Bild {{id}} wurde keine Datei ausgewählt. Wählen Sie vor dem Rendern eine aus.",
+      "renderUnavailable": "Bild {{id}} kann noch nicht gerendert werden.",
+      "invalidConfig": "Die Bildeinstellungen sind ungültig."
+    }
+  },
   "app": {
     "importingYourVideo": "Video wird importiert...",
     "loadingProject": "Projekt wird geladen...",
@@ -105,6 +124,10 @@
     "zoomOut": "Herauszoomen"
   },
   "projects": {
+    "archiveTooLarge": "Das Projekt überschreitet die Archivgrenze von 40 MiB. Entfernen oder ersetzen Sie ein Bild.",
+    "invalidArchive": "Das Projektarchiv ist ungültig oder beschädigt. Wählen Sie eine andere Projektdatei.",
+    "rasterUnavailable": "Ein Bild ist nicht verfügbar. Ersetzen Sie es vor dem Speichern.",
+    "saveFailed": "Das Projekt konnte nicht gespeichert werden. Prüfen Sie den Speicherort und versuchen Sie es erneut.",
     "activity": "Aktivität",
     "cancel": "Abbrechen",
     "closeWithoutSaving": "Ohne Speichern schließen",
@@ -133,6 +156,11 @@
     "000000Or900": "00:00:00 oder 900",
     "backendOffline": "Backend offline",
     "bitrate": "Bitrate",
+    "quality": "Qualität",
+    "better": "Besser",
+    "worse": "Schlechter",
+    "smallerFile": "Kleinere Datei",
+    "largerFile": "Größere Datei",
     "cancel": "Abbrechen",
     "codecOutputFormat": "Codec / Ausgabeformat",
     "custom": "Benutzerdefiniert",
@@ -459,6 +487,7 @@
       "lapLog": "Rundenprotokoll"
     },
     "types": {
+      "raster": { "name": "Bild", "shortName": "Bild" },
       "air_pressure": { "name": "Luftdruck", "shortName": "Luftdr." },
       "altitude": { "name": "Höhenlage", "shortName": "Höhe" },
       "aperture": { "name": "Blende", "shortName": "Blende" },
@@ -547,6 +576,9 @@
     "flatTrack": "Flache Füllung",
     "fontFamily": "Schriftfamilie",
     "fontSize": "Schriftgröße",
+    "fontWeight": "Stärke",
+    "letterSpacing": "Abstand",
+    "italic": "Kursiv",
     "gaugeTrack": "Balkenanzeige",
     "gforcePlot": "G-Kraft-Diagramm",
     "horizontalOffset": "Horizontalversatz",
@@ -571,6 +603,7 @@
     "majorThickness": "Hauptdicke",
     "majorTicks": "Hauptmarkierungen",
     "mapRotation": "Kartendrehung",
+    "rotation": "Drehung",
     "markerColor": "Markierungsfarbe",
     "markerOpacity": "Markerdeckkraft",
     "markerSize": "Markierungsgröße",

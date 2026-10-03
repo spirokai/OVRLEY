@@ -108,9 +108,9 @@ export function applyProjectOwnedState(store, project) {
  * Commits staged media through one synchronous project transition.
  * @param {object} store Zustand application store.
  * @param {object} project Validated project payload.
- * @param {{activity: object|null, video: object|null}} sources Prepared project sources.
+ * @param {{activity: object|null, video: object|null}} prepared Prepared project resources.
  */
-export function applyPreparedProjectState(store, project, sources) {
+export function applyPreparedProjectState(store, project, prepared) {
   store.setState((draft) => {
     draft.activitySource = null
     draft.parsedActivity = null
@@ -121,11 +121,11 @@ export function applyPreparedProjectState(store, project, sources) {
 
   const state = store.getState()
   state.clearImportedVideo()
-  if (sources.video) {
-    store.setState(sources.video.importedVideoState)
-    if (sources.video.telemetry) state.loadVideoTelemetry(sources.video.telemetry)
+  if (prepared.video) {
+    store.setState(prepared.video.importedVideoState)
+    if (prepared.video.telemetry) state.loadVideoTelemetry(prepared.video.telemetry)
   }
-  if (sources.activity) activateParsedActivity(sources.activity, store.getState())
+  if (prepared.activity) activateParsedActivity(prepared.activity, store.getState())
 
   applyProjectOwnedState(store, project)
 }

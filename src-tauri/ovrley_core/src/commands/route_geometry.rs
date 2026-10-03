@@ -6,8 +6,8 @@
 //! layers, no frame states.
 
 use crate::activity::parse_activity_json;
-use crate::commands::parse_and_validate_config;
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::{parse_config_json, validate_route_plots, validate_scene_config};
 use serde::Serialize;
 
 /// Serializable geometry model for the route widget, returned over IPC.
@@ -42,11 +42,12 @@ pub fn build_route_geometry_command(
     config_json: &str,
     parsed_activity_json: &str,
 ) -> CoreResult<RouteGeometryResponse> {
-    let validated = parse_and_validate_config(config_json)?;
+    let config = parse_config_json(config_json)?;
+    let scene = validate_scene_config(config.scene)?;
+    let course_plots = validate_route_plots(&config.plots)?;
     let activity = parse_activity_json(parsed_activity_json)?;
 
-    let course_plot = validated
-        .course_plots
+    let course_plot = course_plots
         .first()
         .ok_or_else(|| CoreError::Config("Config has no course_plot widget".into()))?;
 
@@ -55,13 +56,11 @@ pub fn build_route_geometry_command(
     let route_samples = crate::render::widgets::route::prepare::build_route_samples(
         &activity,
         show_full_activity,
-        &validated.scene,
+        &scene,
     )?;
 
-    let normalized = crate::render::widgets::route::normalize::normalize_route_plot(
-        course_plot,
-        &validated.scene,
-    );
+    let normalized =
+        crate::render::widgets::route::normalize::normalize_route_plot(course_plot, &scene);
 
     let geometry = crate::render::widgets::route::prepare::build_route_geometry(
         &normalized,

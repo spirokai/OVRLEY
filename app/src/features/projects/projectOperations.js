@@ -1,7 +1,9 @@
 import * as backend from '@/api/backend'
 import { replaceEditorDocument } from '@/features/undo-redo/undoHistory'
 import { createDurableEditorState } from '@/lib/widget/editor-state'
+import { attachRasterLoadResults } from '@/lib/widget/raster-resources'
 import useStore from '@/store/useStore'
+import { prepareDocumentFonts } from '@/lib/font-resources'
 import { applyNewProjectState, applyPreparedProjectState } from './utils/projectHydration'
 import { createProjectSnapshot, stringifyProject } from './utils/projectSnapshot'
 
@@ -12,10 +14,11 @@ import { createProjectSnapshot, stringifyProject } from './utils/projectSnapshot
  * @returns {Promise<object|null>} Loaded project, or null when source recovery is cancelled.
  */
 export async function loadProject({ path, resolveProjectSources, prepareActivityPath, prepareVideoPath, onSetBackgroundMode }) {
-  const { project: loadedProject, resolvedSources } = await backend.readProjectFile(path)
-  const project = {
-    ...loadedProject,
-    editor: createDurableEditorState(loadedProject.editor),
+  const { project, resolvedSources, rasterLoadResults } = await backend.readProjectFile(path)
+  project.editor = createDurableEditorState(project.editor)
+  const hydratedProject = {
+    ...project,
+    editor: { ...project.editor, config: attachRasterLoadResults(project.editor.config, rasterLoadResults) },
   }
   const sources = await resolveProjectSources(resolvedSources)
   if (!sources) return null
@@ -23,6 +26,7 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
   const sourceLoadResults = await Promise.allSettled([
     sources.activityPath ? prepareActivityPath(sources.activityPath) : Promise.resolve(null),
     sources.videoPath ? prepareVideoPath(sources.videoPath) : Promise.resolve(null),
+    prepareDocumentFonts(project.editor),
   ])
   const failedSourceLoad = sourceLoadResults.find((result) => result.status === 'rejected')
   if (failedSourceLoad) throw failedSourceLoad.reason
@@ -44,7 +48,7 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
     await backend.clearPreviewVideo()
   }
 
-  replaceEditorDocument(useStore, () => applyPreparedProjectState(useStore, project, { activity, video }))
+  replaceEditorDocument(useStore, () => applyPreparedProjectState(useStore, hydratedProject, { activity, video }))
   if (video) onSetBackgroundMode?.('video')
   return project
 }
@@ -60,6 +64,7 @@ export async function createNewProject({ clearImportedVideo }) {
   const templateState = state.lastSavedTemplateState
   if (templateSource && !templateState) throw new Error('the loaded template has no saved widget state')
 
+  if (templateState) await prepareDocumentFonts(templateState)
   await clearImportedVideo()
   replaceEditorDocument(useStore, () => applyNewProjectState(useStore, { templateSource, templateState }))
 }
@@ -70,7 +75,10 @@ export async function createNewProject({ clearImportedVideo }) {
  * @returns {Promise<object>} Written canonical project snapshot.
  */
 export async function saveProject(path) {
-  const project = createProjectSnapshot(useStore.getState(), path)
-  await backend.writeProjectFile(path, stringifyProject(project))
+  const state = useStore.getState()
+  const project = createProjectSnapshot(state, path)
+  const contents = stringifyProject(project)
+
+  await backend.writeProjectFile(path, contents, state.config)
   return project
 }

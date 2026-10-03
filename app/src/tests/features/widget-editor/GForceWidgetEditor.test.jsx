@@ -4,8 +4,9 @@ import userEvent from '@testing-library/user-event'
 import GForceWidgetEditor from '@/features/widget-editor/components/GForceWidgetEditor'
 import { createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
 
-vi.mock('@/features/scene-settings/hooks/useAvailableFonts', () => ({
-  default: () => ({ recommendedFonts: [], systemFonts: [] }),
+vi.mock('@/hooks/useFonts', async () => ({
+  ...(await vi.importActual('@/hooks/useFonts')),
+  useAvailableFonts: () => ({ recommendedFonts: [], systemFonts: [] }),
 }))
 
 beforeAll(() => {

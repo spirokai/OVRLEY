@@ -1,12 +1,24 @@
 //! Editable FFmpeg command templates for MP4 composite encoder profiles.
 //!
 //! Profiles are intentionally data-shaped: static input, filter, and output
-//! fragments live here, while render-specific values such as bitrate, duration,
-//! FPS, dimensions, trim filters, and output path are injected by the
-//! composite builder.
+//! fragments, including quality and bitrate templates, live here. FFmpeg
+//! helpers expand render-specific values for the composite builder.
 
 use super::catalog::CompositeCodecId;
-use super::composite::CompositeProfile;
+
+/// Profile-specific FFmpeg templates for composite encoding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompositeProfile {
+    pub codec_id: CompositeCodecId,
+    pub cpu_cores_per_frame_worker: usize,
+    pub input_args: &'static [&'static str],
+    pub filter_complex: Option<&'static str>,
+    pub output_args: &'static [&'static str],
+    /// Uses `{quality}` or `{videotoolbox_quality}` value placeholders.
+    pub quality_args: &'static [&'static str],
+    /// Uses `{bitrate}`, `{maxrate}`, and `{bufsize}` values in Mbps.
+    pub bitrate_args: &'static [&'static str],
+}
 
 const SOFTWARE_H264_FILTER: &str = "[0:v]{base_video_filters}null[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
@@ -49,6 +61,15 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         input_args: &[],
         filter_complex: Some(SOFTWARE_H264_FILTER),
         output_args: &["-preset", "veryfast"],
+        quality_args: &["-crf", "{quality}"],
+        bitrate_args: &[
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::SoftwareHevc,
@@ -65,6 +86,15 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
             "-tag:v",
             "hvc1",
         ],
+        quality_args: &["-crf", "{quality}"],
+        bitrate_args: &[
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::NvgpuH264,
@@ -72,8 +102,6 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         input_args: &[],
         filter_complex: Some(SOFTWARE_H264_FILTER),
         output_args: &[
-            "-rc:v",
-            "vbr",
             "-bf:v",
             "3",
             "-profile:v",
@@ -83,6 +111,17 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
             "-temporal-aq",
             "true",
         ],
+        quality_args: &["-rc:v", "vbr", "-b:v", "0", "-cq:v", "{quality}"],
+        bitrate_args: &[
+            "-rc:v",
+            "vbr",
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::NvgpuHevc,
@@ -90,8 +129,6 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         input_args: &[],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
         output_args: &[
-            "-rc:v",
-            "vbr",
             "-bf:v",
             "3",
             "-spatial-aq",
@@ -100,6 +137,17 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
             "true",
             "-tag:v",
             "hvc1",
+        ],
+        quality_args: &["-rc:v", "vbr", "-b:v", "0", "-cq:v", "{quality}"],
+        bitrate_args: &[
+            "-rc:v",
+            "vbr",
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
         ],
     },
     CompositeProfile {
@@ -117,8 +165,6 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         ],
         filter_complex: Some(CUDA_H264_FILTER),
         output_args: &[
-            "-rc:v",
-            "vbr",
             "-bf:v",
             "3",
             "-profile:v",
@@ -127,6 +173,17 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
             "true",
             "-temporal-aq",
             "true",
+        ],
+        quality_args: &["-rc:v", "vbr", "-b:v", "0", "-cq:v", "{quality}"],
+        bitrate_args: &[
+            "-rc:v",
+            "vbr",
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
         ],
     },
     CompositeProfile {
@@ -144,8 +201,6 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         ],
         filter_complex: Some(CUDA_HEVC_FILTER),
         output_args: &[
-            "-rc:v",
-            "vbr",
             "-bf:v",
             "3",
             "-spatial-aq",
@@ -155,34 +210,89 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
             "-tag:v",
             "hvc1",
         ],
+        quality_args: &["-rc:v", "vbr", "-b:v", "0", "-cq:v", "{quality}"],
+        bitrate_args: &[
+            "-rc:v",
+            "vbr",
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::QsvH264,
         cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(SOFTWARE_H264_FILTER),
-        output_args: &["-mbbrc", "1"],
+        output_args: &[],
+        quality_args: &["-b:v", "0", "-global_quality", "{quality}"],
+        bitrate_args: &[
+            "-mbbrc",
+            "1",
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::QsvHevc,
         cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
-        output_args: &["-mbbrc", "1", "-tag:v", "hvc1"],
+        output_args: &["-tag:v", "hvc1"],
+        quality_args: &["-b:v", "0", "-global_quality", "{quality}"],
+        bitrate_args: &[
+            "-mbbrc",
+            "1",
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::QsvFullH264,
         cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(QSV_FULL_FILTER),
-        output_args: &["-mbbrc", "1"],
+        output_args: &[],
+        quality_args: &["-b:v", "0", "-global_quality", "{quality}"],
+        bitrate_args: &[
+            "-mbbrc",
+            "1",
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::QsvFullHevc,
         cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(QSV_FULL_FILTER),
-        output_args: &["-mbbrc", "1", "-tag:v", "hvc1"],
+        output_args: &["-tag:v", "hvc1"],
+        quality_args: &["-b:v", "0", "-global_quality", "{quality}"],
+        bitrate_args: &[
+            "-mbbrc",
+            "1",
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::MacH264,
@@ -190,6 +300,15 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         input_args: &["-hwaccel", "videotoolbox"],
         filter_complex: Some(SOFTWARE_H264_FILTER),
         output_args: &[],
+        quality_args: &["-global_quality", "{videotoolbox_quality}"],
+        bitrate_args: &[
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::MacHevc,
@@ -197,38 +316,100 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         input_args: &["-hwaccel", "videotoolbox"],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
         output_args: &["-tag:v", "hvc1"],
+        quality_args: &["-global_quality", "{videotoolbox_quality}"],
+        bitrate_args: &[
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::VaapiH264,
         cpu_cores_per_frame_worker: 4,
         input_args: &["-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"],
         filter_complex: Some(VAAPI_FILTER),
-        output_args: &["-rc_mode", "VBR"],
+        output_args: &[],
+        quality_args: &["-rc_mode", "CQP", "-qp", "{quality}"],
+        bitrate_args: &[
+            "-rc_mode",
+            "VBR",
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::VaapiHevc,
         cpu_cores_per_frame_worker: 4,
         input_args: &["-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"],
         filter_complex: Some(VAAPI_FILTER),
-        output_args: &["-rc_mode", "VBR", "-tag:v", "hvc1"],
+        output_args: &["-tag:v", "hvc1"],
+        quality_args: &["-rc_mode", "CQP", "-qp", "{quality}"],
+        bitrate_args: &[
+            "-rc_mode",
+            "VBR",
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::AmfH264,
         cpu_cores_per_frame_worker: 4,
         input_args: AMF_D3D11_INPUT_ARGS,
         filter_complex: Some(AMF_D3D11_FILTER),
-        output_args: &["-rc", "vbr_peak"],
+        output_args: &[],
+        quality_args: &[
+            "-rc",
+            "cqp",
+            "-qp_i",
+            "{quality}",
+            "-qp_p",
+            "{quality}",
+            "-qp_b",
+            "{quality}",
+        ],
+        bitrate_args: &[
+            "-rc",
+            "vbr_peak",
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::AmfHevc,
         cpu_cores_per_frame_worker: 4,
         input_args: AMF_D3D11_INPUT_ARGS,
         filter_complex: Some(AMF_D3D11_FILTER),
-        output_args: &["-rc", "vbr_peak", "-tag:v", "hvc1"],
+        output_args: &["-tag:v", "hvc1"],
+        quality_args: &["-rc", "cqp", "-qp_i", "{quality}", "-qp_p", "{quality}"],
+        bitrate_args: &[
+            "-rc",
+            "vbr_peak",
+            "-b:v",
+            "{bitrate}",
+            "-maxrate",
+            "{maxrate}",
+            "-bufsize",
+            "{bufsize}",
+        ],
     },
 ];
 
-/// Expands the command template owned by a validated composite codec ID.
+/// Returns the command templates owned by a validated composite codec ID.
 pub fn composite_profile(codec_id: CompositeCodecId) -> &'static CompositeProfile {
     BUILTIN_PROFILES
         .iter()
@@ -274,35 +455,14 @@ mod tests {
     }
 
     #[test]
-    fn hardware_profiles_with_explicit_rate_control_use_vbr() {
+    fn nvidia_profiles_enable_temporal_aq() {
         for codec_id in [
             CompositeCodecId::NvgpuH264,
             CompositeCodecId::NvgpuHevc,
             CompositeCodecId::NnvgpuH264,
             CompositeCodecId::NnvgpuHevc,
         ] {
-            assert_output_arg_pair(codec_id, "-rc:v", "vbr");
             assert_output_arg_pair(codec_id, "-temporal-aq", "true");
-        }
-
-        for codec_id in [CompositeCodecId::VaapiH264, CompositeCodecId::VaapiHevc] {
-            assert_output_arg_pair(codec_id, "-rc_mode", "VBR");
-        }
-
-        for codec_id in [CompositeCodecId::AmfH264, CompositeCodecId::AmfHevc] {
-            assert_output_arg_pair(codec_id, "-rc", "vbr_peak");
-        }
-    }
-
-    #[test]
-    fn qsv_profiles_enable_macroblock_level_bitrate_control() {
-        for codec_id in [
-            CompositeCodecId::QsvH264,
-            CompositeCodecId::QsvHevc,
-            CompositeCodecId::QsvFullH264,
-            CompositeCodecId::QsvFullHevc,
-        ] {
-            assert_output_arg_pair(codec_id, "-mbbrc", "1");
         }
     }
 

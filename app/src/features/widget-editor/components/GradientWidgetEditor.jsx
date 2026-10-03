@@ -37,18 +37,21 @@ export default function GradientWidgetEditor({ widget, updateWidgetData, updateW
       />
 
       <SliderField
+        editable
         label={t('widget-editor.valueOffset', 'Value Offset')}
         value={valueOffset}
         min={-200}
         max={200}
         step={1}
         integerDisplay
-        valueDisplay={`${valueOffset}px`}
+        valueDisplay={`${valueOffset}`}
+        suffix="px"
         onSliderChange={(value) => updateWidgetSize(widget.id, { value_offset: value })}
         onSliderCommit={() => commitWidgetSize(widget.id)}
       />
       <div className="grid grid-cols-2 gap-4">
         <SliderField
+          editable
           label={t('widget-editor.decimals', 'Decimals')}
           value={decimals}
           min={0}
@@ -91,7 +94,8 @@ export default function GradientWidgetEditor({ widget, updateWidgetData, updateW
           min={0}
           max={240}
           step={1}
-          valueDisplay={`${triangleWidth}px`}
+          valueDisplay={`${triangleWidth}`}
+          suffix="px"
           onChange={(value) => updateWidgetSize(widget.id, { triangle_width: value })}
           onCommit={() => commitWidgetSize(widget.id)}
         />

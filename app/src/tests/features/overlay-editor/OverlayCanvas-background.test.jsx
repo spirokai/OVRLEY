@@ -19,10 +19,6 @@ vi.mock('@/features/widget-preview', () => ({
   buildTextWidgetPreviewModel: () => null,
 }))
 
-vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({
-  useFontMetrics: () => 0,
-}))
-
 vi.mock('@/features/widget-preview/shared/textMeasurement', () => ({
   getPreviewFontFamily: (fontFamily) => fontFamily || 'Arial',
 }))

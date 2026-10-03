@@ -2,27 +2,15 @@
  * Shared live widget draft transformations.
  */
 
-import { resolveActiveBackdropData, resolveActiveMetricWidgetData } from './widget-resolver'
+import { mergeDisplayVariantUpdates, resolveActiveBackdropData, resolveActiveMetricWidgetData } from './widget-resolver'
 
 function resolveDraftData(widget, draftData) {
-  const displayType = draftData.display_type ?? widget.data.display_type
   const mergedData = {
     ...widget.data,
     ...draftData,
     ...(draftData.display_variants
       ? {
-          display_variants: {
-            ...widget.data.display_variants,
-            ...draftData.display_variants,
-            ...(displayType
-              ? {
-                  [displayType]: {
-                    ...widget.data.display_variants?.[displayType],
-                    ...draftData.display_variants[displayType],
-                  },
-                }
-              : {}),
-          },
+          display_variants: mergeDisplayVariantUpdates(widget.data.display_variants, draftData.display_variants),
         }
       : {}),
   }

@@ -74,7 +74,8 @@ export default function useRenderWorkflow({ backendStatus }) {
       updateRate: normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate),
       exportMode: importedVideoPath ? renderSettings.exportMode : 'transparent',
       exportCodec: codec,
-      exportBitrate: renderSettings.bitrateMbps ?? undefined,
+      qualityType: renderSettings.qualityType,
+      qualityValue: renderSettings.qualityValue,
       exportRange: draftExportRange,
     }
   }, [importedVideoPath, renderSettings])
@@ -285,7 +286,8 @@ export default function useRenderWorkflow({ backendStatus }) {
           updateRate: nextUpdateRate,
           exportRange: nextExportRange,
           exportCodec: renderSettingsDraft.exportCodec,
-          exportBitrate: renderSettingsDraft.exportBitrate,
+          qualityType: renderSettingsDraft.qualityType,
+          qualityValue: renderSettingsDraft.qualityValue,
           availableCodecs: useStore.getState().availableCodecs,
           globalDefaults,
           importedVideoDuration: useStore.getState().importedVideoDuration,
@@ -306,7 +308,8 @@ export default function useRenderWorkflow({ backendStatus }) {
           widgetUpdateRate: nextUpdateRate,
           exportMode,
           codec: renderSettingsDraft.exportCodec,
-          bitrateMbps: renderSettingsDraft.exportBitrate ?? null,
+          qualityType: renderSettingsDraft.qualityType,
+          qualityValue: renderSettingsDraft.qualityValue,
           range: nextExportRange,
         })
         startRenderSession(result.render_id, result.outputPath, {
@@ -372,7 +375,8 @@ export default function useRenderWorkflow({ backendStatus }) {
       const nextConfig = createRenderEffectiveConfig({
         availableCodecs: useStore.getState().availableCodecs,
         config,
-        exportBitrate: renderSettingsDraft?.exportBitrate,
+        qualityType: renderSettings.qualityType,
+        qualityValue: renderSettings.qualityValue,
         exportCodec: renderSettings.codec,
         exportRange: renderSettings.range,
         globalDefaults,
@@ -421,7 +425,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     } finally {
       setRenderingPreviewFrame(false)
     }
-  }, [config, globalDefaults, renderPreviewFrameDisabled, renderSettings, renderSettingsDraft?.exportBitrate, setErrorMessage])
+  }, [config, globalDefaults, renderPreviewFrameDisabled, renderSettings, setErrorMessage])
 
   return {
     closeRenderDialog: handleCloseRenderDialog,

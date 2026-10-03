@@ -17,7 +17,9 @@ import { useCallback, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import useStore from '@/store/useStore'
-import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
+import { useAvailableFonts, useFontPreparation } from '@/hooks/useFonts'
+import { getPreparedFont } from '@/lib/font-resources'
+import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 import { getUpdateRateOptions, normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { useFpsMode } from '@/hooks/useFpsMode'
 import { RESOLUTIONS } from '../data/sceneSettingsConstants'
@@ -89,6 +91,18 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   )
 
   const availableFonts = useAvailableFonts()
+  const prepareFontEdit = useFontPreparation()
+  const changeGlobalDefault = (key, value) => {
+    if (key === 'font_text' || key === 'font_values') {
+      prepareFontEdit(key, [value], () => {
+        useStore.getState().setGlobalDefault(key, value, key === 'font_text' ? getPreparedFont(value) : undefined)
+      })
+    } else setGlobalDefault(key, value)
+  }
+  const resetGlobalDefaults = () =>
+    prepareFontEdit(['font_text', 'font_values'], [DEFAULT_GLOBAL_DEFAULTS.font_text, DEFAULT_GLOBAL_DEFAULTS.font_values], () => {
+      useStore.getState().resetGlobalDefaults(getPreparedFont(DEFAULT_GLOBAL_DEFAULTS.font_text))
+    })
   const editorConfig = useMemo(() => createEditorEffectiveConfig({ config, globalDefaults }), [config, globalDefaults])
   const scene = editorConfig?.scene ? { ...editorConfig.scene, fps: renderSettings.fps } : null
   const sceneResolutionKey = getSceneResolutionKey(scene)
@@ -168,9 +182,9 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     },
     globalSettings: {
       globalDefaults,
-      resetGlobalDefaults: useStore((state) => state.resetGlobalDefaults),
+      resetGlobalDefaults,
       sceneStyleValue,
-      setGlobalDefault,
+      setGlobalDefault: changeGlobalDefault,
       availableFonts,
     },
     handlers,

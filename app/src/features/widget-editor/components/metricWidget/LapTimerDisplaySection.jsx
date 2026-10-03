@@ -1,7 +1,7 @@
 import { Type } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import { SectionHeading } from '@/components/ui/section-heading'
-import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
+import { useAvailableFonts } from '@/hooks/useFonts'
 import { FontSection } from '../widgetEditorSections'
 import { ColorField, SelectField, SizeSlider, TextField, ToggleField } from '../widgetFormControls'
 import { LAP_TIMER_MODES } from '@/lib/widget/standard-widgets'
@@ -75,7 +75,8 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
           min={6}
           max={100}
           step={0.5}
-          valueDisplay={`${widget.data.label_font_size}px`}
+          valueDisplay={`${widget.data.label_font_size}`}
+          suffix="px"
           onChange={(label_font_size) => updateWidgetSize(widget.id, { label_font_size })}
           onCommit={() => commitWidgetSize(widget.id)}
         />

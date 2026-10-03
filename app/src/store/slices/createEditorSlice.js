@@ -6,7 +6,7 @@
  */
 
 import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, syncSceneTimingFromConfig, syncSceneTimingToConfig } from '../store-utils'
-import { ensureWidgetIdsInConfig } from '../../lib/widget/widget-config'
+import { ensureWidgetIdsInConfig, replaceWidgetInConfig } from '../../lib/widget/widget-config'
 import { buildConfigWidgets } from '../../lib/widget/widget-presentation'
 import { getPrimarySelectionId, normalizeSelectionIds } from '../../features/overlay-editor/utils/overlayEditorHelpers'
 
@@ -87,6 +87,7 @@ export function createEditorSlice(set, get) {
 
   return {
     editor: null,
+    editorDocumentRevision: 0,
     selectedWidgetId: null,
     selectedWidgetIds: [],
     previewInterpolationEnabled: true,
@@ -103,6 +104,22 @@ export function createEditorSlice(set, get) {
     isVideoMuted: false,
     config: cloneSerializable(DEFAULT_CONFIG),
     autoRender: false,
+
+    setRasterImage: (widgetId, path, image) => {
+      const state = get()
+      const raster = state.config.rasters.find((item) => item.id === widgetId)
+      if (!raster) throw new Error(`Raster widget ${widgetId} is unavailable`)
+      const { resourceErrorCode: _resourceErrorCode, ...currentRaster } = raster
+      state.setConfig(
+        replaceWidgetInConfig(state.config, widgetId, {
+          ...currentRaster,
+          path,
+          width: image.width,
+          height: image.height,
+          resourceId: image.resourceId,
+        }),
+      )
+    },
 
     setConfig: (val) => {
       const currentState = get()

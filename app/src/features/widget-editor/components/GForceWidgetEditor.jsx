@@ -57,7 +57,7 @@ function GForceAxisRow({ label, value, onValueChange, onInvertChange, inverted, 
 export default function GForceWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   const { t } = useTranslation()
   const data = widget.data.display_variants.g_force
-  const updateGForce = useDisplayVariantUpdater(widget, 'g_force', data, updateWidgetData)
+  const updateGForce = useDisplayVariantUpdater(widget, 'g_force', updateWidgetData)
   const selectHorizontalAxis = (axis_horizontal) => {
     updateGForce(axis_horizontal === data.axis_vertical ? { axis_horizontal, axis_vertical: data.axis_horizontal } : { axis_horizontal })
   }

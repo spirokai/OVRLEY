@@ -18,11 +18,12 @@
 
 import { cloneSerializable } from '@/store/store-utils'
 import { normalizeColorFields } from '../color-utils'
+import { mergeDisplayVariantUpdates } from './widget-resolver'
 
 const LEGACY_WIDGET_ID_PATTERN = /^(backdrop|label|value|plot)-\d+$/
 const GENERATED_WIDGET_ID_PATTERN = /^widget-(\d+)$/
 const WIDGET_ID_PREFIX = 'widget-'
-const WIDGET_CATEGORIES = ['backdrops', 'labels', 'values', 'plots']
+const WIDGET_CATEGORIES = ['backdrops', 'rasters', 'labels', 'values', 'plots']
 
 /**
  * Returns whether a widget id is durable enough to preserve across saves.
@@ -222,11 +223,13 @@ function updateWidgetEntry(config, widgetId, updater) {
  */
 export function updateWidgetInConfig(config, widgetId, updates) {
   const normalizedUpdates = normalizeColorFields(updates)
-  return updateWidgetEntry(config, widgetId, (currentWidget) => ({
-    ...currentWidget,
-    ...normalizedUpdates,
-    id: currentWidget.id,
-  }))
+  return updateWidgetEntry(config, widgetId, (currentWidget) => {
+    const nextWidget = { ...currentWidget, ...normalizedUpdates, id: currentWidget.id }
+    if (normalizedUpdates.display_variants) {
+      nextWidget.display_variants = mergeDisplayVariantUpdates(currentWidget.display_variants, normalizedUpdates.display_variants)
+    }
+    return nextWidget
+  })
 }
 
 /**
@@ -390,6 +393,7 @@ export function duplicateWidgetsInConfig(config, widgetsToDuplicate, options = {
   const nextConfig = {
     ...config,
     backdrops: [...(config.backdrops || [])],
+    rasters: [...(config.rasters || [])],
     labels: [...(config.labels || [])],
     values: [...(config.values || [])],
     plots: [...(config.plots || [])],

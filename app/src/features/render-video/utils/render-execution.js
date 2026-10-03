@@ -1,6 +1,6 @@
 /**
  * Pure helper functions for render video configuration — FPS resolution,
- * bitrate formatting, and codec classification.
+ * and codec classification.
  * No React, no side effects.
  */
 
@@ -57,23 +57,6 @@ export function resolveCompositeFps(fpsNum, fpsDen, fps) {
   }
 
   return reduceFps(Math.round(value * 1000), 1000)
-}
-
-/**
- * Formats dialog bitrate values for FFmpeg's `-b:v` argument.
- *
- * @param {*} value - Numeric Mbps value or already formatted FFmpeg bitrate.
- * @returns {string} FFmpeg bitrate string.
- */
-export function formatCompositeBitrate(value) {
-  const bitrate = Number(value)
-  if (Number.isFinite(bitrate) && bitrate > 0) {
-    return `${bitrate}M`
-  }
-  if (typeof value === 'string' && value.trim()) {
-    return value.trim()
-  }
-  return '20M'
 }
 
 /**

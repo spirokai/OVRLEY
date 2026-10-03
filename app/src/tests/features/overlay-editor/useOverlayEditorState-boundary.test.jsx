@@ -1,3 +1,4 @@
+import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 /**
  * Characterization test for the useOverlayEditorState hook.
  *
@@ -43,7 +44,7 @@ describe('useOverlayEditorState module contract', () => {
     const { result } = renderHook(() =>
       useOverlayEditorState({
         config,
-        globalDefaults: {},
+        globalDefaults: { ...DEFAULT_GLOBAL_DEFAULTS },
         onConfigChange: vi.fn(),
         zoomLevel: 1,
         onZoomLevelChange: vi.fn(),

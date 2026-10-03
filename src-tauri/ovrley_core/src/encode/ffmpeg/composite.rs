@@ -3,7 +3,7 @@
 //! This module is intentionally separate from the transparent-overlay FFmpeg
 //! builder so composite rendering can evolve as a parallel backend path.
 //!
-//! Owns: `CompositeProfile` (per-codec encoding profile), `CompositeFfmpegSettings`
+//! Owns: `CompositeFfmpegSettings`
 //!       (grouped FFmpeg arguments for 3-input composite encodes), and
 //!       `build_composite_ffmpeg_settings`
 //!       (the main argument construction function).
@@ -25,28 +25,15 @@ use std::path::Path;
 
 use crate::encode::composite::CompositeRenderPlan;
 use crate::encode::ffmpeg::catalog::{CompositeCodecId, CompositeFilterStackKind};
+use crate::encode::quality::rate_control_args;
 use crate::error::{CoreError, CoreResult};
 use crate::render::FrameSize;
 
 use super::composite_filters::{
-    composite_filter_complex, composite_overlay_thread_queue_size, cuda_display_metadata_filter,
-    format_seconds_arg, normalize_source_rotation, qsv_overlay_cpu_rotation_filter,
-    source_rotation_filter,
+    composite_filter_complex, cuda_display_metadata_filter, format_seconds_arg,
+    normalize_source_rotation, qsv_overlay_cpu_rotation_filter, source_rotation_filter,
 };
 use super::composite_profiles::composite_profile;
-
-/// Profile-specific FFmpeg settings for composite encoding.
-///
-/// Later phases can use this to describe hardware decoder, filter, and encoder
-/// variations without changing the software default builder surface.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CompositeProfile {
-    pub codec_id: CompositeCodecId,
-    pub cpu_cores_per_frame_worker: usize,
-    pub input_args: &'static [&'static str],
-    pub filter_complex: Option<&'static str>,
-    pub output_args: &'static [&'static str],
-}
 
 /// Grouped FFmpeg arguments needed to spawn a composite render.
 ///
@@ -202,10 +189,7 @@ pub fn build_composite_ffmpeg_settings(
     ]);
 
     // ── PHASE 4: BUILD INPUT 1 ARGS (raw RGBA overlay via stdin pipe) ──
-    let overlay_thread_queue_size = composite_overlay_thread_queue_size(width, height).to_string();
     let input_1_args = vec![
-        "-thread_queue_size".to_string(),
-        overlay_thread_queue_size,
         "-f".to_string(),
         "rawvideo".to_string(),
         "-pix_fmt".to_string(),
@@ -276,7 +260,7 @@ pub fn build_composite_ffmpeg_settings(
     {
         output_args.extend(["-bsf:v".to_string(), metadata_filter]);
     }
-    output_args.extend(["-b:v".to_string(), render.bitrate.clone()]);
+    output_args.extend(rate_control_args(selected_profile, render.quality));
     if include_audio {
         output_args.extend([
             "-c:a".to_string(),
@@ -330,7 +314,7 @@ mod tests {
         ] {
             let render = CompositeRenderPlan {
                 video_path: "rotated-landscape.mp4".into(),
-                bitrate: "60M".to_string(),
+                quality: crate::encode::quality::EncodingQuality::Bitrate(60.0),
                 sync_offset: 0.0,
                 trim_start: 0.0,
                 render_duration: 1.0,

@@ -61,6 +61,7 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
       {hasDecimalControl ? (
         <div className="grid grid-cols-2 gap-4">
           <SliderField
+            editable
             label={t('widget-editor.decimals', 'Decimals')}
             value={decimals}
             min={0}

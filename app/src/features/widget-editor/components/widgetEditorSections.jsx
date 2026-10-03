@@ -3,12 +3,12 @@
  * Each section is a reusable UI block (Position, Dimensions, Font, Icon, Units).
  */
 
-import { Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
+import { Italic, Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { ColorField, ContentAlignmentControl, NumberField, SelectField, SizeSlider, SliderField, TextField, ToggleField } from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
-import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
-import { createFontSelection } from '@/lib/fonts'
+import { useAvailableFonts, useLabelTypography } from '@/hooks/useFonts'
 import { getWidgetFont } from '../utils/widgetUtils'
 import { getThemeColor } from '@/lib/theme'
 import { useTranslation } from 'react-i18next'
@@ -48,12 +48,14 @@ export function PositionSection({ widget, setNumericField, updateWidgetData, hea
         />
       </div>
       <SliderField
+        editable
         label={t('widget-editor.transparency', 'Transparency')}
         value={opacity}
         min={0}
         max={100}
         step={1}
-        valueDisplay={`${opacity}%`}
+        valueDisplay={`${opacity}`}
+        suffix="%"
         onSliderChange={(value) => updateWidgetData(widget.id, { opacity: value / 100 })}
       />
     </div>
@@ -68,7 +70,7 @@ export function PositionSection({ widget, setNumericField, updateWidgetData, hea
  * @param {*} props.setNumericField - Value for set numeric field.
  * @returns {JSX.Element} Rendered component output.
  */
-export function DimensionsSection({ widget, setNumericField }) {
+export function DimensionsSection({ widget, setNumericField, min = 0 }) {
   const { t } = useTranslation()
   return (
     <div className="space-y-3">
@@ -77,12 +79,12 @@ export function DimensionsSection({ widget, setNumericField }) {
         <NumberField
           label={t('widget-editor.width', 'Width')}
           value={widget.data.width}
-          onChange={(rawValue) => setNumericField(widget.id, 'width', rawValue, { min: 0 })}
+          onChange={(rawValue) => setNumericField(widget.id, 'width', rawValue, { min })}
         />
         <NumberField
           label={t('widget-editor.height', 'Height')}
           value={widget.data.height}
-          onChange={(rawValue) => setNumericField(widget.id, 'height', rawValue, { min: 0 })}
+          onChange={(rawValue) => setNumericField(widget.id, 'height', rawValue, { min })}
         />
       </div>
     </div>
@@ -122,6 +124,7 @@ export function FontSection({
   const { t } = useTranslation()
   const fontSize = widget.data.font_size
   const availableFonts = useAvailableFonts()
+  const typography = useLabelTypography(widget, updateWidgetData)
 
   return (
     <div className="space-y-4">
@@ -131,7 +134,19 @@ export function FontSection({
         titleKey="widget-editor.typography"
         defaultTitle="Typography"
         trailing={
-          showContentAlignment ? (
+          widget.category === 'labels' ? (
+            <ToggleGroup size="compact" type="multiple" value={typography.italic ? ['italic'] : []} onValueChange={typography.changeItalic}>
+              <ToggleGroupItem
+                value="italic"
+                size="compact"
+                disabled={!typography.italicSupported}
+                aria-label={t('widget-editor.italic', 'Italic')}
+                title={t('widget-editor.italic', 'Italic')}
+              >
+                <Italic />
+              </ToggleGroupItem>
+            </ToggleGroup>
+          ) : showContentAlignment ? (
             <ContentAlignmentControl
               value={widget.data.content_alignment}
               onValueChange={(value) => updateWidgetData(widget.id, { content_alignment: value })}
@@ -154,7 +169,8 @@ export function FontSection({
         min={sizeMin}
         max={sizeMax}
         step={1}
-        valueDisplay={`${fontSize}px`}
+        valueDisplay={`${fontSize}`}
+        suffix="px"
         onChange={(value) => updateWidgetSize(widget.id, { font_size: value })}
         onCommit={() => commitWidgetSize(widget.id)}
       />
@@ -162,7 +178,7 @@ export function FontSection({
         <FontSelectField
           label={t('widget-editor.fontFamily', 'Font Family')}
           value={getWidgetFont(widget)}
-          onValueChange={(value) => updateWidgetData(widget.id, createFontSelection(value))}
+          onValueChange={typography.changeFont}
           recommendedFonts={availableFonts.recommendedFonts}
           systemFonts={availableFonts.systemFonts}
           triggerClassName="h-9 border-border/70 bg-surface text-xs"
@@ -175,6 +191,35 @@ export function FontSection({
           value={widget.data.color || getThemeColor('ice')}
           onChange={(value) => updateWidgetData(widget.id, { color: value })}
         />
+      </div>
+      <div className="grid grid-cols-2 gap-4 items-end pt-2">
+        {widget.category === 'labels' && typography.font ? (
+          <SizeSlider
+            label={t('widget-editor.fontWeight', 'Font Weight')}
+            value={typography.weight}
+            min={typography.weightAxis?.min ?? 1}
+            max={typography.weightAxis?.max ?? 1000}
+            disabled={!typography.weightAxis}
+            step={100}
+            valueDisplay={String(typography.weight)}
+            onChange={(value) => updateWidgetSize(widget.id, { font_weight: value })}
+            onCommit={() => commitWidgetSize(widget.id)}
+          />
+        ) : null}
+        {widget.category === 'labels' ? (
+          <SliderField
+            editable
+            label={t('widget-editor.letterSpacing', 'Letter Spacing')}
+            value={widget.data.letter_spacing}
+            min={-35}
+            max={35}
+            step={0.5}
+            valueDisplay={`${widget.data.letter_spacing.toFixed(1)}`}
+            suffix="%"
+            onSliderChange={(value) => updateWidgetSize(widget.id, { letter_spacing: value })}
+            onSliderCommit={() => commitWidgetSize(widget.id)}
+          />
+        ) : null}
       </div>
     </div>
   )
@@ -227,7 +272,8 @@ export function IconSection({
           min={0}
           max={100}
           step={1}
-          valueDisplay={`${iconSize}px`}
+          valueDisplay={`${iconSize}`}
+          suffix="px"
           onChange={(value) => updateWidgetSize(widget.id, { icon_size: value })}
           onCommit={() => commitWidgetSize(widget.id)}
         />

@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "Afbeeldingsbestanden",
+    "selectImage": "Afbeelding kiezen",
+    "replaceImage": "Afbeelding vervangen",
+    "errors": {
+      "missingAsset": "De ingesloten afbeelding ontbreekt in dit project. Kies een vervanging.",
+      "corruptAsset": "De ingesloten afbeelding is beschadigd. Kies een vervanging.",
+      "relativePath": "Kies een afbeelding met een absoluut bestandspad.",
+      "missing": "Het afbeeldingsbestand ontbreekt. Kies een andere afbeelding.",
+      "unreadable": "Het afbeeldingsbestand is onleesbaar. Controleer de rechten of kies een andere afbeelding.",
+      "unsupportedType": "Kies een PNG-, JPEG-, BMP- of TIFF-bestand (.png, .jpeg, .jpg, .bmp, .tiff).",
+      "encodedSize": "Het bestand is groter dan 5 MiB. Kies een kleiner bestand.",
+      "resolution": "De resolutie is hoger dan 25 megapixels. Kies een kleinere afbeelding.",
+      "decode": "De afbeelding kan niet worden gedecodeerd. Kies een andere afbeelding.",
+      "noImage": "Voor afbeelding {{id}} is geen bestand gekozen. Kies er een vóór het renderen.",
+      "renderUnavailable": "Afbeelding {{id}} kan nog niet worden gerenderd.",
+      "invalidConfig": "De afbeeldingsconfiguratie is ongeldig."
+    }
+  },
   "app": {
     "importingYourVideo": "Video importeren...",
     "loadingProject": "Project laden...",
@@ -105,6 +124,10 @@
     "zoomOut": "Uitzoomen"
   },
   "projects": {
+    "archiveTooLarge": "Het project overschrijdt de archieflimiet van 40 MiB. Verwijder of vervang een afbeelding.",
+    "invalidArchive": "Het projectarchief is ongeldig of beschadigd. Kies een ander projectbestand.",
+    "rasterUnavailable": "Een afbeelding is niet beschikbaar. Vervang deze voordat u opslaat.",
+    "saveFailed": "Het project kon niet worden opgeslagen. Controleer de bestemming en probeer opnieuw.",
     "activity": "Activiteit",
     "cancel": "Annuleren",
     "closeWithoutSaving": "Sluiten zonder op te slaan",
@@ -133,6 +156,11 @@
     "000000Or900": "00:00:00 of 900",
     "backendOffline": "Backend offline",
     "bitrate": "Bitrate",
+    "quality": "Kwaliteit",
+    "better": "Beter",
+    "worse": "Slechter",
+    "smallerFile": "Kleiner bestand",
+    "largerFile": "Groter bestand",
     "cancel": "Annuleren",
     "codecOutputFormat": "Codec / uitvoerformaat",
     "custom": "Aangepast",
@@ -459,6 +487,7 @@
       "lapLog": "Rondeoverzicht"
     },
     "types": {
+      "raster": { "name": "Afbeelding", "shortName": "Afbeelding" },
       "air_pressure": { "name": "Luchtdruk", "shortName": "Druk" },
       "altitude": { "name": "Hoogte", "shortName": "Hoogte" },
       "aperture": { "name": "Diafragma", "shortName": "Diafragma" },
@@ -547,6 +576,9 @@
     "flatTrack": "Vlakke vulling",
     "fontFamily": "Lettertype",
     "fontSize": "Lettergrootte",
+    "fontWeight": "Dikte",
+    "letterSpacing": "Afstand",
+    "italic": "Cursief",
     "gaugeTrack": "Lineaire indicator",
     "gforcePlot": "G-krachtgrafiek",
     "horizontalOffset": "Horizontale offset",
@@ -571,6 +603,7 @@
     "majorThickness": "Dikte - groot",
     "majorTicks": "Grote streepjes",
     "mapRotation": "Kaartrotatie",
+    "rotation": "Rotatie",
     "markerColor": "Markerkleur",
     "markerOpacity": "Markerdekking",
     "markerSize": "Markergrootte",

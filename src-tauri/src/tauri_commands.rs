@@ -126,9 +126,30 @@ pub(crate) async fn backend_open_hevc_support() -> Result<(), String> {
 /// Lists bundled and system fonts available to the backend renderer.
 #[tauri::command]
 pub(crate) async fn backend_list_system_fonts(app: AppHandle) -> Result<String, String> {
-    serialize_command_result(&commands::backend_list_system_fonts(
+    call_and_serialize(commands::backend_list_system_fonts(
         &runtime_paths::app_paths(&app)?,
     ))
+}
+
+#[tauri::command]
+pub(crate) async fn backend_font_capabilities(
+    app: AppHandle,
+    font_id: String,
+) -> Result<String, String> {
+    call_and_serialize(commands::backend_font_capabilities(
+        &runtime_paths::app_paths(&app)?,
+        &font_id,
+    ))
+}
+
+#[tauri::command]
+pub(crate) async fn backend_font_data(
+    app: AppHandle,
+    font_id: String,
+    face_index: usize,
+) -> Result<Vec<u8>, String> {
+    commands::backend_font_data(&runtime_paths::app_paths(&app)?, &font_id, face_index)
+        .map_err(|error| error.to_string())
 }
 
 /// Starts an overlay video render from serialized scene config and activity data.
@@ -139,6 +160,7 @@ pub(crate) async fn backend_list_system_fonts(app: AppHandle) -> Result<String, 
 pub(crate) async fn backend_render(
     app: AppHandle,
     state: tauri::State<'_, BackendState>,
+    raster_resources: tauri::State<'_, crate::raster_resources::RasterResources>,
     config_json: String,
     parsed_activity_json: String,
     output_path: String,
@@ -153,6 +175,7 @@ pub(crate) async fn backend_render(
         &parsed_activity_json,
         &output_path,
         overwrite,
+        Some(&*raster_resources),
     )
     .map_err(BackendRenderError::from_core)?;
     serialize_command_result(&result).map_err(|message| BackendRenderError::RenderError { message })
@@ -198,6 +221,7 @@ pub(crate) async fn backend_parse_vbo_activity(
 #[tauri::command]
 pub(crate) async fn backend_render_preview_frame(
     app: AppHandle,
+    raster_resources: tauri::State<'_, crate::raster_resources::RasterResources>,
     config_json: String,
     parsed_activity_json: String,
     second: f64,
@@ -209,6 +233,7 @@ pub(crate) async fn backend_render_preview_frame(
             &config_json,
             &parsed_activity_json,
             second,
+            Some(&*raster_resources),
         ));
     }
 
@@ -218,6 +243,7 @@ pub(crate) async fn backend_render_preview_frame(
         let _ = config_json;
         let _ = parsed_activity_json;
         let _ = second;
+        let _ = raster_resources;
         Err("Preview-frame rendering is only available in debug builds.".to_string())
     }
 }

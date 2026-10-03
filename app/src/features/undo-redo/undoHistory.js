@@ -74,9 +74,10 @@ export function redoHistory(store) {
  *
  * @param {object} store - Zustand application store.
  * @param {Function} operation - Synchronous document replacement.
+ * @param {...*} args - Arguments passed to the replacement operation.
  * @returns {*} Operation result.
  */
-export function replaceEditorDocument(store, operation) {
+export function replaceEditorDocument(store, operation, ...args) {
   const temporalState = store.temporal.getState()
   const shouldResumeTracking = temporalState.isTracking
 
@@ -85,7 +86,8 @@ export function replaceEditorDocument(store, operation) {
   }
 
   try {
-    const result = operation()
+    const result = operation(...args)
+    store.setState((state) => ({ editorDocumentRevision: state.editorDocumentRevision + 1 }))
     temporalState.clear()
     return result
   } finally {

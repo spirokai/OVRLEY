@@ -72,7 +72,7 @@ export default function useProjectLifecycle({
         return await operation()
       } catch (error) {
         console.error(`Failed to ${operationName}:`, error)
-        useStore.getState().setErrorMessage(`Failed to ${operationName}: ${error.message}`)
+        useStore.getState().setErrorMessage(`${operationName}: ${error.message}`)
         return false
       } finally {
         operationLock.current = false

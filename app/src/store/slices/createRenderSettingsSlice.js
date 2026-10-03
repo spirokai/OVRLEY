@@ -1,11 +1,14 @@
 import { DEFAULT_EXPORT_RANGE } from '@/lib/template/template-constants'
+import { QUALITY_DEFAULTS } from '@/features/render-video/data/qualityDefaults'
+import { validateRenderQuality } from '@/features/render-video/utils/renderQuality'
 
 export const DEFAULT_RENDER_SETTINGS = Object.freeze({
   fps: 30,
   widgetUpdateRate: 1,
   exportMode: 'composite',
   codec: 'prores_ks',
-  bitrateMbps: null,
+  qualityType: 'quality',
+  qualityValue: QUALITY_DEFAULTS.h264,
   range: Object.freeze({ ...DEFAULT_EXPORT_RANGE }),
 })
 
@@ -16,9 +19,7 @@ function validateRenderSettings(settings) {
   }
   if (settings.exportMode !== 'transparent' && settings.exportMode !== 'composite') throw new Error('Invalid export mode')
   if (typeof settings.codec !== 'string' || !settings.codec) throw new Error('Render codec is required')
-  if (settings.bitrateMbps !== null && (!Number.isFinite(settings.bitrateMbps) || settings.bitrateMbps <= 0)) {
-    throw new Error('Render bitrate must be a positive finite number or null')
-  }
+  validateRenderQuality(settings)
   if (!settings.range || !['all', 'custom'].includes(settings.range.type)) throw new Error('Invalid export range type')
   if (!Number.isFinite(settings.range.from) || !Number.isFinite(settings.range.to)) throw new Error('Export range bounds must be finite')
   if (settings.range.type === 'custom' && settings.range.from >= settings.range.to) throw new Error('Custom export range requires from < to')

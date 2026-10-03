@@ -207,7 +207,8 @@ describe('OverlayHeadingWidget', () => {
     )
     const label = container.querySelector('text')
 
-    expect(label).toHaveAttribute('font-family', '"Furore", "Arial Black", Impact, sans-serif')
+    expect(label).toHaveAttribute('font-family', '"OVRLEY Furore.otf"')
+    expect(label).toHaveAttribute('font-weight', '700')
   })
 
   test('heading label font overrides the inherited value font', () => {
@@ -217,6 +218,7 @@ describe('OverlayHeadingWidget', () => {
     )
     const label = container.querySelector('text')
 
-    expect(label).toHaveAttribute('font-family', '"Teko", "Arial Narrow", sans-serif')
+    expect(label).toHaveAttribute('font-family', '"OVRLEY Teko.ttf"')
+    expect(label).toHaveAttribute('font-weight', '700')
   })
 })

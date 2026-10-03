@@ -5,6 +5,7 @@ use crate::render::text::{draw_text, measure_text, parse_color, ResolvedTextStyl
 use crate::render::widgets::types::{
     GForceWidgetCache, WidgetFrameReport, WidgetGeometryReport, WidgetRenderReport,
 };
+use crate::standard_widgets::widget_font_weight;
 use skia_safe::{Canvas, Paint, Point};
 use std::path::PathBuf;
 
@@ -111,6 +112,9 @@ fn draw_label(
         .as_ref()
         .map(|shadow| parse_color(&shadow.color, cache.opacity));
     let mut value_style = ResolvedTextStyle {
+        font_weight: widget_font_weight(),
+        italic: false,
+        letter_spacing: 0.0,
         x: 0.0,
         y: 0.0,
         font_name: Some(cache.label_font.clone()),

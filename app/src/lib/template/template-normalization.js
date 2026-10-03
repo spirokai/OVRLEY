@@ -33,6 +33,7 @@ import {
   ELEVATION_PLOT_KEYS,
   LAP_TIMER_KEYS,
   LABEL_KEYS,
+  RASTER_KEYS,
   SCENE_DURABLE_KEYS,
   SCENE_RENDER_TIME_ONLY_KEYS,
   VALUE_SHARED_KEYS,
@@ -279,15 +280,22 @@ function normalizePlot(plot = {}, config, globalDefaults) {
 /**
  * Normalizes the durable widget config saved inside template files.
  *
- * @param {object|null|undefined} config - Candidate template config.
+ * @param {object} config - Validated editor config.
  * @param {object|null|undefined} globalDefaults - Durable global defaults used for plot-label fallback normalization.
  * @returns {object} Durable normalized template config.
  */
 export function normalizeTemplateConfig(config, globalDefaults) {
-  const nextConfig = ensureWidgetIdsInConfig(cloneSerializable(config) || {})
-  const normalizedConfig = { scene: normalizeScene(nextConfig.scene), backdrops: [], labels: [], values: [], plots: [] }
+  if (!config) throw new Error('Template config must be an object')
+  const clonedConfig = cloneSerializable(config)
+  const nextConfig = ensureWidgetIdsInConfig(clonedConfig)
+  const scene = normalizeScene(nextConfig.scene)
+  const normalizedConfig = { scene, backdrops: [], rasters: [], labels: [], values: [], plots: [] }
   if (Array.isArray(nextConfig.backdrops)) {
     for (const backdrop of nextConfig.backdrops) normalizedConfig.backdrops.push(normalizeBackdrop(backdrop))
+  }
+  for (const raster of config.rasters) {
+    const normalizedRaster = pickDefined(raster, RASTER_KEYS)
+    normalizedConfig.rasters.push(normalizedRaster)
   }
   if (Array.isArray(nextConfig.labels)) {
     for (const label of nextConfig.labels) normalizedConfig.labels.push(normalizeLabel(label))

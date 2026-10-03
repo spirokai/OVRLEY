@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "Image files",
+    "selectImage": "Select image",
+    "replaceImage": "Replace image",
+    "errors": {
+      "missingAsset": "The embedded image is missing from this project. Select a replacement.",
+      "corruptAsset": "The embedded image is damaged. Select a replacement.",
+      "relativePath": "Select an image from an absolute file path.",
+      "missing": "Image file is missing. Select another image.",
+      "unreadable": "Image file cannot be read. Check its permissions or select another image.",
+      "unsupportedType": "Choose a PNG, JPEG, BMP, or TIFF file (.png, .jpeg, .jpg, .bmp, .tiff).",
+      "encodedSize": "Image file is larger than 5 MiB. Choose a smaller file.",
+      "resolution": "Image resolution exceeds 25 megapixels. Choose a smaller image.",
+      "decode": "Image could not be decoded. Choose another image.",
+      "noImage": "Image {{id}} has no selected file. Select one before rendering.",
+      "renderUnavailable": "Image {{id}} cannot be rendered yet.",
+      "invalidConfig": "Image settings are invalid."
+    }
+  },
   "app": {
     "importingYourVideo": "Importing your video...",
     "loadingProject": "Loading project...",
@@ -105,6 +124,10 @@
     "zoomOut": "Zoom out"
   },
   "projects": {
+    "archiveTooLarge": "The project exceeds the 40 MiB archive limit. Remove or replace an image.",
+    "invalidArchive": "The project archive is invalid or damaged. Choose another project file.",
+    "rasterUnavailable": "An image is unavailable. Replace it before saving.",
+    "saveFailed": "The project could not be saved. Check the destination and try again.",
     "activity": "Activity",
     "cancel": "Cancel",
     "closeWithoutSaving": "Close Without Saving",
@@ -133,6 +156,11 @@
     "000000Or900": "00:00:00 or 900",
     "backendOffline": "Backend offline",
     "bitrate": "Bitrate",
+    "quality": "Quality",
+    "better": "Better",
+    "worse": "Worse",
+    "smallerFile": "Smaller file",
+    "largerFile": "Larger file",
     "cancel": "Cancel",
     "codecOutputFormat": "Codec / Output Format",
     "custom": "Custom",
@@ -459,6 +487,7 @@
       "lapLog": "Lap Log"
     },
     "types": {
+      "raster": { "name": "Image", "shortName": "Image" },
       "air_pressure": { "name": "Air Pressure", "shortName": "Air Press." },
       "altitude": { "name": "Altitude", "shortName": "Altitude" },
       "aperture": { "name": "Aperture", "shortName": "Aperture" },
@@ -547,6 +576,9 @@
     "flatTrack": "Flat Track",
     "fontFamily": "Font Family",
     "fontSize": "Font Size",
+    "fontWeight": "Weight",
+    "letterSpacing": "Spacing",
+    "italic": "Italic",
     "gaugeTrack": "Gauge Track",
     "gforcePlot": "G-Force Plot",
     "horizontalOffset": "Horizontal Offset",
@@ -571,6 +603,7 @@
     "majorThickness": "Major Thickness",
     "majorTicks": "Major Ticks",
     "mapRotation": "Map Rotation",
+    "rotation": "Rotation",
     "markerColor": "Marker Color",
     "markerOpacity": "Marker Opacity",
     "markerSize": "Marker Size",

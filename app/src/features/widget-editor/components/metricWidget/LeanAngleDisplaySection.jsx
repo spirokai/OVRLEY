@@ -5,7 +5,7 @@ import { buildUniformResizeUpdate } from '@/features/overlay-editor/utils/widget
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { ColorField, SizeSlider, SliderField } from '../widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
-import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
+import { useAvailableFonts } from '@/hooks/useFonts'
 import { useTranslation } from 'react-i18next'
 
 /**
@@ -19,8 +19,8 @@ import { useTranslation } from 'react-i18next'
 export default function LeanAngleDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   const { t } = useTranslation()
   const leanVariant = useMemo(() => widget.data.display_variants?.lean_angle ?? {}, [widget.data.display_variants?.lean_angle])
-  const updateLean = useDisplayVariantUpdater(widget, 'lean_angle', leanVariant, updateWidgetData)
-  const updateLeanSize = useDisplayVariantUpdater(widget, 'lean_angle', leanVariant, updateWidgetSize)
+  const updateLean = useDisplayVariantUpdater(widget, 'lean_angle', updateWidgetData)
+  const updateLeanSize = useDisplayVariantUpdater(widget, 'lean_angle', updateWidgetSize)
 
   const diameter = leanVariant.diameter
   const trackThicknessMax = Math.floor((diameter - 1) / 2)
@@ -43,18 +43,21 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             min={30}
             max={600}
             step={1}
-            valueDisplay={`${Math.round(diameter)}px`}
+            valueDisplay={`${Math.round(diameter)}`}
+            suffix="px"
             onChange={handleDiameterChange}
             onCommit={() => commitWidgetSize(widget.id)}
           />
           <SliderField
+            editable
             label={t('widget-editor.thickness', 'Thickness')}
             value={leanVariant.track_thickness}
             min={1}
             max={trackThicknessMax}
             step={1}
             integerDisplay
-            valueDisplay={`${leanVariant.track_thickness}px`}
+            valueDisplay={`${leanVariant.track_thickness}`}
+            suffix="px"
             onSliderChange={(track_thickness) => updateLeanSize({ track_thickness })}
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
@@ -66,12 +69,15 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             onChange={(track_empty_color) => updateLean({ track_empty_color })}
           />
           <SliderField
+            editable
             label={t('widget-editor.emptyOpacity', 'Empty Opacity')}
             value={leanVariant.track_empty_opacity}
             min={0}
             max={1}
             step={0.05}
-            valueDisplay={`${Math.round(leanVariant.track_empty_opacity * 100)}%`}
+            valueScale={100}
+            valueDisplay={`${Math.round(leanVariant.track_empty_opacity * 100)}`}
+            suffix="%"
             onSliderChange={(track_empty_opacity) => updateLean({ track_empty_opacity })}
           />
         </div>
@@ -82,12 +88,15 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             onChange={(track_filled_color) => updateLean({ track_filled_color })}
           />
           <SliderField
+            editable
             label={t('widget-editor.filledOpacity', 'Filled Opacity')}
             value={leanVariant.track_filled_opacity}
             min={0}
             max={1}
             step={0.05}
-            valueDisplay={`${Math.round(leanVariant.track_filled_opacity * 100)}%`}
+            valueScale={100}
+            valueDisplay={`${Math.round(leanVariant.track_filled_opacity * 100)}`}
+            suffix="%"
             onSliderChange={(track_filled_opacity) => updateLean({ track_filled_opacity })}
           />
         </div>
@@ -98,13 +107,15 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             onChange={(track_border_color) => updateLean({ track_border_color })}
           />
           <SliderField
+            editable
             label={t('widget-editor.border', 'Border')}
             value={leanVariant.track_border_thickness}
             min={0}
             max={borderThicknessMax}
             step={1}
             integerDisplay
-            valueDisplay={`${leanVariant.track_border_thickness}px`}
+            valueDisplay={`${leanVariant.track_border_thickness}`}
+            suffix="px"
             onSliderChange={(track_border_thickness) => updateLeanSize({ track_border_thickness })}
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
@@ -127,7 +138,8 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             value={widget.data.font_size}
             min={6}
             max={200}
-            valueDisplay={`${widget.data.font_size}px`}
+            valueDisplay={`${widget.data.font_size}`}
+            suffix="px"
             onChange={(font_size) => updateWidgetSize(widget.id, { font_size })}
             onCommit={() => commitWidgetSize(widget.id)}
           />
@@ -146,24 +158,28 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField
+            editable
             label={t('widget-editor.horizontalOffset', 'Horizontal Offset')}
             value={leanVariant.value_offset_x}
             min={-50}
             max={50}
             step={1}
             integerDisplay
-            valueDisplay={`${leanVariant.value_offset_x}px`}
+            valueDisplay={`${leanVariant.value_offset_x}`}
+            suffix="px"
             onSliderChange={(value_offset_x) => updateLeanSize({ value_offset_x })}
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
           <SliderField
+            editable
             label={t('widget-editor.verticalOffset', 'Vertical Offset')}
             value={leanVariant.value_offset_y}
             min={-50}
             max={50}
             step={1}
             integerDisplay
-            valueDisplay={`${leanVariant.value_offset_y}px`}
+            valueDisplay={`${leanVariant.value_offset_y}`}
+            suffix="px"
             onSliderChange={(value_offset_y) => updateLeanSize({ value_offset_y })}
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />

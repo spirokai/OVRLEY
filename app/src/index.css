@@ -2,15 +2,13 @@
  * Main stylesheet — imports Tailwind and modular CSS files.
  *
  * Import order (cascade matters):
- * 1. fonts.css        @font-face declarations
- * 2. theme.css        Tailwind @theme inline block (must precede @layer base)
- * 3. moveable.css     Moveable library overrides
- * 4. utilities.css    App-shell scaling, grid pattern, scrollbar styling
+ * 1. theme.css        Tailwind @theme inline block (must precede @layer base)
+ * 2. moveable.css     Moveable library overrides
+ * 3. utilities.css    App-shell scaling, grid pattern, scrollbar styling
  */
 
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import './styles/fonts.css';
 @import './styles/theme.css';
 @import './styles/moveable.css';
 @import './styles/utilities.css';

@@ -5,6 +5,7 @@
  * all data via props — no hooks, no store access, no side effects.
  */
 
+import { WIDGET_FONT_WEIGHT } from '@/lib/widget/standard-widgets'
 import { normalizeSvgShadowColor } from './svgPreviewUtils'
 
 /**
@@ -87,12 +88,16 @@ function PreviewSvgIconShadow({ icon, left, top, iconScale, shadow, shadowFilter
  * The main text uses paintOrder="stroke fill" for the border effect.
  *
  * @param {object} props
+ * @param {Array<{text: string, x: number}>} [props.textRuns] - Measured grapheme runs for label tracking.
+ * @param {boolean} [props.preserveWhitespace=false] - Preserve label whitespace advances.
  * @param {string} props.text - Text content to render.
  * @param {number} [props.x=0] - X position.
  * @param {number} props.baseline - Y baseline position (text baseline, not top).
  * @param {string} props.color - Text fill color.
  * @param {string} props.fontFamily - Font family.
  * @param {number} props.fontSize - Font size in pixels.
+ * @param {number} [props.fontWeight=WIDGET_FONT_WEIGHT] - Supported weight; labels pass their resolved weight.
+ * @param {string} [props.fontStyle='normal'] - Resolved font style.
  * @param {number} props.opacity - Text opacity.
  * @param {object|null} props.shadow - Shadow configuration ({ color, distance, strength }).
  * @param {string} [props.shadowFilterId] - Filter ID for the shadow layer.
@@ -102,11 +107,15 @@ function PreviewSvgIconShadow({ icon, left, top, iconScale, shadow, shadowFilter
  */
 export function PreviewSvgText({
   text,
+  textRuns,
+  preserveWhitespace = false,
   x = 0,
   baseline,
   color,
   fontFamily,
   fontSize,
+  fontWeight = WIDGET_FONT_WEIGHT,
+  fontStyle = 'normal',
   opacity,
   shadow,
   shadowFilterId,
@@ -115,7 +124,14 @@ export function PreviewSvgText({
   textTransform,
 }) {
   const hasShadow = shadow !== undefined
-  const textStyle = textTransform ? { textTransform } : undefined
+  const textStyle = { textTransform, fontOpticalSizing: 'none', fontSynthesis: 'style', whiteSpace: preserveWhitespace ? 'pre' : undefined }
+  const content = textRuns
+    ? textRuns.map((run, index) => (
+        <tspan key={index} x={x + run.x} y={baseline}>
+          {run.text}
+        </tspan>
+      ))
+    : text
 
   return (
     <>
@@ -128,11 +144,13 @@ export function PreviewSvgText({
           fillOpacity={opacity}
           fontFamily={fontFamily}
           fontSize={fontSize}
+          fontWeight={fontWeight}
+          fontStyle={fontStyle}
           stroke="none"
           filter={`url(#${shadowFilterId})`}
           style={textStyle}
         >
-          {text}
+          {content}
         </text>
       ) : null}
       <text
@@ -141,13 +159,15 @@ export function PreviewSvgText({
         fill={color}
         fontFamily={fontFamily}
         fontSize={fontSize}
+        fontWeight={fontWeight}
+        fontStyle={fontStyle}
         opacity={opacity}
         paintOrder="stroke fill"
         stroke={borderColor ?? 'none'}
         strokeWidth={borderThickness ?? 0}
         style={textStyle}
       >
-        {text}
+        {content}
       </text>
     </>
   )

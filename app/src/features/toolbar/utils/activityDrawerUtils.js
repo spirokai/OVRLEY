@@ -1,5 +1,5 @@
 import { formatClockDuration, formatZonedDateTime } from '@/lib/time-format'
-import { getActivityAttributeLabel } from '@/lib/widget/widget-icons'
+import { getActivityAttributeLabel } from '@/lib/widget/widget-presentation'
 
 const METRIC_GROUPS_BY_SOURCE = {
   direct: ['extracted'],

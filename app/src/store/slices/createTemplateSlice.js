@@ -41,7 +41,7 @@ export function createTemplateSlice(set, get) {
         state.lastSavedTemplateState = templateState
       }),
 
-    setGlobalDefault: (key, value) => {
+    setGlobalDefault: (key, value, labelFont) => {
       const nextDefaults = normalizeGlobalDefaults({
         ...get().globalDefaults,
         [key]: isColorFieldKey(key) ? normalizeColorFields({ [key]: value })[key] : value,
@@ -51,7 +51,7 @@ export function createTemplateSlice(set, get) {
         state.globalDefaults = nextDefaults
 
         if (state.config) {
-          state.config = syncGlobalDefaultsToConfig(state.config, nextDefaults, [key])
+          state.config = syncGlobalDefaultsToConfig(state.config, nextDefaults, [key], labelFont)
           updateConfigPersistence(state)
         }
       })
@@ -86,12 +86,12 @@ export function createTemplateSlice(set, get) {
       })
     },
 
-    resetGlobalDefaults: () => {
+    resetGlobalDefaults: (labelFont) => {
       set((state) => {
         state.globalDefaults = { ...DEFAULT_GLOBAL_DEFAULTS }
 
         if (state.config) {
-          state.config = syncGlobalDefaultsToConfig(state.config, state.globalDefaults)
+          state.config = syncGlobalDefaultsToConfig(state.config, state.globalDefaults, null, labelFont)
           updateConfigPersistence(state)
         }
       })

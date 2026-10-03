@@ -48,7 +48,14 @@ struct RawBackdropSection {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct WidgetTypography {
+    widget_font_weight: f32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct RawStandardWidgetManifest {
+    typography: WidgetTypography,
     plot: RawStandardWidgetSection,
     gradient: RawStandardWidgetSection,
     label: RawStandardWidgetSection,
@@ -110,6 +117,7 @@ impl BackdropSection {
 
 #[derive(Clone, Debug)]
 struct StandardWidgetManifest {
+    typography: WidgetTypography,
     plot: StandardWidgetSection,
     gradient: StandardWidgetSection,
     label: StandardWidgetSection,
@@ -130,11 +138,17 @@ fn load_manifest() -> StandardWidgetManifest {
     .expect("shared standard widgets manifest must be valid JSON");
 
     StandardWidgetManifest {
+        typography: raw.typography,
         plot: StandardWidgetSection::from_raw(raw.plot),
         gradient: StandardWidgetSection::from_raw(raw.gradient),
         label: StandardWidgetSection::from_raw(raw.label),
         backdrops: BackdropSection::from_raw(raw.backdrops),
     }
+}
+
+/// Shared weight for text outside label widgets.
+pub fn widget_font_weight() -> f32 {
+    manifest().typography.widget_font_weight
 }
 
 pub fn plot_widget_definition(key: &str) -> Option<&'static StandardWidgetDefinition> {

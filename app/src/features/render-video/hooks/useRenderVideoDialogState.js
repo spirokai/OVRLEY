@@ -25,6 +25,7 @@ import {
   isOutputFormatAvailable,
 } from '../utils/codecUtils'
 import { getRenderOutputExtension } from '../utils/render-output'
+import { getDefaultQuality, invertQualityValue } from '../utils/renderQuality'
 import useRenderVideoDerivedState from './useRenderVideoDerivedState'
 
 function getImportedVideoExportRange(durationSeconds, offsetSeconds) {
@@ -105,7 +106,6 @@ export default function useRenderVideoDialogState({
       onSettingsChange({
         exportCodec: 'prores_ks',
         exportAcceleration: 'cpu',
-        exportBitrate: undefined,
       })
       return
     }
@@ -121,16 +121,11 @@ export default function useRenderVideoDialogState({
         onSettingsChange({
           exportCodec: firstAvailableMp4Codec,
           exportAcceleration: EXPORT_CODEC_LOOKUP[firstAvailableMp4Codec]?.acceleration || 'cpu',
-          exportBitrate: defaultBitrateForCodec(firstAvailableMp4Codec),
+          qualityValue:
+            settings.qualityType === 'quality' ? getDefaultQuality(firstAvailableMp4Codec) : defaultBitrateForCodec(firstAvailableMp4Codec),
         })
       }
       return
-    }
-
-    if (!Number.isFinite(settings.exportBitrate)) {
-      onSettingsChange({
-        exportBitrate: defaultBitrateForCodec(settings.exportCodec),
-      })
     }
   }, [availableCodecs, defaultBitrateForCodec, exportMode, onSettingsChange, platformOs, selectedCodecIsMp4, selectedExportCodecAvailable, settings])
 
@@ -214,7 +209,9 @@ export default function useRenderVideoDialogState({
     onSettingsChange({
       exportCodec: nextExportCodec,
       exportAcceleration: acceleration.value,
-      exportBitrate: nextIsMp4Codec ? defaultBitrateForCodec(nextExportCodec) : undefined,
+      ...(nextIsMp4Codec && {
+        qualityValue: settings.qualityType === 'quality' ? getDefaultQuality(nextExportCodec) : defaultBitrateForCodec(nextExportCodec),
+      }),
     })
   }
 
@@ -227,8 +224,18 @@ export default function useRenderVideoDialogState({
     onSettingsChange({
       exportCodec: nextExportCodec,
       exportAcceleration: value,
-      exportBitrate: selectedCodecIsMp4 ? defaultBitrateForCodec(nextExportCodec) : undefined,
     })
+  }
+
+  const handleQualityTypeChange = (qualityType) => {
+    onSettingsChange({
+      qualityType,
+      qualityValue: qualityType === 'quality' ? getDefaultQuality(settings.exportCodec) : defaultBitrateForCodec(settings.exportCodec),
+    })
+  }
+
+  const handleQualityValueChange = ([value]) => {
+    onSettingsChange({ qualityValue: settings.qualityType === 'quality' ? invertQualityValue(value) : value })
   }
 
   return {
@@ -244,6 +251,9 @@ export default function useRenderVideoDialogState({
     handleExportModeChange,
     handleFpsModeChange,
     handleOutputFormatChange,
+    handleQualityTypeChange,
+    handleQualityValueChange,
+    qualitySliderValue: settings?.qualityType === 'quality' ? invertQualityValue(settings.qualityValue) : settings?.qualityValue,
     hasImportedVideo,
     importedVideoDuration,
     importedVideoFps,
