@@ -1,153 +1,209 @@
 /**
- * Batch section of the render dialog — video/output folder pickers and the
- * queued videos with per-item overlay toggles, status, and live progress.
+ * Batch folder controls and queued videos with overlay toggles and render progress.
  * Pure presentational - all logic is in useBatchRenderWorkflow.
  */
 
-import { CheckCircle2, FolderOpen, Loader2, Square, Trash2, XCircle } from 'lucide-react'
+import { Files, FolderOpen, Loader2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
 import { formatFps, formatTime } from '../utils/codecUtils'
 import { useTranslation } from 'react-i18next'
 
-function StatusIcon({ status }) {
-  if (status === 'done') return <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-  if (status === 'error') return <XCircle className="h-4 w-4 shrink-0 text-red-500" />
-  if (status === 'cancelled') return <Square className="h-4 w-4 shrink-0 text-muted-foreground" />
-  if (status === 'importing' || status === 'rendering' || status === 'checking')
-    return <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
-  return <span className="h-4 w-4 shrink-0" />
-}
-
-function FolderPicker({ label, folder, onPick, disabled }) {
-  const { t } = useTranslation()
-  return (
-    <div className="space-y-2">
-      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</Label>
-      <Button
-        type="button"
-        variant="outline"
-        className="h-9 w-full justify-start gap-2 border-border/80 bg-surface-elevated text-xs text-foreground shadow-xs hover:bg-surface-strong"
-        onClick={onPick}
-        disabled={disabled}
-      >
-        <FolderOpen className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">{folder || t('render-video.chooseFolder', 'Choose folder...')}</span>
-      </Button>
-    </div>
-  )
-}
-
 /**
- * Renders the batch folder pickers and render queue.
+ * Renders the batch video queue.
  *
  * @param {object} props - Component props.
- * @param {string|null} props.batchVideoFolder - Selected source video folder.
- * @param {string|null} props.batchOutputFolder - Selected output folder.
+ * @param {string|null} props.batchVideoFolder - Selected input folder.
+ * @param {function} props.pickVideoFolder - Chooses an input folder.
+ * @param {function} props.clearBatchQueue - Clears the folder and queue.
  * @param {object[]} props.batchQueue - Queued videos.
+ * @param {object[]} props.visibleBatchQueue - Videos included by the display filter.
+ * @param {boolean} props.showAllBatchVideos - Whether blocked videos are included.
+ * @param {function} props.setShowAllBatchVideos - Changes the display filter.
  * @param {boolean} props.batchRunning - Whether the batch is rendering.
+ * @param {boolean} props.showBatchProgress - Whether rendering or finished results are being shown.
  * @param {string|null} props.batchActiveItemId - Queue item currently rendering.
- * @param {object|null} props.currentItemProgress - Backend progress payload for the active item.
- * @param {function} props.pickVideoFolder - Opens the source folder picker.
- * @param {function} props.pickOutputFolder - Opens the output folder picker.
+ * @param {object} props.currentItemProgress - Frontend progress for the active item.
  * @param {function} props.setBatchItemSkipOverlay - Toggles the activity overlay for an item.
  * @param {function} props.removeBatchQueueItem - Removes an item from the queue.
  * @returns {JSX.Element} Rendered component output.
  */
 export default function BatchRenderQueue({
   batchVideoFolder,
-  batchOutputFolder,
+  pickVideoFolder,
+  clearBatchQueue,
   batchQueue,
+  visibleBatchQueue,
+  showAllBatchVideos,
+  setShowAllBatchVideos,
   batchRunning,
+  showBatchProgress,
   batchActiveItemId,
   currentItemProgress,
-  pickVideoFolder,
-  pickOutputFolder,
   setBatchItemSkipOverlay,
   removeBatchQueueItem,
 }) {
   const { t } = useTranslation()
 
   return (
-    <div className="space-y-4 pt-4">
-      <div className="grid grid-cols-2 gap-4">
-        <FolderPicker
-          label={t('render-video.videoFolder', 'Video folder')}
-          folder={batchVideoFolder}
-          onPick={pickVideoFolder}
-          disabled={batchRunning}
-        />
-        <FolderPicker
-          label={t('render-video.outputFolder', 'Output folder')}
-          folder={batchOutputFolder}
-          onPick={pickOutputFolder}
-          disabled={batchRunning}
-        />
-      </div>
-
-      <div className="max-h-80 space-y-1 overflow-y-auto rounded-sm border border-border/70 bg-surface p-2">
-        {batchQueue.length === 0 ? (
-          <p className="p-4 text-center text-xs text-muted-foreground">
-            {t('render-video.noVideosQueued', 'Choose a video folder to queue videos for batch rendering.')}
+    <div className="flex min-h-0 min-w-0 flex-col gap-4">
+      {!showBatchProgress && (
+        <>
+          <div className="flex h-7 shrink-0 items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <Files className="h-4 w-4 shrink-0 text-primary" />
+              <h2 className="truncate text-sm font-semibold text-foreground">{t('render-video.batchSettings', 'Batch Settings')}</h2>
+            </div>
+            <Label className="flex shrink-0 items-center gap-2 text-[10px] text-muted-foreground">
+              {t('render-video.showAll', 'Show all')}
+              <Switch aria-label={t('render-video.showAll', 'Show all')} checked={showAllBatchVideos} onCheckedChange={setShowAllBatchVideos} />
+            </Label>
+          </div>
+          <BatchFolderPicker
+            label={t('render-video.videoFolder', 'Video folder')}
+            folder={batchVideoFolder}
+            onPick={pickVideoFolder}
+            disabled={batchRunning}
+          >
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 border-border/80 bg-surface-elevated text-xs text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
+              onClick={clearBatchQueue}
+              disabled={batchRunning || (batchVideoFolder === null && batchQueue.length === 0)}
+            >
+              {t('render-video.clearQueue', 'Clear')}
+            </Button>
+          </BatchFolderPicker>
+        </>
+      )}
+      <div
+        className={`min-h-0 flex-1 space-y-1 overflow-y-auto rounded-sm border border-border/70 bg-surface p-2 [scrollbar-gutter:stable] md:contain-size ${showBatchProgress ? 'mt-4' : ''}`}
+      >
+        {visibleBatchQueue.length === 0 ? (
+          <p className="p-4 text-center text-xs text-muted-foreground my-auto">
+            {batchQueue.length === 0
+              ? t('render-video.noVideosQueued', 'Choose a video folder to queue videos for batch rendering.')
+              : t('render-video.noRenderableVideos', 'No renderable videos.')}
           </p>
         ) : (
-          batchQueue.map((item) => {
+          visibleBatchQueue.map((item) => {
             const isActive = item.id === batchActiveItemId
+            const isBlocked = item.status === 'blocked'
+            const isDone = item.status === 'done'
+            const isRendering = isActive && item.status === 'rendering'
+            const isQueued = batchRunning && (item.status === 'pending' || item.status === 'importing')
+            const hasProgress = isDone || isRendering || isQueued
+            const isLoading = item.status === 'checking' || item.status === 'importing' || item.status === 'rendering'
             return (
-              <div key={item.id} className="flex items-center gap-3 rounded-sm px-2 py-2 hover:bg-surface-elevated">
-                <StatusIcon status={item.status} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium text-foreground">{item.filename}</p>
+              <div
+                key={item.id}
+                className={`grid ${showBatchProgress ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_5rem_1.75rem]'} items-center gap-3 rounded-sm px-2 py-2 ${isBlocked ? (showBatchProgress ? 'opacity-50' : '[&>*:not(:last-child)]:opacity-50') : 'hover:bg-surface-elevated'}`}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="min-w-0 truncate text-xs font-medium text-foreground">{item.filename}</p>
+                    {hasProgress ? (
+                      <span
+                        className={`shrink-0 text-right text-[0.7rem] font-semibold tabular-nums ${isDone ? 'text-green-700' : 'text-muted-foreground'}`}
+                      >
+                        {isDone ? t('render-video.done', 'Done') : isQueued ? t('render-video.queued', 'Queued') : `${currentItemProgress.percent}%`}
+                      </span>
+                    ) : null}
+                  </div>
                   {item.status === 'checking' ? (
                     <p className="truncate text-[10px] text-muted-foreground">{t('render-video.checkingOverlap', 'Checking overlap...')}</p>
                   ) : null}
-                  {item.status === 'error' && item.error ? <p className="truncate text-[10px] text-red-500">{item.error}</p> : null}
-                  {isActive && currentItemProgress ? (
+                  {isBlocked ? (
+                    <p className="mt-0.5 truncate text-[10px] font-normal leading-tight text-muted-foreground/70" title={item.error}>
+                      {item.error}
+                    </p>
+                  ) : null}
+                  {item.status === 'error' && item.error ? <p className="truncate text-[10px] text-red-700">{item.error}</p> : null}
+                  {hasProgress ? <Progress value={isDone ? 100 : isQueued ? 0 : currentItemProgress.percent} className="mt-2 h-1.5" /> : null}
+                  {isRendering ? (
                     <>
-                      <Progress
-                        value={
-                          currentItemProgress.current && currentItemProgress.total
-                            ? (currentItemProgress.current / currentItemProgress.total) * 100
-                            : 0
-                        }
-                        className="mt-1 h-1"
-                      />
                       <p className="mt-1 flex gap-3 text-[10px] tabular-nums text-muted-foreground">
                         <span>
-                          {t('render-video.renderFps', 'Render FPS')}: {formatFps(currentItemProgress.rendering_fps)}
+                          {t('render-video.renderFps', 'Render FPS')}: {formatFps(currentItemProgress.renderingFps)}
                         </span>
                         <span>
-                          {t('render-video.estRemaining', 'Est. Remaining')}: {formatTime(currentItemProgress.estimated_seconds_remaining)}
+                          {t('render-video.estRemaining', 'Est. Remaining')}: {formatTime(currentItemProgress.estimatedSecondsRemaining)}
                         </span>
                       </p>
                     </>
                   ) : null}
                 </div>
-                <Label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  {t('render-video.activityOverlay', 'Activity overlay')}
-                  <Switch
-                    checked={!item.skipOverlay}
-                    onCheckedChange={(checked) => setBatchItemSkipOverlay(item.id, !checked)}
-                    disabled={batchRunning || item.status === 'checking'}
-                  />
-                </Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-muted-foreground hover:text-red-500"
-                  onClick={() => removeBatchQueueItem(item.id)}
-                  disabled={batchRunning}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                {!showBatchProgress && (
+                  <>
+                    <div className="flex h-7 items-center justify-center">
+                      {isLoading ? (
+                        <span
+                          role="status"
+                          aria-label={
+                            item.status === 'checking'
+                              ? t('render-video.checkingOverlap', 'Checking overlap...')
+                              : t('render-video.rendering', 'Rendering...')
+                          }
+                        >
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        </span>
+                      ) : (
+                        <Switch
+                          aria-label={`${t('render-video.activityOverlay', 'Activity overlay')}: ${item.filename}`}
+                          checked={!isBlocked && !item.skipOverlay}
+                          onCheckedChange={(checked) => setBatchItemSkipOverlay(item.id, !checked)}
+                          disabled={batchRunning || isBlocked}
+                        />
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground enabled:hover:text-red-700 disabled:hover:bg-transparent"
+                      onClick={() => removeBatchQueueItem(item.id)}
+                      disabled={batchRunning}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                )}
               </div>
             )
           })
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Presents a batch folder picker with optional joined actions.
+ * @param {object} props Folder selection, picker callback, and optional actions.
+ * @returns {JSX.Element} Folder field.
+ */
+export function BatchFolderPicker({ label, folder, onPick, disabled, children }) {
+  const { t } = useTranslation()
+  return (
+    <div className="min-w-0 shrink-0 space-y-2">
+      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</Label>
+      <ButtonGroup className="w-full">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-9 min-w-0 flex-1 justify-start gap-2 border-border/80 bg-surface-elevated text-xs text-foreground shadow-xs hover:bg-surface-strong"
+          onClick={onPick}
+          disabled={disabled}
+        >
+          <FolderOpen className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{folder || t('render-video.chooseFolder', 'Choose folder...')}</span>
+        </Button>
+        {children}
+      </ButtonGroup>
     </div>
   )
 }

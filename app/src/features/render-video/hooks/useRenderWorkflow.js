@@ -16,6 +16,7 @@ import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
 import { createRenderEffectiveConfig } from '../utils/renderConfig'
+import { createRenderProgress } from '../utils/renderProgress'
 import { loadRememberedRenderDirectory, normalizeRenderOutputPath, rememberAcceptedRenderOutput } from '../utils/render-output'
 import useRenderDialogState from './useRenderDialogState'
 import i18next from 'i18next'
@@ -36,6 +37,7 @@ export default function useRenderWorkflow({ backendStatus }) {
   const globalDefaults = useStore((state) => state.globalDefaults)
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const batchRunning = useStore((state) => state.batchRunning)
+  const setRenderTarget = useStore((state) => state.setRenderTarget)
   const [renderingPreviewFrame, setRenderingPreviewFrame] = useState(false)
   const [submissionPending, setSubmissionPending] = useState(false)
   const [outputPathError, setOutputPathError] = useState(null)
@@ -71,10 +73,10 @@ export default function useRenderWorkflow({ backendStatus }) {
     const draftExportRange = { ...DEFAULT_EXPORT_RANGE, ...renderSettings.range }
 
     return {
-      renderTarget: 'current',
+      renderTarget: renderSettings.renderTarget,
       fps,
       updateRate: normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate),
-      exportMode: importedVideoPath ? renderSettings.exportMode : 'transparent',
+      exportMode: renderSettings.renderTarget === 'batch' || importedVideoPath ? renderSettings.exportMode : 'transparent',
       exportCodec: codec,
       qualityType: renderSettings.qualityType,
       qualityValue: renderSettings.qualityValue,
@@ -113,6 +115,9 @@ export default function useRenderWorkflow({ backendStatus }) {
 
   const updateRenderSettingsDraft = useCallback(
     (updates) => {
+      if (updates.renderTarget !== undefined) {
+        setRenderTarget(updates.renderTarget)
+      }
       if (updates.outputPath !== undefined || updates.exportMode !== undefined) {
         setOutputPathError(null)
         setOverwriteOpen(false)
@@ -133,7 +138,7 @@ export default function useRenderWorkflow({ backendStatus }) {
           : updates
       })
     },
-    [updateDraftState],
+    [setRenderTarget, updateDraftState],
   )
 
   // Progress streaming — subscribes to backend `render-progress` events for
@@ -155,17 +160,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         return
       }
 
-      setRenderProgress({
-        renderId: data.render_id ?? null,
-        current: data.current || 0,
-        total: data.total || 0,
-        encoded: data.encoded || 0,
-        status: data.status || 'rendering',
-        message: data.message || '',
-        estimatedSecondsRemaining: data.estimated_seconds_remaining,
-        renderingFps: data.rendering_fps ?? null,
-        filename: data.filename || null,
-      })
+      setRenderProgress(createRenderProgress(data))
     }
 
     backend
@@ -307,6 +302,7 @@ export default function useRenderWorkflow({ backendStatus }) {
           overwrite,
         })
         setRenderSettings({
+          renderTarget: renderSettingsDraft.renderTarget,
           fps: nextFps,
           widgetUpdateRate: nextUpdateRate,
           exportMode,

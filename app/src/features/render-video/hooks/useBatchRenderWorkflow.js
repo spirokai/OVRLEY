@@ -5,17 +5,19 @@
  * Composed by useRenderVideoDialogState when the dialog targets a batch.
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 import { DEFAULT_EXPORT_RANGE } from '@/lib/template/template-constants'
 import { openDirectoryPath } from '@/lib/file-dialog'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { pathInDirectory } from '@/lib/utils'
 import useStore from '@/store/useStore'
+import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import { resolveVideoSyncState } from '@/store/slices/createVideoImportSlice'
 import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import useVideoImport, { prepareVideoPath } from '@/features/video-preview/hooks/useVideoImport'
 import { getRenderOutputExtension } from '../utils/render-output'
+import { createRenderProgress } from '../utils/renderProgress'
 
 function outputFilenameFor(filename, exportMode) {
   const stem = filename.replace(/\.[^.]*$/, '')
@@ -42,7 +44,7 @@ async function runWithConcurrencyLimit(items, limit, worker) {
   await Promise.all(runners)
 }
 
-function waitForRenderCompletion(renderId) {
+function waitForRenderCompletion(renderId, onProgress) {
   return new Promise((resolve, reject) => {
     let unlisten = null
     let settled = false
@@ -55,7 +57,9 @@ function waitForRenderCompletion(renderId) {
     }
 
     const handle = (data) => {
+      if (settled) return
       if (data.render_id !== renderId) return
+      onProgress(createRenderProgress(data))
       if (data.status === 'complete') finish(() => resolve(data))
       else if (data.status === 'cancelled') finish(() => reject(Object.assign(new Error('Render cancelled'), { code: 'cancelled' })))
       else if (data.status === 'error') finish(() => reject(new Error(data.message || 'Render failed')))
@@ -64,7 +68,8 @@ function waitForRenderCompletion(renderId) {
     backend
       .subscribeRenderProgress(handle)
       .then((un) => {
-        unlisten = un
+        if (settled) un()
+        else unlisten = un
       })
       .catch((error) => finish(() => reject(error)))
 
@@ -79,10 +84,11 @@ function waitForRenderCompletion(renderId) {
  * Provides batch-render queue actions and sequential render orchestration.
  *
  * @param {object} params
+ * @param {string} params.phase - Render dialog phase.
  * @param {object|null} params.settings - Render dialog settings draft applied to every queued video.
  * @returns {object} Batch render workflow API.
  */
-export default function useBatchRenderWorkflow({ settings }) {
+export default function useBatchRenderWorkflow({ phase, settings }) {
   const batchVideoFolder = useStore((state) => state.batchVideoFolder)
   const batchOutputFolder = useStore((state) => state.batchOutputFolder)
   const batchQueue = useStore((state) => state.batchQueue)
@@ -92,7 +98,6 @@ export default function useBatchRenderWorkflow({ settings }) {
   const setBatchOutputFolder = useStore((state) => state.setBatchOutputFolder)
   const setBatchQueueFromPaths = useStore((state) => state.setBatchQueueFromPaths)
   const removeBatchQueueItem = useStore((state) => state.removeBatchQueueItem)
-  const clearBatchQueue = useStore((state) => state.clearBatchQueue)
   const setBatchItemSkipOverlay = useStore((state) => state.setBatchItemSkipOverlay)
   const setBatchItemStatus = useStore((state) => state.setBatchItemStatus)
   const setBatchRunning = useStore((state) => state.setBatchRunning)
@@ -101,13 +106,15 @@ export default function useBatchRenderWorkflow({ settings }) {
   const setRenderSettings = useStore((state) => state.setRenderSettings)
 
   const { loadVideoPath, clearImportedVideo } = useVideoImport({})
-  const [currentItemProgress, setCurrentItemProgress] = useState(null)
+  const [currentItemProgress, setCurrentItemProgress] = useState(DEFAULT_RENDER_PROGRESS)
+  const folderScanRef = useRef(null)
   const cancelRequestedRef = useRef(false)
+  const batchDialogOpen = phase === 'confirm' && settings?.renderTarget === 'batch'
 
   // Probes each queued video's creation time against the loaded activity so
-  // the per-item overlay toggle defaults correctly without a manual render.
+  // videos that cannot sync are blocked before rendering.
   const detectQueueOverlaps = useCallback(
-    async (paths) => {
+    async (paths, signal) => {
       const activitySummary = useStore.getState().activitySummary
       if (!activitySummary) return
 
@@ -117,28 +124,61 @@ export default function useBatchRenderWorkflow({ settings }) {
       for (const item of items) setBatchItemStatus(item.id, 'checking')
 
       await runWithConcurrencyLimit(items, OVERLAP_CHECK_CONCURRENCY, async (item) => {
+        if (signal.aborted) return
         try {
           const { importedVideoState } = await prepareVideoPath(item.path)
+          if (signal.aborted) return
           const { videoSyncWarning } = resolveVideoSyncState({ ...importedVideoState, videoSyncTimezoneMode: timezoneMode }, activitySummary)
-          setBatchItemSkipOverlay(item.id, videoSyncWarning !== null)
-          setBatchItemStatus(item.id, 'pending')
+          setBatchItemStatus(item.id, videoSyncWarning === null ? 'pending' : 'blocked', videoSyncWarning)
         } catch (error) {
+          if (signal.aborted) return
           console.warn(`Could not determine activity overlap for ${item.path}:`, error)
-          setBatchItemStatus(item.id, 'error', 'Could not check activity overlap')
+          setBatchItemStatus(item.id, 'blocked', 'Could not check activity overlap')
         }
       })
     },
-    [setBatchItemSkipOverlay, setBatchItemStatus],
+    [setBatchItemStatus],
   )
+
+  const loadVideoFolder = useCallback(
+    async (directory) => {
+      folderScanRef.current?.abort()
+      const controller = new AbortController()
+      folderScanRef.current = controller
+      const { signal } = controller
+      setBatchVideoFolder(directory)
+      setBatchQueueFromPaths([])
+      try {
+        const paths = await backend.listDirectoryVideoFiles(directory)
+        if (signal.aborted) return
+        setBatchQueueFromPaths(paths)
+        await detectQueueOverlaps(paths, signal)
+      } catch (error) {
+        if (!signal.aborted) setErrorMessage(error.message)
+      }
+    },
+    [detectQueueOverlaps, setBatchQueueFromPaths, setBatchVideoFolder, setErrorMessage],
+  )
+
+  useEffect(() => {
+    if (!batchDialogOpen) return
+    const state = useStore.getState()
+    if (state.batchVideoFolder !== null && (state.batchQueue.length === 0 || state.batchQueue.some((item) => item.status === 'checking'))) {
+      void loadVideoFolder(state.batchVideoFolder)
+    }
+    return () => folderScanRef.current?.abort()
+  }, [batchDialogOpen, loadVideoFolder])
+
+  const clearBatchQueue = useCallback(() => {
+    folderScanRef.current?.abort()
+    useStore.getState().clearBatchQueue()
+  }, [])
 
   const pickVideoFolder = useCallback(async () => {
     const directory = await openDirectoryPath({ lastDirectoryKey: 'last-batch-video-dir' })
     if (!directory) return
-    const paths = await backend.listDirectoryVideoFiles(directory)
-    setBatchVideoFolder(directory)
-    setBatchQueueFromPaths(paths)
-    void detectQueueOverlaps(paths)
-  }, [detectQueueOverlaps, setBatchQueueFromPaths, setBatchVideoFolder])
+    await loadVideoFolder(directory)
+  }, [loadVideoFolder])
 
   const pickOutputFolder = useCallback(async () => {
     const directory = await openDirectoryPath({ lastDirectoryKey: 'last-batch-output-dir' })
@@ -150,7 +190,7 @@ export default function useBatchRenderWorkflow({ settings }) {
     async (item, batchSettings, timezoneMode) => {
       setBatchActiveItemId(item.id)
       setBatchItemStatus(item.id, 'importing')
-      setCurrentItemProgress(null)
+      setCurrentItemProgress({ ...DEFAULT_RENDER_PROGRESS, status: 'importing' })
       await loadVideoPath(item.path)
 
       const { parsedActivitySource, setVideoSyncTimezoneMode } = useStore.getState()
@@ -174,6 +214,7 @@ export default function useBatchRenderWorkflow({ settings }) {
       const updateRate = normalizeUpdateRateForFps(shouldComposite ? state.importedVideoFps : batchSettings.fps, batchSettings.updateRate)
 
       setBatchItemStatus(item.id, 'rendering')
+      setCurrentItemProgress({ ...DEFAULT_RENDER_PROGRESS, status: 'rendering' })
       const { default: submitRenderVideo } = await import('@/features/render-video/utils/render-video')
       const result = await submitRenderVideo({
         config: effectiveConfig,
@@ -198,22 +239,11 @@ export default function useBatchRenderWorkflow({ settings }) {
         outputPath,
         overwrite: true,
       })
-      let unlisten = null
-      backend
-        .subscribeRenderProgress((data) => {
-          if (data.render_id === result.render_id) setCurrentItemProgress(data)
-        })
-        .then((un) => {
-          unlisten = un
-        })
-        .catch(() => {})
-
       try {
-        await waitForRenderCompletion(result.render_id)
+        await waitForRenderCompletion(result.render_id, setCurrentItemProgress)
         setBatchItemStatus(item.id, 'done')
       } finally {
-        if (unlisten) unlisten()
-        setCurrentItemProgress(null)
+        setCurrentItemProgress(DEFAULT_RENDER_PROGRESS)
       }
     },
     [batchOutputFolder, loadVideoPath, setBatchActiveItemId, setBatchItemStatus],
@@ -224,7 +254,9 @@ export default function useBatchRenderWorkflow({ settings }) {
       setErrorMessage('Select a batch output folder first')
       return
     }
-    if (batchQueue.length === 0) return
+    if (batchQueue.some((item) => item.status === 'checking')) return
+    const renderableItems = batchQueue.filter((item) => item.status !== 'blocked')
+    if (renderableItems.length === 0) return
 
     cancelRequestedRef.current = false
     // Captured once: importing each queued video resets the editor's selection
@@ -242,7 +274,7 @@ export default function useBatchRenderWorkflow({ settings }) {
     })
     setBatchRunning(true)
     try {
-      for (const item of batchQueue) {
+      for (const item of renderableItems) {
         if (cancelRequestedRef.current) {
           setBatchItemStatus(item.id, 'pending')
           continue

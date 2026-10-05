@@ -208,6 +208,17 @@ describe('RenderVideoDialog', () => {
     expect(screen.getByRole('button', { name: /start batch render/i })).toBeEnabled()
   })
 
+  test('lets the user clear a restored video folder while its empty queue is being loaded', async () => {
+    useStore.getState().setBatchVideoFolder('C:\\videos')
+    const user = userEvent.setup()
+    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
+    const clearButton = screen.getByRole('button', { name: 'Clear' })
+    expect(clearButton).toBeEnabled()
+    await user.click(clearButton)
+    expect(useStore.getState().batchVideoFolder).toBeNull()
+    expect(clearButton).toBeDisabled()
+  })
+
   test('falls back to transparent export when returning to the current video without an import', async () => {
     const user = userEvent.setup()
 

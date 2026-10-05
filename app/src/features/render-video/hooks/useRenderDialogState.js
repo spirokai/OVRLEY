@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import useStore from '@/store/useStore'
 
 export default function useRenderDialogState({
   batchRunning,
@@ -64,6 +65,7 @@ export default function useRenderDialogState({
     }
 
     setRenderDialogPhase('closed')
+    useStore.getState().resetBatchQueueStatuses()
   }, [batchRunning, renderDialogPhase, renderingVideo, submissionPending])
 
   // Draft updates merge partial changes without mutating the current object.

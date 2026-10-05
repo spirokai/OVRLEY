@@ -71,6 +71,7 @@ export function createBatchRenderSlice(set) {
     resetBatchQueueStatuses: () =>
       set((state) => {
         for (const item of state.batchQueue) {
+          if (item.status === 'blocked' || item.status === 'checking') continue
           item.status = 'pending'
           item.error = null
         }

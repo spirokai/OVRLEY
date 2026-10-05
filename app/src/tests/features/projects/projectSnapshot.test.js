@@ -19,6 +19,7 @@ describe('project snapshot contract', () => {
       importedVideoDuration: 100,
       renderSettings: {
         ...state.renderSettings,
+        renderTarget: 'batch',
         fps: 60,
         codec: 'h264_nvenc',
         qualityType: 'bitrate',
@@ -27,6 +28,10 @@ describe('project snapshot contract', () => {
       selectedSecond: 12.5,
       timelineViewport: { viewStart: 10, viewEnd: 30 },
     }))
+    useStore.getState().setBatchVideoFolder('C:\\Events\\batch-videos')
+    useStore.getState().setBatchOutputFolder('C:\\Events\\batch-renders')
+    useStore.getState().setBatchQueueFromPaths(['C:\\Events\\batch-videos\\blocked.mp4'])
+    useStore.getState().setBatchItemStatus(useStore.getState().batchQueue[0].id, 'blocked', 'Sync failed')
 
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
 
@@ -40,6 +45,11 @@ describe('project snapshot contract', () => {
       video: { path: { kind: 'absolute', value: 'D:\\video\\lap.mp4' } },
     })
     expect(project.render.fps).toBe(60)
+    expect(project.render).toMatchObject({
+      renderTarget: 'batch',
+      batchVideoFolder: 'C:\\Events\\batch-videos',
+      batchOutputFolder: 'C:\\Events\\batch-renders',
+    })
     expect(project.render).toMatchObject({ qualityType: 'bitrate', qualityValue: 35 })
     expect(project.render).not.toHaveProperty('bitrateMbps')
     expect(project.timeline).toEqual({ playheadSecond: 12.5, viewStart: 10, viewEnd: 30 })
@@ -53,6 +63,12 @@ describe('project snapshot contract', () => {
       'importedVideoDuration',
       'isVideoMuted',
       'selectedWidgetIds',
+      'batchQueue',
+      'batchActiveItemId',
+      'batchRunning',
+      'skipOverlay',
+      'blocked.mp4',
+      'Sync failed',
     ]) {
       expect(serialized).not.toContain(forbidden)
     }
@@ -144,6 +160,10 @@ describe('project snapshot contract', () => {
     expect(useStore.getState().renderSettings.exportMode).toBe('composite')
     expect(project.sources.video).toBeNull()
     expect(project.render.exportMode).toBe('transparent')
+    useStore.getState().setRenderTarget('batch')
+    const batchProject = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
+    expect(batchProject.render.renderTarget).toBe('batch')
+    expect(batchProject.render.exportMode).toBe('composite')
   })
 
   test('round-trips only durable manual video-sync state', () => {

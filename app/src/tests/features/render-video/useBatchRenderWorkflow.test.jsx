@@ -1,9 +1,12 @@
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useBatchRenderWorkflow from '@/features/render-video/hooks/useBatchRenderWorkflow'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
+import { listDirectoryVideoFiles } from '@/api/backend'
+import { prepareVideoPath } from '@/features/video-preview/hooks/useVideoImport'
+import { openDirectoryPath } from '@/lib/file-dialog'
 
 const { renderVideoMock, loadVideoPathMock, clearImportedVideoMock } = vi.hoisted(() => ({
   renderVideoMock: vi.fn(),
@@ -22,6 +25,8 @@ vi.mock('@/api/backend', () => ({
 vi.mock('@/features/render-video/utils/render-video', () => ({
   default: renderVideoMock,
 }))
+
+vi.mock('@/lib/file-dialog', () => ({ openDirectoryPath: vi.fn() }))
 
 vi.mock('@/features/video-preview/hooks/useVideoImport', () => ({
   default: () => ({ loadVideoPath: loadVideoPathMock, clearImportedVideo: clearImportedVideoMock }),
@@ -42,6 +47,9 @@ const batchSettings = {
 
 describe('useBatchRenderWorkflow', () => {
   beforeEach(() => {
+    vi.mocked(listDirectoryVideoFiles).mockReset().mockResolvedValue([])
+    vi.mocked(prepareVideoPath).mockReset()
+    vi.mocked(openDirectoryPath).mockReset()
     renderVideoMock.mockReset().mockResolvedValue({ started: true, render_id: 'render-1', outputPath: 'C:\\renders\\ride.mp4' })
     clearImportedVideoMock.mockReset().mockResolvedValue(undefined)
     loadVideoPathMock.mockReset().mockImplementation(async (path) => {
@@ -62,7 +70,7 @@ describe('useBatchRenderWorkflow', () => {
   })
 
   test('renders each queued video with the dialog draft settings and commits them', async () => {
-    const { result } = renderHook(() => useBatchRenderWorkflow({ settings: batchSettings }))
+    const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings: batchSettings }))
 
     await act(async () => {
       await result.current.runBatch()
@@ -92,5 +100,74 @@ describe('useBatchRenderWorkflow', () => {
       qualityType: 'bitrate',
       qualityValue: 35,
     })
+  })
+
+  test('scans a restored folder on opening batch mode and checks sync before allowing rendering', async () => {
+    const paths = ['C:\\videos\\ride.mp4', 'C:\\videos\\outside.mp4']
+    useStore.getState().clearBatchQueue()
+    useStore.getState().setBatchVideoFolder('C:\\videos')
+    useStore.setState({
+      activitySummary: { syncTime: '2026-10-05T12:00:00Z', endTime: '2026-10-05T13:00:00Z', timezone: 'UTC' },
+    })
+    vi.mocked(listDirectoryVideoFiles).mockResolvedValue(paths)
+    let finishChecks
+    const checks = new Promise((resolve) => {
+      finishChecks = resolve
+    })
+    vi.mocked(prepareVideoPath).mockImplementation(async (path) => {
+      await checks
+      return {
+        importedVideoState: {
+          importedVideoCreationTime: path === paths[0] ? '2026-10-05T12:10:00Z' : '2026-10-05T15:00:00Z',
+          importedVideoTimeSource: 'ffprobe',
+          importedVideoDuration: 60,
+        },
+      }
+    })
+    const { result, rerender } = renderHook(({ phase }) => useBatchRenderWorkflow({ phase, settings: batchSettings }), {
+      initialProps: { phase: 'closed' },
+    })
+    expect(listDirectoryVideoFiles).not.toHaveBeenCalled()
+    rerender({ phase: 'confirm' })
+    await waitFor(() => expect(prepareVideoPath).toHaveBeenCalledTimes(2))
+    expect(result.current.batchQueue.map((item) => item.status)).toEqual(['checking', 'checking'])
+    await act(async () => result.current.runBatch())
+    expect(renderVideoMock).not.toHaveBeenCalled()
+    await act(async () => {
+      finishChecks()
+      await checks
+    })
+    await waitFor(() => expect(result.current.batchQueue.map((item) => item.status)).toEqual(['pending', 'blocked']))
+    await act(async () => result.current.runBatch())
+    expect(loadVideoPathMock).toHaveBeenCalledOnce()
+    expect(loadVideoPathMock).toHaveBeenCalledWith(paths[0])
+  })
+
+  test('does not repopulate a cleared folder when directory listing finishes late', async () => {
+    useStore.getState().clearBatchQueue()
+    useStore.getState().setBatchVideoFolder('C:\\videos')
+    let finishListing
+    vi.mocked(listDirectoryVideoFiles).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishListing = resolve
+        }),
+    )
+    const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings: batchSettings }))
+    act(() => result.current.clearBatchQueue())
+    await act(async () => finishListing(['C:\\videos\\ride.mp4']))
+    expect(result.current.batchVideoFolder).toBeNull()
+    expect(result.current.batchQueue).toEqual([])
+    expect(prepareVideoPath).not.toHaveBeenCalled()
+  })
+
+  test('rescans when the user picks the same folder again', async () => {
+    useStore.getState().clearBatchQueue()
+    useStore.getState().setBatchVideoFolder('C:\\videos')
+    vi.mocked(openDirectoryPath).mockResolvedValue('C:\\videos')
+    const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings: batchSettings }))
+    await waitFor(() => expect(listDirectoryVideoFiles).toHaveBeenCalledOnce())
+    await act(async () => result.current.pickVideoFolder())
+    await waitFor(() => expect(listDirectoryVideoFiles).toHaveBeenCalledTimes(2))
   })
 })

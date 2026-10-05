@@ -171,6 +171,7 @@ describe('useRenderWorkflow', () => {
     expect(result.current.renderSettingsDraft.renderTarget).toBe('current')
 
     act(() => result.current.updateRenderSettingsDraft({ renderTarget: 'batch' }))
+    expect(useStore.getState().renderSettings.renderTarget).toBe('batch')
     act(() => useStore.getState().setBatchRunning(true))
     act(() => result.current.closeRenderDialog())
     expect(result.current.renderDialogPhase).toBe('confirm')
@@ -178,6 +179,10 @@ describe('useRenderWorkflow', () => {
     act(() => useStore.getState().setBatchRunning(false))
     act(() => result.current.closeRenderDialog())
     expect(result.current.renderDialogPhase).toBe('closed')
+    await act(async () => result.current.openRenderDialog())
+    expect(result.current.renderSettingsDraft.renderTarget).toBe('batch')
+    expect(result.current.renderSettingsDraft.exportMode).toBe('composite')
+    expect(() => useStore.getState().setRenderTarget('invalid')).toThrow('Invalid render target')
   })
 
   test('preserves an explicit transparent project setting when a video is present', async () => {

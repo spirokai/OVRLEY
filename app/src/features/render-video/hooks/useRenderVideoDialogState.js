@@ -11,7 +11,7 @@
  * @returns {object} State and handlers for RenderVideoDialog.
  */
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { cancelRender } from '@/api/backend'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { useFpsMode } from '@/hooks/useFpsMode'
@@ -26,6 +26,8 @@ import {
 } from '../utils/codecUtils'
 import { getRenderOutputExtension } from '../utils/render-output'
 import { getDefaultQuality, invertQualityValue } from '../utils/renderQuality'
+import { getRenderSummaryItems } from '../utils/renderSummary'
+import { useTranslation } from 'react-i18next'
 import useBatchRenderWorkflow from './useBatchRenderWorkflow'
 import useRenderVideoDerivedState from './useRenderVideoDerivedState'
 
@@ -50,8 +52,10 @@ export default function useRenderVideoDialogState({
   onOverwriteCancel,
   submissionPending = false,
 }) {
+  const { t } = useTranslation()
   const derived = useRenderVideoDerivedState({ settings })
-  const batch = useBatchRenderWorkflow({ settings })
+  const batch = useBatchRenderWorkflow({ phase, settings })
+  const [showAllBatchVideos, setShowAllBatchVideos] = useState(true)
   const outputPath = settings?.outputPath
   const exportRange = settings?.exportRange
   const importedVideoRangePrefilledRef = useRef(false)
@@ -257,16 +261,21 @@ export default function useRenderVideoDialogState({
     onSettingsChange({ qualityValue: settings.qualityType === 'quality' ? invertQualityValue(value) : value })
   }
 
+  const batchFinished =
+    !batch.batchRunning &&
+    batch.batchQueue.some((item) => item.status === 'done') &&
+    batch.batchQueue.every((item) => item.status === 'done' || item.status === 'blocked')
   const batchStartDisabled =
     renderStartDisabled ||
     batch.batchRunning ||
-    batch.batchQueue.length === 0 ||
+    !batch.batchQueue.some((item) => item.status !== 'blocked') ||
     !batch.batchOutputFolder ||
     batch.batchQueue.some((item) => item.status === 'checking')
 
   return {
     ...batch,
     availableCodecs,
+    batchFinished,
     batchStartDisabled,
     config,
     containerFps,
@@ -303,6 +312,7 @@ export default function useRenderVideoDialogState({
     phase,
     platformOs,
     renderProgress,
+    renderSummaryItems: settings ? getRenderSummaryItems({ ...derived, settings, OUTPUT_FORMATS }, t) : [],
     renderStartDisabled: renderStartDisabled || submissionPending || !settings?.outputPath,
     renderingVideo,
     resolutionMismatch,
@@ -318,6 +328,10 @@ export default function useRenderVideoDialogState({
     pendingOverwritePath,
     submissionPending,
     settingsLocked: batch.batchRunning,
+    showAllBatchVideos,
+    setShowAllBatchVideos,
+    visibleBatchQueue: showAllBatchVideos ? batch.batchQueue : batch.batchQueue.filter((item) => item.status !== 'blocked'),
+    showBatchProgress: isBatchTarget && (batch.batchRunning || batchFinished),
     showContainerFps: !isBatchTarget || exportMode !== 'composite',
     showExportModeOverride: hasImportedVideo || isBatchTarget,
     showExportRangeSettings: exportMode !== 'composite' && !isBatchTarget,

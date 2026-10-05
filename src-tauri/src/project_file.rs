@@ -292,6 +292,11 @@ enum VideoTimezoneMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectRender {
+    // Older projects omit these choices; absent values mean current / no folders.
+    #[serde(default)]
+    render_target: RenderTarget,
+    batch_video_folder: Option<String>,
+    batch_output_folder: Option<String>,
     fps: f64,
     widget_update_rate: u32,
     export_mode: ExportMode,
@@ -317,6 +322,14 @@ struct LegacyProjectRender {
 enum ExportMode {
     Transparent,
     Composite,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum RenderTarget {
+    #[default]
+    Current,
+    Batch,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -468,6 +481,18 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
     if let Some(source) = &project.sources.video {
         validate_locator(&source.path)?;
     }
+    for folder in [
+        &project.render.batch_video_folder,
+        &project.render.batch_output_folder,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        validate_locator(&PathLocator::Absolute(folder.clone()))?;
+        if folder.trim() != folder {
+            return Err("Batch folder paths must not contain surrounding whitespace".into());
+        }
+    }
     for (label, value) in [
         ("sync.videoOffsetSeconds", project.sync.video_offset_seconds),
         ("render.fps", project.render.fps),
@@ -490,6 +515,7 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
         return Err("render.codec must not be empty".into());
     }
     if matches!(project.render.export_mode, ExportMode::Composite)
+        && matches!(project.render.render_target, RenderTarget::Current)
         && project.sources.video.is_none()
     {
         return Err("Composite export mode requires a video source".into());
@@ -757,6 +783,9 @@ fn migrate_legacy_render(render: LegacyProjectRender) -> Result<ProjectRender, S
         CodecSelection::Transparent(_) => false,
     };
     Ok(ProjectRender {
+        render_target: RenderTarget::Current,
+        batch_video_folder: None,
+        batch_output_folder: None,
         fps: render.fps,
         widget_update_rate: render.widget_update_rate,
         export_mode: render.export_mode,
@@ -1303,6 +1332,7 @@ mod tests {
                 }
             },
             "render": {
+                "renderTarget": "current", "batchVideoFolder": null, "batchOutputFolder": null,
                 "fps": 30.0, "widgetUpdateRate": 1, "exportMode": "transparent", "codec": "prores_ks",
                 "qualityType": "quality", "qualityValue": 18, "range": { "type": "all", "from": 0.0, "to": 0.0 }
             },
@@ -1327,6 +1357,9 @@ mod tests {
             .remove("rasters");
         project.as_object_mut().unwrap().remove("rasterAssets");
         let render = project["render"].as_object_mut().unwrap();
+        render.remove("renderTarget");
+        render.remove("batchVideoFolder");
+        render.remove("batchOutputFolder");
         render.remove("qualityType");
         render.remove("qualityValue");
         render.insert("bitrateMbps".into(), Value::Null);
@@ -1637,9 +1670,16 @@ mod tests {
             std::env::temp_dir().join(format!("ovrley-project-test-{}", Uuid::new_v4()));
         fs::create_dir_all(&directory).unwrap();
         let path = directory.join("Race.oly");
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["render"]["renderTarget"] = Value::from("batch");
+        project["render"]["exportMode"] = Value::from("composite");
+        project["render"]["codec"] = Value::from("libx264");
+        project["render"]["batchVideoFolder"] = Value::from(path_string(directory.join("videos")));
+        project["render"]["batchOutputFolder"] =
+            Value::from(path_string(directory.join("renders")));
         write_project_file_sync(
             path_string(path.clone()),
-            valid_project_json(),
+            project.to_string(),
             None,
             HashMap::new(),
         )
@@ -1647,6 +1687,18 @@ mod tests {
         let result =
             read_project_file_sync(&RasterResources::default(), path_string(path)).unwrap();
         assert_eq!(result.project.version, PROJECT_VERSION);
+        assert!(matches!(
+            result.project.render.render_target,
+            RenderTarget::Batch
+        ));
+        assert_eq!(
+            result.project.render.batch_video_folder,
+            Some(path_string(directory.join("videos")))
+        );
+        assert_eq!(
+            result.project.render.batch_output_folder,
+            Some(path_string(directory.join("renders")))
+        );
         assert_eq!(
             result.resolved_sources.activity_path,
             Some(path_string(directory.join("media/session.fit")))
@@ -1776,6 +1828,51 @@ mod tests {
                 .replace("\"qualityType\":\"quality\"", "\"qualityType\":\"unknown\""),
         ] {
             assert!(parse_project(&invalid).is_err());
+        }
+        for (field, value) in [
+            ("renderTarget", serde_json::json!("invalid")),
+            ("renderTarget", Value::Null),
+            ("batchVideoFolder", serde_json::json!(42)),
+            ("batchOutputFolder", serde_json::json!(false)),
+            ("batchVideoFolder", serde_json::json!("")),
+            ("batchOutputFolder", serde_json::json!("relative/folder")),
+            (
+                "batchOutputFolder",
+                Value::from(format!("{} ", path_string(std::env::temp_dir()))),
+            ),
+        ] {
+            let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+            project["render"][field] = value;
+            assert!(
+                parse_project(&project.to_string()).is_err(),
+                "accepted malformed {field}"
+            );
+        }
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["render"]["batchQueue"] = serde_json::json!([]);
+        assert!(parse_project(&project.to_string()).is_err());
+    }
+
+    #[test]
+    fn projects_without_batch_choices_load_with_documented_defaults() {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        let render = project["render"].as_object_mut().unwrap();
+        render.remove("renderTarget");
+        render.remove("batchVideoFolder");
+        render.remove("batchOutputFolder");
+        for input in [
+            project.to_string(),
+            valid_v1_project_json(),
+            valid_v2_project_json(),
+        ] {
+            let parsed = parse_project(&input).unwrap().document;
+            assert!(matches!(parsed.render.render_target, RenderTarget::Current));
+            assert!(parsed.render.batch_video_folder.is_none());
+            assert!(parsed.render.batch_output_folder.is_none());
+            let serialized = serde_json::to_value(parsed).unwrap();
+            assert_eq!(serialized["render"]["renderTarget"], "current");
+            assert!(serialized["render"]["batchVideoFolder"].is_null());
+            assert!(serialized["render"]["batchOutputFolder"].is_null());
         }
     }
 

@@ -65,7 +65,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: null,
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
-      render: { ...DEFAULT_RENDER_SETTINGS, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     boundaries.readProjectFile.mockResolvedValue({
@@ -108,6 +108,9 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       render: {
+        renderTarget: 'current',
+        batchVideoFolder: null,
+        batchOutputFolder: null,
         fps: 60,
         widgetUpdateRate: 2,
         exportMode: 'composite',
@@ -216,7 +219,10 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(state.importedVideoImportId).toBe('owner-import-id')
     expect(state.videoSyncOffsetSeconds).toBe(12)
     expect(state.videoSyncTimezoneMode).toBe('utc')
-    expect(state.renderSettings).toEqual(project.render)
+    const { batchVideoFolder, batchOutputFolder, ...renderSettings } = project.render
+    expect(state.renderSettings).toEqual(renderSettings)
+    expect(state.batchVideoFolder).toBe(batchVideoFolder)
+    expect(state.batchOutputFolder).toBe(batchOutputFolder)
     expect(state.selectedSecond).toBe(30)
     expect(state.timelineViewport).toEqual({ viewStart: 20, viewEnd: 60 })
     expect(state.previewPlaybackState).toBe('paused')
@@ -237,6 +243,23 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(result.current.status).toBe('Saved')
 
     act(() => useStore.getState().setLoadedTemplateSource({ kind: 'bundled', templateId: 'another-template.json' }))
+    expect(result.current.status).toBe('Saved')
+
+    act(() => useStore.getState().setRenderTarget('batch'))
+    expect(result.current.status).toBe('Modified')
+    act(() => useStore.getState().setRenderTarget('current'))
+    expect(result.current.status).toBe('Saved')
+    act(() => useStore.getState().setBatchVideoFolder('C:\\batch-videos'))
+    expect(result.current.status).toBe('Modified')
+    act(() => useStore.getState().setBatchVideoFolder(null))
+    expect(result.current.status).toBe('Saved')
+    act(() => useStore.getState().setBatchOutputFolder('C:\\batch-renders'))
+    expect(result.current.status).toBe('Modified')
+    act(() => useStore.getState().setBatchOutputFolder(null))
+    expect(result.current.status).toBe('Saved')
+    act(() => useStore.getState().setBatchQueueFromPaths(['C:\\batch-videos\\ride.mp4']))
+    expect(result.current.status).toBe('Saved')
+    act(() => useStore.getState().setBatchItemStatus(useStore.getState().batchQueue[0].id, 'blocked', 'Sync failed'))
     expect(result.current.status).toBe('Saved')
 
     act(() => useStore.getState().setVideoSyncDetectedLocation(20))
@@ -294,13 +317,17 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       selectedSecond: 45,
       timelineViewport: { viewStart: 30, viewEnd: 60 },
       videoSyncOffsetSeconds: 12,
+      batchVideoFolder: 'C:\\batch-videos',
+      batchOutputFolder: 'C:\\batch-renders',
       renderSettings: {
         ...DEFAULT_RENDER_SETTINGS,
+        renderTarget: 'batch',
         fps: 60,
         range: { type: 'custom', from: 10, to: 80 },
       },
     })
 
+    useStore.getState().setBatchQueueFromPaths(['C:\\batch-videos\\ride.mp4'])
     const clearImportedVideo = vi.fn(async () => useStore.getState().clearImportedVideo())
     const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
@@ -331,6 +358,9 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(state.importedVideoPath).toBeNull()
     expect(state.videoSyncOffsetSeconds).toBe(0)
     expect(state.renderSettings).toEqual(DEFAULT_RENDER_SETTINGS)
+    expect(state.batchVideoFolder).toBeNull()
+    expect(state.batchOutputFolder).toBeNull()
+    expect(state.batchQueue).toEqual([])
     expect(state.selectedSecond).toBe(0)
     expect(state.timelineViewport).toEqual({ viewStart: 0, viewEnd: 73 })
     expect(result.current.loadedProjectPath).toBeNull()
@@ -431,7 +461,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: null,
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
-      render: { ...DEFAULT_RENDER_SETTINGS, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     useStore.setState({
@@ -492,7 +522,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: null,
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
-      render: { ...DEFAULT_RENDER_SETTINGS, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     useStore.setState({
@@ -542,7 +572,13 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: null,
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
-      render: { ...DEFAULT_RENDER_SETTINGS, exportMode: 'transparent', range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      render: {
+        ...DEFAULT_RENDER_SETTINGS,
+        batchVideoFolder: null,
+        batchOutputFolder: null,
+        exportMode: 'transparent',
+        range: { ...DEFAULT_RENDER_SETTINGS.range },
+      },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     useStore.setState({ importedBackgroundImagePath: 'C:\\Current\\background.png' })

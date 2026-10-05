@@ -3,6 +3,7 @@ import { QUALITY_DEFAULTS } from '@/features/render-video/data/qualityDefaults'
 import { validateRenderQuality } from '@/features/render-video/utils/renderQuality'
 
 export const DEFAULT_RENDER_SETTINGS = Object.freeze({
+  renderTarget: 'current',
   fps: 30,
   widgetUpdateRate: 1,
   exportMode: 'composite',
@@ -13,6 +14,7 @@ export const DEFAULT_RENDER_SETTINGS = Object.freeze({
 })
 
 function validateRenderSettings(settings) {
+  validateRenderTarget(settings.renderTarget)
   if (!Number.isFinite(settings.fps) || settings.fps <= 0) throw new Error('Render FPS must be a positive finite number')
   if (!Number.isInteger(settings.widgetUpdateRate) || settings.widgetUpdateRate <= 0) {
     throw new Error('Widget update rate must be a positive integer')
@@ -25,6 +27,10 @@ function validateRenderSettings(settings) {
   if (settings.range.type === 'custom' && settings.range.from >= settings.range.to) throw new Error('Custom export range requires from < to')
 }
 
+function validateRenderTarget(renderTarget) {
+  if (renderTarget !== 'current' && renderTarget !== 'batch') throw new Error('Invalid render target')
+}
+
 export function createRenderSettingsSlice(set) {
   return {
     renderSettings: {
@@ -32,6 +38,13 @@ export function createRenderSettingsSlice(set) {
       range: { ...DEFAULT_RENDER_SETTINGS.range },
     },
     platformOs: 'unknown',
+
+    setRenderTarget: (renderTarget) => {
+      validateRenderTarget(renderTarget)
+      set((state) => {
+        state.renderSettings.renderTarget = renderTarget
+      })
+    },
 
     setRenderSettings: (settings) => {
       validateRenderSettings(settings)
