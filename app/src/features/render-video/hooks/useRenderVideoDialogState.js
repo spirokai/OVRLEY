@@ -55,7 +55,7 @@ export default function useRenderVideoDialogState({
   const { t } = useTranslation()
   const derived = useRenderVideoDerivedState({ settings })
   const batch = useBatchRenderWorkflow({ phase, settings })
-  const [showAllBatchVideos, setShowAllBatchVideos] = useState(true)
+  const [showAllBatchVideos, setShowAllBatchVideos] = useState(false)
   const outputPath = settings?.outputPath
   const exportRange = settings?.exportRange
   const importedVideoRangePrefilledRef = useRef(false)

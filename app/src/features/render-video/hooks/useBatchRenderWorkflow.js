@@ -10,6 +10,7 @@ import * as backend from '@/api/backend'
 import { DEFAULT_EXPORT_RANGE } from '@/lib/template/template-constants'
 import { openDirectoryPath } from '@/lib/file-dialog'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
+import { resolveActivityDuration } from '@/lib/preview-timing'
 import { pathInDirectory } from '@/lib/utils'
 import useStore from '@/store/useStore'
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
@@ -17,7 +18,7 @@ import { resolveVideoSyncState } from '@/store/slices/createVideoImportSlice'
 import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import useVideoImport, { prepareVideoPath } from '@/features/video-preview/hooks/useVideoImport'
 import { getRenderOutputExtension } from '../utils/render-output'
-import { createRenderProgress } from '../utils/renderProgress'
+import { createBatchRenderProgress, createRenderProgress, estimateBatchFrameCount } from '../utils/renderProgress'
 
 function outputFilenameFor(filename, exportMode) {
   const stem = filename.replace(/\.[^.]*$/, '')
@@ -100,6 +101,7 @@ export default function useBatchRenderWorkflow({ phase, settings }) {
   const removeBatchQueueItem = useStore((state) => state.removeBatchQueueItem)
   const setBatchItemSkipOverlay = useStore((state) => state.setBatchItemSkipOverlay)
   const setBatchItemStatus = useStore((state) => state.setBatchItemStatus)
+  const setBatchItemMetadata = useStore((state) => state.setBatchItemMetadata)
   const setBatchRunning = useStore((state) => state.setBatchRunning)
   const setBatchActiveItemId = useStore((state) => state.setBatchActiveItemId)
   const setErrorMessage = useStore((state) => state.setErrorMessage)
@@ -107,6 +109,7 @@ export default function useBatchRenderWorkflow({ phase, settings }) {
 
   const { loadVideoPath, clearImportedVideo } = useVideoImport({})
   const [currentItemProgress, setCurrentItemProgress] = useState(DEFAULT_RENDER_PROGRESS)
+  const [batchProgress, setBatchProgress] = useState(DEFAULT_RENDER_PROGRESS)
   const folderScanRef = useRef(null)
   const cancelRequestedRef = useRef(false)
   const batchDialogOpen = phase === 'confirm' && settings?.renderTarget === 'batch'
@@ -116,7 +119,6 @@ export default function useBatchRenderWorkflow({ phase, settings }) {
   const detectQueueOverlaps = useCallback(
     async (paths, signal) => {
       const activitySummary = useStore.getState().activitySummary
-      if (!activitySummary) return
 
       const timezoneMode = selectedTimezoneMode(useStore.getState())
       const itemsByPath = new Map(useStore.getState().batchQueue.map((candidate) => [candidate.path, candidate]))
@@ -126,8 +128,17 @@ export default function useBatchRenderWorkflow({ phase, settings }) {
       await runWithConcurrencyLimit(items, OVERLAP_CHECK_CONCURRENCY, async (item) => {
         if (signal.aborted) return
         try {
-          const { importedVideoState } = await prepareVideoPath(item.path)
+          const { importedVideoState, telemetry } = await prepareVideoPath(item.path)
           if (signal.aborted) return
+          setBatchItemMetadata(item.id, {
+            duration: importedVideoState.importedVideoDuration,
+            fps: importedVideoState.importedVideoFps,
+            activityDuration: resolveActivityDuration({ sourceActivity: telemetry }),
+          })
+          if (!activitySummary) {
+            setBatchItemStatus(item.id, 'pending')
+            return
+          }
           const { videoSyncWarning } = resolveVideoSyncState({ ...importedVideoState, videoSyncTimezoneMode: timezoneMode }, activitySummary)
           setBatchItemStatus(item.id, videoSyncWarning === null ? 'pending' : 'blocked', videoSyncWarning)
         } catch (error) {
@@ -137,7 +148,7 @@ export default function useBatchRenderWorkflow({ phase, settings }) {
         }
       })
     },
-    [setBatchItemStatus],
+    [setBatchItemMetadata, setBatchItemStatus],
   )
 
   const loadVideoFolder = useCallback(
@@ -187,10 +198,14 @@ export default function useBatchRenderWorkflow({ phase, settings }) {
   }, [setBatchOutputFolder])
 
   const renderQueueItem = useCallback(
-    async (item, batchSettings, timezoneMode) => {
+    async (item, batchSettings, timezoneMode, onProgress) => {
+      const updateProgress = (progress) => {
+        setCurrentItemProgress(progress)
+        onProgress(progress)
+      }
       setBatchActiveItemId(item.id)
       setBatchItemStatus(item.id, 'importing')
-      setCurrentItemProgress({ ...DEFAULT_RENDER_PROGRESS, status: 'importing' })
+      updateProgress({ ...DEFAULT_RENDER_PROGRESS, status: 'importing' })
       await loadVideoPath(item.path)
 
       const { parsedActivitySource, setVideoSyncTimezoneMode } = useStore.getState()
@@ -214,7 +229,7 @@ export default function useBatchRenderWorkflow({ phase, settings }) {
       const updateRate = normalizeUpdateRateForFps(shouldComposite ? state.importedVideoFps : batchSettings.fps, batchSettings.updateRate)
 
       setBatchItemStatus(item.id, 'rendering')
-      setCurrentItemProgress({ ...DEFAULT_RENDER_PROGRESS, status: 'rendering' })
+      updateProgress({ ...DEFAULT_RENDER_PROGRESS, status: 'rendering' })
       const { default: submitRenderVideo } = await import('@/features/render-video/utils/render-video')
       const result = await submitRenderVideo({
         config: effectiveConfig,
@@ -240,8 +255,9 @@ export default function useBatchRenderWorkflow({ phase, settings }) {
         overwrite: true,
       })
       try {
-        await waitForRenderCompletion(result.render_id, setCurrentItemProgress)
+        const completed = await waitForRenderCompletion(result.render_id, updateProgress)
         setBatchItemStatus(item.id, 'done')
+        return completed.total
       } finally {
         setCurrentItemProgress(DEFAULT_RENDER_PROGRESS)
       }
@@ -263,6 +279,12 @@ export default function useBatchRenderWorkflow({ phase, settings }) {
     // and may re-normalize the live dialog draft.
     const timezoneMode = selectedTimezoneMode(useStore.getState())
     const batchSettings = settings
+    const state = useStore.getState()
+    const activityDuration = state.parsedActivitySource === 'activity-file' ? state.endSecond - state.startSecond : null
+    const frameEstimates = renderableItems.map((item) => estimateBatchFrameCount(item.metadata, batchSettings, activityDuration))
+    let totalFrames = frameEstimates.reduce((total, frames) => total + frames, 0)
+    let completedFrames = 0
+    setBatchProgress({ ...DEFAULT_RENDER_PROGRESS, total: totalFrames })
     setRenderSettings({
       ...useStore.getState().renderSettings,
       fps: batchSettings.fps,
@@ -274,13 +296,25 @@ export default function useBatchRenderWorkflow({ phase, settings }) {
     })
     setBatchRunning(true)
     try {
-      for (const item of renderableItems) {
+      for (const [index, item] of renderableItems.entries()) {
         if (cancelRequestedRef.current) {
           setBatchItemStatus(item.id, 'pending')
           continue
         }
         try {
-          await renderQueueItem(item, batchSettings, timezoneMode)
+          let itemTotal = frameEstimates[index]
+          const frames = await renderQueueItem(item, batchSettings, timezoneMode, (progress) => {
+            if (progress.total > 0) {
+              totalFrames += progress.total - itemTotal
+              itemTotal = progress.total
+            }
+            const nextProgress = createBatchRenderProgress(progress, completedFrames, totalFrames)
+            setBatchProgress((previous) => ({
+              ...nextProgress,
+              estimatedSecondsRemaining: nextProgress.estimatedSecondsRemaining ?? previous.estimatedSecondsRemaining,
+            }))
+          })
+          completedFrames += frames
         } catch (error) {
           setBatchItemStatus(item.id, error?.code === 'cancelled' ? 'cancelled' : 'error', error?.message || 'Render failed')
           if (error?.code === 'cancelled') cancelRequestedRef.current = true
@@ -324,6 +358,7 @@ export default function useBatchRenderWorkflow({ phase, settings }) {
     batchRunning,
     batchActiveItemId,
     currentItemProgress,
+    batchProgress,
     pickVideoFolder,
     pickOutputFolder,
     removeBatchQueueItem,

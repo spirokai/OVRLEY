@@ -109,11 +109,7 @@ export default function RenderVideoDialog(props) {
               {ctx.showBatchProgress ? (
                 <>
                   <DialogTitle className="sr-only">{t('render-video.exportingOverlay', 'Exporting Overlay')}</DialogTitle>
-                  <RenderProgressPanel
-                    renderProgress={ctx.currentItemProgress}
-                    renderSummaryItems={ctx.renderSummaryItems}
-                    finished={ctx.batchFinished}
-                  />
+                  <RenderProgressPanel renderProgress={ctx.batchProgress} renderSummaryItems={ctx.renderSummaryItems} finished={ctx.batchFinished} />
                 </>
               ) : (
                 <RenderExportSettings {...ctx} />

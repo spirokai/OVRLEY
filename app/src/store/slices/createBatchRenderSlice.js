@@ -16,6 +16,7 @@ function buildQueueItem(path, previousItemsByPath) {
     skipOverlay: previous?.skipOverlay ?? false,
     status: 'pending',
     error: null,
+    metadata: null,
   }
 }
 
@@ -62,6 +63,12 @@ export function createBatchRenderSlice(set) {
           item.status = status
           item.error = error
         }
+      }),
+
+    setBatchItemMetadata: (id, metadata) =>
+      set((state) => {
+        const item = state.batchQueue.find((candidate) => candidate.id === id)
+        if (item) item.metadata = metadata
       }),
 
     setBatchRunning: (running) => set({ batchRunning: Boolean(running) }),

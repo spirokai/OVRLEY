@@ -16,7 +16,15 @@ const { renderVideoMock, loadVideoPathMock, clearImportedVideoMock } = vi.hoiste
 
 vi.mock('@/api/backend', () => ({
   cancelRender: vi.fn(),
-  getRenderProgress: vi.fn().mockResolvedValue({ render_id: 'render-1', status: 'complete' }),
+  getRenderProgress: vi.fn().mockResolvedValue({
+    render_id: 'render-1',
+    status: 'complete',
+    current: 600,
+    total: 600,
+    encoded: 600,
+    rendering_fps: null,
+    estimated_seconds_remaining: null,
+  }),
   listAvailableFonts: vi.fn().mockResolvedValue({ recommendedFonts: [], systemFonts: [] }),
   listDirectoryVideoFiles: vi.fn(),
   subscribeRenderProgress: vi.fn().mockResolvedValue(vi.fn()),
@@ -66,6 +74,7 @@ describe('useBatchRenderWorkflow', () => {
       parsedActivity: { samples: [] },
     })
     useStore.getState().setBatchQueueFromPaths(['C:\\videos\\ride.mp4'])
+    useStore.getState().setBatchItemMetadata(useStore.getState().batchQueue[0].id, { duration: 10, fps: 60, activityDuration: 10 })
     useStore.getState().setBatchOutputFolder('C:\\renders')
   })
 
@@ -121,6 +130,7 @@ describe('useBatchRenderWorkflow', () => {
           importedVideoCreationTime: path === paths[0] ? '2026-10-05T12:10:00Z' : '2026-10-05T15:00:00Z',
           importedVideoTimeSource: 'ffprobe',
           importedVideoDuration: 60,
+          importedVideoFps: 60,
         },
       }
     })
