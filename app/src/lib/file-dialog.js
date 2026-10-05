@@ -46,6 +46,38 @@ export async function openSinglePath(filters, options = {}) {
 }
 
 /**
+ * Opens the native directory picker.
+ *
+ * @param {{defaultPath?: string, lastDirectoryKey?: string}} [options] - Directory-picker options.
+ * @returns {Promise<string|null>} Selected directory path or null when cancelled.
+ */
+export async function openDirectoryPath(options = {}) {
+  const { defaultPath: initialDefaultPath, lastDirectoryKey } = options
+  let defaultPath = initialDefaultPath
+
+  if (lastDirectoryKey) {
+    const savedDirectory = await getOptionalPathPreference(lastDirectoryKey)
+    if (savedDirectory) defaultPath = savedDirectory
+  }
+
+  const selected = await open({
+    directory: true,
+    multiple: false,
+    ...(defaultPath ? { defaultPath } : {}),
+  })
+
+  if (selected && lastDirectoryKey) {
+    try {
+      await setPreference(lastDirectoryKey, selected)
+    } catch {
+      // store may be unavailable
+    }
+  }
+
+  return selected
+}
+
+/**
  * Opens the native save picker for a complete render target.
  *
  * @param {string} defaultPath - Current absolute output path.

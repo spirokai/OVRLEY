@@ -204,7 +204,20 @@
     "videoRequired": "Se necesita un vídeo",
     "videoResolutionMismatch": "La resolución del vídeo no coincide",
     "videoResolutionMismatchMessage": "La resolución de la superposición ({{overlayResolution}}) debe coincidir con la del vídeo importado ({{videoResolution}}).",
-    "widgetUpdateRate": "Frecuencia de actualización de widgets"
+    "widgetUpdateRate": "Frecuencia de actualización de widgets",
+    "activityOverlay": "Superposición de actividad",
+    "batch": "Lote",
+    "currentVideo": "Vídeo actual",
+    "lockedToEachVideoFps": "Bloqueado a los FPS de cada vídeo",
+    "checkingOverlap": "Comprobando solapamiento...",
+    "chooseFolder": "Elegir carpeta...",
+    "clearQueue": "Vaciar cola",
+    "close": "Cerrar",
+    "noVideosQueued": "Elige una carpeta de vídeos para añadirlos a la cola de renderizado por lotes.",
+    "outputFolder": "Carpeta de salida",
+    "rendering": "Renderizando...",
+    "startBatchRender": "Iniciar renderizado por lotes",
+    "videoFolder": "Carpeta de vídeos"
   },
   "keyboard-shortcuts": {
     "generalCommands": "Comandos generales",

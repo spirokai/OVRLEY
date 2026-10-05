@@ -204,7 +204,20 @@
     "videoRequired": "Video krävs",
     "videoResolutionMismatch": "Videoupplösningen stämmer inte",
     "videoResolutionMismatchMessage": "Överläggets upplösning {{overlayResolution}} måste matcha den importerade videons ({{videoResolution}}).",
-    "widgetUpdateRate": "Uppdateringsfrekvens för widgetar"
+    "widgetUpdateRate": "Uppdateringsfrekvens för widgetar",
+    "activityOverlay": "Aktivitetsöverlägg",
+    "batch": "Batch",
+    "currentVideo": "Aktuell video",
+    "lockedToEachVideoFps": "Låst till varje videos FPS",
+    "checkingOverlap": "Kontrollerar överlappning...",
+    "chooseFolder": "Välj mapp...",
+    "clearQueue": "Töm kö",
+    "close": "Stäng",
+    "noVideosQueued": "Välj en videomapp för att köa videor för batchrendering.",
+    "outputFolder": "Utdatamapp",
+    "rendering": "Renderar...",
+    "startBatchRender": "Starta batchrendering",
+    "videoFolder": "Videomapp"
   },
   "keyboard-shortcuts": {
     "generalCommands": "Allmänna kommandon",

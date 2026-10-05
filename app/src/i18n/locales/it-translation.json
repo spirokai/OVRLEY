@@ -204,7 +204,20 @@
     "videoRequired": "Video richiesto",
     "videoResolutionMismatch": "Risoluzione video diversa",
     "videoResolutionMismatchMessage": "La risoluzione della sovrapposizione {{overlayResolution}} deve corrispondere a quella del video importato ({{videoResolution}}).",
-    "widgetUpdateRate": "Frequenza aggiornamento widget"
+    "widgetUpdateRate": "Frequenza aggiornamento widget",
+    "activityOverlay": "Sovrapposizione attività",
+    "batch": "Batch",
+    "currentVideo": "Video corrente",
+    "lockedToEachVideoFps": "Bloccato agli FPS di ciascun video",
+    "checkingOverlap": "Controllo sovrapposizione temporale...",
+    "chooseFolder": "Scegli cartella...",
+    "clearQueue": "Svuota coda",
+    "close": "Chiudi",
+    "noVideosQueued": "Scegli una cartella di video da mettere in coda per il rendering in batch.",
+    "outputFolder": "Cartella di output",
+    "rendering": "Rendering in corso...",
+    "startBatchRender": "Avvia rendering in batch",
+    "videoFolder": "Cartella video"
   },
   "keyboard-shortcuts": {
     "generalCommands": "Comandi generali",

@@ -60,6 +60,7 @@ describe('RenderVideoDialog', () => {
     render(
       <RenderVideoDialogHarness
         initialSettings={{
+          renderTarget: 'current',
           fps: 30,
           updateRate: 1,
           exportMode: 'composite',
@@ -108,6 +109,7 @@ describe('RenderVideoDialog', () => {
     render(
       <RenderVideoDialogHarness
         initialSettings={{
+          renderTarget: 'current',
           fps: 30,
           updateRate: 1,
           exportMode: 'composite',
@@ -139,6 +141,7 @@ describe('RenderVideoDialog', () => {
     render(
       <RenderVideoDialogHarness
         initialSettings={{
+          renderTarget: 'current',
           fps: 30,
           updateRate: 1,
           exportMode: 'transparent',
@@ -157,4 +160,77 @@ describe('RenderVideoDialog', () => {
 
     expect(outputPathInput).toHaveValue('C:\\missing\\nested\\output.mov')
   })
+
+  test('switches to batch mode with folder pickers in place of the single output file', async () => {
+    const user = userEvent.setup()
+
+    render(<RenderVideoDialogHarness initialSettings={transparentSettings()} />)
+
+    expect(screen.queryByRole('tab', { name: 'Full Video' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Batch' }))
+
+    expect(screen.getByText('Video folder')).toBeInTheDocument()
+    expect(screen.getByText('Output folder')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Output path' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Custom Export Range')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /start batch render/i })).toBeDisabled()
+
+    await user.click(screen.getByRole('tab', { name: 'Full Video' }))
+
+    expect(screen.getByText("Locked to each video's FPS")).toBeInTheDocument()
+  })
+
+  test('does not block batch mode on the current video resolution mismatch', async () => {
+    useStore.setState({
+      importedVideoPath: 'C:\\video.mp4',
+      importedVideoFps: 30,
+      importedVideoDuration: 12,
+      importedVideoResolution: { width: 640, height: 360 },
+    })
+    const user = userEvent.setup()
+
+    render(<RenderVideoDialogHarness initialSettings={transparentSettings()} />)
+
+    expect(screen.getByText(/must match imported video/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Batch' }))
+
+    expect(screen.queryByText(/must match imported video/i)).not.toBeInTheDocument()
+    expect(screen.getByText('Video folder')).toBeInTheDocument()
+  })
+
+  test('enables batch start once videos are queued and an output folder is chosen', () => {
+    useStore.getState().setBatchQueueFromPaths(['C:\\videos\\ride.mp4'])
+    useStore.getState().setBatchOutputFolder('C:\\renders')
+
+    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
+
+    expect(screen.getByText('ride.mp4')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /start batch render/i })).toBeEnabled()
+  })
+
+  test('falls back to transparent export when returning to the current video without an import', async () => {
+    const user = userEvent.setup()
+
+    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
+
+    await user.click(screen.getByRole('tab', { name: 'Full Video' }))
+    await user.click(screen.getByRole('tab', { name: 'Current video' }))
+
+    expect(screen.queryByRole('tab', { name: 'Full Video' })).not.toBeInTheDocument()
+    expect(screen.getByText('Custom Export Range')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Output path' })).toBeInTheDocument()
+  })
 })
+
+function transparentSettings() {
+  return {
+    renderTarget: 'current',
+    fps: 30,
+    updateRate: 1,
+    exportMode: 'transparent',
+    exportCodec: 'prores_ks',
+    exportAcceleration: 'cpu',
+    exportRange: { ...DEFAULT_EXPORT_RANGE },
+    outputPath: 'C:\\renders\\overlay.mov',
+  }
+}

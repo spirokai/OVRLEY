@@ -34,10 +34,14 @@ export default function useRenderVideoDerivedState({ settings }) {
   const renderProgress = useStore((state) => state.renderProgress)
 
   const hasImportedVideo = Boolean(importedVideoPath)
+  const isBatchTarget = settings?.renderTarget === 'batch'
+  // Batch renders import each queued video on their own, so the currently
+  // imported video only drives settings when rendering the current video.
+  const lockedVideoFps = isBatchTarget ? null : importedVideoFps
   const exportMode = settings?.exportMode || (hasImportedVideo ? 'composite' : 'transparent')
   const updateRateFps = useMemo(
-    () => (exportMode === 'composite' && importedVideoFps ? sanitizeIntegerFps(Math.round(importedVideoFps)) : settings?.fps),
-    [exportMode, importedVideoFps, settings?.fps],
+    () => (exportMode === 'composite' && lockedVideoFps ? sanitizeIntegerFps(Math.round(lockedVideoFps)) : settings?.fps),
+    [exportMode, lockedVideoFps, settings?.fps],
   )
   const updateRateOptions = useMemo(() => getUpdateRateOptions(updateRateFps), [updateRateFps])
   const containerFps = useMemo(() => getContainerFps(updateRateFps, settings?.updateRate), [updateRateFps, settings?.updateRate])
@@ -51,7 +55,7 @@ export default function useRenderVideoDerivedState({ settings }) {
   const selectedCodecIsMp4 = isMp4Codec(settings?.exportCodec)
   const selectedAccelerationAvailable = Boolean(selectedAccelerationOptions.find((option) => option.value === selectedAccelerationValue)?.available)
   const selectedExportCodecAvailable = Boolean(EXPORT_CODEC_LOOKUP[settings?.exportCodec]) && selectedAccelerationAvailable
-  const resolutionMismatch = resolutionsMismatch(config?.scene, importedVideoResolution)
+  const resolutionMismatch = !isBatchTarget && resolutionsMismatch(config?.scene, importedVideoResolution)
   const renderStartDisabled =
     renderingVideo ||
     resolutionMismatch ||
@@ -79,6 +83,8 @@ export default function useRenderVideoDerivedState({ settings }) {
     importedVideoDuration,
     importedVideoFps,
     importedVideoResolution,
+    isBatchTarget,
+    lockedVideoFps,
     platformOs,
     renderProgress,
     renderStartDisabled,

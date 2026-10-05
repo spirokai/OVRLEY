@@ -414,6 +414,15 @@ export async function rasterPreviewPng(resourceId) {
   return invokeCommand('raster_preview_png', { resourceId })
 }
 
+/**
+ * Lists supported video files (mp4/mov/mkv) directly inside a directory.
+ * @param {string} directory - Absolute directory path.
+ * @returns {Promise<string[]>} Absolute video paths sorted by name.
+ */
+export async function listDirectoryVideoFiles(directory) {
+  return invokeCommand('list_directory_video_files', { directory })
+}
+
 /** @returns {Promise<string>} Absolute Documents/OVRLEY/projects directory. */
 export async function getDefaultProjectDirectory() {
   return invokeCommand('default_project_directory')

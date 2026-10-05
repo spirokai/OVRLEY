@@ -181,6 +181,18 @@
     "lockedToVideoFps": "Locked to video FPS ({{fps}} fps)",
     "minutesMinSecondsSec": "{{minutes}} min {{seconds}} sec",
     "mp4Codecs": "MP4 Codecs",
+    "activityOverlay": "Activity overlay",
+    "batch": "Batch",
+    "currentVideo": "Current video",
+    "lockedToEachVideoFps": "Locked to each video's FPS",
+    "chooseFolder": "Choose folder...",
+    "clearQueue": "Clear queue",
+    "close": "Close",
+    "noVideosQueued": "Choose a video folder to queue videos for batch rendering.",
+    "outputFolder": "Output folder",
+    "rendering": "Rendering...",
+    "startBatchRender": "Start Batch Render",
+    "videoFolder": "Video folder",
     "outputContainerFps": "Output container: {{fps}} fps",
     "outputFile": "Output file",
     "outputPath": "Output path",
@@ -204,7 +216,8 @@
     "videoRequired": "Video required",
     "videoResolutionMismatch": "Video resolution mismatch",
     "videoResolutionMismatchMessage": "Overlay resolution {{overlayResolution}} must match imported video ({{videoResolution}}).",
-    "widgetUpdateRate": "Widget Update Rate"
+    "widgetUpdateRate": "Widget Update Rate",
+    "checkingOverlap": "Checking overlap..."
   },
   "keyboard-shortcuts": {
     "generalCommands": "General commands",
