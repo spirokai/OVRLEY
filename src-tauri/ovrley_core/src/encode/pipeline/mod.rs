@@ -8,4 +8,5 @@ pub(crate) mod frame_pool;
 pub(crate) mod frames;
 pub(crate) mod lifecycle;
 pub(crate) mod queue;
+pub(crate) mod run;
 pub mod transparent;

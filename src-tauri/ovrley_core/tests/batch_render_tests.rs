@@ -96,10 +96,13 @@ impl Fixture {
         };
         let selection = InspectionSourceSelection {
             inspection_id: session.inspection_id.clone(),
-            sources: sources.clone(),
-            calibration_source: None,
+            source_ids: sources
+                .iter()
+                .map(|source| source.source_id.clone())
+                .collect(),
+            calibration_source_id: None,
         };
-        let BatchPlanningResponse::Planned { plans } =
+        let BatchPlanningResponse::Planned { .. } =
             plan_batch_configuration(&self.inspection, &selection, &encoding, &self.directory)
                 .unwrap()
         else {
@@ -109,37 +112,27 @@ impl Fixture {
             inspection_id: session.inspection_id,
             template: common::builders::batch_template(),
             encoding,
-            external_activity: external.then(activity),
-            calibration: if external {
-                BatchCalibration::ExternalActivity {
+            activity: if external {
+                BatchActivity::ExternalActivity {
+                    activity: activity(),
                     timezone_mode: VideoSyncTimezoneMode::Utc,
-                    correction_seconds: 0.0,
                     reference: None,
+                    automatic_offsets: sources
+                        .iter()
+                        .map(|source| (source.source_id.clone(), 0.0))
+                        .collect(),
                 }
             } else {
-                BatchCalibration::EmbeddedActivity
+                BatchActivity::EmbeddedActivity {}
             },
-            calibration_source: None,
             output_directory: self.directory.to_str().unwrap().into(),
             jobs: sources
                 .into_iter()
-                .zip(plans)
                 .enumerate()
-                .map(|(index, (source, plan))| BatchRenderJob {
+                .map(|(index, source)| BatchRenderJob {
                     id: format!("item-{index}"),
-                    source,
-                    timing: if external {
-                        BatchJobTiming::ExternalActivity {
-                            automatic_offset_seconds: 0.0,
-                            offset_seconds: 0.0,
-                        }
-                    } else {
-                        BatchJobTiming::EmbeddedActivity {
-                            offset_seconds: 0.0,
-                        }
-                    },
+                    source_id: source.source_id,
                     skip_overlay: index == 0,
-                    output_path: plan.output_path.to_str().unwrap().into(),
                 })
                 .collect(),
         }
@@ -192,6 +185,7 @@ struct ControlledExecutor {
     entered: mpsc::Sender<String>,
     resume: Mutex<mpsc::Receiver<()>>,
     embedded: Mutex<Vec<String>>,
+    offsets: Mutex<Vec<f64>>,
     cleanup: Option<(mpsc::Sender<()>, Mutex<mpsc::Receiver<()>>)>,
 }
 
@@ -224,6 +218,10 @@ impl BatchJobExecutor for ControlledExecutor {
     ) -> CoreResult<String> {
         let filename = target.filename().to_owned();
         let frames = plan.planned_frames();
+        self.offsets
+            .lock()
+            .unwrap()
+            .push(plan.config().scene.export_start_seconds);
         if filename.starts_with('1') {
             assert!(plan.config().values.is_empty());
             assert_eq!(plan.config().labels.len(), 1);
@@ -275,6 +273,7 @@ fn executor(
             entered: entered_tx,
             resume: Mutex::new(resume_rx),
             embedded: Mutex::new(Vec::new()),
+            offsets: Mutex::new(Vec::new()),
             cleanup,
         }),
         entered_rx,
@@ -289,10 +288,10 @@ fn sequential_mixed_results_settle_frame_weights_and_preserve_completed_outputs(
         &["1-off.mp4", "2-error.mp4", "3-changed.mp4", "4-later.mp4"],
         true,
     );
-    let changed = request.jobs[2].source.metadata.path.clone();
-    let first_output = request.jobs[0].output_path.clone();
+    let changed = fixture.directory.join("3-changed.mp4");
+    let first_output = fixture.directory.join("1-off_overlay.mov");
     let inspection_id = request.inspection_id.clone();
-    let first_source_id = request.jobs[0].source.source_id.clone();
+    let first_source_id = request.jobs[0].source_id.clone();
     let (service, sink, terminal) = service();
     let (executor, entered, resume) = executor(None);
     // Shared template validation belongs to submission, before any item runs.
@@ -460,11 +459,14 @@ fn embedded_failures_continue_and_all_item_failure_has_a_terminal_snapshot() {
 fn cancellation_waits_for_cleanup_retains_success_and_never_launches_later_jobs() {
     let fixture = Fixture::new();
     let request = fixture.request(&["1-done.mp4", "2-active.mp4", "3-unstarted.mp4"], true);
-    let outputs = request
-        .jobs
-        .iter()
-        .map(|job| job.output_path.clone())
-        .collect::<Vec<_>>();
+    let outputs = [
+        "1-done_overlay.mov",
+        "2-active_overlay.mov",
+        "3-unstarted_overlay.mov",
+    ]
+    .iter()
+    .map(|filename| fixture.directory.join(filename))
+    .collect::<Vec<_>>();
     let (service, sink, terminal) = service();
     let (cleanup_tx, cleanup_rx) = mpsc::channel();
     let (release_tx, release_rx) = mpsc::channel();
@@ -513,4 +515,117 @@ fn cancellation_waits_for_cleanup_retains_success_and_never_launches_later_jobs(
     next.begin_item(1, "Next render").unwrap();
     next.check_cancelled().unwrap();
     next.complete(Ok("next.mov".to_owned())).unwrap();
+}
+
+#[test]
+fn batch_calibration_applies_one_correction_to_each_automatic_baseline() {
+    let fixture = Fixture::new();
+    let mut request = fixture.request(&["1-first.mp4", "2-second.mp4"], true);
+    let BatchActivity::ExternalActivity {
+        reference,
+        automatic_offsets,
+        ..
+    } = &mut request.activity
+    else {
+        unreachable!();
+    };
+    *reference = Some(BatchCalibrationReference {
+        source_id: request.jobs[0].source_id.clone(),
+        creation_time: "2026-05-20T12:00:00Z".into(),
+        time_source: Some("gps".into()),
+        automatic_offset_seconds: -5.0,
+        committed_offset_seconds: -1.0,
+    });
+    automatic_offsets.insert(request.jobs[0].source_id.clone(), -5.0);
+    automatic_offsets.insert(request.jobs[1].source_id.clone(), 20.0);
+    let (service, _, terminal) = service();
+    let (executor, entered, resume) = executor(None);
+    service
+        .submit_batch_with_executor(
+            &fixture.paths,
+            &fixture.inspection,
+            request,
+            None,
+            executor.clone(),
+        )
+        .unwrap();
+    for expected in ["1-first_overlay.mov", "2-second_overlay.mov"] {
+        assert_eq!(entered.recv_timeout(WAIT).unwrap(), expected);
+        resume.send(()).unwrap();
+    }
+    assert_eq!(
+        terminal.recv_timeout(WAIT).unwrap().phase,
+        BatchPhase::Completed
+    );
+    assert_eq!(*executor.offsets.lock().unwrap(), vec![-1.0, 24.0]);
+}
+
+#[test]
+fn invalid_calibration_and_missing_baselines_reject_before_reserving_the_renderer() {
+    let fixture = Fixture::new();
+    let request = fixture.request(&["1-first.mp4"], true);
+    let (service, _, _) = service();
+    let (executor, entered, _) = executor(None);
+    for case in 0..4 {
+        let mut malformed = request.clone();
+        let BatchActivity::ExternalActivity {
+            reference,
+            automatic_offsets,
+            ..
+        } = &mut malformed.activity
+        else {
+            unreachable!();
+        };
+        match case {
+            0 => automatic_offsets.clear(),
+            1 => {
+                automatic_offsets.insert(request.jobs[0].source_id.clone(), f64::INFINITY);
+            }
+            2 => {
+                automatic_offsets.clear();
+                automatic_offsets.insert("foreign-source".into(), 0.0);
+            }
+            3 => {
+                *reference = Some(BatchCalibrationReference {
+                    source_id: request.jobs[0].source_id.clone(),
+                    creation_time: "2026-05-20T12:00:00Z".into(),
+                    time_source: None,
+                    automatic_offset_seconds: 1.0,
+                    committed_offset_seconds: 2.0,
+                });
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            matches!(
+                service.submit_batch_with_executor(
+                    &fixture.paths,
+                    &fixture.inspection,
+                    malformed,
+                    None,
+                    executor.clone(),
+                ),
+                Err(BatchServiceError::InvalidRequest { .. })
+            ),
+            "case {case}"
+        );
+        assert!(!service.progress().busy);
+        assert!(entered.try_recv().is_err());
+    }
+}
+
+#[test]
+fn batch_wire_rejects_redundant_job_fields_and_embedded_calibration() {
+    let fixture = Fixture::new();
+    let request = fixture.request(&["1-first.mp4"], false);
+    let wire = serde_json::to_value(request).unwrap();
+    serde_json::from_value::<BatchRenderRequest>(wire.clone()).unwrap();
+    for field in ["source", "outputPath", "timing"] {
+        let mut malformed = wire.clone();
+        malformed["jobs"][0][field] = json!("legacy echo");
+        assert!(serde_json::from_value::<BatchRenderRequest>(malformed).is_err());
+    }
+    let mut malformed = wire;
+    malformed["activity"]["reference"] = serde_json::Value::Null;
+    assert!(serde_json::from_value::<BatchRenderRequest>(malformed).is_err());
 }

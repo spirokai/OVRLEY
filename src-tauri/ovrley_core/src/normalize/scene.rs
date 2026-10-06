@@ -10,8 +10,7 @@ use super::helpers::{
     require_positive_f64, require_positive_u32, require_u32,
 };
 use super::raw::{SceneConfig, ScenePresentationConfig};
-use crate::encode::ffmpeg::catalog::{CodecSelection, CompositeCodecId, TransparentCodecId};
-use crate::encode::quality::{validate_quality, EncodingQuality};
+use crate::encode::ffmpeg::catalog::{CodecSelection, TransparentCodecId};
 use crate::error::{CoreError, CoreResult};
 use serde_json::{Map, Value};
 use std::num::NonZeroU32;
@@ -42,7 +41,7 @@ impl Default for ValidatedFfmpegConfig {
 
 /// Validates the optional external `scene.ffmpeg` object exactly once using
 /// the default codec selected from the owning scene's render mode.
-fn validate_ffmpeg_config(
+pub fn validate_ffmpeg_config(
     value: Value,
     default_codec: CodecSelection,
 ) -> CoreResult<ValidatedFfmpegConfig> {
@@ -122,16 +121,8 @@ pub struct ValidatedSceneConfig {
     pub end: f64,
     pub custom_export_range_active: Option<bool>,
     pub update_rate: NonZeroU32,
-    pub ffmpeg: ValidatedFfmpegConfig,
-    pub composite_video_path: Option<String>,
-    pub quality: Option<EncodingQuality>,
-    pub composite_sync_offset: Option<f64>,
-    pub composite_video_fps_num: Option<u32>,
-    pub composite_video_fps_den: Option<u32>,
-    pub composite_video_duration: Option<f64>,
-    pub composite_render_duration: Option<f64>,
-    pub composite_video_trim_start: Option<f64>,
-    pub composite_widget_update_rate: Option<NonZeroU32>,
+    /// Clock origin for elapsed-time widgets, including video lead-in.
+    pub export_start_seconds: f64,
 }
 
 /// Shared presentation validated once before per-job timing is available.
@@ -178,36 +169,17 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
             "scene.update_rate ({update_rate}) must cleanly divide scene.fps ({fps})"
         )));
     }
-    let composite_sync_offset = raw.composite_sync_offset;
-    let composite_video_trim_start = raw.composite_video_trim_start;
-    let composite_widget_update_rate = raw
-        .composite_widget_update_rate
-        .map(|value| {
-            NonZeroU32::new(value).ok_or_else(|| {
-                CoreError::Config("scene.composite_widget_update_rate must be at least 1".into())
-            })
-        })
-        .transpose()?;
-    let default_codec = if raw.composite_video_path.is_some() {
-        CodecSelection::Composite(CompositeCodecId::SoftwareH264)
+    let export_start_seconds = if raw.composite_video_path.is_some() {
+        require_finite_f64(
+            raw.composite_sync_offset.ok_or_else(|| {
+                CoreError::Config(
+                    "scene.composite_sync_offset required for composite render".into(),
+                )
+            })?,
+            "scene.composite_sync_offset",
+        )?
     } else {
-        CodecSelection::Transparent(TransparentCodecId::ProresKs)
-    };
-    let ffmpeg = validate_ffmpeg_config(raw.ffmpeg, default_codec)?;
-    // Rate control is optional for transparent exports and required for composites.
-    let quality = match (raw.quality_type, raw.quality_value) {
-        (None, None) if raw.composite_video_path.is_none() => None,
-        (None, _) => {
-            return Err(CoreError::Config(
-                "scene.qualityType required for composite render".into(),
-            ))
-        }
-        (_, None) => {
-            return Err(CoreError::Config(
-                "scene.qualityValue required for composite render".into(),
-            ))
-        }
-        (Some(quality_type), Some(value)) => Some(validate_quality(quality_type, value)?),
+        start
     };
     let custom_export_range_active = raw.custom_export_range_active;
 
@@ -218,16 +190,7 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         end,
         custom_export_range_active,
         update_rate,
-        ffmpeg,
-        composite_video_path: raw.composite_video_path,
-        quality,
-        composite_sync_offset,
-        composite_video_fps_num: raw.composite_video_fps_num,
-        composite_video_fps_den: raw.composite_video_fps_den,
-        composite_video_duration: raw.composite_video_duration,
-        composite_render_duration: raw.composite_render_duration,
-        composite_video_trim_start,
-        composite_widget_update_rate,
+        export_start_seconds,
     })
 }
 

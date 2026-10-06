@@ -60,7 +60,7 @@ pub fn normalize_parsed_activity(mut activity: ParsedActivity) -> CoreResult<Par
 }
 
 /// Activity is external data; reject an unusable timeline at its owning ingress.
-pub(crate) fn validate_render_activity(activity: &ParsedActivity) -> CoreResult<f64> {
+pub fn validate_render_activity(activity: &ParsedActivity) -> CoreResult<f64> {
     let activity_end = activity.trim_end_seconds.max(
         activity
             .sample_elapsed_seconds

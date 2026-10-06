@@ -4,11 +4,13 @@
 use std::path::{Path, PathBuf};
 
 use crate::encode::composite::CompositeRenderPlan;
-use crate::encode::ffmpeg::catalog::CodecSelection;
+use crate::encode::ffmpeg::catalog::{CodecSelection, CompositeCodecId};
 use crate::encode::ffmpeg::composite::{build_composite_ffmpeg_settings, CompositeFfmpegSettings};
 use crate::encode::fps::Fps;
+use crate::encode::quality::validate_quality;
 use crate::encode::video_timing::ActivityCoverage;
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::{validate_ffmpeg_config, SceneConfig};
 use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
 use crate::render::FrameSize;
@@ -20,10 +22,11 @@ const COMPOSITE_ACTIVITY_DURATION_SLACK_SECONDS: f64 = 0.25;
 /// Required fields fail before dense activity is built, while optional fields
 /// receive standard defaults.
 pub fn derive_composite_render_plan(
+    raw: &SceneConfig,
     scene: &mut crate::normalize::ValidatedSceneConfig,
     activity_end: Option<f64>,
 ) -> CoreResult<CompositeRenderPlan> {
-    let video_path = scene
+    let video_path = raw
         .composite_video_path
         .as_ref()
         .filter(|value| !value.trim().is_empty())
@@ -31,19 +34,25 @@ pub fn derive_composite_render_plan(
         .ok_or_else(|| {
             CoreError::Config("scene.composite_video_path required for composite render".into())
         })?;
-    let quality = scene.quality.ok_or_else(|| {
-        CoreError::Config(
-            "scene.qualityType and scene.qualityValue required for composite render".into(),
-        )
+    let quality_type = raw.quality_type.ok_or_else(|| {
+        CoreError::Config("scene.qualityType required for composite render".into())
     })?;
-    let fps_num = scene.composite_video_fps_num.ok_or_else(|| {
+    let quality_value = raw.quality_value.ok_or_else(|| {
+        CoreError::Config("scene.qualityValue required for composite render".into())
+    })?;
+    let quality = validate_quality(quality_type, quality_value)?;
+    let ffmpeg = validate_ffmpeg_config(
+        raw.ffmpeg.clone(),
+        CodecSelection::Composite(CompositeCodecId::SoftwareH264),
+    )?;
+    let fps_num = raw.composite_video_fps_num.ok_or_else(|| {
         CoreError::Config("scene.composite_video_fps_num required for composite render".into())
     })?;
-    let fps_den = scene.composite_video_fps_den.ok_or_else(|| {
+    let fps_den = raw.composite_video_fps_den.ok_or_else(|| {
         CoreError::Config("scene.composite_video_fps_den required for composite render".into())
     })?;
     let source_fps = Fps::new(fps_num, fps_den)?;
-    let video_duration = scene.composite_video_duration.ok_or_else(|| {
+    let video_duration = raw.composite_video_duration.ok_or_else(|| {
         CoreError::Config("scene.composite_video_duration required for composite render".into())
     })?;
     if !video_duration.is_finite() || video_duration <= 0.0 {
@@ -52,20 +61,13 @@ pub fn derive_composite_render_plan(
         )));
     }
 
-    let sync_offset = scene.composite_sync_offset.ok_or_else(|| {
-        CoreError::Config("scene.composite_sync_offset required for composite render".into())
-    })?;
-    if !sync_offset.is_finite() {
-        return Err(CoreError::Config(format!(
-            "scene.composite_sync_offset must be finite: {sync_offset}"
-        )));
-    }
+    let sync_offset = scene.export_start_seconds;
     if sync_offset <= -video_duration {
         return Err(CoreError::Config(format!(
             "scene.composite_sync_offset ({sync_offset}) must leave a positive overlap with scene.composite_video_duration ({video_duration})"
         )));
     }
-    let trim_start = scene.composite_video_trim_start.ok_or_else(|| {
+    let trim_start = raw.composite_video_trim_start.ok_or_else(|| {
         CoreError::Config("scene.composite_video_trim_start required for composite render".into())
     })?;
     if !trim_start.is_finite() || trim_start < 0.0 {
@@ -79,11 +81,17 @@ pub fn derive_composite_render_plan(
         )));
     }
 
-    let update_rate = scene.composite_widget_update_rate.ok_or_else(|| {
-        CoreError::Config("scene.composite_widget_update_rate required for composite render".into())
-    })?;
+    let update_rate =
+        std::num::NonZeroU32::new(raw.composite_widget_update_rate.ok_or_else(|| {
+            CoreError::Config(
+                "scene.composite_widget_update_rate required for composite render".into(),
+            )
+        })?)
+        .ok_or_else(|| {
+            CoreError::Config("scene.composite_widget_update_rate must be at least 1".into())
+        })?;
     let overlay_pipe_fps = source_fps.divided_by(update_rate)?;
-    let mut render_duration = scene
+    let mut render_duration = raw
         .composite_render_duration
         .unwrap_or(video_duration - trim_start);
     if !render_duration.is_finite() || render_duration <= 0.0 {
@@ -121,7 +129,7 @@ pub fn derive_composite_render_plan(
         scene.start = sync_offset.max(0.0);
         scene.end = scene.start + render_duration;
     }
-    let requested_codec_id = match scene.ffmpeg.codec {
+    let requested_codec_id = match ffmpeg.codec {
         CodecSelection::Composite(codec_id) => codec_id,
         CodecSelection::Transparent(codec_id) => {
             return Err(CoreError::Config(format!(
@@ -147,6 +155,10 @@ pub fn derive_composite_render_plan(
     })?;
 
     Ok(CompositeRenderPlan {
+        frames: super::frames::FrameProductionPlan::new(
+            overlay_frame_count,
+            std::num::NonZeroU32::MIN,
+        )?,
         video_path: PathBuf::from(video_path),
         quality,
         sync_offset,
@@ -159,7 +171,7 @@ pub fn derive_composite_render_plan(
         output_frame_count,
         coverage,
         requested_codec_id,
-        qsv_full_init_args: scene.ffmpeg.qsv_full_init_args.clone(),
+        qsv_full_init_args: ffmpeg.qsv_full_init_args,
     })
 }
 
@@ -191,25 +203,9 @@ pub struct CompositePipelinePlan {
 }
 
 impl CompositePipelinePlan {
+    /// Maps a completed overlay tick onto the validated source frame grid.
     pub fn output_progress(&self, written_overlay_frames: u64) -> u32 {
-        assert!(
-            written_overlay_frames > 0,
-            "written overlay frames must be non-zero"
-        );
-        assert!(
-            written_overlay_frames <= self.render.overlay_frame_count,
-            "written overlay frames must not exceed the source-video timeline plan"
-        );
-        let video_local_time = self
-            .render
-            .overlay_pipe_fps
-            .seconds_at_frame(written_overlay_frames - 1);
-        let output_progress = (video_local_time * self.render.source_fps.as_f64()).round() as u64;
-        assert!(
-            output_progress <= u64::from(self.render.output_frame_count),
-            "composite output progress must not exceed the source-video frame count"
-        );
-        u32::try_from(output_progress).expect("validated composite output progress fits u32")
+        ((written_overlay_frames - 1) * u64::from(self.render.update_rate.get())) as u32
     }
 }
 

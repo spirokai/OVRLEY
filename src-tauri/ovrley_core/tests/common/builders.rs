@@ -128,40 +128,21 @@ pub fn video_batch_request(
     let directory = std::path::Path::new(&source.metadata.path)
         .parent()
         .unwrap();
-    let kind = if encoding.export_mode == BatchExportMode::Composite {
-        ovrley_core::output::RenderOutputKind::Composite
-    } else {
-        ovrley_core::output::RenderOutputKind::Transparent
-    };
-    let target = ovrley_core::output::plan_batch_output_targets(
-        directory,
-        kind,
-        &[source.metadata.path.clone().into()],
-        None,
-    )
-    .unwrap()
-    .remove(0);
     BatchRenderRequest {
         inspection_id: inspection_id.into(),
         template,
         encoding,
-        external_activity: Some(activity),
-        calibration: BatchCalibration::ExternalActivity {
+        activity: BatchActivity::ExternalActivity {
+            activity,
             timezone_mode: VideoSyncTimezoneMode::Utc,
-            correction_seconds: 0.0,
             reference: None,
+            automatic_offsets: [(source.source_id.clone(), offset)].into(),
         },
-        calibration_source: None,
         output_directory: directory.to_str().unwrap().into(),
         jobs: vec![BatchRenderJob {
             id: "video".into(),
-            source: source.clone(),
-            timing: BatchJobTiming::ExternalActivity {
-                automatic_offset_seconds: offset,
-                offset_seconds: offset,
-            },
+            source_id: source.source_id.clone(),
             skip_overlay,
-            output_path: target.path().to_str().unwrap().into(),
         }],
     }
 }

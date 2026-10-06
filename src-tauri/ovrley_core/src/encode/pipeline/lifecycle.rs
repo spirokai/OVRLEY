@@ -1,6 +1,5 @@
 //! Shared FFmpeg process lifecycle and pipeline teardown.
 
-use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ExitStatus};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -135,66 +134,14 @@ impl Drop for PartialOutputGuard {
     }
 }
 
-/// Owns an FFmpeg child and prevents early-return process leaks.
-pub(crate) struct FfmpegChildGuard {
-    child: Child,
-    pipeline: PipelineKind,
-}
-
-impl FfmpegChildGuard {
-    pub(crate) fn new(child: Child, pipeline: PipelineKind) -> Self {
-        Self { child, pipeline }
-    }
-}
-
-impl Deref for FfmpegChildGuard {
-    type Target = Child;
-
-    fn deref(&self) -> &Self::Target {
-        &self.child
-    }
-}
-
-impl DerefMut for FfmpegChildGuard {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.child
-    }
-}
-
-impl Drop for FfmpegChildGuard {
-    fn drop(&mut self) {
-        match self.child.try_wait() {
-            Ok(Some(_)) => return,
-            Ok(None) => {}
-            Err(error) => {
-                log::warn!(
-                    "Could not inspect {} ffmpeg during cleanup: {error}",
-                    self.pipeline
-                );
-            }
-        }
-        if let Err(error) = self.child.kill() {
-            log::warn!(
-                "Could not terminate leaked {} ffmpeg process: {error}",
-                self.pipeline
-            );
-        }
-        if let Err(error) = self.child.wait() {
-            log::warn!(
-                "Could not reap {} ffmpeg process during cleanup: {error}",
-                self.pipeline
-            );
-        }
-    }
-}
-
 /// Pipeline-owned process and threads. Early returns and unwinding stop this
 /// item, reap FFmpeg, and join both threads before partial-output cleanup runs.
 pub(crate) struct PipelineProcesses {
-    pub(crate) child: FfmpegChildGuard,
+    pub(crate) child: Child,
     pub(crate) writer: Option<JoinHandle<CoreResult<WriterResult>>>,
     pub(crate) monitor: Option<JoinHandle<()>>,
     shutdown: Arc<PipelineShutdown>,
+    pipeline: PipelineKind,
 }
 
 impl PipelineProcesses {
@@ -204,23 +151,23 @@ impl PipelineProcesses {
         shutdown: Arc<PipelineShutdown>,
     ) -> Self {
         Self {
-            child: FfmpegChildGuard::new(child, pipeline),
+            child,
             writer: None,
             monitor: None,
             shutdown,
+            pipeline,
         }
     }
 }
 
 impl Drop for PipelineProcesses {
     fn drop(&mut self) {
-        if self.writer.is_none() && self.monitor.is_none() {
-            return;
+        if self.writer.is_some() || self.monitor.is_some() {
+            self.shutdown.signal_failure(CoreError::Encode(
+                "Encoder pipeline ended before teardown".into(),
+            ));
         }
-        self.shutdown.signal_failure(CoreError::Encode(
-            "Encoder pipeline ended before teardown".into(),
-        ));
-        let pipeline = self.child.pipeline;
+        let pipeline = self.pipeline;
         if let Err(error) = terminate_ffmpeg(&mut self.child, pipeline) {
             log::warn!("Could not stop {pipeline} ffmpeg during pipeline cleanup: {error}");
         }
@@ -258,7 +205,7 @@ pub(crate) fn finalize_pipeline<T, P: PipelineFailurePolicy>(
     pipeline: PipelineKind,
     failure_policy: &P,
 ) -> CoreResult<PipelineOutcome<T>> {
-    let child = &mut *processes.child;
+    let child = &mut processes.child;
     let (writer_thread_name, monitor_thread_name) = match pipeline {
         PipelineKind::Transparent => ("Encoder writer thread", "FFmpeg monitor thread"),
         PipelineKind::Composite => (

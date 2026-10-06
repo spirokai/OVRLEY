@@ -32,13 +32,13 @@ use std::path::PathBuf;
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
 use ovrley_core::debug::RenderProgress;
-use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
 use ovrley_core::error::CoreError;
 use ovrley_core::normalize::raw::parse_config_json;
 use ovrley_core::normalize::raw::{RasterConfig, RenderConfig};
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::raster::{RasterResourceResolver, SelectedRaster};
+use ovrley_core::render_jobs::batch_plan::{plan_single_render, VideoRenderModePlan};
 use ovrley_core::render_jobs::execution::RenderExecutionService;
 
 struct EmptyRasterResources;
@@ -139,7 +139,7 @@ fn test_3_1_transparent_render_branch_keeps_original_dense_timing() {
     let activity = synthetic_activity();
 
     let validated = validate_render_config(config.clone()).unwrap();
-    assert!(validated.scene.composite_video_path.is_none());
+    assert_eq!(validated.scene.export_start_seconds, validated.scene.start);
     let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
 
     assert_eq!(dense.frame_count, 300);
@@ -173,14 +173,14 @@ fn app_render_rejects_a_raster_without_its_loaded_resource() {
             &AppPaths::from_repo_root(PathBuf::from(".")),
             &serde_json::to_string(&config).unwrap(),
             &synthetic_activity_json(),
-            &render_output_path("missing-raster"),
+            PathBuf::from(render_output_path("missing-raster")).with_extension("mov").to_str().unwrap(),
             false,
             Some(&EmptyRasterResources),
         )
         .unwrap_err();
     assert!(error
         .to_string()
-        .contains("raster_error:missing_resource:one"));
+        .contains("raster_error:missing_resource:one"), "{error}");
 }
 
 /// Verifies the composite branch gate: `submit_single` must
@@ -348,7 +348,7 @@ fn test_3_3_missing_quality_validation() {
             "composite_widget_update_rate": 1
             "#,
     );
-    let error = ovrley_core::normalize::validate_scene_config(config.scene).unwrap_err();
+    let error = plan_single_render(config, 120.0, None).err().unwrap();
 
     assert_eq!(
         error.to_string(),
@@ -360,7 +360,7 @@ fn test_3_3_missing_quality_validation() {
 /// (numerator or denominator), giving a field-specific error for each.
 #[test]
 fn test_3_4_missing_fps_validation() {
-    let mut missing_num = composite_validated_scene(
+    let missing_num = composite_config(
         r#"
             "composite_video_path": "input.mp4",
             "qualityType": "bitrate", "qualityValue": 60.0,
@@ -371,7 +371,7 @@ fn test_3_4_missing_fps_validation() {
             "composite_widget_update_rate": 1
             "#,
     );
-    let mut missing_den = composite_validated_scene(
+    let missing_den = composite_config(
         r#"
             "composite_video_path": "input.mp4",
             "qualityType": "bitrate", "qualityValue": 60.0,
@@ -384,14 +384,16 @@ fn test_3_4_missing_fps_validation() {
     );
 
     assert_eq!(
-        derive_composite_render_plan(&mut missing_num, None)
-            .unwrap_err()
+        plan_single_render(missing_num, 120.0, None)
+            .err()
+            .unwrap()
             .to_string(),
         "Invalid configuration: scene.composite_video_fps_num required for composite render"
     );
     assert_eq!(
-        derive_composite_render_plan(&mut missing_den, None)
-            .unwrap_err()
+        plan_single_render(missing_den, 120.0, None)
+            .err()
+            .unwrap()
             .to_string(),
         "Invalid configuration: scene.composite_video_fps_den required for composite render"
     );
@@ -422,9 +424,9 @@ fn test_3_5_dense_report_timing_for_sync_offset() {
             "composite_widget_update_rate": 1
             "#,
     );
-    let mut validated = validate_render_config(config).unwrap();
-    derive_composite_render_plan(&mut validated.scene, None).unwrap();
-    let dense = build_dense_activity_report_validated(&synthetic_activity(), &validated).unwrap();
+    let plan = plan_single_render(config, 600.0, None).unwrap();
+    let validated = plan.config();
+    let dense = plan.prepare_activity(&synthetic_activity()).unwrap();
 
     assert_eq!(validated.scene.start, 300.0);
     assert_eq!(validated.scene.end, 310.0);
@@ -457,9 +459,9 @@ fn test_3_6_dense_report_timing_for_lower_overlay_update_rate() {
             "composite_widget_update_rate": 2
             "#,
     );
-    let mut validated = validate_render_config(config).unwrap();
-    derive_composite_render_plan(&mut validated.scene, None).unwrap();
-    let dense = build_dense_activity_report_validated(&synthetic_activity(), &validated).unwrap();
+    let plan = plan_single_render(config, 600.0, None).unwrap();
+    let validated = plan.config();
+    let dense = plan.prepare_activity(&synthetic_activity()).unwrap();
 
     assert!((validated.scene.fps - (30000.0 / 1001.0)).abs() < 1e-9);
     assert_eq!(validated.scene.update_rate.get(), 1);
@@ -483,10 +485,9 @@ fn test_3_7_render_duration_defaults_to_remaining_video_after_trim() {
             "#,
     );
 
-    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
-    derive_composite_render_plan(&mut scene, None).unwrap();
-
-    assert_eq!(scene.end - scene.start, 50.0);
+    let plan = plan_single_render(config, 120.0, None).unwrap();
+    assert_eq!(plan.config().scene.end - plan.config().scene.start, 50.0);
+    assert!(matches!(plan.mode(), VideoRenderModePlan::Composite { .. }));
 }
 
 /// Trim start >= video duration is an immediate plan-derivation error,
@@ -506,8 +507,7 @@ fn test_3_8_rejects_impossible_trim() {
             "#,
     );
 
-    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
-    let error = derive_composite_render_plan(&mut scene, None).unwrap_err();
+    let error = plan_single_render(config, 120.0, None).err().unwrap();
 
     assert_eq!(
         error.to_string(),
@@ -542,13 +542,6 @@ fn composite_config(extra_scene_fields: &str) -> RenderConfig {
     let json_str = composite_config_json(extra_scene_fields);
     let value: serde_json::Value = serde_json::from_str(&json_str).unwrap();
     serde_json::from_value(value).unwrap()
-}
-
-fn composite_validated_scene(
-    extra_scene_fields: &str,
-) -> ovrley_core::normalize::ValidatedSceneConfig {
-    let config = composite_config(extra_scene_fields);
-    ovrley_core::normalize::validate_scene_config(config.scene).unwrap()
 }
 
 /// Returns the full JSON template string for a composite config, splicing

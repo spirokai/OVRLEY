@@ -241,25 +241,6 @@ fn directory_is_case_sensitive(directory: &Path) -> CoreResult<bool> {
     Ok(!directory.join(name.to_uppercase()).exists())
 }
 
-/// Submission must reuse the reviewed destinations, never repair a mismatch.
-pub fn verify_batch_output_paths(
-    targets: &[RenderOutputTarget],
-    submitted: &[String],
-) -> CoreResult<()> {
-    if targets.len() != submitted.len()
-        || targets
-            .iter()
-            .zip(submitted)
-            .any(|(target, path)| target.path() != Path::new(path))
-    {
-        return Err(CoreError::OutputInvalid(
-            "Batch destinations do not match the planned output directory and naming convention"
-                .into(),
-        ));
-    }
-    Ok(())
-}
-
 struct ProbeCleanup {
     path: PathBuf,
     file: Option<File>,
@@ -434,15 +415,8 @@ mod tests {
         .is_err());
         assert_eq!(fs::read(&source).unwrap(), b"source video");
         fs::remove_file(&target).unwrap();
-        let targets =
-            plan_batch_output_targets(&directory, RenderOutputKind::Composite, &[source], None)
-                .unwrap();
-        verify_batch_output_paths(&targets, &[targets[0].path().to_str().unwrap().into()]).unwrap();
-        assert!(verify_batch_output_paths(
-            &targets,
-            &[directory.join("wrong.mp4").to_str().unwrap().into()]
-        )
-        .is_err());
+        plan_batch_output_targets(&directory, RenderOutputKind::Composite, &[source], None)
+            .unwrap();
         fs::remove_dir_all(directory).unwrap();
     }
 

@@ -6,8 +6,7 @@ use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
 use crate::debug::RenderProfiler;
 use crate::normalize::{
-    GForceAxis, RenderDataRequirements, ValidatedFfmpegConfig, ValidatedGForceWidget,
-    ValidatedSceneConfig,
+    GForceAxis, RenderDataRequirements, ValidatedGForceWidget, ValidatedSceneConfig,
 };
 use serde::Deserialize;
 
@@ -97,16 +96,7 @@ fn scene() -> ValidatedSceneConfig {
         end: 5.0,
         custom_export_range_active: Some(false),
         update_rate: std::num::NonZeroU32::MIN,
-        ffmpeg: ValidatedFfmpegConfig::default(),
-        composite_video_path: None,
-        quality: None,
-        composite_sync_offset: None,
-        composite_video_fps_num: None,
-        composite_video_fps_den: None,
-        composite_video_duration: None,
-        composite_render_duration: None,
-        composite_video_trim_start: None,
-        composite_widget_update_rate: None,
+        export_start_seconds: 0.0,
     }
 }
 

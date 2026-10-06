@@ -10,7 +10,7 @@
 //! deadlock ordered forwarding when an early frame waits for a buffer held by
 //! workers that claimed later frames.
 
-use super::frame_pool::{ParallelFrameProgress, ParallelFrameRenderResult};
+use super::frame_pool::{ParallelFrameProgress, ParallelFrameRenderResult, MAX_FRAME_WORKERS};
 use super::lifecycle::{PipelineKind, PipelineShutdown};
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::encode::pipeline::queue::{merge_timing_maps, queue_frame, FrameBuffer};
@@ -25,6 +25,43 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+
+/// Supported task count and dense-index stride, checked once during planning.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FrameProductionPlan {
+    count: u32,
+    stride: NonZeroU32,
+}
+
+impl FrameProductionPlan {
+    pub(crate) fn new(count: u64, stride: NonZeroU32) -> CoreResult<Self> {
+        let count = u32::try_from(count)
+            .ok()
+            .filter(|count| *count > 0)
+            .ok_or_else(|| CoreError::Encode("Frame count must be positive and fit u32".into()))?;
+        let last_index = u64::from(count - 1) * u64::from(stride.get());
+        // Task allocation may advance once past the end for each worker.
+        usize::try_from(last_index.max(u64::from(count) + MAX_FRAME_WORKERS as u64))
+            .map_err(|_| CoreError::Encode("Frame task indices exceed usize".into()))?;
+        Ok(Self { count, stride })
+    }
+
+    pub(crate) fn decimated(layout_count: u64, stride: NonZeroU32) -> CoreResult<Self> {
+        let layout = Self::new(layout_count, NonZeroU32::MIN)?;
+        Ok(Self {
+            count: (layout.count - 1) / stride.get() + 1,
+            stride,
+        })
+    }
+
+    pub(crate) fn count(self) -> u32 {
+        self.count
+    }
+
+    pub(crate) fn stride(self) -> NonZeroU32 {
+        self.stride
+    }
+}
 
 struct OrderedFrames<T> {
     total_frames: u64,
@@ -96,8 +133,7 @@ enum WorkerEvent {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn render_frames_parallel(
     renderer: VideoFrameRenderer<'_>,
-    frame_count: usize,
-    dense_frame_stride: NonZeroU32,
+    plan: FrameProductionPlan,
     workers: NonZeroUsize,
     progress: ParallelFrameProgress<'_>,
     pipeline: PipelineKind,
@@ -109,15 +145,12 @@ pub(crate) fn render_frames_parallel(
     ffmpeg_child: &mut Child,
     render_started: Instant,
 ) -> CoreResult<ParallelFrameRenderResult> {
+    let frame_count = plan.count() as usize;
+    let dense_frame_stride = plan.stride();
     let mut prewarm_profiler = RenderProfiler::default();
-    let prewarmed_frame = prewarm_first_frame(
-        renderer,
-        frame_count,
-        &free_receiver,
-        shutdown,
-        &mut prewarm_profiler,
-    )?;
-    let next_task = AtomicUsize::new(usize::from(prewarmed_frame.is_some()));
+    let prewarmed_frame =
+        prewarm_first_frame(renderer, &free_receiver, shutdown, &mut prewarm_profiler)?;
+    let next_task = AtomicUsize::new(1);
     let free_receiver = Arc::new(Mutex::new(free_receiver));
     let (result_sender, result_receiver) = std::sync::mpsc::channel::<WorkerEvent>();
 
@@ -156,27 +189,8 @@ pub(crate) fn render_frames_parallel(
                     if task_index >= frame_count {
                         break;
                     }
-                    let output_frame_index = u64::try_from(task_index).map_err(|_| {
-                        CoreError::Encode("Parallel frame index exceeds u64 capacity".to_string())
-                    });
-                    let dense_frame_index = task_index
-                        .checked_mul(dense_frame_stride.get() as usize)
-                        .ok_or_else(|| {
-                            CoreError::Encode("Parallel dense frame index overflow".to_string())
-                        });
-                    let (output_frame_index, dense_frame_index) =
-                        match (output_frame_index, dense_frame_index) {
-                            (Ok(output_frame_index), Ok(dense_frame_index)) => {
-                                (output_frame_index, dense_frame_index)
-                            }
-                            (Err(error), _) | (_, Err(error)) => {
-                                shutdown.signal_failure(CoreError::Encode(format!(
-                                    "Frame index error: {error}"
-                                )));
-                                let _ = result_sender.send(WorkerEvent::Failed { error });
-                                break;
-                            }
-                        };
+                    let output_frame_index = task_index as u64;
+                    let dense_frame_index = task_index * dense_frame_stride.get() as usize;
 
                     let render_result = renderer
                         .render_rgba(
@@ -218,19 +232,15 @@ pub(crate) fn render_frames_parallel(
                 profiler.summary()
             }));
         }
-        if let Some(frame) = prewarmed_frame {
-            result_sender.send(frame).map_err(|_| {
-                CoreError::Encode(
-                    "Parallel render result channel closed during cache prewarm".to_string(),
-                )
-            })?;
-        }
+        result_sender.send(prewarmed_frame).map_err(|_| {
+            CoreError::Encode(
+                "Parallel render result channel closed during cache prewarm".to_string(),
+            )
+        })?;
         drop(result_sender);
 
         let mut coordinator_profiler = prewarm_profiler;
-        let total_frames = u64::try_from(frame_count).map_err(|_| {
-            CoreError::Encode("Parallel frame count exceeds u64 capacity".to_string())
-        })?;
+        let total_frames = u64::from(plan.count());
         let mut ordered_frames = OrderedFrames::new(total_frames);
         let mut written_frames = 0u64;
         let mut estimator = ProgressEstimator::default();
@@ -285,10 +295,8 @@ pub(crate) fn render_frames_parallel(
                                 fps_multiplier,
                             ) = match &progress {
                                 ParallelFrameProgress::Transparent(encoded_frames) => (
-                                    u32::try_from(frame_count)
-                                        .expect("validated transparent frame count fits u32"),
-                                    u32::try_from(written_frames)
-                                        .expect("validated transparent frame count fits u32"),
+                                    plan.count(),
+                                    written_frames as u32,
                                     encoded_frames.load(Ordering::SeqCst),
                                     dense_frame_stride,
                                 ),
@@ -302,16 +310,6 @@ pub(crate) fn render_frames_parallel(
                                     )
                                 }
                             };
-                            if current_progress > total_progress {
-                                return Err(CoreError::Encode(format!(
-                                    "Parallel frame progress {current_progress} exceeds total {total_progress}"
-                                )));
-                            }
-                            if current_progress < previous_progress {
-                                return Err(CoreError::Encode(format!(
-                                    "Parallel frame progress regressed from {previous_progress} to {current_progress}"
-                                )));
-                            }
                             let elapsed = last_progress_at.elapsed().as_secs_f64();
                             last_progress_at = Instant::now();
                             let output_progress_added = current_progress - previous_progress;
@@ -332,7 +330,7 @@ pub(crate) fn render_frames_parallel(
                             controller.set_frame_progress(
                                 current_progress,
                                 total_progress,
-                                u32::try_from(written_frames).expect("validated producer frame count fits u32"),
+                                written_frames as u32,
                                 encoded_progress,
                                 estimate,
                                 effective_rendering_fps,
@@ -404,9 +402,7 @@ pub(crate) fn render_frames_parallel(
         Ok(timings)
     })?;
 
-    let rendered_frames = u32::try_from(frame_count).map_err(|_| {
-        CoreError::Encode("Parallel frame count exceeds u32 progress capacity".to_string())
-    })?;
+    let rendered_frames = plan.count();
     let free_receiver = Arc::try_unwrap(free_receiver)
         .map_err(|_| CoreError::Encode("Parallel buffer receiver is still shared".to_string()))?
         .into_inner()
@@ -452,14 +448,10 @@ fn acquire_worker_frame_buffer(
 
 fn prewarm_first_frame(
     renderer: VideoFrameRenderer<'_>,
-    frame_count: usize,
     free_receiver: &Receiver<FrameBuffer>,
     shutdown: &PipelineShutdown,
     profiler: &mut RenderProfiler,
-) -> CoreResult<Option<WorkerEvent>> {
-    if frame_count == 0 {
-        return Ok(None);
-    }
+) -> CoreResult<WorkerEvent> {
     shutdown.check()?;
 
     let acquire_started = Instant::now();
@@ -481,14 +473,14 @@ fn prewarm_first_frame(
     profiler.record_ms("parallel.prewarm_frame", render_ms);
     profiler.record_ms("frame.total", render_ms);
 
-    Ok(Some(WorkerEvent::Rendered {
+    Ok(WorkerEvent::Rendered {
         output_frame_index: 0,
         frame: CompletedFrame {
             dense_frame_index: 0,
             buffer,
             completed_at: Instant::now(),
         },
-    }))
+    })
 }
 
 #[cfg(test)]
@@ -498,6 +490,31 @@ mod tests {
         diagnose_frame_worker_count_for_resources, ParallelFramePoolPlan,
     };
     use std::num::NonZeroUsize;
+
+    #[test]
+    fn frame_planning_rejects_unsupported_counts_before_workers_start() {
+        for count in [0, u64::from(u32::MAX) + 1] {
+            assert!(FrameProductionPlan::new(count, NonZeroU32::MIN).is_err());
+            assert!(FrameProductionPlan::decimated(count, NonZeroU32::new(6).unwrap()).is_err());
+        }
+    }
+
+    #[test]
+    fn decimation_keeps_the_last_dense_index_inside_the_layout() {
+        for layout in [
+            1,
+            5,
+            6,
+            7,
+            61,
+            u64::from(u32::MAX) - MAX_FRAME_WORKERS as u64,
+        ] {
+            let plan = FrameProductionPlan::decimated(layout, NonZeroU32::new(6).unwrap()).unwrap();
+            let last_index = u64::from(plan.count() - 1) * u64::from(plan.stride().get());
+            assert!(last_index < layout);
+            assert!(last_index + 6 >= layout);
+        }
+    }
 
     #[test]
     fn diagnoses_workers_from_profile_cpu_cost_and_frame_count() {

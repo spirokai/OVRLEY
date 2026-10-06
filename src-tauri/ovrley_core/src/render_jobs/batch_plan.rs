@@ -16,17 +16,21 @@ use crate::activity::{
     schema::{DenseActivityReport, ParsedActivity},
 };
 use crate::encode::composite::CompositeRenderPlan;
-use crate::encode::ffmpeg::catalog::{CodecSelection, CompositeFilterStackKind};
+use crate::encode::ffmpeg::catalog::{
+    CodecSelection, CompositeFilterStackKind, TransparentCodecId,
+};
+use crate::encode::ffmpeg::settings::build_ffmpeg_settings;
 use crate::encode::fps::Fps;
-use crate::encode::pipeline::transparent::{rendered_frame_count, TransparentRenderPlan};
+use crate::encode::pipeline::frames::FrameProductionPlan;
+use crate::encode::pipeline::transparent::TransparentRenderPlan;
 use crate::encode::quality::{validate_quality, EncodingQuality};
 use crate::encode::video_timing::ActivityCoverage;
 use crate::error::{CoreError, CoreResult};
 use crate::media::prepared_video::InspectedVideoSource;
 use crate::normalize::{
     raw::{RenderConfig, ScenePresentationConfig},
-    validate_render_presentation, ValidatedFfmpegConfig, ValidatedRenderConfig,
-    ValidatedSceneConfig, ValidatedScenePresentation,
+    validate_ffmpeg_config, validate_render_config_with_resources, validate_render_presentation,
+    ValidatedFfmpegConfig, ValidatedRenderConfig, ValidatedSceneConfig, ValidatedScenePresentation,
 };
 use crate::output::{plan_batch_output_targets, RenderOutputKind};
 use crate::raster::RasterResourceResolver;
@@ -107,10 +111,9 @@ fn video_output_work(
             (fps.frame_count_for_duration(duration)?, fps)
         }
         CodecSelection::Transparent(_) => {
-            let layout = usize::try_from(layout_fps.frame_count_for_duration(duration)?)
-                .map_err(|_| CoreError::Encode("Batch layout exceeds usize".into()))?;
+            let layout = layout_fps.frame_count_for_duration(duration)?;
             (
-                rendered_frame_count(layout, update_rate)? as u64,
+                u64::from(FrameProductionPlan::decimated(layout, update_rate)?.count()),
                 layout_fps.divided_by(update_rate)?,
             )
         }
@@ -270,12 +273,16 @@ impl PlannedVideoRender {
 }
 
 /// Derives a single custom-range plan from validated submission inputs.
-pub(crate) fn plan_single_render(
-    mut config: ValidatedRenderConfig,
+pub fn plan_single_render(
+    raw: RenderConfig,
     activity_end: f64,
+    resources: Option<&dyn RasterResourceResolver>,
 ) -> CoreResult<PlannedVideoRender> {
-    let (mode, sampling_fps, activity_offset) = if config.scene.composite_video_path.is_some() {
+    let raw_scene = raw.scene.clone();
+    let mut config = validate_render_config_with_resources(raw, resources)?;
+    let (mode, sampling_fps, activity_offset) = if raw_scene.composite_video_path.is_some() {
         let render = crate::encode::pipeline::composite_plan::derive_composite_render_plan(
+            &raw_scene,
             &mut config.scene,
             Some(activity_end),
         )?;
@@ -291,32 +298,24 @@ pub(crate) fn plan_single_render(
         )
     } else {
         let scene = &config.scene;
-        if !scene.presentation.width.is_multiple_of(2)
-            || !scene.presentation.height.is_multiple_of(2)
-        {
-            return Err(CoreError::Config(
-                "Transparent video dimensions must be even".into(),
-            ));
-        }
         let fps = Fps::new(scene.fps as u32, 1)?;
         let count = fps.frame_count_for_duration(scene.end - scene.start)?;
-        let output_frame_count =
-            u32::try_from(rendered_frame_count(count as usize, scene.update_rate)?).map_err(
-                |_| CoreError::Encode("Transparent output frame count exceeds u32".into()),
-            )?;
         (
-            VideoRenderModePlan::Transparent(TransparentRenderPlan {
-                layout_frame_count: count,
-                output_frame_count,
-                update_rate: scene.update_rate,
-                container_fps: fps.divided_by(scene.update_rate)?.ffmpeg_arg(),
-                coverage: ActivityCoverage {
+            plan_transparent_render(
+                scene,
+                validate_ffmpeg_config(
+                    raw_scene.ffmpeg,
+                    CodecSelection::Transparent(TransparentCodecId::ProresKs),
+                )?,
+                count,
+                fps.divided_by(scene.update_rate)?,
+                ActivityCoverage {
                     start: scene.start,
                     end: scene.end,
                     blank_leading_frame_count: 0,
                     frame_count: count,
                 },
-            }),
+            )?,
             fps,
             scene.start,
         )
@@ -367,21 +366,8 @@ pub(crate) fn plan_batch_item(
         } else {
             update_rate
         },
-        ffmpeg: ValidatedFfmpegConfig {
-            codec: encoding.codec,
-            qsv_full_init_args: encoding.qsv_full_init_args.clone(),
-            ..ValidatedFfmpegConfig::default()
-        },
-        quality: Some(encoding.quality),
+        export_start_seconds: offset,
         custom_export_range_active: Some(true),
-        composite_video_path: None,
-        composite_sync_offset: None,
-        composite_video_fps_num: None,
-        composite_video_fps_den: None,
-        composite_video_duration: None,
-        composite_render_duration: None,
-        composite_video_trim_start: None,
-        composite_widget_update_rate: None,
     };
     let mut config = template.config.clone().with_scene(scene);
     if skip_overlay {
@@ -400,6 +386,7 @@ pub(crate) fn plan_batch_item(
                 update_rate,
                 source_fps: container_fps,
                 overlay_pipe_fps: sampling_fps,
+                frames: FrameProductionPlan::new(layout_frame_count, NonZeroU32::MIN)?,
                 overlay_frame_count: layout_frame_count,
                 output_frame_count,
                 coverage,
@@ -408,22 +395,16 @@ pub(crate) fn plan_batch_item(
             },
             source_metadata: Some((source.metadata.has_audio, source.metadata.rotation_degrees)),
         },
-        CodecSelection::Transparent(_) => {
-            if !config.scene.presentation.width.is_multiple_of(2)
-                || !config.scene.presentation.height.is_multiple_of(2)
-            {
-                return Err(CoreError::Config(
-                    "Transparent batch video dimensions must be even".into(),
-                ));
-            }
-            VideoRenderModePlan::Transparent(TransparentRenderPlan {
-                layout_frame_count,
-                output_frame_count,
-                update_rate,
-                container_fps: container_fps.ffmpeg_arg(),
-                coverage,
-            })
-        }
+        CodecSelection::Transparent(_) => plan_transparent_render(
+            &config.scene,
+            ValidatedFfmpegConfig {
+                codec: encoding.codec,
+                ..ValidatedFfmpegConfig::default()
+            },
+            layout_frame_count,
+            container_fps,
+            coverage,
+        )?,
     };
     Ok(PlannedVideoRender {
         config,
@@ -431,4 +412,28 @@ pub(crate) fn plan_batch_item(
         sampling_fps,
         activity_offset: offset,
     })
+}
+
+fn plan_transparent_render(
+    scene: &ValidatedSceneConfig,
+    ffmpeg: ValidatedFfmpegConfig,
+    layout_frame_count: u64,
+    container_fps: Fps,
+    coverage: ActivityCoverage,
+) -> CoreResult<VideoRenderModePlan> {
+    if !scene.presentation.width.is_multiple_of(2) || !scene.presentation.height.is_multiple_of(2) {
+        return Err(CoreError::Config(
+            "Transparent video dimensions must be even".into(),
+        ));
+    }
+    let frames = FrameProductionPlan::decimated(layout_frame_count, scene.update_rate)?;
+    Ok(VideoRenderModePlan::Transparent(TransparentRenderPlan {
+        frames,
+        ffmpeg: build_ffmpeg_settings(&ffmpeg)?,
+        layout_frame_count: layout_frame_count as u32,
+        output_frame_count: frames.count(),
+        update_rate: scene.update_rate,
+        container_fps: container_fps.ffmpeg_arg(),
+        coverage,
+    }))
 }

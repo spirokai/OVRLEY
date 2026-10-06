@@ -14,12 +14,12 @@ use super::batch_plan::{plan_single_render, PlannedVideoRender, VideoRenderModeP
 use crate::activity::schema::ParsedActivity;
 use crate::activity::{parse_activity_json, validate_render_activity};
 use crate::debug::RenderProgress;
-use crate::encode::pipeline::composite::render_inspected_composite_video;
+use crate::encode::pipeline::composite::render_composite_video;
 use crate::encode::pipeline::composite_plan::verify_composite_source_resolution;
-use crate::encode::pipeline::transparent::render_planned_video;
+use crate::encode::pipeline::transparent::render_transparent_video;
 use crate::encode::progress::{ProgressSink, RenderController};
 use crate::error::{CoreError, CoreResult};
-use crate::normalize::{parse_config_json, validate_render_config_with_resources};
+use crate::normalize::parse_config_json;
 use crate::output::{RenderOutputKind, RenderOutputTarget};
 use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
@@ -111,8 +111,7 @@ impl RenderExecutionService {
         overwrite: bool,
         resources: Option<&dyn RasterResourceResolver>,
     ) -> CoreResult<RenderAccepted> {
-        let config =
-            validate_render_config_with_resources(parse_config_json(config_json)?, resources)?;
+        let config = parse_config_json(config_json)?;
         let kind = if config.scene.composite_video_path.is_some() {
             RenderOutputKind::Composite
         } else {
@@ -121,7 +120,7 @@ impl RenderExecutionService {
         let target = RenderOutputTarget::validate(output_path, kind, overwrite)?;
         let activity = parse_activity_json(parsed_activity_json)?;
         let end = validate_render_activity(&activity)?;
-        let plan = plan_single_render(config, end)?;
+        let plan = plan_single_render(config, end, resources)?;
         let reservation = self.reserve()?;
         let accepted = RenderAccepted {
             started: true,
@@ -278,7 +277,7 @@ pub fn execute_render(
                 }
             };
             session.check_cancelled()?;
-            render_inspected_composite_video(
+            render_composite_video(
                 paths,
                 &plan.config,
                 activity,
@@ -290,7 +289,7 @@ pub fn execute_render(
                 target,
             )
         }
-        VideoRenderModePlan::Transparent(render) => render_planned_video(
+        VideoRenderModePlan::Transparent(render) => render_transparent_video(
             paths,
             &plan.config,
             activity,

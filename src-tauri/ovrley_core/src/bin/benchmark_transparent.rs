@@ -9,14 +9,15 @@
 //!
 //! Does not own: rendering or encoding — delegates to `ovrley_core`.
 
-use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
-use ovrley_core::commands::{parse_and_validate_config, validate_config_value};
+use ovrley_core::activity::{parse_activity_json, validate_render_activity};
+use ovrley_core::commands::parse_and_validate_config;
 use ovrley_core::encode::ffmpeg::detect::detect_codecs;
-use ovrley_core::encode::pipeline::transparent::{render_video, rendered_frame_count};
 use ovrley_core::encode::progress::RenderController;
+use ovrley_core::normalize::parse_config_value;
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::batch_plan::plan_single_render;
+use ovrley_core::render_jobs::execution::{execute_render, RenderExecutionService};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -241,14 +242,15 @@ fn main() -> Result<(), String> {
             run_config_value["scene"]["end"] = serde_json::json!(360.0f64);
             run_config_value["scene"]["ffmpeg"] = serde_json::json!({"codec": codec_name});
 
-            let config = validate_config_value(&run_config_value).map_err(|e| e.to_string())?;
-            let dense = build_dense_activity_report_validated(&activity, &config)
-                .map_err(|e| e.to_string())?;
-
-            let update_rate = config.widget_update_rate();
-            let total_frames = rendered_frame_count(dense.frame_count, update_rate)
-                .map_err(|error| error.to_string())? as u32;
-            let overlay_duration = config.scene.end - config.scene.start;
+            let plan = plan_single_render(
+                parse_config_value(&run_config_value).map_err(|e| e.to_string())?,
+                validate_render_activity(&activity).map_err(|e| e.to_string())?,
+                None,
+            )
+            .map_err(|e| e.to_string())?;
+            let update_rate = plan.config().widget_update_rate();
+            let total_frames = plan.planned_frames();
+            let overlay_duration = plan.config().scene.end - plan.config().scene.start;
 
             let controller = RenderController::default();
             let execution = RenderExecutionService::with_controller(controller.clone());
@@ -282,9 +284,8 @@ fn main() -> Result<(), String> {
                 RenderOutputKind::Transparent,
                 true,
             );
-            let render_result = output_target.and_then(|target| {
-                render_video(&paths, &config, &activity, &dense, &controller, &target)
-            });
+            let render_result = output_target
+                .and_then(|target| execute_render(&paths, plan, &activity, &reservation, &target));
             let render_result = reservation
                 .complete(render_result)
                 .map_err(|error| error.to_string());

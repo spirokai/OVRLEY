@@ -17,11 +17,10 @@ use std::process::Command;
 use std::thread;
 
 use ovrley_core::activity::schema::ParsedActivity;
-use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
+use ovrley_core::activity::{parse_activity_json, validate_render_activity};
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::encode::debug::composite::write_composite_timing_summary;
 use ovrley_core::encode::fps::Fps;
-use ovrley_core::encode::pipeline::composite::render_composite_video;
 use ovrley_core::encode::pipeline::composite_plan::{
     derive_composite_pipeline_plan, derive_composite_render_plan, CompositePipelinePlan,
 };
@@ -30,7 +29,8 @@ use ovrley_core::normalize::raw::{parse_config_json, RenderConfig};
 use ovrley_core::normalize::{parse_template_value, validate_render_config, ValidatedRenderConfig};
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::batch_plan::plan_single_render;
+use ovrley_core::render_jobs::execution::{execute_render, RenderExecutionService};
 use serde_json::Value;
 
 /// Bundles the key artifacts produced by a fixture composite render.
@@ -101,8 +101,8 @@ pub fn derive_fixture_composite_plan(
     config.scene.composite_render_duration = Some(render_duration);
     config.scene.composite_video_trim_start = Some(trim_start);
     config.scene.composite_widget_update_rate = Some(update_rate);
-    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene).unwrap();
-    let render = derive_composite_render_plan(&mut scene, None).unwrap();
+    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
+    let render = derive_composite_render_plan(&config.scene, &mut scene, None).unwrap();
     let target = custom_output_target(&paths, "plan", RenderOutputKind::Composite);
     derive_composite_pipeline_plan(&paths, &scene, render, true, None, &target).unwrap()
 }
@@ -252,25 +252,15 @@ pub fn render_fixture_composite_with_paths(
     config.scene.composite_widget_update_rate = Some(update_rate);
 
     let activity = fixture_activity();
-    let mut validated = validate_render_config(config).unwrap();
-    let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
-    let dense_activity = build_dense_activity_report_validated(&activity, &validated).unwrap();
+    let plan =
+        plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
 
     // ── Phase 4: execute canonical frame-worker composite render ────
     let output_target = custom_output_target(&paths, "render", RenderOutputKind::Composite);
     reservation
-        .begin_item(render_plan.output_frame_count, "Preparing fixture render")
+        .begin_item(plan.planned_frames(), "Preparing fixture render")
         .map_err(|error| error.to_string())?;
-    let outcome = render_composite_video(
-        &paths,
-        &validated,
-        &activity,
-        &dense_activity,
-        &controller,
-        render_plan,
-        true,
-        &output_target,
-    );
+    let outcome = execute_render(&paths, plan, &activity, &reservation, &output_target);
     let filename = reservation
         .complete(outcome)
         .map_err(|error| error.to_string())?;
@@ -388,7 +378,7 @@ pub fn composite_test_config(
     render_duration: f64,
     video_path: &str,
     trim_start: f64,
-) -> ValidatedRenderConfig {
+) -> RenderConfig {
     let mut config = mutable_composite_test_config(render_duration);
     config.scene.composite_video_path = Some(video_path.to_string());
     config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
@@ -398,7 +388,7 @@ pub fn composite_test_config(
     config.scene.composite_video_duration = Some(35.0);
     config.scene.composite_render_duration = Some(render_duration);
     config.scene.composite_video_trim_start = Some(trim_start);
-    validate_render_config(config).unwrap()
+    config
 }
 
 /// Builds a minimal mutable raw config for tests that intentionally edit it.

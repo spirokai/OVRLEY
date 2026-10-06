@@ -25,9 +25,7 @@ use crate::encode::fps::Fps;
 use crate::encode::progress::ProgressSink;
 use crate::error::{CoreError, CoreResult};
 use crate::media::prepared_video::check_source_freshness;
-use crate::output::{
-    plan_batch_output_targets, verify_batch_output_paths, RenderOutputKind, RenderOutputTarget,
-};
+use crate::output::{plan_batch_output_targets, RenderOutputKind, RenderOutputTarget};
 use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
 
@@ -214,11 +212,21 @@ fn accept_batch(
             .into());
         }
     }
-    validate_calibration(&request)?;
+    let offsets = validate_batch_activity(&request.activity, &request.jobs)?;
+    let calibration_source_id = match &request.activity {
+        BatchActivity::EmbeddedActivity {} => None,
+        BatchActivity::ExternalActivity { reference, .. } => reference
+            .as_ref()
+            .map(|reference| reference.source_id.clone()),
+    };
     let owned = match inspection.validate_sources(&InspectionSourceSelection {
         inspection_id: request.inspection_id.clone(),
-        sources: request.jobs.iter().map(|job| job.source.clone()).collect(),
-        calibration_source: request.calibration_source.clone(),
+        source_ids: request
+            .jobs
+            .iter()
+            .map(|job| job.source_id.clone())
+            .collect(),
+        calibration_source_id,
     }) {
         InspectionValidation::Valid(sources) => sources,
         InspectionValidation::Rejected(rejection) => {
@@ -244,34 +252,23 @@ fn accept_batch(
             .calibration_source()
             .map(|source| Path::new(&source.metadata.path)),
     )?;
-    verify_batch_output_paths(
-        &targets,
-        &request
-            .jobs
-            .iter()
-            .map(|job| job.output_path.clone())
-            .collect::<Vec<_>>(),
-    )?;
     let template = validate_batch_template(request.template, encoding, resources)?;
-    let external_activity = request
-        .external_activity
-        .map(|activity| {
+    let external_activity = match request.activity {
+        BatchActivity::EmbeddedActivity {} => None,
+        BatchActivity::ExternalActivity { activity, .. } => {
             let activity = crate::activity::normalize_parsed_activity(activity)?;
             let end = validate_render_activity(&activity)?;
-            Ok::<_, CoreError>((activity, end))
-        })
-        .transpose()?;
+            Some((activity, end))
+        }
+    };
     let jobs = request
         .jobs
         .into_iter()
         .zip(owned.sources())
         .zip(targets)
-        .map(|((job, source), target)| {
+        .zip(offsets)
+        .map(|(((job, source), target), offset)| {
             let (frames, container_fps) = template.output_work(source)?;
-            let offset = match job.timing {
-                BatchJobTiming::EmbeddedActivity { offset_seconds }
-                | BatchJobTiming::ExternalActivity { offset_seconds, .. } => offset_seconds,
-            };
             Ok(AcceptedJob {
                 id: job.id,
                 source: source.clone(),
@@ -290,69 +287,55 @@ fn accept_batch(
     })
 }
 
-fn validate_calibration(request: &BatchRenderRequest) -> CoreResult<()> {
-    let invalid =
-        || CoreError::Config("Batch activity, calibration and resolved timing must agree".into());
-    match (&request.calibration, &request.external_activity) {
-        (BatchCalibration::EmbeddedActivity, None) if request.calibration_source.is_none() => {
-            for job in &request.jobs {
-                if !matches!(job.timing, BatchJobTiming::EmbeddedActivity { offset_seconds } if offset_seconds == 0.0)
-                {
-                    return Err(invalid());
-                }
+/// Validate calibration consistency at submission and derive each signed offset once.
+fn validate_batch_activity(
+    activity: &BatchActivity,
+    jobs: &[BatchRenderJob],
+) -> CoreResult<Vec<f64>> {
+    let BatchActivity::ExternalActivity {
+        reference,
+        automatic_offsets,
+        ..
+    } = activity
+    else {
+        return Ok(vec![0.0; jobs.len()]);
+    };
+    let correction = match reference {
+        None => 0.0,
+        Some(reference) => {
+            if reference.creation_time.trim().is_empty()
+                || !reference.committed_offset_seconds.is_finite()
+                || !reference.automatic_offset_seconds.is_finite()
+                || automatic_offsets
+                    .get(&reference.source_id)
+                    .is_some_and(|offset| *offset != reference.automatic_offset_seconds)
+            {
+                return Err(CoreError::Config(
+                    "Batch calibration reference must have a consistent finite baseline".into(),
+                ));
             }
+            reference.committed_offset_seconds - reference.automatic_offset_seconds
         }
-        (
-            BatchCalibration::ExternalActivity {
-                correction_seconds,
-                reference,
-                ..
-            },
-            Some(_),
-        ) => {
-            if !correction_seconds.is_finite() {
-                return Err(invalid());
-            }
-            match (reference, &request.calibration_source) {
-                (None, None) if *correction_seconds == 0.0 => {}
-                (Some(reference), Some(source)) => {
-                    if reference.path != source.metadata.path
-                        || reference.creation_time.trim().is_empty()
-                        || !reference.committed_offset_seconds.is_finite()
-                        || !reference.automatic_offset_seconds.is_finite()
-                        || *correction_seconds
-                            != reference.committed_offset_seconds
-                                - reference.automatic_offset_seconds
-                    {
-                        return Err(invalid());
-                    }
-                }
-                _ => return Err(invalid()),
-            }
-            for job in &request.jobs {
-                match job.timing {
-                    BatchJobTiming::ExternalActivity {
-                        automatic_offset_seconds,
-                        offset_seconds,
-                    } if automatic_offset_seconds.is_finite()
-                        && offset_seconds.is_finite()
-                        && offset_seconds == automatic_offset_seconds + correction_seconds =>
-                    {
-                        if let Some(reference) = reference {
-                            if job.source.metadata.path == reference.path
-                                && automatic_offset_seconds != reference.automatic_offset_seconds
-                            {
-                                return Err(invalid());
-                            }
-                        }
-                    }
-                    _ => return Err(invalid()),
-                }
-            }
-        }
-        _ => return Err(invalid()),
+    };
+    if automatic_offsets.len() != jobs.len() {
+        return Err(CoreError::Config(
+            "Batch automatic offsets must identify exactly the queued sources".into(),
+        ));
     }
-    Ok(())
+    jobs.iter()
+        .map(|job| {
+            let automatic = automatic_offsets.get(&job.source_id).ok_or_else(|| {
+                CoreError::Config(format!("Missing automatic offset for {}", job.source_id))
+            })?;
+            let offset = automatic + correction;
+            if !automatic.is_finite() || !offset.is_finite() {
+                return Err(CoreError::Config(
+                    "Batch activity offsets must be finite".into(),
+                ));
+            }
+            Ok(offset)
+        })
+        .collect()
 }
 
 fn run_batch(

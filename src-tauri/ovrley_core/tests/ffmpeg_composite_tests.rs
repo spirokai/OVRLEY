@@ -107,9 +107,8 @@ fn render_plan(
     scene.composite_video_trim_start = Some(trim_start);
     scene.composite_widget_update_rate =
         Some((source_fps.as_f64() / overlay_pipe_fps.as_f64()).round() as u32);
-    let mut scene = validate_scene_config(scene).unwrap();
     if matches!(codec, "qsv_full_h264" | "qsv_full_hevc") {
-        scene.ffmpeg.qsv_full_init_args = vec![
+        scene.ffmpeg["qsv_full_init_args"] = json!([
             "-init_hw_device".to_string(),
             "dxva2=dx".to_string(),
             "-init_hw_device".to_string(),
@@ -120,9 +119,10 @@ fn render_plan(
             "qsv".to_string(),
             "-hwaccel_output_format".to_string(),
             "qsv".to_string(),
-        ];
+        ]);
     }
-    derive_composite_render_plan(&mut scene, None).unwrap()
+    let mut validated = validate_scene_config(scene.clone()).unwrap();
+    derive_composite_render_plan(&scene, &mut validated, None).unwrap()
 }
 
 #[test]

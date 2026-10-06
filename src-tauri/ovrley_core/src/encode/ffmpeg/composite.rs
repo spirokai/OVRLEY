@@ -313,6 +313,11 @@ mod tests {
             ),
         ] {
             let render = CompositeRenderPlan {
+                frames: crate::encode::pipeline::frames::FrameProductionPlan::new(
+                    30,
+                    std::num::NonZeroU32::MIN,
+                )
+                .unwrap(),
                 video_path: "rotated-landscape.mp4".into(),
                 quality: crate::encode::quality::EncodingQuality::Bitrate(60.0),
                 sync_offset: 0.0,

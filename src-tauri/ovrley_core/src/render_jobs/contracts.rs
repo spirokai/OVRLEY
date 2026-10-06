@@ -8,6 +8,7 @@
 //! and tolerant parsing rules. Inspection state never represents execution.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::activity::schema::ParsedActivity;
 use crate::encode::quality::QualityType;
@@ -45,7 +46,7 @@ pub enum VideoSyncTimezoneMode {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BatchCalibrationReference {
-    pub path: String,
+    pub source_id: String,
     /// Effective editor timestamp, including an override when selected.
     pub creation_time: String,
     /// Null when the external probe did not identify timestamp provenance.
@@ -64,29 +65,15 @@ pub struct BatchCalibrationReference {
     rename_all_fields = "camelCase",
     deny_unknown_fields
 )]
-pub enum BatchCalibration {
-    EmbeddedActivity,
+pub enum BatchActivity {
+    EmbeddedActivity {},
     ExternalActivity {
+        activity: ParsedActivity,
         timezone_mode: VideoSyncTimezoneMode,
-        correction_seconds: f64,
         reference: Option<BatchCalibrationReference>,
-    },
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(
-    tag = "mode",
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase",
-    deny_unknown_fields
-)]
-pub enum BatchJobTiming {
-    /// Required to be zero; full embedded telemetry is resolved per job later.
-    EmbeddedActivity { offset_seconds: f64 },
-    ExternalActivity {
-        automatic_offset_seconds: f64,
-        /// Signed automatic offset plus the shared correction, exactly once.
-        offset_seconds: f64,
+        /// Automatic baselines keyed by the queued source identities. The backend
+        /// applies the reference correction once; jobs carry no timing mode.
+        automatic_offsets: HashMap<String, f64>,
     },
 }
 
@@ -94,12 +81,9 @@ pub enum BatchJobTiming {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BatchRenderJob {
     pub id: String,
-    pub source: InspectedVideoSource,
-    pub timing: BatchJobTiming,
+    pub source_id: String,
     /// Suppresses metric widgets and plots, retaining the job and static art.
     pub skip_overlay: bool,
-    /// Planned destination; acceptance verifies naming, collisions and aliases.
-    pub output_path: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -109,11 +93,7 @@ pub struct BatchRenderRequest {
     #[serde(deserialize_with = "crate::normalize::raw::deserialize_render_presentation")]
     pub template: RenderConfig<ScenePresentationConfig>,
     pub encoding: BatchEncodingSettings,
-    /// Absent only in per-video embedded telemetry mode; never editor telemetry.
-    pub external_activity: Option<ParsedActivity>,
-    pub calibration: BatchCalibration,
-    /// Absent without an external-activity reference. May be outside the queue.
-    pub calibration_source: Option<InspectedVideoSource>,
+    pub activity: BatchActivity,
     pub output_directory: String,
     /// Ordered, eligible jobs only. Row removal excludes a source; skipOverlay
     /// does not. Accepted queue order and inputs are immutable.

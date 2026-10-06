@@ -39,9 +39,8 @@ mod common;
 
 use std::process::Command;
 
-use ovrley_core::activity::build_dense_activity_report_validated;
+use ovrley_core::activity::validate_render_activity;
 use ovrley_core::encode::fps::Fps;
-use ovrley_core::encode::pipeline::composite::render_composite_video;
 use ovrley_core::encode::pipeline::composite_plan::{
     derive_composite_pipeline_plan, derive_composite_render_plan,
 };
@@ -50,7 +49,8 @@ use ovrley_core::encode::pipeline::composite_support::{
 };
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::normalize::validate_render_config;
-use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::batch_plan::plan_single_render;
+use ovrley_core::render_jobs::execution::{execute_render, RenderExecutionService};
 
 use common::composite::{
     assert_argument_pair, cancel_after_delay, composite_debug_timing_summary,
@@ -300,7 +300,8 @@ fn negative_sync_plan_keeps_full_video_output_and_limits_activity_overlap() {
 
     let mut shorter_activity_scene = validate_render_config(config.clone()).unwrap().scene;
     let shorter_activity_plan =
-        derive_composite_render_plan(&mut shorter_activity_scene, Some(10.0)).unwrap();
+        derive_composite_render_plan(&config.scene, &mut shorter_activity_scene, Some(10.0))
+            .unwrap();
     assert_eq!(shorter_activity_scene.start, 0.0);
     assert_eq!(shorter_activity_scene.end, 10.0);
     assert_eq!(
@@ -310,8 +311,8 @@ fn negative_sync_plan_keeps_full_video_output_and_limits_activity_overlap() {
     assert_eq!(shorter_activity_plan.overlay_frame_count, 900);
     assert_eq!(shorter_activity_plan.output_frame_count, 900);
 
-    let mut scene = validate_render_config(config).unwrap().scene;
-    let plan = derive_composite_render_plan(&mut scene, Some(25.0)).unwrap();
+    let mut scene = validate_render_config(config.clone()).unwrap().scene;
+    let plan = derive_composite_render_plan(&config.scene, &mut scene, Some(25.0)).unwrap();
 
     assert_eq!(scene.start, 0.0);
     assert_eq!(scene.end, 25.0);
@@ -336,8 +337,8 @@ fn composite_plan_rejects_offset_at_video_duration_boundary() {
     config.scene.composite_video_trim_start = Some(0.0);
     config.scene.composite_widget_update_rate = Some(1);
 
-    let mut scene = validate_render_config(config).unwrap().scene;
-    let error = derive_composite_render_plan(&mut scene, Some(25.0)).unwrap_err();
+    let mut scene = validate_render_config(config.clone()).unwrap().scene;
+    let error = derive_composite_render_plan(&config.scene, &mut scene, Some(25.0)).unwrap_err();
 
     assert!(error.to_string().contains("positive overlap"));
 }
@@ -490,10 +491,9 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
     config.scene.composite_render_duration = Some(0.2);
     config.scene.composite_video_trim_start = Some(0.0);
     config.scene.composite_widget_update_rate = Some(1);
-    let config = validate_render_config(config).unwrap();
     let paths = test_paths();
-    let mut scene = config.scene.clone();
-    let render = derive_composite_render_plan(&mut scene, None).unwrap();
+    let mut scene = validate_render_config(config.clone()).unwrap().scene;
+    let render = derive_composite_render_plan(&config.scene, &mut scene, None).unwrap();
     let output_target = custom_output_target(
         &paths,
         "plan",
@@ -638,7 +638,7 @@ fn test_6_4_unknown_codec_fails_at_ingress() {
     let mut config = mutable_recent_template_config(1920, 1080);
     config.scene.ffmpeg = serde_json::json!({"codec": "definitely_not_a_codec"});
 
-    let error = match validate_render_config(config) {
+    let error = match plan_single_render(config, 120.0, None) {
         Ok(_) => panic!("unknown codec unexpectedly validated"),
         Err(error) => error,
     };
@@ -836,31 +836,22 @@ fn test_frame_workers_render_short_composite_in_order() {
     let video_path = common::test_config::sample_video_path()
         .to_string_lossy()
         .to_string();
-    let mut validated = composite_test_config(0.2, &video_path, 0.0);
+    let config = composite_test_config(0.2, &video_path, 0.0);
     let activity = fixture_activity();
-    let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
-    let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
+    let plan =
+        plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
     let controller = RenderController::default();
     let execution = RenderExecutionService::with_controller(controller.clone());
     let reservation = execution.reserve().unwrap();
     reservation
-        .begin_item(dense.frame_count as u32, "test_parallel_frame_workers")
+        .begin_item(plan.planned_frames(), "test_parallel_frame_workers")
         .unwrap();
     let output_target = custom_output_target(
         &paths,
         "parallel",
         ovrley_core::output::RenderOutputKind::Composite,
     );
-    let outcome = render_composite_video(
-        &paths,
-        &validated,
-        &activity,
-        &dense,
-        &controller,
-        render_plan,
-        true,
-        &output_target,
-    );
+    let outcome = execute_render(&paths, plan, &activity, &reservation, &output_target);
     let filename = reservation.complete(outcome).unwrap();
 
     let output_path = paths.downloads_dir.join(filename);
@@ -899,15 +890,15 @@ fn test_frame_worker_composite_render() {
     let video_path = common::test_config::sample_video_path()
         .to_string_lossy()
         .to_string();
-    let mut validated = composite_test_config(5.0, &video_path, 0.0);
+    let config = composite_test_config(5.0, &video_path, 0.0);
     let activity = fixture_activity();
-    let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
-    let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
+    let plan =
+        plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
     let controller = RenderController::default();
     let execution = RenderExecutionService::with_controller(controller.clone());
     let reservation = execution.reserve().unwrap();
     reservation
-        .begin_item(dense.frame_count as u32, "test_parallel_2")
+        .begin_item(plan.planned_frames(), "test_parallel_2")
         .unwrap();
 
     let output_target = custom_output_target(
@@ -915,16 +906,7 @@ fn test_frame_worker_composite_render() {
         "parallel-2",
         ovrley_core::output::RenderOutputKind::Composite,
     );
-    let result = render_composite_video(
-        &paths,
-        &validated,
-        &activity,
-        &dense,
-        &controller,
-        render_plan,
-        true,
-        &output_target,
-    );
+    let result = execute_render(&paths, plan, &activity, &reservation, &output_target);
     let result = reservation.complete(result);
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();
@@ -951,15 +933,15 @@ fn test_frame_worker_composite_render_with_audio() {
     let video_path = common::test_config::sample_video_path()
         .to_string_lossy()
         .to_string();
-    let mut validated = composite_test_config(5.0, &video_path, 15.0);
+    let config = composite_test_config(5.0, &video_path, 15.0);
     let activity = fixture_activity();
-    let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
-    let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
+    let plan =
+        plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
     let controller = RenderController::default();
     let execution = RenderExecutionService::with_controller(controller.clone());
     let reservation = execution.reserve().unwrap();
     reservation
-        .begin_item(dense.frame_count as u32, "test_parallel_audio")
+        .begin_item(plan.planned_frames(), "test_parallel_audio")
         .unwrap();
 
     let output_target = custom_output_target(
@@ -967,16 +949,7 @@ fn test_frame_worker_composite_render_with_audio() {
         "parallel-audio",
         ovrley_core::output::RenderOutputKind::Composite,
     );
-    let result = render_composite_video(
-        &paths,
-        &validated,
-        &activity,
-        &dense,
-        &controller,
-        render_plan,
-        true,
-        &output_target,
-    );
+    let result = execute_render(&paths, plan, &activity, &reservation, &output_target);
     let result = reservation.complete(result);
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();

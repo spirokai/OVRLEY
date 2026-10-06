@@ -30,19 +30,14 @@ use crate::encode::debug::video::{
     create_debug_dir, render_sample_frames_enabled, sample_frame_indices, write_prepare_summary,
     write_sample_frame, write_timing_summary,
 };
-use crate::encode::ffmpeg::binary::{resolve_ffmpeg_binary, spawn_ffmpeg};
-use crate::encode::ffmpeg::settings::build_ffmpeg_settings;
+use crate::encode::ffmpeg::binary::resolve_ffmpeg_binary;
+use crate::encode::ffmpeg::settings::FfmpegSettings;
 use crate::encode::ffmpeg::transparent_profiles::transparent_profile;
-use crate::encode::pipeline::frame_pool::{
-    diagnose_frame_worker_count, ParallelFrameChannels, ParallelFramePoolPlan,
-    ParallelFrameProgress,
-};
-use crate::encode::pipeline::frames::render_frames_parallel;
-use crate::encode::pipeline::lifecycle::{
-    finalize_pipeline, PartialOutputGuard, PipelineFailurePolicy, PipelineKind, PipelineProcesses,
-    PipelineShutdown,
-};
-use crate::encode::pipeline::queue::{merge_timing_maps, writer_worker, FrameBuffer, WriterMode};
+use crate::encode::pipeline::frame_pool::ParallelFrameProgress;
+use crate::encode::pipeline::frames::FrameProductionPlan;
+use crate::encode::pipeline::lifecycle::{PipelineFailurePolicy, PipelineKind};
+use crate::encode::pipeline::queue::FrameBuffer;
+use crate::encode::pipeline::run::{run_frame_pipeline, FramePipelinePlan, PipelineDiagnostics};
 use crate::encode::progress::RenderController;
 use crate::encode::video_timing::ActivityCoverage;
 use crate::error::{CoreError, CoreResult};
@@ -55,21 +50,24 @@ use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::thread;
-use std::time::Instant;
 
 /// Fixed input to the transparent pipeline; timing is supplied by the job owner.
 #[derive(Clone, Debug)]
 pub struct TransparentRenderPlan {
-    pub layout_frame_count: u64,
+    pub(crate) frames: FrameProductionPlan,
+    pub(crate) ffmpeg: FfmpegSettings,
+    pub layout_frame_count: u32,
     pub output_frame_count: u32,
     pub update_rate: NonZeroU32,
     pub container_fps: String,
     pub coverage: ActivityCoverage,
 }
 
-struct TransparentFailurePolicy;
+struct TransparentDiagnostics {
+    encoded_frames: Arc<AtomicU32>,
+}
 
-impl PipelineFailurePolicy for TransparentFailurePolicy {
+impl PipelineFailurePolicy for TransparentDiagnostics {
     fn writer_failure(
         &self,
         error: CoreError,
@@ -83,96 +81,21 @@ impl PipelineFailurePolicy for TransparentFailurePolicy {
     }
 }
 
-/// Renders one transparent-overlay video by streaming Skia frames to ffmpeg.
-///
-/// The pipeline diagnoses a profile-specific worker count, prepares reusable
-/// Skia assets, and sends ordered worker output through one FFmpeg process.
-///
-/// # Arguments
-///
-/// * `paths` — Central path configuration (fonts, templates, debug/output dirs).
-/// * `config` — Validated render configuration with scene/widget/ffmpeg settings.
-/// * `activity` — Parsed (but untrimmed) source activity for asset preparation.
-/// * `dense_activity` — Frame-aligned dense report used for per-frame telemetry.
-/// * `controller` — Shared render state; cloned to observe progress/cancellation.
-///
-/// # Returns
-///
-/// On success, returns the output filename (relative to the downloads directory).
-/// Debug timing summaries are written to `paths.debug_render_dir/phase_6/`.
-///
-/// # Errors
-///
-/// Returns [`CoreError::Cancelled`] when the user cancels (output is cleaned up).
-/// Returns [`CoreError::Ffmpeg`] if ffmpeg exits non-zero.
-/// Returns [`CoreError::Encode`] on thread panic, pipe failure, or frame-count mismatch.
-/// Returns [`CoreError::Render`] if any frame fails to render.
-/// Returns [`CoreError::Io`] on filesystem errors.
-///
-/// # Thread Safety
-///
-/// Spawns two threads whose handles are stored and joined before returning:
-/// a monitor thread (ffmpeg stderr → AtomicU32 counter) and a writer thread
-/// (bounded channel → ffmpeg stdin, with buffer return to free pool). The
-/// render loop runs on the calling thread.
-///
-/// # Cancellation
-///
-/// Checks `controller.cancel_flag` between every frame and at buffer-acquire
-/// time. On cancellation, FFmpeg is terminated before threads are joined, the
-/// partial output is removed, and `CoreError::Cancelled` is returned.
-///
-/// # Performance
-///
-/// This is a render hot path. Frame rendering and ffmpeg stdin writing overlap
-/// via a bounded channel and a pooled buffer ring. Parallel rendering sizes the
-/// pool from resolution and a fixed memory ceiling. Avoid per-frame allocations
-/// inside the loop — buffers are reused.
-pub fn render_video(
-    paths: &AppPaths,
-    config: &ValidatedRenderConfig,
-    activity: &ParsedActivity,
-    dense_activity: &DenseActivityReport,
-    controller: &RenderController,
-    output_target: &RenderOutputTarget,
-) -> CoreResult<String> {
-    controller.check_cancelled()?;
-    let scene = &config.scene;
-    if !scene.presentation.width.is_multiple_of(2) || !scene.presentation.height.is_multiple_of(2) {
-        return Err(CoreError::Config(format!(
-            "Transparent video dimensions must be even; received {}x{}",
-            scene.presentation.width, scene.presentation.height
-        )));
+impl PipelineDiagnostics for TransparentDiagnostics {
+    fn start_monitor(&self, stderr: std::process::ChildStderr) -> thread::JoinHandle<()> {
+        let encoded_frames = Arc::clone(&self.encoded_frames);
+        thread::spawn(move || monitor_ffmpeg(stderr, encoded_frames))
     }
-    let plan = TransparentRenderPlan {
-        layout_frame_count: dense_activity.frame_count as u64,
-        output_frame_count: u32::try_from(rendered_frame_count(
-            dense_activity.frame_count,
-            scene.update_rate,
-        )?)
-        .map_err(|_| CoreError::Encode("Transparent output frame count exceeds u32".into()))?,
-        update_rate: scene.update_rate,
-        container_fps: (scene.fps / f64::from(scene.update_rate.get())).to_string(),
-        coverage: ActivityCoverage {
-            start: scene.start,
-            end: scene.end,
-            blank_leading_frame_count: 0,
-            frame_count: dense_activity.frame_count as u64,
-        },
-    };
-    render_planned_video(
-        paths,
-        config,
-        activity,
-        dense_activity,
-        controller,
-        output_target,
-        &plan,
-    )
+    fn progress(&self) -> ParallelFrameProgress<'_> {
+        ParallelFrameProgress::Transparent(&self.encoded_frames)
+    }
+    fn verify_output(&self, _path: &std::path::Path) -> CoreResult<()> {
+        Ok(())
+    }
 }
 
 /// Executes a fixed video-local plan through the same transparent pipeline.
-pub(crate) fn render_planned_video(
+pub(crate) fn render_transparent_video(
     paths: &AppPaths,
     config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
@@ -184,28 +107,13 @@ pub(crate) fn render_planned_video(
     controller.check_cancelled()?;
     // ── PHASE 1: SETUP — derive dimensions, frame counts, paths, and ffmpeg args ──
     let scene = &config.scene;
-    let ffmpeg_settings = build_ffmpeg_settings(&scene.ffmpeg)?;
+    let ffmpeg_settings = &plan.ffmpeg;
     let frame_size = FrameSize {
         width: scene.presentation.width,
         height: scene.presentation.height,
     };
-    let layout_total_frames = u32::try_from(plan.layout_frame_count)
-        .map_err(|_| CoreError::Encode("Transparent layout frame count exceeds u32".to_string()))?;
-    let update_rate = plan.update_rate;
-    // `rendered_frame_count` applies frame decimation: when update_rate > 1,
-    // we render fewer frames than the dense report has, skipping layout frames
-    // that would not change the visible overlay at the configured rate.
+    let layout_total_frames = plan.layout_frame_count;
     let total_frames = plan.output_frame_count;
-    if dense_activity.frame_count as u64 != plan.coverage.frame_count {
-        return Err(CoreError::Encode(
-            "Transparent dense activity does not match planned coverage".into(),
-        ));
-    }
-    let workers = diagnose_frame_worker_count(
-        total_frames as usize,
-        transparent_profile(ffmpeg_settings.codec_id).cpu_cores_per_frame_worker,
-    )?;
-    let channels = ParallelFramePoolPlan::for_frame_size(frame_size, workers)?.create_channels()?;
     let debug_dir = create_debug_dir(paths)?;
     controller.check_cancelled()?;
     // ── PHASE 2: BUILD SKIA ASSETS — pre-render maps, fonts, and label cache ──
@@ -229,84 +137,15 @@ pub(crate) fn render_planned_video(
     let output_path = output_target.path();
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let input_pix_fmt = ffmpeg_input_pix_fmt()?;
-    let encoded_frames = Arc::new(AtomicU32::new(0));
-    let shutdown = PipelineShutdown::shared(controller.cancel_flag());
-    let render_started = Instant::now();
-
-    // ── PHASE 3: CREATE BUFFER POOL (N+1 buffers for N-slot bounded channel) ──
-    let ParallelFrameChannels {
-        frame_sender,
-        frame_receiver,
-        free_sender,
-        free_receiver,
-    } = channels;
-    // ── PHASE 4: SPAWN FFMPEG & WORKER THREADS (writer + monitor) ──
-    // ffmpeg is spawned before the render loop starts. The writer owns stdin
-    // and drains the bounded frame queue; the monitor parses stderr for progress.
-    controller.start_encoding()?;
-    let mut output_guard = PartialOutputGuard::new(&output_path);
-    let mut processes = PipelineProcesses::new(
-        spawn_ffmpeg(
-            &ffmpeg_bin,
-            &ffmpeg_settings.command_args(
-                &output_path,
-                frame_size,
-                &plan.container_fps,
-                &input_pix_fmt,
-            ),
-        )?,
-        PipelineKind::Transparent,
-        Arc::clone(&shutdown),
-    );
-
-    let stderr = processes
-        .child
-        .stderr
-        .take()
-        .ok_or_else(|| CoreError::Encode("Failed to capture ffmpeg stderr".to_string()))?;
-    let stdin = processes
-        .child
-        .stdin
-        .take()
-        .ok_or_else(|| CoreError::Encode("Failed to capture ffmpeg stdin".to_string()))?;
-    let encoded_frames_for_monitor = encoded_frames.clone();
-    processes.monitor = Some(thread::spawn(move || {
-        monitor_ffmpeg(stderr, encoded_frames_for_monitor)
-    }));
-    let shutdown_for_writer = Arc::clone(&shutdown);
-    processes.writer = Some(thread::spawn(move || {
-        writer_worker(
-            stdin,
-            frame_receiver,
-            free_sender,
-            shutdown_for_writer,
-            WriterMode::Transparent,
-        )
-    }));
-
     let sample_frames = if render_sample_frames_enabled()? {
         sample_frame_indices(total_frames as usize)
     } else {
         Vec::new()
     };
-    let sample_output_frame_indices = sample_frames
-        .iter()
-        .copied()
-        .map(|index| {
-            u64::try_from(index).map_err(|_| {
-                CoreError::Encode("Sample frame index exceeds u64 capacity".to_string())
-            })
-        })
-        .collect::<CoreResult<Vec<_>>>()?;
-    // ── PHASE 5: HOT RENDER LOOP ──
-    // ffmpeg is running, the writer is draining the channel, the monitor is
-    // parsing stderr. We own the render thread and produce exactly total_frames.
-    // The bounded channel provides backpressure: if the writer falls behind,
-    // the next queue_frame call blocks, capping memory usage.
     let observe_ordered_frame =
         |output_frame_index: u64, dense_frame_index: usize, buffer: &FrameBuffer| {
-            if sample_output_frame_indices
-                .binary_search(&output_frame_index)
+            if sample_frames
+                .binary_search(&(output_frame_index as usize))
                 .is_ok()
             {
                 write_sample_frame(
@@ -320,88 +159,42 @@ pub(crate) fn render_planned_video(
             }
             Ok(())
         };
-    let render_result = render_frames_parallel(
+    let outcome = run_frame_pipeline(
+        paths,
         renderer,
-        total_frames as usize,
-        update_rate,
-        workers,
-        ParallelFrameProgress::Transparent(&encoded_frames),
-        PipelineKind::Transparent,
+        FramePipelinePlan {
+            kind: PipelineKind::Transparent,
+            frames: plan.frames,
+            frame_size,
+            output_frame_count: total_frames,
+            cpu_cores_per_frame_worker: transparent_profile(ffmpeg_settings.codec_id)
+                .cpu_cores_per_frame_worker,
+            ffmpeg_args: ffmpeg_settings.command_args(
+                &output_path,
+                frame_size,
+                &plan.container_fps,
+                &input_pix_fmt,
+            ),
+        },
         controller,
-        shutdown.as_ref(),
-        &frame_sender,
+        output_target,
+        &TransparentDiagnostics {
+            encoded_frames: Arc::new(AtomicU32::new(0)),
+        },
         Some(&observe_ordered_frame),
-        free_receiver,
-        &mut processes.child,
-        render_started,
-    );
-    drop(frame_sender);
-    // ── PHASE 6: THREAD JOIN & FFMPEG WAIT ──
-    // Dropping the sender signals the writer to exit its recv() loop.
-    // The writer flushes stdin and returns, which causes ffmpeg to see EOF
-    // and finalize the output file. We join threads before waiting on ffmpeg
-    // so pipe-write errors are collected before we check the exit status.
-    let outcome = finalize_pipeline(
-        &mut processes,
-        render_result,
-        shutdown.as_ref(),
-        PipelineKind::Transparent,
-        &TransparentFailurePolicy,
     )?;
-
-    let rendered_frames = outcome.producer.rendered_frames;
-    let producer_timings = outcome.producer.timings;
-    let writer_result = outcome.writer;
-    if writer_result.written_frames != u64::from(total_frames) {
-        // Frame-count mismatch means ffmpeg accepted stdin but produced fewer
-        // frames than expected — typically a pipe-write error partway through
-        // that ffmpeg didn't report via exit status. Clean up and fail.
-        return Err(CoreError::Encode(format!(
-            "ffmpeg encode pipeline ended early: wrote {} of {} frames",
-            writer_result.written_frames, total_frames
-        )));
-    }
-    output_guard.preserve();
-
-    let total_time_taken = render_started.elapsed().as_secs_f64();
-
-    // ── PHASE 7: FINALIZATION — write debug summary, return public filename ──
-    let merged_timings = merge_timing_maps(producer_timings, writer_result.timings);
     write_timing_summary(
         &debug_dir,
         prepared_preview_assets.scene(),
         &output_path,
         total_frames,
         layout_total_frames,
-        rendered_frames,
-        total_time_taken,
+        outcome.rendered_frames,
+        outcome.total_seconds,
         sample_frames,
-        merged_timings,
+        outcome.timings,
     )?;
-    controller.set_frame_progress(
-        total_frames,
-        total_frames,
-        u32::try_from(rendered_frames).expect("validated producer frame count fits u32"),
-        total_frames,
-        Some(0),
-        None,
-    );
     Ok(output_target.filename().to_owned())
-}
-
-/// Computes how many frames will be written after applying frame decimation.
-pub fn rendered_frame_count(
-    layout_frame_count: usize,
-    update_rate: std::num::NonZeroU32,
-) -> CoreResult<usize> {
-    // Decimation keeps the first frame and then every `update_rate`th layout
-    // frame. The +1 form avoids off-by-one loss for non-divisible lengths.
-    if layout_frame_count == 0 {
-        return Err(CoreError::Encode(
-            "Layout frame count must be greater than zero".to_string(),
-        ));
-    }
-    Ok(((layout_frame_count - 1) / update_rate.get() as usize) + 1)
 }
 
 // Monitors ffmpeg stderr and updates the encoded-frame counter.

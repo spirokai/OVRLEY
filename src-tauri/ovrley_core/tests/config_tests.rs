@@ -8,14 +8,15 @@
 mod common;
 
 use ovrley_core::commands::{parse_and_validate_config, validate_template_contents};
-use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, CompositeCodecId};
+use ovrley_core::normalize::parse_config_value;
 use ovrley_core::normalize::ContentAlignment;
 use ovrley_core::normalize::TEMPLATE_FILE_VERSION;
 use ovrley_core::render::widgets::types::PreparedValue;
+use ovrley_core::render_jobs::batch_plan::{plan_single_render, VideoRenderModePlan};
 use serde_json::json;
 
 #[test]
-fn validated_transparent_config_preserves_absent_composite_fields() {
+fn validated_scene_retains_presentation_and_sampling() {
     let config = common::seam::validated_config_from_value(json!({
         "scene": common::seam::explicit_scene_json(),
         "labels": [],
@@ -23,19 +24,13 @@ fn validated_transparent_config_preserves_absent_composite_fields() {
         "plots": []
     }));
 
-    assert_eq!(config.scene.composite_video_path, None);
-    assert_eq!(config.scene.quality, None);
-    assert_eq!(config.scene.composite_sync_offset, None);
-    assert_eq!(config.scene.composite_video_fps_num, None);
-    assert_eq!(config.scene.composite_video_fps_den, None);
-    assert_eq!(config.scene.composite_video_duration, None);
-    assert_eq!(config.scene.composite_render_duration, None);
-    assert_eq!(config.scene.composite_video_trim_start, None);
-    assert_eq!(config.scene.composite_widget_update_rate, None);
+    assert_eq!(config.scene.export_start_seconds, 0.0);
+    assert_eq!(config.scene.fps, 30.0);
+    assert_eq!(config.scene.presentation.width, 1920);
 }
 
 #[test]
-fn validated_composite_config_preserves_fields() {
+fn composite_settings_are_normalized_into_the_render_plan() {
     let mut config = json!({
         "scene": common::seam::explicit_scene_json(),
         "labels": [],
@@ -53,37 +48,25 @@ fn validated_composite_config_preserves_fields() {
     config["scene"]["composite_video_trim_start"] = json!(0.0);
     config["scene"]["composite_widget_update_rate"] = json!(2);
 
-    let validated = common::seam::validated_config_from_value(config);
+    let plan = plan_single_render(parse_config_value(&config).unwrap(), 600.0, None).unwrap();
+    let VideoRenderModePlan::Composite { render, .. } = plan.mode() else {
+        panic!("composite plan")
+    };
     assert_eq!(
-        validated.scene.composite_video_path.as_deref(),
-        Some("test.mp4")
+        render.quality,
+        ovrley_core::encode::quality::EncodingQuality::Bitrate(60.0)
     );
-    assert_eq!(
-        validated.scene.quality,
-        Some(ovrley_core::encode::quality::EncodingQuality::Bitrate(60.0))
-    );
-    assert_eq!(validated.scene.composite_sync_offset, Some(300.0));
-    assert_eq!(validated.scene.composite_video_fps_num, Some(30000));
-    assert_eq!(validated.scene.composite_video_fps_den, Some(1001));
-    assert_eq!(validated.scene.composite_video_duration, Some(20.0));
-    assert_eq!(validated.scene.composite_render_duration, Some(10.0));
-    assert_eq!(validated.scene.composite_video_trim_start, Some(0.0));
-    assert_eq!(
-        validated.scene.ffmpeg.codec,
-        CodecSelection::Composite(CompositeCodecId::SoftwareH264)
-    );
-    assert_eq!(
-        validated
-            .scene
-            .composite_widget_update_rate
-            .map(std::num::NonZeroU32::get),
-        Some(2)
-    );
+    assert_eq!(render.coverage.start, 300.0);
+    assert_eq!(render.coverage.end, 310.0);
+    assert_eq!(render.output_frame_count, 300);
+    assert_eq!(render.overlay_frame_count, 150);
+    assert_eq!(plan.config().scene.export_start_seconds, 300.0);
+    assert!((plan.config().scene.fps - 15000.0 / 1001.0).abs() < 1e-9);
 }
 
 #[test]
 fn rejects_zero_composite_widget_update_rate() {
-    let error = parse_and_validate_config(
+    let raw = ovrley_core::normalize::parse_config_json(
         r##"{
             "scene": {
                 "fps": 30,
@@ -101,6 +84,11 @@ fn rejects_zero_composite_widget_update_rate() {
                 "update_rate": 1,
                 "custom_export_range_active": false,
                 "ffmpeg": {},
+                "composite_video_path": "test.mp4",
+                "qualityType": "bitrate", "qualityValue": 20.0,
+                "composite_sync_offset": 0.0,
+                "composite_video_fps_num": 30, "composite_video_fps_den": 1,
+                "composite_video_duration": 10.0, "composite_video_trim_start": 0.0,
                 "composite_widget_update_rate": 0
             },
             "labels": [],
@@ -108,8 +96,8 @@ fn rejects_zero_composite_widget_update_rate() {
             "plots": []
         }"##,
     )
-    .err()
     .unwrap();
+    let error = plan_single_render(raw, 120.0, None).err().unwrap();
 
     let error_msg = error.to_string();
     assert!(

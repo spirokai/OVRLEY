@@ -51,8 +51,8 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
         .unwrap();
     let mut selection = InspectionSourceSelection {
         inspection_id: session.inspection_id.clone(),
-        sources: vec![source],
-        calibration_source: None,
+        source_ids: vec![source.source_id],
+        calibration_source_id: None,
     };
     for (mode, filename, frames, rate) in [
         (
@@ -85,10 +85,11 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
         assert_eq!(fs::read(existing).unwrap(), b"previous completed output");
     }
     let duplicate = directory.source("queue/ride.朝 morning.mov");
-    selection.sources.push(
+    selection.source_ids.push(
         service
             .inspect_source(&directory.paths(), &session.inspection_id, &duplicate)
-            .unwrap(),
+            .unwrap()
+            .source_id,
     );
     let error = plan_batch_configuration(
         &service,
@@ -326,8 +327,8 @@ fn accepted_sources_survive_disposal_but_closed_and_foreign_sessions_reject() {
     assert_eq!(queued.metadata.fps, Some(30000.0 / 1001.0));
     let mut selection = InspectionSourceSelection {
         inspection_id: session.inspection_id.clone(),
-        sources: vec![queued.clone()],
-        calibration_source: Some(reference.clone()),
+        source_ids: vec![queued.source_id.clone()],
+        calibration_source_id: Some(reference.source_id.clone()),
     };
     let accepted = match service.validate_sources(&selection) {
         InspectionValidation::Valid(accepted) => accepted,
@@ -372,13 +373,17 @@ fn submission_requires_reinspection_of_changed_queue_and_calibration_files() {
     let session = service.create_session();
     let mut selection = InspectionSourceSelection {
         inspection_id: session.inspection_id.clone(),
-        sources: vec![service
-            .inspect_source(&directory.paths(), &session.inspection_id, &queue_path)
-            .unwrap()],
-        calibration_source: Some(
+        source_ids: vec![
+            service
+                .inspect_source(&directory.paths(), &session.inspection_id, &queue_path)
+                .unwrap()
+                .source_id,
+        ],
+        calibration_source_id: Some(
             service
                 .inspect_source(&directory.paths(), &session.inspection_id, &reference_path)
-                .unwrap(),
+                .unwrap()
+                .source_id,
         ),
     };
     // Same-size edits must be caught by mtime; reference edits must also block.
@@ -396,38 +401,37 @@ fn submission_requires_reinspection_of_changed_queue_and_calibration_files() {
                 .issues
                 .iter()
                 .all(|issue| issue.reason == ReinspectionReason::SourceChanged));
-            assert_eq!(
-                rejection.issues[0].source_id,
-                selection.sources[0].source_id
-            );
+            assert_eq!(rejection.issues[0].source_id, selection.source_ids[0]);
             assert_eq!(
                 rejection.issues[1].source_id,
-                selection.calibration_source.as_ref().unwrap().source_id
+                selection.calibration_source_id.as_ref().unwrap().as_str()
             );
         }
         _ => panic!("stale queue or calibration must prevent acceptance"),
     }
-    selection.sources[0] = service
+    selection.source_ids[0] = service
         .inspect_source(&directory.paths(), &session.inspection_id, &queue_path)
-        .unwrap();
-    selection.calibration_source = Some(
+        .unwrap()
+        .source_id;
+    selection.calibration_source_id = Some(
         service
             .inspect_source(&directory.paths(), &session.inspection_id, &reference_path)
-            .unwrap(),
+            .unwrap()
+            .source_id,
     );
     assert!(matches!(
         service.validate_sources(&selection),
         InspectionValidation::Valid(_)
     ));
-    selection.sources[0].metadata.duration = Some(200.0);
+    selection.source_ids[0] = "foreign-source".into();
     match service.validate_sources(&selection) {
         InspectionValidation::Rejected(rejection) => {
             assert_eq!(
                 rejection.issues[0].reason,
-                ReinspectionReason::DescriptorMismatch
+                ReinspectionReason::UnknownDescriptor
             );
         }
-        _ => panic!("client metadata must not replace session-owned metadata"),
+        _ => panic!("unknown identities cannot select session-owned metadata"),
     }
 }
 

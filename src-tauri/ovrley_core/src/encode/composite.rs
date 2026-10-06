@@ -9,6 +9,7 @@ use crate::encode::fps::Fps;
 /// Validated inputs and derived timing for one composite render.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompositeRenderPlan {
+    pub(crate) frames: crate::encode::pipeline::frames::FrameProductionPlan,
     pub(crate) video_path: PathBuf,
     pub quality: crate::encode::quality::EncodingQuality,
     pub(crate) sync_offset: f64,

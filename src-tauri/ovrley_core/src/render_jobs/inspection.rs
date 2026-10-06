@@ -49,8 +49,8 @@ pub struct InspectionSession {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct InspectionSourceSelection {
     pub inspection_id: String,
-    pub sources: Vec<InspectedVideoSource>,
-    pub calibration_source: Option<InspectedVideoSource>,
+    pub source_ids: Vec<String>,
+    pub calibration_source_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -58,7 +58,6 @@ pub struct InspectionSourceSelection {
 pub enum ReinspectionReason {
     ClosedSession,
     UnknownDescriptor,
-    DescriptorMismatch,
     SourceChanged,
     SourceUnavailable,
 }
@@ -67,7 +66,8 @@ pub enum ReinspectionReason {
 #[serde(rename_all = "camelCase")]
 pub struct SourceInspectionIssue {
     pub source_id: String,
-    pub path: String,
+    /// Absent when the submitted identity is unknown or its session is closed.
+    pub path: Option<String>,
     pub reason: ReinspectionReason,
 }
 
@@ -191,18 +191,15 @@ impl VideoInspectionService {
         let session = sessions.get(&selection.inspection_id);
         let mut issues = Vec::new();
         let mut owned = Vec::new();
-        for source in selection
-            .sources
+        for source_id in selection
+            .source_ids
             .iter()
-            .chain(selection.calibration_source.iter())
+            .chain(selection.calibration_source_id.iter())
         {
-            let stored = session.and_then(|sources| sources.get(&source.source_id));
+            let stored = session.and_then(|sources| sources.get(source_id));
             let reason = match (session, stored) {
                 (None, _) => Some(ReinspectionReason::ClosedSession),
                 (_, None) => Some(ReinspectionReason::UnknownDescriptor),
-                (_, Some(stored)) if stored.as_ref() != source => {
-                    Some(ReinspectionReason::DescriptorMismatch)
-                }
                 (_, Some(stored)) => match check_source_freshness(stored) {
                     Ok(()) => {
                         owned.push(stored.clone());
@@ -214,8 +211,8 @@ impl VideoInspectionService {
             };
             if let Some(reason) = reason {
                 issues.push(SourceInspectionIssue {
-                    source_id: source.source_id.clone(),
-                    path: source.metadata.path.clone(),
+                    source_id: source_id.clone(),
+                    path: stored.map(|source| source.metadata.path.clone()),
                     reason,
                 });
             }
@@ -226,7 +223,7 @@ impl VideoInspectionService {
                 issues,
             });
         }
-        let calibration_source = selection.calibration_source.as_ref().map(|_| {
+        let calibration_source = selection.calibration_source_id.as_ref().map(|_| {
             owned
                 .pop()
                 .expect("validated calibration descriptor is owned")

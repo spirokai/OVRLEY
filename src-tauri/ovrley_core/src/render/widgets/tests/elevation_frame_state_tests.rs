@@ -40,16 +40,7 @@ fn minimal_scene() -> ValidatedSceneConfig {
         end: 3.0,
         custom_export_range_active: Some(false),
         update_rate: std::num::NonZeroU32::MIN,
-        ffmpeg: crate::normalize::ValidatedFfmpegConfig::default(),
-        composite_video_path: None,
-        quality: None,
-        composite_sync_offset: None,
-        composite_video_fps_num: None,
-        composite_video_fps_den: None,
-        composite_video_duration: None,
-        composite_render_duration: None,
-        composite_video_trim_start: None,
-        composite_widget_update_rate: None,
+        export_start_seconds: 0.0,
     }
 }
 

@@ -67,7 +67,8 @@ pub use raster::validate_template_rasters;
 pub use raster::{RasterGeometry, RasterSource, ValidatedRaster};
 pub use route::{validate_route_plot, validate_route_plots, ValidatedRoutePlot};
 pub use scene::{
-    validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig, ValidatedScenePresentation,
+    validate_ffmpeg_config, validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig,
+    ValidatedScenePresentation,
 };
 pub use time::{
     validate_time_value, ElapsedTimeOrigin, ValidatedTimeFormatting, ValidatedTimeValue,
