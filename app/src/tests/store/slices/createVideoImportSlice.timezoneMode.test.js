@@ -51,7 +51,7 @@ describe('signed automatic synchronization and shared calibration', () => {
     }
   }
 
-  test('effective reference baseline -12 and committed -9 capture +3 once, ignoring detected time and transient preview', () => {
+  test('captures effective reference calibration at submission while inspection keeps the detected timestamp', () => {
     const reference = source('reference', '2026-07-18T07:59:00Z')
     const queued = source('queued', '2026-07-18T08:00:40Z')
     const editorSnapshot = {
@@ -70,6 +70,10 @@ describe('signed automatic synchronization and shared calibration', () => {
     }
     expect(resolveVideoSyncState(editorSnapshot, summary).videoSyncOffsetSeconds).toBe(-12)
     const sync = captureBatchSync(editorSnapshot)
+    expect(resolveBatchVideoTiming(reference.metadata, summary, sync.timezoneMode)).toEqual({
+      timing: { mode: 'externalActivity', automaticOffsetSeconds: -60 },
+      hasPositiveOverlap: false,
+    })
     const request = createBatchRenderRequest({
       editorSnapshot,
       sync,
@@ -80,7 +84,7 @@ describe('signed automatic synchronization and shared calibration', () => {
       jobs: [reference, queued].map((video) => ({
         id: video.sourceId,
         source: video,
-        timing: resolveBatchVideoTiming(video.metadata, summary, sync.calibration, video.sourceId === reference.sourceId).timing,
+        timing: resolveBatchVideoTiming(video.metadata, summary, sync.timezoneMode).timing,
         skipOverlay: false,
       })),
     })
@@ -137,12 +141,15 @@ describe('signed automatic synchronization and shared calibration', () => {
       referenceVideo: { ...video, path: 'C:/reference.mp4', committedOffsetSeconds: -10 },
       timezoneMode: null,
     })
-    expect(resolveBatchVideoTiming(video, summary, calibration)).toEqual({
-      timing: { mode: 'externalActivity', automaticOffsetSeconds: -30, offsetSeconds: -10 },
-      hasPositiveOverlap: true,
+    expect(calibration.correctionSeconds).toBe(20)
+    expect(resolveBatchVideoTiming(video, summary, calibration.timezoneMode)).toEqual({
+      timing: { mode: 'externalActivity', automaticOffsetSeconds: -30 },
+      hasPositiveOverlap: false,
     })
     const noCorrection = createBatchCalibration({ activitySummary: summary, referenceVideo: null, timezoneMode: null })
-    expect(resolveBatchVideoTiming({ ...video, creationTime: '2026-07-18T07:59:40Z' }, summary, noCorrection).hasPositiveOverlap).toBe(false)
+    expect(resolveBatchVideoTiming({ ...video, creationTime: '2026-07-18T07:59:40Z' }, summary, noCorrection.timezoneMode).hasPositiveOverlap).toBe(
+      false,
+    )
   })
 
   test('rejects an unresolved reference baseline and uses local zero for per-video embedded telemetry', () => {
@@ -153,9 +160,9 @@ describe('signed automatic synchronization and shared calibration', () => {
         timezoneMode: 'utc',
       }),
     ).toThrow('Could not calibrate reference video')
-    const calibration = createBatchCalibration({ activitySummary: null, referenceVideo: null, timezoneMode: 'utc' })
-    expect(resolveBatchVideoTiming({ creationTime: null }, null, calibration)).toEqual({
-      timing: { mode: 'embeddedActivity', offsetSeconds: 0 },
+    expect(createBatchCalibration({ activitySummary: null, referenceVideo: null, timezoneMode: 'utc' })).toEqual({ mode: 'embeddedActivity' })
+    expect(resolveBatchVideoTiming({ creationTime: null }, null, 'utc')).toEqual({
+      timing: { mode: 'embeddedActivity' },
       hasPositiveOverlap: null,
     })
   })

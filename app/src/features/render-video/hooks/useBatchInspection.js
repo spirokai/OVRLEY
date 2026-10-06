@@ -23,7 +23,7 @@ export default function useBatchInspection({ phase, settings }) {
   const [revision, setRevision] = useState(0)
   const [inspection, setInspection] = useState(null)
   const [plan, setPlan] = useState(null)
-  const referencePath = sync.error ? null : (sync.calibration.reference?.path ?? null)
+  const referencePath = sync.error || sync.activitySummary === null ? null : inputs.importedVideoPath
   const context = useMemo(() => ({ folder, referencePath, revision, open }), [folder, referencePath, revision, open])
   const current = inspection?.context === context ? inspection : null
   const rows = useMemo(() => reviewBatchQueue(choices, current, sync), [choices, current, sync])
@@ -76,7 +76,8 @@ export default function useBatchInspection({ phase, settings }) {
             sources,
             complete: true,
             calibrationSource: referencePath === null ? null : sources.get(referencePath).source,
-            error: referencePath === null ? null : sources.get(referencePath).error,
+            calibrationError: referencePath === null ? null : sources.get(referencePath).error,
+            error: null,
           })
       } catch (error) {
         if (!closed) setInspection({ context, error: error.message, sources: new Map() })
@@ -90,7 +91,8 @@ export default function useBatchInspection({ phase, settings }) {
   }, [open, folder, referencePath, context])
 
   useEffect(() => {
-    if (!open || !current?.complete || current.error || sync.error || jobs.length === 0 || outputDirectory === null) return
+    if (!open || !current?.complete || current.error || current.calibrationError || sync.error || jobs.length === 0 || outputDirectory === null)
+      return
     let closed = false
     void backend
       .planBatchOutputs(
@@ -133,7 +135,7 @@ export default function useBatchInspection({ phase, settings }) {
     batchRunning,
     batchQueue: rowsWithIssues,
     batchReady: ready && !batchRunning,
-    batchReviewError: current?.error ?? sync.error ?? currentPlan?.error ?? null,
+    batchReviewError: current?.error ?? current?.calibrationError ?? sync.error ?? currentPlan?.error ?? null,
     request: ready
       ? { inspectionId: current.inspectionId, outputDirectory, jobs, calibrationSource: current.calibrationSource, sync, reviewedInputs: inputs }
       : null,

@@ -90,7 +90,7 @@ export function createBatchItemProgress(snapshot) {
   }
 }
 
-/** @param {object} inputs Editor synchronization inputs. @returns {object} Review calibration or an actionable error. */
+/** @param {object} inputs Editor synchronization inputs. @returns {object} Review automatic synchronization inputs or an actionable error. */
 export function reviewBatchSync(inputs) {
   try {
     return { ...captureBatchSync(inputs), error: null }
@@ -99,7 +99,7 @@ export function reviewBatchSync(inputs) {
   }
 }
 
-/** @param {object[]} choices User queue. @param {object|null} inspection Current descriptors. @param {object} sync Review calibration. @returns {object[]} Reviewed rows. */
+/** @param {object[]} choices User queue. @param {object|null} inspection Current descriptors. @param {object} sync Automatic synchronization context. @returns {object[]} Reviewed rows. */
 export function reviewBatchQueue(choices, inspection, sync) {
   return choices.map((item) => {
     if (inspection?.error && inspection.error !== 'reinspectionRequired') return { ...item, status: 'blocked', error: inspection.error }
@@ -107,12 +107,7 @@ export function reviewBatchQueue(choices, inspection, sync) {
     if (!result) return { ...item, status: 'checking', error: null }
     if (result.error || sync.error) return { ...item, status: 'blocked', error: result.error ?? sync.error }
     try {
-      const { timing, hasPositiveOverlap } = resolveBatchVideoTiming(
-        result.source.metadata,
-        sync.activitySummary,
-        sync.calibration,
-        result.source.sourceId === inspection.calibrationSource?.sourceId,
-      )
+      const { timing, hasPositiveOverlap } = resolveBatchVideoTiming(result.source.metadata, sync.activitySummary, sync.timezoneMode)
       return {
         ...item,
         source: result.source,

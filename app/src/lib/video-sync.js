@@ -140,28 +140,24 @@ export function createBatchCalibration({ activitySummary, referenceVideo, timezo
 }
 
 /**
- * Adds the captured correction exactly once, then evaluates positive overlap.
- * A queued reference uses its captured effective timestamp/source, including
- * an editor override, so its offset remains the committed reference offset.
- * Embedded telemetry is prepared later by its owning job, with local offset
- * zero; null overlap explicitly means coverage has not yet been inspected.
+ * Evaluates automatic overlap using only the inspected video's timestamp.
+ * Reference overrides and shared calibration belong to render submission.
+ * Embedded telemetry is prepared later by its owning job; null overlap
+ * explicitly means coverage has not yet been inspected.
  * @param {object} video Inspected source metadata with creationTime, timeSource and duration.
  * @param {object|null} activitySummary Shared external activity summary, or null.
- * @param {object} calibration Captured calibration from createBatchCalibration.
- * @param {boolean} [isReferenceVideo=false] Inspection identity matches the reference source. Path spellings are not file identities.
+ * @param {'utc'|'local'} timezoneMode Captured Apply Timezone interpretation.
  * @returns {{timing: object, hasPositiveOverlap: boolean|null}} Job timing and eligibility.
  */
-export function resolveBatchVideoTiming(video, activitySummary, calibration, isReferenceVideo = false) {
-  if (calibration.mode === 'embeddedActivity') return { timing: { mode: 'embeddedActivity', offsetSeconds: 0 }, hasPositiveOverlap: null }
-  const timestampSource = isReferenceVideo ? calibration.reference : video
-  const { automaticOffsetSeconds, activityDurationSeconds } = calculateAutomaticVideoOffset(
-    timestampSource,
-    activitySummary,
-    calibration.timezoneMode,
-  )
-  const offsetSeconds = automaticOffsetSeconds + calibration.correctionSeconds
+export function resolveBatchVideoTiming(video, activitySummary, timezoneMode) {
+  if (activitySummary === null) return { timing: { mode: 'embeddedActivity' }, hasPositiveOverlap: null }
+  const { automaticOffsetSeconds, activityDurationSeconds } = calculateAutomaticVideoOffset(video, activitySummary, timezoneMode)
   return {
-    timing: { mode: 'externalActivity', automaticOffsetSeconds, offsetSeconds },
-    hasPositiveOverlap: videoOverlapsActivity({ videoStart: offsetSeconds, videoDuration: video.duration, activityEnd: activityDurationSeconds }),
+    timing: { mode: 'externalActivity', automaticOffsetSeconds },
+    hasPositiveOverlap: videoOverlapsActivity({
+      videoStart: automaticOffsetSeconds,
+      videoDuration: video.duration,
+      activityEnd: activityDurationSeconds,
+    }),
   }
 }

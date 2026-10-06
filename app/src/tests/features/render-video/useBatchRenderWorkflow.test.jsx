@@ -189,6 +189,38 @@ beforeEach(() => {
 })
 
 describe('native batch workflow', () => {
+  test('keeps an automatically non-overlapping clip blocked even when calibration would move it into the activity', async () => {
+    useStore.setState({ videoSyncOffsetSeconds: -4009 })
+    const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
+    await waitFor(() => expect(result.current.batchReady).toBe(true))
+    expect(result.current.batchQueue.find((row) => row.path === next).status).toBe('pending')
+    expect(result.current.batchQueue.find((row) => row.path === blocked).status).toBe('blocked')
+    await act(async () => result.current.runBatch())
+    expect(acceptedRequest.jobs.some((job) => job.id === blocked)).toBe(false)
+  })
+
+  test('defers an invalid reference timestamp to submission without blocking candidate inspection', async () => {
+    useStore.setState({ importedVideoCreationTime: null })
+    const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
+    await waitFor(() => expect(result.current.batchReady).toBe(true))
+    expect(result.current.batchQueue.find((row) => row.path === next).status).toBe('pending')
+    await expect(result.current.runBatch()).rejects.toThrow('Could not calibrate reference video')
+    expect(backend.submitBatchRender).not.toHaveBeenCalled()
+  })
+
+  test('keeps candidate eligibility independent of an unavailable out-of-folder reference', async () => {
+    const referencePath = 'C:/reference/missing.mp4'
+    useStore.setState({ importedVideoPath: referencePath })
+    vi.mocked(backend.inspectVideoSource).mockImplementation(async (id, path) => {
+      if (path === referencePath) throw new Error('Reference video is unavailable')
+      return source(id, path)
+    })
+    const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
+    await waitFor(() => expect(result.current.batchReviewError).toBe('Reference video is unavailable'))
+    expect(result.current.batchQueue.find((row) => row.path === next).status).toBe('pending')
+    expect(result.current.batchReady).toBe(false)
+  })
+
   test('publishes each inspected row immediately while later sources are still probing', async () => {
     let finish
     vi.mocked(backend.inspectVideoSource).mockImplementation(async (id, path) => {

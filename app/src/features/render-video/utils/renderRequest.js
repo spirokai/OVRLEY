@@ -1,4 +1,4 @@
-import { createBatchCalibration } from '@/lib/video-sync'
+import { captureVideoSyncTimezoneMode, createBatchCalibration } from '@/lib/video-sync'
 import { buildPreviewFrameWindow } from '@/lib/preview-timing'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { validateRenderSettings } from '@/store/slices/createRenderSettingsSlice'
@@ -38,13 +38,18 @@ export function captureRenderEncoding(settings, availableCodecs) {
   return { exportMode, exportCodec: codec, fps, updateRate: widgetUpdateRate, qualityType, qualityValue, qsvFullInitArgs }
 }
 
-/** @param {object} editorSnapshot Editor synchronization inputs. @returns {object} Shared synchronization context for review and submission. */
+/** @param {object} editorSnapshot Editor synchronization inputs. @returns {object} Automatic synchronization context for inspection and submission. */
 export function captureBatchSync(editorSnapshot) {
   const hasExternalActivity = editorSnapshot.parsedActivitySource === 'activity-file'
   const activitySummary = hasExternalActivity ? editorSnapshot.activitySummary : null
   if (hasExternalActivity && activitySummary === null) throw new Error('External activity summary is required for batch synchronization')
+  return { activitySummary, timezoneMode: captureVideoSyncTimezoneMode(editorSnapshot.videoSyncTimezoneMode) }
+}
+
+/** @param {object} options Captured editor/settings and inspected batch sources. @returns {Readonly<object>} Native BatchRenderRequest. */
+export function createBatchRenderRequest({ editorSnapshot, settings, inspectionId, outputDirectory, jobs, calibrationSource, sync }) {
   const referenceVideo =
-    hasExternalActivity && editorSnapshot.importedVideoPath !== null
+    sync.activitySummary !== null && editorSnapshot.importedVideoPath !== null
       ? {
           path: editorSnapshot.importedVideoPath,
           creationTime: editorSnapshot.importedVideoCreationTime,
@@ -52,13 +57,7 @@ export function captureBatchSync(editorSnapshot) {
           committedOffsetSeconds: editorSnapshot.videoSyncOffsetSeconds,
         }
       : null
-  const calibration = createBatchCalibration({ activitySummary, referenceVideo, timezoneMode: editorSnapshot.videoSyncTimezoneMode })
-  return { activitySummary, calibration }
-}
-
-/** @param {object} options Captured editor/settings and inspected batch sources. @returns {Readonly<object>} Native BatchRenderRequest. */
-export function createBatchRenderRequest({ editorSnapshot, settings, inspectionId, outputDirectory, jobs, calibrationSource, sync }) {
-  const { calibration } = sync
+  const calibration = createBatchCalibration({ activitySummary: sync.activitySummary, referenceVideo, timezoneMode: sync.timezoneMode })
   const activity =
     calibration.mode === 'embeddedActivity'
       ? { mode: 'embeddedActivity' }
@@ -76,7 +75,12 @@ export function createBatchRenderRequest({ editorSnapshot, settings, inspectionI
                   committedOffsetSeconds: calibration.reference.committedOffsetSeconds,
                   automaticOffsetSeconds: calibration.reference.automaticOffsetSeconds,
                 },
-          automaticOffsets: Object.fromEntries(jobs.map(({ source, timing }) => [source.sourceId, timing.automaticOffsetSeconds])),
+          automaticOffsets: Object.fromEntries(
+            jobs.map(({ source, timing }) => [
+              source.sourceId,
+              source.sourceId === calibrationSource?.sourceId ? calibration.reference.automaticOffsetSeconds : timing.automaticOffsetSeconds,
+            ]),
+          ),
         }
   return freezeRequest(
     structuredClone({
