@@ -15,19 +15,20 @@ use super::queue::WriterResult;
 
 /// Single source of truth for whether the pipeline should stop and why.
 ///
-/// Wraps the controller's cancel flag and adds error recording so the dual
-/// `cancel_flag` + `pipeline_failed` atomics are replaced by one abstraction
-/// that records whether shutdown was initiated by user cancellation or by a
-/// pipeline failure, preserving the first error.
+/// Observes session cancellation without writing it. A pipeline failure stops
+/// this item's workers and preserves its first error; it must not request
+/// cancellation of the entire reserved operation.
 pub(crate) struct PipelineShutdown {
-    flag: Arc<AtomicBool>,
+    session_cancel: Arc<AtomicBool>,
+    failed: AtomicBool,
     error: Mutex<Option<CoreError>>,
 }
 
 impl PipelineShutdown {
     pub(crate) fn new(cancel_flag: Arc<AtomicBool>) -> Self {
         Self {
-            flag: cancel_flag,
+            session_cancel: cancel_flag,
+            failed: AtomicBool::new(false),
             error: Mutex::new(None),
         }
     }
@@ -37,7 +38,11 @@ impl PipelineShutdown {
     }
 
     pub(crate) fn is_stopped(&self) -> bool {
-        self.flag.load(Ordering::SeqCst)
+        self.session_cancel.load(Ordering::SeqCst) || self.failed.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn is_cancelled(&self) -> bool {
+        self.session_cancel.load(Ordering::SeqCst)
     }
 
     /// Records a failure and signals all observers to stop.
@@ -46,11 +51,11 @@ impl PipelineShutdown {
     /// seeing `is_stopped() == true` will also observe the recorded error.
     pub(crate) fn signal_failure(&self, error: CoreError) {
         self.error.lock().unwrap().get_or_insert(error);
-        self.flag.store(true, Ordering::SeqCst);
+        self.failed.store(true, Ordering::SeqCst);
     }
 
     pub(crate) fn has_error(&self) -> bool {
-        self.error.lock().unwrap().is_some()
+        self.failed.load(Ordering::SeqCst)
     }
 
     pub(crate) fn take_error(&self) -> Option<CoreError> {
@@ -60,9 +65,14 @@ impl PipelineShutdown {
     /// Returns `Err` if shutdown has been signalled, distinguishing
     /// cancellation (no error recorded) from pipeline failure.
     pub(crate) fn check(&self) -> CoreResult<()> {
-        if self.flag.load(Ordering::SeqCst) {
+        if self.is_stopped() {
             if let Some(err) = self.take_error() {
                 return Err(err);
+            }
+            if self.has_error() {
+                return Err(CoreError::Encode(
+                    "Encoder pipeline stopped after failure".into(),
+                ));
             }
             return Err(CoreError::Cancelled);
         }
@@ -168,18 +178,61 @@ impl Drop for FfmpegChildGuard {
                 "Could not terminate leaked {} ffmpeg process: {error}",
                 self.pipeline
             );
-            return;
         }
-        match poll_child_exit(&mut self.child, FFMPEG_TERMINATE_TIMEOUT, self.pipeline) {
-            Ok(Some(_)) => {}
-            Ok(None) => log::warn!(
-                "{} ffmpeg process did not exit during cleanup",
-                self.pipeline
-            ),
-            Err(error) => log::warn!(
+        if let Err(error) = self.child.wait() {
+            log::warn!(
                 "Could not reap {} ffmpeg process during cleanup: {error}",
                 self.pipeline
-            ),
+            );
+        }
+    }
+}
+
+/// Pipeline-owned process and threads. Early returns and unwinding stop this
+/// item, reap FFmpeg, and join both threads before partial-output cleanup runs.
+pub(crate) struct PipelineProcesses {
+    pub(crate) child: FfmpegChildGuard,
+    pub(crate) writer: Option<JoinHandle<CoreResult<WriterResult>>>,
+    pub(crate) monitor: Option<JoinHandle<()>>,
+    shutdown: Arc<PipelineShutdown>,
+}
+
+impl PipelineProcesses {
+    pub(crate) fn new(
+        child: Child,
+        pipeline: PipelineKind,
+        shutdown: Arc<PipelineShutdown>,
+    ) -> Self {
+        Self {
+            child: FfmpegChildGuard::new(child, pipeline),
+            writer: None,
+            monitor: None,
+            shutdown,
+        }
+    }
+}
+
+impl Drop for PipelineProcesses {
+    fn drop(&mut self) {
+        if self.writer.is_none() && self.monitor.is_none() {
+            return;
+        }
+        self.shutdown.signal_failure(CoreError::Encode(
+            "Encoder pipeline ended before teardown".into(),
+        ));
+        let pipeline = self.child.pipeline;
+        if let Err(error) = terminate_ffmpeg(&mut self.child, pipeline) {
+            log::warn!("Could not stop {pipeline} ffmpeg during pipeline cleanup: {error}");
+        }
+        if let Some(writer) = self.writer.take() {
+            if let Err(error) = join_shutdown_thread(writer, "Encoder writer thread") {
+                log::warn!("Could not join {pipeline} writer during cleanup: {error}");
+            }
+        }
+        if let Some(monitor) = self.monitor.take() {
+            if let Err(error) = join_shutdown_thread(monitor, "FFmpeg monitor thread") {
+                log::warn!("Could not join {pipeline} monitor during cleanup: {error}");
+            }
         }
     }
 }
@@ -199,14 +252,13 @@ pub(crate) struct PipelineOutcome<T> {
 /// Drains the writer and resolves cancellation, producer, writer, monitor, and
 /// FFmpeg results in one canonical order for every encode mode.
 pub(crate) fn finalize_pipeline<T, P: PipelineFailurePolicy>(
-    child: &mut Child,
-    writer_thread: JoinHandle<CoreResult<WriterResult>>,
-    monitor_thread: JoinHandle<()>,
+    processes: &mut PipelineProcesses,
     producer_result: CoreResult<T>,
     shutdown: &PipelineShutdown,
     pipeline: PipelineKind,
     failure_policy: &P,
 ) -> CoreResult<PipelineOutcome<T>> {
+    let child = &mut *processes.child;
     let (writer_thread_name, monitor_thread_name) = match pipeline {
         PipelineKind::Transparent => ("Encoder writer thread", "FFmpeg monitor thread"),
         PipelineKind::Composite => (
@@ -214,7 +266,7 @@ pub(crate) fn finalize_pipeline<T, P: PipelineFailurePolicy>(
             "Composite ffmpeg monitor thread",
         ),
     };
-    let mut was_cancelled = shutdown.is_stopped() && !shutdown.has_error();
+    let mut was_cancelled = shutdown.is_cancelled();
     let producer_failed = producer_result.is_err();
     let writer_failed_before_teardown = shutdown.has_error();
     let mut shutdown_error = None;
@@ -226,13 +278,27 @@ pub(crate) fn finalize_pipeline<T, P: PipelineFailurePolicy>(
             Err(error) => shutdown_error = Some(error),
         }
     } else {
-        match unblock_stalled_writer(&writer_thread, child, pipeline, shutdown) {
+        match unblock_stalled_writer(
+            processes
+                .writer
+                .as_ref()
+                .expect("pipeline writer must be started"),
+            child,
+            pipeline,
+            shutdown,
+        ) {
             Ok(cancelled) => was_cancelled |= cancelled,
             Err(error) => shutdown_error = Some(error),
         }
     }
 
-    let writer_result = join_shutdown_thread(writer_thread, writer_thread_name);
+    let writer_result = join_shutdown_thread(
+        processes
+            .writer
+            .take()
+            .expect("pipeline writer must be joined once"),
+        writer_thread_name,
+    );
     if status.is_none()
         && shutdown_error.is_none()
         && !was_cancelled
@@ -247,7 +313,13 @@ pub(crate) fn finalize_pipeline<T, P: PipelineFailurePolicy>(
             Err(error) => shutdown_error = Some(error),
         }
     }
-    let monitor_result = join_shutdown_thread(monitor_thread, monitor_thread_name);
+    let monitor_result = join_shutdown_thread(
+        processes
+            .monitor
+            .take()
+            .expect("pipeline monitor must be joined once"),
+        monitor_thread_name,
+    );
 
     if was_cancelled {
         return Err(CoreError::Cancelled);
@@ -264,11 +336,15 @@ pub(crate) fn finalize_pipeline<T, P: PipelineFailurePolicy>(
         }
     };
     if writer_failed_before_teardown {
-        let error = writer_result.err().unwrap_or_else(|| {
-            CoreError::Encode(format!(
-                "{pipeline} encoder writer stopped without reporting its failure"
-            ))
-        });
+        let error = match writer_result {
+            Err(error) => error,
+            Ok(_) => {
+                producer_result?;
+                return Err(shutdown
+                    .take_error()
+                    .expect("failed pipeline must report its error"));
+            }
+        };
         return Err(failure_policy.writer_failure(error, status));
     }
     let producer = producer_result?;
@@ -303,7 +379,7 @@ pub(crate) fn unblock_stalled_writer<T>(
         if shutdown.is_stopped() {
             let _ = terminate_ffmpeg(child, pipeline)?;
             if wait_for_thread(writer, FFMPEG_TERMINATE_TIMEOUT) {
-                return Ok(true);
+                return Ok(shutdown.is_cancelled());
             }
             return Err(CoreError::Encode(format!(
                 "{pipeline} encoder writer did not stop after cancellation"
@@ -339,10 +415,11 @@ pub(crate) fn wait_for_ffmpeg(
         if let Some(status) = child.try_wait().map_err(|error| {
             CoreError::Encode(format!("{pipeline} ffmpeg process error: {error}"))
         })? {
-            return Ok((status, shutdown.is_stopped()));
+            return Ok((status, shutdown.is_cancelled()));
         }
         if shutdown.is_stopped() {
-            return terminate_ffmpeg(child, pipeline).map(|status| (status, true));
+            return terminate_ffmpeg(child, pipeline)
+                .map(|status| (status, shutdown.is_cancelled()));
         }
         if Instant::now() >= deadline {
             break;
@@ -371,20 +448,21 @@ pub(crate) fn terminate_ffmpeg(
     child.kill().map_err(|error| {
         CoreError::Encode(format!("Failed to terminate {pipeline} ffmpeg: {error}"))
     })?;
-    poll_child_exit(child, FFMPEG_TERMINATE_TIMEOUT, pipeline)?.ok_or_else(|| {
-        CoreError::Encode(format!(
-            "{pipeline} ffmpeg did not exit after forced termination"
-        ))
-    })
+    if let Some(status) = poll_child_exit(child, FFMPEG_TERMINATE_TIMEOUT, pipeline)? {
+        return Ok(status);
+    }
+    // Retain native ownership if termination is slow. A timeout is diagnostic,
+    // never permission to detach a live process and release the renderer.
+    log::warn!("{pipeline} ffmpeg is still stopping after forced termination");
+    child
+        .wait()
+        .map_err(|error| CoreError::Encode(format!("Could not reap {pipeline} ffmpeg: {error}")))
 }
 
-/// Joins an encoder-owned thread without allowing teardown to block forever.
+/// Joins an encoder-owned thread before releasing native execution ownership.
 pub(crate) fn join_shutdown_thread<T>(handle: JoinHandle<T>, thread_name: &str) -> CoreResult<T> {
     if !wait_for_thread(&handle, FFMPEG_TERMINATE_TIMEOUT) {
-        return Err(CoreError::Encode(format!(
-            "{thread_name} did not stop within {} seconds of encoder shutdown",
-            FFMPEG_TERMINATE_TIMEOUT.as_secs()
-        )));
+        log::warn!("{thread_name} is still stopping after encoder shutdown");
     }
     handle
         .join()

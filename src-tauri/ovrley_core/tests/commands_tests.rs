@@ -29,20 +29,18 @@ mod common;
 
 use std::path::PathBuf;
 
-use serde_json::Value;
-
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
 use ovrley_core::commands::backend_render;
 use ovrley_core::debug::RenderProgress;
 use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
-use ovrley_core::encode::progress::RenderController;
 use ovrley_core::error::CoreError;
 use ovrley_core::normalize::raw::parse_config_json;
 use ovrley_core::normalize::raw::{RasterConfig, RenderConfig};
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::raster::{RasterResourceResolver, SelectedRaster};
+use ovrley_core::render_jobs::execution::RenderExecutionService;
 
 struct EmptyRasterResources;
 
@@ -50,6 +48,83 @@ impl RasterResourceResolver for EmptyRasterResources {
     fn resolve(&self, _: &str) -> Option<std::sync::Arc<SelectedRaster>> {
         None
     }
+}
+
+/// Acceptance must retain the resolved image after the editor releases its
+/// registry entry. The worker must reach activity parsing without resolving
+/// that handle again, and release the image when preparation fails.
+#[test]
+fn app_render_retains_raster_until_worker_cleanup() {
+    use ovrley_core::encode::progress::ProgressSink;
+    use std::sync::{Arc, Mutex};
+
+    struct Resources(Mutex<Option<Arc<SelectedRaster>>>);
+    impl RasterResourceResolver for Resources {
+        fn resolve(&self, id: &str) -> Option<Arc<SelectedRaster>> {
+            assert_eq!(id, "selected-image");
+            self.0.lock().unwrap().clone()
+        }
+    }
+    struct ReleaseOnAcceptance(Arc<Resources>);
+    impl ProgressSink for ReleaseOnAcceptance {
+        fn emit_progress(&self, progress: &RenderProgress) {
+            if progress.status == "preparing" && progress.total == 0 {
+                self.0 .0.lock().unwrap().take();
+            }
+        }
+    }
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgba8(image::RgbaImage::new(1, 1))
+        .write_to(&mut bytes, image::ImageFormat::Png)
+        .unwrap();
+    let image =
+        Arc::new(ovrley_core::raster::load_embedded_raster("png", bytes.into_inner()).unwrap());
+    let image_lifetime = Arc::downgrade(&image);
+    let resources = Arc::new(Resources(Mutex::new(Some(image))));
+    let service =
+        RenderExecutionService::with_sink(Arc::new(ReleaseOnAcceptance(resources.clone())));
+    let mut config = transparent_config(0.0, 1.0, 30.0);
+    config.rasters.push(RasterConfig {
+        id: "one".into(),
+        x: 0.0,
+        y: 0.0,
+        width: 1.0,
+        height: 1.0,
+        rotation: 0.0,
+        opacity: 1.0,
+        path: Some(
+            std::env::current_dir()
+                .unwrap()
+                .join("unavailable.png")
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        resource_id: Some("selected-image".into()),
+        resource_error_code: None,
+    });
+    let output_path =
+        std::env::temp_dir().join(format!("ovrley-pinned-raster-{}.mov", std::process::id()));
+    let accepted = backend_render(
+        &AppPaths::from_repo_root(PathBuf::from(".")),
+        &service,
+        &serde_json::to_string(&config).unwrap(),
+        "not json",
+        output_path.to_str().unwrap(),
+        false,
+        Some(&*resources),
+    )
+    .unwrap();
+    assert!(accepted.started);
+    assert!(resources.0.lock().unwrap().is_none());
+    let progress = wait_for_completed_progress(&service);
+    assert_eq!(progress.status, "error");
+    assert!(
+        progress.message.contains("expected ident"),
+        "{}",
+        progress.message
+    );
+    assert!(image_lifetime.upgrade().is_none());
+    assert!(!output_path.exists());
 }
 
 /// Verifies the transparent render branch does not alter dense activity
@@ -93,7 +168,7 @@ fn app_render_rejects_a_raster_without_its_loaded_resource() {
     });
     let error = backend_render(
         &AppPaths::from_repo_root(PathBuf::from(".")),
-        &RenderController::default(),
+        &RenderExecutionService::default(),
         &serde_json::to_string(&config).unwrap(),
         &synthetic_activity_json(),
         &render_output_path("missing-raster"),
@@ -113,7 +188,7 @@ fn app_render_rejects_a_raster_without_its_loaded_resource() {
 #[test]
 fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
     let paths = AppPaths::from_repo_root(PathBuf::from("."));
-    let controller = RenderController::default();
+    let controller = RenderExecutionService::default();
     let result = backend_render(
         &paths,
         &controller,
@@ -137,14 +212,14 @@ fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
     )
     .unwrap();
 
-    assert_eq!(result.get("started").and_then(Value::as_bool), Some(true));
-    assert!(controller.progress().total > 0);
+    assert!(result.started);
+    assert!(wait_for_completed_progress(&controller).total > 0);
 }
 
 #[test]
 fn output_rejection_precedes_malformed_activity_processing() {
     let paths = AppPaths::from_repo_root(PathBuf::from("."));
-    let controller = RenderController::default();
+    let controller = RenderExecutionService::default();
     let output_path = std::env::temp_dir().join(format!(
         "ovrley-command-rejection-{}.mov",
         std::time::SystemTime::now()
@@ -173,7 +248,7 @@ fn output_rejection_precedes_malformed_activity_processing() {
 #[test]
 fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
     let paths = AppPaths::from_repo_root(PathBuf::from("."));
-    let controller = RenderController::default();
+    let controller = RenderExecutionService::default();
     let result = backend_render(
         &paths,
         &controller,
@@ -197,8 +272,8 @@ fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
     )
     .unwrap();
 
-    assert_eq!(result.get("started").and_then(Value::as_bool), Some(true));
-    assert_eq!(controller.progress().total, 11530);
+    assert!(result.started);
+    assert_eq!(wait_for_completed_progress(&controller).total, 11530);
 }
 
 #[test]
@@ -218,7 +293,7 @@ fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
 fn test_4_3_composite_branch_reaches_pipeline_shell() {
     let ws_root = common::test_config::workspace_root();
     let paths = test_paths(ws_root.clone());
-    let controller = RenderController::default();
+    let controller = RenderExecutionService::default();
     let video_path = common::test_config::sample_video_path();
 
     let result = backend_render(
@@ -245,7 +320,7 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
     )
     .unwrap();
 
-    assert_eq!(result.get("started").and_then(Value::as_bool), Some(true));
+    assert!(result.started);
     let progress = wait_for_completed_progress(&controller);
     assert_eq!(progress.status, "complete", "{}", progress.message);
     assert_eq!(progress.total, 6);
@@ -544,10 +619,10 @@ fn test_paths(ws_root: PathBuf) -> AppPaths {
 /// Polls the controller every 20ms for up to 6 seconds, returning the
 /// final progress snapshot once the render reaches `complete` or `error`.
 /// If the timeout expires, returns whatever progress exists at that point.
-fn wait_for_completed_progress(controller: &RenderController) -> RenderProgress {
+fn wait_for_completed_progress(controller: &RenderExecutionService) -> RenderProgress {
     for _ in 0..300 {
         let progress = controller.progress();
-        if progress.status == "complete" || progress.status == "error" {
+        if !progress.busy {
             return progress;
         }
         std::thread::sleep(std::time::Duration::from_millis(20));

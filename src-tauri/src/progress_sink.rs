@@ -2,7 +2,7 @@
 //! frontend as Tauri `render-progress` events.
 //!
 //! Owns: `TauriProgressSink` — the concrete `ProgressSink` implementation
-//!   installed on `RenderController` at app startup.
+//!   installed on the native execution service at app startup.
 //! Does not own: render state, event payload shape (both belong to
 //!   `ovrley_core::encode::progress`).
 //!
@@ -25,8 +25,7 @@ pub const RENDER_PROGRESS_EVENT: &str = "render-progress";
 ///
 /// `AppHandle` is `Clone + Send + Sync` and the `Emitter::emit` signature is
 /// `&self`, so a single shared handle serves all `RenderController` clones
-/// (the one in Tauri managed state, and the one moved into the background
-/// render thread).
+/// held by the execution service and its native workers.
 #[derive(Debug, Clone)]
 pub(crate) struct TauriProgressSink {
     app: AppHandle,

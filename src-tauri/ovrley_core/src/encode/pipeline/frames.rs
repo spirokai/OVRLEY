@@ -70,6 +70,19 @@ struct CompletedFrame {
     completed_at: Instant,
 }
 
+/// Wakes the coordinator and other workers if a frame worker unwinds.
+struct FrameWorkerFailureGuard<'a>(&'a PipelineShutdown);
+
+impl Drop for FrameWorkerFailureGuard<'_> {
+    fn drop(&mut self) {
+        if thread::panicking() {
+            self.0.signal_failure(CoreError::Render(
+                "Parallel frame render worker panicked".into(),
+            ));
+        }
+    }
+}
+
 enum WorkerEvent {
     Rendered {
         output_frame_index: u64,
@@ -116,6 +129,7 @@ pub(crate) fn render_frames_parallel(
             let next_task = &next_task;
 
             handles.push(scope.spawn(move || {
+                let _failure_guard = FrameWorkerFailureGuard(shutdown);
                 let mut profiler = RenderProfiler::default();
                 loop {
                     if shutdown.is_stopped() {
@@ -223,7 +237,7 @@ pub(crate) fn render_frames_parallel(
         let mut last_progress_at = Instant::now();
         let mut previous_progress = 0u32;
 
-        let coordinator_result = (|| -> CoreResult<()> {
+        let coordinator_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> CoreResult<()> {
             while written_frames < total_frames {
                 if let Err(e) = shutdown.check() {
                     return Err(e);
@@ -358,8 +372,15 @@ pub(crate) fn render_frames_parallel(
                 }
             }
             Ok(())
-        })();
+        })).unwrap_or_else(|_| Err(CoreError::Render("Frame coordinator panicked".into())));
 
+        if let Err(error) = &coordinator_result {
+            if !matches!(error, CoreError::Cancelled) {
+                shutdown.signal_failure(CoreError::Render(format!(
+                    "Frame coordination stopped: {error}"
+                )));
+            }
+        }
         let mut timings = coordinator_profiler.summary();
         let mut worker_panic = None;
         for handle in handles {

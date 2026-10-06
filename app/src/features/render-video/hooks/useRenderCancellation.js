@@ -9,7 +9,7 @@ export default function useRenderCancellation({ status, onCancel }) {
   const [isCancelling, setIsCancelling] = useState(false)
 
   useEffect(() => {
-    if (status !== 'rendering') setIsCancelling(false)
+    if (['idle', 'complete', 'cancelled', 'error'].includes(status)) setIsCancelling(false)
   }, [status])
 
   const handleCancel = async () => {
@@ -22,5 +22,5 @@ export default function useRenderCancellation({ status, onCancel }) {
     }
   }
 
-  return { isCancelling, handleCancel }
+  return { isCancelling: isCancelling || status === 'cancelling', handleCancel }
 }

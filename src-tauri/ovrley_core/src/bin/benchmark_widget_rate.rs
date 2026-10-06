@@ -18,6 +18,7 @@ use ovrley_core::encode::progress::RenderController;
 use ovrley_core::media::video_probe::probe_video;
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
+use ovrley_core::render_jobs::execution::RenderExecutionService;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -334,7 +335,9 @@ fn main() -> Result<(), String> {
                     (overlay_duration * overlay_pipe_fps).ceil().max(1.0) as u32;
 
                 let controller = RenderController::default();
-                if let Err(e) = controller.try_start(
+                let execution = RenderExecutionService::with_controller(controller.clone());
+                let reservation = execution.reserve().map_err(|error| error.to_string())?;
+                if let Err(e) = reservation.begin_item(
                     overlay_frame_count,
                     &format!("Benchmark {display_name} ur{update_rate} run {run_num}"),
                 ) {
@@ -368,7 +371,6 @@ fn main() -> Result<(), String> {
                     RenderOutputKind::Composite,
                     true,
                 )
-                .map_err(|error| error.to_string())
                 .and_then(|target| {
                     render_composite_video(
                         &paths,
@@ -380,8 +382,10 @@ fn main() -> Result<(), String> {
                         true,
                         &target,
                     )
-                    .map_err(|error| error.to_string())
                 });
+                let render_result = reservation
+                    .complete(render_result)
+                    .map_err(|error| error.to_string());
                 let elapsed_secs = started.elapsed().as_secs_f64();
 
                 match render_result {

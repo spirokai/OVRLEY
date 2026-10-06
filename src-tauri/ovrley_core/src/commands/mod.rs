@@ -10,20 +10,13 @@ pub mod elevation_geometry;
 pub mod route_geometry;
 
 use crate::activity::finalize::FinalizeActivityResponse;
-use crate::activity::schema::ParsedActivity;
-use crate::activity::{
-    build_dense_activity_report_for_timeline, build_dense_activity_report_validated,
-    parse_activity_json,
-};
+use crate::activity::{build_dense_activity_report_validated, parse_activity_json};
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::binary::resolve_ffmpeg_binary;
-use crate::encode::pipeline::composite::render_composite_video;
-use crate::encode::pipeline::composite_plan::derive_composite_render_plan;
-use crate::encode::pipeline::transparent::{render_video, rendered_frame_count};
-use crate::encode::progress::RenderController;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::{parse_config_json, parse_template_json};
-use crate::output::{RenderOutputKind, RenderOutputTarget};
+use crate::output::RenderOutputKind;
+use crate::render_jobs::execution::{RenderAccepted, RenderExecutionService};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
@@ -124,71 +117,25 @@ pub fn backend_font_data(
 
 /// Starts a background video render.
 ///
-/// The function returns immediately after validating inputs and registering a
-/// render with the controller. Completion, errors, and cancellation are exposed
-/// through [`backend_progress`].
+/// Acceptance validates the output and retains raster resources. The execution
+/// service owns blocking preparation, dispatch, and completion after cleanup.
 pub fn backend_render(
     paths: &AppPaths,
-    controller: &RenderController,
+    execution: &RenderExecutionService,
     config_json: &str,
     parsed_activity_json: &str,
     output_path: &str,
     overwrite: bool,
     raster_resources: Option<&dyn crate::raster::RasterResourceResolver>,
-) -> CoreResult<Value> {
-    let config = parse_config_json(config_json)?;
-    let validated =
-        crate::normalize::validate_render_config_with_resources(config, raster_resources)?;
-    let output_kind = if validated.scene.composite_video_path.is_some() {
-        RenderOutputKind::Composite
-    } else {
-        RenderOutputKind::Transparent
-    };
-    let output_target = RenderOutputTarget::validate(output_path, output_kind, overwrite)?;
-    let parsed_activity = parse_activity_json(parsed_activity_json)?;
-    if output_kind == RenderOutputKind::Composite {
-        return start_composite_render(
-            paths,
-            controller,
-            validated,
-            parsed_activity,
-            output_target,
-        );
-    }
-
-    let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
-    let output_frame_count =
-        rendered_frame_count(dense_activity.frame_count, validated.widget_update_rate())?;
-    let output_frame_count = u32::try_from(output_frame_count).map_err(|_| {
-        CoreError::Encode("Transparent progress frame count exceeds u32".to_string())
-    })?;
-    let render_id = controller.try_start(output_frame_count, "Preparing render assets...")?;
-
-    let controller_clone = controller.clone();
-    let paths = paths.clone();
-    let output_target_for_render = output_target.clone();
-    std::thread::spawn(move || {
-        match render_video(
-            &paths,
-            &validated,
-            &parsed_activity,
-            &dense_activity,
-            &controller_clone,
-            &output_target_for_render,
-        ) {
-            Ok(filename) => controller_clone.finish_success(filename),
-            Err(error) => {
-                let cancelled = matches!(error, CoreError::Cancelled);
-                controller_clone.finish_error(error.to_string(), cancelled);
-            }
-        }
-    });
-
-    Ok(json!({
-        "started": true,
-        "render_id": render_id,
-        "outputPath": output_target.path()
-    }))
+) -> CoreResult<RenderAccepted> {
+    execution.submit_single(
+        paths,
+        config_json,
+        parsed_activity_json,
+        output_path,
+        overwrite,
+        raster_resources,
+    )
 }
 
 /// Renders one transparent preview PNG for the requested second.
@@ -230,71 +177,14 @@ pub fn backend_render_preview_frame(
     }))
 }
 
-/// Starts the composite render branch after deriving composite timing.
-///
-/// This branch validates inputs, builds the adjusted dense report, starts
-/// progress, and dispatches to the composite pipeline shell.
-fn start_composite_render(
-    paths: &AppPaths,
-    controller: &RenderController,
-    mut validated: crate::normalize::ValidatedRenderConfig,
-    parsed_activity: ParsedActivity,
-    output_target: RenderOutputTarget,
-) -> CoreResult<Value> {
-    let activity_end = parsed_activity.trim_end_seconds.max(
-        parsed_activity
-            .sample_elapsed_seconds
-            .last()
-            .copied()
-            .unwrap_or_default(),
-    );
-    let plan = derive_composite_render_plan(&mut validated.scene, Some(activity_end))?;
-    let dense_activity = build_dense_activity_report_for_timeline(
-        &parsed_activity,
-        &validated,
-        plan.overlay_pipe_fps
-            .timeline_for_duration(plan.activity_overlap_duration)?,
-    )?;
-
-    let render_id = controller.try_start(plan.output_frame_count, "Compositing video...")?;
-
-    let controller_clone = controller.clone();
-    let paths = paths.clone();
-    let output_target_for_render = output_target.clone();
-    std::thread::spawn(move || {
-        match render_composite_video(
-            &paths,
-            &validated,
-            &parsed_activity,
-            &dense_activity,
-            &controller_clone,
-            plan,
-            true,
-            &output_target_for_render,
-        ) {
-            Ok(filename) => controller_clone.finish_success(filename),
-            Err(error) => {
-                let cancelled = matches!(error, CoreError::Cancelled);
-                controller_clone.finish_error(error.to_string(), cancelled);
-            }
-        }
-    });
-
-    Ok(json!({
-        "started": true,
-        "render_id": render_id,
-        "outputPath": output_target.path()
-    }))
-}
-
 /// Returns the current render progress snapshot.
-pub fn backend_progress(controller: &RenderController) -> RenderProgress {
-    controller.progress()
+pub fn backend_progress(execution: &RenderExecutionService) -> RenderProgress {
+    execution.progress()
 }
 
 /// Requests cancellation of the active render, if one is running.
-pub fn backend_cancel(controller: &RenderController) -> Value {
-    let had_active_render = controller.cancel();
+pub fn backend_cancel(execution: &RenderExecutionService) -> Value {
+    let had_active_render = execution.cancel();
     json!({
         "success": true,
         "message": if had_active_render {

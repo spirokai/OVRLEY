@@ -13,11 +13,9 @@ use std::collections::VecDeque;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::ChildStderr;
-use std::sync::atomic::Ordering;
 use std::sync::mpsc::{Receiver, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::thread::JoinHandle;
 use std::time::Instant;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
@@ -37,12 +35,10 @@ use crate::encode::pipeline::frame_pool::{
 };
 use crate::encode::pipeline::frames::render_frames_parallel;
 use crate::encode::pipeline::lifecycle::{
-    finalize_pipeline, FfmpegChildGuard, PartialOutputGuard, PipelineFailurePolicy, PipelineKind,
+    finalize_pipeline, PartialOutputGuard, PipelineFailurePolicy, PipelineKind, PipelineProcesses,
     PipelineShutdown,
 };
-use crate::encode::pipeline::queue::{
-    merge_timing_maps, writer_worker, FrameBuffer, WriterMode, WriterResult,
-};
+use crate::encode::pipeline::queue::{merge_timing_maps, writer_worker, FrameBuffer, WriterMode};
 use crate::encode::progress::RenderController;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::ValidatedRenderConfig;
@@ -91,14 +87,9 @@ impl PipelineFailurePolicy for CompositeFailurePolicy<'_> {
 
 // ── Spawned process ownership ─────────────────────────────────────────────
 
-/// Owns the FFmpeg child process and background threads spawned for one
-/// composite render. The render loop borrows [`child`](Self::child) for
-/// liveness checks; teardown moves the writer and monitor threads into
-/// [`finalize_pipeline`].
+/// Composite diagnostics accompany the shared pipeline process owner.
 struct CompositeProcesses {
-    child: FfmpegChildGuard,
-    writer: JoinHandle<CoreResult<WriterResult>>,
-    monitor: JoinHandle<()>,
+    pipeline: PipelineProcesses,
     stderr_lines: Arc<Mutex<VecDeque<String>>>,
 }
 
@@ -117,28 +108,29 @@ fn spawn_composite_pipeline(
     SyncSender<FrameBuffer>,
     Receiver<FrameBuffer>,
 )> {
-    let mut child = FfmpegChildGuard::new(
+    let mut pipeline = PipelineProcesses::new(
         spawn_ffmpeg(
             ffmpeg_bin,
             &plan.ffmpeg_settings.command_args(&plan.output_path),
         )?,
         PipelineKind::Composite,
+        Arc::clone(shutdown),
     );
-    let stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| CoreError::Encode("Failed to capture composite ffmpeg stdin".to_string()))?;
-    let stderr = child.stderr.take().ok_or_else(|| {
+    let stdin =
+        pipeline.child.stdin.take().ok_or_else(|| {
+            CoreError::Encode("Failed to capture composite ffmpeg stdin".to_string())
+        })?;
+    let stderr = pipeline.child.stderr.take().ok_or_else(|| {
         CoreError::Encode("Failed to capture composite ffmpeg stderr".to_string())
     })?;
 
     let stderr_lines = Arc::new(Mutex::new(VecDeque::with_capacity(
         FFMPEG_STDERR_LINE_LIMIT,
     )));
-    let monitor = {
+    pipeline.monitor = Some({
         let lines = stderr_lines.clone();
         thread::spawn(move || monitor_composite_ffmpeg(stderr, lines))
-    };
+    });
 
     let ParallelFrameChannels {
         frame_sender,
@@ -147,7 +139,7 @@ fn spawn_composite_pipeline(
         free_receiver,
     } = channels;
 
-    let writer = {
+    pipeline.writer = Some({
         let shutdown = Arc::clone(shutdown);
         thread::spawn(move || {
             writer_worker(
@@ -158,12 +150,10 @@ fn spawn_composite_pipeline(
                 WriterMode::Composite,
             )
         })
-    };
+    });
 
     let processes = CompositeProcesses {
-        child,
-        writer,
-        monitor,
+        pipeline,
         stderr_lines,
     };
     Ok((processes, frame_sender, free_receiver))
@@ -188,9 +178,7 @@ fn finalize_and_summarize(
 ) -> CoreResult<String> {
     let ffmpeg_finalize_started = Instant::now();
     let outcome = finalize_pipeline(
-        &mut *processes.child,
-        processes.writer,
-        processes.monitor,
+        &mut processes.pipeline,
         render_result,
         shutdown,
         PipelineKind::Composite,
@@ -270,9 +258,7 @@ pub fn render_composite_video(
     include_audio: bool,
     output_target: &RenderOutputTarget,
 ) -> CoreResult<String> {
-    if controller.cancel_flag().load(Ordering::SeqCst) {
-        return Err(CoreError::Cancelled);
-    }
+    controller.check_cancelled()?;
     let shutdown = PipelineShutdown::shared(controller.cancel_flag());
 
     // ── PHASE 1: DERIVE PIPELINE PLAN (timing, FPS, FFmpeg args, output path) ──
@@ -283,6 +269,7 @@ pub fn render_composite_video(
         scene.width,
         scene.height,
     )?;
+    controller.check_cancelled()?;
     let include_audio = include_audio && source_has_audio;
     let plan = derive_composite_pipeline_plan(
         paths,
@@ -314,12 +301,12 @@ pub fn render_composite_video(
     let channels =
         ParallelFramePoolPlan::for_frame_size(plan.frame_size, workers)?.create_channels()?;
 
-    let mut output_guard = PartialOutputGuard::new(&plan.output_path);
     controller.set_frame_progress(0, plan.render.output_frame_count, 0, None, None);
 
     // ── PHASE 2: PREPARE SKIA ASSETS ──
     let (prepared_preview_assets, _, _, _) =
         prepare_preview_assets(paths, config, activity, dense_activity)?;
+    controller.check_cancelled()?;
     let renderer = VideoFrameRenderer::new(
         paths,
         dense_activity,
@@ -330,6 +317,8 @@ pub fn render_composite_video(
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
 
     // ── PHASE 3: SPAWN FFMPEG & WORKER THREADS ──
+    controller.start_encoding()?;
+    let mut output_guard = PartialOutputGuard::new(&plan.output_path);
     let (mut processes, frame_sender, free_receiver) =
         spawn_composite_pipeline(&plan, &ffmpeg_bin, channels, &shutdown)?;
 
@@ -347,7 +336,7 @@ pub fn render_composite_video(
         &frame_sender,
         None,
         free_receiver,
-        &mut *processes.child,
+        &mut *processes.pipeline.child,
         render_started,
     );
     let render_loop_ms = render_started.elapsed().as_secs_f64() * 1000.0;

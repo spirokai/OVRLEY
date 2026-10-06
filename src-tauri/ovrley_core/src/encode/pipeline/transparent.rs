@@ -39,7 +39,7 @@ use crate::encode::pipeline::frame_pool::{
 };
 use crate::encode::pipeline::frames::render_frames_parallel;
 use crate::encode::pipeline::lifecycle::{
-    finalize_pipeline, FfmpegChildGuard, PartialOutputGuard, PipelineFailurePolicy, PipelineKind,
+    finalize_pipeline, PartialOutputGuard, PipelineFailurePolicy, PipelineKind, PipelineProcesses,
     PipelineShutdown,
 };
 use crate::encode::pipeline::queue::{merge_timing_maps, writer_worker, FrameBuffer, WriterMode};
@@ -124,6 +124,7 @@ pub fn render_video(
     controller: &RenderController,
     output_target: &RenderOutputTarget,
 ) -> CoreResult<String> {
+    controller.check_cancelled()?;
     // ── PHASE 1: SETUP — derive dimensions, frame counts, paths, and ffmpeg args ──
     let scene = &config.scene;
     let ffmpeg_settings = build_ffmpeg_settings(&scene.ffmpeg)?;
@@ -155,9 +156,11 @@ pub fn render_video(
     )?;
     let channels = ParallelFramePoolPlan::for_frame_size(frame_size, workers)?.create_channels()?;
     let debug_dir = create_debug_dir(paths)?;
+    controller.check_cancelled()?;
     // ── PHASE 2: BUILD SKIA ASSETS — pre-render maps, fonts, and label cache ──
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
         prepare_preview_assets(paths, config, activity, dense_activity)?;
+    controller.check_cancelled()?;
     let renderer = VideoFrameRenderer::new(
         paths,
         dense_activity,
@@ -173,7 +176,6 @@ pub fn render_video(
     )?;
 
     let output_path = output_target.path();
-    let mut output_guard = PartialOutputGuard::new(&output_path);
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let input_pix_fmt = ffmpeg_input_pix_fmt()?;
     let encoded_frames = Arc::new(AtomicU32::new(0));
@@ -190,26 +192,33 @@ pub fn render_video(
     // ── PHASE 4: SPAWN FFMPEG & WORKER THREADS (writer + monitor) ──
     // ffmpeg is spawned before the render loop starts. The writer owns stdin
     // and drains the bounded frame queue; the monitor parses stderr for progress.
-    let mut child = FfmpegChildGuard::new(
+    controller.start_encoding()?;
+    let mut output_guard = PartialOutputGuard::new(&output_path);
+    let mut processes = PipelineProcesses::new(
         spawn_ffmpeg(
             &ffmpeg_bin,
             &ffmpeg_settings.command_args(&output_path, frame_size, container_fps, &input_pix_fmt),
         )?,
         PipelineKind::Transparent,
+        Arc::clone(&shutdown),
     );
 
-    let stderr = child
+    let stderr = processes
+        .child
         .stderr
         .take()
         .ok_or_else(|| CoreError::Encode("Failed to capture ffmpeg stderr".to_string()))?;
-    let stdin = child
+    let stdin = processes
+        .child
         .stdin
         .take()
         .ok_or_else(|| CoreError::Encode("Failed to capture ffmpeg stdin".to_string()))?;
     let encoded_frames_for_monitor = encoded_frames.clone();
-    let monitor_thread = thread::spawn(move || monitor_ffmpeg(stderr, encoded_frames_for_monitor));
+    processes.monitor = Some(thread::spawn(move || {
+        monitor_ffmpeg(stderr, encoded_frames_for_monitor)
+    }));
     let shutdown_for_writer = Arc::clone(&shutdown);
-    let writer_thread = thread::spawn(move || {
+    processes.writer = Some(thread::spawn(move || {
         writer_worker(
             stdin,
             frame_receiver,
@@ -217,7 +226,7 @@ pub fn render_video(
             shutdown_for_writer,
             WriterMode::Transparent,
         )
-    });
+    }));
 
     let sample_frames = if render_sample_frames_enabled()? {
         sample_frame_indices(total_frames as usize)
@@ -267,7 +276,7 @@ pub fn render_video(
         &frame_sender,
         Some(&observe_ordered_frame),
         free_receiver,
-        &mut child,
+        &mut processes.child,
         render_started,
     );
     drop(frame_sender);
@@ -277,9 +286,7 @@ pub fn render_video(
     // and finalize the output file. We join threads before waiting on ffmpeg
     // so pipe-write errors are collected before we check the exit status.
     let outcome = finalize_pipeline(
-        &mut child,
-        writer_thread,
-        monitor_thread,
+        &mut processes,
         render_result,
         shutdown.as_ref(),
         PipelineKind::Transparent,

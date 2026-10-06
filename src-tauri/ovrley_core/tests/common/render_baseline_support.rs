@@ -25,6 +25,7 @@ use ovrley_core::media::{video_probe::probe_video, SourceVideoMetadata};
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::render_preview_to_path;
+use ovrley_core::render_jobs::execution::RenderExecutionService;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::fs;
@@ -250,8 +251,10 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
     let total_frames =
         rendered_frame_count(dense_activity.frame_count, validated.widget_update_rate())? as u32;
     let controller = RenderController::default();
-    controller
-        .try_start(total_frames, &format!("transparent baseline {}", case.name))
+    let execution = RenderExecutionService::with_controller(controller.clone());
+    let reservation = execution.reserve().unwrap();
+    reservation
+        .begin_item(total_frames, &format!("transparent baseline {}", case.name))
         .context("failed to start transparent render controller")?;
 
     let output_path = runtime
@@ -263,15 +266,17 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
         RenderOutputKind::Transparent,
         false,
     )?;
-    let _filename = render_video(
+    let outcome = render_video(
         &runtime.app_paths,
         &validated,
         &activity,
         &dense_activity,
         &controller,
         &output_target,
-    )
-    .context("transparent render failed")?;
+    );
+    let _filename = reservation
+        .complete(outcome)
+        .context("transparent render failed")?;
     let output_path = output_target.path().to_path_buf();
     assert_nonempty_output(&output_path)?;
 
@@ -379,8 +384,10 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     .ceil()
     .max(1.0) as u32;
     let controller = RenderController::default();
-    controller
-        .try_start(total_frames, &format!("composite baseline {}", case.name))
+    let execution = RenderExecutionService::with_controller(controller.clone());
+    let reservation = execution.reserve().unwrap();
+    reservation
+        .begin_item(total_frames, &format!("composite baseline {}", case.name))
         .context("failed to start composite render controller")?;
 
     // ── Phase 5: dispatch composite render through public entry point ──
@@ -393,7 +400,7 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
         RenderOutputKind::Composite,
         false,
     )?;
-    let _filename = render_composite_video(
+    let outcome = render_composite_video(
         &runtime.app_paths,
         &validated,
         &activity,
@@ -402,8 +409,10 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
         render_plan,
         true,
         &output_target,
-    )
-    .context("composite render failed")?;
+    );
+    let _filename = reservation
+        .complete(outcome)
+        .context("composite render failed")?;
     let output_path = output_target.path().to_path_buf();
     assert_nonempty_output(&output_path)?;
 

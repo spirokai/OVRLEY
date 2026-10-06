@@ -14,7 +14,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::Ordering;
 use std::thread;
 
 use ovrley_core::activity::schema::ParsedActivity;
@@ -31,6 +30,7 @@ use ovrley_core::normalize::raw::{parse_config_json, RenderConfig};
 use ovrley_core::normalize::{parse_template_value, validate_render_config, ValidatedRenderConfig};
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
+use ovrley_core::render_jobs::execution::RenderExecutionService;
 use serde_json::Value;
 
 /// Bundles the key artifacts produced by a fixture composite render.
@@ -220,6 +220,8 @@ pub fn render_fixture_composite_with_paths(
     height: u32,
     codec: &str,
 ) -> Result<RenderFixtureResult, String> {
+    let execution = RenderExecutionService::with_controller(controller.clone());
+    let reservation = execution.reserve().map_err(|error| error.to_string())?;
     // ── Phase 1: resolve fixture video path ────────────────────────
     let absolute_video_path = crate::common::test_config::fixtures()
         .join("video")
@@ -256,7 +258,10 @@ pub fn render_fixture_composite_with_paths(
 
     // ── Phase 4: execute canonical frame-worker composite render ────
     let output_target = custom_output_target(&paths, "render", RenderOutputKind::Composite);
-    let filename = render_composite_video(
+    reservation
+        .begin_item(render_plan.output_frame_count, "Preparing fixture render")
+        .map_err(|error| error.to_string())?;
+    let outcome = render_composite_video(
         &paths,
         &validated,
         &activity,
@@ -265,8 +270,10 @@ pub fn render_fixture_composite_with_paths(
         render_plan,
         true,
         &output_target,
-    )
-    .map_err(|error| error.to_string())?;
+    );
+    let filename = reservation
+        .complete(outcome)
+        .map_err(|error| error.to_string())?;
 
     // ── Phase 5: validate output and collect metadata ─────────────────
     let output_path = paths.downloads_dir.join(filename);
@@ -542,5 +549,5 @@ pub fn has_argument_pair(args: &[String], key: &str, value: &str) -> bool {
 /// the controller flag set while ffmpeg work is still in flight.
 pub fn cancel_after_delay(controller: &RenderController, delay_ms: u64) {
     thread::sleep(std::time::Duration::from_millis(delay_ms));
-    controller.cancel_flag().store(true, Ordering::SeqCst);
+    let _ = controller.cancel();
 }

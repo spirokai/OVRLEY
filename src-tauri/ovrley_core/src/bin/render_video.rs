@@ -18,6 +18,7 @@ use ovrley_core::encode::pipeline::transparent::render_video;
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
+use ovrley_core::render_jobs::execution::RenderExecutionService;
 use serde_json::{Map, Value};
 use std::fs;
 use std::path::PathBuf;
@@ -106,8 +107,10 @@ fn main() -> Result<(), String> {
     paths.ensure_dirs().map_err(|e| e.to_string())?;
 
     let controller = RenderController::default();
-    controller
-        .try_start(
+    let execution = RenderExecutionService::with_controller(controller.clone());
+    let reservation = execution.reserve().unwrap();
+    reservation
+        .begin_item(
             dense_activity.frame_count as u32,
             "Preparing render assets...",
         )
@@ -125,16 +128,15 @@ fn main() -> Result<(), String> {
         false,
     )
     .map_err(|error| error.to_string())?;
-    let filename = render_video(
+    let outcome = render_video(
         &paths,
         &config,
         &activity,
         &dense_activity,
         &controller,
         &output_target,
-    )
-    .map_err(|e| e.to_string())?;
-    controller.finish_success(filename.clone());
+    );
+    let filename = reservation.complete(outcome).map_err(|e| e.to_string())?;
     println!("{{\"filename\":\"{filename}\"}}");
     Ok(())
 }

@@ -50,6 +50,7 @@ use ovrley_core::encode::pipeline::composite_support::{
 };
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::normalize::validate_render_config;
+use ovrley_core::render_jobs::execution::RenderExecutionService;
 
 use common::composite::{
     assert_argument_pair, cancel_after_delay, composite_debug_timing_summary,
@@ -635,15 +636,17 @@ fn test_frame_workers_render_short_composite_in_order() {
     let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
     let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
     let controller = RenderController::default();
-    controller
-        .try_start(dense.frame_count as u32, "test_parallel_frame_workers")
+    let execution = RenderExecutionService::with_controller(controller.clone());
+    let reservation = execution.reserve().unwrap();
+    reservation
+        .begin_item(dense.frame_count as u32, "test_parallel_frame_workers")
         .unwrap();
     let output_target = custom_output_target(
         &paths,
         "parallel",
         ovrley_core::output::RenderOutputKind::Composite,
     );
-    let filename = render_composite_video(
+    let outcome = render_composite_video(
         &paths,
         &validated,
         &activity,
@@ -652,8 +655,8 @@ fn test_frame_workers_render_short_composite_in_order() {
         render_plan,
         true,
         &output_target,
-    )
-    .unwrap();
+    );
+    let filename = reservation.complete(outcome).unwrap();
 
     let output_path = paths.downloads_dir.join(filename);
     assert!(output_path.is_file());
@@ -696,8 +699,10 @@ fn test_frame_worker_composite_render() {
     let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
     let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
     let controller = RenderController::default();
-    controller
-        .try_start(dense.frame_count as u32, "test_parallel_2")
+    let execution = RenderExecutionService::with_controller(controller.clone());
+    let reservation = execution.reserve().unwrap();
+    reservation
+        .begin_item(dense.frame_count as u32, "test_parallel_2")
         .unwrap();
 
     let output_target = custom_output_target(
@@ -715,6 +720,7 @@ fn test_frame_worker_composite_render() {
         true,
         &output_target,
     );
+    let result = reservation.complete(result);
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();
     let output = paths.downloads_dir.join(&filename);
@@ -745,8 +751,10 @@ fn test_frame_worker_composite_render_with_audio() {
     let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
     let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
     let controller = RenderController::default();
-    controller
-        .try_start(dense.frame_count as u32, "test_parallel_audio")
+    let execution = RenderExecutionService::with_controller(controller.clone());
+    let reservation = execution.reserve().unwrap();
+    reservation
+        .begin_item(dense.frame_count as u32, "test_parallel_audio")
         .unwrap();
 
     let output_target = custom_output_target(
@@ -764,6 +772,7 @@ fn test_frame_worker_composite_render_with_audio() {
         true,
         &output_target,
     );
+    let result = reservation.complete(result);
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();
     let output = paths.downloads_dir.join(&filename);

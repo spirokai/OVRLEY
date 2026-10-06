@@ -105,8 +105,11 @@ fn writer_worker_inner(
     let mut profiler = RenderProfiler::default();
     let mut written_frames = 0u64;
     loop {
+        if shutdown.is_stopped() {
+            break;
+        }
         let queue_started = Instant::now();
-        let frame = match receiver.recv() {
+        let frame = match receiver.recv_timeout(Duration::from_millis(25)) {
             Ok(frame) => {
                 profiler.record_ms(
                     "writer.rendered_frame_wait",
@@ -114,7 +117,8 @@ fn writer_worker_inner(
                 );
                 frame
             }
-            Err(_) => {
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                 profiler.record_ms(
                     "writer.rendered_frame_wait",
                     queue_started.elapsed().as_secs_f64() * 1000.0,

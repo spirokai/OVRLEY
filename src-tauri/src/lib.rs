@@ -16,8 +16,8 @@
 //!
 //! ## Thread Safety
 //! `BackendState` is managed by Tauri as app-level state (Send + Sync via Tauri's
-//! `manage`). The `RenderController` inside it is the shared coordination point
-//! for all render progress and cancellation. The video server runs on a dedicated
+//! `manage`). The execution service owns renderer reservation, workers, progress
+//! and cancellation. The video server runs on a dedicated
 //! thread spawned at startup and joined on app teardown.
 //!
 //! ## Performance
@@ -44,18 +44,18 @@ mod raster_resources;
 mod runtime_paths;
 mod tauri_commands;
 
-use ovrley_core::encode::progress::RenderController;
+use ovrley_core::render_jobs::execution::RenderExecutionService;
 use std::sync::Arc;
 use tauri::Manager;
 
 pub(crate) struct BackendState {
-    pub(crate) render_controller: RenderController,
+    pub(crate) render_execution: RenderExecutionService,
 }
 
 /// Builds and runs the Tauri application.
 ///
 /// The setup hook installs development logging when appropriate, starts the
-/// loopback preview video server, and constructs the `RenderController` with a
+/// loopback preview video server, and constructs the execution service with a
 /// `TauriProgressSink` wired to the `AppHandle` so live progress flows to the
 /// frontend as `render-progress` events (no polling). All of this happens
 /// before the frontend can invoke commands.
@@ -126,11 +126,11 @@ pub fn run() {
                 )?;
             }
 
-            // Wire the render controller to a Tauri event-emitting sink before
+            // Wire the execution service to a Tauri event-emitting sink before
             // any command can be invoked: the frontend subscribes to
             // `render-progress` events instead of polling `backend_progress`.
             app.manage(BackendState {
-                render_controller: RenderController::with_sink(Arc::new(
+                render_execution: RenderExecutionService::with_sink(Arc::new(
                     progress_sink::TauriProgressSink::new(app.handle().clone()),
                 )),
             });

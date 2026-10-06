@@ -154,8 +154,7 @@ pub(crate) async fn backend_font_data(
 
 /// Starts an overlay video render from serialized scene config and activity data.
 ///
-/// The render controller in managed state tracks progress and cancellation for
-/// the long-running encoder task.
+/// The native execution service owns preparation, rendering, and cancellation.
 #[tauri::command]
 pub(crate) async fn backend_render(
     app: AppHandle,
@@ -170,7 +169,7 @@ pub(crate) async fn backend_render(
         .map_err(|message| BackendRenderError::RenderError { message })?;
     let result = commands::backend_render(
         &paths,
-        &state.render_controller,
+        &state.render_execution,
         &config_json,
         &parsed_activity_json,
         &output_path,
@@ -253,7 +252,7 @@ pub(crate) async fn backend_render_preview_frame(
 pub(crate) async fn backend_progress(
     state: tauri::State<'_, BackendState>,
 ) -> Result<String, String> {
-    serialize_command_result(&commands::backend_progress(&state.render_controller))
+    serialize_command_result(&commands::backend_progress(&state.render_execution))
 }
 
 /// Opens the remembered render output directory in the platform file manager.
@@ -321,7 +320,7 @@ pub(crate) async fn backend_get_template(
 pub(crate) async fn backend_cancel(
     state: tauri::State<'_, BackendState>,
 ) -> Result<String, String> {
-    serialize_command_result(&commands::backend_cancel(&state.render_controller))
+    serialize_command_result(&commands::backend_cancel(&state.render_execution))
 }
 
 /// Probes a video file with ffprobe and returns serialized metadata.

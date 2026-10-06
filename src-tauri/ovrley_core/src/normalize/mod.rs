@@ -152,15 +152,31 @@ pub fn validate_render_config_with_resources(
     raw: RenderConfig,
     resources: Option<&dyn crate::raster::RasterResourceResolver>,
 ) -> CoreResult<ValidatedRenderConfig> {
-    let scene = validate_scene_config(raw.scene)?;
+    let rasters = resolve_render_rasters(&raw.rasters, resources)?;
+    validate_render_config_with_rasters(raw, rasters)
+}
 
-    raster::validate_unique_raster_ids(&raw.rasters)?;
-    let rasters = raw
-        .rasters
+/// Pins immutable raster inputs at acceptance. The worker consumes these
+/// validated resources without consulting the editor's resource registry.
+pub(crate) fn resolve_render_rasters(
+    rasters: &[raw::RasterConfig],
+    resources: Option<&dyn crate::raster::RasterResourceResolver>,
+) -> CoreResult<Vec<ValidatedRaster>> {
+    raster::validate_unique_raster_ids(rasters)?;
+    rasters
         .iter()
         .enumerate()
         .map(|(index, raster)| raster::validate_raster(raster, index, resources))
-        .collect::<CoreResult<Vec<_>>>()?;
+        .collect()
+}
+
+/// Completes configuration ingress on the operation worker. Raster validation
+/// has already happened at acceptance and must not run a second time.
+pub(crate) fn validate_render_config_with_rasters(
+    raw: RenderConfig,
+    rasters: Vec<ValidatedRaster>,
+) -> CoreResult<ValidatedRenderConfig> {
+    let scene = validate_scene_config(raw.scene)?;
 
     let backdrops = raw
         .backdrops

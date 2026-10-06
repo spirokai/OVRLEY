@@ -17,13 +17,15 @@ use std::time::Instant;
 pub struct RenderProgress {
     /// Monotonically increasing identifier for the current render session.
     pub render_id: u64,
+    /// True until the accepted operation's worker and pipeline cleanup finish.
+    pub busy: bool,
     /// Number of frames rendered by the Skia producer.
     pub current: u32,
     /// Total number of frames expected in the encoded output.
     pub total: u32,
     /// Number of output frames encoded or covered by the active render pipeline.
     pub encoded: u32,
-    /// State string such as `idle`, `rendering`, `complete`, `error`, or `cancelled`.
+    /// `idle`, `preparing`, `rendering`, `cancelling`, `complete`, `error`, or `cancelled`.
     pub status: String,
     /// Human-readable status message shown by the UI.
     pub message: String,
@@ -41,6 +43,7 @@ impl Default for RenderProgress {
     fn default() -> Self {
         Self {
             render_id: 0,
+            busy: false,
             current: 0,
             total: 0,
             encoded: 0,
