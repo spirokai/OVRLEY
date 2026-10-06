@@ -62,6 +62,206 @@ use common::composite::{
 };
 
 #[test]
+fn planned_video_pipelines_encode_padding_and_display_rotation() {
+    use ovrley_core::output::{plan_batch_output_targets, RenderOutputKind};
+    use ovrley_core::render_jobs::batch_plan::{
+        plan_video_render, validate_batch_encoding, validate_batch_template,
+    };
+    use ovrley_core::render_jobs::contracts::{
+        BatchEncodingSettings, BatchExportMode, BatchJobTiming,
+    };
+    use ovrley_core::render_jobs::execution::execute_planned_render;
+    use ovrley_core::render_jobs::inspection::VideoInspectionService;
+    use serde_json::json;
+    let paths = test_paths_named("batch-window-pipelines");
+    let ffmpeg =
+        ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&paths.repo_root).unwrap();
+    let source = paths.temp_dir.join("landscape.mp4");
+    let rotated = paths.temp_dir.join("portrait.mp4");
+    let generated = Command::new(&ffmpeg)
+        .args([
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=red:size=64x32:rate=30:duration=20",
+            "-vf",
+            "drawbox=x=32:y=0:w=32:h=32:color=blue:t=fill",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+        ])
+        .arg(&source)
+        .output()
+        .unwrap();
+    assert!(
+        generated.status.success(),
+        "{}",
+        String::from_utf8_lossy(&generated.stderr)
+    );
+    let remuxed = Command::new(&ffmpeg)
+        .args(["-v", "error", "-y", "-display_rotation", "-90", "-i"])
+        .arg(&source)
+        .args(["-c", "copy"])
+        .arg(&rotated)
+        .output()
+        .unwrap();
+    assert!(
+        remuxed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&remuxed.stderr)
+    );
+    let inspection = VideoInspectionService::default();
+    let session = inspection.create_session();
+    let inspected = inspection
+        .inspect_source(&paths, &session.inspection_id, rotated.to_str().unwrap())
+        .unwrap();
+    assert_eq!(inspected.metadata.rotation_degrees, Some(270));
+    assert_eq!(
+        (
+            inspected.display_resolution.width,
+            inspected.display_resolution.height
+        ),
+        (32, 64)
+    );
+    let activity = ovrley_core::activity::parse_activity_json(
+        &json!({
+            "sample_elapsed_seconds":[0,120], "trim_end_seconds":120, "speed":[0,120]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let execution = RenderExecutionService::default();
+    let decode_frame = |path: &std::path::Path, second: f64| {
+        let decoded = Command::new(&ffmpeg)
+            .args(["-v", "error", "-ss", &second.to_string(), "-i"])
+            .arg(path)
+            .args([
+                "-frames:v",
+                "1",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "rgba",
+                "pipe:1",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            decoded.status.success(),
+            "{}",
+            String::from_utf8_lossy(&decoded.stderr)
+        );
+        assert_eq!(decoded.stdout.len(), 32 * 64 * 4);
+        decoded.stdout
+    };
+    for (mode, offset) in [
+        (BatchExportMode::Transparent, -5.0),
+        (BatchExportMode::Transparent, 110.0),
+        (BatchExportMode::Composite, -5.0),
+    ] {
+        let encoding = BatchEncodingSettings {
+            export_mode: mode,
+            export_codec: if mode == BatchExportMode::Composite {
+                "libx264"
+            } else {
+                "qtrle"
+            }
+            .into(),
+            fps: 30,
+            update_rate: if mode == BatchExportMode::Composite {
+                1
+            } else {
+                2
+            },
+            quality_type: ovrley_core::encode::quality::QualityType::Bitrate,
+            quality_value: 1.0,
+            qsv_full_init_args: None,
+        };
+        let template = validate_batch_template(
+            common::builders::batch_template(),
+            validate_batch_encoding(&encoding).unwrap(),
+            None,
+        )
+        .unwrap();
+        let timing = BatchJobTiming::ExternalActivity {
+            automatic_offset_seconds: offset,
+            offset_seconds: offset,
+        };
+        let plan = plan_video_render(&template, &inspected, &timing, true, &activity).unwrap();
+        let kind = if mode == BatchExportMode::Composite {
+            RenderOutputKind::Composite
+        } else {
+            RenderOutputKind::Transparent
+        };
+        let target =
+            plan_batch_output_targets(&paths.downloads_dir, kind, &[rotated.clone()], None)
+                .unwrap()
+                .remove(0);
+        let reservation = execution.reserve().unwrap();
+        let outcome = execute_planned_render(&paths, plan, &activity, &reservation, &target);
+        reservation.complete(outcome).unwrap();
+        let metadata = ovrley_core::media::video_probe::probe_video(
+            &paths.repo_root,
+            target.path().to_str().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                metadata.resolution.as_ref().unwrap().width,
+                metadata.resolution.as_ref().unwrap().height
+            ),
+            (32, 64)
+        );
+        assert!((metadata.duration.unwrap() - 20.0).abs() < 0.001);
+        assert_eq!(
+            metadata.fps,
+            Some(if mode == BatchExportMode::Composite {
+                30.0
+            } else {
+                15.0
+            })
+        );
+        if mode == BatchExportMode::Transparent {
+            let (blank_second, covered_second) = if offset < 0.0 {
+                (0.0, 5.0)
+            } else {
+                (10.0, 0.0)
+            };
+            assert!(decode_frame(target.path(), blank_second)
+                .iter()
+                .all(|byte| *byte == 0));
+            assert!(decode_frame(target.path(), covered_second)
+                .chunks_exact(4)
+                .any(|pixel| pixel[3] > 0));
+        } else {
+            let expected = decode_frame(&rotated, 0.0);
+            let actual = decode_frame(target.path(), 0.0);
+            // Opposite ends of the rotated color pattern must retain the
+            // source's displayed orientation; output metadata must not rotate it again.
+            for pixel in [31usize, 63 * 32 + 31] {
+                for channel in 0..3 {
+                    assert!(
+                        (i16::from(actual[pixel * 4 + channel])
+                            - i16::from(expected[pixel * 4 + channel]))
+                        .abs()
+                            < 15,
+                        "pixel {pixel}: actual {:?}, expected {:?}",
+                        &actual[pixel * 4..pixel * 4 + 4],
+                        &expected[pixel * 4..pixel * 4 + 4]
+                    );
+                }
+            }
+            assert_eq!(metadata.rotation_degrees.unwrap_or(0), 0);
+        }
+        std::fs::remove_file(target.path()).unwrap();
+    }
+}
+
+#[test]
 /// Derives a plan from a 29.97 FPS source with 2x widget update rate and
 /// verifies output_fps matches source, overlay_pipe_fps is halved, and
 /// overlay/output frame counts are correct.
@@ -101,7 +301,10 @@ fn negative_sync_plan_keeps_full_video_output_and_limits_activity_overlap() {
         derive_composite_render_plan(&mut shorter_activity_scene, Some(10.0)).unwrap();
     assert_eq!(shorter_activity_scene.start, 0.0);
     assert_eq!(shorter_activity_scene.end, 10.0);
-    assert_eq!(shorter_activity_plan.activity_overlap_duration, 10.0);
+    assert_eq!(
+        shorter_activity_plan.coverage.end - shorter_activity_plan.coverage.start,
+        10.0
+    );
     assert_eq!(shorter_activity_plan.overlay_frame_count, 900);
     assert_eq!(shorter_activity_plan.output_frame_count, 900);
 
@@ -111,8 +314,8 @@ fn negative_sync_plan_keeps_full_video_output_and_limits_activity_overlap() {
     assert_eq!(scene.start, 0.0);
     assert_eq!(scene.end, 25.0);
     assert_eq!(scene.end - scene.start, 25.0);
-    assert_eq!(plan.activity_overlap_duration, 25.0);
-    assert_eq!(plan.blank_leading_frame_count, 150);
+    assert_eq!(plan.coverage.end - plan.coverage.start, 25.0);
+    assert_eq!(plan.coverage.blank_leading_frame_count, 150);
     assert_eq!(plan.overlay_frame_count, 900);
     assert_eq!(plan.output_frame_count, 900);
 }

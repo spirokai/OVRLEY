@@ -7,7 +7,7 @@
 
 import { describe, expect, test } from 'vitest'
 import { DEFAULT_EXPORT_RANGE } from '@/lib/template/template-constants'
-import { createRenderEffectiveConfig } from '@/features/render-video/utils/renderConfig'
+import { createBatchRenderTemplate, createRenderEffectiveConfig } from '@/features/render-video/utils/renderConfig'
 
 describe('render config preparation', () => {
   test('materializes render-effective config without changing durable template semantics', () => {
@@ -93,6 +93,14 @@ describe('render config preparation', () => {
     expect(renderConfig.values[0]).not.toHaveProperty('width')
     expect(renderConfig.values[0]).not.toHaveProperty('height')
     expect(renderConfig.values[0]).not.toHaveProperty('display_variants')
+    const captured = structuredClone(config)
+    const batchTemplate = createBatchRenderTemplate(config, {})
+    expect(batchTemplate.values[0]).toMatchObject({ diameter: 180, track_thickness: 24 })
+    expect(batchTemplate.values[0]).not.toHaveProperty('display_variants')
+    expect(batchTemplate.scene).not.toHaveProperty('start')
+    expect(batchTemplate.scene).not.toHaveProperty('end')
+    expect(batchTemplate.scene).not.toHaveProperty('fps')
+    expect(config).toEqual(captured)
   })
 
   test('rehydrates scene start/end from editor timeline when durable template config omits them', () => {

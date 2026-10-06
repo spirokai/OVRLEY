@@ -8,10 +8,42 @@
  */
 
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
+import { SCENE_RENDER_TIME_ONLY_KEYS } from '@/lib/template/template-constants'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { clamp } from '@/lib/utils'
 import { videoOverlapsActivity } from '@/lib/video-timing'
 import { isCompositeCodec, isQsvFullCodec, resolveCompositeFps } from './render-execution'
+
+function renderValues(values) {
+  return values.map(({ display_variants: _displayVariants, ...value }) => {
+    if (value.display_type !== 'lean_angle') return value
+    const { width: _width, height: _height, ...renderValue } = value
+    return renderValue
+  })
+}
+
+/**
+ * Materializes shared batch presentation once, excluding editor timing and
+ * source/encoding fields. Each native video plan owns its dimensions and clock.
+ * @param {object} config Committed template configuration.
+ * @param {object} globalDefaults Captured global presentation defaults.
+ * @returns {object} Canonical shared batch template.
+ */
+export function createBatchRenderTemplate(config, globalDefaults) {
+  const effective = createEditorEffectiveConfig({ config, globalDefaults })
+  const scene = { ...effective.scene }
+  for (const key of [...SCENE_RENDER_TIME_ONLY_KEYS, 'start', 'end', 'fps', 'updateRate', 'update_rate', 'ffmpeg', 'custom_export_range_active']) {
+    delete scene[key]
+  }
+  return {
+    scene,
+    backdrops: effective.backdrops,
+    rasters: effective.rasters,
+    labels: effective.labels,
+    values: renderValues(effective.values),
+    plots: effective.plots,
+  }
+}
 
 /**
  * Applies codec-specific FFmpeg defaults after the render codec is resolved.
@@ -242,10 +274,6 @@ export function createRenderEffectiveConfig(options) {
   return {
     ...nextConfig,
     scene,
-    values: nextConfig.values?.map(({ display_variants: _displayVariants, ...value }) => {
-      if (value.display_type !== 'lean_angle') return value
-      const { width: _width, height: _height, ...renderValue } = value
-      return renderValue
-    }),
+    values: renderValues(nextConfig.values),
   }
 }

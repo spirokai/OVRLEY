@@ -98,18 +98,14 @@ pub fn build_dense_activity_report_validated(
     ))
 }
 
-/// Trims activity through the validated scene window and densifies it on an
-/// exact caller-owned frame timeline.
-pub fn build_dense_activity_report_for_timeline(
+/// Trims activity through the validated scene window and densifies it on a
+/// planner-owned frame timeline. Fractional coverage may start between frame
+/// ticks; a positive overlap between ticks may have no covered frames.
+pub(crate) fn build_dense_activity_report_for_timeline(
     activity: &ParsedActivity,
     config: &ValidatedRenderConfig,
     frame_elapsed_seconds: Vec<f64>,
 ) -> CoreResult<DenseActivityReport> {
-    if frame_elapsed_seconds.is_empty() {
-        return Err(CoreError::Activity(
-            "Dense frame timeline must contain at least one timestamp".to_string(),
-        ));
-    }
     let requirements = config.render_data_requirements()?;
     let trimmed = trim_activity(
         activity,
@@ -117,22 +113,6 @@ pub fn build_dense_activity_report_for_timeline(
         config.scene.end,
         &requirements,
     )?;
-    let duration = *trimmed
-        .sample_elapsed_seconds
-        .last()
-        .ok_or_else(|| CoreError::Activity("Trimmed activity has no timeline".to_string()))?;
-    if frame_elapsed_seconds[0] != 0.0
-        || frame_elapsed_seconds
-            .iter()
-            .any(|timestamp| !timestamp.is_finite() || *timestamp < 0.0 || *timestamp >= duration)
-        || frame_elapsed_seconds
-            .windows(2)
-            .any(|pair| pair[0] >= pair[1])
-    {
-        return Err(CoreError::Activity(format!(
-            "Dense frame timeline must start at zero, increase strictly, and remain below duration {duration}"
-        )));
-    }
     Ok(densify_activity(
         &trimmed,
         frame_elapsed_seconds,

@@ -45,11 +45,13 @@ mod runtime_paths;
 mod tauri_commands;
 
 use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::inspection::VideoInspectionService;
 use std::sync::Arc;
 use tauri::Manager;
 
 pub(crate) struct BackendState {
     pub(crate) render_execution: RenderExecutionService,
+    pub(crate) video_inspection: Arc<VideoInspectionService>,
 }
 
 /// Builds and runs the Tauri application.
@@ -90,6 +92,11 @@ pub fn run() {
             tauri_commands::backend_open_templates,
             tauri_commands::backend_open_video,
             tauri_commands::backend_probe_video,
+            tauri_commands::backend_create_video_inspection,
+            tauri_commands::backend_inspect_video_source,
+            tauri_commands::backend_validate_video_inspection,
+            tauri_commands::backend_plan_batch_outputs,
+            tauri_commands::backend_dispose_video_inspection,
             tauri_commands::backend_prepare_preview_video,
             tauri_commands::backend_register_preview_video,
             tauri_commands::backend_import_preview_video,
@@ -130,6 +137,7 @@ pub fn run() {
             // any command can be invoked: the frontend subscribes to
             // `render-progress` events instead of polling `backend_progress`.
             app.manage(BackendState {
+                video_inspection: Arc::new(VideoInspectionService::default()),
                 render_execution: RenderExecutionService::with_sink(Arc::new(
                     progress_sink::TauriProgressSink::new(app.handle().clone()),
                 )),

@@ -44,16 +44,28 @@ use crate::encode::pipeline::lifecycle::{
 };
 use crate::encode::pipeline::queue::{merge_timing_maps, writer_worker, FrameBuffer, WriterMode};
 use crate::encode::progress::RenderController;
+use crate::encode::video_timing::ActivityCoverage;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::ValidatedRenderConfig;
 use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
 use crate::render::{prepare_preview_assets, FrameSize, VideoFrameRenderer};
 use std::io::{BufRead, BufReader};
+use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
+
+/// Fixed input to the transparent pipeline; timing is supplied by the job owner.
+#[derive(Clone, Debug)]
+pub struct TransparentRenderPlan {
+    pub layout_frame_count: u64,
+    pub output_frame_count: u32,
+    pub update_rate: NonZeroU32,
+    pub container_fps: String,
+    pub coverage: ActivityCoverage,
+}
 
 struct TransparentFailurePolicy;
 
@@ -125,31 +137,70 @@ pub fn render_video(
     output_target: &RenderOutputTarget,
 ) -> CoreResult<String> {
     controller.check_cancelled()?;
-    // ── PHASE 1: SETUP — derive dimensions, frame counts, paths, and ffmpeg args ──
     let scene = &config.scene;
-    let ffmpeg_settings = build_ffmpeg_settings(&scene.ffmpeg)?;
     if !scene.width.is_multiple_of(2) || !scene.height.is_multiple_of(2) {
         return Err(CoreError::Config(format!(
             "Transparent video dimensions must be even; received {}x{}",
             scene.width, scene.height
         )));
     }
+    let plan = TransparentRenderPlan {
+        layout_frame_count: dense_activity.frame_count as u64,
+        output_frame_count: u32::try_from(rendered_frame_count(
+            dense_activity.frame_count,
+            scene.update_rate,
+        )?)
+        .map_err(|_| CoreError::Encode("Transparent output frame count exceeds u32".into()))?,
+        update_rate: scene.update_rate,
+        container_fps: (scene.fps / f64::from(scene.update_rate.get())).to_string(),
+        coverage: ActivityCoverage {
+            start: scene.start,
+            end: scene.end,
+            blank_leading_frame_count: 0,
+            frame_count: dense_activity.frame_count as u64,
+        },
+    };
+    render_planned_video(
+        paths,
+        config,
+        activity,
+        dense_activity,
+        controller,
+        output_target,
+        &plan,
+    )
+}
+
+/// Executes a fixed video-local plan through the same transparent pipeline.
+pub(crate) fn render_planned_video(
+    paths: &AppPaths,
+    config: &ValidatedRenderConfig,
+    activity: &ParsedActivity,
+    dense_activity: &DenseActivityReport,
+    controller: &RenderController,
+    output_target: &RenderOutputTarget,
+    plan: &TransparentRenderPlan,
+) -> CoreResult<String> {
+    controller.check_cancelled()?;
+    // ── PHASE 1: SETUP — derive dimensions, frame counts, paths, and ffmpeg args ──
+    let scene = &config.scene;
+    let ffmpeg_settings = build_ffmpeg_settings(&scene.ffmpeg)?;
     let frame_size = FrameSize {
         width: scene.width,
         height: scene.height,
     };
-    let layout_total_frames = u32::try_from(dense_activity.frame_count)
+    let layout_total_frames = u32::try_from(plan.layout_frame_count)
         .map_err(|_| CoreError::Encode("Transparent layout frame count exceeds u32".to_string()))?;
-    let update_rate = scene.update_rate;
+    let update_rate = plan.update_rate;
     // `rendered_frame_count` applies frame decimation: when update_rate > 1,
     // we render fewer frames than the dense report has, skipping layout frames
     // that would not change the visible overlay at the configured rate.
-    let total_frames = u32::try_from(rendered_frame_count(
-        dense_activity.frame_count,
-        update_rate,
-    )?)
-    .map_err(|_| CoreError::Encode("Transparent output frame count exceeds u32".to_string()))?;
-    let container_fps = scene.fps / f64::from(scene.update_rate.get());
+    let total_frames = plan.output_frame_count;
+    if dense_activity.frame_count as u64 != plan.coverage.frame_count {
+        return Err(CoreError::Encode(
+            "Transparent dense activity does not match planned coverage".into(),
+        ));
+    }
     let workers = diagnose_frame_worker_count(
         total_frames as usize,
         transparent_profile(ffmpeg_settings.codec_id).cpu_cores_per_frame_worker,
@@ -166,7 +217,7 @@ pub fn render_video(
         dense_activity,
         &prepared_preview_assets,
         frame_size,
-        0,
+        plan.coverage.blank_leading_frame_count,
     )?;
     write_prepare_summary(
         &debug_dir,
@@ -197,7 +248,12 @@ pub fn render_video(
     let mut processes = PipelineProcesses::new(
         spawn_ffmpeg(
             &ffmpeg_bin,
-            &ffmpeg_settings.command_args(&output_path, frame_size, container_fps, &input_pix_fmt),
+            &ffmpeg_settings.command_args(
+                &output_path,
+                frame_size,
+                &plan.container_fps,
+                &input_pix_fmt,
+            ),
         )?,
         PipelineKind::Transparent,
         Arc::clone(&shutdown),

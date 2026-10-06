@@ -21,6 +21,10 @@ use ovrley_core::activity::finalize::FinalizeActivityResponse;
 use ovrley_core::commands;
 use ovrley_core::error::CoreError;
 use ovrley_core::output::RenderOutputKind;
+use ovrley_core::render_jobs::inspection::InspectionSourceSelection;
+use ovrley_core::render_jobs::{
+    batch_plan::plan_batch_configuration, contracts::BatchEncodingSettings,
+};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
@@ -342,6 +346,76 @@ pub(crate) async fn backend_probe_video(
         &runtime_paths::app_paths(&app)?,
         &file_path,
     ))
+}
+
+#[tauri::command]
+pub(crate) fn backend_create_video_inspection(
+    state: tauri::State<'_, BackendState>,
+) -> Result<String, String> {
+    serialize_command_result(&state.video_inspection.create_session())
+}
+
+/// The core service bounds probing; blocking media work runs off the IPC thread.
+#[tauri::command]
+pub(crate) async fn backend_inspect_video_source(
+    app: AppHandle,
+    state: tauri::State<'_, BackendState>,
+    inspection_id: String,
+    path: String,
+) -> Result<String, String> {
+    let paths = runtime_paths::app_paths(&app)?;
+    let service = state.video_inspection.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        service.inspect_source(&paths, &inspection_id, &path)
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    call_and_serialize(result)
+}
+
+/// Source preflight only. Future batch acceptance must retain the core result
+/// of this same validation operation, rather than trust an earlier IPC preflight.
+#[tauri::command]
+pub(crate) async fn backend_validate_video_inspection(
+    state: tauri::State<'_, BackendState>,
+    selection: InspectionSourceSelection,
+) -> Result<String, String> {
+    let service = state.video_inspection.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        service.validate_sources(&selection).into_response()
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    serialize_command_result(&result)
+}
+
+#[tauri::command]
+pub(crate) async fn backend_plan_batch_outputs(
+    state: tauri::State<'_, BackendState>,
+    selection: InspectionSourceSelection,
+    encoding: BatchEncodingSettings,
+    output_directory: String,
+) -> Result<String, String> {
+    let service = state.video_inspection.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        plan_batch_configuration(
+            &service,
+            &selection,
+            &encoding,
+            Path::new(&output_directory),
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    call_and_serialize(result)
+}
+
+#[tauri::command]
+pub(crate) fn backend_dispose_video_inspection(
+    state: tauri::State<'_, BackendState>,
+    inspection_id: String,
+) {
+    state.video_inspection.dispose_session(&inspection_id);
 }
 
 #[derive(serde::Serialize)]

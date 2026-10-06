@@ -2829,6 +2829,7 @@ dependencies = [
  "image",
  "log",
  "open",
+ "same-file",
  "serde",
  "serde_json",
  "skia-safe",

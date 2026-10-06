@@ -9,6 +9,7 @@ use std::thread::{self, JoinHandle};
 
 use serde::Serialize;
 
+use super::batch_plan::{PlannedVideoRender, VideoRenderModePlan};
 use crate::activity::schema::ParsedActivity;
 use crate::activity::{
     build_dense_activity_report_for_timeline, build_dense_activity_report_validated,
@@ -260,8 +261,8 @@ pub fn execute_render(
         let dense = build_dense_activity_report_for_timeline(
             activity,
             &config,
-            plan.overlay_pipe_fps
-                .timeline_for_duration(plan.activity_overlap_duration)?,
+            plan.coverage
+                .frame_timeline(plan.overlay_pipe_fps, plan.sync_offset),
         )?;
         session.check_cancelled()?;
         render_composite_video(
@@ -291,5 +292,47 @@ pub fn execute_render(
             session.controller(),
             target,
         )
+    }
+}
+
+/// Phase-4 execution seam: one finalized video plan, using the existing owned
+/// pipelines. Queue advancement and batch lifecycle belong to the runner.
+pub fn execute_planned_render(
+    paths: &AppPaths,
+    plan: PlannedVideoRender,
+    activity: &ParsedActivity,
+    session: &RendererReservation,
+    target: &RenderOutputTarget,
+) -> CoreResult<String> {
+    session.check_cancelled()?;
+    crate::media::prepared_video::check_source_freshness(&plan.source)?;
+    session.begin_item(plan.planned_frames(), "Preparing video assets...")?;
+    let dense = plan.prepare_activity(activity)?;
+    session.check_cancelled()?;
+    match plan.mode {
+        VideoRenderModePlan::Composite(render) => {
+            crate::encode::pipeline::composite::render_inspected_composite_video(
+                paths,
+                &plan.config,
+                activity,
+                &dense,
+                session.controller(),
+                render,
+                plan.source.metadata.has_audio,
+                plan.source.metadata.rotation_degrees,
+                target,
+            )
+        }
+        VideoRenderModePlan::Transparent(render) => {
+            crate::encode::pipeline::transparent::render_planned_video(
+                paths,
+                &plan.config,
+                activity,
+                &dense,
+                session.controller(),
+                target,
+                &render,
+            )
+        }
     }
 }

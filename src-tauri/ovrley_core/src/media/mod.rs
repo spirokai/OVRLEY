@@ -9,6 +9,8 @@ pub mod dji_ac004;
 pub mod mp4_telemetry;
 /// Intermediate telemetry sample shape and payload checks.
 pub mod native_sample;
+/// Shared metadata preparation and source file freshness.
+pub mod prepared_video;
 /// Shared source video metadata contract.
 pub mod source_video_metadata;
 /// Shared math utilities for telemetry processing.

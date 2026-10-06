@@ -1,7 +1,7 @@
 //! Shared metadata contract for imported source videos.
 //!
-//! Both ffprobe and telemetry-parser populate this shape so the command layer
-//! can merge source metadata without converting between probe-specific types.
+//! Both ffprobe and telemetry-parser populate this shape so shared media
+//! preparation can merge metadata without converting between probe-specific types.
 
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 /// source video with activity telemetry. `creation_time` is retained as a
 /// transition field for existing frontend code and as provenance for ffprobe
 /// fallback timestamps.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceVideoMetadata {
     pub path: String,
@@ -38,7 +38,7 @@ pub struct SourceVideoMetadata {
 }
 
 /// Width and height in pixels as reported by source video probes.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Resolution {
     pub width: u64,
     pub height: u64,

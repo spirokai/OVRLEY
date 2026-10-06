@@ -14,28 +14,8 @@ use serde_json::Value;
 
 use crate::activity::schema::ParsedActivity;
 use crate::encode::quality::QualityType;
-use crate::media::source_video_metadata::SourceVideoMetadata;
+pub use crate::media::prepared_video::{InspectedVideoSource, SourceFileStamp};
 use crate::normalize::raw::{BackdropConfig, LabelConfig, RasterConfig, ValueConfig};
-
-/// Session-scoped inspected source, independent of preview registration.
-/// Metadata uses the shared probe shape. Inspection must resolve required
-/// duration, display geometry, rotation and exact FPS before publishing it.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct InspectedVideoSource {
-    pub source_id: String,
-    /// `metadata.path` is the canonical absolute input path.
-    pub metadata: SourceVideoMetadata,
-    pub stamp: SourceFileStamp,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SourceFileStamp {
-    pub size_bytes: u64,
-    /// Decimal Unix nanoseconds as text, preserving precision across JS IPC.
-    pub modified_at_unix_nanos: String,
-}
 
 /// Materialized shared presentation, with no activity/custom export window,
 /// source video fields or encoding settings. Scene presentation fields remain

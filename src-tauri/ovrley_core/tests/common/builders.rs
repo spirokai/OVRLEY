@@ -28,6 +28,30 @@ pub fn heading_tape_json() -> Value {
     root()["values"]["heading_tape"].clone()
 }
 
+/// Materialized shared presentation for video-local planning/pipeline tests.
+pub fn batch_template() -> ovrley_core::render_jobs::contracts::BatchTemplate {
+    let mut scene = super::seam::explicit_scene_json();
+    for key in [
+        "start",
+        "end",
+        "fps",
+        "update_rate",
+        "ffmpeg",
+        "custom_export_range_active",
+    ] {
+        scene.as_object_mut().unwrap().remove(key);
+    }
+    serde_json::from_value(serde_json::json!({
+        "scene": scene,
+        "backdrops": [{"id":"art", "display_type":"circle", "x":8, "y":8, "diameter":8,
+            "opacity":1, "fill_color":"#ffffff", "fill_opacity":1, "border_color":"#ffffff", "border_opacity":1, "border_thickness":0}],
+        "rasters": [],
+        "labels": [{"text":"A", "x":4, "y":4, "font":"Teko.ttf", "font_size":8, "color":"#ffffff", "opacity":1,
+            "font_weight":400, "italic":false, "letter_spacing":0}],
+        "values": [speed_value_json()], "plots": [],
+    })).unwrap()
+}
+
 // ── Dense series / activity ─────────────────────────────────────────────
 
 pub fn empty_dense_series() -> DenseSeriesReport {

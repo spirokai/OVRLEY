@@ -1,4 +1,5 @@
-//! Composite render and FFmpeg plan derivation.
+//! Single-render composite ingress and FFmpeg pipeline setup.
+//! Batch jobs supply a CompositeRenderPlan from their inspected inputs directly.
 
 use std::path::{Path, PathBuf};
 
@@ -6,6 +7,7 @@ use crate::encode::composite::CompositeRenderPlan;
 use crate::encode::ffmpeg::catalog::CodecSelection;
 use crate::encode::ffmpeg::composite::{build_composite_ffmpeg_settings, CompositeFfmpegSettings};
 use crate::encode::fps::Fps;
+use crate::encode::video_timing::ActivityCoverage;
 use crate::error::{CoreError, CoreResult};
 use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
@@ -89,7 +91,6 @@ pub fn derive_composite_render_plan(
             "scene.composite_render_duration must be greater than zero: {render_duration}"
         )));
     }
-    let mut activity_overlap_duration = render_duration;
     if let Some(activity_end) = activity_end {
         if !activity_end.is_finite() || activity_end < 0.0 {
             return Err(CoreError::Config(format!(
@@ -113,7 +114,6 @@ pub fn derive_composite_render_plan(
         }
         let overlap_start = sync_offset.max(0.0);
         let overlap_end = activity_end.min(sync_offset + render_duration);
-        activity_overlap_duration = overlap_end - overlap_start;
 
         scene.start = overlap_start;
         scene.end = overlap_end;
@@ -134,8 +134,13 @@ pub fn derive_composite_render_plan(
     scene.fps = overlay_pipe_fps.as_f64();
     scene.update_rate = std::num::NonZeroU32::MIN;
     let overlay_frame_count = overlay_pipe_fps.frame_count_for_duration(render_duration)?;
-    let blank_leading_frame_count =
-        blank_leading_frame_count(overlay_pipe_fps, sync_offset, overlay_frame_count)?;
+    let coverage = ActivityCoverage::for_video(
+        render_duration,
+        sync_offset,
+        scene.end,
+        overlay_pipe_fps,
+        overlay_frame_count,
+    )?;
     let output_frame_count = u32::try_from(source_fps.frame_count_for_duration(render_duration)?)
         .map_err(|_| {
         CoreError::Encode("Composite output frame count exceeds u32".to_string())
@@ -152,20 +157,10 @@ pub fn derive_composite_render_plan(
         overlay_pipe_fps,
         overlay_frame_count,
         output_frame_count,
-        activity_overlap_duration,
-        blank_leading_frame_count,
+        coverage,
         requested_codec_id,
         qsv_full_init_args: scene.ffmpeg.qsv_full_init_args.clone(),
     })
-}
-
-/// Counts output overlay frames whose canonical timeline timestamp precedes
-/// activity time zero, using the canonical rational-FPS duration conversion.
-fn blank_leading_frame_count(fps: Fps, sync_offset: f64, frame_count: u64) -> CoreResult<u64> {
-    if sync_offset >= 0.0 {
-        return Ok(0);
-    }
-    Ok(fps.frame_count_for_duration(-sync_offset)?.min(frame_count))
 }
 
 #[cfg(test)]
@@ -176,9 +171,10 @@ mod tests {
     fn counts_negative_lead_in_frames_at_fractional_offsets() {
         let fps = Fps::new(30, 1).expect("valid fps");
 
-        assert_eq!(blank_leading_frame_count(fps, -0.01, 30).unwrap(), 1);
-        assert_eq!(blank_leading_frame_count(fps, -5.0, 900).unwrap(), 150);
-        assert_eq!(blank_leading_frame_count(fps, -5.01, 900).unwrap(), 151);
+        for (offset, expected) in [(-0.01, 1), (-5.0, 150), (-5.01, 151)] {
+            let coverage = ActivityCoverage::for_video(30.0, offset, 120.0, fps, 900).unwrap();
+            assert_eq!(coverage.blank_leading_frame_count, expected);
+        }
     }
 }
 

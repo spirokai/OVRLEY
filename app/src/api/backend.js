@@ -494,6 +494,76 @@ export async function preparePreviewVideo(path) {
 }
 
 /**
+ * Opens a fresh configuration inspection; it owns no editor preview or render.
+ * @returns {Promise<{inspectionId: string}>} Opaque backend session identity.
+ */
+export async function createVideoInspection() {
+  return apiCall('backend_create_video_inspection', {})
+}
+
+/**
+ * @typedef {object} InspectedVideoSource
+ * @property {string} sourceId Session-owned descriptor identity.
+ * @property {object} metadata Canonical probe metadata with required timing, coded resolution, rotationDegrees, and timestamp provenance.
+ * @property {string} metadata.path Canonical absolute source path.
+ * @property {number} metadata.duration Source duration in seconds.
+ * @property {number} metadata.fps Frame rate derived from its exact rational components.
+ * @property {number} metadata.fpsNum Exact frame-rate numerator.
+ * @property {number} metadata.fpsDen Exact frame-rate denominator.
+ * @property {{width: number, height: number}} metadata.resolution Coded source dimensions.
+ * @property {0|90|180|270} metadata.rotationDegrees This source's normalized display rotation, used by codec-specific rendering.
+ * @property {string|null} metadata.creationTime Probed creation time, without the editor's override.
+ * @property {string|null} metadata.syncTime Embedded synchronization hint when available.
+ * @property {string|null} metadata.timeSource Timestamp provenance; trusted GPS timestamps keep absolute-time semantics.
+ * @property {{width: number, height: number}} displayResolution Dimensions after applying this source's rotation.
+ * @property {{sizeBytes: number, modifiedAtUnixNanos: string}} stamp File identity observed before and after probing.
+ */
+
+/**
+ * Inspects a queued or calibration video without registering a preview or extracting its parsed activity.
+ * Embedded activity resolution remains job preparation; duration supplies provisional work estimates.
+ * Effective editor timestamp overrides stay in calibration inputs, separate from this file descriptor.
+ * @param {string} inspectionId Active configuration inspection identity.
+ * @param {string} path Source path, including reference videos outside the queued folder.
+ * @returns {Promise<InspectedVideoSource>} Session-owned metadata descriptor.
+ */
+export async function inspectVideoSource(inspectionId, path) {
+  return apiCall('backend_inspect_video_source', { inspectionId, path })
+}
+
+/**
+ * Checks descriptor ownership and current file stamps. Actual batch submission must recheck at acceptance.
+ * @param {{inspectionId: string, sources: InspectedVideoSource[], calibrationSource: InspectedVideoSource|null}} selection Selected sources.
+ * @returns {Promise<{status: 'valid'}|{status: 'rejected', inspectionId: string, issues: Array<{sourceId: string, path: string, reason: string}>}>}
+ * Source preflight result, with affected identities when reinspection is required.
+ */
+export async function validateVideoInspection(selection) {
+  return apiCall('backend_validate_video_inspection', { selection })
+}
+
+/**
+ * Plans native batch destinations and frame totals for fresh inspected sources.
+ * Coverage for embedded telemetry is finalized during owning-job preparation.
+ * @param {{inspectionId: string, sources: InspectedVideoSource[], calibrationSource: InspectedVideoSource|null}} selection Selected sources.
+ * @param {{exportMode: string, exportCodec: string, fps: number, updateRate: number, qualityType: string, qualityValue: number, qsvFullInitArgs: string[]|null}} encoding Captured encoder settings.
+ * @param {string} outputDirectory Absolute output folder.
+ * @returns {Promise<{status: 'planned', plans: Array<{sourceId: string, outputPath: string, outputDurationSeconds: number, plannedFrames: number, containerFpsNum: number, containerFpsDen: number}>}|{status: 'rejected', inspectionId: string, issues: object[]}>} Native planning result.
+ */
+export async function planBatchOutputs(selection, encoding, outputDirectory) {
+  return apiCall('backend_plan_batch_outputs', { selection, encoding, outputDirectory })
+}
+
+/**
+ * Discards session descriptors and prevents in-flight inspection from publishing into the closed session.
+ * Accepted execution retains its owned descriptors independently.
+ * @param {string} inspectionId Configuration inspection identity.
+ * @returns {Promise<void>} Resolves after disposal.
+ */
+export async function disposeVideoInspection(inspectionId) {
+  return invokeCommand('backend_dispose_video_inspection', { inspectionId })
+}
+
+/**
  * Registers an already-probed video with the local preview server.
  * @param {string} path Absolute source video path.
  * @returns {Promise<{importId: string, previewUrl: string}>} Runtime preview identity.

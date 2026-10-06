@@ -259,9 +259,6 @@ pub fn render_composite_video(
     output_target: &RenderOutputTarget,
 ) -> CoreResult<String> {
     controller.check_cancelled()?;
-    let shutdown = PipelineShutdown::shared(controller.cancel_flag());
-
-    // ── PHASE 1: DERIVE PIPELINE PLAN (timing, FPS, FFmpeg args, output path) ──
     let scene = &config.scene;
     let (source_rotation_degrees, source_has_audio) = verify_composite_source_resolution(
         paths,
@@ -271,6 +268,36 @@ pub fn render_composite_video(
     )?;
     controller.check_cancelled()?;
     let include_audio = include_audio && source_has_audio;
+    render_inspected_composite_video(
+        paths,
+        config,
+        activity,
+        dense_activity,
+        controller,
+        render_plan,
+        include_audio,
+        source_rotation_degrees,
+        output_target,
+    )
+}
+
+/// Batch preparation already owns normalized source geometry and rotation.
+/// Use that descriptor without probing or consulting the editor again.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn render_inspected_composite_video(
+    paths: &AppPaths,
+    config: &ValidatedRenderConfig,
+    activity: &ParsedActivity,
+    dense_activity: &DenseActivityReport,
+    controller: &RenderController,
+    render_plan: CompositeRenderPlan,
+    include_audio: bool,
+    source_rotation_degrees: Option<i32>,
+    output_target: &RenderOutputTarget,
+) -> CoreResult<String> {
+    controller.check_cancelled()?;
+    let shutdown = PipelineShutdown::shared(controller.cancel_flag());
+    let scene = &config.scene;
     let plan = derive_composite_pipeline_plan(
         paths,
         scene,
@@ -282,12 +309,10 @@ pub fn render_composite_video(
     let task_count = usize::try_from(plan.render.overlay_frame_count).map_err(|_| {
         CoreError::Encode("Composite overlay frame count exceeds usize".to_string())
     })?;
-    let expected_activity_frame_count = usize::try_from(
-        plan.render
-            .overlay_pipe_fps
-            .frame_count_for_duration(plan.render.activity_overlap_duration)?,
-    )
-    .map_err(|_| CoreError::Encode("Composite activity frame count exceeds usize".to_string()))?;
+    let expected_activity_frame_count =
+        usize::try_from(plan.render.coverage.frame_count).map_err(|_| {
+            CoreError::Encode("Composite activity frame count exceeds usize".to_string())
+        })?;
     if dense_activity.frame_count != expected_activity_frame_count {
         return Err(CoreError::Encode(format!(
             "Composite dense activity contains {} frames; activity overlap requires {expected_activity_frame_count}",
@@ -312,7 +337,7 @@ pub fn render_composite_video(
         dense_activity,
         &prepared_preview_assets,
         plan.frame_size,
-        plan.render.blank_leading_frame_count,
+        plan.render.coverage.blank_leading_frame_count,
     )?;
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
 

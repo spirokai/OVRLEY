@@ -19,8 +19,7 @@ pub struct CompositeRenderPlan {
     pub(crate) overlay_pipe_fps: Fps,
     pub overlay_frame_count: u64,
     pub output_frame_count: u32,
-    pub activity_overlap_duration: f64,
-    pub blank_leading_frame_count: u64,
+    pub coverage: crate::encode::video_timing::ActivityCoverage,
     pub(crate) requested_codec_id: CompositeCodecId,
     pub(crate) qsv_full_init_args: Vec<String>,
 }
