@@ -85,7 +85,6 @@ export default function useBatchRenderWorkflow({ phase, settings }) {
     const directory = await openDirectoryPath({ lastDirectoryKey: 'last-batch-video-dir' })
     if (directory !== null) {
       store.setBatchVideoFolder(directory)
-      review.refresh()
     }
   }
   const pickOutputFolder = async () => {

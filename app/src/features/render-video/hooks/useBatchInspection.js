@@ -5,17 +5,18 @@ import { captureBatchEncoding } from '../utils/batchRenderRequest'
 import { reviewBatchQueue } from '../utils/batchRenderReview'
 
 /**
- * Owns one disposable configuration session and its native output review.
+ * Retains a disposable inspection session across dialog openings and owns its native output review.
  * Context identities prevent late results from authorizing Start.
  * @param {object} options Opening, folder, queue choices, sync and encoder inputs.
  * @returns {object} Current inspection, reviewed rows, readiness, error and refresh/rejection actions.
  */
 export default function useBatchInspection({ open, folder, outputDirectory, choices, sync, settings, availableCodecs }) {
   const [revision, setRevision] = useState(0)
+  const [activated, setActivated] = useState(false)
   const [inspection, setInspection] = useState(null)
   const [plan, setPlan] = useState(null)
   const referencePath = sync.error ? null : (sync.calibration.reference?.path ?? null)
-  const context = useMemo(() => ({ open, folder, referencePath, revision }), [open, folder, referencePath, revision])
+  const context = useMemo(() => ({ folder, referencePath, revision }), [folder, referencePath, revision])
   const current = inspection?.context === context ? inspection : null
   const rows = useMemo(() => reviewBatchQueue(choices, current, sync), [choices, current, sync])
   const jobs = useMemo(() => rows.filter((row) => row.status === 'pending'), [rows])
@@ -25,7 +26,11 @@ export default function useBatchInspection({ open, folder, outputDirectory, choi
   )
 
   useEffect(() => {
-    if (!open || folder === null) return
+    if (open) setActivated(true)
+  }, [open])
+
+  useEffect(() => {
+    if (!activated || folder === null) return
     let closed = false
     let inspectionId = null
     void (async () => {
@@ -78,7 +83,7 @@ export default function useBatchInspection({ open, folder, outputDirectory, choi
       if (inspectionId !== null)
         void backend.disposeVideoInspection(inspectionId).catch((error) => useStore.getState().setErrorMessage(error.message))
     }
-  }, [open, folder, referencePath, context])
+  }, [activated, folder, referencePath, context])
 
   useEffect(() => {
     if (!open || !current?.complete || current.error || sync.error || jobs.length === 0 || outputDirectory === null) return
