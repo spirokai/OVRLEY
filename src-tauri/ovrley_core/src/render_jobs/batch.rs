@@ -467,8 +467,10 @@ impl RunningBatch {
             encoded_frames: encoded,
             current_item_progress,
             elapsed_seconds: elapsed,
-            estimated_seconds_remaining: (self.renderer_busy && encoded > 0 && elapsed > 0.0)
-                .then(|| planned.saturating_sub(processed) as f64 * elapsed / encoded as f64),
+            // Composite encoding reports zero until finalization; rendered work
+            // provides throughput while keeping failed items out of that rate.
+            estimated_seconds_remaining: (self.renderer_busy && rendered > 0 && elapsed > 0.0)
+                .then(|| planned.saturating_sub(processed) as f64 * elapsed / rendered as f64),
             outputs,
             result_counts: counts,
         }

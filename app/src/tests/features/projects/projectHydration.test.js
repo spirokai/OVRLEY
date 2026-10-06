@@ -15,7 +15,7 @@ test('project restoration changes only project-owned settings', () => {
     importedVideoImportId: 'canonical-import',
   })
   useStore.getState().setBatchQueueFromPaths(['C:\\old\\queued.mp4'])
-  useStore.getState().setBatchActiveItemId(useStore.getState().batchQueue[0].id)
+  useStore.setState({ batchSnapshot: { batchId: 'old-batch', rendererBusy: false } })
 
   applyProjectOwnedState(useStore, {
     editor: {
@@ -59,7 +59,7 @@ test('project restoration changes only project-owned settings', () => {
   expect(state.batchVideoFolder).toBe('C:\\videos')
   expect(state.batchOutputFolder).toBe('C:\\renders')
   expect(state.batchQueue).toEqual([])
-  expect(state.batchActiveItemId).toBeNull()
+  expect(state.batchSnapshot).toBeNull()
   expect(state.renderSettings).not.toHaveProperty('batchVideoFolder')
   expect(state.renderSettings).not.toHaveProperty('batchOutputFolder')
   expect(state.selectedSecond).toBe(50)

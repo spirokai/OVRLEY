@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -198,14 +198,72 @@ describe('RenderVideoDialog', () => {
     expect(screen.getByText('Video folder')).toBeInTheDocument()
   })
 
-  test('enables batch start once videos are queued and an output folder is chosen', () => {
+  test('keeps batch start disabled until queued sources have fresh native inspection', () => {
     useStore.getState().setBatchQueueFromPaths(['C:\\videos\\ride.mp4'])
     useStore.getState().setBatchOutputFolder('C:\\renders')
 
     render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
 
     expect(screen.getByText('ride.mp4')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /start batch render/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /start batch render/i })).toBeDisabled()
+  })
+
+  test('rounds batch and item ETA to seconds and keeps the existing completion presentation', () => {
+    const id = 'C:/videos/ride.mp4'
+    const snapshot = {
+      batchId: 'batch-1',
+      revision: 1,
+      phase: 'rendering',
+      rendererBusy: true,
+      activeItemId: id,
+      plannedFrames: 300,
+      processedFrames: 30,
+      renderedFrames: 30,
+      encodedFrames: 20,
+      elapsedSeconds: 1,
+      estimatedSecondsRemaining: 59.6,
+      currentItemProgress: {
+        plannedFrames: 300,
+        currentFrames: 30,
+        renderedFrames: 30,
+        encodedFrames: 20,
+        elapsedSeconds: 1,
+        estimatedSecondsRemaining: 1.6,
+      },
+      items: [{ id, phase: 'rendering', plannedFrames: 300, currentFrames: 30, renderedFrames: 30, encodedFrames: 20, outcome: null }],
+      outputs: [],
+      resultCounts: { succeeded: 0, failed: 0, cancelled: 0, unstarted: 0 },
+    }
+    useStore.setState({ batchSnapshot: snapshot })
+    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
+
+    expect(screen.getByText('1:00')).toBeInTheDocument()
+    expect(screen.getByText('Est. Remaining: 0:02')).toBeInTheDocument()
+
+    act(() => {
+      useStore.getState().applyBatchSnapshot({
+        ...snapshot,
+        revision: 2,
+        phase: 'completed',
+        rendererBusy: false,
+        activeItemId: null,
+        currentItemProgress: null,
+        processedFrames: 300,
+        renderedFrames: 300,
+        encodedFrames: 300,
+        estimatedSecondsRemaining: null,
+        items: [{ ...snapshot.items[0], phase: 'finished', outcome: { status: 'succeeded', outputPath: 'C:/renders/ride_overlay.mov' } }],
+        outputs: ['C:/renders/ride_overlay.mov'],
+        resultCounts: { succeeded: 1, failed: 0, cancelled: 0, unstarted: 0 },
+      })
+    })
+
+    expect(screen.getByRole('heading', { name: 'Export Finished' })).toBeInTheDocument()
+    expect(screen.getByText('ride.mp4')).toBeInTheDocument()
+    expect(screen.getByText('Done')).toBeInTheDocument()
+    expect(screen.queryByText(/1 completed/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Est. Remaining')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled()
   })
 
   test('lets the user clear a restored video folder while its empty queue is being loaded', async () => {

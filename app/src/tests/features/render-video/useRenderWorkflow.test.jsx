@@ -172,11 +172,11 @@ describe('useRenderWorkflow', () => {
 
     act(() => result.current.updateRenderSettingsDraft({ renderTarget: 'batch' }))
     expect(useStore.getState().renderSettings.renderTarget).toBe('batch')
-    act(() => useStore.getState().setBatchRunning(true))
+    act(() => useStore.setState({ batchSnapshot: { batchId: 'batch-1', revision: 1, rendererBusy: true } }))
     act(() => result.current.closeRenderDialog())
     expect(result.current.renderDialogPhase).toBe('confirm')
 
-    act(() => useStore.getState().setBatchRunning(false))
+    act(() => useStore.setState({ batchSnapshot: { batchId: 'batch-1', revision: 2, rendererBusy: false } }))
     act(() => result.current.closeRenderDialog())
     expect(result.current.renderDialogPhase).toBe('closed')
     await act(async () => result.current.openRenderDialog())

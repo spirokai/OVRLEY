@@ -93,3 +93,40 @@ export function useRenderStore() {
     })),
   )
 }
+
+/** @returns {object} Batch choices, native lifecycle and configuration actions. */
+export function useBatchRenderStore() {
+  return useStore(
+    useShallow((state) => ({
+      batchVideoFolder: state.batchVideoFolder,
+      batchOutputFolder: state.batchOutputFolder,
+      batchQueue: state.batchQueue,
+      batchSnapshot: state.batchSnapshot,
+      batchRunning: state.batchSnapshot?.rendererBusy ?? false,
+      batchSubmissionPending: state.batchSubmissionPending,
+      setBatchVideoFolder: state.setBatchVideoFolder,
+      setBatchOutputFolder: state.setBatchOutputFolder,
+      setBatchQueueFromPaths: state.setBatchQueueFromPaths,
+      removeBatchQueueItem: state.removeBatchQueueItem,
+      clearBatchQueue: state.clearBatchQueue,
+      setBatchItemSkipOverlay: state.setBatchItemSkipOverlay,
+      setErrorMessage: state.setErrorMessage,
+    })),
+  )
+}
+
+/** @returns {object} Inputs that invalidate reviewed batch synchronization. */
+export function useBatchSyncInputs() {
+  return useStore(
+    useShallow((state) => ({
+      activitySummary: state.activitySummary,
+      parsedActivitySource: state.parsedActivitySource,
+      importedVideoPath: state.importedVideoPath,
+      importedVideoCreationTime: state.importedVideoCreationTime,
+      importedVideoTimeSource: state.importedVideoTimeSource,
+      videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+      videoSyncTimezoneMode: state.videoSyncTimezoneMode,
+      availableCodecs: state.availableCodecs,
+    })),
+  )
+}

@@ -45,6 +45,8 @@ export default function BatchRenderQueue({
   currentItemProgress,
   setBatchItemSkipOverlay,
   removeBatchQueueItem,
+  batchReviewError,
+  refreshInspection,
 }) {
   const { t } = useTranslation()
 
@@ -78,6 +80,14 @@ export default function BatchRenderQueue({
               {t('render-video.clearQueue', 'Clear')}
             </Button>
           </BatchFolderPicker>
+          {batchReviewError && (
+            <div role="alert" className="shrink-0 space-y-2 text-xs text-red-700">
+              <p>{batchReviewError === 'reinspectionRequired' ? t('render-video.reinspectionRequired') : batchReviewError}</p>
+              <Button type="button" variant="outline" onClick={refreshInspection}>
+                {t('render-video.inspectAgain')}
+              </Button>
+            </div>
+          )}
         </>
       )}
       <div
@@ -93,11 +103,11 @@ export default function BatchRenderQueue({
           visibleBatchQueue.map((item) => {
             const isActive = item.id === batchActiveItemId
             const isBlocked = item.status === 'blocked'
-            const isDone = item.status === 'done'
+            const isDone = item.status === 'succeeded'
             const isRendering = isActive && item.status === 'rendering'
-            const isQueued = batchRunning && (item.status === 'pending' || item.status === 'importing')
+            const isQueued = batchRunning && (item.status === 'pending' || item.status === 'queued')
             const hasProgress = isDone || isRendering || isQueued
-            const isLoading = item.status === 'checking' || item.status === 'importing' || item.status === 'rendering'
+            const isLoading = item.status === 'checking' || item.status === 'preparing' || item.status === 'rendering'
             return (
               <div
                 key={item.id}
@@ -105,7 +115,9 @@ export default function BatchRenderQueue({
               >
                 <div className="min-w-0">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="min-w-0 truncate text-xs font-medium text-foreground">{item.filename}</p>
+                    <p className="min-w-0 truncate text-xs font-medium text-foreground" title={item.outputPath ?? item.path}>
+                      {item.filename}
+                    </p>
                     {hasProgress ? (
                       <span
                         className={`shrink-0 text-right text-[0.7rem] font-semibold tabular-nums ${isDone ? 'text-green-700' : 'text-muted-foreground'}`}
@@ -119,10 +131,14 @@ export default function BatchRenderQueue({
                   ) : null}
                   {isBlocked ? (
                     <p className="mt-0.5 truncate text-[10px] font-normal leading-tight text-muted-foreground/70" title={item.error}>
-                      {item.error}
+                      {item.error === 'reinspectionRequired' ? t('render-video.reinspectionRequired') : item.error}
                     </p>
                   ) : null}
-                  {item.status === 'error' && item.error ? <p className="truncate text-[10px] text-red-700">{item.error}</p> : null}
+                  {item.status === 'failed' && item.error ? <p className="truncate text-[10px] text-red-700">{item.error}</p> : null}
+                  {item.status === 'preparing' ? <p className="text-[10px] text-muted-foreground">{t('render-video.preparingBatch')}</p> : null}
+                  {item.status === 'cancelled' || item.status === 'unstarted' ? (
+                    <p className="text-[10px] text-muted-foreground">{t(`render-video.${item.status}`)}</p>
+                  ) : null}
                   {hasProgress ? <Progress value={isDone ? 100 : isQueued ? 0 : currentItemProgress.percent} className="mt-2 h-1.5" /> : null}
                   {isRendering ? (
                     <>

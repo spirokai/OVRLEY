@@ -147,6 +147,16 @@
     "video": "Wideo"
   },
   "render-video": {
+    "reinspectionRequired": "Pliki źródłowe zmieniły się lub weryfikacja wygasła. Sprawdź je ponownie przed rozpoczęciem.",
+    "inspectAgain": "Sprawdź ponownie",
+    "preparingBatch": "Przygotowywanie filmu...",
+    "cancelled": "Anulowano",
+    "unstarted": "Nie rozpoczęto",
+    "batchResult": {
+      "completedWithErrors": "Partia zakończona z błędami",
+      "failed": "Partia nie powiodła się",
+      "cancelled": "Partia anulowana"
+    },
     "cancelling": "Anulowanie...",
     "exportSettings": "Ustawienia eksportu",
     "batchSettings": "Ustawienia partii",

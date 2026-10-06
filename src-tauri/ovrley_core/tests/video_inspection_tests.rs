@@ -453,6 +453,39 @@ impl SourceMetadataProbe for PausedProbe {
 }
 
 #[test]
+fn inspection_allows_five_active_probes_across_sessions_and_releases_capacity() {
+    let directory = SourcesDirectory::new();
+    let (started_tx, started_rx) = mpsc::channel();
+    let (resume_tx, resume_rx) = mpsc::channel();
+    let service = Arc::new(VideoInspectionService::with_probe(Arc::new(PausedProbe {
+        started: started_tx,
+        resume: Mutex::new(resume_rx),
+    })));
+    let sessions = [service.create_session(), service.create_session()];
+    let workers = (0..7)
+        .map(|index| {
+            let service = service.clone();
+            let inspection_id = sessions[index % 2].inspection_id.clone();
+            let path = directory.source(&format!("clip-{index}.mp4"));
+            let paths = directory.paths();
+            std::thread::spawn(move || service.inspect_source(&paths, &inspection_id, &path))
+        })
+        .collect::<Vec<_>>();
+    for _ in 0..5 {
+        started_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+    }
+    assert!(started_rx.recv_timeout(Duration::from_millis(100)).is_err());
+    resume_tx.send(()).unwrap();
+    started_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+    for _ in 0..6 {
+        resume_tx.send(()).unwrap();
+    }
+    for worker in workers {
+        worker.join().unwrap().unwrap();
+    }
+}
+
+#[test]
 fn probing_cannot_publish_changed_media_or_results_after_disposal() {
     let directory = SourcesDirectory::new();
     let path = directory.source("clip.mp4");

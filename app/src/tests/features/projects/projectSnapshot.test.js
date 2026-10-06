@@ -31,7 +31,6 @@ describe('project snapshot contract', () => {
     useStore.getState().setBatchVideoFolder('C:\\Events\\batch-videos')
     useStore.getState().setBatchOutputFolder('C:\\Events\\batch-renders')
     useStore.getState().setBatchQueueFromPaths(['C:\\Events\\batch-videos\\blocked.mp4'])
-    useStore.getState().setBatchItemStatus(useStore.getState().batchQueue[0].id, 'blocked', 'Sync failed')
 
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
 

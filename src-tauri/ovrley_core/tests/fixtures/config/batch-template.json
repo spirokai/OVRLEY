@@ -1,0 +1,20 @@
+{
+  "scene": {
+    "width": 1920,
+    "height": 1080,
+    "font": "Arial.ttf",
+    "font_size": 30,
+    "opacity": 1,
+    "scale": 1,
+    "shadow_color": "#000000",
+    "shadow_strength": 0,
+    "shadow_distance": 0,
+    "border_color": "#000000",
+    "border_thickness": 0
+  },
+  "backdrops": [],
+  "rasters": [],
+  "labels": [],
+  "values": [],
+  "plots": []
+}

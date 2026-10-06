@@ -12,7 +12,7 @@
  * @param {number|null} props.renderProgress.renderingFps - Estimated output-frame-equivalent production FPS.
  * @param {number} props.renderProgress.encoded - Number of encoded frames.
  * @param {string[]} [props.renderSummaryItems] - Compact render settings summary fragments.
- * @param {boolean} [props.finished] - Whether the whole batch has finished successfully.
+ * @param {boolean} [props.finished] - Whether rendering has reached a terminal outcome.
  * @param {function} [props.onCancel] - Cancellation callback; omitted when actions are in the dialog footer.
  */
 
@@ -23,18 +23,20 @@ import { formatFps, formatTime } from '../utils/codecUtils'
 import useRenderCancellation from '../hooks/useRenderCancellation'
 import { useTranslation } from 'react-i18next'
 
-function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel, finished = false }) {
+function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel, finished = false, batchSnapshot = null }) {
   const { t } = useTranslation()
   const { isCancelling, handleCancel } = useRenderCancellation({ status: renderProgress.status, onCancel })
 
   const { percent, current, total, estimatedSecondsRemaining, renderingFps, encoded } = renderProgress
 
-  const isImporting = renderProgress.status === 'importing'
+  const isPreparing = renderProgress.status === 'preparing' || renderProgress.status === 'accepted'
   const isFinalizing = percent >= 100
 
   let subMessage = t('render-video.renderingFrames', 'Rendering frames...')
-  if (isImporting) {
-    subMessage = t('app.importingYourVideo', 'Importing your video...')
+  if (isPreparing) {
+    subMessage = t('render-video.preparingBatch')
+  } else if (renderProgress.status === 'cancelling') {
+    subMessage = t('render-video.cancelling', 'Cancelling...')
   } else if (isFinalizing) {
     subMessage =
       encoded && total > 0
@@ -61,7 +63,9 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
         <div>
           <h2 className="text-xl font-bold text-foreground">
             {finished
-              ? t('render-video.exportFinished', 'Export Finished')
+              ? batchSnapshot === null || batchSnapshot.phase === 'completed'
+                ? t('render-video.exportFinished', 'Export Finished')
+                : t(`render-video.batchResult.${batchSnapshot.phase}`)
               : isFinalizing
                 ? t('render-video.finalizingVideo', 'Finalizing Video')
                 : t('render-video.exportingOverlay', 'Exporting Overlay')}

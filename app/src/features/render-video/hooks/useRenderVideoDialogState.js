@@ -261,16 +261,8 @@ export default function useRenderVideoDialogState({
     onSettingsChange({ qualityValue: settings.qualityType === 'quality' ? invertQualityValue(value) : value })
   }
 
-  const batchFinished =
-    !batch.batchRunning &&
-    batch.batchQueue.some((item) => item.status === 'done') &&
-    batch.batchQueue.every((item) => item.status === 'done' || item.status === 'blocked')
-  const batchStartDisabled =
-    renderStartDisabled ||
-    batch.batchRunning ||
-    !batch.batchQueue.some((item) => item.status !== 'blocked') ||
-    !batch.batchOutputFolder ||
-    batch.batchQueue.some((item) => item.status === 'checking')
+  const batchFinished = batch.batchFinished
+  const batchStartDisabled = renderStartDisabled || !batch.batchReady
 
   return {
     ...batch,

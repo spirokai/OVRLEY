@@ -18,7 +18,7 @@ import useStore from '@/store/useStore'
 import { createRenderEffectiveConfig } from '../utils/renderConfig'
 import { createRenderProgress } from '../utils/renderProgress'
 import { loadRememberedRenderDirectory, normalizeRenderOutputPath, rememberAcceptedRenderOutput } from '../utils/render-output'
-import useRenderDialogState from './useRenderDialogState'
+import useRenderDialogLifecycle from './useRenderDialogLifecycle'
 import i18next from 'i18next'
 
 export default function useRenderWorkflow({ backendStatus }) {
@@ -36,7 +36,7 @@ export default function useRenderWorkflow({ backendStatus }) {
   } = useRenderStore()
   const globalDefaults = useStore((state) => state.globalDefaults)
   const importedVideoPath = useStore((state) => state.importedVideoPath)
-  const batchRunning = useStore((state) => state.batchRunning)
+  const batchRunning = useStore((state) => (state.batchSnapshot?.rendererBusy ?? false) || state.batchSubmissionPending)
   const setRenderTarget = useStore((state) => state.setRenderTarget)
   const [renderingPreviewFrame, setRenderingPreviewFrame] = useState(false)
   const [submissionPending, setSubmissionPending] = useState(false)
@@ -46,7 +46,7 @@ export default function useRenderWorkflow({ backendStatus }) {
 
   const hasParsedActivity = Boolean(activitySummary)
   const canRender = Boolean(config && hasParsedActivity)
-  const renderDisabled = !canRender || renderingVideo || backendStatus !== 'connected'
+  const renderDisabled = !canRender || renderingVideo || batchRunning || submissionPending || backendStatus !== 'connected'
   const renderTooltipContent = useMemo(() => {
     if (!config) {
       return hasParsedActivity
@@ -60,11 +60,11 @@ export default function useRenderWorkflow({ backendStatus }) {
       return i18next.t('render-video.backendOffline', 'Backend offline')
     }
 
-    if (renderingVideo) {
+    if (renderingVideo || batchRunning || submissionPending) {
       return i18next.t('render-video.renderingAlreadyInProgress', 'Rendering already in progress')
     }
     return null
-  }, [backendStatus, config, hasParsedActivity, renderingVideo])
+  }, [backendStatus, batchRunning, config, hasParsedActivity, renderingVideo, submissionPending])
   const renderPreviewFrameDisabled = renderDisabled || renderingPreviewFrame
 
   const buildRenderSettingsDraft = useCallback(() => {
@@ -102,7 +102,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     openRenderDialog,
     closeRenderDialog,
     updateRenderSettingsDraft: updateDraftState,
-  } = useRenderDialogState({
+  } = useRenderDialogLifecycle({
     batchRunning,
     buildRenderSettingsDraft,
     onOpenError: (error) => setErrorMessage(error.message || 'Failed to prepare render output'),
@@ -245,7 +245,13 @@ export default function useRenderWorkflow({ backendStatus }) {
   // promoted into editor state.
   const submitRender = useCallback(
     async (overwrite = false, expectedPath = null) => {
-      if (!config?.scene || !renderSettingsDraft || submissionPending) {
+      if (
+        !config?.scene ||
+        !renderSettingsDraft ||
+        submissionPending ||
+        useStore.getState().batchSnapshot?.rendererBusy ||
+        useStore.getState().batchSubmissionPending
+      ) {
         return
       }
 

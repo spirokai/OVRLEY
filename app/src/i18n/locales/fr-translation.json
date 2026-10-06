@@ -147,6 +147,16 @@
     "video": "Vidéo"
   },
   "render-video": {
+    "reinspectionRequired": "Les fichiers ont changé ou la vérification a expiré. Vérifiez à nouveau avant de démarrer.",
+    "inspectAgain": "Vérifier à nouveau",
+    "preparingBatch": "Préparation de la vidéo...",
+    "cancelled": "Annulé",
+    "unstarted": "Non démarré",
+    "batchResult": {
+      "completedWithErrors": "Lot terminé avec des erreurs",
+      "failed": "Échec du lot",
+      "cancelled": "Lot annulé"
+    },
     "cancelling": "Annulation...",
     "exportSettings": "Paramètres d’exportation",
     "batchSettings": "Paramètres du lot",

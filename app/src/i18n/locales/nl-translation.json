@@ -147,6 +147,16 @@
     "video": "Video"
   },
   "render-video": {
+    "reinspectionRequired": "Bronbestanden zijn gewijzigd of de controle is verlopen. Controleer opnieuw voordat je start.",
+    "inspectAgain": "Opnieuw controleren",
+    "preparingBatch": "Video voorbereiden...",
+    "cancelled": "Geannuleerd",
+    "unstarted": "Niet gestart",
+    "batchResult": {
+      "completedWithErrors": "Batch voltooid met fouten",
+      "failed": "Batch mislukt",
+      "cancelled": "Batch geannuleerd"
+    },
     "cancelling": "Annuleren...",
     "exportSettings": "Exportinstellingen",
     "batchSettings": "Batchinstellingen",

@@ -147,6 +147,16 @@
     "video": "Video"
   },
   "render-video": {
+    "reinspectionRequired": "Kaynak dosyalar değişti veya incelemenin süresi doldu. Başlatmadan önce yeniden inceleyin.",
+    "inspectAgain": "Yeniden incele",
+    "preparingBatch": "Video hazırlanıyor...",
+    "cancelled": "İptal edildi",
+    "unstarted": "Başlatılmadı",
+    "batchResult": {
+      "completedWithErrors": "Toplu işlem hatalarla tamamlandı",
+      "failed": "Toplu işlem başarısız",
+      "cancelled": "Toplu işlem iptal edildi"
+    },
     "cancelling": "İptal ediliyor...",
     "exportSettings": "Dışa aktarma ayarları",
     "batchSettings": "Toplu işlem ayarları",

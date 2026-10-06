@@ -147,6 +147,16 @@
     "video": "Vídeo"
   },
   "render-video": {
+    "reinspectionRequired": "Los archivos cambiaron o la inspección caducó. Inspecciona de nuevo antes de iniciar.",
+    "inspectAgain": "Inspeccionar de nuevo",
+    "preparingBatch": "Preparando vídeo...",
+    "cancelled": "Cancelado",
+    "unstarted": "Sin iniciar",
+    "batchResult": {
+      "completedWithErrors": "Lote finalizado con errores",
+      "failed": "El lote falló",
+      "cancelled": "Lote cancelado"
+    },
     "cancelling": "Cancelando...",
     "exportSettings": "Ajustes de exportación",
     "batchSettings": "Ajustes de lote",

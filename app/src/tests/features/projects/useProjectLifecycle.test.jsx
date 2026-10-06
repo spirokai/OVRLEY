@@ -259,7 +259,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(result.current.status).toBe('Saved')
     act(() => useStore.getState().setBatchQueueFromPaths(['C:\\batch-videos\\ride.mp4']))
     expect(result.current.status).toBe('Saved')
-    act(() => useStore.getState().setBatchItemStatus(useStore.getState().batchQueue[0].id, 'blocked', 'Sync failed'))
     expect(result.current.status).toBe('Saved')
 
     act(() => useStore.getState().setVideoSyncDetectedLocation(20))

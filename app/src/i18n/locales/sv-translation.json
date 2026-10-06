@@ -147,6 +147,16 @@
     "video": "Video"
   },
   "render-video": {
+    "reinspectionRequired": "Källfilerna har ändrats eller kontrollen har gått ut. Kontrollera igen innan du startar.",
+    "inspectAgain": "Kontrollera igen",
+    "preparingBatch": "Förbereder video...",
+    "cancelled": "Avbruten",
+    "unstarted": "Inte startad",
+    "batchResult": {
+      "completedWithErrors": "Batch slutförd med fel",
+      "failed": "Batch misslyckades",
+      "cancelled": "Batch avbruten"
+    },
     "cancelling": "Avbryter...",
     "exportSettings": "Exportinställningar",
     "batchSettings": "Batchinställningar",

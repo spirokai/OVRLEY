@@ -23,6 +23,7 @@ import { getDefaultBitrate } from '../data/bitrateDefaults'
 
 export default function useRenderVideoDerivedState({ settings }) {
   const renderingVideo = useStore((state) => state.renderingVideo)
+  const batchBusy = useStore((state) => (state.batchSnapshot?.rendererBusy ?? false) || state.batchSubmissionPending)
   const platformOs = useStore((state) => state.platformOs)
   const availableCodecs = useStore((state) => state.availableCodecs)
   const config = useStore((state) => state.config)
@@ -35,8 +36,7 @@ export default function useRenderVideoDerivedState({ settings }) {
 
   const hasImportedVideo = Boolean(importedVideoPath)
   const isBatchTarget = settings?.renderTarget === 'batch'
-  // Batch renders import each queued video on their own, so the currently
-  // imported video only drives settings when rendering the current video.
+  // Native jobs own their FPS; the current source only drives single rendering.
   const lockedVideoFps = isBatchTarget ? null : importedVideoFps
   const exportMode = settings?.exportMode || (hasImportedVideo ? 'composite' : 'transparent')
   const updateRateFps = useMemo(
@@ -58,6 +58,7 @@ export default function useRenderVideoDerivedState({ settings }) {
   const resolutionMismatch = !isBatchTarget && resolutionsMismatch(config?.scene, importedVideoResolution)
   const renderStartDisabled =
     renderingVideo ||
+    batchBusy ||
     resolutionMismatch ||
     (exportMode === 'composite' && (!selectedCodecIsMp4 || !selectedExportCodecAvailable)) ||
     (exportMode !== 'composite' && selectedCodecIsMp4)

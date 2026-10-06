@@ -147,6 +147,16 @@
     "video": "동영상"
   },
   "render-video": {
+    "reinspectionRequired": "파일이 변경되었거나 검사 유효 기간이 만료되었습니다. 시작 전에 다시 검사하세요.",
+    "inspectAgain": "다시 검사",
+    "preparingBatch": "동영상 준비 중...",
+    "cancelled": "취소됨",
+    "unstarted": "시작 안 됨",
+    "batchResult": {
+      "completedWithErrors": "오류와 함께 일괄 작업 완료",
+      "failed": "일괄 작업 실패",
+      "cancelled": "일괄 작업 취소됨"
+    },
     "cancelling": "취소 중...",
     "exportSettings": "내보내기 설정",
     "batchSettings": "일괄 처리 설정",

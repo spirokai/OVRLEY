@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 use serde::{Deserialize, Serialize};
 
@@ -18,6 +18,7 @@ use crate::media::SourceVideoMetadata;
 use crate::paths::AppPaths;
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+const MAX_CONCURRENT_PROBES: usize = 5;
 
 fn identity(prefix: &str) -> String {
     format!("{prefix}-{}", NEXT_ID.fetch_add(1, Ordering::Relaxed))
@@ -104,10 +105,25 @@ type SessionSources = HashMap<String, Arc<InspectedVideoSource>>;
 
 pub struct VideoInspectionService {
     sessions: Mutex<HashMap<String, SessionSources>>,
-    // One metadata probe at a time bounds parser memory and ffprobe subprocesses.
+    // The native service is the sole owner of inspection concurrency.
     // Disposal uses only sessions, so closing never waits for a long probe.
-    probe_gate: Mutex<()>,
+    active_probes: Mutex<usize>,
+    probe_available: Condvar,
     probe: Arc<dyn SourceMetadataProbe>,
+}
+
+struct ProbePermit<'a>(&'a VideoInspectionService);
+
+impl Drop for ProbePermit<'_> {
+    fn drop(&mut self) {
+        let mut active = self
+            .0
+            .active_probes
+            .lock()
+            .expect("inspection probe mutex poisoned");
+        *active -= 1;
+        self.0.probe_available.notify_one();
+    }
 }
 
 impl Default for VideoInspectionService {
@@ -120,9 +136,23 @@ impl VideoInspectionService {
     pub fn with_probe(probe: Arc<dyn SourceMetadataProbe>) -> Self {
         Self {
             sessions: Mutex::new(HashMap::new()),
-            probe_gate: Mutex::new(()),
+            active_probes: Mutex::new(0),
+            probe_available: Condvar::new(),
             probe,
         }
+    }
+
+    fn acquire_probe(&self) -> ProbePermit<'_> {
+        let active = self
+            .active_probes
+            .lock()
+            .expect("inspection probe mutex poisoned");
+        let mut active = self
+            .probe_available
+            .wait_while(active, |active| *active >= MAX_CONCURRENT_PROBES)
+            .expect("inspection probe mutex poisoned");
+        *active += 1;
+        ProbePermit(self)
     }
 
     pub fn create_session(&self) -> InspectionSession {
@@ -149,10 +179,7 @@ impl VideoInspectionService {
         path: &str,
     ) -> CoreResult<InspectedVideoSource> {
         self.require_session(inspection_id)?;
-        let _probe_guard = self
-            .probe_gate
-            .lock()
-            .expect("inspection probe mutex poisoned");
+        let _probe_permit = self.acquire_probe();
         self.require_session(inspection_id)?;
         let original_path = Path::new(path);
         let canonical_path = canonical_source_path(original_path)?;

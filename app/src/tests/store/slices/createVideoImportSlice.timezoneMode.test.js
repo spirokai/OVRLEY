@@ -79,14 +79,15 @@ describe('signed automatic synchronization and shared calibration', () => {
         id: video.sourceId,
         source: video,
         skipOverlay: false,
-        outputPath: `C:/output/${video.sourceId}_video.mp4`,
       })),
     })
-    expect(request.calibration.correctionSeconds).toBe(3)
-    expect(request.jobs.map((job) => job.timing.offsetSeconds)).toEqual([-9, 43])
+    const { reference: captured, automaticOffsets } = request.activity
+    const correction = captured.committedOffsetSeconds - captured.automaticOffsetSeconds
+    expect(correction).toBe(3)
+    expect(request.jobs.map((job) => automaticOffsets[job.sourceId] + correction)).toEqual([-9, 43])
     // A different live checkbox value cannot reinterpret this calibration.
     editorSnapshot.videoSyncTimezoneMode = 'local'
-    expect(resolveBatchVideoTiming(queued.metadata, summary, request.calibration).timing.offsetSeconds).toBe(43)
+    expect(request.activity.timezoneMode).toBe('utc')
     expect(resolveVideoSyncState(editorSnapshot, summary).videoSyncOffsetSeconds).toBe(-10812)
   })
 

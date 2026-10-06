@@ -147,6 +147,16 @@
     "video": "视频"
   },
   "render-video": {
+    "reinspectionRequired": "源文件已更改或检查已过期。开始前请重新检查。",
+    "inspectAgain": "重新检查",
+    "preparingBatch": "正在准备视频...",
+    "cancelled": "已取消",
+    "unstarted": "未开始",
+    "batchResult": {
+      "completedWithErrors": "批量任务已完成，但存在错误",
+      "failed": "批量任务失败",
+      "cancelled": "批量任务已取消"
+    },
     "cancelling": "正在取消...",
     "exportSettings": "导出设置",
     "batchSettings": "批量设置",

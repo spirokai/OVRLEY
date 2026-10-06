@@ -10,33 +10,18 @@ function freezeRequest(value) {
   return value
 }
 
-function captureEncoding(settings, availableCodecs) {
+/** @param {object} settings Dialog settings. @param {object|null} availableCodecs Detected hardware. @returns {object} Native encoder inputs. */
+export function captureBatchEncoding(settings, availableCodecs) {
   const { exportMode, exportCodec, fps, updateRate, qualityType, qualityValue } = settings
   const qsvFullInitArgs = isQsvFullCodec(exportCodec) ? (availableCodecs?.qsvFullInitArgs ?? null) : null
   return { exportMode, exportCodec, fps, updateRate, qualityType, qualityValue, qsvFullInitArgs }
 }
 
-/**
- * Captures an owned, immutable batch payload from one editor/settings snapshot.
- * Materializes shared presentation once and resolves timing using the shared
- * calibration utility. The caller supplies ordered, eligible job plans; backend
- * ingress owns request, configuration, source and destination validation.
- *
- * @param {object} options Request capture inputs.
- * @param {object} options.editorSnapshot Editor state captured by the caller.
- * @param {object} options.settings Captured dialog settings.
- * @param {string} options.inspectionId Inspection session identity.
- * @param {string} options.outputDirectory Selected output directory.
- * @param {Array<{id: string, source: object, skipOverlay: boolean, outputPath: string}>} options.jobs Ordered job plans.
- * @param {object|null} options.calibrationSource Inspected reference source; null without an external-activity reference.
- * @returns {Readonly<object>} Owned, frozen payload matching Rust BatchRenderRequest.
- */
-export function createBatchRenderRequest({ editorSnapshot, settings, inspectionId, outputDirectory, jobs, calibrationSource }) {
-  const encoding = captureEncoding(settings, editorSnapshot.availableCodecs)
-  const template = createBatchRenderTemplate(editorSnapshot.config, editorSnapshot.globalDefaults)
+/** @param {object} editorSnapshot Editor sync inputs. @returns {object} Shared synchronization context for review and submission. */
+export function captureBatchSync(editorSnapshot) {
   const hasExternalActivity = editorSnapshot.parsedActivitySource === 'activity-file'
-  const externalActivity = hasExternalActivity ? editorSnapshot.parsedActivity : null
   const activitySummary = hasExternalActivity ? editorSnapshot.activitySummary : null
+  if (hasExternalActivity && activitySummary === null) throw new Error('External activity summary is required for batch synchronization')
   const referenceVideo =
     hasExternalActivity && editorSnapshot.importedVideoPath !== null
       ? {
@@ -47,14 +32,50 @@ export function createBatchRenderRequest({ editorSnapshot, settings, inspectionI
         }
       : null
   const calibration = createBatchCalibration({ activitySummary, referenceVideo, timezoneMode: editorSnapshot.videoSyncTimezoneMode })
-  const capturedJobs = jobs.map(({ id, source, skipOverlay, outputPath }) => ({
-    id,
-    source,
-    timing: resolveBatchVideoTiming(source.metadata, activitySummary, calibration).timing,
-    skipOverlay,
-    outputPath,
-  }))
+  return { activitySummary, calibration }
+}
+
+/**
+ * Captures the native request from one synchronous editor/settings snapshot.
+ * Rust owns destinations, descriptors, validation and correction application.
+ * @param {object} options Editor snapshot, settings, inspectionId, outputDirectory, eligible jobs and optional calibrationSource.
+ * @returns {Readonly<object>} Owned payload matching Rust BatchRenderRequest.
+ */
+export function createBatchRenderRequest({ editorSnapshot, settings, inspectionId, outputDirectory, jobs, calibrationSource }) {
+  const { activitySummary, calibration } = captureBatchSync(editorSnapshot)
+  const activity =
+    calibration.mode === 'embeddedActivity'
+      ? { mode: 'embeddedActivity' }
+      : {
+          mode: 'externalActivity',
+          activity: editorSnapshot.parsedActivity,
+          timezoneMode: calibration.timezoneMode,
+          reference:
+            calibration.reference === null
+              ? null
+              : {
+                  sourceId: calibrationSource.sourceId,
+                  creationTime: calibration.reference.creationTime,
+                  timeSource: calibration.reference.timeSource,
+                  committedOffsetSeconds: calibration.reference.committedOffsetSeconds,
+                  automaticOffsetSeconds: calibration.reference.automaticOffsetSeconds,
+                },
+          automaticOffsets: Object.fromEntries(
+            jobs.map(({ source }) => [
+              source.sourceId,
+              resolveBatchVideoTiming(source.metadata, activitySummary, calibration, source.sourceId === calibrationSource?.sourceId).timing
+                .automaticOffsetSeconds,
+            ]),
+          ),
+        }
   return freezeRequest(
-    structuredClone({ inspectionId, template, encoding, externalActivity, calibration, calibrationSource, outputDirectory, jobs: capturedJobs }),
+    structuredClone({
+      inspectionId,
+      template: createBatchRenderTemplate(editorSnapshot.config, editorSnapshot.globalDefaults),
+      encoding: captureBatchEncoding(settings, editorSnapshot.availableCodecs),
+      activity,
+      outputDirectory,
+      jobs: jobs.map(({ id, source, skipOverlay }) => ({ id, sourceId: source.sourceId, skipOverlay })),
+    }),
   )
 }

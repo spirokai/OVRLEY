@@ -147,6 +147,16 @@
     "video": "動画"
   },
   "render-video": {
+    "reinspectionRequired": "ファイルが変更されたか、検査の有効期限が切れました。開始前に再検査してください。",
+    "inspectAgain": "再検査",
+    "preparingBatch": "動画を準備中...",
+    "cancelled": "キャンセル済み",
+    "unstarted": "未開始",
+    "batchResult": {
+      "completedWithErrors": "エラーが発生してバッチが終了しました",
+      "failed": "バッチが失敗しました",
+      "cancelled": "バッチがキャンセルされました"
+    },
     "cancelling": "キャンセル中...",
     "exportSettings": "書き出し設定",
     "batchSettings": "バッチ設定",

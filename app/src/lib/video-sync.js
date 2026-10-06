@@ -148,11 +148,12 @@ export function createBatchCalibration({ activitySummary, referenceVideo, timezo
  * @param {object} video Inspected source metadata with creationTime, timeSource and duration.
  * @param {object|null} activitySummary Shared external activity summary, or null.
  * @param {object} calibration Captured calibration from createBatchCalibration.
+ * @param {boolean} [isReferenceVideo=false] Inspection identity matches the reference source. Path spellings are not file identities.
  * @returns {{timing: object, hasPositiveOverlap: boolean|null}} Job timing and eligibility.
  */
-export function resolveBatchVideoTiming(video, activitySummary, calibration) {
+export function resolveBatchVideoTiming(video, activitySummary, calibration, isReferenceVideo = false) {
   if (calibration.mode === 'embeddedActivity') return { timing: { mode: 'embeddedActivity', offsetSeconds: 0 }, hasPositiveOverlap: null }
-  const timestampSource = calibration.reference !== null && video.path === calibration.reference.path ? calibration.reference : video
+  const timestampSource = isReferenceVideo ? calibration.reference : video
   const { automaticOffsetSeconds, activityDurationSeconds } = calculateAutomaticVideoOffset(
     timestampSource,
     activitySummary,

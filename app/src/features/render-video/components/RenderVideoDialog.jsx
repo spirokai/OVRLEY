@@ -109,7 +109,12 @@ export default function RenderVideoDialog(props) {
               {ctx.showBatchProgress ? (
                 <>
                   <DialogTitle className="sr-only">{t('render-video.exportingOverlay', 'Exporting Overlay')}</DialogTitle>
-                  <RenderProgressPanel renderProgress={ctx.batchProgress} renderSummaryItems={ctx.renderSummaryItems} finished={ctx.batchFinished} />
+                  <RenderProgressPanel
+                    renderProgress={ctx.batchProgress}
+                    renderSummaryItems={ctx.renderSummaryItems}
+                    finished={ctx.batchFinished}
+                    batchSnapshot={ctx.batchSnapshot}
+                  />
                 </>
               ) : (
                 <RenderExportSettings {...ctx} />
@@ -126,8 +131,13 @@ export default function RenderVideoDialog(props) {
                       variant="outline"
                       className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
                       onClick={ctx.batchRunning ? ctx.cancelBatch : ctx.onClose}
+                      disabled={ctx.batchSubmissionPending || ctx.batchSnapshot?.phase === 'cancelling'}
                     >
-                      {ctx.batchRunning ? t('render-video.cancel', 'Cancel') : t('render-video.close', 'Close')}
+                      {ctx.batchSnapshot?.phase === 'cancelling'
+                        ? t('render-video.cancelling', 'Cancelling...')
+                        : ctx.batchRunning
+                          ? t('render-video.cancel', 'Cancel')
+                          : t('render-video.close', 'Close')}
                     </Button>
                     {!ctx.batchFinished && (
                       <Button

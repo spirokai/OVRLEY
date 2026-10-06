@@ -147,6 +147,16 @@
     "video": "Video"
   },
   "render-video": {
+    "reinspectionRequired": "Sources changed or inspection expired. Inspect again before starting.",
+    "inspectAgain": "Inspect again",
+    "preparingBatch": "Preparing video...",
+    "cancelled": "Cancelled",
+    "unstarted": "Not started",
+    "batchResult": {
+      "completedWithErrors": "Batch finished with errors",
+      "failed": "Batch failed",
+      "cancelled": "Batch cancelled"
+    },
     "cancelling": "Cancelling...",
     "exportSettings": "Export Settings",
     "batchSettings": "Batch Settings",

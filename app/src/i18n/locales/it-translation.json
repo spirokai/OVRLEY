@@ -147,6 +147,16 @@
     "video": "Video"
   },
   "render-video": {
+    "reinspectionRequired": "I file sono cambiati o la verifica è scaduta. Verifica di nuovo prima di iniziare.",
+    "inspectAgain": "Verifica di nuovo",
+    "preparingBatch": "Preparazione del video...",
+    "cancelled": "Annullato",
+    "unstarted": "Non avviato",
+    "batchResult": {
+      "completedWithErrors": "Lotto completato con errori",
+      "failed": "Lotto non riuscito",
+      "cancelled": "Lotto annullato"
+    },
     "cancelling": "Annullamento in corso...",
     "exportSettings": "Impostazioni esportazione",
     "batchSettings": "Impostazioni batch",

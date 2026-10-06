@@ -147,6 +147,16 @@
     "video": "Video"
   },
   "render-video": {
+    "reinspectionRequired": "Zdroje se změnily nebo kontrola vypršela. Před spuštěním je znovu zkontrolujte.",
+    "inspectAgain": "Znovu zkontrolovat",
+    "preparingBatch": "Příprava videa...",
+    "cancelled": "Zrušeno",
+    "unstarted": "Nespuštěno",
+    "batchResult": {
+      "completedWithErrors": "Dávka dokončena s chybami",
+      "failed": "Dávka selhala",
+      "cancelled": "Dávka zrušena"
+    },
     "cancelling": "Ruší se...",
     "exportSettings": "Nastavení exportu",
     "batchSettings": "Nastavení dávky",

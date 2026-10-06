@@ -147,6 +147,16 @@
     "video": "Video"
   },
   "render-video": {
+    "reinspectionRequired": "Quelldateien wurden geändert oder die Prüfung ist abgelaufen. Vor dem Start erneut prüfen.",
+    "inspectAgain": "Erneut prüfen",
+    "preparingBatch": "Video wird vorbereitet...",
+    "cancelled": "Abgebrochen",
+    "unstarted": "Nicht gestartet",
+    "batchResult": {
+      "completedWithErrors": "Stapel mit Fehlern beendet",
+      "failed": "Stapel fehlgeschlagen",
+      "cancelled": "Stapel abgebrochen"
+    },
     "cancelling": "Wird abgebrochen...",
     "exportSettings": "Exporteinstellungen",
     "batchSettings": "Batch-Einstellungen",

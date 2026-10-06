@@ -54,7 +54,7 @@ export function applyNewProjectState(store, { templateSource, templateState }) {
     draft.batchVideoFolder = null
     draft.batchOutputFolder = null
     draft.batchQueue = []
-    draft.batchActiveItemId = null
+    draft.batchSnapshot = null
   })
   state.resetVideoSyncState()
 }
@@ -104,7 +104,7 @@ export function applyProjectOwnedState(store, project) {
     draft.batchVideoFolder = batchVideoFolder
     draft.batchOutputFolder = batchOutputFolder
     draft.batchQueue = []
-    draft.batchActiveItemId = null
+    draft.batchSnapshot = null
     draft.selectedSecond = clamp(project.timeline.playheadSecond, timelineMinimum, timelineEnd)
     draft.timelineViewport = timelineViewport
     draft.skipNextTimelineViewportReset = true

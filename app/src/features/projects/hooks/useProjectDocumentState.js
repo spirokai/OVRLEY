@@ -27,6 +27,7 @@ export default function useProjectDocumentState() {
       isProcessing: state.isProcessing,
       renderSettings: state.renderSettings,
       renderingVideo: state.renderingVideo,
+      batchBusy: (state.batchSnapshot?.rendererBusy ?? false) || state.batchSubmissionPending,
       videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
       videoSyncTimezoneMode: state.videoSyncTimezoneMode,
       manualVideoSync: state.manualVideoSync,
@@ -50,7 +51,8 @@ export default function useProjectDocumentState() {
     ),
   )
 
-  const conflictingOperation = projectOwnedState.isProcessing || projectOwnedState.importingVideo || projectOwnedState.renderingVideo
+  const conflictingOperation =
+    projectOwnedState.isProcessing || projectOwnedState.importingVideo || projectOwnedState.renderingVideo || projectOwnedState.batchBusy
   const status = useMemo(() => {
     if (!lastSavedProjectState) return 'Unsaved'
     const current = getCurrentProjectContent(projectOwnedState, loadedProjectPath)

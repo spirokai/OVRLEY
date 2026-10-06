@@ -147,6 +147,16 @@
     "video": "Видео"
   },
   "render-video": {
+    "reinspectionRequired": "Исходные файлы изменились или срок проверки истёк. Повторите проверку перед запуском.",
+    "inspectAgain": "Проверить снова",
+    "preparingBatch": "Подготовка видео...",
+    "cancelled": "Отменено",
+    "unstarted": "Не запущено",
+    "batchResult": {
+      "completedWithErrors": "Пакет завершён с ошибками",
+      "failed": "Ошибка пакета",
+      "cancelled": "Пакет отменён"
+    },
     "cancelling": "Отмена...",
     "exportSettings": "Настройки экспорта",
     "batchSettings": "Настройки пакетной обработки",

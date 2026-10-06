@@ -1,23 +1,12 @@
-/**
- * Batch render queue — renders many videos from one folder against the same
- * activity, template, and render settings, one at a time.
- */
-
-function filenameFromPath(path) {
-  return path.split(/[/\\]/).pop() || path
+/** User queue choices and retained native execution snapshots. Inspection stays transient. */
+function requireFolder(path) {
+  if (path !== null && (typeof path !== 'string' || path.trim() === '')) throw new Error('Batch folder must be a nonempty path or null')
 }
 
-function buildQueueItem(path, previousItemsByPath) {
-  const previous = previousItemsByPath.get(path)
-  return {
-    id: previous?.id ?? `${path}-${Math.random().toString(36).slice(2)}`,
-    path,
-    filename: filenameFromPath(path),
-    skipOverlay: previous?.skipOverlay ?? false,
-    status: 'pending',
-    error: null,
-    metadata: null,
-  }
+function requireItem(state, id) {
+  const item = state.batchQueue.find((candidate) => candidate.id === id)
+  if (!item) throw new Error(`Unknown batch queue item: ${id}`)
+  return item
 }
 
 export function createBatchRenderSlice(set) {
@@ -25,63 +14,51 @@ export function createBatchRenderSlice(set) {
     batchVideoFolder: null,
     batchOutputFolder: null,
     batchQueue: [],
-    batchRunning: false,
-    batchActiveItemId: null,
+    batchSnapshot: null,
+    batchSubmissionPending: false,
 
-    setBatchVideoFolder: (path) => set({ batchVideoFolder: path || null }),
-
-    setBatchOutputFolder: (path) => set({ batchOutputFolder: path || null }),
-
-    setBatchQueueFromPaths: (paths) =>
+    setBatchVideoFolder: (path) => {
+      requireFolder(path)
+      set({ batchVideoFolder: path })
+    },
+    setBatchOutputFolder: (path) => {
+      requireFolder(path)
+      set({ batchOutputFolder: path })
+    },
+    setBatchQueueFromPaths: (paths) => {
+      if (!Array.isArray(paths) || paths.some((path) => typeof path !== 'string' || path.trim() === '') || new Set(paths).size !== paths.length) {
+        throw new Error('Batch queue requires distinct nonempty source paths')
+      }
       set((state) => {
-        const previousItemsByPath = new Map(state.batchQueue.map((item) => [item.path, item]))
-        state.batchQueue = (Array.isArray(paths) ? paths : []).map((path) => buildQueueItem(path, previousItemsByPath))
-      }),
-
+        const previous = new Map(state.batchQueue.map((item) => [item.path, item]))
+        state.batchQueue = paths.map((path) => ({
+          id: path,
+          path,
+          filename: path.split(/[/\\]/).at(-1),
+          skipOverlay: previous.get(path)?.skipOverlay ?? false,
+        }))
+      })
+    },
     removeBatchQueueItem: (id) =>
       set((state) => {
+        requireItem(state, id)
         state.batchQueue = state.batchQueue.filter((item) => item.id !== id)
       }),
-
-    clearBatchQueue: () =>
-      set({
-        batchQueue: [],
-        batchVideoFolder: null,
-        batchActiveItemId: null,
-      }),
-
-    setBatchItemSkipOverlay: (id, skipOverlay) =>
+    clearBatchQueue: () => set({ batchQueue: [], batchVideoFolder: null }),
+    setBatchItemSkipOverlay: (id, skipOverlay) => {
+      if (typeof skipOverlay !== 'boolean') throw new Error('Activity overlay suppression must be boolean')
       set((state) => {
-        const item = state.batchQueue.find((candidate) => candidate.id === id)
-        if (item) item.skipOverlay = Boolean(skipOverlay)
-      }),
-
-    setBatchItemStatus: (id, status, error = null) =>
+        requireItem(state, id).skipOverlay = skipOverlay
+      })
+    },
+    setBatchSubmissionPending: (pending) => set({ batchSubmissionPending: pending }),
+    acceptBatchSnapshot: (snapshot) => set({ batchSnapshot: snapshot }),
+    applyBatchSnapshot: (snapshot) =>
       set((state) => {
-        const item = state.batchQueue.find((candidate) => candidate.id === id)
-        if (item) {
-          item.status = status
-          item.error = error
-        }
+        if (state.batchSnapshot === null || snapshot.batchId !== state.batchSnapshot.batchId || snapshot.revision <= state.batchSnapshot.revision)
+          return
+        state.batchSnapshot = snapshot
       }),
-
-    setBatchItemMetadata: (id, metadata) =>
-      set((state) => {
-        const item = state.batchQueue.find((candidate) => candidate.id === id)
-        if (item) item.metadata = metadata
-      }),
-
-    setBatchRunning: (running) => set({ batchRunning: Boolean(running) }),
-
-    setBatchActiveItemId: (id) => set({ batchActiveItemId: id }),
-
-    resetBatchQueueStatuses: () =>
-      set((state) => {
-        for (const item of state.batchQueue) {
-          if (item.status === 'blocked' || item.status === 'checking') continue
-          item.status = 'pending'
-          item.error = null
-        }
-      }),
+    clearBatchResults: () => set({ batchSnapshot: null }),
   }
 }

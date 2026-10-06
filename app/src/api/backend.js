@@ -570,7 +570,7 @@ export async function inspectVideoSource(inspectionId, path) {
 /**
  * Plans native batch destinations and frame totals for fresh inspected sources.
  * Coverage for embedded telemetry is finalized during owning-job preparation.
- * @param {{inspectionId: string, sources: InspectedVideoSource[], calibrationSource: InspectedVideoSource|null}} selection Selected sources.
+ * @param {{inspectionId: string, sourceIds: string[], calibrationSourceId: string|null}} selection Session-owned source identities.
  * @param {{exportMode: string, exportCodec: string, fps: number, updateRate: number, qualityType: string, qualityValue: number, qsvFullInitArgs: string[]|null}} encoding Captured encoder settings.
  * @param {string} outputDirectory Absolute output folder.
  * @returns {Promise<{status: 'planned', plans: Array<{sourceId: string, outputPath: string, outputDurationSeconds: number, plannedFrames: number, containerFpsNum: number, containerFpsDen: number}>}|{status: 'rejected', inspectionId: string, issues: object[]}>} Native planning result.

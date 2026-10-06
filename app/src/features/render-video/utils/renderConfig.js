@@ -8,7 +8,7 @@
  */
 
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
-import { SCENE_RENDER_TIME_ONLY_KEYS } from '@/lib/template/template-constants'
+import { SCENE_PRESENTATION_KEYS } from '@/lib/template/template-constants'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { clamp } from '@/lib/utils'
 import { videoOverlapsActivity } from '@/lib/video-timing'
@@ -31,10 +31,9 @@ function renderValues(values) {
  */
 export function createBatchRenderTemplate(config, globalDefaults) {
   const effective = createEditorEffectiveConfig({ config, globalDefaults })
-  const scene = { ...effective.scene }
-  for (const key of [...SCENE_RENDER_TIME_ONLY_KEYS, 'start', 'end', 'fps', 'updateRate', 'update_rate', 'ffmpeg', 'custom_export_range_active']) {
-    delete scene[key]
-  }
+  // Editor-effective scenes also contain widget defaults. Project only the
+  // native ScenePresentationConfig fields; widgets are already materialized.
+  const scene = Object.fromEntries(SCENE_PRESENTATION_KEYS.map((key) => [key, effective.scene[key]]))
   return {
     scene,
     backdrops: effective.backdrops,

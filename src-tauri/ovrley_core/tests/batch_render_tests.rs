@@ -233,9 +233,15 @@ impl BatchJobExecutor for ControlledExecutor {
             assert!(path.contains(filename.split('_').next().unwrap()));
         }
         session.controller().start_encoding()?;
-        session
-            .controller()
-            .set_frame_progress(frames / 2, frames, frames / 2, 7, None, None);
+        let encoded = if filename.contains("off") { 0 } else { 7 };
+        session.controller().set_frame_progress(
+            frames / 2,
+            frames,
+            frames / 2,
+            encoded,
+            None,
+            None,
+        );
         fs::write(target.path(), b"partial output").unwrap();
         self.entered.send(filename.clone()).unwrap();
         self.resume.lock().unwrap().recv_timeout(WAIT).unwrap();
@@ -334,7 +340,12 @@ fn sequential_mixed_results_settle_frame_weights_and_preserve_completed_outputs(
             progress.rendered_frames,
             progress.encoded_frames
         ),
-        (15, 15, 7)
+        (15, 15, 0)
+    );
+    assert_eq!(
+        progress.estimated_seconds_remaining,
+        Some(285.0 * progress.elapsed_seconds / 15.0),
+        "batch ETA is available before composite encoding reports frames"
     );
     assert!(matches!(
         service.submit_batch_with_executor(
@@ -615,8 +626,21 @@ fn invalid_calibration_and_missing_baselines_reject_before_reserving_the_rendere
 }
 
 #[test]
-fn batch_wire_rejects_redundant_job_fields_and_embedded_calibration() {
+fn batch_wire_accepts_frontend_template_and_rejects_redundant_fields() {
     let fixture = Fixture::new();
+    let mut frontend_request = fixture.request(&["1-frontend.mp4"], true);
+    // Frontend workflow coverage emits this same materialized wire template.
+    frontend_request.template =
+        serde_json::from_str(include_str!("fixtures/config/batch-template.json")).unwrap();
+    let inspection_id = frontend_request.inspection_id.clone();
+    let plan = common::builders::batch_video_plan(
+        &fixture.paths,
+        &fixture.inspection,
+        &inspection_id,
+        frontend_request,
+    )
+    .unwrap();
+    assert_eq!(plan.config().scene.presentation.width, 64);
     let request = fixture.request(&["1-first.mp4"], false);
     let wire = serde_json::to_value(request).unwrap();
     serde_json::from_value::<BatchRenderRequest>(wire.clone()).unwrap();
