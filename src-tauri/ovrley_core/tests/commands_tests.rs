@@ -1,6 +1,6 @@
 //! Command orchestration integration tests.
 //!
-//! Exercises `backend_render`, `derive_composite_render_plan`, and
+//! Exercises `RenderExecutionService`, `derive_composite_render_plan`, and
 //! composite timing normalization — the
 //! main Tauri-command dispatch layer. Verifies transparent vs composite
 //! branch routing, missing-field validation, sync-offset timing, overlay
@@ -31,7 +31,6 @@ use std::path::PathBuf;
 
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
-use ovrley_core::commands::backend_render;
 use ovrley_core::debug::RenderProgress;
 use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
 use ovrley_core::error::CoreError;
@@ -104,16 +103,16 @@ fn app_render_retains_raster_until_worker_cleanup() {
     });
     let output_path =
         std::env::temp_dir().join(format!("ovrley-pinned-raster-{}.mov", std::process::id()));
-    let accepted = backend_render(
-        &AppPaths::from_repo_root(PathBuf::from(".")),
-        &service,
-        &serde_json::to_string(&config).unwrap(),
-        "not json",
-        output_path.to_str().unwrap(),
-        false,
-        Some(&*resources),
-    )
-    .unwrap();
+    let accepted = service
+        .submit_single(
+            &AppPaths::from_repo_root(PathBuf::from(".")),
+            &serde_json::to_string(&config).unwrap(),
+            "not json",
+            output_path.to_str().unwrap(),
+            false,
+            Some(&*resources),
+        )
+        .unwrap();
     assert!(accepted.started);
     assert!(resources.0.lock().unwrap().is_none());
     let progress = wait_for_completed_progress(&service);
@@ -166,22 +165,22 @@ fn app_render_rejects_a_raster_without_its_loaded_resource() {
         resource_id: None,
         resource_error_code: None,
     });
-    let error = backend_render(
-        &AppPaths::from_repo_root(PathBuf::from(".")),
-        &RenderExecutionService::default(),
-        &serde_json::to_string(&config).unwrap(),
-        &synthetic_activity_json(),
-        &render_output_path("missing-raster"),
-        false,
-        Some(&EmptyRasterResources),
-    )
-    .unwrap_err();
+    let error = RenderExecutionService::default()
+        .submit_single(
+            &AppPaths::from_repo_root(PathBuf::from(".")),
+            &serde_json::to_string(&config).unwrap(),
+            &synthetic_activity_json(),
+            &render_output_path("missing-raster"),
+            false,
+            Some(&EmptyRasterResources),
+        )
+        .unwrap_err();
     assert!(error
         .to_string()
         .contains("raster_error:missing_resource:one"));
 }
 
-/// Verifies the composite branch gate: `backend_render` must
+/// Verifies the composite branch gate: `submit_single` must
 /// activate the composite branch only when `composite_video_path` is set.
 /// Uses a synthetic activity and validates the render starts (controller
 /// reports `total > 0`).
@@ -189,11 +188,11 @@ fn app_render_rejects_a_raster_without_its_loaded_resource() {
 fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
     let paths = AppPaths::from_repo_root(PathBuf::from("."));
     let controller = RenderExecutionService::default();
-    let result = backend_render(
-        &paths,
-        &controller,
-        &composite_config_json(
-            r#"
+    let result = controller
+        .submit_single(
+            &paths,
+            &composite_config_json(
+                r#"
                 "composite_video_path": "input.mp4",
                 "qualityType": "bitrate", "qualityValue": 60.0,
                 "composite_sync_offset": 0.0,
@@ -204,13 +203,13 @@ fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
                 "composite_video_trim_start": 0.0,
                 "composite_widget_update_rate": 1
                 "#,
-        ),
-        &synthetic_activity_json(),
-        &render_output_path("branch"),
-        false,
-        None,
-    )
-    .unwrap();
+            ),
+            &synthetic_activity_json(),
+            &render_output_path("branch"),
+            false,
+            None,
+        )
+        .unwrap();
 
     assert!(result.started);
     assert!(wait_for_completed_progress(&controller).total > 0);
@@ -229,16 +228,16 @@ fn output_rejection_precedes_malformed_activity_processing() {
     ));
     std::fs::write(&output_path, b"existing").unwrap();
 
-    let error = backend_render(
-        &paths,
-        &controller,
-        &serde_json::to_string(&transparent_config(0.0, 10.0, 30.0)).unwrap(),
-        "not json",
-        output_path.to_str().unwrap(),
-        false,
-        None,
-    )
-    .unwrap_err();
+    let error = controller
+        .submit_single(
+            &paths,
+            &serde_json::to_string(&transparent_config(0.0, 10.0, 30.0)).unwrap(),
+            "not json",
+            output_path.to_str().unwrap(),
+            false,
+            None,
+        )
+        .unwrap_err();
 
     assert!(matches!(error, CoreError::OutputExists(_)));
     assert_eq!(controller.progress().status, "idle");
@@ -249,11 +248,11 @@ fn output_rejection_precedes_malformed_activity_processing() {
 fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
     let paths = AppPaths::from_repo_root(PathBuf::from("."));
     let controller = RenderExecutionService::default();
-    let result = backend_render(
-        &paths,
-        &controller,
-        &composite_config_json(
-            r#"
+    let result = controller
+        .submit_single(
+            &paths,
+            &composite_config_json(
+                r#"
                 "composite_video_path": "input.mp4",
                 "qualityType": "bitrate", "qualityValue": 60.0,
                 "composite_sync_offset": 0.0,
@@ -264,13 +263,13 @@ fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
                 "composite_video_trim_start": 0.0,
                 "composite_widget_update_rate": 1
                 "#,
-        ),
-        &short_fractional_activity_json(),
-        &render_output_path("clamp"),
-        false,
-        None,
-    )
-    .unwrap();
+            ),
+            &short_fractional_activity_json(),
+            &render_output_path("clamp"),
+            false,
+            None,
+        )
+        .unwrap();
 
     assert!(result.started);
     assert_eq!(wait_for_completed_progress(&controller).total, 11530);
@@ -296,11 +295,11 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
     let controller = RenderExecutionService::default();
     let video_path = common::test_config::sample_video_path();
 
-    let result = backend_render(
-        &paths,
-        &controller,
-        &composite_config_json(&format!(
-            r#"
+    let result = controller
+        .submit_single(
+            &paths,
+            &composite_config_json(&format!(
+                r#"
                 "composite_video_path": "{}",
                 "qualityType": "bitrate", "qualityValue": 60.0,
                 "composite_sync_offset": 300.0,
@@ -311,14 +310,14 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
                 "composite_widget_update_rate": 2,
                 "composite_video_trim_start": 0.0
                 "#,
-            video_path.to_string_lossy().replace('\\', "\\\\")
-        )),
-        &synthetic_activity_json(),
-        &render_output_path("pipeline"),
-        false,
-        None,
-    )
-    .unwrap();
+                video_path.to_string_lossy().replace('\\', "\\\\")
+            )),
+            &synthetic_activity_json(),
+            &render_output_path("pipeline"),
+            false,
+            None,
+        )
+        .unwrap();
 
     assert!(result.started);
     let progress = wait_for_completed_progress(&controller);

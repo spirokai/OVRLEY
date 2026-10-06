@@ -1,12 +1,8 @@
-//! Native render execution ownership, independent of IPC and frontend events.
-//!
-//! Acceptance pins resource handles and validates the exact output destination.
-//! The supervised operation worker owns configuration/activity preparation and
-//! calls the existing synchronous pipelines. Those pipelines own frame workers,
-//! writer/monitor joins, FFmpeg shutdown, and incomplete-output cleanup. Only
-//! after joining the operation worker does the supervisor publish its outcome
-//! and release the renderer. Dropping the service joins its supervisor.
+//! Native render ownership. One worker prepares and executes the operation;
+//! pipeline guards clean up before its reservation publishes the outcome.
+//! The service joins the worker before reuse and on drop.
 
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -41,17 +37,11 @@ pub struct RenderAccepted {
     pub output_path: PathBuf,
 }
 
-/// Owns renderer reservation and background dispatch. Progress is observational;
-/// it never joins workers or determines completion.
+/// Owns the background worker; progress events never supervise execution.
+#[derive(Default)]
 pub struct RenderExecutionService {
     controller: RenderController,
-    supervisor: Mutex<Option<JoinHandle<()>>>,
-}
-
-impl Default for RenderExecutionService {
-    fn default() -> Self {
-        Self::with_controller(RenderController::default())
-    }
+    worker: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl RenderExecutionService {
@@ -63,7 +53,7 @@ impl RenderExecutionService {
     pub fn with_controller(controller: RenderController) -> Self {
         Self {
             controller,
-            supervisor: Mutex::new(None),
+            worker: Mutex::new(None),
         }
     }
 
@@ -75,8 +65,7 @@ impl RenderExecutionService {
         self.controller.cancel()
     }
 
-    /// Reserves the renderer for an operation's entire lifetime. An eventual
-    /// batch holds this same reservation across preparation and all its items.
+    /// Held across preparation, cleanup, and all items of an eventual batch.
     pub fn reserve(&self) -> CoreResult<RendererReservation> {
         let render_id = self.controller.reserve()?;
         Ok(RendererReservation {
@@ -86,10 +75,8 @@ impl RenderExecutionService {
         })
     }
 
-    /// Accepts a single render without doing dense activity or asset preparation
-    /// on the IPC caller. JSON decoding identifies resource handles; each raster
-    /// is validated and resolved once here. All other config validation runs on
-    /// the owned worker. Output/overwrite errors still precede activity parsing.
+    /// Pins raster handles and validates output before dispatch. Remaining
+    /// configuration validation and activity preparation belong to the worker.
     #[allow(clippy::too_many_arguments)]
     pub fn submit_single(
         &self,
@@ -127,9 +114,7 @@ impl RenderExecutionService {
         Ok(accepted)
     }
 
-    /// Dispatches owned native work. The closure returns the real pipeline
-    /// outcome, after cleanup, rather than waiting for a progress event. This
-    /// boundary also permits controlled execution in lifecycle tests.
+    /// Dispatches an operation returning its actual outcome after cleanup.
     pub fn dispatch<F>(&self, reservation: RendererReservation, operation: F) -> CoreResult<()>
     where
         F: FnOnce(&RendererReservation) -> CoreResult<String> + Send + 'static,
@@ -138,19 +123,16 @@ impl RenderExecutionService {
             self.controller.shares_state(&reservation.controller),
             "the reservation must belong to this execution service"
         );
-        let mut supervisor = self
-            .supervisor
-            .lock()
-            .expect("render supervisor mutex poisoned");
-        if let Some(previous) = supervisor.take() {
-            previous.join().expect("render supervisor panicked");
+        let mut worker = self.worker.lock().expect("render worker mutex poisoned");
+        if let Some(previous) = worker.take() {
+            previous.join().expect("render worker panicked");
         }
-        *supervisor = Some(
+        *worker = Some(
             thread::Builder::new()
-                .name("render-supervisor".into())
-                .spawn(move || supervise_operation(reservation, operation))
+                .name("render-operation".into())
+                .spawn(move || run_operation(reservation, operation))
                 .map_err(|error| {
-                    CoreError::Encode(format!("Could not start render supervisor: {error}"))
+                    CoreError::Encode(format!("Could not start render worker: {error}"))
                 })?,
         );
         Ok(())
@@ -159,22 +141,20 @@ impl RenderExecutionService {
 
 impl Drop for RenderExecutionService {
     fn drop(&mut self) {
-        if let Some(supervisor) = self
-            .supervisor
+        if let Some(worker) = self
+            .worker
             .get_mut()
-            .expect("render supervisor mutex poisoned")
+            .expect("render worker mutex poisoned")
             .take()
         {
-            if supervisor.join().is_err() {
-                log::error!("Render supervisor panicked during service shutdown");
+            if worker.join().is_err() {
+                log::error!("Render worker panicked during service shutdown");
             }
         }
     }
 }
 
-/// Unique session owner. Item starts never clear a requested cancellation or
-/// release this reservation. Synchronous callers complete it after cleanup;
-/// dispatched work leaves completion to its supervisor.
+/// Unique session owner; item resets preserve cancellation and reservation.
 pub struct RendererReservation {
     controller: RenderController,
     render_id: u64,
@@ -218,21 +198,19 @@ impl Drop for RendererReservation {
     }
 }
 
-fn supervise_operation<F>(reservation: RendererReservation, operation: F)
+fn run_operation<F>(reservation: RendererReservation, operation: F)
 where
-    F: FnOnce(&RendererReservation) -> CoreResult<String> + Send,
+    F: FnOnce(&RendererReservation) -> CoreResult<String>,
 {
-    let outcome = thread::scope(|scope| {
-        thread::Builder::new()
-            .name("render-operation".into())
-            .spawn_scoped(scope, || {
-                reservation.check_cancelled()?;
-                operation(&reservation)
-            })
-            .map_err(|error| CoreError::Encode(format!("Could not start render worker: {error}")))?
-            .join()
-            .map_err(|_| CoreError::Encode("Render operation worker panicked".into()))?
-    });
+    // Move accepted resources into the unwind boundary so they are released
+    // even when cancellation prevents the operation from being called.
+    let session = &reservation;
+    let outcome = catch_unwind(AssertUnwindSafe(move || {
+        session.check_cancelled()?;
+        operation(session)
+    }));
+    let outcome = outcome
+        .unwrap_or_else(|_| Err(CoreError::Encode("Render operation worker panicked".into())));
     let _ = reservation.complete(outcome);
 }
 
@@ -259,10 +237,7 @@ fn execute_single(
     execute_render(paths, config, &activity, session, &request.target)
 }
 
-/// Executes one validated render to its real outcome after pipeline cleanup.
-/// Both single requests and future batch items use this seam under the same
-/// reservation. Custom range, composite tolerance, and transparent decimation
-/// stay owned by the existing planners; activity keeps its original time origin.
+/// Shared synchronous execution; existing planners retain timing ownership.
 pub fn execute_render(
     paths: &AppPaths,
     mut config: ValidatedRenderConfig,

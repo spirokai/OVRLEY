@@ -1,22 +1,17 @@
 //! Backend command implementations used by the Tauri shell.
 //!
-//! Functions in this module are framework-agnostic: they accept plain strings,
-//! paths, and controller references so the Tauri command layer can delegate here
-//! without mixing app-window concerns into render logic. Responsibilities include
-//! runtime path resolution, template IO, video render startup, progress/cancel
-//! plumbing, and small OS integration helpers.
+//! Framework-agnostic template, activity, preview and OS helpers. Production
+//! rendering, progress and cancellation belong to `render_jobs::execution`.
 
 pub mod elevation_geometry;
 pub mod route_geometry;
 
 use crate::activity::finalize::FinalizeActivityResponse;
 use crate::activity::{build_dense_activity_report_validated, parse_activity_json};
-use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::binary::resolve_ffmpeg_binary;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::{parse_config_json, parse_template_json};
 use crate::output::RenderOutputKind;
-use crate::render_jobs::execution::{RenderAccepted, RenderExecutionService};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
@@ -115,29 +110,6 @@ pub fn backend_font_data(
     crate::fonts::bundled_face_data(&paths.font_dirs, font_id, face_index)
 }
 
-/// Starts a background video render.
-///
-/// Acceptance validates the output and retains raster resources. The execution
-/// service owns blocking preparation, dispatch, and completion after cleanup.
-pub fn backend_render(
-    paths: &AppPaths,
-    execution: &RenderExecutionService,
-    config_json: &str,
-    parsed_activity_json: &str,
-    output_path: &str,
-    overwrite: bool,
-    raster_resources: Option<&dyn crate::raster::RasterResourceResolver>,
-) -> CoreResult<RenderAccepted> {
-    execution.submit_single(
-        paths,
-        config_json,
-        parsed_activity_json,
-        output_path,
-        overwrite,
-        raster_resources,
-    )
-}
-
 /// Renders one transparent preview PNG for the requested second.
 ///
 /// The file is written into the public downloads directory so it is easy to
@@ -175,24 +147,6 @@ pub fn backend_render_preview_frame(
         "path": output_path,
         "second": second
     }))
-}
-
-/// Returns the current render progress snapshot.
-pub fn backend_progress(execution: &RenderExecutionService) -> RenderProgress {
-    execution.progress()
-}
-
-/// Requests cancellation of the active render, if one is running.
-pub fn backend_cancel(execution: &RenderExecutionService) -> Value {
-    let had_active_render = execution.cancel();
-    json!({
-        "success": true,
-        "message": if had_active_render {
-            "Cancellation requested"
-        } else {
-            "No active render"
-        }
-    })
 }
 
 /// Lists valid built-in and user templates.

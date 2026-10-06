@@ -1,6 +1,6 @@
 //! Tauri command wrappers for the application shell.
 //!
-//! Owns: all `#[tauri::command]` functions that delegate to `ovrley_core::commands`,
+//! Owns: all `#[tauri::command]` functions that delegate to core commands/services,
 //!       plus the shared serializer helper that eliminates repeated JSON-string
 //!       serialization boilerplate.
 //! Does not own: file-system commands — those live in `file_ops.rs`.
@@ -167,16 +167,17 @@ pub(crate) async fn backend_render(
 ) -> Result<String, BackendRenderError> {
     let paths = runtime_paths::app_paths(&app)
         .map_err(|message| BackendRenderError::RenderError { message })?;
-    let result = commands::backend_render(
-        &paths,
-        &state.render_execution,
-        &config_json,
-        &parsed_activity_json,
-        &output_path,
-        overwrite,
-        Some(&*raster_resources),
-    )
-    .map_err(BackendRenderError::from_core)?;
+    let result = state
+        .render_execution
+        .submit_single(
+            &paths,
+            &config_json,
+            &parsed_activity_json,
+            &output_path,
+            overwrite,
+            Some(&*raster_resources),
+        )
+        .map_err(BackendRenderError::from_core)?;
     serialize_command_result(&result).map_err(|message| BackendRenderError::RenderError { message })
 }
 
@@ -252,7 +253,7 @@ pub(crate) async fn backend_render_preview_frame(
 pub(crate) async fn backend_progress(
     state: tauri::State<'_, BackendState>,
 ) -> Result<String, String> {
-    serialize_command_result(&commands::backend_progress(&state.render_execution))
+    serialize_command_result(&state.render_execution.progress())
 }
 
 /// Opens the remembered render output directory in the platform file manager.
@@ -320,7 +321,12 @@ pub(crate) async fn backend_get_template(
 pub(crate) async fn backend_cancel(
     state: tauri::State<'_, BackendState>,
 ) -> Result<String, String> {
-    serialize_command_result(&commands::backend_cancel(&state.render_execution))
+    let message = if state.render_execution.cancel() {
+        "Cancellation requested"
+    } else {
+        "No active render"
+    };
+    serialize_command_result(&serde_json::json!({ "success": true, "message": message }))
 }
 
 /// Probes a video file with ffprobe and returns serialized metadata.
