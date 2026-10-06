@@ -293,6 +293,7 @@ pub fn trim_activity(
     // positions so downstream interpolation has precise endpoints even when
     // the trim window cuts through a source sampling interval.
     Ok(TrimmedActivity {
+        full_activity_metric_ranges: super::metric_ranges::calculate_metric_ranges(activity),
         sync_time: start_time,
         sample_elapsed_seconds: trimmed_elapsed,
         sample_distance_progress: trimmed_distance_progress,

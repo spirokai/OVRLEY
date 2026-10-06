@@ -600,6 +600,8 @@ pub struct DebugPayload {
 /// template and should be skipped by render code.
 #[derive(Clone, Debug, Serialize)]
 pub struct DenseActivityReport {
+    /// Numeric metric bounds from the entire source activity, before trimming.
+    pub full_activity_metric_ranges: std::collections::HashMap<MetricKind, (f64, f64)>,
     /// Number of layout frames generated for the scene at `scene.fps`.
     pub frame_count: usize,
     /// Per-frame elapsed seconds relative to the scene start.
@@ -781,6 +783,8 @@ impl DenseSeriesReport {
 /// endpoints even when the trim window cuts through source samples.
 #[derive(Clone, Debug)]
 pub struct TrimmedActivity {
+    /// Numeric metric bounds from the entire source activity, before trimming.
+    pub full_activity_metric_ranges: std::collections::HashMap<MetricKind, (f64, f64)>,
     /// Trim-adjusted sync time for the trimmed window.
     pub sync_time: Option<String>,
     /// Sample times relative to the trim start.

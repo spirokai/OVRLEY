@@ -248,6 +248,12 @@ fn dense_speed_activity(speed: Vec<Option<f64>>) -> DenseActivityReport {
         frame_distance_progress: vec![Some(0.0); frame_count],
         full_activity_distance: None,
         full_activity_total_ascent: None,
+        full_activity_metric_ranges: ovrley_core::activity::metric_ranges::calculate_metric_range(
+            &series.speed,
+        )
+        .map(|range| (ovrley_core::MetricKind::Speed, range))
+        .into_iter()
+        .collect(),
         series,
     }
 }

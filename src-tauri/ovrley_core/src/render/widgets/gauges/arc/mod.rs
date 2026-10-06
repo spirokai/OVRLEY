@@ -83,7 +83,7 @@ pub fn prepare_arc_gauge_cache(
                 track_border_thickness,
             ),
         };
-        let (min_value, max_value) = metric_range(&dense_activity.series, gauge.metric);
+        let (min_value, max_value) = metric_range(dense_activity, gauge.metric);
         let text_style = validated_value_style(&gauge.inner_value, scene, scale);
         let unit_parts = format_metric_presentation_parts(
             &gauge.inner_value,

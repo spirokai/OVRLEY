@@ -48,6 +48,7 @@ fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
             frame_distance_progress: vec![],
             full_activity_distance: None,
             full_activity_total_ascent: None,
+            full_activity_metric_ranges: Default::default(),
         };
     }
     let series = vec![raw];
@@ -79,6 +80,7 @@ fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
         frame_distance_progress: vec![],
         full_activity_distance: None,
         full_activity_total_ascent: None,
+        full_activity_metric_ranges: Default::default(),
     }
 }
 

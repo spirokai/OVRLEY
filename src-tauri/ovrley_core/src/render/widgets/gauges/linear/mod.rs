@@ -46,7 +46,7 @@ pub fn prepare_linear_gauge_cache(
     prepare_profiler.measure("gauge.linear.prepare", || {
         let scaled_width = ((gauge.width as f32) * scale).round().max(1.0) as u32;
         let scaled_height = ((gauge.height as f32) * scale).round().max(1.0) as u32;
-        let (min_value, max_value) = metric_range(&dense_activity.series, gauge.metric);
+        let (min_value, max_value) = metric_range(dense_activity, gauge.metric);
         let shadow = normalize_shadow_style_validated(
             &scene.presentation.shadow_color,
             scene.presentation.shadow_strength,

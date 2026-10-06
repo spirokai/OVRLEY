@@ -15,6 +15,8 @@ pub mod finalize;
 pub mod interpolate;
 /// Canonical lap-timing derivation, validation, and queries.
 pub(crate) mod lap_timing;
+/// Full-source metric bounds, independent of render trimming and frame rate.
+pub mod metric_ranges;
 /// Serializable activity payloads and internal dense/trimmed report types.
 pub mod schema;
 /// Scene-window trimming for parsed activity samples.
