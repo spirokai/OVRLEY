@@ -50,8 +50,8 @@ impl RasterResourceResolver for EmptyRasterResources {
 }
 
 /// Acceptance must retain the resolved image after the editor releases its
-/// registry entry. The worker must reach activity parsing without resolving
-/// that handle again, and release the image when preparation fails.
+/// registry entry. Cancellation before preparation must release the image
+/// without resolving the editor handle again.
 #[test]
 fn app_render_retains_raster_until_worker_cleanup() {
     use ovrley_core::encode::progress::ProgressSink;
@@ -64,11 +64,15 @@ fn app_render_retains_raster_until_worker_cleanup() {
             self.0.lock().unwrap().clone()
         }
     }
-    struct ReleaseOnAcceptance(Arc<Resources>);
+    struct ReleaseOnAcceptance(
+        Arc<Resources>,
+        Arc<Mutex<Option<ovrley_core::encode::progress::RenderController>>>,
+    );
     impl ProgressSink for ReleaseOnAcceptance {
         fn emit_progress(&self, progress: &RenderProgress) {
             if progress.status == "preparing" && progress.total == 0 {
                 self.0 .0.lock().unwrap().take();
+                let _ = self.1.lock().unwrap().as_ref().unwrap().cancel();
             }
         }
     }
@@ -80,8 +84,12 @@ fn app_render_retains_raster_until_worker_cleanup() {
         Arc::new(ovrley_core::raster::load_embedded_raster("png", bytes.into_inner()).unwrap());
     let image_lifetime = Arc::downgrade(&image);
     let resources = Arc::new(Resources(Mutex::new(Some(image))));
-    let service =
-        RenderExecutionService::with_sink(Arc::new(ReleaseOnAcceptance(resources.clone())));
+    let cancel = Arc::new(Mutex::new(None));
+    let controller = ovrley_core::encode::progress::RenderController::with_sink(Arc::new(
+        ReleaseOnAcceptance(resources.clone(), cancel.clone()),
+    ));
+    *cancel.lock().unwrap() = Some(controller.clone());
+    let service = RenderExecutionService::with_controller(controller);
     let mut config = transparent_config(0.0, 1.0, 30.0);
     config.rasters.push(RasterConfig {
         id: "one".into(),
@@ -107,7 +115,7 @@ fn app_render_retains_raster_until_worker_cleanup() {
         .submit_single(
             &AppPaths::from_repo_root(PathBuf::from(".")),
             &serde_json::to_string(&config).unwrap(),
-            "not json",
+            &synthetic_activity_json(),
             output_path.to_str().unwrap(),
             false,
             Some(&*resources),
@@ -116,12 +124,7 @@ fn app_render_retains_raster_until_worker_cleanup() {
     assert!(accepted.started);
     assert!(resources.0.lock().unwrap().is_none());
     let progress = wait_for_completed_progress(&service);
-    assert_eq!(progress.status, "error");
-    assert!(
-        progress.message.contains("expected ident"),
-        "{}",
-        progress.message
-    );
+    assert_eq!(progress.status, "cancelled");
     assert!(image_lifetime.upgrade().is_none());
     assert!(!output_path.exists());
 }

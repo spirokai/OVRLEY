@@ -23,13 +23,54 @@ use ovrley_core::error::CoreError;
 use ovrley_core::output::RenderOutputKind;
 use ovrley_core::render_jobs::inspection::InspectionSourceSelection;
 use ovrley_core::render_jobs::{
-    batch_plan::plan_batch_configuration, contracts::BatchEncodingSettings,
+    batch::BatchServiceError,
+    batch_plan::plan_batch_configuration,
+    contracts::{BatchAcceptance, BatchEncodingSettings, BatchRenderRequest, BatchSnapshot},
 };
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 
 const WINDOWS_HEVC_EXTENSION_URL: &str = "https://apps.microsoft.com/detail/9nmzlz57r3t7";
+
+/// Shared ingress and resource retention run off the shell's async executor.
+/// Queue execution and every lifecycle transition remain core-owned.
+#[tauri::command]
+pub(crate) async fn backend_submit_batch(
+    app: AppHandle,
+    state: tauri::State<'_, BackendState>,
+    raster_resources: tauri::State<'_, crate::raster_resources::RasterResources>,
+    request: BatchRenderRequest,
+) -> Result<BatchAcceptance, BatchServiceError> {
+    let paths = runtime_paths::app_paths(&app)
+        .map_err(|message| BatchServiceError::InvalidRequest { message })?;
+    let resources = raster_resources.inner().clone();
+    let service = state.render_execution.clone();
+    let inspection = state.video_inspection.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        service.submit_batch(&paths, &inspection, request, Some(&resources))
+    })
+    .await
+    .map_err(|error| BatchServiceError::DispatchFailed {
+        message: error.to_string(),
+    })?
+}
+
+#[tauri::command]
+pub(crate) fn backend_batch_snapshot(
+    state: tauri::State<'_, BackendState>,
+    batch_id: String,
+) -> Result<BatchSnapshot, BatchServiceError> {
+    state.render_execution.batch_snapshot(&batch_id)
+}
+
+#[tauri::command]
+pub(crate) fn backend_cancel_batch(
+    state: tauri::State<'_, BackendState>,
+    batch_id: String,
+) -> Result<BatchSnapshot, BatchServiceError> {
+    state.render_execution.cancel_batch(&batch_id)
+}
 
 /// Serializes a `Serialize` value into a JSON string or maps an error to a
 /// `String`, consolidating the repeated `.map_err(|e| e.to_string())?;
@@ -371,22 +412,6 @@ pub(crate) async fn backend_inspect_video_source(
     .await
     .map_err(|error| error.to_string())?;
     call_and_serialize(result)
-}
-
-/// Source preflight only. Future batch acceptance must retain the core result
-/// of this same validation operation, rather than trust an earlier IPC preflight.
-#[tauri::command]
-pub(crate) async fn backend_validate_video_inspection(
-    state: tauri::State<'_, BackendState>,
-    selection: InspectionSourceSelection,
-) -> Result<String, String> {
-    let service = state.video_inspection.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        service.validate_sources(&selection).into_response()
-    })
-    .await
-    .map_err(|error| error.to_string())?;
-    serialize_command_result(&result)
 }
 
 #[tauri::command]

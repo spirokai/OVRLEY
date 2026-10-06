@@ -50,7 +50,7 @@ use std::sync::Arc;
 use tauri::Manager;
 
 pub(crate) struct BackendState {
-    pub(crate) render_execution: RenderExecutionService,
+    pub(crate) render_execution: Arc<RenderExecutionService>,
     pub(crate) video_inspection: Arc<VideoInspectionService>,
 }
 
@@ -79,6 +79,9 @@ pub fn run() {
             tauri_commands::backend_font_capabilities,
             tauri_commands::backend_font_data,
             tauri_commands::backend_render,
+            tauri_commands::backend_submit_batch,
+            tauri_commands::backend_batch_snapshot,
+            tauri_commands::backend_cancel_batch,
             tauri_commands::backend_finalize_activity,
             tauri_commands::backend_parse_csv_activity,
             tauri_commands::backend_parse_vbo_activity,
@@ -94,7 +97,6 @@ pub fn run() {
             tauri_commands::backend_probe_video,
             tauri_commands::backend_create_video_inspection,
             tauri_commands::backend_inspect_video_source,
-            tauri_commands::backend_validate_video_inspection,
             tauri_commands::backend_plan_batch_outputs,
             tauri_commands::backend_dispose_video_inspection,
             tauri_commands::backend_prepare_preview_video,
@@ -138,9 +140,9 @@ pub fn run() {
             // `render-progress` events instead of polling `backend_progress`.
             app.manage(BackendState {
                 video_inspection: Arc::new(VideoInspectionService::default()),
-                render_execution: RenderExecutionService::with_sink(Arc::new(
+                render_execution: Arc::new(RenderExecutionService::with_sink(Arc::new(
                     progress_sink::TauriProgressSink::new(app.handle().clone()),
-                )),
+                ))),
             });
 
             let map_tile_service = map_tile_service::MapTileService::for_application_cache(

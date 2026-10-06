@@ -64,13 +64,8 @@ use common::composite::{
 #[test]
 fn planned_video_pipelines_encode_padding_and_display_rotation() {
     use ovrley_core::output::{plan_batch_output_targets, RenderOutputKind};
-    use ovrley_core::render_jobs::batch_plan::{
-        plan_video_render, validate_batch_encoding, validate_batch_template,
-    };
-    use ovrley_core::render_jobs::contracts::{
-        BatchEncodingSettings, BatchExportMode, BatchJobTiming,
-    };
-    use ovrley_core::render_jobs::execution::execute_planned_render;
+    use ovrley_core::render_jobs::contracts::{BatchEncodingSettings, BatchExportMode};
+    use ovrley_core::render_jobs::execution::execute_render;
     use ovrley_core::render_jobs::inspection::VideoInspectionService;
     use serde_json::json;
     let paths = test_paths_named("batch-window-pipelines");
@@ -181,17 +176,21 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
             quality_value: 1.0,
             qsv_full_init_args: None,
         };
-        let template = validate_batch_template(
-            common::builders::batch_template(),
-            validate_batch_encoding(&encoding).unwrap(),
-            None,
+        let plan = common::builders::batch_video_plan(
+            &paths,
+            &inspection,
+            &session.inspection_id,
+            common::builders::video_batch_request(
+                &session.inspection_id,
+                &inspected,
+                encoding,
+                common::builders::batch_template(),
+                activity.clone(),
+                offset,
+                true,
+            ),
         )
         .unwrap();
-        let timing = BatchJobTiming::ExternalActivity {
-            automatic_offset_seconds: offset,
-            offset_seconds: offset,
-        };
-        let plan = plan_video_render(&template, &inspected, &timing, true, &activity).unwrap();
         let kind = if mode == BatchExportMode::Composite {
             RenderOutputKind::Composite
         } else {
@@ -202,7 +201,10 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
                 .unwrap()
                 .remove(0);
         let reservation = execution.reserve().unwrap();
-        let outcome = execute_planned_render(&paths, plan, &activity, &reservation, &target);
+        reservation
+            .begin_item(plan.planned_frames(), "Preparing video assets")
+            .unwrap();
+        let outcome = execute_render(&paths, plan, &activity, &reservation, &target);
         reservation.complete(outcome).unwrap();
         let metadata = ovrley_core::media::video_probe::probe_video(
             &paths.repo_root,

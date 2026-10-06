@@ -377,8 +377,8 @@ pub fn mutable_recent_template_config(width: u32, height: u32) -> RenderConfig {
     let template = fs::read_to_string(template_path).unwrap();
     let value: Value = serde_json::from_str(&template).unwrap();
     let mut config = parse_template_value(&value).unwrap();
-    config.scene.width = Some(width);
-    config.scene.height = Some(height);
+    config.scene.presentation.width = Some(width);
+    config.scene.presentation.height = Some(height);
     config.scene.ffmpeg = serde_json::json!({"codec":"libx264"});
     config
 }

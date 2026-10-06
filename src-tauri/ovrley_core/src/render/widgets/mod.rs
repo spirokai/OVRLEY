@@ -168,7 +168,7 @@ pub fn prepare_render_assets(
                     widget.altitude_offset_m,
                     dense_activity,
                     &assets.scene,
-                    assets.scene.scale,
+                    assets.scene.presentation.scale,
                     &paths.font_dirs,
                     prepare_profiler,
                 )?;
@@ -180,7 +180,7 @@ pub fn prepare_render_assets(
                     widget.altitude_offset_m,
                     dense_activity,
                     &assets.scene,
-                    assets.scene.scale,
+                    assets.scene.presentation.scale,
                     &paths.font_dirs,
                     prepare_profiler,
                 )?;
@@ -209,7 +209,7 @@ pub fn prepare_render_assets(
                     &widget.validated,
                     dense_activity,
                     &assets.scene,
-                    assets.scene.scale,
+                    assets.scene.presentation.scale,
                     &paths.font_dirs,
                     prepare_profiler,
                 )?;

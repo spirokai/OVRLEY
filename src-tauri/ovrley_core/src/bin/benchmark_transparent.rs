@@ -202,8 +202,8 @@ fn main() -> Result<(), String> {
     let base_config_str = serde_json::to_string(&base_config_value)
         .map_err(|e| format!("Failed to serialize config: {e}"))?;
     let base_validated = parse_and_validate_config(&base_config_str).map_err(|e| e.to_string())?;
-    let res_width = base_validated.scene.width;
-    let res_height = base_validated.scene.height;
+    let res_width = base_validated.scene.presentation.width;
+    let res_height = base_validated.scene.presentation.height;
     let base_update_rate = settings_update_rate.unwrap_or(base_validated.scene.update_rate.get());
 
     let mut results = BTreeMap::new();

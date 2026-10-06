@@ -6,9 +6,8 @@ use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use serde_json::{json, Value};
 
-use super::contracts::{BatchEncodingSettings, BatchExportMode, BatchJobTiming, BatchTemplate};
+use super::contracts::{BatchEncodingSettings, BatchExportMode};
 use super::inspection::{
     InspectionRejection, InspectionSourceSelection, InspectionValidation, VideoInspectionService,
 };
@@ -25,14 +24,16 @@ use crate::encode::video_timing::ActivityCoverage;
 use crate::error::{CoreError, CoreResult};
 use crate::media::prepared_video::InspectedVideoSource;
 use crate::normalize::{
-    raw::RenderConfig, validate_render_config_with_resources, ValidatedRenderConfig,
+    raw::{RenderConfig, ScenePresentationConfig},
+    validate_render_presentation, ValidatedFfmpegConfig, ValidatedRenderConfig,
+    ValidatedSceneConfig, ValidatedScenePresentation,
 };
 use crate::output::{plan_batch_output_targets, RenderOutputKind};
 use crate::raster::RasterResourceResolver;
 
 /// Validated once at configuration/acceptance ingress; private fields keep
 /// consumers from substituting malformed settings after validation.
-pub struct ValidatedBatchEncoding {
+pub(crate) struct ValidatedBatchEncoding {
     layout_fps: Fps,
     update_rate: NonZeroU32,
     codec: CodecSelection,
@@ -40,7 +41,9 @@ pub struct ValidatedBatchEncoding {
     qsv_full_init_args: Vec<String>,
 }
 
-pub fn validate_batch_encoding(raw: &BatchEncodingSettings) -> CoreResult<ValidatedBatchEncoding> {
+pub(crate) fn validate_batch_encoding(
+    raw: &BatchEncodingSettings,
+) -> CoreResult<ValidatedBatchEncoding> {
     let layout_fps = Fps::new(raw.fps, 1)?;
     let update_rate = NonZeroU32::new(raw.update_rate)
         .ok_or_else(|| CoreError::Config("Batch updateRate must be positive".into()))?;
@@ -190,69 +193,45 @@ pub fn plan_batch_configuration(
     Ok(BatchPlanningResponse::Planned { plans })
 }
 
-/// Immutable shared validated presentation; raster resources are retained by
-/// the existing normalization/resource seam. An internal unit clock lets that
-/// seam validate presentation; already validated encoding is applied afterward.
-pub struct ValidatedBatchTemplate {
-    config: ValidatedRenderConfig,
-    layout_fps: Fps,
+/// Submission-owned presentation and encoding, independent of any render clock.
+pub(crate) struct ValidatedBatchTemplate {
+    config: ValidatedRenderConfig<ValidatedScenePresentation>,
+    encoding: ValidatedBatchEncoding,
 }
 
-pub fn validate_batch_template(
-    template: BatchTemplate,
+impl ValidatedBatchTemplate {
+    pub(crate) fn output_work(&self, source: &InspectedVideoSource) -> CoreResult<(u32, Fps)> {
+        video_output_work(
+            source,
+            self.encoding.codec,
+            self.encoding.layout_fps,
+            self.encoding.update_rate,
+        )
+    }
+}
+
+pub(crate) fn validate_batch_template(
+    template: RenderConfig<ScenePresentationConfig>,
     encoding: ValidatedBatchEncoding,
     resources: Option<&dyn RasterResourceResolver>,
 ) -> CoreResult<ValidatedBatchTemplate> {
-    let mut scene = template.scene.presentation;
-    if scene.keys().any(|key| {
-        matches!(
-            key.as_str(),
-            "width"
-                | "height"
-                | "start"
-                | "end"
-                | "fps"
-                | "updateRate"
-                | "update_rate"
-                | "ffmpeg"
-                | "qualityType"
-                | "qualityValue"
-                | "custom_export_range_active"
-        ) || key.starts_with("composite_")
-    }) {
+    if !template.extra.is_empty() || !template.scene.extra.is_empty() {
         return Err(CoreError::Config(
             "Batch template must contain only shared presentation fields".into(),
         ));
     }
-    scene.insert("width".into(), json!(template.scene.width));
-    scene.insert("height".into(), json!(template.scene.height));
-    scene.insert("start".into(), json!(0));
-    scene.insert("end".into(), json!(1));
-    scene.insert("fps".into(), json!(1));
-    scene.insert("update_rate".into(), json!(1));
-    let raw = RenderConfig {
-        scene: serde_json::from_value(Value::Object(scene.into_iter().collect()))?,
-        backdrops: template.backdrops,
-        rasters: template.rasters,
-        labels: template.labels,
-        values: template.values,
-        plots: Value::Array(template.plots),
-        extra: Default::default(),
-    };
-    let mut config = validate_render_config_with_resources(raw, resources)?;
-    config.scene.fps = encoding.layout_fps.as_f64();
-    config.scene.update_rate = encoding.update_rate;
-    config.scene.ffmpeg.codec = encoding.codec;
-    config.scene.ffmpeg.qsv_full_init_args = encoding.qsv_full_init_args;
-    config.scene.quality = Some(encoding.quality);
     Ok(ValidatedBatchTemplate {
-        config,
-        layout_fps: encoding.layout_fps,
+        config: validate_render_presentation(template, resources)?,
+        encoding,
     })
 }
 
 pub enum VideoRenderModePlan {
-    Composite(CompositeRenderPlan),
+    Composite {
+        render: CompositeRenderPlan,
+        /// Absent for a single render until its source is probed on the worker.
+        source_metadata: Option<(bool, Option<i32>)>,
+    },
     Transparent(TransparentRenderPlan),
 }
 
@@ -260,7 +239,6 @@ pub enum VideoRenderModePlan {
 pub struct PlannedVideoRender {
     pub(crate) config: ValidatedRenderConfig,
     pub(crate) mode: VideoRenderModePlan,
-    pub(crate) source: InspectedVideoSource,
     sampling_fps: Fps,
     activity_offset: f64,
 }
@@ -274,13 +252,13 @@ impl PlannedVideoRender {
     }
     pub fn planned_frames(&self) -> u32 {
         match &self.mode {
-            VideoRenderModePlan::Composite(plan) => plan.output_frame_count,
+            VideoRenderModePlan::Composite { render: plan, .. } => plan.output_frame_count,
             VideoRenderModePlan::Transparent(plan) => plan.output_frame_count,
         }
     }
     pub fn prepare_activity(&self, activity: &ParsedActivity) -> CoreResult<DenseActivityReport> {
         let coverage = match &self.mode {
-            VideoRenderModePlan::Composite(plan) => &plan.coverage,
+            VideoRenderModePlan::Composite { render: plan, .. } => &plan.coverage,
             VideoRenderModePlan::Transparent(plan) => &plan.coverage,
         };
         build_dense_activity_report_for_timeline(
@@ -291,62 +269,82 @@ impl PlannedVideoRender {
     }
 }
 
-/// Finalizes activity-dependent coverage at the owning job's preparation seam.
-/// Sources must come from the inspection service's owned validation result.
-pub fn plan_video_render(
+/// Derives a single custom-range plan from validated submission inputs.
+pub(crate) fn plan_single_render(
+    mut config: ValidatedRenderConfig,
+    activity_end: f64,
+) -> CoreResult<PlannedVideoRender> {
+    let (mode, sampling_fps, activity_offset) = if config.scene.composite_video_path.is_some() {
+        let render = crate::encode::pipeline::composite_plan::derive_composite_render_plan(
+            &mut config.scene,
+            Some(activity_end),
+        )?;
+        let fps = render.overlay_pipe_fps;
+        let offset = render.sync_offset;
+        (
+            VideoRenderModePlan::Composite {
+                render,
+                source_metadata: None,
+            },
+            fps,
+            offset,
+        )
+    } else {
+        let scene = &config.scene;
+        if !scene.presentation.width.is_multiple_of(2)
+            || !scene.presentation.height.is_multiple_of(2)
+        {
+            return Err(CoreError::Config(
+                "Transparent video dimensions must be even".into(),
+            ));
+        }
+        let fps = Fps::new(scene.fps as u32, 1)?;
+        let count = fps.frame_count_for_duration(scene.end - scene.start)?;
+        let output_frame_count =
+            u32::try_from(rendered_frame_count(count as usize, scene.update_rate)?).map_err(
+                |_| CoreError::Encode("Transparent output frame count exceeds u32".into()),
+            )?;
+        (
+            VideoRenderModePlan::Transparent(TransparentRenderPlan {
+                layout_frame_count: count,
+                output_frame_count,
+                update_rate: scene.update_rate,
+                container_fps: fps.divided_by(scene.update_rate)?.ffmpeg_arg(),
+                coverage: ActivityCoverage {
+                    start: scene.start,
+                    end: scene.end,
+                    blank_leading_frame_count: 0,
+                    frame_count: count,
+                },
+            }),
+            fps,
+            scene.start,
+        )
+    };
+    Ok(PlannedVideoRender {
+        config,
+        mode,
+        sampling_fps,
+        activity_offset,
+    })
+}
+
+/// Consumes timing and activity bounds validated by acceptance/job preparation.
+pub(crate) fn plan_batch_item(
     template: &ValidatedBatchTemplate,
     source: &InspectedVideoSource,
-    timing: &BatchJobTiming,
+    offset: f64,
     skip_overlay: bool,
-    activity: &ParsedActivity,
+    activity_end: f64,
+    output_frame_count: u32,
+    container_fps: Fps,
 ) -> CoreResult<PlannedVideoRender> {
-    let offset = match timing {
-        BatchJobTiming::EmbeddedActivity { offset_seconds } if *offset_seconds == 0.0 => 0.0,
-        BatchJobTiming::EmbeddedActivity { .. } => {
-            return Err(CoreError::Config(
-                "Embedded batch offset must be zero".into(),
-            ))
-        }
-        BatchJobTiming::ExternalActivity {
-            offset_seconds,
-            automatic_offset_seconds,
-        } => {
-            if !offset_seconds.is_finite() || !automatic_offset_seconds.is_finite() {
-                return Err(CoreError::Config("Batch offsets must be finite".into()));
-            }
-            *offset_seconds
-        }
-    };
-    let activity_end = activity.trim_end_seconds.max(
-        activity
-            .sample_elapsed_seconds
-            .last()
-            .copied()
-            .unwrap_or_default(),
-    );
-    if !activity_end.is_finite() || activity_end <= 0.0 || activity.sample_elapsed_seconds.len() < 2
-    {
-        return Err(CoreError::Activity(
-            "Batch rendering requires a positive activity timeline".into(),
-        ));
-    }
     let duration = source.metadata.duration.expect("inspected source duration");
-    let mut config = template.config.clone();
-    config.scene.width = source.display_resolution.width as u32;
-    config.scene.height = source.display_resolution.height as u32;
-    config.scene.custom_export_range_active = Some(true);
-    if skip_overlay {
-        config.values.clear();
-        config.course_plots.clear();
-        config.elevation_plots.clear();
-    }
-    let scene = &mut config.scene;
-    let update_rate = scene.update_rate;
-    let (output_frame_count, container_fps) =
-        video_output_work(source, scene.ffmpeg.codec, template.layout_fps, update_rate)?;
-    let sampling_fps = match scene.ffmpeg.codec {
+    let encoding = &template.encoding;
+    let update_rate = encoding.update_rate;
+    let sampling_fps = match encoding.codec {
         CodecSelection::Composite(_) => container_fps.divided_by(update_rate)?,
-        CodecSelection::Transparent(_) => template.layout_fps,
+        CodecSelection::Transparent(_) => encoding.layout_fps,
     };
     let layout_frame_count = sampling_fps.frame_count_for_duration(duration)?;
     let coverage = ActivityCoverage::for_video(
@@ -356,17 +354,46 @@ pub fn plan_video_render(
         sampling_fps,
         layout_frame_count,
     )?;
-    scene.start = coverage.start;
-    scene.end = coverage.end;
-    scene.fps = sampling_fps.as_f64();
-    let mode = match scene.ffmpeg.codec {
-        CodecSelection::Composite(requested_codec_id) => {
-            scene.composite_video_path = Some(source.metadata.path.clone());
-            scene.composite_sync_offset = Some(offset);
-            scene.update_rate = NonZeroU32::MIN;
-            VideoRenderModePlan::Composite(CompositeRenderPlan {
+    let mut presentation = template.config.scene.clone();
+    presentation.width = source.display_resolution.width as u32;
+    presentation.height = source.display_resolution.height as u32;
+    let scene = ValidatedSceneConfig {
+        presentation,
+        start: coverage.start,
+        end: coverage.end,
+        fps: sampling_fps.as_f64(),
+        update_rate: if matches!(encoding.codec, CodecSelection::Composite(_)) {
+            NonZeroU32::MIN
+        } else {
+            update_rate
+        },
+        ffmpeg: ValidatedFfmpegConfig {
+            codec: encoding.codec,
+            qsv_full_init_args: encoding.qsv_full_init_args.clone(),
+            ..ValidatedFfmpegConfig::default()
+        },
+        quality: Some(encoding.quality),
+        custom_export_range_active: Some(true),
+        composite_video_path: None,
+        composite_sync_offset: None,
+        composite_video_fps_num: None,
+        composite_video_fps_den: None,
+        composite_video_duration: None,
+        composite_render_duration: None,
+        composite_video_trim_start: None,
+        composite_widget_update_rate: None,
+    };
+    let mut config = template.config.clone().with_scene(scene);
+    if skip_overlay {
+        config.values.clear();
+        config.course_plots.clear();
+        config.elevation_plots.clear();
+    }
+    let mode = match encoding.codec {
+        CodecSelection::Composite(requested_codec_id) => VideoRenderModePlan::Composite {
+            render: CompositeRenderPlan {
                 video_path: PathBuf::from(&source.metadata.path),
-                quality: scene.quality.expect("validated batch quality"),
+                quality: encoding.quality,
                 sync_offset: offset,
                 trim_start: 0.0,
                 render_duration: duration,
@@ -377,11 +404,14 @@ pub fn plan_video_render(
                 output_frame_count,
                 coverage,
                 requested_codec_id,
-                qsv_full_init_args: scene.ffmpeg.qsv_full_init_args.clone(),
-            })
-        }
+                qsv_full_init_args: encoding.qsv_full_init_args.clone(),
+            },
+            source_metadata: Some((source.metadata.has_audio, source.metadata.rotation_degrees)),
+        },
         CodecSelection::Transparent(_) => {
-            if !scene.width.is_multiple_of(2) || !scene.height.is_multiple_of(2) {
+            if !config.scene.presentation.width.is_multiple_of(2)
+                || !config.scene.presentation.height.is_multiple_of(2)
+            {
                 return Err(CoreError::Config(
                     "Transparent batch video dimensions must be even".into(),
                 ));
@@ -398,7 +428,6 @@ pub fn plan_video_render(
     Ok(PlannedVideoRender {
         config,
         mode,
-        source: source.clone(),
         sampling_fps,
         activity_offset: offset,
     })

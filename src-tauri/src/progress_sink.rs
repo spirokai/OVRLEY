@@ -1,19 +1,21 @@
-//! Adapter that streams `RenderProgress` snapshots from `ovrley_core` to the
-//! frontend as Tauri `render-progress` events.
+//! Forwards core-owned single-render progress and batch snapshots to Tauri.
+//! The execution service selects one progress destination per reservation;
+//! batch pipeline updates stay internal and only batch snapshots reach here.
 //!
 //! Owns: `TauriProgressSink` — the concrete `ProgressSink` implementation
 //!   installed on the native execution service at app startup.
-//! Does not own: render state, event payload shape (both belong to
-//!   `ovrley_core::encode::progress`).
+//! Does not own: render state or payloads, owned by the core controller and
+//!   batch service.
 //!
 //! This is the single adapter boundary for progress events per the project
 //! "adapters are permitted only at genuine external-system boundaries and MUST
-//! translate once" rule: `ovrley_core` produces canonical `RenderProgress`
-//! values; this module only forwards them through Tauri's `Emitter` with no
+//! translate once" rule: `ovrley_core` produces canonical progress payloads;
+//! this module only forwards them through Tauri's `Emitter` with no
 //! remapping, aliasing, or compatibility shims.
 
 use ovrley_core::debug::RenderProgress;
 use ovrley_core::encode::progress::ProgressSink;
+use ovrley_core::render_jobs::contracts::BatchSnapshot;
 use tauri::{AppHandle, Emitter};
 
 /// Event name used for streamed render-progress updates. The frontend
@@ -38,6 +40,12 @@ impl TauriProgressSink {
 }
 
 impl ProgressSink for TauriProgressSink {
+    fn emit_batch_progress(&self, snapshot: &BatchSnapshot) {
+        if let Err(error) = self.app.emit("batch-render-progress", snapshot) {
+            log::warn!("failed to emit batch-render-progress event: {error}");
+        }
+    }
+
     fn emit_progress(&self, progress: &RenderProgress) {
         // `Emitter::emit` serializes the payload to the frontend. Failures are
         // non-fatal — e.g. no webview is listening yet during startup, or the

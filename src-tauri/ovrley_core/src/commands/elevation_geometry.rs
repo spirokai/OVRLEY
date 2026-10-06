@@ -48,7 +48,7 @@ pub fn build_elevation_geometry_command(
 ) -> CoreResult<ElevationGeometryResponse> {
     let config = parse_config_json(config_json)?;
     let scene = validate_scene_config(config.scene)?;
-    let elevation_plots = validate_elevation_plots(&config.plots, &scene)?;
+    let elevation_plots = validate_elevation_plots(&config.plots, &scene.presentation)?;
     let activity = parse_activity_json(parsed_activity_json)?;
 
     let elevation_plot = elevation_plots

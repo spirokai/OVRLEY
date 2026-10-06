@@ -100,24 +100,6 @@ pub enum InspectionValidation {
     Rejected(InspectionRejection),
 }
 
-/// IPC validation is a preflight, not render acceptance. Real submission must
-/// call validate_sources again at acceptance, retaining its owned descriptors.
-#[derive(Debug, Serialize)]
-#[serde(tag = "status", rename_all = "camelCase")]
-pub enum InspectionValidationResponse {
-    Valid,
-    Rejected(InspectionRejection),
-}
-
-impl InspectionValidation {
-    pub fn into_response(self) -> InspectionValidationResponse {
-        match self {
-            Self::Valid(_) => InspectionValidationResponse::Valid,
-            Self::Rejected(rejection) => InspectionValidationResponse::Rejected(rejection),
-        }
-    }
-}
-
 type SessionSources = HashMap<String, Arc<InspectedVideoSource>>;
 
 pub struct VideoInspectionService {

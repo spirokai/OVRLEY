@@ -380,20 +380,20 @@ fn resolve_global_defaults(scene: &ValidatedSceneConfig, config_raw: &Value) -> 
 /// Derives global default values from a ValidatedSceneConfig.
 fn derive_global_defaults(scene: &ValidatedSceneConfig) -> Value {
     serde_json::json!({
-        "font_values": scene.font.as_deref().unwrap_or("Arial.ttf"),
-        "font_text": scene.font.as_deref().unwrap_or("Arial.ttf"),
+        "font_values": scene.presentation.font.as_deref().unwrap_or("Arial.ttf"),
+        "font_text": scene.presentation.font.as_deref().unwrap_or("Arial.ttf"),
         "color_values": "#ffffff",
         "color_text": "#ffffff",
         "color_icons": "#ffffff",
         "color_units": "#ffffff",
-        "font_size": scene.font_size.unwrap_or(30.0),
-        "border_color": &scene.border_color,
-        "border_thickness": scene.border_thickness,
-        "shadow_color": &scene.shadow_color,
-        "shadow_strength": scene.shadow_strength,
-        "shadow_distance": scene.shadow_distance,
-        "opacity": scene.opacity.unwrap_or(1.0),
-        "scale": scene.scale,
+        "font_size": scene.presentation.font_size.unwrap_or(30.0),
+        "border_color": &scene.presentation.border_color,
+        "border_thickness": scene.presentation.border_thickness,
+        "shadow_color": &scene.presentation.shadow_color,
+        "shadow_strength": scene.presentation.shadow_strength,
+        "shadow_distance": scene.presentation.shadow_distance,
+        "opacity": scene.presentation.opacity.unwrap_or(1.0),
+        "scale": scene.presentation.scale,
     })
 }
 

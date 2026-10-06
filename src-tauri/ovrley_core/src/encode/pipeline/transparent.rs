@@ -138,10 +138,10 @@ pub fn render_video(
 ) -> CoreResult<String> {
     controller.check_cancelled()?;
     let scene = &config.scene;
-    if !scene.width.is_multiple_of(2) || !scene.height.is_multiple_of(2) {
+    if !scene.presentation.width.is_multiple_of(2) || !scene.presentation.height.is_multiple_of(2) {
         return Err(CoreError::Config(format!(
             "Transparent video dimensions must be even; received {}x{}",
-            scene.width, scene.height
+            scene.presentation.width, scene.presentation.height
         )));
     }
     let plan = TransparentRenderPlan {
@@ -186,8 +186,8 @@ pub(crate) fn render_planned_video(
     let scene = &config.scene;
     let ffmpeg_settings = build_ffmpeg_settings(&scene.ffmpeg)?;
     let frame_size = FrameSize {
-        width: scene.width,
-        height: scene.height,
+        width: scene.presentation.width,
+        height: scene.presentation.height,
     };
     let layout_total_frames = u32::try_from(plan.layout_frame_count)
         .map_err(|_| CoreError::Encode("Transparent layout frame count exceeds u32".to_string()))?;
@@ -378,6 +378,14 @@ pub(crate) fn render_planned_video(
         sample_frames,
         merged_timings,
     )?;
+    controller.set_frame_progress(
+        total_frames,
+        total_frames,
+        u32::try_from(rendered_frames).expect("validated producer frame count fits u32"),
+        total_frames,
+        Some(0),
+        None,
+    );
     Ok(output_target.filename().to_owned())
 }
 

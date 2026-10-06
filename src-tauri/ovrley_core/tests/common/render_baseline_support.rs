@@ -284,8 +284,8 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
         .context("failed to probe transparent output")?;
     assert_video_metadata(
         &metadata,
-        validated.scene.width,
-        validated.scene.height,
+        validated.scene.presentation.width,
+        validated.scene.presentation.height,
         validated.container_fps().round() as u32,
         1,
         &case.expected_codec_name,
@@ -426,8 +426,8 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     };
     assert_video_metadata(
         &output_metadata,
-        validated.scene.width,
-        validated.scene.height,
+        validated.scene.presentation.width,
+        validated.scene.presentation.height,
         source_fps_num,
         source_fps_den,
         &case.expected_codec_name,

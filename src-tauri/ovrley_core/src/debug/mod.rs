@@ -19,11 +19,13 @@ pub struct RenderProgress {
     pub render_id: u64,
     /// True until the accepted operation's worker and pipeline cleanup finish.
     pub busy: bool,
-    /// Number of frames rendered by the Skia producer.
+    /// Output-equivalent planned work traversed by the producer.
     pub current: u32,
+    /// Actual frames produced, before output-rate expansion.
+    pub rendered: u32,
     /// Total number of frames expected in the encoded output.
     pub total: u32,
-    /// Number of output frames encoded or covered by the active render pipeline.
+    /// Output frames confirmed by the encoder (zero until confirmed).
     pub encoded: u32,
     /// `idle`, `preparing`, `rendering`, `cancelling`, `complete`, `error`, or `cancelled`.
     pub status: String,
@@ -45,6 +47,7 @@ impl Default for RenderProgress {
             render_id: 0,
             busy: false,
             current: 0,
+            rendered: 0,
             total: 0,
             encoded: 0,
             status: "idle".to_string(),

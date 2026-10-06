@@ -53,9 +53,7 @@ function normalizeBackendError(error, fallbackMessage = 'Unknown backend error')
 
   if (error && typeof error === 'object' && typeof error.message === 'string' && error.message.trim()) {
     const normalized = new Error(error.message)
-    if (typeof error.code === 'string' && error.code.trim()) {
-      normalized.code = error.code
-    }
+    Object.assign(normalized, error)
     return normalized
   }
 
@@ -310,6 +308,44 @@ export async function subscribeRenderProgress(handler) {
 }
 
 /**
+ * Submits the captured queue once. Rust owns all preparation and execution.
+ * Subscribe to batch progress before submission, then read the initial snapshot.
+ * @param {object} request Canonical BatchRenderRequest.
+ * @returns {Promise<{batchId: string, snapshot: object}>} Accepted batch identity and snapshot.
+ */
+export async function submitBatchRender(request) {
+  return invokeCommand('backend_submit_batch', { request })
+}
+
+/**
+ * Reads the retained authoritative snapshot, including terminal results.
+ * @param {string} batchId Accepted batch identity.
+ * @returns {Promise<object>} Canonical BatchSnapshot.
+ */
+export async function getBatchRenderSnapshot(batchId) {
+  return invokeCommand('backend_batch_snapshot', { batchId })
+}
+
+/**
+ * Requests cancellation; terminal cancellation follows native cleanup.
+ * @param {string} batchId Accepted batch identity.
+ * @returns {Promise<object>} Current canonical BatchSnapshot.
+ */
+export async function cancelBatchRender(batchId) {
+  return invokeCommand('backend_cancel_batch', { batchId })
+}
+
+/**
+ * Observes snapshots. Consumers use batchId and revision to order events and reads.
+ * @param {(snapshot: object) => void} handler Snapshot observer.
+ * @returns {Promise<() => void>} Listener disposal function.
+ */
+export async function subscribeBatchRenderProgress(handler) {
+  const { listen } = await import('@tauri-apps/api/event')
+  return listen('batch-render-progress', (event) => handler(event.payload))
+}
+
+/**
  * Checks whether cancel render.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
@@ -529,16 +565,6 @@ export async function createVideoInspection() {
  */
 export async function inspectVideoSource(inspectionId, path) {
   return apiCall('backend_inspect_video_source', { inspectionId, path })
-}
-
-/**
- * Checks descriptor ownership and current file stamps. Actual batch submission must recheck at acceptance.
- * @param {{inspectionId: string, sources: InspectedVideoSource[], calibrationSource: InspectedVideoSource|null}} selection Selected sources.
- * @returns {Promise<{status: 'valid'}|{status: 'rejected', inspectionId: string, issues: Array<{sourceId: string, path: string, reason: string}>}>}
- * Source preflight result, with affected identities when reinspection is required.
- */
-export async function validateVideoInspection(selection) {
-  return apiCall('backend_validate_video_inspection', { selection })
 }
 
 /**

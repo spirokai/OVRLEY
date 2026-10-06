@@ -66,7 +66,9 @@ pub use linear_gauge::{
 pub use raster::validate_template_rasters;
 pub use raster::{RasterGeometry, RasterSource, ValidatedRaster};
 pub use route::{validate_route_plot, validate_route_plots, ValidatedRoutePlot};
-pub use scene::{validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig};
+pub use scene::{
+    validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig, ValidatedScenePresentation,
+};
 pub use time::{
     validate_time_value, ElapsedTimeOrigin, ValidatedTimeFormatting, ValidatedTimeValue,
 };
@@ -131,8 +133,8 @@ pub struct RenderDataRequirements {
 
 /// Validated render config where all output-affecting fields are explicit.
 #[derive(Clone)]
-pub struct ValidatedRenderConfig {
-    pub scene: ValidatedSceneConfig,
+pub struct ValidatedRenderConfig<S = ValidatedSceneConfig> {
+    pub scene: S,
     pub backdrops: Vec<ValidatedBackdrop>,
     pub rasters: Vec<ValidatedRaster>,
     pub labels: Vec<ValidatedLabel>,
@@ -152,31 +154,34 @@ pub fn validate_render_config_with_resources(
     raw: RenderConfig,
     resources: Option<&dyn crate::raster::RasterResourceResolver>,
 ) -> CoreResult<ValidatedRenderConfig> {
-    let rasters = resolve_render_rasters(&raw.rasters, resources)?;
-    validate_render_config_with_rasters(raw, rasters)
+    let scene = validate_scene_config(raw.scene.clone())?;
+    Ok(
+        validate_render_contents(raw.with_scene(scene.presentation.clone()), resources)?
+            .with_scene(scene),
+    )
 }
 
-/// Pins immutable raster inputs at acceptance. The worker consumes these
-/// validated resources without consulting the editor's resource registry.
-pub(crate) fn resolve_render_rasters(
-    rasters: &[raw::RasterConfig],
+/// Validates shared presentation directly, without inventing a render window.
+pub(crate) fn validate_render_presentation(
+    raw: RenderConfig<raw::ScenePresentationConfig>,
     resources: Option<&dyn crate::raster::RasterResourceResolver>,
-) -> CoreResult<Vec<ValidatedRaster>> {
-    raster::validate_unique_raster_ids(rasters)?;
-    rasters
+) -> CoreResult<ValidatedRenderConfig<ValidatedScenePresentation>> {
+    let scene = scene::validate_scene_presentation(raw.scene.clone())?;
+    validate_render_contents(raw.with_scene(scene), resources)
+}
+
+fn validate_render_contents(
+    raw: RenderConfig<ValidatedScenePresentation>,
+    resources: Option<&dyn crate::raster::RasterResourceResolver>,
+) -> CoreResult<ValidatedRenderConfig<ValidatedScenePresentation>> {
+    let scene = raw.scene;
+    raster::validate_unique_raster_ids(&raw.rasters)?;
+    let rasters = raw
+        .rasters
         .iter()
         .enumerate()
         .map(|(index, raster)| raster::validate_raster(raster, index, resources))
-        .collect()
-}
-
-/// Completes configuration ingress on the operation worker. Raster validation
-/// has already happened at acceptance and must not run a second time.
-pub(crate) fn validate_render_config_with_rasters(
-    raw: RenderConfig,
-    rasters: Vec<ValidatedRaster>,
-) -> CoreResult<ValidatedRenderConfig> {
-    let scene = validate_scene_config(raw.scene)?;
+        .collect::<CoreResult<Vec<_>>>()?;
 
     let backdrops = raw
         .backdrops
@@ -289,6 +294,20 @@ pub(crate) fn validate_render_config_with_rasters(
         course_plots,
         elevation_plots,
     })
+}
+
+impl<S> ValidatedRenderConfig<S> {
+    pub(crate) fn with_scene<T>(self, scene: T) -> ValidatedRenderConfig<T> {
+        ValidatedRenderConfig {
+            scene,
+            backdrops: self.backdrops,
+            rasters: self.rasters,
+            labels: self.labels,
+            values: self.values,
+            course_plots: self.course_plots,
+            elevation_plots: self.elevation_plots,
+        }
+    }
 }
 
 impl ValidatedRenderConfig {

@@ -14,10 +14,9 @@ use ovrley_core::media::prepared_video::check_source_freshness;
 use ovrley_core::media::SourceVideoMetadata;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render_jobs::batch_plan::{
-    plan_batch_configuration, plan_video_render, validate_batch_encoding, validate_batch_template,
-    BatchPlanningResponse, VideoRenderModePlan,
+    plan_batch_configuration, BatchPlanningResponse, VideoRenderModePlan,
 };
-use ovrley_core::render_jobs::contracts::{BatchEncodingSettings, BatchExportMode, BatchJobTiming};
+use ovrley_core::render_jobs::contracts::{BatchEncodingSettings, BatchExportMode};
 use ovrley_core::render_jobs::inspection::{
     InspectionSourceSelection, InspectionValidation, ReinspectionReason, SourceMetadataProbe,
     VideoInspectionService,
@@ -149,17 +148,30 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
     let original_template = serde_json::to_value(&template).unwrap();
     let paths = common::composite::test_paths_named("batch-video-window");
     for mode in [BatchExportMode::Transparent, BatchExportMode::Composite] {
-        let settings = validate_batch_encoding(&encoding(mode)).unwrap();
-        let shared = validate_batch_template(template.clone(), settings, None).unwrap();
+        let prepare = |offset, skip_overlay| {
+            common::builders::batch_video_plan(
+                &paths,
+                &service,
+                &session.inspection_id,
+                common::builders::video_batch_request(
+                    &session.inspection_id,
+                    &source,
+                    encoding(mode),
+                    template.clone(),
+                    activity.clone(),
+                    offset,
+                    skip_overlay,
+                ),
+            )
+        };
         for offset in [-5.0, 110.0, -5.01, 100.1] {
-            let timing = BatchJobTiming::ExternalActivity {
-                automatic_offset_seconds: offset - 3.0,
-                offset_seconds: offset,
-            };
-            let plan = plan_video_render(&shared, &source, &timing, false, &activity).unwrap();
+            let plan = prepare(offset, false).unwrap();
             let dense = plan.prepare_activity(&activity).unwrap();
             assert_eq!(
-                (plan.config().scene.width, plan.config().scene.height),
+                (
+                    plan.config().scene.presentation.width,
+                    plan.config().scene.presentation.height
+                ),
                 (32, 64)
             );
             let (coverage, stride, layout_rate, frames) = match plan.mode() {
@@ -168,7 +180,7 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
                     assert_eq!(render.container_fps, "15/1");
                     (&render.coverage, 2usize, 30.0, 300)
                 }
-                VideoRenderModePlan::Composite(render) => {
+                VideoRenderModePlan::Composite { render, .. } => {
                     (&render.coverage, 1usize, 15000.0 / 1001.0, 600)
                 }
             };
@@ -180,7 +192,7 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
                 (dense.frame_elapsed_seconds[0] + plan.config().scene.start - first_time).abs()
                     < 1e-9
             );
-            let suppressed = plan_video_render(&shared, &source, &timing, true, &activity).unwrap();
+            let suppressed = prepare(offset, true).unwrap();
             assert_eq!(suppressed.planned_frames(), frames);
             assert!(suppressed.config().values.is_empty());
             assert_eq!(suppressed.config().labels.len(), 1);
@@ -223,11 +235,7 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
                 "reused buffers cannot leak art into padding"
             );
         }
-        let touching = BatchJobTiming::ExternalActivity {
-            automatic_offset_seconds: 120.0,
-            offset_seconds: 120.0,
-        };
-        assert!(plan_video_render(&shared, &source, &touching, true, &activity).is_err());
+        assert!(prepare(120.0, true).is_err());
     }
     assert_eq!(serde_json::to_value(&activity).unwrap(), original_activity);
     assert_eq!(serde_json::to_value(&template).unwrap(), original_template);
@@ -329,8 +337,16 @@ fn accepted_sources_survive_disposal_but_closed_and_foreign_sessions_reject() {
     assert_eq!(accepted.sources()[0].as_ref(), &queued);
     assert_eq!(accepted.calibration_source(), Some(&reference));
     check_source_freshness(&accepted.sources()[0]).unwrap();
-    let response =
-        serde_json::to_value(service.validate_sources(&selection).into_response()).unwrap();
+    let response = serde_json::to_value(
+        plan_batch_configuration(
+            &service,
+            &selection,
+            &encoding(BatchExportMode::Composite),
+            &directory.0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
     assert_eq!(response["status"], "rejected");
     assert_eq!(response["issues"].as_array().unwrap().len(), 2);
     assert_eq!(response["issues"][0]["reason"], "closedSession");

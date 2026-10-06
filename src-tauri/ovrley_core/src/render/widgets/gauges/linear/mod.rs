@@ -48,9 +48,9 @@ pub fn prepare_linear_gauge_cache(
         let scaled_height = ((gauge.height as f32) * scale).round().max(1.0) as u32;
         let (min_value, max_value) = metric_range(&dense_activity.series, gauge.metric);
         let shadow = normalize_shadow_style_validated(
-            &scene.shadow_color,
-            scene.shadow_strength,
-            scene.shadow_distance,
+            &scene.presentation.shadow_color,
+            scene.presentation.shadow_strength,
+            scene.presentation.shadow_distance,
             scale,
         );
         let track_padding =

@@ -9,22 +9,17 @@ use std::thread::{self, JoinHandle};
 
 use serde::Serialize;
 
-use super::batch_plan::{PlannedVideoRender, VideoRenderModePlan};
+use super::batch::BatchState;
+use super::batch_plan::{plan_single_render, PlannedVideoRender, VideoRenderModePlan};
 use crate::activity::schema::ParsedActivity;
-use crate::activity::{
-    build_dense_activity_report_for_timeline, build_dense_activity_report_validated,
-    parse_activity_json,
-};
+use crate::activity::{parse_activity_json, validate_render_activity};
 use crate::debug::RenderProgress;
-use crate::encode::pipeline::composite::render_composite_video;
-use crate::encode::pipeline::composite_plan::derive_composite_render_plan;
-use crate::encode::pipeline::transparent::{render_video, rendered_frame_count};
+use crate::encode::pipeline::composite::render_inspected_composite_video;
+use crate::encode::pipeline::composite_plan::verify_composite_source_resolution;
+use crate::encode::pipeline::transparent::render_planned_video;
 use crate::encode::progress::{ProgressSink, RenderController};
 use crate::error::{CoreError, CoreResult};
-use crate::normalize::{
-    parse_config_json, raw::RenderConfig, resolve_render_rasters,
-    validate_render_config_with_rasters, ValidatedRaster, ValidatedRenderConfig,
-};
+use crate::normalize::{parse_config_json, validate_render_config_with_resources};
 use crate::output::{RenderOutputKind, RenderOutputTarget};
 use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
@@ -39,10 +34,16 @@ pub struct RenderAccepted {
 }
 
 /// Owns the background worker; progress events never supervise execution.
-#[derive(Default)]
 pub struct RenderExecutionService {
-    controller: RenderController,
+    pub(crate) controller: RenderController,
+    pub(crate) batch: Arc<BatchState>,
     worker: Mutex<Option<JoinHandle<()>>>,
+}
+
+impl Default for RenderExecutionService {
+    fn default() -> Self {
+        Self::with_controller(RenderController::default())
+    }
 }
 
 impl RenderExecutionService {
@@ -52,8 +53,10 @@ impl RenderExecutionService {
 
     /// Allows standalone pipeline callers to observe the same controller.
     pub fn with_controller(controller: RenderController) -> Self {
+        let batch = Arc::new(BatchState::new(controller.sink()));
         Self {
             controller,
+            batch,
             worker: Mutex::new(None),
         }
     }
@@ -68,16 +71,36 @@ impl RenderExecutionService {
 
     /// Held across preparation, cleanup, and all items of an eventual batch.
     pub fn reserve(&self) -> CoreResult<RendererReservation> {
-        let render_id = self.controller.reserve()?;
-        Ok(RendererReservation {
+        self.reserve_with_sink(self.controller.sink())
+    }
+
+    /// Each reservation has one progress destination: the single-render sink
+    /// or internal batch state. Pipeline code uses the same controller API.
+    pub(crate) fn reserve_with_sink(
+        &self,
+        sink: Arc<dyn ProgressSink>,
+    ) -> CoreResult<RendererReservation> {
+        let render_id = self.controller.reserve(sink)?;
+        let reservation = RendererReservation {
             controller: self.controller.clone(),
             render_id,
             finalized: false,
-        })
+        };
+        // A previous worker may still be publishing its terminal batch result
+        // after releasing the controller. Join it before accepting new inputs.
+        if let Some(previous) = self
+            .worker
+            .lock()
+            .expect("render worker mutex poisoned")
+            .take()
+        {
+            previous.join().expect("render worker panicked");
+        }
+        Ok(reservation)
     }
 
-    /// Pins raster handles and validates output before dispatch. Remaining
-    /// configuration validation and activity preparation belong to the worker.
+    /// Validates config/activity and pins resources at submission ingress.
+    /// Dense activity, source probing and native rendering stay on the worker.
     #[allow(clippy::too_many_arguments)]
     pub fn submit_single(
         &self,
@@ -88,50 +111,70 @@ impl RenderExecutionService {
         overwrite: bool,
         resources: Option<&dyn RasterResourceResolver>,
     ) -> CoreResult<RenderAccepted> {
-        let config = parse_config_json(config_json)?;
-        let rasters = resolve_render_rasters(&config.rasters, resources)?;
+        let config =
+            validate_render_config_with_resources(parse_config_json(config_json)?, resources)?;
         let kind = if config.scene.composite_video_path.is_some() {
             RenderOutputKind::Composite
         } else {
             RenderOutputKind::Transparent
         };
         let target = RenderOutputTarget::validate(output_path, kind, overwrite)?;
-        let request = AcceptedSingleRender {
-            config,
-            rasters,
-            activity_json: parsed_activity_json.to_owned(),
-            target,
-        };
+        let activity = parse_activity_json(parsed_activity_json)?;
+        let end = validate_render_activity(&activity)?;
+        let plan = plan_single_render(config, end)?;
         let reservation = self.reserve()?;
         let accepted = RenderAccepted {
             started: true,
             render_id: reservation.render_id,
-            output_path: request.target.path().to_path_buf(),
+            output_path: target.path().to_path_buf(),
         };
         let paths = paths.clone();
-        self.dispatch(reservation, move |session| {
-            execute_single(&paths, request, session)
-        })?;
+        self.dispatch(
+            reservation,
+            move |session| {
+                session.begin_item(plan.planned_frames(), "Preparing video assets...")?;
+                execute_render(&paths, plan, &activity, session, &target)
+            },
+            |_| {},
+        )?;
         Ok(accepted)
     }
 
     /// Dispatches an operation returning its actual outcome after cleanup.
-    pub fn dispatch<F>(&self, reservation: RendererReservation, operation: F) -> CoreResult<()>
+    pub fn dispatch<T, F, C>(
+        &self,
+        reservation: RendererReservation,
+        operation: F,
+        completed: C,
+    ) -> CoreResult<()>
     where
-        F: FnOnce(&RendererReservation) -> CoreResult<String> + Send + 'static,
+        T: Clone + Into<Option<String>> + Send + 'static,
+        F: FnOnce(&RendererReservation) -> CoreResult<T> + Send + 'static,
+        C: FnOnce(&CoreResult<T>) + Send + 'static,
     {
         assert!(
             self.controller.shares_state(&reservation.controller),
             "the reservation must belong to this execution service"
         );
         let mut worker = self.worker.lock().expect("render worker mutex poisoned");
-        if let Some(previous) = worker.take() {
-            previous.join().expect("render worker panicked");
-        }
+        assert!(worker.is_none(), "reservation joins the previous worker");
         *worker = Some(
             thread::Builder::new()
                 .name("render-operation".into())
-                .spawn(move || run_operation(reservation, operation))
+                .spawn(move || {
+                    // Accepted inputs leave scope before the reservation is released,
+                    // including cancellation before preparation and worker unwinding.
+                    let session = &reservation;
+                    let outcome = catch_unwind(AssertUnwindSafe(move || {
+                        session.check_cancelled()?;
+                        operation(session)
+                    }))
+                    .unwrap_or_else(|_| {
+                        Err(CoreError::Encode("Render operation worker panicked".into()))
+                    });
+                    let outcome = reservation.complete(outcome);
+                    completed(&outcome);
+                })
                 .map_err(|error| {
                     CoreError::Encode(format!("Could not start render worker: {error}"))
                 })?,
@@ -163,6 +206,9 @@ pub struct RendererReservation {
 }
 
 impl RendererReservation {
+    pub(crate) fn render_id(&self) -> u64 {
+        self.render_id
+    }
     pub fn controller(&self) -> &RenderController {
         &self.controller
     }
@@ -178,10 +224,13 @@ impl RendererReservation {
     /// Returns the synchronous operation's actual result and finalizes once.
     /// Cancellation arriving after a successful pipeline has preserved its
     /// output cannot turn that completed output into an interrupted one.
-    pub fn complete(mut self, outcome: CoreResult<String>) -> CoreResult<String> {
+    pub fn complete<T: Clone + Into<Option<String>>>(
+        mut self,
+        outcome: CoreResult<T>,
+    ) -> CoreResult<T> {
         self.finalized = true;
         match &outcome {
-            Ok(filename) => self.controller.finish_success(filename.clone()),
+            Ok(filename) => self.controller.finish_success(filename.clone().into()),
             Err(error) => self
                 .controller
                 .finish_error(error.to_string(), matches!(error, CoreError::Cancelled)),
@@ -199,105 +248,9 @@ impl Drop for RendererReservation {
     }
 }
 
-fn run_operation<F>(reservation: RendererReservation, operation: F)
-where
-    F: FnOnce(&RendererReservation) -> CoreResult<String>,
-{
-    // Move accepted resources into the unwind boundary so they are released
-    // even when cancellation prevents the operation from being called.
-    let session = &reservation;
-    let outcome = catch_unwind(AssertUnwindSafe(move || {
-        session.check_cancelled()?;
-        operation(session)
-    }));
-    let outcome = outcome
-        .unwrap_or_else(|_| Err(CoreError::Encode("Render operation worker panicked".into())));
-    let _ = reservation.complete(outcome);
-}
-
-/// Owned acceptance inputs; private fields prevent replacing pinned rasters or
-/// pairing them with another raw configuration after ingress.
-struct AcceptedSingleRender {
-    config: RenderConfig,
-    rasters: Vec<ValidatedRaster>,
-    activity_json: String,
-    target: RenderOutputTarget,
-}
-
-/// Completes single-request ingress on the worker before shared execution.
-fn execute_single(
-    paths: &AppPaths,
-    request: AcceptedSingleRender,
-    session: &RendererReservation,
-) -> CoreResult<String> {
-    session.check_cancelled()?;
-    let config = validate_render_config_with_rasters(request.config, request.rasters)?;
-    session.check_cancelled()?;
-    let activity = parse_activity_json(&request.activity_json)?;
-    session.check_cancelled()?;
-    execute_render(paths, config, &activity, session, &request.target)
-}
-
-/// Shared synchronous execution; existing planners retain timing ownership.
+/// Executes a finalized single or batch plan. The caller owns item start and
+/// the reservation; pipelines return only after native cleanup.
 pub fn execute_render(
-    paths: &AppPaths,
-    mut config: ValidatedRenderConfig,
-    activity: &ParsedActivity,
-    session: &RendererReservation,
-    target: &RenderOutputTarget,
-) -> CoreResult<String> {
-    session.check_cancelled()?;
-    if config.scene.composite_video_path.is_some() {
-        let activity_end = activity.trim_end_seconds.max(
-            activity
-                .sample_elapsed_seconds
-                .last()
-                .copied()
-                .unwrap_or_default(),
-        );
-        let plan = derive_composite_render_plan(&mut config.scene, Some(activity_end))?;
-        session.check_cancelled()?;
-        session.begin_item(plan.output_frame_count, "Preparing composite assets...")?;
-        let dense = build_dense_activity_report_for_timeline(
-            activity,
-            &config,
-            plan.coverage
-                .frame_timeline(plan.overlay_pipe_fps, plan.sync_offset),
-        )?;
-        session.check_cancelled()?;
-        render_composite_video(
-            paths,
-            &config,
-            activity,
-            &dense,
-            session.controller(),
-            plan,
-            true,
-            target,
-        )
-    } else {
-        let dense = build_dense_activity_report_validated(activity, &config)?;
-        session.check_cancelled()?;
-        let total = u32::try_from(rendered_frame_count(
-            dense.frame_count,
-            config.widget_update_rate(),
-        )?)
-        .map_err(|_| CoreError::Encode("Transparent progress frame count exceeds u32".into()))?;
-        session.begin_item(total, "Preparing render assets...")?;
-        render_video(
-            paths,
-            &config,
-            activity,
-            &dense,
-            session.controller(),
-            target,
-        )
-    }
-}
-
-/// Phase-4 execution seam: one finalized video plan, using the existing owned
-/// pipelines. Queue advancement and batch lifecycle belong to the runner.
-pub fn execute_planned_render(
     paths: &AppPaths,
     plan: PlannedVideoRender,
     activity: &ParsedActivity,
@@ -305,34 +258,46 @@ pub fn execute_planned_render(
     target: &RenderOutputTarget,
 ) -> CoreResult<String> {
     session.check_cancelled()?;
-    crate::media::prepared_video::check_source_freshness(&plan.source)?;
-    session.begin_item(plan.planned_frames(), "Preparing video assets...")?;
     let dense = plan.prepare_activity(activity)?;
     session.check_cancelled()?;
     match plan.mode {
-        VideoRenderModePlan::Composite(render) => {
-            crate::encode::pipeline::composite::render_inspected_composite_video(
+        VideoRenderModePlan::Composite {
+            render,
+            source_metadata,
+        } => {
+            let (has_audio, rotation) = match source_metadata {
+                Some(metadata) => metadata,
+                None => {
+                    let (rotation, audio) = verify_composite_source_resolution(
+                        paths,
+                        &render.video_path,
+                        plan.config.scene.presentation.width,
+                        plan.config.scene.presentation.height,
+                    )?;
+                    (audio, rotation)
+                }
+            };
+            session.check_cancelled()?;
+            render_inspected_composite_video(
                 paths,
                 &plan.config,
                 activity,
                 &dense,
                 session.controller(),
                 render,
-                plan.source.metadata.has_audio,
-                plan.source.metadata.rotation_degrees,
+                has_audio,
+                rotation,
                 target,
             )
         }
-        VideoRenderModePlan::Transparent(render) => {
-            crate::encode::pipeline::transparent::render_planned_video(
-                paths,
-                &plan.config,
-                activity,
-                &dense,
-                session.controller(),
-                target,
-                &render,
-            )
-        }
+        VideoRenderModePlan::Transparent(render) => render_planned_video(
+            paths,
+            &plan.config,
+            activity,
+            &dense,
+            session.controller(),
+            target,
+            &render,
+        ),
     }
 }

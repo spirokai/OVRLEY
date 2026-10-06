@@ -227,8 +227,8 @@ pub fn derive_composite_pipeline_plan(
 ) -> CoreResult<CompositePipelinePlan> {
     // —— PHASE 1: VALIDATE & DERIVE TIMING VALUES ——
     let frame_size = FrameSize {
-        width: scene.width,
-        height: scene.height,
+        width: scene.presentation.width,
+        height: scene.presentation.height,
     };
     // —— PHASE 2: BUILD COMPOSITE FFMPEG SETTINGS ——
     let ffmpeg_settings = build_composite_ffmpeg_settings(

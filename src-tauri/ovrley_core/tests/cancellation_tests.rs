@@ -25,7 +25,7 @@ fn double_cancel_is_idempotent() {
     assert_eq!(progress.status, "cancelling");
     assert!(progress.busy);
     assert!(matches!(
-        session.complete(Err(CoreError::Cancelled)),
+        session.complete::<String>(Err(CoreError::Cancelled)),
         Err(CoreError::Cancelled)
     ));
     assert_eq!(controller.progress().status, "cancelled");
@@ -66,21 +66,25 @@ fn cancellation_or_panic_during_preparation_retains_ownership_until_cleanup() {
         let encoder = encoder_started.clone();
         let session = service.reserve().unwrap();
         service
-            .dispatch(session, move |session| {
-                let _cleanup = ControlledCleanup {
-                    entered: cleanup_tx,
-                    release: release_rx,
-                };
-                prepared_tx.send(()).unwrap();
-                resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
-                if !cancel {
-                    panic!("Preparation failed");
-                }
-                session.begin_item(30, "Starting prepared item")?;
-                session.check_cancelled()?;
-                encoder.store(true, Ordering::SeqCst);
-                Ok("output.mov".into())
-            })
+            .dispatch(
+                session,
+                move |session| {
+                    let _cleanup = ControlledCleanup {
+                        entered: cleanup_tx,
+                        release: release_rx,
+                    };
+                    prepared_tx.send(()).unwrap();
+                    resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                    if !cancel {
+                        panic!("Preparation failed");
+                    }
+                    session.begin_item(30, "Starting prepared item")?;
+                    session.check_cancelled()?;
+                    encoder.store(true, Ordering::SeqCst);
+                    Ok("output.mov".to_owned())
+                },
+                |_| {},
+            )
             .unwrap();
 
         prepared_rx.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -120,7 +124,7 @@ fn cancellation_or_panic_during_preparation_retains_ownership_until_cleanup() {
         let service = RenderExecutionService::with_controller(controller);
         let next = service.reserve().unwrap();
         next.begin_item(1, "Next operation").unwrap();
-        next.complete(Ok("next.mov".into())).unwrap();
+        next.complete(Ok("next.mov".to_owned())).unwrap();
         assert_eq!(service.progress().status, "complete");
     }
 }

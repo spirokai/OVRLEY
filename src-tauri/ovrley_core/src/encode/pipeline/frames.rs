@@ -297,7 +297,7 @@ pub(crate) fn render_frames_parallel(
                                     (
                                         plan.render.output_frame_count,
                                         current,
-                                        current,
+                                        0,
                                         NonZeroU32::MIN,
                                     )
                                 }
@@ -332,6 +332,7 @@ pub(crate) fn render_frames_parallel(
                             controller.set_frame_progress(
                                 current_progress,
                                 total_progress,
+                                u32::try_from(written_frames).expect("validated producer frame count fits u32"),
                                 encoded_progress,
                                 estimate,
                                 effective_rendering_fps,

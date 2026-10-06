@@ -10,7 +10,7 @@ pub(crate) fn normalize_elevation_plot(
     validated: &ValidatedElevationPlot,
     scene: &ValidatedSceneConfig,
 ) -> NormalizedElevationPlot {
-    let scale = scene.scale.max(0.1);
+    let scale = scene.presentation.scale.max(0.1);
     let scaled_width = ((validated.width as f32) * scale).round().max(1.0) as u32;
     let scaled_height = ((validated.height as f32) * scale).round().max(1.0) as u32;
 
@@ -28,9 +28,9 @@ pub(crate) fn normalize_elevation_plot(
         remaining_line_opacity: validated.remaining_line_opacity,
         remaining_line_shadow: shadow_with_screen_offset(
             normalize_shadow_style_validated(
-                &scene.shadow_color,
-                scene.shadow_strength,
-                scene.shadow_distance,
+                &scene.presentation.shadow_color,
+                scene.presentation.shadow_strength,
+                scene.presentation.shadow_distance,
                 scale,
             ),
             validated.rotation,

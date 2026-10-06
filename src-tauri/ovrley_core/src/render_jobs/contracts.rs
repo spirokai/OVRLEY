@@ -7,37 +7,12 @@
 //! acceptance service. External metadata/activity keep their existing types
 //! and tolerant parsing rules. Inspection state never represents execution.
 
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use crate::activity::schema::ParsedActivity;
 use crate::encode::quality::QualityType;
 pub use crate::media::prepared_video::{InspectedVideoSource, SourceFileStamp};
-use crate::normalize::raw::{BackdropConfig, LabelConfig, RasterConfig, ValueConfig};
-
-/// Materialized shared presentation, with no activity/custom export window,
-/// source video fields or encoding settings. Scene presentation fields remain
-/// in the existing template vocabulary; each job later supplies render timing.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct BatchTemplate {
-    pub scene: BatchTemplateScene,
-    pub backdrops: Vec<BackdropConfig>,
-    pub rasters: Vec<RasterConfig>,
-    pub labels: Vec<LabelConfig>,
-    pub values: Vec<ValueConfig>,
-    pub plots: Vec<Value>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct BatchTemplateScene {
-    pub width: u32,
-    pub height: u32,
-    #[serde(flatten)]
-    pub presentation: BTreeMap<String, Value>,
-}
+use crate::normalize::raw::{RenderConfig, ScenePresentationConfig};
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -131,7 +106,8 @@ pub struct BatchRenderJob {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BatchRenderRequest {
     pub inspection_id: String,
-    pub template: BatchTemplate,
+    #[serde(deserialize_with = "crate::normalize::raw::deserialize_render_presentation")]
+    pub template: RenderConfig<ScenePresentationConfig>,
     pub encoding: BatchEncodingSettings,
     /// Absent only in per-video embedded telemetry mode; never editor telemetry.
     pub external_activity: Option<ParsedActivity>,
@@ -142,13 +118,6 @@ pub struct BatchRenderRequest {
     /// Ordered, eligible jobs only. Row removal excludes a source; skipOverlay
     /// does not. Accepted queue order and inputs are immutable.
     pub jobs: Vec<BatchRenderJob>,
-}
-
-/// Owned inputs after acceptance, distinct from an inspection session. The
-/// acceptance service will retain validated resources for this lifetime.
-pub struct AcceptedBatchRequest {
-    pub batch_id: String,
-    pub request: BatchRenderRequest,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -202,8 +171,10 @@ pub enum BatchItemOutcome {
 pub struct BatchItemSnapshot {
     pub id: String,
     pub phase: BatchItemPhase,
-    /// Absent until terminal. Inspection estimates are not authoritative totals.
-    pub planned_frames: Option<u64>,
+    /// Fixed source-window work, known when the request is accepted.
+    pub planned_frames: u64,
+    /// Output-equivalent work reached, retained for interrupted items.
+    pub current_frames: u64,
     pub rendered_frames: u64,
     pub encoded_frames: u64,
     /// Absent while queued or active; present only after item cleanup.
@@ -253,8 +224,8 @@ pub struct BatchSnapshot {
     pub items: Vec<BatchItemSnapshot>,
     /// Absent between items and after terminal cleanup.
     pub active_item_id: Option<String>,
-    /// Absent until authoritative planning has resolved every submitted job.
-    pub planned_frames: Option<u64>,
+    /// Total source-window work, fixed at acceptance.
+    pub planned_frames: u64,
     /// Frame-weighted work settled, including failed jobs' planned work. Does
     /// not claim that failed/cancelled work produced successful output frames.
     pub processed_frames: u64,

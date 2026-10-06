@@ -9,7 +9,7 @@ use super::helpers::{
     require_f32, require_finite_f64, require_non_negative_f32, require_positive_f32,
     require_positive_f64, require_positive_u32, require_u32,
 };
-use super::raw::SceneConfig;
+use super::raw::{SceneConfig, ScenePresentationConfig};
 use crate::encode::ffmpeg::catalog::{CodecSelection, CompositeCodecId, TransparentCodecId};
 use crate::encode::quality::{validate_quality, EncodingQuality};
 use crate::error::{CoreError, CoreResult};
@@ -116,32 +116,13 @@ fn optional_string_array(object: &Map<String, Value>, field: &str) -> CoreResult
 /// Missing or invalid fields are rejected by `validate_scene_config`.
 #[derive(Clone, Debug)]
 pub struct ValidatedSceneConfig {
-    // ── Core timing ───────────────────────────────────────────────────
+    pub presentation: ValidatedScenePresentation,
     pub fps: f64,
     pub start: f64,
     pub end: f64,
-    // ── Dimensions ────────────────────────────────────────────────────
-    pub width: u32,
-    pub height: u32,
-    pub scale: f32,
-    // ── Render defaults ───────────────────────────────────────────────
-    pub font: Option<String>,
-    pub font_size: Option<f32>,
-    pub opacity: f32,
-    pub decimal_rounding: Option<i32>,
-    pub time_format: Option<String>,
     pub custom_export_range_active: Option<bool>,
-    // ── Shadow/border ─────────────────────────────────────────────────
-    pub shadow_color: String,
-    pub shadow_strength: f32,
-    pub shadow_distance: f32,
-    pub border_color: String,
-    pub border_thickness: f32,
-    // ── Encoding ──────────────────────────────────────────────────────
     pub update_rate: NonZeroU32,
-    pub overlay_filename: Option<String>,
     pub ffmpeg: ValidatedFfmpegConfig,
-    // ── Composite encoding ────────────────────────────────────────────
     pub composite_video_path: Option<String>,
     pub quality: Option<EncodingQuality>,
     pub composite_sync_offset: Option<f64>,
@@ -153,9 +134,33 @@ pub struct ValidatedSceneConfig {
     pub composite_widget_update_rate: Option<NonZeroU32>,
 }
 
+/// Shared presentation validated once before per-job timing is available.
+#[derive(Clone, Debug)]
+pub struct ValidatedScenePresentation {
+    pub width: u32,
+    pub height: u32,
+    pub scale: f32,
+    pub font: Option<String>,
+    pub font_size: Option<f32>,
+    pub opacity: f32,
+    pub decimal_rounding: Option<i32>,
+    pub time_format: Option<String>,
+    pub shadow_color: String,
+    pub shadow_strength: f32,
+    pub shadow_distance: f32,
+    pub border_color: String,
+    pub border_thickness: f32,
+    pub overlay_filename: Option<String>,
+}
+
 /// Validates scene config, rejecting missing or out-of-range fields.
 pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfig> {
     let fps = require_positive_f64(raw.fps, "scene.fps")?;
+    if fps.fract().abs() > f64::EPSILON || fps > u32::MAX as f64 {
+        return Err(CoreError::Config(
+            "scene.fps must be a supported positive integer".into(),
+        ));
+    }
     let start = require_finite_f64(raw.start, "scene.start")?;
     let end = require_finite_f64(raw.end, "scene.end")?;
     if start >= end {
@@ -164,29 +169,15 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         )));
     }
 
-    let width = require_positive_u32(raw.width, "scene.width")?;
-    let height = require_positive_u32(raw.height, "scene.height")?;
-    let scale = require_positive_f32(raw.scale, "scene.scale")?;
-    let opacity = require_f32(raw.opacity, "scene.opacity")?;
-    if !(0.0..=1.0).contains(&opacity) {
-        return Err(CoreError::Config("scene.opacity must be between 0 and 1".into()));
-    }
-
-    let shadow_strength = require_f32(raw.shadow_strength, "scene.shadow_strength")?;
-    require_non_negative_f32(shadow_strength, "scene.shadow_strength")?;
-    let shadow_distance = require_f32(raw.shadow_distance, "scene.shadow_distance")?;
-    require_non_negative_f32(shadow_distance, "scene.shadow_distance")?;
-    let shadow_color = raw
-        .shadow_color
-        .ok_or_else(|| CoreError::Config("scene.shadow_color: required".into()))?;
-    let border_thickness = require_f32(raw.border_thickness, "scene.border_thickness")?;
-    require_non_negative_f32(border_thickness, "scene.border_thickness")?;
-    let border_color = raw
-        .border_color
-        .ok_or_else(|| CoreError::Config("scene.border_color: required".into()))?;
+    let presentation = validate_scene_presentation(raw.presentation)?;
 
     let update_rate = NonZeroU32::new(require_u32(raw.update_rate, "scene.update_rate")?)
         .ok_or_else(|| CoreError::Config("scene.update_rate: must be > 0".into()))?;
+    if !(fps as u32).is_multiple_of(update_rate.get()) {
+        return Err(CoreError::Config(format!(
+            "scene.update_rate ({update_rate}) must cleanly divide scene.fps ({fps})"
+        )));
+    }
     let composite_sync_offset = raw.composite_sync_offset;
     let composite_video_trim_start = raw.composite_video_trim_start;
     let composite_widget_update_rate = raw
@@ -221,25 +212,12 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
     let custom_export_range_active = raw.custom_export_range_active;
 
     Ok(ValidatedSceneConfig {
+        presentation,
         fps,
         start,
         end,
-        width,
-        height,
-        scale,
-        font: raw.font,
-        font_size: raw.font_size,
-        opacity,
-        decimal_rounding: raw.decimal_rounding,
-        time_format: raw.time_format,
         custom_export_range_active,
-        shadow_color,
-        shadow_strength,
-        shadow_distance,
-        border_color,
-        border_thickness,
         update_rate,
-        overlay_filename: raw.overlay_filename,
         ffmpeg,
         composite_video_path: raw.composite_video_path,
         quality,
@@ -250,5 +228,49 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         composite_render_duration: raw.composite_render_duration,
         composite_video_trim_start,
         composite_widget_update_rate,
+    })
+}
+
+pub(crate) fn validate_scene_presentation(
+    raw: ScenePresentationConfig,
+) -> CoreResult<ValidatedScenePresentation> {
+    let width = require_positive_u32(raw.width, "scene.width")?;
+    let height = require_positive_u32(raw.height, "scene.height")?;
+    let scale = require_positive_f32(raw.scale, "scene.scale")?;
+    let opacity = require_f32(raw.opacity, "scene.opacity")?;
+    if !(0.0..=1.0).contains(&opacity) {
+        return Err(CoreError::Config(
+            "scene.opacity must be between 0 and 1".into(),
+        ));
+    }
+
+    let shadow_strength = require_f32(raw.shadow_strength, "scene.shadow_strength")?;
+    require_non_negative_f32(shadow_strength, "scene.shadow_strength")?;
+    let shadow_distance = require_f32(raw.shadow_distance, "scene.shadow_distance")?;
+    require_non_negative_f32(shadow_distance, "scene.shadow_distance")?;
+    let shadow_color = raw
+        .shadow_color
+        .ok_or_else(|| CoreError::Config("scene.shadow_color: required".into()))?;
+    let border_thickness = require_f32(raw.border_thickness, "scene.border_thickness")?;
+    require_non_negative_f32(border_thickness, "scene.border_thickness")?;
+    let border_color = raw
+        .border_color
+        .ok_or_else(|| CoreError::Config("scene.border_color: required".into()))?;
+
+    Ok(ValidatedScenePresentation {
+        width,
+        height,
+        scale,
+        font: raw.font,
+        font_size: raw.font_size,
+        opacity,
+        decimal_rounding: raw.decimal_rounding,
+        time_format: raw.time_format,
+        shadow_color,
+        shadow_strength,
+        shadow_distance,
+        border_color,
+        border_thickness,
+        overlay_filename: raw.overlay_filename,
     })
 }

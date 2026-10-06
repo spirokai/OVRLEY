@@ -217,6 +217,7 @@ fn finalize_and_summarize(
     controller.set_frame_progress(
         plan.render.output_frame_count,
         plan.render.output_frame_count,
+        u32::try_from(rendered_frames).expect("validated producer frame count fits u32"),
         plan.render.output_frame_count,
         Some(0),
         None,
@@ -263,8 +264,8 @@ pub fn render_composite_video(
     let (source_rotation_degrees, source_has_audio) = verify_composite_source_resolution(
         paths,
         &render_plan.video_path,
-        scene.width,
-        scene.height,
+        scene.presentation.width,
+        scene.presentation.height,
     )?;
     controller.check_cancelled()?;
     let include_audio = include_audio && source_has_audio;
@@ -326,7 +327,7 @@ pub(crate) fn render_inspected_composite_video(
     let channels =
         ParallelFramePoolPlan::for_frame_size(plan.frame_size, workers)?.create_channels()?;
 
-    controller.set_frame_progress(0, plan.render.output_frame_count, 0, None, None);
+    controller.set_frame_progress(0, plan.render.output_frame_count, 0, 0, None, None);
 
     // ── PHASE 2: PREPARE SKIA ASSETS ──
     let (prepared_preview_assets, _, _, _) =

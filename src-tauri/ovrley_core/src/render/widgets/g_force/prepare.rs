@@ -75,7 +75,7 @@ pub fn prepare_g_force_cache(
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<GForceWidgetCache> {
     prepare_profiler.measure("g_force.prepare", || {
-        let scale = scene.scale;
+        let scale = scene.presentation.scale;
         let width = (widget.width as f32 * scale).round().max(1.0) as u32;
         let height = (widget.height as f32 * scale).round().max(1.0) as u32;
         let radius = widget.diameter * scale * 0.5;
@@ -85,9 +85,9 @@ pub fn prepare_g_force_cache(
         let center_x = width as f32 * 0.5;
         let center_y = height as f32 * 0.5;
         let shadow = normalize_shadow_style_validated(
-            &scene.shadow_color,
-            scene.shadow_strength,
-            scene.shadow_distance,
+            &scene.presentation.shadow_color,
+            scene.presentation.shadow_strength,
+            scene.presentation.shadow_distance,
             scale,
         );
         let padding = static_layer_padding(border_thickness, shadow.as_ref());

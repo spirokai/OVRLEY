@@ -88,7 +88,7 @@ pub fn prepare_lean_angle_cache(
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<LeanAngleCache> {
     prepare_profiler.measure("lean_angle.prepare", || {
-        let scale = scene.scale;
+        let scale = scene.presentation.scale;
         let layout = lean_angle_layout(
             widget.diameter * scale,
             widget.track_thickness * scale,
@@ -106,9 +106,9 @@ pub fn prepare_lean_angle_cache(
         let inner_path = annular_sector_inset_path(geometry, border_thickness);
         let border_path = annular_sector_border_path(geometry, border_thickness);
         let shadow = normalize_shadow_style_validated(
-            &scene.shadow_color,
-            scene.shadow_strength,
-            scene.shadow_distance,
+            &scene.presentation.shadow_color,
+            scene.presentation.shadow_strength,
+            scene.presentation.shadow_distance,
             scale,
         );
         let track_shadow = if border_thickness > 0.0 {
@@ -200,8 +200,8 @@ pub fn prepare_lean_angle_cache(
             font_size: widget.font_size * scale,
             color: widget.color.clone(),
             unit_color: widget.unit_color.clone(),
-            text_border_color: scene.border_color.clone(),
-            text_border_thickness: scene.border_thickness * scale,
+            text_border_color: scene.presentation.border_color.clone(),
+            text_border_thickness: scene.presentation.border_thickness * scale,
             show_units: widget.show_units,
             value_offset_x: widget.value_offset_x * scale,
             value_offset_y: widget.value_offset_y * scale,

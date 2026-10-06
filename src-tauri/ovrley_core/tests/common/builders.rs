@@ -29,7 +29,9 @@ pub fn heading_tape_json() -> Value {
 }
 
 /// Materialized shared presentation for video-local planning/pipeline tests.
-pub fn batch_template() -> ovrley_core::render_jobs::contracts::BatchTemplate {
+pub fn batch_template(
+) -> ovrley_core::normalize::raw::RenderConfig<ovrley_core::normalize::raw::ScenePresentationConfig>
+{
     let mut scene = super::seam::explicit_scene_json();
     for key in [
         "start",
@@ -50,6 +52,118 @@ pub fn batch_template() -> ovrley_core::render_jobs::contracts::BatchTemplate {
             "font_weight":400, "italic":false, "letter_spacing":0}],
         "values": [speed_value_json()], "plots": [],
     })).unwrap()
+}
+
+/// Captures the plan produced by real submission/preparation, replacing helper-only ingress tests.
+pub fn batch_video_plan(
+    paths: &ovrley_core::paths::AppPaths,
+    inspection: &ovrley_core::render_jobs::inspection::VideoInspectionService,
+    inspection_id: &str,
+    request: ovrley_core::render_jobs::contracts::BatchRenderRequest,
+) -> ovrley_core::error::CoreResult<ovrley_core::render_jobs::batch_plan::PlannedVideoRender> {
+    use ovrley_core::activity::schema::ParsedActivity;
+    use ovrley_core::error::{CoreError, CoreResult};
+    use ovrley_core::render_jobs::{
+        batch::BatchJobExecutor,
+        batch_plan::PlannedVideoRender,
+        execution::{RenderExecutionService, RendererReservation},
+    };
+    struct Capture(std::sync::Mutex<std::sync::mpsc::Sender<PlannedVideoRender>>);
+    impl BatchJobExecutor for Capture {
+        fn embedded_activity(
+            &self,
+            _: &ovrley_core::paths::AppPaths,
+            _: &ovrley_core::media::prepared_video::InspectedVideoSource,
+        ) -> CoreResult<ParsedActivity> {
+            unreachable!("external activity")
+        }
+        fn execute(
+            &self,
+            _: &ovrley_core::paths::AppPaths,
+            plan: PlannedVideoRender,
+            _: &ParsedActivity,
+            _: &RendererReservation,
+            target: &ovrley_core::output::RenderOutputTarget,
+        ) -> CoreResult<String> {
+            self.0.lock().unwrap().send(plan).unwrap();
+            Ok(target
+                .path()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_owned())
+        }
+    }
+    assert_eq!(request.inspection_id, inspection_id);
+    let (send, receive) = std::sync::mpsc::channel();
+    let service = RenderExecutionService::default();
+    service
+        .submit_batch_with_executor(
+            paths,
+            inspection,
+            request,
+            None,
+            std::sync::Arc::new(Capture(std::sync::Mutex::new(send))),
+        )
+        .map_err(|error| CoreError::Config(format!("Submission failed: {error:?}")))?;
+    drop(service); // Join the owning worker before observing its preparation outcome.
+    receive
+        .try_recv()
+        .map_err(|_| CoreError::Config("Batch preparation failed".into()))
+}
+
+pub fn video_batch_request(
+    inspection_id: &str,
+    source: &ovrley_core::media::prepared_video::InspectedVideoSource,
+    encoding: ovrley_core::render_jobs::contracts::BatchEncodingSettings,
+    template: ovrley_core::normalize::raw::RenderConfig<
+        ovrley_core::normalize::raw::ScenePresentationConfig,
+    >,
+    activity: ovrley_core::activity::schema::ParsedActivity,
+    offset: f64,
+    skip_overlay: bool,
+) -> ovrley_core::render_jobs::contracts::BatchRenderRequest {
+    use ovrley_core::render_jobs::contracts::*;
+    let directory = std::path::Path::new(&source.metadata.path)
+        .parent()
+        .unwrap();
+    let kind = if encoding.export_mode == BatchExportMode::Composite {
+        ovrley_core::output::RenderOutputKind::Composite
+    } else {
+        ovrley_core::output::RenderOutputKind::Transparent
+    };
+    let target = ovrley_core::output::plan_batch_output_targets(
+        directory,
+        kind,
+        &[source.metadata.path.clone().into()],
+        None,
+    )
+    .unwrap()
+    .remove(0);
+    BatchRenderRequest {
+        inspection_id: inspection_id.into(),
+        template,
+        encoding,
+        external_activity: Some(activity),
+        calibration: BatchCalibration::ExternalActivity {
+            timezone_mode: VideoSyncTimezoneMode::Utc,
+            correction_seconds: 0.0,
+            reference: None,
+        },
+        calibration_source: None,
+        output_directory: directory.to_str().unwrap().into(),
+        jobs: vec![BatchRenderJob {
+            id: "video".into(),
+            source: source.clone(),
+            timing: BatchJobTiming::ExternalActivity {
+                automatic_offset_seconds: offset,
+                offset_seconds: offset,
+            },
+            skip_overlay,
+            output_path: target.path().to_str().unwrap().into(),
+        }],
+    }
 }
 
 // ── Dense series / activity ─────────────────────────────────────────────

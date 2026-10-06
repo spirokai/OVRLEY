@@ -38,7 +38,7 @@ pub fn parse_activity_json(input: &str) -> CoreResult<ParsedActivity> {
     let value: Value = serde_json::from_str(input)
         .map_err(|error| CoreError::Activity(format!("Invalid parsedActivity JSON: {error}")))?;
 
-    let mut activity = if value.get("parsed_activity").is_some() {
+    let activity = if value.get("parsed_activity").is_some() {
         serde_json::from_value::<DebugPayload>(value)
             .map(|payload| payload.parsed_activity)
             .map_err(|error| {
@@ -49,9 +49,42 @@ pub fn parse_activity_json(input: &str) -> CoreResult<ParsedActivity> {
             CoreError::Activity(format!("Invalid parsedActivity payload: {error}"))
         })
     }?;
+    normalize_parsed_activity(activity)
+}
+
+/// Shared ingress for already deserialized activity, including batch submission.
+pub fn normalize_parsed_activity(mut activity: ParsedActivity) -> CoreResult<ParsedActivity> {
     activity.timezone = parse_activity_timezone(&activity.metadata)?;
     lap_timing::validate_lap_timing_contract(&activity)?;
     Ok(activity)
+}
+
+/// Activity is external data; reject an unusable timeline at its owning ingress.
+pub(crate) fn validate_render_activity(activity: &ParsedActivity) -> CoreResult<f64> {
+    let activity_end = activity.trim_end_seconds.max(
+        activity
+            .sample_elapsed_seconds
+            .last()
+            .copied()
+            .unwrap_or_default(),
+    );
+    if !activity_end.is_finite()
+        || activity_end <= 0.0
+        || activity.sample_elapsed_seconds.len() < 2
+        || activity
+            .sample_elapsed_seconds
+            .iter()
+            .any(|time| !time.is_finite())
+        || activity
+            .sample_elapsed_seconds
+            .windows(2)
+            .any(|pair| pair[1] < pair[0])
+    {
+        return Err(CoreError::Activity(
+            "Rendering requires a positive activity timeline".into(),
+        ));
+    }
+    Ok(activity_end)
 }
 
 fn parse_activity_timezone(metadata: &Value) -> CoreResult<Option<Tz>> {
