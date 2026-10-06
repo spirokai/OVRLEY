@@ -68,8 +68,8 @@ export function calculateAutomaticVideoOffset(video, activitySummary, timezoneMo
 
 /**
  * Resolves interactive sync state using the same baseline as batch calibration.
- * Unresolvable external timestamps keep the existing warning/zero UI state;
- * resolved timestamps retain their signed offset even when they do not overlap.
+ * Unresolvable external timestamps or clips without positive activity overlap
+ * use the warning/zero UI state; overlapping clips retain their signed offset.
  * @param {object} videoState Imported video state.
  * @param {object|null} activitySummary Activity summary.
  * @returns {object} Store sync fields ready to commit.
@@ -89,7 +89,7 @@ export function resolveVideoSyncState(videoState, activitySummary) {
       activityEnd: activityDurationSeconds,
     })
     return {
-      videoSyncOffsetSeconds: automaticOffsetSeconds,
+      videoSyncOffsetSeconds: overlaps ? automaticOffsetSeconds : 0,
       videoSyncWarning: overlaps ? null : i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity'),
       videoSyncTimezoneMode: ambiguous ? mode : null,
     }

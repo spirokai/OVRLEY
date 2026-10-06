@@ -21,7 +21,7 @@ describe('resolveVideoSyncState with an explicit timezone mode', () => {
   test("'utc' rejects a clip recorded after the activity", () => {
     const sync = resolveVideoSyncState(ffprobeVideo(creationTime, 'utc'), activitySummary)
     expect(sync.videoSyncWarning).not.toBeNull()
-    expect(sync.videoSyncOffsetSeconds).toBe(20893)
+    expect(sync.videoSyncOffsetSeconds).toBe(0)
   })
 
   test("'local' keeps the clock-text reading", () => {
@@ -88,10 +88,35 @@ describe('signed automatic synchronization and shared calibration', () => {
     // A different live checkbox value cannot reinterpret this calibration.
     editorSnapshot.videoSyncTimezoneMode = 'local'
     expect(request.activity.timezoneMode).toBe('utc')
-    expect(resolveVideoSyncState(editorSnapshot, summary).videoSyncOffsetSeconds).toBe(-10812)
+    expect(resolveVideoSyncState(editorSnapshot, summary).videoSyncOffsetSeconds).toBe(0)
   })
 
-  test('keeps an out-of-coverage baseline so manual correction can rescue positive overlap', () => {
+  test.each([
+    ['2026-05-10T07:36:51Z', 0, true], // Reported -5876649-second failed sync.
+    ['2026-07-18T07:59:30Z', 0, true], // Video ends before activity.
+    ['2026-07-18T07:59:40Z', 0, true], // Video ends exactly at activity start.
+    ['2026-07-18T07:59:48Z', -12, false], // Video starts before activity and overlaps.
+    ['2026-07-18T08:01:59Z', 119, false], // Video starts just before activity ends.
+    ['2026-07-18T08:02:00Z', 0, true], // Video starts exactly at activity end.
+    ['2026-07-18T08:02:01Z', 0, true], // Video starts after activity.
+    [null, 0, true],
+    ['invalid-timestamp', 0, true],
+  ])('resolves creation time %s to offset %s with warning=%s', (creationTime, offset, warning) => {
+    const sync = resolveVideoSyncState(
+      {
+        importedVideoCreationTime: creationTime,
+        importedVideoTimeSource: 'gps',
+        importedVideoDuration: 20,
+        videoSyncTimezoneMode: null,
+      },
+      summary,
+    )
+    expect(sync.videoSyncOffsetSeconds).toBe(offset)
+    if (warning) expect(sync.videoSyncWarning).not.toBeNull()
+    else expect(sync.videoSyncWarning).toBeNull()
+  })
+
+  test('resets failed interactive sync to zero while retaining the raw baseline for batch calibration', () => {
     const video = { creationTime: '2026-07-18T07:59:30Z', timeSource: 'gps', duration: 20 }
     const interactive = resolveVideoSyncState(
       {
@@ -102,7 +127,7 @@ describe('signed automatic synchronization and shared calibration', () => {
       },
       summary,
     )
-    expect(interactive.videoSyncOffsetSeconds).toBe(-30)
+    expect(interactive.videoSyncOffsetSeconds).toBe(0)
     expect(interactive.videoSyncWarning).not.toBeNull()
     const calibration = createBatchCalibration({
       activitySummary: summary,
