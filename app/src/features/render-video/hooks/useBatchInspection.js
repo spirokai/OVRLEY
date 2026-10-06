@@ -1,36 +1,40 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as backend from '@/api/backend'
 import useStore from '@/store/useStore'
-import { captureBatchEncoding } from '../utils/batchRenderRequest'
-import { reviewBatchQueue } from '../utils/batchRenderReview'
+import { useBatchRenderStore, useBatchSyncInputs } from '@/hooks/useAppStoreSelectors'
+import { openDirectoryPath } from '@/lib/file-dialog'
+import { captureRenderEncoding } from '../utils/renderRequest'
+import { reviewBatchQueue, reviewBatchSync } from '../utils/renderPresentation'
 
 /**
- * Retains a disposable inspection session across dialog openings and owns its native output review.
+ * Owns disposable native source inspection and output review while confirmation is open.
  * Context identities prevent late results from authorizing Start.
- * @param {object} options Opening, folder, queue choices, sync and encoder inputs.
- * @returns {object} Current inspection, reviewed rows, readiness, error and refresh/rejection actions.
+ * @param {object} options Dialog phase and canonical settings.
+ * @returns {object} Reviewed submission inputs and folder/queue controls. Execution and progress have separate owners.
  */
-export default function useBatchInspection({ open, folder, outputDirectory, choices, sync, settings, availableCodecs }) {
+export default function useBatchInspection({ phase, settings }) {
+  const store = useBatchRenderStore()
+  const inputs = useBatchSyncInputs()
+  const open = phase === 'confirm' && settings?.renderTarget === 'batch' && !store.hasBatchResults
+  const folder = store.batchVideoFolder
+  const outputDirectory = store.batchOutputFolder
+  const choices = store.batchQueue
+  const sync = useMemo(() => reviewBatchSync(inputs), [inputs])
   const [revision, setRevision] = useState(0)
-  const [activated, setActivated] = useState(false)
   const [inspection, setInspection] = useState(null)
   const [plan, setPlan] = useState(null)
   const referencePath = sync.error ? null : (sync.calibration.reference?.path ?? null)
-  const context = useMemo(() => ({ folder, referencePath, revision }), [folder, referencePath, revision])
+  const context = useMemo(() => ({ folder, referencePath, revision, open }), [folder, referencePath, revision, open])
   const current = inspection?.context === context ? inspection : null
   const rows = useMemo(() => reviewBatchQueue(choices, current, sync), [choices, current, sync])
   const jobs = useMemo(() => rows.filter((row) => row.status === 'pending'), [rows])
   const review = useMemo(
-    () => ({ current, jobs, sync, outputDirectory, encoding: settings ? captureBatchEncoding(settings, availableCodecs) : null }),
-    [current, jobs, sync, outputDirectory, settings, availableCodecs],
+    () => ({ current, jobs, sync, outputDirectory, encoding: settings ? captureRenderEncoding(settings, inputs.availableCodecs) : null }),
+    [current, jobs, sync, outputDirectory, settings, inputs.availableCodecs],
   )
 
   useEffect(() => {
-    if (open) setActivated(true)
-  }, [open])
-
-  useEffect(() => {
-    if (!activated || folder === null) return
+    if (!open || folder === null) return
     let closed = false
     let inspectionId = null
     void (async () => {
@@ -83,7 +87,7 @@ export default function useBatchInspection({ open, folder, outputDirectory, choi
       if (inspectionId !== null)
         void backend.disposeVideoInspection(inspectionId).catch((error) => useStore.getState().setErrorMessage(error.message))
     }
-  }, [activated, folder, referencePath, context])
+  }, [open, folder, referencePath, context])
 
   useEffect(() => {
     if (!open || !current?.complete || current.error || sync.error || jobs.length === 0 || outputDirectory === null) return
@@ -113,13 +117,29 @@ export default function useBatchInspection({ open, folder, outputDirectory, choi
 
   const currentPlan = plan?.review === review ? plan : null
   const staleIds = new Set((current?.issues ?? []).map((issue) => issue.sourceId))
+  const rowsWithIssues = rows.map((row) => (staleIds.has(row.source?.sourceId) ? { ...row, status: 'blocked', error: 'reinspectionRequired' } : row))
+  const ready = open && currentPlan?.status === 'planned'
+  const batchRunning = store.batchRunning || store.batchSubmissionPending
+  const pickVideoFolder = async () => {
+    const directory = await openDirectoryPath({ lastDirectoryKey: 'last-batch-video-dir' })
+    if (directory !== null) store.setBatchVideoFolder(directory)
+  }
+  const pickOutputFolder = async () => {
+    const directory = await openDirectoryPath({ lastDirectoryKey: 'last-batch-output-dir' })
+    if (directory !== null) store.setBatchOutputFolder(directory)
+  }
   return {
-    inspection: current,
-    rows: rows.map((row) => (staleIds.has(row.source?.sourceId) ? { ...row, status: 'blocked', error: 'reinspectionRequired' } : row)),
-    jobs,
-    ready: open && currentPlan?.status === 'planned',
-    error: current?.error ?? sync.error ?? currentPlan?.error ?? null,
-    refresh: () => setRevision((value) => value + 1),
+    ...store,
+    batchRunning,
+    batchQueue: rowsWithIssues,
+    batchReady: ready && !batchRunning,
+    batchReviewError: current?.error ?? sync.error ?? currentPlan?.error ?? null,
+    request: ready
+      ? { inspectionId: current.inspectionId, outputDirectory, jobs, calibrationSource: current.calibrationSource, sync, reviewedInputs: inputs }
+      : null,
+    pickVideoFolder,
+    pickOutputFolder,
+    refreshInspection: () => setRevision((value) => value + 1),
     reject: (error) => setInspection({ ...current, error: 'reinspectionRequired', issues: error.issues }),
   }
 }

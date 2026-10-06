@@ -25,17 +25,21 @@ describe('render config preparation', () => {
     }
     const renderConfig = createRenderEffectiveConfig({
       config,
+      fps: 60,
+      exportMode: 'transparent',
+      timelineStart: 0,
+      timelineEnd: 50,
       globalDefaults: {
         color_values: '#ffffff',
       },
-      updateRate: 6,
-      exportRange: {
+      widgetUpdateRate: 6,
+      range: {
         ...DEFAULT_EXPORT_RANGE,
         type: 'custom',
         from: 5.25,
         to: 15.75,
       },
-      exportCodec: 'prores_ks',
+      codec: 'prores_ks',
       importedVideoPath: null,
       availableCodecs: null,
     })
@@ -81,10 +85,14 @@ describe('render config preparation', () => {
 
     const renderConfig = createRenderEffectiveConfig({
       config,
+      fps: 60,
+      exportMode: 'transparent',
+      timelineStart: 0,
+      timelineEnd: 50,
       globalDefaults: {},
-      updateRate: 1,
-      exportRange: { ...DEFAULT_EXPORT_RANGE },
-      exportCodec: 'prores_ks',
+      widgetUpdateRate: 1,
+      range: { ...DEFAULT_EXPORT_RANGE },
+      codec: 'prores_ks',
       importedVideoPath: null,
       availableCodecs: null,
     })
@@ -117,10 +125,12 @@ describe('render config preparation', () => {
 
     const renderConfig = createRenderEffectiveConfig({
       config,
+      fps: 60,
+      exportMode: 'composite',
       globalDefaults: {},
-      updateRate: 1,
-      exportRange: { ...DEFAULT_EXPORT_RANGE },
-      exportCodec: 'prores_ks',
+      widgetUpdateRate: 1,
+      range: { ...DEFAULT_EXPORT_RANGE },
+      codec: 'libx264',
       importedVideoPath: 'C:\\clip.mp4',
       importedVideoDuration: 24,
       importedVideoFps: 30,
@@ -152,16 +162,17 @@ describe('render config preparation', () => {
 
     const renderConfig = createRenderEffectiveConfig({
       config,
+      fps: 60,
       globalDefaults: {},
-      updateRate: 1,
-      exportRange: {
+      widgetUpdateRate: 1,
+      range: {
         ...DEFAULT_EXPORT_RANGE,
         type: 'custom',
         from: 5.25,
         to: 15.75,
       },
       exportMode: 'transparent',
-      exportCodec: 'prores_ks',
+      codec: 'prores_ks',
       importedVideoPath: 'C:\\clip.mp4',
       importedVideoDuration: 24,
       importedVideoFps: 30,
@@ -190,9 +201,11 @@ describe('render config preparation', () => {
         plots: [],
       },
       globalDefaults: {},
-      updateRate: 1,
-      exportRange: { ...DEFAULT_EXPORT_RANGE },
-      exportCodec: 'libx264',
+      fps: 60,
+      exportMode: 'composite',
+      widgetUpdateRate: 1,
+      range: { ...DEFAULT_EXPORT_RANGE },
+      codec: 'libx264',
       importedVideoPath: 'C:\\clip.mp4',
       importedVideoDuration: 30,
       importedVideoFps: 30,
@@ -216,9 +229,11 @@ describe('render config preparation', () => {
       createRenderEffectiveConfig({
         config: { scene: { width: 1920, height: 1080, fps: 60 }, labels: [], values: [], plots: [] },
         globalDefaults: {},
-        updateRate: 1,
-        exportRange: { ...DEFAULT_EXPORT_RANGE },
-        exportCodec: 'libx264',
+        fps: 60,
+        exportMode: 'composite',
+        widgetUpdateRate: 1,
+        range: { ...DEFAULT_EXPORT_RANGE },
+        codec: 'libx264',
         importedVideoPath: 'C:\\clip.mp4',
         importedVideoDuration: 10,
         importedVideoFps: 30,

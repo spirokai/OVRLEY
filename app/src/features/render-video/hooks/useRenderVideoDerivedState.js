@@ -9,8 +9,7 @@
  */
 
 import { useCallback, useMemo } from 'react'
-import useStore from '@/store/useStore'
-import { EXPORT_CODEC_LOOKUP, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
+import { OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
 import {
   getAccelerationValueForSettings,
   getOutputFormatForExportCodec,
@@ -18,47 +17,80 @@ import {
   isMp4Codec,
   resolutionsMismatch,
 } from '../utils/codecUtils'
-import { getContainerFps, getUpdateRateOptions, sanitizeIntegerFps } from '@/lib/update-rate'
+import { getContainerFps, getUpdateRateOptions } from '@/lib/update-rate'
 import { getDefaultBitrate } from '../data/bitrateDefaults'
+import { useRenderDialogInputs, useRenderRangeActivity } from '@/hooks/useAppStoreSelectors'
+import {
+  formatExportRangeTime,
+  getActivityDurationSeconds,
+  getCustomExportRangeDefault,
+  setExportRangeBoundaryFromTimeInput,
+} from '@/features/overlay-editor/utils/exportRange'
+import { createBatchItemProgress, createBatchProgress, isBatchFinished, sanitizeRangeTimeInput } from '../utils/renderPresentation'
+
+/** @param {object} options Editable range and commit callback. @returns {object} Shared range control presentation and input handlers. */
+export function useExportRangeSettings({ range, onExportRangeChange }) {
+  const activity = useRenderRangeActivity()
+  return {
+    isCustom: range.type === 'custom',
+    fromTime: formatExportRangeTime(range.from),
+    toTime: formatExportRangeTime(range.to),
+    handleCustomChange: (checked) =>
+      onExportRangeChange(checked ? getCustomExportRangeDefault(range, getActivityDurationSeconds(activity)) : { ...range, type: 'all' }),
+    handleFromChange: (event) => onExportRangeChange(setExportRangeBoundaryFromTimeInput(range, 'from', sanitizeRangeTimeInput(event.target.value))),
+    handleToChange: (event) => onExportRangeChange(setExportRangeBoundaryFromTimeInput(range, 'to', sanitizeRangeTimeInput(event.target.value))),
+    preventDecimalInput: (event) => {
+      if (event.key === '.' || event.key === ',') event.preventDefault()
+    },
+  }
+}
 
 export default function useRenderVideoDerivedState({ settings }) {
-  const renderingVideo = useStore((state) => state.renderingVideo)
-  const batchBusy = useStore((state) => (state.batchSnapshot?.rendererBusy ?? false) || state.batchSubmissionPending)
-  const platformOs = useStore((state) => state.platformOs)
-  const availableCodecs = useStore((state) => state.availableCodecs)
-  const config = useStore((state) => state.config)
-  const importedVideoPath = useStore((state) => state.importedVideoPath)
-  const importedVideoDuration = useStore((state) => state.importedVideoDuration)
-  const importedVideoFps = useStore((state) => state.importedVideoFps)
-  const importedVideoResolution = useStore((state) => state.importedVideoResolution)
-  const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)
-  const renderProgress = useStore((state) => state.renderProgress)
-
-  const hasImportedVideo = Boolean(importedVideoPath)
-  const isBatchTarget = settings?.renderTarget === 'batch'
+  const {
+    renderingVideo,
+    rendererBusy,
+    platformOs,
+    availableCodecs,
+    config,
+    importedVideoPath,
+    importedVideoDuration,
+    importedVideoFps,
+    importedVideoResolution,
+    videoSyncOffsetSeconds,
+    renderProgress,
+    batchSnapshot,
+    renderSettings,
+    renderSubmissionTarget,
+    isCancelling,
+  } = useRenderDialogInputs()
+  // A closed dialog has no draft; its hidden controls read committed settings.
+  const displaySettings = settings === null ? renderSettings : settings
+  const hasImportedVideo = importedVideoPath !== null
+  const isBatchTarget = displaySettings.renderTarget === 'batch'
   // Native jobs own their FPS; the current source only drives single rendering.
-  const lockedVideoFps = isBatchTarget ? null : importedVideoFps
-  const exportMode = settings?.exportMode || (hasImportedVideo ? 'composite' : 'transparent')
+  const lockedVideoFps = isBatchTarget || !hasImportedVideo ? null : importedVideoFps
+  const exportMode = displaySettings.exportMode
   const updateRateFps = useMemo(
-    () => (exportMode === 'composite' && lockedVideoFps ? sanitizeIntegerFps(Math.round(lockedVideoFps)) : settings?.fps),
-    [exportMode, lockedVideoFps, settings?.fps],
+    () => (exportMode === 'composite' && lockedVideoFps !== null ? Math.round(lockedVideoFps) : displaySettings.fps),
+    [exportMode, lockedVideoFps, displaySettings.fps],
   )
   const updateRateOptions = useMemo(() => getUpdateRateOptions(updateRateFps), [updateRateFps])
-  const containerFps = useMemo(() => getContainerFps(updateRateFps, settings?.updateRate), [updateRateFps, settings?.updateRate])
-  const selectedOutputFormat = getOutputFormatForExportCodec(settings?.exportCodec)
-  const selectedOutputFormatValue = selectedOutputFormat?.value || 'prores'
-  const selectedAccelerationValue = getAccelerationValueForSettings(settings)
+  const containerFps = useMemo(
+    () => getContainerFps(updateRateFps, displaySettings.widgetUpdateRate),
+    [updateRateFps, displaySettings.widgetUpdateRate],
+  )
+  const selectedOutputFormat = getOutputFormatForExportCodec(displaySettings.codec)
+  const selectedOutputFormatValue = selectedOutputFormat.value
+  const selectedAccelerationValue = getAccelerationValueForSettings(displaySettings)
   const selectedAccelerationOptions = useMemo(
     () => getVisibleAccelerationOptions(OUTPUT_FORMATS_BY_VALUE[selectedOutputFormatValue], platformOs, availableCodecs),
     [availableCodecs, platformOs, selectedOutputFormatValue],
   )
-  const selectedCodecIsMp4 = isMp4Codec(settings?.exportCodec)
-  const selectedAccelerationAvailable = Boolean(selectedAccelerationOptions.find((option) => option.value === selectedAccelerationValue)?.available)
-  const selectedExportCodecAvailable = Boolean(EXPORT_CODEC_LOOKUP[settings?.exportCodec]) && selectedAccelerationAvailable
+  const selectedCodecIsMp4 = isMp4Codec(displaySettings.codec)
+  const selectedExportCodecAvailable = selectedAccelerationOptions.some((option) => option.value === selectedAccelerationValue && option.available)
   const resolutionMismatch = !isBatchTarget && resolutionsMismatch(config?.scene, importedVideoResolution)
   const renderStartDisabled =
-    renderingVideo ||
-    batchBusy ||
+    rendererBusy ||
     resolutionMismatch ||
     (exportMode === 'composite' && (!selectedCodecIsMp4 || !selectedExportCodecAvailable)) ||
     (exportMode !== 'composite' && selectedCodecIsMp4)
@@ -66,16 +98,21 @@ export default function useRenderVideoDerivedState({ settings }) {
   const defaultBitrateForCodec = useCallback(
     (codec) =>
       getDefaultBitrate(
-        importedVideoResolution?.width || config?.scene?.width,
-        importedVideoResolution?.height || config?.scene?.height,
-        importedVideoFps || settings?.fps,
+        hasImportedVideo ? importedVideoResolution.width : config.scene.width,
+        hasImportedVideo ? importedVideoResolution.height : config.scene.height,
+        hasImportedVideo ? importedVideoFps : displaySettings.fps,
         codec,
       ),
-    [config?.scene?.height, config?.scene?.width, importedVideoFps, importedVideoResolution?.height, importedVideoResolution?.width, settings?.fps],
+    [config, displaySettings.fps, hasImportedVideo, importedVideoFps, importedVideoResolution],
   )
 
   return {
     availableCodecs,
+    batchSnapshot,
+    batchFinished: isBatchFinished(batchSnapshot),
+    batchActiveItemId: batchSnapshot?.activeItemId ?? null,
+    batchProgress: createBatchProgress(batchSnapshot),
+    currentItemProgress: createBatchItemProgress(batchSnapshot),
     config,
     containerFps,
     defaultBitrateForCodec,
@@ -85,11 +122,13 @@ export default function useRenderVideoDerivedState({ settings }) {
     importedVideoFps,
     importedVideoResolution,
     isBatchTarget,
+    isCancelling,
     lockedVideoFps,
     platformOs,
     renderProgress,
     renderStartDisabled,
     renderingVideo,
+    submissionPending: renderSubmissionTarget === 'current',
     resolutionMismatch,
     selectedAccelerationOptions,
     selectedAccelerationValue,

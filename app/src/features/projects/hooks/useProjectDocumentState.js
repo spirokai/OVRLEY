@@ -4,6 +4,7 @@ import { deepEqual } from '@/store/store-utils'
 import useStore from '@/store/useStore'
 import { filenameFromSelectedPath } from '@/lib/utils'
 import { createProjectContentSnapshot, createProjectDirtyState } from '../utils/projectSnapshot'
+import { isRendererBusy } from '@/features/render-video/utils/renderRequest'
 
 function getCurrentProjectContent(state, projectPath) {
   if (!projectPath) return null
@@ -26,8 +27,7 @@ export default function useProjectDocumentState() {
       importingVideo: state.importingVideo,
       isProcessing: state.isProcessing,
       renderSettings: state.renderSettings,
-      renderingVideo: state.renderingVideo,
-      batchBusy: (state.batchSnapshot?.rendererBusy ?? false) || state.batchSubmissionPending,
+      rendererBusy: isRendererBusy(state),
       videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
       videoSyncTimezoneMode: state.videoSyncTimezoneMode,
       manualVideoSync: state.manualVideoSync,
@@ -51,8 +51,7 @@ export default function useProjectDocumentState() {
     ),
   )
 
-  const conflictingOperation =
-    projectOwnedState.isProcessing || projectOwnedState.importingVideo || projectOwnedState.renderingVideo || projectOwnedState.batchBusy
+  const conflictingOperation = projectOwnedState.isProcessing || projectOwnedState.importingVideo || projectOwnedState.rendererBusy
   const status = useMemo(() => {
     if (!lastSavedProjectState) return 'Unsaved'
     const current = getCurrentProjectContent(projectOwnedState, loadedProjectPath)

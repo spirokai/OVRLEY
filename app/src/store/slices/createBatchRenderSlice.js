@@ -15,7 +15,6 @@ export function createBatchRenderSlice(set) {
     batchOutputFolder: null,
     batchQueue: [],
     batchSnapshot: null,
-    batchSubmissionPending: false,
 
     setBatchVideoFolder: (path) => {
       requireFolder(path)
@@ -51,7 +50,6 @@ export function createBatchRenderSlice(set) {
         requireItem(state, id).skipOverlay = skipOverlay
       })
     },
-    setBatchSubmissionPending: (pending) => set({ batchSubmissionPending: pending }),
     acceptBatchSnapshot: (snapshot) => set({ batchSnapshot: snapshot }),
     applyBatchSnapshot: (snapshot) =>
       set((state) => {

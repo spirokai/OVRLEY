@@ -65,7 +65,12 @@ export default function RenderVideoDialog(props) {
         {ctx.isProgress ? (
           <>
             <DialogTitle className="sr-only">{t('render-video.exportingOverlay', 'Exporting Overlay')}</DialogTitle>
-            <RenderProgressPanel renderProgress={ctx.renderProgress} renderSummaryItems={ctx.renderSummaryItems} onCancel={ctx.handleCancel} />
+            <RenderProgressPanel
+              renderProgress={ctx.renderProgress}
+              renderSummaryItems={ctx.renderSummaryItems}
+              onCancel={ctx.handleCancel}
+              isCancelling={ctx.isCancelling}
+            />
           </>
         ) : hasBlockingResolutionMismatch ? (
           <div className="space-y-12 p-3">
@@ -130,10 +135,10 @@ export default function RenderVideoDialog(props) {
                       type="button"
                       variant="outline"
                       className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
-                      onClick={ctx.batchRunning ? ctx.cancelBatch : ctx.onClose}
-                      disabled={ctx.batchSubmissionPending || ctx.batchSnapshot?.phase === 'cancelling'}
+                      onClick={ctx.batchRunning ? ctx.handleCancel : ctx.onClose}
+                      disabled={ctx.batchSubmissionPending || ctx.isCancelling || ctx.batchSnapshot?.phase === 'cancelling'}
                     >
-                      {ctx.batchSnapshot?.phase === 'cancelling'
+                      {ctx.isCancelling || ctx.batchSnapshot?.phase === 'cancelling'
                         ? t('render-video.cancelling', 'Cancelling...')
                         : ctx.batchRunning
                           ? t('render-video.cancel', 'Cancel')
@@ -143,7 +148,7 @@ export default function RenderVideoDialog(props) {
                       <Button
                         type="button"
                         className="bg-primary text-primary-foreground hover:bg-primary/90"
-                        onClick={ctx.runBatch}
+                        onClick={ctx.onConfirm}
                         disabled={ctx.batchStartDisabled}
                       >
                         {ctx.batchRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}

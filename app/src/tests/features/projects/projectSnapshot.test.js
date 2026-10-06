@@ -112,9 +112,11 @@ describe('project snapshot contract', () => {
     const renderConfig = createRenderEffectiveConfig({
       config: state.config,
       globalDefaults: state.globalDefaults,
-      updateRate: state.renderSettings.widgetUpdateRate,
+      fps: state.renderSettings.fps,
+      widgetUpdateRate: state.renderSettings.widgetUpdateRate,
+      range: state.renderSettings.range,
       exportMode: 'composite',
-      exportCodec: state.renderSettings.codec,
+      codec: state.renderSettings.codec,
       qualityType,
       qualityValue,
       importedVideoPath: state.importedVideoPath,

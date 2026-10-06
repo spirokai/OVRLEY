@@ -20,12 +20,10 @@ import { Activity, CircleCheck, Film, Loader2, Timer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { formatFps, formatTime } from '../utils/codecUtils'
-import useRenderCancellation from '../hooks/useRenderCancellation'
 import { useTranslation } from 'react-i18next'
 
-function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel, finished = false, batchSnapshot = null }) {
+function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel, isCancelling = false, finished = false, batchSnapshot = null }) {
   const { t } = useTranslation()
-  const { isCancelling, handleCancel } = useRenderCancellation({ status: renderProgress.status, onCancel })
 
   const { percent, current, total, estimatedSecondsRemaining, renderingFps, encoded } = renderProgress
 
@@ -124,7 +122,7 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
             type="button"
             variant="ghost"
             className="text-muted-foreground hover:bg-surface-accent-soft hover:text-highlight"
-            onClick={handleCancel}
+            onClick={onCancel}
             disabled={isCancelling}
           >
             {isCancelling ? (

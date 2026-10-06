@@ -62,13 +62,13 @@ describe('RenderVideoDialog', () => {
         initialSettings={{
           renderTarget: 'current',
           fps: 30,
-          updateRate: 1,
+          widgetUpdateRate: 1,
           exportMode: 'composite',
-          exportCodec: 'libx264',
+          codec: 'libx264',
           exportAcceleration: 'cpu',
           qualityType: 'quality',
           qualityValue: 18,
-          exportRange: { ...DEFAULT_EXPORT_RANGE },
+          range: { ...DEFAULT_EXPORT_RANGE },
         }}
       />,
     )
@@ -111,13 +111,13 @@ describe('RenderVideoDialog', () => {
         initialSettings={{
           renderTarget: 'current',
           fps: 30,
-          updateRate: 1,
+          widgetUpdateRate: 1,
           exportMode: 'composite',
-          exportCodec: 'libx264',
+          codec: 'libx264',
           exportAcceleration: 'cpu',
           qualityType: 'quality',
           qualityValue: 18,
-          exportRange: {
+          range: {
             ...DEFAULT_EXPORT_RANGE,
             type: 'custom',
             from: 2,
@@ -143,11 +143,11 @@ describe('RenderVideoDialog', () => {
         initialSettings={{
           renderTarget: 'current',
           fps: 30,
-          updateRate: 1,
+          widgetUpdateRate: 1,
           exportMode: 'transparent',
-          exportCodec: 'prores_ks',
+          codec: 'prores_ks',
           exportAcceleration: 'cpu',
-          exportRange: { ...DEFAULT_EXPORT_RANGE },
+          range: { ...DEFAULT_EXPORT_RANGE },
           outputPath: 'C:\\renders\\previous.mov',
         }}
       />,
@@ -295,11 +295,11 @@ function transparentSettings() {
   return {
     renderTarget: 'current',
     fps: 30,
-    updateRate: 1,
+    widgetUpdateRate: 1,
     exportMode: 'transparent',
-    exportCodec: 'prores_ks',
+    codec: 'prores_ks',
     exportAcceleration: 'cpu',
-    exportRange: { ...DEFAULT_EXPORT_RANGE },
+    range: { ...DEFAULT_EXPORT_RANGE },
     outputPath: 'C:\\renders\\overlay.mov',
   }
 }

@@ -185,7 +185,7 @@ export default function OverlaySettingsSection({
 
       {activitySummary ? (
         <div className="space-y-3 rounded-xs border-none bg-surface-accent-soft/70 p-4">
-          <ExportRangeSettings exportRange={exportRange} onExportRangeChange={onExportRangeChange} />
+          <ExportRangeSettings range={exportRange} onExportRangeChange={onExportRangeChange} />
         </div>
       ) : null}
     </>

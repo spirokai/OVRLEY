@@ -160,12 +160,12 @@ function AppShell() {
           onSettingsChange={renderWorkflow.updateRenderSettingsDraft}
           onClose={renderWorkflow.closeRenderDialog}
           onConfirm={renderWorkflow.handleRenderVideoConfirm}
+          onCancel={renderWorkflow.cancelRender}
           outputPathError={renderWorkflow.outputPathError}
           overwriteOpen={renderWorkflow.overwriteOpen}
           pendingOverwritePath={renderWorkflow.pendingOverwritePath}
           onOverwriteConfirm={renderWorkflow.handleOverwriteConfirm}
           onOverwriteCancel={renderWorkflow.handleOverwriteCancel}
-          submissionPending={renderWorkflow.submissionPending}
         />
         <UnsavedChangesDialog {...templateManagement.newTemplateConfirmDialog} />
         <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />

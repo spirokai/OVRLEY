@@ -1,6 +1,6 @@
 /**
  * Batch folder controls and queued videos with overlay toggles and render progress.
- * Pure presentational - all logic is in useBatchRenderWorkflow.
+ * Pure presentational - inspection and execution are owned by their hooks.
  */
 
 import { Files, FolderOpen, Loader2, Trash2 } from 'lucide-react'

@@ -100,7 +100,10 @@ export default function RenderExportSettings(ctx) {
               <Label className="text-xs font-semibold">{t('render-video.widgetUpdateRate', 'Widget Update Rate')}</Label>
             </div>
           </div>
-          <Tabs value={ctx.settings.updateRate.toString()} onValueChange={(value) => ctx.onSettingsChange({ updateRate: parseInt(value, 10) })}>
+          <Tabs
+            value={ctx.settings.widgetUpdateRate.toString()}
+            onValueChange={(value) => ctx.onSettingsChange({ widgetUpdateRate: parseInt(value, 10) })}
+          >
             <TabsList
               className="grid h-8 w-full bg-surface p-0.5"
               style={{
@@ -242,8 +245,8 @@ export default function RenderExportSettings(ctx) {
 
         {ctx.showExportRangeSettings && (
           <ExportRangeSettings
-            exportRange={ctx.settings.exportRange}
-            onExportRangeChange={(exportRange) => ctx.onSettingsChange({ exportRange })}
+            range={ctx.settings.range}
+            onExportRangeChange={(range) => ctx.onSettingsChange({ range })}
             showUseVideoRangeAction={ctx.hasImportedVideo}
             onUseVideoRange={ctx.handleApplyImportedVideoRange}
           />

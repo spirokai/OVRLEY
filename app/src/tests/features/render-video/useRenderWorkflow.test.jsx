@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useRenderWorkflow from '@/features/render-video/hooks/useRenderWorkflow'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG, DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
-import * as renderOutput from '@/features/render-video/utils/render-output'
+import * as renderOutput from '@/lib/file-dialog'
 import * as backend from '@/api/backend'
 
-const renderVideoMock = vi.fn().mockResolvedValue({ started: true, render_id: 'render-1', outputPath: 'C:\\renders\\overlay.mov' })
-
 vi.mock('@/api/backend', () => ({
+  renderVideo: vi.fn(),
+  subscribeBatchRenderProgress: vi.fn().mockResolvedValue(vi.fn()),
+  getBatchRenderSnapshot: vi.fn(),
   getRenderProgress: vi.fn().mockResolvedValue({
     render_id: null,
     current: 0,
@@ -27,12 +28,10 @@ vi.mock('@/api/backend', () => ({
   suggestRenderOutputPath: vi.fn((outputKind) => Promise.resolve(outputKind === 'composite' ? 'C:\\renders\\video.mp4' : 'C:\\renders\\overlay.mov')),
 }))
 
-vi.mock('@/features/render-video/utils/render-video', () => ({
-  default: renderVideoMock,
-}))
+const renderVideoMock = vi.mocked(backend.renderVideo)
 
-vi.mock('@/features/render-video/utils/render-output', async () => {
-  const actual = await vi.importActual('@/features/render-video/utils/render-output')
+vi.mock('@/lib/file-dialog', async () => {
+  const actual = await vi.importActual('@/lib/file-dialog')
   return {
     ...actual,
     loadRememberedRenderDirectory: vi.fn().mockResolvedValue(undefined),
@@ -51,6 +50,13 @@ describe('useRenderWorkflow', () => {
     useStore.setState(useStore.getInitialState(), true)
     useStore.setState({
       activitySummary: { durationSeconds: 73 },
+      parsedActivity: { sample_elapsed_seconds: [0, 73] },
+      endSecond: 73,
+      importedVideoFps: 30,
+      importedVideoFpsNum: 30,
+      importedVideoFpsDen: 1,
+      importedVideoDuration: 12,
+      importedVideoResolution: { width: 1920, height: 1080 },
       config: {
         ...DEFAULT_CONFIG,
         scene: {
@@ -74,9 +80,13 @@ describe('useRenderWorkflow', () => {
     const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
     await act(async () => result.current.openRenderDialog())
     expect(result.current.renderSettingsDraft).toMatchObject({ qualityType: 'quality', qualityValue: 21 })
-    act(() => result.current.updateRenderSettingsDraft({ exportCodec: 'libx264', qualityType, qualityValue }))
+    act(() => result.current.updateRenderSettingsDraft({ codec: 'libx264', qualityType, qualityValue }))
     await act(async () => result.current.handleRenderVideoConfirm())
-    expect(renderVideoMock).toHaveBeenCalledWith(expect.objectContaining({ qualityType, qualityValue }))
+    expect(renderVideoMock).toHaveBeenCalledWith(
+      expect.objectContaining({ scene: expect.objectContaining({ qualityType, qualityValue }) }),
+      expect.any(Object),
+      expect.any(Object),
+    )
     expect(useStore.getState().renderSettings).toMatchObject({ qualityType, qualityValue })
     act(() => useStore.getState().clearRenderSession())
     await act(async () => result.current.openRenderDialog())
@@ -117,9 +127,9 @@ describe('useRenderWorkflow', () => {
       await result.current.openRenderDialog()
       result.current.updateRenderSettingsDraft({
         exportMode: 'transparent',
-        exportCodec: 'prores_ks',
+        codec: 'prores_ks',
         exportAcceleration: 'cpu',
-        exportRange: {
+        range: {
           type: 'custom',
           from: 5.25,
           to: 15.75,
@@ -133,16 +143,10 @@ describe('useRenderWorkflow', () => {
 
     expect(renderVideoMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        exportMode: 'transparent',
-        exportCodec: 'prores_ks',
-        exportRange: expect.objectContaining({
-          type: 'custom',
-          from: 5.25,
-          to: 15.75,
-        }),
-        importedVideoPath: null,
-        outputPath: 'C:\\renders\\video.mov',
+        scene: expect.objectContaining({ start: 5.25, end: 15.75, ffmpeg: expect.objectContaining({ codec: 'prores_ks' }) }),
       }),
+      expect.any(Object),
+      expect.objectContaining({ outputPath: 'C:\\renders\\video.mov' }),
     )
     expect(useStore.getState().renderSettings).toMatchObject({
       exportMode: 'transparent',
@@ -172,11 +176,27 @@ describe('useRenderWorkflow', () => {
 
     act(() => result.current.updateRenderSettingsDraft({ renderTarget: 'batch' }))
     expect(useStore.getState().renderSettings.renderTarget).toBe('batch')
-    act(() => useStore.setState({ batchSnapshot: { batchId: 'batch-1', revision: 1, rendererBusy: true } }))
+    const batchSnapshot = {
+      batchId: 'batch-1',
+      revision: 1,
+      rendererBusy: true,
+      phase: 'rendering',
+      activeItemId: null,
+      items: [],
+      plannedFrames: 300,
+      processedFrames: 0,
+      renderedFrames: 0,
+      encodedFrames: 0,
+      elapsedSeconds: 0,
+      estimatedSecondsRemaining: null,
+      currentItemProgress: null,
+    }
+    vi.mocked(backend.getBatchRenderSnapshot).mockImplementation(async () => useStore.getState().batchSnapshot)
+    act(() => useStore.setState({ batchSnapshot }))
     act(() => result.current.closeRenderDialog())
     expect(result.current.renderDialogPhase).toBe('confirm')
 
-    act(() => useStore.setState({ batchSnapshot: { batchId: 'batch-1', revision: 2, rendererBusy: false } }))
+    act(() => useStore.setState({ batchSnapshot: { ...batchSnapshot, revision: 2, rendererBusy: false, phase: 'completed' } }))
     act(() => result.current.closeRenderDialog())
     expect(result.current.renderDialogPhase).toBe('closed')
     await act(async () => result.current.openRenderDialog())
@@ -224,9 +244,10 @@ describe('useRenderWorkflow', () => {
 
     expect(renderVideoMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        exportMode: 'composite',
-        importedVideoPath: 'C:\\video.mp4',
+        scene: expect.objectContaining({ composite_video_path: 'C:\\video.mp4' }),
       }),
+      expect.any(Object),
+      expect.any(Object),
     )
   })
 
@@ -257,7 +278,7 @@ describe('useRenderWorkflow', () => {
     })
 
     expect(renderVideoMock).toHaveBeenCalledTimes(2)
-    expect(renderVideoMock.mock.calls[1][0]).toMatchObject({ outputPath: submittedPath, overwrite: true })
+    expect(renderVideoMock.mock.calls[1][2]).toMatchObject({ outputPath: submittedPath, overwrite: true })
   })
 
   test('keeps the dialog open while render acceptance is pending', async () => {
@@ -280,7 +301,7 @@ describe('useRenderWorkflow', () => {
       await Promise.resolve()
     })
 
-    expect(result.current.submissionPending).toBe(true)
+    expect(useStore.getState().renderSubmissionTarget).toBe('current')
     act(() => result.current.closeRenderDialog())
     expect(result.current.renderDialogPhase).toBe('confirm')
 

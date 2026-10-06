@@ -1,6 +1,6 @@
 import { DEFAULT_EXPORT_RANGE } from '@/lib/template/template-constants'
 import { QUALITY_DEFAULTS } from '@/features/render-video/data/qualityDefaults'
-import { validateRenderQuality } from '@/features/render-video/utils/renderQuality'
+import { validateRenderQuality } from '@/features/render-video/utils/codecUtils'
 
 export const DEFAULT_RENDER_SETTINGS = Object.freeze({
   renderTarget: 'current',
@@ -13,7 +13,8 @@ export const DEFAULT_RENDER_SETTINGS = Object.freeze({
   range: Object.freeze({ ...DEFAULT_EXPORT_RANGE }),
 })
 
-function validateRenderSettings(settings) {
+/** @param {object} settings Canonical settings at store or submission ingress. @returns {void} */
+export function validateRenderSettings(settings) {
   validateRenderTarget(settings.renderTarget)
   if (!Number.isFinite(settings.fps) || settings.fps <= 0) throw new Error('Render FPS must be a positive finite number')
   if (!Number.isInteger(settings.widgetUpdateRate) || settings.widgetUpdateRate <= 0) {
@@ -49,7 +50,9 @@ export function createRenderSettingsSlice(set) {
     setRenderSettings: (settings) => {
       validateRenderSettings(settings)
       set((state) => {
-        state.renderSettings = { ...settings, range: { ...settings.range } }
+        const { range, ...fields } = settings
+        Object.assign(state.renderSettings, fields)
+        Object.assign(state.renderSettings.range, range)
       })
     },
 

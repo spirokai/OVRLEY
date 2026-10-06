@@ -1,7 +1,9 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import * as backend from '@/api/backend'
-import useBatchRenderWorkflow from '@/features/render-video/hooks/useBatchRenderWorkflow'
+import useRenderVideoDialogState from '@/features/render-video/hooks/useRenderVideoDialogState'
+import useRenderExecution from '@/features/render-video/hooks/useRenderExecution'
+import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlice'
 import useRenderVideoDerivedState from '@/features/render-video/hooks/useRenderVideoDerivedState'
 import useProjectDocumentState from '@/features/projects/hooks/useProjectDocumentState'
 import useStore from '@/store/useStore'
@@ -29,11 +31,12 @@ const next = `${folder}/ride.part 2.mp4`
 const removed = `${folder}/removed.mp4`
 const blocked = `${folder}/outside.mp4`
 const settings = {
+  ...DEFAULT_RENDER_SETTINGS,
   renderTarget: 'batch',
   fps: 24,
-  updateRate: 2,
+  widgetUpdateRate: 2,
   exportMode: 'composite',
-  exportCodec: 'libx264',
+  codec: 'libx264',
   qualityType: 'bitrate',
   qualityValue: 35,
 }
@@ -42,6 +45,22 @@ let observe
 let acceptedRequest
 let latest
 let unlisten
+
+function useBatchRenderWorkflow(options) {
+  const execution = useRenderExecution()
+  const dialog = useRenderVideoDialogState({
+    ...options,
+    onSettingsChange: () => {},
+    onClose: () => {},
+    onConfirm: (batchReview) => execution.submit({ settings: options.settings, batchReview, onAccepted: () => {} }),
+    onCancel: execution.cancel,
+  })
+  return {
+    ...dialog,
+    runBatch: dialog.onConfirm,
+    cancelBatch: dialog.handleCancel,
+  }
+}
 
 function source(inspectionId, path) {
   const creationTime = path === reference ? '2026-10-05T11:59:48Z' : path === blocked ? '2026-10-05T14:00:00Z' : '2026-10-05T12:00:40Z'

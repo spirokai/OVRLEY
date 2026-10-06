@@ -12,32 +12,23 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { cancelRender } from '@/api/backend'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { useFpsMode } from '@/hooks/useFpsMode'
 import { saveSinglePath } from '@/lib/file-dialog'
-import { EXPORT_CODEC_LOOKUP, OUTPUT_FORMATS, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
+import { OUTPUT_FORMATS, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
 import {
   getExportCodecForSelection,
   getFirstAvailableAcceleration,
   getFirstAvailableMp4ExportCodec,
   getVisibleAccelerationOptions,
   isOutputFormatAvailable,
+  getDefaultQuality,
+  invertQualityValue,
 } from '../utils/codecUtils'
-import { getRenderOutputExtension } from '../utils/render-output'
-import { getDefaultQuality, invertQualityValue } from '../utils/renderQuality'
-import { getRenderSummaryItems } from '../utils/renderSummary'
+import { batchResultQueue, getImportedVideoExportRange, getRenderOutputExtension, getRenderSummaryItems } from '../utils/renderPresentation'
 import { useTranslation } from 'react-i18next'
-import useBatchRenderWorkflow from './useBatchRenderWorkflow'
 import useRenderVideoDerivedState from './useRenderVideoDerivedState'
-
-function getImportedVideoExportRange(durationSeconds, offsetSeconds) {
-  return {
-    type: 'custom',
-    from: offsetSeconds,
-    to: offsetSeconds + durationSeconds,
-  }
-}
+import useBatchInspection from './useBatchInspection'
 
 export default function useRenderVideoDialogState({
   phase,
@@ -45,22 +36,27 @@ export default function useRenderVideoDialogState({
   onSettingsChange,
   onClose,
   onConfirm,
+  onCancel,
   outputPathError,
   overwriteOpen,
   pendingOverwritePath,
   onOverwriteConfirm,
   onOverwriteCancel,
-  submissionPending = false,
 }) {
   const { t } = useTranslation()
   const derived = useRenderVideoDerivedState({ settings })
-  const batch = useBatchRenderWorkflow({ phase, settings })
+  const batch = useBatchInspection({ phase, settings })
   const [showAllBatchVideos, setShowAllBatchVideos] = useState(false)
   const outputPath = settings?.outputPath
-  const exportRange = settings?.exportRange
+  const range = settings?.range
   const importedVideoRangePrefilledRef = useRef(false)
   const {
     availableCodecs,
+    batchSnapshot,
+    batchFinished,
+    batchActiveItemId,
+    batchProgress,
+    currentItemProgress,
     config,
     containerFps,
     defaultBitrateForCodec,
@@ -70,11 +66,13 @@ export default function useRenderVideoDialogState({
     importedVideoFps,
     importedVideoResolution,
     isBatchTarget,
+    isCancelling,
     lockedVideoFps,
     platformOs,
     renderProgress,
     renderStartDisabled,
     renderingVideo,
+    submissionPending,
     resolutionMismatch,
     selectedAccelerationOptions,
     selectedAccelerationValue,
@@ -91,10 +89,10 @@ export default function useRenderVideoDialogState({
     onFpsChange: (fps) => {
       onSettingsChange({
         fps,
-        updateRate: normalizeUpdateRateForFps(fps, settings?.updateRate),
+        widgetUpdateRate: normalizeUpdateRateForFps(fps, settings?.widgetUpdateRate),
       })
     },
-    updateRate: settings?.updateRate,
+    updateRate: settings?.widgetUpdateRate,
   })
 
   useEffect(() => {
@@ -112,8 +110,7 @@ export default function useRenderVideoDialogState({
     // cannot keep MP4 codecs, while composite exports must land on one.
     if (exportMode !== 'composite' && selectedCodecIsMp4) {
       onSettingsChange({
-        exportCodec: 'prores_ks',
-        exportAcceleration: 'cpu',
+        codec: 'prores_ks',
       })
       return
     }
@@ -127,8 +124,7 @@ export default function useRenderVideoDialogState({
     if (!selectedCodecIsMp4 || !selectedExportCodecAvailable) {
       if (firstAvailableMp4Codec) {
         onSettingsChange({
-          exportCodec: firstAvailableMp4Codec,
-          exportAcceleration: EXPORT_CODEC_LOOKUP[firstAvailableMp4Codec]?.acceleration || 'cpu',
+          codec: firstAvailableMp4Codec,
           qualityValue:
             settings.qualityType === 'quality' ? getDefaultQuality(firstAvailableMp4Codec) : defaultBitrateForCodec(firstAvailableMp4Codec),
         })
@@ -142,15 +138,11 @@ export default function useRenderVideoDialogState({
       return
     }
 
-    const normalizedUpdateRate = normalizeUpdateRateForFps(updateRateFps, settings.updateRate)
-    if (normalizedUpdateRate !== settings.updateRate) {
-      onSettingsChange({ updateRate: normalizedUpdateRate })
+    const normalizedUpdateRate = normalizeUpdateRateForFps(updateRateFps, settings.widgetUpdateRate)
+    if (normalizedUpdateRate !== settings.widgetUpdateRate) {
+      onSettingsChange({ widgetUpdateRate: normalizedUpdateRate })
     }
   }, [settings, updateRateFps, onSettingsChange])
-
-  const handleCancel = useCallback(async () => {
-    await cancelRender()
-  }, [])
 
   const isProgress = phase === 'progress'
 
@@ -161,7 +153,7 @@ export default function useRenderVideoDialogState({
 
     importedVideoRangePrefilledRef.current = true
     onSettingsChange({
-      exportRange: getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
+      range: getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
     })
   }, [hasImportedVideo, importedVideoDuration, onSettingsChange, videoSyncOffsetSeconds])
 
@@ -176,13 +168,7 @@ export default function useRenderVideoDialogState({
 
   const handleExportModeChange = useCallback(
     (exportMode) => {
-      if (
-        exportMode !== 'transparent' ||
-        isBatchTarget ||
-        !hasImportedVideo ||
-        importedVideoRangePrefilledRef.current ||
-        exportRange?.type === 'custom'
-      ) {
+      if (exportMode !== 'transparent' || isBatchTarget || !hasImportedVideo || importedVideoRangePrefilledRef.current || range?.type === 'custom') {
         onSettingsChange({ exportMode })
         return
       }
@@ -190,10 +176,10 @@ export default function useRenderVideoDialogState({
       importedVideoRangePrefilledRef.current = true
       onSettingsChange({
         exportMode,
-        exportRange: getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
+        range: getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
       })
     },
-    [exportRange, hasImportedVideo, importedVideoDuration, isBatchTarget, onSettingsChange, videoSyncOffsetSeconds],
+    [range, hasImportedVideo, importedVideoDuration, isBatchTarget, onSettingsChange, videoSyncOffsetSeconds],
   )
 
   const handleOutputPathCommit = useCallback(
@@ -230,8 +216,7 @@ export default function useRenderVideoDialogState({
     const nextIsMp4Codec = format.group === 'mp4'
 
     onSettingsChange({
-      exportCodec: nextExportCodec,
-      exportAcceleration: acceleration.value,
+      codec: nextExportCodec,
       ...(nextIsMp4Codec && {
         qualityValue: settings.qualityType === 'quality' ? getDefaultQuality(nextExportCodec) : defaultBitrateForCodec(nextExportCodec),
       }),
@@ -245,15 +230,14 @@ export default function useRenderVideoDialogState({
     }
 
     onSettingsChange({
-      exportCodec: nextExportCodec,
-      exportAcceleration: value,
+      codec: nextExportCodec,
     })
   }
 
   const handleQualityTypeChange = (qualityType) => {
     onSettingsChange({
       qualityType,
-      qualityValue: qualityType === 'quality' ? getDefaultQuality(settings.exportCodec) : defaultBitrateForCodec(settings.exportCodec),
+      qualityValue: qualityType === 'quality' ? getDefaultQuality(settings.codec) : defaultBitrateForCodec(settings.codec),
     })
   }
 
@@ -261,16 +245,31 @@ export default function useRenderVideoDialogState({
     onSettingsChange({ qualityValue: settings.qualityType === 'quality' ? invertQualityValue(value) : value })
   }
 
-  const batchFinished = batch.batchFinished
+  const batchQueue = batchSnapshot === null ? batch.batchQueue : batchResultQueue(batchSnapshot)
   const batchStartDisabled = renderStartDisabled || !batch.batchReady
+  const handleConfirm = useCallback(async () => {
+    if (isBatchTarget && !batch.batchReady) return
+    try {
+      await onConfirm(batch.request)
+    } catch (error) {
+      if (error.code === 'reinspectionRequired') batch.reject(error)
+      else throw error
+    }
+  }, [batch, isBatchTarget, onConfirm])
+  const handleCancel = useCallback(() => onCancel(settings.renderTarget), [onCancel, settings])
 
   return {
     ...batch,
     availableCodecs,
+    batchSnapshot,
     batchFinished,
+    batchActiveItemId,
+    batchProgress,
+    batchQueue,
     batchStartDisabled,
     config,
     containerFps,
+    currentItemProgress,
     exportMode,
     // Composite output follows the source video's frame rate: the imported
     // video's when rendering it, each queued video's own in batch mode.
@@ -279,6 +278,7 @@ export default function useRenderVideoDialogState({
     handleAccelerationChange,
     handleApplyImportedVideoRange,
     handleCancel,
+    isCancelling,
     handleCustomFpsChange,
     handleExportModeChange,
     handleFpsModeChange,
@@ -296,7 +296,7 @@ export default function useRenderVideoDialogState({
     isOutputFormatAvailable,
     lockedVideoFps,
     onClose,
-    onConfirm,
+    onConfirm: handleConfirm,
     onOverwriteCancel,
     onOverwriteConfirm,
     onSettingsChange,
@@ -322,7 +322,7 @@ export default function useRenderVideoDialogState({
     settingsLocked: batch.batchRunning,
     showAllBatchVideos,
     setShowAllBatchVideos,
-    visibleBatchQueue: showAllBatchVideos ? batch.batchQueue : batch.batchQueue.filter((item) => item.status !== 'blocked'),
+    visibleBatchQueue: showAllBatchVideos ? batchQueue : batchQueue.filter((item) => item.status !== 'blocked'),
     showBatchProgress: isBatchTarget && (batch.batchRunning || batchFinished),
     showContainerFps: !isBatchTarget || exportMode !== 'composite',
     showExportModeOverride: hasImportedVideo || isBatchTarget,

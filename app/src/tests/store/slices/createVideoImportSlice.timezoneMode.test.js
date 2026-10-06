@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { createBatchCalibration, resolveBatchVideoTiming, resolveVideoSyncState } from '@/lib/video-sync'
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
-import { createBatchRenderRequest } from '@/features/render-video/utils/batchRenderRequest'
+import { captureBatchSync, createBatchRenderRequest } from '@/features/render-video/utils/renderRequest'
 
 // 5:47:13 activity ending 17:29 Sofia time (UTC+3).
 const activitySummary = {
@@ -69,15 +69,18 @@ describe('signed automatic synchronization and shared calibration', () => {
       videoSyncOffsetPreviewSeconds: 87,
     }
     expect(resolveVideoSyncState(editorSnapshot, summary).videoSyncOffsetSeconds).toBe(-12)
+    const sync = captureBatchSync(editorSnapshot)
     const request = createBatchRenderRequest({
       editorSnapshot,
-      settings: { exportMode: 'composite', exportCodec: 'libx264', fps: 30, updateRate: 1, qualityType: 'quality', qualityValue: 20 },
+      sync,
+      settings: { exportMode: 'composite', codec: 'libx264', fps: 30, widgetUpdateRate: 1, qualityType: 'quality', qualityValue: 20 },
       inspectionId: 'inspection',
       calibrationSource: reference,
       outputDirectory: 'C:/output',
       jobs: [reference, queued].map((video) => ({
         id: video.sourceId,
         source: video,
+        timing: resolveBatchVideoTiming(video.metadata, summary, sync.calibration, video.sourceId === reference.sourceId).timing,
         skipOverlay: false,
       })),
     })

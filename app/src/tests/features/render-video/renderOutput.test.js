@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { normalizeRenderOutputPath } from '@/features/render-video/utils/render-output'
+import { normalizeRenderOutputPath } from '@/features/render-video/utils/renderPresentation'
 
 describe('render output path normalization', () => {
   test.each([
