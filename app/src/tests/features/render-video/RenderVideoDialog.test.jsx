@@ -229,6 +229,7 @@ describe('RenderVideoDialog', () => {
         encodedFrames: 20,
         elapsedSeconds: 1,
         estimatedSecondsRemaining: 1.6,
+        renderingFps: 30,
       },
       items: [{ id, phase: 'rendering', plannedFrames: 300, currentFrames: 30, renderedFrames: 30, encodedFrames: 20, outcome: null }],
       outputs: [],

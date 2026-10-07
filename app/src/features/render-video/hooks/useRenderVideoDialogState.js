@@ -11,7 +11,7 @@
  * @returns {object} State and handlers for RenderVideoDialog.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { useFpsMode } from '@/hooks/useFpsMode'
 import { saveSinglePath } from '@/lib/file-dialog'
@@ -245,7 +245,12 @@ export default function useRenderVideoDialogState({
     onSettingsChange({ qualityValue: settings.qualityType === 'quality' ? invertQualityValue(value) : value })
   }
 
-  const batchQueue = batchSnapshot === null ? batch.batchQueue : batchResultQueue(batchSnapshot)
+  const batchItems = batchSnapshot?.items ?? null
+  const batchQueue = useMemo(() => (batchItems === null ? batch.batchQueue : batchResultQueue(batchItems)), [batchItems, batch.batchQueue])
+  const visibleBatchQueue = useMemo(
+    () => (showAllBatchVideos ? batchQueue : batchQueue.filter((item) => item.status !== 'blocked')),
+    [batchQueue, showAllBatchVideos],
+  )
   const batchStartDisabled = renderStartDisabled || !batch.batchReady
   const handleConfirm = useCallback(async () => {
     if (isBatchTarget && !batch.batchReady) return
@@ -322,7 +327,7 @@ export default function useRenderVideoDialogState({
     settingsLocked: batch.batchRunning,
     showAllBatchVideos,
     setShowAllBatchVideos,
-    visibleBatchQueue: showAllBatchVideos ? batchQueue : batchQueue.filter((item) => item.status !== 'blocked'),
+    visibleBatchQueue,
     showBatchProgress: isBatchTarget && (batch.batchRunning || batchFinished),
     showContainerFps: !isBatchTarget || exportMode !== 'composite',
     showExportModeOverride: hasImportedVideo || isBatchTarget,

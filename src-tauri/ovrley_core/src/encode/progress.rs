@@ -196,7 +196,7 @@ impl Default for ProgressEstimator {
 pub trait ProgressSink: Send + Sync {
     fn emit_progress(&self, progress: &RenderProgress);
 
-    fn emit_batch_progress(&self, _snapshot: &crate::render_jobs::contracts::BatchSnapshot) {}
+    fn emit_batch_progress(&self, _event: &crate::render_jobs::contracts::BatchRenderEvent) {}
 }
 
 /// No-op sink for `RenderController::default()` and tests.

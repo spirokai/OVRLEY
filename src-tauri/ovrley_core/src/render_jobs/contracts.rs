@@ -173,6 +173,8 @@ pub struct BatchItemProgress {
     pub elapsed_seconds: f64,
     /// Absent when throughput is unavailable or zero.
     pub estimated_seconds_remaining: Option<f64>,
+    /// Same native output-frame-equivalent estimator used by single renders.
+    pub rendering_fps: Option<f64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -198,6 +200,8 @@ pub struct BatchSnapshot {
     /// Monotonically increasing within a batch, shared by reads and events.
     /// Consumers ignore snapshots with revisions <= their current revision.
     pub revision: u64,
+    /// Revision of the latest queue transition, shared by its compact updates.
+    pub snapshot_revision: u64,
     pub phase: BatchPhase,
     /// Reservation remains busy through preparation, gaps and cancellation cleanup.
     pub renderer_busy: bool,
@@ -219,6 +223,30 @@ pub struct BatchSnapshot {
     /// Successful outputs only, retained across subsequent failure/cancellation.
     pub outputs: Vec<BatchOutput>,
     pub result_counts: BatchResultCounts,
+}
+
+/// Frequent frame observations contain no queue rows or completed outputs.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BatchProgressUpdate {
+    pub batch_id: String,
+    pub revision: u64,
+    /// Updates apply only after the corresponding full snapshot was received.
+    pub snapshot_revision: u64,
+    pub processed_frames: u64,
+    pub rendered_frames: u64,
+    pub encoded_frames: u64,
+    pub current_item_progress: Option<BatchItemProgress>,
+    pub elapsed_seconds: f64,
+    pub estimated_seconds_remaining: Option<f64>,
+}
+
+/// Queue transitions publish full state; ordinary frame ticks publish scalars.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "kind", content = "data", rename_all = "camelCase")]
+pub enum BatchRenderEvent {
+    Snapshot(BatchSnapshot),
+    Progress(BatchProgressUpdate),
 }
 
 /// Submission response includes the first authoritative snapshot; later

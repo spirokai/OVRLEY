@@ -1,6 +1,6 @@
-//! Forwards core-owned single-render progress and batch snapshots to Tauri.
+//! Forwards core-owned single-render progress and batch events to Tauri.
 //! The execution service selects one progress destination per reservation;
-//! batch pipeline updates stay internal and only batch snapshots reach here.
+//! batch updates contain full queue transitions or compact frame observations.
 //!
 //! Owns: `TauriProgressSink` — the concrete `ProgressSink` implementation
 //!   installed on the native execution service at app startup.
@@ -15,7 +15,7 @@
 
 use ovrley_core::debug::RenderProgress;
 use ovrley_core::encode::progress::ProgressSink;
-use ovrley_core::render_jobs::contracts::BatchSnapshot;
+use ovrley_core::render_jobs::contracts::BatchRenderEvent;
 use tauri::{AppHandle, Emitter};
 
 /// Event name used for streamed render-progress updates. The frontend
@@ -40,8 +40,8 @@ impl TauriProgressSink {
 }
 
 impl ProgressSink for TauriProgressSink {
-    fn emit_batch_progress(&self, snapshot: &BatchSnapshot) {
-        if let Err(error) = self.app.emit("batch-render-progress", snapshot) {
+    fn emit_batch_progress(&self, event: &BatchRenderEvent) {
+        if let Err(error) = self.app.emit("batch-render-progress", event) {
             log::warn!("failed to emit batch-render-progress event: {error}");
         }
     }

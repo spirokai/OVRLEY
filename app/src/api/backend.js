@@ -336,8 +336,8 @@ export async function cancelBatchRender(batchId) {
 }
 
 /**
- * Observes snapshots. Consumers use batchId and revision to order events and reads.
- * @param {(snapshot: object) => void} handler Snapshot observer.
+ * Observes full queue transitions and compact frame updates. Both carry native revisions.
+ * @param {(event: {kind: 'snapshot'|'progress', data: object}) => void} handler Native event observer.
  * @returns {Promise<() => void>} Listener disposal function.
  */
 export async function subscribeBatchRenderProgress(handler) {

@@ -67,7 +67,7 @@ export function createBatchProgress(snapshot) {
     encoded: snapshot.encodedFrames,
     status: snapshot.phase,
     estimatedSecondsRemaining: snapshot.estimatedSecondsRemaining,
-    renderingFps: snapshot.elapsedSeconds > 0 ? snapshot.renderedFrames / snapshot.elapsedSeconds : null,
+    renderingFps: snapshot.currentItemProgress?.renderingFps ?? null,
   }
 }
 
@@ -86,7 +86,7 @@ export function createBatchItemProgress(snapshot) {
     encoded: progress.encodedFrames,
     status: snapshot.phase,
     estimatedSecondsRemaining: progress.estimatedSecondsRemaining,
-    renderingFps: progress.elapsedSeconds > 0 ? progress.renderedFrames / progress.elapsedSeconds : null,
+    renderingFps: progress.renderingFps,
   }
 }
 
@@ -121,9 +121,9 @@ export function reviewBatchQueue(choices, inspection, sync) {
   })
 }
 
-/** @param {object} snapshot Native lifecycle. @returns {object[]} Submitted item presentation; frontend job IDs are validated source paths. */
-export function batchResultQueue(snapshot) {
-  return snapshot.items.map((item) => {
+/** @param {object[]} items Native queue items. @returns {object[]} Submitted item presentation; frontend job IDs are validated source paths. */
+export function batchResultQueue(items) {
+  return items.map((item) => {
     return {
       id: item.id,
       path: item.id,

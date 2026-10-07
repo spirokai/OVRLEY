@@ -152,6 +152,7 @@ fn activity() -> ParsedActivity {
 struct Sink {
     single_progress: Mutex<Vec<RenderProgress>>,
     snapshots: Mutex<Vec<BatchSnapshot>>,
+    events: Mutex<Vec<BatchRenderEvent>>,
     terminal: mpsc::Sender<BatchSnapshot>,
 }
 
@@ -159,10 +160,13 @@ impl ProgressSink for Sink {
     fn emit_progress(&self, progress: &RenderProgress) {
         self.single_progress.lock().unwrap().push(progress.clone());
     }
-    fn emit_batch_progress(&self, snapshot: &BatchSnapshot) {
-        self.snapshots.lock().unwrap().push(snapshot.clone());
-        if !snapshot.renderer_busy {
-            self.terminal.send(snapshot.clone()).unwrap();
+    fn emit_batch_progress(&self, event: &BatchRenderEvent) {
+        self.events.lock().unwrap().push(event.clone());
+        if let BatchRenderEvent::Snapshot(snapshot) = event {
+            self.snapshots.lock().unwrap().push(snapshot.clone());
+            if !snapshot.renderer_busy {
+                self.terminal.send(snapshot.clone()).unwrap();
+            }
         }
     }
 }
@@ -176,6 +180,7 @@ fn service() -> (
     let sink = Arc::new(Sink {
         single_progress: Mutex::new(Vec::new()),
         snapshots: Mutex::new(Vec::new()),
+        events: Mutex::new(Vec::new()),
         terminal: tx,
     });
     (RenderExecutionService::with_sink(sink.clone()), sink, rx)
@@ -240,7 +245,7 @@ impl BatchJobExecutor for ControlledExecutor {
             frames / 2,
             encoded,
             None,
-            None,
+            Some(120.0),
         );
         fs::write(target.path(), b"partial output").unwrap();
         self.entered.send(filename.clone()).unwrap();
@@ -344,9 +349,29 @@ fn sequential_mixed_results_settle_frame_weights_and_preserve_completed_outputs(
     );
     assert_eq!(
         progress.estimated_seconds_remaining,
-        Some(285.0 * progress.elapsed_seconds / 15.0),
+        Some(285.0 / 120.0),
         "batch ETA is available before composite encoding reports frames"
     );
+    assert_eq!(
+        progress
+            .current_item_progress
+            .as_ref()
+            .unwrap()
+            .rendering_fps,
+        service.progress().rendering_fps
+    );
+    let events = sink.events.lock().unwrap();
+    assert!(events.iter().any(|event| matches!(event, BatchRenderEvent::Snapshot(snapshot)
+        if snapshot.phase == BatchPhase::Rendering && snapshot.current_item_progress.as_ref().unwrap().rendering_fps.is_none())));
+    let tick = events
+        .iter()
+        .find(|event| matches!(event, BatchRenderEvent::Progress(_)))
+        .unwrap();
+    let wire = serde_json::to_value(tick).unwrap();
+    assert_eq!(wire["data"]["currentItemProgress"]["renderingFps"], 120.0);
+    assert!(wire["data"].get("items").is_none());
+    assert!(wire["data"].get("outputs").is_none());
+    drop(events);
     assert!(matches!(
         service.submit_batch_with_executor(
             &fixture.paths,

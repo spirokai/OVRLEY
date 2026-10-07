@@ -87,6 +87,7 @@ function snapshot(phase = 'accepted', revision = 1) {
   return {
     batchId: 'batch-1',
     revision,
+    snapshotRevision: revision,
     phase,
     rendererBusy: !terminal,
     activeItemId: null,
@@ -157,7 +158,7 @@ beforeEach(() => {
   vi.mocked(backend.submitBatchRender).mockImplementation(async (request) => {
     acceptedRequest = request
     latest = snapshot()
-    observe({ ...latest, revision: 2, phase: 'preparing', activeItemId: request.jobs[0].id })
+    observe({ kind: 'snapshot', data: { ...latest, revision: 2, snapshotRevision: 2, phase: 'preparing', activeItemId: request.jobs[0].id } })
     return { batchId: latest.batchId, snapshot: latest }
   })
   vi.mocked(backend.getBatchRenderSnapshot).mockImplementation(async () => latest)
@@ -189,6 +190,82 @@ beforeEach(() => {
 })
 
 describe('native batch workflow', () => {
+  test('uses native warmup and FPS while compact ticks preserve the queue and ignore stale transitions', async () => {
+    vi.mocked(backend.submitBatchRender).mockImplementation(async (request) => {
+      acceptedRequest = request
+      latest = snapshot()
+      // A newer tick may arrive before its queue transition and acceptance.
+      observe({
+        kind: 'progress',
+        data: {
+          batchId: 'batch-1',
+          revision: 3,
+          snapshotRevision: 2,
+          processedFrames: 0,
+          renderedFrames: 0,
+          encodedFrames: 0,
+          currentItemProgress: null,
+          elapsedSeconds: 1,
+          estimatedSecondsRemaining: null,
+        },
+      })
+      observe({ kind: 'snapshot', data: snapshot('preparing', 2) })
+      return { batchId: 'batch-1', snapshot: latest }
+    })
+    const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
+    await waitFor(() => expect(result.current.batchReady).toBe(true))
+    await act(async () => result.current.runBatch())
+    expect(result.current.batchSnapshot.revision).toBe(3)
+    expect(result.current.batchSnapshot.phase).toBe('preparing')
+    const rendering = {
+      ...snapshot('rendering', 4),
+      activeItemId: reference,
+      currentItemProgress: {
+        itemId: reference,
+        plannedFrames: 3600,
+        currentFrames: 100,
+        renderedFrames: 50,
+        encodedFrames: 0,
+        elapsedSeconds: 100,
+        estimatedSecondsRemaining: null,
+        renderingFps: null,
+      },
+    }
+    rendering.items[0].phase = 'rendering'
+    act(() => observe({ kind: 'snapshot', data: rendering }))
+    // Even with nonzero frames and elapsed time, native warmup stays unavailable.
+    expect(result.current.batchProgress.renderingFps).toBeNull()
+    expect(result.current.currentItemProgress.renderingFps).toBeNull()
+    const queue = result.current.batchQueue
+    const visibleQueue = result.current.visibleBatchQueue
+    const items = useStore.getState().batchSnapshot.items
+    const outputs = useStore.getState().batchSnapshot.outputs
+    const tick = {
+      batchId: 'batch-1',
+      revision: 5,
+      snapshotRevision: 4,
+      processedFrames: 200,
+      renderedFrames: 100,
+      encodedFrames: 0,
+      currentItemProgress: { ...rendering.currentItemProgress, currentFrames: 200, renderedFrames: 100, renderingFps: 120 },
+      elapsedSeconds: 101,
+      estimatedSecondsRemaining: 50,
+    }
+    act(() => observe({ kind: 'progress', data: tick }))
+    expect(result.current.batchProgress.renderingFps).toBe(120)
+    expect(result.current.currentItemProgress.renderingFps).toBe(120)
+    expect(result.current.batchQueue).toBe(queue)
+    expect(result.current.visibleBatchQueue).toBe(visibleQueue)
+    expect(useStore.getState().batchSnapshot.items).toBe(items)
+    expect(useStore.getState().batchSnapshot.outputs).toBe(outputs)
+    act(() => {
+      observe({ kind: 'progress', data: { ...tick, revision: 2 } })
+      observe({ kind: 'progress', data: { ...tick, revision: 6, snapshotRevision: 5 } })
+    })
+    expect(useStore.getState().batchSnapshot.revision).toBe(5)
+    act(() => observe({ kind: 'snapshot', data: snapshot('cancelled', 7) }))
+  })
+
   test('keeps an automatically non-overlapping clip blocked even when calibration would move it into the activity', async () => {
     useStore.setState({ videoSyncOffsetSeconds: -4009 })
     const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
@@ -286,7 +363,7 @@ describe('native batch workflow', () => {
     latest.items[0].outcome = { status: 'succeeded', outputPath: 'C:/renders/reference_video.mp4' }
     latest.resultCounts = { succeeded: 1, failed: 1, cancelled: 0, unstarted: 0 }
     latest.outputs = [{ itemId: reference, outputPath: 'C:/renders/reference_video.mp4' }]
-    act(() => observe(latest))
+    act(() => observe({ kind: 'snapshot', data: latest }))
     expect(useStore.getState().batchSnapshot.phase).toBe('completedWithErrors')
     expect(unlisten).toHaveBeenCalled()
     const resumed = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
@@ -374,7 +451,7 @@ describe('native batch workflow', () => {
       latest.items.forEach((item, i) => {
         item.outcome = { status: i === 0 ? 'cancelled' : 'unstarted' }
       })
-    act(() => observe(latest))
+    act(() => observe({ kind: 'snapshot', data: latest }))
     expect(result.current.batchFinished).toBe(true)
     expect(result.current.batchRunning).toBe(false)
     expect(editorState()).toEqual(before)

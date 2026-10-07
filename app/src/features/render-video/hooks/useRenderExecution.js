@@ -8,6 +8,10 @@ import { createPreviewRenderRequest, createRenderRequest, isRendererBusy } from 
 import { createRenderProgress } from '../utils/renderPresentation'
 import i18next from 'i18next'
 
+function applyRenderProgress(snapshot) {
+  useStore.getState().setRenderProgress(createRenderProgress(snapshot))
+}
+
 // The transports are the native boundary. Submission, buffering, recovery and
 // listener lifetime are shared; native IDs and terminal contracts stay native.
 const transports = {
@@ -16,6 +20,7 @@ const transports = {
     submit: ({ config, parsedActivity, outputPath, overwrite }) => backend.renderVideo(config, parsedActivity, { outputPath, overwrite }),
     read: () => backend.getRenderProgress(),
     id: (snapshot) => snapshot.render_id,
+    eventId: (event) => event.render_id,
     activeId: (state) => state.activeRenderId,
     snapshot: (state) => state.renderProgress,
     finished: (snapshot) => ['complete', 'cancelled', 'error'].includes(snapshot.status),
@@ -27,7 +32,8 @@ const transports = {
       void rememberAcceptedRenderOutput(accepted.outputPath)
     },
     acceptedId: (accepted) => accepted.render_id,
-    apply: (snapshot) => useStore.getState().setRenderProgress(createRenderProgress(snapshot)),
+    apply: applyRenderProgress,
+    applyEvent: applyRenderProgress,
     finish: (state) => {
       const { status, message } = state.renderProgress
       const outputPath = state.activeRenderOutputPath
@@ -44,12 +50,30 @@ const transports = {
     submit: (request) => backend.submitBatchRender(request),
     read: (id) => backend.getBatchRenderSnapshot(id),
     id: (snapshot) => snapshot.batchId,
+    eventId: (event) => event.data.batchId,
     activeId: (state) => state.batchSnapshot?.batchId ?? null,
     snapshot: (state) => state.batchSnapshot,
     finished: (snapshot) => !snapshot.rendererBusy,
     accept: (accepted) => useStore.getState().acceptBatchSnapshot(accepted.snapshot),
     acceptedId: (accepted) => accepted.batchId,
     apply: (snapshot) => useStore.getState().applyBatchSnapshot(snapshot),
+    applyEvent: (event) => {
+      switch (event.kind) {
+        case 'snapshot':
+          useStore.getState().applyBatchSnapshot(event.data)
+          break
+        case 'progress': {
+          const state = useStore.getState()
+          const snapshot = state.batchSnapshot
+          // A tick belongs to one queue transition. If it arrives before that
+          // snapshot, wait for the snapshot rather than updating an older queue.
+          if (event.data.snapshotRevision === snapshot.snapshotRevision) state.applyBatchSnapshot({ ...snapshot, ...event.data })
+          break
+        }
+        default:
+          throw new Error(`Unknown batch render event: ${event.kind}`)
+      }
+    },
     finish: () => {},
     cancel: async (id) => useStore.getState().applyBatchSnapshot(await backend.cancelBatchRender(id)),
   },
@@ -94,9 +118,9 @@ function createObserver(target, activeId = null) {
     accept: (accepted) => {
       id = transport.acceptedId(accepted)
       transport.accept(accepted)
-      const snapshot = buffered.get(id)
+      const events = buffered.get(id)
       buffered.clear()
-      if (snapshot !== undefined) apply(snapshot)
+      if (events !== undefined) events.forEach(applyEvent)
     },
     recover: async () => {
       if (closed) return
@@ -131,16 +155,33 @@ function createObserver(target, activeId = null) {
     transport.apply(snapshot)
   }
 
-  function receive(snapshot) {
+  function applyEvent(event) {
+    if (closed || transport.eventId(event) !== id) return
+    transport.applyEvent(event)
+  }
+
+  function receive(event) {
     if (closed) return
     eventSequence += 1
     if (id === null) {
-      const snapshotId = transport.id(snapshot)
-      const previous = buffered.get(snapshotId)
-      if (target === 'current' || previous === undefined || snapshot.revision > previous.revision) buffered.set(snapshotId, snapshot)
+      const eventId = transport.eventId(event)
+      const previous = buffered.get(eventId)
+      if (target === 'current') buffered.set(eventId, [event])
+      else {
+        // Retain the newest full queue plus its newest tick until acceptance.
+        // A tick alone cannot reconstruct outcomes from earlier queue items.
+        const sameKind = previous?.find((entry) => entry.kind === event.kind)
+        if (sameKind === undefined || event.data.revision > sameKind.data.revision) {
+          const events = [...(previous ?? []).filter((entry) => entry.kind !== event.kind), event]
+          buffered.set(
+            eventId,
+            events.sort((left, right) => left.data.revision - right.data.revision),
+          )
+        }
+      }
       return
     }
-    apply(snapshot)
+    applyEvent(event)
   }
 
   return observer

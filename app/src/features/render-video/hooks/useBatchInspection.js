@@ -118,8 +118,10 @@ export default function useBatchInspection({ phase, settings }) {
   }, [open, current, sync, jobs, outputDirectory, review])
 
   const currentPlan = plan?.review === review ? plan : null
-  const staleIds = new Set((current?.issues ?? []).map((issue) => issue.sourceId))
-  const rowsWithIssues = rows.map((row) => (staleIds.has(row.source?.sourceId) ? { ...row, status: 'blocked', error: 'reinspectionRequired' } : row))
+  const rowsWithIssues = useMemo(() => {
+    const staleIds = new Set((current?.issues ?? []).map((issue) => issue.sourceId))
+    return rows.map((row) => (staleIds.has(row.source?.sourceId) ? { ...row, status: 'blocked', error: 'reinspectionRequired' } : row))
+  }, [rows, current?.issues])
   const ready = open && currentPlan?.status === 'planned'
   const batchRunning = store.batchRunning || store.batchSubmissionPending
   const pickVideoFolder = async () => {
