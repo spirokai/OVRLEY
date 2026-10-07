@@ -60,13 +60,13 @@ pub fn batch_video_plan(
     inspection: &ovrley_core::render_jobs::inspection::VideoInspectionService,
     inspection_id: &str,
     request: ovrley_core::render_jobs::contracts::BatchRenderRequest,
-) -> ovrley_core::error::CoreResult<ovrley_core::render_jobs::batch_plan::PlannedVideoRender> {
+) -> ovrley_core::error::CoreResult<ovrley_core::render_jobs::planning::PlannedVideoRender> {
     use ovrley_core::activity::schema::ParsedActivity;
     use ovrley_core::error::{CoreError, CoreResult};
     use ovrley_core::render_jobs::{
         batch::BatchJobExecutor,
-        batch_plan::PlannedVideoRender,
         execution::{RenderExecutionService, RendererReservation},
+        planning::PlannedVideoRender,
     };
     struct Capture(std::sync::Mutex<std::sync::mpsc::Sender<PlannedVideoRender>>);
     impl BatchJobExecutor for Capture {

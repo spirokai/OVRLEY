@@ -16,8 +16,8 @@ use ovrley_core::encode::progress::RenderController;
 use ovrley_core::normalize::parse_config_value;
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::batch_plan::plan_single_render;
-use ovrley_core::render_jobs::execution::{execute_render, RenderExecutionService};
+use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::planning::plan_single_render;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -254,26 +254,6 @@ fn main() -> Result<(), String> {
 
             let controller = RenderController::default();
             let execution = RenderExecutionService::with_controller(controller.clone());
-            let reservation = execution.reserve().map_err(|error| error.to_string())?;
-            if let Err(e) = reservation.begin_item(
-                total_frames,
-                &format!("Benchmark {codec_name} run {run_num}"),
-            ) {
-                println!("FAILED: {e}");
-                runs.push(RunResult {
-                    run: run_num,
-                    success: false,
-                    resolution: None,
-                    widget_update_rate: None,
-                    total_frames: None,
-                    overlay_duration_seconds: None,
-                    job_time: None,
-                    job_time_seconds: None,
-                    file_size_mb: None,
-                    error: Some(e.to_string()),
-                });
-                continue;
-            }
 
             let started = Instant::now();
             let output_path = paths
@@ -284,11 +264,9 @@ fn main() -> Result<(), String> {
                 RenderOutputKind::Transparent,
                 true,
             );
-            let render_result = output_target
-                .and_then(|target| execute_render(&paths, plan, &activity, &reservation, &target));
-            let render_result = reservation
-                .complete(render_result)
-                .map_err(|error| error.to_string());
+            let render_result =
+                output_target.and_then(|target| execution.render(&paths, plan, &activity, &target));
+            let render_result = render_result.map_err(|error| error.to_string());
             let elapsed_secs = started.elapsed().as_secs_f64();
 
             match render_result {

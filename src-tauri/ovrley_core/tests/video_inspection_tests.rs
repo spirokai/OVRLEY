@@ -13,13 +13,13 @@ use ovrley_core::error::CoreResult;
 use ovrley_core::media::prepared_video::check_source_freshness;
 use ovrley_core::media::SourceVideoMetadata;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::batch_plan::{
-    plan_batch_configuration, BatchPlanningResponse, VideoRenderModePlan,
-};
 use ovrley_core::render_jobs::contracts::{BatchEncodingSettings, BatchExportMode};
 use ovrley_core::render_jobs::inspection::{
     InspectionSourceSelection, InspectionValidation, ReinspectionReason, SourceMetadataProbe,
     VideoInspectionService,
+};
+use ovrley_core::render_jobs::planning::{
+    plan_batch_configuration, BatchPlanningResponse, VideoRenderModePlan,
 };
 use serde_json::json;
 

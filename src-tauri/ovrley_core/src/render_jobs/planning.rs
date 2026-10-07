@@ -1,4 +1,4 @@
-//! Batch ingress, output review and per-video preparation.
+//! Single and batch ingress, output review and per-video planning.
 //! Owns the source-local clock and coverage for both export modes; pipelines
 //! consume the resulting fixed plans without reinterpreting batch input.
 
@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 use super::contracts::{BatchEncodingSettings, BatchExportMode};
+use super::inspection::CompositeSourceMetadata;
 use super::inspection::{
     InspectionRejection, InspectionSourceSelection, InspectionValidation, VideoInspectionService,
 };
@@ -15,18 +16,19 @@ use crate::activity::{
     build_dense_activity_report_for_timeline,
     schema::{DenseActivityReport, ParsedActivity},
 };
-use crate::encode::composite::CompositeRenderPlan;
 use crate::encode::ffmpeg::catalog::{
-    CodecSelection, CompositeFilterStackKind, TransparentCodecId,
+    CodecSelection, CompositeCodecId, CompositeFilterStackKind, TransparentCodecId,
 };
 use crate::encode::ffmpeg::settings::build_ffmpeg_settings;
 use crate::encode::fps::Fps;
-use crate::encode::pipeline::frames::FrameProductionPlan;
-use crate::encode::pipeline::transparent::TransparentRenderPlan;
+use crate::encode::plan::CompositeRenderPlan;
+use crate::encode::plan::FrameProductionPlan;
+use crate::encode::plan::TransparentRenderPlan;
 use crate::encode::quality::{validate_quality, EncodingQuality};
 use crate::encode::video_timing::ActivityCoverage;
 use crate::error::{CoreError, CoreResult};
 use crate::media::prepared_video::InspectedVideoSource;
+use crate::normalize::SceneConfig;
 use crate::normalize::{
     raw::{RenderConfig, ScenePresentationConfig},
     validate_ffmpeg_config, validate_render_config_with_resources, validate_render_presentation,
@@ -155,44 +157,23 @@ pub fn plan_batch_configuration(
             return Ok(BatchPlanningResponse::Rejected(rejection))
         }
     };
-    let paths = sources
-        .sources()
-        .iter()
-        .map(|source| PathBuf::from(&source.metadata.path))
-        .collect::<Vec<_>>();
-    let targets = plan_batch_output_targets(
-        output_directory,
-        match encoding.codec {
-            CodecSelection::Composite(_) => RenderOutputKind::Composite,
-            CodecSelection::Transparent(_) => RenderOutputKind::Transparent,
-        },
-        &paths,
-        sources
-            .calibration_source()
-            .map(|source| Path::new(&source.metadata.path)),
-    )?;
+    let outputs = encoding.plan_outputs(&sources, output_directory)?;
     let plans = sources
         .sources()
         .iter()
-        .zip(targets)
-        .map(|(source, target)| {
-            let (planned_frames, fps) = video_output_work(
-                source,
-                encoding.codec,
-                encoding.layout_fps,
-                encoding.update_rate,
-            )?;
-            let (container_fps_num, container_fps_den) = fps.components();
-            Ok(BatchVideoOutputPlan {
+        .zip(outputs)
+        .map(|(source, output)| {
+            let (container_fps_num, container_fps_den) = output.container_fps.components();
+            BatchVideoOutputPlan {
                 source_id: source.source_id.clone(),
-                output_path: target.path().to_path_buf(),
+                output_path: output.target.path().to_path_buf(),
                 output_duration_seconds: source.metadata.duration.expect("inspected duration"),
-                planned_frames: u64::from(planned_frames),
+                planned_frames: u64::from(output.frames),
                 container_fps_num,
                 container_fps_den,
-            })
+            }
         })
-        .collect::<CoreResult<_>>()?;
+        .collect();
     Ok(BatchPlanningResponse::Planned { plans })
 }
 
@@ -202,14 +183,49 @@ pub(crate) struct ValidatedBatchTemplate {
     encoding: ValidatedBatchEncoding,
 }
 
-impl ValidatedBatchTemplate {
-    pub(crate) fn output_work(&self, source: &InspectedVideoSource) -> CoreResult<(u32, Fps)> {
-        video_output_work(
-            source,
-            self.encoding.codec,
-            self.encoding.layout_fps,
-            self.encoding.update_rate,
-        )
+/// Reviewed and accepted jobs share the same output contract.
+pub(crate) struct PlannedBatchOutput {
+    pub target: crate::output::RenderOutputTarget,
+    pub frames: u32,
+    pub container_fps: Fps,
+}
+
+impl ValidatedBatchEncoding {
+    pub(crate) fn plan_outputs(
+        &self,
+        sources: &super::inspection::AcceptedInspectionSources,
+        directory: &Path,
+    ) -> CoreResult<Vec<PlannedBatchOutput>> {
+        let paths = sources
+            .sources()
+            .iter()
+            .map(|source| PathBuf::from(&source.metadata.path))
+            .collect::<Vec<_>>();
+        let targets = plan_batch_output_targets(
+            directory,
+            match self.codec {
+                CodecSelection::Composite(_) => RenderOutputKind::Composite,
+                CodecSelection::Transparent(_) => RenderOutputKind::Transparent,
+            },
+            &paths,
+            sources
+                .calibration_source()
+                .map(|source| Path::new(&source.metadata.path)),
+        )?;
+        sources
+            .sources()
+            .iter()
+            .zip(targets)
+            .map(|(source, target)| {
+                let (frames, container_fps) =
+                    video_output_work(source, self.codec, self.layout_fps, self.update_rate)?;
+                Ok(PlannedBatchOutput {
+                    target,
+                    frames,
+                    container_fps,
+                })
+            })
+            .collect()
     }
 }
 
@@ -233,7 +249,7 @@ pub enum VideoRenderModePlan {
     Composite {
         render: CompositeRenderPlan,
         /// Absent for a single render until its source is probed on the worker.
-        source_metadata: Option<(bool, Option<i32>)>,
+        source_metadata: Option<CompositeSourceMetadata>,
     },
     Transparent(TransparentRenderPlan),
 }
@@ -281,11 +297,8 @@ pub fn plan_single_render(
     let raw_scene = raw.scene.clone();
     let mut config = validate_render_config_with_resources(raw, resources)?;
     let (mode, sampling_fps, activity_offset) = if raw_scene.composite_video_path.is_some() {
-        let render = crate::encode::pipeline::composite_plan::derive_composite_render_plan(
-            &raw_scene,
-            &mut config.scene,
-            Some(activity_end),
-        )?;
+        let render =
+            derive_composite_render_plan(&raw_scene, &mut config.scene, Some(activity_end))?;
         let fps = render.overlay_pipe_fps;
         let offset = render.sync_offset;
         (
@@ -393,7 +406,10 @@ pub(crate) fn plan_batch_item(
                 requested_codec_id,
                 qsv_full_init_args: encoding.qsv_full_init_args.clone(),
             },
-            source_metadata: Some((source.metadata.has_audio, source.metadata.rotation_degrees)),
+            source_metadata: Some(CompositeSourceMetadata {
+                has_audio: source.metadata.has_audio,
+                rotation_degrees: source.metadata.rotation_degrees,
+            }),
         },
         CodecSelection::Transparent(_) => plan_transparent_render(
             &config.scene,
@@ -436,4 +452,179 @@ fn plan_transparent_render(
         container_fps: container_fps.ffmpeg_arg(),
         coverage,
     }))
+}
+
+const COMPOSITE_ACTIVITY_DURATION_SLACK_SECONDS: f64 = 0.25;
+
+/// Validates composite render fields and derives timing/FPS values.
+///
+/// Required fields fail before dense activity is built, while optional fields
+/// receive standard defaults.
+pub fn derive_composite_render_plan(
+    raw: &SceneConfig,
+    scene: &mut crate::normalize::ValidatedSceneConfig,
+    activity_end: Option<f64>,
+) -> CoreResult<CompositeRenderPlan> {
+    let video_path = raw
+        .composite_video_path
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+        .cloned()
+        .ok_or_else(|| {
+            CoreError::Config("scene.composite_video_path required for composite render".into())
+        })?;
+    let quality_type = raw.quality_type.ok_or_else(|| {
+        CoreError::Config("scene.qualityType required for composite render".into())
+    })?;
+    let quality_value = raw.quality_value.ok_or_else(|| {
+        CoreError::Config("scene.qualityValue required for composite render".into())
+    })?;
+    let quality = validate_quality(quality_type, quality_value)?;
+    let ffmpeg = validate_ffmpeg_config(
+        raw.ffmpeg.clone(),
+        CodecSelection::Composite(CompositeCodecId::SoftwareH264),
+    )?;
+    let fps_num = raw.composite_video_fps_num.ok_or_else(|| {
+        CoreError::Config("scene.composite_video_fps_num required for composite render".into())
+    })?;
+    let fps_den = raw.composite_video_fps_den.ok_or_else(|| {
+        CoreError::Config("scene.composite_video_fps_den required for composite render".into())
+    })?;
+    let source_fps = Fps::new(fps_num, fps_den)?;
+    let video_duration = raw.composite_video_duration.ok_or_else(|| {
+        CoreError::Config("scene.composite_video_duration required for composite render".into())
+    })?;
+    if !video_duration.is_finite() || video_duration <= 0.0 {
+        return Err(CoreError::Config(format!(
+            "scene.composite_video_duration must be greater than zero: {video_duration}"
+        )));
+    }
+
+    let sync_offset = scene.export_start_seconds;
+    if sync_offset <= -video_duration {
+        return Err(CoreError::Config(format!(
+            "scene.composite_sync_offset ({sync_offset}) must leave a positive overlap with scene.composite_video_duration ({video_duration})"
+        )));
+    }
+    let trim_start = raw.composite_video_trim_start.ok_or_else(|| {
+        CoreError::Config("scene.composite_video_trim_start required for composite render".into())
+    })?;
+    if !trim_start.is_finite() || trim_start < 0.0 {
+        return Err(CoreError::Config(format!(
+            "scene.composite_video_trim_start must be zero or greater: {trim_start}"
+        )));
+    }
+    if trim_start >= video_duration {
+        return Err(CoreError::Config(format!(
+            "scene.composite_video_trim_start ({trim_start}) must be less than scene.composite_video_duration ({video_duration})"
+        )));
+    }
+
+    let update_rate =
+        std::num::NonZeroU32::new(raw.composite_widget_update_rate.ok_or_else(|| {
+            CoreError::Config(
+                "scene.composite_widget_update_rate required for composite render".into(),
+            )
+        })?)
+        .ok_or_else(|| {
+            CoreError::Config("scene.composite_widget_update_rate must be at least 1".into())
+        })?;
+    let overlay_pipe_fps = source_fps.divided_by(update_rate)?;
+    let mut render_duration = raw
+        .composite_render_duration
+        .unwrap_or(video_duration - trim_start);
+    if !render_duration.is_finite() || render_duration <= 0.0 {
+        return Err(CoreError::Config(format!(
+            "scene.composite_render_duration must be greater than zero: {render_duration}"
+        )));
+    }
+    if let Some(activity_end) = activity_end {
+        if !activity_end.is_finite() || activity_end < 0.0 {
+            return Err(CoreError::Config(format!(
+                "Composite activity end must be finite and zero or greater: {activity_end}"
+            )));
+        }
+        let video_end = sync_offset + render_duration;
+        if sync_offset >= activity_end || video_end <= 0.0 {
+            return Err(CoreError::Config(format!(
+                "Composite video range [{sync_offset}, {video_end}] does not overlap activity range [0, {activity_end}]"
+            )));
+        }
+        let max_render_duration = activity_end - sync_offset;
+        let overrun = render_duration - max_render_duration;
+        if sync_offset >= 0.0 {
+            let ends_just_after_activity =
+                overrun > 0.0 && overrun <= COMPOSITE_ACTIVITY_DURATION_SLACK_SECONDS;
+            if ends_just_after_activity {
+                render_duration = max_render_duration;
+            }
+        }
+        let overlap_start = sync_offset.max(0.0);
+        let overlap_end = activity_end.min(sync_offset + render_duration);
+
+        scene.start = overlap_start;
+        scene.end = overlap_end;
+    } else {
+        scene.start = sync_offset.max(0.0);
+        scene.end = scene.start + render_duration;
+    }
+    let requested_codec_id = match ffmpeg.codec {
+        CodecSelection::Composite(codec_id) => codec_id,
+        CodecSelection::Transparent(codec_id) => {
+            return Err(CoreError::Config(format!(
+                "Transparent codec '{}' cannot be used for a composite render",
+                codec_id.metadata().profile_name
+            )))
+        }
+    };
+
+    scene.fps = overlay_pipe_fps.as_f64();
+    scene.update_rate = std::num::NonZeroU32::MIN;
+    let overlay_frame_count = overlay_pipe_fps.frame_count_for_duration(render_duration)?;
+    let coverage = ActivityCoverage::for_video(
+        render_duration,
+        sync_offset,
+        scene.end,
+        overlay_pipe_fps,
+        overlay_frame_count,
+    )?;
+    let output_frame_count = u32::try_from(source_fps.frame_count_for_duration(render_duration)?)
+        .map_err(|_| {
+        CoreError::Encode("Composite output frame count exceeds u32".to_string())
+    })?;
+
+    Ok(CompositeRenderPlan {
+        frames: crate::encode::plan::FrameProductionPlan::new(
+            overlay_frame_count,
+            std::num::NonZeroU32::MIN,
+        )?,
+        video_path: PathBuf::from(video_path),
+        quality,
+        sync_offset,
+        trim_start,
+        render_duration,
+        update_rate,
+        source_fps,
+        overlay_pipe_fps,
+        overlay_frame_count,
+        output_frame_count,
+        coverage,
+        requested_codec_id,
+        qsv_full_init_args: ffmpeg.qsv_full_init_args,
+    })
+}
+
+#[cfg(test)]
+mod composite_timing_tests {
+    use super::*;
+
+    #[test]
+    fn counts_negative_lead_in_frames_at_fractional_offsets() {
+        let fps = Fps::new(30, 1).expect("valid fps");
+
+        for (offset, expected) in [(-0.01, 1), (-5.0, 150), (-5.01, 151)] {
+            let coverage = ActivityCoverage::for_video(30.0, offset, 120.0, fps, 900).unwrap();
+            assert_eq!(coverage.blank_leading_frame_count, expected);
+        }
+    }
 }

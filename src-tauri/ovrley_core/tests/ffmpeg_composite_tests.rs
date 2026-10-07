@@ -22,15 +22,15 @@
 mod common;
 
 use common::composite::{assert_argument_pair, has_argument_pair};
-use ovrley_core::encode::composite::CompositeRenderPlan;
 use ovrley_core::encode::ffmpeg::catalog::CompositeCodecId;
 use ovrley_core::encode::ffmpeg::composite::{
     build_composite_ffmpeg_settings, CompositeFfmpegSettings,
 };
 use ovrley_core::encode::fps::Fps;
-use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
+use ovrley_core::encode::plan::CompositeRenderPlan;
 use ovrley_core::normalize::{validate_scene_config, SceneConfig};
 use ovrley_core::render::FrameSize;
+use ovrley_core::render_jobs::planning::derive_composite_render_plan;
 use serde_json::json;
 
 /// Builds composite FFmpeg settings with default libx264 codec for quick tests

@@ -6,7 +6,6 @@
 
 use crate::debug::TimingBucket;
 use crate::encode::debug::round3;
-use crate::encode::ffmpeg::binary::configure_ffmpeg_command;
 use crate::error::{CoreError, CoreResult};
 use crate::paths::AppPaths;
 use crate::render::{FrameSize, LabelCacheStatus};
@@ -14,9 +13,7 @@ use chrono::Local;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -214,58 +211,27 @@ pub(crate) fn render_sample_frames_enabled() -> CoreResult<bool> {
     }
 }
 
-/// Writes one raw RGBA frame to a PNG sample file through ffmpeg.
-#[allow(clippy::too_many_arguments)]
+/// Writes the renderer's canonical RGBA pixels directly, without a subprocess.
 pub(crate) fn write_sample_frame(
-    ffmpeg_bin: &Path,
     debug_dir: &Path,
     frame_size: FrameSize,
     rgba: &[u8],
     frame_index: usize,
-    input_pix_fmt: &str,
 ) -> CoreResult<()> {
-    let png_path = debug_dir.join(format!("sample_{frame_index:04}.png"));
-    let mut command = Command::new(ffmpeg_bin);
-    configure_ffmpeg_command(&mut command);
-    command
-        .arg("-loglevel")
-        .arg("error")
-        .arg("-f")
-        .arg("rawvideo")
-        .arg("-pix_fmt")
-        .arg(input_pix_fmt)
-        .arg("-s")
-        .arg(format!("{}x{}", frame_size.width, frame_size.height))
-        .arg("-i")
-        .arg("-")
-        .arg("-frames:v")
-        .arg("1")
-        .arg("-y")
-        .arg(&png_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    let mut child = command.spawn().map_err(|error| {
-        CoreError::Encode(format!("Failed to spawn ffmpeg for sample frame: {error}"))
-    })?;
-    let mut stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| CoreError::Encode("Failed to capture sample-frame ffmpeg stdin".into()))?;
-    stdin
-        .write_all(rgba)
-        .map_err(|error| CoreError::Encode(error.to_string()))?;
-    drop(stdin);
-    let status = child
-        .wait()
-        .map_err(|error| CoreError::Encode(error.to_string()))?;
-    if !status.success() {
-        return Err(CoreError::Encode(format!(
-            "Failed to write sample frame {}",
-            png_path.display()
-        )));
-    }
-    Ok(())
+    let path = debug_dir.join(format!("sample_{frame_index:04}.png"));
+    image::save_buffer(
+        &path,
+        rgba,
+        frame_size.width,
+        frame_size.height,
+        image::ColorType::Rgba8,
+    )
+    .map_err(|error| {
+        CoreError::Encode(format!(
+            "Could not write sample frame {}: {error}",
+            path.display()
+        ))
+    })
 }
 
 // Serializes a payload as pretty JSON and writes it to disk.
@@ -275,4 +241,31 @@ fn write_json<T: Serialize>(path: PathBuf, payload: &T) -> CoreResult<()> {
         path: path.clone(),
         source: error,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sample_png_preserves_rgba_pixels_and_alpha() {
+        let directory =
+            std::env::temp_dir().join(format!("ovrley-png-{}", timestamp_nanos().unwrap()));
+        fs::create_dir(&directory).unwrap();
+        let rgba = [255, 0, 0, 0, 0, 127, 255, 128];
+        write_sample_frame(
+            &directory,
+            FrameSize {
+                width: 2,
+                height: 1,
+            },
+            &rgba,
+            7,
+        )
+        .unwrap();
+        let path = directory.join("sample_0007.png");
+        assert_eq!(image::open(&path).unwrap().to_rgba8().as_raw(), &rgba);
+        fs::remove_file(path).unwrap();
+        fs::remove_dir(directory).unwrap();
+    }
 }

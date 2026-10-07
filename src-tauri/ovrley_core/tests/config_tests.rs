@@ -12,7 +12,7 @@ use ovrley_core::normalize::parse_config_value;
 use ovrley_core::normalize::ContentAlignment;
 use ovrley_core::normalize::TEMPLATE_FILE_VERSION;
 use ovrley_core::render::widgets::types::PreparedValue;
-use ovrley_core::render_jobs::batch_plan::{plan_single_render, VideoRenderModePlan};
+use ovrley_core::render_jobs::planning::{plan_single_render, VideoRenderModePlan};
 use serde_json::json;
 
 #[test]

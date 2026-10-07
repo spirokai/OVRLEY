@@ -277,3 +277,64 @@ impl VideoInspectionService {
 fn closed_session(inspection_id: &str) -> CoreError {
     CoreError::Config(format!("Inspection session is closed: {inspection_id}"))
 }
+
+/// Source metadata required by composite encoding, resolved once before execution.
+#[derive(Clone, Copy, Debug)]
+pub struct CompositeSourceMetadata {
+    pub has_audio: bool,
+    pub rotation_degrees: Option<i32>,
+}
+
+pub(crate) fn verify_composite_source_resolution(
+    paths: &AppPaths,
+    composite_video_path: &Path,
+    scene_width: u32,
+    scene_height: u32,
+) -> CoreResult<CompositeSourceMetadata> {
+    if !composite_video_path.is_file() {
+        return Err(CoreError::Config(format!(
+            "Composite video does not exist: {}",
+            composite_video_path.display()
+        )));
+    }
+
+    let video_path = composite_video_path.to_str().ok_or_else(|| {
+        CoreError::Config(format!(
+            "Composite video path is not valid Unicode: {}",
+            composite_video_path.display()
+        ))
+    })?;
+    let metadata = crate::media::video_probe::probe_video(&paths.repo_root, video_path)?;
+    let resolution = metadata.resolution.ok_or_else(|| {
+        CoreError::Config(format!(
+            "Could not read composite video resolution for {}",
+            composite_video_path.display()
+        ))
+    })?;
+
+    let rotation = metadata
+        .rotation_degrees
+        .map(|degrees| degrees.rem_euclid(360));
+    let (display_width, display_height) = if matches!(rotation, Some(90 | 270)) {
+        (resolution.height, resolution.width)
+    } else {
+        (resolution.width, resolution.height)
+    };
+
+    if u64::from(scene_width) != display_width || u64::from(scene_height) != display_height {
+        return Err(CoreError::Config(format!(
+            "scene resolution {scene_width}x{scene_height} must match display-oriented composite video resolution {display_width}x{display_height} (coded {}x{}, rotation {})",
+            resolution.width,
+            resolution.height,
+            metadata
+                .rotation_degrees
+                .map(|degrees| degrees.to_string())
+                .unwrap_or_else(|| "none".to_string())
+        )));
+    }
+
+    Ok(CompositeSourceMetadata {
+        has_audio: metadata.has_audio,
+        rotation_degrees: metadata.rotation_degrees,
+    })
+}

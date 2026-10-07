@@ -1,7 +1,7 @@
 //! Composite video pipeline integration tests.
 //!
 //! The largest test suite in the crate. Covers the full composite pipeline:
-//! `derive_composite_pipeline_plan`, canonical frame-worker rendering,
+//! `CompositeEncoding::new`, canonical frame-worker rendering,
 //! fractional overrun guards, sync-offset correctness, FPS preservation,
 //! audio track copying, progress reporting, cancellation lifecycle,
 //! FFmpeg failure diagnostics, broken-pipe handling, and composite debug
@@ -40,17 +40,16 @@ mod common;
 use std::process::Command;
 
 use ovrley_core::activity::validate_render_activity;
+use ovrley_core::encode::ffmpeg::composite::CompositeEncoding;
 use ovrley_core::encode::fps::Fps;
-use ovrley_core::encode::pipeline::composite_plan::{
-    derive_composite_pipeline_plan, derive_composite_render_plan,
-};
-use ovrley_core::encode::pipeline::composite_support::{
-    format_pipe_write_failure, is_pipe_write_error, verify_successful_composite_output,
+use ovrley_core::encode::pipeline::diagnostics::{
+    format_pipe_write_failure, is_pipe_write_error, verify_successful_output,
 };
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::normalize::validate_render_config;
-use ovrley_core::render_jobs::batch_plan::plan_single_render;
-use ovrley_core::render_jobs::execution::{execute_render, RenderExecutionService};
+use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::planning::derive_composite_render_plan;
+use ovrley_core::render_jobs::planning::plan_single_render;
 
 use common::composite::{
     assert_argument_pair, cancel_after_delay, composite_debug_timing_summary,
@@ -65,7 +64,6 @@ use common::composite::{
 fn planned_video_pipelines_encode_padding_and_display_rotation() {
     use ovrley_core::output::{plan_batch_output_targets, RenderOutputKind};
     use ovrley_core::render_jobs::contracts::{BatchEncodingSettings, BatchExportMode};
-    use ovrley_core::render_jobs::execution::execute_render;
     use ovrley_core::render_jobs::inspection::VideoInspectionService;
     use serde_json::json;
     let paths = test_paths_named("batch-window-pipelines");
@@ -200,12 +198,8 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
             plan_batch_output_targets(&paths.downloads_dir, kind, &[rotated.clone()], None)
                 .unwrap()
                 .remove(0);
-        let reservation = execution.reserve().unwrap();
-        reservation
-            .begin_item(plan.planned_frames(), "Preparing video assets")
-            .unwrap();
-        let outcome = execute_render(&paths, plan, &activity, &reservation, &target);
-        reservation.complete(outcome).unwrap();
+        let outcome = execution.render(&paths, plan, &activity, &target);
+        outcome.unwrap();
         let metadata = ovrley_core::media::video_probe::probe_video(
             &paths.repo_root,
             target.path().to_str().unwrap(),
@@ -499,8 +493,17 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
         "plan",
         ovrley_core::output::RenderOutputKind::Composite,
     );
-    let plan =
-        derive_composite_pipeline_plan(&paths, &scene, render, true, None, &output_target).unwrap();
+    let plan = CompositeEncoding::new(
+        ovrley_core::render::FrameSize {
+            width: scene.presentation.width,
+            height: scene.presentation.height,
+        },
+        render,
+        true,
+        None,
+        &output_target,
+    )
+    .unwrap();
 
     assert!(!has_argument_pair(
         &plan.ffmpeg_settings.input_0_args,
@@ -622,8 +625,8 @@ fn test_6_3_progress_uses_output_frames_with_lower_overlay_fps() {
         0.0,
         6,
     );
-    let first_overlay_progress = plan.output_progress(1);
-    let second_overlay_progress = plan.output_progress(2);
+    let first_overlay_progress = plan.render.output_progress(1);
+    let second_overlay_progress = plan.render.output_progress(2);
 
     assert_eq!(plan.render.output_frame_count, 60);
     assert_eq!(plan.render.overlay_frame_count, 10);
@@ -692,7 +695,7 @@ fn test_6_5_broken_pipe_error_includes_ffmpeg_exit_context() {
     assert!(message.contains("Unknown filter"));
 }
 
-/// On success, `verify_successful_composite_output` must not error for a
+/// On success, `verify_successful_output` must not error for a
 /// real rendered composite MP4.
 #[test]
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
@@ -701,7 +704,7 @@ fn test_6_6_output_file_exists_and_is_nonzero_on_success() {
 
     assert!(result.output_path.is_file());
     assert!(result.output_size > 0);
-    verify_successful_composite_output(&result.output_path).unwrap();
+    verify_successful_output(&result.output_path).unwrap();
 }
 
 /// After writing a fixture debug summary, the timing summary JSON file must
@@ -842,17 +845,13 @@ fn test_frame_workers_render_short_composite_in_order() {
         plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
     let controller = RenderController::default();
     let execution = RenderExecutionService::with_controller(controller.clone());
-    let reservation = execution.reserve().unwrap();
-    reservation
-        .begin_item(plan.planned_frames(), "test_parallel_frame_workers")
-        .unwrap();
     let output_target = custom_output_target(
         &paths,
         "parallel",
         ovrley_core::output::RenderOutputKind::Composite,
     );
-    let outcome = execute_render(&paths, plan, &activity, &reservation, &output_target);
-    let filename = reservation.complete(outcome).unwrap();
+    let outcome = execution.render(&paths, plan, &activity, &output_target);
+    let filename = outcome.unwrap();
 
     let output_path = paths.downloads_dir.join(filename);
     assert!(output_path.is_file());
@@ -896,18 +895,14 @@ fn test_frame_worker_composite_render() {
         plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
     let controller = RenderController::default();
     let execution = RenderExecutionService::with_controller(controller.clone());
-    let reservation = execution.reserve().unwrap();
-    reservation
-        .begin_item(plan.planned_frames(), "test_parallel_2")
-        .unwrap();
 
     let output_target = custom_output_target(
         &paths,
         "parallel-2",
         ovrley_core::output::RenderOutputKind::Composite,
     );
-    let result = execute_render(&paths, plan, &activity, &reservation, &output_target);
-    let result = reservation.complete(result);
+    let result = execution.render(&paths, plan, &activity, &output_target);
+    let result = result;
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();
     let output = paths.downloads_dir.join(&filename);
@@ -939,18 +934,14 @@ fn test_frame_worker_composite_render_with_audio() {
         plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
     let controller = RenderController::default();
     let execution = RenderExecutionService::with_controller(controller.clone());
-    let reservation = execution.reserve().unwrap();
-    reservation
-        .begin_item(plan.planned_frames(), "test_parallel_audio")
-        .unwrap();
 
     let output_target = custom_output_target(
         &paths,
         "parallel-audio",
         ovrley_core::output::RenderOutputKind::Composite,
     );
-    let result = execute_render(&paths, plan, &activity, &reservation, &output_target);
-    let result = reservation.complete(result);
+    let result = execution.render(&paths, plan, &activity, &output_target);
+    let result = result;
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();
     let output = paths.downloads_dir.join(&filename);

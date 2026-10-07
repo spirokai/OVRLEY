@@ -18,13 +18,13 @@ use ovrley_core::media::SourceVideoMetadata;
 use ovrley_core::output::RenderOutputTarget;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render_jobs::batch::{BatchJobExecutor, BatchServiceError};
-use ovrley_core::render_jobs::batch_plan::{
-    plan_batch_configuration, BatchPlanningResponse, PlannedVideoRender,
-};
 use ovrley_core::render_jobs::contracts::*;
 use ovrley_core::render_jobs::execution::{RenderExecutionService, RendererReservation};
 use ovrley_core::render_jobs::inspection::{
     InspectionSourceSelection, SourceMetadataProbe, VideoInspectionService,
+};
+use ovrley_core::render_jobs::planning::{
+    plan_batch_configuration, BatchPlanningResponse, PlannedVideoRender,
 };
 use serde_json::json;
 

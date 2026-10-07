@@ -38,8 +38,8 @@ use ovrley_core::normalize::raw::{RasterConfig, RenderConfig};
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::raster::{RasterResourceResolver, SelectedRaster};
-use ovrley_core::render_jobs::batch_plan::{plan_single_render, VideoRenderModePlan};
 use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::planning::{plan_single_render, VideoRenderModePlan};
 
 struct EmptyRasterResources;
 
@@ -173,14 +173,20 @@ fn app_render_rejects_a_raster_without_its_loaded_resource() {
             &AppPaths::from_repo_root(PathBuf::from(".")),
             &serde_json::to_string(&config).unwrap(),
             &synthetic_activity_json(),
-            PathBuf::from(render_output_path("missing-raster")).with_extension("mov").to_str().unwrap(),
+            PathBuf::from(render_output_path("missing-raster"))
+                .with_extension("mov")
+                .to_str()
+                .unwrap(),
             false,
             Some(&EmptyRasterResources),
         )
         .unwrap_err();
-    assert!(error
-        .to_string()
-        .contains("raster_error:missing_resource:one"), "{error}");
+    assert!(
+        error
+            .to_string()
+            .contains("raster_error:missing_resource:one"),
+        "{error}"
+    );
 }
 
 /// Verifies the composite branch gate: `submit_single` must

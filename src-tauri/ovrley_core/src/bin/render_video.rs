@@ -17,8 +17,8 @@ use ovrley_core::encode::progress::RenderController;
 use ovrley_core::normalize::parse_config_value;
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::batch_plan::{plan_single_render, VideoRenderModePlan};
-use ovrley_core::render_jobs::execution::{execute_render, RenderExecutionService};
+use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::planning::{plan_single_render, VideoRenderModePlan};
 use serde_json::{Map, Value};
 use std::fs;
 use std::path::PathBuf;
@@ -115,10 +115,6 @@ fn main() -> Result<(), String> {
 
     let controller = RenderController::default();
     let execution = RenderExecutionService::with_controller(controller.clone());
-    let reservation = execution.reserve().unwrap();
-    reservation
-        .begin_item(plan.planned_frames(), "Preparing render assets...")
-        .map_err(|e| e.to_string())?;
     let output_path = paths.downloads_dir.join(format!(
         "overlay_{}.{}",
         std::time::SystemTime::now()
@@ -130,8 +126,8 @@ fn main() -> Result<(), String> {
     let output_target =
         RenderOutputTarget::validate(output_path.to_str().unwrap(), output_kind, false)
             .map_err(|error| error.to_string())?;
-    let outcome = execute_render(&paths, plan, &activity, &reservation, &output_target);
-    let filename = reservation.complete(outcome).map_err(|e| e.to_string())?;
+    let outcome = execution.render(&paths, plan, &activity, &output_target);
+    let filename = outcome.map_err(|e| e.to_string())?;
     println!("{{\"filename\":\"{filename}\"}}");
     Ok(())
 }

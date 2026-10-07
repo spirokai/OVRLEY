@@ -13,7 +13,7 @@ use crate::encode::debug::round3;
 use crate::encode::debug::video::{
     prune_completed_timing_directories, timestamp_nanos, DEBUG_TIMING_RETENTION_LIMIT,
 };
-use crate::encode::pipeline::composite_plan::CompositePipelinePlan;
+use crate::encode::ffmpeg::composite::CompositeEncoding;
 use crate::error::{CoreError, CoreResult};
 use crate::paths::AppPaths;
 use serde::Serialize;
@@ -92,7 +92,7 @@ struct CompositeDiagnostics<'a> {
 #[allow(clippy::too_many_arguments)]
 pub fn write_composite_timing_summary(
     paths: &AppPaths,
-    plan: &CompositePipelinePlan,
+    plan: &CompositeEncoding,
     total_ms: f64,
     render_loop_ms: f64,
     ffmpeg_finalize_wait_ms: f64,

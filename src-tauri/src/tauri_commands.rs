@@ -24,8 +24,8 @@ use ovrley_core::output::RenderOutputKind;
 use ovrley_core::render_jobs::inspection::InspectionSourceSelection;
 use ovrley_core::render_jobs::{
     batch::BatchServiceError,
-    batch_plan::plan_batch_configuration,
     contracts::{BatchAcceptance, BatchEncodingSettings, BatchRenderRequest, BatchSnapshot},
+    planning::plan_batch_configuration,
 };
 use serde::Serialize;
 use std::path::{Path, PathBuf};

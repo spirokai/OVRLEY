@@ -2,7 +2,10 @@
 //! The batch runner owns queue transitions; sinks only observe snapshots.
 
 pub mod batch;
-pub mod batch_plan;
+mod batch_state;
+pub mod planning;
+mod submission;
+
 pub mod contracts;
 pub mod execution;
 pub mod inspection;

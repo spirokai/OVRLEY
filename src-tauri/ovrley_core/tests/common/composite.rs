@@ -20,17 +20,16 @@ use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{parse_activity_json, validate_render_activity};
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::encode::debug::composite::write_composite_timing_summary;
+use ovrley_core::encode::ffmpeg::composite::CompositeEncoding;
 use ovrley_core::encode::fps::Fps;
-use ovrley_core::encode::pipeline::composite_plan::{
-    derive_composite_pipeline_plan, derive_composite_render_plan, CompositePipelinePlan,
-};
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::normalize::raw::{parse_config_json, RenderConfig};
 use ovrley_core::normalize::{parse_template_value, validate_render_config, ValidatedRenderConfig};
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::batch_plan::plan_single_render;
-use ovrley_core::render_jobs::execution::{execute_render, RenderExecutionService};
+use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::planning::derive_composite_render_plan;
+use ovrley_core::render_jobs::planning::plan_single_render;
 use serde_json::Value;
 
 /// Bundles the key artifacts produced by a fixture composite render.
@@ -54,7 +53,7 @@ pub struct RenderFixtureResult {
 /// production planner.
 ///
 /// This helper exists only to keep tests concise. All timing and ffmpeg-plan
-/// behavior still comes from `derive_composite_pipeline_plan(...)`.
+/// behavior still comes from `CompositeEncoding::new(...)`.
 pub fn derive_fixture_composite_plan(
     scene_prefix: &str,
     fps_num: u32,
@@ -63,7 +62,7 @@ pub fn derive_fixture_composite_plan(
     render_duration: f64,
     trim_start: f64,
     update_rate: u32,
-) -> CompositePipelinePlan {
+) -> CompositeEncoding {
     let mut config = parse_config_json(&format!(
         r##"{{
             "scene":{{
@@ -104,7 +103,17 @@ pub fn derive_fixture_composite_plan(
     let mut scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
     let render = derive_composite_render_plan(&config.scene, &mut scene, None).unwrap();
     let target = custom_output_target(&paths, "plan", RenderOutputKind::Composite);
-    derive_composite_pipeline_plan(&paths, &scene, render, true, None, &target).unwrap()
+    CompositeEncoding::new(
+        ovrley_core::render::FrameSize {
+            width: scene.presentation.width,
+            height: scene.presentation.height,
+        },
+        render,
+        true,
+        None,
+        &target,
+    )
+    .unwrap()
 }
 
 pub fn custom_output_target(
@@ -221,7 +230,6 @@ pub fn render_fixture_composite_with_paths(
     codec: &str,
 ) -> Result<RenderFixtureResult, String> {
     let execution = RenderExecutionService::with_controller(controller.clone());
-    let reservation = execution.reserve().map_err(|error| error.to_string())?;
     // ── Phase 1: resolve fixture video path ────────────────────────
     let absolute_video_path = crate::common::test_config::fixtures()
         .join("video")
@@ -257,13 +265,8 @@ pub fn render_fixture_composite_with_paths(
 
     // ── Phase 4: execute canonical frame-worker composite render ────
     let output_target = custom_output_target(&paths, "render", RenderOutputKind::Composite);
-    reservation
-        .begin_item(plan.planned_frames(), "Preparing fixture render")
-        .map_err(|error| error.to_string())?;
-    let outcome = execute_render(&paths, plan, &activity, &reservation, &output_target);
-    let filename = reservation
-        .complete(outcome)
-        .map_err(|error| error.to_string())?;
+    let outcome = execution.render(&paths, plan, &activity, &output_target);
+    let filename = outcome.map_err(|error| error.to_string())?;
 
     // ── Phase 5: validate output and collect metadata ─────────────────
     let output_path = paths.downloads_dir.join(filename);

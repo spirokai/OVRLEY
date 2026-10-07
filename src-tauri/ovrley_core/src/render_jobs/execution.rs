@@ -9,14 +9,14 @@ use std::thread::{self, JoinHandle};
 
 use serde::Serialize;
 
-use super::batch::BatchState;
-use super::batch_plan::{plan_single_render, PlannedVideoRender, VideoRenderModePlan};
+use super::batch_state::BatchState;
+use super::inspection::verify_composite_source_resolution;
+use super::planning::{plan_single_render, PlannedVideoRender, VideoRenderModePlan};
 use crate::activity::schema::ParsedActivity;
 use crate::activity::{parse_activity_json, validate_render_activity};
 use crate::debug::RenderProgress;
-use crate::encode::pipeline::composite::render_composite_video;
-use crate::encode::pipeline::composite_plan::verify_composite_source_resolution;
-use crate::encode::pipeline::transparent::render_transparent_video;
+use crate::encode::ffmpeg::composite::CompositeEncoding;
+use crate::encode::pipeline::{encode_video, VideoEncoding};
 use crate::encode::progress::{ProgressSink, RenderController};
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::parse_config_json;
@@ -67,6 +67,21 @@ impl RenderExecutionService {
 
     pub fn cancel(&self) -> bool {
         self.controller.cancel()
+    }
+
+    /// Synchronous entry for native tools and tests, with the same reservation,
+    /// panic handling and finalization as background submissions.
+    pub fn render(
+        &self,
+        paths: &AppPaths,
+        plan: PlannedVideoRender,
+        activity: &ParsedActivity,
+        target: &RenderOutputTarget,
+    ) -> CoreResult<String> {
+        run_operation(self.reserve()?, |session| {
+            session.begin_item(plan.planned_frames(), "Preparing video assets...")?;
+            execute_render(paths, plan, activity, session, target)
+        })
     }
 
     /// Held across preparation, cleanup, and all items of an eventual batch.
@@ -161,17 +176,7 @@ impl RenderExecutionService {
             thread::Builder::new()
                 .name("render-operation".into())
                 .spawn(move || {
-                    // Accepted inputs leave scope before the reservation is released,
-                    // including cancellation before preparation and worker unwinding.
-                    let session = &reservation;
-                    let outcome = catch_unwind(AssertUnwindSafe(move || {
-                        session.check_cancelled()?;
-                        operation(session)
-                    }))
-                    .unwrap_or_else(|_| {
-                        Err(CoreError::Encode("Render operation worker panicked".into()))
-                    });
-                    let outcome = reservation.complete(outcome);
+                    let outcome = run_operation(reservation, operation);
                     completed(&outcome);
                 })
                 .map_err(|error| {
@@ -180,6 +185,22 @@ impl RenderExecutionService {
         );
         Ok(())
     }
+}
+
+fn run_operation<T, F>(reservation: RendererReservation, operation: F) -> CoreResult<T>
+where
+    T: Clone + Into<Option<String>>,
+    F: FnOnce(&RendererReservation) -> CoreResult<T>,
+{
+    // Accepted inputs leave scope before the reservation is released, including
+    // cancellation before preparation and unwinding.
+    let session = &reservation;
+    let outcome = catch_unwind(AssertUnwindSafe(move || {
+        session.check_cancelled()?;
+        operation(session)
+    }))
+    .unwrap_or_else(|_| Err(CoreError::Encode("Render operation worker panicked".into())));
+    reservation.complete(outcome)
 }
 
 impl Drop for RenderExecutionService {
@@ -249,7 +270,7 @@ impl Drop for RendererReservation {
 
 /// Executes a finalized single or batch plan. The caller owns item start and
 /// the reservation; pipelines return only after native cleanup.
-pub fn execute_render(
+pub(crate) fn execute_render(
     paths: &AppPaths,
     plan: PlannedVideoRender,
     activity: &ParsedActivity,
@@ -259,44 +280,41 @@ pub fn execute_render(
     session.check_cancelled()?;
     let dense = plan.prepare_activity(activity)?;
     session.check_cancelled()?;
-    match plan.mode {
+    let encoding = match plan.mode {
         VideoRenderModePlan::Composite {
             render,
             source_metadata,
         } => {
-            let (has_audio, rotation) = match source_metadata {
+            let source = match source_metadata {
                 Some(metadata) => metadata,
-                None => {
-                    let (rotation, audio) = verify_composite_source_resolution(
-                        paths,
-                        &render.video_path,
-                        plan.config.scene.presentation.width,
-                        plan.config.scene.presentation.height,
-                    )?;
-                    (audio, rotation)
-                }
+                None => verify_composite_source_resolution(
+                    paths,
+                    &render.video_path,
+                    plan.config.scene.presentation.width,
+                    plan.config.scene.presentation.height,
+                )?,
             };
             session.check_cancelled()?;
-            render_composite_video(
-                paths,
-                &plan.config,
-                activity,
-                &dense,
-                session.controller(),
+            VideoEncoding::Composite(CompositeEncoding::new(
+                crate::render::FrameSize {
+                    width: plan.config.scene.presentation.width,
+                    height: plan.config.scene.presentation.height,
+                },
                 render,
-                has_audio,
-                rotation,
+                source.has_audio,
+                source.rotation_degrees,
                 target,
-            )
+            )?)
         }
-        VideoRenderModePlan::Transparent(render) => render_transparent_video(
-            paths,
-            &plan.config,
-            activity,
-            &dense,
-            session.controller(),
-            target,
-            &render,
-        ),
-    }
+        VideoRenderModePlan::Transparent(render) => VideoEncoding::Transparent(render),
+    };
+    encode_video(
+        paths,
+        &plan.config,
+        activity,
+        &dense,
+        session.controller(),
+        target,
+        encoding,
+    )
 }
