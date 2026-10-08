@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import * as backend from '@/api/backend'
 import useStore from '@/store/useStore'
 import { useBatchRenderStore, useBatchSyncInputs } from '@/hooks/useAppStoreSelectors'
@@ -13,6 +14,7 @@ import { reviewBatchQueue, reviewBatchSync } from '../utils/renderPresentation'
  * @returns {object} Reviewed submission inputs and folder/queue controls. Execution and progress have separate owners.
  */
 export default function useBatchInspection({ phase, settings }) {
+  const { i18n } = useTranslation()
   const store = useBatchRenderStore()
   const inputs = useBatchSyncInputs()
   const open = phase === 'confirm' && settings?.renderTarget === 'batch' && !store.hasBatchResults
@@ -27,7 +29,7 @@ export default function useBatchInspection({ phase, settings }) {
   const context = useMemo(() => ({ folder, referencePath, revision }), [folder, referencePath, revision])
   const current = inspection?.context === context ? inspection : null
   const inspectionContext = open || current !== null ? context : null
-  const rows = useMemo(() => reviewBatchQueue(choices, current, sync), [choices, current, sync])
+  const rows = useMemo(() => reviewBatchQueue(choices, current, sync, i18n.resolvedLanguage), [choices, current, sync, i18n.resolvedLanguage])
   const jobs = useMemo(() => rows.filter((row) => row.status === 'pending'), [rows])
   const review = useMemo(
     () => ({ current, jobs, sync, outputDirectory, encoding: settings ? captureRenderEncoding(settings, inputs.availableCodecs) : null }),

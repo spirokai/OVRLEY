@@ -101,8 +101,8 @@ export function reviewBatchSync(inputs) {
   }
 }
 
-/** @param {object[]} choices User queue. @param {object|null} inspection Current descriptors. @param {object} sync Automatic synchronization context. @returns {object[]} Reviewed rows. */
-export function reviewBatchQueue(choices, inspection, sync) {
+/** @param {object[]} choices User queue. @param {object|null} inspection Current descriptors. @param {object} sync Automatic synchronization context. @param {string} locale Display language. @returns {object[]} Reviewed rows. */
+export function reviewBatchQueue(choices, inspection, sync, locale) {
   return choices.map((item) => {
     if (inspection?.error && inspection.error !== 'reinspectionRequired') return { ...item, status: 'blocked', error: inspection.error }
     const result = inspection?.sources.get(item.path)
@@ -111,12 +111,15 @@ export function reviewBatchQueue(choices, inspection, sync) {
     const { metadata } = result.source
     const inspectedItem = { ...item, source: result.source, durationLabel: formatClockDuration(metadata.duration) }
     try {
-      inspectedItem.creationTimeLabel = formatVideoCreationTime(
+      const [creationDateLabel, creationTimeLabel] = formatVideoCreationTime(
         metadata.creationTime,
         metadata.timeSource,
         sync.activitySummary?.timezone ?? null,
         sync.timezoneMode,
-      )
+        locale,
+      ).split(/(?=\d{2}:\d{2}:\d{2}$)/)
+      inspectedItem.creationDateLabel = creationDateLabel.trimEnd()
+      inspectedItem.creationTimeLabel = creationTimeLabel
       const { timing, hasPositiveOverlap } = resolveBatchVideoTiming(metadata, sync.activitySummary, sync.timezoneMode)
       return {
         ...inspectedItem,

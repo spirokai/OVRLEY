@@ -1,5 +1,5 @@
 import i18next from 'i18next'
-import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
+import { getZonedDateTimeParts } from '@/lib/time-format'
 import { videoOverlapsActivity } from '@/lib/video-timing'
 
 class VideoSyncError extends Error {
@@ -14,9 +14,18 @@ class VideoSyncError extends Error {
 function parseSyncTimestamp(timestamp, source, timezone) {
   if (typeof timestamp !== 'string' || timestamp.trim() === '') return null
   try {
-    const formatted = formatVideoCreationTime(timestamp, source, timezone)
-    const normalized = formatted.trim().replace(' ', 'T')
-    const parsed = Date.parse(normalized.endsWith('Z') ? normalized : `${normalized}Z`)
+    let normalized
+    if (source === 'gps') {
+      const values = getZonedDateTimeParts(timestamp, timezone)
+      normalized = `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}:${values.second}`
+    } else {
+      normalized = timestamp
+        .replace(/\.\d+(?=(?:Z|[+-]\d{2}:?\d{2}| UTC)?$)/, '')
+        .replace(/(?:Z|[+-]\d{2}:?\d{2}| UTC)$/, '')
+        .trim()
+        .replace(' ', 'T')
+    }
+    const parsed = Date.parse(`${normalized}Z`)
     return Number.isFinite(parsed) ? parsed : null
   } catch (error) {
     if (error instanceof RangeError) return null

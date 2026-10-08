@@ -46,11 +46,14 @@ function BatchRenderQueueRow({
               <span className="sr-only">{t('toolbar.duration', 'Duration')}: </span>
               <span>{item.durationLabel}</span>
             </span>
-            {item.creationTimeLabel && (
+            {item.creationDateLabel && (
               <span className="flex min-w-0 items-center gap-1">
                 <CalendarDays className="h-3 w-3 shrink-0" aria-hidden="true" />
                 <span className="sr-only">{t('toolbar.createdAt', 'Created at')}: </span>
-                <span className="truncate [word-spacing:0.5rem]">{item.creationTimeLabel}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate">{item.creationDateLabel}</span>
+                  {item.creationTimeLabel && <span className="shrink-0">{item.creationTimeLabel}</span>}
+                </span>
               </span>
             )}
           </p>

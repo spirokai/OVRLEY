@@ -64,24 +64,26 @@ export function parseVideoFilenameCreationTime(path) {
 /**
  * Formats a video creation timestamp according to its authoritative source.
  * GPS timestamps and explicitly UTC metadata timestamps are converted into the
- * recording timezone. Local metadata timestamps retain their clock text.
+ * recording timezone. Local metadata timestamps retain their clock values.
  *
  * @param {string|null} timestamp - Canonical RFC 3339 timestamp.
  * @param {string|null} source - Timestamp source.
  * @param {string|null} timezone - IANA timezone for GPS timestamps.
  * @param {string|null} [timezoneMode=null] - Selected ffprobe interpretation.
+ * @param {string} [locale] - Selected app language; defaults to the active language.
  * @returns {string} Display-formatted timestamp.
  */
-export function formatVideoCreationTime(timestamp, source, timezone, timezoneMode = null) {
+export function formatVideoCreationTime(timestamp, source, timezone, timezoneMode = null, locale) {
   if (!timestamp) return 'Unknown'
 
   if ((source === 'gps' || ((source === 'ffprobe' || source === 'filename') && timezoneMode === 'utc')) && timezone) {
-    return formatZonedDateTime(timestamp, timezone)
+    return formatZonedDateTime(timestamp, timezone, locale)
   }
 
-  return timestamp
-    .replace('T', ' ')
+  const clockTimestamp = timestamp
     .replace(/\.\d+(?=(?:Z|[+-]\d{2}:?\d{2}| UTC)?$)/, '')
     .replace(/(?:Z|[+-]\d{2}:?\d{2}| UTC)$/, '')
     .trim()
+    .replace(' ', 'T')
+  return formatZonedDateTime(`${clockTimestamp}Z`, 'UTC', locale)
 }
