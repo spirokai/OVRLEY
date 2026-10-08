@@ -4,8 +4,14 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { VideoPreviewSurface } from '@/features/video-preview'
+import { getPreviewFontFamily } from '@/features/widget-preview/shared/textMeasurement'
 import useVideoSyncPreview from '../hooks/useVideoSyncPreview'
-import { VIDEO_SYNC_MAP_STYLES, VIDEO_SYNC_NAVIGATION_MAP_MAX_PITCH, VIDEO_SYNC_NAVIGATION_MAP_MIN_PITCH } from '../data/videoSyncConstants'
+import {
+  VIDEO_SYNC_MAP_STYLES,
+  VIDEO_SYNC_NAVIGATION_MAP_MAX_PITCH,
+  VIDEO_SYNC_NAVIGATION_MAP_MIN_PITCH,
+  VIDEO_SYNC_SPEED_FONT,
+} from '../data/videoSyncConstants'
 
 function CourseLocationAction({ actionPoint, onConfirm }) {
   const { t } = useTranslation()
@@ -66,7 +72,7 @@ function VideoSyncNavigationMap({ containerRef, pitch, onPitchChange }) {
   return (
     <div
       data-testid="video-sync-navigation-map"
-      className="absolute top-[3%] right-[2%] z-20 isolate aspect-square w-[25%] overflow-hidden rounded-sm border border-white/50 bg-surface-elevated shadow-lg"
+      className="absolute top-[3%] right-[2%] z-20 isolate aspect-square w-[25%] [@container_(aspect-ratio<1/1)]:h-[25%] [@container_(aspect-ratio<1/1)]:w-auto overflow-hidden rounded-sm border border-white/50 bg-surface-elevated shadow-lg"
       onWheel={(event) => event.stopPropagation()}
     >
       <div ref={containerRef} className="h-full w-full" aria-label="Route navigation map" />
@@ -125,16 +131,19 @@ export default function VideoSyncPreviewScreens({
     <div ref={setSceneElement} data-testid="video-sync-preview-screens" className="grid shrink-0" style={screenLayout.pairStyle}>
       <div
         data-testid="video-sync-video-screen"
-        className="relative z-0 isolate shrink-0 overflow-hidden rounded-sm border border-border/50 bg-black shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)]"
+        className="relative z-0 isolate shrink-0 overflow-hidden rounded-sm border border-border/50 bg-black shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)] [container-type:size]"
         style={screenLayout.screenStyle}
       >
         <VideoPreviewSurface displayScale={1} isActive>
           <div data-testid="video-sync-canvas-diagnostics" className="pointer-events-none absolute inset-0 z-40">
             <div data-testid="video-sync-speed-diagnostic" className="absolute top-[6%] left-[4%] whitespace-nowrap">
               {speed ? (
-                <div className="flex items-baseline text-white" style={{ fontFamily: 'JetBrains Mono', gap: 8 * displayScale }}>
-                  <span style={{ fontSize: 126 * displayScale, lineHeight: 1 }}>{speed.value}</span>
-                  <span style={{ fontSize: 37 * displayScale, lineHeight: 1 }}>{speed.units}</span>
+                <div
+                  className="flex items-baseline text-white"
+                  style={{ fontFamily: getPreviewFontFamily(VIDEO_SYNC_SPEED_FONT), gap: 8 * displayScale }}
+                >
+                  <span style={screenLayout.speedValueStyle}>{speed.value}</span>
+                  <span style={screenLayout.speedUnitsStyle}>{speed.units}</span>
                 </div>
               ) : null}
             </div>

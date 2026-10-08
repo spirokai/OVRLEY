@@ -69,22 +69,22 @@ export function VideoSyncMarkControls({
   return (
     <div
       data-testid="video-sync-mark-controls"
-      className="pointer-events-auto absolute bottom-4 left-1/2 z-50 flex w-max max-w-full -translate-x-1/2 flex-row gap-1 "
+      className="pointer-events-auto absolute bottom-4 left-1/2 z-50 grid grid-cols-4 w-max max-w-[calc(100%-2rem)] -translate-x-1/2 gap-1 [@container_(aspect-ratio<1/1)]:grid-cols-2 [@container_(aspect-ratio<1/1)]:[&>div:nth-child(2)]:order-2 [@container_(aspect-ratio<1/1)]:[&>div:nth-child(3)]:order-3"
       aria-label={t('videoSync.markControls', 'Video sync landmark controls')}
     >
       {controls.map(({ Icon, colorClassName, disabled, disabledReason, label, onClick }) => (
-        <div key={label} className="flex flex-1 rounded-sm bg-surface shadow-md">
+        <div key={label} className="flex min-w-0 rounded-sm bg-surface shadow-md">
           <Button
             variant="ghost"
             size="sm"
-            className={`h-7 uppercase w-auto justify-center border bg-surface px-2 text-[0.75rem] font-semibold ${colorClassName}`}
+            className={`h-auto min-h-7 w-full uppercase justify-center border bg-surface px-2 py-1 text-[0.75rem] font-semibold ${colorClassName}`}
             disabled={disabled}
             title={disabledReason ?? label}
             aria-label={label}
             onClick={onClick}
           >
             <Icon className="size-3.5 shrink-0" />
-            <span>{label}</span>
+            <span className="min-w-0 whitespace-normal break-words">{label}</span>
           </Button>
         </div>
       ))}

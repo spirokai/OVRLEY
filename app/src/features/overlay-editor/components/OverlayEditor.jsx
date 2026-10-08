@@ -495,7 +495,7 @@ function OverlayEditorContent({
             ) : null}
             {videoSyncMode ? (
               <div
-                className="pointer-events-none absolute left-0 top-0"
+                className="pointer-events-none absolute left-0 top-0 [container-type:size]"
                 style={{ width: overlayState.sceneSize.width * displayScale, height: '100%' }}
               >
                 <VideoSyncMarkControls {...resolvedVideoSyncMarkControls} />

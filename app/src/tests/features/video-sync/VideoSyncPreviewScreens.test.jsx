@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const getMapStyleUrlTemplate = vi.hoisted(() => vi.fn())
+const prepareFont = vi.hoisted(() => vi.fn())
 const mapOptions = vi.hoisted(() => vi.fn())
 const markerOptions = vi.hoisted(() => vi.fn())
 const eventHandlers = vi.hoisted(() => new Map())
@@ -74,6 +75,7 @@ const popupContent = vi.hoisted(() => ({ addEventListener: vi.fn(), click: vi.fn
 
 vi.mock('@/api/backend', () => ({ getMapStyleUrlTemplate }))
 vi.mock('@/lib/preferences-store', () => ({ getPreference, setPreference }))
+vi.mock('@/lib/font-resources', () => ({ prepareFont }))
 
 vi.mock('maplibre-gl', () => ({
   LngLat: class {
@@ -147,6 +149,7 @@ describe('VideoSyncPreviewScreens', () => {
   beforeEach(() => {
     getMapStyleUrlTemplate.mockReset()
     getMapStyleUrlTemplate.mockResolvedValue('http://127.0.0.1:3210/styles/{style}')
+    prepareFont.mockReset().mockResolvedValue(undefined)
     getPreference.mockReset()
     getPreference.mockResolvedValue(undefined)
     setPreference.mockReset()
