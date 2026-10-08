@@ -193,6 +193,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       expect(prepareActivityPath).toHaveBeenCalledOnce()
       expect(prepareVideoPath).toHaveBeenCalledOnce()
     })
+    expect(result.current.loadingProject).toBe(true)
     expect(useStore.getState().activitySource).toBeNull()
     expect(useStore.getState().importedVideoPath).toBeNull()
     finishActivityPreparation()
@@ -202,6 +203,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(useStore.getState().importedVideoPath).toBeNull()
     finishFonts()
     await act(async () => openPromise)
+    expect(result.current.loadingProject).toBe(false)
 
     expect(boundaries.openSinglePath).toHaveBeenCalledWith(expect.any(Array), {
       defaultPath: 'C:\\Users\\test\\Documents\\OVRLEY\\projects',
@@ -555,6 +557,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(boundaries.clearPreviewVideo).not.toHaveBeenCalled()
     expect(useStore.getState().activitySource.path).toBe('C:\\Current\\ride.fit')
     expect(useStore.getState().importedBackgroundImagePath).toBe('C:\\Current\\background.png')
+    expect(result.current.loadingProject).toBe(false)
   })
 
   test('clears a previous background image when the opened project has no video', async () => {
@@ -601,9 +604,15 @@ describe('useProjectLifecycle canonical load orchestration', () => {
 
   test('rejects a second project command while the first command owns the lock', async () => {
     let finishDirectoryLookup
+    let finishPicking
     boundaries.getDefaultProjectDirectory.mockReturnValue(
       new Promise((resolve) => {
         finishDirectoryLookup = resolve
+      }),
+    )
+    boundaries.openSinglePath.mockReturnValue(
+      new Promise((resolve) => {
+        finishPicking = resolve
       }),
     )
     const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
@@ -619,10 +628,14 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     act(() => {
       openPromise = result.current.handleOpenProject()
     })
-    expect(result.current.loadingProject).toBe(true)
+    expect(result.current.loadingProject).toBe(false)
+    expect(result.current.busy).toBe(true)
+    await act(async () => finishDirectoryLookup('C:\\Projects'))
+    expect(boundaries.openSinglePath).toHaveBeenCalledOnce()
+    expect(result.current.loadingProject).toBe(false)
+    expect(result.current.busy).toBe(true)
     const secondResult = await act(() => result.current.handleSaveProjectAs())
-    finishDirectoryLookup('C:\\Projects')
-    boundaries.openSinglePath.mockResolvedValue(null)
+    finishPicking(null)
     await act(async () => openPromise)
 
     expect(secondResult).toBe(false)
