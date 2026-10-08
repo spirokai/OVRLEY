@@ -20,6 +20,7 @@ import { Activity, CircleCheck, Film, Loader2, Timer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { formatFps, formatTime } from '../utils/codecUtils'
+import { formatProgressPercent } from '../utils/renderPresentation'
 import { useTranslation } from 'react-i18next'
 
 function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel, isCancelling = false, finished = false, batchSnapshot = null }) {
@@ -85,7 +86,9 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
       {!finished && (
         <div className="space-y-3 pt-6">
           <div className="flex justify-between text-xs font-medium tabular-nums">
-            <span className="text-primary">{t('render-video.percentComplete', '{{percent}}% Complete', { percent })}</span>
+            <span className="text-primary">
+              {t('render-video.percentComplete', '{{percent}}% Complete', { percent: formatProgressPercent(percent) })}
+            </span>
             <span className="text-muted-foreground">
               {t('render-video.frameProgress', '{{current}} / {{total}} frames', {
                 current: current.toLocaleString(),

@@ -45,7 +45,7 @@ export function createRenderProgress(data) {
     renderId: data.render_id,
     current: data.current,
     total: data.total,
-    percent: data.total > 0 ? Math.round((data.current / data.total) * 100) : 0,
+    percent: data.total > 0 ? (data.current / data.total) * 100 : 0,
     encoded: data.encoded,
     status: data.status,
     message: data.message,
@@ -65,7 +65,7 @@ export function createBatchProgress(snapshot) {
   return {
     current: snapshot.processedFrames,
     total: snapshot.plannedFrames,
-    percent: snapshot.plannedFrames > 0 ? Math.round((snapshot.processedFrames / snapshot.plannedFrames) * 100) : 0,
+    percent: snapshot.plannedFrames > 0 ? (snapshot.processedFrames / snapshot.plannedFrames) * 100 : 0,
     encoded: snapshot.encodedFrames,
     status: snapshot.phase,
     estimatedSecondsRemaining: snapshot.estimatedSecondsRemaining,
@@ -84,12 +84,17 @@ export function createBatchItemProgress(snapshot) {
   return {
     current: progress.currentFrames,
     total: progress.plannedFrames,
-    percent: progress.plannedFrames > 0 ? Math.round((progress.currentFrames / progress.plannedFrames) * 100) : 0,
+    percent: progress.plannedFrames > 0 ? (progress.currentFrames / progress.plannedFrames) * 100 : 0,
     encoded: progress.encodedFrames,
     status: snapshot.phase,
     estimatedSecondsRemaining: progress.estimatedSecondsRemaining,
     renderingFps: progress.renderingFps,
   }
+}
+
+/** @param {number} percent Completion percentage. @returns {string} Whole-percent display label. */
+export function formatProgressPercent(percent) {
+  return Math.round(percent).toString()
 }
 
 /** @param {object} inputs Editor synchronization inputs. @returns {object} Review automatic synchronization inputs or an actionable error. */

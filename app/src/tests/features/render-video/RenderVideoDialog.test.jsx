@@ -208,7 +208,7 @@ describe('RenderVideoDialog', () => {
     expect(screen.getByRole('button', { name: /start batch render/i })).toBeDisabled()
   })
 
-  test('rounds batch and item ETA to seconds and keeps the existing completion presentation', () => {
+  test('keeps fractional bar progress, rounds percentage labels and ETA, and preserves completion presentation', () => {
     const id = 'C:/videos/ride.mp4'
     const snapshot = {
       batchId: 'batch-1',
@@ -217,27 +217,34 @@ describe('RenderVideoDialog', () => {
       rendererBusy: true,
       activeItemId: id,
       plannedFrames: 300,
-      processedFrames: 30,
-      renderedFrames: 30,
+      processedFrames: 32,
+      renderedFrames: 32,
       encodedFrames: 20,
       elapsedSeconds: 1,
       estimatedSecondsRemaining: 59.6,
       currentItemProgress: {
         plannedFrames: 300,
-        currentFrames: 30,
-        renderedFrames: 30,
+        currentFrames: 32,
+        renderedFrames: 32,
         encodedFrames: 20,
         elapsedSeconds: 1,
         estimatedSecondsRemaining: 1.6,
         renderingFps: 30,
       },
-      items: [{ id, phase: 'rendering', plannedFrames: 300, currentFrames: 30, renderedFrames: 30, encodedFrames: 20, outcome: null }],
+      items: [{ id, phase: 'rendering', plannedFrames: 300, currentFrames: 32, renderedFrames: 32, encodedFrames: 20, outcome: null }],
       outputs: [],
       resultCounts: { succeeded: 0, failed: 0, cancelled: 0, unstarted: 0 },
     }
     useStore.setState({ batchSnapshot: snapshot })
     render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
 
+    expect(screen.getByText('11% Complete')).toBeInTheDocument()
+    expect(screen.getByText('11%')).toBeInTheDocument()
+    const indicators = document.querySelectorAll('[data-slot="progress-indicator"]')
+    expect(indicators).toHaveLength(2)
+    for (const indicator of indicators) {
+      expect(indicator).toHaveStyle({ transform: 'translateX(-89.33333333333333%)' })
+    }
     expect(screen.getByText('1:00')).toBeInTheDocument()
     expect(screen.getByText('Est. Remaining: 0:02')).toBeInTheDocument()
 

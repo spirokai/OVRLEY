@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 // import { Switch } from '@/components/ui/switch'
 import { formatFps, formatTime } from '../utils/codecUtils'
+import { formatProgressPercent } from '../utils/renderPresentation'
 import { useTranslation } from 'react-i18next'
 
 /** @param {object} props Queue item, active progress, display mode, and queue actions. @returns {JSX.Element} One presentational queue row. */
@@ -37,7 +38,11 @@ function BatchRenderQueueRow({
             <span
               className={`shrink-0 text-right text-[0.7rem] font-semibold tabular-nums ${isDone ? 'text-green-700' : 'text-muted-foreground/60'}`}
             >
-              {isDone ? t('render-video.done', 'Done') : isQueued ? t('render-video.queued', 'Queued') : `${currentItemProgress.percent}%`}
+              {isDone
+                ? t('render-video.done', 'Done')
+                : isQueued
+                  ? t('render-video.queued', 'Queued')
+                  : `${formatProgressPercent(currentItemProgress.percent)}%`}
             </span>
           ) : null}
         </div>
