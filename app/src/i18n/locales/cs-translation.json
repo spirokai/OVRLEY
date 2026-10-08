@@ -223,7 +223,7 @@
     "batch": "Dávka",
     "currentVideo": "Aktuální video",
     "lockedToEachVideoFps": "Uzamčeno na snímkovou frekvenci každého videa",
-    "checkingOverlap": "Kontrola překryvu...",
+    "analyzingVideo": "Analýza videa...",
     "chooseFolder": "Vybrat složku...",
     "clearQueue": "Vymazat",
     "close": "Zavřít",

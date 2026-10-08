@@ -223,7 +223,7 @@
     "batch": "Lote",
     "currentVideo": "Vídeo atual",
     "lockedToEachVideoFps": "Bloqueado na taxa de quadros de cada vídeo",
-    "checkingOverlap": "Verificando sobreposição temporal...",
+    "analyzingVideo": "Analisando vídeo...",
     "chooseFolder": "Escolher pasta...",
     "clearQueue": "Limpar",
     "close": "Fechar",

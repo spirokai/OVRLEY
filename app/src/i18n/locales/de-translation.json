@@ -223,7 +223,7 @@
     "batch": "Stapel",
     "currentVideo": "Aktuelles Video",
     "lockedToEachVideoFps": "Auf die FPS des jeweiligen Videos festgelegt",
-    "checkingOverlap": "Überschneidung wird geprüft...",
+    "analyzingVideo": "Video wird analysiert...",
     "chooseFolder": "Ordner auswählen...",
     "clearQueue": "Leeren",
     "close": "Schließen",

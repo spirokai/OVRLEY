@@ -223,7 +223,7 @@
     "batch": "一括",
     "currentVideo": "現在の動画",
     "lockedToEachVideoFps": "各動画のFPSに固定",
-    "checkingOverlap": "重なりを確認中...",
+    "analyzingVideo": "動画を解析中...",
     "chooseFolder": "フォルダーを選択...",
     "clearQueue": "クリア",
     "close": "閉じる",

@@ -223,7 +223,7 @@
     "batch": "일괄",
     "currentVideo": "현재 동영상",
     "lockedToEachVideoFps": "각 동영상의 FPS로 고정됨",
-    "checkingOverlap": "겹침 확인 중...",
+    "analyzingVideo": "동영상 분석 중...",
     "chooseFolder": "폴더 선택...",
     "clearQueue": "비우기",
     "close": "닫기",

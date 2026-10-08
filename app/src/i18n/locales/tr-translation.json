@@ -223,7 +223,7 @@
     "batch": "Toplu",
     "currentVideo": "Geçerli video",
     "lockedToEachVideoFps": "Her videonun FPS değerine kilitli",
-    "checkingOverlap": "Çakışma kontrol ediliyor...",
+    "analyzingVideo": "Video analiz ediliyor...",
     "chooseFolder": "Klasör seç...",
     "clearQueue": "Temizle",
     "close": "Kapat",

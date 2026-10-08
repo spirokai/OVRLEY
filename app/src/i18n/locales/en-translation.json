@@ -233,7 +233,7 @@
     "videoResolutionMismatch": "Video resolution mismatch",
     "videoResolutionMismatchMessage": "Overlay resolution {{overlayResolution}} must match imported video ({{videoResolution}}).",
     "widgetUpdateRate": "Widget Update Rate",
-    "checkingOverlap": "Checking overlap..."
+    "analyzingVideo": "Analyzing video..."
   },
   "keyboard-shortcuts": {
     "generalCommands": "General commands",

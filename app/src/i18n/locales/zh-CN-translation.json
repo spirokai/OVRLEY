@@ -223,7 +223,7 @@
     "batch": "批量",
     "currentVideo": "当前视频",
     "lockedToEachVideoFps": "锁定为每个视频的 FPS",
-    "checkingOverlap": "正在检查重叠...",
+    "analyzingVideo": "正在分析视频...",
     "chooseFolder": "选择文件夹...",
     "clearQueue": "清空",
     "close": "关闭",

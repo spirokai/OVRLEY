@@ -223,7 +223,7 @@
     "batch": "Batch",
     "currentVideo": "Huidige video",
     "lockedToEachVideoFps": "Vergrendeld op de FPS van elke video",
-    "checkingOverlap": "Overlap controleren...",
+    "analyzingVideo": "Video analyseren...",
     "chooseFolder": "Map kiezen...",
     "clearQueue": "Wissen",
     "close": "Sluiten",

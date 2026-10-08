@@ -34,13 +34,15 @@ function BatchRenderQueueRow({
             {item.filename}
           </p>
           {hasProgress ? (
-            <span className={`shrink-0 text-right text-[0.7rem] font-semibold tabular-nums ${isDone ? 'text-green-700' : 'text-muted-foreground'}`}>
+            <span
+              className={`shrink-0 text-right text-[0.7rem] font-semibold tabular-nums ${isDone ? 'text-green-700' : 'text-muted-foreground/60'}`}
+            >
               {isDone ? t('render-video.done', 'Done') : isQueued ? t('render-video.queued', 'Queued') : `${currentItemProgress.percent}%`}
             </span>
           ) : null}
         </div>
-        {!showBatchProgress && item.durationLabel ? (
-          <p className="mt-0.5 grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-3 text-[9px] font-normal leading-tight tabular-nums text-muted-foreground/50">
+        {!showBatchProgress && !isBlocked && item.durationLabel ? (
+          <p className="mt-0.5 grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-3 text-[0.7rem] font-normal leading-tight tabular-nums text-muted-foreground/60">
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
               <span className="sr-only">{t('toolbar.duration', 'Duration')}: </span>
@@ -59,22 +61,24 @@ function BatchRenderQueueRow({
           </p>
         ) : null}
         {item.status === 'checking' ? (
-          <p className="truncate text-[10px] text-muted-foreground">{t('render-video.checkingOverlap', 'Checking overlap...')}</p>
+          <p className="mt-0.5 truncate text-[0.7rem] font-normal leading-tight tabular-nums text-muted-foreground/60">
+            {t('render-video.analyzingVideo', 'Analyzing video...')}
+          </p>
         ) : null}
         {isBlocked ? (
-          <p className="mt-0.5 truncate text-[10px] font-normal leading-tight text-muted-foreground/70" title={item.error}>
+          <p className="mt-0.5 truncate text-[0.7rem] font-normal leading-tight text-muted-foreground/60" title={item.error}>
             {item.error === 'reinspectionRequired' ? t('render-video.reinspectionRequired') : item.error}
           </p>
         ) : null}
-        {item.status === 'failed' && item.error ? <p className="truncate text-[10px] text-red-700">{item.error}</p> : null}
-        {item.status === 'preparing' ? <p className="text-[10px] text-muted-foreground">{t('render-video.preparingBatch')}</p> : null}
+        {item.status === 'failed' && item.error ? <p className="truncate text-[0.7rem] text-red-700">{item.error}</p> : null}
+        {item.status === 'preparing' ? <p className="text-[0.7rem] text-muted-foreground/60">{t('render-video.preparingBatch')}</p> : null}
         {item.status === 'cancelled' || item.status === 'unstarted' ? (
-          <p className="text-[10px] text-muted-foreground">{t(`render-video.${item.status}`)}</p>
+          <p className="text-[0.7rem] text-muted-foreground/60">{t(`render-video.${item.status}`)}</p>
         ) : null}
         {hasProgress ? <Progress value={isDone ? 100 : isQueued ? 0 : currentItemProgress.percent} className="mt-2 h-1.5" /> : null}
         {isRendering ? (
           <>
-            <p className="mt-1 flex gap-3 text-[10px] tabular-nums text-muted-foreground">
+            <p className="mt-1 flex gap-3 text-[0.7rem] tabular-nums text-muted-foreground/60">
               <span>
                 {t('render-video.renderFps', 'Render FPS')}: {formatFps(currentItemProgress.renderingFps)}
               </span>
@@ -92,7 +96,7 @@ function BatchRenderQueueRow({
               <span
                 role="status"
                 aria-label={
-                  item.status === 'checking' ? t('render-video.checkingOverlap', 'Checking overlap...') : t('render-video.rendering', 'Rendering...')
+                  item.status === 'checking' ? t('render-video.analyzingVideo', 'Analyzing video...') : t('render-video.rendering', 'Rendering...')
                 }
               >
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
