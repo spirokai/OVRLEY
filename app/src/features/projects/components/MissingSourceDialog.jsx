@@ -8,7 +8,7 @@ export function MissingSourceDialog({ sourceRole, open, onLocate, onLoadAnyway, 
   return (
     <Dialog open={open}>
       <DialogContent
-        className="w-full max-w-lg rounded-sm border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
+        className="w-full max-w-lg rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50"
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
       >
         <DialogTitle className="text-lg font-bold">

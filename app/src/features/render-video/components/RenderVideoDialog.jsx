@@ -49,7 +49,7 @@ export default function RenderVideoDialog(props) {
     >
       <DialogContent
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
-        className={`w-full rounded-sm border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50 ${ctx.isBatchTarget ? 'max-w-6xl' : 'max-w-xl'}`}
+        className={`w-full rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50 ${ctx.isBatchTarget ? 'max-w-6xl' : 'max-w-xl'}`}
         aria-describedby={undefined}
         onEscapeKeyDown={(event) => {
           if (ctx.isProgress || ctx.submissionPending || ctx.batchRunning) {
