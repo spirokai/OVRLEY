@@ -313,7 +313,7 @@ describe('MP4 activity — store actions', () => {
 
       expect(useStore.getState().videoSyncOffsetSeconds).toBe(1857)
       expect(useStore.getState().videoSyncWarning).toBeNull()
-      expect(useStore.getState().videoSyncTimezoneMode).toBe('local')
+      expect(useStore.getState().videoSyncTimezoneMode).toBeNull()
     })
 
     test('offers both ffprobe timezone interpretations when both fit the activity', () => {

@@ -34,8 +34,8 @@ function parseSyncTimestamp(timestamp, source, timezone) {
 }
 
 /**
- * Captures Apply Timezone: UTC when checked, local when unchecked. Null or
- * omitted selection is the documented initial unchecked UI state.
+ * Captures Apply Timezone: UTC when checked, local when unchecked. An automatic
+ * unchecked selection captures the local interpretation.
  * @param {'utc'|'local'|null|undefined} mode Editor selection.
  * @returns {'utc'|'local'} Captured interpretation.
  */
@@ -48,7 +48,8 @@ export function captureVideoSyncTimezoneMode(mode) {
 /**
  * Calculates a signed baseline independently of clip overlap. GPS and other
  * trusted sources keep absolute-time handling; camera/filename timestamps use
- * the selected interpretation, never whichever interpretation overlaps.
+ * the selected interpretation. Interactive auto-sync resolves that selection
+ * before batch calibration captures it.
  * @param {object} video Source metadata with creationTime and timeSource.
  * @param {object} activitySummary Activity syncTime, endTime and timezone.
  * @param {'utc'|'local'} timezoneMode Captured Apply Timezone interpretation.
@@ -77,6 +78,9 @@ export function calculateAutomaticVideoOffset(video, activitySummary, timezoneMo
 
 /**
  * Resolves interactive sync state using the same baseline as batch calibration.
+ * Ambiguous camera timestamps try both interpretations until a mode is selected;
+ * prefer local when both overlap and retain an explicit selection.
+ * A sole local match remains automatic for subsequent activity changes.
  * Unresolvable external timestamps or clips without positive activity overlap
  * use the warning/zero UI state; overlapping clips retain their signed offset.
  * @param {object} videoState Imported video state.
@@ -86,21 +90,32 @@ export function calculateAutomaticVideoOffset(video, activitySummary, timezoneMo
 export function resolveVideoSyncState(videoState, activitySummary) {
   const mode = captureVideoSyncTimezoneMode(videoState.videoSyncTimezoneMode)
   const ambiguous = videoState.importedVideoTimeSource === 'ffprobe' || videoState.importedVideoTimeSource === 'filename'
+  const inferMode = ambiguous && (videoState.videoSyncTimezoneMode === null || videoState.videoSyncTimezoneMode === undefined)
+  const modes = inferMode ? ['local', 'utc'] : [mode]
   try {
-    const { automaticOffsetSeconds, activityDurationSeconds } = calculateAutomaticVideoOffset(
-      { creationTime: videoState.importedVideoCreationTime, timeSource: videoState.importedVideoTimeSource },
-      activitySummary,
-      mode,
-    )
-    const overlaps = videoOverlapsActivity({
-      videoStart: automaticOffsetSeconds,
-      videoDuration: videoState.importedVideoDuration,
-      activityEnd: activityDurationSeconds,
+    const candidates = modes.map((timezoneMode) => {
+      const { automaticOffsetSeconds, activityDurationSeconds } = calculateAutomaticVideoOffset(
+        { creationTime: videoState.importedVideoCreationTime, timeSource: videoState.importedVideoTimeSource },
+        activitySummary,
+        timezoneMode,
+      )
+      return {
+        timezoneMode,
+        automaticOffsetSeconds,
+        overlaps: videoOverlapsActivity({
+          videoStart: automaticOffsetSeconds,
+          videoDuration: videoState.importedVideoDuration,
+          activityEnd: activityDurationSeconds,
+        }),
+      }
     })
+    const matches = candidates.filter(({ overlaps }) => overlaps)
+    const selected = matches[0] ?? candidates[0]
+    const inferredLocalOnly = inferMode && matches.length === 1 && selected.timezoneMode === 'local'
     return {
-      videoSyncOffsetSeconds: overlaps ? automaticOffsetSeconds : 0,
-      videoSyncWarning: overlaps ? null : i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity'),
-      videoSyncTimezoneMode: ambiguous ? mode : null,
+      videoSyncOffsetSeconds: selected.overlaps ? selected.automaticOffsetSeconds : 0,
+      videoSyncWarning: selected.overlaps ? null : i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity'),
+      videoSyncTimezoneMode: ambiguous && !inferredLocalOnly ? selected.timezoneMode : null,
     }
   } catch (error) {
     if (!(error instanceof VideoSyncError)) throw error

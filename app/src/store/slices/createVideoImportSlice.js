@@ -104,7 +104,7 @@ export const createVideoImportSlice = (set, get) => ({
   videoSyncOffsetSeconds: 0, // user-adjustable sync offset
   videoSyncOffsetPreviewSeconds: null, // transient drag preview; committed on release
   videoSyncWarning: null, // string warning or null
-  videoSyncTimezoneMode: null, // "local" or "utc" for camera timestamps; null is initially unchecked
+  videoSyncTimezoneMode: null, // "local" or "utc" for camera timestamps; null requests automatic inference
   availableCodecs: null,
   importedVideoCodecName: null,
   importedVideoCodecLongName: null,
