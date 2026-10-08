@@ -7,7 +7,7 @@ import { captureRenderEncoding } from '../utils/renderRequest'
 import { reviewBatchQueue, reviewBatchSync } from '../utils/renderPresentation'
 
 /**
- * Owns disposable native source inspection and output review while confirmation is open.
+ * Retains native source inspection across dialog openings and reviews outputs while confirmation is open.
  * Context identities prevent late results from authorizing Start.
  * @param {object} options Dialog phase and canonical settings.
  * @returns {object} Reviewed submission inputs and folder/queue controls. Execution and progress have separate owners.
@@ -24,8 +24,9 @@ export default function useBatchInspection({ phase, settings }) {
   const [inspection, setInspection] = useState(null)
   const [plan, setPlan] = useState(null)
   const referencePath = sync.error || sync.activitySummary === null ? null : inputs.importedVideoPath
-  const context = useMemo(() => ({ folder, referencePath, revision, open }), [folder, referencePath, revision, open])
+  const context = useMemo(() => ({ folder, referencePath, revision }), [folder, referencePath, revision])
   const current = inspection?.context === context ? inspection : null
+  const inspectionContext = open || current !== null ? context : null
   const rows = useMemo(() => reviewBatchQueue(choices, current, sync), [choices, current, sync])
   const jobs = useMemo(() => rows.filter((row) => row.status === 'pending'), [rows])
   const review = useMemo(
@@ -34,7 +35,9 @@ export default function useBatchInspection({ phase, settings }) {
   )
 
   useEffect(() => {
-    if (!open || folder === null) return
+    if (inspectionContext === null || inspectionContext.folder === null) return
+    const context = inspectionContext
+    const { folder, referencePath } = context
     let closed = false
     let inspectionId = null
     void (async () => {
@@ -88,7 +91,7 @@ export default function useBatchInspection({ phase, settings }) {
       if (inspectionId !== null)
         void backend.disposeVideoInspection(inspectionId).catch((error) => useStore.getState().setErrorMessage(error.message))
     }
-  }, [open, folder, referencePath, context])
+  }, [inspectionContext])
 
   useEffect(() => {
     if (!open || !current?.complete || current.error || current.calibrationError || sync.error || jobs.length === 0 || outputDirectory === null)
@@ -135,6 +138,7 @@ export default function useBatchInspection({ phase, settings }) {
   return {
     ...store,
     batchRunning,
+    batchInspecting: folder !== null && (current === null || (!current.complete && !current.error)),
     batchQueue: rowsWithIssues,
     batchReady: ready && !batchRunning,
     batchReviewError: current?.error ?? current?.calibrationError ?? sync.error ?? currentPlan?.error ?? null,

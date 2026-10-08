@@ -1,6 +1,8 @@
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import i18next from 'i18next'
 import { resolveBatchVideoTiming } from '@/lib/video-sync'
+import { formatClockDuration } from '@/lib/time-format'
+import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { captureBatchSync } from './renderRequest'
 
 /** @param {number} durationSeconds Imported video duration. @param {number} offsetSeconds Committed activity offset. @returns {object} Activity-timeline export range. */
@@ -106,17 +108,24 @@ export function reviewBatchQueue(choices, inspection, sync) {
     const result = inspection?.sources.get(item.path)
     if (!result) return { ...item, status: 'checking', error: null }
     if (result.error || sync.error) return { ...item, status: 'blocked', error: result.error ?? sync.error }
+    const { metadata } = result.source
+    const inspectedItem = { ...item, source: result.source, durationLabel: formatClockDuration(metadata.duration) }
     try {
-      const { timing, hasPositiveOverlap } = resolveBatchVideoTiming(result.source.metadata, sync.activitySummary, sync.timezoneMode)
+      inspectedItem.creationTimeLabel = formatVideoCreationTime(
+        metadata.creationTime,
+        metadata.timeSource,
+        sync.activitySummary?.timezone ?? null,
+        sync.timezoneMode,
+      )
+      const { timing, hasPositiveOverlap } = resolveBatchVideoTiming(metadata, sync.activitySummary, sync.timezoneMode)
       return {
-        ...item,
-        source: result.source,
+        ...inspectedItem,
         timing,
         status: hasPositiveOverlap === false ? 'blocked' : 'pending',
         error: hasPositiveOverlap === false ? i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity') : null,
       }
     } catch (error) {
-      return { ...item, status: 'blocked', error: error.message }
+      return { ...inspectedItem, status: 'blocked', error: error.message }
     }
   })
 }

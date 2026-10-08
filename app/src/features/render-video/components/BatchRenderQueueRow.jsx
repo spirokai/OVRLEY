@@ -1,8 +1,8 @@
 import { memo } from 'react'
-import { Loader2, Trash2 } from 'lucide-react'
+import { CalendarDays, Clock, Loader2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Switch } from '@/components/ui/switch'
+// import { Switch } from '@/components/ui/switch'
 import { formatFps, formatTime } from '../utils/codecUtils'
 import { useTranslation } from 'react-i18next'
 
@@ -13,7 +13,7 @@ function BatchRenderQueueRow({
   batchRunning,
   showBatchProgress,
   currentItemProgress,
-  setBatchItemSkipOverlay,
+  // setBatchItemSkipOverlay,
   removeBatchQueueItem,
 }) {
   const { t } = useTranslation()
@@ -26,7 +26,7 @@ function BatchRenderQueueRow({
   return (
     <div
       key={item.id}
-      className={`grid ${showBatchProgress ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_5rem_1.75rem]'} items-center gap-3 rounded-sm px-2 py-2 ${isBlocked ? (showBatchProgress ? 'opacity-50' : '[&>*:not(:last-child)]:opacity-50') : 'hover:bg-surface-elevated'}`}
+      className={`grid ${showBatchProgress ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_1.75rem_1.75rem]'} items-center gap-3 rounded-sm px-2 py-2 ${isBlocked ? (showBatchProgress ? 'opacity-50' : '[&>*:not(:last-child)]:opacity-50') : 'hover:bg-surface-elevated'}`}
     >
       <div className="min-w-0">
         <div className="flex items-center justify-between gap-3">
@@ -39,6 +39,22 @@ function BatchRenderQueueRow({
             </span>
           ) : null}
         </div>
+        {!showBatchProgress && item.durationLabel ? (
+          <p className="mt-0.5 grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-3 text-[9px] font-normal leading-tight tabular-nums text-muted-foreground/50">
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span className="sr-only">{t('toolbar.duration', 'Duration')}: </span>
+              <span>{item.durationLabel}</span>
+            </span>
+            {item.creationTimeLabel && (
+              <span className="flex min-w-0 items-center gap-1">
+                <CalendarDays className="h-3 w-3 shrink-0" aria-hidden="true" />
+                <span className="sr-only">{t('toolbar.createdAt', 'Created at')}: </span>
+                <span className="truncate [word-spacing:0.5rem]">{item.creationTimeLabel}</span>
+              </span>
+            )}
+          </p>
+        ) : null}
         {item.status === 'checking' ? (
           <p className="truncate text-[10px] text-muted-foreground">{t('render-video.checkingOverlap', 'Checking overlap...')}</p>
         ) : null}
@@ -69,7 +85,7 @@ function BatchRenderQueueRow({
       {!showBatchProgress && (
         <>
           <div className="flex h-7 items-center justify-center">
-            {isLoading ? (
+            {isLoading && (
               <span
                 role="status"
                 aria-label={
@@ -78,20 +94,21 @@ function BatchRenderQueueRow({
               >
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
               </span>
-            ) : (
+            )}
+            {/* Experimental activity overlay toggle; retained for future development.
               <Switch
                 aria-label={`${t('render-video.activityOverlay', 'Activity overlay')}: ${item.filename}`}
                 checked={!isBlocked && !item.skipOverlay}
                 onCheckedChange={(checked) => setBatchItemSkipOverlay(item.id, !checked)}
                 disabled={batchRunning || isBlocked}
               />
-            )}
+            */}
           </div>
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground enabled:hover:text-red-700 disabled:hover:bg-transparent"
+            className="h-7 w-7 text-muted-foreground enabled:hover:text-primary disabled:hover:bg-transparent"
             onClick={() => removeBatchQueueItem(item.id)}
             disabled={batchRunning}
           >
