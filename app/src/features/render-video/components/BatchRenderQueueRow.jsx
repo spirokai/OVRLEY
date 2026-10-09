@@ -27,7 +27,7 @@ function BatchRenderQueueRow({
   return (
     <div
       key={item.id}
-      className={`grid ${showBatchProgress ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_1.75rem_1.75rem]'} items-center gap-3 rounded-sm px-2 py-2 ${isBlocked ? (showBatchProgress ? 'opacity-50' : '[&>*:not(:last-child)]:opacity-50') : 'hover:bg-surface-elevated'}`}
+      className={`grid ${showBatchProgress ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_4.5rem_1.75rem]'} items-center gap-3 rounded-sm px-2 py-2 ${isBlocked ? (showBatchProgress ? 'opacity-50' : '[&>*:not(:last-child)]:opacity-50') : 'hover:bg-surface-elevated'}`}
     >
       <div className="min-w-0">
         <div className="flex items-center justify-between gap-3">
@@ -107,12 +107,14 @@ function BatchRenderQueueRow({
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
               </span>
             )}
-            <Switch
-              aria-label={`${t('render-video.activityOverlay', 'Activity overlay')}: ${item.filename}`}
-              checked={!isBlocked && !item.skipOverlay}
-              onCheckedChange={(checked) => setBatchItemSkipOverlay(item.id, !checked)}
-              disabled={batchRunning || isBlocked}
-            />
+            {item.status === 'pending' && (
+              <Switch
+                aria-label={`${t('render-video.activityOverlay', 'Activity overlay')}: ${item.filename}`}
+                checked={!item.skipOverlay}
+                onCheckedChange={(checked) => setBatchItemSkipOverlay(item.id, !checked)}
+                disabled={batchRunning}
+              />
+            )}
           </div>
           <Button
             type="button"
