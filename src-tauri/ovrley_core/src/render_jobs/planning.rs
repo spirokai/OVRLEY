@@ -384,6 +384,8 @@ pub(crate) fn plan_batch_item(
     };
     let mut config = template.config.clone().with_scene(scene);
     if skip_overlay {
+        config.backdrops.clear();
+        config.labels.clear();
         config.values.clear();
         config.course_plots.clear();
         config.elevation_plots.clear();

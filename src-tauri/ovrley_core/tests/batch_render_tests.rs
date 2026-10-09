@@ -108,9 +108,17 @@ impl Fixture {
         else {
             panic!("fresh sources")
         };
+        let mut template = common::builders::batch_template();
+        template.rasters.push(
+            serde_json::from_value(json!({
+                "id":"logo", "x":2, "y":3, "width":4, "height":5,
+                "rotation":0, "opacity":1, "path":self.directory.join("logo.png")
+            }))
+            .unwrap(),
+        );
         BatchRenderRequest {
             inspection_id: session.inspection_id,
-            template: common::builders::batch_template(),
+            template,
             encoding,
             activity: if external {
                 BatchActivity::ExternalActivity {
@@ -229,11 +237,18 @@ impl BatchJobExecutor for ControlledExecutor {
             .push(plan.config().scene.export_start_seconds);
         if filename.starts_with('1') {
             assert!(plan.config().values.is_empty());
-            assert_eq!(plan.config().labels.len(), 1);
-            assert_eq!(plan.config().backdrops.len(), 1);
+            assert!(plan.config().labels.is_empty());
+            assert!(plan.config().backdrops.is_empty());
+            assert!(plan.config().course_plots.is_empty());
+            assert!(plan.config().elevation_plots.is_empty());
         } else {
             assert!(!plan.config().values.is_empty());
+            assert_eq!(plan.config().labels.len(), 1);
+            assert_eq!(plan.config().backdrops.len(), 1);
         }
+        assert_eq!(plan.config().rasters.len(), 1);
+        assert_eq!(plan.config().rasters[0].id, "logo");
+        assert_eq!(plan.config().rasters[0].geometry.width, 4.0);
         if let Some(path) = &activity.file_name {
             assert!(path.contains(filename.split('_').next().unwrap()));
         }

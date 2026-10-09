@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { CalendarDays, Clock, Loader2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-// import { Switch } from '@/components/ui/switch'
+import { Switch } from '@/components/ui/switch'
 import { formatFps, formatTime } from '../utils/codecUtils'
 import { formatProgressPercent } from '../utils/renderPresentation'
 import { useTranslation } from 'react-i18next'
@@ -14,7 +14,7 @@ function BatchRenderQueueRow({
   batchRunning,
   showBatchProgress,
   currentItemProgress,
-  // setBatchItemSkipOverlay,
+  setBatchItemSkipOverlay,
   removeBatchQueueItem,
 }) {
   const { t } = useTranslation()
@@ -107,14 +107,12 @@ function BatchRenderQueueRow({
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
               </span>
             )}
-            {/* Experimental activity overlay toggle; retained for future development.
-              <Switch
-                aria-label={`${t('render-video.activityOverlay', 'Activity overlay')}: ${item.filename}`}
-                checked={!isBlocked && !item.skipOverlay}
-                onCheckedChange={(checked) => setBatchItemSkipOverlay(item.id, !checked)}
-                disabled={batchRunning || isBlocked}
-              />
-            */}
+            <Switch
+              aria-label={`${t('render-video.activityOverlay', 'Activity overlay')}: ${item.filename}`}
+              checked={!isBlocked && !item.skipOverlay}
+              onCheckedChange={(checked) => setBatchItemSkipOverlay(item.id, !checked)}
+              disabled={batchRunning || isBlocked}
+            />
           </div>
           <Button
             type="button"

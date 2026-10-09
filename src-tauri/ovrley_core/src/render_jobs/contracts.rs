@@ -82,7 +82,7 @@ pub enum BatchActivity {
 pub struct BatchRenderJob {
     pub id: String,
     pub source_id: String,
-    /// Suppresses metric widgets and plots, retaining the job and static art.
+    /// Suppresses all widgets except rasters, retaining the job.
     pub skip_overlay: bool,
 }
 

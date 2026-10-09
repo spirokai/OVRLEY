@@ -196,8 +196,8 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
             let suppressed = prepare(offset, true).unwrap();
             assert_eq!(suppressed.planned_frames(), frames);
             assert!(suppressed.config().values.is_empty());
-            assert_eq!(suppressed.config().labels.len(), 1);
-            assert_eq!(suppressed.config().backdrops.len(), 1);
+            assert!(suppressed.config().labels.is_empty());
+            assert!(suppressed.config().backdrops.is_empty());
             let dense = suppressed.prepare_activity(&activity).unwrap();
             let (assets, _, _, _) =
                 prepare_preview_assets(&paths, suppressed.config(), &activity, &dense).unwrap();
@@ -220,8 +220,8 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
                 .render_rgba(covered_frame, &mut pixels, &mut profiler)
                 .unwrap();
             assert!(
-                pixels.chunks_exact(4).any(|pixel| pixel[3] > 0),
-                "static art remains in coverage"
+                pixels.chunks_exact(4).all(|pixel| pixel[3] == 0),
+                "suppressed overlay without rasters is transparent in coverage"
             );
             let blank_frame = if offset < 0.0 {
                 0
