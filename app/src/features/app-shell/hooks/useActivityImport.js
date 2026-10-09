@@ -1,5 +1,5 @@
 /**
- * Activity import - GPX/FIT/SRT/IGC/CSV/VBO file selection and import.
+ * Activity import - GPX/FIT/TCX/SRT/IGC/CSV/VBO file selection and import.
  */
 
 import { useCallback } from 'react'
@@ -51,7 +51,7 @@ export default function useActivityImport() {
       let selection = null
 
       if (hasTauriRuntime()) {
-        const selectedPath = await openSinglePath([{ name: 'Activity', extensions: ['gpx', 'fit', 'srt', 'igc', 'csv', 'vbo'] }], {
+        const selectedPath = await openSinglePath([{ name: 'Activity', extensions: ['gpx', 'fit', 'tcx', 'srt', 'igc', 'csv', 'vbo'] }], {
           lastDirectoryKey: 'last-activity-import-dir',
         })
         if (typeof selectedPath === 'string') selection = selectedPath

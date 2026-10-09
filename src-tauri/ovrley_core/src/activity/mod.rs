@@ -19,6 +19,8 @@ pub(crate) mod lap_timing;
 pub mod metric_ranges;
 /// Serializable activity payloads and internal dense/trimmed report types.
 pub mod schema;
+/// Native Garmin TCX extraction into canonical raw activity samples.
+pub mod tcx;
 /// Scene-window trimming for parsed activity samples.
 pub mod trim;
 /// Native Racelogic VBOX extraction into canonical activity columns.

@@ -99,6 +99,12 @@ pub struct RawActivity {
     /// Format-specific context carried through without backend interpretation.
     #[serde(default)]
     pub metadata: Value,
+    /// Optional source-provided activity start instant.
+    #[serde(default)]
+    pub sync_time: Option<String>,
+    /// Exact source lap boundaries when sample-aligned labels are unavailable.
+    #[serde(default)]
+    pub lap_markers: LapMarkers,
     /// Normalized samples in source order, before shared finalization.
     #[serde(default)]
     pub raw_samples: Vec<RawSample>,
@@ -129,10 +135,10 @@ pub struct DirectMetricGapPolicy {
 }
 
 /// Metadata carrier for implicit lap boundaries.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum LapMarkers {
     None,
-    /// AiM: elapsed seconds of start/finish crossings.
+    /// Activity-relative elapsed seconds of exact lap boundaries.
     BeaconMarkers(Vec<f64>),
     /// VBO: start/finish lat/lon points.
     TimingMarkers(Vec<TimingMarker>),
@@ -145,7 +151,7 @@ impl Default for LapMarkers {
 }
 
 /// Single lap-timing marker from a VBO `[laptiming]` section.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TimingMarker {
     pub kind: TimingMarkerKind,
     pub latitude_a: f64,
@@ -154,7 +160,7 @@ pub struct TimingMarker {
     pub longitude_b: f64,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum TimingMarkerKind {
     Start,
     Split,

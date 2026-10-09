@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 import { openSinglePath } from '@/lib/file-dialog'
 
-const ACTIVITY_FILTER = [{ name: 'Activity', extensions: ['gpx', 'fit', 'srt', 'igc', 'csv', 'vbo'] }]
+const ACTIVITY_FILTER = [{ name: 'Activity', extensions: ['gpx', 'fit', 'tcx', 'srt', 'igc', 'csv', 'vbo'] }]
 const VIDEO_FILTER = [{ name: 'Video', extensions: ['mp4', 'mov', 'mkv'] }]
 
 function sourceExtension(path) {

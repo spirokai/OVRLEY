@@ -195,6 +195,15 @@ export async function parseVboActivity(path) {
 }
 
 /**
+ * Parses and finalizes a native TCX activity using the Rust parser.
+ * @param {string} path - Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseTcxActivity(path) {
+  return invokeCommand('backend_parse_tcx_activity', { path })
+}
+
+/**
  * Renders a transparent PNG for a single preview second.
  *
  * @param {*} config - Overlay template configuration data.

@@ -85,6 +85,7 @@ pub fn run() {
             tauri_commands::backend_finalize_activity,
             tauri_commands::backend_parse_csv_activity,
             tauri_commands::backend_parse_vbo_activity,
+            tauri_commands::backend_parse_tcx_activity,
             tauri_commands::backend_render_preview_frame,
             tauri_commands::backend_suggest_output_path,
             tauri_commands::backend_progress,

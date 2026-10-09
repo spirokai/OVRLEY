@@ -161,7 +161,15 @@ pub fn finalize_raw_activity_json(
     repo_root: Option<&std::path::Path>,
 ) -> CoreResult<FinalizeActivityResponse> {
     let raw_activity = parse_raw_activity_json(input)?;
-    let finalized = finalize_raw_activity_with_debug(&raw_activity)?;
+    finalize_raw_activity(&raw_activity, repo_root)
+}
+
+/// Finalizes native extraction through the same gap-filling path as raw JSON input.
+pub fn finalize_raw_activity(
+    raw_activity: &RawActivity,
+    repo_root: Option<&std::path::Path>,
+) -> CoreResult<FinalizeActivityResponse> {
+    let finalized = finalize_raw_activity_with_debug(raw_activity)?;
     Ok(finalized.into_response(
         Some(&raw_activity.file_name),
         Some(&raw_activity.file_format),
@@ -434,7 +442,7 @@ fn activity_columns_from_samples(
         file_name: raw_activity.file_name.clone(),
         file_format: raw_activity.file_format.clone(),
         metadata: raw_activity.metadata.clone(),
-        sync_time: None,
+        sync_time: raw_activity.sync_time.clone(),
         options: raw_activity.options.clone(),
         preserve_direct_metric_gaps: Default::default(),
         timestamp: raw_samples
@@ -489,7 +497,7 @@ fn activity_columns_from_samples(
         color_temperature: collect!(color_temperature),
         original_sample_count,
         include_original_sample_count_metadata: true,
-        lap_markers: crate::activity::schema::LapMarkers::None,
+        lap_markers: raw_activity.lap_markers.clone(),
     }
 }
 

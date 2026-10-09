@@ -262,6 +262,16 @@ pub(crate) async fn backend_parse_vbo_activity(
         .map_err(|error| error.to_string())
 }
 
+/// Parses a native TCX path through the shared activity finalizer.
+#[tauri::command]
+pub(crate) async fn backend_parse_tcx_activity(
+    app: AppHandle,
+    path: String,
+) -> Result<FinalizeActivityResponse, String> {
+    commands::backend_parse_tcx_activity(&runtime_paths::app_paths(&app)?, &path)
+        .map_err(|error| error.to_string())
+}
+
 /// Renders one transparent preview PNG for the requested second.
 #[tauri::command]
 pub(crate) async fn backend_render_preview_frame(

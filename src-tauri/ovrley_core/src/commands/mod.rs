@@ -86,6 +86,14 @@ pub fn backend_parse_vbo_activity(
     Ok(response)
 }
 
+/// Parses and finalizes a native TCX activity through the shared raw-sample pipeline.
+pub fn backend_parse_tcx_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    crate::activity::tcx::parse_tcx_activity_path(Path::new(path), Some(&paths.repo_root))
+}
+
 /// Lists canonical bundled capabilities and lazy system font identities.
 pub fn backend_list_system_fonts(paths: &AppPaths) -> CoreResult<Value> {
     Ok(serde_json::to_value(crate::fonts::font_catalog(
