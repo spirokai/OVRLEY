@@ -3,7 +3,8 @@
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::{RasterGeometry, RasterSource, ValidatedRaster};
 use crate::raster::load_selected_raster;
-use skia_safe::{Canvas, Data, Image, Paint, Rect};
+use image::{imageops, RgbaImage};
+use skia_safe::{images, AlphaType, Canvas, ColorType, Data, FilterMode, Image, Paint, Rect};
 use std::sync::Arc;
 
 pub struct PreparedRaster {
@@ -12,7 +13,10 @@ pub struct PreparedRaster {
     image: Image,
 }
 
-pub(super) fn prepare_rasters(rasters: &[ValidatedRaster]) -> CoreResult<Vec<PreparedRaster>> {
+pub(super) fn prepare_rasters(
+    rasters: &[ValidatedRaster],
+    global_scale: f32,
+) -> CoreResult<Vec<PreparedRaster>> {
     rasters
         .iter()
         .map(|config| {
@@ -29,6 +33,7 @@ pub(super) fn prepare_rasters(rasters: &[ValidatedRaster]) -> CoreResult<Vec<Pre
                     config.id, config.id
                 ))
             })?;
+            let image = downsample_raster(image, config, global_scale)?;
             Ok(PreparedRaster {
                 geometry: config.geometry.clone(),
                 content_hash: selected.content_hash(),
@@ -36,6 +41,51 @@ pub(super) fn prepare_rasters(rasters: &[ValidatedRaster]) -> CoreResult<Vec<Pre
             })
         })
         .collect()
+}
+
+fn downsample_raster(
+    image: Image,
+    config: &ValidatedRaster,
+    global_scale: f32,
+) -> CoreResult<Image> {
+    // Keep subpixel widgets at one pixel and avoid allocating enlarged source images.
+    let width =
+        ((config.geometry.width * global_scale).ceil() as u32).clamp(1, image.width() as u32);
+    let height =
+        ((config.geometry.height * global_scale).ceil() as u32).clamp(1, image.height() as u32);
+    if (width, height) == (image.width() as u32, image.height() as u32) {
+        return Ok(image);
+    }
+    let info = image
+        .image_info()
+        .with_color_type(ColorType::RGBA8888)
+        .with_alpha_type(AlphaType::Premul);
+    let mut pixels = RgbaImage::new(image.width() as u32, image.height() as u32);
+    if !image.read_pixels(
+        &info,
+        pixels.as_mut(),
+        image.width() as usize * 4,
+        (0, 0),
+        skia_safe::image::CachingHint::Allow,
+    ) {
+        return Err(CoreError::Render(format!(
+            "Raster {} pixels could not be read for resizing",
+            config.id
+        )));
+    }
+    // Filter premultiplied colors to prevent transparent pixels from bleeding into edges.
+    let resized = imageops::resize(&pixels, width, height, imageops::FilterType::Triangle);
+    images::raster_from_data(
+        &info.with_dimensions((width as i32, height as i32)),
+        Data::new_copy(resized.as_raw()),
+        width as usize * 4,
+    )
+    .ok_or_else(|| {
+        CoreError::Render(format!(
+            "Raster {} resized image could not be created",
+            config.id
+        ))
+    })
 }
 
 pub(super) fn draw_rasters(
@@ -53,10 +103,11 @@ pub(super) fn draw_rasters(
         canvas.translate((config.x, config.y));
         canvas.rotate(config.rotation, None);
         canvas.scale((global_scale, global_scale));
-        canvas.draw_image_rect(
+        canvas.draw_image_rect_with_sampling_options(
             &raster.image,
             None,
             Rect::from_xywh(0.0, 0.0, config.width, config.height),
+            FilterMode::Linear,
             &paint,
         );
         canvas.restore();
@@ -97,7 +148,7 @@ mod tests {
                 crate::raster::load_embedded_raster("png", encoded).unwrap(),
             )),
         };
-        prepare_rasters(&[config]).unwrap().pop().unwrap()
+        prepare_rasters(&[config], 1.0).unwrap().pop().unwrap()
     }
 
     #[test]

@@ -302,7 +302,7 @@ pub fn prepare_preview_assets(
         dense_activity,
         &mut prepare_profiler,
     )?;
-    let rasters = prepare_rasters(&config.rasters)?;
+    let rasters = prepare_rasters(&config.rasters, prepared_assets.scene.presentation.scale)?;
     let static_layer = StaticLayer {
         backdrops: &prepared_assets.backdrops,
         rasters: &rasters,
