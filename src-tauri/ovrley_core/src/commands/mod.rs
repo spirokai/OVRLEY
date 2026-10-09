@@ -91,7 +91,10 @@ pub fn backend_parse_tcx_activity(
     paths: &AppPaths,
     path: &str,
 ) -> CoreResult<FinalizeActivityResponse> {
-    crate::activity::tcx::parse_tcx_activity_path(Path::new(path), Some(&paths.repo_root))
+    let mut response =
+        crate::activity::tcx::parse_tcx_activity_path(Path::new(path), Some(&paths.repo_root))?;
+    response.debug_payload = None;
+    Ok(response)
 }
 
 /// Lists canonical bundled capabilities and lazy system font identities.

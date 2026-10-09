@@ -81,6 +81,15 @@ fn tcx_preserves_lap_start_times_through_idle_gap_filling() {
         activity.sample_elapsed_seconds,
         vec![2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
     );
+    assert_eq!(
+        activity.time,
+        (2..=7)
+            .map(|second| Some(format!("2026-06-07T11:00:{second:02}.000Z")))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(&activity.speed[2..5], &[Some(0.0); 3]);
+    assert_eq!(&activity.cadence[2..5], &[Some(0.0); 3]);
+    assert_eq!(&activity.power[2..5], &[Some(0.0); 3]);
     assert_eq!(activity.lap_start_elapsed_seconds, vec![1.0, 5.0]);
     assert_eq!(activity.lap_number, vec![0, 0, 0, 1, 1, 1]);
     assert_eq!(
