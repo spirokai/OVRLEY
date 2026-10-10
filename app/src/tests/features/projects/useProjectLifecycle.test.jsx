@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createDurableTemplateState } from '@/lib/template/template-state'
 import { createDurableEditorState } from '@/lib/widget/editor-state'
 import { loadProject } from '@/features/projects/projectOperations'
+import useProjectLifecycle from '@/features/projects/hooks/useProjectLifecycle'
 import { prepareDocumentFonts } from '@/lib/font-resources'
 import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlice'
 import useStore from '@/store/useStore'
@@ -168,7 +169,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     )
     const clearHistory = vi.spyOn(useStore.temporal.getState(), 'clear')
     const onSetBackgroundMode = vi.fn()
-    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({
         clearImportedVideo: vi.fn(),
@@ -276,7 +276,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
   test('Save As does not involve template persistence', async () => {
     boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Users\\test\\Documents\\OVRLEY\\projects')
     boundaries.saveSinglePath.mockResolvedValue(null)
-    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({
         clearImportedVideo: vi.fn(),
@@ -330,7 +329,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
 
     useStore.getState().setBatchQueueFromPaths(['C:\\batch-videos\\ride.mp4'])
     const clearImportedVideo = vi.fn(async () => useStore.getState().clearImportedVideo())
-    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({
         clearImportedVideo,
@@ -391,7 +389,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.writeProjectFile.mockResolvedValue(null)
 
     const clearImportedVideo = vi.fn(async () => useStore.getState().clearImportedVideo())
-    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({
         clearImportedVideo,
@@ -420,7 +417,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     useStore.setState({ activitySource: { kind: 'file', path: 'C:\\Media\\ride.fit' }, parsedActivity: { samples: [] } })
 
     const clearImportedVideo = vi.fn()
-    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({
         clearImportedVideo,
@@ -481,7 +477,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.selectedPathIsFile.mockResolvedValue(false)
     const prepareActivityPath = vi.fn()
     const onSetBackgroundMode = vi.fn()
-    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({
         clearImportedVideo: vi.fn(),
@@ -540,7 +535,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.selectedPathIsFile.mockResolvedValue(true)
     const prepareActivityPath = vi.fn().mockRejectedValue(new Error('invalid activity'))
     const prepareVideoPath = vi.fn().mockResolvedValue({ path: 'C:\\Events\\ride.mp4' })
-    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({
         clearImportedVideo: vi.fn(),
@@ -587,7 +581,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
     boundaries.openSinglePath.mockResolvedValue(projectPath)
     boundaries.readProjectFile.mockResolvedValue({ project, resolvedSources: { activityPath: null, videoPath: null }, rasterLoadResults: {} })
-    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({
         clearImportedVideo: vi.fn(),
@@ -615,7 +608,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         finishPicking = resolve
       }),
     )
-    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({
         clearImportedVideo: vi.fn(),

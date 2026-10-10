@@ -89,7 +89,7 @@ pub fn derive_fixture_composite_plan(
         }}"##
     ))
     .unwrap();
-    let paths = AppPaths::from_repo_root(PathBuf::from("."));
+    let paths = test_paths_named("composite_plan_tests");
 
     config.scene.composite_video_path = Some("input.mp4".to_string());
     config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);

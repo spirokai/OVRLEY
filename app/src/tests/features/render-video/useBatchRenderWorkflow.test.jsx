@@ -373,7 +373,7 @@ describe('native batch workflow', () => {
     expect(useStore.temporal.getState().pastStates).toBe(history)
   })
 
-  test('close/reopen and folder replacement dispose inspections and ignore late results; context changes invalidate Start', async () => {
+  test('close/reopen retains in-flight inspections; folder replacement disposes sessions and context changes invalidate Start', async () => {
     let finish
     vi.mocked(backend.inspectVideoSource).mockImplementationOnce(
       (id, path) =>
@@ -385,12 +385,12 @@ describe('native batch workflow', () => {
     await waitFor(() => expect(finish).toBeDefined())
     expect(result.current.batchReady).toBe(false)
     rerender({ phase: 'closed' })
-    expect(backend.disposeVideoInspection).toHaveBeenCalledWith('inspection-1')
+    expect(backend.disposeVideoInspection).not.toHaveBeenCalled()
+    await act(async () => finish())
     rerender({ phase: 'confirm' })
     await waitFor(() => expect(result.current.batchReady).toBe(true))
-    await act(async () => finish())
-    expect(result.current.batchQueue[0].source.sourceId).toContain('inspection-2:')
-    expect(backend.listDirectoryVideoFiles).toHaveBeenCalledTimes(2)
+    expect(result.current.batchQueue[0].source.sourceId).toContain('inspection-1:')
+    expect(backend.listDirectoryVideoFiles).toHaveBeenCalledOnce()
     let finishPlan
     vi.mocked(backend.planBatchOutputs).mockImplementationOnce(
       () =>
@@ -407,7 +407,7 @@ describe('native batch workflow', () => {
     vi.mocked(openDirectoryPath).mockResolvedValue('C:/other')
     await act(async () => result.current.pickVideoFolder())
     await waitFor(() => expect(result.current.batchReady).toBe(true))
-    expect(backend.disposeVideoInspection).toHaveBeenCalledWith('inspection-2')
+    expect(backend.disposeVideoInspection).toHaveBeenCalledWith('inspection-1')
     expect(backend.listDirectoryVideoFiles).toHaveBeenLastCalledWith('C:/other')
   })
 

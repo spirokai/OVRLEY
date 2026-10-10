@@ -185,7 +185,7 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
                 common::builders::batch_template(),
                 activity.clone(),
                 offset,
-                true,
+                mode == BatchExportMode::Composite,
             ),
         )
         .unwrap();

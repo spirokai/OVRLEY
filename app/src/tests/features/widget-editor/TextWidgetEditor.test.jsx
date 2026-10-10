@@ -83,7 +83,7 @@ describe('label weight controls', () => {
       <TextWidgetEditor widget={label} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />,
     )
     await waitFor(() => expect(screen.getAllByRole('slider')).toHaveLength(3))
-    const spacing = screen.getByRole('slider', { name: 'Letter Spacing' })
+    const spacing = screen.getByRole('slider', { name: 'Spacing' })
     expect(spacing).toHaveAttribute('aria-valuenow', '-1.25')
     expect(screen.getByText('-1.3%')).toBeInTheDocument()
     fireEvent.keyDown(spacing, { key: 'ArrowRight' })
