@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getMapStyleUrlTemplate } from '@/api/backend'
 import { getPreference, setPreference } from '@/lib/preferences-store'
+import { prepareFont } from '@/lib/font-resources'
 import {
   VIDEO_SYNC_DEFAULT_MAP_STYLE,
   VIDEO_SYNC_MAP_STYLES,
   VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY,
   VIDEO_SYNC_NAVIGATION_MAP_PITCH,
+  VIDEO_SYNC_SPEED_FONT,
 } from '../data/videoSyncConstants'
 import { buildActivityCourseSegments } from '../utils/activitySyncInput'
 import { buildVideoSyncScreenLayout, getVideoSyncPreviewSpeed } from '../utils/videoSyncPresentation'
@@ -51,7 +53,11 @@ export default function useVideoSyncPreview({
 
   useEffect(() => {
     let mounted = true
-    Promise.all([getMapStyleUrlTemplate(), getPreference(VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY).catch(() => undefined)])
+    Promise.all([
+      getMapStyleUrlTemplate(),
+      getPreference(VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY).catch(() => undefined),
+      prepareFont(VIDEO_SYNC_SPEED_FONT),
+    ])
       .then(([template, storedStyle]) => {
         if (!mounted) return
         setStyleUrlTemplate(template)

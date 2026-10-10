@@ -1,6 +1,6 @@
 //! Request-owned production render output contracts.
 
-use crate::error::{CoreError, CoreResult};
+use crate::error::{CoreError, CoreResult, RenderPathError};
 use crate::paths::AppPaths;
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, Ordering};
 
 static LAST_SUGGESTED_SECONDS: AtomicI64 = AtomicI64::new(0);
+static NEXT_BATCH_PROBE: AtomicI64 = AtomicI64::new(0);
 
 /// The two production output containers supported by OVRLEY.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -45,49 +46,52 @@ impl RenderOutputTarget {
     /// Validates and probes one exact output path.
     pub fn validate(raw_path: &str, kind: RenderOutputKind, overwrite: bool) -> CoreResult<Self> {
         if raw_path.trim().is_empty() {
-            return Err(CoreError::OutputInvalid("Choose an output file".into()));
+            return Err(CoreError::OutputInvalid(
+                RenderPathError::OutputFileRequired,
+            ));
         }
 
         let path = PathBuf::from(raw_path);
         if !path.is_absolute() {
-            return Err(CoreError::OutputInvalid(format!(
-                "Choose a complete output path, including its folder: {}",
-                path.display()
-            )));
+            return Err(CoreError::OutputInvalid(
+                RenderPathError::OutputPathIncomplete {
+                    path: path.display().to_string(),
+                },
+            ));
         }
 
         let filename = path
             .file_name()
             .and_then(|value| value.to_str())
             .ok_or_else(|| {
-                CoreError::OutputInvalid(format!(
-                    "The output path must include a file name: {}",
-                    path.display()
-                ))
+                CoreError::OutputInvalid(RenderPathError::OutputFilenameRequired {
+                    path: path.display().to_string(),
+                })
             })?;
         if filename.is_empty() || filename == "." || filename == ".." {
-            return Err(CoreError::OutputInvalid(format!(
-                "The output path must include a file name: {}",
-                path.display()
-            )));
+            return Err(CoreError::OutputInvalid(
+                RenderPathError::OutputFilenameRequired {
+                    path: path.display().to_string(),
+                },
+            ));
         }
 
         let extension = path
             .extension()
             .and_then(|value| value.to_str())
             .ok_or_else(|| {
-                CoreError::OutputInvalid(format!(
-                    "The output file must use .{}: {}",
-                    kind.extension(),
-                    path.display()
-                ))
+                CoreError::OutputInvalid(RenderPathError::OutputExtensionInvalid {
+                    path: path.display().to_string(),
+                    extension: kind.extension(),
+                })
             })?;
         if !extension.eq_ignore_ascii_case(kind.extension()) {
-            return Err(CoreError::OutputInvalid(format!(
-                "The output file must use .{}: {}",
-                kind.extension(),
-                path.display()
-            )));
+            return Err(CoreError::OutputInvalid(
+                RenderPathError::OutputExtensionInvalid {
+                    path: path.display().to_string(),
+                    extension: kind.extension(),
+                },
+            ));
         }
 
         match OpenOptions::new().write(true).create_new(true).open(&path) {
@@ -105,10 +109,9 @@ impl RenderOutputTarget {
                     source,
                 })?;
                 if !metadata.is_file() {
-                    return Err(CoreError::OutputInvalid(format!(
-                        "The selected output is not a file: {}",
-                        path.display()
-                    )));
+                    return Err(CoreError::OutputInvalid(RenderPathError::OutputNotFile {
+                        path: path.display().to_string(),
+                    }));
                 }
 
                 OpenOptions::new()
@@ -134,6 +137,111 @@ impl RenderOutputTarget {
             .and_then(|value| value.to_str())
             .expect("RenderOutputTarget always has a Unicode filename")
     }
+}
+
+/// Plans mandatory batch names and validates the entire set before probing
+/// destinations. Existing outputs may be overwritten; input aliases may not.
+pub fn plan_batch_output_targets(
+    directory: &Path,
+    kind: RenderOutputKind,
+    sources: &[PathBuf],
+    calibration_source: Option<&Path>,
+) -> CoreResult<Vec<RenderOutputTarget>> {
+    if !directory.is_absolute() || !directory.is_dir() {
+        return Err(CoreError::OutputInvalid(
+            RenderPathError::OutputDirectoryInvalid,
+        ));
+    }
+    let directory = fs::canonicalize(directory).map_err(|source| CoreError::OutputIo {
+        path: directory.to_path_buf(),
+        source,
+    })?;
+    let case_sensitive = directory_is_case_sensitive(&directory)?;
+    let file_handle = |path: &Path| {
+        same_file::Handle::from_path(path).map_err(|source| CoreError::OutputIo {
+            path: path.to_path_buf(),
+            source,
+        })
+    };
+    let input_handles = sources
+        .iter()
+        .map(PathBuf::as_path)
+        .chain(calibration_source)
+        .map(file_handle)
+        .collect::<CoreResult<Vec<_>>>()?;
+    let mut output_handles = Vec::new();
+    let mut destinations = Vec::with_capacity(sources.len());
+    let mut keys = std::collections::HashSet::new();
+    for source in sources {
+        let stem = source
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| {
+                CoreError::OutputInvalid(RenderPathError::SourceFilenameInvalid {
+                    path: source.display().to_string(),
+                })
+            })?;
+        let filename = format!("{stem}_{}.{}", kind.filename_prefix(), kind.extension());
+        let target = directory.join(&filename);
+        let key = if case_sensitive {
+            filename
+        } else {
+            filename.to_lowercase()
+        };
+        let handle = target.exists().then(|| file_handle(&target)).transpose()?;
+        let aliases_input = handle
+            .as_ref()
+            .is_some_and(|handle| input_handles.contains(handle));
+        if aliases_input {
+            return Err(CoreError::OutputInvalid(
+                RenderPathError::OutputAliasesInput {
+                    path: target.display().to_string(),
+                },
+            ));
+        }
+        let aliases_output = handle
+            .as_ref()
+            .is_some_and(|handle| output_handles.contains(handle));
+        if !keys.insert(key) || aliases_output {
+            return Err(CoreError::OutputInvalid(
+                RenderPathError::OutputDestinationsConflict {
+                    path: target.display().to_string(),
+                },
+            ));
+        }
+        destinations.push(target);
+        if let Some(handle) = handle {
+            output_handles.push(handle);
+        }
+    }
+    destinations
+        .iter()
+        .map(|path| {
+            RenderOutputTarget::validate(
+                path.to_str().expect("validated Unicode output"),
+                kind,
+                true,
+            )
+        })
+        .collect()
+}
+
+/// Query the selected filesystem rather than assuming the host's default case
+/// rules (case-sensitive directories and mounted volumes can differ).
+fn directory_is_case_sensitive(directory: &Path) -> CoreResult<bool> {
+    let id = NEXT_BATCH_PROBE.fetch_add(1, Ordering::Relaxed);
+    let name = format!(".ovrley-case-probe-{}-{id}", std::process::id());
+    let path = directory.join(&name);
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .map_err(|source| CoreError::OutputIo {
+            path: path.clone(),
+            source,
+        })?;
+    let _cleanup = ProbeCleanup::new(path, file);
+    Ok(!directory.join(name.to_uppercase()).exists())
 }
 
 struct ProbeCleanup {
@@ -275,6 +383,44 @@ mod tests {
         assert_eq!(fs::read(&path).unwrap(), b"existing");
         assert_eq!(target.filename(), "custom.mov");
         let _ = fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn batch_outputs_reject_input_and_calibration_aliases_before_overwrite() {
+        let directory = temp_target("batch-aliases");
+        fs::create_dir_all(&directory).unwrap();
+        let source = directory.join("ride.mp4");
+        let target = directory.join("ride_video.mp4");
+        fs::write(&source, b"source video").unwrap();
+        fs::write(&target, b"reference video").unwrap();
+        for (inputs, reference) in [
+            (vec![source.clone(), target.clone()], None),
+            (vec![source.clone()], Some(target.as_path())),
+        ] {
+            let error = plan_batch_output_targets(
+                &directory,
+                RenderOutputKind::Composite,
+                &inputs,
+                reference,
+            )
+            .unwrap_err();
+            assert!(error.to_string().contains("aliases an input"));
+            assert_eq!(fs::read(&target).unwrap(), b"reference video");
+        }
+        fs::remove_file(&target).unwrap();
+        fs::hard_link(&source, &target).unwrap();
+        assert!(plan_batch_output_targets(
+            &directory,
+            RenderOutputKind::Composite,
+            &[source.clone()],
+            None
+        )
+        .is_err());
+        assert_eq!(fs::read(&source).unwrap(), b"source video");
+        fs::remove_file(&target).unwrap();
+        plan_batch_output_targets(&directory, RenderOutputKind::Composite, &[source], None)
+            .unwrap();
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

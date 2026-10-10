@@ -5,16 +5,19 @@
 name = "ovrley_core"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.95"
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
 csv = "1.4"
+roxmltree = "0.21"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 unicode-segmentation = "=1.12.0"
 thiserror = "2"
 log = "0.4"
+same-file = "1"
 open = "5"
 image = { version = "=0.25.5", default-features = false, features = ["png", "jpeg", "bmp", "tiff"] }
 skia-safe = { version = "0.97.2", features = ["binary-cache"] }

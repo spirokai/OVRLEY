@@ -46,8 +46,8 @@ impl StaticLayer<'_> {
     ) -> CoreResult<PreparedStaticLayer> {
         let (image, cache_status) = self.cached_image(paths, profiler)?;
         let frame_size = super::FrameSize {
-            width: self.scene.width,
-            height: self.scene.height,
+            width: self.scene.presentation.width,
+            height: self.scene.presentation.height,
         };
         let mut base_rgba = vec![0; frame_size.rgba_len()?];
         if let Some(image) = &image {
@@ -94,7 +94,10 @@ impl StaticLayer<'_> {
         }
         let started = Instant::now();
         let mut surface = profiler.measure("create_base_image", || {
-            create_surface(self.scene.width, self.scene.height)
+            create_surface(
+                self.scene.presentation.width,
+                self.scene.presentation.height,
+            )
         })?;
         profiler.measure("prepare.surface.clear", || {
             surface.canvas().clear(skia_safe::Color::TRANSPARENT);
@@ -113,9 +116,9 @@ impl StaticLayer<'_> {
 
     fn draw(&self, canvas: &skia_safe::Canvas, font_dirs: &[std::path::PathBuf]) -> CoreResult<()> {
         let scene = self.scene;
-        let scale = scene.scale;
+        let scale = scene.presentation.scale;
         draw_backdrops_static_layer(canvas, self.backdrops, scale);
-        draw_rasters(canvas, self.rasters, scale, scene.opacity);
+        draw_rasters(canvas, self.rasters, scale, scene.presentation.opacity);
         for label in self.labels {
             let style = validated_label_style(label, scene, scale);
             draw_text(canvas, &label.text, &style, font_dirs)?;

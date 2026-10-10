@@ -185,7 +185,7 @@ impl<'a> VideoFrameRenderer<'a> {
             dense_activity,
             prepared_assets: &prepared_preview_assets.prepared_assets,
             frame_size,
-            scale: prepared_preview_assets.scene().scale,
+            scale: prepared_preview_assets.scene().presentation.scale,
             base_rgba,
             blank_leading_frame_count,
         })
@@ -302,7 +302,7 @@ pub fn prepare_preview_assets(
         dense_activity,
         &mut prepare_profiler,
     )?;
-    let rasters = prepare_rasters(&config.rasters)?;
+    let rasters = prepare_rasters(&config.rasters, prepared_assets.scene.presentation.scale)?;
     let static_layer = StaticLayer {
         backdrops: &prepared_assets.backdrops,
         rasters: &rasters,
@@ -393,9 +393,9 @@ pub fn render_preview_with_prepared_assets(
     request: PreviewRenderRequest<'_>,
 ) -> CoreResult<PreviewRenderReport> {
     // Phase 1: resolve dimensions, frame index, and create profilers.
-    let width = request.prepared_preview_assets.scene().width;
-    let height = request.prepared_preview_assets.scene().height;
-    let scale = request.prepared_preview_assets.scene().scale;
+    let width = request.prepared_preview_assets.scene().presentation.width;
+    let height = request.prepared_preview_assets.scene().presentation.height;
+    let scale = request.prepared_preview_assets.scene().presentation.scale;
     let frame_index = frame_index_for_second(
         request.prepared_preview_assets.scene(),
         request.dense_activity,
@@ -495,8 +495,8 @@ fn render_frame_surface(
     // Preview rendering owns its surface and writes a PNG, while video rendering
     // wraps caller-owned pixels. This helper is the preview-side equivalent of
     // `render_frame_rgba`.
-    let width = prepared_assets.scene.width;
-    let height = prepared_assets.scene.height;
+    let width = prepared_assets.scene.presentation.width;
+    let height = prepared_assets.scene.presentation.height;
     let mut surface = if preview_profiler.is_some() {
         create_surface(width, height)?
     } else {

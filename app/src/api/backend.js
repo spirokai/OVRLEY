@@ -51,11 +51,13 @@ function normalizeBackendError(error, fallbackMessage = 'Unknown backend error')
     return new Error(error)
   }
 
+  if (error && typeof error === 'object' && 'reason' in error) {
+    return Object.assign(new Error(error.reason), error)
+  }
+
   if (error && typeof error === 'object' && typeof error.message === 'string' && error.message.trim()) {
     const normalized = new Error(error.message)
-    if (typeof error.code === 'string' && error.code.trim()) {
-      normalized.code = error.code
-    }
+    Object.assign(normalized, error)
     return normalized
   }
 
@@ -197,6 +199,15 @@ export async function parseVboActivity(path) {
 }
 
 /**
+ * Parses and finalizes a native TCX activity using the Rust parser.
+ * @param {string} path - Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseTcxActivity(path) {
+  return invokeCommand('backend_parse_tcx_activity', { path })
+}
+
+/**
  * Renders a transparent PNG for a single preview second.
  *
  * @param {*} config - Overlay template configuration data.
@@ -310,6 +321,44 @@ export async function subscribeRenderProgress(handler) {
 }
 
 /**
+ * Submits the captured queue once. Rust owns all preparation and execution.
+ * Subscribe to batch progress before submission, then read the initial snapshot.
+ * @param {object} request Canonical BatchRenderRequest.
+ * @returns {Promise<{batchId: string, snapshot: object}>} Accepted batch identity and snapshot.
+ */
+export async function submitBatchRender(request) {
+  return invokeCommand('backend_submit_batch', { request })
+}
+
+/**
+ * Reads the retained authoritative snapshot, including terminal results.
+ * @param {string} batchId Accepted batch identity.
+ * @returns {Promise<object>} Canonical BatchSnapshot.
+ */
+export async function getBatchRenderSnapshot(batchId) {
+  return invokeCommand('backend_batch_snapshot', { batchId })
+}
+
+/**
+ * Requests cancellation; terminal cancellation follows native cleanup.
+ * @param {string} batchId Accepted batch identity.
+ * @returns {Promise<object>} Current canonical BatchSnapshot.
+ */
+export async function cancelBatchRender(batchId) {
+  return invokeCommand('backend_cancel_batch', { batchId })
+}
+
+/**
+ * Observes full queue transitions and compact frame updates. Both carry native revisions.
+ * @param {(event: {kind: 'snapshot'|'progress', data: object}) => void} handler Native event observer.
+ * @returns {Promise<() => void>} Listener disposal function.
+ */
+export async function subscribeBatchRenderProgress(handler) {
+  const { listen } = await import('@tauri-apps/api/event')
+  return listen('batch-render-progress', (event) => handler(event.payload))
+}
+
+/**
  * Checks whether cancel render.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
@@ -414,6 +463,15 @@ export async function rasterPreviewPng(resourceId) {
   return invokeCommand('raster_preview_png', { resourceId })
 }
 
+/**
+ * Lists supported video files (mp4/mov/mkv) directly inside a directory.
+ * @param {string} directory - Absolute directory path.
+ * @returns {Promise<string[]>} Absolute video paths sorted by name.
+ */
+export async function listDirectoryVideoFiles(directory) {
+  return invokeCommand('list_directory_video_files', { directory })
+}
+
 /** @returns {Promise<string>} Absolute Documents/OVRLEY/projects directory. */
 export async function getDefaultProjectDirectory() {
   return invokeCommand('default_project_directory')
@@ -482,6 +540,66 @@ export async function importPreviewVideo(path) {
  */
 export async function preparePreviewVideo(path) {
   return apiCall('backend_prepare_preview_video', { path })
+}
+
+/**
+ * Opens a fresh configuration inspection; it owns no editor preview or render.
+ * @returns {Promise<{inspectionId: string}>} Opaque backend session identity.
+ */
+export async function createVideoInspection() {
+  return apiCall('backend_create_video_inspection', {})
+}
+
+/**
+ * @typedef {object} InspectedVideoSource
+ * @property {string} sourceId Session-owned descriptor identity.
+ * @property {object} metadata Canonical probe metadata with required timing, coded resolution, rotationDegrees, and timestamp provenance.
+ * @property {string} metadata.path Canonical absolute source path.
+ * @property {number} metadata.duration Source duration in seconds.
+ * @property {number} metadata.fps Frame rate derived from its exact rational components.
+ * @property {number} metadata.fpsNum Exact frame-rate numerator.
+ * @property {number} metadata.fpsDen Exact frame-rate denominator.
+ * @property {{width: number, height: number}} metadata.resolution Coded source dimensions.
+ * @property {0|90|180|270} metadata.rotationDegrees This source's normalized display rotation, used by codec-specific rendering.
+ * @property {string|null} metadata.creationTime Probed creation time, without the editor's override.
+ * @property {string|null} metadata.syncTime Embedded synchronization hint when available.
+ * @property {string|null} metadata.timeSource Timestamp provenance; trusted GPS timestamps keep absolute-time semantics.
+ * @property {{width: number, height: number}} displayResolution Dimensions after applying this source's rotation.
+ * @property {{sizeBytes: number, modifiedAtUnixNanos: string}} stamp File identity observed before and after probing.
+ */
+
+/**
+ * Inspects a queued or calibration video without registering a preview or extracting its parsed activity.
+ * Embedded activity resolution remains job preparation; duration supplies provisional work estimates.
+ * Effective editor timestamp overrides stay in calibration inputs, separate from this file descriptor.
+ * @param {string} inspectionId Active configuration inspection identity.
+ * @param {string} path Source path, including reference videos outside the queued folder.
+ * @returns {Promise<InspectedVideoSource>} Session-owned metadata descriptor.
+ */
+export async function inspectVideoSource(inspectionId, path) {
+  return apiCall('backend_inspect_video_source', { inspectionId, path })
+}
+
+/**
+ * Plans native batch destinations and frame totals for fresh inspected sources.
+ * Coverage for embedded telemetry is finalized during owning-job preparation.
+ * @param {{inspectionId: string, sourceIds: string[], calibrationSourceId: string|null}} selection Session-owned source identities.
+ * @param {{exportMode: string, exportCodec: string, fps: number, updateRate: number, qualityType: string, qualityValue: number, qsvFullInitArgs: string[]|null}} encoding Captured encoder settings.
+ * @param {string} outputDirectory Absolute output folder.
+ * @returns {Promise<{status: 'planned', plans: Array<{sourceId: string, outputPath: string, outputDurationSeconds: number, plannedFrames: number, containerFpsNum: number, containerFpsDen: number}>}|{status: 'rejected', inspectionId: string, issues: object[]}>} Native planning result.
+ */
+export async function planBatchOutputs(selection, encoding, outputDirectory) {
+  return apiCall('backend_plan_batch_outputs', { selection, encoding, outputDirectory })
+}
+
+/**
+ * Discards session descriptors and prevents in-flight inspection from publishing into the closed session.
+ * Accepted execution retains its owned descriptors independently.
+ * @param {string} inspectionId Configuration inspection identity.
+ * @returns {Promise<void>} Resolves after disposal.
+ */
+export async function disposeVideoInspection(inspectionId) {
+  return invokeCommand('backend_dispose_video_inspection', { inspectionId })
 }
 
 /**

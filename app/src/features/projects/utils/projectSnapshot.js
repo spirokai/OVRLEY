@@ -29,9 +29,12 @@ export function createProjectContentSnapshot(state, projectPath) {
       manual: state.manualVideoSync,
     },
     render: {
+      renderTarget: state.renderSettings.renderTarget,
+      batchVideoFolder: state.batchVideoFolder,
+      batchOutputFolder: state.batchOutputFolder,
       fps: state.renderSettings.fps,
       widgetUpdateRate: state.renderSettings.widgetUpdateRate,
-      exportMode: state.importedVideoPath ? state.renderSettings.exportMode : 'transparent',
+      exportMode: state.renderSettings.renderTarget === 'batch' || state.importedVideoPath ? state.renderSettings.exportMode : 'transparent',
       codec: state.renderSettings.codec,
       qualityType: state.renderSettings.qualityType,
       qualityValue: state.renderSettings.qualityValue,

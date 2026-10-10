@@ -14,23 +14,22 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::Ordering;
 use std::thread;
 
 use ovrley_core::activity::schema::ParsedActivity;
-use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
+use ovrley_core::activity::{parse_activity_json, validate_render_activity};
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::encode::debug::composite::write_composite_timing_summary;
+use ovrley_core::encode::ffmpeg::composite::CompositeEncoding;
 use ovrley_core::encode::fps::Fps;
-use ovrley_core::encode::pipeline::composite::render_composite_video;
-use ovrley_core::encode::pipeline::composite_plan::{
-    derive_composite_pipeline_plan, derive_composite_render_plan, CompositePipelinePlan,
-};
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::normalize::raw::{parse_config_json, RenderConfig};
 use ovrley_core::normalize::{parse_template_value, validate_render_config, ValidatedRenderConfig};
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
+use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::planning::derive_composite_render_plan;
+use ovrley_core::render_jobs::planning::plan_single_render;
 use serde_json::Value;
 
 /// Bundles the key artifacts produced by a fixture composite render.
@@ -54,7 +53,7 @@ pub struct RenderFixtureResult {
 /// production planner.
 ///
 /// This helper exists only to keep tests concise. All timing and ffmpeg-plan
-/// behavior still comes from `derive_composite_pipeline_plan(...)`.
+/// behavior still comes from `CompositeEncoding::new(...)`.
 pub fn derive_fixture_composite_plan(
     scene_prefix: &str,
     fps_num: u32,
@@ -63,7 +62,7 @@ pub fn derive_fixture_composite_plan(
     render_duration: f64,
     trim_start: f64,
     update_rate: u32,
-) -> CompositePipelinePlan {
+) -> CompositeEncoding {
     let mut config = parse_config_json(&format!(
         r##"{{
             "scene":{{
@@ -90,7 +89,7 @@ pub fn derive_fixture_composite_plan(
         }}"##
     ))
     .unwrap();
-    let paths = AppPaths::from_repo_root(PathBuf::from("."));
+    let paths = test_paths_named("composite_plan_tests");
 
     config.scene.composite_video_path = Some("input.mp4".to_string());
     config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
@@ -101,10 +100,20 @@ pub fn derive_fixture_composite_plan(
     config.scene.composite_render_duration = Some(render_duration);
     config.scene.composite_video_trim_start = Some(trim_start);
     config.scene.composite_widget_update_rate = Some(update_rate);
-    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene).unwrap();
-    let render = derive_composite_render_plan(&mut scene, None).unwrap();
+    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
+    let render = derive_composite_render_plan(&config.scene, &mut scene, None).unwrap();
     let target = custom_output_target(&paths, "plan", RenderOutputKind::Composite);
-    derive_composite_pipeline_plan(&paths, &scene, render, true, None, &target).unwrap()
+    CompositeEncoding::new(
+        ovrley_core::render::FrameSize {
+            width: scene.presentation.width,
+            height: scene.presentation.height,
+        },
+        render,
+        true,
+        None,
+        &target,
+    )
+    .unwrap()
 }
 
 pub fn custom_output_target(
@@ -220,6 +229,7 @@ pub fn render_fixture_composite_with_paths(
     height: u32,
     codec: &str,
 ) -> Result<RenderFixtureResult, String> {
+    let execution = RenderExecutionService::with_controller(controller.clone());
     // ── Phase 1: resolve fixture video path ────────────────────────
     let absolute_video_path = crate::common::test_config::fixtures()
         .join("video")
@@ -250,23 +260,13 @@ pub fn render_fixture_composite_with_paths(
     config.scene.composite_widget_update_rate = Some(update_rate);
 
     let activity = fixture_activity();
-    let mut validated = validate_render_config(config).unwrap();
-    let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
-    let dense_activity = build_dense_activity_report_validated(&activity, &validated).unwrap();
+    let plan =
+        plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
 
     // ── Phase 4: execute canonical frame-worker composite render ────
     let output_target = custom_output_target(&paths, "render", RenderOutputKind::Composite);
-    let filename = render_composite_video(
-        &paths,
-        &validated,
-        &activity,
-        &dense_activity,
-        &controller,
-        render_plan,
-        true,
-        &output_target,
-    )
-    .map_err(|error| error.to_string())?;
+    let outcome = execution.render(&paths, plan, &activity, &output_target);
+    let filename = outcome.map_err(|error| error.to_string())?;
 
     // ── Phase 5: validate output and collect metadata ─────────────────
     let output_path = paths.downloads_dir.join(filename);
@@ -370,8 +370,8 @@ pub fn mutable_recent_template_config(width: u32, height: u32) -> RenderConfig {
     let template = fs::read_to_string(template_path).unwrap();
     let value: Value = serde_json::from_str(&template).unwrap();
     let mut config = parse_template_value(&value).unwrap();
-    config.scene.width = Some(width);
-    config.scene.height = Some(height);
+    config.scene.presentation.width = Some(width);
+    config.scene.presentation.height = Some(height);
     config.scene.ffmpeg = serde_json::json!({"codec":"libx264"});
     config
 }
@@ -381,7 +381,7 @@ pub fn composite_test_config(
     render_duration: f64,
     video_path: &str,
     trim_start: f64,
-) -> ValidatedRenderConfig {
+) -> RenderConfig {
     let mut config = mutable_composite_test_config(render_duration);
     config.scene.composite_video_path = Some(video_path.to_string());
     config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
@@ -391,7 +391,7 @@ pub fn composite_test_config(
     config.scene.composite_video_duration = Some(35.0);
     config.scene.composite_render_duration = Some(render_duration);
     config.scene.composite_video_trim_start = Some(trim_start);
-    validate_render_config(config).unwrap()
+    config
 }
 
 /// Builds a minimal mutable raw config for tests that intentionally edit it.
@@ -542,5 +542,5 @@ pub fn has_argument_pair(args: &[String], key: &str, value: &str) -> bool {
 /// the controller flag set while ffmpeg work is still in flight.
 pub fn cancel_after_delay(controller: &RenderController, delay_ms: u64) {
     thread::sleep(std::time::Duration::from_millis(delay_ms));
-    controller.cancel_flag().store(true, Ordering::SeqCst);
+    let _ = controller.cancel();
 }

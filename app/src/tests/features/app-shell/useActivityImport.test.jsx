@@ -65,6 +65,17 @@ describe('useActivityImport native picker boundary', () => {
     expect(importActivityFile).not.toHaveBeenCalled()
   })
 
+  test('offers TCX in the native picker and imports its selected path', async () => {
+    openSinglePath.mockResolvedValue('C:\\activities\\ride.tcx')
+    const { default: useActivityImport } = await import('@/features/app-shell/hooks/useActivityImport')
+    const { result } = renderHook(() => useActivityImport())
+
+    await act(() => result.current.handleActivityFileOpen())
+
+    expect(openSinglePath.mock.calls[0][0][0].extensions).toContain('tcx')
+    expect(importActivityPath).toHaveBeenCalledWith('C:\\activities\\ride.tcx', {})
+  })
+
   test('reports native CSV structural errors through the existing activity error path', async () => {
     openSinglePath.mockResolvedValue('C:\\activities\\broken.csv')
     importActivityPath.mockRejectedValue(new Error("CSV import 'broken.csv': CSV row 3 canonical time must not decrease"))

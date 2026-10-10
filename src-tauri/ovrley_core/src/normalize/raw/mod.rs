@@ -61,21 +61,11 @@ fn deserialize_letter_spacing<'de, D: serde::Deserializer<'de>>(
 /// Global render settings shared by labels, metric values, plots, and ffmpeg.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SceneConfig {
-    #[serde(default)]
-    pub width: Option<u32>,
-    #[serde(default)]
-    pub height: Option<u32>,
+    #[serde(flatten)]
+    pub presentation: ScenePresentationConfig,
     pub fps: f64,
     pub start: f64,
     pub end: f64,
-    #[serde(default)]
-    pub font: Option<String>,
-    #[serde(default)]
-    pub font_size: Option<f32>,
-    #[serde(default)]
-    pub decimal_rounding: Option<i32>,
-    #[serde(default)]
-    pub overlay_filename: Option<String>,
     #[serde(default, alias = "updateRate")]
     pub update_rate: Option<u32>,
     #[serde(default, skip_serializing)]
@@ -101,6 +91,25 @@ pub struct SceneConfig {
     #[serde(default)]
     pub ffmpeg: Value,
     #[serde(default)]
+    pub custom_export_range_active: Option<bool>,
+}
+
+/// Shared presentation ingress, independent of an activity or export window.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ScenePresentationConfig {
+    #[serde(default)]
+    pub width: Option<u32>,
+    #[serde(default)]
+    pub height: Option<u32>,
+    #[serde(default)]
+    pub font: Option<String>,
+    #[serde(default)]
+    pub font_size: Option<f32>,
+    #[serde(default)]
+    pub decimal_rounding: Option<i32>,
+    #[serde(default)]
+    pub overlay_filename: Option<String>,
+    #[serde(default)]
     pub opacity: Option<f32>,
     #[serde(default)]
     pub scale: Option<f32>,
@@ -120,8 +129,6 @@ pub struct SceneConfig {
     pub border_strength: Option<f32>,
     #[serde(default)]
     pub border_distance: Option<f32>,
-    #[serde(default)]
-    pub custom_export_range_active: Option<bool>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -529,8 +536,8 @@ fn deserialize_raster_path<'de, D: serde::Deserializer<'de>>(
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RenderConfig {
-    pub scene: SceneConfig,
+pub struct RenderConfig<S = SceneConfig> {
+    pub scene: S,
     #[serde(default)]
     pub backdrops: Vec<BackdropConfig>,
     #[serde(default, deserialize_with = "deserialize_render_rasters")]
@@ -543,6 +550,39 @@ pub struct RenderConfig {
     pub plots: Value,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+/// Materialized presentation requires explicit collections at JSON ingress.
+/// Saved/single config optional collections retain their existing contract.
+pub(crate) fn deserialize_render_presentation<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<RenderConfig<ScenePresentationConfig>, D::Error> {
+    let value = Value::deserialize(deserializer)?;
+    for field in ["scene", "backdrops", "rasters", "labels", "values", "plots"] {
+        if value.get(field).is_none() {
+            return Err(serde::de::Error::missing_field(field));
+        }
+    }
+    if !value["plots"].is_array() {
+        return Err(serde::de::Error::custom(
+            "batch template.plots must be an array",
+        ));
+    }
+    serde_json::from_value(value).map_err(serde::de::Error::custom)
+}
+
+impl<S> RenderConfig<S> {
+    pub(crate) fn with_scene<T>(self, scene: T) -> RenderConfig<T> {
+        RenderConfig {
+            scene,
+            backdrops: self.backdrops,
+            rasters: self.rasters,
+            labels: self.labels,
+            values: self.values,
+            plots: self.plots,
+            extra: self.extra,
+        }
+    }
 }
 
 fn deserialize_render_rasters<'de, D: serde::Deserializer<'de>>(
@@ -864,13 +904,10 @@ pub fn strip_json_nulls(value: &mut Value) {
 }
 
 // ---------------------------------------------------------------------------
-// Parsing — deserialization + timing pre-checks
+// Parsing — deserialization; normalization owns semantic validation
 // ---------------------------------------------------------------------------
 
-/// Parses and validates render configuration JSON.
-///
-/// Validation focuses on constraints that would otherwise break frame timing:
-/// positive integer FPS, update-rate divisibility, and non-empty scene ranges.
+/// Deserializes render configuration JSON; submission owns normalization.
 #[must_use = "parsed config must be consumed for rendering"]
 pub fn parse_config_json(input: &str) -> CoreResult<RenderConfig> {
     let value: Value = serde_json::from_str(input)
@@ -881,39 +918,8 @@ pub fn parse_config_json(input: &str) -> CoreResult<RenderConfig> {
 /// Parses a raw render config from a pre-built JSON value.
 #[must_use = "parsed config must be consumed for rendering"]
 pub fn parse_config_value(value: &Value) -> CoreResult<RenderConfig> {
-    let config: RenderConfig = serde_json::from_value(value.clone())
-        .map_err(|error| CoreError::Config(format!("config JSON: {error}")))?;
-    if config.scene.fps <= 0.0 {
-        return Err(CoreError::Config(format!(
-            "scene.fps: {}",
-            config.scene.fps
-        )));
-    }
-    if (config.scene.fps.fract()).abs() > f64::EPSILON {
-        return Err(CoreError::Config(format!(
-            "scene.fps must be an integer for widget update rate support: {}",
-            config.scene.fps
-        )));
-    }
-    if let Some(update_rate) = config.scene.update_rate {
-        if update_rate == 0 {
-            return Err(CoreError::Config(
-                "scene.update_rate must be at least 1".into(),
-            ));
-        }
-        let fps = config.scene.fps.round() as u32;
-        if !fps.is_multiple_of(update_rate) {
-            return Err(CoreError::Config(format!(
-                "scene.update_rate ({update_rate}) must cleanly divide scene.fps ({fps})"
-            )));
-        }
-    }
-    if matches!(config.scene.composite_widget_update_rate, Some(0)) {
-        return Err(CoreError::Config(
-            "scene.composite_widget_update_rate must be at least 1".into(),
-        ));
-    }
-    Ok(config)
+    serde_json::from_value(value.clone())
+        .map_err(|error| CoreError::Config(format!("config JSON: {error}")))
 }
 
 /// Parses either a raw render config or a wrapped OVRLEY template file.

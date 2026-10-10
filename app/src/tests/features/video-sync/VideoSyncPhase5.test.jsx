@@ -67,7 +67,7 @@ describe('manual video-sync Phase 5 controls', () => {
     )
 
     const controls = screen.getByTestId('video-sync-mark-controls')
-    expect(controls.className).toContain('flex-row')
+    expect(controls).toHaveClass('grid-cols-4')
     expect([...controls.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))).toEqual([
       'Mark Left Turn',
       'Mark Stop',

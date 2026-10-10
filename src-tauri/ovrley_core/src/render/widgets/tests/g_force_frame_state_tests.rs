@@ -6,8 +6,7 @@ use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
 use crate::debug::RenderProfiler;
 use crate::normalize::{
-    GForceAxis, RenderDataRequirements, ValidatedFfmpegConfig, ValidatedGForceWidget,
-    ValidatedSceneConfig,
+    GForceAxis, RenderDataRequirements, ValidatedGForceWidget, ValidatedSceneConfig,
 };
 use serde::Deserialize;
 
@@ -76,35 +75,28 @@ fn widget(config: &FixtureConfig) -> ValidatedGForceWidget {
 
 fn scene() -> ValidatedSceneConfig {
     ValidatedSceneConfig {
+        presentation: crate::normalize::ValidatedScenePresentation {
+            width: 1920,
+            height: 1080,
+            scale: 1.0,
+            font: None,
+            font_size: None,
+            opacity: 1.0,
+            decimal_rounding: None,
+            time_format: None,
+            shadow_color: String::new(),
+            shadow_strength: 0.0,
+            shadow_distance: 0.0,
+            border_color: String::new(),
+            border_thickness: 0.0,
+            overlay_filename: None,
+        },
         fps: 1.0,
         start: 0.0,
         end: 5.0,
-        width: 1920,
-        height: 1080,
-        scale: 1.0,
-        font: None,
-        font_size: None,
-        opacity: 1.0,
-        decimal_rounding: None,
-        time_format: None,
         custom_export_range_active: Some(false),
-        shadow_color: String::new(),
-        shadow_strength: 0.0,
-        shadow_distance: 0.0,
-        border_color: String::new(),
-        border_thickness: 0.0,
         update_rate: std::num::NonZeroU32::MIN,
-        overlay_filename: None,
-        ffmpeg: ValidatedFfmpegConfig::default(),
-        composite_video_path: None,
-        quality: None,
-        composite_sync_offset: None,
-        composite_video_fps_num: None,
-        composite_video_fps_den: None,
-        composite_video_duration: None,
-        composite_render_duration: None,
-        composite_video_trim_start: None,
-        composite_widget_update_rate: None,
+        export_start_seconds: 0.0,
     }
 }
 

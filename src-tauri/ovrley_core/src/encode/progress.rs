@@ -1,8 +1,8 @@
 //! Render progress estimation and lifecycle state.
 
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use crate::debug::RenderProgress;
@@ -195,6 +195,8 @@ impl Default for ProgressEstimator {
 /// tests use [`NullSink`]. Must be `Send + Sync`.
 pub trait ProgressSink: Send + Sync {
     fn emit_progress(&self, progress: &RenderProgress);
+
+    fn emit_batch_progress(&self, _event: &crate::render_jobs::contracts::BatchRenderEvent) {}
 }
 
 /// No-op sink for `RenderController::default()` and tests.
@@ -205,16 +207,20 @@ impl ProgressSink for NullSink {
     fn emit_progress(&self, _progress: &RenderProgress) {}
 }
 
-/// Shared render state. Clones share the same `Arc`-wrapped state.
-/// Only one render active at a time (enforced by `try_start`).
+/// Shared observations and cancellation for the execution service and pipeline.
+/// Only the execution service may reserve or finalize a session.
 #[derive(Clone)]
 pub struct RenderController {
-    pub(crate) progress: Arc<Mutex<RenderProgress>>,
-    pub(crate) cancel_flag: Arc<AtomicBool>,
-    pub(crate) running: Arc<AtomicBool>,
-    pub(crate) next_render_id: Arc<AtomicU32>,
-    pub(crate) progress_sink: Arc<dyn ProgressSink>,
-    pub(crate) last_fps_emit_at: Arc<Mutex<Option<Instant>>>,
+    session: Arc<Mutex<RenderSession>>,
+    cancel_flag: Arc<AtomicBool>,
+    progress_sink: Arc<dyn ProgressSink>,
+}
+
+struct RenderSession {
+    progress: RenderProgress,
+    next_render_id: u64,
+    sink: Arc<dyn ProgressSink>,
+    last_fps_emit_at: Option<Instant>,
 }
 
 impl Default for RenderController {
@@ -225,80 +231,139 @@ impl Default for RenderController {
 }
 
 impl RenderController {
+    pub(crate) fn sink(&self) -> Arc<dyn ProgressSink> {
+        self.progress_sink.clone()
+    }
+
+    /// Capture the destination with the progress mutation, before releasing
+    /// the session lock. A later reservation cannot reroute an older snapshot.
+    fn publish_progress(&self, session: MutexGuard<'_, RenderSession>) {
+        let snapshot = session.progress.clone();
+        let sink = session.sink.clone();
+        drop(session);
+        sink.emit_progress(&snapshot);
+    }
+
     /// Wired to a concrete `ProgressSink`. [`default`] installs [`NullSink`].
     pub fn with_sink(progress_sink: Arc<dyn ProgressSink>) -> Self {
         Self {
-            progress: Arc::new(Mutex::new(RenderProgress::default())),
+            session: Arc::new(Mutex::new(RenderSession {
+                progress: RenderProgress::default(),
+                next_render_id: 0,
+                sink: progress_sink.clone(),
+                last_fps_emit_at: None,
+            })),
             cancel_flag: Arc::new(AtomicBool::new(false)),
-            running: Arc::new(AtomicBool::new(false)),
-            next_render_id: Arc::new(AtomicU32::new(0)),
             progress_sink,
-            last_fps_emit_at: Arc::new(Mutex::new(None)),
         }
     }
 
     /// Snapshot of latest progress state (one-shot). Live updates via sink.
     #[must_use = "progress snapshot must be consumed for frontend reads"]
     pub fn progress(&self) -> RenderProgress {
-        self.progress
+        self.session
             .lock()
             .expect("render progress mutex poisoned")
+            .progress
             .clone()
+    }
+
+    pub(crate) fn shares_state(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.session, &other.session)
     }
 
     /// Requests cancellation. Returns whether a render was active.
     #[must_use = "the return value indicates whether a render was in progress"]
     pub fn cancel(&self) -> bool {
-        self.cancel_flag.store(true, Ordering::SeqCst);
-        let mut progress = self
-            .progress
-            .lock()
-            .expect("render progress mutex poisoned");
-        progress.status = "cancelled".to_string();
-        progress.message = "Cancelling render...".to_string();
-        let snapshot = progress.clone();
-        drop(progress);
-        self.progress_sink.emit_progress(&snapshot);
-        self.running.load(Ordering::SeqCst)
+        self.request_cancel(None)
     }
 
-    /// Starts a render if none is running. Concurrent starts fail fast.
-    pub fn try_start(&self, total_frames: u32, message: &str) -> CoreResult<u64> {
-        if self
-            .running
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_err()
-        {
+    /// Cancels only the named reservation, so a late batch request cannot
+    /// interrupt a newer operation after the previous renderer was released.
+    pub(crate) fn cancel_session(&self, render_id: u64) -> bool {
+        self.request_cancel(Some(render_id))
+    }
+
+    fn request_cancel(&self, render_id: Option<u64>) -> bool {
+        let mut session = self.session.lock().expect("render session mutex poisoned");
+        let progress = &mut session.progress;
+        if !progress.busy || render_id.is_some_and(|id| id != progress.render_id) {
+            return false;
+        }
+        self.cancel_flag.store(true, Ordering::SeqCst);
+        progress.status = "cancelling".to_string();
+        progress.message = "Cancelling render...".to_string();
+        self.publish_progress(session);
+        true
+    }
+
+    /// Reserves a session atomically with its cancellation and progress state.
+    pub(crate) fn reserve(&self, sink: Arc<dyn ProgressSink>) -> CoreResult<u64> {
+        let mut session = self.session.lock().expect("render session mutex poisoned");
+        let progress = &mut session.progress;
+        if progress.busy {
             return Err(CoreError::Encode(
                 "A render is already in progress".to_string(),
             ));
         }
         self.cancel_flag.store(false, Ordering::SeqCst);
-        let render_id = self.next_render_id.fetch_add(1, Ordering::SeqCst) as u64 + 1;
-        let mut progress = self
-            .progress
-            .lock()
-            .expect("render progress mutex poisoned");
-        *progress = RenderProgress {
+        session.sink = sink;
+        session.next_render_id += 1;
+        let render_id = session.next_render_id;
+        session.progress = RenderProgress {
             render_id,
+            busy: true,
             current: 0,
-            total: total_frames,
+            rendered: 0,
+            total: 0,
             encoded: 0,
-            status: "rendering".to_string(),
-            message: message.to_string(),
+            status: "preparing".to_string(),
+            message: "Preparing render...".to_string(),
             estimated_seconds_remaining: None,
             rendering_fps: None,
             filename: None,
         };
-        let snapshot = progress.clone();
-        drop(progress);
-        self.progress_sink.emit_progress(&snapshot);
-        // Reset FPS throttle from any prior render.
-        *self
-            .last_fps_emit_at
-            .lock()
-            .expect("render FPS throttle mutex poisoned") = None;
+        self.publish_progress(session);
         Ok(render_id)
+    }
+
+    /// Resets item counters without releasing the session or clearing cancellation.
+    pub(crate) fn begin_item(&self, total_frames: u32, message: &str) -> CoreResult<()> {
+        let mut session = self.session.lock().expect("render session mutex poisoned");
+        let progress = &mut session.progress;
+        self.check_cancelled()?;
+        assert!(progress.busy, "an item requires a renderer reservation");
+        progress.current = 0;
+        progress.rendered = 0;
+        progress.total = total_frames;
+        progress.encoded = 0;
+        progress.status = "preparing".to_string();
+        progress.message = message.to_string();
+        progress.estimated_seconds_remaining = None;
+        progress.rendering_fps = None;
+        progress.filename = None;
+        session.last_fps_emit_at = None;
+        self.publish_progress(session);
+        Ok(())
+    }
+
+    /// Cancellable preparation boundary, including immediately before FFmpeg startup.
+    pub fn check_cancelled(&self) -> CoreResult<()> {
+        if self.cancel_flag.load(Ordering::SeqCst) {
+            return Err(CoreError::Cancelled);
+        }
+        Ok(())
+    }
+
+    /// Publishes encoding startup without overwriting a pending cancellation.
+    pub fn start_encoding(&self) -> CoreResult<()> {
+        let mut session = self.session.lock().expect("render session mutex poisoned");
+        let progress = &mut session.progress;
+        self.check_cancelled()?;
+        progress.status = "rendering".to_string();
+        progress.message = "Rendering frames...".to_string();
+        self.publish_progress(session);
+        self.check_cancelled()
     }
 
     /// Updates counts and emits through sink. `rendering_fps` is ~10 Hz.
@@ -306,71 +371,57 @@ impl RenderController {
         &self,
         current: u32,
         total: u32,
+        rendered: u32,
         encoded: u32,
         estimate: Option<u64>,
         rendering_fps: Option<f64>,
     ) {
-        let mut last = self
-            .last_fps_emit_at
-            .lock()
-            .expect("render FPS throttle mutex poisoned");
+        let mut session = self.session.lock().expect("render session mutex poisoned");
         let now = Instant::now();
-        let due = match *last {
-            None => true,
-            Some(prev) => now.duration_since(prev) >= PROGRESS_EMIT_MIN_INTERVAL,
-        };
+        let due = session
+            .last_fps_emit_at
+            .is_none_or(|previous| now.duration_since(previous) >= PROGRESS_EMIT_MIN_INTERVAL);
         if due {
-            *last = Some(now);
+            session.last_fps_emit_at = Some(now);
         }
-        drop(last);
-
-        let mut progress = self
-            .progress
-            .lock()
-            .expect("render progress mutex poisoned");
+        let progress = &mut session.progress;
         progress.current = current;
         progress.total = total;
+        progress.rendered = rendered;
         progress.encoded = encoded;
         progress.estimated_seconds_remaining = estimate;
         if due {
             progress.rendering_fps = rendering_fps;
         }
-        progress.message = if current >= total {
-            "Encoding output file...".to_string()
-        } else {
-            "Rendering frames...".to_string()
-        };
-        let snapshot = progress.clone();
-        drop(progress);
+        if progress.status == "rendering" {
+            progress.message = if current >= total {
+                "Encoding output file...".to_string()
+            } else {
+                "Rendering frames...".to_string()
+            };
+        }
         if due {
-            self.progress_sink.emit_progress(&snapshot);
+            self.publish_progress(session);
         }
     }
 
-    pub fn finish_success(&self, filename: String) {
-        let mut progress = self
-            .progress
-            .lock()
-            .expect("render progress mutex poisoned");
+    pub(crate) fn finish_success(&self, filename: Option<String>) {
+        let mut session = self.session.lock().expect("render session mutex poisoned");
+        let progress = &mut session.progress;
         progress.current = progress.total;
         progress.encoded = progress.total;
         progress.status = "complete".to_string();
         progress.message = "Video rendered successfully".to_string();
         progress.estimated_seconds_remaining = Some(0);
         progress.rendering_fps = None;
-        progress.filename = Some(filename);
-        let snapshot = progress.clone();
-        drop(progress);
-        self.progress_sink.emit_progress(&snapshot);
-        self.running.store(false, Ordering::SeqCst);
-        self.cancel_flag.store(false, Ordering::SeqCst);
+        progress.filename = filename;
+        progress.busy = false;
+        self.publish_progress(session);
     }
 
-    pub fn finish_error(&self, error: String, cancelled: bool) {
-        let mut progress = self
-            .progress
-            .lock()
-            .expect("render progress mutex poisoned");
+    pub(crate) fn finish_error(&self, error: String, cancelled: bool) {
+        let mut session = self.session.lock().expect("render session mutex poisoned");
+        let progress = &mut session.progress;
         progress.status = if cancelled {
             "cancelled".to_string()
         } else {
@@ -384,11 +435,8 @@ impl RenderController {
         progress.estimated_seconds_remaining = None;
         progress.rendering_fps = None;
         progress.filename = None;
-        let snapshot = progress.clone();
-        drop(progress);
-        self.progress_sink.emit_progress(&snapshot);
-        self.running.store(false, Ordering::SeqCst);
-        self.cancel_flag.store(false, Ordering::SeqCst);
+        progress.busy = false;
+        self.publish_progress(session);
     }
 
     /// Returns the shared cancellation flag for internal worker coordination.

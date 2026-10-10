@@ -22,6 +22,24 @@
     "from": 0,
     "to": 0
   },
+  "scenePresentationKeys": [
+    "width",
+    "height",
+    "font",
+    "font_size",
+    "decimal_rounding",
+    "overlay_filename",
+    "opacity",
+    "scale",
+    "time_format",
+    "shadow_color",
+    "shadow_strength",
+    "shadow_distance",
+    "border_color",
+    "border_thickness",
+    "border_strength",
+    "border_distance"
+  ],
   "renderTimeOnlyKeys": [
     "composite_video_path",
     "composite_bitrate",

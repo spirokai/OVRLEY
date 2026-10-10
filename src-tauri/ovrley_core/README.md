@@ -8,7 +8,7 @@ Headless Rust library for OVRLEY's overlay rendering and video encoding. Owns th
 Frontend (Tauri IPC)
   │  config_json  +  parsed_activity_json
   ▼
-commands::backend_render
+render_jobs::execution::RenderExecutionService::submit_single
   │
   ├─► normalize::parse_config_json    ── deserialize raw config
   └─► normalize::validate_render_config  ◄── the seam

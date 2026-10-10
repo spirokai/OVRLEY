@@ -24,6 +24,7 @@ fn lap_activity() -> DenseActivityReport {
         frame_distance_progress: Vec::new(),
         full_activity_distance: None,
         full_activity_total_ascent: None,
+        full_activity_metric_ranges: Default::default(),
         series,
     }
 }

@@ -40,7 +40,7 @@ export const VIDEO_SYNC_LANDMARK_PRESENTATION = {
 /**
  * @param {{width: number, height: number}} sceneSize Video dimensions.
  * @param {number} displayScale Preview scale.
- * @returns {object} Screen and pair styles.
+ * @returns {object} Screen, pair, and speed text styles.
  */
 export function buildVideoSyncScreenLayout(sceneSize, displayScale) {
   const width = sceneSize.width * displayScale
@@ -49,6 +49,8 @@ export function buildVideoSyncScreenLayout(sceneSize, displayScale) {
   return {
     screenStyle: { width, height },
     pairStyle: { gridTemplateColumns: `repeat(2, ${width}px)`, width: width * 2 + gap, height, gap },
+    speedValueStyle: { fontSize: 189 * displayScale, lineHeight: 1 },
+    speedUnitsStyle: { fontSize: 55.5 * displayScale, lineHeight: 1 },
   }
 }
 

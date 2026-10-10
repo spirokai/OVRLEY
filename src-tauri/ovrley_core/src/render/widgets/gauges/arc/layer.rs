@@ -36,9 +36,9 @@ pub(super) fn draw_static_layer(
     let border_thickness = gauge.track_border_thickness * scale;
     let shadow = if border_thickness > 0.0 {
         normalize_shadow_style_validated(
-            &scene.shadow_color,
-            scene.shadow_strength,
-            scene.shadow_distance,
+            &scene.presentation.shadow_color,
+            scene.presentation.shadow_strength,
+            scene.presentation.shadow_distance,
             scale,
         )
     } else {

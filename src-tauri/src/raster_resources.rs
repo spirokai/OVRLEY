@@ -6,11 +6,11 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(crate) struct RasterResources {
     // Retain every selected version for session undo/redo. Jobs hold their own
     // Arc snapshots; dropping app state releases the store's ownership.
-    images: Mutex<HashMap<String, Arc<SelectedRaster>>>,
+    images: Arc<Mutex<HashMap<String, Arc<SelectedRaster>>>>,
 }
 
 impl RasterResources {

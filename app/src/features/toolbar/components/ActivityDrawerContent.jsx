@@ -56,7 +56,7 @@ export function ActivityDrawerContent({ activitySummary, filename, onBrowseActiv
         dropZoneProps={dropZoneProps}
         isOverDropZone={isOverDropZone}
         label={t('toolbar.dropActivityFile', 'Drop activity file')}
-        sublabel="GPX, FIT, SRT, IGC, CSV, VBO"
+        sublabel="GPX, FIT, TCX, SRT, IGC, CSV, VBO"
       />
 
       {drawerViewModel ? (

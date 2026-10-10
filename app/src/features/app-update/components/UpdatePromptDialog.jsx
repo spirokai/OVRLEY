@@ -31,7 +31,7 @@ export default function UpdatePromptDialog({ open, phase, version, progress, pro
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && !downloading && onClose()}>
       <DialogContent
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
-        className="w-full max-w-md rounded-sm border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
+        className="w-full max-w-md rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50"
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
         <div className="flex items-center gap-3">

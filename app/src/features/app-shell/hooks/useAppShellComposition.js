@@ -17,7 +17,7 @@ import { useAppUpdate } from '@/features/app-update'
 import { useVideoImport } from '@/features/video-preview'
 import { useUndoRedo } from '@/features/undo-redo'
 import * as backend from '@/api/backend'
-import { loadRememberedRenderDirectory } from '@/features/render-video/utils/render-output'
+import { loadRememberedRenderDirectory } from '@/lib/file-dialog'
 import { useProjectLifecycle } from '@/features/projects'
 
 /**

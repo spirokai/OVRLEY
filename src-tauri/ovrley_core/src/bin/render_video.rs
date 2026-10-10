@@ -12,12 +12,13 @@
 //!
 //! Does not own: parsing or encoding — those live in `ovrley_core`.
 
-use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
-use ovrley_core::commands::validate_config_value;
-use ovrley_core::encode::pipeline::transparent::render_video;
+use ovrley_core::activity::{parse_activity_json, validate_render_activity};
 use ovrley_core::encode::progress::RenderController;
+use ovrley_core::normalize::parse_config_value;
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
+use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::planning::{plan_single_render, VideoRenderModePlan};
 use serde_json::{Map, Value};
 use std::fs;
 use std::path::PathBuf;
@@ -99,42 +100,34 @@ fn main() -> Result<(), String> {
         "loglevel",
         read_optional_arg("--loglevel", &args),
     )?;
-    let config = validate_config_value(&config_value).map_err(|e| e.to_string())?;
-    let dense_activity =
-        build_dense_activity_report_validated(&activity, &config).map_err(|e| e.to_string())?;
+    let plan = plan_single_render(
+        parse_config_value(&config_value).map_err(|e| e.to_string())?,
+        validate_render_activity(&activity).map_err(|e| e.to_string())?,
+        None,
+    )
+    .map_err(|e| e.to_string())?;
+    let output_kind = match plan.mode() {
+        VideoRenderModePlan::Composite { .. } => RenderOutputKind::Composite,
+        VideoRenderModePlan::Transparent(_) => RenderOutputKind::Transparent,
+    };
     let paths = AppPaths::from_repo_root(repo_root()?);
     paths.ensure_dirs().map_err(|e| e.to_string())?;
 
     let controller = RenderController::default();
-    controller
-        .try_start(
-            dense_activity.frame_count as u32,
-            "Preparing render assets...",
-        )
-        .map_err(|e| e.to_string())?;
+    let execution = RenderExecutionService::with_controller(controller.clone());
     let output_path = paths.downloads_dir.join(format!(
-        "overlay_{}.mov",
+        "overlay_{}.{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|error| error.to_string())?
-            .as_nanos()
+            .as_nanos(),
+        output_kind.extension(),
     ));
-    let output_target = RenderOutputTarget::validate(
-        output_path.to_str().unwrap(),
-        RenderOutputKind::Transparent,
-        false,
-    )
-    .map_err(|error| error.to_string())?;
-    let filename = render_video(
-        &paths,
-        &config,
-        &activity,
-        &dense_activity,
-        &controller,
-        &output_target,
-    )
-    .map_err(|e| e.to_string())?;
-    controller.finish_success(filename.clone());
+    let output_target =
+        RenderOutputTarget::validate(output_path.to_str().unwrap(), output_kind, false)
+            .map_err(|error| error.to_string())?;
+    let outcome = execution.render(&paths, plan, &activity, &output_target);
+    let filename = outcome.map_err(|e| e.to_string())?;
     println!("{{\"filename\":\"{filename}\"}}");
     Ok(())
 }

@@ -6,11 +6,13 @@ import { describe, expect, test, vi, beforeEach } from 'vitest'
 const finalizeActivity = vi.hoisted(() => vi.fn())
 const parseCsvActivity = vi.hoisted(() => vi.fn())
 const parseVboActivity = vi.hoisted(() => vi.fn())
+const parseTcxActivity = vi.hoisted(() => vi.fn())
 
 vi.mock('@/api/backend', () => ({
   finalizeActivity,
   parseCsvActivity,
   parseVboActivity,
+  parseTcxActivity,
   writeParseDebugFile: vi.fn().mockResolvedValue('debug-path.json'),
   openVideo: vi.fn(),
 }))
@@ -37,6 +39,7 @@ describe('import-activity store boundary', () => {
     finalizeActivity.mockReset()
     parseCsvActivity.mockReset()
     parseVboActivity.mockReset()
+    parseTcxActivity.mockReset()
     finalizeActivity.mockResolvedValue({
       parsed_activity: {
         metadata: {
@@ -116,6 +119,20 @@ describe('import-activity store boundary', () => {
       },
     })
     expect(store.setEndSecond).toHaveBeenCalledWith(12)
+  })
+
+  test('imports a native TCX path and activates the Rust-finalized activity', async () => {
+    const { importActivityPath } = await import('@/lib/activity/import-activity')
+    const store = storeActions()
+    const parsedActivity = { metadata: { duration_seconds: 5 } }
+    parseTcxActivity.mockResolvedValue({ parsed_activity: parsedActivity })
+
+    await importActivityPath('C:\\activities\\ride.TCX', store)
+
+    expect(parseTcxActivity).toHaveBeenCalledWith('C:\\activities\\ride.TCX')
+    expect(finalizeActivity).not.toHaveBeenCalled()
+    expect(store.activateActivityFile).toHaveBeenCalledWith(parsedActivity)
+    expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\ride.TCX' })
   })
 
   test('imports a native VBO path without creating a browser File or finalizing RawActivity', async () => {

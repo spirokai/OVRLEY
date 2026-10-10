@@ -52,7 +52,7 @@ pub struct ValidatedElevationPlot {
 
 pub fn validate_elevation_plots(
     plots: &serde_json::Value,
-    scene: &crate::normalize::ValidatedSceneConfig,
+    scene: &crate::normalize::ValidatedScenePresentation,
 ) -> CoreResult<Vec<ValidatedElevationPlot>> {
     find_plot_values(plots, "elevation")
         .into_iter()
@@ -67,7 +67,7 @@ pub fn validate_elevation_plots(
 pub fn validate_elevation_plot(
     plot: &ElevationPlotConfig,
     index: usize,
-    scene: &crate::normalize::ValidatedSceneConfig,
+    scene: &crate::normalize::ValidatedScenePresentation,
 ) -> CoreResult<ValidatedElevationPlot> {
     let p = |f: &str| format!("plots[{index}].{f}");
 

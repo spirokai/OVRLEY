@@ -15,8 +15,12 @@ pub mod finalize;
 pub mod interpolate;
 /// Canonical lap-timing derivation, validation, and queries.
 pub(crate) mod lap_timing;
+/// Full-source metric bounds, independent of render trimming and frame rate.
+pub mod metric_ranges;
 /// Serializable activity payloads and internal dense/trimmed report types.
 pub mod schema;
+/// Native Garmin TCX extraction into canonical raw activity samples.
+pub mod tcx;
 /// Scene-window trimming for parsed activity samples.
 pub mod trim;
 /// Native Racelogic VBOX extraction into canonical activity columns.
@@ -38,7 +42,7 @@ pub fn parse_activity_json(input: &str) -> CoreResult<ParsedActivity> {
     let value: Value = serde_json::from_str(input)
         .map_err(|error| CoreError::Activity(format!("Invalid parsedActivity JSON: {error}")))?;
 
-    let mut activity = if value.get("parsed_activity").is_some() {
+    let activity = if value.get("parsed_activity").is_some() {
         serde_json::from_value::<DebugPayload>(value)
             .map(|payload| payload.parsed_activity)
             .map_err(|error| {
@@ -49,9 +53,42 @@ pub fn parse_activity_json(input: &str) -> CoreResult<ParsedActivity> {
             CoreError::Activity(format!("Invalid parsedActivity payload: {error}"))
         })
     }?;
+    normalize_parsed_activity(activity)
+}
+
+/// Shared ingress for already deserialized activity, including batch submission.
+pub fn normalize_parsed_activity(mut activity: ParsedActivity) -> CoreResult<ParsedActivity> {
     activity.timezone = parse_activity_timezone(&activity.metadata)?;
     lap_timing::validate_lap_timing_contract(&activity)?;
     Ok(activity)
+}
+
+/// Activity is external data; reject an unusable timeline at its owning ingress.
+pub fn validate_render_activity(activity: &ParsedActivity) -> CoreResult<f64> {
+    let activity_end = activity.trim_end_seconds.max(
+        activity
+            .sample_elapsed_seconds
+            .last()
+            .copied()
+            .unwrap_or_default(),
+    );
+    if !activity_end.is_finite()
+        || activity_end <= 0.0
+        || activity.sample_elapsed_seconds.len() < 2
+        || activity
+            .sample_elapsed_seconds
+            .iter()
+            .any(|time| !time.is_finite())
+        || activity
+            .sample_elapsed_seconds
+            .windows(2)
+            .any(|pair| pair[1] < pair[0])
+    {
+        return Err(CoreError::Activity(
+            "Rendering requires a positive activity timeline".into(),
+        ));
+    }
+    Ok(activity_end)
 }
 
 fn parse_activity_timezone(metadata: &Value) -> CoreResult<Option<Tz>> {
@@ -98,18 +135,14 @@ pub fn build_dense_activity_report_validated(
     ))
 }
 
-/// Trims activity through the validated scene window and densifies it on an
-/// exact caller-owned frame timeline.
-pub fn build_dense_activity_report_for_timeline(
+/// Trims activity through the validated scene window and densifies it on a
+/// planner-owned frame timeline. Fractional coverage may start between frame
+/// ticks; a positive overlap between ticks may have no covered frames.
+pub(crate) fn build_dense_activity_report_for_timeline(
     activity: &ParsedActivity,
     config: &ValidatedRenderConfig,
     frame_elapsed_seconds: Vec<f64>,
 ) -> CoreResult<DenseActivityReport> {
-    if frame_elapsed_seconds.is_empty() {
-        return Err(CoreError::Activity(
-            "Dense frame timeline must contain at least one timestamp".to_string(),
-        ));
-    }
     let requirements = config.render_data_requirements()?;
     let trimmed = trim_activity(
         activity,
@@ -117,22 +150,6 @@ pub fn build_dense_activity_report_for_timeline(
         config.scene.end,
         &requirements,
     )?;
-    let duration = *trimmed
-        .sample_elapsed_seconds
-        .last()
-        .ok_or_else(|| CoreError::Activity("Trimmed activity has no timeline".to_string()))?;
-    if frame_elapsed_seconds[0] != 0.0
-        || frame_elapsed_seconds
-            .iter()
-            .any(|timestamp| !timestamp.is_finite() || *timestamp < 0.0 || *timestamp >= duration)
-        || frame_elapsed_seconds
-            .windows(2)
-            .any(|pair| pair[0] >= pair[1])
-    {
-        return Err(CoreError::Activity(format!(
-            "Dense frame timeline must start at zero, increase strictly, and remain below duration {duration}"
-        )));
-    }
     Ok(densify_activity(
         &trimmed,
         frame_elapsed_seconds,

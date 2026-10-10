@@ -39,13 +39,15 @@ describe('useRenderVideoDialogState', () => {
     const onClose = vi.fn()
     const onConfirm = vi.fn()
     const initialSettings = {
+      renderTarget: 'current',
+      exportMode: 'transparent',
       fps: 30,
-      updateRate: 1,
-      exportCodec: 'prores_ks',
+      widgetUpdateRate: 1,
+      codec: 'prores_ks',
       qualityType: 'quality',
       qualityValue: 18,
       exportAcceleration: 'cpu',
-      exportRange: { ...DEFAULT_EXPORT_RANGE },
+      range: { ...DEFAULT_EXPORT_RANGE },
     }
 
     const { result, rerender } = renderHook(
@@ -75,8 +77,8 @@ describe('useRenderVideoDialogState', () => {
     rerender({
       settings: {
         ...initialSettings,
-        exportRange: {
-          ...initialSettings.exportRange,
+        range: {
+          ...initialSettings.range,
           type: 'custom',
         },
       },
@@ -96,13 +98,15 @@ describe('useRenderVideoDialogState', () => {
 
     const { result } = renderHook(() => {
       const [settings, setSettings] = useState({
+        renderTarget: 'current',
+        exportMode: 'composite',
         fps: 30,
-        updateRate: 1,
-        exportCodec: 'prores_ks',
+        widgetUpdateRate: 1,
+        codec: 'prores_ks',
         qualityType: 'quality',
         qualityValue: 18,
         exportAcceleration: 'cpu',
-        exportRange: { ...DEFAULT_EXPORT_RANGE },
+        range: { ...DEFAULT_EXPORT_RANGE },
       })
 
       return useRenderVideoDialogState({
@@ -115,7 +119,7 @@ describe('useRenderVideoDialogState', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.settings.exportCodec).toBe('libx264')
+      expect(result.current.settings.codec).toBe('libx264')
     })
     expect(result.current.exportMode).toBe('composite')
     expect(result.current.settings.qualityType).toBe('quality')
@@ -130,10 +134,10 @@ describe('useRenderVideoDialogState', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.settings.exportCodec).toBe('prores_ks')
+      expect(result.current.settings.codec).toBe('prores_ks')
     })
     expect(result.current.exportMode).toBe('transparent')
-    expect(result.current.settings.exportRange).toEqual({
+    expect(result.current.settings.range).toEqual({
       ...DEFAULT_EXPORT_RANGE,
       type: 'custom',
       from: 5,
@@ -142,8 +146,8 @@ describe('useRenderVideoDialogState', () => {
 
     act(() => {
       result.current.onSettingsChange({
-        exportRange: {
-          ...result.current.settings.exportRange,
+        range: {
+          ...result.current.settings.range,
           from: 6.25,
           to: 15.75,
         },
@@ -155,7 +159,7 @@ describe('useRenderVideoDialogState', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.settings.exportCodec).toBe('libx264')
+      expect(result.current.settings.codec).toBe('libx264')
     })
     expect(result.current.exportMode).toBe('composite')
 
@@ -164,9 +168,9 @@ describe('useRenderVideoDialogState', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.settings.exportCodec).toBe('prores_ks')
+      expect(result.current.settings.codec).toBe('prores_ks')
     })
-    expect(result.current.settings.exportRange).toEqual({
+    expect(result.current.settings.range).toEqual({
       ...DEFAULT_EXPORT_RANGE,
       type: 'custom',
       from: 6.25,
@@ -177,7 +181,7 @@ describe('useRenderVideoDialogState', () => {
       result.current.handleApplyImportedVideoRange()
     })
 
-    expect(result.current.settings.exportRange).toEqual({
+    expect(result.current.settings.range).toEqual({
       ...DEFAULT_EXPORT_RANGE,
       type: 'custom',
       from: 5,

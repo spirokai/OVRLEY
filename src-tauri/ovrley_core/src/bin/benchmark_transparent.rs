@@ -9,13 +9,15 @@
 //!
 //! Does not own: rendering or encoding — delegates to `ovrley_core`.
 
-use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
-use ovrley_core::commands::{parse_and_validate_config, validate_config_value};
+use ovrley_core::activity::{parse_activity_json, validate_render_activity};
+use ovrley_core::commands::parse_and_validate_config;
 use ovrley_core::encode::ffmpeg::detect::detect_codecs;
-use ovrley_core::encode::pipeline::transparent::{render_video, rendered_frame_count};
 use ovrley_core::encode::progress::RenderController;
+use ovrley_core::normalize::parse_config_value;
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
+use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::planning::plan_single_render;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -201,8 +203,8 @@ fn main() -> Result<(), String> {
     let base_config_str = serde_json::to_string(&base_config_value)
         .map_err(|e| format!("Failed to serialize config: {e}"))?;
     let base_validated = parse_and_validate_config(&base_config_str).map_err(|e| e.to_string())?;
-    let res_width = base_validated.scene.width;
-    let res_height = base_validated.scene.height;
+    let res_width = base_validated.scene.presentation.width;
+    let res_height = base_validated.scene.presentation.height;
     let base_update_rate = settings_update_rate.unwrap_or(base_validated.scene.update_rate.get());
 
     let mut results = BTreeMap::new();
@@ -240,35 +242,18 @@ fn main() -> Result<(), String> {
             run_config_value["scene"]["end"] = serde_json::json!(360.0f64);
             run_config_value["scene"]["ffmpeg"] = serde_json::json!({"codec": codec_name});
 
-            let config = validate_config_value(&run_config_value).map_err(|e| e.to_string())?;
-            let dense = build_dense_activity_report_validated(&activity, &config)
-                .map_err(|e| e.to_string())?;
-
-            let update_rate = config.widget_update_rate();
-            let total_frames = rendered_frame_count(dense.frame_count, update_rate)
-                .map_err(|error| error.to_string())? as u32;
-            let overlay_duration = config.scene.end - config.scene.start;
+            let plan = plan_single_render(
+                parse_config_value(&run_config_value).map_err(|e| e.to_string())?,
+                validate_render_activity(&activity).map_err(|e| e.to_string())?,
+                None,
+            )
+            .map_err(|e| e.to_string())?;
+            let update_rate = plan.config().widget_update_rate();
+            let total_frames = plan.planned_frames();
+            let overlay_duration = plan.config().scene.end - plan.config().scene.start;
 
             let controller = RenderController::default();
-            if let Err(e) = controller.try_start(
-                total_frames,
-                &format!("Benchmark {codec_name} run {run_num}"),
-            ) {
-                println!("FAILED: {e}");
-                runs.push(RunResult {
-                    run: run_num,
-                    success: false,
-                    resolution: None,
-                    widget_update_rate: None,
-                    total_frames: None,
-                    overlay_duration_seconds: None,
-                    job_time: None,
-                    job_time_seconds: None,
-                    file_size_mb: None,
-                    error: Some(e.to_string()),
-                });
-                continue;
-            }
+            let execution = RenderExecutionService::with_controller(controller.clone());
 
             let started = Instant::now();
             let output_path = paths
@@ -278,12 +263,10 @@ fn main() -> Result<(), String> {
                 output_path.to_str().unwrap(),
                 RenderOutputKind::Transparent,
                 true,
-            )
-            .map_err(|error| error.to_string());
-            let render_result = output_target.and_then(|target| {
-                render_video(&paths, &config, &activity, &dense, &controller, &target)
-                    .map_err(|error| error.to_string())
-            });
+            );
+            let render_result =
+                output_target.and_then(|target| execution.render(&paths, plan, &activity, &target));
+            let render_result = render_result.map_err(|error| error.to_string());
             let elapsed_secs = started.elapsed().as_secs_f64();
 
             match render_result {

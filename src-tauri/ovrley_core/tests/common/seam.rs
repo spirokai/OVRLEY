@@ -3,8 +3,7 @@
 use ovrley_core::commands::{parse_and_validate_config, validate_config_value};
 use ovrley_core::error::CoreResult;
 use ovrley_core::normalize::{
-    validate_scene_config, SceneConfig, ValidatedFfmpegConfig, ValidatedRenderConfig,
-    ValidatedValueWidget,
+    validate_ffmpeg_config, ValidatedFfmpegConfig, ValidatedRenderConfig, ValidatedValueWidget,
 };
 use ovrley_core::render::widgets::types::PreparedValue;
 use serde_json::{json, Value};
@@ -38,9 +37,12 @@ pub fn validated_config_from_value(config_value: Value) -> ValidatedRenderConfig
 }
 
 pub fn validate_scene_ffmpeg(ffmpeg: Value) -> CoreResult<ValidatedFfmpegConfig> {
-    let mut scene: SceneConfig = serde_json::from_value(explicit_scene_json()).unwrap();
-    scene.ffmpeg = ffmpeg;
-    validate_scene_config(scene).map(|scene| scene.ffmpeg)
+    validate_ffmpeg_config(
+        ffmpeg,
+        ovrley_core::encode::ffmpeg::catalog::CodecSelection::Transparent(
+            ovrley_core::encode::ffmpeg::catalog::TransparentCodecId::ProresKs,
+        ),
+    )
 }
 
 pub fn expect_standard_value(value: PreparedValue, index: usize) -> ValidatedValueWidget {
