@@ -179,6 +179,7 @@
     "cancelling": "Annulation...",
     "exportSettings": "Paramètres d’exportation",
     "batchSettings": "Paramètres du lot",
+    "batchAutoSyncRequirement": "Le rendu par lot nécessite une synchronisation automatique entre les vidéos et les données d’activité.\n\nIl échouera ou produira des résultats erronés si la synchronisation automatique ne fonctionne pas.",
     "showAll": "Tout afficher",
     "noRenderableVideos": "Aucune vidéo à rendre.",
     "finalizingVideo": "Finalisation de la vidéo",

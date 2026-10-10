@@ -179,6 +179,7 @@
     "cancelling": "İptal ediliyor...",
     "exportSettings": "Dışa aktarma ayarları",
     "batchSettings": "Toplu işlem ayarları",
+    "batchAutoSyncRequirement": "Toplu işleme, videolar ile aktivite verileri arasında otomatik senkronizasyon gerektirir.\n\nOtomatik senkronizasyon çalışmazsa işlem başarısız olur veya hatalı sonuçlar üretir.",
     "showAll": "Tümünü göster",
     "noRenderableVideos": "İşlenebilecek video yok.",
     "finalizingVideo": "Video sonlandırılıyor",

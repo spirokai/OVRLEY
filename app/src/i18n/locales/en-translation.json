@@ -179,6 +179,7 @@
     "cancelling": "Cancelling...",
     "exportSettings": "Export Settings",
     "batchSettings": "Batch Settings",
+    "batchAutoSyncRequirement": "Batch rendering relies on automatic syncing between videos and activity data.\n\nIt will fail or produce erroneous results if the automatic sync does not work.",
     "showAll": "Show all",
     "noRenderableVideos": "No renderable videos.",
     "finalizingVideo": "Finalizing Video",

@@ -179,6 +179,7 @@
     "cancelling": "Anulowanie...",
     "exportSettings": "Ustawienia eksportu",
     "batchSettings": "Ustawienia partii",
+    "batchAutoSyncRequirement": "Renderowanie wsadowe wymaga automatycznej synchronizacji filmów z danymi aktywności.\n\nZakończy się niepowodzeniem lub da błędne wyniki, jeśli automatyczna synchronizacja nie zadziała.",
     "showAll": "Pokaż wszystkie",
     "noRenderableVideos": "Brak filmów do renderowania.",
     "finalizingVideo": "Finalizowanie wideo",

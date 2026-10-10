@@ -179,6 +179,7 @@
     "cancelling": "Ruší se...",
     "exportSettings": "Nastavení exportu",
     "batchSettings": "Nastavení dávky",
+    "batchAutoSyncRequirement": "Dávkové vykreslování vyžaduje automatickou synchronizaci videí s daty aktivity.\n\nPokud automatická synchronizace nefunguje, vykreslování selže nebo vytvoří chybné výsledky.",
     "showAll": "Zobrazit vše",
     "noRenderableVideos": "Žádná videa k vykreslení.",
     "finalizingVideo": "Dokončování videa",

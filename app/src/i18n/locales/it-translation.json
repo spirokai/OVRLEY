@@ -179,6 +179,7 @@
     "cancelling": "Annullamento in corso...",
     "exportSettings": "Impostazioni esportazione",
     "batchSettings": "Impostazioni batch",
+    "batchAutoSyncRequirement": "Il rendering in batch richiede la sincronizzazione automatica tra i video e i dati dell’attività.\n\nNon riuscirà o produrrà risultati errati se la sincronizzazione automatica non funziona.",
     "showAll": "Mostra tutti",
     "noRenderableVideos": "Nessun video da renderizzare.",
     "finalizingVideo": "Finalizzazione video",

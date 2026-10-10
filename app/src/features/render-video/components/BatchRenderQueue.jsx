@@ -6,6 +6,7 @@
 import { Files, FolderOpen, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
+import { HelpTooltip } from '@/components/ui/help-tooltip'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import BatchRenderQueueRow from './BatchRenderQueueRow'
@@ -57,7 +58,10 @@ export default function BatchRenderQueue({
           <div className="flex h-7 shrink-0 items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <Files className="h-4 w-4 shrink-0 text-primary" />
-              <h2 className="truncate text-sm font-semibold text-foreground">{t('render-video.batchSettings', 'Batch Settings')}</h2>
+              <div className="flex min-w-0 items-center gap-1">
+                <h2 className="truncate text-sm font-semibold text-foreground">{t('render-video.batchSettings', 'Batch Settings')}</h2>
+                <HelpTooltip className="-mt-0.5 self-start" content={t('render-video.batchAutoSyncRequirement')} />
+              </div>
             </div>
             <Label className="flex shrink-0 items-center gap-2 text-[10px] text-muted-foreground">
               {t('render-video.showAll', 'Show all')}

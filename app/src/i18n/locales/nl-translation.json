@@ -179,6 +179,7 @@
     "cancelling": "Annuleren...",
     "exportSettings": "Exportinstellingen",
     "batchSettings": "Batchinstellingen",
+    "batchAutoSyncRequirement": "Batchrendering vereist automatische synchronisatie tussen video's en activiteitsgegevens.\n\nHet renderen mislukt of levert onjuiste resultaten op als de automatische synchronisatie niet werkt.",
     "showAll": "Alles tonen",
     "noRenderableVideos": "Geen renderbare video’s.",
     "finalizingVideo": "Video voltooien",

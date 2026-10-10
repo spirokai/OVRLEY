@@ -179,6 +179,7 @@
     "cancelling": "Avbryter...",
     "exportSettings": "Exportinställningar",
     "batchSettings": "Batchinställningar",
+    "batchAutoSyncRequirement": "Batchrendering kräver automatisk synkronisering mellan videor och aktivitetsdata.\n\nRenderingen misslyckas eller ger felaktiga resultat om den automatiska synkroniseringen inte fungerar.",
     "showAll": "Visa alla",
     "noRenderableVideos": "Inga videor att rendera.",
     "finalizingVideo": "Slutför video",

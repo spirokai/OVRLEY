@@ -179,6 +179,7 @@
     "cancelling": "Cancelando...",
     "exportSettings": "Ajustes de exportación",
     "batchSettings": "Ajustes de lote",
+    "batchAutoSyncRequirement": "El renderizado por lotes depende de la sincronización automática entre los vídeos y los datos de actividad.\n\nFallará o producirá resultados erróneos si la sincronización automática no funciona.",
     "showAll": "Mostrar todos",
     "noRenderableVideos": "No hay vídeos que se puedan renderizar.",
     "finalizingVideo": "Finalizando vídeo",

@@ -179,6 +179,7 @@
     "cancelling": "正在取消...",
     "exportSettings": "导出设置",
     "batchSettings": "批量设置",
+    "batchAutoSyncRequirement": "批量渲染依赖视频与活动数据之间的自动同步。\n\n如果自动同步无法正常工作，渲染将失败或产生错误的结果。",
     "showAll": "显示全部",
     "noRenderableVideos": "没有可渲染的视频。",
     "finalizingVideo": "正在完成视频处理",

@@ -179,6 +179,7 @@
     "cancelling": "Wird abgebrochen...",
     "exportSettings": "Exporteinstellungen",
     "batchSettings": "Batch-Einstellungen",
+    "batchAutoSyncRequirement": "Die Stapelverarbeitung benötigt eine automatische Synchronisierung zwischen Videos und Aktivitätsdaten.\n\nSie schlägt fehl oder liefert fehlerhafte Ergebnisse, wenn die automatische Synchronisierung nicht funktioniert.",
     "showAll": "Alle anzeigen",
     "noRenderableVideos": "Keine renderbaren Videos.",
     "finalizingVideo": "Video wird fertiggestellt",

@@ -179,6 +179,7 @@
     "cancelling": "キャンセル中...",
     "exportSettings": "書き出し設定",
     "batchSettings": "バッチ設定",
+    "batchAutoSyncRequirement": "一括レンダリングには、動画とアクティビティデータの自動同期が必要です。\n\n自動同期が機能しない場合、レンダリングは失敗するか、誤った結果が生成されます。",
     "showAll": "すべて表示",
     "noRenderableVideos": "レンダリング可能な動画はありません。",
     "finalizingVideo": "動画を仕上げています",
