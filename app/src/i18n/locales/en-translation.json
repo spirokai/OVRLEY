@@ -147,6 +147,25 @@
     "video": "Video"
   },
   "render-video": {
+    "pathErrors": {
+      "outputFileRequired": "Choose an output file",
+      "outputPathIncomplete": "Choose a complete output path, including its folder",
+      "outputFilenameRequired": "The output path must include a file name",
+      "outputExtensionInvalid": "The output file must use .{{extension}}",
+      "outputNotFile": "The selected output is not a file",
+      "outputDirectoryInvalid": "Choose an existing output directory",
+      "sourceFilenameInvalid": "The source file name is invalid",
+      "outputAliasesInput": "The output would overwrite an input video",
+      "outputDestinationsConflict": "Multiple batch outputs use the same destination",
+      "outputDirectoryMissing": "The output directory does not exist",
+      "outputPermissionDenied": "You do not have permission to write the output file",
+      "outputPathInvalid": "The output file name or path is not valid",
+      "outputWriteFailed": "Could not create or write the output file: {{detail}}",
+      "videoDirectoryInvalid": "Choose a complete video directory path",
+      "videoDirectoryMissing": "The video directory does not exist",
+      "videoDirectoryPermissionDenied": "You do not have permission to read the video directory",
+      "videoDirectoryReadFailed": "Could not read the video directory: {{detail}}"
+    },
     "reinspectionRequired": "Sources changed or inspection expired. Inspect again before starting.",
     "inspectAgain": "Inspect again",
     "preparingBatch": "Preparing video...",

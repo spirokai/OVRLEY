@@ -147,6 +147,25 @@
     "video": "Video"
   },
   "render-video": {
+    "pathErrors": {
+      "outputFileRequired": "Kies een uitvoerbestand",
+      "outputPathIncomplete": "Kies een volledig uitvoerpad, inclusief de map",
+      "outputFilenameRequired": "Het uitvoerpad moet een bestandsnaam bevatten",
+      "outputExtensionInvalid": "Het uitvoerbestand moet de extensie .{{extension}} gebruiken",
+      "outputNotFile": "De geselecteerde bestemming is geen bestand",
+      "outputDirectoryInvalid": "Kies een bestaande uitvoermap",
+      "sourceFilenameInvalid": "De naam van het bronbestand is ongeldig",
+      "outputAliasesInput": "De uitvoer zou een invoervideo overschrijven",
+      "outputDestinationsConflict": "Meerdere batchuitvoerbestanden gebruiken dezelfde bestemming",
+      "outputDirectoryMissing": "De uitvoermap bestaat niet",
+      "outputPermissionDenied": "Je hebt geen toestemming om het uitvoerbestand te schrijven",
+      "outputPathInvalid": "De naam of het pad van het uitvoerbestand is ongeldig",
+      "outputWriteFailed": "Kan het uitvoerbestand niet maken of schrijven: {{detail}}",
+      "videoDirectoryInvalid": "Kies een volledig pad naar de videomap",
+      "videoDirectoryMissing": "De videomap bestaat niet",
+      "videoDirectoryPermissionDenied": "Je hebt geen toestemming om de videomap te lezen",
+      "videoDirectoryReadFailed": "Kan de videomap niet lezen: {{detail}}"
+    },
     "reinspectionRequired": "Bronbestanden zijn gewijzigd of de controle is verlopen. Controleer opnieuw voordat je start.",
     "inspectAgain": "Opnieuw controleren",
     "preparingBatch": "Video voorbereiden...",

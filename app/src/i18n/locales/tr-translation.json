@@ -147,6 +147,25 @@
     "video": "Video"
   },
   "render-video": {
+    "pathErrors": {
+      "outputFileRequired": "Bir çıktı dosyası seçin",
+      "outputPathIncomplete": "Klasörü de içeren tam bir çıktı yolu seçin",
+      "outputFilenameRequired": "Çıktı yolu bir dosya adı içermelidir",
+      "outputExtensionInvalid": "Çıktı dosyası .{{extension}} uzantısını kullanmalıdır",
+      "outputNotFile": "Seçilen hedef bir dosya değil",
+      "outputDirectoryInvalid": "Var olan bir çıktı dizini seçin",
+      "sourceFilenameInvalid": "Kaynak dosya adı geçersiz",
+      "outputAliasesInput": "Çıktı, bir girdi videosunun üzerine yazacak",
+      "outputDestinationsConflict": "Birden fazla toplu çıktı aynı hedefi kullanıyor",
+      "outputDirectoryMissing": "Çıktı dizini mevcut değil",
+      "outputPermissionDenied": "Çıktı dosyasına yazma izniniz yok",
+      "outputPathInvalid": "Çıktı dosyasının adı veya yolu geçersiz",
+      "outputWriteFailed": "Çıktı dosyası oluşturulamadı veya yazılamadı: {{detail}}",
+      "videoDirectoryInvalid": "Video dizini için tam bir yol seçin",
+      "videoDirectoryMissing": "Video dizini mevcut değil",
+      "videoDirectoryPermissionDenied": "Video dizinini okuma izniniz yok",
+      "videoDirectoryReadFailed": "Video dizini okunamadı: {{detail}}"
+    },
     "reinspectionRequired": "Kaynak dosyalar değişti veya incelemenin süresi doldu. Başlatmadan önce yeniden inceleyin.",
     "inspectAgain": "Yeniden incele",
     "preparingBatch": "Video hazırlanıyor...",

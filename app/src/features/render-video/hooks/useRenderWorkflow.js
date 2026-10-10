@@ -3,9 +3,10 @@ import * as backend from '@/api/backend'
 import useStore from '@/store/useStore'
 import { loadRememberedRenderDirectory } from '@/lib/file-dialog'
 import { createRenderSettingsDraft, isRendererBusy } from '../utils/renderRequest'
-import { normalizeRenderOutputPath } from '../utils/renderPresentation'
+import { formatRenderPathError, normalizeRenderOutputPath } from '../utils/renderPresentation'
 import useRenderExecution from './useRenderExecution'
 import i18next from 'i18next'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Owns dialog intent and routes both targets through one execution owner.
@@ -14,6 +15,7 @@ import i18next from 'i18next'
  * @returns {object} Shell actions and dialog presentation/controls.
  */
 export default function useRenderWorkflow({ backendStatus }) {
+  const { t } = useTranslation()
   const [renderDialogPhase, setRenderDialogPhase] = useState('closed')
   const [renderSettingsDraft, setRenderSettingsDraft] = useState(null)
   const execution = useRenderExecution({ reviewTarget: renderDialogPhase === 'confirm' ? renderSettingsDraft.renderTarget : null })
@@ -93,7 +95,7 @@ export default function useRenderWorkflow({ backendStatus }) {
       const target = renderSettingsDraft.renderTarget
       if (target === 'batch' && batchReview === null) return
       if (target === 'current' && !renderSettingsDraft.outputPath) {
-        setOutputPathError('Render output path is required')
+        setOutputPathError({ reason: 'outputFileRequired' })
         return
       }
       if (expectedPath !== null && renderSettingsDraft.outputPath !== expectedPath) {
@@ -113,14 +115,14 @@ export default function useRenderWorkflow({ backendStatus }) {
       } catch (error) {
         if (target === 'batch' && error.code === 'reinspectionRequired') throw error
         else if (target === 'current' && error.code === 'already_exists') setPendingOverwritePath(renderSettingsDraft.outputPath)
-        else if (target === 'current' && error.code === 'output_error') setOutputPathError(error.message)
+        else if (target === 'current' && error.code === 'output_error') setOutputPathError(error)
         else {
           if (target === 'current') setRenderDialogPhase('closed')
-          setErrorMessage(error.message)
+          setErrorMessage(formatRenderPathError(error, t))
         }
       }
     },
-    [backendStatus, clearOutputReview, execution, renderSettingsDraft, setErrorMessage],
+    [backendStatus, clearOutputReview, execution, renderSettingsDraft, setErrorMessage, t],
   )
 
   const handleRenderVideoConfirm = useCallback((batchReview) => submitRender(batchReview), [submitRender])
@@ -145,7 +147,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     renderSettingsDraft,
     renderTooltipContent,
     renderingVideo,
-    outputPathError,
+    outputPathError: formatRenderPathError(outputPathError, t),
     overwriteOpen: pendingOverwritePath !== null,
     pendingOverwritePath,
     updateRenderSettingsDraft,

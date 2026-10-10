@@ -1,6 +1,6 @@
 //! Request-owned production render output contracts.
 
-use crate::error::{CoreError, CoreResult};
+use crate::error::{CoreError, CoreResult, RenderPathError};
 use crate::paths::AppPaths;
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use serde::{Deserialize, Serialize};
@@ -46,49 +46,52 @@ impl RenderOutputTarget {
     /// Validates and probes one exact output path.
     pub fn validate(raw_path: &str, kind: RenderOutputKind, overwrite: bool) -> CoreResult<Self> {
         if raw_path.trim().is_empty() {
-            return Err(CoreError::OutputInvalid("Choose an output file".into()));
+            return Err(CoreError::OutputInvalid(
+                RenderPathError::OutputFileRequired,
+            ));
         }
 
         let path = PathBuf::from(raw_path);
         if !path.is_absolute() {
-            return Err(CoreError::OutputInvalid(format!(
-                "Choose a complete output path, including its folder: {}",
-                path.display()
-            )));
+            return Err(CoreError::OutputInvalid(
+                RenderPathError::OutputPathIncomplete {
+                    path: path.display().to_string(),
+                },
+            ));
         }
 
         let filename = path
             .file_name()
             .and_then(|value| value.to_str())
             .ok_or_else(|| {
-                CoreError::OutputInvalid(format!(
-                    "The output path must include a file name: {}",
-                    path.display()
-                ))
+                CoreError::OutputInvalid(RenderPathError::OutputFilenameRequired {
+                    path: path.display().to_string(),
+                })
             })?;
         if filename.is_empty() || filename == "." || filename == ".." {
-            return Err(CoreError::OutputInvalid(format!(
-                "The output path must include a file name: {}",
-                path.display()
-            )));
+            return Err(CoreError::OutputInvalid(
+                RenderPathError::OutputFilenameRequired {
+                    path: path.display().to_string(),
+                },
+            ));
         }
 
         let extension = path
             .extension()
             .and_then(|value| value.to_str())
             .ok_or_else(|| {
-                CoreError::OutputInvalid(format!(
-                    "The output file must use .{}: {}",
-                    kind.extension(),
-                    path.display()
-                ))
+                CoreError::OutputInvalid(RenderPathError::OutputExtensionInvalid {
+                    path: path.display().to_string(),
+                    extension: kind.extension(),
+                })
             })?;
         if !extension.eq_ignore_ascii_case(kind.extension()) {
-            return Err(CoreError::OutputInvalid(format!(
-                "The output file must use .{}: {}",
-                kind.extension(),
-                path.display()
-            )));
+            return Err(CoreError::OutputInvalid(
+                RenderPathError::OutputExtensionInvalid {
+                    path: path.display().to_string(),
+                    extension: kind.extension(),
+                },
+            ));
         }
 
         match OpenOptions::new().write(true).create_new(true).open(&path) {
@@ -106,10 +109,9 @@ impl RenderOutputTarget {
                     source,
                 })?;
                 if !metadata.is_file() {
-                    return Err(CoreError::OutputInvalid(format!(
-                        "The selected output is not a file: {}",
-                        path.display()
-                    )));
+                    return Err(CoreError::OutputInvalid(RenderPathError::OutputNotFile {
+                        path: path.display().to_string(),
+                    }));
                 }
 
                 OpenOptions::new()
@@ -147,7 +149,7 @@ pub fn plan_batch_output_targets(
 ) -> CoreResult<Vec<RenderOutputTarget>> {
     if !directory.is_absolute() || !directory.is_dir() {
         return Err(CoreError::OutputInvalid(
-            "Choose an existing absolute output directory".into(),
+            RenderPathError::OutputDirectoryInvalid,
         ));
     }
     let directory = fs::canonicalize(directory).map_err(|source| CoreError::OutputIo {
@@ -175,10 +177,9 @@ pub fn plan_batch_output_targets(
             .file_stem()
             .and_then(|value| value.to_str())
             .ok_or_else(|| {
-                CoreError::OutputInvalid(format!(
-                    "Source has no Unicode filename stem: {}",
-                    source.display()
-                ))
+                CoreError::OutputInvalid(RenderPathError::SourceFilenameInvalid {
+                    path: source.display().to_string(),
+                })
             })?;
         let filename = format!("{stem}_{}.{}", kind.filename_prefix(), kind.extension());
         let target = directory.join(&filename);
@@ -192,19 +193,21 @@ pub fn plan_batch_output_targets(
             .as_ref()
             .is_some_and(|handle| input_handles.contains(handle));
         if aliases_input {
-            return Err(CoreError::OutputInvalid(format!(
-                "Batch output aliases an input: {}",
-                target.display()
-            )));
+            return Err(CoreError::OutputInvalid(
+                RenderPathError::OutputAliasesInput {
+                    path: target.display().to_string(),
+                },
+            ));
         }
         let aliases_output = handle
             .as_ref()
             .is_some_and(|handle| output_handles.contains(handle));
         if !keys.insert(key) || aliases_output {
-            return Err(CoreError::OutputInvalid(format!(
-                "Batch outputs have conflicting destinations: {}",
-                target.display()
-            )));
+            return Err(CoreError::OutputInvalid(
+                RenderPathError::OutputDestinationsConflict {
+                    path: target.display().to_string(),
+                },
+            ));
         }
         destinations.push(target);
         if let Some(handle) = handle {

@@ -147,6 +147,25 @@
     "video": "Vídeo"
   },
   "render-video": {
+    "pathErrors": {
+      "outputFileRequired": "Selecciona un archivo de salida",
+      "outputPathIncomplete": "Selecciona una ruta de salida completa, incluida su carpeta",
+      "outputFilenameRequired": "La ruta de salida debe incluir un nombre de archivo",
+      "outputExtensionInvalid": "El archivo de salida debe usar la extensión .{{extension}}",
+      "outputNotFile": "El destino seleccionado no es un archivo",
+      "outputDirectoryInvalid": "Selecciona un directorio de salida existente",
+      "sourceFilenameInvalid": "El nombre del archivo de origen no es válido",
+      "outputAliasesInput": "La salida sobrescribiría un vídeo de entrada",
+      "outputDestinationsConflict": "Varias salidas del lote usan el mismo destino",
+      "outputDirectoryMissing": "El directorio de salida no existe",
+      "outputPermissionDenied": "No tienes permiso para escribir el archivo de salida",
+      "outputPathInvalid": "El nombre o la ruta del archivo de salida no es válido",
+      "outputWriteFailed": "No se pudo crear ni escribir el archivo de salida: {{detail}}",
+      "videoDirectoryInvalid": "Selecciona una ruta completa al directorio de vídeos",
+      "videoDirectoryMissing": "El directorio de vídeos no existe",
+      "videoDirectoryPermissionDenied": "No tienes permiso para leer el directorio de vídeos",
+      "videoDirectoryReadFailed": "No se pudo leer el directorio de vídeos: {{detail}}"
+    },
     "reinspectionRequired": "Los archivos cambiaron o la inspección caducó. Inspecciona de nuevo antes de iniciar.",
     "inspectAgain": "Inspeccionar de nuevo",
     "preparingBatch": "Preparando vídeo...",

@@ -14,7 +14,7 @@ use super::planning::{plan_batch_item, PlannedVideoRender};
 use super::submission::{accept_batch, AcceptedBatch, AcceptedJob};
 use crate::activity::schema::ParsedActivity;
 use crate::activity::validate_render_activity;
-use crate::error::{CoreError, CoreResult};
+use crate::error::{CoreError, CoreResult, RenderPathError};
 use crate::media::prepared_video::check_source_freshness;
 use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
@@ -23,6 +23,11 @@ use crate::raster::RasterResourceResolver;
 #[derive(Debug, Serialize)]
 #[serde(tag = "code", rename_all = "camelCase")]
 pub enum BatchServiceError {
+    #[serde(rename = "output_error")]
+    OutputError {
+        #[serde(flatten)]
+        error: RenderPathError,
+    },
     InvalidRequest {
         message: String,
     },
@@ -44,8 +49,14 @@ pub enum BatchServiceError {
 
 impl From<CoreError> for BatchServiceError {
     fn from(error: CoreError) -> Self {
-        Self::InvalidRequest {
-            message: error.to_string(),
+        match error {
+            CoreError::OutputInvalid(error) => Self::OutputError { error },
+            CoreError::OutputIo { path, source } => Self::OutputError {
+                error: RenderPathError::output_io(path, source),
+            },
+            error => Self::InvalidRequest {
+                message: error.to_string(),
+            },
         }
     }
 }

@@ -147,6 +147,25 @@
     "video": "동영상"
   },
   "render-video": {
+    "pathErrors": {
+      "outputFileRequired": "출력 파일을 선택하세요",
+      "outputPathIncomplete": "폴더를 포함한 전체 출력 경로를 선택하세요",
+      "outputFilenameRequired": "출력 경로에 파일 이름이 포함되어야 합니다",
+      "outputExtensionInvalid": "출력 파일은 .{{extension}} 확장자를 사용해야 합니다",
+      "outputNotFile": "선택한 출력 대상이 파일이 아닙니다",
+      "outputDirectoryInvalid": "기존 출력 디렉터리를 선택하세요",
+      "sourceFilenameInvalid": "원본 파일 이름이 유효하지 않습니다",
+      "outputAliasesInput": "출력 파일이 입력 동영상을 덮어쓰게 됩니다",
+      "outputDestinationsConflict": "여러 일괄 출력이 같은 대상을 사용합니다",
+      "outputDirectoryMissing": "출력 디렉터리가 존재하지 않습니다",
+      "outputPermissionDenied": "출력 파일에 쓸 권한이 없습니다",
+      "outputPathInvalid": "출력 파일 이름 또는 경로가 유효하지 않습니다",
+      "outputWriteFailed": "출력 파일을 만들거나 쓸 수 없습니다: {{detail}}",
+      "videoDirectoryInvalid": "동영상 디렉터리의 전체 경로를 선택하세요",
+      "videoDirectoryMissing": "동영상 디렉터리가 존재하지 않습니다",
+      "videoDirectoryPermissionDenied": "동영상 디렉터리를 읽을 권한이 없습니다",
+      "videoDirectoryReadFailed": "동영상 디렉터리를 읽을 수 없습니다: {{detail}}"
+    },
     "reinspectionRequired": "파일이 변경되었거나 검사 유효 기간이 만료되었습니다. 시작 전에 다시 검사하세요.",
     "inspectAgain": "다시 검사",
     "preparingBatch": "동영상 준비 중...",

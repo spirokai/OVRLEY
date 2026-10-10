@@ -147,6 +147,25 @@
     "video": "Wideo"
   },
   "render-video": {
+    "pathErrors": {
+      "outputFileRequired": "Wybierz plik wyjściowy",
+      "outputPathIncomplete": "Wybierz pełną ścieżkę wyjściową wraz z folderem",
+      "outputFilenameRequired": "Ścieżka wyjściowa musi zawierać nazwę pliku",
+      "outputExtensionInvalid": "Plik wyjściowy musi mieć rozszerzenie .{{extension}}",
+      "outputNotFile": "Wybrane miejsce docelowe nie jest plikiem",
+      "outputDirectoryInvalid": "Wybierz istniejący katalog wyjściowy",
+      "sourceFilenameInvalid": "Nazwa pliku źródłowego jest nieprawidłowa",
+      "outputAliasesInput": "Plik wyjściowy nadpisałby wejściowy film",
+      "outputDestinationsConflict": "Kilka plików wyjściowych ma to samo miejsce docelowe",
+      "outputDirectoryMissing": "Katalog wyjściowy nie istnieje",
+      "outputPermissionDenied": "Nie masz uprawnień do zapisu pliku wyjściowego",
+      "outputPathInvalid": "Nazwa lub ścieżka pliku wyjściowego jest nieprawidłowa",
+      "outputWriteFailed": "Nie można utworzyć lub zapisać pliku wyjściowego: {{detail}}",
+      "videoDirectoryInvalid": "Wybierz pełną ścieżkę do katalogu filmów",
+      "videoDirectoryMissing": "Katalog filmów nie istnieje",
+      "videoDirectoryPermissionDenied": "Nie masz uprawnień do odczytu katalogu filmów",
+      "videoDirectoryReadFailed": "Nie można odczytać katalogu filmów: {{detail}}"
+    },
     "reinspectionRequired": "Pliki źródłowe zmieniły się lub weryfikacja wygasła. Sprawdź je ponownie przed rozpoczęciem.",
     "inspectAgain": "Sprawdź ponownie",
     "preparingBatch": "Przygotowywanie filmu...",

@@ -10,6 +10,7 @@
 
 use crate::raster_resources::RasterResources;
 use crate::runtime_paths;
+use ovrley_core::error::RenderPathError;
 use serde::Serialize;
 use std::path::PathBuf;
 use tauri::Manager;
@@ -130,19 +131,26 @@ const BATCH_VIDEO_EXTENSIONS: [&str; 3] = ["mp4", "mov", "mkv"];
 /// Used by the batch-render folder picker — does not recurse into
 /// subdirectories.
 #[tauri::command]
-pub(crate) fn list_directory_video_files(directory: String) -> Result<Vec<String>, String> {
+pub(crate) fn list_directory_video_files(
+    directory: String,
+) -> Result<Vec<String>, RenderPathError> {
     let directory = PathBuf::from(directory);
     if !directory.is_absolute() {
-        return Err("Video directory must be an absolute path".into());
+        return Err(RenderPathError::VideoDirectoryInvalid {
+            path: directory.display().to_string(),
+        });
     }
 
     let mut paths = Vec::new();
-    for entry in std::fs::read_dir(&directory).map_err(|error| error.to_string())? {
-        let entry = entry.map_err(|error| error.to_string())?;
+    for entry in std::fs::read_dir(&directory)
+        .map_err(|error| RenderPathError::video_directory_io(&directory, error))?
+    {
+        let entry =
+            entry.map_err(|error| RenderPathError::video_directory_io(&directory, error))?;
         let path = entry.path();
         let is_video = entry
             .file_type()
-            .map_err(|error| error.to_string())?
+            .map_err(|error| RenderPathError::video_directory_io(&directory, error))?
             .is_file()
             && path
                 .extension()

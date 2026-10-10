@@ -147,6 +147,25 @@
     "video": "Video"
   },
   "render-video": {
+    "pathErrors": {
+      "outputFileRequired": "Vyberte výstupní soubor",
+      "outputPathIncomplete": "Vyberte úplnou výstupní cestu včetně složky",
+      "outputFilenameRequired": "Výstupní cesta musí obsahovat název souboru",
+      "outputExtensionInvalid": "Výstupní soubor musí mít příponu .{{extension}}",
+      "outputNotFile": "Vybrané umístění není soubor",
+      "outputDirectoryInvalid": "Vyberte existující výstupní adresář",
+      "sourceFilenameInvalid": "Název zdrojového souboru je neplatný",
+      "outputAliasesInput": "Výstup by přepsal vstupní video",
+      "outputDestinationsConflict": "Více výstupů dávky používá stejné umístění",
+      "outputDirectoryMissing": "Výstupní adresář neexistuje",
+      "outputPermissionDenied": "Nemáte oprávnění zapisovat do výstupního souboru",
+      "outputPathInvalid": "Název nebo cesta výstupního souboru je neplatná",
+      "outputWriteFailed": "Nelze vytvořit nebo zapsat výstupní soubor: {{detail}}",
+      "videoDirectoryInvalid": "Vyberte úplnou cestu k adresáři videí",
+      "videoDirectoryMissing": "Adresář videí neexistuje",
+      "videoDirectoryPermissionDenied": "Nemáte oprávnění číst adresář videí",
+      "videoDirectoryReadFailed": "Nelze číst adresář videí: {{detail}}"
+    },
     "reinspectionRequired": "Zdroje se změnily nebo kontrola vypršela. Před spuštěním je znovu zkontrolujte.",
     "inspectAgain": "Znovu zkontrolovat",
     "preparingBatch": "Příprava videa...",

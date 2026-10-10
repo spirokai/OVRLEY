@@ -147,6 +147,25 @@
     "video": "视频"
   },
   "render-video": {
+    "pathErrors": {
+      "outputFileRequired": "请选择输出文件",
+      "outputPathIncomplete": "请选择包含文件夹的完整输出路径",
+      "outputFilenameRequired": "输出路径必须包含文件名",
+      "outputExtensionInvalid": "输出文件必须使用 .{{extension}} 扩展名",
+      "outputNotFile": "所选输出目标不是文件",
+      "outputDirectoryInvalid": "请选择现有的输出目录",
+      "sourceFilenameInvalid": "源文件名无效",
+      "outputAliasesInput": "输出文件会覆盖输入视频",
+      "outputDestinationsConflict": "多个批量输出使用了相同的目标路径",
+      "outputDirectoryMissing": "输出目录不存在",
+      "outputPermissionDenied": "您没有写入输出文件的权限",
+      "outputPathInvalid": "输出文件名或路径无效",
+      "outputWriteFailed": "无法创建或写入输出文件：{{detail}}",
+      "videoDirectoryInvalid": "请选择完整的视频目录路径",
+      "videoDirectoryMissing": "视频目录不存在",
+      "videoDirectoryPermissionDenied": "您没有读取视频目录的权限",
+      "videoDirectoryReadFailed": "无法读取视频目录：{{detail}}"
+    },
     "reinspectionRequired": "源文件已更改或检查已过期。开始前请重新检查。",
     "inspectAgain": "重新检查",
     "preparingBatch": "正在准备视频...",

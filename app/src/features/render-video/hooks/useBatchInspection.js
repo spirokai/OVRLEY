@@ -5,7 +5,7 @@ import useStore from '@/store/useStore'
 import { useBatchRenderStore, useBatchSyncInputs } from '@/hooks/useAppStoreSelectors'
 import { openDirectoryPath } from '@/lib/file-dialog'
 import { captureRenderEncoding } from '../utils/renderRequest'
-import { reviewBatchQueue, reviewBatchSync } from '../utils/renderPresentation'
+import { formatRenderPathError, reviewBatchQueue, reviewBatchSync } from '../utils/renderPresentation'
 
 /**
  * Retains native source inspection across dialog openings and reviews outputs while confirmation is open.
@@ -14,7 +14,7 @@ import { reviewBatchQueue, reviewBatchSync } from '../utils/renderPresentation'
  * @returns {object} Reviewed submission inputs and folder/queue controls. Execution and progress have separate owners.
  */
 export default function useBatchInspection({ phase, settings }) {
-  const { i18n } = useTranslation()
+  const { i18n, t } = useTranslation()
   const store = useBatchRenderStore()
   const inputs = useBatchSyncInputs()
   const open = phase === 'confirm' && settings?.renderTarget === 'batch' && !store.hasBatchResults
@@ -32,8 +32,8 @@ export default function useBatchInspection({ phase, settings }) {
   const rows = useMemo(() => reviewBatchQueue(choices, current, sync, i18n.resolvedLanguage), [choices, current, sync, i18n.resolvedLanguage])
   const jobs = useMemo(() => rows.filter((row) => row.status === 'pending'), [rows])
   const review = useMemo(
-    () => ({ current, jobs, sync, outputDirectory, encoding: settings ? captureRenderEncoding(settings, inputs.availableCodecs) : null }),
-    [current, jobs, sync, outputDirectory, settings, inputs.availableCodecs],
+    () => ({ current, choices, sync, outputDirectory, encoding: settings ? captureRenderEncoding(settings, inputs.availableCodecs) : null }),
+    [current, choices, sync, outputDirectory, settings, inputs.availableCodecs],
   )
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export default function useBatchInspection({ phase, settings }) {
             try {
               sources.set(path, { source: await backend.inspectVideoSource(inspectionId, path), error: null })
             } catch (error) {
-              sources.set(path, { source: null, error: error.message })
+              sources.set(path, { source: null, error })
             }
             if (!closed)
               setInspection({
@@ -85,7 +85,7 @@ export default function useBatchInspection({ phase, settings }) {
             error: null,
           })
       } catch (error) {
-        if (!closed) setInspection({ context, error: error.message, sources: new Map() })
+        if (!closed) setInspection({ context, error, sources: new Map() })
       }
     })()
     return () => {
@@ -111,11 +111,11 @@ export default function useBatchInspection({ phase, settings }) {
       )
       .then((result) => {
         if (closed) return
-        if (result.status === 'rejected') setInspection({ ...current, error: 'reinspectionRequired', issues: result.issues })
+        if (result.status === 'rejected') setInspection({ ...current, error: new Error('reinspectionRequired'), issues: result.issues })
         else setPlan({ review, ...result })
       })
       .catch((error) => {
-        if (!closed) setPlan({ review, status: 'error', error: error.message })
+        if (!closed) setPlan({ review, status: 'error', error })
       })
     return () => {
       closed = true
@@ -143,13 +143,14 @@ export default function useBatchInspection({ phase, settings }) {
     batchInspecting: folder !== null && (current === null || (!current.complete && !current.error)),
     batchQueue: rowsWithIssues,
     batchReady: ready && !batchRunning,
-    batchReviewError: current?.error ?? current?.calibrationError ?? sync.error ?? currentPlan?.error ?? null,
+    batchReviewError: formatRenderPathError(current?.error ?? current?.calibrationError ?? sync.error ?? null, t),
+    batchOutputError: formatRenderPathError(currentPlan?.error ?? null, t),
     request: ready
       ? { inspectionId: current.inspectionId, outputDirectory, jobs, calibrationSource: current.calibrationSource, sync, reviewedInputs: inputs }
       : null,
     pickVideoFolder,
     pickOutputFolder,
     refreshInspection: () => setRevision((value) => value + 1),
-    reject: (error) => setInspection({ ...current, error: 'reinspectionRequired', issues: error.issues }),
+    reject: (error) => setInspection({ ...current, error: new Error('reinspectionRequired'), issues: error.issues }),
   }
 }

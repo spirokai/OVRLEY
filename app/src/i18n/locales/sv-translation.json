@@ -147,6 +147,25 @@
     "video": "Video"
   },
   "render-video": {
+    "pathErrors": {
+      "outputFileRequired": "Välj en utdatafil",
+      "outputPathIncomplete": "Välj en fullständig utdatasökväg, inklusive mappen",
+      "outputFilenameRequired": "Utdatasökvägen måste innehålla ett filnamn",
+      "outputExtensionInvalid": "Utdatafilen måste ha filändelsen .{{extension}}",
+      "outputNotFile": "Den valda destinationen är inte en fil",
+      "outputDirectoryInvalid": "Välj en befintlig utdatakatalog",
+      "sourceFilenameInvalid": "Källfilens namn är ogiltigt",
+      "outputAliasesInput": "Utdata skulle skriva över en indatavideo",
+      "outputDestinationsConflict": "Flera batchutdata använder samma destination",
+      "outputDirectoryMissing": "Utdatakatalogen finns inte",
+      "outputPermissionDenied": "Du har inte behörighet att skriva utdatafilen",
+      "outputPathInvalid": "Utdatafilens namn eller sökväg är ogiltig",
+      "outputWriteFailed": "Det gick inte att skapa eller skriva utdatafilen: {{detail}}",
+      "videoDirectoryInvalid": "Välj en fullständig sökväg till videokatalogen",
+      "videoDirectoryMissing": "Videokatalogen finns inte",
+      "videoDirectoryPermissionDenied": "Du har inte behörighet att läsa videokatalogen",
+      "videoDirectoryReadFailed": "Det gick inte att läsa videokatalogen: {{detail}}"
+    },
     "reinspectionRequired": "Källfilerna har ändrats eller kontrollen har gått ut. Kontrollera igen innan du startar.",
     "inspectAgain": "Kontrollera igen",
     "preparingBatch": "Förbereder video...",

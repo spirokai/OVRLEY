@@ -19,7 +19,7 @@ use crate::video_server::VideoServerHandle;
 use crate::BackendState;
 use ovrley_core::activity::finalize::FinalizeActivityResponse;
 use ovrley_core::commands;
-use ovrley_core::error::CoreError;
+use ovrley_core::error::{CoreError, RenderPathError};
 use ovrley_core::output::RenderOutputKind;
 use ovrley_core::render_jobs::inspection::InspectionSourceSelection;
 use ovrley_core::render_jobs::{
@@ -93,7 +93,10 @@ pub(crate) enum BackendRenderError {
     #[serde(rename = "already_exists")]
     AlreadyExists { message: String },
     #[serde(rename = "output_error")]
-    OutputError { message: String },
+    OutputError {
+        #[serde(flatten)]
+        error: RenderPathError,
+    },
     #[serde(rename = "render_error")]
     RenderError { message: String },
 }
@@ -103,42 +106,13 @@ impl BackendRenderError {
         match error {
             CoreError::OutputExists(message) => Self::AlreadyExists { message },
             CoreError::OutputIo { path, source } => Self::OutputError {
-                message: output_io_message(&path, &source),
+                error: RenderPathError::output_io(path, source),
             },
-            CoreError::OutputInvalid(message) => Self::OutputError { message },
+            CoreError::OutputInvalid(error) => Self::OutputError { error },
             error => Self::RenderError {
                 message: error.to_string(),
             },
         }
-    }
-}
-
-fn output_io_message(path: &Path, source: &std::io::Error) -> String {
-    let directory = path
-        .parent()
-        .map(|value| value.display().to_string())
-        .unwrap_or_else(|| path.display().to_string());
-
-    match source.kind() {
-        std::io::ErrorKind::NotFound => {
-            format!("The output directory does not exist: {directory}")
-        }
-        std::io::ErrorKind::PermissionDenied => {
-            format!(
-                "You do not have permission to write the output file: {}",
-                path.display()
-            )
-        }
-        std::io::ErrorKind::InvalidInput => {
-            format!(
-                "The output file name or path is not valid: {}",
-                path.display()
-            )
-        }
-        _ => format!(
-            "Could not create or write the output file at {}: {source}",
-            path.display()
-        ),
     }
 }
 
@@ -430,7 +404,7 @@ pub(crate) async fn backend_plan_batch_outputs(
     selection: InspectionSourceSelection,
     encoding: BatchEncodingSettings,
     output_directory: String,
-) -> Result<String, String> {
+) -> Result<String, BackendRenderError> {
     let service = state.video_inspection.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         plan_batch_configuration(
@@ -441,8 +415,11 @@ pub(crate) async fn backend_plan_batch_outputs(
         )
     })
     .await
-    .map_err(|error| error.to_string())?;
-    call_and_serialize(result)
+    .map_err(|error| BackendRenderError::RenderError {
+        message: error.to_string(),
+    })?;
+    let result = result.map_err(BackendRenderError::from_core)?;
+    serialize_command_result(&result).map_err(|message| BackendRenderError::RenderError { message })
 }
 
 #[tauri::command]

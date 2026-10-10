@@ -51,6 +51,10 @@ function normalizeBackendError(error, fallbackMessage = 'Unknown backend error')
     return new Error(error)
   }
 
+  if (error && typeof error === 'object' && 'reason' in error) {
+    return Object.assign(new Error(error.reason), error)
+  }
+
   if (error && typeof error === 'object' && typeof error.message === 'string' && error.message.trim()) {
     const normalized = new Error(error.message)
     Object.assign(normalized, error)

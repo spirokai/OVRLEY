@@ -97,22 +97,35 @@ export function formatProgressPercent(percent) {
   return Math.round(percent).toString()
 }
 
+/**
+ * Formats a retained render path error in the current UI language.
+ * @param {object|null} error Structured path error or an error with a diagnostic message.
+ * @param {function} translate Current translation function.
+ * @returns {string|null} Error text for presentation.
+ */
+export function formatRenderPathError(error, translate) {
+  if (error === null) return null
+  return error.reason === undefined ? error.message : translate(`render-video.pathErrors.${error.reason}`, error)
+}
+
 /** @param {object} inputs Editor synchronization inputs. @returns {object} Review automatic synchronization inputs or an actionable error. */
 export function reviewBatchSync(inputs) {
   try {
     return { ...captureBatchSync(inputs), error: null }
   } catch (error) {
-    return { error: error.message }
+    return { error }
   }
 }
 
 /** @param {object[]} choices User queue. @param {object|null} inspection Current descriptors. @param {object} sync Automatic synchronization context. @param {string} locale Display language. @returns {object[]} Reviewed rows. */
 export function reviewBatchQueue(choices, inspection, sync, locale) {
   return choices.map((item) => {
-    if (inspection?.error && inspection.error !== 'reinspectionRequired') return { ...item, status: 'blocked', error: inspection.error }
+    if (inspection?.error && inspection.error.message !== 'reinspectionRequired')
+      return { ...item, status: 'blocked', error: formatRenderPathError(inspection.error, i18next.getFixedT(locale)) }
     const result = inspection?.sources.get(item.path)
     if (!result) return { ...item, status: 'checking', error: null }
-    if (result.error || sync.error) return { ...item, status: 'blocked', error: result.error ?? sync.error }
+    if (result.error || sync.error)
+      return { ...item, status: 'blocked', error: formatRenderPathError(result.error ?? sync.error, i18next.getFixedT(locale)) }
     const { metadata } = result.source
     const inspectedItem = { ...item, source: result.source, durationLabel: formatClockDuration(metadata.duration) }
     try {

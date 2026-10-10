@@ -253,13 +253,18 @@ export default function RenderExportSettings(ctx) {
         )}
 
         {ctx.isBatchTarget ? (
-          <div className="pt-4">
+          <div className="space-y-2 pt-4">
             <BatchFolderPicker
               label={t('render-video.outputFolder', 'Output folder')}
               folder={ctx.batchOutputFolder}
               onPick={ctx.pickOutputFolder}
               disabled={ctx.batchRunning}
             />
+            {ctx.batchOutputError && (
+              <p role="alert" className="text-xs text-red-700">
+                {ctx.batchOutputError}
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-2 pt-4">

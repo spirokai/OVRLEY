@@ -147,6 +147,25 @@
     "video": "Video"
   },
   "render-video": {
+    "pathErrors": {
+      "outputFileRequired": "Scegli un file di output",
+      "outputPathIncomplete": "Scegli un percorso di output completo, inclusa la cartella",
+      "outputFilenameRequired": "Il percorso di output deve includere un nome di file",
+      "outputExtensionInvalid": "Il file di output deve usare l’estensione .{{extension}}",
+      "outputNotFile": "La destinazione selezionata non è un file",
+      "outputDirectoryInvalid": "Scegli una cartella di output esistente",
+      "sourceFilenameInvalid": "Il nome del file sorgente non è valido",
+      "outputAliasesInput": "L’output sovrascriverebbe un video di input",
+      "outputDestinationsConflict": "Più output del batch usano la stessa destinazione",
+      "outputDirectoryMissing": "La cartella di output non esiste",
+      "outputPermissionDenied": "Non hai il permesso di scrivere il file di output",
+      "outputPathInvalid": "Il nome o il percorso del file di output non è valido",
+      "outputWriteFailed": "Impossibile creare o scrivere il file di output: {{detail}}",
+      "videoDirectoryInvalid": "Scegli un percorso completo per la cartella dei video",
+      "videoDirectoryMissing": "La cartella dei video non esiste",
+      "videoDirectoryPermissionDenied": "Non hai il permesso di leggere la cartella dei video",
+      "videoDirectoryReadFailed": "Impossibile leggere la cartella dei video: {{detail}}"
+    },
     "reinspectionRequired": "I file sono cambiati o la verifica è scaduta. Verifica di nuovo prima di iniziare.",
     "inspectAgain": "Verifica di nuovo",
     "preparingBatch": "Preparazione del video...",

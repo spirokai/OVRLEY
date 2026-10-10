@@ -147,6 +147,25 @@
     "video": "Видео"
   },
   "render-video": {
+    "pathErrors": {
+      "outputFileRequired": "Выберите выходной файл",
+      "outputPathIncomplete": "Укажите полный путь к выходному файлу, включая папку",
+      "outputFilenameRequired": "Путь к выходному файлу должен содержать имя файла",
+      "outputExtensionInvalid": "Выходной файл должен иметь расширение .{{extension}}",
+      "outputNotFile": "Выбранное место назначения не является файлом",
+      "outputDirectoryInvalid": "Выберите существующий выходной каталог",
+      "sourceFilenameInvalid": "Имя исходного файла недопустимо",
+      "outputAliasesInput": "Выходной файл перезаписал бы входное видео",
+      "outputDestinationsConflict": "Несколько выходных файлов пакета используют одно место назначения",
+      "outputDirectoryMissing": "Выходной каталог не существует",
+      "outputPermissionDenied": "У вас нет разрешения на запись выходного файла",
+      "outputPathInvalid": "Имя или путь выходного файла недопустимы",
+      "outputWriteFailed": "Не удалось создать или записать выходной файл: {{detail}}",
+      "videoDirectoryInvalid": "Укажите полный путь к каталогу видео",
+      "videoDirectoryMissing": "Каталог видео не существует",
+      "videoDirectoryPermissionDenied": "У вас нет разрешения на чтение каталога видео",
+      "videoDirectoryReadFailed": "Не удалось прочитать каталог видео: {{detail}}"
+    },
     "reinspectionRequired": "Исходные файлы изменились или срок проверки истёк. Повторите проверку перед запуском.",
     "inspectAgain": "Проверить снова",
     "preparingBatch": "Подготовка видео...",

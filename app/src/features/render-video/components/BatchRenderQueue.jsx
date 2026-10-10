@@ -85,9 +85,6 @@ export default function BatchRenderQueue({
           {batchReviewError && (
             <div role="alert" className="shrink-0 space-y-2 text-xs text-red-700">
               <p>{batchReviewError === 'reinspectionRequired' ? t('render-video.reinspectionRequired') : batchReviewError}</p>
-              <Button type="button" variant="outline" onClick={refreshInspection}>
-                {t('render-video.inspectAgain')}
-              </Button>
             </div>
           )}
         </>
