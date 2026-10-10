@@ -11,106 +11,33 @@ use std::time::{Duration, Instant};
 
 const CODEC_PROBE_TIMEOUT: Duration = Duration::from_secs(8);
 
-/// Returns the first QSV hardware-device argument set that can run `overlay_qsv`.
+/// Returns the default QSV hardware-device arguments if they can run `overlay_qsv`.
 ///
-/// The probe mirrors the composite render shape with two video inputs, hardware
-/// upload for the raw overlay leg, `scale_qsv`, `overlay_qsv`, and a one-frame
-/// QSV encode without downloading the filtered frames.
+/// The live composite encoder reuses these arguments, so both paths use the
+/// same automatically selected QSV device without explicit adapter binding.
 pub(super) fn detect_qsv_full_init_args(ffmpeg_path: &Path) -> Option<Vec<String>> {
-    qsv_full_init_arg_candidates()
-        .into_iter()
-        .find(|args| probe_qsv_overlay_path(ffmpeg_path, args))
-}
+    let args = [
+        "-init_hw_device",
+        "qsv=qs",
+        "-filter_hw_device",
+        "qs",
+        "-hwaccel",
+        "qsv",
+        "-hwaccel_output_format",
+        "qsv",
+    ]
+    .iter()
+    .map(|arg| (*arg).to_string())
+    .collect::<Vec<_>>();
 
-/// Lists platform-specific QSV hardware-device initialization candidates.
-///
-/// Windows tries explicit DXVA2/D3D11 derivation first because adapter binding
-/// can differ on systems with both integrated and dedicated GPUs.
-fn qsv_full_init_arg_candidates() -> Vec<Vec<String>> {
-    let candidates: &[&[&str]] = if cfg!(windows) {
-        &[
-            &[
-                "-init_hw_device",
-                "dxva2=dx",
-                "-init_hw_device",
-                "qsv=qs@dx",
-                "-filter_hw_device",
-                "qs",
-                "-hwaccel",
-                "qsv",
-                "-hwaccel_output_format",
-                "qsv",
-            ],
-            &[
-                "-init_hw_device",
-                "d3d11va=dx",
-                "-init_hw_device",
-                "qsv=qs@dx",
-                "-filter_hw_device",
-                "qs",
-                "-hwaccel",
-                "qsv",
-                "-hwaccel_output_format",
-                "qsv",
-            ],
-            &[
-                "-init_hw_device",
-                "d3d11va=dx:0",
-                "-init_hw_device",
-                "qsv=qs@dx",
-                "-filter_hw_device",
-                "qs",
-                "-hwaccel",
-                "qsv",
-                "-hwaccel_output_format",
-                "qsv",
-            ],
-            &[
-                "-init_hw_device",
-                "d3d11va=dx:1",
-                "-init_hw_device",
-                "qsv=qs@dx",
-                "-filter_hw_device",
-                "qs",
-                "-hwaccel",
-                "qsv",
-                "-hwaccel_output_format",
-                "qsv",
-            ],
-            &[
-                "-init_hw_device",
-                "qsv=qs",
-                "-filter_hw_device",
-                "qs",
-                "-hwaccel",
-                "qsv",
-                "-hwaccel_output_format",
-                "qsv",
-            ],
-        ]
-    } else {
-        &[&[
-            "-init_hw_device",
-            "qsv=qs",
-            "-filter_hw_device",
-            "qs",
-            "-hwaccel",
-            "qsv",
-            "-hwaccel_output_format",
-            "qsv",
-        ]]
-    };
-
-    candidates
-        .iter()
-        .map(|candidate| candidate.iter().map(|arg| (*arg).to_string()).collect())
-        .collect()
+    probe_qsv_overlay_path(ffmpeg_path, &args).then_some(args)
 }
 
 /// Probes whether a QSV device can run the performance QSV filter path.
 ///
-/// This is intentionally small but exercises QSV scaling, raw overlay upload,
-/// QSV overlay, and QSV encode without a hardware-frame download.
+/// This is intentionally small but exercises QSV scaling, RGBA overlay upload,
+/// QSV overlay, and direct hardware-frame encoding. Only the overlay upload
+/// reserves extra hardware frames, matching the live render profile.
 fn probe_qsv_overlay_path(ffmpeg_path: &Path, init_args: &[String]) -> bool {
     let mut args = vec![
         "-hide_banner".to_string(),
@@ -122,13 +49,13 @@ fn probe_qsv_overlay_path(ffmpeg_path: &Path, init_args: &[String]) -> bool {
         "-f".to_string(),
         "lavfi".to_string(),
         "-i".to_string(),
-        "color=c=black:s=128x128:r=30:d=0.1,format=yuv420p".to_string(),
+        "color=c=black:s=256x256:r=30:d=0.1,format=yuv420p".to_string(),
         "-f".to_string(),
         "lavfi".to_string(),
         "-i".to_string(),
         "color=c=red@0.35:s=128x128:r=30:d=0.1,format=rgba".to_string(),
         "-filter_complex".to_string(),
-        "[0:v]format=nv12,hwupload=extra_hw_frames=64[main_hw];[1:v]format=bgra,hwupload=extra_hw_frames=64[overlay_hw];[main_hw][overlay_hw]overlay_qsv=x=0:y=0,hwdownload,format=nv12[out]"
+        "[0:v]format=nv12,hwupload,scale_qsv=w=128:h=128:format=nv12[main_hw];[1:v]hwupload=extra_hw_frames=16[overlay_hw];[main_hw][overlay_hw]overlay_qsv=x=0:y=0[out]"
             .to_string(),
         "-map".to_string(),
         "[out]".to_string(),

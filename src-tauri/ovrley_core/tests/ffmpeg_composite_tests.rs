@@ -110,9 +110,7 @@ fn render_plan(
     if matches!(codec, "qsv_full_h264" | "qsv_full_hevc") {
         scene.ffmpeg["qsv_full_init_args"] = json!([
             "-init_hw_device".to_string(),
-            "dxva2=dx".to_string(),
-            "-init_hw_device".to_string(),
-            "qsv=qs@dx".to_string(),
+            "qsv=qs".to_string(),
             "-filter_hw_device".to_string(),
             "qs".to_string(),
             "-hwaccel".to_string(),
@@ -564,9 +562,7 @@ fn test_9_3_1_cuda_hevc_uses_display_oriented_output_dimensions() {
 fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
     let detected_args = vec![
         "-init_hw_device".to_string(),
-        "dxva2=dx".to_string(),
-        "-init_hw_device".to_string(),
-        "qsv=qs@dx".to_string(),
+        "qsv=qs".to_string(),
         "-filter_hw_device".to_string(),
         "qs".to_string(),
         "-hwaccel".to_string(),
@@ -596,7 +592,7 @@ fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
         .contains("scale_qsv=w=3840:h=2160:format=nv12[main_hw]"));
     assert!(built
         .filter_complex
-        .contains("[1:v]setpts=PTS-STARTPTS,hwupload=extra_hw_frames=64[overlay_hw]"));
+        .contains("[1:v]setpts=PTS-STARTPTS,hwupload=extra_hw_frames=16[overlay_hw]"));
     assert!(built.filter_complex.contains("overlay_qsv"));
     assert!(!built.filter_complex.contains("hwdownload"));
     assert_argument_pair(&built.input_0_args, "-noautorotate", "-i");
@@ -641,7 +637,7 @@ fn qsv_full_rotated_sources_rotate_only_the_rgba_overlay() {
         assert_argument_pair(&built.input_0_args, "-noautorotate", "-i");
         assert!(built.filter_complex.contains(main_scale));
         assert!(built.filter_complex.contains(&format!(
-            "[1:v]setpts=PTS-STARTPTS,{overlay_rotation}hwupload=extra_hw_frames=64[overlay_hw]"
+            "[1:v]setpts=PTS-STARTPTS,{overlay_rotation}hwupload=extra_hw_frames=16[overlay_hw]"
         )));
         assert!(!built.filter_complex.contains("vpp_qsv"));
         assert!(!built
