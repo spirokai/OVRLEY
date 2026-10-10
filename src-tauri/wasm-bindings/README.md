@@ -97,8 +97,7 @@ depend on Wasm. Before enabling a production preview, add:
    filesystem paths and native global caches.
 2. Session-owned activity state and per-widget configuration/invalidation;
    frame/playhead inputs should be the normal per-frame traffic.
-3. Widget parity tests, transparency tests, and error/lifetime tests at that ABI.
-4. CI generation and bundling of the JS/Wasm pair, shipped third-party notices,
+3. CI generation and bundling of the JS/Wasm pair, shipped third-party notices,
    and the Tauri production CSP permission for Wasm compilation.
 
 Do not import the old branch's native Cargo lockfile or replace the existing
