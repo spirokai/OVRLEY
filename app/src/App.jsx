@@ -5,7 +5,8 @@
  * canonical domain objects to the render tree.
  */
 
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
+import { useDebugRoute } from '@/features/wasm-preview-debug/hooks/useDebugRoute'
 import { OverlayEditor } from '@/features/overlay-editor'
 import { OverlayPlayer } from '@/features/player'
 import { RenderVideoDialog } from '@/features/render-video'
@@ -34,6 +35,8 @@ import {
 import * as backend from './api/backend'
 import { useTranslation } from 'react-i18next'
 import { changeLanguagePreference } from '@/i18n/language-preference'
+
+const WasmPreviewDebug = import.meta.env.DEV ? lazy(() => import('@/features/wasm-preview-debug/WasmPreviewDebug')) : null
 
 function useRightClickDevtools() {
   useEffect(() => {
@@ -258,6 +261,14 @@ function AppShell() {
  * @returns {JSX.Element} Rendered component output.
  */
 function App() {
+  const debugRoute = useDebugRoute()
+  if (import.meta.env.DEV && debugRoute) {
+    return (
+      <Suspense fallback={<p>Loading Wasm diagnostics…</p>}>
+        <WasmPreviewDebug />
+      </Suspense>
+    )
+  }
   return <AppShell />
 }
 

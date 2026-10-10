@@ -9,6 +9,8 @@
     "dev": "pnpm tauri dev",
     "build": "pnpm tauri build",
     "dev:frontend": "cd app && pnpm dev",
+    "wasm:build": "node scripts/build-wasm.mjs",
+    "wasm:skia:build": "node scripts/build-skia-wasm.mjs",
     "build:frontend": "cd app && pnpm build",
     "prepare:packaging": "node scripts/prepare-packaging-resources.mjs",
     "lint:frontend": "cd app && pnpm lint",

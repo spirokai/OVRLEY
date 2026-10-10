@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { wasmBindingsPlugin } from '../scripts/vite-wasm.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -86,7 +87,7 @@ function parseDebugWritePlugin() {
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
-  plugins: [react(), tailwindcss(), parseDebugWritePlugin()],
+  plugins: [react(), tailwindcss(), parseDebugWritePlugin(), wasmBindingsPlugin()],
   server: {
     host: true,
     port: 5173,

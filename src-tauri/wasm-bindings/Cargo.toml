@@ -1,0 +1,20 @@
+[package]
+name = "wasm-bindings"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-or-later"
+
+[[bin]]
+name = "wasm_bindings"
+path = "src/main.rs"
+
+# Keep the browser toolchain and Skia version out of the native workspace.
+[workspace]
+
+[profile.wasm]
+inherits = "release"
+panic = "abort"
+
+[dependencies]
+skia-safe = { git = "https://github.com/rust-skia/rust-skia", rev = "1a80f6716b5ba787f6583443f7b62fa5f60e7084", version = "=0.153.4", features = ["binary-cache"] }

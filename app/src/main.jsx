@@ -13,11 +13,15 @@ import './i18n/index.js'
 import { hydrateLanguagePreference } from './i18n/language-preference.js'
 import './index.css'
 import App from './App.jsx'
+import { WASM_PREVIEW_DEBUG_HASH } from '@/features/wasm-preview-debug/data/debugRoute'
 
 setWorkerUrl(workerUrl)
 
 async function mountApp() {
-  await hydrateLanguagePreference()
+  // The standalone renderer diagnostics do not consume desktop preferences.
+  if (!(import.meta.env.DEV && window.location.hash === WASM_PREVIEW_DEBUG_HASH)) {
+    await hydrateLanguagePreference()
+  }
 
   createRoot(document.getElementById('root')).render(
     <StrictMode>

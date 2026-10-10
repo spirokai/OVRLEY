@@ -62,6 +62,6 @@ tmp/
 .agents/release-notes.md
 
 # Generated package resources
-THIRD_PARTY_NOTICES.txt
+/THIRD_PARTY_NOTICES.txt
 INSTALL-macos.txt
 INSTALL-linux.txt

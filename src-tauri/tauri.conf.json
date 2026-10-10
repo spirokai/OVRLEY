@@ -26,6 +26,7 @@
       }
     ],
     "security": {
+      "devCsp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* http://localhost:* https://tiles.openfreemap.org; img-src 'self' data: blob: asset: https://asset.localhost http://asset.localhost http://127.0.0.1:* http://localhost:* https://tiles.openfreemap.org; worker-src 'self' blob:; media-src 'self' asset: https://asset.localhost http://asset.localhost http://127.0.0.1:* http://localhost:*",
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* http://localhost:* https://tiles.openfreemap.org; img-src 'self' data: blob: asset: https://asset.localhost http://asset.localhost http://127.0.0.1:* http://localhost:* https://tiles.openfreemap.org; worker-src 'self' blob:; media-src 'self' asset: https://asset.localhost http://asset.localhost http://127.0.0.1:* http://localhost:*",
       "assetProtocol": {
         "enable": true,
