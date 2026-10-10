@@ -99,7 +99,7 @@ impl FrameTasks {
     fn claim(&self) -> Option<(u64, usize)> {
         let index = self
             .next
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |index| {
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |index| {
                 (index < self.plan.count() as usize).then(|| index + 1)
             })
             .ok()?;

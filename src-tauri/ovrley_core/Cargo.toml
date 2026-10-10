@@ -5,6 +5,7 @@
 name = "ovrley_core"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.95"
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
