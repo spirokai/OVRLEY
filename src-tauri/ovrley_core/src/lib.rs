@@ -41,6 +41,8 @@ pub mod raster;
 pub mod rdp;
 /// Skia-based overlay rendering.
 pub mod render;
+/// Batch render submission and lifecycle vocabulary.
+pub mod render_jobs;
 /// Shared standard-metric widget definitions.
 pub mod standard_metrics;
 /// Shared standard-widget definitions.

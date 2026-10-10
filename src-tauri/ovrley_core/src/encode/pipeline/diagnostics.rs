@@ -1,28 +1,87 @@
-//! Pure helper logic shared by the composite render pipeline and its tests.
-//!
-//! This module owns only composite-specific helper functions that are pure or
-//! nearly pure: progress math, output verification, stderr trimming, and
-//! broken-pipe diagnostic formatting. The composite render loop, ffmpeg
-//! process lifecycle, and render-plan orchestration remain in
-//! `composite.rs`.
+//! One stderr reader for progress and bounded FFmpeg diagnostics.
 
+use std::collections::VecDeque;
+use std::io::{BufRead, BufReader};
+use std::process::ChildStderr;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Mutex;
+
+use crate::encode::ffmpeg::composite::CompositeEncoding;
+use crate::error::{CoreError, CoreResult};
 use std::path::Path;
 
-use crate::encode::pipeline::composite_plan::CompositePipelinePlan;
-use crate::error::{CoreError, CoreResult};
+const STDERR_LINE_LIMIT: usize = 200;
+
+#[derive(Default)]
+pub(crate) struct EncoderMonitor {
+    encoded_frames: AtomicU32,
+    lines: Mutex<VecDeque<String>>,
+}
+
+impl EncoderMonitor {
+    pub(crate) fn encoded_frames(&self) -> u32 {
+        self.encoded_frames.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn stderr(&self) -> String {
+        self.lines
+            .lock()
+            .expect("FFmpeg stderr mutex poisoned")
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    pub(crate) fn read(&self, stderr: ChildStderr) {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            if let Some(frame) = parse_frame(&line) {
+                self.encoded_frames.store(frame, Ordering::Relaxed);
+            }
+            let mut lines = self.lines.lock().expect("FFmpeg stderr mutex poisoned");
+            if lines.len() == STDERR_LINE_LIMIT {
+                lines.pop_front();
+            }
+            lines.push_back(line);
+        }
+    }
+}
+
+fn parse_frame(line: &str) -> Option<u32> {
+    let start = line.find("frame=")? + "frame=".len();
+    line[start..]
+        .trim_start()
+        .split_whitespace()
+        .next()?
+        .parse()
+        .ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_padded_ffmpeg_progress_without_confusing_other_logs() {
+        assert_eq!(parse_frame("frame=  123 fps=30"), Some(123));
+        assert_eq!(parse_frame("frame=456"), Some(456));
+        assert_eq!(parse_frame("frame=unknown"), None);
+        assert_eq!(parse_frame("video:123kB audio:0kB"), None);
+    }
+}
 
 /// Confirms that FFmpeg finalized a usable output file on success.
 ///
-/// A successful process exit without a non-empty MP4 is treated as a render
+/// A successful process exit without a non-empty video is treated as a render
 /// failure because callers need a playable artifact, not just a clean status.
-pub fn verify_successful_composite_output(output_path: &Path) -> CoreResult<()> {
+pub fn verify_successful_output(output_path: &Path) -> CoreResult<()> {
     let metadata = std::fs::metadata(output_path).map_err(|error| CoreError::Io {
         path: output_path.to_path_buf(),
         source: error,
     })?;
     if metadata.len() == 0 {
         return Err(CoreError::Encode(format!(
-            "Composite render finished but output file is empty: {}",
+            "Render finished but output file is empty: {}",
             output_path.display()
         )));
     }
@@ -51,7 +110,7 @@ pub fn format_pipe_write_failure(
     error: String,
     status: std::process::ExitStatus,
     stderr: &str,
-    plan: &CompositePipelinePlan,
+    plan: &CompositeEncoding,
 ) -> String {
     let mut message = format!(
         "{error}. FFmpeg terminated before all overlay frames were written (status {status}) for profile {}.",

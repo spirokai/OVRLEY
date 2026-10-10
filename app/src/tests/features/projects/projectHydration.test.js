@@ -14,6 +14,8 @@ test('project restoration changes only project-owned settings', () => {
     importedVideoResolution: videoResolution,
     importedVideoImportId: 'canonical-import',
   })
+  useStore.getState().setBatchQueueFromPaths(['C:\\old\\queued.mp4'])
+  useStore.setState({ batchSnapshot: { batchId: 'old-batch', rendererBusy: false } })
 
   applyProjectOwnedState(useStore, {
     editor: {
@@ -26,6 +28,9 @@ test('project restoration changes only project-owned settings', () => {
       manual: { landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
     },
     render: {
+      renderTarget: 'batch',
+      batchVideoFolder: 'C:\\videos',
+      batchOutputFolder: 'C:\\renders',
       fps: 60,
       widgetUpdateRate: 2,
       exportMode: 'composite',
@@ -50,6 +55,13 @@ test('project restoration changes only project-owned settings', () => {
   expect(state.manualVideoSync.detectedLocationSecond).toBe(30)
   expect(state.manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 30 })
   expect(state.renderSettings).toMatchObject({ fps: 60, codec: 'libx264', qualityType: 'bitrate', qualityValue: 20 })
+  expect(state.renderSettings.renderTarget).toBe('batch')
+  expect(state.batchVideoFolder).toBe('C:\\videos')
+  expect(state.batchOutputFolder).toBe('C:\\renders')
+  expect(state.batchQueue).toEqual([])
+  expect(state.batchSnapshot).toBeNull()
+  expect(state.renderSettings).not.toHaveProperty('batchVideoFolder')
+  expect(state.renderSettings).not.toHaveProperty('batchOutputFolder')
   expect(state.selectedSecond).toBe(50)
   expect(state.timelineViewport).toEqual({ viewStart: 25, viewEnd: 75 })
   expect(state.previewPlaybackState).toBe('paused')
@@ -75,6 +87,9 @@ test('project hydration rejects landmarks without matching staged video bounds',
       },
     },
     render: {
+      renderTarget: 'current',
+      batchVideoFolder: null,
+      batchOutputFolder: null,
       fps: 30,
       widgetUpdateRate: 1,
       exportMode: 'composite',

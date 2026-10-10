@@ -37,7 +37,7 @@ export default function KeyboardShortcutsDialog({ open, locale, onLocaleChange, 
     >
       <DialogContent
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
-        className="flex h-[80vh] max-h-200 w-full max-w-3xl flex-col rounded-sm border border-accent-border/80 bg-card/95 py-6 shadow-2xl shadow-background/50"
+        className="flex h-[80vh] max-h-200 w-full max-w-3xl flex-col rounded-sm border border-accent-border/80 bg-card py-6 shadow-2xl shadow-background/50"
         aria-describedby={undefined}
       >
         <div className="flex items-center justify-between gap-3 px-6">

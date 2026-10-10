@@ -11,7 +11,7 @@ use super::helpers::{
 };
 use super::raw::{HeadingWidgetConfig, ValueConfig};
 use crate::error::{CoreError, CoreResult};
-use crate::normalize::ValidatedSceneConfig;
+use crate::normalize::ValidatedScenePresentation;
 use crate::render::widgets::common::normalize_shadow_style_validated;
 use crate::render::widgets::types::ShadowStyle;
 use crate::types::MetricKind;
@@ -60,7 +60,7 @@ pub struct ValidatedHeading {
 pub fn validate_heading(
     value: &ValueConfig,
     index: usize,
-    scene: &ValidatedSceneConfig,
+    scene: &ValidatedScenePresentation,
 ) -> CoreResult<ValidatedHeading> {
     let p = |f: &str| format!("values[{index}].{f}");
 
@@ -206,7 +206,10 @@ pub fn validate_heading(
     })
 }
 
-fn resolve_label_font(hw: &HeadingWidgetConfig, scene: &ValidatedSceneConfig) -> Option<String> {
+fn resolve_label_font(
+    hw: &HeadingWidgetConfig,
+    scene: &ValidatedScenePresentation,
+) -> Option<String> {
     hw.label_font.clone().or_else(|| scene.font.clone())
 }
 

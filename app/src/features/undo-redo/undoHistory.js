@@ -102,9 +102,9 @@ export function replaceEditorDocument(store, operation, ...args) {
  *
  * @param {object} store - Zustand application store.
  * @param {Function} operation - Synchronous or asynchronous transition.
- * @returns {Promise<*>} Operation result.
+ * @returns {*|Promise<*>} Operation result, preserving synchronous transitions.
  */
-export async function runWithoutEditorHistory(store, operation) {
+export function runWithoutEditorHistory(store, operation) {
   const temporalState = store.temporal.getState()
   if (!temporalState.isTracking) {
     return operation()
@@ -112,8 +112,12 @@ export async function runWithoutEditorHistory(store, operation) {
 
   temporalState.pause()
   try {
-    return await operation()
-  } finally {
+    const result = operation()
+    if (result instanceof Promise) return result.finally(() => temporalState.resume())
     temporalState.resume()
+    return result
+  } catch (error) {
+    temporalState.resume()
+    throw error
   }
 }

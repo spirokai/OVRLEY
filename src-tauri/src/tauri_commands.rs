@@ -1,6 +1,6 @@
 //! Tauri command wrappers for the application shell.
 //!
-//! Owns: all `#[tauri::command]` functions that delegate to `ovrley_core::commands`,
+//! Owns: all `#[tauri::command]` functions that delegate to core commands/services,
 //!       plus the shared serializer helper that eliminates repeated JSON-string
 //!       serialization boilerplate.
 //! Does not own: file-system commands — those live in `file_ops.rs`.
@@ -19,13 +19,58 @@ use crate::video_server::VideoServerHandle;
 use crate::BackendState;
 use ovrley_core::activity::finalize::FinalizeActivityResponse;
 use ovrley_core::commands;
-use ovrley_core::error::CoreError;
+use ovrley_core::error::{CoreError, RenderPathError};
 use ovrley_core::output::RenderOutputKind;
+use ovrley_core::render_jobs::inspection::InspectionSourceSelection;
+use ovrley_core::render_jobs::{
+    batch::BatchServiceError,
+    contracts::{BatchAcceptance, BatchEncodingSettings, BatchRenderRequest, BatchSnapshot},
+    planning::plan_batch_configuration,
+};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 
 const WINDOWS_HEVC_EXTENSION_URL: &str = "https://apps.microsoft.com/detail/9nmzlz57r3t7";
+
+/// Shared ingress and resource retention run off the shell's async executor.
+/// Queue execution and every lifecycle transition remain core-owned.
+#[tauri::command]
+pub(crate) async fn backend_submit_batch(
+    app: AppHandle,
+    state: tauri::State<'_, BackendState>,
+    raster_resources: tauri::State<'_, crate::raster_resources::RasterResources>,
+    request: BatchRenderRequest,
+) -> Result<BatchAcceptance, BatchServiceError> {
+    let paths = runtime_paths::app_paths(&app)
+        .map_err(|message| BatchServiceError::InvalidRequest { message })?;
+    let resources = raster_resources.inner().clone();
+    let service = state.render_execution.clone();
+    let inspection = state.video_inspection.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        service.submit_batch(&paths, &inspection, request, Some(&resources))
+    })
+    .await
+    .map_err(|error| BatchServiceError::DispatchFailed {
+        message: error.to_string(),
+    })?
+}
+
+#[tauri::command]
+pub(crate) fn backend_batch_snapshot(
+    state: tauri::State<'_, BackendState>,
+    batch_id: String,
+) -> Result<BatchSnapshot, BatchServiceError> {
+    state.render_execution.batch_snapshot(&batch_id)
+}
+
+#[tauri::command]
+pub(crate) fn backend_cancel_batch(
+    state: tauri::State<'_, BackendState>,
+    batch_id: String,
+) -> Result<BatchSnapshot, BatchServiceError> {
+    state.render_execution.cancel_batch(&batch_id)
+}
 
 /// Serializes a `Serialize` value into a JSON string or maps an error to a
 /// `String`, consolidating the repeated `.map_err(|e| e.to_string())?;
@@ -48,7 +93,10 @@ pub(crate) enum BackendRenderError {
     #[serde(rename = "already_exists")]
     AlreadyExists { message: String },
     #[serde(rename = "output_error")]
-    OutputError { message: String },
+    OutputError {
+        #[serde(flatten)]
+        error: RenderPathError,
+    },
     #[serde(rename = "render_error")]
     RenderError { message: String },
 }
@@ -58,42 +106,13 @@ impl BackendRenderError {
         match error {
             CoreError::OutputExists(message) => Self::AlreadyExists { message },
             CoreError::OutputIo { path, source } => Self::OutputError {
-                message: output_io_message(&path, &source),
+                error: RenderPathError::output_io(path, source),
             },
-            CoreError::OutputInvalid(message) => Self::OutputError { message },
+            CoreError::OutputInvalid(error) => Self::OutputError { error },
             error => Self::RenderError {
                 message: error.to_string(),
             },
         }
-    }
-}
-
-fn output_io_message(path: &Path, source: &std::io::Error) -> String {
-    let directory = path
-        .parent()
-        .map(|value| value.display().to_string())
-        .unwrap_or_else(|| path.display().to_string());
-
-    match source.kind() {
-        std::io::ErrorKind::NotFound => {
-            format!("The output directory does not exist: {directory}")
-        }
-        std::io::ErrorKind::PermissionDenied => {
-            format!(
-                "You do not have permission to write the output file: {}",
-                path.display()
-            )
-        }
-        std::io::ErrorKind::InvalidInput => {
-            format!(
-                "The output file name or path is not valid: {}",
-                path.display()
-            )
-        }
-        _ => format!(
-            "Could not create or write the output file at {}: {source}",
-            path.display()
-        ),
     }
 }
 
@@ -154,8 +173,7 @@ pub(crate) async fn backend_font_data(
 
 /// Starts an overlay video render from serialized scene config and activity data.
 ///
-/// The render controller in managed state tracks progress and cancellation for
-/// the long-running encoder task.
+/// The native execution service owns preparation, rendering, and cancellation.
 #[tauri::command]
 pub(crate) async fn backend_render(
     app: AppHandle,
@@ -168,16 +186,17 @@ pub(crate) async fn backend_render(
 ) -> Result<String, BackendRenderError> {
     let paths = runtime_paths::app_paths(&app)
         .map_err(|message| BackendRenderError::RenderError { message })?;
-    let result = commands::backend_render(
-        &paths,
-        &state.render_controller,
-        &config_json,
-        &parsed_activity_json,
-        &output_path,
-        overwrite,
-        Some(&*raster_resources),
-    )
-    .map_err(BackendRenderError::from_core)?;
+    let result = state
+        .render_execution
+        .submit_single(
+            &paths,
+            &config_json,
+            &parsed_activity_json,
+            &output_path,
+            overwrite,
+            Some(&*raster_resources),
+        )
+        .map_err(BackendRenderError::from_core)?;
     serialize_command_result(&result).map_err(|message| BackendRenderError::RenderError { message })
 }
 
@@ -217,6 +236,16 @@ pub(crate) async fn backend_parse_vbo_activity(
         .map_err(|error| error.to_string())
 }
 
+/// Parses a native TCX path through the shared activity finalizer.
+#[tauri::command]
+pub(crate) async fn backend_parse_tcx_activity(
+    app: AppHandle,
+    path: String,
+) -> Result<FinalizeActivityResponse, String> {
+    commands::backend_parse_tcx_activity(&runtime_paths::app_paths(&app)?, &path)
+        .map_err(|error| error.to_string())
+}
+
 /// Renders one transparent preview PNG for the requested second.
 #[tauri::command]
 pub(crate) async fn backend_render_preview_frame(
@@ -253,7 +282,7 @@ pub(crate) async fn backend_render_preview_frame(
 pub(crate) async fn backend_progress(
     state: tauri::State<'_, BackendState>,
 ) -> Result<String, String> {
-    serialize_command_result(&commands::backend_progress(&state.render_controller))
+    serialize_command_result(&state.render_execution.progress())
 }
 
 /// Opens the remembered render output directory in the platform file manager.
@@ -321,7 +350,12 @@ pub(crate) async fn backend_get_template(
 pub(crate) async fn backend_cancel(
     state: tauri::State<'_, BackendState>,
 ) -> Result<String, String> {
-    serialize_command_result(&commands::backend_cancel(&state.render_controller))
+    let message = if state.render_execution.cancel() {
+        "Cancellation requested"
+    } else {
+        "No active render"
+    };
+    serialize_command_result(&serde_json::json!({ "success": true, "message": message }))
 }
 
 /// Probes a video file with ffprobe and returns serialized metadata.
@@ -337,6 +371,63 @@ pub(crate) async fn backend_probe_video(
         &runtime_paths::app_paths(&app)?,
         &file_path,
     ))
+}
+
+#[tauri::command]
+pub(crate) fn backend_create_video_inspection(
+    state: tauri::State<'_, BackendState>,
+) -> Result<String, String> {
+    serialize_command_result(&state.video_inspection.create_session())
+}
+
+/// The core service bounds probing; blocking media work runs off the IPC thread.
+#[tauri::command]
+pub(crate) async fn backend_inspect_video_source(
+    app: AppHandle,
+    state: tauri::State<'_, BackendState>,
+    inspection_id: String,
+    path: String,
+) -> Result<String, String> {
+    let paths = runtime_paths::app_paths(&app)?;
+    let service = state.video_inspection.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        service.inspect_source(&paths, &inspection_id, &path)
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    call_and_serialize(result)
+}
+
+#[tauri::command]
+pub(crate) async fn backend_plan_batch_outputs(
+    state: tauri::State<'_, BackendState>,
+    selection: InspectionSourceSelection,
+    encoding: BatchEncodingSettings,
+    output_directory: String,
+) -> Result<String, BackendRenderError> {
+    let service = state.video_inspection.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        plan_batch_configuration(
+            &service,
+            &selection,
+            &encoding,
+            Path::new(&output_directory),
+        )
+    })
+    .await
+    .map_err(|error| BackendRenderError::RenderError {
+        message: error.to_string(),
+    })?;
+    let result = result.map_err(BackendRenderError::from_core)?;
+    serialize_command_result(&result).map_err(|message| BackendRenderError::RenderError { message })
+}
+
+#[tauri::command]
+pub(crate) fn backend_dispose_video_inspection(
+    state: tauri::State<'_, BackendState>,
+    inspection_id: String,
+) {
+    state.video_inspection.dispose_session(&inspection_id);
 }
 
 #[derive(serde::Serialize)]

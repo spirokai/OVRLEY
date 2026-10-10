@@ -33,14 +33,14 @@ export default function useProjectLifecycle({
   const { conflictingOperation, loadedProjectPath, markNew, markSaved, projectName, status } = useProjectDocumentState()
   const { dialog: missingSourceDialog, resolveProjectSources } = useProjectSourceRecovery()
   const { answerConfirm: answerProjectConfirm, isOpen: isProjectConfirmOpen, requestConfirm: requestProjectConfirm } = useUnsavedChangesConfirm()
-  const [activeOperation, setActiveOperation] = useState(null)
+  const [operationPhase, setOperationPhase] = useState(null)
   const [confirmationIntent, setConfirmationIntent] = useState('new')
   const [startupDialogOpen, setStartupDialogOpen] = useState(false)
   const [startupProjects, setStartupProjects] = useState([])
   const [startupOpeningPath, setStartupOpeningPath] = useState(null)
   const operationLock = useRef(false)
   const startupLoaded = useRef(false)
-  const busy = activeOperation !== null || conflictingOperation
+  const busy = operationPhase !== null || conflictingOperation
 
   useEffect(() => {
     if (!startupReady || startupLoaded.current) return
@@ -67,7 +67,7 @@ export default function useProjectLifecycle({
     async (operationName, operation) => {
       if (operationLock.current || conflictingOperation) return false
       operationLock.current = true
-      setActiveOperation(operationName)
+      setOperationPhase('running')
       try {
         return await operation()
       } catch (error) {
@@ -76,7 +76,7 @@ export default function useProjectLifecycle({
         return false
       } finally {
         operationLock.current = false
-        setActiveOperation(null)
+        setOperationPhase(null)
       }
     },
     [conflictingOperation],
@@ -84,6 +84,7 @@ export default function useProjectLifecycle({
 
   const loadProjectPath = useCallback(
     async (path) => {
+      setOperationPhase('loading')
       const project = await loadProject({ path, resolveProjectSources, prepareActivityPath, prepareVideoPath, onSetBackgroundMode })
       if (!project) return false
       markSaved(path, project)
@@ -207,7 +208,7 @@ export default function useProjectLifecycle({
     handleSaveProject,
     handleSaveProjectAs,
     loadedProjectPath,
-    loadingProject: activeOperation === i18next.t('projects.openProject', 'open project'),
+    loadingProject: operationPhase === 'loading',
     missingSourceDialog,
     projectName,
     startupProjectDialog: {

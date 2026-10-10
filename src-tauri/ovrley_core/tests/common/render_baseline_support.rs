@@ -14,17 +14,19 @@
 use crate::common::test_config;
 use anyhow::{anyhow, bail, Context, Result};
 use ovrley_core::activity::schema::ParsedActivity;
-use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
+use ovrley_core::activity::{
+    build_dense_activity_report_validated, parse_activity_json, validate_render_activity,
+};
 use ovrley_core::commands::validate_config_value;
 use ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary;
-use ovrley_core::encode::pipeline::composite::render_composite_video;
-use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
-use ovrley_core::encode::pipeline::transparent::{render_video, rendered_frame_count};
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::media::{video_probe::probe_video, SourceVideoMetadata};
+use ovrley_core::normalize::parse_config_value;
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::render_preview_to_path;
+use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::planning::plan_single_render;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::fs;
@@ -229,7 +231,7 @@ fn run_frame_case(case: &FrameCase) -> Result<()> {
 ///
 /// Phase/layer flow:
 /// 1. Load the shared config fixture and narrow it to a short qtrle window.
-/// 2. Render a real transparent video through `render_video`.
+/// 2. Plan and execute a real transparent video through the canonical seam.
 /// 3. Probe the container metadata and compare selected decoded frames.
 fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
     let runtime = prepare_case_runtime("transparent", &case.name)?;
@@ -243,16 +245,14 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
     let scene = mutable_scene_value(&mut config_value)?;
     scene.insert("ffmpeg".to_string(), json!({ "codec": case.codec }));
 
-    let validated =
-        validate_config_value(&config_value).context("failed to validate transparent config")?;
-    let dense_activity = build_dense_activity_report_validated(&activity, &validated)
-        .context("failed to build dense activity for transparent case")?;
-    let total_frames =
-        rendered_frame_count(dense_activity.frame_count, validated.widget_update_rate())? as u32;
+    let plan = plan_single_render(
+        parse_config_value(&config_value)?,
+        validate_render_activity(&activity)?,
+        None,
+    )?;
+    let validated = plan.config().clone();
     let controller = RenderController::default();
-    controller
-        .try_start(total_frames, &format!("transparent baseline {}", case.name))
-        .context("failed to start transparent render controller")?;
+    let execution = RenderExecutionService::with_controller(controller.clone());
 
     let output_path = runtime
         .app_paths
@@ -263,15 +263,8 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
         RenderOutputKind::Transparent,
         false,
     )?;
-    let _filename = render_video(
-        &runtime.app_paths,
-        &validated,
-        &activity,
-        &dense_activity,
-        &controller,
-        &output_target,
-    )
-    .context("transparent render failed")?;
+    let outcome = execution.render(&runtime.app_paths, plan, &activity, &output_target);
+    let _filename = outcome.context("transparent render failed")?;
     let output_path = output_target.path().to_path_buf();
     assert_nonempty_output(&output_path)?;
 
@@ -279,8 +272,8 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
         .context("failed to probe transparent output")?;
     assert_video_metadata(
         &metadata,
-        validated.scene.width,
-        validated.scene.height,
+        validated.scene.presentation.width,
+        validated.scene.presentation.height,
         validated.container_fps().round() as u32,
         1,
         &case.expected_codec_name,
@@ -302,7 +295,7 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
 /// Phase/layer flow:
 /// 1. Probe the source MP4 fixture so the test uses its real FPS/duration.
 /// 2. Apply a short overlay window to the shared config fixture.
-/// 3. Render through the public `render_composite_video` entry point.
+/// 3. Plan and execute through the canonical render seam.
 /// 4. Validate output metadata and compare selected decoded frames.
 fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     // ── Phase 1: prepare isolated runtime sandbox ────────────────────
@@ -367,21 +360,15 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     );
     scene.insert("composite_widget_update_rate".to_string(), json!(1));
 
-    // ── Phase 4: build dense activity and prepare render controller ──
-    let mut validated =
-        validate_config_value(&config_value).context("failed to validate composite config")?;
-    let render_plan = derive_composite_render_plan(&mut validated.scene, None)
-        .context("failed to derive composite render plan")?;
-    let dense_activity = build_dense_activity_report_validated(&activity, &validated)
-        .context("failed to build dense activity for composite case")?;
-    let total_frames = (case.duration_seconds * f64::from(source_fps_num)
-        / f64::from(source_fps_den))
-    .ceil()
-    .max(1.0) as u32;
+    // ── Phase 4: plan the render and reserve execution ──
+    let plan = plan_single_render(
+        parse_config_value(&config_value)?,
+        validate_render_activity(&activity)?,
+        None,
+    )?;
+    let validated = plan.config().clone();
     let controller = RenderController::default();
-    controller
-        .try_start(total_frames, &format!("composite baseline {}", case.name))
-        .context("failed to start composite render controller")?;
+    let execution = RenderExecutionService::with_controller(controller.clone());
 
     // ── Phase 5: dispatch composite render through public entry point ──
     let output_path = runtime
@@ -393,17 +380,8 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
         RenderOutputKind::Composite,
         false,
     )?;
-    let _filename = render_composite_video(
-        &runtime.app_paths,
-        &validated,
-        &activity,
-        &dense_activity,
-        &controller,
-        render_plan,
-        true,
-        &output_target,
-    )
-    .context("composite render failed")?;
+    let outcome = execution.render(&runtime.app_paths, plan, &activity, &output_target);
+    let _filename = outcome.context("composite render failed")?;
     let output_path = output_target.path().to_path_buf();
     assert_nonempty_output(&output_path)?;
 
@@ -417,8 +395,8 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     };
     assert_video_metadata(
         &output_metadata,
-        validated.scene.width,
-        validated.scene.height,
+        validated.scene.presentation.width,
+        validated.scene.presentation.height,
         source_fps_num,
         source_fps_den,
         &case.expected_codec_name,

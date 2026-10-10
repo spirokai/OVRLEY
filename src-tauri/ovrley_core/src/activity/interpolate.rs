@@ -435,6 +435,7 @@ pub fn densify_activity(
         };
 
     DenseActivityReport {
+        full_activity_metric_ranges: trimmed.full_activity_metric_ranges.clone(),
         frame_count: frame_elapsed_seconds.len(),
         frame_elapsed_seconds: frame_elapsed_seconds.clone(),
         frame_distance_progress,

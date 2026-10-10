@@ -35,7 +35,7 @@ impl FfmpegSettings {
         &self,
         output_path: &Path,
         frame_size: FrameSize,
-        fps: f64,
+        fps: &str,
         input_pix_fmt: &str,
     ) -> Vec<String> {
         let mut args = vec!["-loglevel".to_string(), self.loglevel.clone()];

@@ -9,15 +9,16 @@
 //!
 //! Does not own: rendering or encoding — delegates to `ovrley_core`.
 
-use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
-use ovrley_core::commands::{parse_and_validate_config, validate_config_value};
+use ovrley_core::activity::{parse_activity_json, validate_render_activity};
+use ovrley_core::commands::parse_and_validate_config;
 use ovrley_core::encode::ffmpeg::detect::detect_codecs;
-use ovrley_core::encode::pipeline::composite::render_composite_video;
-use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::media::video_probe::probe_video;
+use ovrley_core::normalize::parse_config_value;
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
+use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::planning::{plan_single_render, VideoRenderModePlan};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -161,7 +162,7 @@ struct BenchmarkOutput {
 ///    overlay FPS and run 3 iterations with cooldowns between update-rate groups.
 /// 4. **Inner run loop** — serialize per-run config (injecting the update rate
 ///    and QSV init args if applicable), build dense activity report, create a
-///    `RenderController`, call `render_composite_video`, measure elapsed time
+///    `RenderController`, call `execute_render`, measure elapsed time
 ///    and output file size, and record success/failure.
 /// 5. **Output** — aggregate results into `BenchmarkOutput` and write to
 ///    `debug/benchmarks/update_rate.json`.
@@ -256,8 +257,8 @@ fn main() -> Result<(), String> {
     let base_config_str = serde_json::to_string(&base_config_value)
         .map_err(|e| format!("Failed to serialize config: {e}"))?;
     let base_validated = parse_and_validate_config(&base_config_str).map_err(|e| e.to_string())?;
-    let res_width = base_validated.scene.width;
-    let res_height = base_validated.scene.height;
+    let res_width = base_validated.scene.presentation.width;
+    let res_height = base_validated.scene.presentation.height;
 
     let mut results = BTreeMap::new();
 
@@ -324,42 +325,32 @@ fn main() -> Result<(), String> {
                 }
                 run_config_value["scene"]["ffmpeg"] = ffmpeg_config;
 
-                let mut config =
-                    validate_config_value(&run_config_value).map_err(|e| e.to_string())?;
-                let dense = build_dense_activity_report_validated(&activity, &config)
-                    .map_err(|e| e.to_string())?;
-
-                let overlay_duration = config.scene.end - config.scene.start;
-                let overlay_frame_count =
-                    (overlay_duration * overlay_pipe_fps).ceil().max(1.0) as u32;
+                let mut raw = parse_config_value(&run_config_value).map_err(|e| e.to_string())?;
+                raw.scene.composite_video_path = Some(metadata.path.clone());
+                raw.scene.composite_video_fps_num = Some(fps_num);
+                raw.scene.composite_video_fps_den = Some(fps_den);
+                raw.scene.composite_video_duration = Some(video_duration);
+                raw.scene.composite_sync_offset = Some(activity_start);
+                raw.scene.composite_video_trim_start = Some(trim_start);
+                raw.scene.composite_render_duration = Some(render_duration);
+                raw.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+                raw.scene.quality_value = Some(40.0);
+                let plan = plan_single_render(
+                    raw,
+                    validate_render_activity(&activity).map_err(|e| e.to_string())?,
+                    None,
+                )
+                .map_err(|e| e.to_string())?;
+                let overlay_duration = plan.config().scene.end - plan.config().scene.start;
+                let VideoRenderModePlan::Composite { render, .. } = plan.mode() else {
+                    unreachable!("composite benchmark")
+                };
+                let overlay_frame_count = render.overlay_frame_count as u32;
 
                 let controller = RenderController::default();
-                if let Err(e) = controller.try_start(
-                    overlay_frame_count,
-                    &format!("Benchmark {display_name} ur{update_rate} run {run_num}"),
-                ) {
-                    println!("FAILED: {e}");
-                    runs.push(RunResult {
-                        update_rate,
-                        codec: display_name.to_string(),
-                        run: run_num,
-                        success: false,
-                        resolution: None,
-                        total_frames: None,
-                        overlay_duration_seconds: None,
-                        job_time: None,
-                        job_time_seconds: None,
-                        file_size_mb: None,
-                        error: Some(e.to_string()),
-                        overlay_fps: None,
-                        overlay_frame_count: None,
-                    });
-                    continue;
-                }
+                let execution = RenderExecutionService::with_controller(controller.clone());
 
                 let started = Instant::now();
-                let render_plan = derive_composite_render_plan(&mut config.scene, None)
-                    .expect("validated benchmark composite plan");
                 let output_path = paths.downloads_dir.join(format!(
                     "benchmark-{display_name}-ur{update_rate}-{run_num}.mp4"
                 ));
@@ -368,20 +359,8 @@ fn main() -> Result<(), String> {
                     RenderOutputKind::Composite,
                     true,
                 )
-                .map_err(|error| error.to_string())
-                .and_then(|target| {
-                    render_composite_video(
-                        &paths,
-                        &config,
-                        &activity,
-                        &dense,
-                        &controller,
-                        render_plan,
-                        true,
-                        &target,
-                    )
-                    .map_err(|error| error.to_string())
-                });
+                .and_then(|target| execution.render(&paths, plan, &activity, &target));
+                let render_result = render_result.map_err(|error| error.to_string());
                 let elapsed_secs = started.elapsed().as_secs_f64();
 
                 match render_result {

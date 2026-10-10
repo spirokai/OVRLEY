@@ -34,7 +34,7 @@ pub(crate) fn draw_elevation_widget(
     frame_profiler: &mut RenderProfiler,
 ) -> CoreResult<Option<WidgetRenderReport>> {
     // Phase 1: fetch precomputed frame state and build the completed-points prefix.
-    let scene_scale = scene.scale.max(0.1);
+    let scene_scale = scene.presentation.scale.max(0.1);
     let Some(state) = elevation_cache
         .frame_states
         .get(frame_index.min(elevation_cache.frame_states.len().saturating_sub(1)))
@@ -189,23 +189,23 @@ fn elevation_label_style(
             .plot
             .label_font
             .clone()
-            .or_else(|| scene.font.clone()),
+            .or_else(|| scene.presentation.font.clone()),
         font_size: elevation_cache.plot.label_font_size,
         line_height: elevation_cache.plot.label_font_size * 0.92,
         color: parse_color(&elevation_cache.plot.label_color, 1.0),
         opacity: 1.0,
-        shadow_color: if scene.shadow_color.is_empty() {
+        shadow_color: if scene.presentation.shadow_color.is_empty() {
             None
         } else {
-            Some(parse_color(&scene.shadow_color, 1.0))
+            Some(parse_color(&scene.presentation.shadow_color, 1.0))
         },
-        shadow_strength: scene.shadow_strength * scene_scale,
-        shadow_distance: scene.shadow_distance * scene_scale,
-        border_color: if scene.border_color.is_empty() {
+        shadow_strength: scene.presentation.shadow_strength * scene_scale,
+        shadow_distance: scene.presentation.shadow_distance * scene_scale,
+        border_color: if scene.presentation.border_color.is_empty() {
             None
         } else {
-            Some(parse_color(&scene.border_color, 1.0))
+            Some(parse_color(&scene.presentation.border_color, 1.0))
         },
-        border_thickness: scene.border_thickness * scene_scale,
+        border_thickness: scene.presentation.border_thickness * scene_scale,
     }
 }

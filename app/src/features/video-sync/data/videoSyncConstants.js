@@ -8,6 +8,7 @@ export const VIDEO_SYNC_LANDMARK_TYPES = {
 export const VIDEO_SYNC_MAX_LANDMARKS = 5
 export const VIDEO_SYNC_MAX_LOCATION_LANDMARKS = 1
 export const VIDEO_SYNC_PREVIEW_SCREEN_GAP = 16
+export const VIDEO_SYNC_SPEED_FONT = 'JetBrains Mono.ttf'
 export const VIDEO_SYNC_DETECTED_LOCATION_ID = 'detected-course-location'
 
 export const VIDEO_SYNC_DEFAULT_SPEED_THRESHOLD_KMH = 5

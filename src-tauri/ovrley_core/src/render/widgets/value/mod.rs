@@ -190,6 +190,7 @@ mod tests {
             frame_distance_progress: vec![Some(0.0)],
             full_activity_distance: None,
             full_activity_total_ascent: None,
+            full_activity_metric_ranges: Default::default(),
             series: DenseSeriesReport {
                 speed: vec![Some(10.0)],
                 distance: vec![],
@@ -311,6 +312,7 @@ mod tests {
             frame_distance_progress: vec![Some(0.0)],
             full_activity_distance: None,
             full_activity_total_ascent: None,
+            full_activity_metric_ranges: Default::default(),
             series: DenseSeriesReport {
                 speed: vec![Some(10.0)],
                 distance: vec![],

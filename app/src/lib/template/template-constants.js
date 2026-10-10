@@ -45,6 +45,9 @@ export const DEFAULT_GLOBAL_DEFAULTS = Object.freeze({ ...standardTemplateManife
 /** Scene keys that are render-time-only artifacts, stripped during normalization. */
 export const SCENE_RENDER_TIME_ONLY_KEYS = [...standardTemplateManifest.renderTimeOnlyKeys]
 
+/** Native scene presentation fields, independent of source timing and widget defaults. */
+export const SCENE_PRESENTATION_KEYS = [...standardTemplateManifest.scenePresentationKeys]
+
 /** Durable keys persisted on the scene config. */
 export const SCENE_DURABLE_KEYS = ['width', 'height', 'fps', 'updateRate']
 

@@ -1,7 +1,7 @@
 //! Composite video pipeline integration tests.
 //!
 //! The largest test suite in the crate. Covers the full composite pipeline:
-//! `derive_composite_pipeline_plan`, canonical frame-worker rendering,
+//! `CompositeEncoding::new`, canonical frame-worker rendering,
 //! fractional overrun guards, sync-offset correctness, FPS preservation,
 //! audio track copying, progress reporting, cancellation lifecycle,
 //! FFmpeg failure diagnostics, broken-pipe handling, and composite debug
@@ -39,17 +39,17 @@ mod common;
 
 use std::process::Command;
 
-use ovrley_core::activity::build_dense_activity_report_validated;
+use ovrley_core::activity::validate_render_activity;
+use ovrley_core::encode::ffmpeg::composite::CompositeEncoding;
 use ovrley_core::encode::fps::Fps;
-use ovrley_core::encode::pipeline::composite::render_composite_video;
-use ovrley_core::encode::pipeline::composite_plan::{
-    derive_composite_pipeline_plan, derive_composite_render_plan,
-};
-use ovrley_core::encode::pipeline::composite_support::{
-    format_pipe_write_failure, is_pipe_write_error, verify_successful_composite_output,
+use ovrley_core::encode::pipeline::diagnostics::{
+    format_pipe_write_failure, is_pipe_write_error, verify_successful_output,
 };
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::normalize::validate_render_config;
+use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::planning::derive_composite_render_plan;
+use ovrley_core::render_jobs::planning::plan_single_render;
 
 use common::composite::{
     assert_argument_pair, cancel_after_delay, composite_debug_timing_summary,
@@ -59,6 +59,203 @@ use common::composite::{
     spawn_fixture_composite_render, test_paths, test_paths_named,
     write_fixture_composite_debug_summary,
 };
+
+#[test]
+fn planned_video_pipelines_encode_padding_and_display_rotation() {
+    use ovrley_core::output::{plan_batch_output_targets, RenderOutputKind};
+    use ovrley_core::render_jobs::contracts::{BatchEncodingSettings, BatchExportMode};
+    use ovrley_core::render_jobs::inspection::VideoInspectionService;
+    use serde_json::json;
+    let paths = test_paths_named("batch-window-pipelines");
+    let ffmpeg =
+        ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&paths.repo_root).unwrap();
+    let source = paths.temp_dir.join("landscape.mp4");
+    let rotated = paths.temp_dir.join("portrait.mp4");
+    let generated = Command::new(&ffmpeg)
+        .args([
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=red:size=64x32:rate=30:duration=20",
+            "-vf",
+            "drawbox=x=32:y=0:w=32:h=32:color=blue:t=fill",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+        ])
+        .arg(&source)
+        .output()
+        .unwrap();
+    assert!(
+        generated.status.success(),
+        "{}",
+        String::from_utf8_lossy(&generated.stderr)
+    );
+    let remuxed = Command::new(&ffmpeg)
+        .args(["-v", "error", "-y", "-display_rotation", "-90", "-i"])
+        .arg(&source)
+        .args(["-c", "copy"])
+        .arg(&rotated)
+        .output()
+        .unwrap();
+    assert!(
+        remuxed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&remuxed.stderr)
+    );
+    let inspection = VideoInspectionService::default();
+    let session = inspection.create_session();
+    let inspected = inspection
+        .inspect_source(&paths, &session.inspection_id, rotated.to_str().unwrap())
+        .unwrap();
+    assert_eq!(inspected.metadata.rotation_degrees, Some(270));
+    assert_eq!(
+        (
+            inspected.display_resolution.width,
+            inspected.display_resolution.height
+        ),
+        (32, 64)
+    );
+    let activity = ovrley_core::activity::parse_activity_json(
+        &json!({
+            "sample_elapsed_seconds":[0,120], "trim_end_seconds":120, "speed":[0,120]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let execution = RenderExecutionService::default();
+    let decode_frame = |path: &std::path::Path, second: f64| {
+        let decoded = Command::new(&ffmpeg)
+            .args(["-v", "error", "-ss", &second.to_string(), "-i"])
+            .arg(path)
+            .args([
+                "-frames:v",
+                "1",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "rgba",
+                "pipe:1",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            decoded.status.success(),
+            "{}",
+            String::from_utf8_lossy(&decoded.stderr)
+        );
+        assert_eq!(decoded.stdout.len(), 32 * 64 * 4);
+        decoded.stdout
+    };
+    for (mode, offset) in [
+        (BatchExportMode::Transparent, -5.0),
+        (BatchExportMode::Transparent, 110.0),
+        (BatchExportMode::Composite, -5.0),
+    ] {
+        let encoding = BatchEncodingSettings {
+            export_mode: mode,
+            export_codec: if mode == BatchExportMode::Composite {
+                "libx264"
+            } else {
+                "qtrle"
+            }
+            .into(),
+            fps: 30,
+            update_rate: if mode == BatchExportMode::Composite {
+                1
+            } else {
+                2
+            },
+            quality_type: ovrley_core::encode::quality::QualityType::Bitrate,
+            quality_value: 1.0,
+            qsv_full_init_args: None,
+        };
+        let plan = common::builders::batch_video_plan(
+            &paths,
+            &inspection,
+            &session.inspection_id,
+            common::builders::video_batch_request(
+                &session.inspection_id,
+                &inspected,
+                encoding,
+                common::builders::batch_template(),
+                activity.clone(),
+                offset,
+                mode == BatchExportMode::Composite,
+            ),
+        )
+        .unwrap();
+        let kind = if mode == BatchExportMode::Composite {
+            RenderOutputKind::Composite
+        } else {
+            RenderOutputKind::Transparent
+        };
+        let target =
+            plan_batch_output_targets(&paths.downloads_dir, kind, &[rotated.clone()], None)
+                .unwrap()
+                .remove(0);
+        let outcome = execution.render(&paths, plan, &activity, &target);
+        outcome.unwrap();
+        let metadata = ovrley_core::media::video_probe::probe_video(
+            &paths.repo_root,
+            target.path().to_str().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                metadata.resolution.as_ref().unwrap().width,
+                metadata.resolution.as_ref().unwrap().height
+            ),
+            (32, 64)
+        );
+        assert!((metadata.duration.unwrap() - 20.0).abs() < 0.001);
+        assert_eq!(
+            metadata.fps,
+            Some(if mode == BatchExportMode::Composite {
+                30.0
+            } else {
+                15.0
+            })
+        );
+        if mode == BatchExportMode::Transparent {
+            let (blank_second, covered_second) = if offset < 0.0 {
+                (0.0, 5.0)
+            } else {
+                (10.0, 0.0)
+            };
+            assert!(decode_frame(target.path(), blank_second)
+                .iter()
+                .all(|byte| *byte == 0));
+            assert!(decode_frame(target.path(), covered_second)
+                .chunks_exact(4)
+                .any(|pixel| pixel[3] > 0));
+        } else {
+            let expected = decode_frame(&rotated, 0.0);
+            let actual = decode_frame(target.path(), 0.0);
+            // Opposite ends of the rotated color pattern must retain the
+            // source's displayed orientation; output metadata must not rotate it again.
+            for pixel in [31usize, 63 * 32 + 31] {
+                for channel in 0..3 {
+                    assert!(
+                        (i16::from(actual[pixel * 4 + channel])
+                            - i16::from(expected[pixel * 4 + channel]))
+                        .abs()
+                            < 15,
+                        "pixel {pixel}: actual {:?}, expected {:?}",
+                        &actual[pixel * 4..pixel * 4 + 4],
+                        &expected[pixel * 4..pixel * 4 + 4]
+                    );
+                }
+            }
+            assert_eq!(metadata.rotation_degrees.unwrap_or(0), 0);
+        }
+        std::fs::remove_file(target.path()).unwrap();
+    }
+}
 
 #[test]
 /// Derives a plan from a 29.97 FPS source with 2x widget update rate and
@@ -97,21 +294,25 @@ fn negative_sync_plan_keeps_full_video_output_and_limits_activity_overlap() {
 
     let mut shorter_activity_scene = validate_render_config(config.clone()).unwrap().scene;
     let shorter_activity_plan =
-        derive_composite_render_plan(&mut shorter_activity_scene, Some(10.0)).unwrap();
+        derive_composite_render_plan(&config.scene, &mut shorter_activity_scene, Some(10.0))
+            .unwrap();
     assert_eq!(shorter_activity_scene.start, 0.0);
     assert_eq!(shorter_activity_scene.end, 10.0);
-    assert_eq!(shorter_activity_plan.activity_overlap_duration, 10.0);
+    assert_eq!(
+        shorter_activity_plan.coverage.end - shorter_activity_plan.coverage.start,
+        10.0
+    );
     assert_eq!(shorter_activity_plan.overlay_frame_count, 900);
     assert_eq!(shorter_activity_plan.output_frame_count, 900);
 
-    let mut scene = validate_render_config(config).unwrap().scene;
-    let plan = derive_composite_render_plan(&mut scene, Some(25.0)).unwrap();
+    let mut scene = validate_render_config(config.clone()).unwrap().scene;
+    let plan = derive_composite_render_plan(&config.scene, &mut scene, Some(25.0)).unwrap();
 
     assert_eq!(scene.start, 0.0);
     assert_eq!(scene.end, 25.0);
     assert_eq!(scene.end - scene.start, 25.0);
-    assert_eq!(plan.activity_overlap_duration, 25.0);
-    assert_eq!(plan.blank_leading_frame_count, 150);
+    assert_eq!(plan.coverage.end - plan.coverage.start, 25.0);
+    assert_eq!(plan.coverage.blank_leading_frame_count, 150);
     assert_eq!(plan.overlay_frame_count, 900);
     assert_eq!(plan.output_frame_count, 900);
 }
@@ -130,8 +331,8 @@ fn composite_plan_rejects_offset_at_video_duration_boundary() {
     config.scene.composite_video_trim_start = Some(0.0);
     config.scene.composite_widget_update_rate = Some(1);
 
-    let mut scene = validate_render_config(config).unwrap().scene;
-    let error = derive_composite_render_plan(&mut scene, Some(25.0)).unwrap_err();
+    let mut scene = validate_render_config(config.clone()).unwrap().scene;
+    let error = derive_composite_render_plan(&config.scene, &mut scene, Some(25.0)).unwrap_err();
 
     assert!(error.to_string().contains("positive overlap"));
 }
@@ -284,17 +485,25 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
     config.scene.composite_render_duration = Some(0.2);
     config.scene.composite_video_trim_start = Some(0.0);
     config.scene.composite_widget_update_rate = Some(1);
-    let config = validate_render_config(config).unwrap();
     let paths = test_paths();
-    let mut scene = config.scene.clone();
-    let render = derive_composite_render_plan(&mut scene, None).unwrap();
+    let mut scene = validate_render_config(config.clone()).unwrap().scene;
+    let render = derive_composite_render_plan(&config.scene, &mut scene, None).unwrap();
     let output_target = custom_output_target(
         &paths,
         "plan",
         ovrley_core::output::RenderOutputKind::Composite,
     );
-    let plan =
-        derive_composite_pipeline_plan(&paths, &scene, render, true, None, &output_target).unwrap();
+    let plan = CompositeEncoding::new(
+        ovrley_core::render::FrameSize {
+            width: scene.presentation.width,
+            height: scene.presentation.height,
+        },
+        render,
+        true,
+        None,
+        &output_target,
+    )
+    .unwrap();
 
     assert!(!has_argument_pair(
         &plan.ffmpeg_settings.input_0_args,
@@ -416,8 +625,8 @@ fn test_6_3_progress_uses_output_frames_with_lower_overlay_fps() {
         0.0,
         6,
     );
-    let first_overlay_progress = plan.output_progress(1);
-    let second_overlay_progress = plan.output_progress(2);
+    let first_overlay_progress = plan.render.output_progress(1);
+    let second_overlay_progress = plan.render.output_progress(2);
 
     assert_eq!(plan.render.output_frame_count, 60);
     assert_eq!(plan.render.overlay_frame_count, 10);
@@ -432,7 +641,7 @@ fn test_6_4_unknown_codec_fails_at_ingress() {
     let mut config = mutable_recent_template_config(1920, 1080);
     config.scene.ffmpeg = serde_json::json!({"codec": "definitely_not_a_codec"});
 
-    let error = match validate_render_config(config) {
+    let error = match plan_single_render(config, 120.0, None) {
         Ok(_) => panic!("unknown codec unexpectedly validated"),
         Err(error) => error,
     };
@@ -486,7 +695,7 @@ fn test_6_5_broken_pipe_error_includes_ffmpeg_exit_context() {
     assert!(message.contains("Unknown filter"));
 }
 
-/// On success, `verify_successful_composite_output` must not error for a
+/// On success, `verify_successful_output` must not error for a
 /// real rendered composite MP4.
 #[test]
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
@@ -495,7 +704,7 @@ fn test_6_6_output_file_exists_and_is_nonzero_on_success() {
 
     assert!(result.output_path.is_file());
     assert!(result.output_size > 0);
-    verify_successful_composite_output(&result.output_path).unwrap();
+    verify_successful_output(&result.output_path).unwrap();
 }
 
 /// After writing a fixture debug summary, the timing summary JSON file must
@@ -630,30 +839,19 @@ fn test_frame_workers_render_short_composite_in_order() {
     let video_path = common::test_config::sample_video_path()
         .to_string_lossy()
         .to_string();
-    let mut validated = composite_test_config(0.2, &video_path, 0.0);
+    let config = composite_test_config(0.2, &video_path, 0.0);
     let activity = fixture_activity();
-    let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
-    let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
+    let plan =
+        plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
     let controller = RenderController::default();
-    controller
-        .try_start(dense.frame_count as u32, "test_parallel_frame_workers")
-        .unwrap();
+    let execution = RenderExecutionService::with_controller(controller.clone());
     let output_target = custom_output_target(
         &paths,
         "parallel",
         ovrley_core::output::RenderOutputKind::Composite,
     );
-    let filename = render_composite_video(
-        &paths,
-        &validated,
-        &activity,
-        &dense,
-        &controller,
-        render_plan,
-        true,
-        &output_target,
-    )
-    .unwrap();
+    let outcome = execution.render(&paths, plan, &activity, &output_target);
+    let filename = outcome.unwrap();
 
     let output_path = paths.downloads_dir.join(filename);
     assert!(output_path.is_file());
@@ -691,30 +889,20 @@ fn test_frame_worker_composite_render() {
     let video_path = common::test_config::sample_video_path()
         .to_string_lossy()
         .to_string();
-    let mut validated = composite_test_config(5.0, &video_path, 0.0);
+    let config = composite_test_config(5.0, &video_path, 0.0);
     let activity = fixture_activity();
-    let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
-    let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
+    let plan =
+        plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
     let controller = RenderController::default();
-    controller
-        .try_start(dense.frame_count as u32, "test_parallel_2")
-        .unwrap();
+    let execution = RenderExecutionService::with_controller(controller.clone());
 
     let output_target = custom_output_target(
         &paths,
         "parallel-2",
         ovrley_core::output::RenderOutputKind::Composite,
     );
-    let result = render_composite_video(
-        &paths,
-        &validated,
-        &activity,
-        &dense,
-        &controller,
-        render_plan,
-        true,
-        &output_target,
-    );
+    let result = execution.render(&paths, plan, &activity, &output_target);
+    let result = result;
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();
     let output = paths.downloads_dir.join(&filename);
@@ -740,30 +928,20 @@ fn test_frame_worker_composite_render_with_audio() {
     let video_path = common::test_config::sample_video_path()
         .to_string_lossy()
         .to_string();
-    let mut validated = composite_test_config(5.0, &video_path, 15.0);
+    let config = composite_test_config(5.0, &video_path, 15.0);
     let activity = fixture_activity();
-    let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
-    let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
+    let plan =
+        plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
     let controller = RenderController::default();
-    controller
-        .try_start(dense.frame_count as u32, "test_parallel_audio")
-        .unwrap();
+    let execution = RenderExecutionService::with_controller(controller.clone());
 
     let output_target = custom_output_target(
         &paths,
         "parallel-audio",
         ovrley_core::output::RenderOutputKind::Composite,
     );
-    let result = render_composite_video(
-        &paths,
-        &validated,
-        &activity,
-        &dense,
-        &controller,
-        render_plan,
-        true,
-        &output_target,
-    );
+    let result = execution.render(&paths, plan, &activity, &output_target);
+    let result = result;
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();
     let output = paths.downloads_dir.join(&filename);

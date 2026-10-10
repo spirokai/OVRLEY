@@ -16,8 +16,8 @@
 //!
 //! ## Thread Safety
 //! `BackendState` is managed by Tauri as app-level state (Send + Sync via Tauri's
-//! `manage`). The `RenderController` inside it is the shared coordination point
-//! for all render progress and cancellation. The video server runs on a dedicated
+//! `manage`). The execution service owns renderer reservation, workers, progress
+//! and cancellation. The video server runs on a dedicated
 //! thread spawned at startup and joined on app teardown.
 //!
 //! ## Performance
@@ -44,18 +44,20 @@ mod raster_resources;
 mod runtime_paths;
 mod tauri_commands;
 
-use ovrley_core::encode::progress::RenderController;
+use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::render_jobs::inspection::VideoInspectionService;
 use std::sync::Arc;
 use tauri::Manager;
 
 pub(crate) struct BackendState {
-    pub(crate) render_controller: RenderController,
+    pub(crate) render_execution: Arc<RenderExecutionService>,
+    pub(crate) video_inspection: Arc<VideoInspectionService>,
 }
 
 /// Builds and runs the Tauri application.
 ///
 /// The setup hook installs development logging when appropriate, starts the
-/// loopback preview video server, and constructs the `RenderController` with a
+/// loopback preview video server, and constructs the execution service with a
 /// `TauriProgressSink` wired to the `AppHandle` so live progress flows to the
 /// frontend as `render-progress` events (no polling). All of this happens
 /// before the frontend can invoke commands.
@@ -77,9 +79,13 @@ pub fn run() {
             tauri_commands::backend_font_capabilities,
             tauri_commands::backend_font_data,
             tauri_commands::backend_render,
+            tauri_commands::backend_submit_batch,
+            tauri_commands::backend_batch_snapshot,
+            tauri_commands::backend_cancel_batch,
             tauri_commands::backend_finalize_activity,
             tauri_commands::backend_parse_csv_activity,
             tauri_commands::backend_parse_vbo_activity,
+            tauri_commands::backend_parse_tcx_activity,
             tauri_commands::backend_render_preview_frame,
             tauri_commands::backend_suggest_output_path,
             tauri_commands::backend_progress,
@@ -90,6 +96,10 @@ pub fn run() {
             tauri_commands::backend_open_templates,
             tauri_commands::backend_open_video,
             tauri_commands::backend_probe_video,
+            tauri_commands::backend_create_video_inspection,
+            tauri_commands::backend_inspect_video_source,
+            tauri_commands::backend_plan_batch_outputs,
+            tauri_commands::backend_dispose_video_inspection,
             tauri_commands::backend_prepare_preview_video,
             tauri_commands::backend_register_preview_video,
             tauri_commands::backend_import_preview_video,
@@ -105,6 +115,7 @@ pub fn run() {
             file_ops::load_selected_raster,
             file_ops::raster_preview_png,
             file_ops::selected_path_is_file,
+            file_ops::list_directory_video_files,
             file_ops::write_template_file,
             file_ops::write_parse_debug_file,
             project_file::default_project_directory,
@@ -125,13 +136,14 @@ pub fn run() {
                 )?;
             }
 
-            // Wire the render controller to a Tauri event-emitting sink before
+            // Wire the execution service to a Tauri event-emitting sink before
             // any command can be invoked: the frontend subscribes to
             // `render-progress` events instead of polling `backend_progress`.
             app.manage(BackendState {
-                render_controller: RenderController::with_sink(Arc::new(
+                video_inspection: Arc::new(VideoInspectionService::default()),
+                render_execution: Arc::new(RenderExecutionService::with_sink(Arc::new(
                     progress_sink::TauriProgressSink::new(app.handle().clone()),
-                )),
+                ))),
             });
 
             let map_tile_service = map_tile_service::MapTileService::for_application_cache(

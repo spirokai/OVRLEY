@@ -66,19 +66,19 @@ pub struct MeasuredText {
 
 // Resolves the scene-level text shadow color with opacity applied.
 fn scene_shadow_color(scene: &ValidatedSceneConfig, opacity: f32) -> Option<Color> {
-    if scene.shadow_color.is_empty() {
+    if scene.presentation.shadow_color.is_empty() {
         None
     } else {
-        Some(parse_color(&scene.shadow_color, opacity))
+        Some(parse_color(&scene.presentation.shadow_color, opacity))
     }
 }
 
 // Resolves the scene-level text border color with opacity applied.
 fn scene_border_color(scene: &ValidatedSceneConfig, opacity: f32) -> Option<Color> {
-    if scene.border_color.is_empty() {
+    if scene.presentation.border_color.is_empty() {
         None
     } else {
-        Some(parse_color(&scene.border_color, opacity))
+        Some(parse_color(&scene.presentation.border_color, opacity))
     }
 }
 
@@ -111,10 +111,10 @@ pub fn validated_label_style(
         color,
         opacity,
         shadow_color: scene_shadow_color(scene, opacity),
-        shadow_strength: scene.shadow_strength * scale,
-        shadow_distance: scene.shadow_distance * scale,
+        shadow_strength: scene.presentation.shadow_strength * scale,
+        shadow_distance: scene.presentation.shadow_distance * scale,
         border_color: scene_border_color(scene, opacity),
-        border_thickness: scene.border_thickness * scale,
+        border_thickness: scene.presentation.border_thickness * scale,
     }
 }
 
@@ -147,10 +147,10 @@ pub fn validated_value_style(
         color,
         opacity,
         shadow_color: scene_shadow_color(scene, opacity),
-        shadow_strength: scene.shadow_strength * scale,
-        shadow_distance: scene.shadow_distance * scale,
+        shadow_strength: scene.presentation.shadow_strength * scale,
+        shadow_distance: scene.presentation.shadow_distance * scale,
         border_color: scene_border_color(scene, opacity),
-        border_thickness: scene.border_thickness * scale,
+        border_thickness: scene.presentation.border_thickness * scale,
     }
 }
 
@@ -192,10 +192,10 @@ pub fn validated_lap_timer_style(
         color,
         opacity,
         shadow_color: scene_shadow_color(scene, opacity),
-        shadow_strength: scene.shadow_strength * scale,
-        shadow_distance: scene.shadow_distance * scale,
+        shadow_strength: scene.presentation.shadow_strength * scale,
+        shadow_distance: scene.presentation.shadow_distance * scale,
         border_color: scene_border_color(scene, opacity),
-        border_thickness: scene.border_thickness * scale,
+        border_thickness: scene.presentation.border_thickness * scale,
     }
 }
 
@@ -247,10 +247,10 @@ pub fn validated_gradient_style(
         color,
         opacity,
         shadow_color: scene_shadow_color(scene, opacity),
-        shadow_strength: scene.shadow_strength * scale,
-        shadow_distance: scene.shadow_distance * scale,
+        shadow_strength: scene.presentation.shadow_strength * scale,
+        shadow_distance: scene.presentation.shadow_distance * scale,
         border_color: scene_border_color(scene, opacity),
-        border_thickness: scene.border_thickness * scale,
+        border_thickness: scene.presentation.border_thickness * scale,
     }
 }
 

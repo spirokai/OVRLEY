@@ -1,11 +1,11 @@
 //! Shared telemetry, fill, and boundary-label helpers for gauges.
 //!
 //! This module owns the common mapping from a validated metric to its dense
-//! series, derives the activity range once during cache preparation, and keeps
+//! series, reads full-activity bounds during cache preparation, and keeps
 //! fill quantization and boundary-label formatting identical across arc and
 //! linear renderers.
 
-use crate::activity::schema::DenseSeriesReport;
+use crate::activity::schema::{DenseActivityReport, DenseSeriesReport};
 use crate::render::format::convert_standard_metric_value;
 use crate::types::MetricKind;
 
@@ -25,22 +25,17 @@ pub(crate) fn bar_fill_count(fill01: f32, count: u32) -> usize {
     (fill01.clamp(0.0, 1.0) * count as f32).floor() as usize
 }
 
-/// Derives the finite minimum and maximum for a metric's dense series.
+/// Reads the metric's source-activity bounds independently of export coverage.
 ///
 /// An absent or constant series uses the documented neutral gauge range so
 /// cache preparation still has a usable scale.
-pub(crate) fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f64, f64) {
-    let mut min_value = f64::INFINITY;
-    let mut max_value = f64::NEG_INFINITY;
-    for value in metric_values(series, metric).iter().flatten() {
-        min_value = min_value.min(*value);
-        max_value = max_value.max(*value);
-    }
-    if min_value.is_finite() && max_value.is_finite() && max_value > min_value {
-        (min_value, max_value)
-    } else {
-        (0.0, 100.0)
-    }
+pub(crate) fn metric_range(activity: &DenseActivityReport, metric: MetricKind) -> (f64, f64) {
+    activity
+        .full_activity_metric_ranges
+        .get(&metric)
+        .copied()
+        .filter(|(min, max)| max > min)
+        .unwrap_or((0.0, 100.0))
 }
 
 /// Selects the canonical dense telemetry series for a metric.

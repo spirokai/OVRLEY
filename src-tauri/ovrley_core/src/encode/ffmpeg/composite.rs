@@ -1,30 +1,14 @@
 //! FFmpeg argument builder for MP4 compositing mode.
 //!
-//! This module is intentionally separate from the transparent-overlay FFmpeg
-//! builder so composite rendering can evolve as a parallel backend path.
-//!
-//! Owns: `CompositeFfmpegSettings`
-//!       (grouped FFmpeg arguments for 3-input composite encodes), and
-//!       `build_composite_ffmpeg_settings`
-//!       (the main argument construction function).
-//! Does not own: encoder profile templates (see
-//!       [`crate::encode::ffmpeg::composite_profiles`]), codec detection (see
-//!       [`crate::encode::ffmpeg::detect`]), actual ffmpeg process spawning (see
-//!       [`crate::encode::pipeline::composite`]).
-//!
-//! Allowed dependencies: `crate::encode::ffmpeg::detect`, `crate::encode::ffmpeg::composite_profiles`,
-//!       `crate::encode::fps`, `crate::error`.
-//! Forbidden dependencies: `crate::commands`, `crate::render`,
-//!       `crate::encode::pipeline::transparent`, `crate::encode::pipeline::composite`.
-//!
-//! ## Thread Safety
-//! All types are plain data (no shared mutable state). Callers construct
-//! `CompositeFfmpegSettings` on the render thread before spawning ffmpeg.
+//! Consumes fixed job timing and source metadata to construct codec arguments.
+//! These are immutable settings; [`crate::encode::pipeline`] owns execution,
+//! supervision and cleanup for both export modes.
 
-use std::path::Path;
+use crate::output::RenderOutputTarget;
+use std::path::{Path, PathBuf};
 
-use crate::encode::composite::CompositeRenderPlan;
 use crate::encode::ffmpeg::catalog::{CompositeCodecId, CompositeFilterStackKind};
+use crate::encode::plan::CompositeRenderPlan;
 use crate::encode::quality::rate_control_args;
 use crate::error::{CoreError, CoreResult};
 use crate::render::FrameSize;
@@ -34,6 +18,40 @@ use super::composite_filters::{
     normalize_source_rotation, qsv_overlay_cpu_rotation_filter, source_rotation_filter,
 };
 use super::composite_profiles::composite_profile;
+
+/// Prepared composite settings and diagnostic metadata for one encoding.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompositeEncoding {
+    pub render: CompositeRenderPlan,
+    pub frame_size: FrameSize,
+    pub ffmpeg_settings: CompositeFfmpegSettings,
+    pub output_path: PathBuf,
+}
+
+impl CompositeEncoding {
+    pub fn new(
+        frame_size: FrameSize,
+        render: CompositeRenderPlan,
+        include_audio: bool,
+        source_rotation_degrees: Option<i32>,
+        output_target: &RenderOutputTarget,
+    ) -> CoreResult<Self> {
+        let ffmpeg_settings = build_composite_ffmpeg_settings(
+            &render,
+            frame_size,
+            include_audio,
+            source_rotation_degrees,
+        )?;
+        let output_path = output_target.path().to_path_buf();
+
+        Ok(Self {
+            render,
+            frame_size,
+            ffmpeg_settings,
+            output_path,
+        })
+    }
+}
 
 /// Grouped FFmpeg arguments needed to spawn a composite render.
 ///
@@ -313,6 +331,11 @@ mod tests {
             ),
         ] {
             let render = CompositeRenderPlan {
+                frames: crate::encode::plan::FrameProductionPlan::new(
+                    30,
+                    std::num::NonZeroU32::MIN,
+                )
+                .unwrap(),
                 video_path: "rotated-landscape.mp4".into(),
                 quality: crate::encode::quality::EncodingQuality::Bitrate(60.0),
                 sync_offset: 0.0,
@@ -323,8 +346,14 @@ mod tests {
                 overlay_pipe_fps: Fps::new(30, 1).unwrap(),
                 overlay_frame_count: 30,
                 output_frame_count: 30,
-                activity_overlap_duration: 1.0,
-                blank_leading_frame_count: 0,
+                coverage: crate::encode::video_timing::ActivityCoverage::for_video(
+                    1.0,
+                    0.0,
+                    1.0,
+                    Fps::new(30, 1).unwrap(),
+                    30,
+                )
+                .unwrap(),
                 requested_codec_id: codec_id,
                 qsv_full_init_args: Vec::new(),
             };

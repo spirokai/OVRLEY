@@ -1,5 +1,6 @@
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
+import { isRendererBusy } from '@/features/render-video/utils/renderRequest'
 
 export function useLayoutStore() {
   return useStore(
@@ -75,21 +76,84 @@ export function useTemplateStore() {
   )
 }
 
+/** @returns {object} Shell availability and native session identities; frame progress stays in the dialog. */
 export function useRenderStore() {
   return useStore(
     useShallow((state) => ({
       activitySummary: state.activitySummary,
       activeRenderId: state.activeRenderId,
-      activeRenderOutputPath: state.activeRenderOutputPath,
+      activeBatchId: state.batchSnapshot?.rendererBusy ? state.batchSnapshot.batchId : null,
       config: state.config,
-      renderSettings: state.renderSettings,
+      rendererBusy: isRendererBusy(state),
       renderStatus: state.renderProgress.status,
       renderingVideo: state.renderingVideo,
-      clearRenderSession: state.clearRenderSession,
       setErrorMessage: state.setErrorMessage,
-      setRenderProgress: state.setRenderProgress,
-      startRenderSession: state.startRenderSession,
-      setRenderSettings: state.setRenderSettings,
+    })),
+  )
+}
+
+/** @returns {object|null} External activity used to initialize an editable export range. */
+export function useRenderRangeActivity() {
+  return useStore((state) => state.parsedActivity)
+}
+
+/** @returns {object} Renderer availability and inputs for dialog presentation. */
+export function useRenderDialogInputs() {
+  return useStore(
+    useShallow((state) => ({
+      availableCodecs: state.availableCodecs,
+      config: state.config,
+      importedVideoPath: state.importedVideoPath,
+      importedVideoDuration: state.importedVideoDuration,
+      importedVideoFps: state.importedVideoFps,
+      importedVideoResolution: state.importedVideoResolution,
+      platformOs: state.platformOs,
+      rendererBusy: isRendererBusy(state),
+      renderingVideo: state.renderingVideo,
+      renderSubmissionTarget: state.renderSubmissionTarget,
+      isCancelling: state.renderCancellationTarget !== null,
+      renderProgress: state.renderProgress,
+      batchSnapshot: state.batchSnapshot,
+      renderSettings: state.renderSettings,
+      videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+    })),
+  )
+}
+
+/** @returns {object} Batch inspection inputs and queue choices, without native frame progress. */
+export function useBatchRenderStore() {
+  return useStore(
+    useShallow((state) => ({
+      batchVideoFolder: state.batchVideoFolder,
+      batchOutputFolder: state.batchOutputFolder,
+      batchQueue: state.batchQueue,
+      hasBatchResults: state.batchSnapshot !== null,
+      batchRunning: state.batchSnapshot?.rendererBusy ?? false,
+      batchSubmissionPending: state.renderSubmissionTarget === 'batch',
+      setBatchVideoFolder: state.setBatchVideoFolder,
+      setBatchOutputFolder: state.setBatchOutputFolder,
+      setBatchQueueFromPaths: state.setBatchQueueFromPaths,
+      removeBatchQueueItem: state.removeBatchQueueItem,
+      clearBatchQueue: state.clearBatchQueue,
+      setBatchItemSkipOverlay: state.setBatchItemSkipOverlay,
+      setErrorMessage: state.setErrorMessage,
+    })),
+  )
+}
+
+/** @returns {object} Inputs that invalidate reviewed batch synchronization. */
+export function useBatchSyncInputs() {
+  return useStore(
+    useShallow((state) => ({
+      activitySummary: state.activitySummary,
+      parsedActivity: state.parsedActivity,
+      parsedActivitySource: state.parsedActivitySource,
+      importedVideoPath: state.importedVideoPath,
+      importedVideoCreationTime: state.importedVideoCreationTime,
+      importedVideoTimeSource: state.importedVideoTimeSource,
+      videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+      videoSyncTimezoneMode: state.videoSyncTimezoneMode,
+      availableCodecs: state.availableCodecs,
     })),
   )
 }

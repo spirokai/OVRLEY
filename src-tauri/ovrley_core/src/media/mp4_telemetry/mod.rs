@@ -70,7 +70,7 @@ pub fn probe_video_metadata(repo_root: &Path, file_path: &str) -> CoreResult<Sou
     let vm = read_video_metadata(path)?;
 
     let (fps_num, fps_den) = rational_fps_parts(vm.fps);
-    let telemetry = resolve_telemetry(repo_root, path)?;
+    let telemetry = resolve_telemetry(repo_root, path, TelemetryPurpose::Metadata)?;
     let camera_type = telemetry.as_ref().map(|value| value.camera_type.clone());
     let camera_model = telemetry
         .as_ref()
@@ -99,7 +99,9 @@ pub fn probe_video_metadata(repo_root: &Path, file_path: &str) -> CoreResult<Sou
         bit_rate: None,
         has_audio: false,
         container_format: None,
-        rotation_degrees: Some(vm.rotation),
+        // telemetry-parser reports clockwise rotation; our canonical metadata
+        // follows ffprobe's counter-clockwise display-matrix angle.
+        rotation_degrees: Some(-vm.rotation),
         camera_type,
         camera_model,
     })
@@ -154,6 +156,14 @@ struct ResolvedTelemetry {
     source: TelemetrySource,
 }
 
+/// Metadata probing needs camera/timestamp tags, never expanded sensor series.
+/// Full normalization is deferred to the source's owning activity preparation.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TelemetryPurpose {
+    Metadata,
+    Activity,
+}
+
 /// Timeline selected by the activity adapter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TimelineKind {
@@ -196,7 +206,11 @@ struct Mp4TelemetryExtraction {
 /// are handed to the AC004 decoder before the result is returned, so metadata
 /// probing and activity extraction cannot choose different timestamps or
 /// sources.
-fn resolve_telemetry(repo_root: &Path, path: &Path) -> CoreResult<Option<ResolvedTelemetry>> {
+fn resolve_telemetry(
+    repo_root: &Path,
+    path: &Path,
+    purpose: TelemetryPurpose,
+) -> CoreResult<Option<ResolvedTelemetry>> {
     let file_size = std::fs::metadata(path)
         .map_err(|source| CoreError::Io {
             path: path.to_path_buf(),
@@ -217,7 +231,9 @@ fn resolve_telemetry(repo_root: &Path, path: &Path) -> CoreResult<Option<Resolve
             return Ok(None);
         }
     };
-    dump_raw_telemetry_parser_output(path, &input.samples);
+    if purpose == TelemetryPurpose::Activity {
+        dump_raw_telemetry_parser_output(path, &input.samples);
+    }
 
     let camera_type = input.camera_type().to_string();
     let camera_model = input.camera_model().cloned();
@@ -228,10 +244,16 @@ fn resolve_telemetry(repo_root: &Path, path: &Path) -> CoreResult<Option<Resolve
                 .iter()
                 .any(|s| s.tag_map.as_ref().is_some_and(extraction::has_gps_source));
 
-            let extracted = extraction::extract_native_samples(parser_samples);
+            let extracted = if purpose == TelemetryPurpose::Activity {
+                extraction::extract_native_samples(parser_samples)
+            } else {
+                Vec::new()
+            };
 
-            if extracted.is_empty() || (camera_type == "DJI" && !has_gps_group) {
-                resolve_dji_fallback(repo_root, path, camera_type)?
+            if (purpose == TelemetryPurpose::Activity && extracted.is_empty())
+                || (camera_type == "DJI" && !has_gps_group)
+            {
+                resolve_dji_fallback(repo_root, path, camera_type, purpose)?
             } else {
                 Some(ResolvedTelemetry {
                     samples: extracted,
@@ -242,7 +264,7 @@ fn resolve_telemetry(repo_root: &Path, path: &Path) -> CoreResult<Option<Resolve
                 })
             }
         }
-        _ => resolve_dji_fallback(repo_root, path, camera_type)?,
+        _ => resolve_dji_fallback(repo_root, path, camera_type, purpose)?,
     };
 
     Ok(resolved)
@@ -255,7 +277,7 @@ fn extract_telemetry_data(
     file_path: &str,
 ) -> CoreResult<Option<Mp4TelemetryExtraction>> {
     let path = Path::new(file_path);
-    let Some(resolved) = resolve_telemetry(repo_root, path)? else {
+    let Some(resolved) = resolve_telemetry(repo_root, path, TelemetryPurpose::Activity)? else {
         if cfg!(debug_assertions) {
             let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("video");
             let debug_payload = serde_json::json!({
@@ -305,8 +327,9 @@ fn resolve_dji_fallback(
     repo_root: &Path,
     path: &Path,
     camera_type: String,
+    purpose: TelemetryPurpose,
 ) -> CoreResult<Option<ResolvedTelemetry>> {
-    let Some(dji) = dji_normalized_samples(repo_root, path)? else {
+    let Some(dji) = dji_normalized_samples(repo_root, path, purpose)? else {
         return Ok(None);
     };
 
@@ -344,28 +367,36 @@ struct DjiFallbackResult {
 }
 
 /// Runs the DJI AC004 fallback decoder and returns normalized samples + metadata.
-fn dji_normalized_samples(repo_root: &Path, path: &Path) -> CoreResult<Option<DjiFallbackResult>> {
+fn dji_normalized_samples(
+    repo_root: &Path,
+    path: &Path,
+    purpose: TelemetryPurpose,
+) -> CoreResult<Option<DjiFallbackResult>> {
     let Some(telemetry) = dji_ac004::extract_from_video(repo_root, path)? else {
         return Ok(None);
     };
 
-    let samples: Vec<_> = telemetry
-        .samples
-        .iter()
-        .map(|sample| NativeSample {
-            timestamp_ms: sample.timestamp_ms,
-            timestamp: Some(sample.timestamp.clone()),
-            latitude: Some(sample.latitude),
-            longitude: Some(sample.longitude),
-            altitude: Some(sample.altitude),
-            speed: Some(sample.speed),
-            heading: sample.heading,
-            g_force: sample.g_force,
-            ..NativeSample::default()
-        })
-        .collect();
+    let samples: Vec<_> = if purpose == TelemetryPurpose::Activity {
+        telemetry
+            .samples
+            .iter()
+            .map(|sample| NativeSample {
+                timestamp_ms: sample.timestamp_ms,
+                timestamp: Some(sample.timestamp.clone()),
+                latitude: Some(sample.latitude),
+                longitude: Some(sample.longitude),
+                altitude: Some(sample.altitude),
+                speed: Some(sample.speed),
+                heading: sample.heading,
+                g_force: sample.g_force,
+                ..NativeSample::default()
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
 
-    if samples.is_empty() {
+    if telemetry.samples.is_empty() {
         return Ok(None);
     }
 

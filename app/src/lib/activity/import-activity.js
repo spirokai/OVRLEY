@@ -132,6 +132,7 @@ export async function parseActivityPath(path) {
   let parsedActivity
   if (lowerPath.endsWith('.csv')) parsedActivity = (await backend.parseCsvActivity(path)).parsed_activity
   else if (lowerPath.endsWith('.vbo')) parsedActivity = (await backend.parseVboActivity(path)).parsed_activity
+  else if (lowerPath.endsWith('.tcx')) parsedActivity = (await backend.parseTcxActivity(path)).parsed_activity
   else {
     const file = await (await import('@/lib/file-dialog')).fileFromSelectedPath(path, 'activity')
     parsedActivity = await parseActivityFile(file)

@@ -29,7 +29,7 @@ pub fn prepare_heading_cache(
 ) -> CoreResult<HeadingWidgetCache> {
     let prepare_started = Instant::now();
 
-    let scale = scene.scale.max(0.1);
+    let scale = scene.presentation.scale.max(0.1);
     let scaled_ppd = heading.pixels_per_degree * scale;
     let tape_width = (360.0 * scaled_ppd).ceil() as u32;
     let scaled_width = ((heading.width as f32) * scale).round().max(1.0) as u32;
@@ -52,9 +52,9 @@ pub fn prepare_heading_cache(
 
     // Resolve shadow style from scene defaults (shadow is not part of heading contract)
     let shadow = normalize_shadow_style_validated(
-        &scene.shadow_color,
-        scene.shadow_strength,
-        scene.shadow_distance,
+        &scene.presentation.shadow_color,
+        scene.presentation.shadow_strength,
+        scene.presentation.shadow_distance,
         scale,
     );
 

@@ -161,7 +161,15 @@ pub fn finalize_raw_activity_json(
     repo_root: Option<&std::path::Path>,
 ) -> CoreResult<FinalizeActivityResponse> {
     let raw_activity = parse_raw_activity_json(input)?;
-    let finalized = finalize_raw_activity_with_debug(&raw_activity)?;
+    finalize_raw_activity(&raw_activity, repo_root)
+}
+
+/// Finalizes native extraction through the same gap-filling path as raw JSON input.
+pub fn finalize_raw_activity(
+    raw_activity: &RawActivity,
+    repo_root: Option<&std::path::Path>,
+) -> CoreResult<FinalizeActivityResponse> {
+    let finalized = finalize_raw_activity_with_debug(raw_activity)?;
     Ok(finalized.into_response(
         Some(&raw_activity.file_name),
         Some(&raw_activity.file_format),
@@ -421,76 +429,79 @@ fn activity_columns_from_samples(
     raw_samples: Vec<RawSample>,
     original_sample_count: usize,
 ) -> ActivityColumns {
-    macro_rules! collect {
-        ($field:ident) => {
-            raw_samples
-                .iter()
-                .map(|sample| sample.$field.and_then(finite_f64))
-                .collect()
-        };
+    macro_rules! transpose {
+        ($($field:ident),+ $(,)?) => {{
+            let sample_count = raw_samples.len();
+            let mut columns = ActivityColumns {
+                file_name: raw_activity.file_name.clone(),
+                file_format: raw_activity.file_format.clone(),
+                metadata: raw_activity.metadata.clone(),
+                sync_time: raw_activity.sync_time.clone(),
+                options: raw_activity.options.clone(),
+                preserve_direct_metric_gaps: Default::default(),
+                timestamp: Vec::with_capacity(sample_count),
+                $($field: Vec::with_capacity(sample_count),)+
+                distance_to_home: vec![None; sample_count],
+                lap_number: Vec::with_capacity(sample_count),
+                rpm: vec![None; sample_count],
+                throttle_position: vec![None; sample_count],
+                brake_position: vec![None; sample_count],
+                gear_position: Vec::with_capacity(sample_count),
+                original_sample_count,
+                include_original_sample_count_metadata: true,
+                lap_markers: raw_activity.lap_markers.clone(),
+            };
+
+            // Gap filling is complete before this conversion consumes its rows.
+            for sample in raw_samples {
+                columns.timestamp.push(sample.timestamp);
+                columns.lap_number.push(sample.lap_number);
+                columns.gear_position.push(sample.gear_position);
+                $(columns.$field.push(sample.$field.and_then(finite_f64));)+
+            }
+            columns
+        }};
     }
 
-    ActivityColumns {
-        file_name: raw_activity.file_name.clone(),
-        file_format: raw_activity.file_format.clone(),
-        metadata: raw_activity.metadata.clone(),
-        sync_time: None,
-        options: raw_activity.options.clone(),
-        preserve_direct_metric_gaps: Default::default(),
-        timestamp: raw_samples
-            .iter()
-            .map(|sample| sample.timestamp.clone())
-            .collect(),
-        elapsed_seconds: collect!(elapsed_seconds),
-        latitude: collect!(latitude),
-        longitude: collect!(longitude),
-        elevation: collect!(elevation),
-        barometric_altitude: collect!(barometric_altitude),
-        speed: collect!(speed),
-        heading: collect!(heading),
-        heartrate: collect!(heartrate),
-        cadence: collect!(cadence),
-        power: collect!(power),
-        engine_power: collect!(engine_power),
-        engine_load: collect!(engine_load),
-        temperature: collect!(temperature),
-        calories: collect!(calories),
-        gradient: collect!(gradient),
-        pace: collect!(pace),
-        distance: collect!(distance),
-        distance_to_home: raw_samples.iter().map(|_| None).collect(),
-        lap_number: raw_samples.iter().map(|sample| sample.lap_number).collect(),
-        g_force: collect!(g_force),
-        g_force_x: collect!(g_force_x),
-        g_force_y: collect!(g_force_y),
-        g_force_z: collect!(g_force_z),
-        rpm: raw_samples.iter().map(|_| None).collect(),
-        throttle_position: raw_samples.iter().map(|_| None).collect(),
-        brake_position: raw_samples.iter().map(|_| None).collect(),
-        lean_angle: collect!(lean_angle),
-        vertical_speed: collect!(vertical_speed),
-        torque: collect!(torque),
-        stroke_rate: collect!(stroke_rate),
-        stride_length: collect!(stride_length),
-        vertical_oscillation: collect!(vertical_oscillation),
-        ground_contact_time: collect!(ground_contact_time),
-        left_right_balance: collect!(left_right_balance),
-        core_temperature: collect!(core_temperature),
-        air_pressure: collect!(air_pressure),
-        gear_position: raw_samples
-            .iter()
-            .map(|sample| sample.gear_position.clone())
-            .collect(),
-        iso: collect!(iso),
-        aperture: collect!(aperture),
-        shutter_speed: collect!(shutter_speed),
-        focal_length: collect!(focal_length),
-        ev: collect!(ev),
-        color_temperature: collect!(color_temperature),
-        original_sample_count,
-        include_original_sample_count_metadata: true,
-        lap_markers: crate::activity::schema::LapMarkers::None,
-    }
+    transpose!(
+        elapsed_seconds,
+        latitude,
+        longitude,
+        elevation,
+        barometric_altitude,
+        speed,
+        heading,
+        heartrate,
+        cadence,
+        power,
+        engine_power,
+        engine_load,
+        temperature,
+        calories,
+        gradient,
+        pace,
+        distance,
+        g_force,
+        g_force_x,
+        g_force_y,
+        g_force_z,
+        lean_angle,
+        vertical_speed,
+        torque,
+        stroke_rate,
+        stride_length,
+        vertical_oscillation,
+        ground_contact_time,
+        left_right_balance,
+        core_temperature,
+        air_pressure,
+        iso,
+        aperture,
+        shutter_speed,
+        focal_length,
+        ev,
+        color_temperature,
+    )
 }
 
 impl ActivityColumns {

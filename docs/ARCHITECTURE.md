@@ -512,7 +512,7 @@ All defined in `lib.rs` and implemented in `ovrley_core/src/commands/mod.rs`:
 Render Request (config + activity JSON)
     │
     ▼
-commands::backend_render
+render_jobs::execution::RenderExecutionService::submit_single
     ├── is_composite_render() ?
     │   ├── YES → derive_composite_render_plan()
     │   │        → apply_composite_scene_timing()

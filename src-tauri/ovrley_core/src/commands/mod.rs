@@ -1,29 +1,17 @@
 //! Backend command implementations used by the Tauri shell.
 //!
-//! Functions in this module are framework-agnostic: they accept plain strings,
-//! paths, and controller references so the Tauri command layer can delegate here
-//! without mixing app-window concerns into render logic. Responsibilities include
-//! runtime path resolution, template IO, video render startup, progress/cancel
-//! plumbing, and small OS integration helpers.
+//! Framework-agnostic template, activity, preview and OS helpers. Production
+//! rendering, progress and cancellation belong to `render_jobs::execution`.
 
 pub mod elevation_geometry;
 pub mod route_geometry;
 
 use crate::activity::finalize::FinalizeActivityResponse;
-use crate::activity::schema::ParsedActivity;
-use crate::activity::{
-    build_dense_activity_report_for_timeline, build_dense_activity_report_validated,
-    parse_activity_json,
-};
-use crate::debug::RenderProgress;
+use crate::activity::{build_dense_activity_report_validated, parse_activity_json};
 use crate::encode::ffmpeg::binary::resolve_ffmpeg_binary;
-use crate::encode::pipeline::composite::render_composite_video;
-use crate::encode::pipeline::composite_plan::derive_composite_render_plan;
-use crate::encode::pipeline::transparent::{render_video, rendered_frame_count};
-use crate::encode::progress::RenderController;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::{parse_config_json, parse_template_json};
-use crate::output::{RenderOutputKind, RenderOutputTarget};
+use crate::output::RenderOutputKind;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
@@ -98,6 +86,17 @@ pub fn backend_parse_vbo_activity(
     Ok(response)
 }
 
+/// Parses and finalizes a native TCX activity through the shared raw-sample pipeline.
+pub fn backend_parse_tcx_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response =
+        crate::activity::tcx::parse_tcx_activity_path(Path::new(path), Some(&paths.repo_root))?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
 /// Lists canonical bundled capabilities and lazy system font identities.
 pub fn backend_list_system_fonts(paths: &AppPaths) -> CoreResult<Value> {
     Ok(serde_json::to_value(crate::fonts::font_catalog(
@@ -120,75 +119,6 @@ pub fn backend_font_data(
     face_index: usize,
 ) -> CoreResult<Vec<u8>> {
     crate::fonts::bundled_face_data(&paths.font_dirs, font_id, face_index)
-}
-
-/// Starts a background video render.
-///
-/// The function returns immediately after validating inputs and registering a
-/// render with the controller. Completion, errors, and cancellation are exposed
-/// through [`backend_progress`].
-pub fn backend_render(
-    paths: &AppPaths,
-    controller: &RenderController,
-    config_json: &str,
-    parsed_activity_json: &str,
-    output_path: &str,
-    overwrite: bool,
-    raster_resources: Option<&dyn crate::raster::RasterResourceResolver>,
-) -> CoreResult<Value> {
-    let config = parse_config_json(config_json)?;
-    let validated =
-        crate::normalize::validate_render_config_with_resources(config, raster_resources)?;
-    let output_kind = if validated.scene.composite_video_path.is_some() {
-        RenderOutputKind::Composite
-    } else {
-        RenderOutputKind::Transparent
-    };
-    let output_target = RenderOutputTarget::validate(output_path, output_kind, overwrite)?;
-    let parsed_activity = parse_activity_json(parsed_activity_json)?;
-    if output_kind == RenderOutputKind::Composite {
-        return start_composite_render(
-            paths,
-            controller,
-            validated,
-            parsed_activity,
-            output_target,
-        );
-    }
-
-    let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
-    let output_frame_count =
-        rendered_frame_count(dense_activity.frame_count, validated.widget_update_rate())?;
-    let output_frame_count = u32::try_from(output_frame_count).map_err(|_| {
-        CoreError::Encode("Transparent progress frame count exceeds u32".to_string())
-    })?;
-    let render_id = controller.try_start(output_frame_count, "Preparing render assets...")?;
-
-    let controller_clone = controller.clone();
-    let paths = paths.clone();
-    let output_target_for_render = output_target.clone();
-    std::thread::spawn(move || {
-        match render_video(
-            &paths,
-            &validated,
-            &parsed_activity,
-            &dense_activity,
-            &controller_clone,
-            &output_target_for_render,
-        ) {
-            Ok(filename) => controller_clone.finish_success(filename),
-            Err(error) => {
-                let cancelled = matches!(error, CoreError::Cancelled);
-                controller_clone.finish_error(error.to_string(), cancelled);
-            }
-        }
-    });
-
-    Ok(json!({
-        "started": true,
-        "render_id": render_id,
-        "outputPath": output_target.path()
-    }))
 }
 
 /// Renders one transparent preview PNG for the requested second.
@@ -228,81 +158,6 @@ pub fn backend_render_preview_frame(
         "path": output_path,
         "second": second
     }))
-}
-
-/// Starts the composite render branch after deriving composite timing.
-///
-/// This branch validates inputs, builds the adjusted dense report, starts
-/// progress, and dispatches to the composite pipeline shell.
-fn start_composite_render(
-    paths: &AppPaths,
-    controller: &RenderController,
-    mut validated: crate::normalize::ValidatedRenderConfig,
-    parsed_activity: ParsedActivity,
-    output_target: RenderOutputTarget,
-) -> CoreResult<Value> {
-    let activity_end = parsed_activity.trim_end_seconds.max(
-        parsed_activity
-            .sample_elapsed_seconds
-            .last()
-            .copied()
-            .unwrap_or_default(),
-    );
-    let plan = derive_composite_render_plan(&mut validated.scene, Some(activity_end))?;
-    let dense_activity = build_dense_activity_report_for_timeline(
-        &parsed_activity,
-        &validated,
-        plan.overlay_pipe_fps
-            .timeline_for_duration(plan.activity_overlap_duration)?,
-    )?;
-
-    let render_id = controller.try_start(plan.output_frame_count, "Compositing video...")?;
-
-    let controller_clone = controller.clone();
-    let paths = paths.clone();
-    let output_target_for_render = output_target.clone();
-    std::thread::spawn(move || {
-        match render_composite_video(
-            &paths,
-            &validated,
-            &parsed_activity,
-            &dense_activity,
-            &controller_clone,
-            plan,
-            true,
-            &output_target_for_render,
-        ) {
-            Ok(filename) => controller_clone.finish_success(filename),
-            Err(error) => {
-                let cancelled = matches!(error, CoreError::Cancelled);
-                controller_clone.finish_error(error.to_string(), cancelled);
-            }
-        }
-    });
-
-    Ok(json!({
-        "started": true,
-        "render_id": render_id,
-        "outputPath": output_target.path()
-    }))
-}
-
-/// Returns the current render progress snapshot.
-pub fn backend_progress(controller: &RenderController) -> RenderProgress {
-    controller.progress()
-}
-
-/// Requests cancellation of the active render, if one is running.
-pub fn backend_cancel(controller: &RenderController) -> Value {
-    let had_active_render = controller.cancel();
-    json!({
-        "success": true,
-        "message": if had_active_render {
-            "Cancellation requested"
-        } else {
-            "No active render"
-        }
-    })
 }
 
 /// Lists valid built-in and user templates.
@@ -537,35 +392,8 @@ fn open_path_in_system(path: &Path) -> CoreResult<()> {
 
 /// Probes a video file and returns its metadata.
 pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> CoreResult<Value> {
-    let metadata = probe_video_metadata(paths, file_path)?;
+    let metadata = crate::media::prepared_video::probe_video_metadata(paths, file_path)?;
     serde_json::to_value(&metadata).map_err(CoreError::Serialization)
-}
-
-fn probe_video_metadata(
-    paths: &AppPaths,
-    file_path: &str,
-) -> CoreResult<crate::media::SourceVideoMetadata> {
-    match crate::media::mp4_telemetry::probe_video_metadata(&paths.repo_root, file_path) {
-        Ok(metadata) => {
-            if needs_ffprobe_salvage(&metadata) {
-                match crate::media::video_probe::probe_video(&paths.repo_root, file_path) {
-                    Ok(ffprobe_metadata) => Ok(merge_ffprobe_metadata(metadata, ffprobe_metadata)),
-                    Err(error) => {
-                        log::warn!("ffprobe fallback failed for {file_path}: {error}");
-                        Ok(metadata)
-                    }
-                }
-            } else {
-                Ok(metadata)
-            }
-        }
-        Err(error) => {
-            log::warn!(
-                "telemetry-parser probe failed for {file_path}: {error}; falling back to ffprobe"
-            );
-            crate::media::video_probe::probe_video(&paths.repo_root, file_path)
-        }
-    }
 }
 
 /// Extracts embedded MP4 telemetry as a parsed activity payload.
@@ -582,90 +410,6 @@ pub fn backend_extract_video_telemetry(
         response.debug_payload = None;
     }
     Ok(response)
-}
-
-fn needs_ffprobe_salvage(metadata: &crate::media::SourceVideoMetadata) -> bool {
-    metadata.duration.is_none()
-        || metadata.fps.is_none()
-        || metadata.fps_num.is_none()
-        || metadata.fps_den.is_none()
-        || metadata.sync_time.is_none()
-        || metadata.creation_time.is_none()
-        || metadata.codec_name.is_none()
-        || metadata.codec_long_name.is_none()
-        || metadata.codec_profile.is_none()
-        || metadata.pix_fmt.is_none()
-        || metadata.bits_per_raw_sample.is_none()
-        || metadata.resolution.is_none()
-        || metadata
-            .rotation_degrees
-            .map(|degrees| degrees.rem_euclid(360) == 0)
-            .unwrap_or(true)
-        || metadata.container_format.is_none()
-        || metadata.bit_rate.is_none()
-        || !metadata.has_audio
-}
-
-fn merge_ffprobe_metadata(
-    mut metadata: crate::media::SourceVideoMetadata,
-    ffprobe_metadata: crate::media::SourceVideoMetadata,
-) -> crate::media::SourceVideoMetadata {
-    if metadata.duration.is_none() {
-        metadata.duration = ffprobe_metadata.duration;
-    }
-    if metadata.fps.is_none() {
-        metadata.fps = ffprobe_metadata.fps;
-    }
-    if metadata.fps_num.is_none() {
-        metadata.fps_num = ffprobe_metadata.fps_num;
-    }
-    if metadata.fps_den.is_none() {
-        metadata.fps_den = ffprobe_metadata.fps_den;
-    }
-    if metadata.sync_time.is_none() {
-        metadata.sync_time = ffprobe_metadata
-            .sync_time
-            .clone()
-            .or_else(|| ffprobe_metadata.creation_time.clone());
-    }
-    if metadata.creation_time.is_none() {
-        metadata.creation_time = ffprobe_metadata.creation_time;
-        metadata.time_source = ffprobe_metadata.time_source.clone();
-    }
-    if metadata.codec_name.is_none() {
-        metadata.codec_name = ffprobe_metadata.codec_name;
-    }
-    if metadata.codec_long_name.is_none() {
-        metadata.codec_long_name = ffprobe_metadata.codec_long_name;
-    }
-    if metadata.codec_profile.is_none() {
-        metadata.codec_profile = ffprobe_metadata.codec_profile;
-    }
-    if metadata.pix_fmt.is_none() {
-        metadata.pix_fmt = ffprobe_metadata.pix_fmt;
-    }
-    if metadata.bits_per_raw_sample.is_none() {
-        metadata.bits_per_raw_sample = ffprobe_metadata.bits_per_raw_sample;
-    }
-    if metadata.resolution.is_none() {
-        metadata.resolution = ffprobe_metadata.resolution.clone();
-    }
-    if metadata
-        .rotation_degrees
-        .map(|degrees| degrees.rem_euclid(360) == 0)
-        .unwrap_or(true)
-        && ffprobe_metadata.rotation_degrees.is_some()
-    {
-        metadata.rotation_degrees = ffprobe_metadata.rotation_degrees;
-    }
-    metadata.has_audio = metadata.has_audio || ffprobe_metadata.has_audio;
-    if metadata.container_format.is_none() {
-        metadata.container_format = ffprobe_metadata.container_format;
-    }
-    if metadata.bit_rate.is_none() {
-        metadata.bit_rate = ffprobe_metadata.bit_rate;
-    }
-    metadata
 }
 
 /// Detects ffmpeg encoders and hardware acceleration methods available locally.

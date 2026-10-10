@@ -51,6 +51,10 @@ export function applyNewProjectState(store, { templateSource, templateState }) {
       range: { ...DEFAULT_RENDER_SETTINGS.range },
     }
     draft.errorMessage = null
+    draft.batchVideoFolder = null
+    draft.batchOutputFolder = null
+    draft.batchQueue = []
+    draft.batchSnapshot = null
   })
   state.resetVideoSyncState()
 }
@@ -76,6 +80,7 @@ export function applyProjectOwnedState(store, project) {
   const timelineEnd = Math.max(activityDuration, videoEnd, timelineMinimum + 0.001)
   const timelineViewport = clampToView(project.timeline.viewStart, project.timeline.viewEnd, timelineEnd, timelineMinimum)
   const range = { ...project.render.range }
+  const { batchVideoFolder, batchOutputFolder, ...renderSettings } = project.render
 
   if (range.type === 'custom') {
     range.from = clamp(range.from, timelineMinimum, timelineEnd)
@@ -95,7 +100,11 @@ export function applyProjectOwnedState(store, project) {
     draft.videoSyncTimezoneMode = project.sync.videoTimezoneMode
     draft.videoSyncOffsetPreviewSeconds = null
     draft.videoSyncWarning = null
-    draft.renderSettings = { ...project.render, range }
+    draft.renderSettings = { ...renderSettings, range }
+    draft.batchVideoFolder = batchVideoFolder
+    draft.batchOutputFolder = batchOutputFolder
+    draft.batchQueue = []
+    draft.batchSnapshot = null
     draft.selectedSecond = clamp(project.timeline.playheadSecond, timelineMinimum, timelineEnd)
     draft.timelineViewport = timelineViewport
     draft.skipNextTimelineViewportReset = true

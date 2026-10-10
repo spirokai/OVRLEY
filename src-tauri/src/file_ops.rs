@@ -10,6 +10,7 @@
 
 use crate::raster_resources::RasterResources;
 use crate::runtime_paths;
+use ovrley_core::error::RenderPathError;
 use serde::Serialize;
 use std::path::PathBuf;
 use tauri::Manager;
@@ -121,4 +122,49 @@ pub(crate) fn raster_preview_png(
     resource_id: String,
 ) -> Result<String, String> {
     resources.preview_png_base64(&resource_id)
+}
+
+const BATCH_VIDEO_EXTENSIONS: [&str; 3] = ["mp4", "mov", "mkv"];
+
+/// Lists supported video files directly inside a directory, sorted by name.
+///
+/// Used by the batch-render folder picker — does not recurse into
+/// subdirectories.
+#[tauri::command]
+pub(crate) fn list_directory_video_files(
+    directory: String,
+) -> Result<Vec<String>, RenderPathError> {
+    let directory = PathBuf::from(directory);
+    if !directory.is_absolute() {
+        return Err(RenderPathError::VideoDirectoryInvalid {
+            path: directory.display().to_string(),
+        });
+    }
+
+    let mut paths = Vec::new();
+    for entry in std::fs::read_dir(&directory)
+        .map_err(|error| RenderPathError::video_directory_io(&directory, error))?
+    {
+        let entry =
+            entry.map_err(|error| RenderPathError::video_directory_io(&directory, error))?;
+        let path = entry.path();
+        let is_video = entry
+            .file_type()
+            .map_err(|error| RenderPathError::video_directory_io(&directory, error))?
+            .is_file()
+            && path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| {
+                    BATCH_VIDEO_EXTENSIONS
+                        .iter()
+                        .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+                });
+        if is_video {
+            paths.push(path.to_string_lossy().to_string());
+        }
+    }
+
+    paths.sort_by(|left, right| left.to_lowercase().cmp(&right.to_lowercase()));
+    Ok(paths)
 }

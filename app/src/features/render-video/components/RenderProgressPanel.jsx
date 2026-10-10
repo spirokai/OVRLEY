@@ -12,42 +12,31 @@
  * @param {number|null} props.renderProgress.renderingFps - Estimated output-frame-equivalent production FPS.
  * @param {number} props.renderProgress.encoded - Number of encoded frames.
  * @param {string[]} [props.renderSummaryItems] - Compact render settings summary fragments.
- * @param {function} props.onCancel - Async callback invoked when user clicks cancel.
+ * @param {boolean} [props.finished] - Whether rendering has reached a terminal outcome.
+ * @param {function} [props.onCancel] - Cancellation callback; omitted when actions are in the dialog footer.
  */
 
-import { useEffect, useState } from 'react'
-import { Activity, Film, Loader2, Timer } from 'lucide-react'
+import { Activity, CircleCheck, Film, Loader2, Timer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { formatFps, formatTime } from '../utils/codecUtils'
+import { formatProgressPercent } from '../utils/renderPresentation'
 import { useTranslation } from 'react-i18next'
 
-function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel }) {
+function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel, isCancelling = false, finished = false, batchSnapshot = null }) {
   const { t } = useTranslation()
-  const [isCancelling, setIsCancelling] = useState(false)
 
   const { percent, current, total, estimatedSecondsRemaining, renderingFps, encoded } = renderProgress
 
-  useEffect(() => {
-    if (renderProgress.status !== 'rendering') {
-      setIsCancelling(false)
-    }
-  }, [renderProgress.status])
-
-  const handleCancel = async () => {
-    try {
-      setIsCancelling(true)
-      await onCancel()
-    } catch (error) {
-      console.error('Failed to cancel render:', error)
-      setIsCancelling(false)
-    }
-  }
-
+  const isPreparing = renderProgress.status === 'preparing' || renderProgress.status === 'accepted'
   const isFinalizing = percent >= 100
 
   let subMessage = t('render-video.renderingFrames', 'Rendering frames...')
-  if (isFinalizing) {
+  if (isPreparing) {
+    subMessage = t('render-video.preparingBatch')
+  } else if (renderProgress.status === 'cancelling') {
+    subMessage = t('render-video.cancelling', 'Cancelling...')
+  } else if (isFinalizing) {
     subMessage =
       encoded && total > 0
         ? t('render-video.encodingValVal2Frames', 'Encoding: {{val}} / {{val2}} frames', {
@@ -61,14 +50,26 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
     <div className="space-y-6">
       <div className="flex flex-col items-center gap-4 text-center">
         <div className="relative flex h-16 w-16 items-center justify-center rounded-sm bg-surface-accent-soft">
-          <Loader2 className="absolute h-10 w-10 animate-spin text-primary" />
-          <Film className="h-5 w-5 text-primary/60" />
+          {finished ? (
+            <CircleCheck className="h-10 w-10 text-green-700" />
+          ) : (
+            <>
+              <Loader2 className="absolute h-10 w-10 animate-spin text-primary" />
+              <Film className="h-5 w-5 text-primary/60" />
+            </>
+          )}
         </div>
         <div>
           <h2 className="text-xl font-bold text-foreground">
-            {isFinalizing ? t('render-video.finalizingVideo', 'Finalizing Video') : t('render-video.exportingOverlay', 'Exporting Overlay')}
+            {finished
+              ? batchSnapshot === null || batchSnapshot.phase === 'completed'
+                ? t('render-video.exportFinished', 'Export Finished')
+                : t(`render-video.batchResult.${batchSnapshot.phase}`)
+              : isFinalizing
+                ? t('render-video.finalizingVideo', 'Finalizing Video')
+                : t('render-video.exportingOverlay', 'Exporting Overlay')}
           </h2>
-          <p className="text-sm tabular-nums text-muted-foreground">{subMessage}</p>
+          {!finished && <p className="text-sm tabular-nums text-muted-foreground">{subMessage}</p>}
           {renderSummaryItems.length > 0 && (
             <p className="pt-8 flex flex-wrap items-center justify-center gap-x-1 gap-y-1 text-[0.65rem] text-muted-foreground/55">
               {renderSummaryItems.map((item, index) => (
@@ -82,20 +83,24 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
         </div>
       </div>
 
-      <div className="space-y-3 pt-6">
-        <div className="flex justify-between text-xs font-medium tabular-nums">
-          <span className="text-primary">{t('render-video.percentComplete', '{{percent}}% Complete', { percent })}</span>
-          <span className="text-muted-foreground">
-            {t('render-video.frameProgress', '{{current}} / {{total}} frames', {
-              current: current.toLocaleString(),
-              total: total.toLocaleString(),
-            })}
-          </span>
+      {!finished && (
+        <div className="space-y-3 pt-6">
+          <div className="flex justify-between text-xs font-medium tabular-nums">
+            <span className="text-primary">
+              {t('render-video.percentComplete', '{{percent}}% Complete', { percent: formatProgressPercent(percent) })}
+            </span>
+            <span className="text-muted-foreground">
+              {t('render-video.frameProgress', '{{current}} / {{total}} frames', {
+                current: current.toLocaleString(),
+                total: total.toLocaleString(),
+              })}
+            </span>
+          </div>
+          <Progress value={percent} className="h-2 bg-surface-strong" />
         </div>
-        <Progress value={percent} className="h-2 bg-surface-strong" />
-      </div>
+      )}
 
-      {!isFinalizing && (
+      {!finished && !isFinalizing && (
         <div className="flex items-center justify-center gap-6 pt-2">
           <div className="flex flex-col items-center">
             <div className="mb-1 flex items-center gap-1.5 text-muted-foreground">
@@ -114,28 +119,32 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
         </div>
       )}
 
-      <div className="flex justify-center pt-2">
-        <Button
-          type="button"
-          variant="ghost"
-          className="text-muted-foreground hover:bg-surface-accent-soft hover:text-highlight"
-          onClick={handleCancel}
-          disabled={isCancelling}
-        >
-          {isCancelling ? (
-            <>
-              <Loader2 className="h-3 w-3 animate-spin" />
-              {t('render-video.cancelling', 'Cancelling...')}
-            </>
-          ) : (
-            t('render-video.cancel', 'Cancel')
-          )}
-        </Button>
-      </div>
+      {!finished && onCancel && (
+        <div className="flex justify-center pt-2">
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-muted-foreground hover:bg-surface-accent-soft hover:text-highlight"
+            onClick={onCancel}
+            disabled={isCancelling}
+          >
+            {isCancelling ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {t('render-video.cancelling', 'Cancelling...')}
+              </>
+            ) : (
+              t('render-video.cancel', 'Cancel')
+            )}
+          </Button>
+        </div>
+      )}
 
-      <p className="text-center text-[10px] italic text-muted-foreground/50">
-        {t('render-video.keepAppOpen', 'Please keep the application open during rendering')}
-      </p>
+      {!finished && (
+        <p className="text-center text-[10px] italic text-muted-foreground/50">
+          {t('render-video.keepAppOpen', 'Please keep the application open during rendering')}
+        </p>
+      )}
     </div>
   )
 }

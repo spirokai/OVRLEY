@@ -1,3 +1,5 @@
+import i18next from 'i18next'
+
 /**
  * Formats seconds as a clock duration in mm:ss or h:mm:ss form.
  *
@@ -44,13 +46,22 @@ export function getZonedDateTimeParts(timestamp, timezone) {
 }
 
 /**
- * Formats a canonical timestamp in its recording timezone.
+ * Formats a canonical timestamp in its recording timezone and display language.
  *
  * @param {string} timestamp - Canonical timestamp.
  * @param {string} timezone - IANA recording timezone.
- * @returns {string} Zoned timestamp in YYYY-MM-DD HH:mm:ss form.
+ * @param {string} [locale=i18next.resolvedLanguage] - Selected app language.
+ * @returns {string} Localized date and time.
  */
-export function formatZonedDateTime(timestamp, timezone) {
-  const values = getZonedDateTimeParts(timestamp, timezone)
-  return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}:${values.second}`
+export function formatZonedDateTime(timestamp, timezone, locale = i18next.resolvedLanguage) {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: timezone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date(timestamp))
 }

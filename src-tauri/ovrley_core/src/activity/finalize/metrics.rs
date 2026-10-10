@@ -155,6 +155,42 @@ fn smooth_elevation_series(elevation_series: &[Option<f64>], radius: usize) -> N
     smoothed
 }
 
+// Finalization supplies nondecreasing cumulative distances. Retaining each
+// boundary makes stationary plateaus linear to process. Missing distances stop
+// a window; callers reset the lookback boundary at each missing current sample.
+fn advance_lookback_index(
+    distance_series: &NumericSeries,
+    index: usize,
+    current_distance: f64,
+    baseline_meters: f64,
+    lookback_index: &mut Option<usize>,
+) {
+    let mut next_index = lookback_index.map_or(0, |index| index + 1);
+    while next_index < index
+        && distance_series[next_index]
+            .is_some_and(|distance| current_distance - distance >= baseline_meters)
+    {
+        *lookback_index = Some(next_index);
+        next_index += 1;
+    }
+}
+
+fn advance_lookahead_index(
+    distance_series: &NumericSeries,
+    index: usize,
+    current_distance: f64,
+    baseline_meters: f64,
+    lookahead_index: &mut usize,
+) {
+    *lookahead_index = (*lookahead_index).max(index + 1);
+    while *lookahead_index < distance_series.len()
+        && distance_series[*lookahead_index]
+            .is_some_and(|distance| distance - current_distance < baseline_meters)
+    {
+        *lookahead_index += 1;
+    }
+}
+
 /// Derives percent grade over a roughly 5 meter distance window.
 ///
 /// A distance-window baseline is less sensitive to sample cadence than adjacent
@@ -167,27 +203,33 @@ pub fn derive_gradient_series(
     let smoothed_elevation = smooth_elevation_series(elevation_series, 2);
     let mut gradient_series = Vec::with_capacity(distance_series.len());
     let mut last_gradient = 0.0;
+    let mut lookback_index = None;
+    let mut lookahead_index = 0;
 
     for index in 0..distance_series.len() {
         let Some(current_distance) = distance_series[index].and_then(finite_f64) else {
+            lookback_index = Some(index);
             gradient_series.push(None);
             continue;
         };
 
-        let mut left_index = index;
-        while left_index > 0
-            && distance_series[left_index].is_some_and(|distance| current_distance - distance < 5.0)
-        {
-            left_index -= 1;
-        }
-
-        let mut right_index = index;
-        while right_index < distance_series.len() - 1
-            && distance_series[right_index]
-                .is_some_and(|distance| distance - current_distance < 5.0)
-        {
-            right_index += 1;
-        }
+        advance_lookback_index(
+            distance_series,
+            index,
+            current_distance,
+            5.0,
+            &mut lookback_index,
+        );
+        advance_lookahead_index(
+            distance_series,
+            index,
+            current_distance,
+            5.0,
+            &mut lookahead_index,
+        );
+        // Gradient uses the endpoint when the full baseline is unavailable.
+        let left_index = lookback_index.unwrap_or(0);
+        let right_index = lookahead_index.min(distance_series.len() - 1);
 
         let left_distance = distance_series[left_index].and_then(finite_f64);
         let right_distance = distance_series[right_index].and_then(finite_f64);
@@ -238,54 +280,53 @@ pub fn derive_heading_series(
     let mut derived = Vec::with_capacity(course_series.len());
     let mut last_heading = None;
     let half_baseline_meters = min_distance_meters / 2.0;
+    let mut centered_lookback_index = None;
+    let mut fallback_lookback_index = None;
+    let mut lookahead_index = 0;
 
     for index in 0..course_series.len() {
         let current_distance = distance_series[index].and_then(finite_f64);
         let mut heading = None;
 
         if let Some(current_distance) = current_distance {
-            let mut centered_lookback_index = index as isize - 1;
-            while centered_lookback_index >= 0
-                && distance_series[centered_lookback_index as usize]
-                    .is_some_and(|distance| current_distance - distance < half_baseline_meters)
-            {
-                centered_lookback_index -= 1;
-            }
+            advance_lookback_index(
+                distance_series,
+                index,
+                current_distance,
+                half_baseline_meters,
+                &mut centered_lookback_index,
+            );
+            advance_lookahead_index(
+                distance_series,
+                index,
+                current_distance,
+                half_baseline_meters,
+                &mut lookahead_index,
+            );
+            advance_lookback_index(
+                distance_series,
+                index,
+                current_distance,
+                min_distance_meters,
+                &mut fallback_lookback_index,
+            );
 
-            let mut lookahead_index = index + 1;
-            while lookahead_index < course_series.len()
-                && distance_series[lookahead_index]
-                    .is_some_and(|distance| distance - current_distance < half_baseline_meters)
-            {
-                lookahead_index += 1;
-            }
+            let centered =
+                centered_lookback_index.filter(|&index| distance_series[index].is_some());
+            let lookahead = (lookahead_index < course_series.len()
+                && distance_series[lookahead_index].is_some())
+            .then_some(lookahead_index);
+            let fallback =
+                fallback_lookback_index.filter(|&index| distance_series[index].is_some());
 
-            let mut fallback_lookback_index = index as isize - 1;
-            while fallback_lookback_index >= 0
-                && distance_series[fallback_lookback_index as usize]
-                    .is_some_and(|distance| current_distance - distance < min_distance_meters)
-            {
-                fallback_lookback_index -= 1;
+            if let (Some(left), Some(right)) = (centered, lookahead) {
+                heading = bearing_between(course_series[left], course_series[right]);
+            } else if let Some(left) = fallback {
+                heading = bearing_between(course_series[left], course_series[index]);
             }
-
-            let has_centered = centered_lookback_index >= 0
-                && distance_series[centered_lookback_index as usize].is_some();
-            let has_lookahead =
-                lookahead_index < course_series.len() && distance_series[lookahead_index].is_some();
-            let has_fallback = fallback_lookback_index >= 0
-                && distance_series[fallback_lookback_index as usize].is_some();
-
-            if has_centered && has_lookahead {
-                heading = bearing_between(
-                    course_series[centered_lookback_index as usize],
-                    course_series[lookahead_index],
-                );
-            } else if has_fallback {
-                heading = bearing_between(
-                    course_series[fallback_lookback_index as usize],
-                    course_series[index],
-                );
-            }
+        } else {
+            centered_lookback_index = Some(index);
+            fallback_lookback_index = Some(index);
         }
 
         if let Some(value) = heading.and_then(|value| round_f64(value, 3)) {
@@ -790,7 +831,105 @@ fn direct_metrics(
 
 #[cfg(test)]
 mod tests {
-    use super::{derive_distance_to_home_series, derive_total_ascent_series};
+    use super::{
+        derive_distance_to_home_series, derive_gradient_series, derive_heading_series,
+        derive_total_ascent_series,
+    };
+
+    #[test]
+    fn distance_windows_preserve_thresholds_plateaus_holes_and_endpoints() {
+        let distances = vec![
+            None,
+            Some(0.0),
+            Some(0.0),
+            Some(1.0),
+            Some(5.0),
+            Some(5.0),
+            Some(6.0),
+            Some(10.0),
+            None,
+            Some(15.0),
+            Some(16.0),
+            Some(20.0),
+            Some(20.0),
+        ];
+        let elevations = vec![
+            None,
+            Some(100.0),
+            Some(100.0),
+            Some(100.1),
+            Some(100.5),
+            Some(100.5),
+            Some(100.6),
+            Some(101.0),
+            None,
+            Some(101.5),
+            Some(101.6),
+            Some(102.0),
+            Some(102.0),
+        ];
+        let course = distances
+            .iter()
+            .enumerate()
+            .map(|(index, distance)| match distance {
+                Some(distance) if index < 8 => (Some(0.0), Some(distance / 100_000.0)),
+                Some(distance) => (Some(distance / 100_000.0), Some(0.0001)),
+                None => (None, None),
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            derive_gradient_series(&elevations, &distances),
+            vec![
+                None,
+                Some(0.0),
+                Some(0.0),
+                Some(0.0),
+                Some(7.5),
+                Some(7.5),
+                Some(7.5),
+                Some(7.5),
+                None,
+                Some(7.5),
+                Some(7.5),
+                Some(6.84),
+                Some(6.84),
+            ]
+        );
+        assert_eq!(
+            derive_heading_series(&course, &distances, 2.0),
+            vec![
+                None,
+                None,
+                None,
+                Some(90.0),
+                Some(90.0),
+                Some(90.0),
+                Some(90.0),
+                Some(90.0),
+                Some(90.0),
+                Some(90.0),
+                Some(0.0),
+                Some(0.0),
+                Some(0.0),
+            ]
+        );
+    }
+
+    #[test]
+    fn distance_windows_handle_long_stationary_stretches() {
+        let sample_count = 100_000;
+        let distances = vec![Some(10.0); sample_count];
+        let elevations = vec![Some(100.0); sample_count];
+        let course = vec![(Some(47.0), Some(8.0)); sample_count];
+
+        let gradients = derive_gradient_series(&elevations, &distances);
+        let headings = derive_heading_series(&course, &distances, 5.0);
+        assert_eq!(gradients.len(), sample_count);
+        assert_eq!(headings.len(), sample_count);
+        assert!(gradients.iter().all(|value| *value == Some(0.0)));
+        assert!(headings.iter().all(Option::is_none));
+    }
 
     #[test]
     fn distance_to_home_uses_first_present_coordinate_and_preserves_gaps() {

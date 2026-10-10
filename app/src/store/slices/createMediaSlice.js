@@ -65,6 +65,8 @@ export function createMediaSlice(set, get) {
     isProcessing: false,
     importingVideo: false,
     renderingVideo: false,
+    renderSubmissionTarget: null,
+    renderCancellationTarget: null,
     errorMessage: null,
     activitySource: null,
     activitySummary: null,
@@ -84,6 +86,9 @@ export function createMediaSlice(set, get) {
       set((state) => {
         state.importingVideo = importing
       }),
+
+    setRenderSubmissionTarget: (target) => set({ renderSubmissionTarget: target }),
+    setRenderCancellationTarget: (target) => set({ renderCancellationTarget: target }),
 
     startRenderSession: (renderId, outputPath, progress = {}) => {
       const nextProgress = {
@@ -107,6 +112,7 @@ export function createMediaSlice(set, get) {
         state.activeRenderId = null
         state.activeRenderOutputPath = null
         state.renderingVideo = false
+        state.renderCancellationTarget = null
       }),
 
     setRenderProgress: (progress) => {

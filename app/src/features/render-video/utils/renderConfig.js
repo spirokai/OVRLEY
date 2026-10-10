@@ -8,10 +8,68 @@
  */
 
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
-import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
+import { SCENE_PRESENTATION_KEYS } from '@/lib/template/template-constants'
 import { clamp } from '@/lib/utils'
 import { videoOverlapsActivity } from '@/lib/video-timing'
-import { isCompositeCodec, isQsvFullCodec, resolveCompositeFps } from './render-execution'
+import { isMp4Codec, isQsvFullCodec } from './codecUtils'
+
+function reduceFps(num, den) {
+  let a = Math.abs(num)
+  let b = Math.abs(den)
+  while (b !== 0) {
+    const next = a % b
+    a = b
+    b = next
+  }
+  const gcd = Math.max(a, 1)
+  return { num: num / gcd, den: den / gcd }
+}
+
+// ffprobe metadata is external data: prefer its exact rational, then known
+// broadcast rates, then a reduced millisecond approximation.
+function resolveCompositeFps(fpsNum, fpsDen, fps) {
+  const num = Number(fpsNum)
+  const den = Number(fpsDen)
+  if (Number.isInteger(num) && num > 0 && Number.isInteger(den) && den > 0) return reduceFps(num, den)
+  const value = Number(fps)
+  if (!Number.isFinite(value) || value <= 0) return null
+  const match = [
+    [23.976, 24000, 1001],
+    [29.97, 30000, 1001],
+    [59.94, 60000, 1001],
+  ].find(([approx]) => Math.abs(value - approx) <= 0.001)
+  return match ? { num: match[1], den: match[2] } : reduceFps(Math.round(value * 1000), 1000)
+}
+
+function renderValues(values) {
+  return values.map(({ display_variants: _displayVariants, ...value }) => {
+    if (value.display_type !== 'lean_angle') return value
+    const { width: _width, height: _height, ...renderValue } = value
+    return renderValue
+  })
+}
+
+/**
+ * Materializes shared batch presentation once, excluding editor timing and
+ * source/encoding fields. Each native video plan owns its dimensions and clock.
+ * @param {object} config Committed template configuration.
+ * @param {object} globalDefaults Captured global presentation defaults.
+ * @returns {object} Canonical shared batch template.
+ */
+export function createBatchRenderTemplate(config, globalDefaults) {
+  const effective = createEditorEffectiveConfig({ config, globalDefaults })
+  // Editor-effective scenes also contain widget defaults. Project only the
+  // native ScenePresentationConfig fields; widgets are already materialized.
+  const scene = Object.fromEntries(SCENE_PRESENTATION_KEYS.map((key) => [key, effective.scene[key]]))
+  return {
+    scene,
+    backdrops: effective.backdrops,
+    rasters: effective.rasters,
+    labels: effective.labels,
+    values: renderValues(effective.values),
+    plots: effective.plots,
+  }
+}
 
 /**
  * Applies codec-specific FFmpeg defaults after the render codec is resolved.
@@ -21,19 +79,19 @@ import { isCompositeCodec, isQsvFullCodec, resolveCompositeFps } from './render-
  */
 function applyCodecDefaults(scene, resolvedExportCodec) {
   if (resolvedExportCodec === 'prores_ks') {
-    scene.ffmpeg.prores_profile = scene.ffmpeg.prores_profile || '4444'
-    scene.ffmpeg.pix_fmt = scene.ffmpeg.pix_fmt || 'yuva444p10le'
+    scene.ffmpeg.prores_profile ??= '4444'
+    scene.ffmpeg.pix_fmt ??= 'yuva444p10le'
     return
   }
 
   if (resolvedExportCodec === 'prores_ks_vulkan') {
-    scene.ffmpeg.prores_profile = scene.ffmpeg.prores_profile || '4'
-    scene.ffmpeg.alpha_bits = scene.ffmpeg.alpha_bits || 16
+    scene.ffmpeg.prores_profile ??= '4'
+    scene.ffmpeg.alpha_bits ??= 16
     return
   }
 
   if (resolvedExportCodec === 'qtrle') {
-    scene.ffmpeg.pix_fmt = scene.ffmpeg.pix_fmt || 'argb'
+    scene.ffmpeg.pix_fmt ??= 'argb'
   }
 }
 
@@ -96,7 +154,7 @@ function applyCompositeSceneFields(scene, options) {
 function validateCompositeTiming(scene, timelineEnd) {
   const syncOffset = scene.composite_sync_offset
   const renderDuration = scene.composite_render_duration
-  const activityEnd = timelineEnd ?? Number.POSITIVE_INFINITY
+  const activityEnd = timelineEnd
   if (!videoOverlapsActivity({ videoStart: syncOffset, videoDuration: renderDuration, activityEnd })) {
     throw new Error('Imported video range must have positive overlap with the activity timeline.')
   }
@@ -113,18 +171,15 @@ function validateCompositeTiming(scene, timelineEnd) {
  * @param {string|null|undefined} importedVideoPath - Active composite-video path, if any.
  */
 function applyCustomExportRange(scene, exportRange, importedVideoPath) {
-  scene.custom_export_range_active = Boolean(importedVideoPath)
+  scene.custom_export_range_active = importedVideoPath !== null
 
-  if (exportRange?.type !== 'custom') {
+  if (exportRange.type !== 'custom') {
     return
   }
 
   const start = exportRange.from
   const end = exportRange.to
 
-  if (!Number.isFinite(start) || !Number.isFinite(end)) {
-    throw new Error('Custom export range must contain numeric start and end values.')
-  }
   if (end <= start) {
     throw new Error('Custom export range end must be after its start.')
   }
@@ -153,8 +208,7 @@ function applyCustomExportRange(scene, exportRange, importedVideoPath) {
 }
 
 /**
- * Rehydrates render-window timing from the editor timeline state when the
- * committed template config intentionally omits scene start/end.
+ * Applies the captured editor timeline, which owns activity-specific timing.
  *
  * Durable template state strips activity-specific timing, but the renderer
  * still requires an explicit scene window. The editor timeline remains the
@@ -162,20 +216,12 @@ function applyCustomExportRange(scene, exportRange, importedVideoPath) {
  * here before any export-range overrides are applied.
  *
  * @param {object} scene - Render-effective scene config.
- * @param {number|null|undefined} timelineStart - Active editor timeline start second.
- * @param {number|null|undefined} timelineEnd - Active editor timeline end second.
+ * @param {number} timelineStart - Active editor timeline start second.
+ * @param {number} timelineEnd - Active editor timeline end second.
  */
 function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
-  const normalizedStart = Number(timelineStart)
-  const normalizedEnd = Number(timelineEnd)
-
-  if (scene.start === undefined && Number.isFinite(normalizedStart)) {
-    scene.start = normalizedStart
-  }
-
-  if (scene.end === undefined && Number.isFinite(normalizedEnd)) {
-    scene.end = normalizedEnd
-  }
+  scene.start = timelineStart
+  scene.end = timelineEnd
 }
 
 /**
@@ -184,20 +230,21 @@ function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
  * @param {object} options - Render preparation options.
  * @param {object|null|undefined} options.availableCodecs - Detected codec metadata from the backend.
  * @param {object} options.config - Committed template config.
- * @param {*} options.exportCodec - Requested export codec.
+ * @param {string} options.codec - Requested export codec.
  * @param {'quality'|'bitrate'} options.qualityType - Composite rate control mode.
  * @param {number} options.qualityValue - CRF value (1–51) or bitrate in Mbps.
- * @param {'transparent'|'composite'|null|undefined} options.exportMode - Active export pipeline selection.
- * @param {object|null|undefined} options.exportRange - Export range settings.
+ * @param {'transparent'|'composite'} options.exportMode - Active export pipeline selection.
+ * @param {object} options.range - Validated export range settings.
  * @param {object|null|undefined} options.globalDefaults - Template global defaults.
- * @param {string|null|undefined} options.importedVideoPath - Imported-video path, if any.
- * @param {number|null|undefined} options.timelineStart - Active editor timeline start second.
- * @param {number|null|undefined} options.timelineEnd - Active editor timeline end second.
- * @param {*} options.updateRate - Requested widget update-rate divisor.
+ * @param {string|null} options.importedVideoPath - Imported-video path, if any.
+ * @param {number} options.timelineStart - Active editor timeline start second.
+ * @param {number} options.timelineEnd - Active editor timeline end second.
+ * @param {number} options.fps - Validated overlay FPS.
+ * @param {number} options.widgetUpdateRate - Validated widget update-rate divisor.
  * @returns {object} Render-effective config.
  */
 export function createRenderEffectiveConfig(options) {
-  const { availableCodecs, config, exportCodec, exportMode, exportRange, globalDefaults, importedVideoPath, timelineStart, timelineEnd, updateRate } =
+  const { availableCodecs, config, codec, exportMode, range, globalDefaults, importedVideoPath, timelineStart, timelineEnd, widgetUpdateRate, fps } =
     options
 
   if (!config?.scene) {
@@ -208,21 +255,19 @@ export function createRenderEffectiveConfig(options) {
   const scene = {
     ...nextConfig.scene,
   }
-  // Callers that do not pass an explicit export mode still follow the existing
-  // imported-video default of compositing; dialog callers can now opt out with
-  // transparent mode.
-  const shouldComposite = exportMode ? exportMode === 'composite' && Boolean(importedVideoPath) : Boolean(importedVideoPath)
-  const resolvedExportCodec = shouldComposite && !isCompositeCodec(exportCodec) ? 'libx264' : exportCodec || 'prores_ks'
+  const shouldComposite = exportMode === 'composite'
+  if (shouldComposite && importedVideoPath === null) throw new Error('Imported video is required for composite export')
+  if (isMp4Codec(codec) !== shouldComposite) throw new Error('Render codec must match the export mode')
 
-  scene.fps = sanitizeIntegerFps(scene.fps)
+  scene.fps = fps
   delete scene.updateRate
-  scene.update_rate = normalizeUpdateRateForFps(scene.fps, updateRate ?? scene.updateRate)
+  scene.update_rate = widgetUpdateRate
   scene.ffmpeg = {
-    ...(scene.ffmpeg || {}),
-    codec: resolvedExportCodec,
+    ...scene.ffmpeg,
+    codec,
   }
 
-  if (isQsvFullCodec(resolvedExportCodec) && Array.isArray(availableCodecs?.qsvFullInitArgs)) {
+  if (isQsvFullCodec(codec)) {
     scene.ffmpeg.qsv_full_init_args = availableCodecs.qsvFullInitArgs
   } else {
     delete scene.ffmpeg.qsv_full_init_args
@@ -233,8 +278,8 @@ export function createRenderEffectiveConfig(options) {
   }
 
   applyTimelineSceneFields(scene, timelineStart, timelineEnd)
-  applyCodecDefaults(scene, resolvedExportCodec)
-  applyCustomExportRange(scene, exportRange, shouldComposite ? importedVideoPath : null)
+  applyCodecDefaults(scene, codec)
+  applyCustomExportRange(scene, range, shouldComposite ? importedVideoPath : null)
   if (shouldComposite) {
     validateCompositeTiming(scene, timelineEnd)
   }
@@ -242,10 +287,6 @@ export function createRenderEffectiveConfig(options) {
   return {
     ...nextConfig,
     scene,
-    values: nextConfig.values?.map(({ display_variants: _displayVariants, ...value }) => {
-      if (value.display_type !== 'lean_angle') return value
-      const { width: _width, height: _height, ...renderValue } = value
-      return renderValue
-    }),
+    values: renderValues(nextConfig.values),
   }
 }
