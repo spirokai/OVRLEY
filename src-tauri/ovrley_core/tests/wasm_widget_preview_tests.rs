@@ -124,3 +124,92 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
         .update_widget(id, serde_json::from_value(request).unwrap())
         .is_err());
 }
+
+#[test]
+fn live_resize_keeps_the_opposite_content_corner_fixed_and_commits_the_same_geometry() {
+    let root = common::test_config::repo_git_root();
+    let config: Value = serde_json::from_str(
+        &std::fs::read_to_string(common::test_config::simple_config_path()).unwrap(),
+    )
+    .unwrap();
+    let mut origin =
+        json!({"widget": config["values"][0], "scene": common::seam::explicit_scene_json()});
+    origin["widget"]["font"] = json!("Inter.ttf");
+    origin["widget"]["x"] = json!(600.25);
+    origin["widget"]["y"] = json!(100.5);
+    origin["widget"]["icon_offset_x"] = json!(-12);
+    origin["widget"]["icon_offset_y"] = json!(17);
+    origin["scene"]["scale"] = json!(1.7);
+    origin["scene"]["shadow_strength"] = json!(5);
+    origin["scene"]["shadow_distance"] = json!(8);
+    let mut preview = PreviewSession::default();
+    preview
+        .fonts
+        .register(
+            "Inter.ttf".into(),
+            &preview_font_resource(&[root.join("fonts")], "Inter.ttf").unwrap(),
+        )
+        .unwrap();
+    preview
+        .replace_activity(
+            br#"{"sample_elapsed_seconds":[0,1,2],"speed":[0,10,40],"trim_end_seconds":2}"#,
+        )
+        .unwrap();
+    let id = preview
+        .create_widget(serde_json::from_value(origin.clone()).unwrap())
+        .unwrap();
+    for alignment in ["left", "center", "right"] {
+        origin["widget"]["content_alignment"] = json!(alignment);
+        preview
+            .update_widget(id, serde_json::from_value(origin.clone()).unwrap())
+            .unwrap();
+        preview.render(0.5).unwrap();
+        let geometry: Value = serde_json::from_slice(&preview.widgets[&id].geometry).unwrap();
+        let bounds = &geometry["content"];
+        assert!(bounds["width"].as_f64().unwrap() < geometry["width"].as_f64().unwrap());
+        assert!(bounds["height"].as_f64().unwrap() < geometry["height"].as_f64().unwrap());
+        for fixed in [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] {
+            let point = [
+                bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0],
+                bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1],
+            ];
+            for factor in [0.55, 1.8] {
+                let mut gesture = origin.clone();
+                gesture["factor"] = json!(factor);
+                gesture["fixed"] = json!(fixed);
+                gesture["point"] = json!(point);
+                gesture["second"] = json!(1.5); // Telemetry may change while the gesture is active.
+                let patch = serde_json::to_value(
+                    preview
+                        .resize_widget(serde_json::from_value(gesture).unwrap())
+                        .unwrap(),
+                )
+                .unwrap();
+                let mut committed = origin.clone();
+                committed["widget"]
+                    .as_object_mut()
+                    .unwrap()
+                    .extend(patch.as_object().unwrap().clone());
+                preview
+                    .update_widget(id, serde_json::from_value(committed).unwrap())
+                    .unwrap();
+                preview.render(1.5).unwrap();
+                let resized: Value =
+                    serde_json::from_slice(&preview.widgets[&id].geometry).unwrap();
+                let actual = &resized["content"];
+                let corner = [
+                    actual["left"].as_f64().unwrap() + actual["width"].as_f64().unwrap() * fixed[0],
+                    actual["top"].as_f64().unwrap() + actual["height"].as_f64().unwrap() * fixed[1],
+                ];
+                assert!(
+                    (corner[0] - point[0]).abs() < 0.002,
+                    "{alignment}: horizontal anchor moved"
+                );
+                assert!(
+                    (corner[1] - point[1]).abs() < 0.002,
+                    "{alignment}: vertical anchor moved"
+                );
+            }
+        }
+    }
+}

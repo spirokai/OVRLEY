@@ -28,7 +28,6 @@ import { useProjectLifecycle } from '@/features/projects'
  *   appUpdate: object,
  *   appShell: object,
  *   backendState: object,
- *   bootstrap: object,
  *   editorShell: object,
  *   handleOpenOutputDirectory: Function,
  *   layout: object,
@@ -51,8 +50,8 @@ export default function useAppShellComposition() {
   const templateManagement = useTemplateManagement({ onTemplateCreated: editorShell.resetZoom })
   const renderWorkflow = useRenderWorkflow({ backendStatus: backendState.backendStatus })
   const videoControls = useVideoImport({ debugModeEnabled: editorShell.debugModeEnabled, onSetBackgroundMode: editorShell.setEditorBackgroundMode })
-  const bootstrap = useAppBootstrap()
-  const startupReady = backendState.backendReady && templateRestoreComplete && bootstrap.ready
+  useAppBootstrap()
+  const startupReady = backendState.backendReady && templateRestoreComplete
   const projectLifecycle = useProjectLifecycle({
     clearImportedVideo: videoControls.clearImportedVideo,
     onSetBackgroundMode: editorShell.setEditorBackgroundMode,
@@ -101,7 +100,6 @@ export default function useAppShellComposition() {
     appUpdate,
     appShell,
     backendState,
-    bootstrap,
     editorShell,
     handleOpenOutputDirectory,
     layout,

@@ -10,6 +10,7 @@ use ovrley_widgets::{
 pub struct Session {
     preview: PreviewSession,
     error: Vec<u8>,
+    resize_update: Vec<u8>,
 }
 
 impl Session {
@@ -155,4 +156,32 @@ pub unsafe extern "C" fn ovrley_preview_geometry_len(session: *const Session, id
 #[no_mangle]
 pub unsafe extern "C" fn ovrley_preview_revision(session: *const Session, id: u32) -> u32 {
     (&(*session).preview.widgets)[&id].revision
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_resize(
+    session: *mut Session,
+    ptr: *const u8,
+    len: usize,
+) -> u32 {
+    let session = &mut *session;
+    let result = (|| {
+        let request = serde_json::from_slice(bytes(ptr, len)?)
+            .map_err(|e| WidgetError::Config(e.to_string()))?;
+        let update = session.preview.resize_widget(request)?;
+        session.resize_update =
+            serde_json::to_vec(&update).map_err(|e| WidgetError::Render(e.to_string()))?;
+        Ok(())
+    })();
+    session.status(result)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_resize_ptr(session: *const Session) -> *const u8 {
+    (*session).resize_update.as_ptr()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_resize_len(session: *const Session) -> usize {
+    (*session).resize_update.len()
 }

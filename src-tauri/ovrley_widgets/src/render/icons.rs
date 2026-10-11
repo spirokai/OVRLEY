@@ -4,7 +4,9 @@ use crate::model::{
     standard_metrics::standard_metric_definition, standard_widgets::time_icon_asset_file,
     types::MetricKind,
 };
-use skia_safe::{image_filters, paint::Style, Canvas, Color, Paint, PaintCap, PaintJoin, Point};
+use skia_safe::{
+    image_filters, paint::Style, Canvas, Color, Paint, PaintCap, PaintJoin, Point, Rect,
+};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 const ICON_VIEWBOX_SIZE: f32 = 24.0;
@@ -37,6 +39,44 @@ fn parsed_metric_icon(asset_file: &str) -> MutexGuard<'static, ParsedSvgIcon> {
         })
         .lock()
         .expect("icon geometry lock poisoned")
+}
+
+/// Tight vector bounds, including round strokes but excluding the SVG viewbox whitespace.
+pub fn metric_icon_bounds(asset_file: &str, placement: Rect) -> Rect {
+    let icon = parsed_metric_icon(asset_file);
+    let mut bounds = Rect::new_empty();
+    for primitive in &icon.primitives {
+        let (mut rect, style) = match primitive {
+            SvgPrimitive::Path { path, style } => (path.compute_tight_bounds(), style),
+            SvgPrimitive::Line {
+                x1,
+                y1,
+                x2,
+                y2,
+                style,
+            } => (
+                Rect::new(x1.min(*x2), y1.min(*y2), x1.max(*x2), y1.max(*y2)),
+                style,
+            ),
+            SvgPrimitive::Circle { cx, cy, r, style } => {
+                (Rect::new(cx - r, cy - r, cx + r, cy + r), style)
+            }
+        };
+        if style.stroke {
+            let width = style.stroke_width.unwrap_or(icon.stroke_width.max(1.0));
+            rect.outset((width * 0.5, width * 0.5));
+        }
+        if style.fill || style.stroke {
+            bounds.join(rect);
+        }
+    }
+    let scale = placement.width() / ICON_VIEWBOX_SIZE;
+    Rect::new(
+        placement.left + bounds.left * scale,
+        placement.top + bounds.top * scale,
+        placement.left + bounds.right * scale,
+        placement.top + bounds.bottom * scale,
+    )
 }
 
 /// Draws a scaled parsed metric icon with optional shadow.

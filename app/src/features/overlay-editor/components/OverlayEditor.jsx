@@ -27,6 +27,7 @@ import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-beha
 import { buildRenderedGeometrySignature, buildWidgetRenderGeometryModels } from '../utils/widgetRenderGeometry'
 import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
 import { isWasmWidget } from '@/lib/widget/wasm-widget'
+import { useWasmWidgetInteractions } from '@/features/wasm-widgets/hooks/useWasmWidgetInteractions'
 import { useTranslation } from 'react-i18next'
 import { getWidgetTypeName } from '@/lib/widget/widget-presentation'
 import { resolveVideoSyncMarkControls, VIDEO_SYNC_PREVIEW_SCREEN_GAP, VideoSyncMarkControls, VideoSyncPreviewScreens } from '@/features/video-sync'
@@ -305,7 +306,15 @@ function OverlayEditorContent({
     endWidgetInteraction: overlayState.endWidgetInteraction,
   })
 
-  const handlers = { ...dragHandlers, ...resizeHandlers, ...scaleHandlers, ...rotateHandlers }
+  const wasmHandlers = useWasmWidgetInteractions({
+    selectedWidget: selection.selectedWidget,
+    selectedWidgets: selection.selectedWidgets,
+    state: overlayState,
+    setIsGroupDragActive,
+    setGroupDragSelectionIds,
+  })
+  const hasWasmSelection = selection.selectedWidgets.some(isWasmWidget)
+  const handlers = hasWasmSelection ? wasmHandlers : { ...dragHandlers, ...resizeHandlers, ...scaleHandlers, ...rotateHandlers }
   const selectedRenderedGeometryVersion = useMemo(() => {
     if (!selection.effectiveSelectedWidgetIds.length) {
       return 'none'
@@ -317,7 +326,7 @@ function OverlayEditorContent({
         if (!widget) {
           return 'missing'
         }
-        if (isWasmWidget(widget)) return 'wasm-editor-only'
+        if (isWasmWidget(widget)) return 'wasm'
 
         return buildRenderedGeometrySignature(widget, renderGeometryModels[widgetId])
       })
@@ -331,11 +340,11 @@ function OverlayEditorContent({
   const isFramedSelected = isFramedWidget(selectedWidget)
   const selectedDisplayType = selectedWidget?.data?.display_type
 
-  const canResizeSelected = hasSingleSelection && isFramedSelected
+  const canResizeSelected = hasSingleSelection && (isFramedSelected || hasWasmSelection)
   const showEdgeResizeHandles =
     canResizeSelected &&
     (selectedWidget?.type === 'raster' || (selectedWidget?.type === 'elevation' && !isUniformResizeDisplayType(selectedDisplayType)))
-  const canScaleSelected = hasSingleSelection && !isFramedSelected
+  const canScaleSelected = hasSingleSelection && !isFramedSelected && !hasWasmSelection
   const canRotateSelected = hasSingleSelection && (selectedWidget?.type === 'course' || selectedWidget?.type === 'raster')
   const maintainAspectRatio =
     hasSingleSelection &&
@@ -363,9 +372,10 @@ function OverlayEditorContent({
       sceneFontSize: globalDefaults?.font_size,
       sceneStyle: overlayState.sceneStyle,
       valueFont,
+      defaultValueFont: globalDefaults.font_values,
       sceneSize: overlayState.sceneSize,
     }),
-    [globalDefaults?.font_text, globalDefaults?.font_size, overlayState.sceneStyle, valueFont, overlayState.sceneSize],
+    [globalDefaults?.font_text, globalDefaults?.font_size, globalDefaults.font_values, overlayState.sceneStyle, valueFont, overlayState.sceneSize],
   )
   const canvasDisplayProps = useMemo(
     () => ({
@@ -475,6 +485,8 @@ function OverlayEditorContent({
                   displayScale={displayScale}
                   canResizeSelected={canResizeSelected}
                   canScaleSelected={canScaleSelected}
+                  canScaleGroup={!hasWasmSelection}
+                  checkResizableError={!hasWasmSelection}
                   canRotateSelected={canRotateSelected}
                   maintainAspectRatio={maintainAspectRatio}
                   showEdgeResizeHandles={showEdgeResizeHandles}

@@ -62,7 +62,7 @@ describe('useOverlayEditorState module contract', () => {
     const wasmRef = result.current.widgetRefCallbacks['speed-widget']
     const node = document.createElement('canvas')
     act(() => wasmRef(node))
-    expect(result.current.widgetNodes['speed-widget']).toBeUndefined()
+    expect(result.current.widgetNodes['speed-widget']).toBe(node)
 
     rerender({ config: { ...DEFAULT_CONFIG, values: [{ ...speed, display_type: 'linear' }] } })
     const legacyRef = result.current.widgetRefCallbacks['speed-widget']

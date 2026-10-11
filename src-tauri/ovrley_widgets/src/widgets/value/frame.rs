@@ -5,6 +5,7 @@ use crate::widgets::value::layout::{
 };
 use crate::{
     error::WidgetResult,
+    render::icons::metric_icon_bounds,
     render::text::{measure_text, parse_color, FontResolver, ResolvedTextStyle},
     widgets::value::{format::MetricDisplayParts, validation::ValidatedValueWidget},
 };
@@ -15,6 +16,7 @@ pub struct MetricFrame {
     pub unit: Option<(ResolvedTextStyle, String)>,
     pub icon: Option<Rect>,
     pub bounds: Rect,
+    pub content_bounds: Rect,
     pub content_width: f32,
 }
 
@@ -98,9 +100,6 @@ pub fn prepare_metric_frame(
             icon_size,
         )
     });
-    if let Some(rect) = icon {
-        bounds.join(rect);
-    }
     let unit = if let Some(text) = unit {
         let reference = if text == "\u{00b0}" {
             "\u{00b0}C"
@@ -127,6 +126,18 @@ pub fn prepare_metric_frame(
     } else {
         None
     };
+    // Selection excludes line-box whitespace, shadows and raster safety padding.
+    let mut content_bounds = bounds;
+    if style.border_color.is_some() {
+        content_bounds.outset((style.border_thickness * 0.5, style.border_thickness * 0.5));
+    }
+    if let Some(rect) = icon {
+        bounds.join(rect);
+        content_bounds.join(metric_icon_bounds(
+            parts.icon_asset_file.expect("visible icon asset"),
+            rect,
+        ));
+    }
     // Include the line box as well as glyph overhangs, icon offsets, strokes, and shadows.
     bounds.join(Rect::from_xywh(
         horizontal.row_origin_x,
@@ -153,6 +164,7 @@ pub fn prepare_metric_frame(
         unit,
         icon,
         bounds,
+        content_bounds,
         content_width: horizontal.content_width,
     })
 }

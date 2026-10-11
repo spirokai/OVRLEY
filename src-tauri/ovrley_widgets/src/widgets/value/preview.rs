@@ -31,6 +31,27 @@ pub struct WidgetGeometry {
     pub width: u32,
     pub height: u32,
     pub content_width: f32,
+    pub content: ContentBounds,
+}
+
+/// Tight interaction rectangle in scene pixels, independent of raster allocation.
+#[derive(Serialize)]
+pub struct ContentBounds {
+    pub left: f32,
+    pub top: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+impl From<skia_safe::Rect> for ContentBounds {
+    fn from(rect: skia_safe::Rect) -> Self {
+        Self {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width(),
+            height: rect.height(),
+        }
+    }
 }
 
 struct StaticImage {
@@ -177,6 +198,7 @@ impl PreviewWidget {
             width,
             height,
             content_width: frame.content_width,
+            content: frame.content_bounds.into(),
         })
         .map_err(|e| WidgetError::Render(e.to_string()))?;
         self.revision = self.revision.wrapping_add(1);

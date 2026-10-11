@@ -1,4 +1,6 @@
 import { previewActivity, previewFont } from '@/api/backend'
+import { createWidgetInteraction, registerWidgetInteraction, unregisterWidgetInteraction } from './widgetInteraction'
+import { presentWidgetGeometry } from './widgetPresentation'
 
 const BASE_URL = '/wasm-bindings'
 const encoder = new TextEncoder()
@@ -30,6 +32,21 @@ export function createPreviewSession(module, onError) {
   let activityReady = true
   let disposed = false
   let frame = null
+  let renderError = null
+  const interaction = createWidgetInteraction({
+    schedule,
+    flush() {
+      if (frame !== null) cancelAnimationFrame(frame)
+      render()
+      if (renderError) throw renderError
+    },
+    getSnapshot: () => snapshot,
+    getGeometry: (id) => widgets.get(id).geometry,
+    resize(request) {
+      upload(encoder.encode(JSON.stringify(request)), (ptr, len) => check(module._ovrley_preview_resize(handle, ptr, len)))
+      return JSON.parse(read(module._ovrley_preview_resize_ptr(handle), module._ovrley_preview_resize_len(handle)))
+    },
+  })
 
   function read(ptr, len) {
     return decoder.decode(module.HEAPU8.subarray(ptr, ptr + len))
@@ -70,7 +87,7 @@ export function createPreviewSession(module, onError) {
   }
   function render() {
     frame = null
-    if (!snapshot || !activityReady) return
+    if (!snapshot) return
     try {
       const active = new Set(snapshot.widgets.map((widget) => widget.id))
       for (const [id, widget] of widgets) {
@@ -79,9 +96,9 @@ export function createPreviewSession(module, onError) {
           widgets.delete(id)
         }
       }
-      for (const widget of snapshot.widgets) loadFont(widget.data.font)
+      if (!activityReady) return
       if (snapshot.widgets.some((widget) => fonts.get(widget.data.font) !== 'ready')) return
-      for (const widget of snapshot.widgets) {
+      for (const widget of interaction.resolve(snapshot)) {
         let instance = widgets.get(widget.id)
         if (instance?.data === widget.data && instance.scene === snapshot.scene) continue
         const config = JSON.stringify({ widget: widget.data, scene: snapshot.scene })
@@ -114,13 +131,14 @@ export function createPreviewSession(module, onError) {
         const ptr = module._ovrley_preview_pixels(handle, widget.handle)
         widget.image.data.set(module.HEAPU8.subarray(ptr, ptr + widget.image.data.length))
         canvas.getContext('2d').putImageData(widget.image, 0, 0)
-        canvas.style.left = `${geometry.left}px`
-        canvas.style.top = `${geometry.top}px`
-        canvas.dataset.widgetContentWidth = geometry.content_width
+        presentWidgetGeometry(canvas, geometry)
+        widget.geometry = geometry
         widget.revision = revision
       }
+      renderError = null
       onError(null)
     } catch (error) {
+      renderError = error
       onError(error)
     }
   }
@@ -131,6 +149,8 @@ export function createPreviewSession(module, onError) {
         return
       }
       snapshot = next
+      loadFont(next.defaultFont)
+      for (const widget of next.widgets) loadFont(widget.data.font)
       const nextId = next.activityId
       if (nextId !== activityId) {
         activityId = nextId
@@ -156,8 +176,12 @@ export function createPreviewSession(module, onError) {
       schedule()
     },
     attach(id, canvas) {
-      if (canvas) canvases.set(id, canvas)
-      else canvases.delete(id)
+      const previous = canvases.get(id)
+      if (previous) unregisterWidgetInteraction(previous.parentElement)
+      if (canvas) {
+        canvases.set(id, canvas)
+        registerWidgetInteraction(canvas.parentElement, interaction.forWidget(id))
+      } else canvases.delete(id)
       const widget = widgets.get(id)
       if (widget) {
         widget.revision = -1
@@ -168,6 +192,8 @@ export function createPreviewSession(module, onError) {
     dispose() {
       disposed = true
       if (frame !== null) cancelAnimationFrame(frame)
+      interaction.dispose()
+      for (const canvas of canvases.values()) unregisterWidgetInteraction(canvas.parentElement)
       module._ovrley_preview_destroy(handle)
       widgets.clear()
       canvases.clear()

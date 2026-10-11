@@ -73,7 +73,6 @@ function AppShell() {
     appUpdate,
     appShell,
     backendState,
-    bootstrap,
     editorShell,
     handleOpenOutputDirectory,
     layout,
@@ -140,17 +139,9 @@ function AppShell() {
     }
   }
 
-  if (bootstrap.error) {
-    return (
-      <main role="alert" className="h-screen bg-background p-8 text-destructive">
-        {bootstrap.error.message}
-      </main>
-    )
-  }
-
   if (!toolbarDrawer.initialized || !startupReady) {
     return (
-      <div className="app-startup" role="status">
+      <div className="fixed inset-0 bg-background text-foreground" role="status">
         <LoadingOverlay show label={t('app.ovrleyIsStarting', 'OVRLEY is starting...')} />
       </div>
     )

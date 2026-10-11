@@ -186,7 +186,7 @@ const OverlayCanvasWidget = memo(
  * @returns {JSX.Element} Rendered component output.
  */
 export default function OverlayCanvas({ sceneProps, displayProps, dataProps, callbacks }) {
-  const { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize } = sceneProps
+  const { sceneFont, sceneFontSize, sceneStyle, valueFont, defaultValueFont, sceneSize } = sceneProps
   const { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible } = displayProps
   const { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange } = dataProps
   const { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
@@ -197,7 +197,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
     () => ({ ...sceneStyle, ...sceneSize, scale: globalScale, opacity: globalOpacity }),
     [sceneStyle, sceneSize, globalScale, globalOpacity],
   )
-  const wasm = useWasmWidgets({ widgets, scene: wasmScene, activity, second: previewSecond })
+  const wasm = useWasmWidgets({ widgets, scene: wasmScene, activity, second: previewSecond, defaultFont: defaultValueFont })
 
   return (
     <div
@@ -233,7 +233,15 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
         ) : null}
         {widgets.map((widget) => {
           if (isWasmWidget(widget)) {
-            return <WasmWidgetCanvas key={widget.id} widget={widget} attach={wasm.attach} registerNode={widgetRefCallbacks[widget.id]} />
+            return (
+              <WasmWidgetCanvas
+                key={widget.id}
+                widget={widget}
+                attach={wasm.attach}
+                registerNode={widgetRefCallbacks[widget.id]}
+                handleWidgetMouseDown={handleWidgetMouseDown}
+              />
+            )
           }
           return (
             <OverlayCanvasWidget

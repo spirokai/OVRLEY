@@ -60,6 +60,8 @@ export default function OverlayMoveable({
   displayScale,
   canResizeSelected,
   canScaleSelected,
+  canScaleGroup = true,
+  checkResizableError = true,
   canRotateSelected,
   maintainAspectRatio,
   showEdgeResizeHandles,
@@ -103,7 +105,8 @@ export default function OverlayMoveable({
       hideChildMoveableDefaultLines={isGroupDragActive && isGroupSelection}
       draggable
       resizable={canResizeSelected}
-      scalable={canScaleSelected || isGroupSelection}
+      checkResizableError={checkResizableError}
+      scalable={canScaleSelected || (isGroupSelection && canScaleGroup)}
       rotatable={canRotateSelected}
       renderDirections={showEdgeResizeHandles ? EDGE_RESIZE_DIRECTIONS : CORNER_RESIZE_DIRECTIONS}
       snappable

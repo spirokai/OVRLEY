@@ -3,19 +3,17 @@ import { isWasmWidget } from '@/lib/widget/wasm-widget'
 import { createPreviewSession, loadWidgetModule } from '../utils/previewSession'
 
 /** @param {object} props Effective scene/widgets and canonical playhead. @returns {object} Canvas binding and visible resource/render error. */
-export function useWasmWidgets({ widgets, scene, activity, second }) {
+export function useWasmWidgets({ widgets, scene, activity, second, defaultFont }) {
   const migrated = useMemo(() => widgets.filter(isWasmWidget), [widgets])
-  const enabled = migrated.length > 0
   const session = useRef(null)
   const canvases = useRef(new Map())
   const latest = useRef(null)
   const [error, setError] = useState(null)
   useEffect(() => {
-    latest.current = { widgets: migrated, scene, activityId: activity === null ? null : activity.preview_activity_id, second }
+    latest.current = { widgets: migrated, scene, activityId: activity === null ? null : activity.preview_activity_id, second, defaultFont }
     session.current?.setSnapshot(latest.current)
-  }, [activity, enabled, migrated, scene, second])
+  }, [activity, migrated, scene, second, defaultFont])
   useEffect(() => {
-    if (!enabled) return
     let cancelled = false
     loadWidgetModule()
       .then((module) => {
@@ -33,7 +31,7 @@ export function useWasmWidgets({ widgets, scene, activity, second }) {
       session.current?.dispose()
       session.current = null
     }
-  }, [enabled])
+  }, [])
   const attach = useCallback((id, canvas) => {
     if (canvas) canvases.current.set(id, canvas)
     else canvases.current.delete(id)

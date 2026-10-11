@@ -50,6 +50,19 @@ pub struct PreviewSession {
 }
 
 impl PreviewSession {
+    pub fn resize_widget(
+        &mut self,
+        request: crate::widgets::value::interaction::ResizeRequest,
+    ) -> WidgetResult<crate::widgets::value::interaction::ResizeUpdate> {
+        if !request.second.is_finite() {
+            return Err(WidgetError::Config("previewSecond must be finite".into()));
+        }
+        let speed = self
+            .activity
+            .as_mut()
+            .and_then(|a| a.speed_at(request.second));
+        crate::widgets::value::interaction::resize_value(request, speed, &self.fonts)
+    }
     pub fn replace_activity(&mut self, bytes: &[u8]) -> WidgetResult<()> {
         self.activity = if bytes.is_empty() {
             None
