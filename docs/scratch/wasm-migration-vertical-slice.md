@@ -273,3 +273,106 @@ Future widget families belong under `widgets/`. Shared drawing resources stay un
 `ovrley_widgets/build.rs` reads `assets/standard-metrics.json` and the time icon in `assets/standard-widgets.json`, deduplicates asset filenames, and generates embedded SVG resources and their cache entries. The hand-maintained icon enums, mapping matches, cache declarations, and include paths are gone. Each asset's SVG and Skia paths are parsed once and cached; drawing reuses that geometry. A missing asset fails compilation, and malformed geometry fails explicitly when first loaded.
 
 Initial cleanup verification: 130 Rust unit tests, 16 formatting/value/preview composition tests, and 64 frontend media lifecycle and project tests passed; all core integration test targets compiled. Focused lint and formatting checks passed. The two new lifecycle tests cover native snapshot retention through stashing/restoration and release on replacement/removal. After pinning release 0.153.3, the one-time WASM archive build, ordinary bindings build, desktop `cargo check`, and all 16 focused native tests pass. Native checks use the published binary without source-tool settings; the ordinary WASM build imports the regenerated archive with `no-compile` and links without the `longjmp` error.
+
+### TENTATIVE SCOPE OF CLEANUP AFTER FULL MIGRATION TO WASM
+
+Yes for the rendering and geometry code. Less of lib/widget disappears than you might expect: much of it manages the editable document rather than drawing widgets.
+
+Based on current imports, after all widget types and their interactions migrate:
+
+| Area                                                                                                     | Expected outcome                                                                                                                                                |
+| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| features/widget-preview/                                                                                 | Its renderers, preview models, SVG generation, text measurement, sampling, and layout become obsolete. A few outside consumers need untangling first—see below. |
+| overlay-editor/hooks/useOverlayPreviewModels.js                                                          | Remove entirely. Rust supplies the preview.                                                                                                                     |
+| useDragHandlers, useResizeHandlers, useScaleHandlers, useRotateHandlers                                  | Replace the legacy implementations with the shared WASM interaction lifecycle, extended to support every required gesture.                                      |
+| widgetRenderGeometry.js, widgetInteractionGeometry.js, widgetResizeScaling.js, widgetScaleInteraction.js | Their legacy layout/resize calculations become obsolete. Widget-specific geometry and resize rules belong in Rust.                                              |
+| widgetDomHelpers.js                                                                                      | Remove direct CSS transform/layout manipulation. Small identity and draft-cleanup helpers may remain or move elsewhere.                                         |
+| OverlayCanvas / OverlayEditor                                                                            | Remove the legacy rendering branch, preview-model plumbing, geometry signatures, and handler switching. Keep scene composition and editor orchestration.        |
+| lib/widget/wasm-widget.js                                                                                | Remove the migration predicate once every supported widget uses WASM.                                                                                           |
+
+Within lib/widget, mostly keep or simplify:
+
+- Keep: widget-config, editor-state, widget defaults/catalogs, sidebar names/icons, resource identities, and display-variant editing. These support creation, editing, persistence, and undo.
+- Simplify widget-draft: remove the separate CSS-layout handling and canvas rules that omit x/y or suppress scale drafts. Keep canonical data patches.
+- Split widget-resolver: keep config/default/variant resolution; remove rendering geometry. It currently calls the legacy lean-angle layout.
+- Trim standard-metrics and altitude: preview sampling/conversion calculations move to Rust; inspector unit choices and input conversions still have frontend consumers.
+
+Additional cleanup candidates:
+
+- lib/geometryUtils.js: its SVG/path and legacy transform helpers should become unnecessary.
+- overlayEditorUtils.js: remove widget sampling/interpolation and preview-value calculations; keep scene/grid helpers.
+- exportRange.js: remove route sampling/progress calculations used only by previews; keep export-range controls.
+- Browser font preparation: remove widget-rendering readiness gates from add/edit, project/template loading, and scene settings. Keep font catalogs and typography controls.
+- Remove corresponding obsolete tests, preview-only styles/assets, and any dependencies left unused.
+
+One current complication: widget-preview also serves non-preview consumers. Inspector controls import gauge geometry and formatting options; video-sync imports speed formatting and browser-font helpers. Those consumers must be moved to the appropriate owner or switched to Rust before deleting the directory. Video-sync also still uses JS interpolation, so lib/interpolation.js does not automatically disappear.
+
+Selection, keyboard shortcuts, viewport zoom/pan, Moveable, draft transactions, undo/redo, playback, and inspector controls remain frontend responsibilities.
+
+Assuming every widget and supported gesture has migrated, here is the complete overview for both folders under app/src/features/overlay-editor/.
+
+| File                                  | Outcome             | Changes                                                                                                                                                                                                                                 |
+| ------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| hooks/useDragHandlers.js              | Replace             | Shared WASM interaction handlers own drag intent, axis locking, and commit/cancel. Remove direct CSS movement.                                                                                                                          |
+| hooks/useResizeHandlers.js            | Replace             | Frontend forwards requested geometry; Rust owns intrinsic field changes, constraints, and anchor correction.                                                                                                                            |
+| hooks/useScaleHandlers.js             | Replace             | Remove bitmap/CSS scaling. Preserve supported single/group scaling through canonical field updates and shared interaction policies.                                                                                                     |
+| hooks/useRotateHandlers.js            | Replace             | Forward rotation intent through the shared lifecycle; Rust supplies resulting drawing and bounds. Rotation support must exist before removal.                                                                                           |
+| hooks/useEditorKeyboard.js            | Keep                | Copy/paste, delete, nudge, grid, and zoom remain editor actions. Ensure Escape cooperates with gesture cancellation.                                                                                                                    |
+| hooks/useEditorViewport.js            | Keep                | Viewport measurement, scrolling, fit scale, and cursor-anchored zoom remain frontend responsibilities.                                                                                                                                  |
+| hooks/useOverlayEditorState.js        | Simplify            | Keep effective config, widget identities, node registration, drafts, and commits. Collapse the separate inspector/canvas draft representations once CSS-layout drafts disappear.                                                        |
+| hooks/useOverlayPreviewModels.js      | Remove              | Rust replaces metric/text/lap preview preparation and sampling.                                                                                                                                                                         |
+| hooks/useWidgetDraftState.js          | Simplify            | Keep temporary canonical patches, subscriptions, RAF-coalesced publication, and transaction lifecycle. Remove the legacy layout payload.                                                                                                |
+| hooks/useWidgetSelection.js           | Keep                | Selection IDs, primary selection, group selection, Moveable targets, and snapping guidelines still use registered wrappers. Their bounds come from Rust.                                                                                |
+| utils/createOverlayPointerHandlers.js | Keep                | Canvas clicks, modifier selection, marquee selection, and pointer routing remain frontend behavior. Hit testing uses Rust-positioned wrappers. This file already implements a hook; its placement could be corrected separately.        |
+| utils/exportRange.js                  | Split/trim          | Keep time-input parsing, range editing, and duration/window helpers needed by export controls. Move preview route sampling and distance-progress calculations to Rust; remove unused JS implementations.                                |
+| utils/overlayEditorHelpers.js         | Trim                | Keep modifier detection, selection rectangles/intersection, selection ordering, and primary-ID helpers. Remove getWidgetSceneOrigin when Rust geometry replaces its callers.                                                            |
+| utils/overlayEditorUtils.js           | Split/trim          | Keep scene-size and editor-grid helpers. Widget sampling, time interpolation, altitude correction, and progress calculations move to Rust. Existing video-sync consumers need relocation or migration before deleting shared functions. |
+| utils/widgetDomHelpers.js             | Mostly remove       | Delete CSS layout/style application and legacy visual-bound reconstruction. Move any surviving identity or draft-cleanup helpers to their actual owners.                                                                                |
+| utils/widgetInteractionGeometry.js    | Remove              | CSS-derived origins, transform construction, and temporary drag/resize/rotation layouts are replaced by session gesture origins and Rust geometry.                                                                                      |
+| utils/widgetRenderGeometry.js         | Remove              | Rust supplies render/selection bounds; presentation events refresh Moveable. JS geometry models and signatures disappear.                                                                                                               |
+| utils/widgetResizeScaling.js          | Move policy to Rust | Move widget-specific sizing rules, limits, aspect constraints, and intrinsic field scaling. Any remaining UI handle-capability metadata should live separately.                                                                         |
+| utils/widgetScaleInteraction.js       | Replace             | Shared interaction lifecycle captures origins and commits patches; Rust handles widget-specific scale results. Preserve group behavior before removing it.                                                                              |
+
+“Replace” means the current implementation becomes obsolete, while the interaction itself remains. The surviving editor code should manage user intent and document state; Rust should determine widget appearance and geometry.
+
+## IMMEDIATE NEXT STEPS TO FULLY FINISH METRIC WIDGET MIGRATION
+
+Yes—for ordinary numeric metrics displayed as text, those are the main changes, plus formatting and resize measurement.
+
+| Change                                                                                                              | Where                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Use config value to select the metric’s activity column and interpolation policy, instead of hardcoded speed        | ovrley_widgets/src/activity.rs and preview.rs                                                           |
+| Share each metric’s existing unit conversion, precision, icon, and missing-value formatting between native and WASM | Move remaining relevant logic from ovrley_core/src/render/format.rs into shared widgets/value/format.rs |
+| Remove the speed-only restriction; render the selected metric                                                       | widgets/value/preview.rs                                                                                |
+| Measure the selected metric during resizing, so its current text determines the fixed-corner correction             | widgets/value/interaction.rs                                                                            |
+| Route supported text metrics through WASM                                                                           | Widen app/src/lib/widget/wasm-widget.js:isWasmWidget                                                    |
+
+The canvas already uses that predicate, as do the legacy-preview exclusions. No new canvas branch, binding, or gesture implementation is needed.
+
+However, all metric values includes special cases: gear is textual, GPS uses coordinate pairs and potentially multiple lines, altitude has correction, and some metrics have special formatting or missing-data rules. GPS in particular needs extending the current WASM frame/bounds path, which assumes ordinary value/unit text.
+
+So power, heart rate, cadence, etc. are straightforward extensions. Supporting every metric requires carrying over those existing special behaviors too:
+
+Most special formatting still lives in ovrley_core/src/render/format.rs (src-tauri/ovrley_core/src/render/format.rs).
+
+| Rule                                                                                               | Current owner                                                                                                                  |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Metric selection, gear strings, GPS coordinate pairs, prefixes/suffixes                            | format_metric_presentation_parts                                                                                               |
+| Units, precision, temperature, pace, balance, shutter/aperture, distance/ascent totals             | format_validated_standard_metric_parts and its helpers                                                                         |
+| Missing value → zero for metrics with a preserve policy; entirely unavailable series stays missing | resolve_metric_display_value                                                                                                   |
+| Starting-altitude correction                                                                       | altitude_offset_m and raw_value; offset prepared in render/widgets/mod.rs (src-tauri/ovrley_core/src/render/widgets/mod.rs:49) |
+| GPS coordinate formats and placeholders                                                            | format_coordinates, format_coordinate_line, format_coordinate_placeholder                                                      |
+| Time-of-day, elapsed time, timezone/date formats                                                   | format_validated_time_parts and time helpers                                                                                   |
+| Gradient sign/precision                                                                            | format_validated_gradient                                                                                                      |
+
+Some relevant rules live outside that file:
+
+| File                                                                                                  | Responsibility                                                                                                |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| ovrley_core/src/activity/interpolate.rs (src-tauri/ovrley_core/src/activity/interpolate.rs)           | Native sampling: bridge gaps, preserve gaps, hold values, interpolate coordinates/timestamps.                 |
+| ovrley_widgets/src/model/standard_metrics.rs (src-tauri/ovrley_widgets/src/model/standard_metrics.rs) | Reads each metric’s formatter, data source, and interpolation policy from the shared manifest.                |
+| ovrley_widgets/src/interpolation.rs (src-tauri/ovrley_widgets/src/interpolation.rs)                   | Already-shared numeric interpolation primitives.                                                              |
+| ovrley_widgets/src/widgets/value/layout.rs (src-tauri/ovrley_widgets/src/widgets/value/layout.rs:150) | Already-shared GPS multiline drawing. Its geometry still needs integration into the WASM prepared-frame path. |
+| ovrley_widgets/src/widgets/value/format.rs (src-tauri/ovrley_widgets/src/widgets/value/format.rs)     | Already-shared speed formatting and display-content types.                                                    |
+
+For migration, extract the remaining formatting rules into the shared value module, with samples and required activity metadata as inputs. Native export and WASM should supply those inputs through their respective sampling paths.
