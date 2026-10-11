@@ -208,42 +208,52 @@ pub(crate) async fn backend_render(
 #[tauri::command]
 pub(crate) async fn backend_finalize_activity(
     app: AppHandle,
+    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
     raw_activity_json: String,
 ) -> Result<String, String> {
-    call_and_serialize(commands::backend_finalize_activity(
-        &runtime_paths::app_paths(&app)?,
-        &raw_activity_json,
-    ))
+    let response =
+        commands::backend_finalize_activity(&runtime_paths::app_paths(&app)?, &raw_activity_json)
+            .map_err(|error| error.to_string())?;
+    serialize_command_result(&previews.retain(response)?)
 }
 
 /// Parses a native CSV path through the core columnar activity pipeline.
 #[tauri::command]
 pub(crate) async fn backend_parse_csv_activity(
     app: AppHandle,
+    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
     path: String,
 ) -> Result<FinalizeActivityResponse, String> {
-    commands::backend_parse_csv_activity(&runtime_paths::app_paths(&app)?, &path)
-        .map_err(|error| error.to_string())
+    previews.retain(
+        commands::backend_parse_csv_activity(&runtime_paths::app_paths(&app)?, &path)
+            .map_err(|error| error.to_string())?,
+    )
 }
 
 /// Parses a native VBO path through the core columnar activity pipeline.
 #[tauri::command]
 pub(crate) async fn backend_parse_vbo_activity(
     app: AppHandle,
+    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
     path: String,
 ) -> Result<FinalizeActivityResponse, String> {
-    commands::backend_parse_vbo_activity(&runtime_paths::app_paths(&app)?, &path)
-        .map_err(|error| error.to_string())
+    previews.retain(
+        commands::backend_parse_vbo_activity(&runtime_paths::app_paths(&app)?, &path)
+            .map_err(|error| error.to_string())?,
+    )
 }
 
 /// Parses a native TCX path through the shared activity finalizer.
 #[tauri::command]
 pub(crate) async fn backend_parse_tcx_activity(
     app: AppHandle,
+    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
     path: String,
 ) -> Result<FinalizeActivityResponse, String> {
-    commands::backend_parse_tcx_activity(&runtime_paths::app_paths(&app)?, &path)
-        .map_err(|error| error.to_string())
+    previews.retain(
+        commands::backend_parse_tcx_activity(&runtime_paths::app_paths(&app)?, &path)
+            .map_err(|error| error.to_string())?,
+    )
 }
 
 /// Renders one transparent preview PNG for the requested second.
@@ -537,10 +547,13 @@ pub(crate) async fn backend_import_preview_video(
 #[tauri::command]
 pub(crate) async fn backend_extract_video_telemetry(
     app: AppHandle,
+    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
     file_path: String,
 ) -> Result<Option<FinalizeActivityResponse>, String> {
     commands::backend_extract_video_telemetry(&runtime_paths::app_paths(&app)?, &file_path)
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?
+        .map(|response| previews.retain(response))
+        .transpose()
 }
 
 /// Clears the currently registered local HTTP preview video.

@@ -6,9 +6,8 @@
 //!       elevation/gradient/time values).
 //!       Replaces the pre-refactor pattern of matching raw `"speed"` / `"heartrate"`
 //!       string literals scattered across 5+ files.
-//! Does not own: metric formatting (see [`crate::render::format`]), metric widget
-//!       rendering, or the `RenderDataRequirements` derivation (see
-//!       [`crate::normalize`]).
+//! Metric formatting and drawing live in [`crate::widgets`]. Native data requirements
+//! and export scheduling remain in `ovrley_core`.
 //!
 //! Allowed dependencies: `serde` (for JSON compatibility).
 //! Forbidden dependencies: all other crate modules (this is a leaf dependency

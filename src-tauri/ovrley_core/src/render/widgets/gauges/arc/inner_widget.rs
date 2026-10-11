@@ -7,7 +7,8 @@
 use super::geometry::ArcGaugeGeometry;
 use crate::error::CoreResult;
 use crate::normalize::ValidatedArcGaugeWidget;
-use crate::render::text::{draw_text, origin_x_for_centered_text, resolve_font, ResolvedTextStyle};
+use crate::render::text::{draw_text, resolve_font};
+use ovrley_widgets::render::text::{origin_x_for_centered_text, ResolvedTextStyle};
 use skia_safe::Canvas;
 use std::path::PathBuf;
 

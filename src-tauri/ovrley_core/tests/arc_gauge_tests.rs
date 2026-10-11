@@ -2,7 +2,7 @@ mod common;
 
 use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
 use ovrley_core::debug::RenderProfiler;
-use ovrley_core::normalize::raw::{RenderConfig, ValueConfig};
+use ovrley_core::normalize::raw::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::widgets::gauges::arc::{
@@ -10,7 +10,8 @@ use ovrley_core::render::widgets::gauges::arc::{
 };
 use ovrley_core::render::widgets::types::PreparedValue;
 use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
-use ovrley_core::types::{DisplayType, MetricKind, TrackFillStyle};
+use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
+use ovrley_widgets::widgets::value::config::ValueConfig;
 use std::collections::BTreeMap;
 
 #[test]
@@ -251,7 +252,7 @@ fn dense_speed_activity(speed: Vec<Option<f64>>) -> DenseActivityReport {
         full_activity_metric_ranges: ovrley_core::activity::metric_ranges::calculate_metric_range(
             &series.speed,
         )
-        .map(|range| (ovrley_core::MetricKind::Speed, range))
+        .map(|range| (ovrley_widgets::model::types::MetricKind::Speed, range))
         .into_iter()
         .collect(),
         series,

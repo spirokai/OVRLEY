@@ -29,7 +29,7 @@ use crate::render::widgets::types::{
     LinearGaugeCache, LinearGaugeFrameState, WidgetFrameReport, WidgetGeometryReport,
     WidgetRenderReport,
 };
-use crate::types::TrackFillStyle;
+use ovrley_widgets::model::types::TrackFillStyle;
 use skia_safe::Canvas;
 use std::path::PathBuf;
 

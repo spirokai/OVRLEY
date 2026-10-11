@@ -12,11 +12,11 @@ use super::{
 use crate::activity::schema::DenseActivityReport;
 use crate::error::{CoreError, CoreResult};
 use crate::render::surface::create_surface;
-use crate::render::text::{
-    baseline_for_text_top_with_line_height, draw_text_with_vertical_metrics_text,
-    measure_text_with_font, resolve_font, ResolvedTextStyle,
-};
+use crate::render::text::{draw_text_with_vertical_metrics_text, resolve_font};
 use crate::render::widgets::types::StaticLayer;
+use ovrley_widgets::render::text::{
+    baseline_for_text_top_with_line_height, measure_text_with_font, ResolvedTextStyle,
+};
 use skia_safe::{Canvas, Color};
 use std::path::PathBuf;
 

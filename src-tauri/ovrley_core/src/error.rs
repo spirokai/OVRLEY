@@ -29,6 +29,15 @@ use thiserror::Error;
 
 pub type CoreResult<T> = Result<T, CoreError>;
 
+impl From<ovrley_widgets::error::WidgetError> for CoreError {
+    fn from(error: ovrley_widgets::error::WidgetError) -> Self {
+        match error {
+            ovrley_widgets::error::WidgetError::Config(message) => Self::Config(message),
+            ovrley_widgets::error::WidgetError::Render(message) => Self::Render(message),
+        }
+    }
+}
+
 /// Stable render path reasons for frontend localization. Display text is for native diagnostics.
 #[derive(Error, Debug, Serialize)]
 #[serde(tag = "reason", rename_all = "camelCase")]

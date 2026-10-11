@@ -17,10 +17,10 @@
 
 mod common;
 
-use ovrley_core::render::text::MeasuredText;
-use ovrley_core::render::widgets::value::{
-    gradient_triangle_height, metric_icon_top_from_value_layout, metric_vertical_metrics_text,
-    NUMERIC_VERTICAL_METRICS_TEXT,
+use ovrley_core::render::widgets::value::gradient_triangle_height;
+use ovrley_widgets::render::text::MeasuredText;
+use ovrley_widgets::widgets::value::layout::{
+    metric_icon_top_from_value_layout, metric_vertical_metrics_text, NUMERIC_VERTICAL_METRICS_TEXT,
 };
 
 #[test]
@@ -73,7 +73,8 @@ fn metric_icon_top_centers_on_value_glyph_box() {
 #[test]
 // Verifies stable numeric baseline measurement removes per-digit vertical drift.
 fn stable_numeric_vertical_metrics_keep_baseline_constant() {
-    use ovrley_core::render::text::{baseline_for_text_top_with_line_height, resolve_font};
+    use ovrley_core::render::text::resolve_font;
+    use ovrley_widgets::render::text::baseline_for_text_top_with_line_height;
 
     let workspace_root = common::test_config::repo_git_root();
     let font_dirs = vec![workspace_root.join("fonts")];

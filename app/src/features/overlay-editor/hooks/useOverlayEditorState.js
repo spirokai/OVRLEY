@@ -22,6 +22,7 @@ import { getEffectiveWidgetData } from '@/lib/template/template-state'
 import { applyWidgetDrafts, applyWidgetDraftsForCanvas } from '@/lib/widget/widget-draft'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
 import { getSceneSize } from '../utils/overlayEditorUtils'
+import { isWasmWidget } from '@/lib/widget/wasm-widget'
 import useWidgetDraftState, { useWidgetDraftView } from './useWidgetDraftState'
 
 function materializeWidgets(rawWidgets, globalDefaults) {
@@ -114,12 +115,11 @@ export function useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onC
       Object.fromEntries(
         widgets.map((widget) => [
           widget.id,
-          (node) => {
-            setWidgetNode(widget.id, node)
-          },
+          // WASM canvases supply editor measurements; Moveable integration is phase two.
+          isWasmWidget(widget) ? widgetLiveEdits.getWidgetNodeRef(widget.id) : (node) => setWidgetNode(widget.id, node),
         ]),
       ),
-    [setWidgetNode, widgets],
+    [setWidgetNode, widgetLiveEdits, widgets],
   )
 
   const commitWidgetUpdate = (widgetId, updates) => {

@@ -107,7 +107,10 @@ pub(crate) fn validate_unique_raster_ids(rasters: &[RasterConfig]) -> CoreResult
     let mut seen = HashSet::new();
     for raster in rasters {
         if !seen.insert(&raster.id) {
-            return Err(invalid_raster(&raster.id, format!("Raster {} id is duplicated", raster.id)));
+            return Err(invalid_raster(
+                &raster.id,
+                format!("Raster {} id is duplicated", raster.id),
+            ));
         }
     }
     Ok(())

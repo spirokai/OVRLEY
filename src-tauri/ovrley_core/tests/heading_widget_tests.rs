@@ -21,7 +21,7 @@ use ovrley_core::normalize::{
     validate_render_config, validate_scene_config, ValidatedHeading, ValidatedSceneConfig,
 };
 use ovrley_core::render::surface::create_surface;
-use ovrley_core::render::text::{origin_x_for_centered_text, resolve_font};
+use ovrley_core::render::text::resolve_font;
 use ovrley_core::render::widgets::heading::draw::draw_heading_widget;
 use ovrley_core::render::widgets::heading::geometry::{
     chevron_vertices, heading_label_baseline, heading_tape_layout, heading_tick_position,
@@ -29,7 +29,8 @@ use ovrley_core::render::widgets::heading::geometry::{
 };
 use ovrley_core::render::widgets::heading::prepare::prepare_heading_cache;
 use ovrley_core::render::widgets::types::HeadingWidgetCache;
-use ovrley_core::types::DisplayType;
+use ovrley_widgets::model::types::DisplayType;
+use ovrley_widgets::render::text::origin_x_for_centered_text;
 use std::collections::BTreeMap;
 
 // ── Geometry helpers ──────────────────────────────────────────────────────

@@ -6,7 +6,7 @@
 //!       `NumericSeries`, `TimeSeries`, `CourseSeries`.
 //! Does not own: parsing (see [`crate::activity::mod::parse_activity_json`]),
 //!       trimming (see [`crate::activity::trim`]), interpolation (see
-//!       [`crate::activity::interpolate`] and [`crate::interpolation`]).
+//!       [`crate::activity::interpolate`] and [`ovrley_widgets::interpolation`]).
 //!
 //! Allowed dependencies: `chrono-tz`, `serde`, `serde_json`, and activity metric contracts.
 //! Forbidden dependencies: `render`, `encode`, `commands`.
@@ -27,8 +27,8 @@
 //! per-frame rendering (O(1) lookup via `frame_index`).
 
 use super::elevation::preferred_elevation_series;
-use crate::MetricKind;
 use chrono_tz::Tz;
+use ovrley_widgets::model::types::MetricKind;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;

@@ -19,9 +19,6 @@ run('git', ['-C', checkout, 'fetch', '--depth=1', 'origin', revision])
 run('git', ['-C', checkout, '-c', 'core.longpaths=true', 'checkout', '--detach', revision])
 run('git', ['-C', checkout, '-c', 'core.longpaths=true', 'submodule', 'update', '--init', '--depth', '1'])
 
-// PR #1336 probes a literal emcc file; SDK 6 ships .exe entrypoints on Windows.
-// Only this one-time source build needs the marker. All actual tools use .exe.
-if (process.platform === 'win32' && !existsSync(join(emscripten, 'emcc'))) writeFileSync(join(emscripten, 'emcc'), '')
 let ninja = env.NINJA
 if (!ninja) {
   if (process.platform === 'win32') {
@@ -62,13 +59,16 @@ if (!existsSync(depsMarker)) {
 }
 
 const staging = join(cache, 'export')
+const sysroot = join(emscripten, 'cache', 'sysroot').replaceAll('\\', '/')
 Object.assign(env, {
   CARGO_TARGET_DIR: join(cache, 'target'),
   SKIA_SOURCE_DIR: skia,
   FORCE_SKIA_BUILD: '1',
   SKIA_GN_COMMAND: gn,
   SKIA_NINJA_COMMAND: ninja,
-  SKIA_GN_ARGS: `ar="${emar.replaceAll('\\', '/')}" cc="${emcc.replaceAll('\\', '/')}" cxx="${emxx.replaceAll('\\', '/')}"`,
+  // Skia 0.153.3 expects .bat SDK launchers on Windows; SDK 6 supplies .exe.
+  // Select the installed tools explicitly, including their WASM sysroot.
+  SKIA_GN_ARGS: `skia_emsdk_dir="" ar="${emar.replaceAll('\\', '/')}" cc="${emcc.replaceAll('\\', '/')}" cxx="${emxx.replaceAll('\\', '/')}" extra_cflags+=["-fwasm-exceptions","--sysroot=${sysroot}"] extra_ldflags=["--sysroot=${sysroot}"]`,
   BINDGEN_EXTRA_CLANG_ARGS: `-isystem"${join(emscripten, 'system', 'include', 'compat')}"`,
   BUILD_ARTIFACTSTAGINGDIRECTORY: staging,
 })

@@ -1,0 +1,19 @@
+OVRLEY FOR DEBIAN-BASED LINUX
+
+Install
+-------
+1. Extract the downloaded OVRLEY Debian ZIP archive.
+2. Install the package with: sudo apt install ./OVRLEY-*.deb
+3. Launch OVRLEY from the application menu.
+
+Dependencies
+------------
+The Debian package declares these runtime dependencies; apt installs them automatically:
+- gstreamer1.0-libav
+- gstreamer1.0-plugins-good
+- libgtk-3-0
+- libwebkit2gtk-4.1-0
+
+Notes
+-----
+The Debian package includes OVRLEY and self-contained FFmpeg and FFprobe command-line tools.

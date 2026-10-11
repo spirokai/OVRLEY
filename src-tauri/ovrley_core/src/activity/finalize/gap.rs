@@ -390,7 +390,7 @@ pub fn build_distance_series(
         sparse_distance_series.push(round_f64(total_distance_meters, 3));
     }
 
-    let points = crate::interpolation::collect_valid_numeric_points(
+    let points = ovrley_widgets::interpolation::collect_valid_numeric_points(
         elapsed_seconds,
         &sparse_distance_series,
     );
@@ -401,7 +401,7 @@ pub fn build_distance_series(
             if first_observation.is_some_and(|first| *elapsed < first) {
                 return None;
             }
-            crate::interpolation::interpolate_points(&points, *elapsed)
+            ovrley_widgets::interpolation::interpolate_points(&points, *elapsed)
                 .and_then(|distance| round_f64(distance, 3))
         })
         .collect()

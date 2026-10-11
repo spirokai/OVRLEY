@@ -1,0 +1,177 @@
+import { previewActivity, previewFont } from '@/api/backend'
+
+const BASE_URL = '/wasm-bindings'
+const encoder = new TextEncoder()
+const decoder = new TextDecoder()
+let modulePromise
+
+/** @returns {Promise<object>} One compiled module shared by independently disposable editor sessions. */
+export async function loadWidgetModule() {
+  modulePromise ??= import(/* @vite-ignore */ `${BASE_URL}/wasm_bindings.js`).then(({ default: createModule }) =>
+    createModule({ locateFile: (name) => `${BASE_URL}/${name}` }),
+  )
+  return modulePromise
+}
+
+/**
+ * External ABI boundary. Rust owns sampling, layout, static caches and RGBA surfaces.
+ * JS owns scheduling, resource transport and presentation. No activity JSON is parsed here.
+ * @param {object} module Emscripten module.
+ * @param {Function} onError Visible error reporting.
+ * @returns {object} Disposable editor preview session.
+ */
+export function createPreviewSession(module, onError) {
+  const handle = module._ovrley_preview_create()
+  const widgets = new Map()
+  const canvases = new Map()
+  const fonts = new Map()
+  let snapshot
+  let activityId
+  let activityReady = true
+  let disposed = false
+  let frame = null
+
+  function read(ptr, len) {
+    return decoder.decode(module.HEAPU8.subarray(ptr, ptr + len))
+  }
+  function fail() {
+    throw new Error(read(module._ovrley_preview_error_ptr(handle), module._ovrley_preview_error_len(handle)))
+  }
+  function check(status) {
+    if (status !== 0) fail()
+  }
+  function upload(bytes, call) {
+    const ptr = module._ovrley_alloc(bytes.byteLength)
+    try {
+      module.HEAPU8.set(bytes, ptr)
+      return call(ptr, bytes.byteLength)
+    } finally {
+      module._ovrley_dealloc(ptr, bytes.byteLength)
+    }
+  }
+  function schedule() {
+    if (!disposed && frame === null) frame = requestAnimationFrame(render)
+  }
+  function loadFont(id) {
+    if (fonts.has(id)) return
+    fonts.set(id, 'loading')
+    previewFont(id)
+      .then((bytes) => {
+        if (disposed) return
+        upload(encoder.encode(id), (idPtr, idLen) =>
+          upload(new Uint8Array(bytes), (ptr, len) => check(module._ovrley_preview_font(handle, idPtr, idLen, ptr, len))),
+        )
+        fonts.set(id, 'ready')
+        schedule()
+      })
+      .catch((error) => {
+        if (!disposed) onError(error)
+      })
+  }
+  function render() {
+    frame = null
+    if (!snapshot || !activityReady) return
+    try {
+      const active = new Set(snapshot.widgets.map((widget) => widget.id))
+      for (const [id, widget] of widgets) {
+        if (!active.has(id)) {
+          module._ovrley_preview_widget_destroy(handle, widget.handle)
+          widgets.delete(id)
+        }
+      }
+      for (const widget of snapshot.widgets) loadFont(widget.data.font)
+      if (snapshot.widgets.some((widget) => fonts.get(widget.data.font) !== 'ready')) return
+      for (const widget of snapshot.widgets) {
+        let instance = widgets.get(widget.id)
+        if (instance?.data === widget.data && instance.scene === snapshot.scene) continue
+        const config = JSON.stringify({ widget: widget.data, scene: snapshot.scene })
+        if (!instance) {
+          const widgetHandle = upload(encoder.encode(config), (ptr, len) => module._ovrley_preview_widget_create(handle, ptr, len))
+          if (!widgetHandle) fail()
+          instance = { handle: widgetHandle, config, revision: -1, image: null }
+          widgets.set(widget.id, instance)
+        } else if (config !== instance.config) {
+          upload(encoder.encode(config), (ptr, len) => check(module._ovrley_preview_widget_update(handle, instance.handle, ptr, len)))
+          instance.config = config
+        }
+        instance.data = widget.data
+        instance.scene = snapshot.scene
+      }
+      check(module._ovrley_preview_render(handle, snapshot.second))
+      for (const [id, widget] of widgets) {
+        const canvas = canvases.get(id)
+        if (!canvas) continue
+        const revision = module._ovrley_preview_revision(handle, widget.handle)
+        if (widget.revision === revision) continue
+        const geometry = JSON.parse(
+          read(module._ovrley_preview_geometry_ptr(handle, widget.handle), module._ovrley_preview_geometry_len(handle, widget.handle)),
+        )
+        if (!widget.image || widget.image.width !== geometry.width || widget.image.height !== geometry.height) {
+          canvas.width = geometry.width
+          canvas.height = geometry.height
+          widget.image = new ImageData(geometry.width, geometry.height)
+        }
+        const ptr = module._ovrley_preview_pixels(handle, widget.handle)
+        widget.image.data.set(module.HEAPU8.subarray(ptr, ptr + widget.image.data.length))
+        canvas.getContext('2d').putImageData(widget.image, 0, 0)
+        canvas.style.left = `${geometry.left}px`
+        canvas.style.top = `${geometry.top}px`
+        canvas.dataset.widgetContentWidth = geometry.content_width
+        widget.revision = revision
+      }
+      onError(null)
+    } catch (error) {
+      onError(error)
+    }
+  }
+  return {
+    setSnapshot(next) {
+      if (next.activityId === undefined) {
+        onError(new Error('Finalized activity is missing its native preview identity. Reload the activity.'))
+        return
+      }
+      snapshot = next
+      const nextId = next.activityId
+      if (nextId !== activityId) {
+        activityId = nextId
+        activityReady = false
+        // Explicitly clear old values while replacement bytes are in flight.
+        check(module._ovrley_preview_activity(handle, 0, 0))
+        for (const canvas of canvases.values()) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
+        for (const widget of widgets.values()) widget.revision = -1
+        if (nextId === null) activityReady = true
+        else
+          previewActivity(nextId)
+            .then((bytes) => {
+              if (disposed || activityId !== nextId) return
+              upload(new Uint8Array(bytes), (ptr, len) => check(module._ovrley_preview_activity(handle, ptr, len)))
+              activityReady = true
+              for (const widget of widgets.values()) widget.revision = -1
+              schedule()
+            })
+            .catch((error) => {
+              if (!disposed && activityId === nextId) onError(error)
+            })
+      }
+      schedule()
+    },
+    attach(id, canvas) {
+      if (canvas) canvases.set(id, canvas)
+      else canvases.delete(id)
+      const widget = widgets.get(id)
+      if (widget) {
+        widget.revision = -1
+        widget.image = null
+      }
+      schedule()
+    },
+    dispose() {
+      disposed = true
+      if (frame !== null) cancelAnimationFrame(frame)
+      module._ovrley_preview_destroy(handle)
+      widgets.clear()
+      canvases.clear()
+      fonts.clear()
+    },
+  }
+}

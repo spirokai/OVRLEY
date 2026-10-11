@@ -7,7 +7,7 @@
 //!
 //! ## Type
 //! Integration test. Reads the compiled-in manifest via the public
-//! `ovrley_core::standard_metrics` API.
+//! `ovrley_widgets::model::standard_metrics` API.
 //!
 //! ## Regressions guarded
 //! - Malformed or incomplete display-type definitions in the manifest
@@ -15,12 +15,12 @@
 //! - Missing default frame dimensions for boxed display types
 //! - Per-metric override regressions
 
-use ovrley_core::standard_metrics::{
+use ovrley_widgets::model::standard_metrics::{
     default_frame_dimensions, display_type_definition, display_type_label_key,
     is_boxed_display_type, is_display_type_supported, supported_display_types,
     DisplayTypeLayoutMode,
 };
-use ovrley_core::MetricKind;
+use ovrley_widgets::model::types::MetricKind;
 
 const LINEAR_FRAME: (u32, u32) = (200, 24);
 const ARC_FRAME: (u32, u32) = (220, 220);

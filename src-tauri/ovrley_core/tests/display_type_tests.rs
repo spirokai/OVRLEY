@@ -7,8 +7,8 @@
 mod common;
 
 use ovrley_core::render::widgets::types::PreparedValue;
-use ovrley_core::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
-use ovrley_core::types::{DisplayType, TrackFillStyle};
+use ovrley_widgets::model::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
+use ovrley_widgets::model::types::{DisplayType, TrackFillStyle};
 use serde_json::json;
 
 #[test]

@@ -8,9 +8,10 @@ import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
  * function signature.
  */
 
-import { act, renderHook } from '@testing-library/react'
+import { act, render, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useOverlayEditorState from '@/features/overlay-editor/hooks/useOverlayEditorState'
+import { WasmWidgetCanvas } from '@/features/wasm-widgets/components/WasmWidgetCanvas'
 import { getPrimarySelectionId, normalizeSelectionIds } from '@/features/overlay-editor/utils/overlayEditorHelpers'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
@@ -19,8 +20,59 @@ function resetStore() {
   useStore.setState(useStore.getInitialState(), true)
 }
 
+const globalDefaults = { ...DEFAULT_GLOBAL_DEFAULTS }
+
+function WasmCanvases({ config, attach }) {
+  const state = useOverlayEditorState({ config, globalDefaults, onConfigChange: vi.fn() })
+  return state.canvasWidgets.map((widget) => (
+    <WasmWidgetCanvas key={widget.id} widget={widget} attach={attach} registerNode={state.widgetRefCallbacks[widget.id]} />
+  ))
+}
+
 describe('useOverlayEditorState module contract', () => {
   beforeEach(resetStore)
+
+  test('keeps existing canvases attached across appearance edits and widget additions', () => {
+    const speed = { id: 'speed-widget', value: 'speed', x: 0, y: 0, display_type: 'text', opacity: 1 }
+    const config = { ...DEFAULT_CONFIG, values: [speed] }
+    const attach = vi.fn()
+    const { rerender } = render(<WasmCanvases config={config} attach={attach} />)
+    const canvas = attach.mock.calls[0][1]
+    expect(attach).toHaveBeenCalledTimes(1)
+
+    const editedSpeed = { ...speed, opacity: 0.5 }
+    rerender(<WasmCanvases config={{ ...config, values: [editedSpeed] }} attach={attach} />)
+    expect(attach).toHaveBeenCalledTimes(1)
+
+    const otherSpeed = { ...speed, id: 'other-speed' }
+    rerender(<WasmCanvases config={{ ...config, values: [editedSpeed, otherSpeed] }} attach={attach} />)
+    expect(attach).toHaveBeenCalledTimes(2)
+    expect(attach.mock.calls[0]).toEqual(['speed-widget', canvas])
+
+    rerender(<WasmCanvases config={{ ...config, values: [otherSpeed] }} attach={attach} />)
+    expect(attach).toHaveBeenCalledTimes(3)
+    expect(attach.mock.calls[2]).toEqual(['speed-widget', null])
+  })
+
+  test('changes node registration when a widget switches from WASM to the legacy renderer', () => {
+    const speed = { id: 'speed-widget', value: 'speed', x: 0, y: 0, display_type: 'text' }
+    const { result, rerender } = renderHook(({ config }) => useOverlayEditorState({ config, globalDefaults, onConfigChange: vi.fn() }), {
+      initialProps: { config: { ...DEFAULT_CONFIG, values: [speed] } },
+    })
+    const wasmRef = result.current.widgetRefCallbacks['speed-widget']
+    const node = document.createElement('canvas')
+    act(() => wasmRef(node))
+    expect(result.current.widgetNodes['speed-widget']).toBeUndefined()
+
+    rerender({ config: { ...DEFAULT_CONFIG, values: [{ ...speed, display_type: 'linear' }] } })
+    const legacyRef = result.current.widgetRefCallbacks['speed-widget']
+    expect(legacyRef).not.toBe(wasmRef)
+    act(() => {
+      wasmRef(null)
+      legacyRef(node)
+    })
+    expect(result.current.widgetNodes['speed-widget']).toBe(node)
+  })
 
   test('exports a function as default', () => {
     expect(typeof useOverlayEditorState).toBe('function')

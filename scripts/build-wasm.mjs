@@ -3,11 +3,12 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { delimiter, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadLocalEnvironment } from './build-environment.mjs'
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 export const crateDir = join(root, 'src-tauri', 'wasm-bindings')
 export const target = 'wasm32-unknown-emscripten'
-export const revision = '1a80f6716b5ba787f6583443f7b62fa5f60e7084'
+export const revision = 'b7f043e0b1e2a850e702245de811f01df1f6b0ff'
 export const rustVersion = '1.98.1'
 export const emscriptenVersion = '6.0.9'
 export const vendorDir = join(root, 'vendor', 'skia-wasm')
@@ -20,9 +21,8 @@ export const artifactNames = ['wasm_bindings.js', 'wasm_bindings.wasm']
 
 /** Load and validate the SDK boundary once for both compilation commands. */
 export function toolchainEnvironment() {
-  const local = join(root, '.env.wasm.local')
-  if (existsSync(local)) process.loadEnvFile(local)
-  if (!process.env.EMSDK) throw new Error('Set EMSDK in .env.wasm.local (see .env.wasm.example).')
+  loadLocalEnvironment(root)
+  if (!process.env.EMSDK) throw new Error('Set EMSDK in .env.local (see .env.example).')
   const emsdk = resolve(root, process.env.EMSDK)
   const emscripten = join(emsdk, 'upstream', 'emscripten')
   const installed = JSON.parse(readFileSync(join(emscripten, 'emscripten-version.txt'), 'utf8').trim())

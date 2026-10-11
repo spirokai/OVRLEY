@@ -4,6 +4,7 @@
 //! frontend and backend share one source of truth for non-metric widget
 //! defaults and backdrop display-type definitions.
 
+use crate::model::standard_metrics::StandardMetricIconDefinition;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -18,6 +19,11 @@ pub struct StandardWidgetDefinition {
 pub struct BackdropTypeDefinition {
     pub label: String,
     pub defaults: Value,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct RawTimeWidgetDefinition {
+    icon: StandardMetricIconDefinition,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -55,6 +61,7 @@ struct WidgetTypography {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RawStandardWidgetManifest {
+    time: RawTimeWidgetDefinition,
     typography: WidgetTypography,
     plot: RawStandardWidgetSection,
     gradient: RawStandardWidgetSection,
@@ -117,6 +124,7 @@ impl BackdropSection {
 
 #[derive(Clone, Debug)]
 struct StandardWidgetManifest {
+    time: RawTimeWidgetDefinition,
     typography: WidgetTypography,
     plot: StandardWidgetSection,
     gradient: StandardWidgetSection,
@@ -138,6 +146,7 @@ fn load_manifest() -> StandardWidgetManifest {
     .expect("shared standard widgets manifest must be valid JSON");
 
     StandardWidgetManifest {
+        time: raw.time,
         typography: raw.typography,
         plot: StandardWidgetSection::from_raw(raw.plot),
         gradient: StandardWidgetSection::from_raw(raw.gradient),
@@ -182,4 +191,8 @@ pub fn default_backdrop_display_types() -> &'static [String] {
 
 pub fn is_backdrop_type_supported(display_type: &str) -> bool {
     manifest().backdrops.definitions.contains_key(display_type)
+}
+
+pub fn time_icon_asset_file() -> &'static str {
+    &manifest().time.icon.asset_file
 }

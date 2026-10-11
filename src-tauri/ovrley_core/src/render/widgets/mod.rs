@@ -77,10 +77,7 @@ pub use lean_angle::{draw_lean_angle_widget, prepare_lean_angle_cache};
 pub use metric_presentation::draw_metric_presentation;
 pub(crate) use route::draw_route_widget;
 pub use types::{MetricPresentationReport, PreparedRenderAssets, WidgetRenderReport};
-pub(crate) use value::{
-    draw_metric_value_widget_with_config, draw_static_metric_parts_for_value,
-    static_metric_parts_for_value, StaticMetricParts,
-};
+pub(crate) use value::{draw_metric_value_widget_with_config, draw_static_metric_parts_for_value};
 
 // White-box widget tests exercise internal geometry and reduction contracts
 // that are not available from crate-level integration tests. They live in the

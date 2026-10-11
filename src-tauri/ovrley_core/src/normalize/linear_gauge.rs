@@ -4,13 +4,13 @@
 //! display type is `linear`. All gauge-specific fields (orientation,
 //! track styling, labels) are required and validated here.
 
-use super::helpers::{require_bool, require_f32, require_string};
-use super::raw::ValueConfig;
-use super::value::normalize_starting_altitude_m;
 use super::{resolve_bar_style_geometry, track_corner_radius_max, ResolvedBarGeometry};
 use crate::error::{CoreError, CoreResult};
-use crate::standard_metrics::is_standard_metric;
-use crate::types::{DisplayType, MetricKind, TrackFillStyle};
+use ovrley_widgets::model::standard_metrics::is_standard_metric;
+use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
+use ovrley_widgets::model::validation::{require_bool, require_f32, require_string};
+use ovrley_widgets::widgets::value::config::ValueConfig;
+use ovrley_widgets::widgets::value::validation::normalize_starting_altitude_m;
 
 /// Validated linear gauge orientation, restricted to horizontal or vertical.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

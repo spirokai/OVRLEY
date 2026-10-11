@@ -2,9 +2,9 @@
 
 Migrate speed with `display_type: text` in the actual `OverlayEditor`. Keep the editable document in Zustand; shared Rust code owns sampling, formatting, layout, and drawing. WASM receives original finalized activity samples when the activity changes and `previewSecond` when rendering.
 
-This document records the architecture and scope agreed during discussion. Implementation still requires explicit user approval. Builds require separate permission under `AGENTS.md`. Updating this document does not authorize either.
+This document records the agreed architecture. The user subsequently approved implementation and verification builds (native, WASM, focused tests, frontend production compilation; no packaging/release).
 
-Prerequisite: migrate native rendering to Skia `0.153.4` and verify existing rendering before starting the widget slice.
+Prerequisite: migrate native rendering to Skia `0.153.3` and verify existing rendering before starting the widget slice. Both targets use that release's revision `b7f043e0b1e2a850e702245de811f01df1f6b0ff`.
 
 ## 1. Ownership
 
@@ -157,7 +157,7 @@ Extract one platform-independent Rust widget-rendering crate, initially containi
 
 Native ovrley_core consumes it for speed/text export. wasm-bindings consumes it through a thin ABI. Filesystem discovery, Tauri, activity import, FFmpeg, and browser lifecycle stay outside that crate.
 
-Upgrade native from Skia `0.97.2` to `0.153.4` before starting the slice. Align both hosts to the same pinned rust-skia revision where applicable. This supersedes the earlier proposal to support different Skia versions through target-specific dependencies. Do not add parallel drawing implementations or compatibility wrappers to disguise API differences.
+Upgrade native from Skia `0.97.2` to `0.153.3` before starting the slice. Align both hosts to the same pinned rust-skia revision. This supersedes the earlier proposal to support different Skia versions through target-specific dependencies. Do not add parallel drawing implementations or compatibility wrappers to disguise API differences.
 
 Treat the native Skia upgrade as a separate prerequisite and verify existing native rendering before widget extraction. Matching source and dependency versions still requires representative rendering verification across targets. The upgrade and builds have not been performed as part of this design discussion.
 
@@ -191,7 +191,7 @@ Other widgets and other speed presentations keep their existing preview paths. T
 
 Drag-and-drop, canvas resize interactions, and react-moveable changes are deferred to the next phase. Existing editor styling controls remain in scope, including sliders that use live drafts. Rust geometry reporting is in scope so those controls do not depend on the old speed/text presentation model.
 
-After approval, the slice would:
+The implemented slice:
 
 - Extract and reuse speed/text rendering in native export and WASM.
 - Connect the existing editor and live drafts to a standalone WASM canvas.
@@ -211,3 +211,65 @@ The user explicitly wants only essential and crucial tests. Reuse existing cover
 Avoid exhaustive control-by-control tests, trivial wrapper tests, tests that mirror implementation, and large new snapshot suites.
 
 Measure representative activity transfer/decoding and the full frame path (drawing, pixel copy, canvas presentation). The existing diagnostic is not sufficient evidence for a production frame-rate guarantee. Run only checks appropriate to the change; build execution remains subject to explicit permission.
+
+## Checkpoint — 2026-10-11
+
+Speed/text now renders through a standalone WASM canvas in OverlayEditor. The existing widget editor sends complete effective configuration, including live slider drafts. Other presentations use the existing preview. The migrated canvas is intentionally excluded from Moveable targets and pointer dragging during this phase.
+
+`ovrley_widgets` owns shared contracts, validation, numeric interpolation, formatting, layout, drawing, and preview sessions. The initial checkpoint used Skia 0.153.4; the manual follow-up pins both targets to release 0.153.3. The WASM crate remains a separate host/toolchain.
+
+Each native finalization produces an immutable `preview_activity_id` (a fresh identity also denotes a new revision). The shell retains its original-density snapshot; WASM requests raw bytes once when that identity changes. The media store releases snapshots once neither the active activity nor stashed video telemetry owns them. Legacy previews still retain the existing JS activity payload. Preview/export fonts use native-resolved serialized Skia faces with included bytes and variation coordinates, including system fonts.
+
+Verified at this checkpoint:
+
+- Native shell `cargo check` and frontend production build, including emitted WASM assets.
+- 31 existing frontend tests around editor selection, drafts, and backgrounds.
+- 15 existing native typography/value tests, the shared sampling/cache tests, and one new native preview-composition seam test.
+- Headless Chromium running the actual OverlayEditor, MetricWidgetEditor, and live-edit hooks with native-produced bundled/system font resources. Verified interpolation, paused slider drafts/commit, units/alignment, font replacement, activity replacement/clear, and unmount. IPC was supplied by the verification harness; this does not replace testing imports in the actual Tauri window.
+- One activity resource request during playback/editor changes and two font requests when switching between two faces.
+
+User testing checkpoint: run `pnpm dev` from the repository root in a fresh terminal. Machine-specific SDK paths live in the ignored root `.env.local` (see `.env.example`); the dev and WASM scripts load it automatically. The temporary checkpoint launcher is no longer used. Test a newly loaded activity with a speed widget in Text presentation, timeline scrubbing/playback, paused editor changes, font changes, and activity replacement/clear.
+
+Native Skia now uses the published Windows binary for release 0.153.3, shared by `ovrley_core` and `ovrley_widgets`. It does not need Skia source, Ninja, LLVM or libclang. Representative multi-megabyte transfer/frame timings remain to measure after this checkpoint. No 30–60 fps guarantee is claimed from these checks alone.
+
+## CHECKPOINT MANUAL TEST RESULTS
+
+- speed widget text renders correctly in OverlayEditor, including units, alignment, and shadows
+- speed widget text updates immediately when changing editor controls, including while paused or during playback
+- speed widget value is correctly driven by the previewSecond and interpolated correctly
+- the very first speed text widget I add has about 300-500 ms delay before it appears, subsequent are instant. Do we know why? is it the first time the WASM module is loaded?
+
+### COMMENTS
+
+- is trackPreviewActivityLifetime necessary? it seems supsicious. What do we need it for? we already have scaffolding for swapping activities no?
+- pin rust-skia to a version with an existing prebuilt Windows binaries for both native and wasm. We will not be compiling everything from scratch
+- overlay_widgets need proper folder structure. There will be dozens of widgets, so it needs to be structured by widget type. The shared files can stay in the root - if reasonable number - otherwise they need some folder structure too - please not 1-2 files per folder. The goal is to have a clear structure for the widgets and their shared files, so that it is easy to find and maintain them in the future.
+- the one-liner files with orphaned files inside ovrley_core/src and ovrley_core/src/render/widgets ovrley_core/src/normalize etc that contain just pub use XXXX must be cleaned up; they are clutter
+- is the widget editor somehow coalesce rapid updates to the latest state per animation frame? Do not make changes, I just want to know the status.
+- there is 400 LOC of icon mapping in ovrley_widgets/src/icons.rs including hardcoded icon paths. Why cannot we simply use the icons already declared inside the manifest in assets/. This must be doable in a much more sensibel and maintainable way. Can't we generate all maps, parsed icons, paths etc programatically from the manifest?
+
+## Manual review follow-up — 2026-10-11
+
+The first migrated widget originally triggered `loadWidgetModule()` in `useWasmWidgets`. Loading was then moved to canvas mount, but manual testing still found a 300–500 ms first-widget delay in release. The app bootstrap now initializes the module while the existing “OVRLEY is starting” screen is visible. That screen waits for both drawer preferences and renderer readiness before mounting the editor, and startup project selection also waits for renderer readiness. Initialization failures are shown visibly. There is no separate pre-mount WASM loading screen. The initial window background matches the app background. The cached module promise is reused when widgets create their preview session. The standalone diagnostic keeps its own renderer initialization. Activity snapshot and font loading still start through the preview session. In development, the first `/wasm-bindings` asset request additionally waits for Vite's serialized bindings build. The reported delay has not been profiled into individual costs.
+
+The preview controller already coalesces complete snapshots with one pending `requestAnimationFrame`. Each update replaces `snapshot`, and the scheduled render reads the latest state. This applies to playback and paused editor changes, including live drafts. It does not debounce until a control stops changing. Scheduling was left unchanged.
+
+Native activity retention needs explicit release: swapping a JS activity does not free its entry in `PreviewActivities`. The store-wide `trackPreviewActivityLifetime` subscriber was removed. The existing media actions now release discarded identities after committing their transitions, retaining active and stashed video telemetry. New-project and staged-project replacement use those same owner actions. The unused direct `setParsedActivity` setter was removed.
+
+Both hosts were tried with published Skia `0.153.3` CPU binaries. Native compilation passed, but WASM linking failed with `undefined symbol: emscripten_longjmp`. Both targets now pin release `0.153.3` / `b7f043e0b1e2a850e702245de811f01df1f6b0ff`: native uses the published binary, while WASM uses a locally built archive from the same source with native WASM exceptions. `.cargo/config.toml` selects prebuilt downloads for the release Git pin, and the native host enables `no-compile`. `pnpm wasm:skia:build` alone enables source compilation; ordinary `pnpm wasm:build` reuses the archive with `no-compile`. No exception stripping, missing-symbol suppression, or legacy longjmp shim is used.
+
+The shared crate now has four areas:
+
+```text
+ovrley_widgets/src/
+  lib.rs, error.rs, activity.rs, interpolation.rs, preview.rs
+  model/          scene, domain types, manifests, common validation
+  render/         text, icons, SVG geometry
+  widgets/value/  config, validation, formatting, layout, frame, preview surface
+```
+
+Future widget families belong under `widgets/`. Shared drawing resources stay under `render/`, and session/activity ownership remains outside widget implementations. Seven native forwarding files were deleted; consumers import contracts and utilities from their owning shared modules.
+
+`ovrley_widgets/build.rs` reads `assets/standard-metrics.json` and the time icon in `assets/standard-widgets.json`, deduplicates asset filenames, and generates embedded SVG resources and their cache entries. The hand-maintained icon enums, mapping matches, cache declarations, and include paths are gone. Each asset's SVG and Skia paths are parsed once and cached; drawing reuses that geometry. A missing asset fails compilation, and malformed geometry fails explicitly when first loaded.
+
+Initial cleanup verification: 130 Rust unit tests, 16 formatting/value/preview composition tests, and 64 frontend media lifecycle and project tests passed; all core integration test targets compiled. Focused lint and formatting checks passed. The two new lifecycle tests cover native snapshot retention through stashing/restoration and release on replacement/removal. After pinning release 0.153.3, the one-time WASM archive build, ordinary bindings build, desktop `cargo check`, and all 16 focused native tests pass. Native checks use the published binary without source-tool settings; the ordinary WASM build imports the regenerated archive with `no-compile` and links without the `longjmp` error.

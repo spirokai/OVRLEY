@@ -1,11 +1,12 @@
 use super::frame_state::g_force_frame_state;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
-use crate::render::text::{draw_text, measure_text, parse_color, ResolvedTextStyle};
+use crate::render::text::{draw_text, measure_text};
 use crate::render::widgets::types::{
     GForceWidgetCache, WidgetFrameReport, WidgetGeometryReport, WidgetRenderReport,
 };
-use crate::standard_widgets::widget_font_weight;
+use ovrley_widgets::model::standard_widgets::widget_font_weight;
+use ovrley_widgets::render::text::{parse_color, ResolvedTextStyle};
 use skia_safe::{Canvas, Paint, Point};
 use std::path::PathBuf;
 

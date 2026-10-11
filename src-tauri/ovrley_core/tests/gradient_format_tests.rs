@@ -11,7 +11,9 @@
 use ovrley_core::normalize::validate_gradient_widget;
 use ovrley_core::render::format::format_validated_gradient;
 
-fn gradient_config(overrides: &[(&str, &str)]) -> ovrley_core::normalize::raw::ValueConfig {
+fn gradient_config(
+    overrides: &[(&str, &str)],
+) -> ovrley_widgets::widgets::value::config::ValueConfig {
     let mut fields = ("\"value\": \"gradient\", \"x\": 100, \"y\": 200, \"font\": \"Arial.ttf\", \
          \"font_size\": 48.0, \"color\": \"#ffffff\", \"opacity\": 1.0, \
          \"triangle_width\": 72.0, \"value_offset\": 0.0, \"show_triangle\": true, \

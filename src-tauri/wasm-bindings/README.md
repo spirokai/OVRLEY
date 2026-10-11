@@ -1,29 +1,35 @@
 # Frontend preview migration setup
 
 This crate is OVRLEY's Emscripten binding boundary. It is an isolated Cargo
-workspace so its toolchain and Skia version do not change the native renderer.
-The initial diagnostic draws text and an animated bar into caller-owned RGBA;
-production widgets have not been migrated.
+workspace to isolate its Emscripten toolchain and output. Native and WASM both
+pin rust-skia 0.153.3 at `b7f043e0b1e2a850e702245de811f01df1f6b0ff`.
+Speed/text in OverlayEditor uses the shared `ovrley_widgets` renderer.
 
 ## Daily development
 
 1. Install Rust `1.98.1` with `wasm32-unknown-emscripten` and activate Emscripten
    `6.0.9` in your existing emsdk installation.
-2. Copy root `.env.wasm.example` to `.env.wasm.local` and set `EMSDK`.
+2. Copy root `.env.example` to `.env.local` and set `EMSDK`.
    Set `PYTHON` if the Python on PATH is older than 3.10. Local paths are ignored
    by Git; shell variables take precedence.
-3. Run `pnpm dev:frontend` (or `pnpm dev` for Tauri), then open
-   `http://localhost:5173/#/debug/wasm-preview`.
+3. Run `pnpm dev` from the repository root to test OverlayEditor in Tauri.
+   Both the Tauri launcher and WASM scripts load `.env.local` automatically.
+   No checkpoint launcher or native Skia source-tool paths are needed.
+   The standalone diagnostic is also available through `pnpm dev:frontend`
+   at `http://localhost:5173/#/debug/wasm-preview`.
 
-The first debug asset request runs `pnpm wasm:build`. Subsequent Rust, Cargo,
+App bootstrap initializes the module under the existing “OVRLEY is starting”
+screen and waits for it before showing the editor. The first WASM
+asset request runs `pnpm wasm:build`. Subsequent Rust, Cargo,
 toolchain, build-script or stored-bundle changes trigger serialized rebuilds
 through Vite's existing watcher and reload the page. Edits arriving during a
 build queue another build. Requests wait for the current build; a failed build
 returns HTTP 503 and a Vite error overlay, never old artifacts. React keeps its
 standard HMR and releases renderer allocations on effect cleanup. Tauri ignores
 this crate for native restarts. No extra watcher process or watch dependency is
-needed. Ordinary editor development does not compile Wasm until this debug path
-is opened. The Tauri development CSP explicitly permits Wasm compilation;
+needed. Ordinary bindings builds reuse the stored Skia archive; they need
+Emscripten and Python, but no Skia source, Ninja or libclang. The Tauri
+development CSP explicitly permits Wasm compilation;
 the standalone debug route skips desktop-only preference hydration.
 
 `pnpm wasm:build` also runs independently. It verifies the stored bundle's pins
@@ -66,9 +72,8 @@ archive, manifest and notices together after regeneration.
 
 Windows fixes carried forward from the experiment and validated here:
 
-- PR #1336 probes a literal `emcc` file; the script creates an empty presence
-  marker in the SDK while using the actual `.exe` tools for compilation.
-- GN receives explicit `emcc.exe`, `em++.exe` and `emar.exe` paths.
+- GN receives explicit `emcc.exe`, `em++.exe` and `emar.exe` paths and the SDK
+  sysroot, replacing this release's assumptions about `.bat` launchers.
 - The selected Python is put first on PATH. A cached `python3.cmd` maps Skia's
   hard-coded command to that Python on Windows.
 - Bindgen receives Emscripten's compatibility include directory.
@@ -77,30 +82,19 @@ Windows fixes carried forward from the experiment and validated here:
 
 ## Runtime contract and migration boundary
 
-The Emscripten output is an ES module factory, so there is no shared global
-`window.Module`. Each debug mount owns a renderer handle, font and persistent
-pixel buffer. Initialization checks ABI version 1. Fonts are supplied as bytes,
-with invalid fonts reported as errors and no system-font fallback. Teardown
-frees the handle and pixels, including initialization/unmount races.
+The Emscripten output is an ES module factory. OverlayEditor caches that module
+and owns a disposable preview session with activity, fonts and widget surfaces.
+Native supplies immutable activity snapshots and serialized Skia font faces.
+Rust owns sampling and drawing; JS coalesces the latest snapshot per animation
+frame and presents the pixels. The separate diagnostic owns its own renderer
+handle, font and pixel buffer.
 
 The C ABI is internal: pointers must refer to live allocations in this module;
 callers must not double-free or reuse destroyed handles. Rendering is synchronous
-and single-threaded. The diagnostic is opaque RGBA; before rendering transparent
-widgets, define conversion between Skia premultiplied RGBA and ImageData's
-straight alpha explicitly.
+and single-threaded. Widget pixels use ImageData's straight-alpha RGBA format;
+the diagnostic is opaque RGBA.
 
-This setup stops before widget migration. The debug route and asset server are
-development-only. Production build hooks and release workflows do not yet
-depend on Wasm. Before enabling a production preview, add:
-
-1. A host-neutral render core with injected font/resource bytes instead of
-   filesystem paths and native global caches.
-2. Session-owned activity state and per-widget configuration/invalidation;
-   frame/playhead inputs should be the normal per-frame traffic.
-3. CI generation and bundling of the JS/Wasm pair, shipped third-party notices,
-   and the Tauri production CSP permission for Wasm compilation.
-
-Do not import the old branch's native Cargo lockfile or replace the existing
-React preview orchestration. The `wasm-poc` README and report were references;
-their benchmark widget and production release wiring are not this migration's
-runtime API.
+Vite builds and emits the JS/WASM pair for production and serves it during
+development. Further widget families, interaction support and representative
+performance measurements remain described in
+[the migration notes](../../docs/scratch/wasm-migration-vertical-slice.md).

@@ -13,7 +13,7 @@
 //! - Unknown metric strings silently mapping to a default variant
 //! - Variant name refactors breaking frontend communication
 
-use ovrley_core::MetricKind;
+use ovrley_widgets::model::types::MetricKind;
 use serde_json;
 
 #[test]

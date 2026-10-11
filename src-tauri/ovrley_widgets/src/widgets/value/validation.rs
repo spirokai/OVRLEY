@@ -8,12 +8,14 @@
 //! Shadow, border, and other scene-level properties are NOT part of the
 //! value contract — they belong to the scene validation contract.
 
-use super::helpers::{require_bool, require_f32, require_str, require_string, rgba_from_hex};
-use super::raw::ValueConfig;
-use crate::error::{CoreError, CoreResult};
-use crate::standard_metrics::is_standard_metric;
-use crate::types::DisplayType;
-use crate::MetricKind;
+use crate::error::{WidgetError, WidgetResult};
+use crate::model::standard_metrics::is_standard_metric;
+use crate::model::types::DisplayType;
+use crate::model::types::MetricKind;
+use crate::model::validation::{
+    require_bool, require_f32, require_str, require_string, rgba_from_hex,
+};
+use crate::widgets::value::config::ValueConfig;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -29,18 +31,18 @@ pub enum ContentAlignment {
     Right,
 }
 
-pub(super) fn validate_content_alignment(
+pub fn validate_content_alignment(
     content_alignment: Option<String>,
     path: &str,
-) -> CoreResult<ContentAlignment> {
+) -> WidgetResult<ContentAlignment> {
     match content_alignment.as_deref() {
         Some("left") => Ok(ContentAlignment::Left),
         Some("center") => Ok(ContentAlignment::Center),
         Some("right") => Ok(ContentAlignment::Right),
-        Some(value) => Err(CoreError::Config(format!(
+        Some(value) => Err(WidgetError::Config(format!(
             "{path}: expected 'left', 'center', or 'right', got '{value}'"
         ))),
-        None => Err(CoreError::Config(format!("{path}: required"))),
+        None => Err(WidgetError::Config(format!("{path}: required"))),
     }
 }
 
@@ -107,16 +109,16 @@ pub struct ValidatedValueWidget {
     pub format: Option<String>,
 }
 
-pub(super) fn normalize_starting_altitude_m(
+pub fn normalize_starting_altitude_m(
     metric: MetricKind,
     starting_altitude: Option<f64>,
     display_unit: Option<&str>,
     altitude_path: &str,
     unit_path: &str,
-) -> CoreResult<Option<f64>> {
+) -> WidgetResult<Option<f64>> {
     if metric != MetricKind::Altitude {
         if starting_altitude.is_some() {
-            return Err(CoreError::Config(format!(
+            return Err(WidgetError::Config(format!(
                 "{altitude_path}: is only valid for altitude widgets"
             )));
         }
@@ -124,13 +126,13 @@ pub(super) fn normalize_starting_altitude_m(
     }
 
     let display_unit =
-        display_unit.ok_or_else(|| CoreError::Config(format!("{unit_path}: required")))?;
+        display_unit.ok_or_else(|| WidgetError::Config(format!("{unit_path}: required")))?;
 
     let meter_scale = match display_unit {
         "m" => 1.0,
         "ft" => 3.280_84,
         unit => {
-            return Err(CoreError::Config(format!(
+            return Err(WidgetError::Config(format!(
                 "{unit_path}: expected 'm' or 'ft', got '{unit}'"
             )))
         }
@@ -143,11 +145,17 @@ pub(super) fn normalize_starting_altitude_m(
 // Validation — every output-affecting field must be explicit
 // ---------------------------------------------------------------------------
 
-pub fn validate_value_widget(value: ValueConfig, index: usize) -> CoreResult<ValidatedValueWidget> {
+pub fn validate_value_widget(
+    value: ValueConfig,
+    index: usize,
+) -> WidgetResult<ValidatedValueWidget> {
     let p = |f: &str| format!("values[{index}].{f}");
 
+    require_f32(Some(value.x), &p("x"))?;
+    require_f32(Some(value.y), &p("y"))?;
+
     if value.display_type != DisplayType::Text {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: display_type '{}' is outside the standard metric text/value validation slice",
             p("display_type"),
             value.display_type.as_str()
@@ -162,10 +170,10 @@ pub fn validate_value_widget(value: ValueConfig, index: usize) -> CoreResult<Val
 /// Arc gauges deliberately do not render icons, so icon configuration is not
 /// required for this path. All fields which affect the inner value or unit are
 /// still validated explicitly before drawing.
-pub(super) fn validate_arc_inner_value_widget(
+pub fn validate_arc_inner_value_widget(
     value: ValueConfig,
     index: usize,
-) -> CoreResult<ValidatedValueWidget> {
+) -> WidgetResult<ValidatedValueWidget> {
     validate_value_widget_fields(value, index, false, false)
 }
 
@@ -174,18 +182,18 @@ fn validate_value_widget_fields(
     index: usize,
     require_icon_fields: bool,
     require_alignment: bool,
-) -> CoreResult<ValidatedValueWidget> {
+) -> WidgetResult<ValidatedValueWidget> {
     let p = |f: &str| format!("values[{index}].{f}");
 
     if !is_standard_metric(value.value) {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: metric {:?} is outside the standard metric text/value validation slice",
             p("value"),
             value.value
         )));
     }
     if !require_icon_fields && value.value == MetricKind::GpsCoordinates {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: gps_coordinates only supports text display",
             p("value")
         )));
@@ -201,7 +209,7 @@ fn validate_value_widget_fields(
     // -- opacity ----------------------------------------------------------
     let opacity = require_f32(value.opacity, &p("opacity"))?;
     if !(0.0..=1.0).contains(&opacity) {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be 0.0..1.0, got {opacity}",
             p("opacity")
         )));
@@ -209,7 +217,7 @@ fn validate_value_widget_fields(
 
     let font_size = require_f32(value.font_size, &p("font_size"))?;
     if font_size <= 0.0 {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be > 0, got {font_size}",
             p("font_size")
         )));
@@ -232,7 +240,7 @@ fn validate_value_widget_fields(
         )?;
         let icon_size = require_f32(value.icon_size, &p("icon_size"))?;
         if icon_size < 0.0 {
-            return Err(CoreError::Config(format!(
+            return Err(WidgetError::Config(format!(
                 "{}: must be >= 0, got {icon_size}",
                 p("icon_size")
             )));
@@ -267,7 +275,7 @@ fn validate_value_widget_fields(
         )?)
     } else {
         if value.show_full_ascent.is_some() {
-            return Err(CoreError::Config(format!(
+            return Err(WidgetError::Config(format!(
                 "{}: is only valid for total_ascent widgets",
                 p("show_full_ascent")
             )));
@@ -277,7 +285,7 @@ fn validate_value_widget_fields(
     let coordinate_format = if value.value == MetricKind::GpsCoordinates {
         let coordinate_format = require_string(value.coordinate_format, &p("coordinate_format"))?;
         if !matches!(coordinate_format.as_str(), "dms" | "ddm") {
-            return Err(CoreError::Config(format!(
+            return Err(WidgetError::Config(format!(
                 "{}: expected 'dms' or 'ddm', got '{coordinate_format}'",
                 p("coordinate_format")
             )));
@@ -285,7 +293,7 @@ fn validate_value_widget_fields(
         Some(coordinate_format)
     } else {
         if value.coordinate_format.is_some() {
-            return Err(CoreError::Config(format!(
+            return Err(WidgetError::Config(format!(
                 "{}: is only valid for gps_coordinates widgets",
                 p("coordinate_format")
             )));
@@ -299,16 +307,24 @@ fn validate_value_widget_fields(
         opacity,
     )?;
     let display_unit = require_string(value.display_unit, &p("display_unit"))?;
+    if value.value == MetricKind::Speed
+        && !matches!(display_unit.as_str(), "kmh" | "mph" | "kn" | "mps")
+    {
+        return Err(WidgetError::Config(format!(
+            "{}: unsupported speed unit '{display_unit}'",
+            p("display_unit")
+        )));
+    }
     if value.value == MetricKind::GpsCoordinates
         && !matches!(display_unit.as_str(), "latitude" | "longitude" | "both")
     {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: expected 'latitude', 'longitude', or 'both', got '{display_unit}'",
             p("display_unit")
         )));
     }
     if value.value == MetricKind::TotalAscent && !matches!(display_unit.as_str(), "m" | "ft") {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: expected 'm' or 'ft', got '{display_unit}'",
             p("display_unit")
         )));
@@ -316,13 +332,13 @@ fn validate_value_widget_fields(
     if value.value == MetricKind::DistanceToHome
         && !matches!(display_unit.as_str(), "m" | "km" | "mi" | "ft")
     {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: expected 'm', 'km', 'mi', or 'ft', got '{display_unit}'",
             p("display_unit")
         )));
     }
     if value.value == MetricKind::Calories && display_unit != "kcal" {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: expected 'kcal', got '{display_unit}'",
             p("display_unit")
         )));
@@ -351,14 +367,14 @@ fn validate_value_widget_fields(
                 balance_format: require_string(value.balance_format, &p("balance_format"))?,
             },
             (Some(_), Some(_)) => {
-                return Err(CoreError::Config(format!(
+                return Err(WidgetError::Config(format!(
                     "{} and {}: provide exactly one precision field for balance widgets",
                     p("decimals"),
                     p("decimal_rounding")
                 )));
             }
             (None, None) => {
-                return Err(CoreError::Config(format!(
+                return Err(WidgetError::Config(format!(
                     "{} or {}: one precision field must be explicit",
                     p("decimals"),
                     p("decimal_rounding")
@@ -372,14 +388,14 @@ fn validate_value_widget_fields(
                 ValidatedValueFormatting::DecimalRounding { decimal_rounding }
             }
             (Some(_), Some(_)) => {
-                return Err(CoreError::Config(format!(
+                return Err(WidgetError::Config(format!(
                     "{} and {}: provide exactly one precision field",
                     p("decimals"),
                     p("decimal_rounding")
                 )));
             }
             (None, None) => {
-                return Err(CoreError::Config(format!(
+                return Err(WidgetError::Config(format!(
                     "{} or {}: one precision field must be explicit",
                     p("decimals"),
                     p("decimal_rounding")
@@ -398,7 +414,7 @@ fn validate_value_widget_fields(
             | ValidatedValueFormatting::BalanceRounded { .. } => 0,
         };
         if decimals > 2 {
-            return Err(CoreError::Config(format!(
+            return Err(WidgetError::Config(format!(
                 "{}: distance supports only 0, 1, or 2 decimals, got {decimals}",
                 p("decimals")
             )));

@@ -1,8 +1,8 @@
 //! Static backdrop widget drawing.
 
 use crate::normalize::ValidatedBackdrop;
-use crate::render::text::parse_color;
-use crate::types::BackdropType;
+use ovrley_widgets::model::types::BackdropType;
+use ovrley_widgets::render::text::parse_color;
 use skia_safe::{paint::Style, Canvas, Paint, Path, PathBuilder, Point};
 
 #[derive(Clone, Copy)]

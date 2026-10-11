@@ -20,8 +20,9 @@ use super::frame_state::build_elevation_completed_points;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::paths::AppPaths;
-use crate::render::text::{draw_text, parse_color, ResolvedTextStyle};
-use crate::standard_widgets::widget_font_weight;
+use crate::render::text::draw_text;
+use ovrley_widgets::model::standard_widgets::widget_font_weight;
+use ovrley_widgets::render::text::{parse_color, ResolvedTextStyle};
 use skia_safe::Canvas;
 
 /// Draws the elevation widget for one frame and returns preview diagnostics.

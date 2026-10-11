@@ -1,0 +1,4 @@
+[env]
+# The pinned release Git revision has published binaries. Never fall back to a
+# native source build; WASM archive regeneration explicitly sets FORCE_SKIA_BUILD.
+FORCE_SKIA_BINARIES_DOWNLOAD = "1"

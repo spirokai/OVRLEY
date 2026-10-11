@@ -1,12 +1,12 @@
 //! G-force friction-circle widget validation.
 
-use super::helpers::{
+use crate::error::{CoreError, CoreResult};
+use ovrley_widgets::model::types::{DisplayType, MetricKind};
+use ovrley_widgets::model::validation::{
     require_bool, require_f32, require_hex_color, require_positive_f32, require_positive_u32,
     require_string, require_unit_opacity,
 };
-use super::raw::ValueConfig;
-use crate::error::{CoreError, CoreResult};
-use crate::types::{DisplayType, MetricKind};
+use ovrley_widgets::widgets::value::config::ValueConfig;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GForceAxis {

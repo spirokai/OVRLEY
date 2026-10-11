@@ -8,105 +8,19 @@
 use crate::activity::schema::DenseActivityReport;
 use crate::normalize::{
     ElapsedTimeOrigin, ValidatedGradientWidget, ValidatedTimeFormatting, ValidatedTimeValue,
-    ValidatedValueFormatting, ValidatedValueWidget,
 };
-use crate::standard_metrics::{
+use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+use chrono_tz::Tz;
+use ovrley_widgets::model::standard_metrics::{
     standard_metric_formatter, standard_metric_interpolation, standard_metric_unit_label,
     StandardMetricFormatterKind, StandardMetricInterpolationKind,
 };
-use crate::MetricKind;
-use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
-use chrono_tz::Tz;
+use ovrley_widgets::model::types::MetricKind;
+use ovrley_widgets::widgets::value::validation::{ValidatedValueFormatting, ValidatedValueWidget};
 
-/// Built-in metric icon kinds supported by value widgets.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MetricIconKind {
-    Gauge,
-    Distance,
-    Heart,
-    RefreshCw,
-    Zap,
-    Clock3,
-    Thermometer,
-    CoreTemperature,
-    Footprints,
-    Wind,
-    Scale,
-    Ruler,
-    Waves,
-    TrendingUp,
-    Percent,
-    GForce,
-    GroundContactTime,
-    Torque,
-    GearPosition,
-    Compass,
-    ArrowUpDown,
-    Altitude,
-    Iso,
-    Aperture,
-    ShutterSpeed,
-    FocalLength,
-    Ev,
-    ColorTemperature,
-    Rpm,
-    ThrottlePosition,
-    BrakePosition,
-    EngineLoad,
-    LeanAngle,
-    House,
-    Satellite,
-    ArrowUpNarrowWide,
-    Calories,
-}
-
-/// Display content used by icon+value+unit widgets.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum MetricDisplayContent {
-    /// Main metric/time text and optional unit suffix.
-    Standard {
-        value_text: String,
-        unit_text: Option<String>,
-    },
-    /// Coordinate lines with independently colored direction letters.
-    Coordinates(MetricCoordinateDisplay),
-}
-
-/// Formatted metric content plus its shared icon configuration.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MetricDisplayParts {
-    pub content: MetricDisplayContent,
-    pub show_icon: bool,
-    pub icon_kind: Option<MetricIconKind>,
-}
-
-impl MetricDisplayParts {
-    /// Returns standard value/unit text. Coordinate content is invalid here.
-    pub fn standard_text(&self) -> (&str, Option<&str>) {
-        match &self.content {
-            MetricDisplayContent::Standard {
-                value_text,
-                unit_text,
-            } => (value_text, unit_text.as_deref()),
-            MetricDisplayContent::Coordinates(_) => {
-                panic!("coordinate display content has no standard value/unit text")
-            }
-        }
-    }
-}
-
-/// One formatted latitude or longitude line.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MetricCoordinateLine {
-    pub direction: Option<String>,
-    pub value_text: String,
-}
-
-/// Coordinate display content. Two lines are used for the `both` unit mode.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MetricCoordinateDisplay {
-    pub lines: Vec<MetricCoordinateLine>,
-}
+use ovrley_widgets::widgets::value::format::{
+    MetricCoordinateDisplay, MetricCoordinateLine, MetricDisplayContent, MetricDisplayParts,
+};
 
 enum MetricValue<'a> {
     Numeric(Option<f64>),
@@ -192,7 +106,13 @@ pub(crate) fn format_metric_presentation_parts(
     frame_index: usize,
     altitude_offset_m: f64,
 ) -> Option<MetricDisplayParts> {
-    let icon_kind = super::widgets::value::metric_icon_kind_for_value(validated.metric);
+    if validated.metric == MetricKind::Speed {
+        return Some(ovrley_widgets::widgets::value::format::format_speed_parts(
+            validated,
+            raw_value(validated, dense_activity, frame_index, 0.0),
+        ));
+    }
+    let icon_asset_file = ovrley_widgets::render::icons::metric_icon_asset_file(validated.metric);
     if validated.metric == MetricKind::GpsCoordinates {
         let latitude = dense_activity
             .series
@@ -225,7 +145,7 @@ pub(crate) fn format_metric_presentation_parts(
         return Some(MetricDisplayParts {
             content: MetricDisplayContent::Coordinates(coordinate),
             show_icon: validated.show_icon,
-            icon_kind,
+            icon_asset_file,
         });
     }
 
@@ -260,7 +180,7 @@ pub(crate) fn format_metric_presentation_parts(
             unit_text,
         },
         show_icon: validated.show_icon,
-        icon_kind,
+        icon_asset_file,
     })
 }
 
@@ -339,7 +259,7 @@ pub fn format_validated_time_parts(
             unit_text: None,
         },
         show_icon: validated.base.show_icon,
-        icon_kind: super::widgets::value::metric_icon_kind_for_value(MetricKind::Time),
+        icon_asset_file: ovrley_widgets::render::icons::metric_icon_asset_file(MetricKind::Time),
     }
 }
 
@@ -626,21 +546,7 @@ where
 //
 // Zero-decimal values intentionally round instead of truncating so backend
 // preview PNGs match the editor canvas' metric formatting.
-pub(crate) fn format_number(value: f64, decimals: usize) -> String {
-    if decimals == 0 {
-        let rounded = value.round();
-        return if rounded == 0.0 {
-            "0".to_string()
-        } else {
-            rounded.to_string()
-        };
-    }
-
-    let factor = 10_f64.powi(decimals as i32);
-    let rounded = (value * factor).round() / factor;
-    let rounded = if rounded == 0.0 { 0.0 } else { rounded };
-    format!("{rounded:.decimals$}")
-}
+use ovrley_widgets::widgets::value::format::format_number;
 
 fn format_coordinates(
     latitude: Option<f64>,

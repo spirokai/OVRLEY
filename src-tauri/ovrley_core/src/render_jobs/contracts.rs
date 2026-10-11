@@ -13,7 +13,8 @@ use std::collections::HashMap;
 use crate::activity::schema::ParsedActivity;
 use crate::encode::quality::QualityType;
 pub use crate::media::prepared_video::{InspectedVideoSource, SourceFileStamp};
-use crate::normalize::raw::{RenderConfig, ScenePresentationConfig};
+use crate::normalize::raw::RenderConfig;
+use ovrley_widgets::model::scene::ScenePresentationConfig;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

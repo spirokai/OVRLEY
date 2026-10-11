@@ -5,7 +5,7 @@
 //! best prior lap contains enough distance coverage for interpolation.
 
 use crate::activity::schema::NumericSeries;
-use crate::interpolation::interpolate_points;
+use ovrley_widgets::interpolation::interpolate_points;
 
 /// Computes each sample's live time delta against the best previously completed lap.
 ///

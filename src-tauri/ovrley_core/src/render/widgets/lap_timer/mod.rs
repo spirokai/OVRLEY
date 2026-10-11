@@ -21,7 +21,7 @@ mod text;
 mod tests {
     use super::layout::prepare_content_layer;
     use super::text::{delta_color, format_lap_delta, format_lap_duration, lap_timer_label_text};
-    use crate::render::text::ResolvedTextStyle;
+    use ovrley_widgets::render::text::ResolvedTextStyle;
     use skia_safe::Color;
 
     /// Verifies compact and hour-inclusive lap duration formatting.

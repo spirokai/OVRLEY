@@ -4,7 +4,7 @@
 //!       `draw_polyline_with_shadow` (two-pass shadow+line compositing),
 //!       `draw_area` (filled area under an elevation curve).
 //! Does not own: point-to-path conversion (see [`super::transform`]), color
-//!       parsing (see [`crate::render::text::parse_color`]).
+//!       parsing (see [`ovrley_widgets::render::text::parse_color`]).
 //!
 //! Allowed dependencies: `skia_safe`, `super::transform`, `super::types`.
 //! Forbidden dependencies: `crate::normalize`, `crate::activity`,
@@ -47,7 +47,7 @@ pub(crate) fn draw_polyline_with_shadow(
     paint.set_stroke_width(width.max(1.0));
     paint.set_stroke_cap(PaintCap::Round);
     paint.set_stroke_join(PaintJoin::Round);
-    paint.set_color(crate::render::text::parse_color(color, opacity));
+    paint.set_color(ovrley_widgets::render::text::parse_color(color, opacity));
 
     if let Some(shadow) = shadow {
         if shadow.strength > 0.0 {
@@ -57,7 +57,10 @@ pub(crate) fn draw_polyline_with_shadow(
             shadow_paint.set_stroke_width(width.max(1.0));
             shadow_paint.set_stroke_cap(PaintCap::Round);
             shadow_paint.set_stroke_join(PaintJoin::Round);
-            shadow_paint.set_color(crate::render::text::parse_color(&shadow.color, opacity));
+            shadow_paint.set_color(ovrley_widgets::render::text::parse_color(
+                &shadow.color,
+                opacity,
+            ));
             if shadow.strength > 0.0 {
                 shadow_paint.set_mask_filter(MaskFilter::blur(
                     BlurStyle::Normal,
@@ -89,6 +92,6 @@ pub(crate) fn draw_area(
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
     paint.set_style(skia_safe::paint::Style::Fill);
-    paint.set_color(crate::render::text::parse_color(color, opacity));
+    paint.set_color(ovrley_widgets::render::text::parse_color(color, opacity));
     canvas.draw_path(&path, &paint);
 }

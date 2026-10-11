@@ -2,7 +2,7 @@
 
 use super::elevation::preferred_elevation_series;
 use super::schema::ParsedActivity;
-use crate::MetricKind;
+use ovrley_widgets::model::types::MetricKind;
 use std::collections::HashMap;
 
 /// Returns observed finite bounds; missing external telemetry has no range.

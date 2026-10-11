@@ -4,16 +4,16 @@
 //! inside a circular stroked track. The validator keeps every visual input
 //! explicit and rejects out-of-range arc geometry before render preparation.
 
-use super::helpers::{require_bool, require_f32, require_string};
-use super::raw::ValueConfig;
-use super::value::validate_arc_inner_value_widget;
 use super::ValidatedValueWidget;
 use super::{
     arc_track_radius, corner_track_radius, resolve_bar_style_geometry, track_corner_radius_max,
     ResolvedBarGeometry,
 };
 use crate::error::{CoreError, CoreResult};
-use crate::types::{DisplayType, MetricKind, TrackFillStyle};
+use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
+use ovrley_widgets::model::validation::{require_bool, require_f32, require_string};
+use ovrley_widgets::widgets::value::config::ValueConfig;
+use ovrley_widgets::widgets::value::validation::validate_arc_inner_value_widget;
 
 pub const MIN_ARC_ANGLE_DEGREES: f32 = 30.0;
 pub const MAX_ARC_ANGLE_DEGREES: f32 = 360.0;

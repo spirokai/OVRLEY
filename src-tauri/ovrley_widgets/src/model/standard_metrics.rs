@@ -5,8 +5,8 @@
 //! units, formatter families, and icon asset bindings. `time`, `gradient`, and
 //! `elevation` remain specialized render paths outside this contract.
 
-use crate::DisplayType;
-use crate::MetricKind;
+use crate::model::types::DisplayType;
+use crate::model::types::MetricKind;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -43,47 +43,6 @@ pub enum StandardMetricInterpolationKind {
 pub enum StandardMetricUnitsMode {
     Selectable,
     Hidden,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MetricIconAssetKey {
-    Speed,
-    Distance,
-    Heartrate,
-    Cadence,
-    Power,
-    Time,
-    Temperature,
-    Pace,
-    AirPressure,
-    LeftRightBalance,
-    StrideLength,
-    StrokeRate,
-    VerticalSpeed,
-    VerticalRatio,
-    VerticalOscillation,
-    CoreTemperature,
-    GForce,
-    GroundContactTime,
-    Torque,
-    GearPosition,
-    Heading,
-    Altitude,
-    Iso,
-    Aperture,
-    ShutterSpeed,
-    FocalLength,
-    Ev,
-    ColorTemperature,
-    Rpm,
-    ThrottlePosition,
-    BrakePosition,
-    EngineLoad,
-    LeanAngle,
-    House,
-    Satellite,
-    ArrowUpNarrowWide,
-    Calories,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -373,52 +332,6 @@ pub fn standard_metric_interpolation(kind: MetricKind) -> Option<StandardMetricI
 
 pub fn standard_metric_units_mode(kind: MetricKind) -> Option<StandardMetricUnitsMode> {
     standard_metric_definition(kind).map(|definition| definition.units_mode)
-}
-
-pub fn metric_icon_asset_key(kind: MetricKind) -> Option<MetricIconAssetKey> {
-    if kind == MetricKind::Time {
-        return Some(MetricIconAssetKey::Time);
-    }
-
-    match standard_metric_definition(kind)?.icon.asset_file.as_str() {
-        "widget-speed.svg" => Some(MetricIconAssetKey::Speed),
-        "widget-distance.svg" => Some(MetricIconAssetKey::Distance),
-        "widget-heartrate.svg" => Some(MetricIconAssetKey::Heartrate),
-        "widget-cadence.svg" => Some(MetricIconAssetKey::Cadence),
-        "widget-power.svg" => Some(MetricIconAssetKey::Power),
-        "widget-temperature.svg" => Some(MetricIconAssetKey::Temperature),
-        "widget-pace.svg" => Some(MetricIconAssetKey::Pace),
-        "widget-air-pressure.svg" => Some(MetricIconAssetKey::AirPressure),
-        "widget-left-right-balance.svg" => Some(MetricIconAssetKey::LeftRightBalance),
-        "widget-stride-length.svg" => Some(MetricIconAssetKey::StrideLength),
-        "widget-stroke-rate.svg" => Some(MetricIconAssetKey::StrokeRate),
-        "widget-vertical-speed.svg" => Some(MetricIconAssetKey::VerticalSpeed),
-        "widget-vertical-ratio.svg" => Some(MetricIconAssetKey::VerticalRatio),
-        "widget-vertical-oscillation.svg" => Some(MetricIconAssetKey::VerticalOscillation),
-        "widget-core-temperature.svg" => Some(MetricIconAssetKey::CoreTemperature),
-        "widget-g-force.svg" => Some(MetricIconAssetKey::GForce),
-        "widget-ground-contact-time.svg" => Some(MetricIconAssetKey::GroundContactTime),
-        "widget-torque.svg" => Some(MetricIconAssetKey::Torque),
-        "widget-gear-position.svg" => Some(MetricIconAssetKey::GearPosition),
-        "widget-heading.svg" => Some(MetricIconAssetKey::Heading),
-        "widget-altitude.svg" => Some(MetricIconAssetKey::Altitude),
-        "widget-iso.svg" => Some(MetricIconAssetKey::Iso),
-        "widget-aperture.svg" => Some(MetricIconAssetKey::Aperture),
-        "widget-shutter-speed.svg" => Some(MetricIconAssetKey::ShutterSpeed),
-        "widget-focal-length.svg" => Some(MetricIconAssetKey::FocalLength),
-        "widget-ev.svg" => Some(MetricIconAssetKey::Ev),
-        "widget-color-temperature.svg" => Some(MetricIconAssetKey::ColorTemperature),
-        "widget-rpm.svg" => Some(MetricIconAssetKey::Rpm),
-        "widget-throttle-position.svg" => Some(MetricIconAssetKey::ThrottlePosition),
-        "widget-brake-position.svg" => Some(MetricIconAssetKey::BrakePosition),
-        "widget-engine-load.svg" => Some(MetricIconAssetKey::EngineLoad),
-        "widget-lean-angle.svg" => Some(MetricIconAssetKey::LeanAngle),
-        "widget-house.svg" => Some(MetricIconAssetKey::House),
-        "widget-satellite.svg" => Some(MetricIconAssetKey::Satellite),
-        "widget-arrow-up-narrow-wide.svg" => Some(MetricIconAssetKey::ArrowUpNarrowWide),
-        "widget-calories.svg" => Some(MetricIconAssetKey::Calories),
-        _ => None,
-    }
 }
 
 pub fn standard_metric_unit_label(kind: MetricKind, display_unit: Option<&str>) -> &'static str {

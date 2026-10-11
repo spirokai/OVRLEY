@@ -2,7 +2,7 @@
  * Renders the overlay canvas component with grouped props.
  */
 
-import { memo, useEffect, useRef } from 'react'
+import { memo, useEffect, useMemo, useRef } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
@@ -10,6 +10,9 @@ import { WidgetPreview } from '@/features/widget-preview'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { VideoPreviewSurface } from '@/features/video-preview'
 import useStore from '@/store/useStore'
+import { isWasmWidget } from '@/lib/widget/wasm-widget'
+import { useWasmWidgets } from '@/features/wasm-widgets/hooks/useWasmWidgets'
+import { WasmWidgetCanvas } from '@/features/wasm-widgets/components/WasmWidgetCanvas'
 
 /**
  * Canvas overlay grid — draws a teal-colored grid on an HTML canvas element
@@ -190,6 +193,11 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
   const hasTransparentBackground = backgroundMode === 'transparent'
   const backgroundImageSrc = importedBackgroundImagePath ? convertFileSrc(importedBackgroundImagePath) : ''
+  const wasmScene = useMemo(
+    () => ({ ...sceneStyle, ...sceneSize, scale: globalScale, opacity: globalOpacity }),
+    [sceneStyle, sceneSize, globalScale, globalOpacity],
+  )
+  const wasm = useWasmWidgets({ widgets, scene: wasmScene, activity, second: previewSecond })
 
   return (
     <div
@@ -218,7 +226,15 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
       ) : null}
       {gridVisible ? <CanvasGrid displayScale={displayScale} sceneSize={sceneSize} /> : null}
       <div data-testid="widget-layer" className="absolute inset-0 overflow-visible">
+        {wasm.error ? (
+          <div role="alert" className="absolute z-50 bg-destructive p-2 text-sm text-white">
+            {wasm.error.message}
+          </div>
+        ) : null}
         {widgets.map((widget) => {
+          if (isWasmWidget(widget)) {
+            return <WasmWidgetCanvas key={widget.id} widget={widget} attach={wasm.attach} registerNode={widgetRefCallbacks[widget.id]} />
+          }
           return (
             <OverlayCanvasWidget
               key={widget.id}

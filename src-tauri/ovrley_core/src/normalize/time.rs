@@ -5,13 +5,15 @@
 //! render-affecting defaults. The frontend must materialise all defaults
 //! before sending the config.
 
-use super::helpers::{require_bool, require_f32, require_str, require_string, rgba_from_hex};
-use super::raw::ValueConfig;
-use super::value::validate_content_alignment;
 use crate::error::{CoreError, CoreResult};
-use crate::normalize::{ValidatedValueFormatting, ValidatedValueWidget};
-use crate::types::DisplayType;
-use crate::MetricKind;
+use ovrley_widgets::model::types::DisplayType;
+use ovrley_widgets::model::types::MetricKind;
+use ovrley_widgets::model::validation::{
+    require_bool, require_f32, require_str, require_string, rgba_from_hex,
+};
+use ovrley_widgets::widgets::value::config::ValueConfig;
+use ovrley_widgets::widgets::value::validation::validate_content_alignment;
+use ovrley_widgets::widgets::value::validation::{ValidatedValueFormatting, ValidatedValueWidget};
 
 /// Explicit formatting mode for a validated time value.
 #[derive(Clone, Debug)]

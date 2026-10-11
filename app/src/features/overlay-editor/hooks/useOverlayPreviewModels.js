@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { isWasmWidget } from '@/lib/widget/wasm-widget'
 import { buildMetricWidgetPreviewModel } from '@/features/widget-preview/widgets/metric/model'
 import { buildLapTimerPreviewModel, prepareLapLogPreview } from '@/features/widget-preview/widgets/lap-timer/model'
 import { buildTextWidgetPreviewModel } from '@/features/widget-preview/widgets/text/model'
@@ -9,7 +10,7 @@ function buildPreviewModels({ renderedWidgets, category, activity, previewSecond
   const models = {}
 
   for (const widget of renderedWidgets) {
-    if (widget.category !== category) continue
+    if (widget.category !== category || isWasmWidget(widget)) continue
 
     const model =
       category === 'values'

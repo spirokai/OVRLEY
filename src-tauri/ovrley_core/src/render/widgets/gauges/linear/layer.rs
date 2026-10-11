@@ -12,9 +12,10 @@ use crate::error::CoreResult;
 use crate::normalize::{
     ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget, ValidatedSceneConfig,
 };
-use crate::render::text::{parse_color, resolve_font};
+use crate::render::text::resolve_font;
 use crate::render::widgets::common::normalize_shadow_style_validated;
 use crate::render::widgets::types::LinearGaugeCache;
+use ovrley_widgets::render::text::parse_color;
 use skia_safe::{image_filters, BlendMode, Canvas, Paint, PathBuilder, PathFillType, RRect, Rect};
 use std::path::PathBuf;
 

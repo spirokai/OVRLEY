@@ -14,10 +14,9 @@ use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{LapTimerMode, ValidatedLapTimer, ValidatedSceneConfig};
-use crate::render::text::{
-    validated_lap_timer_label_style, validated_lap_timer_style, ResolvedTextStyle,
-};
+use crate::render::text::{validated_lap_timer_label_style, validated_lap_timer_style};
 use crate::render::widgets::types::{LapTimerWidgetCache, StaticLayer};
+use ovrley_widgets::render::text::ResolvedTextStyle;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 

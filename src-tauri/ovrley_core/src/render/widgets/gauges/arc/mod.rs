@@ -27,14 +27,14 @@ use crate::normalize::{ValidatedArcGaugeWidget, ValidatedSceneConfig};
 use crate::render::format::{format_metric_presentation_parts, resolve_metric_display_value};
 use crate::render::surface::create_surface;
 use crate::render::text::{
-    draw_text, draw_text_with_vertical_metrics_text, origin_x_for_centered_text, parse_color,
-    resolve_font, validated_value_style, ResolvedTextStyle,
+    draw_text, draw_text_with_vertical_metrics_text, resolve_font, validated_value_style,
 };
 use crate::render::widgets::common::{normalize_shadow_style_validated, static_layer_padding};
 use crate::render::widgets::types::{
     ArcGaugeCache, ArcGaugeFrameState, WidgetFrameReport, WidgetGeometryReport, WidgetRenderReport,
 };
-use crate::render::widgets::value::metric_vertical_metrics_text;
+use ovrley_widgets::render::text::{origin_x_for_centered_text, parse_color, ResolvedTextStyle};
+use ovrley_widgets::widgets::value::layout::metric_vertical_metrics_text;
 use skia_safe::{Canvas, Point};
 use std::path::PathBuf;
 

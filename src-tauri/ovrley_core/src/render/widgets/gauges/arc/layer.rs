@@ -11,10 +11,10 @@ use super::path::ArcTrackSpec;
 use super::segment::{draw_segment, inner_segment_geometry, segment_geometries};
 use crate::error::CoreResult;
 use crate::normalize::{ValidatedArcGaugeWidget, ValidatedSceneConfig};
-use crate::render::text::{parse_color, ResolvedTextStyle};
 use crate::render::widgets::common::normalize_shadow_style_validated;
 use crate::render::widgets::types::ArcGaugeCache;
-use crate::types::TrackFillStyle;
+use ovrley_widgets::model::types::TrackFillStyle;
+use ovrley_widgets::render::text::{parse_color, ResolvedTextStyle};
 use skia_safe::{image_filters, paint::Style, BlendMode, Canvas, ClipOp, Paint};
 use std::path::PathBuf;
 

@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useStore from '@/store/useStore'
+import { releasePreviewActivity } from '@/api/backend'
+
+vi.mock('@/api/backend', async (importOriginal) => ({
+  ...(await importOriginal()),
+  releasePreviewActivity: vi.fn().mockResolvedValue(undefined),
+}))
 
 const mp4Telemetry = {
   coverage: { speed: { source: 'direct' } },
@@ -19,6 +25,7 @@ const activityFile = {
 
 function resetStore() {
   useStore.setState(useStore.getInitialState(), true)
+  vi.clearAllMocks()
 }
 
 describe('video import — telemetry lifecycle', () => {
@@ -107,6 +114,31 @@ describe('activity import — overwrites MP4 telemetry', () => {
 
 describe('activity clear — restores video telemetry', () => {
   beforeEach(resetStore)
+
+  test('native snapshots survive stashing and are released after restoration and removal', () => {
+    useStore.getState().loadVideoTelemetry({ ...mp4Telemetry, preview_activity_id: 'video-1' })
+    useStore.getState().activateActivityFile({ ...activityFile, preview_activity_id: 'activity-1' })
+    expect(releasePreviewActivity).not.toHaveBeenCalled()
+
+    useStore.getState().clearActivityFile()
+    expect(releasePreviewActivity.mock.calls).toEqual([['activity-1']])
+    expect(useStore.getState().parsedActivity.preview_activity_id).toBe('video-1')
+
+    useStore.getState().clearVideoTelemetry()
+    expect(releasePreviewActivity.mock.calls).toEqual([['activity-1'], ['video-1']])
+  })
+
+  test('replacing active and stashed activities releases each discarded native snapshot', () => {
+    useStore.getState().activateActivityFile({ ...activityFile, preview_activity_id: 'activity-1' })
+    useStore.getState().loadVideoTelemetry({ ...mp4Telemetry, preview_activity_id: 'video-1' })
+    useStore.getState().loadVideoTelemetry({ ...mp4Telemetry, preview_activity_id: 'video-2' })
+    expect(releasePreviewActivity.mock.calls).toEqual([['video-1']])
+
+    useStore.getState().activateActivityFile({ ...activityFile, preview_activity_id: 'activity-2' })
+    useStore.getState().clearActivityFile({ restoreVideoTelemetry: false })
+    useStore.getState().clearVideoTelemetry()
+    expect(releasePreviewActivity.mock.calls).toEqual([['video-1'], ['activity-1'], ['activity-2'], ['video-2']])
+  })
 
   test('clearing external activity restores MP4 telemetry as parsedActivity', () => {
     useStore.getState().loadVideoTelemetry(mp4Telemetry)

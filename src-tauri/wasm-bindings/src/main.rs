@@ -1,5 +1,6 @@
 //! Browser ABI. Pointers must refer to live allocations owned by this module.
 use wasm_bindings::{Renderer, HEIGHT, RGBA_LEN, WIDTH};
+mod widget_abi;
 
 fn main() {}
 

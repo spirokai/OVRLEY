@@ -24,6 +24,7 @@ function assertLandmarksFitVideo(landmarks, videoDurationSeconds) {
 export function applyNewProjectState(store, { templateSource, templateState }) {
   const state = store.getState()
   state.clearActivityFile({ restoreVideoTelemetry: false })
+  state.clearVideoTelemetry()
   if (templateSource) {
     state.hydrateTemplateState(templateState, { source: templateSource })
   } else {
@@ -31,10 +32,6 @@ export function applyNewProjectState(store, { templateSource, templateState }) {
   }
   store.setState((draft) => {
     draft.activitySource = null
-    draft.parsedActivity = null
-    draft.parsedActivitySource = null
-    draft.activitySummary = null
-    draft.stashedVideoTelemetry = null
     draft.fallbackDurationSeconds = 73
     draft.startSecond = 0
     draft.endSecond = 73
@@ -120,15 +117,13 @@ export function applyProjectOwnedState(store, project) {
  * @param {{activity: object|null, video: object|null}} prepared Prepared project resources.
  */
 export function applyPreparedProjectState(store, project, prepared) {
+  const state = store.getState()
+  state.clearActivityFile({ restoreVideoTelemetry: false })
+  state.clearVideoTelemetry()
   store.setState((draft) => {
     draft.activitySource = null
-    draft.parsedActivity = null
-    draft.parsedActivitySource = null
-    draft.activitySummary = null
-    draft.stashedVideoTelemetry = null
   })
 
-  const state = store.getState()
   state.clearImportedVideo()
   if (prepared.video) {
     store.setState(prepared.video.importedVideoState)

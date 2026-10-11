@@ -30,12 +30,13 @@ use crate::error::{CoreError, CoreResult};
 use crate::media::prepared_video::InspectedVideoSource;
 use crate::normalize::SceneConfig;
 use crate::normalize::{
-    raw::{RenderConfig, ScenePresentationConfig},
-    validate_ffmpeg_config, validate_render_config_with_resources, validate_render_presentation,
-    ValidatedFfmpegConfig, ValidatedRenderConfig, ValidatedSceneConfig, ValidatedScenePresentation,
+    raw::RenderConfig, validate_ffmpeg_config, validate_render_config_with_resources,
+    validate_render_presentation, ValidatedFfmpegConfig, ValidatedRenderConfig,
+    ValidatedSceneConfig,
 };
 use crate::output::{plan_batch_output_targets, RenderOutputKind};
 use crate::raster::RasterResourceResolver;
+use ovrley_widgets::model::scene::{ScenePresentationConfig, ValidatedScenePresentation};
 
 /// Validated once at configuration/acceptance ingress; private fields keep
 /// consumers from substituting malformed settings after validation.

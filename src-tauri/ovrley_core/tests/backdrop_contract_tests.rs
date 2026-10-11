@@ -6,12 +6,12 @@ use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::parse_config_value;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::{prepare_preview_assets, LabelCacheStatus, StaticLayer};
-use ovrley_core::standard_widgets::{
+use ovrley_widgets::model::standard_widgets::{
     backdrop_type_definition, backdrop_type_label, default_backdrop_display_types,
     gradient_widget_definition, is_backdrop_type_supported, label_widget_definition,
     plot_widget_definition,
 };
-use ovrley_core::BackdropType;
+use ovrley_widgets::model::types::BackdropType;
 use serde_json::json;
 
 #[test]

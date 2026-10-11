@@ -43,6 +43,7 @@ mod project_file;
 mod raster_resources;
 mod runtime_paths;
 mod tauri_commands;
+mod widget_preview;
 
 use ovrley_core::render_jobs::execution::RenderExecutionService;
 use ovrley_core::render_jobs::inspection::VideoInspectionService;
@@ -66,6 +67,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(video_server)
+        .manage(widget_preview::PreviewActivities::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -78,6 +80,9 @@ pub fn run() {
             tauri_commands::backend_list_system_fonts,
             tauri_commands::backend_font_capabilities,
             tauri_commands::backend_font_data,
+            widget_preview::backend_preview_activity,
+            widget_preview::backend_release_preview_activity,
+            widget_preview::backend_preview_font,
             tauri_commands::backend_render,
             tauri_commands::backend_submit_batch,
             tauri_commands::backend_batch_snapshot,

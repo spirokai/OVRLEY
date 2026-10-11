@@ -8,43 +8,28 @@
 //! Module ownership:
 //! - `layout` — text positioning, icon/unit row layout, static-part cache logic.
 //! - `gradient` — slope triangle rendering and triangle height math.
-//! - `icons` — icon kind mapping, SVG cache, paint creation, primitives drawing.
-//! - `svg` — lightweight SVG parser, path tokenizer, and Skia path conversion.
+//! Shared layout, icon resources, and SVG parsing live in `ovrley_widgets`.
 
 mod gradient;
-mod icons;
 mod layout;
-mod svg;
-
-pub(crate) use icons::metric_icon_kind_for_value;
 
 use crate::activity::schema::DenseActivityReport;
 use crate::error::CoreResult;
-use crate::normalize::{ValidatedGradientWidget, ValidatedTimeValue, ValidatedValueWidget};
+use crate::normalize::{ValidatedGradientWidget, ValidatedTimeValue};
 use crate::render::format::{
     format_metric_presentation_parts, format_validated_time_parts, ElapsedTimeValues,
 };
-use crate::render::text::ResolvedTextStyle;
-use crate::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
-use crate::types::{DisplayType, MetricKind};
 use chrono_tz::Tz;
+use ovrley_widgets::model::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
+use ovrley_widgets::model::types::{DisplayType, MetricKind};
+use ovrley_widgets::render::text::ResolvedTextStyle;
+use ovrley_widgets::widgets::value::validation::ValidatedValueWidget;
 use skia_safe::Canvas;
 use std::path::PathBuf;
 
 pub use gradient::gradient_triangle_height;
-pub use layout::{
-    metric_icon_top_from_value_layout, metric_vertical_metrics_text, NUMERIC_VERTICAL_METRICS_TEXT,
-};
-
-pub(crate) use layout::{
-    METRIC_WIDGET_LINE_HEIGHT, METRIC_WIDGET_UNITS_GAP_PX, METRIC_WIDGET_UNIT_RATIO,
-    MIN_UNITS_FONT_SIZE,
-};
-
-pub(crate) use layout::{
-    draw_metric_parts, draw_static_metric_parts_for_value, static_metric_parts_for_value,
-    StaticMetricParts,
-};
+pub(crate) use layout::{draw_metric_parts, draw_static_metric_parts_for_value};
+use ovrley_widgets::widgets::value::layout::StaticMetricParts;
 
 /// Bundled parameters for drawing a metric value widget.
 pub(crate) struct MetricWidgetRequest<'a> {
@@ -161,8 +146,8 @@ mod tests {
     use super::*;
     use crate::activity::schema::{DenseActivityReport, DenseSeriesReport};
     use crate::render::surface::create_surface;
-    use crate::render::text::ResolvedTextStyle;
-    use crate::types::DisplayType;
+    use ovrley_widgets::model::types::DisplayType;
+    use ovrley_widgets::render::text::ResolvedTextStyle;
     use skia_safe::Color;
 
     #[test]
@@ -266,7 +251,7 @@ mod tests {
             assert!(
                 draw_metric_value_widget_with_config(MetricWidgetRequest {
                     canvas: surface.canvas(),
-                    metric_kind: crate::MetricKind::Speed,
+                    metric_kind: ovrley_widgets::model::types::MetricKind::Speed,
                     display_type,
                     base_style: &style,
                     dense_activity: &dense,
@@ -367,12 +352,12 @@ mod tests {
             },
         };
         let mut surface = create_surface(400, 200).unwrap();
-        let mut validated = crate::normalize::ValidatedValueWidget {
-            metric: crate::MetricKind::Speed,
+        let mut validated = ovrley_widgets::widgets::value::validation::ValidatedValueWidget {
+            metric: ovrley_widgets::model::types::MetricKind::Speed,
             x: 10.0,
             y: 20.0,
             display_type: DisplayType::Text,
-            content_alignment: crate::normalize::ContentAlignment::Left,
+            content_alignment: ovrley_widgets::widgets::value::validation::ContentAlignment::Left,
             font_name: "Arial.ttf".to_string(),
             font_size: 32.0,
             color: [0xff, 0xff, 0xff, 0xff],
@@ -391,7 +376,7 @@ mod tests {
             starting_altitude_m: None,
             prefix: String::new(),
             suffix: String::new(),
-            formatting: crate::normalize::ValidatedValueFormatting::DecimalPlaces { decimals: 0 },
+            formatting: ovrley_widgets::widgets::value::validation::ValidatedValueFormatting::DecimalPlaces { decimals: 0 },
             hours_offset: None,
             format: None,
         };
@@ -399,7 +384,7 @@ mod tests {
         assert!(
             draw_metric_value_widget_with_config(MetricWidgetRequest {
                 canvas: surface.canvas(),
-                metric_kind: crate::MetricKind::Speed,
+                metric_kind: ovrley_widgets::model::types::MetricKind::Speed,
                 display_type: DisplayType::Text,
                 base_style: &style,
                 dense_activity: &dense,
@@ -420,7 +405,7 @@ mod tests {
 
         dense.series.course_lat = vec![Some(40.446111)];
         dense.series.course_lon = vec![Some(-73.987222)];
-        validated.metric = crate::MetricKind::GpsCoordinates;
+        validated.metric = ovrley_widgets::model::types::MetricKind::GpsCoordinates;
         validated.show_units = false;
         validated.display_unit = "both".to_string();
         validated.coordinate_format = Some("dms".to_string());
@@ -428,7 +413,7 @@ mod tests {
         assert!(
             draw_metric_value_widget_with_config(MetricWidgetRequest {
                 canvas: surface.canvas(),
-                metric_kind: crate::MetricKind::GpsCoordinates,
+                metric_kind: ovrley_widgets::model::types::MetricKind::GpsCoordinates,
                 display_type: DisplayType::Text,
                 base_style: &style,
                 dense_activity: &dense,

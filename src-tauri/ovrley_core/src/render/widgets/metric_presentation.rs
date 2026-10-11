@@ -27,7 +27,7 @@ use crate::render::widgets::types::{
     ArcGaugeCache, GForceWidgetCache, HeadingWidgetCache, LeanAngleCache, LinearGaugeCache,
     PreparedValue, WidgetRenderReport,
 };
-use crate::types::DisplayType;
+use ovrley_widgets::model::types::DisplayType;
 use skia_safe::Canvas;
 
 /// Draws a boxed metric presentation for a value widget.

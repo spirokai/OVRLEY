@@ -16,8 +16,8 @@ use super::{LINE_HEIGHT_RATIO, LOG_ROW_GAP_RATIO};
 use crate::activity::schema::DenseActivityReport;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::{LapTimerMode, ValidatedLapTimer};
-use crate::render::text::ResolvedTextStyle;
 use crate::render::widgets::types::LapTimerWidgetCache;
+use ovrley_widgets::render::text::ResolvedTextStyle;
 use skia_safe::Canvas;
 use std::path::PathBuf;
 

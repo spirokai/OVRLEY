@@ -19,6 +19,7 @@ import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDra
 import { useFontPreparation } from '@/hooks/useFonts'
 import { collectFontIds, createLabelFontSelection } from '@/lib/fonts'
 import { getPreparedFont } from '@/lib/font-resources'
+import { isWasmWidget } from '@/lib/widget/wasm-widget'
 
 const CONTENT_ALIGNMENT_FACTORS = {
   left: 0,
@@ -96,7 +97,7 @@ export function useWidgetManager({ widgetLiveEdits }) {
           : {}
       state.setConfig(updateWidgetInConfig(state.config, id, { ...nextUpdates, ...selection }))
     }
-    if (fontIds.length) prepareFontEdit(id, fontIds, commit)
+    if (fontIds.length && !isWasmWidget(widget)) prepareFontEdit(id, fontIds, commit)
     else commit()
   }
 
@@ -104,6 +105,10 @@ export function useWidgetManager({ widgetLiveEdits }) {
     const widget = widgets.find((item) => item.id === id)
     if (!liveEdits.draftWidgetsRef.current[id]) {
       liveEdits.beginWidgetInteraction(id, 'slider')
+    }
+    if (isWasmWidget(widget)) {
+      liveEdits.setLiveWidgetDraft(id, updates)
+      return
     }
     updateLiveWidgetDraft({
       draftWidgetsRef: liveEdits.draftWidgetsRef,
@@ -165,12 +170,14 @@ export function useWidgetManager({ widgetLiveEdits }) {
       })
     } else throw new Error(`Unknown widget type: ${type}`)
 
-    prepareFontEdit(Symbol('add widget'), collectFontIds(data), () => {
+    const commit = () => {
       const state = useStore.getState()
       const nextConfig = ensureWidgetIdsInConfig({ ...state.config, [category]: [...state.config[category], data] })
       state.setConfig(nextConfig)
       state.setSelectedWidgetId(nextConfig[category].at(-1).id)
-    })
+    }
+    if (isWasmWidget({ type, data })) commit()
+    else prepareFontEdit(Symbol('add widget'), collectFontIds(data), commit)
   }
 
   // Delete widget — removes the widget by id and updates config
@@ -183,12 +190,15 @@ export function useWidgetManager({ widgetLiveEdits }) {
     const widget = widgets.find((item) => item.id === id)
     if (!widget) return
 
-    const commitReset = (data) =>
-      prepareFontEdit(id, collectFontIds(data), () => {
+    const commitReset = (data) => {
+      const commit = () => {
         const state = useStore.getState()
         if (!buildConfigWidgets(state.config).some((item) => item.id === id)) return
         state.setConfig(replaceWidgetInConfig(state.config, id, data))
-      })
+      }
+      if (isWasmWidget({ ...widget, data })) commit()
+      else prepareFontEdit(id, collectFontIds(data), commit)
+    }
 
     if (widget.type === 'label') return commitReset(createLabelDefaults(globalDefaults))
 

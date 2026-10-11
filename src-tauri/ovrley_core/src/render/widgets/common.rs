@@ -15,7 +15,7 @@ pub(crate) const DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER: f32 = 1.0;
 
 // Interpolates one numeric value from sorted valid points.
 // Delegates to the shared `interpolation` leaf module.
-use crate::interpolation::interpolate_points as interpolate_points_f64; // intentionally aliased
+use ovrley_widgets::interpolation::interpolate_points as interpolate_points_f64; // intentionally aliased
 
 // Interpolates a numeric series at many target positions.
 fn interpolate_numeric_series_many(
@@ -122,11 +122,11 @@ pub(crate) fn interpolate_distance_progress_at_elapsed(
         .copied()
         .map(Some)
         .collect::<Vec<_>>();
-    crate::activity::interpolate::interpolate_numeric_series_value(
+    ovrley_widgets::interpolation::interpolate_numeric_series_value(
         x_values,
         &y_values,
         elapsed_second,
-        crate::interpolation::MissingSamplePolicy::Bridge,
+        ovrley_widgets::interpolation::MissingSamplePolicy::Bridge,
     )
 }
 

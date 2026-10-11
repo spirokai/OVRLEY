@@ -1,6 +1,6 @@
 OVRLEY Skia Wasm bundle - third-party notices
 
-Source: https://github.com/rust-skia/rust-skia/tree/1a80f6716b5ba787f6583443f7b62fa5f60e7084
+Source: https://github.com/rust-skia/rust-skia/tree/b7f043e0b1e2a850e702245de811f01df1f6b0ff
 
 Dependency revisions are pinned by that checkout and its Skia DEPS file.
 

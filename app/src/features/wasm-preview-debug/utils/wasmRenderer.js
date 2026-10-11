@@ -1,4 +1,4 @@
-const BASE_URL = '/debug/wasm-bindings'
+const BASE_URL = '/wasm-bindings'
 
 /**
  * Create an independently owned renderer and persistent RGBA buffer.

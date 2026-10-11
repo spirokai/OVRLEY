@@ -3,9 +3,11 @@ import { readFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import { artifactDir, artifactNames, crateDir, root, vendorDir } from './build-wasm.mjs'
 
-/** Dev-only serving and serialized Rust rebuilds, using Vite's existing watcher. */
+/** Production assets and serialized development rebuilds of the portable renderer. */
 export function wasmBindingsPlugin() {
   const buildScript = join(root, 'scripts', 'build-wasm.mjs')
+  const sharedDir = join(root, 'src-tauri', 'ovrley_widgets')
+  const widgetAssets = join(root, 'assets')
   const assets = new Map(
     artifactNames.map((name) => [
       `/${name}`,
@@ -15,7 +17,16 @@ export function wasmBindingsPlugin() {
   assets.set('/font.ttf', { file: join(root, 'fonts', 'JetBrainsMono-variable.ttf'), type: 'font/ttf' })
   return {
     name: 'ovrley-wasm-bindings',
-    apply: 'serve',
+    async generateBundle() {
+      await new Promise((resolveBuild, rejectBuild) => {
+        const child = spawn(process.execPath, [buildScript], { cwd: root, stdio: 'inherit' })
+        child.once('error', rejectBuild)
+        child.once('close', (code) => code === 0 ? resolveBuild() : rejectBuild(new Error(`WASM build failed (${code})`)))
+      })
+      for (const [name, asset] of assets) {
+        this.emitFile({ type: 'asset', fileName: `wasm-bindings${name}`, source: await readFile(asset.file) })
+      }
+    },
     configureServer(server) {
       let started = false
       let pending = false
@@ -61,10 +72,11 @@ export function wasmBindingsPlugin() {
         const vendorRelative = relative(vendorDir, absolute)
         const isCrate = !crateRelative.startsWith('..') && /\.(rs|toml|lock)$/.test(file)
         const isBundle = !vendorRelative.startsWith('..') && /(?:manifest\.json|\.tar\.gz)$/.test(file)
-        if (started && (isCrate || isBundle || absolute === buildScript || absolute === join(root, '.env.wasm.local'))) rebuild()
+        const isShared = [sharedDir, widgetAssets].some((directory) => !relative(directory, absolute).startsWith('..'))
+        if (started && (isCrate || isBundle || isShared || absolute === buildScript || absolute === join(root, '.env.local'))) rebuild()
       }
 
-      server.watcher.add([crateDir, vendorDir, buildScript, join(root, '.env.wasm.local')])
+      server.watcher.add([crateDir, sharedDir, widgetAssets, vendorDir, buildScript, join(root, '.env.local')])
       for (const event of ['add', 'change', 'unlink']) server.watcher.on(event, sourceChanged)
       server.httpServer?.once('close', () => {
         closed = true
@@ -72,7 +84,7 @@ export function wasmBindingsPlugin() {
         for (const event of ['add', 'change', 'unlink']) server.watcher.off(event, sourceChanged)
       })
 
-      server.middlewares.use('/debug/wasm-bindings', async (req, res) => {
+      server.middlewares.use('/wasm-bindings', async (req, res) => {
         res.setHeader('Cache-Control', 'no-store')
         if (req.method !== 'GET' && req.method !== 'HEAD') {
           res.statusCode = 405

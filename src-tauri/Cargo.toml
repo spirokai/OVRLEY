@@ -2,6 +2,7 @@
 members = [
     ".",
     "ovrley_core",
+    "ovrley_widgets",
 ]
 
 [package]

@@ -26,6 +26,7 @@ import { useRotateHandlers } from '../hooks/useRotateHandlers'
 import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
 import { buildRenderedGeometrySignature, buildWidgetRenderGeometryModels } from '../utils/widgetRenderGeometry'
 import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
+import { isWasmWidget } from '@/lib/widget/wasm-widget'
 import { useTranslation } from 'react-i18next'
 import { getWidgetTypeName } from '@/lib/widget/widget-presentation'
 import { resolveVideoSyncMarkControls, VIDEO_SYNC_PREVIEW_SCREEN_GAP, VideoSyncMarkControls, VideoSyncPreviewScreens } from '@/features/video-sync'
@@ -41,7 +42,7 @@ function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels,
   const visibleWidgets = useMemo(() => {
     const visibleIds = new Set(selectedWidgetIds)
     if (hoveredWidgetId) visibleIds.add(hoveredWidgetId)
-    return widgets.filter((widget) => visibleIds.has(widget.id))
+    return widgets.filter((widget) => !isWasmWidget(widget) && visibleIds.has(widget.id))
   }, [hoveredWidgetId, selectedWidgetIds, widgets])
 
   if (!visibleWidgets.length) return null
@@ -316,6 +317,7 @@ function OverlayEditorContent({
         if (!widget) {
           return 'missing'
         }
+        if (isWasmWidget(widget)) return 'wasm-editor-only'
 
         return buildRenderedGeometrySignature(widget, renderGeometryModels[widgetId])
       })

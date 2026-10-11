@@ -1,8 +1,10 @@
 import { spawn } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadLocalEnvironment } from './build-environment.mjs'
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+loadLocalEnvironment(rootDir)
 const tauriScript = join(rootDir, 'node_modules', '@tauri-apps', 'cli', 'tauri.js')
 
 const args = process.argv.slice(2)

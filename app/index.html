@@ -5,9 +5,66 @@
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OVRLEY</title>
+    <style>
+      .app-startup {
+        position: fixed;
+        inset: 0;
+        background: #00111b;
+        color: #86aaaa;
+        font:
+          14px system-ui,
+          sans-serif;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .app-startup > div {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+      }
+      .app-startup > div > div {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .app-startup svg {
+        width: 32px;
+        height: 32px;
+        animation: app-startup-spin 1s linear infinite;
+      }
+      .app-startup span {
+        color: inherit;
+        font: inherit;
+      }
+      @keyframes app-startup-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="app-startup" role="status">
+        <div>
+          <div>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle opacity="0.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path
+                opacity="0.75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <span>OVRLEY is starting...</span>
+          </div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="src/main.jsx"></script>
   </body>
 </html>

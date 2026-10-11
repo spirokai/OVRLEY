@@ -1,8 +1,9 @@
 # Skia for the OVRLEY Wasm preview
 
 This directory intentionally stores compiled third-party code in the repository.
-The wasm-bindings crate uses a pinned rust-skia revision with Emscripten support
-from PR #1336. Upstream release binaries do not supply this build contract.
+Both native and WASM pin rust-skia release 0.153.3. Native uses the published
+binary; WASM uses a local source build with native WASM exceptions because the
+published WASM archive fails to link with this SDK (`emscripten_longjmp`).
 Keeping the libraries and generated Rust declarations here makes ordinary Rust
 preview edits independent of a full Skia source build, GN, Ninja and libclang.
 
@@ -14,7 +15,7 @@ archive and manifest belong in version control. The content hash in the filename
 also invalidates Cargo's cached import when the bundle changes. Generated application `.js` and
 `.wasm` files stay in the ignored Cargo target directory.
 
-Source: https://github.com/rust-skia/rust-skia/tree/1a80f6716b5ba787f6583443f7b62fa5f60e7084
+Source: https://github.com/rust-skia/rust-skia/tree/b7f043e0b1e2a850e702245de811f01df1f6b0ff
 
 `LICENSE.skia` (BSD-3-Clause) and `LICENSE.rust-skia` (MIT) are the two
 primary licenses; `THIRD_PARTY_NOTICES.txt` consolidates them plus the notices

@@ -1,9 +1,11 @@
 //! Lean-angle sector metric widget validation.
 
-use super::helpers::{require_bool, require_f32, require_str, require_string, rgba_from_hex};
-use super::raw::ValueConfig;
 use crate::error::{CoreError, CoreResult};
-use crate::types::{DisplayType, MetricKind};
+use ovrley_widgets::model::types::{DisplayType, MetricKind};
+use ovrley_widgets::model::validation::{
+    require_bool, require_f32, require_str, require_string, rgba_from_hex,
+};
+use ovrley_widgets::widgets::value::config::ValueConfig;
 
 const START_ANGLE: f32 = 210.0;
 const SWEEP_ANGLE: f32 = 120.0;

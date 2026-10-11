@@ -9,10 +9,12 @@
 //! fields: triangle colors, show_sign, show_triangle, triangle_width,
 //! value_offset, and unit_color.
 
-use super::helpers::{require_bool, require_f32, require_str, require_string, rgba_from_hex};
-use super::raw::ValueConfig;
 use crate::error::{CoreError, CoreResult};
-use crate::MetricKind;
+use ovrley_widgets::model::types::MetricKind;
+use ovrley_widgets::model::validation::{
+    require_bool, require_f32, require_str, require_string, rgba_from_hex,
+};
+use ovrley_widgets::widgets::value::config::ValueConfig;
 
 // ---------------------------------------------------------------------------
 // ValidatedGradientWidget — zero backend-side defaults

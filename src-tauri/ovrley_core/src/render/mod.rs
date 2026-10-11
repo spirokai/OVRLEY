@@ -36,10 +36,11 @@ use crate::render::widgets::types::PreparedValue;
 use crate::render::widgets::value::MetricWidgetRequest;
 use crate::render::widgets::{
     draw_elevation_widget, draw_metric_presentation, draw_metric_value_widget_with_config,
-    draw_route_widget, prepare_render_assets, static_metric_parts_for_value,
-    MetricPresentationReport, PreparedRenderAssets, StaticMetricParts, WidgetRenderReport,
+    draw_route_widget, prepare_render_assets, MetricPresentationReport, PreparedRenderAssets,
+    WidgetRenderReport,
 };
-use crate::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
+use ovrley_widgets::model::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
+use ovrley_widgets::widgets::value::layout::{static_metric_parts_for_value, StaticMetricParts};
 use skia_safe::Canvas;
 use skia_safe::Image;
 use std::collections::BTreeMap;
@@ -603,8 +604,8 @@ fn render_frame_to_surface(
                     };
                     draw_metric_value_widget_with_config(MetricWidgetRequest {
                         canvas,
-                        metric_kind: crate::MetricKind::Time,
-                        display_type: crate::DisplayType::Text,
+                        metric_kind: ovrley_widgets::model::types::MetricKind::Time,
+                        display_type: ovrley_widgets::model::types::DisplayType::Text,
                         base_style: &style,
                         dense_activity,
                         frame_index,
@@ -627,8 +628,8 @@ fn render_frame_to_surface(
                     let style = validated_gradient_style(validated, &prepared_assets.scene, scale);
                     draw_metric_value_widget_with_config(MetricWidgetRequest {
                         canvas,
-                        metric_kind: crate::MetricKind::Gradient,
-                        display_type: crate::DisplayType::Text,
+                        metric_kind: ovrley_widgets::model::types::MetricKind::Gradient,
+                        display_type: ovrley_widgets::model::types::DisplayType::Text,
                         base_style: &style,
                         dense_activity,
                         frame_index,

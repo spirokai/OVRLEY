@@ -5,16 +5,17 @@
 //! render-affecting defaults. The frontend must materialise all defaults
 //! before sending the config.
 
-use super::helpers::{
+use super::raw::HeadingWidgetConfig;
+use crate::error::{CoreError, CoreResult};
+use crate::render::widgets::common::normalize_shadow_style_validated;
+use crate::render::widgets::types::ShadowStyle;
+use ovrley_widgets::model::scene::ValidatedScenePresentation;
+use ovrley_widgets::model::types::MetricKind;
+use ovrley_widgets::model::validation::{
     require_f32, require_hex_color, require_non_negative_f32, require_percentage,
     require_positive_f32, require_positive_u32,
 };
-use super::raw::{HeadingWidgetConfig, ValueConfig};
-use crate::error::{CoreError, CoreResult};
-use crate::normalize::ValidatedScenePresentation;
-use crate::render::widgets::common::normalize_shadow_style_validated;
-use crate::render::widgets::types::ShadowStyle;
-use crate::types::MetricKind;
+use ovrley_widgets::widgets::value::config::ValueConfig;
 
 /// All output-affecting heading widget fields — no `Option`, no defaults at render time.
 ///
@@ -73,7 +74,7 @@ pub fn validate_heading(
     }
 
     // Deserialize extra heading-specific fields via the existing serde path
-    let hw: HeadingWidgetConfig = value.to_heading_widget_config()?;
+    let hw: HeadingWidgetConfig = super::raw::to_heading_widget_config(value)?;
 
     let x = hw.x;
     let y = hw.y;

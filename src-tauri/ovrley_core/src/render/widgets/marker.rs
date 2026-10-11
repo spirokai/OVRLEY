@@ -82,7 +82,7 @@ pub(crate) fn draw_marker(
         let mut paint = Paint::default();
         paint.set_anti_alias(true);
         paint.set_style(skia_safe::paint::Style::Fill);
-        paint.set_color(crate::render::text::parse_color(
+        paint.set_color(ovrley_widgets::render::text::parse_color(
             fallback_color,
             fallback_opacity,
         ));
@@ -93,7 +93,7 @@ pub(crate) fn draw_marker(
     for layer in layers {
         let mut paint = Paint::default();
         paint.set_anti_alias(true);
-        paint.set_color(crate::render::text::parse_color(
+        paint.set_color(ovrley_widgets::render::text::parse_color(
             &layer.color,
             layer.opacity,
         ));

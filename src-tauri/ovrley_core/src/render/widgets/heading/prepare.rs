@@ -14,7 +14,7 @@ use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{ValidatedHeading, ValidatedSceneConfig};
 use crate::render::surface::create_surface;
-use crate::render::text::{origin_x_for_centered_text, parse_color};
+use ovrley_widgets::render::text::{origin_x_for_centered_text, parse_color};
 use skia_safe::{image_filters, Paint, Point};
 use std::path::PathBuf;
 use std::time::Instant;
@@ -255,6 +255,6 @@ pub fn prepare_heading_cache(
         indicator_color: heading.indicator_color.clone(),
         indicator_size: scaled_indicator_size,
         indicator_shadow: shadow,
-        display_type: crate::types::DisplayType::Tape,
+        display_type: ovrley_widgets::model::types::DisplayType::Tape,
     })
 }

@@ -8,9 +8,9 @@
 //! Shadow, border, and other scene-level properties are NOT part of the
 //! label contract — they belong to the scene validation contract.
 
-use super::helpers::rgba_from_hex;
 use super::raw::{LabelConfig, LabelTypography};
 use crate::error::{CoreError, CoreResult};
+use ovrley_widgets::model::validation::rgba_from_hex;
 
 // ---------------------------------------------------------------------------
 // ValidatedLabel — zero backend-side defaults

@@ -11,7 +11,6 @@ mod elevation;
 mod g_force;
 mod gradient;
 mod heading;
-mod helpers;
 mod label;
 mod lap_timer;
 mod lean_angle;
@@ -21,21 +20,19 @@ pub mod raw;
 mod route;
 mod scene;
 mod time;
-mod value;
 
 use crate::error::CoreResult;
 use crate::render::widgets::types::{
     PreparedArcGauge, PreparedGForce, PreparedHeadingTape, PreparedLapTimer, PreparedLeanAngle,
     PreparedLinearGauge, PreparedStandardText, PreparedValue,
 };
-use crate::types::{DisplayType, MetricKind};
+use ovrley_widgets::model::types::{DisplayType, MetricKind};
 use raw::RenderConfig;
 
 pub use raw::{
     find_plot_value, find_plot_values, parse_config_json, parse_config_value, parse_template_json,
     parse_template_value, BackdropConfig, CoursePlotConfig, ElevationPlotConfig,
-    HeadingWidgetConfig, LabelConfig, SceneConfig, ValueConfig, TEMPLATE_FILE_FORMAT,
-    TEMPLATE_FILE_VERSION,
+    HeadingWidgetConfig, LabelConfig, SceneConfig, TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION,
 };
 
 pub use arc_gauge::{
@@ -63,18 +60,18 @@ pub use linear_gauge::{
     validate_linear_gauge, ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation,
     ValidatedLinearGaugeWidget,
 };
+use ovrley_widgets::model::scene::{
+    validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
+};
+use ovrley_widgets::widgets::value::validation::{validate_value_widget, ValidatedValueWidget};
 pub use raster::validate_template_rasters;
 pub use raster::{RasterGeometry, RasterSource, ValidatedRaster};
 pub use route::{validate_route_plot, validate_route_plots, ValidatedRoutePlot};
 pub use scene::{
     validate_ffmpeg_config, validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig,
-    ValidatedScenePresentation,
 };
 pub use time::{
     validate_time_value, ElapsedTimeOrigin, ValidatedTimeFormatting, ValidatedTimeValue,
-};
-pub use value::{
-    validate_value_widget, ContentAlignment, ValidatedValueFormatting, ValidatedValueWidget,
 };
 
 /// Telemetry series needed by a template.
@@ -164,10 +161,10 @@ pub fn validate_render_config_with_resources(
 
 /// Validates shared presentation directly, without inventing a render window.
 pub(crate) fn validate_render_presentation(
-    raw: RenderConfig<raw::ScenePresentationConfig>,
+    raw: RenderConfig<ScenePresentationConfig>,
     resources: Option<&dyn crate::raster::RasterResourceResolver>,
 ) -> CoreResult<ValidatedRenderConfig<ValidatedScenePresentation>> {
-    let scene = scene::validate_scene_presentation(raw.scene.clone())?;
+    let scene = validate_scene_presentation(raw.scene.clone())?;
     validate_render_contents(raw.with_scene(scene), resources)
 }
 
@@ -197,7 +194,7 @@ fn validate_render_contents(
         .enumerate()
         .map(|(idx, value)| {
             if value.value == MetricKind::GForce && value.display_type == DisplayType::GForce {
-                let value = value.with_promoted_display_variant("g_force")?;
+                let value = raw::promote_value_variant(&value, "g_force")?;
                 return validate_g_force(value, idx).map(|validated| {
                     PreparedValue::GForce(PreparedGForce {
                         validated,
@@ -215,7 +212,7 @@ fn validate_render_contents(
             }
             if value.value == MetricKind::LeanAngle && value.display_type == DisplayType::LeanAngle
             {
-                let value = value.with_promoted_display_variant("lean_angle")?;
+                let value = raw::promote_value_variant(&value, "lean_angle")?;
                 return validate_lean_angle(value, idx).map(|validated| {
                     PreparedValue::LeanAngle(PreparedLeanAngle {
                         validated,
@@ -238,7 +235,7 @@ fn validate_render_contents(
                 return validate_time_value(value, idx).map(PreparedValue::TimeText);
             }
             if value.display_type == DisplayType::Linear {
-                let value = value.with_promoted_display_variant("linear")?;
+                let value = raw::promote_value_variant(&value, "linear")?;
                 return validate_linear_gauge(value, idx).map(|validated| {
                     PreparedValue::LinearGauge(PreparedLinearGauge {
                         validated,
@@ -248,7 +245,7 @@ fn validate_render_contents(
                 });
             }
             if value.display_type == DisplayType::Arc {
-                let value = value.with_promoted_display_variant("arc")?;
+                let value = raw::promote_value_variant(&value, "arc")?;
                 return validate_arc_gauge(value, idx).map(|validated| {
                     PreparedValue::ArcGauge(PreparedArcGauge {
                         validated,
@@ -258,7 +255,7 @@ fn validate_render_contents(
                 });
             }
             if value.display_type == DisplayType::Corner {
-                let value = value.with_promoted_display_variant("corner")?;
+                let value = raw::promote_value_variant(&value, "corner")?;
                 return validate_corner_gauge(value, idx).map(|validated| {
                     PreparedValue::ArcGauge(PreparedArcGauge {
                         validated,
@@ -267,12 +264,14 @@ fn validate_render_contents(
                     })
                 });
             }
-            validate_value_widget(value, idx).map(|validated| {
-                PreparedValue::StandardText(PreparedStandardText {
-                    validated,
-                    altitude_offset_m: 0.0,
+            validate_value_widget(value, idx)
+                .map_err(crate::CoreError::from)
+                .map(|validated| {
+                    PreparedValue::StandardText(PreparedStandardText {
+                        validated,
+                        altitude_offset_m: 0.0,
+                    })
                 })
-            })
         })
         .collect::<CoreResult<Vec<_>>>()?;
 

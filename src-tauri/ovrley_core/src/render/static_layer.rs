@@ -13,9 +13,8 @@ use crate::render::raster::{draw_rasters, PreparedRaster};
 use crate::render::surface::{create_surface, native_n32_image_info};
 use crate::render::text::{draw_text, validated_label_style, validated_value_style};
 use crate::render::widgets::types::PreparedValue;
-use crate::render::widgets::{
-    draw_backdrops_static_layer, draw_static_metric_parts_for_value, static_metric_parts_for_value,
-};
+use crate::render::widgets::{draw_backdrops_static_layer, draw_static_metric_parts_for_value};
+use ovrley_widgets::widgets::value::layout::static_metric_parts_for_value;
 use skia_safe::Image;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -157,7 +156,9 @@ pub(super) fn config_has_static_metric_parts(values: &[PreparedValue]) -> bool {
         .any(|parts| parts.icon || parts.unit)
 }
 
-fn text_value(value: &PreparedValue) -> Option<&crate::normalize::ValidatedValueWidget> {
+fn text_value(
+    value: &PreparedValue,
+) -> Option<&ovrley_widgets::widgets::value::validation::ValidatedValueWidget> {
     match value {
         PreparedValue::StandardText(prepared) => Some(&prepared.validated),
         PreparedValue::TimeText(validated) => Some(&validated.base),

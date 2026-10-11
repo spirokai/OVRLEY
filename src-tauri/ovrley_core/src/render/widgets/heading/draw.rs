@@ -10,7 +10,7 @@ use super::super::types::{
 };
 use super::geometry::{chevron_vertices, heading_offset};
 use crate::debug::RenderProfiler;
-use crate::render::text::parse_color;
+use ovrley_widgets::render::text::parse_color;
 use skia_safe::{Canvas, Paint, PathBuilder, Point, Rect};
 
 /// Draws the heading widget for one frame.

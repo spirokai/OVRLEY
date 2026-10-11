@@ -9,7 +9,8 @@ use crate::error::CoreResult;
 use crate::normalize::{
     ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
 };
-use crate::render::text::{origin_x_for_centered_text, resolve_font};
+use crate::render::text::resolve_font;
+use ovrley_widgets::render::text::origin_x_for_centered_text;
 use skia_safe::Point;
 use std::path::PathBuf;
 

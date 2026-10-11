@@ -73,11 +73,13 @@ function AppShell() {
     appUpdate,
     appShell,
     backendState,
+    bootstrap,
     editorShell,
     handleOpenOutputDirectory,
     layout,
     projectLifecycle,
     renderWorkflow,
+    startupReady,
     templateManagement,
     undoRedoControls,
     videoControls,
@@ -138,9 +140,17 @@ function AppShell() {
     }
   }
 
-  if (!toolbarDrawer.initialized) {
+  if (bootstrap.error) {
     return (
-      <div className="relative h-screen w-full bg-background text-foreground">
+      <main role="alert" className="h-screen bg-background p-8 text-destructive">
+        {bootstrap.error.message}
+      </main>
+    )
+  }
+
+  if (!toolbarDrawer.initialized || !startupReady) {
+    return (
+      <div className="app-startup" role="status">
         <LoadingOverlay show label={t('app.ovrleyIsStarting', 'OVRLEY is starting...')} />
       </div>
     )

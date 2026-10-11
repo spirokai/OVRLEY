@@ -9,20 +9,19 @@ use crate::normalize::{
 };
 use crate::render::format::{format_lean_angle_value, resolve_metric_display_value};
 use crate::render::surface::create_surface;
-use crate::render::text::{
-    draw_text_with_vertical_metrics_text, measure_text, parse_color, ResolvedTextStyle,
-};
+use crate::render::text::{draw_text_with_vertical_metrics_text, measure_text};
 use crate::render::widgets::common::{normalize_shadow_style_validated, static_layer_padding};
 use crate::render::widgets::types::{
     LeanAngleCache, WidgetFrameReport, WidgetGeometryReport, WidgetRenderReport,
 };
-use crate::render::widgets::value::{
+use ovrley_widgets::model::standard_metrics::standard_metric_unit_label;
+use ovrley_widgets::model::standard_widgets::widget_font_weight;
+use ovrley_widgets::model::types::MetricKind;
+use ovrley_widgets::render::text::{parse_color, ResolvedTextStyle};
+use ovrley_widgets::widgets::value::layout::{
     metric_vertical_metrics_text, METRIC_WIDGET_LINE_HEIGHT, METRIC_WIDGET_UNITS_GAP_PX,
     METRIC_WIDGET_UNIT_RATIO, MIN_UNITS_FONT_SIZE,
 };
-use crate::standard_metrics::standard_metric_unit_label;
-use crate::standard_widgets::widget_font_weight;
-use crate::types::MetricKind;
 use skia_safe::{
     image_filters, paint::Style, BlendMode, Canvas, ClipOp, Paint, Path, PathBuilder, PathFillType,
     Point,

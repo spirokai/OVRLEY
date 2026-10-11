@@ -10,12 +10,13 @@ use chrono::DateTime;
 use serde_json::json;
 
 use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport};
-use ovrley_core::normalize::ValidatedValueWidget;
 use ovrley_core::render::format::{
     format_elapsed_time, format_time_key, format_validated_metric_parts,
-    format_validated_time_parts, ElapsedTimeValues, MetricDisplayContent, MetricIconKind,
+    format_validated_time_parts, ElapsedTimeValues,
 };
 use ovrley_core::render::widgets::types::PreparedValue;
+use ovrley_widgets::widgets::value::format::MetricDisplayContent;
+use ovrley_widgets::widgets::value::validation::ValidatedValueWidget;
 
 #[test]
 fn formats_time_key_variants() {
@@ -105,7 +106,7 @@ fn formats_metric_parts_for_speed() {
     let parts = format_validated_metric_parts(&validated, &dense, 0).unwrap();
     assert_eq!(parts.standard_text().0, "36");
     assert_eq!(parts.standard_text().1, Some("KM/H"));
-    assert_eq!(parts.icon_kind, Some(MetricIconKind::Gauge));
+    assert_eq!(parts.icon_asset_file, Some("widget-speed.svg"));
     assert!(parts.show_icon);
 }
 
@@ -139,7 +140,7 @@ fn formats_metric_parts_for_temperature_with_degree_units() {
     let parts = format_validated_metric_parts(&validated, &dense, 0).unwrap();
     assert_eq!(parts.standard_text().0, "68");
     assert_eq!(parts.standard_text().1, Some("\u{00B0}F"));
-    assert_eq!(parts.icon_kind, Some(MetricIconKind::Thermometer));
+    assert_eq!(parts.icon_asset_file, Some("widget-temperature.svg"));
     assert!(parts.show_icon);
 }
 
@@ -174,7 +175,7 @@ fn formats_metric_parts_for_pace() {
     let parts = format_validated_metric_parts(&validated, &dense, 0).unwrap();
     assert_eq!(parts.standard_text().0, "4:35");
     assert_eq!(parts.standard_text().1, Some("MIN/KM"));
-    assert_eq!(parts.icon_kind, Some(MetricIconKind::Footprints));
+    assert_eq!(parts.icon_asset_file, Some("widget-pace.svg"));
     assert!(parts.show_icon);
 }
 
@@ -209,7 +210,7 @@ fn formats_metric_parts_for_left_right_balance() {
     let parts = format_validated_metric_parts(&validated, &dense, 0).unwrap();
     assert_eq!(parts.standard_text().0, "54/46");
     assert_eq!(parts.standard_text().1, None);
-    assert_eq!(parts.icon_kind, Some(MetricIconKind::Scale));
+    assert_eq!(parts.icon_asset_file, Some("widget-left-right-balance.svg"));
     assert!(parts.show_icon);
 }
 
@@ -243,7 +244,7 @@ fn formats_metric_parts_for_heading() {
     let parts = format_validated_metric_parts(&validated, &dense, 0).unwrap();
     assert_eq!(parts.standard_text().0, "91");
     assert_eq!(parts.standard_text().1, None);
-    assert_eq!(parts.icon_kind, Some(MetricIconKind::Compass));
+    assert_eq!(parts.icon_asset_file, Some("widget-heading.svg"));
     assert!(parts.show_icon);
 }
 
@@ -279,7 +280,7 @@ fn formats_metric_parts_for_distance_with_fixed_decimals() {
     let parts = format_validated_metric_parts(&validated, &dense, 0).unwrap();
     assert_eq!(parts.standard_text().0, "2.30/5.00");
     assert_eq!(parts.standard_text().1, Some("KM"));
-    assert_eq!(parts.icon_kind, Some(MetricIconKind::Distance));
+    assert_eq!(parts.icon_asset_file, Some("widget-distance.svg"));
     assert!(parts.show_icon);
 }
 
@@ -315,7 +316,10 @@ fn formats_metric_parts_for_total_ascent_with_full_total() {
     let parts = format_validated_metric_parts(&validated, &dense, 0).unwrap();
     assert_eq!(parts.standard_text().0, "12/25");
     assert_eq!(parts.standard_text().1, Some("M"));
-    assert_eq!(parts.icon_kind, Some(MetricIconKind::ArrowUpNarrowWide));
+    assert_eq!(
+        parts.icon_asset_file,
+        Some("widget-arrow-up-narrow-wide.svg")
+    );
 }
 
 #[test]
@@ -358,7 +362,7 @@ fn formats_metric_parts_for_both_gps_coordinates_as_two_colored_lines() {
     assert_eq!(coordinates.lines[0].value_text, "40°26′46″");
     assert_eq!(coordinates.lines[1].value_text, "73°59′14″");
     assert_eq!(coordinates.lines[1].direction.as_deref(), Some("W"));
-    assert_eq!(parts.icon_kind, Some(MetricIconKind::Satellite));
+    assert_eq!(parts.icon_asset_file, Some("widget-satellite.svg"));
 }
 
 fn validated_standard_value(value: serde_json::Value) -> ValidatedValueWidget {

@@ -12,7 +12,7 @@ fn gauge_bounds_preserve_source_extrema_outside_export_window() {
     use crate::activity::schema::ParsedActivity;
     use crate::activity::trim::trim_activity;
     use crate::normalize::RenderDataRequirements;
-    use crate::MetricKind;
+    use ovrley_widgets::model::types::MetricKind;
 
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({
         "sample_elapsed_seconds": [0, 1, 2, 3, 4],

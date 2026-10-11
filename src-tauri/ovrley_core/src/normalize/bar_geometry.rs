@@ -1,7 +1,7 @@
 //! Shared segmented-track geometry validation.
 
 use crate::error::{CoreError, CoreResult};
-use crate::types::TrackFillStyle;
+use ovrley_widgets::model::types::TrackFillStyle;
 
 const MIN_BAR_PX: f32 = 2.0;
 

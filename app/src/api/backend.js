@@ -178,6 +178,21 @@ export async function finalizeActivity(rawActivity) {
   })
 }
 
+/** @param {string} activityId Native snapshot identity. @returns {Promise<ArrayBuffer>} Original-density activity bytes. */
+export function previewActivity(activityId) {
+  return invokeCommand('backend_preview_activity', { activityId })
+}
+
+/** @param {string} activityId Snapshot no longer owned by the editor or stashed telemetry. @returns {Promise<void>} */
+export function releasePreviewActivity(activityId) {
+  return invokeCommand('backend_release_preview_activity', { activityId })
+}
+
+/** @param {string} fontId Canonical native font identity. @returns {Promise<ArrayBuffer>} Serialized Skia face with its data. */
+export function previewFont(fontId) {
+  return invokeCommand('backend_preview_font', { fontId })
+}
+
 /**
  * Parses a native CSV activity path through the Rust columnar pipeline.
  *

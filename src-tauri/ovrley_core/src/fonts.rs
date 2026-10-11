@@ -13,6 +13,48 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 
+/// Native resource boundary for the portable widget renderer.
+pub struct NativeFonts<'a>(pub &'a [PathBuf]);
+
+/// Includes font bytes and resolved variation coordinates, including system faces.
+pub fn preview_font_resource(font_dirs: &[PathBuf], id: &str) -> CoreResult<Vec<u8>> {
+    let face = resolve_typeface(
+        font_dirs,
+        id,
+        ovrley_widgets::model::standard_widgets::widget_font_weight(),
+        false,
+    )?;
+    Ok(face
+        .serialize(skia_safe::typeface::SerializeBehavior::DoIncludeData)
+        .as_bytes()
+        .to_vec())
+}
+
+impl ovrley_widgets::render::text::FontResolver for NativeFonts<'_> {
+    fn resolve_typeface(
+        &self,
+        name: Option<&str>,
+        weight: f32,
+        italic: bool,
+    ) -> ovrley_widgets::error::WidgetResult<Typeface> {
+        use ovrley_widgets::error::WidgetError;
+        match name {
+            Some(name) => resolve_typeface(self.0, name, weight, italic)
+                .map_err(|error| WidgetError::Render(error.to_string())),
+            None => FontMgr::default()
+                .legacy_make_typeface(
+                    None,
+                    skia_safe::FontStyle::new(
+                        (weight.round() as i32).into(),
+                        skia_safe::font_style::Width::NORMAL,
+                        Slant::Upright,
+                    ),
+                )
+                .ok_or_else(|| WidgetError::Render("System default font unavailable".into())),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct FontAxis {
     pub tag: String,
@@ -200,7 +242,7 @@ fn discover_bundled(font_dirs: &[PathBuf]) -> CoreResult<Vec<LoadedFamily>> {
             source,
         })?;
         let typeface = manager
-            .new_from_data(&bytes, None)
+            .new_from_data(skia_safe::Data::new_copy(&bytes), None)
             .ok_or_else(|| CoreError::Config(format!("invalid font asset: {file}")))?;
         let name = bundled_family_name(&typeface);
         let extension = path

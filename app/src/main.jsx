@@ -16,6 +16,7 @@ import App from './App.jsx'
 import { WASM_PREVIEW_DEBUG_HASH } from '@/features/wasm-preview-debug/data/debugRoute'
 
 setWorkerUrl(workerUrl)
+const root = createRoot(document.getElementById('root'))
 
 async function mountApp() {
   // The standalone renderer diagnostics do not consume desktop preferences.
@@ -23,11 +24,18 @@ async function mountApp() {
     await hydrateLanguagePreference()
   }
 
-  createRoot(document.getElementById('root')).render(
+  root.render(
     <StrictMode>
       <App />
     </StrictMode>,
   )
 }
 
-mountApp()
+mountApp().catch((error) => {
+  console.error('Failed to start OVRLEY:', error)
+  root.render(
+    <main role="alert" className="p-8 text-destructive">
+      {error.message}
+    </main>,
+  )
+})

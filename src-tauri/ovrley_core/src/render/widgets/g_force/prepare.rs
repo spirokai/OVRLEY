@@ -3,9 +3,9 @@ use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{GForceAxis, ValidatedGForceWidget, ValidatedSceneConfig};
 use crate::render::surface::create_surface;
-use crate::render::text::parse_color;
 use crate::render::widgets::common::{normalize_shadow_style_validated, static_layer_padding};
 use crate::render::widgets::types::GForceWidgetCache;
+use ovrley_widgets::render::text::parse_color;
 use skia_safe::{
     image_filters, paint::Style, BlendMode, ClipOp, Paint, PathBuilder, PathFillType, Point,
 };

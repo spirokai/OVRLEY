@@ -5,13 +5,13 @@
 //! level; this validator promotes the active variant and rejects missing
 //! render-affecting fields.
 
-use super::helpers::{
+use super::raw::BackdropConfig;
+use crate::error::{CoreError, CoreResult};
+use ovrley_widgets::model::types::BackdropType;
+use ovrley_widgets::model::validation::{
     require_bool, require_border_fits_dimension, require_f32, require_hex_color,
     require_positive_u32, require_string, require_unit_opacity, rgba_from_hex,
 };
-use super::raw::BackdropConfig;
-use crate::error::{CoreError, CoreResult};
-use crate::types::BackdropType;
 
 #[derive(Clone, Debug)]
 pub struct ValidatedBackdrop {

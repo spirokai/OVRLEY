@@ -33,7 +33,7 @@
 
   color-scheme: dark;
   color: #afeeee;
-  background-color: #00293b;
+  background-color: var(--background);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;

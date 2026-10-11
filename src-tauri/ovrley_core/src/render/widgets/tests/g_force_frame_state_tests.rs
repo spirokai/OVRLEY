@@ -75,7 +75,7 @@ fn widget(config: &FixtureConfig) -> ValidatedGForceWidget {
 
 fn scene() -> ValidatedSceneConfig {
     ValidatedSceneConfig {
-        presentation: crate::normalize::ValidatedScenePresentation {
+        presentation: ovrley_widgets::model::scene::ValidatedScenePresentation {
             width: 1920,
             height: 1080,
             scale: 1.0,

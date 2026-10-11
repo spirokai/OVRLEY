@@ -6,11 +6,56 @@
 /// commands, so the parser does not attempt full SVG compliance.
 use skia_safe::{path_builder::ArcSize, Path, PathBuilder, PathDirection, Point};
 
-use super::icons::{ParsedSvgIcon, SvgPrimitive, SvgPrimitiveStyle};
+/// Parsed SVG icon with enough data for Skia fill/stroke rendering.
+#[derive(Clone, Debug)]
+pub struct ParsedSvgIcon {
+    pub stroke_width: f32,
+    pub primitives: Vec<SvgPrimitive>,
+}
+
+/// Rendering style captured for one supported SVG primitive.
+#[derive(Clone, Debug)]
+pub struct SvgPrimitiveStyle {
+    pub fill: bool,
+    pub stroke: bool,
+    pub stroke_width: Option<f32>,
+}
+
+impl SvgPrimitiveStyle {
+    pub fn stroke_only(stroke_width: Option<f32>) -> Self {
+        Self {
+            fill: false,
+            stroke: true,
+            stroke_width,
+        }
+    }
+}
+
+/// Primitive SVG elements supported by the local icon parser.
+#[derive(Clone, Debug)]
+pub enum SvgPrimitive {
+    Path {
+        path: Path,
+        style: SvgPrimitiveStyle,
+    },
+    Line {
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+        style: SvgPrimitiveStyle,
+    },
+    Circle {
+        cx: f32,
+        cy: f32,
+        r: f32,
+        style: SvgPrimitiveStyle,
+    },
+}
 
 /// Token emitted by the SVG path tokenizer.
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum PathToken {
+pub enum PathToken {
     Command(char),
     Number(f32),
 }
@@ -19,7 +64,7 @@ pub(crate) enum PathToken {
 ///
 /// The bundled metric icons use a deliberately small SVG subset: paths,
 /// lines, circles, fills, and root/per-primitive stroke width.
-pub(crate) fn parse_svg_icon(svg_markup: &str) -> Option<ParsedSvgIcon> {
+pub fn parse_svg_icon(svg_markup: &str) -> Option<ParsedSvgIcon> {
     let root_tag = root_svg_tag(svg_markup)?;
     let stroke_width = parse_xml_attr(root_tag, "stroke-width")
         .and_then(|value| value.parse::<f32>().ok())
@@ -39,7 +84,7 @@ pub(crate) fn parse_svg_icon(svg_markup: &str) -> Option<ParsedSvgIcon> {
 
         if tag.starts_with("path") {
             primitives.push(SvgPrimitive::Path {
-                data: parse_xml_attr(tag, "d")?.to_string(),
+                path: svg_path_to_skia_path(parse_xml_attr(tag, "d")?)?,
                 style: parse_primitive_style(tag, root_fill, root_stroke),
             });
         } else if tag.starts_with("line") {
@@ -115,7 +160,7 @@ fn parse_primitive_style(tag: &str, root_fill: bool, root_stroke: bool) -> SvgPr
 ///
 /// Implements only the path commands emitted by the bundled Lucide-style
 /// icons. Returning None for unsupported commands fails closed.
-pub(crate) fn svg_path_to_skia_path(data: &str) -> Option<Path> {
+pub fn svg_path_to_skia_path(data: &str) -> Option<Path> {
     // Phase 1: tokenize the compact SVG path data into commands and numbers.
     let tokens = tokenize_path_data(data);
     if tokens.is_empty() {

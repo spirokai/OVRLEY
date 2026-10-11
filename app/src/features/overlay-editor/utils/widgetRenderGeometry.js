@@ -1,4 +1,5 @@
 import { buildWidgetTransform } from '@/lib/geometryUtils'
+import { isWasmWidget } from '@/lib/widget/wasm-widget'
 import { isFramedWidget } from '@/lib/widget/display-type-behavior'
 import { getLeanAngleSelectionFrame } from '@/features/widget-preview/widgets/lean-angle/geometry'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
@@ -88,6 +89,7 @@ export function buildWidgetRenderGeometryModels({ widgets, metricPreviewModels, 
   const models = {}
 
   for (const widget of widgets) {
+    if (isWasmWidget(widget)) continue
     const metricPreviewModel = metricPreviewModels[widget.id] ?? null
     const textPreviewModel = textPreviewModels[widget.id] ?? null
     const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null

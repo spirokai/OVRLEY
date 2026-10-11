@@ -26,7 +26,7 @@ use ovrley_core::normalize::{raw::RenderConfig, validate_render_config};
 use ovrley_core::render::surface::create_surface;
 use ovrley_core::render::widgets::metric_presentation::draw_metric_presentation;
 use ovrley_core::render::widgets::types::{HeadingWidgetCache, PreparedValue};
-use ovrley_core::types::{DisplayType, MetricKind};
+use ovrley_widgets::model::types::{DisplayType, MetricKind};
 use std::collections::BTreeMap;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────

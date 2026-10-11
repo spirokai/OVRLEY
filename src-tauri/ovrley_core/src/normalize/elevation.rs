@@ -5,11 +5,11 @@
 //! render-affecting defaults. The frontend must materialise all defaults
 //! before sending the config.
 
-use super::helpers::{
-    normalize_marker_variant, require_f32, require_hex_color, require_opacity, require_positive_f32,
-};
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::raw::{find_plot_values, ElevationPlotConfig};
+use ovrley_widgets::model::validation::{
+    normalize_marker_variant, require_f32, require_hex_color, require_opacity, require_positive_f32,
+};
 
 #[derive(Clone, Debug)]
 pub struct ValidatedElevationPlot {
@@ -52,7 +52,7 @@ pub struct ValidatedElevationPlot {
 
 pub fn validate_elevation_plots(
     plots: &serde_json::Value,
-    scene: &crate::normalize::ValidatedScenePresentation,
+    scene: &ovrley_widgets::model::scene::ValidatedScenePresentation,
 ) -> CoreResult<Vec<ValidatedElevationPlot>> {
     find_plot_values(plots, "elevation")
         .into_iter()
@@ -67,7 +67,7 @@ pub fn validate_elevation_plots(
 pub fn validate_elevation_plot(
     plot: &ElevationPlotConfig,
     index: usize,
-    scene: &crate::normalize::ValidatedScenePresentation,
+    scene: &ovrley_widgets::model::scene::ValidatedScenePresentation,
 ) -> CoreResult<ValidatedElevationPlot> {
     let p = |f: &str| format!("plots[{index}].{f}");
 

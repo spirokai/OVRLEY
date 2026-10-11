@@ -7,14 +7,14 @@
 //! active template needs.
 
 use super::interpolate::{
-    densify_hold_series, interpolate_course_value, interpolate_numeric_series_value,
-    interpolate_time_series_value, interpolation_strategy, InterpolationStrategy,
+    densify_hold_series, interpolate_course_value, interpolate_time_series_value,
+    interpolation_strategy, InterpolationStrategy,
 };
 use super::schema::{ParsedActivity, TrimmedActivity};
 use crate::error::{CoreError, CoreResult};
-use crate::interpolation::MissingSamplePolicy;
 use crate::normalize::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
+use ovrley_widgets::interpolation::{interpolate_numeric_series_value, MissingSamplePolicy};
 
 // Validates that the requested scene window fits inside activity duration.
 fn validate_trim_window(duration: f64, start: f64, end: f64) -> CoreResult<()> {
@@ -306,7 +306,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Elevation),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Elevation),
             )
         } else {
             Vec::new()
@@ -319,7 +319,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Calories),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Calories),
             )
         } else {
             Vec::new()
@@ -332,7 +332,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::DistanceToHome),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::DistanceToHome),
             )
         } else {
             Vec::new()
@@ -345,7 +345,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::TotalAscent),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::TotalAscent),
             )
         } else {
             Vec::new()
@@ -359,7 +359,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Elevation),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Elevation),
             )
         } else {
             Vec::new()
@@ -372,7 +372,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Speed),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Speed),
             )
         } else {
             Vec::new()
@@ -385,7 +385,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Distance),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Distance),
             )
         } else {
             Vec::new()
@@ -398,7 +398,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Heartrate),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Heartrate),
             )
         } else {
             Vec::new()
@@ -411,7 +411,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Cadence),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Cadence),
             )
         } else {
             Vec::new()
@@ -424,7 +424,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Power),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Power),
             )
         } else {
             Vec::new()
@@ -437,7 +437,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::EnginePower),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::EnginePower),
             )
         } else {
             Vec::new()
@@ -450,7 +450,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::EngineLoad),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::EngineLoad),
             )
         } else {
             Vec::new()
@@ -463,7 +463,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Temperature),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Temperature),
             )
         } else {
             Vec::new()
@@ -476,7 +476,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Pace),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Pace),
             )
         } else {
             Vec::new()
@@ -489,7 +489,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::GForce),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::GForce),
             )
         } else {
             Vec::new()
@@ -541,7 +541,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Rpm),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Rpm),
             )
         } else {
             Vec::new()
@@ -554,7 +554,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::ThrottlePosition),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::ThrottlePosition),
             )
         } else {
             Vec::new()
@@ -567,7 +567,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::BrakePosition),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::BrakePosition),
             )
         } else {
             Vec::new()
@@ -580,7 +580,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::LeanAngle),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::LeanAngle),
             )
         } else {
             Vec::new()
@@ -593,7 +593,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::AirPressure),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::AirPressure),
             )
         } else {
             Vec::new()
@@ -606,7 +606,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::GroundContactTime),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::GroundContactTime),
             )
         } else {
             Vec::new()
@@ -619,7 +619,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::LeftRightBalance),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::LeftRightBalance),
             )
         } else {
             Vec::new()
@@ -632,7 +632,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::StrideLength),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::StrideLength),
             )
         } else {
             Vec::new()
@@ -645,7 +645,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::StrokeRate),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::StrokeRate),
             )
         } else {
             Vec::new()
@@ -658,7 +658,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Torque),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Torque),
             )
         } else {
             Vec::new()
@@ -671,7 +671,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::VerticalSpeed),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::VerticalSpeed),
             )
         } else {
             Vec::new()
@@ -684,7 +684,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Iso),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Iso),
             )
         } else {
             Vec::new()
@@ -697,7 +697,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Aperture),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Aperture),
             )
         } else {
             Vec::new()
@@ -710,7 +710,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::ShutterSpeed),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::ShutterSpeed),
             )
         } else {
             Vec::new()
@@ -723,7 +723,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::FocalLength),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::FocalLength),
             )
         } else {
             Vec::new()
@@ -736,7 +736,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Ev),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Ev),
             )
         } else {
             Vec::new()
@@ -749,7 +749,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::ColorTemperature),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::ColorTemperature),
             )
         } else {
             Vec::new()
@@ -775,7 +775,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::VerticalRatio),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::VerticalRatio),
             )
         } else {
             Vec::new()
@@ -788,7 +788,9 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::VerticalOscillation),
+                interpolation_strategy(
+                    ovrley_widgets::model::types::MetricKind::VerticalOscillation,
+                ),
             )
         } else {
             Vec::new()
@@ -801,7 +803,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::CoreTemperature),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::CoreTemperature),
             )
         } else {
             Vec::new()
@@ -814,7 +816,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Gradient),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Gradient),
             )
         } else {
             Vec::new()
@@ -827,7 +829,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                interpolation_strategy(crate::MetricKind::Heading),
+                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Heading),
             )
         } else {
             Vec::new()

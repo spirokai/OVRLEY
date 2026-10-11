@@ -9,10 +9,11 @@ use crate::normalize::{
     ResolvedBarGeometry, ValidatedArcGaugeWidget, ValidatedBackdrop, ValidatedGForceWidget,
     ValidatedGradientWidget, ValidatedHeading, ValidatedLabel, ValidatedLapTimer,
     ValidatedLeanAngleWidget, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
-    ValidatedSceneConfig, ValidatedTimeValue, ValidatedValueWidget,
+    ValidatedSceneConfig, ValidatedTimeValue,
 };
-use crate::types::{DisplayType, MetricKind, TrackFillStyle};
 use chrono_tz::Tz;
+use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
+use ovrley_widgets::widgets::value::validation::ValidatedValueWidget;
 use skia_safe::Image;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -52,8 +53,8 @@ pub struct WidgetRenderReport {
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct MetricPresentationReport {
     pub value_idx: usize,
-    pub metric_kind: crate::types::MetricKind,
-    pub display_type: crate::types::DisplayType,
+    pub metric_kind: ovrley_widgets::model::types::MetricKind,
+    pub display_type: ovrley_widgets::model::types::DisplayType,
     pub widget: WidgetRenderReport,
 }
 
@@ -461,7 +462,7 @@ pub struct ArcGaugeCache {
     pub track_fill_flat: bool,
     pub track_fill_style: TrackFillStyle,
     pub bar_geometry: Option<ResolvedBarGeometry>,
-    pub text_style: crate::render::text::ResolvedTextStyle,
+    pub text_style: ovrley_widgets::render::text::ResolvedTextStyle,
     pub has_unit: bool,
     pub unit_font_size: f32,
     pub inner_widget_gap: f32,

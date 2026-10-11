@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
 import { createLabelDefaults, createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
@@ -40,7 +40,7 @@ describe('useWidgetManager alignment updates', () => {
     act(() => result.current.updateWidgetSize('label-spacing', { letter_spacing: 2.5 }))
     act(() => result.current.updateWidgetSize('label-spacing', { letter_spacing: -1.25 }))
     expect(useStore.getState().config.labels[0].letter_spacing).toBe(0)
-    expect(result.current.widgets.find((widget) => widget.id === 'label-spacing').data.letter_spacing).toBe(-1.25)
+    await waitFor(() => expect(result.current.widgets.find((widget) => widget.id === 'label-spacing').data.letter_spacing).toBe(-1.25))
     expect(useStore.temporal.getState().pastStates).toHaveLength(0)
     act(() => result.current.commitWidgetSize('label-spacing'))
     expect(useStore.getState().config.labels[0]).toMatchObject({ letter_spacing: -1.25, font_weight: 537, italic: true })
@@ -76,6 +76,32 @@ describe('useWidgetManager alignment updates', () => {
     const config = cloneSerializable(DEFAULT_CONFIG)
     config.values = [{ ...createMetricValueDefaults('speed'), id: 'speed-0', x: 300 }]
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
+  })
+
+  test('commits the latest WASM font size when the slider is released before its pending frame', () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] })
+    try {
+      useStore.temporal.getState().clear()
+      const initialSize = useStore.getState().config.values[0].font_size
+      const { result } = renderHook(() => useWidgetManager({ widgetLiveEdits: useWidgetDraftState() }))
+
+      act(() => {
+        result.current.updateWidgetSize('speed-0', { font_size: 50 })
+        result.current.updateWidgetSize('speed-0', { font_size: 60 })
+      })
+      expect(useStore.getState().config.values[0].font_size).toBe(initialSize)
+      expect(vi.getTimerCount()).toBe(1)
+
+      act(() => result.current.commitWidgetSize('speed-0'))
+      expect(useStore.getState().config.values[0].font_size).toBe(60)
+      expect(result.current.widgets[0].data.font_size).toBe(60)
+      expect(useStore.temporal.getState().pastStates).toHaveLength(1)
+      expect(vi.getTimerCount()).toBe(0)
+      act(() => vi.advanceTimersToNextFrame())
+      expect(result.current.widgets[0].data.font_size).toBe(60)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   test('commits the new alignment and compensates x from current rendered geometry', () => {

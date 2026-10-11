@@ -5,12 +5,12 @@
 //! render-affecting defaults. The frontend must materialise all defaults
 //! before sending the config.
 
-use super::helpers::{
+use crate::error::{CoreError, CoreResult};
+use crate::normalize::raw::{find_plot_values, CoursePlotConfig};
+use ovrley_widgets::model::validation::{
     normalize_marker_variant, require_f32, require_hex_color, require_non_negative_f32,
     require_opacity, require_positive_f32,
 };
-use crate::error::{CoreError, CoreResult};
-use crate::normalize::raw::{find_plot_values, CoursePlotConfig};
 
 #[derive(Clone, Debug)]
 pub struct ValidatedRoutePlot {

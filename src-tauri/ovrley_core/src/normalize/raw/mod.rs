@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 use crate::error::{CoreError, CoreResult};
-use crate::types::{BackdropType, DisplayType, MetricKind, TrackFillStyle};
+use ovrley_widgets::model::types::{BackdropType, DisplayType, MetricKind};
 
 pub const TEMPLATE_FILE_FORMAT: &str = "ovrley-template";
 pub const TEMPLATE_FILE_VERSION: u32 = 3;
@@ -94,44 +94,7 @@ pub struct SceneConfig {
     pub custom_export_range_active: Option<bool>,
 }
 
-/// Shared presentation ingress, independent of an activity or export window.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ScenePresentationConfig {
-    #[serde(default)]
-    pub width: Option<u32>,
-    #[serde(default)]
-    pub height: Option<u32>,
-    #[serde(default)]
-    pub font: Option<String>,
-    #[serde(default)]
-    pub font_size: Option<f32>,
-    #[serde(default)]
-    pub decimal_rounding: Option<i32>,
-    #[serde(default)]
-    pub overlay_filename: Option<String>,
-    #[serde(default)]
-    pub opacity: Option<f32>,
-    #[serde(default)]
-    pub scale: Option<f32>,
-    #[serde(default)]
-    pub time_format: Option<String>,
-    #[serde(default)]
-    pub shadow_color: Option<String>,
-    #[serde(default)]
-    pub shadow_strength: Option<f32>,
-    #[serde(default)]
-    pub shadow_distance: Option<f32>,
-    #[serde(default)]
-    pub border_color: Option<String>,
-    #[serde(default)]
-    pub border_thickness: Option<f32>,
-    #[serde(default)]
-    pub border_strength: Option<f32>,
-    #[serde(default)]
-    pub border_distance: Option<f32>,
-    #[serde(flatten)]
-    pub extra: BTreeMap<String, Value>,
-}
+use ovrley_widgets::model::scene::ScenePresentationConfig;
 
 /// Static text label drawn onto the cached base layer.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -231,241 +194,37 @@ impl BackdropConfig {
     }
 }
 
-/// Dynamic telemetry value configuration.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ValueConfig {
-    pub value: MetricKind,
-    pub x: f32,
-    pub y: f32,
-    #[serde(default)]
-    pub font: Option<String>,
-    #[serde(default)]
-    pub font_family: Option<String>,
-    #[serde(default)]
-    pub font_size: Option<f32>,
-    #[serde(default)]
-    pub color: Option<String>,
-    #[serde(default)]
-    pub opacity: Option<f32>,
-    #[serde(default)]
-    pub suffix: Option<String>,
-    #[serde(default)]
-    pub prefix: Option<String>,
-    #[serde(default)]
-    pub unit: Option<String>,
-    #[serde(default)]
-    pub hours_offset: Option<i32>,
-    #[serde(default)]
-    pub time_format: Option<String>,
-    #[serde(default)]
-    pub format: Option<String>,
-    #[serde(default)]
-    pub time_mode: Option<String>,
-    #[serde(default)]
-    pub elapsed_origin: Option<String>,
-    #[serde(default)]
-    pub show_hundredths: Option<bool>,
-    #[serde(default)]
-    pub decimal_rounding: Option<i32>,
-    #[serde(default)]
-    pub decimals: Option<usize>,
-    #[serde(default)]
-    pub show_icon: Option<bool>,
-    #[serde(default)]
-    pub icon_color: Option<String>,
-    #[serde(default)]
-    pub icon_size: Option<f32>,
-    #[serde(default)]
-    pub icon_offset_x: Option<f32>,
-    #[serde(default)]
-    pub icon_offset_y: Option<f32>,
-    #[serde(default)]
-    pub show_units: Option<bool>,
-    #[serde(default)]
-    pub show_full_distance: Option<bool>,
-    #[serde(default)]
-    pub show_full_ascent: Option<bool>,
-    #[serde(default)]
-    pub unit_color: Option<String>,
-    #[serde(default)]
-    pub display_unit: Option<String>,
-    #[serde(default)]
-    pub starting_altitude: Option<f64>,
-    #[serde(default)]
-    pub coordinate_format: Option<String>,
-    #[serde(default)]
-    pub balance_format: Option<String>,
-    #[serde(default)]
-    pub value_offset: Option<f32>,
-    #[serde(default)]
-    pub triangle_positive_color: Option<String>,
-    #[serde(default)]
-    pub triangle_negative_color: Option<String>,
-    #[serde(default)]
-    pub show_sign: Option<bool>,
-    #[serde(default)]
-    pub show_triangle: Option<bool>,
-    #[serde(default)]
-    pub triangle_width: Option<f32>,
-    #[serde(default)]
-    pub shadow_color: Option<String>,
-    #[serde(default)]
-    pub shadow_strength: Option<f32>,
-    #[serde(default)]
-    pub shadow_distance: Option<f32>,
-    #[serde(default)]
-    pub border_color: Option<String>,
-    #[serde(default)]
-    pub border_thickness: Option<f32>,
-    #[serde(default)]
-    pub border_strength: Option<f32>,
-    #[serde(default)]
-    pub border_distance: Option<f32>,
-    #[serde(default)]
-    pub display_type: DisplayType,
-    #[serde(default)]
-    pub content_alignment: Option<String>,
-    #[serde(default)]
-    pub lap_timer_mode: Option<String>,
-    #[serde(default)]
-    pub show_label: Option<bool>,
-    #[serde(default)]
-    pub label: Option<String>,
-    #[serde(default)]
-    pub positive_delta_color: Option<String>,
-    #[serde(default)]
-    pub negative_delta_color: Option<String>,
-    #[serde(default)]
-    pub width: Option<u32>,
-    #[serde(default)]
-    pub height: Option<u32>,
-    #[serde(default)]
-    pub rotation: Option<f32>,
-    #[serde(default)]
-    pub orientation: Option<String>,
-    #[serde(default)]
-    pub arc_angle: Option<f32>,
-    #[serde(default)]
-    pub corner_orientation: Option<String>,
-    #[serde(default)]
-    pub inner_widget_offset_x: Option<f32>,
-    #[serde(default)]
-    pub inner_widget_offset_y: Option<f32>,
-    #[serde(default)]
-    pub value_offset_x: Option<f32>,
-    #[serde(default)]
-    pub value_offset_y: Option<f32>,
-    #[serde(default)]
-    pub track_thickness: Option<f32>,
-    #[serde(default)]
-    pub track_corner_radius: Option<f32>,
-    #[serde(default)]
-    pub track_border_thickness: Option<f32>,
-    #[serde(default)]
-    pub track_border_color: Option<String>,
-    #[serde(default)]
-    pub track_empty_color: Option<String>,
-    #[serde(default)]
-    pub track_empty_opacity: Option<f32>,
-    #[serde(default)]
-    pub track_filled_color: Option<String>,
-    #[serde(default)]
-    pub track_filled_opacity: Option<f32>,
-    #[serde(default)]
-    pub track_fill_flat: Option<bool>,
-    #[serde(default)]
-    pub track_fill_style: Option<TrackFillStyle>,
-    #[serde(default)]
-    pub bar_count: Option<u32>,
-    #[serde(default)]
-    pub bar_gap: Option<f32>,
-    #[serde(default)]
-    pub show_min_max_labels: Option<bool>,
-    #[serde(default)]
-    pub min_max_label_font: Option<String>,
-    #[serde(default)]
-    pub min_max_label_font_size: Option<f32>,
-    #[serde(default)]
-    pub min_max_label_position: Option<String>,
-    #[serde(default)]
-    pub min_max_label_color: Option<String>,
-    #[serde(default)]
-    pub diameter: Option<f32>,
-    #[serde(default)]
-    pub fill_color: Option<String>,
-    #[serde(default)]
-    pub fill_opacity: Option<f32>,
-    #[serde(default)]
-    pub border_opacity: Option<f32>,
-    #[serde(default)]
-    pub marker_size: Option<f32>,
-    #[serde(default)]
-    pub marker_color: Option<String>,
-    #[serde(default)]
-    pub marker_opacity: Option<f32>,
-    #[serde(default)]
-    pub axis_horizontal: Option<String>,
-    #[serde(default)]
-    pub axis_vertical: Option<String>,
-    #[serde(default)]
-    pub invert_horizontal: Option<bool>,
-    #[serde(default)]
-    pub invert_vertical: Option<bool>,
-    #[serde(default)]
-    pub clip_percentile: Option<f32>,
-    #[serde(default)]
-    pub label_font: Option<String>,
-    #[serde(default)]
-    pub label_font_size: Option<f32>,
-    #[serde(default)]
-    pub label_color: Option<String>,
-    #[serde(default)]
-    pub label_decimals: Option<usize>,
-    #[serde(default)]
-    pub label_unit: Option<String>,
-    #[serde(default)]
-    pub label_unit_color: Option<String>,
-    #[serde(default)]
-    pub label_offset_x: Option<f32>,
-    #[serde(default)]
-    pub label_offset_y: Option<f32>,
-    #[serde(flatten)]
-    pub extra: BTreeMap<String, Value>,
+use ovrley_widgets::widgets::value::config::ValueConfig;
+
+/// Promotes nested display variant fields to the top level so validators
+/// can consume them as flat fields. Used when a JS-normalized config stores
+/// variant-specific keys inside `display_variants.<key>` — Rust deserializes
+/// the raw JSON, strips nulls, and promotes the nested object up.
+pub(crate) fn promote_value_variant(
+    value: &ValueConfig,
+    variant_key: &str,
+) -> CoreResult<ValueConfig> {
+    let mut raw = serde_json::to_value(value)
+        .map_err(|e| CoreError::Config(format!("value config serialization: {e}")))?;
+    strip_json_nulls(&mut raw);
+    promote_variant_keys(&mut raw, variant_key);
+
+    serde_json::from_value(raw).map_err(|e| CoreError::Config(format!("value config: {e}")))
 }
 
-impl ValueConfig {
-    /// Promotes nested display variant fields to the top level so validators
-    /// can consume them as flat fields. Used when a JS-normalized config stores
-    /// variant-specific keys inside `display_variants.<key>` — Rust deserializes
-    /// the raw JSON, strips nulls, and promotes the nested object up.
-    pub(crate) fn with_promoted_display_variant(
-        &self,
-        variant_key: &str,
-    ) -> CoreResult<ValueConfig> {
-        let mut raw = serde_json::to_value(self)
-            .map_err(|e| CoreError::Config(format!("value config serialization: {e}")))?;
-        strip_json_nulls(&mut raw);
-        promote_variant_keys(&mut raw, variant_key);
+pub(crate) fn to_heading_widget_config(value: &ValueConfig) -> CoreResult<HeadingWidgetConfig> {
+    let mut raw = serde_json::to_value(value)
+        .map_err(|e| CoreError::Config(format!("heading value serialization: {e}")))?;
+    strip_json_nulls(&mut raw);
 
-        serde_json::from_value(raw).map_err(|e| CoreError::Config(format!("value config: {e}")))
-    }
+    // Promote all keys from display_variants.heading_tape to the top level
+    // so HeadingWidgetConfig can deserialize. The JS durable normalization
+    // stores heading-specific fields inside display_variants so they
+    // survive round-tripping alongside text defaults.
+    promote_variant_keys(&mut raw, "heading_tape");
 
-    pub(crate) fn to_heading_widget_config(&self) -> CoreResult<HeadingWidgetConfig> {
-        let mut raw = serde_json::to_value(self)
-            .map_err(|e| CoreError::Config(format!("heading value serialization: {e}")))?;
-        strip_json_nulls(&mut raw);
-
-        // Promote all keys from display_variants.heading_tape to the top level
-        // so HeadingWidgetConfig can deserialize. The JS durable normalization
-        // stores heading-specific fields inside display_variants so they
-        // survive round-tripping alongside text defaults.
-        promote_variant_keys(&mut raw, "heading_tape");
-
-        serde_json::from_value(raw)
-            .map_err(|e| CoreError::Config(format!("heading value config: {e}")))
-    }
+    serde_json::from_value(raw).map_err(|e| CoreError::Config(format!("heading value config: {e}")))
 }
-
 /// Promotes all keys from a nested display variant to the top level if they
 /// are not already present at the root. This ensures display-specific fields
 /// (e.g. width, height, pixels_per_degree, tick_color, etc.) are visible to

@@ -1,5 +1,5 @@
-use crate::render::format::format_number;
 use crate::render::widgets::types::GForceFrameState;
+use ovrley_widgets::widgets::value::format::format_number;
 
 pub fn g_force_frame_state(
     horizontal: Option<f64>,
