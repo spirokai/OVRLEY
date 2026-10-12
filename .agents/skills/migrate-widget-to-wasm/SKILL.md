@@ -88,9 +88,12 @@ Reuse `OverlayCanvas.jsx`'s binding (inside the existing orchestration):
 
 ```js
 const wasm = useWasmWidgets({
-  widgets, scene: wasmScene, activity, second: previewSecond,
+  widgets,
+  scene: wasmScene,
+  activity,
+  second: previewSecond,
   defaultFont: defaultValueFont,
-})
+});
 ```
 
 - `previewSecond` is the sole preview clock, including resize measurement. Do not round to an index, add an independent timer, or make Tauri render calls per frame.
@@ -111,10 +114,10 @@ Register the **wrapper** with `widgetRefCallbacks[widget.id]`; attach its child 
 Reuse `presentWidgetGeometry`, whose essential placement is:
 
 ```js
-target.style.left = `${geometry.content.left}px`
-target.style.width = `${geometry.content.width}px`
-canvas.style.left = `${geometry.left - geometry.content.left}px`
-target.dispatchEvent(new Event('wasm-widget-render', { bubbles: true }))
+target.style.left = `${geometry.content.left}px`;
+target.style.width = `${geometry.content.width}px`;
+canvas.style.left = `${geometry.left - geometry.content.left}px`;
+target.dispatchEvent(new Event("wasm-widget-render", { bubbles: true }));
 ```
 
 It also installs top/height and visibility. `useWasmWidgetInteractions` listens for this event and runs `flushSync(() => moveableRef.current?.updateRect())` for selected widgets. Keep this notification during active gestures and playback: glyph widths can change without config edits. The legacy geometry-signature effect skips active gestures and cannot replace it.
@@ -133,12 +136,12 @@ Existing metric resize intent:
 
 ```js
 current.controller.update({
-  type: 'resize',
+  type: "resize",
   geometry: {
     factor: Math.max(width / current.origin.bounds.width, 0.01),
     ...current.anchor, // normalized fixed corner + its original scene point
   },
-})
+});
 ```
 
 Rust `interaction.rs` validates that request, scales the **original** intrinsic fields, applies product size limits, prepares layout at the **current** `second`, and returns a canonical patch. For speed: font/icon sizes and icon offsets change; no persisted widget scale is introduced. Anchor correction follows the newly measured content:
@@ -152,20 +155,22 @@ Keep resolving resize when `previewSecond` changes even without a new pointer ev
 
 ## Common mistakes
 
-| Bad pattern | Correct seam |
-| --- | --- |
-| `data.font_size \|\| 32`, coerced config, unknown kind rendered as speed | Validate canonical input once; report malformed/unsupported input |
-| WASM depends on `ovrley_core`; duplicated native/WASM layout | Move shared domain code into `ovrley_widgets`; native supplies resources |
-| JS interpolates/formats values or uses DOM text bounds | Rust samples, formats, and prepares the frame |
-| Per-pointer React state -> effect -> second RAF -> render | Replace session intent; resolve in its existing RAF |
-| `draft.x += beforeTranslate[0]` | `origin.x + beforeTranslate[0]` |
-| `target.style.transform = event.transform` / bitmap scaling | Rust updates intrinsic fields and redraws; presenter installs bounds |
-| Selection uses shadow-expanded raster box | Wrapper uses tight content; raster overflows |
-| Mouseup commits last published inspector draft or rounds values | Flush controller; commit its exact patch once |
-| Session effect depends on widget count; resource chain starts on first add | Session lives with canvas; prewarm activity/default font independently |
-| Catch WASM failure and silently use legacy preview | Visible error; fix the owning contract/resource boundary |
+| Bad pattern                                                                | Correct seam                                                             |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `data.font_size \|\| 32`, coerced config, unknown kind rendered as speed   | Validate canonical input once; report malformed/unsupported input        |
+| WASM depends on `ovrley_core`; duplicated native/WASM layout               | Move shared domain code into `ovrley_widgets`; native supplies resources |
+| JS interpolates/formats values or uses DOM text bounds                     | Rust samples, formats, and prepares the frame                            |
+| Per-pointer React state -> effect -> second RAF -> render                  | Replace session intent; resolve in its existing RAF                      |
+| `draft.x += beforeTranslate[0]`                                            | `origin.x + beforeTranslate[0]`                                          |
+| `target.style.transform = event.transform` / bitmap scaling                | Rust updates intrinsic fields and redraws; presenter installs bounds     |
+| Selection uses shadow-expanded raster box                                  | Wrapper uses tight content; raster overflows                             |
+| Mouseup commits last published inspector draft or rounds values            | Flush controller; commit its exact patch once                            |
+| Session effect depends on widget count; resource chain starts on first add | Session lives with canvas; prewarm activity/default font independently   |
+| Catch WASM failure and silently use legacy preview                         | Visible error; fix the owning contract/resource boundary                 |
 
 ## Verification and completion
+
+Add only essential tests. Extend existing tests when approporiate.
 
 Extend meaningful seam tests, using these references:
 
@@ -173,7 +178,7 @@ Extend meaningful seam tests, using these references:
 - `app/src/tests/features/wasm-widgets/{widgetInteraction.test.js,useWasmWidgetInteractions.test.jsx}`: latest intent wins, original-data math, mouseup before RAF, cancel/dispose, and batched mixed-group translation.
 - `app/src/tests/features/overlay-editor/useWidgetDraftState.test.jsx` and widget-manager tests: coalesced inspector drafts and immediate WASM edits without legacy font gates.
 
-Run targeted Vitest tests from `app/`; run shared Rust tests with `cargo test --manifest-path src-tauri/Cargo.toml -p ovrley_widgets` and parity tests with `cargo test --manifest-path src-tauri/ovrley_core/Cargo.toml --test wasm_widget_preview_tests`. Add the migrated family's native tests and frontend lint as appropriate. Native seam tests do not establish actual browser/WASM behavior: exercise selection, playback/scrubbing, inspector edits, drag/resize at multiple viewport zooms, mixed groups, undo/redo, cancellation, replacement, and delete-last/add-first in the editor when available.
+Run targeted Vitest tests from `app/`; run shared Rust tests with `cargo test --manifest-path src-tauri/Cargo.toml -p ovrley_widgets` and parity tests with `cargo test --manifest-path src-tauri/ovrley_core/Cargo.toml --test wasm_widget_preview_tests`. Add the migrated family's native tests and frontend lint as appropriate. Do not run builds.
 
 **Never run builds without user permission**, including `pnpm wasm:build`; dev/Vite asset requests can trigger builds too. Reuse an already running app when available. Report any unverified browser/build behavior. Toolchain ownership is in `scripts/build-wasm.mjs`, `scripts/vite-wasm.mjs`, `.env.example`, and `vendor/skia-wasm/manifest.json`; reuse the pinned archive and existing watcher. An ordinary widget migration does not require rebuilding Skia or changing toolchain pins.
 
