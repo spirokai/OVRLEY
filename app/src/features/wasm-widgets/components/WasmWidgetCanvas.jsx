@@ -11,7 +11,7 @@ export function WasmWidgetCanvas({ widget, attach, registerNode, handleWidgetMou
       style={{ visibility: 'hidden' }}
       onMouseDown={(event) => handleWidgetMouseDown(event, widget.id)}
     >
-      <canvas ref={ref} data-wasm-widget-id={widget.id} aria-label="Speed preview" className="pointer-events-none absolute" />
+      <canvas ref={ref} data-wasm-widget-id={widget.id} aria-label={`${widget.type} preview`} className="pointer-events-none absolute" />
     </div>
   )
 }

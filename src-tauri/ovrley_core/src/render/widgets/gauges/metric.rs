@@ -6,8 +6,8 @@
 //! linear renderers.
 
 use crate::activity::schema::{DenseActivityReport, DenseSeriesReport};
-use crate::render::format::convert_standard_metric_value;
 use ovrley_widgets::model::types::MetricKind;
+use ovrley_widgets::widgets::value::format::convert_standard_metric_value;
 
 /// Maps a metric value into the inclusive normalized gauge range.
 ///

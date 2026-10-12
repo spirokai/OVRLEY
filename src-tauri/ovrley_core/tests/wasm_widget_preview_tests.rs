@@ -8,7 +8,7 @@ use ovrley_widgets::{
     render::text::validated_value_style,
     widgets::value::preview::WidgetRequest,
     widgets::value::{
-        format::format_speed_parts,
+        format::{format_metric_parts, MetricSample},
         layout::{draw_metric_parts, draw_static_metric_parts_for_value},
         validation::validate_value_widget,
     },
@@ -89,7 +89,13 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
             draw_metric_parts(
                 canvas,
                 &style,
-                &format_speed_parts(&validated, speed),
+                &format_metric_parts(
+                    &validated,
+                    &MetricSample {
+                        numeric: speed,
+                        ..MetricSample::default()
+                    },
+                ),
                 scene.scale,
                 &fonts,
                 cached,

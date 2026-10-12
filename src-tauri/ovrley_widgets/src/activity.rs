@@ -1,111 +1,247 @@
-//! Original-density preview samples. Preparation is once per activity, never per frame.
-use crate::error::{WidgetError, WidgetResult};
+//! Original-density metric sampling. Columns and bridge/hold indices are prepared once.
+use crate::{
+    error::{WidgetError, WidgetResult},
+    interpolation::{
+        collect_valid_numeric_points, interpolate_numeric_series_value, interpolate_points,
+        MissingSamplePolicy,
+    },
+    model::{
+        standard_metrics::{standard_metric_interpolation, StandardMetricInterpolationKind},
+        types::MetricKind,
+    },
+    widgets::value::{format::MetricSample, validation::ValidatedValueWidget},
+};
 use serde::Deserialize;
+use std::collections::HashMap;
 
-/// Subset of the canonical finalized activity required by this migration slice.
-/// Serde skips other telemetry columns without constructing them in WASM.
-#[derive(Deserialize)]
-pub struct PreviewActivity {
-    sample_elapsed_seconds: Vec<f64>,
-    #[serde(default)]
-    speed: Vec<Option<f64>>,
-    trim_end_seconds: f64,
+macro_rules! activity_columns {
+    ($($field:ident: $kind:ident),* $(,)?) => {
+        /// Canonical finalized columns. Missing external telemetry is an empty series.
+        #[derive(Deserialize)]
+        struct PreviewActivity {
+            sample_elapsed_seconds: Vec<f64>,
+            trim_end_seconds: f64,
+            $(#[serde(default)] $field: Vec<Option<f64>> ,)*
+            #[serde(default)] elevation: Vec<Option<f64>>,
+            #[serde(default)] barometric_altitude: Vec<Option<f64>>,
+            #[serde(default)] gear_position: Vec<Option<String>>,
+            #[serde(default)] course: Vec<(Option<f64>, Option<f64>)>,
+        }
+        impl PreviewActivity {
+            fn take_numeric(&mut self) -> HashMap<MetricKind, Vec<Option<f64>>> {
+                HashMap::from([$( (MetricKind::$kind, std::mem::take(&mut self.$field)), )*])
+            }
+        }
+    }
+}
+activity_columns! {
+    speed: Speed,
+    distance: Distance,
+    heartrate: Heartrate,
+    cadence: Cadence,
+    power: Power,
+    engine_power: EnginePower,
+    engine_load: EngineLoad,
+    temperature: Temperature,
+    calories: Calories,
+    pace: Pace,
+    g_force: GForce,
+    air_pressure: AirPressure,
+    ground_contact_time: GroundContactTime,
+    left_right_balance: LeftRightBalance,
+    stride_length: StrideLength,
+    stroke_rate: StrokeRate,
+    torque: Torque,
+    vertical_speed: VerticalSpeed,
+    vertical_ratio: VerticalRatio,
+    vertical_oscillation: VerticalOscillation,
+    core_temperature: CoreTemperature,
+    heading: Heading,
+    iso: Iso,
+    aperture: Aperture,
+    shutter_speed: ShutterSpeed,
+    focal_length: FocalLength,
+    ev: Ev,
+    color_temperature: ColorTemperature,
+    rpm: Rpm,
+    throttle_position: ThrottlePosition,
+    brake_position: BrakePosition,
+    lean_angle: LeanAngle,
+    distance_to_home: DistanceToHome,
+    total_ascent: TotalAscent
+}
+
+struct NumericColumn {
+    values: Vec<Option<f64>>,
+    points: Vec<(f64, f64)>,
+    policy: StandardMetricInterpolationKind,
+}
+impl NumericColumn {
+    fn new(
+        times: &[f64],
+        values: Vec<Option<f64>>,
+        policy: StandardMetricInterpolationKind,
+    ) -> WidgetResult<Self> {
+        if !values.is_empty() && values.len() != times.len() {
+            return Err(WidgetError::Config(
+                "finalized activity columns must align with timestamps".into(),
+            ));
+        }
+        let points = collect_valid_numeric_points(times, &values);
+        Ok(Self {
+            values,
+            points,
+            policy,
+        })
+    }
+    fn contains(&self, second: f64) -> bool {
+        self.points
+            .first()
+            .zip(self.points.last())
+            .is_some_and(|(first, last)| second >= first.0 && second <= last.0)
+    }
+    fn at(&self, times: &[f64], second: f64) -> Option<f64> {
+        match self.policy {
+            StandardMetricInterpolationKind::Linear => interpolate_points(&self.points, second),
+            StandardMetricInterpolationKind::Preserve => interpolate_numeric_series_value(
+                times,
+                &self.values,
+                second,
+                MissingSamplePolicy::Preserve,
+            ),
+            StandardMetricInterpolationKind::Hold => self
+                .points
+                .partition_point(|p| p.0 <= second + 1e-9)
+                .checked_sub(1)
+                .map(|i| self.points[i].1),
+        }
+    }
 }
 
 pub struct ActivitySampler {
-    activity: PreviewActivity,
-    valid_speed_indices: Vec<usize>,
-    right: usize,
+    times: Vec<f64>,
+    end: f64,
+    numeric: HashMap<MetricKind, NumericColumn>,
+    gear: Vec<(f64, String)>,
+    latitude: NumericColumn,
+    longitude: NumericColumn,
+    full_activity_distance: Option<f64>,
+    full_activity_total_ascent: Option<f64>,
 }
-
 impl ActivitySampler {
     pub fn from_json(bytes: &[u8]) -> WidgetResult<Self> {
-        let activity: PreviewActivity = serde_json::from_slice(bytes)
+        let mut activity: PreviewActivity = serde_json::from_slice(bytes)
             .map_err(|e| WidgetError::Config(format!("preview activity: {e}")))?;
+        let times = &activity.sample_elapsed_seconds;
         if !activity.trim_end_seconds.is_finite()
             || activity.trim_end_seconds < 0.0
-            || activity
-                .sample_elapsed_seconds
-                .iter()
-                .any(|t| !t.is_finite())
-            || activity
-                .sample_elapsed_seconds
-                .windows(2)
-                .any(|p| p[0] >= p[1])
-            || (!activity.speed.is_empty()
-                && activity.speed.len() != activity.sample_elapsed_seconds.len())
+            || times.iter().any(|t| !t.is_finite())
+            || times.windows(2).any(|p| p[0] >= p[1])
         {
             return Err(WidgetError::Config(
-                "finalized activity timestamps and speed samples must align".into(),
+                "finalized activity timestamps must be finite and increasing".into(),
             ));
         }
-        let valid_speed_indices = activity
-            .speed
+        for len in [
+            activity.gear_position.len(),
+            activity.course.len(),
+            activity.elevation.len(),
+            activity.barometric_altitude.len(),
+        ] {
+            if len != 0 && len != times.len() {
+                return Err(WidgetError::Config(
+                    "finalized activity columns must align with timestamps".into(),
+                ));
+            }
+        }
+        let altitude = if activity.barometric_altitude.iter().any(Option::is_some) {
+            std::mem::take(&mut activity.barometric_altitude)
+        } else {
+            std::mem::take(&mut activity.elevation)
+        };
+        let mut columns = activity.take_numeric();
+        columns.insert(MetricKind::Altitude, altitude);
+        let times = activity.sample_elapsed_seconds;
+        let numeric: HashMap<_, _> = columns
+            .into_iter()
+            .map(|(kind, values)| {
+                let policy = standard_metric_interpolation(kind)
+                    .expect("metric column has a manifest policy");
+                NumericColumn::new(&times, values, policy).map(|column| (kind, column))
+            })
+            .collect::<WidgetResult<_>>()?;
+        let full_activity_distance = numeric[&MetricKind::Distance].points.last().map(|p| p.1);
+        let full_activity_total_ascent =
+            numeric[&MetricKind::TotalAscent].points.last().map(|p| p.1);
+        let latitude = NumericColumn::new(
+            &times,
+            activity.course.iter().map(|p| p.0).collect(),
+            StandardMetricInterpolationKind::Linear,
+        )?;
+        let longitude = NumericColumn::new(
+            &times,
+            activity.course.iter().map(|p| p.1).collect(),
+            StandardMetricInterpolationKind::Linear,
+        )?;
+        let gear = times
             .iter()
-            .enumerate()
-            .filter_map(|(i, value)| value.filter(|v| v.is_finite()).map(|_| i))
+            .copied()
+            .zip(activity.gear_position)
+            .filter_map(|(time, value)| value.map(|value| (time, value)))
             .collect();
         Ok(Self {
-            activity,
-            valid_speed_indices,
-            right: 0,
+            times,
+            end: activity.trim_end_seconds,
+            numeric,
+            gear,
+            latitude,
+            longitude,
+            full_activity_distance,
+            full_activity_total_ascent,
         })
     }
 
-    /// Bridge missing speed samples, matching export's linear interpolation policy.
-    pub fn speed_at(&mut self, second: f64) -> Option<f64> {
-        if second < 0.0
-            || second > self.activity.trim_end_seconds
-            || self.valid_speed_indices.is_empty()
-        {
-            return None;
+    pub fn sample(&self, widget: &ValidatedValueWidget, second: f64) -> MetricSample<'_> {
+        if second < 0.0 || second > self.end {
+            return MetricSample::default();
         }
-        let indices = &self.valid_speed_indices;
-        let times = &self.activity.sample_elapsed_seconds;
-        let values = &self.activity.speed;
-        let last = indices.len() - 1;
-        if second <= times[indices[0]] {
-            return values[indices[0]];
-        }
-        if second >= times[indices[last]] {
-            return values[indices[last]];
-        }
-        let inside = self.right > 0
-            && second > times[indices[self.right - 1]]
-            && second <= times[indices[self.right]];
-        if !inside {
-            if self.right < last
-                && second > times[indices[self.right]]
-                && second <= times[indices[self.right + 1]]
-            {
-                self.right += 1;
-            } else {
-                self.right = indices.partition_point(|&i| times[i] < second);
+        let mut sample = MetricSample {
+            full_activity_distance: self.full_activity_distance,
+            full_activity_total_ascent: self.full_activity_total_ascent,
+            ..MetricSample::default()
+        };
+        match widget.metric {
+            MetricKind::GearPosition => {
+                sample.gear = self
+                    .gear
+                    .partition_point(|p| p.0 <= second + 1e-9)
+                    .checked_sub(1)
+                    .map(|i| self.gear[i].1.as_str());
+            }
+            MetricKind::GpsCoordinates => {
+                sample.latitude = self.latitude.at(&self.times, second);
+                sample.longitude = self.longitude.at(&self.times, second);
+            }
+            kind => {
+                let column = &self.numeric[&kind];
+                // Heading and coordinates retain native bridge/edge-clamping behavior.
+                sample.available = if kind == MetricKind::Heading || column.points.is_empty() {
+                    !column.values.is_empty()
+                } else {
+                    column.contains(second)
+                };
+                if sample.available {
+                    sample.numeric = column.at(&self.times, second);
+                    if kind == MetricKind::Altitude {
+                        let offset = widget
+                            .starting_altitude_m
+                            .zip(column.points.first())
+                            .map_or(0.0, |(target, first)| target - first.1);
+                        sample.numeric = sample.numeric.map(|v| v + offset);
+                    }
+                }
             }
         }
-        let left = indices[self.right - 1];
-        let right = indices[self.right];
-        let a = values[left].expect("prepared speed index is present");
-        let b = values[right].expect("prepared speed index is present");
-        crate::interpolation::interpolate_points(&[(times[left], a), (times[right], b)], second)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn original_samples_support_playback_gaps_and_backward_seeks() {
-        let mut sampler = ActivitySampler::from_json(
-            br#"{"sample_elapsed_seconds":[0,1,2,3],"speed":[0,null,20,30],"trim_end_seconds":3}"#,
-        )
-        .unwrap();
-        for (t, expected) in [(0.5, 5.0), (0.6, 6.0), (2.5, 25.0), (0.2, 2.0), (3.0, 30.0)] {
-            assert!((sampler.speed_at(t).unwrap() - expected).abs() < 1e-9);
-        }
-        assert_eq!(sampler.speed_at(-1.0), None);
-        assert_eq!(sampler.speed_at(4.0), None);
-        assert_eq!(sampler.activity.speed.len(), 4);
-        assert_eq!(sampler.valid_speed_indices, [0, 2, 3]);
+        sample
     }
 }

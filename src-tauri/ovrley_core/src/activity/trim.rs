@@ -68,10 +68,6 @@ fn trim_numeric_series(
     }
     // Boundary interpolation preserves continuity when the trim cuts through
     // the middle of a source sampling interval.
-    let missing_sample_policy = match strategy {
-        InterpolationStrategy::Hold => MissingSamplePolicy::Bridge,
-        InterpolationStrategy::Numeric(policy) => policy,
-    };
     let first_observation = data
         .iter()
         .position(Option::is_some)
@@ -86,7 +82,12 @@ fn trim_numeric_series(
         {
             None
         } else {
-            interpolate_numeric_series_value(elapsed, data, target, missing_sample_policy)
+            match strategy {
+                InterpolationStrategy::Hold => densify_hold_series(elapsed, data, &[target])[0],
+                InterpolationStrategy::Numeric(policy) => {
+                    interpolate_numeric_series_value(elapsed, data, target, policy)
+                }
+            }
         }
     };
     let start_value = boundary_value(start);

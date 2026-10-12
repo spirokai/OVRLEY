@@ -57,11 +57,11 @@ impl PreviewSession {
         if !request.second.is_finite() {
             return Err(WidgetError::Config("previewSecond must be finite".into()));
         }
-        let speed = self
-            .activity
-            .as_mut()
-            .and_then(|a| a.speed_at(request.second));
-        crate::widgets::value::interaction::resize_value(request, speed, &self.fonts)
+        crate::widgets::value::interaction::resize_value(
+            request,
+            self.activity.as_ref(),
+            &self.fonts,
+        )
     }
     pub fn replace_activity(&mut self, bytes: &[u8]) -> WidgetResult<()> {
         self.activity = if bytes.is_empty() {
@@ -94,9 +94,8 @@ impl PreviewSession {
         if !second.is_finite() {
             return Err(WidgetError::Config("previewSecond must be finite".into()));
         }
-        let speed = self.activity.as_mut().and_then(|a| a.speed_at(second));
         for widget in self.widgets.values_mut() {
-            widget.render(speed, &self.fonts)?;
+            widget.render(self.activity.as_ref(), second, &self.fonts)?;
         }
         Ok(())
     }

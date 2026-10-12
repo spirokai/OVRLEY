@@ -9,7 +9,9 @@
 //! value contract — they belong to the scene validation contract.
 
 use crate::error::{WidgetError, WidgetResult};
-use crate::model::standard_metrics::is_standard_metric;
+use crate::model::standard_metrics::{
+    is_display_type_supported, is_standard_metric, standard_metric_definition,
+};
 use crate::model::types::DisplayType;
 use crate::model::types::MetricKind;
 use crate::model::validation::{
@@ -138,6 +140,11 @@ pub fn normalize_starting_altitude_m(
         }
     };
 
+    if starting_altitude.is_some_and(|altitude| !altitude.is_finite()) {
+        return Err(WidgetError::Config(format!(
+            "{altitude_path}: must be finite"
+        )));
+    }
     Ok(starting_altitude.map(|altitude| altitude / meter_scale))
 }
 
@@ -159,6 +166,13 @@ pub fn validate_value_widget(
             "{}: display_type '{}' is outside the standard metric text/value validation slice",
             p("display_type"),
             value.display_type.as_str()
+        )));
+    }
+
+    if !is_display_type_supported(value.value, "text") {
+        return Err(WidgetError::Config(format!(
+            "{}: metric does not support text display",
+            p("value")
         )));
     }
 
@@ -307,39 +321,25 @@ fn validate_value_widget_fields(
         opacity,
     )?;
     let display_unit = require_string(value.display_unit, &p("display_unit"))?;
-    if value.value == MetricKind::Speed
-        && !matches!(display_unit.as_str(), "kmh" | "mph" | "kn" | "mps")
+    let supported_units = &standard_metric_definition(value.value)
+        .expect("standard metric validated above")
+        .supported_display_units;
+    if !supported_units
+        .iter()
+        .any(|unit| unit.value == display_unit)
     {
+        let names: Vec<_> = supported_units
+            .iter()
+            .map(|unit| format!("'{}'", unit.value))
+            .collect();
+        let expected = match names.as_slice() {
+            [only] => only.clone(),
+            [first, last] => format!("{first} or {last}"),
+            [rest @ .., last] => format!("{}, or {last}", rest.join(", ")),
+            [] => unreachable!("standard metric declares display units"),
+        };
         return Err(WidgetError::Config(format!(
-            "{}: unsupported speed unit '{display_unit}'",
-            p("display_unit")
-        )));
-    }
-    if value.value == MetricKind::GpsCoordinates
-        && !matches!(display_unit.as_str(), "latitude" | "longitude" | "both")
-    {
-        return Err(WidgetError::Config(format!(
-            "{}: expected 'latitude', 'longitude', or 'both', got '{display_unit}'",
-            p("display_unit")
-        )));
-    }
-    if value.value == MetricKind::TotalAscent && !matches!(display_unit.as_str(), "m" | "ft") {
-        return Err(WidgetError::Config(format!(
-            "{}: expected 'm' or 'ft', got '{display_unit}'",
-            p("display_unit")
-        )));
-    }
-    if value.value == MetricKind::DistanceToHome
-        && !matches!(display_unit.as_str(), "m" | "km" | "mi" | "ft")
-    {
-        return Err(WidgetError::Config(format!(
-            "{}: expected 'm', 'km', 'mi', or 'ft', got '{display_unit}'",
-            p("display_unit")
-        )));
-    }
-    if value.value == MetricKind::Calories && display_unit != "kcal" {
-        return Err(WidgetError::Config(format!(
-            "{}: expected 'kcal', got '{display_unit}'",
+            "{}: expected {expected}, got '{display_unit}'",
             p("display_unit")
         )));
     }
@@ -357,6 +357,15 @@ fn validate_value_widget_fields(
 
     // -- formatting must be explicit, not inferred later ------------------
     let formatting = if value.value == MetricKind::LeftRightBalance {
+        if !matches!(
+            value.balance_format.as_deref(),
+            Some("plain" | "percent_label" | "l_prefix" | "l_suffix")
+        ) {
+            return Err(WidgetError::Config(format!(
+                "{}: expected a supported balance format",
+                p("balance_format")
+            )));
+        }
         match (value.decimals, value.decimal_rounding) {
             (Some(decimals), None) => ValidatedValueFormatting::Balance {
                 decimals,

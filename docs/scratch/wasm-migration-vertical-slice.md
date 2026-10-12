@@ -376,3 +376,30 @@ Some relevant rules live outside that file:
 | ovrley_widgets/src/widgets/value/format.rs (src-tauri/ovrley_widgets/src/widgets/value/format.rs)     | Already-shared speed formatting and display-content types.                                                    |
 
 For migration, extract the remaining formatting rules into the shared value module, with samples and required activity metadata as inputs. Native export and WASM should supply those inputs through their respective sampling paths.
+
+### Metric text implementation — 2026-10-12
+
+The standard metric `text` slice now uses the shared renderer for every supported
+metric, including gear and GPS. Formatting, conversions, totals, affixes, and
+coordinate formatting live in `ovrley_widgets/widgets/value/format.rs`; native
+export supplies dense samples to that same implementation. Specialized time and
+gradient widgets and all other display types remain outside this migration.
+
+The preview sampler prepares canonical numeric columns and bridge/hold points
+once per finalized activity. It handles preserve gaps, barometric altitude
+selection/correction, coordinate pairs, gear labels, and full-activity totals.
+Unavailable preview samples produce placeholders; an out-of-activity playhead
+does not reuse the last reading. Numeric hold values now also remain held at
+native export trim boundaries instead of being linearly blended there.
+
+GPS drawing and selection now consume the same prepared text positions and
+bounds. Rendering and intrinsic resize both sample the selected metric at
+`previewSecond`. The existing frontend session, Moveable transactions, and
+legacy-renderer exclusions are reused through `isWasmWidget`.
+
+Verification includes all manifest text metrics and display units against native
+sampling, formatting, and pixels; the existing speed resize and frontend gesture
+suites remain in use. The shared/core unit and focused integration suites pass
+(179 tests), as do the focused frontend suites (23 tests), frontend lint, and
+diff checks. The user elected to run the build separately; actual WASM compilation
+and browser interaction verification remain unverified in this session.

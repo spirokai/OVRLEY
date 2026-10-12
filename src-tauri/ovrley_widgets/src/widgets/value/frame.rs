@@ -11,7 +11,14 @@ use crate::{
 };
 use skia_safe::Rect;
 
+pub struct PreparedText {
+    pub text: String,
+    pub reference: String,
+    pub style: ResolvedTextStyle,
+}
+
 pub struct MetricFrame {
+    pub coordinate_text: Vec<PreparedText>,
     pub value_style: ResolvedTextStyle,
     pub unit: Option<(ResolvedTextStyle, String)>,
     pub icon: Option<Rect>,
@@ -46,6 +53,11 @@ pub fn prepare_metric_frame(
     fonts: &dyn FontResolver,
     widget: &ValidatedValueWidget,
 ) -> WidgetResult<MetricFrame> {
+    if let crate::widgets::value::format::MetricDisplayContent::Coordinates(coordinate) =
+        &parts.content
+    {
+        return prepare_coordinate_frame(style, parts, coordinate, scale, fonts, widget);
+    }
     let (value, unit) = parts.standard_text();
     let value_measure = measure_text(value, style, fonts)?;
     let vertical = measure_text(metric_vertical_metrics_text(value), style, fonts)?;
@@ -91,10 +103,21 @@ pub fn prepare_metric_frame(
         &value_style,
         fonts,
     )?;
+    // Cached left-aligned icons use the stable numeric reference in native composition.
+    let icon_vertical = if crate::widgets::value::layout::static_metric_parts_for_value(widget).icon
+    {
+        measure_text(
+            crate::widgets::value::layout::NUMERIC_VERTICAL_METRICS_TEXT,
+            style,
+            fonts,
+        )?
+    } else {
+        vertical
+    };
     let icon = horizontal.icon_x.map(|x| {
         Rect::from_xywh(
             x + widget.icon_offset_x * scale,
-            metric_icon_top_from_value_layout(bottom, value_height, &vertical, icon_size)
+            metric_icon_top_from_value_layout(bottom, value_height, &icon_vertical, icon_size)
                 + widget.icon_offset_y * scale,
             icon_size,
             icon_size,
@@ -126,25 +149,47 @@ pub fn prepare_metric_frame(
     } else {
         None
     };
-    // Selection excludes line-box whitespace, shadows and raster safety padding.
-    let mut content_bounds = bounds;
+    Ok(finish_frame(
+        MetricFrame {
+            value_style,
+            unit,
+            icon,
+            bounds,
+            content_bounds: bounds,
+            content_width: horizontal.content_width,
+            coordinate_text: Vec::new(),
+        },
+        style,
+        parts,
+        Rect::from_xywh(
+            horizontal.row_origin_x,
+            style.y,
+            horizontal.content_width,
+            row_height,
+        ),
+    ))
+}
+
+/// One bounds policy for both standard rows and coordinate text runs.
+fn finish_frame(
+    mut frame: MetricFrame,
+    style: &ResolvedTextStyle,
+    parts: &MetricDisplayParts,
+    line_box: Rect,
+) -> MetricFrame {
     if style.border_color.is_some() {
-        content_bounds.outset((style.border_thickness * 0.5, style.border_thickness * 0.5));
+        frame
+            .content_bounds
+            .outset((style.border_thickness * 0.5, style.border_thickness * 0.5));
     }
-    if let Some(rect) = icon {
-        bounds.join(rect);
-        content_bounds.join(metric_icon_bounds(
+    if let Some(rect) = frame.icon {
+        frame.bounds.join(rect);
+        frame.content_bounds.join(metric_icon_bounds(
             parts.icon_asset_file.expect("visible icon asset"),
             rect,
         ));
     }
-    // Include the line box as well as glyph overhangs, icon offsets, strokes, and shadows.
-    bounds.join(Rect::from_xywh(
-        horizontal.row_origin_x,
-        style.y,
-        horizontal.content_width,
-        row_height,
-    ));
+    frame.bounds.join(line_box);
     let padding = 2.0
         + style.border_thickness * 0.5
         + if style.shadow_color.is_some() {
@@ -152,19 +197,157 @@ pub fn prepare_metric_frame(
         } else {
             0.0
         };
-    bounds.outset((padding, padding));
-    bounds = Rect::new(
-        bounds.left.floor(),
-        bounds.top.floor(),
-        bounds.right.ceil(),
-        bounds.bottom.ceil(),
+    frame.bounds.outset((padding, padding));
+    frame.bounds = Rect::new(
+        frame.bounds.left.floor(),
+        frame.bounds.top.floor(),
+        frame.bounds.right.ceil(),
+        frame.bounds.bottom.ceil(),
     );
-    Ok(MetricFrame {
-        value_style,
-        unit,
-        icon,
-        bounds,
-        content_bounds,
-        content_width: horizontal.content_width,
-    })
+    frame
+}
+
+fn prepare_coordinate_frame(
+    base_style: &ResolvedTextStyle,
+    parts: &MetricDisplayParts,
+    coordinate: &crate::widgets::value::format::MetricCoordinateDisplay,
+    scale: f32,
+    fonts: &dyn FontResolver,
+    validated: &ValidatedValueWidget,
+) -> WidgetResult<MetricFrame> {
+    let is_stacked = coordinate.lines.len() == 2;
+    let coordinate_font_size = if is_stacked {
+        base_style.font_size * 0.4
+    } else {
+        base_style.font_size
+    };
+    let line_height = coordinate_font_size * METRIC_WIDGET_LINE_HEIGHT;
+    let line_gap = if is_stacked {
+        coordinate_font_size * 0.08
+    } else {
+        0.0
+    };
+    let total_height = (line_height * coordinate.lines.len() as f32)
+        + (line_gap * coordinate.lines.len().saturating_sub(1) as f32);
+    let direction_gap = (coordinate_font_size * 0.08).max(8.0 * scale);
+    let mut line_measurements = Vec::with_capacity(coordinate.lines.len());
+    let mut value_style = base_style.clone();
+    value_style.font_size = coordinate_font_size;
+    value_style.line_height = line_height;
+    for line in &coordinate.lines {
+        let direction_measure = line
+            .direction
+            .as_deref()
+            .map(|direction| measure_text(direction, &value_style, fonts))
+            .transpose()?;
+        let value_measure = measure_text(&line.value_text, &value_style, fonts)?;
+        let direction_width = direction_measure.map_or(0.0, |measure| measure.width);
+        line_measurements.push((direction_width, value_measure.width));
+    }
+    let direction_column_width = line_measurements
+        .iter()
+        .map(|(direction_width, _)| *direction_width)
+        .fold(0.0, f32::max);
+    let value_column_width = line_measurements
+        .iter()
+        .map(|(_, value_width)| *value_width)
+        .fold(0.0, f32::max);
+    let unit_color_hex =
+        crate::widgets::value::layout::ColorHexSlice(validated.unit_color).to_hex_string();
+    let icon_size = validated.icon_size * scale;
+    let show_icon = parts.show_icon && parts.icon_asset_file.is_some();
+    let text_group_left = if show_icon {
+        icon_size + (8.0 * scale) + (base_style.font_size * 0.08).max(8.0 * scale)
+    } else {
+        0.0
+    };
+    let text_width = value_column_width
+        + if direction_column_width > 0.0 {
+            direction_column_width + direction_gap
+        } else {
+            0.0
+        };
+    let horizontal_layout = metric_horizontal_layout(
+        validated.content_alignment,
+        base_style.x,
+        show_icon.then_some(text_group_left),
+        text_width,
+        None,
+        0.0,
+    );
+    let row_height = total_height.max(if show_icon { icon_size } else { 0.0 });
+    let text_top = base_style.y + (row_height - total_height) * 0.5;
+
+    let icon = horizontal_layout.icon_x.map(|x| {
+        Rect::from_xywh(
+            x + validated.icon_offset_x * scale,
+            base_style.y + (row_height - icon_size) * 0.5 + validated.icon_offset_y * scale,
+            icon_size,
+            icon_size,
+        )
+    });
+    let mut texts = Vec::new();
+    let mut bounds = Rect::new_empty();
+    for (index, line) in coordinate.lines.iter().enumerate() {
+        let line_y = text_top + index as f32 * (line_height + line_gap);
+        let (_, value_width) = line_measurements[index];
+        let line_x = horizontal_layout.value_x;
+        let line_vertical_metrics_text = metric_vertical_metrics_text(&line.value_text);
+        if let Some(direction) = line.direction.as_deref() {
+            let mut direction_style = value_style.clone();
+            direction_style.x = line_x;
+            direction_style.y = line_y;
+            direction_style.color = parse_color(&unit_color_hex, base_style.opacity);
+            bounds.join(text_bounds(
+                direction,
+                line_vertical_metrics_text,
+                &direction_style,
+                fonts,
+            )?);
+            texts.push(PreparedText {
+                text: direction.to_owned(),
+                reference: line_vertical_metrics_text.to_owned(),
+                style: direction_style,
+            });
+        }
+
+        let mut number_style = value_style.clone();
+        number_style.x = line_x
+            + if direction_column_width > 0.0 {
+                direction_column_width + direction_gap + (value_column_width - value_width)
+            } else {
+                value_column_width - value_width
+            };
+        number_style.y = line_y;
+        bounds.join(text_bounds(
+            &line.value_text,
+            line_vertical_metrics_text,
+            &number_style,
+            fonts,
+        )?);
+        texts.push(PreparedText {
+            text: line.value_text.clone(),
+            reference: line_vertical_metrics_text.to_owned(),
+            style: number_style,
+        });
+    }
+    Ok(finish_frame(
+        MetricFrame {
+            value_style,
+            unit: None,
+            icon,
+            bounds,
+            content_bounds: bounds,
+            content_width: horizontal_layout.content_width,
+            coordinate_text: texts,
+        },
+        base_style,
+        parts,
+        Rect::from_xywh(
+            horizontal_layout.row_origin_x,
+            base_style.y,
+            horizontal_layout.content_width,
+            row_height,
+        ),
+    ))
 }

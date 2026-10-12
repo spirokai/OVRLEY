@@ -1,7 +1,15 @@
 # WASM widget interactions
 
 The document keeps the canonical widget configuration. No persisted scale field or
-CSS bitmap scaling is involved in dragging/resizing the speed/text widget.
+CSS bitmap scaling is involved in dragging/resizing metric text widgets.
+
+Every standard metric supporting `display_type: text` uses this path, including
+gear labels and GPS coordinate rows. Shared Rust formatting handles units,
+precision, affixes, totals, and altitude correction. The sampler prepares source
+columns once and applies each metric's bridge, preserve, or hold policy at the
+current `previewSecond`. Outside the activity's time range, preview shows missing
+value placeholders. Other display types and specialized time/gradient widgets
+remain on their existing render paths.
 
 WASM module loading starts at canvas mount and does not gate app startup. Module
 initialization errors are displayed by the canvas. The preview session lives for

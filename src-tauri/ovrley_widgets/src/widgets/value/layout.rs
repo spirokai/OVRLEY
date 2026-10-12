@@ -12,9 +12,7 @@ use crate::widgets::value::validation::{ContentAlignment, ValidatedValueWidget};
 use skia_safe::Canvas;
 
 pub const METRIC_WIDGET_LINE_HEIGHT: f32 = 0.92;
-const METRIC_WIDGET_OUTER_GAP_PX: f32 = 8.0;
 pub const METRIC_WIDGET_UNITS_GAP_PX: f32 = 8.0;
-const COORDINATE_DIRECTION_GAP_PX: f32 = 8.0;
 pub const MIN_UNITS_FONT_SIZE: f32 = 12.0;
 pub const METRIC_WIDGET_UNIT_RATIO: f32 = 0.28;
 
@@ -78,22 +76,6 @@ pub fn draw_metric_parts(
     static_parts: StaticMetricParts,
     validated: &ValidatedValueWidget,
 ) -> WidgetResult<()> {
-    match &parts.content {
-        crate::widgets::value::format::MetricDisplayContent::Coordinates(coordinate) => {
-            return draw_coordinate_parts(
-                canvas,
-                base_style,
-                coordinate,
-                scale,
-                fonts,
-                static_parts,
-                parts.icon_asset_file,
-                validated,
-            )
-        }
-        crate::widgets::value::format::MetricDisplayContent::Standard { .. } => {}
-    };
-
     let frame = crate::widgets::value::frame::prepare_metric_frame(
         base_style, parts, scale, fonts, validated,
     )?;
@@ -117,7 +99,6 @@ pub fn draw_prepared_metric_frame(
     validated: &ValidatedValueWidget,
     frame: &crate::widgets::value::frame::MetricFrame,
 ) -> WidgetResult<()> {
-    let (value_text, unit_text) = parts.standard_text();
     if let Some(icon) = frame.icon.filter(|_| !static_parts.icon) {
         crate::render::icons::draw_metric_icon(
             canvas,
@@ -132,6 +113,22 @@ pub fn draw_prepared_metric_frame(
             icon.width(),
         );
     }
+    if matches!(
+        parts.content,
+        crate::widgets::value::format::MetricDisplayContent::Coordinates(_)
+    ) {
+        for text in &frame.coordinate_text {
+            draw_text_with_vertical_metrics_text(
+                canvas,
+                &text.text,
+                &text.reference,
+                &text.style,
+                fonts,
+            )?;
+        }
+        return Ok(());
+    }
+    let (value_text, unit_text) = parts.standard_text();
     draw_text_with_vertical_metrics_text(
         canvas,
         value_text,
@@ -147,145 +144,12 @@ pub fn draw_prepared_metric_frame(
     Ok(())
 }
 
-/// Draws GPS coordinate lines with explicit positioning and separate direction
-/// and numeric colors. The `both` mode uses two compact 40%-size rows.
-fn draw_coordinate_parts(
-    canvas: &Canvas,
-    base_style: &ResolvedTextStyle,
-    coordinate: &crate::widgets::value::format::MetricCoordinateDisplay,
-    scale: f32,
-    fonts: &dyn crate::render::text::FontResolver,
-    static_parts: StaticMetricParts,
-    icon_asset_file: Option<&str>,
-    validated: &ValidatedValueWidget,
-) -> WidgetResult<()> {
-    let is_stacked = coordinate.lines.len() == 2;
-    let coordinate_font_size = if is_stacked {
-        base_style.font_size * 0.4
-    } else {
-        base_style.font_size
-    };
-    let line_height = coordinate_font_size * METRIC_WIDGET_LINE_HEIGHT;
-    let line_gap = if is_stacked {
-        coordinate_font_size * 0.08
-    } else {
-        0.0
-    };
-    let total_height = (line_height * coordinate.lines.len() as f32)
-        + (line_gap * coordinate.lines.len().saturating_sub(1) as f32);
-    let direction_gap = (coordinate_font_size * 0.08).max(COORDINATE_DIRECTION_GAP_PX * scale);
-    let mut line_measurements = Vec::with_capacity(coordinate.lines.len());
-    let mut value_style = base_style.clone();
-    value_style.font_size = coordinate_font_size;
-    value_style.line_height = line_height;
-    for line in &coordinate.lines {
-        let direction_measure = line
-            .direction
-            .as_deref()
-            .map(|direction| measure_text(direction, &value_style, fonts))
-            .transpose()?;
-        let value_measure = measure_text(&line.value_text, &value_style, fonts)?;
-        let direction_width = direction_measure.map_or(0.0, |measure| measure.width);
-        line_measurements.push((direction_width, value_measure.width));
-    }
-    let direction_column_width = line_measurements
-        .iter()
-        .map(|(direction_width, _)| *direction_width)
-        .fold(0.0, f32::max);
-    let value_column_width = line_measurements
-        .iter()
-        .map(|(_, value_width)| *value_width)
-        .fold(0.0, f32::max);
-    let icon_color_hex = ColorHexSlice(validated.icon_color).to_hex_string();
-    let unit_color_hex = ColorHexSlice(validated.unit_color).to_hex_string();
-    let icon_size = validated.icon_size * scale;
-    let show_icon = validated.show_icon && icon_asset_file.is_some();
-    let text_group_left = if show_icon {
-        icon_size
-            + (METRIC_WIDGET_OUTER_GAP_PX * scale)
-            + (base_style.font_size * 0.08).max(8.0 * scale)
-    } else {
-        0.0
-    };
-    let text_width = value_column_width
-        + if direction_column_width > 0.0 {
-            direction_column_width + direction_gap
-        } else {
-            0.0
-        };
-    let horizontal_layout = metric_horizontal_layout(
-        validated.content_alignment,
-        base_style.x,
-        show_icon.then_some(text_group_left),
-        text_width,
-        None,
-        0.0,
-    );
-    let row_height = total_height.max(if show_icon { icon_size } else { 0.0 });
-    let text_top = base_style.y + (row_height - total_height) * 0.5;
-
-    if show_icon && !static_parts.icon {
-        crate::render::icons::draw_metric_icon(
-            canvas,
-            icon_asset_file,
-            &icon_color_hex,
-            base_style.opacity,
-            base_style.shadow_color,
-            base_style.shadow_strength,
-            base_style.shadow_distance,
-            horizontal_layout
-                .icon_x
-                .expect("visible icon must have a horizontal position")
-                + validated.icon_offset_x * scale,
-            base_style.y + (row_height - icon_size) * 0.5 + validated.icon_offset_y * scale,
-            icon_size,
-        );
-    }
-
-    for (index, line) in coordinate.lines.iter().enumerate() {
-        let line_y = text_top + index as f32 * (line_height + line_gap);
-        let (_, value_width) = line_measurements[index];
-        let line_x = horizontal_layout.value_x;
-        let line_vertical_metrics_text = metric_vertical_metrics_text(&line.value_text);
-        if let Some(direction) = line.direction.as_deref() {
-            let mut direction_style = value_style.clone();
-            direction_style.x = line_x;
-            direction_style.y = line_y;
-            direction_style.color = parse_color(&unit_color_hex, base_style.opacity);
-            draw_text_with_vertical_metrics_text(
-                canvas,
-                direction,
-                line_vertical_metrics_text,
-                &direction_style,
-                fonts,
-            )?;
-        }
-
-        let mut number_style = value_style.clone();
-        number_style.x = line_x
-            + if direction_column_width > 0.0 {
-                direction_column_width + direction_gap + (value_column_width - value_width)
-            } else {
-                value_column_width - value_width
-            };
-        number_style.y = line_y;
-        draw_text_with_vertical_metrics_text(
-            canvas,
-            &line.value_text,
-            line_vertical_metrics_text,
-            &number_style,
-            fonts,
-        )?;
-    }
-    Ok(())
-}
-
 /// Small wrapper to present `[u8; 4]` RGBA bytes as a `#RRGGBBAA` hex string
 /// for functions that still expect a `&str` colour.
-struct ColorHexSlice([u8; 4]);
+pub(crate) struct ColorHexSlice(pub(crate) [u8; 4]);
 
 impl ColorHexSlice {
-    fn to_hex_string(&self) -> String {
+    pub(crate) fn to_hex_string(&self) -> String {
         format!(
             "#{:02x}{:02x}{:02x}{:02x}",
             self.0[0], self.0[1], self.0[2], self.0[3]

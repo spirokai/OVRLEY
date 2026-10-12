@@ -5,7 +5,7 @@ use crate::{
     preview::PreviewFonts,
     render::text::validated_value_style,
     widgets::value::{
-        format::format_speed_parts, frame::prepare_metric_frame, preview::WidgetRequest,
+        format::format_metric_parts, frame::prepare_metric_frame, preview::WidgetRequest,
         validation::validate_value_widget,
     },
 };
@@ -35,7 +35,7 @@ pub struct ResizeUpdate {
 
 pub fn resize_value(
     request: ResizeRequest,
-    speed: Option<f64>,
+    activity: Option<&crate::activity::ActivitySampler>,
     fonts: &PreviewFonts,
 ) -> WidgetResult<ResizeUpdate> {
     if !request.factor.is_finite()
@@ -56,7 +56,10 @@ pub fn resize_value(
     config.icon_offset_x *= request.factor;
     config.icon_offset_y *= request.factor;
     let style = validated_value_style(&config, &scene, scene.scale);
-    let parts = format_speed_parts(&config, speed);
+    let sample = activity
+        .map(|a| a.sample(&config, request.second))
+        .unwrap_or_default();
+    let parts = format_metric_parts(&config, &sample);
     let bounds = prepare_metric_frame(&style, &parts, scene.scale, fonts, &config)?.content_bounds;
     Ok(ResizeUpdate {
         x: config.x + request.point[0] - (bounds.left + bounds.width() * request.fixed[0]),

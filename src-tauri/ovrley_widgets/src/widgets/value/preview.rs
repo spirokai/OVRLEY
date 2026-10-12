@@ -6,7 +6,7 @@ use crate::{
     render::text::{validated_value_style, ResolvedTextStyle},
     widgets::value::{
         config::ValueConfig,
-        format::{format_speed_parts, MetricDisplayParts},
+        format::{format_metric_parts, MetricDisplayParts, MetricSample},
         frame::prepare_metric_frame,
         layout::{
             draw_prepared_metric_frame, draw_static_metric_parts_for_value,
@@ -96,19 +96,12 @@ fn surface(width: u32, height: u32) -> WidgetResult<Surface> {
 
 impl PreviewWidget {
     pub fn new(request: WidgetRequest, fonts: &PreviewFonts) -> WidgetResult<Self> {
-        if request.widget.value != crate::model::types::MetricKind::Speed
-            || request.widget.display_type != crate::model::types::DisplayType::Text
-        {
-            return Err(WidgetError::Config(
-                "WASM preview currently supports speed/text".into(),
-            ));
-        }
         let config = validate_value_widget(request.widget, 0)?;
         let scene = validate_scene_presentation(request.scene)?;
         let style = validated_value_style(&config, &scene, scene.scale);
         let static_parts = static_metric_parts_for_value(&config);
         let static_image = if static_parts.icon || static_parts.unit {
-            let parts = format_speed_parts(&config, Some(0.0));
+            let parts = format_metric_parts(&config, &MetricSample::default());
             let frame = prepare_metric_frame(&style, &parts, scene.scale, fonts, &config)?;
             let bounds = frame.bounds;
             let mut surface = surface(bounds.width() as u32, bounds.height() as u32)?;
@@ -138,8 +131,16 @@ impl PreviewWidget {
         })
     }
 
-    pub fn render(&mut self, speed: Option<f64>, fonts: &PreviewFonts) -> WidgetResult<()> {
-        let parts = format_speed_parts(&self.config, speed);
+    pub fn render(
+        &mut self,
+        activity: Option<&crate::activity::ActivitySampler>,
+        second: f64,
+        fonts: &PreviewFonts,
+    ) -> WidgetResult<()> {
+        let sample = activity
+            .map(|a| a.sample(&self.config, second))
+            .unwrap_or_default();
+        let parts = format_metric_parts(&self.config, &sample);
         if self.last_parts.as_ref() == Some(&parts) {
             return Ok(());
         }
