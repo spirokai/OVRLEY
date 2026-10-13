@@ -73,7 +73,7 @@ pub struct PreviewWidget {
     last_parts: Option<MetricDisplayParts>,
 }
 
-fn surface(width: u32, height: u32) -> WidgetResult<Surface> {
+pub(crate) fn surface(width: u32, height: u32) -> WidgetResult<Surface> {
     if width == 0
         || height == 0
         || width > 16384

@@ -8,9 +8,9 @@
 //! Shadow, border, and other scene-level properties are NOT part of the
 //! label contract — they belong to the scene validation contract.
 
-use super::raw::{LabelConfig, LabelTypography};
-use crate::error::{CoreError, CoreResult};
-use ovrley_widgets::model::validation::rgba_from_hex;
+use super::config::{LabelConfig, LabelTypography};
+use crate::error::{WidgetError, WidgetResult};
+use crate::model::validation::rgba_from_hex;
 
 // ---------------------------------------------------------------------------
 // ValidatedLabel — zero backend-side defaults
@@ -36,11 +36,15 @@ pub struct ValidatedLabel {
 /// Validates a label config and returns a `ValidatedLabel` with all
 /// output-affecting fields explicit. Missing or invalid fields cause an
 /// immediate error.
-pub fn validate_label(label: &LabelConfig, index: usize) -> CoreResult<ValidatedLabel> {
+pub fn validate_label(label: &LabelConfig, index: usize) -> WidgetResult<ValidatedLabel> {
     let p = |f: &str| format!("labels[{index}].{f}");
 
     // text: allow empty (labels can be empty by design)
     let text = label.text.clone();
+
+    if !label.x.is_finite() || !label.y.is_finite() {
+        return Err(WidgetError::Config("label coordinates must be finite".into()));
+    }
 
     // x, y: required
     // (already non-optional in LabelConfig, so always present)
@@ -51,10 +55,10 @@ pub fn validate_label(label: &LabelConfig, index: usize) -> CoreResult<Validated
         .font
         .clone()
         .or_else(|| label.font_family.clone())
-        .ok_or_else(|| CoreError::Config(format!("{}: required field missing", p("font"))))?;
+        .ok_or_else(|| WidgetError::Config(format!("{}: required field missing", p("font"))))?;
 
     if font_name.is_empty() {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: font name must not be empty",
             p("font")
         )));
@@ -63,10 +67,10 @@ pub fn validate_label(label: &LabelConfig, index: usize) -> CoreResult<Validated
     // font_size: required
     let font_size = label
         .font_size
-        .ok_or_else(|| CoreError::Config(format!("{}: required field missing", p("font_size"))))?;
+        .ok_or_else(|| WidgetError::Config(format!("{}: required field missing", p("font_size"))))?;
 
-    if font_size <= 0.0 {
-        return Err(CoreError::Config(format!(
+    if !font_size.is_finite() || font_size <= 0.0 {
+        return Err(WidgetError::Config(format!(
             "{}: must be positive, got {font_size}",
             p("font_size")
         )));
@@ -76,14 +80,14 @@ pub fn validate_label(label: &LabelConfig, index: usize) -> CoreResult<Validated
     let color_hex = label
         .color
         .as_deref()
-        .ok_or_else(|| CoreError::Config(format!("{}: required field missing", p("color"))))?;
+        .ok_or_else(|| WidgetError::Config(format!("{}: required field missing", p("color"))))?;
 
     let opacity = label
         .opacity
-        .ok_or_else(|| CoreError::Config(format!("{}: required field missing", p("opacity"))))?;
+        .ok_or_else(|| WidgetError::Config(format!("{}: required field missing", p("opacity"))))?;
 
     if !(0.0..=1.0).contains(&opacity) {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be 0.0..=1.0, got {opacity}",
             p("opacity")
         )));

@@ -6,7 +6,7 @@
 
 use crate::error::CoreResult;
 use crate::normalize::{
-    ValidatedGradientWidget, ValidatedLabel, ValidatedLapTimer, ValidatedSceneConfig,
+    ValidatedGradientWidget, ValidatedLapTimer, ValidatedSceneConfig,
     ValidatedTimeValue,
 };
 use ovrley_widgets::model::standard_widgets::widget_font_weight;
@@ -31,42 +31,6 @@ fn scene_border_color(scene: &ValidatedSceneConfig, opacity: f32) -> Option<Colo
         None
     } else {
         Some(parse_color(&scene.presentation.border_color, opacity))
-    }
-}
-
-/// Resolves a text style from a validated label and scene config.
-///
-/// All output-affecting fields are already explicit in the validated type.
-/// Shadow and border come from scene config (not part of the label contract).
-pub fn validated_label_style(
-    validated: &ValidatedLabel,
-    scene: &ValidatedSceneConfig,
-    scale: f32,
-) -> ResolvedTextStyle {
-    let opacity = validated.opacity;
-    let color = Color::from_argb(
-        validated.color[3],
-        validated.color[0],
-        validated.color[1],
-        validated.color[2],
-    );
-
-    ResolvedTextStyle {
-        x: validated.x,
-        y: validated.y,
-        font_name: Some(validated.font_name.clone()),
-        font_size: validated.font_size * scale,
-        font_weight: validated.typography.font_weight,
-        italic: validated.typography.italic,
-        letter_spacing: validated.font_size * scale * validated.typography.letter_spacing / 100.0,
-        line_height: validated.font_size * scale * 0.92,
-        color,
-        opacity,
-        shadow_color: scene_shadow_color(scene, opacity),
-        shadow_strength: scene.presentation.shadow_strength * scale,
-        shadow_distance: scene.presentation.shadow_distance * scale,
-        border_color: scene_border_color(scene, opacity),
-        border_thickness: scene.presentation.border_thickness * scale,
     }
 }
 

@@ -114,6 +114,12 @@ pub fn draw_text_with_vertical_metrics_text(
         style.y + (style.line_height - glyph_height) * 0.5 - vertical_measurement.bounds_top
     };
 
+    draw_text_blob(canvas, &blob, baseline, style);
+    Ok(())
+}
+
+/// Paint an already prepared text run, shared by static label frames and text helpers.
+pub fn draw_text_blob(canvas: &Canvas, blob: &TextBlob, baseline: f32, style: &ResolvedTextStyle) {
     if let Some(shadow_color) = style.shadow_color {
         if style.shadow_strength > 0.0 {
             if let Some(shadow_filter) = image_filters::drop_shadow_only(
@@ -143,7 +149,6 @@ pub fn draw_text_with_vertical_metrics_text(
 
     let paint = text_paint(style.color);
     canvas.draw_text_blob(&blob, Point::new(style.x, baseline), &paint);
-    Ok(())
 }
 
 /// Resolves a font from configured font directories or system fonts.
@@ -216,15 +221,15 @@ pub fn measure_text(
     })
 }
 
-struct LaidOutText {
-    blob: Option<TextBlob>,
-    measurement: MeasuredText,
+pub(crate) struct LaidOutText {
+    pub blob: Option<TextBlob>,
+    pub measurement: MeasuredText,
 }
 
 // Keep the existing whole-string layout at zero. Nonzero tracking uses intact
 // extended grapheme clusters, with gaps only between them. One blob is reused
 // for every paint layer, including shadows where overlapping runs must blur together.
-fn layout_text(text: &str, font: &Font, letter_spacing: f32) -> LaidOutText {
+pub(crate) fn layout_text(text: &str, font: &Font, letter_spacing: f32) -> LaidOutText {
     if letter_spacing == 0.0 || text.is_empty() {
         return LaidOutText {
             blob: TextBlob::from_str(text, font),

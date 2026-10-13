@@ -52,9 +52,11 @@ pub(crate) fn backend_release_preview_activity(
 pub(crate) fn backend_preview_font(
     app: tauri::AppHandle,
     font_id: String,
+    font_weight: f32,
+    italic: bool,
 ) -> Result<tauri::ipc::Response, String> {
     let paths = crate::runtime_paths::app_paths(&app)?;
-    let bytes = ovrley_core::fonts::preview_font_resource(&paths.font_dirs, &font_id)
+    let bytes = ovrley_core::fonts::preview_font_resource(&paths.font_dirs, &font_id, font_weight, italic)
         .map_err(|e| e.to_string())?;
     Ok(tauri::ipc::Response::new(bytes))
 }

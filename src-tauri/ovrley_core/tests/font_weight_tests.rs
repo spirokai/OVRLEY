@@ -4,7 +4,8 @@ use ovrley_core::commands::backend_list_system_fonts;
 use ovrley_core::commands::validate_config_value;
 use ovrley_core::normalize::parse_template_value;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::text::{measure_text, validated_label_style};
+use ovrley_core::render::text::measure_text;
+use ovrley_widgets::widgets::label::style::validated_label_style;
 use serde_json::json;
 
 #[test]
@@ -172,7 +173,7 @@ fn label_weight_changes_measurement_and_invalidates_static_cache() {
         let mut input = label_config(weight);
         input["labels"][0]["text"] = json!("Cache weight sample");
         let config = validate_config_value(&input).unwrap();
-        let style = validated_label_style(&config.labels[0], &config.scene, 1.0);
+        let style = validated_label_style(&config.labels[0], &config.scene.presentation, 1.0);
         let width = measure_text("Cache weight sample", &style, &paths.font_dirs)
             .unwrap()
             .width;
@@ -253,7 +254,7 @@ fn genuine_italic_changes_ink_bounds_and_cached_pixels_with_border_and_shadow() 
         input["scene"]["shadow_distance"] = json!(3);
         input["scene"]["border_thickness"] = json!(1);
         let config = validate_config_value(&input).unwrap();
-        let style = validated_label_style(&config.labels[0], &config.scene, 1.0);
+        let style = validated_label_style(&config.labels[0], &config.scene.presentation, 1.0);
         let measurement = measure_text(&config.labels[0].text, &style, &paths.font_dirs).unwrap();
         let layer = StaticLayer {
             backdrops: &[],
@@ -337,7 +338,7 @@ fn spacing_layout_uses_grapheme_gaps_without_trailing_advance_and_scales_with_te
         let mut label = config.labels[0].clone();
         label.typography.letter_spacing = spacing;
         label.font_size = font_size;
-        let style = validated_label_style(&label, &config.scene, scale);
+        let style = validated_label_style(&label, &config.scene.presentation, scale);
         measure_text(text, &style, &paths.font_dirs).unwrap()
     };
     // Four clusters: accented combining sequence, whitespace, supplementary character, accent.

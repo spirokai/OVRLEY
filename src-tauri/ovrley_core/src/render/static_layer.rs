@@ -4,14 +4,15 @@
 //! per-frame metric values or plot widgets. It keeps the label-image cache
 //! private and derives preview images and video base pixels from one static draw.
 
+use ovrley_widgets::widgets::label::validation::ValidatedLabel;
 use super::LabelCacheStatus;
 use crate::debug::RenderProfiler;
 use crate::error::{CoreError, CoreResult};
-use crate::normalize::{ValidatedBackdrop, ValidatedLabel, ValidatedSceneConfig};
+use crate::normalize::{ValidatedBackdrop, ValidatedSceneConfig};
 use crate::paths::AppPaths;
 use crate::render::raster::{draw_rasters, PreparedRaster};
 use crate::render::surface::{create_surface, native_n32_image_info};
-use crate::render::text::{draw_text, validated_label_style, validated_value_style};
+use crate::render::text::{validated_value_style};
 use crate::render::widgets::types::PreparedValue;
 use crate::render::widgets::{draw_backdrops_static_layer, draw_static_metric_parts_for_value};
 use ovrley_widgets::widgets::value::layout::static_metric_parts_for_value;
@@ -119,8 +120,10 @@ impl StaticLayer<'_> {
         draw_backdrops_static_layer(canvas, self.backdrops, scale);
         draw_rasters(canvas, self.rasters, scale, scene.presentation.opacity);
         for label in self.labels {
-            let style = validated_label_style(label, scene, scale);
-            draw_text(canvas, &label.text, &style, font_dirs)?;
+            let frame = ovrley_widgets::widgets::label::frame::prepare_label_frame(
+                label, &scene.presentation, &crate::fonts::NativeFonts(font_dirs),
+            )?;
+            frame.draw(canvas)?;
         }
         for value in self.values.iter().filter_map(text_value) {
             let parts = static_metric_parts_for_value(value);

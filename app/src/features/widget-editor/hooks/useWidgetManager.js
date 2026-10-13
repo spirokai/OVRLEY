@@ -17,8 +17,7 @@ import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
 import { updateLiveWidgetDraft } from '@/features/overlay-editor/utils/widgetDomHelpers'
 import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { useFontPreparation } from '@/hooks/useFonts'
-import { collectFontIds, createLabelFontSelection } from '@/lib/fonts'
-import { getPreparedFont } from '@/lib/font-resources'
+import { collectFontIds } from '@/lib/fonts'
 import { isWasmWidget } from '@/lib/widget/wasm-widget'
 
 const CONTENT_ALIGNMENT_FACTORS = {
@@ -91,11 +90,7 @@ export function useWidgetManager({ widgetLiveEdits }) {
       const state = useStore.getState()
       const currentWidget = buildConfigWidgets(state.config).find((item) => item.id === id)
       if (!currentWidget) return // A pending font edit may outlive a deleted widget.
-      const selection =
-        currentWidget.category === 'labels' && Object.hasOwn(updates, 'font')
-          ? createLabelFontSelection(getPreparedFont(updates.font), currentWidget.data)
-          : {}
-      state.setConfig(updateWidgetInConfig(state.config, id, { ...nextUpdates, ...selection }))
+      state.setConfig(updateWidgetInConfig(state.config, id, nextUpdates))
     }
     if (fontIds.length && !isWasmWidget(widget)) prepareFontEdit(id, fontIds, commit)
     else commit()

@@ -16,6 +16,109 @@ use ovrley_widgets::{
 use serde_json::{json, Value};
 use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
 
+fn label_preview() -> (PreviewSession, Value) {
+    let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
+    let mut preview = PreviewSession::default();
+    preview.fonts.register(
+        ovrley_widgets::preview::FontRequest {
+            font: "Inter.ttf".into(), font_weight: 537.0, italic: true,
+        },
+        &preview_font_resource(&font_dirs, "Inter.ttf", 537.0, true).unwrap(),
+    ).unwrap();
+    let mut scene = common::seam::explicit_scene_json();
+    scene["scale"] = json!(1.7);
+    scene["shadow_strength"] = json!(3);
+    scene["shadow_distance"] = json!(4);
+    scene["border_thickness"] = json!(2);
+    (preview, json!({
+        "type": "label", "scene": scene,
+        "widget": {
+            "text": "Label e\u{301}", "x": 120.25, "y": 60.5,
+            "font": "Inter.ttf", "font_size": 48, "font_weight": 537,
+            "italic": true, "letter_spacing": -1.25, "color": "#abcdef", "opacity": 0.8,
+        },
+    }))
+}
+
+#[test]
+fn label_pixels_match_native_and_only_config_changes_invalidate_the_static_revision() {
+    use ovrley_widgets::widgets::label::{style::validated_label_style, validation::validate_label};
+    let (mut preview, mut request) = label_preview();
+    let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+    let widget = &preview.widgets[&id];
+    let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+    let label = validate_label(&serde_json::from_value(request["widget"].clone()).unwrap(), 0).unwrap();
+    let scene = validate_scene_presentation(serde_json::from_value(request["scene"].clone()).unwrap()).unwrap();
+    let info = ImageInfo::new(
+        (geometry["width"].as_i64().unwrap() as i32, geometry["height"].as_i64().unwrap() as i32),
+        ColorType::RGBA8888, AlphaType::Premul, None,
+    );
+    let mut surface = surfaces::raster(&info, None, None).unwrap();
+    let canvas = surface.canvas();
+    canvas.clear(Color::TRANSPARENT);
+    canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
+    ovrley_core::render::text::draw_text(
+        canvas, &label.text, &validated_label_style(&label, &scene, scene.scale),
+        &[common::test_config::repo_git_root().join("fonts")],
+    ).unwrap();
+    let mut pixels = vec![0; widget.pixels().len()];
+    assert!(surface.read_pixels(&info.with_alpha_type(AlphaType::Unpremul), &mut pixels, info.width() as usize * 4, (0, 0)));
+    assert_eq!(&pixels, widget.pixels());
+    assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+    let revision = widget.revision();
+    let original_geometry = widget.geometry().clone();
+    preview.replace_activity(br#"{"sample_elapsed_seconds":[0,1],"speed":[0,20],"trim_end_seconds":1}"#).unwrap();
+    for second in [0.0, 1.0, 0.25, 50.0] {
+        preview.render(second).unwrap();
+        assert_eq!(preview.widgets[&id].revision(), revision);
+        assert_eq!(preview.widgets[&id].pixels(), &pixels);
+        assert_eq!(preview.widgets[&id].geometry(), &original_geometry);
+    }
+    preview.replace_activity(&[]).unwrap();
+    preview.render(0.0).unwrap();
+    assert_eq!(preview.widgets[&id].revision(), revision);
+    request["widget"]["text"] = json!("Edited label");
+    preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+    assert_ne!(preview.widgets[&id].revision(), revision);
+    assert_ne!(preview.widgets[&id].pixels(), &pixels);
+    request["widget"]["font_size"] = json!(0);
+    assert!(preview.update_widget(id, serde_json::from_value(request).unwrap()).is_err());
+}
+
+#[test]
+fn label_intrinsic_resize_preserves_every_opposite_corner_and_fractional_size() {
+    let (mut preview, origin) = label_preview();
+    let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
+    let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let bounds = &geometry["content"];
+    assert!(bounds["width"].as_f64().unwrap() < geometry["width"].as_f64().unwrap());
+    for fixed in [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] {
+        let point = [
+            bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0],
+            bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1],
+        ];
+        let mut gesture = origin.clone();
+        gesture["factor"] = json!(1.234375);
+        gesture["fixed"] = json!(fixed);
+        gesture["point"] = json!(point);
+        gesture["second"] = json!(17.5);
+        let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(gesture).unwrap()).unwrap()).unwrap();
+        assert_eq!(patch["font_size"], json!(59.25));
+        assert_eq!(patch.as_object().unwrap().len(), 3, "labels resize only x, y and font_size");
+        let mut committed = origin.clone();
+        committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+        preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
+        let resized: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let actual = &resized["content"];
+        let corner = [
+            actual["left"].as_f64().unwrap() + actual["width"].as_f64().unwrap() * fixed[0],
+            actual["top"].as_f64().unwrap() + actual["height"].as_f64().unwrap() * fixed[1],
+        ];
+        assert!((corner[0] - point[0]).abs() < 0.002);
+        assert!((corner[1] - point[1]).abs() < 0.002);
+    }
+}
+
 #[test]
 fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
     let root = common::test_config::repo_git_root();
@@ -25,7 +128,7 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
     )
     .unwrap();
     let mut request =
-        json!({"widget": config["values"][0], "scene": common::seam::explicit_scene_json()});
+        json!({"type": "speed", "widget": config["values"][0], "scene": common::seam::explicit_scene_json()});
     request["widget"]["font"] = json!("Inter.ttf");
     request["widget"]["x"] = json!(600.25);
     request["widget"]["y"] = json!(100.5);
@@ -36,8 +139,8 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
     preview
         .fonts
         .register(
-            "Inter.ttf".into(),
-            &preview_font_resource(&font_dirs, "Inter.ttf").unwrap(),
+            ovrley_widgets::preview::FontRequest { font: "Inter.ttf".into(), font_weight: ovrley_widgets::model::standard_widgets::widget_font_weight(), italic: false },
+            &preview_font_resource(&font_dirs, "Inter.ttf", ovrley_widgets::model::standard_widgets::widget_font_weight(), false).unwrap(),
         )
         .unwrap();
     preview
@@ -61,7 +164,7 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
         ] {
             preview.render(second).unwrap();
             let widget = &preview.widgets[&id];
-            let geometry: Value = serde_json::from_slice(&widget.geometry).unwrap();
+            let geometry: Value = serde_json::from_slice(&widget.geometry()).unwrap();
             let input: WidgetRequest = serde_json::from_value(request.clone()).unwrap();
             let validated = validate_value_widget(input.widget, 0).unwrap();
             let scene = validate_scene_presentation(input.scene).unwrap();
@@ -102,7 +205,7 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
                 &validated,
             )
             .unwrap();
-            let mut pixels = vec![0; widget.pixels.len()];
+            let mut pixels = vec![0; widget.pixels().len()];
             let read_info = info.with_alpha_type(AlphaType::Unpremul);
             assert!(surface.read_pixels(
                 &read_info,
@@ -110,21 +213,21 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
                 info.width() as usize * 4,
                 (0, 0)
             ));
-            assert_eq!(pixels, widget.pixels, "{alignment}, t={second}");
+            assert_eq!(&pixels, widget.pixels(), "{alignment}, t={second}");
             assert!(pixels.chunks_exact(4).any(|p| p[3] != 0));
-            let revision = widget.revision;
+            let revision = widget.revision();
             preview.render(second).unwrap();
             assert_eq!(
-                preview.widgets[&id].revision, revision,
+                preview.widgets[&id].revision(), revision,
                 "unchanged presentation reuses its pixels"
             );
         }
     }
     preview.replace_activity(&[]).unwrap();
     preview.render(0.5).unwrap();
-    let empty = preview.widgets[&id].pixels.clone();
+    let empty = preview.widgets[&id].pixels().clone();
     preview.render(1.5).unwrap();
-    assert_eq!(preview.widgets[&id].pixels, empty);
+    assert_eq!(preview.widgets[&id].pixels(), &empty);
     request["widget"]["font_size"] = json!(0);
     assert!(preview
         .update_widget(id, serde_json::from_value(request).unwrap())
@@ -139,7 +242,7 @@ fn live_resize_keeps_the_opposite_content_corner_fixed_and_commits_the_same_geom
     )
     .unwrap();
     let mut origin =
-        json!({"widget": config["values"][0], "scene": common::seam::explicit_scene_json()});
+        json!({"type": "speed", "widget": config["values"][0], "scene": common::seam::explicit_scene_json()});
     origin["widget"]["font"] = json!("Inter.ttf");
     origin["widget"]["x"] = json!(600.25);
     origin["widget"]["y"] = json!(100.5);
@@ -152,8 +255,8 @@ fn live_resize_keeps_the_opposite_content_corner_fixed_and_commits_the_same_geom
     preview
         .fonts
         .register(
-            "Inter.ttf".into(),
-            &preview_font_resource(&[root.join("fonts")], "Inter.ttf").unwrap(),
+            ovrley_widgets::preview::FontRequest { font: "Inter.ttf".into(), font_weight: ovrley_widgets::model::standard_widgets::widget_font_weight(), italic: false },
+            &preview_font_resource(&[root.join("fonts")], "Inter.ttf", ovrley_widgets::model::standard_widgets::widget_font_weight(), false).unwrap(),
         )
         .unwrap();
     preview
@@ -170,7 +273,7 @@ fn live_resize_keeps_the_opposite_content_corner_fixed_and_commits_the_same_geom
             .update_widget(id, serde_json::from_value(origin.clone()).unwrap())
             .unwrap();
         preview.render(0.5).unwrap();
-        let geometry: Value = serde_json::from_slice(&preview.widgets[&id].geometry).unwrap();
+        let geometry: Value = serde_json::from_slice(&preview.widgets[&id].geometry()).unwrap();
         let bounds = &geometry["content"];
         assert!(bounds["width"].as_f64().unwrap() < geometry["width"].as_f64().unwrap());
         assert!(bounds["height"].as_f64().unwrap() < geometry["height"].as_f64().unwrap());
@@ -201,7 +304,7 @@ fn live_resize_keeps_the_opposite_content_corner_fixed_and_commits_the_same_geom
                     .unwrap();
                 preview.render(1.5).unwrap();
                 let resized: Value =
-                    serde_json::from_slice(&preview.widgets[&id].geometry).unwrap();
+                    serde_json::from_slice(&preview.widgets[&id].geometry()).unwrap();
                 let actual = &resized["content"];
                 let corner = [
                     actual["left"].as_f64().unwrap() + actual["width"].as_f64().unwrap() * fixed[0],

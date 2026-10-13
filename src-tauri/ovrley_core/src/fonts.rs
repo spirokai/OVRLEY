@@ -17,13 +17,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 pub struct NativeFonts<'a>(pub &'a [PathBuf]);
 
 /// Includes font bytes and resolved variation coordinates, including system faces.
-pub fn preview_font_resource(font_dirs: &[PathBuf], id: &str) -> CoreResult<Vec<u8>> {
-    let face = resolve_typeface(
-        font_dirs,
-        id,
-        ovrley_widgets::model::standard_widgets::widget_font_weight(),
-        false,
-    )?;
+pub fn preview_font_resource(font_dirs: &[PathBuf], id: &str, font_weight: f32, italic: bool) -> CoreResult<Vec<u8>> {
+    let face = resolve_typeface(font_dirs, id, font_weight, italic)?;
     Ok(face
         .serialize(skia_safe::typeface::SerializeBehavior::DoIncludeData)
         .as_bytes()

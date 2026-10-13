@@ -1,6 +1,6 @@
 //! Intrinsic resizing policy. The editor supplies gesture geometry; shared layout owns placement.
 use crate::{
-    error::{WidgetError, WidgetResult},
+    error::WidgetResult,
     model::scene::validate_scene_presentation,
     preview::PreviewFonts,
     render::text::validated_value_style,
@@ -38,16 +38,6 @@ pub fn resize_value(
     activity: Option<&crate::activity::ActivitySampler>,
     fonts: &PreviewFonts,
 ) -> WidgetResult<ResizeUpdate> {
-    if !request.factor.is_finite()
-        || request.factor <= 0.0
-        || request
-            .fixed
-            .iter()
-            .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
-        || request.point.iter().any(|v| !v.is_finite())
-    {
-        return Err(WidgetError::Config("invalid widget resize gesture".into()));
-    }
     let mut config = validate_value_widget(request.origin.widget, 0)?;
     let scene = validate_scene_presentation(request.origin.scene)?;
     // Match the editor's existing intrinsic size limits without rounding on release.

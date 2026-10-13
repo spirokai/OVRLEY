@@ -5,8 +5,8 @@ import { resizeAnchor } from '@/features/wasm-widgets/utils/widgetGestureGeometr
 beforeEach(() => vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] }))
 afterEach(() => vi.useRealTimers())
 
-function editor() {
-  const original = { id: 'speed', data: { x: 120.25, y: 60.5, font_size: 48 } }
+function editor(type = 'speed') {
+  const original = { id: 'widget', type, data: { x: 120.25, y: 60.5, font_size: 48 } }
   let snapshot = { widgets: [original], scene: { scale: 1.5 }, second: 0 }
   let frame = null
   const presentations = []
@@ -28,7 +28,8 @@ function editor() {
     resize,
   })
   return {
-    interaction: controller.forWidget('speed'),
+    interaction: controller.forWidget('widget'),
+    render,
     presentations,
     resize,
     original,
@@ -65,7 +66,7 @@ test('resize uses original configuration and a fixed content corner across live 
   interaction.update({ type: 'resize', geometry: { factor: 1.5, ...anchor } })
   vi.advanceTimersToNextFrame()
   expect(resize).toHaveBeenCalledTimes(1)
-  expect(resize.mock.calls[0][0]).toEqual({ widget: original.data, scene: { scale: 1.5 }, second: 0, factor: 1.5, fixed: [1, 1], point: [260, 105] })
+  expect(resize.mock.calls[0][0]).toEqual({ type: 'speed', widget: original.data, scene: { scale: 1.5 }, second: 0, factor: 1.5, fixed: [1, 1], point: [260, 105] })
   const patch = draft.mock.calls[0][0]
   setSnapshot({ widgets: [{ ...original, data: { ...original.data, ...patch } }], scene: { scale: 1.5 }, second: 1 })
   interaction.update({ type: 'resize', geometry: { factor: 2, ...anchor } })
@@ -80,4 +81,24 @@ test('resize uses original configuration and a fixed content corner across live 
   expect(resize).toHaveBeenCalledTimes(2)
   expect(presentations.at(-1)).toEqual([original])
   expect(interaction.finish()).toBeNull()
+})
+
+test('label resize ignores playhead changes but flushes the final pointer intent', () => {
+  const { interaction, resize, original, setSnapshot, render } = editor('label')
+  const draft = vi.fn()
+  const origin = interaction.begin(draft)
+  const anchor = resizeAnchor(origin.bounds, [1, 1])
+  interaction.update({ type: 'resize', geometry: { factor: 1.25, ...anchor } })
+  vi.advanceTimersToNextFrame()
+  for (const second of [10, 2, 30]) {
+    setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second })
+    render()
+  }
+  expect(resize).toHaveBeenCalledTimes(1)
+  expect(draft).toHaveBeenCalledTimes(1)
+  interaction.update({ type: 'resize', geometry: { factor: 1.375, ...anchor } })
+  expect(interaction.finish().font_size).toBe(66)
+  expect(resize).toHaveBeenCalledTimes(2)
+  expect(resize.mock.lastCall[0]).toMatchObject({ type: 'label', widget: original.data, second: 30 })
+  expect(vi.getTimerCount()).toBe(0)
 })

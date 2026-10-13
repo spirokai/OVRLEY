@@ -11,7 +11,6 @@ mod elevation;
 mod g_force;
 mod gradient;
 mod heading;
-mod label;
 mod lap_timer;
 mod lean_angle;
 mod linear_gauge;
@@ -32,7 +31,7 @@ use raw::RenderConfig;
 pub use raw::{
     find_plot_value, find_plot_values, parse_config_json, parse_config_value, parse_template_json,
     parse_template_value, BackdropConfig, CoursePlotConfig, ElevationPlotConfig,
-    HeadingWidgetConfig, LabelConfig, SceneConfig, TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION,
+    HeadingWidgetConfig, SceneConfig, TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION,
 };
 
 pub use arc_gauge::{
@@ -50,7 +49,7 @@ pub use elevation::{validate_elevation_plot, validate_elevation_plots, Validated
 pub use g_force::{validate_g_force, GForceAxis, ValidatedGForceWidget};
 pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
 pub use heading::{validate_heading, ValidatedHeading};
-pub use label::{validate_label, ValidatedLabel};
+use ovrley_widgets::widgets::label::validation::{validate_label, ValidatedLabel};
 pub use lap_timer::{validate_lap_timer, LapTimerMode, ValidatedLapTimer};
 pub(crate) use lean_angle::LEAN_ANGLE_MAX_FILL_SWEEP;
 pub use lean_angle::{
@@ -279,7 +278,7 @@ fn validate_render_contents(
         .labels
         .iter()
         .enumerate()
-        .map(|(i, l)| validate_label(l, i))
+        .map(|(i, l)| validate_label(l, i).map_err(crate::error::CoreError::from))
         .collect::<CoreResult<Vec<_>>>()?;
 
     let course_plots = validate_route_plots(&raw.plots)?;

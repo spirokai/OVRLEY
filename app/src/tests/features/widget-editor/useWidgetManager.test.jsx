@@ -30,7 +30,7 @@ function createWidgetLiveEdits(renderedContentWidth) {
 }
 
 describe('useWidgetManager alignment updates', () => {
-  test('preserves styles through draft edits and commits only the latest prepared font against current label state', async () => {
+  test('preserves label drafts and commits WASM font edits without browser font preparation', async () => {
     const config = cloneSerializable(DEFAULT_CONFIG)
     config.labels = [{ ...createLabelDefaults(), id: 'label-spacing', letter_spacing: 0, font_weight: 537, italic: true }]
     config.values = [{ ...createMetricValueDefaults('speed', undefined, { displayType: 'linear' }), id: 'speed-0' }]
@@ -53,11 +53,9 @@ describe('useWidgetManager alignment updates', () => {
     act(() => result.current.updateWidgetData('label-spacing', { font: 'Slow.ttf' }))
     act(() => result.current.updateWidgetData('label-spacing', { font: 'Latest.ttf' }))
     act(() => result.current.updateWidgetData('label-spacing', { font_weight: 900 }))
-    expect(useStore.getState().config.labels[0].font).not.toBe('Latest.ttf')
-    await act(async () => fontRequests.get('Latest.ttf')())
-    expect(useStore.getState().config.labels[0]).toMatchObject({ font: 'Latest.ttf', font_weight: 700, italic: false, letter_spacing: -1.25 })
-    await act(async () => fontRequests.get('Slow.ttf')())
-    expect(useStore.getState().config.labels[0].font).toBe('Latest.ttf')
+    expect(useStore.getState().config.labels[0]).toMatchObject({ font: 'Latest.ttf', font_weight: 900, italic: true, letter_spacing: -1.25 })
+    expect(fontRequests.has('Latest.ttf')).toBe(false)
+    expect(fontRequests.has('Slow.ttf')).toBe(false)
 
     act(() => result.current.updateWidgetData('speed-0', { display_variants: { linear: { min_max_label_font: 'Pending.ttf' } } }))
     act(() => result.current.updateWidgetData('speed-0', { display_variants: { linear: { min_max_label_color: '#123456' } } }))
@@ -69,7 +67,7 @@ describe('useWidgetManager alignment updates', () => {
 
     act(() => result.current.updateWidgetData('label-spacing', { font: 'Obsolete.ttf' }))
     act(() => replaceEditorDocument(useStore, useStore.getState().createNewTemplate))
-    await act(async () => fontRequests.get('Obsolete.ttf')())
+    expect(fontRequests.has('Obsolete.ttf')).toBe(false)
     expect(useStore.getState().config.labels).toEqual([])
   })
   beforeEach(() => {

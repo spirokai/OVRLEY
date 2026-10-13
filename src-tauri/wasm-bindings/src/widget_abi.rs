@@ -3,7 +3,7 @@
 use ovrley_widgets::{
     error::{WidgetError, WidgetResult},
     preview::PreviewSession,
-    widgets::value::preview::WidgetRequest,
+    preview_widget::WidgetRequest,
 };
 
 #[derive(Default)]
@@ -73,12 +73,12 @@ pub unsafe extern "C" fn ovrley_preview_font(
 ) -> u32 {
     let session = &mut *session;
     let result = (|| {
-        let id = std::str::from_utf8(bytes(id, id_len)?)
+        let request = serde_json::from_slice(bytes(id, id_len)?)
             .map_err(|e| WidgetError::Config(e.to_string()))?;
         session
             .preview
             .fonts
-            .register(id.to_owned(), bytes(ptr, len)?)
+            .register(request, bytes(ptr, len)?)
     })();
     session.status(result)
 }
@@ -140,22 +140,22 @@ pub unsafe extern "C" fn ovrley_preview_error_len(session: *const Session) -> us
 }
 #[no_mangle]
 pub unsafe extern "C" fn ovrley_preview_pixels(session: *const Session, id: u32) -> *const u8 {
-    (&(*session).preview.widgets)[&id].pixels.as_ptr()
+    (&(*session).preview.widgets)[&id].pixels().as_ptr()
 }
 #[no_mangle]
 pub unsafe extern "C" fn ovrley_preview_geometry_ptr(
     session: *const Session,
     id: u32,
 ) -> *const u8 {
-    (&(*session).preview.widgets)[&id].geometry.as_ptr()
+    (&(*session).preview.widgets)[&id].geometry().as_ptr()
 }
 #[no_mangle]
 pub unsafe extern "C" fn ovrley_preview_geometry_len(session: *const Session, id: u32) -> usize {
-    (&(*session).preview.widgets)[&id].geometry.len()
+    (&(*session).preview.widgets)[&id].geometry().len()
 }
 #[no_mangle]
 pub unsafe extern "C" fn ovrley_preview_revision(session: *const Session, id: u32) -> u32 {
-    (&(*session).preview.widgets)[&id].revision
+    (&(*session).preview.widgets)[&id].revision()
 }
 
 #[no_mangle]

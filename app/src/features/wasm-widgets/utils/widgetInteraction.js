@@ -1,3 +1,5 @@
+import { isTimeDependentWasmWidget } from '@/lib/widget/wasm-widget'
+
 const targets = new WeakMap()
 
 /** @param {HTMLElement} target Rendered widget wrapper. @returns {object} Its preview interaction controller. */
@@ -34,7 +36,7 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
           const widget = snapshot.widgets.find((item) => item.id === id)
           if (!widget) throw new Error(`Missing WASM widget: ${id}`)
           const geometry = getGeometry(id)
-          active = { id, data: widget.data, scene: snapshot.scene, intent: null, patch: null, onDraft, resolvedIntent: null, second: null }
+          active = { id, type: widget.type, data: widget.data, scene: snapshot.scene, intent: null, patch: null, onDraft, resolvedIntent: null, second: null }
           return { data: widget.data, bounds: geometry.content }
         },
         update(intent) {
@@ -59,11 +61,11 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
     resolve(snapshot) {
       if (!active || !active.intent) return snapshot.widgets
       const { intent } = active
-      if (active.resolvedIntent !== intent || (intent.type === 'resize' && active.second !== snapshot.second)) {
+      if (active.resolvedIntent !== intent || (intent.type === 'resize' && isTimeDependentWasmWidget(active) && active.second !== snapshot.second)) {
         const patch =
           intent.type === 'drag'
             ? { x: active.data.x + intent.translate[0], y: active.data.y + intent.translate[1] }
-            : resize({ widget: active.data, scene: active.scene, second: snapshot.second, ...intent.geometry })
+            : resize({ type: active.type, widget: active.data, scene: active.scene, second: snapshot.second, ...intent.geometry })
         const changed = JSON.stringify(patch) !== JSON.stringify(active.patch)
         active.patch = patch
         active.resolvedIntent = intent
@@ -77,3 +79,4 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
     },
   }
 }
+

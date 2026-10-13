@@ -3,19 +3,27 @@ use crate::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
     render::text::FontResolver,
-    widgets::value::preview::{PreviewWidget, WidgetRequest},
+    preview_widget::{PreviewWidget, WidgetRequest, ResizeRequest, ResizeUpdate},
 };
 use skia_safe::{FontMgr, Typeface};
 use std::collections::BTreeMap;
 
 #[derive(Default)]
-pub struct PreviewFonts(BTreeMap<String, Typeface>);
+pub struct PreviewFonts(BTreeMap<(String, u32, bool), Typeface>);
+
+#[derive(serde::Deserialize)]
+pub struct FontRequest {
+    pub font: String,
+    #[serde(deserialize_with = "crate::widgets::label::config::deserialize_font_weight")]
+    pub font_weight: f32,
+    pub italic: bool,
+}
 
 impl PreviewFonts {
-    pub fn register(&mut self, id: String, bytes: &[u8]) -> WidgetResult<()> {
+    pub fn register(&mut self, request: FontRequest, bytes: &[u8]) -> WidgetResult<()> {
         let face = Typeface::make_deserialize(bytes, FontMgr::default())
-            .ok_or_else(|| WidgetError::Render(format!("unable to load font resource: {id}")))?;
-        self.0.insert(id, face);
+            .ok_or_else(|| WidgetError::Render(format!("unable to load font resource: {}", request.font)))?;
+        self.0.insert((request.font, request.font_weight.to_bits(), request.italic), face);
         Ok(())
     }
 }
@@ -27,15 +35,10 @@ impl FontResolver for PreviewFonts {
         weight: f32,
         italic: bool,
     ) -> WidgetResult<Typeface> {
-        if weight != crate::model::standard_widgets::widget_font_weight() || italic {
-            return Err(WidgetError::Render(
-                "preview font resource does not support the requested style".into(),
-            ));
-        }
         let name =
             name.ok_or_else(|| WidgetError::Render("preview requires a font identity".into()))?;
         self.0
-            .get(name)
+            .get(&(name.to_owned(), weight.to_bits(), italic))
             .cloned()
             .ok_or_else(|| WidgetError::Render(format!("font not registered: {name}")))
     }
@@ -52,16 +55,22 @@ pub struct PreviewSession {
 impl PreviewSession {
     pub fn resize_widget(
         &mut self,
-        request: crate::widgets::value::interaction::ResizeRequest,
-    ) -> WidgetResult<crate::widgets::value::interaction::ResizeUpdate> {
+        request: ResizeRequest,
+    ) -> WidgetResult<ResizeUpdate> {
         if !request.second.is_finite() {
             return Err(WidgetError::Config("previewSecond must be finite".into()));
         }
-        crate::widgets::value::interaction::resize_value(
-            request,
-            self.activity.as_ref(),
-            &self.fonts,
-        )
+        if !request.factor.is_finite() || request.factor <= 0.0
+            || request.fixed.iter().any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+            || request.point.iter().any(|v| !v.is_finite()) {
+            return Err(WidgetError::Config("invalid widget resize gesture".into()));
+        }
+        match request.origin {
+            WidgetRequest::Label {widget, scene} => Ok(ResizeUpdate::Label(crate::widgets::label::interaction::resize_label(widget, scene, request.factor, request.fixed, request.point, &self.fonts)?)),
+            WidgetRequest::Value(origin) => Ok(ResizeUpdate::Value(crate::widgets::value::interaction::resize_value(
+                crate::widgets::value::interaction::ResizeRequest {origin, factor: request.factor, fixed: request.fixed, point: request.point, second: request.second}, self.activity.as_ref(), &self.fonts,
+            )?)),
+        }
     }
     pub fn replace_activity(&mut self, bytes: &[u8]) -> WidgetResult<()> {
         self.activity = if bytes.is_empty() {
@@ -86,7 +95,7 @@ impl PreviewSession {
             .widgets
             .get(&id)
             .ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?;
-        replacement.revision = previous.revision;
+        replacement.inherit_revision(previous.revision());
         self.widgets.insert(id, replacement);
         Ok(())
     }
@@ -95,7 +104,10 @@ impl PreviewSession {
             return Err(WidgetError::Config("previewSecond must be finite".into()));
         }
         for widget in self.widgets.values_mut() {
-            widget.render(self.activity.as_ref(), second, &self.fonts)?;
+            // Labels are fully rendered on creation/update and never visit the playhead path.
+            if let PreviewWidget::Value(widget) = widget {
+                widget.render(self.activity.as_ref(), second, &self.fonts)?;
+            }
         }
         Ok(())
     }

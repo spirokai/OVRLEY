@@ -1,2 +1,3 @@
 //! Widget implementations grouped by family.
 pub mod value;
+pub mod label;

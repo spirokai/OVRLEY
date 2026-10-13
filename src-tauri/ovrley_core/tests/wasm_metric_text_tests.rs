@@ -50,7 +50,7 @@ fn request(metric: &str, unit: &str) -> Value {
     scene["border_thickness"] = json!(1.5);
     scene["shadow_strength"] = json!(3);
     scene["shadow_distance"] = json!(4);
-    json!({"widget": widget, "scene": scene})
+    json!({"type": metric, "widget": widget, "scene": scene})
 }
 
 #[test]
@@ -60,8 +60,8 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
     preview
         .fonts
         .register(
-            "Inter.ttf".into(),
-            &preview_font_resource(&font_dirs, "Inter.ttf").unwrap(),
+            ovrley_widgets::preview::FontRequest { font: "Inter.ttf".into(), font_weight: ovrley_widgets::model::standard_widgets::widget_font_weight(), italic: false },
+            &preview_font_resource(&font_dirs, "Inter.ttf", ovrley_widgets::model::standard_widgets::widget_font_weight(), false).unwrap(),
         )
         .unwrap();
     for definition in manifest()["definitions"].as_array().unwrap() {
@@ -111,7 +111,7 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
                     assert_eq!(sampled, expected, "{metric}/{unit:?} at {second}");
                     preview.render(second).unwrap();
                     let widget = &preview.widgets[&id];
-                    let geometry: Value = serde_json::from_slice(&widget.geometry).unwrap();
+                    let geometry: Value = serde_json::from_slice(&widget.geometry()).unwrap();
                     let info = ImageInfo::new(
                         (
                             geometry["width"].as_i64().unwrap() as i32,
@@ -147,7 +147,7 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
                         &validated,
                     )
                     .unwrap();
-                    let mut pixels = vec![0; widget.pixels.len()];
+                    let mut pixels = vec![0; widget.pixels().len()];
                     assert!(surface.read_pixels(
                         &info.with_alpha_type(AlphaType::Unpremul),
                         &mut pixels,
@@ -155,13 +155,13 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
                         (0, 0)
                     ));
                     assert_eq!(
-                        pixels, widget.pixels,
+                        &pixels, widget.pixels(),
                         "pixels: {metric}/{unit:?}/{alignment} at {second}"
                     );
                     assert!(pixels.chunks_exact(4).any(|p| p[3] != 0));
-                    let revision = widget.revision;
+                    let revision = widget.revision();
                     preview.render(second).unwrap();
-                    assert_eq!(preview.widgets[&id].revision, revision);
+                    assert_eq!(preview.widgets[&id].revision(), revision);
                 }
                 preview.widgets.remove(&id);
             }

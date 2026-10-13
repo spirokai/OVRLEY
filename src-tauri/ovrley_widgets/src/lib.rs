@@ -7,3 +7,4 @@ pub mod model;
 pub mod preview;
 pub mod render;
 pub mod widgets;
+pub mod preview_widget;
