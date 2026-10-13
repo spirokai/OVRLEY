@@ -3,7 +3,10 @@ use crate::{error::WidgetResult, model::{scene::ScenePresentationConfig, types::
 use serde::{Deserialize, Deserializer, Serialize};
 use crate::widgets::backdrop::{config::BackdropConfig, preview::PreviewBackdrop};
 
+use crate::widgets::raster::{config::RasterConfig, preview::{PreviewRaster, PreviewImages}};
+
 pub enum WidgetRequest {
+    Raster { widget: RasterConfig, scene: ScenePresentationConfig },
     Backdrop { widget: BackdropConfig, scene: ScenePresentationConfig },
     Label { widget: LabelConfig, scene: ScenePresentationConfig },
     Value(ValueRequest),
@@ -22,6 +25,8 @@ impl<'de> Deserialize<'de> for WidgetRequest {
             Ok(Self::Label { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene })
         } else if input.r#type == "backdrop" {
             Ok(Self::Backdrop { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene })
+        } else if input.r#type == "raster" {
+            Ok(Self::Raster { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene })
         } else {
             let metric: MetricKind = serde_json::from_value(input.r#type.into()).map_err(serde::de::Error::custom)?;
             let widget: ValueConfig = serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?;
@@ -34,30 +39,33 @@ impl<'de> Deserialize<'de> for WidgetRequest {
 }
 
 pub enum PreviewWidget {
+    Raster(PreviewRaster),
     Backdrop(PreviewBackdrop),
     Label(PreviewLabel),
     Value(ValuePreview),
 }
 
 impl PreviewWidget {
-    pub fn new(request: WidgetRequest, fonts: &PreviewFonts) -> WidgetResult<Self> {
+    pub fn new(request: WidgetRequest, fonts: &PreviewFonts, images: &PreviewImages) -> WidgetResult<Self> {
         match request {
+            WidgetRequest::Raster {widget, scene} => Ok(Self::Raster(PreviewRaster::new(widget, scene, images)?)),
             WidgetRequest::Backdrop {widget, scene} => Ok(Self::Backdrop(PreviewBackdrop::new(widget, scene)?)),
             WidgetRequest::Label {widget, scene} => Ok(Self::Label(PreviewLabel::new(widget, scene, fonts)?)),
             WidgetRequest::Value(request) => Ok(Self::Value(ValuePreview::new(request, fonts)?)),
         }
     }
     pub fn pixels(&self) -> &Vec<u8> {
-        match self { Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
+        match self { Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
     }
     pub fn geometry(&self) -> &Vec<u8> {
-        match self { Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
+        match self { Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
     }
     pub fn revision(&self) -> u32 {
-        match self { Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Value(widget) => widget.revision }
+        match self { Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Value(widget) => widget.revision }
     }
     pub fn inherit_revision(&mut self, previous: u32) {
         match self {
+            Self::Raster(widget) => widget.revision = previous.wrapping_add(1),
             Self::Backdrop(widget) => widget.revision = previous.wrapping_add(1),
             Self::Label(widget) => widget.revision = previous.wrapping_add(1),
             Self::Value(widget) => widget.revision = previous,
@@ -80,6 +88,7 @@ pub struct ResizeRequest {
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum ResizeUpdate {
+    Raster(crate::widgets::raster::interaction::ResizeUpdate),
     Backdrop(crate::widgets::backdrop::interaction::ResizeUpdate),
     Label(crate::widgets::label::interaction::ResizeUpdate),
     Value(crate::widgets::value::interaction::ResizeUpdate),

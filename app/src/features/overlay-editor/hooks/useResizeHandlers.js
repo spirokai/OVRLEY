@@ -4,7 +4,7 @@
 
 import { updateLiveWidgetDraft } from '../utils/widgetDomHelpers'
 import { buildFrameInteractionLayout, captureWidgetLayout, getWidgetInteractionPosition } from '../utils/widgetInteractionGeometry'
-import { buildLiveResizeUpdate, buildResizeUpdate, captureResizeOrigin, constrainRasterResize } from '../utils/widgetResizeScaling'
+import { buildLiveResizeUpdate, buildResizeUpdate, captureResizeOrigin } from '../utils/widgetResizeScaling'
 import { isFramedWidget } from '@/lib/widget/display-type-behavior'
 
 /**
@@ -64,8 +64,7 @@ export function useResizeHandlers({
       const nextX = origin.x + drag.beforeTranslate[0]
       const nextY = origin.y + drag.beforeTranslate[1]
       const frameScale = isFramedWidget(selectedWidget) ? globalScale : 1
-      const frame = { x: nextX, y: nextY, width: Math.max(width / frameScale, 8), height: Math.max(height / frameScale, 8) }
-      const resized = selectedWidget.type === 'raster' ? constrainRasterResize(origin, frame, frameScale) : frame
+      const resized = { x: nextX, y: nextY, width: Math.max(width / frameScale, 8), height: Math.max(height / frameScale, 8) }
       const liveResizeUpdate = buildLiveResizeUpdate(origin, resized, selectedWidget)
       const liveLayout = buildFrameInteractionLayout(origin.layout, {
         width: resized.width * frameScale,

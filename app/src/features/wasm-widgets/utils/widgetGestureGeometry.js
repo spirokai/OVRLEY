@@ -12,8 +12,11 @@ export function dragTranslation(gesture, delta, locked) {
   return gesture.axis === 'x' ? [x, 0] : [0, y]
 }
 
-/** @param {object} bounds Rust content rectangle. @param {number[]} direction Moveable handle direction. @returns {object} Fixed corner constraint. */
-export function resizeAnchor(bounds, direction) {
+/** @param {object} bounds Rust content rectangle. @param {number[]} direction Moveable handle direction. @param {number} rotation Frame rotation in degrees. @returns {object} Fixed corner constraint. */
+export function resizeAnchor(bounds, direction, rotation = 0) {
   const fixed = direction.map((value) => (1 - value) / 2)
-  return { fixed, point: [bounds.left + bounds.width * fixed[0], bounds.top + bounds.height * fixed[1]] }
+  const angle = (rotation * Math.PI) / 180
+  const x = bounds.width * fixed[0]
+  const y = bounds.height * fixed[1]
+  return { fixed, point: [bounds.left + x * Math.cos(angle) - y * Math.sin(angle), bounds.top + x * Math.sin(angle) + y * Math.cos(angle)] }
 }

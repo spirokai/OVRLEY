@@ -84,6 +84,18 @@ pub unsafe extern "C" fn ovrley_preview_font(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_image(
+    session: *mut Session, id: *const u8, id_len: usize, ptr: *const u8, len: usize,
+) -> u32 {
+    let session = &mut *session;
+    let result = (|| {
+        let id = std::str::from_utf8(bytes(id, id_len)?).map_err(|e| WidgetError::Config(e.to_string()))?;
+        session.preview.images.register(id.to_owned(), bytes(ptr, len)?)
+    })();
+    session.status(result)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn ovrley_preview_widget_create(
     session: *mut Session,
     ptr: *const u8,

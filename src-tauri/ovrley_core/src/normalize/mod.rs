@@ -63,7 +63,7 @@ use ovrley_widgets::model::scene::{
 };
 use ovrley_widgets::widgets::value::validation::{validate_value_widget, ValidatedValueWidget};
 pub use raster::validate_template_rasters;
-pub use raster::{RasterGeometry, RasterSource, ValidatedRaster};
+pub use raster::{RasterSource, ValidatedRaster};
 pub use route::{validate_route_plot, validate_route_plots, ValidatedRoutePlot};
 pub use scene::{
     validate_ffmpeg_config, validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig,

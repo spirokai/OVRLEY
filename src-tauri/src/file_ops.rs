@@ -89,8 +89,8 @@ pub(crate) struct RasterSelectionError {
     message: String,
 }
 
-impl From<ovrley_core::raster::RasterError> for RasterSelectionError {
-    fn from(error: ovrley_core::raster::RasterError) -> Self {
+impl From<ovrley_widgets::widgets::raster::error::RasterError> for RasterSelectionError {
+    fn from(error: ovrley_widgets::widgets::raster::error::RasterError) -> Self {
         Self {
             code: error.code(),
             message: error.to_string(),

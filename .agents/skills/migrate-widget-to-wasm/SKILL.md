@@ -170,7 +170,7 @@ Keep resolving resize when `previewSecond` changes even without a new pointer ev
 
 ## Verification and completion
 
-Add only essential tests. Extend existing tests when approporiate.
+IMPORTANT!: Only essential tests must be added, no test spamming. Extend existing tests when approporiate.
 
 Extend meaningful seam tests, using these references:
 
@@ -178,7 +178,7 @@ Extend meaningful seam tests, using these references:
 - `app/src/tests/features/wasm-widgets/{widgetInteraction.test.js,useWasmWidgetInteractions.test.jsx}`: latest intent wins, original-data math, mouseup before RAF, cancel/dispose, and batched mixed-group translation.
 - `app/src/tests/features/overlay-editor/useWidgetDraftState.test.jsx` and widget-manager tests: coalesced inspector drafts and immediate WASM edits without legacy font gates.
 
-Run targeted Vitest tests from `app/`; run shared Rust tests with `cargo test --manifest-path src-tauri/Cargo.toml -p ovrley_widgets` and parity tests with `cargo test --manifest-path src-tauri/ovrley_core/Cargo.toml --test wasm_widget_preview_tests`. Add the migrated family's native tests and frontend lint as appropriate. Do not run builds.
+Run targeted Vitest tests from `app/`; run shared Rust tests with `cargo test --manifest-path src-tauri/Cargo.toml -p ovrley_widgets` and parity tests with `cargo test --manifest-path src-tauri/ovrley_core/Cargo.toml --test wasm_widget_preview_tests`. Do not run builds.
 
 **Never run builds without user permission**, including `pnpm wasm:build`; dev/Vite asset requests can trigger builds too. Reuse an already running app when available. Report any unverified browser/build behavior. Toolchain ownership is in `scripts/build-wasm.mjs`, `scripts/vite-wasm.mjs`, `.env.example`, and `vendor/skia-wasm/manifest.json`; reuse the pinned archive and existing watcher. An ordinary widget migration does not require rebuilding Skia or changing toolchain pins.
 

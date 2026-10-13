@@ -2,3 +2,4 @@
 pub mod value;
 pub mod label;
 pub mod backdrop;
+pub mod raster;

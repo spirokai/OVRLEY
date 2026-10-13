@@ -104,6 +104,7 @@ dependencies = [
  "log",
  "open",
  "ovrley_core",
+ "ovrley_widgets",
  "reqwest",
  "serde",
  "serde_json",
@@ -2845,6 +2846,7 @@ dependencies = [
 name = "ovrley_widgets"
 version = "0.1.0"
 dependencies = [
+ "image",
  "serde",
  "serde_json",
  "skia-safe",

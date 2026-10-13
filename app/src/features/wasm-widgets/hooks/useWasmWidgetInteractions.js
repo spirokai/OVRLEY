@@ -92,7 +92,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     onResizeStart: ({ target, direction, set, dragStart }) => {
       const current = begin(target, 'wasm-resize')
       const { bounds } = current.origin
-      current.anchor = resizeAnchor(bounds, direction)
+      current.anchor = resizeAnchor(bounds, direction, selectedWidget.type === 'raster' ? current.origin.data.rotation : 0)
       set([bounds.width, bounds.height])
       if (dragStart) dragStart.set([0, 0])
     },
@@ -102,7 +102,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       current.controller.update({
         type: 'resize',
         geometry: {
-          ...(selectedWidget.type === 'backdrop'
+          ...(selectedWidget.type === 'backdrop' || selectedWidget.type === 'raster'
             ? { size: [Math.max(width, 0.01), Math.max(height, 0.01)] }
             : { factor: Math.max(width / current.origin.bounds.width, 0.01) }),
           ...current.anchor,
@@ -110,6 +110,16 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       })
     },
     onResizeEnd: finish,
+    onRotateStart: ({ target, set }) => {
+      const current = begin(target, 'wasm-rotate')
+      set(current.origin.data.rotation)
+    },
+    onRotate: ({ beforeRotate, drag }) => {
+      const current = gesture.current
+      if (!current) return
+      current.controller.update({ type: 'rotate', rotation: beforeRotate, translate: drag.beforeTranslate })
+    },
+    onRotateEnd: finish,
     onDragGroupStart: ({ events }) => {
       const ids = selectedWidgets.map((widget) => widget.id)
       state.beginWidgetInteraction(ids[0], 'wasm-group-drag')

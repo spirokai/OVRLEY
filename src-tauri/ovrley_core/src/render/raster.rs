@@ -1,10 +1,10 @@
 //! Prepares oriented raster images once per render job and draws their scene geometry.
 
 use crate::error::{CoreError, CoreResult};
-use crate::normalize::{RasterGeometry, RasterSource, ValidatedRaster};
+use crate::normalize::{RasterSource, ValidatedRaster};
+use ovrley_widgets::widgets::raster::{validation::RasterGeometry, image::downsample_raster, frame::RasterFrame};
 use crate::raster::load_selected_raster;
-use image::{imageops, RgbaImage};
-use skia_safe::{images, AlphaType, Canvas, ColorType, Data, FilterMode, Image, Paint, Rect};
+use skia_safe::{Canvas, Data, Image};
 use std::sync::Arc;
 
 pub struct PreparedRaster {
@@ -33,7 +33,7 @@ pub(super) fn prepare_rasters(
                     config.id, config.id
                 ))
             })?;
-            let image = downsample_raster(image, config, global_scale)?;
+            let image = downsample_raster(image, &config.geometry, &config.id, global_scale)?;
             Ok(PreparedRaster {
                 geometry: config.geometry.clone(),
                 content_hash: selected.content_hash(),
@@ -43,74 +43,9 @@ pub(super) fn prepare_rasters(
         .collect()
 }
 
-fn downsample_raster(
-    image: Image,
-    config: &ValidatedRaster,
-    global_scale: f32,
-) -> CoreResult<Image> {
-    // Keep subpixel widgets at one pixel and avoid allocating enlarged source images.
-    let width =
-        ((config.geometry.width * global_scale).ceil() as u32).clamp(1, image.width() as u32);
-    let height =
-        ((config.geometry.height * global_scale).ceil() as u32).clamp(1, image.height() as u32);
-    if (width, height) == (image.width() as u32, image.height() as u32) {
-        return Ok(image);
-    }
-    let info = image
-        .image_info()
-        .with_color_type(ColorType::RGBA8888)
-        .with_alpha_type(AlphaType::Premul);
-    let mut pixels = RgbaImage::new(image.width() as u32, image.height() as u32);
-    if !image.read_pixels(
-        &info,
-        pixels.as_mut(),
-        image.width() as usize * 4,
-        (0, 0),
-        skia_safe::image::CachingHint::Allow,
-    ) {
-        return Err(CoreError::Render(format!(
-            "Raster {} pixels could not be read for resizing",
-            config.id
-        )));
-    }
-    // Filter premultiplied colors to prevent transparent pixels from bleeding into edges.
-    let resized = imageops::resize(&pixels, width, height, imageops::FilterType::Triangle);
-    images::raster_from_data(
-        &info.with_dimensions((width as i32, height as i32)),
-        Data::new_copy(resized.as_raw()),
-        width as usize * 4,
-    )
-    .ok_or_else(|| {
-        CoreError::Render(format!(
-            "Raster {} resized image could not be created",
-            config.id
-        ))
-    })
-}
-
-pub(super) fn draw_rasters(
-    canvas: &Canvas,
-    rasters: &[PreparedRaster],
-    global_scale: f32,
-    global_opacity: f32,
-) {
+pub(super) fn draw_rasters(canvas: &Canvas, rasters: &[PreparedRaster], global_scale: f32, global_opacity: f32) {
     for raster in rasters {
-        let config = &raster.geometry;
-        let mut paint = Paint::default();
-        paint.set_anti_alias(true);
-        paint.set_alpha_f(config.opacity * global_opacity);
-        canvas.save();
-        canvas.translate((config.x, config.y));
-        canvas.rotate(config.rotation, None);
-        canvas.scale((global_scale, global_scale));
-        canvas.draw_image_rect_with_sampling_options(
-            &raster.image,
-            None,
-            Rect::from_xywh(0.0, 0.0, config.width, config.height),
-            FilterMode::Linear,
-            &paint,
-        );
-        canvas.restore();
+        RasterFrame::new(&raster.geometry, global_scale).draw(canvas, Some(&raster.image), global_opacity);
     }
 }
 
@@ -136,7 +71,7 @@ mod tests {
             .unwrap();
         let config = ValidatedRaster {
             id: id.into(),
-            geometry: crate::normalize::RasterGeometry {
+            geometry: ovrley_widgets::widgets::raster::validation::RasterGeometry {
                 x,
                 y,
                 width,
@@ -205,6 +140,44 @@ mod tests {
         assert!((185..=200).contains(&inside[1]));
         assert_eq!(inside[1], inside[2]);
         assert_eq!(image.get_pixel(7, 3).0, [255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn wasm_pixels_match_native_rasters_with_rotation_downsampling_and_opacity() {
+        use ovrley_widgets::preview::PreviewSession;
+        use serde_json::json;
+        use skia_safe::{AlphaType, ColorType, ImageInfo};
+        let source = RgbaImage::from_fn(80, 40, |x, y| Rgba([x as u8 * 3, y as u8 * 5, 120, if x < 40 { 120 } else { 255 }]));
+        let mut encoded = Vec::new();
+        DynamicImage::ImageRgba8(source).write_to(&mut Cursor::new(&mut encoded), ImageFormat::Png).unwrap();
+        let selected = Arc::new(crate::raster::load_embedded_raster("png", encoded).unwrap());
+        let mut preview = PreviewSession::default();
+        preview.images.register("selected".into(), selected.preview_png()).unwrap();
+        for rotation in [0.0, 37.0, 90.0, 230.0] {
+            let config = ValidatedRaster {
+                id: "raster".into(),
+                geometry: RasterGeometry { x: 110.25, y: 70.5, width: 21.25, height: 10.625, rotation, opacity: 0.7 },
+                source: RasterSource::Image(Arc::clone(&selected)),
+            };
+            let id = preview.create_widget(serde_json::from_value(json!({
+                "type": "raster",
+                "widget": { "id":"raster", "x":110.25, "y":70.5, "width":21.25, "height":10.625, "rotation":rotation, "opacity":0.7, "path":"/image.png", "resourceId":"selected" },
+                "scene": { "width":1920, "height":1080, "scale":1.7, "opacity":0.6, "shadow_color":"#000000", "shadow_strength":0, "shadow_distance":0, "border_color":"#000000", "border_thickness":0 }
+            })).unwrap()).unwrap();
+            let widget = &preview.widgets[&id];
+            let geometry: serde_json::Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let width = geometry["width"].as_i64().unwrap() as i32;
+            let height = geometry["height"].as_i64().unwrap() as i32;
+            let mut surface = crate::render::surface::create_surface(width as u32, height as u32).unwrap();
+            surface.canvas().clear(skia_safe::Color::TRANSPARENT);
+            surface.canvas().translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
+            draw_rasters(surface.canvas(), &prepare_rasters(&[config], 1.7).unwrap(), 1.7, 0.6);
+            let info = ImageInfo::new((width, height), ColorType::RGBA8888, AlphaType::Unpremul, None);
+            let mut pixels = vec![0; widget.pixels().len()];
+            assert!(surface.read_pixels(&info, &mut pixels, width as usize * 4, (0, 0)));
+            assert_eq!(&pixels, widget.pixels(), "rotation={rotation}");
+            assert!(pixels.chunks_exact(4).any(|p| p[3] != 0));
+        }
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! Validates a selected bitmap once and prepares its oriented editor preview.
+use ovrley_widgets::widgets::raster::error::RasterError;
 
 use image::{metadata::Orientation, ImageDecoder, ImageFormat, ImageReader};
-use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io::{Cursor, Read};
@@ -58,59 +58,6 @@ impl std::fmt::Debug for SelectedRaster {
 /// The shell owns session resources; the core only borrows their lookup seam.
 pub trait RasterResourceResolver {
     fn resolve(&self, resource_id: &str) -> Option<Arc<SelectedRaster>>;
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, thiserror::Error)]
-#[serde(rename_all = "snake_case")]
-pub enum RasterError {
-    #[error("Select an absolute image path.")]
-    RelativePath,
-    #[error("The image file is missing.")]
-    Missing,
-    #[error("The image file cannot be read.")]
-    Unreadable,
-    #[error("The image must be a PNG, JPEG, BMP, or TIFF file with a supported extension.")]
-    UnsupportedType,
-    #[error("The image exceeds the 5 MiB encoded file limit.")]
-    EncodedSize,
-    #[error("The image exceeds the 25 MP decoded resolution limit.")]
-    Resolution,
-    #[error("The image could not be decoded.")]
-    Decode,
-    #[error("The embedded image asset is missing. Select a replacement image.")]
-    MissingAsset,
-    #[error("The embedded image asset is corrupt. Select a replacement image.")]
-    CorruptAsset,
-}
-
-impl RasterError {
-    pub fn code(&self) -> &'static str {
-        match self {
-            Self::RelativePath => "relative_path",
-            Self::Missing => "missing",
-            Self::Unreadable => "unreadable",
-            Self::UnsupportedType => "unsupported_type",
-            Self::EncodedSize => "encoded_size",
-            Self::Resolution => "resolution",
-            Self::Decode => "decode",
-            Self::MissingAsset => "missing_asset",
-            Self::CorruptAsset => "corrupt_asset",
-        }
-    }
-
-    pub fn for_widget(self, id: &str) -> crate::error::CoreError {
-        crate::error::CoreError::Config(format!(
-            "Raster {id}: {self} [raster_error:{}:{id}]",
-            self.code()
-        ))
-    }
-}
-
-pub fn valid_raster_id(id: &str) -> bool {
-    !id.is_empty()
-        && id
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
 
 /// Archive names use canonical extensions, while file selection also accepts jpg.

@@ -47,6 +47,7 @@ impl FontResolver for PreviewFonts {
 #[derive(Default)]
 pub struct PreviewSession {
     pub fonts: PreviewFonts,
+    pub images: crate::widgets::raster::preview::PreviewImages,
     activity: Option<ActivitySampler>,
     pub widgets: BTreeMap<u32, PreviewWidget>,
     next_id: u32,
@@ -68,9 +69,13 @@ impl PreviewSession {
             let size = request.size.ok_or_else(|| WidgetError::Config("backdrop resize size is required".into()))?;
             return Ok(ResizeUpdate::Backdrop(crate::widgets::backdrop::interaction::resize_backdrop(widget, scene, size, request.fixed, request.point)?));
         }
+        if let WidgetRequest::Raster {widget, scene} = request.origin {
+            let size = request.size.ok_or_else(|| WidgetError::Config("raster resize size is required".into()))?;
+            return Ok(ResizeUpdate::Raster(crate::widgets::raster::interaction::resize_raster(widget, scene, size, request.fixed, request.point)?));
+        }
         let factor = crate::model::validation::require_positive_f32(request.factor, "resize factor")?;
         match request.origin {
-            WidgetRequest::Backdrop { .. } => unreachable!(),
+            WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } => unreachable!(),
             WidgetRequest::Label {widget, scene} => Ok(ResizeUpdate::Label(crate::widgets::label::interaction::resize_label(widget, scene, factor, request.fixed, request.point, &self.fonts)?)),
             WidgetRequest::Value(origin) => Ok(ResizeUpdate::Value(crate::widgets::value::interaction::resize_value(
                 crate::widgets::value::interaction::ResizeRequest {origin, factor, fixed: request.fixed, point: request.point, second: request.second}, self.activity.as_ref(), &self.fonts,
@@ -86,7 +91,7 @@ impl PreviewSession {
         Ok(())
     }
     pub fn create_widget(&mut self, request: WidgetRequest) -> WidgetResult<u32> {
-        let widget = PreviewWidget::new(request, &self.fonts)?;
+        let widget = PreviewWidget::new(request, &self.fonts, &self.images)?;
         self.next_id = self
             .next_id
             .checked_add(1)
@@ -95,7 +100,7 @@ impl PreviewSession {
         Ok(self.next_id)
     }
     pub fn update_widget(&mut self, id: u32, request: WidgetRequest) -> WidgetResult<()> {
-        let mut replacement = PreviewWidget::new(request, &self.fonts)?;
+        let mut replacement = PreviewWidget::new(request, &self.fonts, &self.images)?;
         let previous = self
             .widgets
             .get(&id)

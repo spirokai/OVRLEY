@@ -1,4 +1,4 @@
-import { previewActivity, previewFont } from '@/api/backend'
+import { previewActivity, previewFont, rasterPreviewPng } from '@/api/backend'
 import { WIDGET_FONT_WEIGHT } from '@/lib/widget/standard-widgets'
 import { isTimeDependentWasmWidget } from '@/lib/widget/wasm-widget'
 import { createWidgetInteraction, registerWidgetInteraction, unregisterWidgetInteraction } from './widgetInteraction'
@@ -10,7 +10,7 @@ const decoder = new TextDecoder()
 let modulePromise
 
 function widgetFont(widget) {
-  if (widget.type === 'backdrop') return null
+  if (widget.type === 'backdrop' || widget.type === 'raster') return null
   return {
     font: widget.data.font,
     font_weight: widget.type === 'label' ? widget.data.font_weight : WIDGET_FONT_WEIGHT,
@@ -38,6 +38,7 @@ export function createPreviewSession(module, onError) {
   const widgets = new Map()
   const canvases = new Map()
   const fonts = new Map()
+  const images = new Map()
   let snapshot
   let activityId
   let activityReady = true
@@ -97,6 +98,23 @@ export function createPreviewSession(module, onError) {
         if (!disposed) onError(error)
       })
   }
+  function loadImage(id) {
+    if (images.has(id)) return
+    const resource = { ready: false, error: null }
+    images.set(id, resource)
+    rasterPreviewPng(id)
+      .then((base64) => {
+        if (disposed) return
+        const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0))
+        upload(encoder.encode(id), (idPtr, idLen) => upload(bytes, (ptr, len) => check(module._ovrley_preview_image(handle, idPtr, idLen, ptr, len))))
+        resource.ready = true
+        schedule()
+      })
+      .catch((error) => {
+        resource.error = error
+        schedule()
+      })
+  }
   function render() {
     frame = null
     if (!snapshot) return
@@ -109,6 +127,21 @@ export function createPreviewSession(module, onError) {
         }
       }
       for (const widget of interaction.resolve(snapshot)) {
+        const resource = widget.type === 'raster' && images.get(widget.data.resourceId)
+        if (resource?.error) throw resource.error
+        if (resource && !resource.ready) {
+          const instance = widgets.get(widget.id)
+          if (instance) {
+            module._ovrley_preview_widget_destroy(handle, instance.handle)
+            widgets.delete(widget.id)
+          }
+          const canvas = canvases.get(widget.id)
+          if (canvas) {
+            canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
+            canvas.parentElement.style.visibility = 'hidden'
+          }
+          continue
+        }
         const font = widgetFont(widget)
         if (font && fonts.get(JSON.stringify(font)) !== 'ready') continue
         if (isTimeDependentWasmWidget(widget) && !activityReady) continue
@@ -165,11 +198,20 @@ export function createPreviewSession(module, onError) {
       const previous = snapshot
       snapshot = next
       // A playhead-only update has no work to schedule for a static scene.
-      if (previous && previous.widgets === next.widgets && previous.scene === next.scene && previous.activityId === next.activityId && previous.defaultFont === next.defaultFont && !next.widgets.some(isTimeDependentWasmWidget)) return
+      if (
+        previous &&
+        previous.widgets === next.widgets &&
+        previous.scene === next.scene &&
+        previous.activityId === next.activityId &&
+        previous.defaultFont === next.defaultFont &&
+        !next.widgets.some(isTimeDependentWasmWidget)
+      )
+        return
       loadFont({ font: next.defaultFont, font_weight: WIDGET_FONT_WEIGHT, italic: false })
       for (const widget of next.widgets) {
         const font = widgetFont(widget)
         if (font) loadFont(font)
+        if (widget.type === 'raster' && widget.data.resourceId !== undefined) loadImage(widget.data.resourceId)
       }
       const nextId = next.activityId
       if (nextId !== activityId) {
@@ -222,6 +264,7 @@ export function createPreviewSession(module, onError) {
       widgets.clear()
       canvases.clear()
       fonts.clear()
+      images.clear()
     },
   }
 }

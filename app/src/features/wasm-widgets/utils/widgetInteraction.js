@@ -37,7 +37,17 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
           const widget = snapshot.widgets.find((item) => item.id === id)
           if (!widget) throw new Error(`Missing WASM widget: ${id}`)
           const geometry = getGeometry(id)
-          active = { id, type: widget.type, data: widget.data, scene: snapshot.scene, intent: null, patch: null, onDraft, resolvedIntent: null, second: null }
+          active = {
+            id,
+            type: widget.type,
+            data: widget.data,
+            scene: snapshot.scene,
+            intent: null,
+            patch: null,
+            onDraft,
+            resolvedIntent: null,
+            second: null,
+          }
           return { data: widget.data, bounds: geometry.content }
         },
         update(intent) {
@@ -66,7 +76,9 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
         const patch =
           intent.type === 'drag'
             ? { x: active.data.x + intent.translate[0], y: active.data.y + intent.translate[1] }
-            : resize({ type: active.type, widget: active.data, scene: active.scene, second: snapshot.second, ...intent.geometry })
+            : intent.type === 'rotate'
+              ? { x: active.data.x + intent.translate[0], y: active.data.y + intent.translate[1], rotation: ((intent.rotation % 360) + 360) % 360 }
+              : resize({ type: active.type, widget: active.data, scene: active.scene, second: snapshot.second, ...intent.geometry })
         const changed = JSON.stringify(patch) !== JSON.stringify(active.patch)
         active.patch = patch
         active.resolvedIntent = intent
@@ -81,4 +93,3 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
     },
   }
 }
-

@@ -42,7 +42,7 @@ function editor(type = 'speed') {
   }
 }
 
-test.each(['speed', 'backdrop'])('%s drag coalesces from the captured origin and flushes the final movement without rounding', (type) => {
+test.each(['speed', 'backdrop', 'raster'])('%s drag coalesces from the captured origin and flushes the final movement without rounding', (type) => {
   const { interaction, presentations, original } = editor(type)
   const draft = vi.fn()
   interaction.begin(draft)

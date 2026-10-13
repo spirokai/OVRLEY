@@ -9,10 +9,12 @@ use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use chrono::DateTime;
 use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, EncoderId};
 use ovrley_core::encode::quality::{validate_quality, QualityType};
-use ovrley_core::normalize::{raw::RasterConfig, validate_template_rasters};
+use ovrley_core::normalize::validate_template_rasters;
+use ovrley_widgets::widgets::raster::config::RasterConfig;
 use ovrley_core::raster::{
-    is_canonical_extension, load_embedded_raster, RasterError, SelectedRaster, MAX_ENCODED_BYTES,
+    is_canonical_extension, load_embedded_raster, SelectedRaster, MAX_ENCODED_BYTES,
 };
+use ovrley_widgets::widgets::raster::error::RasterError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};

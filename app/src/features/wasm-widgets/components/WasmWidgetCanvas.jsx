@@ -7,7 +7,7 @@ export function WasmWidgetCanvas({ widget, attach, registerNode, handleWidgetMou
     <div
       ref={registerNode}
       data-widget-id={widget.id}
-      className={`absolute cursor-move select-none overflow-visible ${widget.type === 'backdrop' ? 'z-1' : 'z-10'}`}
+      className={`absolute cursor-move select-none overflow-visible ${widget.type === 'backdrop' ? 'z-1' : widget.type === 'raster' ? 'z-2' : 'z-10'}`}
       style={{ visibility: 'hidden' }}
       onMouseDown={(event) => handleWidgetMouseDown(event, widget.id)}
     >

@@ -37,7 +37,6 @@ import { OverlayArcGaugeWidget } from './widgets/arc-gauge/ArcGaugePreview'
 import { OverlayLeanAngleWidget } from './widgets/lean-angle/LeanAnglePreview'
 import { OverlayGForceWidget } from './widgets/g-force/GForcePreview'
 import OverlayBackdropWidget from './widgets/backdrop/BackdropPreview'
-import RasterPreview from './widgets/raster/RasterPreview'
 import { isBoxedDisplayType } from '@/lib/widget/standard-metrics'
 
 const BOXED_PREVIEW_COMPONENTS = {
@@ -75,10 +74,6 @@ function WidgetPreview({
 }) {
   if (widget.type === 'backdrop') {
     return <OverlayBackdropWidget widget={widget} globalOpacity={globalOpacity} globalScale={globalScale} />
-  }
-
-  if (widget.type === 'raster') {
-    return <RasterPreview widget={widget} globalOpacity={globalOpacity} />
   }
 
   if (widget.type === 'label') {
