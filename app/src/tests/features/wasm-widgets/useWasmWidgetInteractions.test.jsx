@@ -3,8 +3,8 @@ import { expect, test, vi } from 'vitest'
 import { useWasmWidgetInteractions } from '@/features/wasm-widgets/hooks/useWasmWidgetInteractions'
 import { registerWidgetInteraction, unregisterWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 
-test('resize commits once on release; Escape cancels the controller and prevents a later end event from committing', () => {
-  const widget = { id: 'speed', data: { x: 100, y: 50 } }
+test.each(['speed', 'backdrop'])('%s resize commits once on release; Escape cancels without committing', (type) => {
+  const widget = { id: type, type, data: { x: 100, y: 50 } }
   const target = document.createElement('div')
   const patch = { x: 70.25, y: 35.5, font_size: 72 }
   const controller = {
@@ -36,15 +36,18 @@ test('resize commits once on release; Escape cancels the controller and prevents
   const start = { target, direction: [-1, -1], set: vi.fn(), dragStart: false }
   act(() => {
     result.current.onResizeStart(start)
-    result.current.onResize({ width: 240 })
+    result.current.onResize({ width: 240, height: 75.5 })
   })
-  expect(controller.update).toHaveBeenCalledWith({ type: 'resize', geometry: { factor: 1.5, fixed: [1, 1], point: [240, 95] } })
+  expect(controller.update).toHaveBeenCalledWith({
+    type: 'resize',
+    geometry: { ...(type === 'backdrop' ? { size: [240, 75.5] } : { factor: 1.5 }), fixed: [1, 1], point: [240, 95] },
+  })
   expect(state.commitWidgetUpdate).not.toHaveBeenCalled()
   act(() => result.current.onResizeEnd())
-  expect(state.commitWidgetUpdate).toHaveBeenCalledExactlyOnceWith('speed', patch)
+  expect(state.commitWidgetUpdate).toHaveBeenCalledExactlyOnceWith(type, patch)
   act(() => {
     result.current.onResizeStart(start)
-    result.current.onResize({ width: 320 })
+    result.current.onResize({ width: 320, height: 80 })
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
     result.current.onResizeEnd()
   })
@@ -52,7 +55,7 @@ test('resize commits once on release; Escape cancels the controller and prevents
   expect(controller.cancel).toHaveBeenCalled()
   expect(state.moveableRef.current.stopDrag).toHaveBeenCalledTimes(1)
   expect(state.commitWidgetUpdate).toHaveBeenCalledTimes(1)
-  expect(state.clearWidgetDrafts).toHaveBeenLastCalledWith(['speed'])
+  expect(state.clearWidgetDrafts).toHaveBeenLastCalledWith([type])
   unmount()
   unregisterWidgetInteraction(target)
 })

@@ -60,15 +60,20 @@ impl PreviewSession {
         if !request.second.is_finite() {
             return Err(WidgetError::Config("previewSecond must be finite".into()));
         }
-        if !request.factor.is_finite() || request.factor <= 0.0
-            || request.fixed.iter().any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+        if request.fixed.iter().any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
             || request.point.iter().any(|v| !v.is_finite()) {
             return Err(WidgetError::Config("invalid widget resize gesture".into()));
         }
+        if let WidgetRequest::Backdrop {widget, scene} = request.origin {
+            let size = request.size.ok_or_else(|| WidgetError::Config("backdrop resize size is required".into()))?;
+            return Ok(ResizeUpdate::Backdrop(crate::widgets::backdrop::interaction::resize_backdrop(widget, scene, size, request.fixed, request.point)?));
+        }
+        let factor = crate::model::validation::require_positive_f32(request.factor, "resize factor")?;
         match request.origin {
-            WidgetRequest::Label {widget, scene} => Ok(ResizeUpdate::Label(crate::widgets::label::interaction::resize_label(widget, scene, request.factor, request.fixed, request.point, &self.fonts)?)),
+            WidgetRequest::Backdrop { .. } => unreachable!(),
+            WidgetRequest::Label {widget, scene} => Ok(ResizeUpdate::Label(crate::widgets::label::interaction::resize_label(widget, scene, factor, request.fixed, request.point, &self.fonts)?)),
             WidgetRequest::Value(origin) => Ok(ResizeUpdate::Value(crate::widgets::value::interaction::resize_value(
-                crate::widgets::value::interaction::ResizeRequest {origin, factor: request.factor, fixed: request.fixed, point: request.point, second: request.second}, self.activity.as_ref(), &self.fonts,
+                crate::widgets::value::interaction::ResizeRequest {origin, factor, fixed: request.fixed, point: request.point, second: request.second}, self.activity.as_ref(), &self.fonts,
             )?)),
         }
     }
@@ -104,7 +109,7 @@ impl PreviewSession {
             return Err(WidgetError::Config("previewSecond must be finite".into()));
         }
         for widget in self.widgets.values_mut() {
-            // Labels are fully rendered on creation/update and never visit the playhead path.
+            // Static families are fully rendered on creation/update and never visit the playhead path.
             if let PreviewWidget::Value(widget) = widget {
                 widget.render(self.activity.as_ref(), second, &self.fonts)?;
             }

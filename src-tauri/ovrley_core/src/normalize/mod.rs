@@ -5,7 +5,6 @@
 //! frontend must materialise all defaults before sending the config.
 
 mod arc_gauge;
-mod backdrop;
 mod bar_geometry;
 mod elevation;
 mod g_force;
@@ -30,7 +29,7 @@ use raw::RenderConfig;
 
 pub use raw::{
     find_plot_value, find_plot_values, parse_config_json, parse_config_value, parse_template_json,
-    parse_template_value, BackdropConfig, CoursePlotConfig, ElevationPlotConfig,
+    parse_template_value, CoursePlotConfig, ElevationPlotConfig,
     HeadingWidgetConfig, SceneConfig, TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION,
 };
 
@@ -39,7 +38,7 @@ pub use arc_gauge::{
     ValidatedCornerGaugeOrientation, CORNER_GAUGE_ANGLE_DEGREES, MAX_ARC_ANGLE_DEGREES,
     MIN_ARC_ANGLE_DEGREES,
 };
-pub use backdrop::{validate_backdrop, ValidatedBackdrop};
+use ovrley_widgets::widgets::backdrop::validation::{validate_backdrop, ValidatedBackdrop};
 pub use bar_geometry::ResolvedBarGeometry;
 pub(crate) use bar_geometry::{
     arc_track_radius, corner_track_cap_padding, corner_track_radius, resolve_bar_style_geometry,
@@ -184,7 +183,7 @@ fn validate_render_contents(
         .backdrops
         .iter()
         .enumerate()
-        .map(|(i, backdrop)| validate_backdrop(backdrop, i))
+        .map(|(i, backdrop)| validate_backdrop(backdrop, i).map_err(Into::into))
         .collect::<CoreResult<Vec<_>>>()?;
 
     let values = raw

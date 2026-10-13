@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 import { resizeAnchor } from '@/features/wasm-widgets/utils/widgetGestureGeometry'
+import { resolveActiveBackdropData } from '@/lib/widget/widget-resolver'
+import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
+import { updateWidgetInConfig } from '@/lib/widget/widget-config'
 
 beforeEach(() => vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] }))
 afterEach(() => vi.useRealTimers())
@@ -39,8 +42,8 @@ function editor(type = 'speed') {
   }
 }
 
-test('drag previews coalesce from the captured origin; release flushes the last unpainted movement without rounding', () => {
-  const { interaction, presentations, original } = editor()
+test.each(['speed', 'backdrop'])('%s drag coalesces from the captured origin and flushes the final movement without rounding', (type) => {
+  const { interaction, presentations, original } = editor(type)
   const draft = vi.fn()
   interaction.begin(draft)
   interaction.update({ type: 'drag', translate: [10, 20] })
@@ -101,4 +104,38 @@ test('label resize ignores playhead changes but flushes the final pointer intent
   expect(resize).toHaveBeenCalledTimes(2)
   expect(resize.mock.lastCall[0]).toMatchObject({ type: 'label', widget: original.data, second: 30 })
   expect(vi.getTimerCount()).toBe(0)
+})
+
+test.each(['rectangle', 'circle'])('backdrop %s resize resolves variant drafts and commits the same fractional geometry without playhead work', (displayType) => {
+  const { interaction, resize, setSnapshot, presentations, render } = editor('backdrop')
+  const stored = {
+    id: 'widget', x: 120.25, y: 60.5, display_type: displayType,
+    display_variants: { rectangle: { width: 100, height: 60, corner_radius: 10 }, circle: { diameter: 100 } },
+  }
+  const original = { id: 'widget', type: 'backdrop', category: 'backdrops', data: resolveActiveBackdropData(stored) }
+  setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second: 0 })
+  const patch = {
+    x: 110.125, y: 50.25,
+    display_variants: { [displayType]: displayType === 'circle' ? { diameter: 125.25 } : { width: 125.25, height: 80.5 } },
+  }
+  resize.mockReturnValue(patch)
+  const draft = vi.fn()
+  const origin = interaction.begin(draft)
+  interaction.update({ type: 'resize', geometry: { size: [187.875, 120.75], ...resizeAnchor(origin.bounds, [-1, -1]) } })
+  vi.advanceTimersToNextFrame()
+  const live = presentations.at(-1)[0].data
+  expect(live.width).toBe(125.25)
+  expect(live.height).toBe(displayType === 'circle' ? 125.25 : 80.5)
+  expect(live.display_variants.rectangle.corner_radius).toBe(10)
+  const drafts = { widget: { data: patch, layout: null } }
+  expect(applyWidgetDrafts([original], drafts)[0].data).toEqual(live)
+  for (const second of [1, 10, 2]) {
+    setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second })
+    render()
+  }
+  expect(resize).toHaveBeenCalledTimes(1)
+  expect(draft).toHaveBeenCalledTimes(1)
+  const committed = updateWidgetInConfig({ backdrops: [stored] }, 'widget', interaction.finish())
+  expect(resolveActiveBackdropData(committed.backdrops[0])).toEqual(live)
+  expect(committed.backdrops[0].width).toBeUndefined()
 })

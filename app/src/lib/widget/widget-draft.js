@@ -16,7 +16,7 @@ function resolveDraftData(widget, draftData) {
   }
 
   if (widget.category === 'backdrops') {
-    return resolveActiveBackdropData(mergedData)
+    return resolveActiveBackdropData(mergedData, draftData.display_variants?.[mergedData.display_type])
   }
 
   if (widget.category === 'values') {

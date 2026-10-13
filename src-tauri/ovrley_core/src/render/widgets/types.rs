@@ -6,8 +6,9 @@
 //! place.
 
 use ovrley_widgets::widgets::label::validation::ValidatedLabel;
+use ovrley_widgets::widgets::backdrop::validation::ValidatedBackdrop;
 use crate::normalize::{
-    ResolvedBarGeometry, ValidatedArcGaugeWidget, ValidatedBackdrop, ValidatedGForceWidget,
+    ResolvedBarGeometry, ValidatedArcGaugeWidget, ValidatedGForceWidget,
     ValidatedGradientWidget, ValidatedHeading, ValidatedLapTimer,
     ValidatedLeanAngleWidget, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
     ValidatedSceneConfig, ValidatedTimeValue,

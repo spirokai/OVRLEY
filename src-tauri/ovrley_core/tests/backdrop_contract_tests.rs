@@ -151,8 +151,8 @@ fn valid_rectangle_backdrop_promotes_and_validates_active_variant() {
     let backdrop = &validated.backdrops[0];
     assert_eq!(backdrop.id, "backdrop-1");
     assert_eq!(backdrop.display_type, BackdropType::Rectangle);
-    assert_eq!(backdrop.width, 100);
-    assert_eq!(backdrop.height, 60);
+    assert_eq!(backdrop.width, 100.0);
+    assert_eq!(backdrop.height, 60.0);
     assert_eq!(backdrop.corner_radius, 12.0);
     assert!(backdrop.round_top_left);
     assert!(!backdrop.round_top_right);
@@ -199,9 +199,9 @@ fn valid_circle_backdrop_promotes_and_validates_active_variant() {
     let backdrop = &validated.backdrops[0];
     assert_eq!(backdrop.id, "backdrop-circle");
     assert_eq!(backdrop.display_type, BackdropType::Circle);
-    assert_eq!(backdrop.diameter, 80);
-    assert_eq!(backdrop.width, 0);
-    assert_eq!(backdrop.height, 0);
+    assert_eq!(backdrop.diameter, 80.0);
+    assert_eq!(backdrop.width, 0.0);
+    assert_eq!(backdrop.height, 0.0);
     assert_eq!(backdrop.corner_radius, 0.0);
     assert_eq!(backdrop.fill_color, "#112233");
     assert_eq!(backdrop.border_color, "#445566");
@@ -509,6 +509,100 @@ fn static_cache_key_includes_backdrops() {
     assert!(matches!(first_status, LabelCacheStatus::Miss));
     assert!(matches!(second_status, LabelCacheStatus::Hit));
     assert!(matches!(changed_status, LabelCacheStatus::Miss));
+}
+
+#[test]
+fn wasm_backdrops_match_native_static_layer_and_ignore_playhead_and_activity() {
+    use ovrley_widgets::preview::PreviewSession;
+    for mut backdrop in [rectangle_backdrop_json("wasm-rect", "#abcdef80"), circle_backdrop_json("wasm-circle", "#abcdef80")] {
+        backdrop["x"] = json!(20.25);
+        backdrop["y"] = json!(30.5);
+        backdrop["border_thickness"] = json!(2.25);
+        backdrop["border_opacity"] = json!(0.6);
+        backdrop["opacity"] = json!(0.75);
+        if backdrop["display_type"] == "rectangle" {
+            backdrop["display_variants"]["rectangle"]["corner_radius"] = json!(4.0);
+            backdrop["display_variants"]["rectangle"]["round_top_left"] = json!(true);
+            backdrop["display_variants"]["rectangle"]["round_bottom_right"] = json!(true);
+        }
+        let mut scene = small_scene_json(96, 96);
+        scene["scale"] = json!(1.75);
+        let mut request = json!({"type": "backdrop", "widget": backdrop, "scene": scene});
+        let mut preview = PreviewSession::default(); // No font or activity resources.
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        let widget = &preview.widgets[&id];
+        let geometry: serde_json::Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let pixels = widget.pixels().clone();
+        let revision = widget.revision();
+        let pixel_storage = widget.pixels().as_ptr();
+        let config = validate_config_value(&json!({"scene": scene, "backdrops": [backdrop], "labels": [], "values": [], "plots": []})).unwrap();
+        let native = StaticLayer {
+            backdrops: &config.backdrops, rasters: &[], labels: &[], values: &[], scene: &config.scene,
+        }.prepare(&test_paths(), &mut RenderProfiler::default()).unwrap().base_rgba;
+        let width = geometry["width"].as_u64().unwrap() as usize;
+        let height = geometry["height"].as_u64().unwrap() as usize;
+        let left = geometry["left"].as_f64().unwrap() as usize;
+        let top = geometry["top"].as_f64().unwrap() as usize;
+        for y in 0..height {
+            for x in 0..width {
+                assert_eq!(rgba_at(&pixels, width, x, y), rgba_at(&native, 96, left + x, top + y));
+            }
+        }
+        assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
+        preview.replace_activity(br#"{"sample_elapsed_seconds":[0,1],"speed":[0,20],"trim_end_seconds":1}"#).unwrap();
+        for second in [0.0, 1.0, 0.25, 100.0] {
+            preview.render(second).unwrap();
+            assert_eq!(preview.widgets[&id].revision(), revision);
+            assert_eq!(preview.widgets[&id].pixels().as_ptr(), pixel_storage);
+            assert_eq!(preview.widgets[&id].pixels(), &pixels);
+        }
+        preview.replace_activity(&[]).unwrap();
+        preview.render(0.0).unwrap();
+        assert_eq!(preview.widgets[&id].revision(), revision);
+        request["widget"]["fill_color"] = json!("#ff0000");
+        preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+        assert_ne!(preview.widgets[&id].revision(), revision);
+        assert_ne!(preview.widgets[&id].pixels(), &pixels);
+        request["widget"]["border_thickness"] = json!(-1);
+        assert!(preview.update_widget(id, serde_json::from_value(request).unwrap()).is_err());
+    }
+}
+
+#[test]
+fn wasm_backdrop_resize_keeps_opposite_corners_and_fractional_dimensions() {
+    use ovrley_widgets::preview::PreviewSession;
+    for backdrop in [rectangle_backdrop_json("resize-rect", "#ff0000"), circle_backdrop_json("resize-circle", "#ff0000")] {
+        let mut scene = small_scene_json(96, 96);
+        scene["scale"] = json!(1.5);
+        let origin = json!({"type": "backdrop", "widget": backdrop, "scene": scene});
+        let mut preview = PreviewSession::default();
+        let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
+        let geometry: serde_json::Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let bounds = &geometry["content"];
+        for fixed in [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] {
+            let point = [bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0], bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1]];
+            let mut gesture = origin.clone();
+            gesture["size"] = json!([37.875, 28.125]);
+            gesture["fixed"] = json!(fixed);
+            gesture["point"] = json!(point);
+            gesture["second"] = json!(19.5);
+            let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(gesture).unwrap()).unwrap()).unwrap();
+            let mut committed = origin.clone();
+            committed["widget"]["x"] = patch["x"].clone();
+            committed["widget"]["y"] = patch["y"].clone();
+            let display_type = backdrop["display_type"].as_str().unwrap();
+            committed["widget"]["display_variants"][display_type].as_object_mut().unwrap().extend(patch["display_variants"][display_type].as_object().unwrap().clone());
+            preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
+            let resized: serde_json::Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let actual = &resized["content"];
+            assert_eq!(actual["width"], json!(37.875));
+            assert_eq!(actual["height"], json!(if display_type == "circle" { 37.875 } else { 28.125 }));
+            for (axis, position, dimension) in [(0, "left", "width"), (1, "top", "height")] {
+                let corner = actual[position].as_f64().unwrap() + actual[dimension].as_f64().unwrap() * fixed[axis];
+                assert!((corner - point[axis]).abs() < 0.002);
+            }
+        }
+    }
 }
 
 fn small_scene_json(width: u32, height: u32) -> serde_json::Value {

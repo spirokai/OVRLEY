@@ -102,7 +102,7 @@ export function resolveActiveBackdropData(widgetData, previewOverrides = null) {
 
   const nextResolved = previewOverrides ? { ...resolved, ...previewOverrides } : resolved
   if (displayType === 'circle') {
-    const diameter = nextResolved.width ?? nextResolved.height ?? nextResolved.diameter
+    const diameter = previewOverrides?.diameter ?? nextResolved.width ?? nextResolved.height ?? nextResolved.diameter
     return { ...nextResolved, diameter, width: diameter, height: diameter }
   }
 

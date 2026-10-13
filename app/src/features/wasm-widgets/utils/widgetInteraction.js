@@ -1,4 +1,5 @@
 import { isTimeDependentWasmWidget } from '@/lib/widget/wasm-widget'
+import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
 
 const targets = new WeakMap()
 
@@ -72,7 +73,8 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
         active.second = snapshot.second
         if (changed) active.onDraft(patch)
       }
-      return snapshot.widgets.map((widget) => (widget.id === active.id ? { ...widget, data: { ...active.data, ...active.patch } } : widget))
+      const originWidgets = snapshot.widgets.map((widget) => (widget.id === active.id ? { ...widget, data: active.data } : widget))
+      return applyWidgetDrafts(originWidgets, { [active.id]: { data: active.patch } })
     },
     dispose() {
       active = null

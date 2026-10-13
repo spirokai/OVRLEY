@@ -10,6 +10,7 @@ const decoder = new TextDecoder()
 let modulePromise
 
 function widgetFont(widget) {
+  if (widget.type === 'backdrop') return null
   return {
     font: widget.data.font,
     font_weight: widget.type === 'label' ? widget.data.font_weight : WIDGET_FONT_WEIGHT,
@@ -108,7 +109,8 @@ export function createPreviewSession(module, onError) {
         }
       }
       for (const widget of interaction.resolve(snapshot)) {
-        if (fonts.get(JSON.stringify(widgetFont(widget))) !== 'ready') continue
+        const font = widgetFont(widget)
+        if (font && fonts.get(JSON.stringify(font)) !== 'ready') continue
         if (isTimeDependentWasmWidget(widget) && !activityReady) continue
         let instance = widgets.get(widget.id)
         if (instance?.data === widget.data && instance.scene === snapshot.scene) continue
@@ -165,7 +167,10 @@ export function createPreviewSession(module, onError) {
       // A playhead-only update has no work to schedule for a static scene.
       if (previous && previous.widgets === next.widgets && previous.scene === next.scene && previous.activityId === next.activityId && previous.defaultFont === next.defaultFont && !next.widgets.some(isTimeDependentWasmWidget)) return
       loadFont({ font: next.defaultFont, font_weight: WIDGET_FONT_WEIGHT, italic: false })
-      for (const widget of next.widgets) loadFont(widgetFont(widget))
+      for (const widget of next.widgets) {
+        const font = widgetFont(widget)
+        if (font) loadFont(font)
+      }
       const nextId = next.activityId
       if (nextId !== activityId) {
         activityId = nextId

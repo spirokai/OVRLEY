@@ -96,12 +96,17 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       set([bounds.width, bounds.height])
       if (dragStart) dragStart.set([0, 0])
     },
-    onResize: ({ width }) => {
+    onResize: ({ width, height }) => {
       const current = gesture.current
       if (!current) return
       current.controller.update({
         type: 'resize',
-        geometry: { factor: Math.max(width / current.origin.bounds.width, 0.01), ...current.anchor },
+        geometry: {
+          ...(selectedWidget.type === 'backdrop'
+            ? { size: [Math.max(width, 0.01), Math.max(height, 0.01)] }
+            : { factor: Math.max(width / current.origin.bounds.width, 0.01) }),
+          ...current.anchor,
+        },
       })
     },
     onResizeEnd: finish,

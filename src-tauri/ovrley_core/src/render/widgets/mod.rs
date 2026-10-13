@@ -5,8 +5,6 @@
 //! widget-local geometry, builds static layers, and precomputes marker states so
 //! video rendering can draw each frame with predictable cost.
 
-/// Static backdrop widget implementation.
-pub(crate) mod backdrop;
 /// Shared geometry, style, and drawing helpers for all widgets.
 pub(crate) mod common;
 /// Elevation profile widget implementation.
@@ -67,7 +65,6 @@ fn apply_altitude_value_offset(value: &mut PreparedValue, altitude_series: &[Opt
     }
 }
 
-pub(crate) use backdrop::draw_backdrops_static_layer;
 pub(crate) use elevation::draw_elevation_widget;
 pub use g_force::{draw_g_force_widget, prepare_g_force_cache};
 pub use gauges::arc::{draw_arc_gauge_widget, prepare_arc_gauge_cache};

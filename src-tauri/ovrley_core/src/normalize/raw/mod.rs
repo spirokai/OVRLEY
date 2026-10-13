@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 use crate::error::{CoreError, CoreResult};
-use ovrley_widgets::model::types::{BackdropType, DisplayType, MetricKind};
+use ovrley_widgets::model::types::{DisplayType, MetricKind};
 
 pub const TEMPLATE_FILE_FORMAT: &str = "ovrley-template";
 pub const TEMPLATE_FILE_VERSION: u32 = 3;
@@ -55,66 +55,7 @@ pub struct SceneConfig {
 use ovrley_widgets::model::scene::ScenePresentationConfig;
 
 
-/// Static geometric backdrop drawn below other widgets.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct BackdropConfig {
-    #[serde(default)]
-    pub id: Option<String>,
-    #[serde(default)]
-    pub x: Option<f32>,
-    #[serde(default)]
-    pub y: Option<f32>,
-    #[serde(default)]
-    pub opacity: Option<f32>,
-    pub display_type: BackdropType,
-    #[serde(default)]
-    pub fill_color: Option<String>,
-    #[serde(default)]
-    pub fill_opacity: Option<f32>,
-    #[serde(default)]
-    pub border_thickness: Option<f32>,
-    #[serde(default)]
-    pub border_color: Option<String>,
-    #[serde(default)]
-    pub border_opacity: Option<f32>,
-    #[serde(default)]
-    pub display_variants: BTreeMap<String, Value>,
-    #[serde(default)]
-    pub diameter: Option<u32>,
-    #[serde(default)]
-    pub width: Option<u32>,
-    #[serde(default)]
-    pub height: Option<u32>,
-    #[serde(default)]
-    pub corner_radius: Option<f32>,
-    #[serde(default)]
-    pub round_top_left: Option<bool>,
-    #[serde(default)]
-    pub round_top_right: Option<bool>,
-    #[serde(default)]
-    pub round_bottom_left: Option<bool>,
-    #[serde(default)]
-    pub round_bottom_right: Option<bool>,
-    #[serde(flatten)]
-    pub extra: BTreeMap<String, Value>,
-}
-
-impl BackdropConfig {
-    /// Promotes nested backdrop variant fields to the top level so validators
-    /// can consume them as flat fields while durable templates store geometry
-    /// under `display_variants.<key>`.
-    pub(crate) fn with_promoted_display_variant(
-        &self,
-        variant_key: &str,
-    ) -> CoreResult<BackdropConfig> {
-        let mut raw = serde_json::to_value(self)
-            .map_err(|e| CoreError::Config(format!("backdrop config serialization: {e}")))?;
-        strip_json_nulls(&mut raw);
-        promote_variant_keys(&mut raw, variant_key);
-
-        serde_json::from_value(raw).map_err(|e| CoreError::Config(format!("backdrop config: {e}")))
-    }
-}
+use ovrley_widgets::widgets::backdrop::config::BackdropConfig;
 
 use ovrley_widgets::widgets::value::config::ValueConfig;
 

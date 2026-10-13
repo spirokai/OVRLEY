@@ -1,8 +1,8 @@
 //! Static backdrop widget drawing.
 
-use crate::normalize::ValidatedBackdrop;
-use ovrley_widgets::model::types::BackdropType;
-use ovrley_widgets::render::text::parse_color;
+use super::{frame::prepare_backdrop_frame, validation::ValidatedBackdrop};
+use crate::model::types::BackdropType;
+use crate::render::text::parse_color;
 use skia_safe::{paint::Style, Canvas, Paint, Path, PathBuilder, Point};
 
 #[derive(Clone, Copy)]
@@ -13,13 +13,13 @@ struct RectangleCorners {
     bottom_left: bool,
 }
 
-pub(crate) fn draw_backdrops_static_layer(
+pub fn draw_backdrops_static_layer(
     canvas: &Canvas,
     backdrops: &[ValidatedBackdrop],
     scale: f32,
 ) {
     for backdrop in backdrops {
-        draw_backdrop(canvas, backdrop, scale);
+        prepare_backdrop_frame(backdrop, scale).draw(canvas);
     }
 }
 
@@ -39,7 +39,7 @@ fn backdrop_paint(color: &str, opacity: f32, style: Style) -> Paint {
 }
 
 fn draw_circle_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f32) {
-    let diameter = backdrop.diameter as f32 * scale;
+    let diameter = backdrop.diameter * scale;
     let border = (backdrop.border_thickness * scale).max(0.0);
     let center = Point::new(backdrop.x + diameter * 0.5, backdrop.y + diameter * 0.5);
     let fill_alpha = backdrop.opacity * backdrop.fill_opacity;
@@ -58,8 +58,8 @@ fn draw_circle_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f3
 }
 
 fn draw_rectangle_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f32) {
-    let width = backdrop.width as f32 * scale;
-    let height = backdrop.height as f32 * scale;
+    let width = backdrop.width * scale;
+    let height = backdrop.height * scale;
     let border = (backdrop.border_thickness * scale).max(0.0);
     let radius = (backdrop.corner_radius * scale).max(0.0);
     let corners = RectangleCorners {
