@@ -17,7 +17,7 @@
 
 mod common;
 
-use ovrley_core::render::widgets::value::gradient_triangle_height;
+use ovrley_widgets::widgets::gradient::frame::gradient_triangle_height;
 use ovrley_widgets::render::text::MeasuredText;
 use ovrley_widgets::widgets::value::layout::{
     metric_icon_top_from_value_layout, metric_vertical_metrics_text, NUMERIC_VERTICAL_METRICS_TEXT,

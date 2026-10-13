@@ -76,7 +76,7 @@ describe('useWidgetManager alignment updates', () => {
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
   })
 
-  test.each(['speed', 'time'])('commits the latest %s font size when the slider is released before its pending frame', (type) => {
+  test.each(['speed', 'time', 'gradient'])('commits the latest %s font size when the slider is released before its pending frame', (type) => {
     const config = cloneSerializable(DEFAULT_CONFIG)
     config.values = [{ ...createMetricValueDefaults(type), id: 'speed-0' }]
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))

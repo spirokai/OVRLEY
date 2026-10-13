@@ -8,7 +8,6 @@ mod arc_gauge;
 mod bar_geometry;
 mod elevation;
 mod g_force;
-mod gradient;
 mod heading;
 mod lap_timer;
 mod lean_angle;
@@ -45,7 +44,7 @@ pub(crate) use bar_geometry::{
 };
 pub use elevation::{validate_elevation_plot, validate_elevation_plots, ValidatedElevationPlot};
 pub use g_force::{validate_g_force, GForceAxis, ValidatedGForceWidget};
-pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
+use ovrley_widgets::widgets::gradient::validation::validate_gradient_widget;
 pub use heading::{validate_heading, ValidatedHeading};
 use ovrley_widgets::widgets::label::validation::{validate_label, ValidatedLabel};
 pub use lap_timer::{validate_lap_timer, LapTimerMode, ValidatedLapTimer};
@@ -218,7 +217,7 @@ fn validate_render_contents(
                 });
             }
             if value.value == MetricKind::Gradient {
-                return validate_gradient_widget(value, idx).map(PreparedValue::Gradient);
+                return Ok(PreparedValue::Gradient(validate_gradient_widget(value, idx)?));
             }
             if value.value == MetricKind::LapTimer {
                 return validate_lap_timer(value, idx).map(|validated| {

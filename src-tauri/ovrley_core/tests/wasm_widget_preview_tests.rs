@@ -16,6 +16,276 @@ use ovrley_widgets::{
 use serde_json::{json, Value};
 use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
 
+fn gradient_preview() -> (PreviewSession, Value) {
+    let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
+    let mut preview = PreviewSession::default();
+    let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
+    preview
+        .fonts
+        .register(
+            ovrley_widgets::preview::FontRequest {
+                font: "Inter.ttf".into(),
+                font_weight: weight,
+                italic: false,
+            },
+            &preview_font_resource(&font_dirs, "Inter.ttf", weight, false).unwrap(),
+        )
+        .unwrap();
+    let mut scene = common::seam::explicit_scene_json();
+    scene["end"] = json!(4);
+    scene["scale"] = json!(1.7);
+    scene["shadow_strength"] = json!(3);
+    scene["shadow_distance"] = json!(4);
+    scene["border_thickness"] = json!(1.5);
+    (
+        preview,
+        json!({
+            "type": "gradient", "scene": scene,
+            "widget": {
+                "value": "gradient", "display_type": "text", "x": 600.25, "y": 100.5,
+                "font": "Inter.ttf", "font_size": 48, "color": "#abcdef", "opacity": 0.8,
+                "prefix": "", "suffix": "", "decimals": 1, "show_sign": true,
+                "show_triangle": true, "triangle_width": 72, "value_offset": 11.25,
+                "unit_color": "#aaaaaa", "triangle_positive_color": "#40e0d0", "triangle_negative_color": "#c65102",
+            },
+        }),
+    )
+}
+
+#[test]
+fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_triangle_changes() {
+    use ovrley_core::activity::{
+        interpolate::densify_activity, schema::ParsedActivity, trim::trim_activity,
+    };
+    use ovrley_widgets::{
+        activity::ActivitySampler,
+        widgets::gradient::{
+            format::format_validated_gradient,
+            frame::{prepare_gradient_frame, validated_gradient_style},
+            validation::validate_gradient_widget,
+        },
+    };
+    let (mut preview, mut request) = gradient_preview();
+    let parsed: ParsedActivity = serde_json::from_value(json!({
+        "sample_elapsed_seconds": [0,1,2,3,4], "trim_end_seconds": 4,
+        "gradient": [null,6,null,-6,null],
+    }))
+    .unwrap();
+    let bytes = serde_json::to_vec(&parsed).unwrap();
+    let sampler = ActivitySampler::from_json(&bytes).unwrap();
+    preview.replace_activity(&bytes).unwrap();
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
+    }));
+    let requirements = config.render_data_requirements().unwrap();
+    let trimmed = trim_activity(&parsed, 0.0, 4.0, &requirements).unwrap();
+    let seconds = vec![0.0, 0.5, 1.0, 1.002, 2.0, 2.5, 3.0, 4.0];
+    let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
+    let validated = validate_gradient_widget(
+        serde_json::from_value(request["widget"].clone()).unwrap(),
+        0,
+    )
+    .unwrap();
+    let scene =
+        validate_scene_presentation(serde_json::from_value(request["scene"].clone()).unwrap())
+            .unwrap();
+    let style = validated_gradient_style(&validated, &scene, scene.scale);
+    let fonts = NativeFonts(&[common::test_config::repo_git_root().join("fonts")]);
+    let id = preview
+        .create_widget(serde_json::from_value(request.clone()).unwrap())
+        .unwrap();
+    // Forward playback and backward seeks include a bridged gap and missing coverage edges.
+    for index in [0, 1, 2, 3, 4, 5, 6, 7, 2, 0] {
+        let second = seconds[index];
+        assert_eq!(sampler.gradient_at(second), dense.series.gradient[index]);
+        preview.render(second).unwrap();
+        let widget = &preview.widgets[&id];
+        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let info = ImageInfo::new(
+            (
+                geometry["width"].as_i64().unwrap() as i32,
+                geometry["height"].as_i64().unwrap() as i32,
+            ),
+            ColorType::RGBA8888,
+            AlphaType::Premul,
+            None,
+        );
+        let mut surface = surfaces::raster(&info, None, None).unwrap();
+        let canvas = surface.canvas();
+        canvas.clear(Color::TRANSPARENT);
+        canvas.translate((
+            -geometry["left"].as_f64().unwrap() as f32,
+            -geometry["top"].as_f64().unwrap() as f32,
+        ));
+        prepare_gradient_frame(
+            &validated,
+            &style,
+            dense.series.gradient[index],
+            scene.scale,
+            &fonts,
+        )
+        .unwrap()
+        .draw(canvas, &fonts)
+        .unwrap();
+        let mut pixels = vec![0; widget.pixels().len()];
+        assert!(surface.read_pixels(
+            &info.with_alpha_type(AlphaType::Unpremul),
+            &mut pixels,
+            info.width() as usize * 4,
+            (0, 0)
+        ));
+        assert_eq!(&pixels, widget.pixels(), "gradient at {second}");
+        assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+        let revision = widget.revision();
+        preview.render(second).unwrap();
+        assert_eq!(preview.widgets[&id].revision(), revision);
+    }
+    assert_eq!(
+        format_validated_gradient(&validated, sampler.gradient_at(1.0)),
+        format_validated_gradient(&validated, sampler.gradient_at(1.002))
+    );
+    preview.render(1.0).unwrap();
+    let revision = preview.widgets[&id].revision();
+    preview.render(1.002).unwrap();
+    assert_ne!(
+        preview.widgets[&id].revision(),
+        revision,
+        "triangle changes even when the text does not"
+    );
+    let original = preview.widgets[&id].pixels().clone();
+    preview.replace_activity(&[]).unwrap();
+    preview.render(1.002).unwrap();
+    assert_ne!(preview.widgets[&id].pixels(), &original);
+    let missing = preview.widgets[&id].pixels().clone();
+    preview.render(3.0).unwrap();
+    assert_eq!(preview.widgets[&id].pixels(), &missing);
+    preview.replace_activity(&bytes).unwrap();
+    preview.render(1.002).unwrap();
+    assert_eq!(preview.widgets[&id].pixels(), &original);
+    preview
+        .replace_activity(
+            br#"{"sample_elapsed_seconds":[0,4],"trim_end_seconds":4,"gradient":[-3,-3]}"#,
+        )
+        .unwrap();
+    preview.render(1.002).unwrap();
+    assert_ne!(preview.widgets[&id].pixels(), &original);
+    assert_eq!(sampler.gradient_at(-1.0), None);
+    assert_eq!(sampler.gradient_at(5.0), None);
+    for (field, malformed) in [
+        ("show_triangle", Value::Null),
+        ("triangle_width", json!(-1)),
+        ("value_offset", Value::Null),
+        ("unit_color", json!("invalid")),
+        ("font_size", json!(0)),
+        ("opacity", json!(2)),
+        ("display_type", json!("arc")),
+    ] {
+        let mut invalid = request.clone();
+        invalid["widget"][field] = malformed;
+        assert!(
+            preview
+                .create_widget(serde_json::from_value(invalid).unwrap())
+                .is_err(),
+            "{field}"
+        );
+    }
+    request["widget"]["triangle_positive_color"] = json!("#123456");
+    let revision = preview.widgets[&id].revision();
+    preview
+        .update_widget(id, serde_json::from_value(request).unwrap())
+        .unwrap();
+    preview.render(1.002).unwrap();
+    assert_ne!(preview.widgets[&id].revision(), revision);
+}
+
+#[test]
+fn gradient_resize_preserves_all_opposite_corners_during_playback_and_commits_fractional_intrinsic_fields(
+) {
+    let (mut preview, mut origin) = gradient_preview();
+    preview
+        .replace_activity(
+            br#"{"sample_elapsed_seconds":[0,1,2,3],"gradient":[6,12,-6,0],"trim_end_seconds":3}"#,
+        )
+        .unwrap();
+    let id = preview
+        .create_widget(serde_json::from_value(origin.clone()).unwrap())
+        .unwrap();
+    for (show_triangle, offset, scale) in
+        [(true, 11.25, 1.7), (true, -17.5, 0.8), (false, 11.25, 1.7)]
+    {
+        origin["widget"]["show_triangle"] = json!(show_triangle);
+        origin["widget"]["value_offset"] = json!(offset);
+        origin["scene"]["scale"] = json!(scale);
+        preview
+            .update_widget(id, serde_json::from_value(origin.clone()).unwrap())
+            .unwrap();
+        preview.render(0.5).unwrap();
+        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let bounds = &geometry["content"];
+        assert!(bounds["width"].as_f64().unwrap() < geometry["width"].as_f64().unwrap());
+        assert!(bounds["height"].as_f64().unwrap() < geometry["height"].as_f64().unwrap());
+        for fixed in [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] {
+            let point = [
+                bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0],
+                bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1],
+            ];
+            for factor in [0.55, 1.234375, 12.0] {
+                for second in [2.25, 3.0, 0.25] {
+                    let mut gesture = origin.clone();
+                    gesture.as_object_mut().unwrap().extend(
+                        json!({
+                            "factor": factor, "fixed": fixed, "point": point, "second": second,
+                        })
+                        .as_object()
+                        .unwrap()
+                        .clone(),
+                    );
+                    let patch = serde_json::to_value(
+                        preview
+                            .resize_widget(serde_json::from_value(gesture).unwrap())
+                            .unwrap(),
+                    )
+                    .unwrap();
+                    assert_eq!(
+                        patch.as_object().unwrap().len(),
+                        5,
+                        "gradient only resizes its intrinsic fields and position"
+                    );
+                    if factor == 1.234375 {
+                        assert_eq!(patch["font_size"], json!(59.25));
+                        assert_eq!(patch["triangle_width"], json!(88.875));
+                        assert_eq!(patch["value_offset"].as_f64().unwrap(), offset * factor);
+                    }
+                    assert!(patch["font_size"].as_f64().unwrap() <= 400.0);
+                    assert!(patch["triangle_width"].as_f64().unwrap() <= 600.0);
+                    let mut committed = origin.clone();
+                    committed["widget"]
+                        .as_object_mut()
+                        .unwrap()
+                        .extend(patch.as_object().unwrap().clone());
+                    preview
+                        .update_widget(id, serde_json::from_value(committed.clone()).unwrap())
+                        .unwrap();
+                    preview.render(second).unwrap();
+                    let live_geometry = preview.widgets[&id].geometry().clone();
+                    let actual: Value = serde_json::from_slice(&live_geometry).unwrap();
+                    let actual = &actual["content"];
+                    for (axis, position, size) in [(0, "left", "width"), (1, "top", "height")] {
+                        let corner = actual[position].as_f64().unwrap()
+                            + actual[size].as_f64().unwrap() * fixed[axis];
+                        assert!((corner - point[axis]).abs() < 0.002, "gradient corner moved: triangle={show_triangle} offset={offset} factor={factor} second={second}");
+                    }
+                    preview
+                        .update_widget(id, serde_json::from_value(committed).unwrap())
+                        .unwrap();
+                    preview.render(second).unwrap();
+                    assert_eq!(preview.widgets[&id].geometry(), &live_geometry);
+                }
+            }
+        }
+    }
+}
+
 #[test]
 fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
     use ovrley_widgets::widgets::time::{

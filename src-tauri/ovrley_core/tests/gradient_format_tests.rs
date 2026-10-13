@@ -8,8 +8,8 @@
 //! Integration-adjacent test. Constructs config and validates gradient widgets
 //! in memory. No I/O, no fixtures.
 
-use ovrley_core::normalize::validate_gradient_widget;
-use ovrley_core::render::format::format_validated_gradient;
+use ovrley_widgets::widgets::gradient::validation::validate_gradient_widget;
+use ovrley_widgets::widgets::gradient::format::format_validated_gradient;
 
 fn gradient_config(
     overrides: &[(&str, &str)],

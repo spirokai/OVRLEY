@@ -4,11 +4,13 @@ use serde::{Deserialize, Deserializer, Serialize};
 use crate::widgets::backdrop::{config::BackdropConfig, preview::PreviewBackdrop};
 
 use crate::widgets::raster::{config::RasterConfig, preview::{PreviewRaster, PreviewImages}};
+use crate::widgets::gradient::preview::PreviewGradient;
 
 pub enum WidgetRequest {
     Raster { widget: RasterConfig, scene: ScenePresentationConfig },
     Backdrop { widget: BackdropConfig, scene: ScenePresentationConfig },
     Label { widget: LabelConfig, scene: ScenePresentationConfig },
+    Gradient(ValueRequest),
     Value(ValueRequest),
 }
 
@@ -33,7 +35,8 @@ impl<'de> Deserialize<'de> for WidgetRequest {
             if widget.value != metric {
                 return Err(serde::de::Error::custom("widget type must match its value metric"));
             }
-            Ok(Self::Value(ValueRequest { widget, scene: input.scene }))
+            let request = ValueRequest { widget, scene: input.scene };
+            Ok(if metric == MetricKind::Gradient { Self::Gradient(request) } else { Self::Value(request) })
         }
     }
 }
@@ -42,6 +45,7 @@ pub enum PreviewWidget {
     Raster(PreviewRaster),
     Backdrop(PreviewBackdrop),
     Label(PreviewLabel),
+    Gradient(PreviewGradient),
     Value(ValuePreview),
 }
 
@@ -51,23 +55,25 @@ impl PreviewWidget {
             WidgetRequest::Raster {widget, scene} => Ok(Self::Raster(PreviewRaster::new(widget, scene, images)?)),
             WidgetRequest::Backdrop {widget, scene} => Ok(Self::Backdrop(PreviewBackdrop::new(widget, scene)?)),
             WidgetRequest::Label {widget, scene} => Ok(Self::Label(PreviewLabel::new(widget, scene, fonts)?)),
+            WidgetRequest::Gradient(request) => Ok(Self::Gradient(PreviewGradient::new(request.widget, request.scene)?)),
             WidgetRequest::Value(request) => Ok(Self::Value(ValuePreview::new(request, fonts)?)),
         }
     }
     pub fn pixels(&self) -> &Vec<u8> {
-        match self { Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
+        match self { Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
     }
     pub fn geometry(&self) -> &Vec<u8> {
-        match self { Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
+        match self { Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
     }
     pub fn revision(&self) -> u32 {
-        match self { Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Value(widget) => widget.revision }
+        match self { Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::Value(widget) => widget.revision }
     }
     pub fn inherit_revision(&mut self, previous: u32) {
         match self {
             Self::Raster(widget) => widget.revision = previous.wrapping_add(1),
             Self::Backdrop(widget) => widget.revision = previous.wrapping_add(1),
             Self::Label(widget) => widget.revision = previous.wrapping_add(1),
+            Self::Gradient(widget) => widget.revision = previous,
             Self::Value(widget) => widget.revision = previous,
         }
     }
@@ -91,5 +97,6 @@ pub enum ResizeUpdate {
     Raster(crate::widgets::raster::interaction::ResizeUpdate),
     Backdrop(crate::widgets::backdrop::interaction::ResizeUpdate),
     Label(crate::widgets::label::interaction::ResizeUpdate),
+    Gradient(crate::widgets::gradient::interaction::ResizeUpdate),
     Value(crate::widgets::value::interaction::ResizeUpdate),
 }

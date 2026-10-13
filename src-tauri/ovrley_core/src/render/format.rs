@@ -1,10 +1,8 @@
 //! Metric formatting for dynamic overlay values.
 //!
-//! Supplies dense samples to shared metric formatting. Gradient formatting
-//! remains native until that widget family migrates.
+//! Supplies dense samples to shared metric formatting.
 
 use crate::activity::schema::DenseActivityReport;
-use crate::normalize::ValidatedGradientWidget;
 use ovrley_widgets::model::standard_metrics::{
     standard_metric_formatter, StandardMetricFormatterKind,
 };
@@ -125,35 +123,6 @@ pub fn format_lean_angle_value(raw: Option<f64>) -> String {
         Some(StandardMetricFormatterKind::Integer) => format_number(raw.abs(), 0),
         _ => unreachable!("lean_angle must use the integer standard metric formatter"),
     }
-}
-
-/// Formats a gradient widget value using the validated contract.
-///
-/// All output-affecting fields are already explicit — no backend-owned defaults
-/// are applied. Raw telemetry is looked up by metric kind and formatted using
-/// the validated formatting contract.
-pub fn format_validated_gradient(validated: &ValidatedGradientWidget, raw: Option<f64>) -> String {
-    let Some(value) = raw else {
-        return "--%".to_string();
-    };
-    let decimals = validated.formatting.decimals();
-    let magnitude = format_number(value.abs(), decimals);
-    let sign = if value > 0.0 {
-        "+"
-    } else if value < 0.0 {
-        "-"
-    } else {
-        ""
-    };
-    let prefix = if validated.show_sign { sign } else { "" };
-    let mut formatted = format!("{prefix}{magnitude}%");
-    if !validated.prefix.is_empty() {
-        formatted = format!("{}{formatted}", validated.prefix);
-    }
-    if !validated.suffix.is_empty() {
-        formatted.push_str(&validated.suffix);
-    }
-    formatted
 }
 
 /// Returns whether the finalized metric has any dense samples.

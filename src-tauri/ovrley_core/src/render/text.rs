@@ -6,7 +6,7 @@
 
 use crate::error::CoreResult;
 use crate::normalize::{
-    ValidatedGradientWidget, ValidatedLapTimer, ValidatedSceneConfig,
+    ValidatedLapTimer, ValidatedSceneConfig,
 };
 use ovrley_widgets::model::standard_widgets::widget_font_weight;
 use ovrley_widgets::widgets::time::validation::ValidatedTimeValue;
@@ -108,42 +108,6 @@ pub fn validated_lap_timer_label_style(
         validated.label_color[2],
     );
     style
-}
-
-/// Resolves a text style from a validated gradient widget and scene config.
-///
-/// All output-affecting fields are already explicit in the validated type.
-/// Shadow and border come from scene config (not part of the gradient contract).
-pub fn validated_gradient_style(
-    validated: &ValidatedGradientWidget,
-    scene: &ValidatedSceneConfig,
-    scale: f32,
-) -> ResolvedTextStyle {
-    let opacity = validated.opacity;
-    let color = Color::from_argb(
-        validated.color[3],
-        validated.color[0],
-        validated.color[1],
-        validated.color[2],
-    );
-
-    ResolvedTextStyle {
-        x: validated.x,
-        y: validated.y,
-        font_name: Some(validated.font_name.clone()),
-        font_size: validated.font_size * scale,
-        font_weight: widget_font_weight(),
-        italic: false,
-        letter_spacing: 0.0,
-        line_height: validated.font_size * scale * 0.92,
-        color,
-        opacity,
-        shadow_color: scene_shadow_color(scene, opacity),
-        shadow_strength: scene.presentation.shadow_strength * scale,
-        shadow_distance: scene.presentation.shadow_distance * scale,
-        border_color: scene_border_color(scene, opacity),
-        border_thickness: scene.presentation.border_thickness * scale,
-    }
 }
 
 /// Native font acquisition boundary for shared text rendering.

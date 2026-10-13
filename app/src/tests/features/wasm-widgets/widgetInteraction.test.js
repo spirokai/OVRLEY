@@ -42,7 +42,7 @@ function editor(type = 'speed') {
   }
 }
 
-test.each(['speed', 'time', 'backdrop', 'raster'])(
+test.each(['speed', 'time', 'gradient', 'backdrop', 'raster'])(
   '%s drag coalesces from the captured origin and flushes the final movement without rounding',
   (type) => {
     const { interaction, presentations, original } = editor(type)
@@ -97,7 +97,7 @@ test('resize uses original configuration and a fixed content corner across live 
   expect(interaction.finish()).toBeNull()
 })
 
-test.each(['label', 'time'])('%s resize follows its playhead policy and flushes the final pointer intent', (type) => {
+test.each(['label', 'time', 'gradient'])('%s resize follows its playhead policy and flushes the final pointer intent', (type) => {
   const { interaction, resize, original, setSnapshot, render } = editor(type)
   const draft = vi.fn()
   const origin = interaction.begin(draft)
@@ -108,11 +108,11 @@ test.each(['label', 'time'])('%s resize follows its playhead policy and flushes 
     setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second })
     render()
   }
-  expect(resize).toHaveBeenCalledTimes(type === 'time' ? 4 : 1)
+  expect(resize).toHaveBeenCalledTimes(type === 'label' ? 1 : 4)
   expect(draft).toHaveBeenCalledTimes(1) // Identical resolved patches need no new inspector draft.
   interaction.update({ type: 'resize', geometry: { factor: 1.375, ...anchor } })
   expect(interaction.finish().font_size).toBe(66)
-  expect(resize).toHaveBeenCalledTimes(type === 'time' ? 5 : 2)
+  expect(resize).toHaveBeenCalledTimes(type === 'label' ? 2 : 5)
   expect(resize.mock.lastCall[0]).toMatchObject({ type, widget: original.data, second: 30 })
   expect(vi.getTimerCount()).toBe(0)
 })

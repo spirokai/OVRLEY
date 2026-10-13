@@ -27,6 +27,7 @@ macro_rules! activity_columns {
             $(#[serde(default)] $field: Vec<Option<f64>> ,)*
             #[serde(default)] elevation: Vec<Option<f64>>,
             #[serde(default)] barometric_altitude: Vec<Option<f64>>,
+            #[serde(default)] gradient: Vec<Option<f64>>,
             #[serde(default)] gear_position: Vec<Option<String>>,
             #[serde(default)] course: Vec<(Option<f64>, Option<f64>)>,
         }
@@ -130,6 +131,7 @@ pub struct ActivitySampler {
     gear: Vec<(f64, String)>,
     latitude: NumericColumn,
     longitude: NumericColumn,
+    gradient: NumericColumn,
     full_activity_distance: Option<f64>,
     full_activity_total_ascent: Option<f64>,
 }
@@ -180,6 +182,8 @@ impl ActivitySampler {
             .transpose()?;
         columns.insert(MetricKind::Altitude, altitude);
         let times = activity.sample_elapsed_seconds;
+        // Gradient bridges internal gaps; samples outside observed coverage stay missing.
+        let gradient = NumericColumn::new(&times, activity.gradient, StandardMetricInterpolationKind::Linear)?;
         let numeric: HashMap<_, _> = columns
             .into_iter()
             .map(|(kind, values)| {
@@ -216,9 +220,17 @@ impl ActivitySampler {
             gear,
             latitude,
             longitude,
+            gradient,
             full_activity_distance,
             full_activity_total_ascent,
         })
+    }
+
+    pub fn gradient_at(&self, second: f64) -> Option<f64> {
+        if second < 0.0 || second > self.end || !self.gradient.contains(second) {
+            return None;
+        }
+        self.gradient.at(&self.times, second)
     }
 
     pub fn sample(&self, widget: &ValidatedValueWidget, second: f64) -> MetricSample<'_> {

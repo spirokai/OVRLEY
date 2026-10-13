@@ -7,15 +7,13 @@
 //!
 //! Module ownership:
 //! - `layout` — text positioning, icon/unit row layout, static-part cache logic.
-//! - `gradient` — slope triangle rendering and triangle height math.
-//! Shared layout, icon resources, and SVG parsing live in `ovrley_widgets`.
+//! Shared layout, gradient rendering, icons, and SVG parsing live in `ovrley_widgets`.
 
-mod gradient;
 mod layout;
 
 use crate::activity::schema::DenseActivityReport;
 use crate::error::CoreResult;
-use crate::normalize::ValidatedGradientWidget;
+use ovrley_widgets::widgets::gradient::{frame::prepare_gradient_frame, validation::ValidatedGradientWidget};
 use crate::render::format::format_metric_presentation_parts;
 use ovrley_widgets::widgets::time::{validation::ValidatedTimeValue, format::{format_validated_time_parts, ElapsedTimeValues}};
 use chrono_tz::Tz;
@@ -26,7 +24,6 @@ use ovrley_widgets::widgets::value::validation::ValidatedValueWidget;
 use skia_safe::Canvas;
 use std::path::PathBuf;
 
-pub use gradient::gradient_triangle_height;
 pub(crate) use layout::{draw_metric_parts, draw_static_metric_parts_for_value};
 use ovrley_widgets::widgets::value::layout::StaticMetricParts;
 
@@ -74,15 +71,15 @@ pub(crate) fn draw_metric_value_widget_with_config(
         let validated_gradient = request
             .validated_gradient
             .expect("gradient widget must be validated before rendering");
-        return gradient::draw_gradient_value_widget(
-            request.canvas,
+        let raw = request.dense_activity.series.gradient.get(request.frame_index).copied().flatten();
+        prepare_gradient_frame(
             validated_gradient,
             request.base_style,
-            request.dense_activity,
-            request.frame_index,
+            raw,
             request.scale,
-            request.font_dirs,
-        );
+            &crate::fonts::NativeFonts(request.font_dirs),
+        )?.draw(request.canvas, &crate::fonts::NativeFonts(request.font_dirs))?;
+        return Ok(true);
     }
 
     if request.metric_kind == MetricKind::Time {

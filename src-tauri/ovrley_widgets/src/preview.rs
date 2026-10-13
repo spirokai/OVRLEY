@@ -77,6 +77,9 @@ impl PreviewSession {
         match request.origin {
             WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } => unreachable!(),
             WidgetRequest::Label {widget, scene} => Ok(ResizeUpdate::Label(crate::widgets::label::interaction::resize_label(widget, scene, factor, request.fixed, request.point, &self.fonts)?)),
+            WidgetRequest::Gradient(origin) => Ok(ResizeUpdate::Gradient(crate::widgets::gradient::interaction::resize_gradient(
+                origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
+            )?)),
             WidgetRequest::Value(origin) => Ok(ResizeUpdate::Value(crate::widgets::value::interaction::resize_value(
                 crate::widgets::value::interaction::ResizeRequest {origin, factor, fixed: request.fixed, point: request.point, second: request.second}, self.activity.as_ref(), &self.fonts,
             )?)),
@@ -115,8 +118,10 @@ impl PreviewSession {
         }
         for widget in self.widgets.values_mut() {
             // Static families are fully rendered on creation/update and never visit the playhead path.
-            if let PreviewWidget::Value(widget) = widget {
-                widget.render(self.activity.as_ref(), second, &self.fonts)?;
+            match widget {
+                PreviewWidget::Value(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
+                PreviewWidget::Gradient(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
+                _ => {},
             }
         }
         Ok(())

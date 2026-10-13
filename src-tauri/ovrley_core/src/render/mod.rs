@@ -29,10 +29,11 @@ use crate::render::raster::prepare_rasters;
 use crate::render::static_layer::config_has_static_metric_parts;
 use crate::render::surface::{create_surface, wrap_native_surface, write_surface_png};
 use crate::render::text::{
-    validated_gradient_style, validated_lap_timer_style, validated_time_style,
+    validated_lap_timer_style, validated_time_style,
     validated_value_style,
 };
 use crate::render::widgets::types::PreparedValue;
+use ovrley_widgets::widgets::gradient::frame::validated_gradient_style;
 use crate::render::widgets::value::MetricWidgetRequest;
 use crate::render::widgets::{
     draw_elevation_widget, draw_metric_presentation, draw_metric_value_widget_with_config,
@@ -647,7 +648,7 @@ fn render_frame_to_surface(
                     })?;
                 }
                 PreparedValue::Gradient(validated) => {
-                    let style = validated_gradient_style(validated, &prepared_assets.scene, scale);
+                    let style = validated_gradient_style(validated, &prepared_assets.scene.presentation, scale);
                     draw_metric_value_widget_with_config(MetricWidgetRequest {
                         canvas,
                         metric_kind: ovrley_widgets::model::types::MetricKind::Gradient,
