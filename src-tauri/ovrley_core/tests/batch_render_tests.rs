@@ -118,6 +118,7 @@ impl Fixture {
         );
         BatchRenderRequest {
             inspection_id: session.inspection_id,
+            auto_sync: true,
             template,
             encoding,
             activity: if external {

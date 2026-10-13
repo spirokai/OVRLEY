@@ -91,6 +91,8 @@ pub struct PreparedPreviewAssets {
     pub(crate) labels_image: Option<Image>,
     /// Widget caches and optional base RGBA bytes.
     pub(crate) prepared_assets: PreparedRenderAssets,
+    /// Images remain visible on video frames without activity coverage.
+    pub(crate) raster_rgba: Vec<u8>,
 }
 
 impl PreparedPreviewAssets {
@@ -153,6 +155,7 @@ pub struct VideoFrameRenderer<'a> {
     frame_size: FrameSize,
     scale: f32,
     base_rgba: &'a [u8],
+    raster_rgba: &'a [u8],
     blank_leading_frame_count: usize,
 }
 
@@ -178,6 +181,13 @@ impl<'a> VideoFrameRenderer<'a> {
                 base_rgba.len(), frame_size.width, frame_size.height
             )));
         }
+        let raster_rgba = &prepared_preview_assets.raster_rgba;
+        if raster_rgba.len() != expected_len {
+            return Err(CoreError::Render(format!(
+                "Prepared raster layer has {} bytes; expected {expected_len}",
+                raster_rgba.len()
+            )));
+        }
         let blank_leading_frame_count = usize::try_from(blank_leading_frame_count)
             .map_err(|_| CoreError::Render("Blank leading frame count exceeds usize".into()))?;
 
@@ -188,6 +198,7 @@ impl<'a> VideoFrameRenderer<'a> {
             frame_size,
             scale: prepared_preview_assets.scene().presentation.scale,
             base_rgba,
+            raster_rgba,
             blank_leading_frame_count,
         })
     }
@@ -214,8 +225,9 @@ impl<'a> VideoFrameRenderer<'a> {
             pixels,
         );
         let Some(activity_frame_index) = activity_frame_index else {
+            pixels.copy_from_slice(self.raster_rgba);
             frame_profiler.record_ms(
-                "blank.clear",
+                "raster.restore",
                 Instant::now().duration_since(started).as_secs_f64() * 1000.0,
             );
             return Ok(());
@@ -304,6 +316,15 @@ pub fn prepare_preview_assets(
         &mut prepare_profiler,
     )?;
     let rasters = prepare_rasters(&config.rasters, prepared_assets.scene.presentation.scale)?;
+    let raster_rgba = StaticLayer {
+        backdrops: &[],
+        rasters: &rasters,
+        labels: &[],
+        values: &[],
+        scene: &prepared_assets.scene,
+    }
+    .prepare(paths, &mut prepare_profiler)?
+    .base_rgba;
     let static_layer = StaticLayer {
         backdrops: &prepared_assets.backdrops,
         rasters: &rasters,
@@ -324,6 +345,7 @@ pub fn prepare_preview_assets(
         PreparedPreviewAssets {
             labels_image,
             prepared_assets,
+            raster_rgba,
         },
         label_cache_status,
         prepare_timings,

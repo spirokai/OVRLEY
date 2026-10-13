@@ -11,11 +11,17 @@ function requireItem(state, id) {
 
 export function createBatchRenderSlice(set) {
   return {
+    // Session preference; excluded from project, template, and undo snapshots.
+    batchAutoSync: true,
     batchVideoFolder: null,
     batchOutputFolder: null,
     batchQueue: [],
     batchSnapshot: null,
 
+    setBatchAutoSync: (autoSync) => {
+      if (typeof autoSync !== 'boolean') throw new Error('Automatic batch synchronization must be boolean')
+      set({ batchAutoSync: autoSync })
+    },
     setBatchVideoFolder: (path) => {
       requireFolder(path)
       set({ batchVideoFolder: path })

@@ -179,6 +179,8 @@
     "cancelling": "Annuleren...",
     "exportSettings": "Exportinstellingen",
     "batchSettings": "Batchinstellingen",
+    "batchAuto": "Auto",
+    "batchAutoHelp": "<strong>Auto aan</strong>: Alleen video's die synchroniseren en overlappen met de activiteit kunnen worden gerenderd.\n\n<strong>Auto uit</strong>: Elke video kan worden gerenderd, zelfs als deze niets met de activiteit te maken heeft. Gebruik dit alleen als je weet wat je doet.",
     "batchAutoSyncRequirement": "Batchrendering vereist automatische synchronisatie tussen video's en activiteitsgegevens.\n\nHet renderen mislukt of levert onjuiste resultaten op als de automatische synchronisatie niet werkt.",
     "showAll": "Alles tonen",
     "noRenderableVideos": "Geen renderbare video’s.",

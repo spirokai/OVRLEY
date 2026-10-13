@@ -69,7 +69,7 @@ describe('signed automatic synchronization and shared calibration', () => {
       videoSyncOffsetPreviewSeconds: 87,
     }
     expect(resolveVideoSyncState(editorSnapshot, summary).videoSyncOffsetSeconds).toBe(-12)
-    const sync = captureBatchSync(editorSnapshot)
+    const sync = captureBatchSync(editorSnapshot, true)
     expect(resolveBatchVideoTiming(reference.metadata, summary, sync.timezoneMode)).toEqual({
       timing: { mode: 'externalActivity', automaticOffsetSeconds: -60 },
       hasPositiveOverlap: false,

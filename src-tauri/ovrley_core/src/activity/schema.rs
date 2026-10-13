@@ -386,7 +386,7 @@ pub struct RawSample {
 /// The struct is intentionally forward-compatible: unknown fields are retained
 /// in [`ParsedActivity::extra`] so newer frontend payloads can travel through
 /// older Rust builds without being discarded by serde.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct ParsedActivity {
     /// Original source filename when known.
     #[serde(default)]
@@ -604,7 +604,7 @@ pub struct DebugPayload {
 /// Every non-empty vector in this report is aligned to `frame_elapsed_seconds`.
 /// Empty vectors mean the corresponding series was not required by the active
 /// template and should be skipped by render code.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct DenseActivityReport {
     /// Numeric metric bounds from the entire source activity, before trimming.
     pub full_activity_metric_ranges: std::collections::HashMap<MetricKind, (f64, f64)>,
@@ -623,7 +623,7 @@ pub struct DenseActivityReport {
 }
 
 /// Densified telemetry series aligned with a [`DenseActivityReport`].
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct DenseSeriesReport {
     /// Speed in meters per second.
     pub speed: Vec<Option<f64>>,

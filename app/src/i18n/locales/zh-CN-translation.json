@@ -179,6 +179,8 @@
     "cancelling": "正在取消...",
     "exportSettings": "导出设置",
     "batchSettings": "批量设置",
+    "batchAuto": "自动",
+    "batchAutoHelp": "<strong>自动开启</strong>：仅能渲染可同步且时间范围与活动重叠的视频。\n\n<strong>自动关闭</strong>：可以渲染任何视频，即使与活动无关。仅在清楚此设置的作用时使用。",
     "batchAutoSyncRequirement": "批量渲染依赖视频与活动数据之间的自动同步。\n\n如果自动同步无法正常工作，渲染将失败或产生错误的结果。",
     "showAll": "显示全部",
     "noRenderableVideos": "没有可渲染的视频。",

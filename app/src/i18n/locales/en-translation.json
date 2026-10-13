@@ -179,6 +179,8 @@
     "cancelling": "Cancelling...",
     "exportSettings": "Export Settings",
     "batchSettings": "Batch Settings",
+    "batchAuto": "Auto",
+    "batchAutoHelp": "<strong>Auto on</strong>: Only videos that sync and overlap with the activity can be rendered.\n\n<strong>Auto off</strong>: Any video, even one unrelated to the activity, can be rendered. Use only if you know what you are doing.",
     "batchAutoSyncRequirement": "Batch rendering relies on automatic syncing between videos and activity data.\n\nIt will fail or produce erroneous results if the automatic sync does not work.",
     "showAll": "Show all",
     "noRenderableVideos": "No renderable videos.",

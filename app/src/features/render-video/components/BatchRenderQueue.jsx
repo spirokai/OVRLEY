@@ -10,7 +10,7 @@ import { HelpTooltip } from '@/components/ui/help-tooltip'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import BatchRenderQueueRow from './BatchRenderQueueRow'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 
 /**
  * Renders the batch video queue.
@@ -21,6 +21,8 @@ import { useTranslation } from 'react-i18next'
  * @param {function} props.clearBatchQueue - Clears the folder and queue.
  * @param {object[]} props.batchQueue - Queued videos.
  * @param {object[]} props.visibleBatchQueue - Videos included by the display filter.
+ * @param {boolean} props.batchAutoSync - Whether automatic sync and overlap checks are enabled.
+ * @param {function} props.setBatchAutoSync - Changes automatic batch synchronization.
  * @param {boolean} props.showAllBatchVideos - Whether blocked videos are included.
  * @param {function} props.setShowAllBatchVideos - Changes the display filter.
  * @param {boolean} props.batchRunning - Whether the batch is rendering.
@@ -37,6 +39,8 @@ export default function BatchRenderQueue({
   clearBatchQueue,
   batchQueue,
   visibleBatchQueue,
+  batchAutoSync,
+  setBatchAutoSync,
   showAllBatchVideos,
   setShowAllBatchVideos,
   batchRunning,
@@ -63,10 +67,31 @@ export default function BatchRenderQueue({
                 <HelpTooltip className="-mt-0.5 self-start" content={t('render-video.batchAutoSyncRequirement')} />
               </div>
             </div>
-            <Label className="flex shrink-0 items-center gap-2 text-[10px] text-muted-foreground">
-              {t('render-video.showAll', 'Show all')}
-              <Switch aria-label={t('render-video.showAll', 'Show all')} checked={showAllBatchVideos} onCheckedChange={setShowAllBatchVideos} />
-            </Label>
+            <div className="flex shrink-0 items-center gap-4">
+              <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
+                  <Label htmlFor="batch-auto-sync" className="text-[10px] text-muted-foreground">
+                    {t('render-video.batchAuto', 'Auto')}
+                  </Label>
+                  <HelpTooltip
+                    className="-mt-0.5 self-start"
+                    ariaLabel={t('render-video.batchAuto', 'Auto')}
+                    content={<Trans i18nKey="render-video.batchAutoHelp" components={{ strong: <strong /> }} />}
+                  />
+                </div>
+                <Switch
+                  id="batch-auto-sync"
+                  aria-label={t('render-video.batchAuto', 'Auto')}
+                  checked={batchAutoSync}
+                  onCheckedChange={setBatchAutoSync}
+                  disabled={batchRunning}
+                />
+              </div>
+              <Label className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                {t('render-video.showAll', 'Show all')}
+                <Switch aria-label={t('render-video.showAll', 'Show all')} checked={showAllBatchVideos} onCheckedChange={setShowAllBatchVideos} />
+              </Label>
+            </div>
           </div>
           <BatchFolderPicker
             label={t('render-video.videoFolder', 'Video folder')}

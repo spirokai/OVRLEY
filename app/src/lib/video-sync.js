@@ -135,9 +135,10 @@ export function resolveVideoSyncState(videoState, activitySummary) {
  * @param {object|null} options.activitySummary Shared external activity summary, or null.
  * @param {object|null} options.referenceVideo Effective path, creationTime, timeSource and committedOffsetSeconds, or null.
  * @param {'utc'|'local'|null|undefined} options.timezoneMode Apply Timezone selection.
+ * @param {boolean} [options.requireReferenceSync=true] Whether an unusable external timestamp blocks calibration.
  * @returns {object} Serializable calibration, matching the Rust BatchCalibration contract.
  */
-export function createBatchCalibration({ activitySummary, referenceVideo, timezoneMode }) {
+export function createBatchCalibration({ activitySummary, referenceVideo, timezoneMode, requireReferenceSync = true }) {
   const mode = captureVideoSyncTimezoneMode(timezoneMode)
   if (activitySummary === null) return { mode: 'embeddedActivity' }
   if (referenceVideo === null) return { mode: 'externalActivity', timezoneMode: mode, correctionSeconds: 0, reference: null }
@@ -146,6 +147,8 @@ export function createBatchCalibration({ activitySummary, referenceVideo, timezo
   try {
     baseline = calculateAutomaticVideoOffset(referenceVideo, activitySummary, mode)
   } catch (error) {
+    if (!requireReferenceSync && error instanceof VideoSyncError)
+      return { mode: 'externalActivity', timezoneMode: mode, correctionSeconds: 0, reference: null }
     throw new Error(`Could not calibrate reference video: ${error.message}`)
   }
   const { automaticOffsetSeconds } = baseline
@@ -171,11 +174,19 @@ export function createBatchCalibration({ activitySummary, referenceVideo, timezo
  * @param {object} video Inspected source metadata with creationTime, timeSource and duration.
  * @param {object|null} activitySummary Shared external activity summary, or null.
  * @param {'utc'|'local'} timezoneMode Captured Apply Timezone interpretation.
+ * @param {boolean} [requireSync=true] Whether unusable external timestamps block rendering. Otherwise start at activity time zero.
  * @returns {{timing: object, hasPositiveOverlap: boolean|null}} Job timing and eligibility.
  */
-export function resolveBatchVideoTiming(video, activitySummary, timezoneMode) {
+export function resolveBatchVideoTiming(video, activitySummary, timezoneMode, requireSync = true) {
   if (activitySummary === null) return { timing: { mode: 'embeddedActivity' }, hasPositiveOverlap: null }
-  const { automaticOffsetSeconds, activityDurationSeconds } = calculateAutomaticVideoOffset(video, activitySummary, timezoneMode)
+  let baseline
+  try {
+    baseline = calculateAutomaticVideoOffset(video, activitySummary, timezoneMode)
+  } catch (error) {
+    if (requireSync || !(error instanceof VideoSyncError)) throw error
+    return { timing: { mode: 'externalActivity', automaticOffsetSeconds: 0 }, hasPositiveOverlap: null }
+  }
+  const { automaticOffsetSeconds, activityDurationSeconds } = baseline
   return {
     timing: { mode: 'externalActivity', automaticOffsetSeconds },
     hasPositiveOverlap: videoOverlapsActivity({

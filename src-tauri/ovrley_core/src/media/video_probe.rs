@@ -102,6 +102,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
         pix_fmt: None,
         bits_per_raw_sample: None,
         bit_rate: None,
+        audio_bit_rate: None,
         has_audio: false,
         container_format: None,
         rotation_degrees: None,
@@ -138,9 +139,15 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
             }
         }
 
-        metadata.has_audio = streams
+        let audio_stream = streams
             .iter()
-            .any(|stream| stream.get("codec_type").and_then(|v| v.as_str()) == Some("audio"));
+            .find(|stream| stream.get("codec_type").and_then(|v| v.as_str()) == Some("audio"));
+        metadata.has_audio = audio_stream.is_some();
+        metadata.audio_bit_rate = audio_stream
+            .and_then(|stream| stream.get("bit_rate"))
+            .and_then(Value::as_str)
+            .and_then(|value| value.parse::<u64>().ok())
+            .filter(|value| *value > 0);
     }
 
     // ── PHASE 3: EXTRACT VIDEO STREAM PROPERTIES ──

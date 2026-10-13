@@ -179,6 +179,8 @@
     "cancelling": "Cancelando...",
     "exportSettings": "Ajustes de exportación",
     "batchSettings": "Ajustes de lote",
+    "batchAuto": "Auto",
+    "batchAutoHelp": "<strong>Auto activado</strong>: Solo se pueden renderizar vídeos que se sincronicen y se solapen con la actividad.\n\n<strong>Auto desactivado</strong>: Se puede renderizar cualquier vídeo, incluso uno que no esté relacionado con la actividad. Úsalo solo si sabes lo que haces.",
     "batchAutoSyncRequirement": "El renderizado por lotes depende de la sincronización automática entre los vídeos y los datos de actividad.\n\nFallará o producirá resultados erróneos si la sincronización automática no funciona.",
     "showAll": "Mostrar todos",
     "noRenderableVideos": "No hay vídeos que se puedan renderizar.",

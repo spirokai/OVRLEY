@@ -24,6 +24,7 @@ pub(super) struct AcceptedJob {
 
 pub(super) struct AcceptedBatch {
     pub(super) template: ValidatedBatchTemplate,
+    pub(super) auto_sync: bool,
     pub(super) external_activity: Option<(ParsedActivity, f64)>,
     pub(super) jobs: Vec<AcceptedJob>,
 }
@@ -98,6 +99,7 @@ pub(super) fn accept_batch(
         .collect();
     Ok(AcceptedBatch {
         template,
+        auto_sync: request.auto_sync,
         external_activity,
         jobs,
     })

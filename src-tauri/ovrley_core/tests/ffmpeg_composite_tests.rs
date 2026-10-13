@@ -74,6 +74,7 @@ fn settings_for_codec_with_rotation(
             height: 2160,
         },
         true,
+        None,
         rotation_degrees,
     )
     .unwrap()
@@ -82,7 +83,7 @@ fn settings_for_codec_with_rotation(
 fn cuda_settings_for_dimensions(codec: &str, width: u32, height: u32) -> CompositeFfmpegSettings {
     let fps = Fps::new(30000, 1001).unwrap();
     let render = render_plan(codec, "60M", fps, fps, 0.0);
-    build_composite_ffmpeg_settings(&render, FrameSize { width, height }, true, None).unwrap()
+    build_composite_ffmpeg_settings(&render, FrameSize { width, height }, true, None, None).unwrap()
 }
 
 fn render_plan(
@@ -238,15 +239,28 @@ fn test_2_6_filter_graph_labels_and_maps_output() {
 
 #[test]
 fn test_2_7_filtered_audio_map_and_encoding_are_present() {
-    let built = settings(
-        Fps::new(30000, 1001).unwrap(),
-        Fps::new(30000, 1001).unwrap(),
-        0.0,
-    );
+    let fps = Fps::new(30000, 1001).unwrap();
+    let render = render_plan("libx264", "60M", fps, fps, 12.0);
+    for (audio_bit_rate, expected) in [(Some(128_000), "128000"), (None, "192000")] {
+        let built = build_composite_ffmpeg_settings(
+            &render,
+            FrameSize {
+                width: 3840,
+                height: 2160,
+            },
+            true,
+            audio_bit_rate,
+            None,
+        )
+        .unwrap();
 
-    assert_argument_pair(&built.output_args, "-map", "[aout]");
-    assert_argument_pair(&built.output_args, "-c:a", "aac");
-    assert_argument_pair(&built.output_args, "-b:a", "192k");
+        assert_argument_pair(&built.output_args, "-map", "[aout]");
+        assert_argument_pair(&built.output_args, "-c:a", "aac");
+        assert_argument_pair(&built.output_args, "-b:a", expected);
+        assert!(built
+            .filter_complex
+            .contains("atrim=start=5:duration=10,asetpts=N/SR/TB[aout]"));
+    }
 }
 
 #[test]
@@ -265,6 +279,7 @@ fn test_2_7b_source_without_audio_omits_audio_input_and_filter_graph() {
             height: 2160,
         },
         false,
+        None,
         None,
     )
     .unwrap();
@@ -664,6 +679,7 @@ fn qsv_full_rotated_sources_rotate_only_the_rgba_overlay() {
             height: 2160,
         },
         true,
+        None,
         Some(45),
     )
     .unwrap_err();
@@ -726,6 +742,7 @@ fn quality_mode_selects_encoder_specific_args() {
                 height: 1080,
             },
             true,
+            None,
             None,
         )
         .unwrap();

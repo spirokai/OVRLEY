@@ -33,6 +33,7 @@ impl CompositeEncoding {
         frame_size: FrameSize,
         render: CompositeRenderPlan,
         include_audio: bool,
+        audio_bit_rate: Option<u64>,
         source_rotation_degrees: Option<i32>,
         output_target: &RenderOutputTarget,
     ) -> CoreResult<Self> {
@@ -40,6 +41,7 @@ impl CompositeEncoding {
             &render,
             frame_size,
             include_audio,
+            audio_bit_rate,
             source_rotation_degrees,
         )?;
         let output_path = output_target.path().to_path_buf();
@@ -112,6 +114,7 @@ impl CompositeFfmpegSettings {
 /// Input 0 uses a coarse input seek followed by frame-accurate filter-side
 /// video trimming. Input 1 is the raw RGBA overlay stream on `pipe:0`, and
 /// input 2 uses the same derived source window for filtered audio encoding.
+/// Audio encoding targets the source bitrate, or 192 kbps when unreported.
 ///
 /// The function consumes the validated render plan, selects and configures an encoder profile,
 /// then assembles four argument groups that callers concatenate in order: HW
@@ -122,6 +125,7 @@ pub fn build_composite_ffmpeg_settings(
     render: &CompositeRenderPlan,
     frame_size: FrameSize,
     include_audio: bool,
+    audio_bit_rate: Option<u64>,
     source_rotation_degrees: Option<i32>,
 ) -> CoreResult<CompositeFfmpegSettings> {
     let FrameSize { width, height } = frame_size;
@@ -284,7 +288,7 @@ pub fn build_composite_ffmpeg_settings(
             "-c:a".to_string(),
             "aac".to_string(),
             "-b:a".to_string(),
-            "192k".to_string(),
+            audio_bit_rate.unwrap_or(192_000).to_string(),
         ]);
     }
     output_args.extend(["-movflags".to_string(), "faststart".to_string()]);
@@ -364,6 +368,7 @@ mod tests {
                     height: 1920,
                 },
                 true,
+                None,
                 Some(90),
             )
             .unwrap();

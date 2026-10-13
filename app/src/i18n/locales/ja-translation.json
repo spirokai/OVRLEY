@@ -179,6 +179,8 @@
     "cancelling": "キャンセル中...",
     "exportSettings": "書き出し設定",
     "batchSettings": "バッチ設定",
+    "batchAuto": "自動",
+    "batchAutoHelp": "<strong>自動オン</strong>：アクティビティと同期でき、時間範囲が重なる動画のみをレンダリングできます。\n\n<strong>自動オフ</strong>：アクティビティに無関係な動画も含め、どの動画でもレンダリングできます。動作を理解している場合にのみ使用してください。",
     "batchAutoSyncRequirement": "一括レンダリングには、動画とアクティビティデータの自動同期が必要です。\n\n自動同期が機能しない場合、レンダリングは失敗するか、誤った結果が生成されます。",
     "showAll": "すべて表示",
     "noRenderableVideos": "レンダリング可能な動画はありません。",

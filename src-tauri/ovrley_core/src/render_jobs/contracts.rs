@@ -91,6 +91,9 @@ pub struct BatchRenderJob {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BatchRenderRequest {
     pub inspection_id: String,
+    /// Requires automatic sync and positive activity overlap when enabled.
+    /// Disabling it preserves resolved offsets and allows blank activity coverage.
+    pub auto_sync: bool,
     #[serde(deserialize_with = "crate::normalize::raw::deserialize_render_presentation")]
     pub template: RenderConfig<ScenePresentationConfig>,
     pub encoding: BatchEncodingSettings,

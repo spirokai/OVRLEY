@@ -130,6 +130,7 @@ pub fn video_batch_request(
         .unwrap();
     BatchRenderRequest {
         inspection_id: inspection_id.into(),
+        auto_sync: true,
         template,
         encoding,
         activity: BatchActivity::ExternalActivity {

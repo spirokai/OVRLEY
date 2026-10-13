@@ -97,6 +97,7 @@ pub fn probe_video_metadata(repo_root: &Path, file_path: &str) -> CoreResult<Sou
         pix_fmt: None,
         bits_per_raw_sample: None,
         bit_rate: None,
+        audio_bit_rate: None,
         has_audio: false,
         container_format: None,
         // telemetry-parser reports clockwise rotation; our canonical metadata

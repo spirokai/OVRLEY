@@ -108,10 +108,10 @@ export function formatRenderPathError(error, translate) {
   return error.reason === undefined ? error.message : translate(`render-video.pathErrors.${error.reason}`, error)
 }
 
-/** @param {object} inputs Editor synchronization inputs. @returns {object} Review automatic synchronization inputs or an actionable error. */
-export function reviewBatchSync(inputs) {
+/** @param {object} inputs Editor synchronization inputs. @param {boolean} autoSync Whether sync and overlap are required. @returns {object} Reviewed synchronization inputs or an actionable error. */
+export function reviewBatchSync(inputs, autoSync) {
   try {
-    return { ...captureBatchSync(inputs), error: null }
+    return { ...captureBatchSync(inputs, autoSync), error: null }
   } catch (error) {
     return { error }
   }
@@ -129,21 +129,28 @@ export function reviewBatchQueue(choices, inspection, sync, locale) {
     const { metadata } = result.source
     const inspectedItem = { ...item, source: result.source, durationLabel: formatClockDuration(metadata.duration) }
     try {
-      const [creationDateLabel, creationTimeLabel] = formatVideoCreationTime(
-        metadata.creationTime,
-        metadata.timeSource,
-        sync.activitySummary?.timezone ?? null,
-        sync.timezoneMode,
-        locale,
-      ).split(/(?=\d{2}:\d{2}:\d{2}$)/)
-      inspectedItem.creationDateLabel = creationDateLabel.trimEnd()
-      inspectedItem.creationTimeLabel = creationTimeLabel
-      const { timing, hasPositiveOverlap } = resolveBatchVideoTiming(metadata, sync.activitySummary, sync.timezoneMode)
+      try {
+        const [creationDateLabel, creationTimeLabel] = formatVideoCreationTime(
+          metadata.creationTime,
+          metadata.timeSource,
+          sync.activitySummary?.timezone ?? null,
+          sync.timezoneMode,
+          locale,
+        ).split(/(?=\d{2}:\d{2}:\d{2}$)/)
+        inspectedItem.creationDateLabel = creationDateLabel.trimEnd()
+        inspectedItem.creationTimeLabel = creationTimeLabel
+      } catch (error) {
+        if (sync.autoSync || !(error instanceof RangeError)) throw error
+      }
+      const { timing, hasPositiveOverlap } = resolveBatchVideoTiming(metadata, sync.activitySummary, sync.timezoneMode, sync.autoSync)
+      const blocked = sync.autoSync && hasPositiveOverlap === false
       return {
         ...inspectedItem,
         timing,
-        status: hasPositiveOverlap === false ? 'blocked' : 'pending',
-        error: hasPositiveOverlap === false ? i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity') : null,
+        hasPositiveOverlap,
+        skipOverlay: item.skipOverlay || hasPositiveOverlap === false,
+        status: blocked ? 'blocked' : 'pending',
+        error: blocked ? i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity') : null,
       }
     } catch (error) {
       return { ...inspectedItem, status: 'blocked', error: error.message }

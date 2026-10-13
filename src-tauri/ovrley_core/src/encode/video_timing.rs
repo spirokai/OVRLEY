@@ -20,13 +20,35 @@ impl ActivityCoverage {
         fps: Fps,
         total_frames: u64,
     ) -> CoreResult<Self> {
-        let start = offset.max(0.0);
-        let end = (offset + duration).min(activity_end);
-        if end <= start {
+        let coverage = Self::for_video_or_blank(duration, offset, activity_end, fps, total_frames)?;
+        if coverage.end <= coverage.start {
             return Err(CoreError::Config(format!(
                 "Video range [{offset}, {}] must have positive overlap with activity [0, {activity_end}]",
                 offset + duration
             )));
+        }
+        Ok(coverage)
+    }
+
+    /// Preserves the video clock, including wholly disjoint activity windows.
+    /// A disjoint window has no activity frames rather than a repaired offset.
+    pub fn for_video_or_blank(
+        duration: f64,
+        offset: f64,
+        activity_end: f64,
+        fps: Fps,
+        total_frames: u64,
+    ) -> CoreResult<Self> {
+        let start = offset.max(0.0);
+        let end = (offset + duration).min(activity_end);
+        if end <= start {
+            let boundary = start.min(activity_end);
+            return Ok(Self {
+                start: boundary,
+                end: boundary,
+                blank_leading_frame_count: if offset < 0.0 { total_frames } else { 0 },
+                frame_count: 0,
+            });
         }
         let mut first = fps
             .frame_count_for_duration((start - offset).max(0.0))?

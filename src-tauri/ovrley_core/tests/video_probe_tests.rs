@@ -71,6 +71,7 @@ fn source_video_metadata_serializes_sync_and_legacy_creation_fields() {
         pix_fmt: Some("yuv420p".to_string()),
         bits_per_raw_sample: Some(8),
         bit_rate: None,
+        audio_bit_rate: Some(128_000),
         has_audio: true,
         container_format: Some("mov,mp4,m4a,3gp,3g2,mj2".to_string()),
         rotation_degrees: Some(0),
@@ -85,6 +86,7 @@ fn source_video_metadata_serializes_sync_and_legacy_creation_fields() {
     assert_eq!(value["syncTime"], "2026-05-20T21:49:10.000000Z");
     assert_eq!(value["fpsNum"], 30000);
     assert_eq!(value["fpsDen"], 1001);
+    assert_eq!(value["audioBitRate"], 128_000);
 }
 
 // --- Snapshot / golden tests (Step 11g) ---

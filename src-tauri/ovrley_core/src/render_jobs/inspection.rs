@@ -282,6 +282,7 @@ fn closed_session(inspection_id: &str) -> CoreError {
 #[derive(Clone, Copy, Debug)]
 pub struct CompositeSourceMetadata {
     pub has_audio: bool,
+    pub audio_bit_rate: Option<u64>,
     pub rotation_degrees: Option<i32>,
 }
 
@@ -335,6 +336,7 @@ pub(crate) fn verify_composite_source_resolution(
 
     Ok(CompositeSourceMetadata {
         has_audio: metadata.has_audio,
+        audio_bit_rate: metadata.audio_bit_rate,
         rotation_degrees: metadata.rotation_degrees,
     })
 }

@@ -179,6 +179,8 @@
     "cancelling": "취소 중...",
     "exportSettings": "내보내기 설정",
     "batchSettings": "일괄 처리 설정",
+    "batchAuto": "자동",
+    "batchAutoHelp": "<strong>자동 켜짐</strong>: 활동과 동기화되고 시간 범위가 겹치는 동영상만 렌더링할 수 있습니다.\n\n<strong>자동 꺼짐</strong>: 활동과 관련 없는 동영상을 포함해 모든 동영상을 렌더링할 수 있습니다. 이 설정의 동작을 이해하는 경우에만 사용하세요.",
     "batchAutoSyncRequirement": "일괄 렌더링에는 동영상과 활동 데이터 간의 자동 동기화가 필요합니다.\n\n자동 동기화가 작동하지 않으면 렌더링이 실패하거나 잘못된 결과가 생성됩니다.",
     "showAll": "모두 표시",
     "noRenderableVideos": "렌더링할 수 있는 동영상이 없습니다.",

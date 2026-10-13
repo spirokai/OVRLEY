@@ -179,6 +179,8 @@
     "cancelling": "Wird abgebrochen...",
     "exportSettings": "Exporteinstellungen",
     "batchSettings": "Batch-Einstellungen",
+    "batchAuto": "Auto",
+    "batchAutoHelp": "<strong>Auto ein</strong>: Nur Videos, die sich synchronisieren lassen und mit der Aktivität überlappen, können gerendert werden.\n\n<strong>Auto aus</strong>: Jedes Video kann gerendert werden, auch wenn es nichts mit der Aktivität zu tun hat. Verwende dies nur, wenn du weißt, was du tust.",
     "batchAutoSyncRequirement": "Die Stapelverarbeitung benötigt eine automatische Synchronisierung zwischen Videos und Aktivitätsdaten.\n\nSie schlägt fehl oder liefert fehlerhafte Ergebnisse, wenn die automatische Synchronisierung nicht funktioniert.",
     "showAll": "Alle anzeigen",
     "noRenderableVideos": "Keine renderbaren Videos.",

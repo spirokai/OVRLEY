@@ -111,6 +111,7 @@ pub fn derive_fixture_composite_plan(
         render,
         true,
         None,
+        None,
         &target,
     )
     .unwrap()

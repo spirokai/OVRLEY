@@ -187,6 +187,7 @@ fn run_batch(
                 paths,
                 &batch.template,
                 batch.external_activity.as_ref(),
+                batch.auto_sync,
                 job,
                 executor.as_ref(),
                 session,
@@ -213,6 +214,7 @@ fn execute_batch_item(
     paths: &AppPaths,
     template: &super::planning::ValidatedBatchTemplate,
     external_activity: Option<&(ParsedActivity, f64)>,
+    auto_sync: bool,
     job: &AcceptedJob,
     executor: &dyn BatchJobExecutor,
     session: &RendererReservation,
@@ -221,11 +223,22 @@ fn execute_batch_item(
     session.check_cancelled()?;
     let embedded;
     let (activity, end) = match external_activity {
-        Some((activity, end)) => (activity, *end),
+        Some((activity, end)) => (activity, Some(*end)),
         None => {
-            embedded = executor.embedded_activity(paths, &job.source)?;
+            let prepared = executor
+                .embedded_activity(paths, &job.source)
+                .and_then(|activity| {
+                    let end = validate_render_activity(&activity)?;
+                    Ok((activity, Some(end)))
+                });
             session.check_cancelled()?;
-            let end = validate_render_activity(&embedded)?;
+            let (activity, end) = match prepared {
+                Ok(prepared) => prepared,
+                // Missing/unusable external telemetry is optional with Auto off.
+                Err(CoreError::Activity(_)) if !auto_sync => (ParsedActivity::default(), None),
+                Err(error) => return Err(error),
+            };
+            embedded = activity;
             (&embedded, end)
         }
     };
@@ -235,6 +248,7 @@ fn execute_batch_item(
         job.offset,
         job.skip_overlay,
         end,
+        auto_sync,
         job.output.frames,
         job.output.container_fps,
     )?;

@@ -38,12 +38,12 @@ export function captureRenderEncoding(settings, availableCodecs) {
   return { exportMode, exportCodec: codec, fps, updateRate: widgetUpdateRate, qualityType, qualityValue, qsvFullInitArgs }
 }
 
-/** @param {object} editorSnapshot Editor synchronization inputs. @returns {object} Automatic synchronization context for inspection and submission. */
-export function captureBatchSync(editorSnapshot) {
+/** @param {object} editorSnapshot Editor synchronization inputs. @param {boolean} autoSync Whether sync and overlap are required. @returns {object} Synchronization context for inspection and submission. */
+export function captureBatchSync(editorSnapshot, autoSync) {
   const hasExternalActivity = editorSnapshot.parsedActivitySource === 'activity-file'
   const activitySummary = hasExternalActivity ? editorSnapshot.activitySummary : null
   if (hasExternalActivity && activitySummary === null) throw new Error('External activity summary is required for batch synchronization')
-  return { activitySummary, timezoneMode: captureVideoSyncTimezoneMode(editorSnapshot.videoSyncTimezoneMode) }
+  return { activitySummary, timezoneMode: captureVideoSyncTimezoneMode(editorSnapshot.videoSyncTimezoneMode), autoSync }
 }
 
 /** @param {object} options Captured editor/settings and inspected batch sources. @returns {Readonly<object>} Native BatchRenderRequest. */
@@ -57,7 +57,12 @@ export function createBatchRenderRequest({ editorSnapshot, settings, inspectionI
           committedOffsetSeconds: editorSnapshot.videoSyncOffsetSeconds,
         }
       : null
-  const calibration = createBatchCalibration({ activitySummary: sync.activitySummary, referenceVideo, timezoneMode: sync.timezoneMode })
+  const calibration = createBatchCalibration({
+    activitySummary: sync.activitySummary,
+    referenceVideo: !sync.autoSync && calibrationSource === null ? null : referenceVideo,
+    timezoneMode: sync.timezoneMode,
+    requireReferenceSync: sync.autoSync,
+  })
   const activity =
     calibration.mode === 'embeddedActivity'
       ? { mode: 'embeddedActivity' }
@@ -78,13 +83,16 @@ export function createBatchRenderRequest({ editorSnapshot, settings, inspectionI
           automaticOffsets: Object.fromEntries(
             jobs.map(({ source, timing }) => [
               source.sourceId,
-              source.sourceId === calibrationSource?.sourceId ? calibration.reference.automaticOffsetSeconds : timing.automaticOffsetSeconds,
+              source.sourceId === calibrationSource?.sourceId && calibration.reference !== null
+                ? calibration.reference.automaticOffsetSeconds
+                : timing.automaticOffsetSeconds,
             ]),
           ),
         }
   return freezeRequest(
     structuredClone({
       inspectionId,
+      autoSync: sync.autoSync,
       template: createBatchRenderTemplate(editorSnapshot.config, editorSnapshot.globalDefaults),
       encoding: captureRenderEncoding(settings, editorSnapshot.availableCodecs),
       activity,

@@ -29,6 +29,8 @@ pub struct SourceVideoMetadata {
     pub pix_fmt: Option<String>,
     pub bits_per_raw_sample: Option<u32>,
     pub bit_rate: Option<String>,
+    /// First audio stream's bitrate in bits per second, when reported by ffprobe.
+    pub audio_bit_rate: Option<u64>,
     pub has_audio: bool,
     pub container_format: Option<String>,
     pub rotation_degrees: Option<i32>,

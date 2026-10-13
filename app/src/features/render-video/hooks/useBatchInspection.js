@@ -17,11 +17,12 @@ export default function useBatchInspection({ phase, settings }) {
   const { i18n, t } = useTranslation()
   const store = useBatchRenderStore()
   const inputs = useBatchSyncInputs()
+  const { batchAutoSync } = store
   const open = phase === 'confirm' && settings?.renderTarget === 'batch' && !store.hasBatchResults
   const folder = store.batchVideoFolder
   const outputDirectory = store.batchOutputFolder
   const choices = store.batchQueue
-  const sync = useMemo(() => reviewBatchSync(inputs), [inputs])
+  const sync = useMemo(() => reviewBatchSync(inputs, batchAutoSync), [inputs, batchAutoSync])
   const [revision, setRevision] = useState(0)
   const [inspection, setInspection] = useState(null)
   const [plan, setPlan] = useState(null)
@@ -96,7 +97,15 @@ export default function useBatchInspection({ phase, settings }) {
   }, [inspectionContext])
 
   useEffect(() => {
-    if (!open || !current?.complete || current.error || current.calibrationError || sync.error || jobs.length === 0 || outputDirectory === null)
+    if (
+      !open ||
+      !current?.complete ||
+      current.error ||
+      (sync.autoSync && current.calibrationError) ||
+      sync.error ||
+      jobs.length === 0 ||
+      outputDirectory === null
+    )
       return
     let closed = false
     void backend
@@ -143,7 +152,7 @@ export default function useBatchInspection({ phase, settings }) {
     batchInspecting: folder !== null && (current === null || (!current.complete && !current.error)),
     batchQueue: rowsWithIssues,
     batchReady: ready && !batchRunning,
-    batchReviewError: formatRenderPathError(current?.error ?? current?.calibrationError ?? sync.error ?? null, t),
+    batchReviewError: formatRenderPathError(current?.error ?? (sync.autoSync ? current?.calibrationError : null) ?? sync.error ?? null, t),
     batchOutputError: formatRenderPathError(currentPlan?.error ?? null, t),
     request: ready
       ? { inspectionId: current.inspectionId, outputDirectory, jobs, calibrationSource: current.calibrationSource, sync, reviewedInputs: inputs }

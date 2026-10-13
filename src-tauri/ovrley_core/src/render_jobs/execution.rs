@@ -302,6 +302,7 @@ pub(crate) fn execute_render(
                 },
                 render,
                 source.has_audio,
+                source.audio_bit_rate,
                 source.rotation_degrees,
                 target,
             )?)

@@ -112,7 +112,7 @@ function BatchRenderQueueRow({
                 aria-label={`${t('render-video.activityOverlay', 'Activity overlay')}: ${item.filename}`}
                 checked={!item.skipOverlay}
                 onCheckedChange={(checked) => setBatchItemSkipOverlay(item.id, !checked)}
-                disabled={batchRunning}
+                disabled={batchRunning || item.hasPositiveOverlap === false}
               />
             )}
           </div>

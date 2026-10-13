@@ -179,6 +179,8 @@
     "cancelling": "Ruší se...",
     "exportSettings": "Nastavení exportu",
     "batchSettings": "Nastavení dávky",
+    "batchAuto": "Auto",
+    "batchAutoHelp": "<strong>Auto zapnuto</strong>: Lze vykreslit pouze videa, která lze synchronizovat a která se překrývají s aktivitou.\n\n<strong>Auto vypnuto</strong>: Lze vykreslit jakékoli video, i když s aktivitou nesouvisí. Používejte pouze tehdy, pokud víte, co děláte.",
     "batchAutoSyncRequirement": "Dávkové vykreslování vyžaduje automatickou synchronizaci videí s daty aktivity.\n\nPokud automatická synchronizace nefunguje, vykreslování selže nebo vytvoří chybné výsledky.",
     "showAll": "Zobrazit vše",
     "noRenderableVideos": "Žádná videa k vykreslení.",

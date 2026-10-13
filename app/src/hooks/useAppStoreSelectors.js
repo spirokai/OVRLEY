@@ -124,6 +124,8 @@ export function useRenderDialogInputs() {
 export function useBatchRenderStore() {
   return useStore(
     useShallow((state) => ({
+      batchAutoSync: state.batchAutoSync,
+      setBatchAutoSync: state.setBatchAutoSync,
       batchVideoFolder: state.batchVideoFolder,
       batchOutputFolder: state.batchOutputFolder,
       batchQueue: state.batchQueue,
