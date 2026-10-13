@@ -47,7 +47,7 @@ export async function fileFromSelectedPath(selectedPath, fallbackName = 'file') 
   return new File([bytes], filename, { type: 'application/octet-stream' })
 }
 
-export async function openSinglePath(filters, options = {}) {
+async function openPaths(filters, options, multiple) {
   const { defaultPath: initialDefaultPath, lastDirectoryKey } = options
   let defaultPath = initialDefaultPath
 
@@ -55,22 +55,31 @@ export async function openSinglePath(filters, options = {}) {
     const savedDirectory = await getOptionalPathPreference(lastDirectoryKey)
     if (savedDirectory) defaultPath = savedDirectory
   }
-
   const selected = await open({
-    multiple: false,
+    multiple,
     filters,
     ...(defaultPath ? { defaultPath } : {}),
   })
 
   if (selected && lastDirectoryKey) {
     try {
-      await setPreference(lastDirectoryKey, directoryFromSelectedPath(selected))
+      await setPreference(lastDirectoryKey, directoryFromSelectedPath(multiple ? selected[0] : selected))
     } catch {
       // store may be unavailable
     }
   }
 
   return selected
+}
+
+/** @param {Array<object>} filters File filters. @param {object} options Picker options. @returns {Promise<string|null>} Selected path. */
+export function openSinglePath(filters, options = {}) {
+  return openPaths(filters, options, false)
+}
+
+/** @param {Array<object>} filters File filters. @param {object} options Picker options. @returns {Promise<string[]|null>} Selected paths. */
+export function openMultiplePaths(filters, options = {}) {
+  return openPaths(filters, options, true)
 }
 
 /**

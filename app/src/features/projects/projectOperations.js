@@ -6,6 +6,7 @@ import useStore from '@/store/useStore'
 import { prepareDocumentFonts } from '@/lib/font-resources'
 import { applyNewProjectState, applyPreparedProjectState } from './utils/projectHydration'
 import { createProjectSnapshot, stringifyProject } from './utils/projectSnapshot'
+import { prepareVideoGroup, registerPreparedVideo } from '@/features/video-preview/hooks/useVideoImport'
 
 /**
  * Loads project dependencies through their owners, then applies project-owned settings.
@@ -25,7 +26,11 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
 
   const sourceLoadResults = await Promise.allSettled([
     sources.activityPath ? prepareActivityPath(sources.activityPath) : Promise.resolve(null),
-    sources.videoPath ? prepareVideoPath(sources.videoPath) : Promise.resolve(null),
+    sources.videoPath
+      ? sources.videoFollowingPaths
+        ? prepareVideoGroup([sources.videoPath, ...sources.videoFollowingPaths])
+        : prepareVideoPath(sources.videoPath)
+      : Promise.resolve(null),
     prepareDocumentFonts(project.editor),
   ])
   const failedSourceLoad = sourceLoadResults.find((result) => result.status === 'rejected')
@@ -35,15 +40,7 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
   const preparedVideo = sourceLoadResults[1].value
   let video = null
   if (preparedVideo) {
-    const registration = await backend.registerPreviewVideo(preparedVideo.path)
-    video = {
-      ...preparedVideo,
-      importedVideoState: {
-        ...preparedVideo.importedVideoState,
-        importedVideoImportId: registration.importId,
-        importedVideoPreviewUrl: registration.previewUrl,
-      },
-    }
+    video = await registerPreparedVideo(preparedVideo)
   } else {
     await backend.clearPreviewVideo()
   }

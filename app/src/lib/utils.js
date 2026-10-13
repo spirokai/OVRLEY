@@ -66,7 +66,7 @@ export function filenameFromSelectedPath(path) {
 export function directoryFromSelectedPath(path) {
   const value = String(path)
   const separatorIndex = Math.max(value.lastIndexOf('/'), value.lastIndexOf('\\'))
-  return separatorIndex < 0 ? '' : value.slice(0, separatorIndex)
+  return separatorIndex < 0 ? '' : value.slice(0, separatorIndex + 1)
 }
 
 /** @param {string} directory Native directory. @param {string} filename Filename only. @returns {string} Joined path. */

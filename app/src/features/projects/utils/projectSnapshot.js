@@ -21,7 +21,12 @@ export function createProjectContentSnapshot(state, projectPath) {
     editor,
     sources: {
       activity: source(state.activitySource?.path),
-      video: source(state.importedVideoPath),
+      video: state.importedVideoParts
+        ? {
+            path: createPathLocator(state.importedVideoParts[0].path, projectPath),
+            following: state.importedVideoParts.slice(1).map((part) => createPathLocator(part.path, projectPath)),
+          }
+        : source(state.importedVideoPath),
     },
     sync: {
       videoOffsetSeconds: state.videoSyncOffsetSeconds,

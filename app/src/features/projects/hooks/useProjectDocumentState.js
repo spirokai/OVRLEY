@@ -24,6 +24,7 @@ export default function useProjectDocumentState() {
       config: state.config,
       globalDefaults: state.globalDefaults,
       importedVideoPath: state.importedVideoPath,
+      importedVideoParts: state.importedVideoParts,
       importingVideo: state.importingVideo,
       isProcessing: state.isProcessing,
       renderSettings: state.renderSettings,

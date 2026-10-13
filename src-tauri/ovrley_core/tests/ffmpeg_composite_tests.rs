@@ -124,6 +124,48 @@ fn render_plan(
 }
 
 #[test]
+fn virtual_chapters_use_concat_for_both_video_and_audio_inputs() {
+    let mut scene: SceneConfig =
+        serde_json::from_value(common::seam::explicit_scene_json()).unwrap();
+    scene.ffmpeg = json!({"codec": "libx264"});
+    scene.composite_video_path = Some("sequence.ffconcat".into());
+    scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    scene.quality_value = Some(10.0);
+    scene.composite_sync_offset = Some(0.0);
+    scene.composite_video_fps_num = Some(25);
+    scene.composite_video_fps_den = Some(1);
+    scene.composite_video_duration = Some(18.0);
+    scene.composite_render_duration = Some(10.0);
+    scene.composite_video_trim_start = Some(8.0);
+    scene.composite_widget_update_rate = Some(1);
+    let mut validated = validate_scene_config(scene.clone()).unwrap();
+    let render = derive_composite_render_plan(&scene, &mut validated, None).unwrap();
+    let settings = build_composite_ffmpeg_settings(
+        &render,
+        FrameSize {
+            width: 64,
+            height: 64,
+        },
+        true,
+        None,
+    )
+    .unwrap();
+    for input in [&settings.input_0_args, &settings.input_2_args] {
+        assert!(input
+            .windows(4)
+            .any(|args| args == ["-f", "concat", "-safe", "0"]));
+        assert!(input.windows(2).any(|args| args == ["-ss", "3"]));
+        assert!(input
+            .windows(2)
+            .any(|args| args == ["-i", "sequence.ffconcat"]));
+    }
+    assert!(!settings
+        .output_args
+        .windows(2)
+        .any(|args| args == ["-map", "0"]));
+}
+
+#[test]
 fn test_2_1_builds_command_for_29_97_fps_source_without_rounding() {
     let built = settings(
         Fps::new(30000, 1001).unwrap(),

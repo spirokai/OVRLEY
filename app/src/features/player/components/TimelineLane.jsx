@@ -26,22 +26,33 @@ export default function TimelineLane({ lane }) {
               {lane.highlightStyle && (
                 <div aria-hidden="true" className="pointer-events-none absolute -top-3 -bottom-1 bg-success/20" style={lane.highlightStyle} />
               )}
-              {lane.showText && (
-                <div
-                  className={`relative grid h-full items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${lane.textClassName}`}
-                  style={{ gridTemplateColumns: `${lane.sourceColumnWidth} minmax(0, 1fr) auto` }}
-                >
-                  <span className={`flex min-w-0 items-center justify-left pl-2 ${lane.clipContentClassName}`}>
-                    {Icon ? (
-                      <Icon className="h-5 w-5 shrink-0 pb-0.5" strokeWidth={3} aria-hidden="true" />
-                    ) : (
-                      <span className="block max-w-full truncate text-[0.85rem] font-black leading-none">{lane.formatLabel}</span>
-                    )}
-                  </span>
-                  <span className={`min-w-0 truncate leading-none ${lane.clipContentClassName}`}>{lane.label}</span>
-                  <span className={`shrink-0 pl-1 tabular-nums leading-none ${lane.clipContentClassName}`}>{lane.durationLabel}</span>
-                </div>
-              )}
+              {lane.parts
+                ? lane.parts.map((part) => (
+                    <span
+                      key={part.path}
+                      title={part.label}
+                      style={part.style}
+                      className={`absolute inset-y-0 flex items-center overflow-hidden border-l border-background/70 px-2 text-[0.7rem] font-bold ${lane.textClassName}`}
+                    >
+                      <span className="truncate">{part.label}</span>
+                    </span>
+                  ))
+                : lane.showText && (
+                    <div
+                      className={`relative grid h-full items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${lane.textClassName}`}
+                      style={{ gridTemplateColumns: `${lane.sourceColumnWidth} minmax(0, 1fr) auto` }}
+                    >
+                      <span className={`flex min-w-0 items-center justify-left pl-2 ${lane.clipContentClassName}`}>
+                        {Icon ? (
+                          <Icon className="h-5 w-5 shrink-0 pb-0.5" strokeWidth={3} aria-hidden="true" />
+                        ) : (
+                          <span className="block max-w-full truncate text-[0.85rem] font-black leading-none">{lane.formatLabel}</span>
+                        )}
+                      </span>
+                      <span className={`min-w-0 truncate leading-none ${lane.clipContentClassName}`}>{lane.label}</span>
+                      <span className={`shrink-0 pl-1 tabular-nums leading-none ${lane.clipContentClassName}`}>{lane.durationLabel}</span>
+                    </div>
+                  )}
             </div>
           </button>
         )}

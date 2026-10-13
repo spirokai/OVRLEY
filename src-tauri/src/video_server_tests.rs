@@ -35,7 +35,48 @@ use uuid::Uuid;
 
 use crate::video_server::{parse_range, ByteRange, ParsedRange, VideoServerHandle};
 
-/// Verifies all byte range forms required by the Phase A plan.
+/// Every chapter remains accessible, including after a failed replacement.
+#[test]
+fn serves_all_chapters_and_replaces_registration_atomically() {
+    let (first, first_bytes) = write_temp_file("chapter-one", 1024);
+    let (second, second_bytes) = write_temp_file("chapter-two", 2048);
+    let server = VideoServerHandle::new();
+    server.start().unwrap();
+    let urls = server
+        .set_videos(vec![
+            (first.clone(), "video/mp4".into()),
+            (second.clone(), "video/mp4".into()),
+        ])
+        .unwrap();
+    assert!(server
+        .set_videos(vec![
+            (first.clone(), "video/mp4".into()),
+            (first.with_extension("missing"), "video/mp4".into()),
+        ])
+        .is_err());
+    for (url, expected) in urls.iter().zip([&first_bytes, &second_bytes]) {
+        let (port, id) = split_url(url);
+        let response = request(
+            port,
+            &format!("GET /video/{id} HTTP/1.1\r\nHost: 127.0.0.1\r\nRange: bytes=16-31\r\n\r\n"),
+        );
+        assert!(headers(&response).starts_with("HTTP/1.1 206"));
+        assert_eq!(body(&response), expected[16..32]);
+    }
+    server.set_video(first.clone(), "video/mp4".into()).unwrap();
+    for url in urls {
+        let (port, id) = split_url(&url);
+        let response = request(
+            port,
+            &format!("GET /video/{id} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),
+        );
+        assert!(headers(&response).starts_with("HTTP/1.1 404"));
+    }
+    server.clear_video().unwrap();
+    std::fs::remove_file(&first).unwrap();
+    std::fs::remove_file(&second).unwrap();
+}
+
 #[test]
 fn parses_required_range_forms() {
     assert_eq!(

@@ -62,6 +62,7 @@ export default function useTimelineClips({
   hasVideo,
   importedVideoDuration,
   importedVideoPath,
+  importedVideoParts = null,
   nudgeClip,
   selectedClipId,
   setSelectedClipId,
@@ -93,7 +94,12 @@ export default function useTimelineClips({
         icon: Video,
         id: 'video',
         isVideo: true,
-        label: getBasename(importedVideoPath),
+        label: importedVideoParts ? importedVideoParts.map((part) => getBasename(part.path)).join(' + ') : getBasename(importedVideoPath),
+        parts: importedVideoParts?.map((part) => ({
+          path: part.path,
+          label: getBasename(part.path),
+          style: { left: `${(100 * part.startSeconds) / importedVideoDuration}%`, width: `${(100 * part.duration) / importedVideoDuration}%` },
+        })),
         startSecond: videoSyncOffsetSeconds,
       })
     }
@@ -224,6 +230,7 @@ export default function useTimelineClips({
     hoveredLaneId,
     importedVideoDuration,
     importedVideoPath,
+    importedVideoParts,
     nudgeClip,
     selectedClipId,
     setSelectedClipId,

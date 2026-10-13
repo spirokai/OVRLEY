@@ -200,6 +200,7 @@ pub fn build_composite_ffmpeg_settings(
     } else {
         "-autorotate"
     };
+    input_0_args.extend(crate::media::video_sequence::input_options(&render.video_path));
     input_0_args.extend([
         source_autorotate_arg.to_string(),
         "-i".to_string(),
@@ -229,6 +230,7 @@ pub fn build_composite_ffmpeg_settings(
                 format_seconds_arg(input_window.seek_start),
             ]);
         }
+        input_2_args.extend(crate::media::video_sequence::input_options(&render.video_path));
         input_2_args.extend(["-i".to_string(), video_path]);
     }
 

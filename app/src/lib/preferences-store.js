@@ -28,9 +28,9 @@ export async function getOptionalPathPreference(key) {
   } catch {
     return null
   }
-
   if (value === null || value === undefined) return null
   if (typeof value !== 'string' || !value.trim() || value !== value.trim() || !(await isAbsolute(value))) {
+    await deletePreference(key)
     throw new Error(`Preference "${key}" must be an absolute path`)
   }
   return value

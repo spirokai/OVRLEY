@@ -6,6 +6,29 @@ import { createRenderEffectiveConfig } from '@/features/render-video/utils/rende
 import useStore from '@/store/useStore'
 
 describe('project snapshot contract', () => {
+  test('persists all original chapter paths instead of the runtime concat manifest', () => {
+    useStore.setState(useStore.getInitialState(), true)
+    useStore.setState({
+      importedVideoPath: 'C:/temp/sequence.ffconcat',
+      importedVideoParts: [
+        { path: 'C:/Events/one.mp4', duration: 10, startSeconds: 0 },
+        { path: 'C:/Events/two.mp4', duration: 20, startSeconds: 10 },
+        { path: 'D:/three.mp4', duration: 30, startSeconds: 30 },
+      ],
+      videoSyncOffsetSeconds: 12,
+    })
+    const project = createProjectSnapshot(useStore.getState(), 'C:/Events/Ride.oly')
+    expect(project.sources.video).toEqual({
+      path: { kind: 'project-relative', value: 'one.mp4' },
+      following: [
+        { kind: 'project-relative', value: 'two.mp4' },
+        { kind: 'absolute', value: 'D:/three.mp4' },
+      ],
+    })
+    expect(project.sync.videoOffsetSeconds).toBe(12)
+    expect(JSON.stringify(project)).not.toContain('ffconcat')
+  })
+
   test('projects only sources and project-owned settings', () => {
     useStore.setState(useStore.getInitialState(), true)
     useStore.setState((state) => ({

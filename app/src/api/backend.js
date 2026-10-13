@@ -533,6 +533,21 @@ export async function importPreviewVideo(path) {
   return apiCall('backend_import_preview_video', { path })
 }
 
+/** @param {string[]} paths Ordered original chapters. @returns {Promise<object>} Virtual source metadata. */
+export async function prepareVideoSequence(paths) {
+  return apiCall('backend_prepare_video_sequence', { paths })
+}
+
+/** @param {string[]} paths Original chapters. @returns {Promise<object[]>} Preview registrations in source order. */
+export async function registerPreviewSequence(paths) {
+  return apiCall('backend_register_preview_sequence', { paths })
+}
+
+/** @param {string[]} paths Original chapters. @returns {Promise<object|null>} Telemetry on the shared sequence clock. */
+export async function extractVideoSequenceTelemetry(paths) {
+  return apiCall('backend_extract_video_sequence_telemetry', { paths })
+}
+
 /**
  * Probes a video without changing preview-server state.
  * @param {string} path Absolute source video path.

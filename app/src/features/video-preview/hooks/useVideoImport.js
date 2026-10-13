@@ -2,9 +2,19 @@
  * Video import - background media selection and preview management.
  */
 
-import { clearPreviewVideo, extractVideoTelemetry, importPreviewVideo, preparePreviewVideo } from '@/api/backend'
+import {
+  clearPreviewVideo,
+  extractVideoTelemetry,
+  extractVideoSequenceTelemetry,
+  importPreviewVideo,
+  preparePreviewVideo,
+  prepareVideoSequence,
+  registerPreviewSequence,
+  registerPreviewVideo,
+} from '@/api/backend'
 import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
-import { openSinglePath } from '@/lib/file-dialog'
+import { openMultiplePaths } from '@/lib/file-dialog'
+import { orderVideoParts } from '../utils/videoParts'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { createImportedVideoState } from '@/store/slices/createVideoImportSlice'
 import useStore from '@/store/useStore'
@@ -52,6 +62,35 @@ export async function prepareVideoPath(path) {
   return { path, importedVideoState, telemetry }
 }
 
+/** @param {string[]} paths Ordered original parts. @returns {Promise<object>} Staged group with no preview mutation. */
+export async function prepareVideoGroup(paths) {
+  const preview = await prepareVideoSequence(paths)
+  const importedVideoState = createImportedVideoState({ ...preview.metadata, previewWarnings: preview.warnings })
+  let telemetry = null
+  try {
+    telemetry = (await extractVideoSequenceTelemetry(paths))?.parsed_activity ?? null
+  } catch (error) {
+    console.warn('Sequence telemetry extraction failed (non-fatal):', error)
+  }
+  return { path: preview.metadata.path, importedVideoState, telemetry }
+}
+
+/** @param {object} prepared Staged video. @returns {Promise<object>} Prepared video with registered preview sources. */
+export async function registerPreparedVideo(prepared) {
+  const parts = prepared.importedVideoState.importedVideoParts
+  const registrations = parts ? await registerPreviewSequence(parts.map((part) => part.path)) : [await registerPreviewVideo(prepared.path)]
+  const registeredParts = parts ? parts.map((part, index) => ({ ...part, ...registrations[index] })) : null
+  return {
+    ...prepared,
+    importedVideoState: {
+      ...prepared.importedVideoState,
+      importedVideoImportId: registrations[0].importId,
+      importedVideoPreviewUrl: registrations[0].previewUrl,
+      importedVideoParts: registeredParts,
+    },
+  }
+}
+
 async function importVideoSelection(selection, { setImportingVideo, setImportedVideo, setConfig, clearVideoTelemetry, onSetBackgroundMode }) {
   if (typeof selection !== 'string') {
     throw new Error('Video import requires a file path.')
@@ -76,13 +115,18 @@ async function importVideoSelection(selection, { setImportingVideo, setImportedV
     previewUrl: response.previewUrl,
     previewWarnings: response.warnings ?? [],
   }
+  await commitImportedVideo(createImportedVideoState(metadata), { setImportedVideo, setConfig, onSetBackgroundMode })
+  await extractAndStoreVideoTelemetry(path)
+}
+
+async function commitImportedVideo(importedVideoState, { setImportedVideo, setConfig, onSetBackgroundMode }) {
   const currentConfig = useStore.getState().config
   if (!currentConfig?.scene) {
     throw new Error('Cannot import video without an active template scene')
   }
 
   await runWithoutEditorHistory(useStore, () => {
-    const importedVideoResolution = setImportedVideo(metadata)
+    const importedVideoResolution = setImportedVideo(importedVideoState)
     setConfig({
       ...currentConfig,
       scene: {
@@ -91,19 +135,16 @@ async function importVideoSelection(selection, { setImportingVideo, setImportedV
         height: importedVideoResolution.height,
       },
     })
-    if (metadata.fps) {
-      const { renderSettings, setRenderFpsAndUpdateRate } = useStore.getState()
-      const fps = Math.round(metadata.fps)
-      setRenderFpsAndUpdateRate(fps, normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate))
-    }
+    const { renderSettings, setRenderFpsAndUpdateRate } = useStore.getState()
+    const fps = Math.round(importedVideoState.importedVideoFps)
+    setRenderFpsAndUpdateRate(fps, normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate))
   })
   onSetBackgroundMode?.('video')
-
-  await extractAndStoreVideoTelemetry(path)
 }
 
 export default function useVideoImport({ debugModeEnabled = false, onSetBackgroundMode }) {
   const importedVideoPath = useStore((state) => state.importedVideoPath)
+  const importedVideoParts = useStore((state) => state.importedVideoParts)
   const importedVideoDuration = useStore((state) => state.importedVideoDuration)
   const importedVideoFps = useStore((state) => state.importedVideoFps)
   const importedVideoResolution = useStore((state) => state.importedVideoResolution)
@@ -123,7 +164,11 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   const clearVideoTelemetry = useStore((state) => state.clearVideoTelemetry)
   const setErrorMessage = useStore((state) => state.setErrorMessage)
 
-  const importedVideoFilename = importedVideoPath ? importedVideoPath.split(/[/\\]/).pop() : null
+  const importedVideoFilename = importedVideoParts
+    ? importedVideoParts.map((part) => part.path.split(/[/\\]/).pop()).join(' + ')
+    : importedVideoPath
+      ? importedVideoPath.split(/[/\\]/).pop()
+      : null
   const importedBackgroundImageFilename = importedBackgroundImagePath ? importedBackgroundImagePath.split(/[/\\]/).pop() : null
   const importedMediaFilename = importedBackgroundImageFilename || importedVideoFilename
 
@@ -142,8 +187,10 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   }
 
   const handleImportVideo = async () => {
+    if (useStore.getState().importingVideo) return
+    setImportingVideo(true)
     try {
-      const selected = await openSinglePath(
+      const selections = await openMultiplePaths(
         [
           {
             name: debugModeEnabled ? i18next.t('video-preview.videoOrImage', 'Video or Image') : 'Video',
@@ -152,9 +199,15 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
         ],
         { lastDirectoryKey: 'last-video-import-dir' },
       )
-      if (!selected) {
+      if (!selections || selections.length === 0) {
         return
       }
+
+      if (selections.length > 1) {
+        await loadVideoParts(selections)
+        return
+      }
+      const selected = selections[0]
 
       if (debugModeEnabled && DEBUG_IMAGE_EXTENSIONS.has(pathExtension(selected))) {
         setImportingVideo(true)
@@ -180,10 +233,14 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   }
 
   const handleVideoFilesDrop = async (selections) => {
+    if (useStore.getState().importingVideo) return
+    setImportingVideo(true)
     try {
-      if (selections.length !== 1) {
-        throw new Error('Drop exactly one video file.')
+      if (selections.length > 1) {
+        await loadVideoParts(selections)
+        return
       }
+      if (selections.length === 0) throw new Error('Drop at least one video file.')
 
       const selection = selections[0]
       const path = typeof selection === 'string' ? selection : selection.name
@@ -210,6 +267,14 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
     }
   }
 
+  const loadVideoParts = async (selections) => {
+    const paths = orderVideoParts(selections)
+    const prepared = await registerPreparedVideo(await prepareVideoGroup(paths))
+    clearVideoTelemetry()
+    await commitImportedVideo(prepared.importedVideoState, { setImportedVideo, setConfig, onSetBackgroundMode })
+    if (prepared.telemetry) await runWithoutEditorHistory(useStore, () => useStore.getState().loadVideoTelemetry(prepared.telemetry))
+  }
+
   const handleClearImportedVideo = async () => {
     try {
       if (importedVideoPath) {
@@ -226,6 +291,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   const videoSummary = {
     path: importedVideoPath,
     filename: importedVideoFilename,
+    parts: importedVideoParts,
     duration: importedVideoDuration,
     fps: importedVideoFps,
     resolution: importedVideoResolution,

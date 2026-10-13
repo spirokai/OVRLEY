@@ -51,7 +51,7 @@ pub struct VideoServerHandle {
 
 struct VideoServerInner {
     port: Option<u16>,
-    current: Option<CurrentVideo>,
+    current: Vec<CurrentVideo>,
     shutdown: bool,
     started: bool,
 }
@@ -107,7 +107,7 @@ impl VideoServerHandle {
         Self {
             inner: Arc::new(Mutex::new(VideoServerInner {
                 port: None,
-                current: None,
+                current: Vec::new(),
                 shutdown: false,
                 started: false,
             })),
@@ -199,27 +199,42 @@ impl VideoServerHandle {
     /// fresh opaque import ID, and returns the corresponding loopback preview
     /// URL. Registering a new file immediately invalidates the previous URL.
     pub fn set_video(&self, path: PathBuf, content_type: String) -> Result<String, String> {
-        let metadata = std::fs::metadata(&path)
-            .map_err(|error| format!("Failed to read video metadata: {error}"))?;
-        if !metadata.is_file() {
-            return Err(format!("Video path is not a file: {}", path.display()));
+        let urls = self.set_videos(vec![(path, content_type)])?;
+        Ok(urls[0].clone())
+    }
+
+    /// Atomically replaces the allowed preview files with a whole sequence.
+    pub fn set_videos(&self, paths: Vec<(PathBuf, String)>) -> Result<Vec<String>, String> {
+        if paths.is_empty() {
+            return Err("Preview registration requires video files".into());
         }
+        let mut videos = Vec::new();
+        let mut urls = Vec::new();
+        for (path, content_type) in paths {
+            let metadata = std::fs::metadata(&path)
+                .map_err(|error| format!("Failed to read video metadata: {error}"))?;
+            if !metadata.is_file() {
+                return Err(format!("Video path is not a file: {}", path.display()));
+            }
 
-        let import_id = Uuid::new_v4().to_string();
-        let file_size = metadata.len();
-        let current = CurrentVideo {
-            import_id: import_id.clone(),
-            path,
-            file_size,
-            content_type,
-        };
+            let import_id = Uuid::new_v4().to_string();
+            let file_size = metadata.len();
+            let current = CurrentVideo {
+                import_id: import_id.clone(),
+                path,
+                file_size,
+                content_type,
+            };
 
+            urls.push(self.url_for_import(&import_id)?);
+            videos.push(current);
+        }
         {
             let mut guard = self.inner.lock().map_err(|error| error.to_string())?;
-            guard.current = Some(current);
+            guard.current = videos;
         }
 
-        self.url_for_import(&import_id)
+        Ok(urls)
     }
 
     /// Removes the current video registration.
@@ -228,7 +243,7 @@ impl VideoServerHandle {
     /// another video is registered.
     pub fn clear_video(&self) -> Result<(), String> {
         let mut guard = self.inner.lock().map_err(|error| error.to_string())?;
-        guard.current = None;
+        guard.current.clear();
         Ok(())
     }
 
@@ -240,7 +255,7 @@ impl VideoServerHandle {
     pub fn current_state(&self) -> Option<PreviewVideoState> {
         let current = {
             let guard = self.inner.lock().ok()?;
-            guard.current.clone()?
+            guard.current.first().cloned()?
         };
 
         Some(PreviewVideoState {
@@ -377,7 +392,11 @@ fn respond_to_request(
 
     let current = {
         let guard = inner.lock().map_err(|error| error.to_string())?;
-        guard.current.clone()
+        guard
+            .current
+            .iter()
+            .find(|video| video.import_id == import_id)
+            .cloned()
     };
 
     let Some(current) = current else {

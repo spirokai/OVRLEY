@@ -62,7 +62,7 @@ export default function useProjectSourceRecovery() {
   )
 
   const resolveProjectSources = useCallback(
-    async ({ activityPath, videoPath }) => {
+    async ({ activityPath, videoPath, videoFollowingPaths = [] }) => {
       const [activityExists, videoExists] = await Promise.all([
         activityPath ? backend.selectedPathIsFile(activityPath) : false,
         videoPath ? backend.selectedPathIsFile(videoPath) : false,
@@ -71,6 +71,17 @@ export default function useProjectSourceRecovery() {
       if (resolvedActivityPath === undefined) return null
       const resolvedVideoPath = await resolveSource('video', videoPath, videoExists)
       if (resolvedVideoPath === undefined) return null
+      if (resolvedVideoPath && videoFollowingPaths.length > 0) {
+        const following = []
+        for (const path of videoFollowingPaths) {
+          const resolved = await resolveSource('video', path, await backend.selectedPathIsFile(path))
+          if (resolved === undefined) return null
+          // Skipping any missing chapter skips the complete group, preserving its clock.
+          if (resolved === null) return { activityPath: resolvedActivityPath, videoPath: null }
+          following.push(resolved)
+        }
+        return { activityPath: resolvedActivityPath, videoPath: resolvedVideoPath, videoFollowingPaths: following }
+      }
       return { activityPath: resolvedActivityPath, videoPath: resolvedVideoPath }
     },
     [resolveSource],

@@ -4,6 +4,7 @@ import { resolveVideoSyncState } from '@/lib/video-sync'
 import { createCachedPromise } from '@/lib/cached-promise'
 import { videoOverlapsActivity } from '@/lib/video-timing'
 import { clamp } from '@/lib/utils'
+import { validateVideoParts } from '@/features/video-preview/utils/videoParts'
 import { getTimelineMinimum, getTotalPlaybackDuration } from '@/features/player/utils/playerTiming'
 
 let fetchCodecsOnce = null
@@ -53,6 +54,7 @@ export function createImportedVideoState(metadata) {
   validateImportedVideoTiming(metadata)
   return {
     importedVideoPath: metadata.path,
+    importedVideoParts: metadata.parts === undefined ? null : validateVideoParts(metadata.parts, metadata.duration),
     importedVideoDuration: metadata.duration,
     importedVideoFps: metadata.fps,
     importedVideoFpsNum: metadata.fpsNum,
@@ -88,6 +90,7 @@ function validateVideoSyncOffset(seconds, videoDuration, label = 'Video sync off
 
 export const createVideoImportSlice = (set, get) => ({
   importedVideoPath: null, // absolute path from Tauri file dialog
+  importedVideoParts: null, // null for a single file; ordered original chapters for a group
   importedVideoDuration: null, // seconds (float), read via ffprobe
   importedVideoFps: null, // fps (float)
   importedVideoFpsNum: null, // exact ffprobe FPS numerator
@@ -112,8 +115,8 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoCameraType: null,
   importedVideoCameraModel: null,
 
-  setImportedVideo: (metadata) => {
-    const importedVideoState = createImportedVideoState(metadata)
+  // Metadata is normalized once by createImportedVideoState at import ingress.
+  setImportedVideo: (importedVideoState) => {
     get().clearVideoSyncForVideo()
     set(importedVideoState)
 
@@ -127,6 +130,7 @@ export const createVideoImportSlice = (set, get) => ({
     get().clearVideoTelemetry()
     set({
       importedVideoPath: null,
+      importedVideoParts: null,
       importedVideoDuration: null,
       importedVideoFps: null,
       importedVideoFpsNum: null,
@@ -157,6 +161,7 @@ export const createVideoImportSlice = (set, get) => ({
     get().clearVideoTelemetry()
     set({
       importedVideoPath: null,
+      importedVideoParts: null,
       importedVideoDuration: null,
       importedVideoFps: null,
       importedVideoFpsNum: null,
@@ -236,7 +241,8 @@ export const createVideoImportSlice = (set, get) => ({
   },
 
   setVideoCreationTimeFromFilename: () => {
-    const creationTime = parseVideoFilenameCreationTime(get().importedVideoPath)
+    const state = get()
+    const creationTime = parseVideoFilenameCreationTime(state.importedVideoParts ? state.importedVideoParts[0].path : state.importedVideoPath)
     if (creationTime === null) {
       throw new Error('Video filename does not contain a valid YYYYMMDD_HHMMSS timestamp')
     }

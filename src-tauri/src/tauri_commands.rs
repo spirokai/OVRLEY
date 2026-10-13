@@ -529,6 +529,75 @@ pub(crate) async fn backend_import_preview_video(
     serialize_command_result(&response)
 }
 
+/// Prepares a virtual sequence without changing the active preview registration.
+#[tauri::command]
+pub(crate) async fn backend_prepare_video_sequence(
+    app: AppHandle,
+    paths: Vec<String>,
+) -> Result<String, String> {
+    let runtime = runtime_paths::app_paths(&app)?;
+    let manifest = runtime
+        .temp_dir
+        .join(format!("sequence-{}.ffconcat", uuid::Uuid::new_v4()));
+    let sequence = tauri::async_runtime::spawn_blocking(move || {
+        ovrley_core::media::video_sequence::prepare_video_sequence(&runtime, &paths, &manifest)
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    let metadata = serde_json::to_value(sequence).map_err(|error| error.to_string())?;
+    serialize_command_result(&PreparePreviewVideoResponse {
+        warnings: preview_warnings_for_metadata(&metadata),
+        metadata,
+    })
+}
+
+#[tauri::command]
+pub(crate) async fn backend_register_preview_sequence(
+    state: tauri::State<'_, VideoServerHandle>,
+    paths: Vec<String>,
+) -> Result<String, String> {
+    let urls = state.set_videos(
+        paths
+            .iter()
+            .map(|path| (PathBuf::from(path), content_type_for_path(path)))
+            .collect(),
+    )?;
+    let registrations: Result<Vec<_>, String> = urls
+        .into_iter()
+        .map(|preview_url| {
+            let import_id = preview_url
+                .rsplit('/')
+                .next()
+                .ok_or("Missing preview import ID")?
+                .to_string();
+            Ok(RegisterPreviewVideoResponse {
+                import_id,
+                preview_url,
+            })
+        })
+        .collect();
+    serialize_command_result(&registrations?)
+}
+
+#[tauri::command]
+pub(crate) async fn backend_extract_video_sequence_telemetry(
+    app: AppHandle,
+    paths: Vec<String>,
+) -> Result<Option<FinalizeActivityResponse>, String> {
+    let root = runtime_paths::app_paths(&app)?.repo_root;
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut response =
+            ovrley_core::media::mp4_telemetry::extract_sequence_activity(&root, &paths)
+                .map_err(|error| error.to_string())?;
+        if let Some(response) = &mut response {
+            response.debug_payload = None;
+        }
+        Ok(response)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 /// Extracts embedded telemetry from an imported video source.
 ///
 /// This is intentionally separate from preview import so a failed telemetry

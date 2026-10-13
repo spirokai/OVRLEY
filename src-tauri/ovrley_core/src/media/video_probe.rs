@@ -62,6 +62,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
     let ffprobe_path = ffmpeg_path.with_file_name(ffprobe_name);
 
     let mut command = Command::new(&ffprobe_path);
+    command.args(crate::media::video_sequence::input_options(Path::new(file_path)));
     command.args([
         "-v",
         "quiet",

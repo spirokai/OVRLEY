@@ -453,6 +453,134 @@ pub fn extract_activity(
     crate::activity::finalize::finalize_activity_columns(&columns, Some(repo_root)).map(Some)
 }
 
+/// Reads original chapter telemetry and aligns samples to a shared, continuous video clock.
+pub fn extract_sequence_activity(
+    repo_root: &Path,
+    paths: &[String],
+) -> CoreResult<Option<crate::activity::finalize::FinalizeActivityResponse>> {
+    if paths.len() < 2 {
+        return Err(CoreError::Config(
+            "A video sequence requires at least two files".into(),
+        ));
+    }
+    let mut duration = 0.0;
+    let mut fps = None;
+    // An empty time-zero anchor preserves leading chapters without telemetry.
+    // Activity assembly must not rebase the first later measurement to zero.
+    let mut samples = vec![NativeSample::default()];
+    let mut first = None;
+    for path in paths {
+        let vm = read_video_metadata(Path::new(path))?;
+        let part_duration = positive_f64(vm.duration_s)
+            .ok_or_else(|| CoreError::Config(format!("Invalid video duration: {path}")))?;
+        if fps.is_none() {
+            fps = positive_f64(vm.fps);
+        }
+        if let Some(mut result) = extract_telemetry_data(repo_root, path)? {
+            append_chapter_samples(
+                &mut samples,
+                result.samples.drain(..),
+                duration,
+                part_duration,
+            );
+            if first.is_none() {
+                if let Some(timestamp) = &result.sync_time {
+                    if let Ok(time) = chrono::DateTime::parse_from_rfc3339(timestamp) {
+                        result.sync_time = Some(
+                            (time - chrono::Duration::milliseconds((duration * 1000.0) as i64))
+                                .to_rfc3339(),
+                        );
+                    }
+                }
+                first = Some(result);
+            }
+        }
+        duration += part_duration;
+    }
+    let Some(first) = first else {
+        return Ok(None);
+    };
+    samples.sort_by(|left, right| left.timestamp_ms.total_cmp(&right.timestamp_ms));
+    let counts = count_series(&samples);
+    let columns = activity::build_activity_columns(
+        &samples,
+        fps.ok_or_else(|| CoreError::Config("Missing sequence FPS".into()))?,
+        duration,
+        first.file_name,
+        &first.camera_type,
+        first.camera_model,
+        first.sync_time,
+        first.source.as_str(),
+        TimelineKind::from_counts(counts).as_str(),
+        counts,
+    );
+    crate::activity::finalize::finalize_activity_columns(&columns, Some(repo_root)).map(Some)
+}
+
+fn append_chapter_samples(
+    target: &mut Vec<NativeSample>,
+    chapter: impl Iterator<Item = NativeSample>,
+    start_seconds: f64,
+    duration_seconds: f64,
+) {
+    for mut sample in chapter {
+        // Samples on an exact chapter end belong to the next chapter.
+        if sample.timestamp_ms < 0.0 || sample.timestamp_ms >= duration_seconds * 1000.0 {
+            continue;
+        }
+        sample.timestamp_ms += start_seconds * 1000.0;
+        target.push(sample);
+    }
+}
+
+#[cfg(test)]
+mod sequence_tests {
+    use super::*;
+
+    #[test]
+    fn chapter_telemetry_keeps_group_time_and_leading_absence() {
+        let mut samples = vec![NativeSample::default()];
+        append_chapter_samples(
+            &mut samples,
+            [0.0, 500.0, 1000.0]
+                .into_iter()
+                .map(|timestamp_ms| NativeSample {
+                    timestamp_ms,
+                    g_force: Some(1.2),
+                    ..NativeSample::default()
+                }),
+            2.0,
+            1.0,
+        );
+        assert_eq!(
+            samples
+                .iter()
+                .map(|sample| sample.timestamp_ms)
+                .collect::<Vec<_>>(),
+            [0.0, 2000.0, 2500.0]
+        );
+        let counts = count_series(&samples);
+        let columns = activity::build_activity_columns(
+            &samples,
+            2.0,
+            3.0,
+            Some("group.mp4".into()),
+            "DJI",
+            None,
+            None,
+            "test",
+            "imu",
+            counts,
+        );
+        assert_eq!(
+            columns.elapsed_seconds,
+            [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0].map(Some).to_vec()
+        );
+        assert_eq!(&columns.g_force[..4], &[None; 4]);
+        assert_eq!(columns.g_force[4], Some(1.2));
+    }
+}
+
 /// Converts floating FPS metadata into the shared rational representation.
 pub fn rational_fps_parts(fps: f64) -> (Option<u32>, Option<u32>) {
     match Fps::from_f64_metadata(fps) {

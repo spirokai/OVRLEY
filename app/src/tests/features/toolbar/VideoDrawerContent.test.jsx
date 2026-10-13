@@ -61,7 +61,8 @@ describe('VideoDrawerContent', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Load video' }))
 
     expect(onBrowseVideo).toHaveBeenCalledOnce()
-    expect(screen.getByText('Drop video file')).toBeInTheDocument()
+    expect(screen.getByText('Drop video file(s)')).toBeInTheDocument()
+    expect(screen.getByText(/Select or drop several MP4 parts/)).toBeInTheDocument()
     expect(screen.queryByText('Details')).not.toBeInTheDocument()
   })
 

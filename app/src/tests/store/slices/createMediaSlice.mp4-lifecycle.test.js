@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useStore from '@/store/useStore'
+import { createImportedVideoState } from '@/store/slices/createVideoImportSlice'
 
 const mp4Telemetry = {
   coverage: { speed: { source: 'direct' } },
@@ -66,12 +67,14 @@ describe('video import — telemetry lifecycle', () => {
   test('resets a stale negative offset when importing a shorter unsynced video', () => {
     useStore.setState({ videoSyncOffsetSeconds: -20 })
 
-    useStore.getState().setImportedVideo({
-      duration: 10,
-      fps: 30,
-      path: '/videos/short.mp4',
-      resolution: { width: 1920, height: 1080 },
-    })
+    useStore.getState().setImportedVideo(
+      createImportedVideoState({
+        duration: 10,
+        fps: 30,
+        path: '/videos/short.mp4',
+        resolution: { width: 1920, height: 1080 },
+      }),
+    )
 
     expect(useStore.getState().importedVideoPath).toBe('/videos/short.mp4')
     expect(useStore.getState().videoSyncOffsetSeconds).toBe(0)

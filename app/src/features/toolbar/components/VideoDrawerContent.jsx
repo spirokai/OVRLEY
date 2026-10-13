@@ -44,6 +44,12 @@ export function VideoDrawerContent({ videoSummary, onBrowseVideo, onDeleteVideo,
         label={t('toolbar.dropVideoFile', 'Drop video file')}
         sublabel="MP4, MOV, MKV"
       />
+      <p className="mt-2 px-2 text-xs text-muted-foreground">
+        {t(
+          'toolbar.videoPartsHelp',
+          'Select or drop several MP4 parts. They appear in filename order (1, 2, 10) as one movable group. Original files are used directly; no merged copy is created. Use parts recorded with the same camera settings.',
+        )}
+      </p>
 
       {drawerViewModel ? (
         <div className="mt-10 space-y-8 border-t border-border/80 pt-2">

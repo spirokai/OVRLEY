@@ -6,10 +6,11 @@
  * playback stays paused.
  */
 
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useStore from '@/store/useStore'
 import { useVideoPreview } from '@/features/video-preview/hooks/useVideoPreview'
+import { useVideoPlaybackClock } from '@/features/video-preview/hooks/useVideoPlaybackClock'
 
 vi.mock('@/features/video-preview/hooks/useVideoPlaybackClock', () => ({
   useVideoPlaybackClock: vi.fn(),
@@ -108,5 +109,48 @@ describe('useVideoPreview', () => {
 
     expect(useStore.getState().previewPlaybackSource).toBe('video')
     expect(useStore.getState().selectedSecond).toBe(8)
+  })
+
+  test('seeks across original parts using the common group offset', async () => {
+    useStore.setState({
+      importedVideoParts: [
+        { path: 'C:/one.mp4', duration: 10, startSeconds: 0, importId: 'one', previewUrl: 'http://localhost/one' },
+        { path: 'C:/two.mp4', duration: 20, startSeconds: 10, importId: 'two', previewUrl: 'http://localhost/two' },
+      ],
+    })
+    const video = createVideoStub()
+    const { result } = renderHook(() => useVideoPreview({ current: video }, true))
+    expect(result.current.importId).toBe('one')
+    expect(video.currentTime).toBe(3)
+    act(() => useStore.setState({ selectedSecond: 17 }))
+    expect(result.current.videoSrc).toBe('http://localhost/two')
+    expect(video.currentTime).toBe(2)
+    act(() => useStore.setState({ selectedSecond: 6 }))
+    expect(result.current.importId).toBe('one')
+    expect(video.currentTime).toBe(1)
+    act(() => useStore.setState({ selectedSecond: 17, videoSyncOffsetPreviewSeconds: 4 }))
+    expect(result.current.importId).toBe('two')
+    await waitFor(() => expect(video.currentTime).toBe(3))
+    expect(useStore.getState().videoSyncOffsetSeconds).toBe(5)
+  })
+
+  test('continues into the next part and hands off only at the end of the group', () => {
+    useStore.setState({
+      importedVideoParts: [
+        { path: 'C:/one.mp4', duration: 10, startSeconds: 0, importId: 'one', previewUrl: 'http://localhost/one' },
+        { path: 'C:/two.mp4', duration: 20, startSeconds: 10, importId: 'two', previewUrl: 'http://localhost/two' },
+      ],
+      previewPlaybackSource: 'video',
+      previewPlaybackState: 'playing',
+    })
+    const videoRef = { current: createVideoStub() }
+    const { result } = renderHook(() => useVideoPreview(videoRef, true))
+    act(() => useVideoPlaybackClock.mock.lastCall[0].onPlaybackEnded())
+    expect(useStore.getState().selectedSecond).toBe(15)
+    expect(useStore.getState().previewPlaybackSource).toBe('video')
+    expect(result.current.importId).toBe('two')
+    act(() => useVideoPlaybackClock.mock.lastCall[0].onPlaybackEnded())
+    expect(useStore.getState().selectedSecond).toBe(35)
+    expect(useStore.getState().previewPlaybackSource).toBe('timeline')
   })
 })

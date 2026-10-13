@@ -31,6 +31,24 @@ function renderClips(overrides = {}) {
 }
 
 describe('useTimelineClips', () => {
+  test('shows adjacent chapter segments inside one draggable video lane', () => {
+    const getLaneDragProps = vi.fn(() => ({}))
+    const { result } = renderClips({
+      getLaneDragProps,
+      importedVideoParts: [
+        { path: 'C:/one.mp4', duration: 5, startSeconds: 0 },
+        { path: 'C:/two.mp4', duration: 15, startSeconds: 5 },
+      ],
+    })
+    const videos = result.current.filter((lane) => lane.isVideo)
+    expect(videos).toHaveLength(1)
+    expect(videos[0].parts).toEqual([
+      { path: 'C:/one.mp4', label: 'one.mp4', style: { left: '0%', width: '25%' } },
+      { path: 'C:/two.mp4', label: 'two.mp4', style: { left: '25%', width: '75%' } },
+    ])
+    expect(getLaneDragProps.mock.calls).toEqual([['video'], ['activity']])
+  })
+
   test('builds video and activity lane models from canonical second fields', () => {
     const { result } = renderClips()
 

@@ -21,5 +21,7 @@ pub mod time;
 pub mod timezone;
 /// MP4/MOV metadata extraction via ffprobe.
 pub mod video_probe;
+/// Virtual sequences of original camera chapters.
+pub mod video_sequence;
 
 pub use source_video_metadata::{Resolution, SourceVideoMetadata};

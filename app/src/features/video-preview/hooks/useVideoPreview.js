@@ -12,6 +12,7 @@ import { SCRUB_SEEK_EPSILON_SECONDS, SCRUB_SEEK_INTERVAL_MS } from '../data/vide
 import { primeVideoFirstFrame, syncVideoCurrentTime } from '../utils/videoPreviewPlayback'
 import { createVideoPreviewScrubScheduler } from '../utils/videoPreviewScrubScheduler'
 import { isVideoPreviewOutOfRange, resolveVideoPreviewSource } from '../utils/videoPreviewSource'
+import { videoPartAtTime } from '../utils/videoParts'
 import i18next from 'i18next'
 
 /**
@@ -24,6 +25,7 @@ import i18next from 'i18next'
 export function useVideoPreview(videoRef, isActive = true) {
   // Store selectors - subscribes to video import state, playhead position, playback mode, and sync offset.
   const importedVideoPath = useStore((state) => state.importedVideoPath)
+  const importedVideoParts = useStore((state) => state.importedVideoParts)
   const importedVideoImportId = useStore((state) => state.importedVideoImportId)
   const importedVideoPreviewUrl = useStore((state) => state.importedVideoPreviewUrl)
   const importedVideoPreviewWarnings = useStore((state) => state.importedVideoPreviewWarnings)
@@ -39,6 +41,11 @@ export function useVideoPreview(videoRef, isActive = true) {
   const startPreviewPlayback = useStore((state) => state.startPreviewPlayback)
   const videoDuration = useStore((state) => state.importedVideoDuration || 0)
   const effectiveVideoSyncOffsetSeconds = videoSyncOffsetPreviewSeconds ?? videoSyncOffsetSeconds
+  const activePart = importedVideoParts ? videoPartAtTime(importedVideoParts, selectedSecond - effectiveVideoSyncOffsetSeconds) : null
+  const partStartSeconds = activePart ? activePart.startSeconds : 0
+  const sourceOffsetSeconds = videoSyncOffsetSeconds + partStartSeconds
+  const sourcePath = activePart ? activePart.path : importedVideoPath
+  const sourcePreviewUrl = activePart ? activePart.previewUrl : importedVideoPreviewUrl
 
   // Derived state - determines whether the video should play and which source URL to load.
   const videoEndSecond = videoSyncOffsetSeconds + videoDuration
@@ -47,10 +54,10 @@ export function useVideoPreview(videoRef, isActive = true) {
   const videoSrc = useMemo(
     () =>
       resolveVideoPreviewSource({
-        importedVideoPath,
-        importedVideoPreviewUrl,
+        importedVideoPath: sourcePath,
+        importedVideoPreviewUrl: sourcePreviewUrl,
       }),
-    [importedVideoPath, importedVideoPreviewUrl],
+    [sourcePath, sourcePreviewUrl],
   )
 
   // Warning lifecycle - tracks metadata, native-player, and slow-seek messages separately from playback sync.
@@ -68,38 +75,24 @@ export function useVideoPreview(videoRef, isActive = true) {
   }, [])
 
   const handoffVideoPlaybackToTimeline = useCallback(() => {
+    if (activePart && importedVideoParts[importedVideoParts.length - 1] !== activePart) {
+      setSelectedSecond(videoSyncOffsetSeconds + activePart.startSeconds + activePart.duration)
+      return
+    }
     startPreviewPlayback({ source: 'timeline', second: videoEndSecond })
-  }, [startPreviewPlayback, videoEndSecond])
+  }, [activePart, importedVideoParts, setSelectedSecond, startPreviewPlayback, videoEndSecond, videoSyncOffsetSeconds])
 
   // Video playback clock - publishes preview time from the video element while playing.
   useVideoPlaybackClock({
     videoRef,
     isActive: Boolean(videoSrc) && isVideoPlaybackMode,
-    videoSyncOffsetSeconds,
+    videoSyncOffsetSeconds: sourceOffsetSeconds,
     onPreviewSecond: setSelectedSecond,
     onPlaybackEnded: handoffVideoPlaybackToTimeline,
   })
 
   const scrubSchedulerRef = useRef(null)
   const videoPlaybackOwnerRef = useRef(null)
-
-  // Drag preview - seek the video directly from the transient offset without committing global sync state.
-  useEffect(() => {
-    if (videoSyncOffsetPreviewSeconds === null) {
-      return
-    }
-
-    const video = videoRef.current
-    if (!video || !videoSrc) {
-      return
-    }
-
-    if (!video.paused) {
-      video.pause()
-    }
-
-    scrubSchedulerRef.current?.schedule(selectedSecond - videoSyncOffsetPreviewSeconds)
-  }, [selectedSecond, videoRef, videoSrc, videoSyncOffsetPreviewSeconds])
 
   // Scrub scheduler ownership - preserve throttle state across playhead updates.
   useEffect(() => {
@@ -133,10 +126,12 @@ export function useVideoPreview(videoRef, isActive = true) {
     const syncPlaybackState = () => {
       if (videoSyncOffsetPreviewSeconds !== null) {
         videoPlaybackOwnerRef.current = null
+        if (!video.paused) video.pause()
+        scrubSchedulerRef.current?.schedule(selectedSecond - videoSyncOffsetPreviewSeconds - partStartSeconds)
         return
       }
 
-      const desiredVideoSecond = selectedSecond - videoSyncOffsetSeconds
+      const desiredVideoSecond = selectedSecond - sourceOffsetSeconds
 
       const handlePlaybackFailure = (error) => {
         const currentState = useStore.getState()
@@ -147,6 +142,7 @@ export function useVideoPreview(videoRef, isActive = true) {
           return
         }
 
+        if (error?.name === 'AbortError') return
         if (error?.name !== i18next.t('video-preview.aborterror', 'AbortError') && error?.name !== 'NotAllowedError') {
           console.error('[useVideoPreview] Failed to start playback', error)
         }
@@ -165,9 +161,9 @@ export function useVideoPreview(videoRef, isActive = true) {
       if (isVideoPlaybackMode) {
         scrubSchedulerRef.current?.clear()
         const owner = videoPlaybackOwnerRef.current
-        if (owner?.video !== video || owner.videoSyncOffsetSeconds !== videoSyncOffsetSeconds) {
+        if (owner?.video !== video || owner.sourceOffsetSeconds !== sourceOffsetSeconds || owner.videoSrc !== videoSrc) {
           syncVideoCurrentTime(video, desiredVideoSecond)
-          videoPlaybackOwnerRef.current = { video, videoSyncOffsetSeconds }
+          videoPlaybackOwnerRef.current = { video, sourceOffsetSeconds, videoSrc }
         }
 
         if (video.paused) {
@@ -198,6 +194,7 @@ export function useVideoPreview(videoRef, isActive = true) {
     }
 
     const handleLoadedMetadata = () => {
+      videoPlaybackOwnerRef.current = null
       syncPlaybackState()
       primeVideoFirstFrame(video)
     }
@@ -211,13 +208,14 @@ export function useVideoPreview(videoRef, isActive = true) {
   }, [
     isActive,
     isVideoPlaybackMode,
+    partStartSeconds,
     pausePreviewPlayback,
     previewPlaybackState,
     selectedSecond,
     videoRef,
     videoSrc,
     videoSyncOffsetPreviewSeconds,
-    videoSyncOffsetSeconds,
+    sourceOffsetSeconds,
   ])
 
   // Derived return values - aggregate imported-video warnings with local preview messages.
@@ -233,7 +231,7 @@ export function useVideoPreview(videoRef, isActive = true) {
 
   return {
     videoSrc,
-    importId: importedVideoImportId,
+    importId: activePart ? activePart.importId : importedVideoImportId,
     isOutOfRange,
     hevcPlaybackWarning,
     openVideoPreviewHelp,

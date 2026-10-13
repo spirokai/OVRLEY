@@ -214,6 +214,9 @@ struct ProjectSources {
 #[serde(deny_unknown_fields)]
 struct ProjectSource {
     path: PathLocator,
+    /// Optional ordered chapters after the first video; absent for single-file projects.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    following: Vec<PathLocator>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -361,6 +364,8 @@ struct ProjectTimeline {
 struct ResolvedSources {
     activity_path: Option<String>,
     video_path: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    video_following_paths: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -477,9 +482,15 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
     }
     if let Some(source) = &project.sources.activity {
         validate_locator(&source.path)?;
+        if !source.following.is_empty() {
+            return Err("Activity sources cannot contain video chapters".into());
+        }
     }
     if let Some(source) = &project.sources.video {
         validate_locator(&source.path)?;
+        for locator in &source.following {
+            validate_locator(locator)?;
+        }
     }
     for folder in [
         &project.render.batch_video_folder,
@@ -877,6 +888,19 @@ fn resolved_sources(
     Ok(ResolvedSources {
         activity_path,
         video_path,
+        video_following_paths: project
+            .sources
+            .video
+            .as_ref()
+            .map(|source| {
+                source
+                    .following
+                    .iter()
+                    .map(|locator| resolve_locator(project_path, locator).map(path_string))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?
+            .unwrap_or_default(),
     })
 }
 
@@ -1661,6 +1685,47 @@ mod tests {
             .unwrap_err();
         assert!(matches!(error, ProjectFileError::ArchiveSize));
         assert_eq!(fs::read(&path).unwrap(), previous);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn chapter_sources_survive_archive_round_trip() {
+        let directory = std::env::temp_dir().join(format!("ovrley-chapters-{}", Uuid::new_v4()));
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("Ride.oly");
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["sources"]["video"] = serde_json::json!({
+            "path": { "kind": "project-relative", "value": "one.mp4" },
+            "following": [
+                { "kind": "project-relative", "value": "two.mp4" },
+                { "kind": "project-relative", "value": "three.mp4" }
+            ]
+        });
+        write_project_file_sync(
+            path_string(path.clone()),
+            project.to_string(),
+            None,
+            HashMap::new(),
+        )
+        .unwrap();
+        let loaded =
+            read_project_file_sync(&RasterResources::default(), path_string(path)).unwrap();
+        assert_eq!(
+            loaded.resolved_sources.video_path,
+            Some(path_string(directory.join("one.mp4")))
+        );
+        assert_eq!(
+            loaded.resolved_sources.video_following_paths,
+            vec![
+                path_string(directory.join("two.mp4")),
+                path_string(directory.join("three.mp4"))
+            ]
+        );
+        let serialized = serde_json::to_value(loaded.project).unwrap();
+        assert_eq!(serialized["sources"]["video"], project["sources"]["video"]);
+        project["sources"]["video"]["following"] =
+            serde_json::json!([{"kind": "project-relative", "value": "../escape.mp4"}]);
+        assert!(parse_project(&project.to_string()).is_err());
         fs::remove_dir_all(directory).unwrap();
     }
 
