@@ -617,7 +617,7 @@ fn render_frame_to_surface(
                         validated_time: Some(validated),
                         altitude_offset_m: 0.0,
                         timezone: prepared_assets.timezone,
-                        elapsed_time: Some(crate::render::format::ElapsedTimeValues {
+                        elapsed_time: Some(ovrley_widgets::widgets::time::format::ElapsedTimeValues {
                             activity_seconds: activity_elapsed_seconds,
                             export_seconds: activity_elapsed_seconds
                                 - prepared_assets.export_start_seconds,

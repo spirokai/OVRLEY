@@ -2846,6 +2846,8 @@ dependencies = [
 name = "ovrley_widgets"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "chrono-tz",
  "image",
  "serde",
  "serde_json",

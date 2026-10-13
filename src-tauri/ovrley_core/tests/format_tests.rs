@@ -10,8 +10,9 @@ use chrono::DateTime;
 use serde_json::json;
 
 use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport};
-use ovrley_core::render::format::{
-    format_elapsed_time, format_time_key, format_validated_metric_parts,
+use ovrley_core::render::format::format_validated_metric_parts;
+use ovrley_widgets::widgets::time::format::{
+    format_elapsed_time, format_time_key,
     format_validated_time_parts, ElapsedTimeValues,
 };
 use ovrley_core::render::widgets::types::PreparedValue;

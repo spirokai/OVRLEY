@@ -17,7 +17,6 @@ mod raster;
 pub mod raw;
 mod route;
 mod scene;
-mod time;
 
 use crate::error::CoreResult;
 use crate::render::widgets::types::{
@@ -68,8 +67,8 @@ pub use route::{validate_route_plot, validate_route_plots, ValidatedRoutePlot};
 pub use scene::{
     validate_ffmpeg_config, validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig,
 };
-pub use time::{
-    validate_time_value, ElapsedTimeOrigin, ValidatedTimeFormatting, ValidatedTimeValue,
+use ovrley_widgets::widgets::time::validation::{
+    validate_time_value, ValidatedTimeFormatting,
 };
 
 /// Telemetry series needed by a template.
@@ -230,7 +229,7 @@ fn validate_render_contents(
                 });
             }
             if value.value == MetricKind::Time && value.display_type == DisplayType::Text {
-                return validate_time_value(value, idx).map(PreparedValue::TimeText);
+                return validate_time_value(value, idx).map(PreparedValue::TimeText).map_err(Into::into);
             }
             if value.display_type == DisplayType::Linear {
                 let value = raw::promote_value_variant(&value, "linear")?;

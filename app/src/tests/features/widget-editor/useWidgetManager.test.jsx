@@ -76,12 +76,20 @@ describe('useWidgetManager alignment updates', () => {
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
   })
 
-  test('commits the latest WASM font size when the slider is released before its pending frame', () => {
+  test.each(['speed', 'time'])('commits the latest %s font size when the slider is released before its pending frame', (type) => {
+    const config = cloneSerializable(DEFAULT_CONFIG)
+    config.values = [{ ...createMetricValueDefaults(type), id: 'speed-0' }]
+    useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] })
     try {
       useStore.temporal.getState().clear()
       const initialSize = useStore.getState().config.values[0].font_size
       const { result } = renderHook(() => useWidgetManager({ widgetLiveEdits: useWidgetDraftState() }))
+
+      act(() => result.current.updateWidgetData('speed-0', { font: 'Immediate.ttf' }))
+      expect(useStore.getState().config.values[0].font).toBe('Immediate.ttf')
+      expect(fontRequests.has('Immediate.ttf')).toBe(false)
+      useStore.temporal.getState().clear()
 
       act(() => {
         result.current.updateWidgetSize('speed-0', { font_size: 50 })

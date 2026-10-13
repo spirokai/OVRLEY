@@ -11,9 +11,10 @@ use crate::normalize::{
     ResolvedBarGeometry, ValidatedArcGaugeWidget, ValidatedGForceWidget,
     ValidatedGradientWidget, ValidatedHeading, ValidatedLapTimer,
     ValidatedLeanAngleWidget, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
-    ValidatedSceneConfig, ValidatedTimeValue,
+    ValidatedSceneConfig,
 };
 use chrono_tz::Tz;
+use ovrley_widgets::widgets::time::validation::ValidatedTimeValue;
 use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
 use ovrley_widgets::widgets::value::validation::ValidatedValueWidget;
 use skia_safe::Image;

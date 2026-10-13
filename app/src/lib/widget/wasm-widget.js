@@ -6,6 +6,7 @@ export function isWasmWidget(widget) {
     widget.type === 'raster' ||
     widget.type === 'backdrop' ||
     widget.type === 'label' ||
+    (widget.type === 'time' && widget.data.display_type === 'text') ||
     (isStandardMetricWidgetType(widget.type) && widget.data.display_type === 'text' && getSupportedDisplayTypes(widget.type).includes('text'))
   )
 }

@@ -6,13 +6,13 @@ use crate::{
     render::text::{validated_value_style, ResolvedTextStyle},
     widgets::value::{
         config::ValueConfig,
-        format::{format_metric_parts, MetricDisplayParts, MetricSample},
+        format::MetricDisplayParts,
         frame::prepare_metric_frame,
         layout::{
             draw_prepared_metric_frame, draw_static_metric_parts_for_value,
             static_metric_parts_for_value, StaticMetricParts,
         },
-        validation::{validate_value_widget, ValidatedValueWidget},
+        presentation::ValuePresentation,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -61,7 +61,7 @@ struct StaticImage {
 }
 
 pub struct PreviewWidget {
-    config: ValidatedValueWidget,
+    config: ValuePresentation,
     style: ResolvedTextStyle,
     scale: f32,
     static_parts: StaticMetricParts,
@@ -96,19 +96,19 @@ pub(crate) fn surface(width: u32, height: u32) -> WidgetResult<Surface> {
 
 impl PreviewWidget {
     pub fn new(request: WidgetRequest, fonts: &PreviewFonts) -> WidgetResult<Self> {
-        let config = validate_value_widget(request.widget, 0)?;
+        let config = ValuePresentation::new(request.widget, &request.scene)?;
         let scene = validate_scene_presentation(request.scene)?;
-        let style = validated_value_style(&config, &scene, scene.scale);
-        let static_parts = static_metric_parts_for_value(&config);
+        let style = validated_value_style(config.base(), &scene, scene.scale);
+        let static_parts = static_metric_parts_for_value(config.base());
         let static_image = if static_parts.icon || static_parts.unit {
-            let parts = format_metric_parts(&config, &MetricSample::default());
-            let frame = prepare_metric_frame(&style, &parts, scene.scale, fonts, &config)?;
+            let parts = config.parts(None, 0.0);
+            let frame = prepare_metric_frame(&style, &parts, scene.scale, fonts, config.base())?;
             let bounds = frame.bounds;
             let mut surface = surface(bounds.width() as u32, bounds.height() as u32)?;
             let canvas = surface.canvas();
             canvas.clear(Color::TRANSPARENT);
             canvas.translate((-bounds.left, -bounds.top));
-            draw_static_metric_parts_for_value(canvas, &config, &style, scene.scale, fonts)?;
+            draw_static_metric_parts_for_value(canvas, config.base(), &style, scene.scale, fonts)?;
             Some(StaticImage {
                 image: surface.image_snapshot(),
                 left: bounds.left,
@@ -137,14 +137,11 @@ impl PreviewWidget {
         second: f64,
         fonts: &PreviewFonts,
     ) -> WidgetResult<()> {
-        let sample = activity
-            .map(|a| a.sample(&self.config, second))
-            .unwrap_or_default();
-        let parts = format_metric_parts(&self.config, &sample);
+        let parts = self.config.parts(activity, second);
         if self.last_parts.as_ref() == Some(&parts) {
             return Ok(());
         }
-        let frame = prepare_metric_frame(&self.style, &parts, self.scale, fonts, &self.config)?;
+        let frame = prepare_metric_frame(&self.style, &parts, self.scale, fonts, self.config.base())?;
         let mut bounds = frame.bounds;
         if let Some(cache) = &self.static_image {
             bounds.join(skia_safe::Rect::from_xywh(
@@ -176,7 +173,7 @@ impl PreviewWidget {
             &parts,
             fonts,
             self.static_parts,
-            &self.config,
+            self.config.base(),
             &frame,
         );
         canvas.restore();

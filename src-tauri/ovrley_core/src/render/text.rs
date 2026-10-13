@@ -7,9 +7,9 @@
 use crate::error::CoreResult;
 use crate::normalize::{
     ValidatedGradientWidget, ValidatedLapTimer, ValidatedSceneConfig,
-    ValidatedTimeValue,
 };
 use ovrley_widgets::model::standard_widgets::widget_font_weight;
+use ovrley_widgets::widgets::time::validation::ValidatedTimeValue;
 use ovrley_widgets::widgets::value::validation::ValidatedValueWidget;
 use skia_safe::{Canvas, Color, Font};
 use std::path::PathBuf;

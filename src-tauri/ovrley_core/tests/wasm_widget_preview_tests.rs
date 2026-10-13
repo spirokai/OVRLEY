@@ -16,6 +16,225 @@ use ovrley_widgets::{
 use serde_json::{json, Value};
 use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
 
+#[test]
+fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
+    use ovrley_widgets::widgets::time::{
+        format::{format_validated_time_parts, ElapsedTimeValues},
+        validation::validate_time_value,
+    };
+    let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
+    let mut preview = PreviewSession::default();
+    let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
+    preview
+        .fonts
+        .register(
+            ovrley_widgets::preview::FontRequest {
+                font: "Inter.ttf".into(),
+                font_weight: weight,
+                italic: false,
+            },
+            &preview_font_resource(&font_dirs, "Inter.ttf", weight, false).unwrap(),
+        )
+        .unwrap();
+    let mut request = json!({"type": "time", "widget": common::builders::speed_value_json(), "scene": common::seam::explicit_scene_json()});
+    request["widget"].as_object_mut().unwrap().extend(
+        json!({
+            "value": "time", "font": "Inter.ttf", "format": "date-time-12s", "hours_offset": 1,
+            "time_mode": "daytime", "elapsed_origin": "export", "show_hundredths": true,
+            "x": 600.25, "y": 100.5, "icon_offset_x": -12, "icon_offset_y": 17,
+            "prefix": "[", "suffix": "]", "show_icon": true,
+        })
+        .as_object()
+        .unwrap()
+        .clone(),
+    );
+    request["scene"]["export_start_seconds"] = json!(10.0);
+    request["scene"]["scale"] = json!(1.7);
+    request["scene"]["shadow_strength"] = json!(3);
+    request["scene"]["shadow_distance"] = json!(4);
+    request["scene"]["border_thickness"] = json!(2);
+    let activity = br#"{"sample_elapsed_seconds":[0,1,2],"time":["2025-04-21T13:05:00Z",null,"2025-04-21T13:05:02Z"],"sync_time":"2000-01-01T00:00:00Z","metadata":{"timezone":"Europe/Berlin"},"trim_end_seconds":2}"#;
+    preview.replace_activity(activity).unwrap();
+    let id = preview
+        .create_widget(serde_json::from_value(request.clone()).unwrap())
+        .unwrap();
+    for (mode, origin) in [
+        ("daytime", "activity"),
+        ("elapsed", "activity"),
+        ("elapsed", "export"),
+    ] {
+        request["widget"]["time_mode"] = json!(mode);
+        request["widget"]["elapsed_origin"] = json!(origin);
+        for alignment in ["left", "center", "right"] {
+            request["widget"]["content_alignment"] = json!(alignment);
+            preview
+                .update_widget(id, serde_json::from_value(request.clone()).unwrap())
+                .unwrap();
+            for (second, timestamp) in [
+                (1.5, Some("2025-04-21T13:05:01.500Z")),
+                (0.25, Some("2025-04-21T13:05:00.250Z")),
+                (-1.0, None),
+            ] {
+                preview.render(second).unwrap();
+                let widget = &preview.widgets[&id];
+                let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+                let validated = validate_time_value(
+                    serde_json::from_value(request["widget"].clone()).unwrap(),
+                    0,
+                )
+                .unwrap();
+                let scene = validate_scene_presentation(
+                    serde_json::from_value(request["scene"].clone()).unwrap(),
+                )
+                .unwrap();
+                let style = validated_value_style(&validated.base, &scene, scene.scale);
+                let parts = format_validated_time_parts(
+                    &validated,
+                    timestamp,
+                    ElapsedTimeValues {
+                        activity_seconds: second,
+                        export_seconds: second - 10.0,
+                    },
+                    Some(chrono_tz::Europe::Berlin),
+                );
+                let info = ImageInfo::new(
+                    (
+                        geometry["width"].as_i64().unwrap() as i32,
+                        geometry["height"].as_i64().unwrap() as i32,
+                    ),
+                    ColorType::RGBA8888,
+                    AlphaType::Premul,
+                    None,
+                );
+                let mut surface = surfaces::raster(&info, None, None).unwrap();
+                let canvas = surface.canvas();
+                canvas.clear(Color::TRANSPARENT);
+                canvas.translate((
+                    -geometry["left"].as_f64().unwrap() as f32,
+                    -geometry["top"].as_f64().unwrap() as f32,
+                ));
+                let fonts = NativeFonts(&font_dirs);
+                let cached = draw_static_metric_parts_for_value(
+                    canvas,
+                    &validated.base,
+                    &style,
+                    scene.scale,
+                    &fonts,
+                )
+                .unwrap();
+                draw_metric_parts(
+                    canvas,
+                    &style,
+                    &parts,
+                    scene.scale,
+                    &fonts,
+                    cached,
+                    &validated.base,
+                )
+                .unwrap();
+                let mut pixels = vec![0; widget.pixels().len()];
+                assert!(surface.read_pixels(
+                    &info.with_alpha_type(AlphaType::Unpremul),
+                    &mut pixels,
+                    info.width() as usize * 4,
+                    (0, 0)
+                ));
+                assert_eq!(
+                    &pixels,
+                    widget.pixels(),
+                    "{mode}/{origin}/{alignment}/{second}"
+                );
+                assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+                let revision = widget.revision();
+                preview.render(second).unwrap();
+                assert_eq!(preview.widgets[&id].revision(), revision);
+            }
+            let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let bounds = &geometry["content"];
+            for fixed in [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] {
+                let point = [
+                    bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0],
+                    bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1],
+                ];
+                let mut gesture = request.clone();
+                gesture.as_object_mut().unwrap().extend(
+                    json!({"second": 1.75, "factor": 1.234375, "fixed": fixed, "point": point})
+                        .as_object()
+                        .unwrap()
+                        .clone(),
+                );
+                let patch = serde_json::to_value(
+                    preview
+                        .resize_widget(serde_json::from_value(gesture).unwrap())
+                        .unwrap(),
+                )
+                .unwrap();
+                let mut committed = request.clone();
+                committed["widget"]
+                    .as_object_mut()
+                    .unwrap()
+                    .extend(patch.as_object().unwrap().clone());
+                preview
+                    .update_widget(id, serde_json::from_value(committed).unwrap())
+                    .unwrap();
+                preview.render(1.75).unwrap();
+                let resized: Value =
+                    serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+                let actual = &resized["content"];
+                assert!(
+                    (actual["left"].as_f64().unwrap()
+                        + actual["width"].as_f64().unwrap() * fixed[0]
+                        - point[0])
+                        .abs()
+                        < 0.002
+                );
+                assert!(
+                    (actual["top"].as_f64().unwrap()
+                        + actual["height"].as_f64().unwrap() * fixed[1]
+                        - point[1])
+                        .abs()
+                        < 0.002
+                );
+            }
+        }
+    }
+    request["widget"]["time_mode"] = json!("daytime");
+    preview
+        .update_widget(id, serde_json::from_value(request.clone()).unwrap())
+        .unwrap();
+    preview.render(0.5).unwrap();
+    let original = preview.widgets[&id].pixels().clone();
+    preview.replace_activity(&[]).unwrap();
+    preview.render(0.5).unwrap();
+    assert_ne!(preview.widgets[&id].pixels(), &original);
+    preview.replace_activity(activity).unwrap();
+    preview.render(0.5).unwrap();
+    assert_eq!(preview.widgets[&id].pixels(), &original);
+    for (field, malformed) in [
+        ("format", json!("unknown")),
+        ("elapsed_origin", json!("unknown")),
+        ("time_mode", json!("unknown")),
+        ("hours_offset", Value::Null),
+        ("show_hundredths", Value::Null),
+    ] {
+        let mut invalid = request.clone();
+        invalid["widget"][field] = malformed;
+        assert!(
+            preview
+                .create_widget(serde_json::from_value(invalid).unwrap())
+                .is_err(),
+            "{field}"
+        );
+    }
+    request["scene"]
+        .as_object_mut()
+        .unwrap()
+        .remove("export_start_seconds");
+    assert!(preview
+        .create_widget(serde_json::from_value(request).unwrap())
+        .is_err());
+}
+
 fn label_preview() -> (PreviewSession, Value) {
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
     let mut preview = PreviewSession::default();

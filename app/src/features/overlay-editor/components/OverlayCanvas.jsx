@@ -188,14 +188,14 @@ const OverlayCanvasWidget = memo(
 export default function OverlayCanvas({ sceneProps, displayProps, dataProps, callbacks }) {
   const { sceneFont, sceneFontSize, sceneStyle, valueFont, defaultValueFont, sceneSize } = sceneProps
   const { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible } = displayProps
-  const { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange } = dataProps
+  const { widgets, activity, previewSecond, exportStartSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange } = dataProps
   const { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
   const hasTransparentBackground = backgroundMode === 'transparent'
   const backgroundImageSrc = importedBackgroundImagePath ? convertFileSrc(importedBackgroundImagePath) : ''
   const wasmScene = useMemo(
-    () => ({ ...sceneStyle, ...sceneSize, scale: globalScale, opacity: globalOpacity }),
-    [sceneStyle, sceneSize, globalScale, globalOpacity],
+    () => ({ ...sceneStyle, ...sceneSize, scale: globalScale, opacity: globalOpacity, export_start_seconds: exportStartSecond }),
+    [sceneStyle, sceneSize, globalScale, globalOpacity, exportStartSecond],
   )
   const wasm = useWasmWidgets({ widgets, scene: wasmScene, activity, second: previewSecond, defaultFont: defaultValueFont })
 

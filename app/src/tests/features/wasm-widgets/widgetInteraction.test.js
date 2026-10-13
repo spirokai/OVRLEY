@@ -42,23 +42,26 @@ function editor(type = 'speed') {
   }
 }
 
-test.each(['speed', 'backdrop', 'raster'])('%s drag coalesces from the captured origin and flushes the final movement without rounding', (type) => {
-  const { interaction, presentations, original } = editor(type)
-  const draft = vi.fn()
-  interaction.begin(draft)
-  interaction.update({ type: 'drag', translate: [10, 20] })
-  interaction.update({ type: 'drag', translate: [30, 40] })
-  expect(draft).not.toHaveBeenCalled()
-  vi.advanceTimersToNextFrame()
-  expect(draft).toHaveBeenCalledTimes(1)
-  expect(presentations.at(-1)[0].data).toEqual({ ...original.data, x: 150.25, y: 100.5 })
-  interaction.update({ type: 'drag', translate: [50.125, 60.25] })
-  const patch = interaction.finish()
-  expect(patch).toEqual({ x: 170.375, y: 120.75 })
-  expect(presentations.at(-1)[0].data).toEqual({ ...original.data, ...patch })
-  expect(vi.getTimerCount()).toBe(0)
-  expect(original.data.x).toBe(120.25)
-})
+test.each(['speed', 'time', 'backdrop', 'raster'])(
+  '%s drag coalesces from the captured origin and flushes the final movement without rounding',
+  (type) => {
+    const { interaction, presentations, original } = editor(type)
+    const draft = vi.fn()
+    interaction.begin(draft)
+    interaction.update({ type: 'drag', translate: [10, 20] })
+    interaction.update({ type: 'drag', translate: [30, 40] })
+    expect(draft).not.toHaveBeenCalled()
+    vi.advanceTimersToNextFrame()
+    expect(draft).toHaveBeenCalledTimes(1)
+    expect(presentations.at(-1)[0].data).toEqual({ ...original.data, x: 150.25, y: 100.5 })
+    interaction.update({ type: 'drag', translate: [50.125, 60.25] })
+    const patch = interaction.finish()
+    expect(patch).toEqual({ x: 170.375, y: 120.75 })
+    expect(presentations.at(-1)[0].data).toEqual({ ...original.data, ...patch })
+    expect(vi.getTimerCount()).toBe(0)
+    expect(original.data.x).toBe(120.25)
+  },
+)
 
 test('resize uses original configuration and a fixed content corner across live drafts/playback; cancellation restores the document', () => {
   const { interaction, presentations, resize, original, setSnapshot } = editor()
@@ -69,7 +72,15 @@ test('resize uses original configuration and a fixed content corner across live 
   interaction.update({ type: 'resize', geometry: { factor: 1.5, ...anchor } })
   vi.advanceTimersToNextFrame()
   expect(resize).toHaveBeenCalledTimes(1)
-  expect(resize.mock.calls[0][0]).toEqual({ type: 'speed', widget: original.data, scene: { scale: 1.5 }, second: 0, factor: 1.5, fixed: [1, 1], point: [260, 105] })
+  expect(resize.mock.calls[0][0]).toEqual({
+    type: 'speed',
+    widget: original.data,
+    scene: { scale: 1.5 },
+    second: 0,
+    factor: 1.5,
+    fixed: [1, 1],
+    point: [260, 105],
+  })
   const patch = draft.mock.calls[0][0]
   setSnapshot({ widgets: [{ ...original, data: { ...original.data, ...patch } }], scene: { scale: 1.5 }, second: 1 })
   interaction.update({ type: 'resize', geometry: { factor: 2, ...anchor } })
@@ -86,8 +97,8 @@ test('resize uses original configuration and a fixed content corner across live 
   expect(interaction.finish()).toBeNull()
 })
 
-test('label resize ignores playhead changes but flushes the final pointer intent', () => {
-  const { interaction, resize, original, setSnapshot, render } = editor('label')
+test.each(['label', 'time'])('%s resize follows its playhead policy and flushes the final pointer intent', (type) => {
+  const { interaction, resize, original, setSnapshot, render } = editor(type)
   const draft = vi.fn()
   const origin = interaction.begin(draft)
   const anchor = resizeAnchor(origin.bounds, [1, 1])
@@ -97,45 +108,52 @@ test('label resize ignores playhead changes but flushes the final pointer intent
     setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second })
     render()
   }
-  expect(resize).toHaveBeenCalledTimes(1)
-  expect(draft).toHaveBeenCalledTimes(1)
+  expect(resize).toHaveBeenCalledTimes(type === 'time' ? 4 : 1)
+  expect(draft).toHaveBeenCalledTimes(1) // Identical resolved patches need no new inspector draft.
   interaction.update({ type: 'resize', geometry: { factor: 1.375, ...anchor } })
   expect(interaction.finish().font_size).toBe(66)
-  expect(resize).toHaveBeenCalledTimes(2)
-  expect(resize.mock.lastCall[0]).toMatchObject({ type: 'label', widget: original.data, second: 30 })
+  expect(resize).toHaveBeenCalledTimes(type === 'time' ? 5 : 2)
+  expect(resize.mock.lastCall[0]).toMatchObject({ type, widget: original.data, second: 30 })
   expect(vi.getTimerCount()).toBe(0)
 })
 
-test.each(['rectangle', 'circle'])('backdrop %s resize resolves variant drafts and commits the same fractional geometry without playhead work', (displayType) => {
-  const { interaction, resize, setSnapshot, presentations, render } = editor('backdrop')
-  const stored = {
-    id: 'widget', x: 120.25, y: 60.5, display_type: displayType,
-    display_variants: { rectangle: { width: 100, height: 60, corner_radius: 10 }, circle: { diameter: 100 } },
-  }
-  const original = { id: 'widget', type: 'backdrop', category: 'backdrops', data: resolveActiveBackdropData(stored) }
-  setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second: 0 })
-  const patch = {
-    x: 110.125, y: 50.25,
-    display_variants: { [displayType]: displayType === 'circle' ? { diameter: 125.25 } : { width: 125.25, height: 80.5 } },
-  }
-  resize.mockReturnValue(patch)
-  const draft = vi.fn()
-  const origin = interaction.begin(draft)
-  interaction.update({ type: 'resize', geometry: { size: [187.875, 120.75], ...resizeAnchor(origin.bounds, [-1, -1]) } })
-  vi.advanceTimersToNextFrame()
-  const live = presentations.at(-1)[0].data
-  expect(live.width).toBe(125.25)
-  expect(live.height).toBe(displayType === 'circle' ? 125.25 : 80.5)
-  expect(live.display_variants.rectangle.corner_radius).toBe(10)
-  const drafts = { widget: { data: patch, layout: null } }
-  expect(applyWidgetDrafts([original], drafts)[0].data).toEqual(live)
-  for (const second of [1, 10, 2]) {
-    setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second })
-    render()
-  }
-  expect(resize).toHaveBeenCalledTimes(1)
-  expect(draft).toHaveBeenCalledTimes(1)
-  const committed = updateWidgetInConfig({ backdrops: [stored] }, 'widget', interaction.finish())
-  expect(resolveActiveBackdropData(committed.backdrops[0])).toEqual(live)
-  expect(committed.backdrops[0].width).toBeUndefined()
-})
+test.each(['rectangle', 'circle'])(
+  'backdrop %s resize resolves variant drafts and commits the same fractional geometry without playhead work',
+  (displayType) => {
+    const { interaction, resize, setSnapshot, presentations, render } = editor('backdrop')
+    const stored = {
+      id: 'widget',
+      x: 120.25,
+      y: 60.5,
+      display_type: displayType,
+      display_variants: { rectangle: { width: 100, height: 60, corner_radius: 10 }, circle: { diameter: 100 } },
+    }
+    const original = { id: 'widget', type: 'backdrop', category: 'backdrops', data: resolveActiveBackdropData(stored) }
+    setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second: 0 })
+    const patch = {
+      x: 110.125,
+      y: 50.25,
+      display_variants: { [displayType]: displayType === 'circle' ? { diameter: 125.25 } : { width: 125.25, height: 80.5 } },
+    }
+    resize.mockReturnValue(patch)
+    const draft = vi.fn()
+    const origin = interaction.begin(draft)
+    interaction.update({ type: 'resize', geometry: { size: [187.875, 120.75], ...resizeAnchor(origin.bounds, [-1, -1]) } })
+    vi.advanceTimersToNextFrame()
+    const live = presentations.at(-1)[0].data
+    expect(live.width).toBe(125.25)
+    expect(live.height).toBe(displayType === 'circle' ? 125.25 : 80.5)
+    expect(live.display_variants.rectangle.corner_radius).toBe(10)
+    const drafts = { widget: { data: patch, layout: null } }
+    expect(applyWidgetDrafts([original], drafts)[0].data).toEqual(live)
+    for (const second of [1, 10, 2]) {
+      setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second })
+      render()
+    }
+    expect(resize).toHaveBeenCalledTimes(1)
+    expect(draft).toHaveBeenCalledTimes(1)
+    const committed = updateWidgetInConfig({ backdrops: [stored] }, 'widget', interaction.finish())
+    expect(resolveActiveBackdropData(committed.backdrops[0])).toEqual(live)
+    expect(committed.backdrops[0].width).toBeUndefined()
+  },
+)

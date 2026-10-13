@@ -5,15 +5,15 @@
 //! render-affecting defaults. The frontend must materialise all defaults
 //! before sending the config.
 
-use crate::error::{CoreError, CoreResult};
-use ovrley_widgets::model::types::DisplayType;
-use ovrley_widgets::model::types::MetricKind;
-use ovrley_widgets::model::validation::{
+use crate::error::{WidgetError, WidgetResult};
+use crate::model::types::DisplayType;
+use crate::model::types::MetricKind;
+use crate::model::validation::{
     require_bool, require_f32, require_str, require_string, rgba_from_hex,
 };
-use ovrley_widgets::widgets::value::config::ValueConfig;
-use ovrley_widgets::widgets::value::validation::validate_content_alignment;
-use ovrley_widgets::widgets::value::validation::{ValidatedValueFormatting, ValidatedValueWidget};
+use crate::widgets::value::config::ValueConfig;
+use crate::widgets::value::validation::validate_content_alignment;
+use crate::widgets::value::validation::{ValidatedValueFormatting, ValidatedValueWidget};
 
 /// Explicit formatting mode for a validated time value.
 #[derive(Clone, Debug)]
@@ -39,11 +39,14 @@ pub struct ValidatedTimeValue {
     pub formatting: ValidatedTimeFormatting,
 }
 
-pub fn validate_time_value(value: ValueConfig, index: usize) -> CoreResult<ValidatedTimeValue> {
+pub fn validate_time_value(value: ValueConfig, index: usize) -> WidgetResult<ValidatedTimeValue> {
     let p = |field: &str| format!("values[{index}].{field}");
 
+    require_f32(Some(value.x), &p("x"))?;
+    require_f32(Some(value.y), &p("y"))?;
+
     if value.value != MetricKind::Time {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: expected Time, got {:?}",
             p("value"),
             value.value
@@ -51,7 +54,7 @@ pub fn validate_time_value(value: ValueConfig, index: usize) -> CoreResult<Valid
     }
 
     if value.display_type != DisplayType::Text {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: display_type '{}' is outside the time text validation slice",
             p("display_type"),
             value.display_type.as_str()
@@ -63,7 +66,7 @@ pub fn validate_time_value(value: ValueConfig, index: usize) -> CoreResult<Valid
         validate_content_alignment(value.content_alignment, &p("content_alignment"))?;
     let opacity = require_f32(value.opacity, &p("opacity"))?;
     if !(0.0..=1.0).contains(&opacity) {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be 0.0..1.0, got {opacity}",
             p("opacity")
         )));
@@ -71,7 +74,7 @@ pub fn validate_time_value(value: ValueConfig, index: usize) -> CoreResult<Valid
 
     let font_size = require_f32(value.font_size, &p("font_size"))?;
     if font_size <= 0.0 {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be > 0, got {font_size}",
             p("font_size")
         )));
@@ -91,7 +94,7 @@ pub fn validate_time_value(value: ValueConfig, index: usize) -> CoreResult<Valid
     )?;
     let icon_size = require_f32(value.icon_size, &p("icon_size"))?;
     if icon_size < 0.0 {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be >= 0, got {icon_size}",
             p("icon_size")
         )));
@@ -102,7 +105,7 @@ pub fn validate_time_value(value: ValueConfig, index: usize) -> CoreResult<Valid
     let prefix = require_string(value.prefix, &p("prefix"))?;
     let suffix = require_string(value.suffix, &p("suffix"))?;
     if value.time_format.is_some() {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: legacy field is not supported; use format",
             p("time_format")
         )));
@@ -110,7 +113,7 @@ pub fn validate_time_value(value: ValueConfig, index: usize) -> CoreResult<Valid
     let hours_offset = i64::from(
         value
             .hours_offset
-            .ok_or_else(|| CoreError::Config(format!("{}: required", p("hours_offset"))))?,
+            .ok_or_else(|| WidgetError::Config(format!("{}: required", p("hours_offset"))))?,
     );
     let format_key = require_string(value.format, &p("format"))?;
     validate_time_format_key(&format_key, &p("format"))?;
@@ -120,7 +123,7 @@ pub fn validate_time_value(value: ValueConfig, index: usize) -> CoreResult<Valid
         "activity" => ElapsedTimeOrigin::Activity,
         "export" => ElapsedTimeOrigin::Export,
         value => {
-            return Err(CoreError::Config(format!(
+            return Err(WidgetError::Config(format!(
                 "{}: expected 'activity' or 'export', got '{value}'",
                 p("elapsed_origin")
             )))
@@ -134,7 +137,7 @@ pub fn validate_time_value(value: ValueConfig, index: usize) -> CoreResult<Valid
             show_hundredths,
         },
         value => {
-            return Err(CoreError::Config(format!(
+            return Err(WidgetError::Config(format!(
                 "{}: expected 'daytime' or 'elapsed', got '{value}'",
                 p("time_mode")
             )))
@@ -175,14 +178,14 @@ pub fn validate_time_value(value: ValueConfig, index: usize) -> CoreResult<Valid
     })
 }
 
-fn validate_time_format_key(format_key: &str, field: &str) -> CoreResult<()> {
+fn validate_time_format_key(format_key: &str, field: &str) -> WidgetResult<()> {
     match format_key {
         "time-24" | "time-24s" | "time-12" | "time-12s" | "date-dd-mm-yyyy" | "date-mm-dd-yyyy"
         | "date-yyyy-mm-dd" | "date-dd-mmm-yyyy" | "date-mmm-dd-yyyy" | "date-dd-mmmm-yyyy"
         | "date-mmmm-dd-yyyy" | "date-time-24" | "date-time-24s" | "date-time-12"
         | "date-time-12s" | "date-mmm-time-24" | "date-mmm-time-12" | "date-mmmm-time-24"
         | "date-mmmm-time-12" => Ok(()),
-        _ => Err(CoreError::Config(format!(
+        _ => Err(WidgetError::Config(format!(
             "{field}: unsupported time format '{format_key}'"
         ))),
     }

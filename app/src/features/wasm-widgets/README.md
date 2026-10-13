@@ -8,8 +8,10 @@ gear labels and GPS coordinate rows. Shared Rust formatting handles units,
 precision, affixes, totals, and altitude correction. The sampler prepares source
 columns once and applies each metric's bridge, preserve, or hold policy at the
 current `previewSecond`. Outside the activity's time range, preview shows missing
-value placeholders. Other display types and specialized time/gradient widgets
-remain on their existing render paths.
+value placeholders. Time text also uses this path, including timezone-aware
+daytime and activity/export-relative elapsed time. The scene supplies the current
+export start second, and native export shares the timestamp sampler and formatter.
+Other display types and gradient widgets remain on their existing render paths.
 
 WASM module loading starts at canvas mount and does not gate app startup. Module
 initialization errors are displayed by the canvas. The preview session lives for

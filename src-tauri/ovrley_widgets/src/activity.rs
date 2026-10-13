@@ -21,6 +21,9 @@ macro_rules! activity_columns {
         struct PreviewActivity {
             sample_elapsed_seconds: Vec<f64>,
             trim_end_seconds: f64,
+            #[serde(default)] time: Vec<Option<String>>,
+            #[serde(default)] sync_time: Option<String>,
+            #[serde(default)] metadata: serde_json::Value,
             $(#[serde(default)] $field: Vec<Option<f64>> ,)*
             #[serde(default)] elevation: Vec<Option<f64>>,
             #[serde(default)] barometric_altitude: Vec<Option<f64>>,
@@ -119,6 +122,8 @@ impl NumericColumn {
 }
 
 pub struct ActivitySampler {
+    pub(crate) time: crate::widgets::time::sampling::TimeSampler,
+    pub(crate) timezone: Option<chrono_tz::Tz>,
     times: Vec<f64>,
     end: f64,
     numeric: HashMap<MetricKind, NumericColumn>,
@@ -143,6 +148,7 @@ impl ActivitySampler {
             ));
         }
         for len in [
+            activity.time.len(),
             activity.gear_position.len(),
             activity.course.len(),
             activity.elevation.len(),
@@ -160,6 +166,18 @@ impl ActivitySampler {
             std::mem::take(&mut activity.elevation)
         };
         let mut columns = activity.take_numeric();
+        let time = crate::widgets::time::sampling::TimeSampler::new(
+            activity.sync_time.as_deref(),
+            &activity.sample_elapsed_seconds,
+            &activity.time,
+        );
+        let timezone = activity.metadata.get("timezone").filter(|v| !v.is_null())
+            .map(|value| {
+                value.as_str()
+                    .ok_or_else(|| WidgetError::Config("activity timezone must be an IANA timezone string".into()))?
+                    .parse().map_err(|e| WidgetError::Config(format!("activity timezone: {e}")))
+            })
+            .transpose()?;
         columns.insert(MetricKind::Altitude, altitude);
         let times = activity.sample_elapsed_seconds;
         let numeric: HashMap<_, _> = columns
@@ -190,6 +208,8 @@ impl ActivitySampler {
             .filter_map(|(time, value)| value.map(|value| (time, value)))
             .collect();
         Ok(Self {
+            time,
+            timezone,
             times,
             end: activity.trim_end_seconds,
             numeric,

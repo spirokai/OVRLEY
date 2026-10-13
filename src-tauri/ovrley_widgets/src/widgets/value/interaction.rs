@@ -5,8 +5,7 @@ use crate::{
     preview::PreviewFonts,
     render::text::validated_value_style,
     widgets::value::{
-        format::format_metric_parts, frame::prepare_metric_frame, preview::WidgetRequest,
-        validation::validate_value_widget,
+        frame::prepare_metric_frame, presentation::ValuePresentation, preview::WidgetRequest,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -38,19 +37,18 @@ pub fn resize_value(
     activity: Option<&crate::activity::ActivitySampler>,
     fonts: &PreviewFonts,
 ) -> WidgetResult<ResizeUpdate> {
-    let mut config = validate_value_widget(request.origin.widget, 0)?;
+    let mut presentation = ValuePresentation::new(request.origin.widget, &request.origin.scene)?;
+    let config = presentation.base_mut();
     let scene = validate_scene_presentation(request.origin.scene)?;
     // Match the editor's existing intrinsic size limits without rounding on release.
     config.font_size = (config.font_size * request.factor).clamp(8.0, 400.0);
     config.icon_size = (config.icon_size * request.factor).clamp(0.0, 400.0);
     config.icon_offset_x *= request.factor;
     config.icon_offset_y *= request.factor;
-    let style = validated_value_style(&config, &scene, scene.scale);
-    let sample = activity
-        .map(|a| a.sample(&config, request.second))
-        .unwrap_or_default();
-    let parts = format_metric_parts(&config, &sample);
-    let bounds = prepare_metric_frame(&style, &parts, scene.scale, fonts, &config)?.content_bounds;
+    let style = validated_value_style(config, &scene, scene.scale);
+    let parts = presentation.parts(activity, request.second);
+    let config = presentation.base();
+    let bounds = prepare_metric_frame(&style, &parts, scene.scale, fonts, config)?.content_bounds;
     Ok(ResizeUpdate {
         x: config.x + request.point[0] - (bounds.left + bounds.width() * request.fixed[0]),
         y: config.y + request.point[1] - (bounds.top + bounds.height() * request.fixed[1]),

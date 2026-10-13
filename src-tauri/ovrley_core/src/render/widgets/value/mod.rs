@@ -15,10 +15,9 @@ mod layout;
 
 use crate::activity::schema::DenseActivityReport;
 use crate::error::CoreResult;
-use crate::normalize::{ValidatedGradientWidget, ValidatedTimeValue};
-use crate::render::format::{
-    format_metric_presentation_parts, format_validated_time_parts, ElapsedTimeValues,
-};
+use crate::normalize::ValidatedGradientWidget;
+use crate::render::format::format_metric_presentation_parts;
+use ovrley_widgets::widgets::time::{validation::ValidatedTimeValue, format::{format_validated_time_parts, ElapsedTimeValues}};
 use chrono_tz::Tz;
 use ovrley_widgets::model::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
 use ovrley_widgets::model::types::{DisplayType, MetricKind};

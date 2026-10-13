@@ -266,59 +266,8 @@ fn interpolate_time_series(
     y_values: &TimeSeries,
     target_x_values: &[f64],
 ) -> Vec<Option<String>> {
-    // The source time series is authoritative. In particular, using sync_time
-    // here would hide a mismatch between the activity start and its actual
-    // timestamp samples and would make the time widget display the wrong time.
-    if y_values.iter().any(Option::is_some) {
-        // Build the filtered source points once. Rebuilding them for every
-        // frame makes densification quadratic for large activities.
-        let points = x_values
-            .iter()
-            .copied()
-            .zip(y_values.iter())
-            .filter_map(|(x, value)| {
-                value
-                    .as_deref()
-                    .and_then(|raw| DateTime::parse_from_rfc3339(raw).ok())
-                    .map(|time| (x, time.timestamp_millis() as f64))
-            })
-            .collect::<Vec<_>>();
-        return target_x_values
-            .iter()
-            .map(|target| {
-                if points.first().is_some_and(|(first, _)| *target < *first)
-                    || points.last().is_some_and(|(last, _)| *target > *last)
-                {
-                    return None;
-                }
-                interpolate_points(&points, *target).map(|millis| {
-                    DateTime::<Utc>::from_timestamp_millis(millis.round() as i64)
-                        .unwrap_or(DateTime::<Utc>::UNIX_EPOCH)
-                        .to_rfc3339_opts(SecondsFormat::Millis, true)
-                })
-            })
-            .collect();
-    }
-
-    // sync_time is only a fallback for formats that do not provide absolute
-    // timestamp samples at all.
-    if let Some(start_time) = sync_time
-        .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
-        .map(|value| value.with_timezone(&Utc))
-    {
-        return target_x_values
-            .iter()
-            .map(|target| {
-                Some(
-                    (start_time
-                        + chrono::TimeDelta::milliseconds((target * 1000.0).round() as i64))
-                    .to_rfc3339_opts(SecondsFormat::Millis, true),
-                )
-            })
-            .collect();
-    }
-
-    vec![None; target_x_values.len()]
+    let sampler = ovrley_widgets::widgets::time::sampling::TimeSampler::new(sync_time, x_values, y_values);
+    target_x_values.iter().map(|second| sampler.at(*second)).collect()
 }
 
 /// Converts a trimmed activity into frame-aligned render data.
