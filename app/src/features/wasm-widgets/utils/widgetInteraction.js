@@ -31,6 +31,20 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
   return {
     forWidget(id) {
       return {
+        resize(geometry) {
+          const snapshot = getSnapshot()
+          const widget = snapshot.widgets.find((item) => item.id === id)
+          if (!widget) throw new Error(`Missing WASM widget: ${id}`)
+          return resize({
+            type: widget.type,
+            widget: widget.data,
+            scene: snapshot.scene,
+            second: snapshot.second,
+            fixed: [0, 0],
+            point: [widget.data.x, widget.data.y],
+            ...geometry,
+          })
+        },
         begin(onDraft) {
           flush()
           const snapshot = getSnapshot()

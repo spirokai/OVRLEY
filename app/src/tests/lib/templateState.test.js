@@ -433,6 +433,11 @@ describe('createEditorEffectiveConfig', () => {
     const result = createEditorEffectiveConfig({ config, globalDefaults: { font_values: 'Fallback.ttf' } })
 
     expect(result.values[0].display_variants.heading_tape.label_font).toBe('Teko.ttf')
+    expect(result.values[0].label_font).toBe('Teko.ttf')
+    delete config.values[0].display_variants.heading_tape.label_font
+    expect(createEditorEffectiveConfig({ config, globalDefaults: { font_values: 'Inherited.ttf' } }).values[0].label_font).toBe('Inherited.ttf')
+    config.values[0].display_variants.heading_tape.label_font = ''
+    expect(createEditorEffectiveConfig({ config, globalDefaults: { font_values: 'Inherited.ttf' } }).values[0].label_font).toBe('')
   })
 })
 

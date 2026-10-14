@@ -1,8 +1,7 @@
 //! Heading tape geometry: tick positions, label placement, and scroll offsets.
 //!
 //! Pure functions that compute which ticks and labels are visible at a given
-//! heading value, widget dimensions, and scale. These are shared conceptually
-//! between the Skia backend (cached tape image) and the frontend SVG preview.
+//! heading value, widget dimensions, and scale for both native and WASM hosts.
 
 pub const LABEL_DESCENT_PCT: f32 = 0.25;
 pub const HIGHLIGHT_BAR_BODY_MARGIN_FRAME_PCT: f32 = 0.1;
@@ -229,21 +228,15 @@ pub fn visible_ticks(
     show_major_ticks: bool,
     show_minor_ticks: bool,
 ) -> Vec<TapeTick> {
-    if pixels_per_degree <= 0.0 || width <= 0.0 {
-        return Vec::new();
-    }
-
     let tape_width = 360.0 * pixels_per_degree;
     let offset = heading * pixels_per_degree;
     let minor_interval = major_tick_interval as f32 / minor_ticks_per_major as f32;
     let mut degrees: Vec<f32> = CARDINAL_LABELS.iter().map(|(degree, _)| *degree).collect();
 
-    if major_tick_interval > 0 && minor_ticks_per_major > 0 && minor_interval > 0.0 {
-        let mut degree = 0.0_f32;
-        while degree < 360.0 {
-            degrees.push((degree * 1000.0).round() / 1000.0);
-            degree += minor_interval;
-        }
+    let mut degree = 0.0_f32;
+    while degree < 360.0 {
+        degrees.push((degree * 1000.0).round() / 1000.0);
+        degree += minor_interval;
     }
 
     degrees.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));

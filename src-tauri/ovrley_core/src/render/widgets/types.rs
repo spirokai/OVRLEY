@@ -11,9 +11,9 @@ use ovrley_widgets::widgets::gradient::validation::ValidatedGradientWidget;
 use ovrley_widgets::widgets::lean_angle::{layout::LeanAngleCache, validation::ValidatedLeanAngleWidget};
 use ovrley_widgets::widgets::g_force::{layout::GForceCache, validation::ValidatedGForceWidget};
 use ovrley_widgets::widgets::lap_timer::{layout::LapTimerLayout, validation::ValidatedLapTimer};
+use ovrley_widgets::widgets::heading::{layout::HeadingCache, validation::ValidatedHeading};
 use crate::normalize::{
     ResolvedBarGeometry, ValidatedArcGaugeWidget,
-    ValidatedHeading,
     ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
     ValidatedSceneConfig,
 };
@@ -68,7 +68,7 @@ pub struct MetricPresentationReport {
 #[derive(Clone, Debug)]
 pub struct PreparedHeadingTape {
     pub validated: ValidatedHeading,
-    pub cache: Option<HeadingWidgetCache>,
+    pub cache: Option<HeadingCache>,
 }
 
 /// Validated lean-angle configuration together with its typed cache.
@@ -295,39 +295,6 @@ pub(crate) struct RouteWidgetCache {
     pub(crate) remaining_layer: Option<StaticLayer>,
 }
 
-/// Prepared heading widget cache.
-#[derive(Clone, Debug)]
-pub struct HeadingWidgetCache {
-    /// The cached 360° tape image (ticks + labels + shadows baked in).
-    pub tape_image: Image,
-    /// Tape image width in pixels (360 × pixels_per_degree).
-    pub tape_width: f32,
-    /// Y offset from widget top to the tape body.
-    pub tape_body_y: f32,
-    /// Tape body height in pixels, excluding chevrons and chevron gaps.
-    pub tape_body_height: f32,
-    /// Widget position and dimensions.
-    pub x: f32,
-    pub y: f32,
-    pub width: u32,
-    pub height: u32,
-    /// Horizontal scale in pixels per degree.
-    pub pixels_per_degree: f32,
-    /// Whether to draw the indicator.
-    pub show_indicator: bool,
-    /// Indicator style: "chevron" or "highlight_bar".
-    pub indicator_style: String,
-    /// Indicator placement: "top", "bottom", or "both".
-    pub indicator_placement: String,
-    /// Indicator color as hex string.
-    pub indicator_color: String,
-    /// Indicator size in pixels (chevron height or bar width).
-    pub indicator_size: f32,
-    /// Shadow style for the indicator (inherited from widget config).
-    pub indicator_shadow: Option<ShadowStyle>,
-    /// Visual representation mode. When `Text`, the tape is not drawn.
-    pub display_type: DisplayType,
-}
 
 /// Cached static circle and dynamic drawing contract for a G-force widget.
 #[derive(Clone, Debug)]

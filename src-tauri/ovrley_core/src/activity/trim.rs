@@ -14,7 +14,10 @@ use super::schema::{ParsedActivity, TrimmedActivity};
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
-use ovrley_widgets::interpolation::{interpolate_numeric_series_value, MissingSamplePolicy};
+use ovrley_widgets::interpolation::{
+    collect_valid_numeric_points, interpolate_heading_points, interpolate_numeric_series_value,
+    MissingSamplePolicy,
+};
 
 // Validates that the requested scene window fits inside activity duration.
 fn validate_trim_window(duration: f64, start: f64, end: f64) -> CoreResult<()> {
@@ -83,6 +86,9 @@ fn trim_numeric_series(
             None
         } else {
             match strategy {
+                InterpolationStrategy::Angular => {
+                    interpolate_heading_points(&collect_valid_numeric_points(elapsed, data), target)
+                }
                 InterpolationStrategy::Hold => densify_hold_series(elapsed, data, &[target])[0],
                 InterpolationStrategy::Numeric(policy) => {
                     interpolate_numeric_series_value(elapsed, data, target, policy)

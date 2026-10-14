@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
 import { createLabelDefaults, createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
+import { registerWidgetInteraction, unregisterWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 import { redoHistory, replaceEditorDocument, undoHistory } from '@/features/undo-redo/undoHistory'
 import { ensureWidgetIdsInConfig } from '@/lib/widget/widget-config'
 import useStore from '@/store/useStore'
@@ -76,48 +77,91 @@ describe('useWidgetManager alignment updates', () => {
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
   })
 
-  test.each(['speed', 'time', 'gradient', 'lean_angle', 'lap_timer'])('%s font sizes commit on release before the pending frame', (type) => {
+  test.each(['speed', 'time', 'gradient', 'lean_angle', 'lap_timer', 'heading'])(
+    '%s font sizes commit on release before the pending frame',
+    (type) => {
+      const config = cloneSerializable(DEFAULT_CONFIG)
+      config.values = [
+        {
+          ...createMetricValueDefaults(type, undefined, {
+            displayType: type === 'heading' ? 'heading_tape' : type === 'lean_angle' ? 'lean_angle' : 'text',
+            lapTimerMode: 'current_lap',
+          }),
+          id: 'speed-0',
+        },
+      ]
+      useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
+      vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] })
+      try {
+        useStore.temporal.getState().clear()
+        const initialSize = useStore.getState().config.values[0].font_size
+        const { result } = renderHook(() => useWidgetManager({ widgetLiveEdits: useWidgetDraftState() }))
+
+        act(() => result.current.updateWidgetData('speed-0', { font: 'Immediate.ttf' }))
+        expect(useStore.getState().config.values[0].font).toBe('Immediate.ttf')
+        expect(fontRequests.has('Immediate.ttf')).toBe(false)
+        if (type === 'lap_timer') {
+          act(() => result.current.updateWidgetData('speed-0', { label_font: 'ImmediateLabel.ttf' }))
+          expect(useStore.getState().config.values[0].label_font).toBe('ImmediateLabel.ttf')
+          expect(fontRequests.has('ImmediateLabel.ttf')).toBe(false)
+        }
+        if (type === 'heading') {
+          act(() => result.current.updateWidgetData('speed-0', { display_variants: { heading_tape: { label_font: 'ImmediateLabel.ttf' } } }))
+          expect(useStore.getState().config.values[0].display_variants.heading_tape.label_font).toBe('ImmediateLabel.ttf')
+          expect(fontRequests.has('ImmediateLabel.ttf')).toBe(false)
+        }
+        useStore.temporal.getState().clear()
+
+        act(() => {
+          result.current.updateWidgetSize('speed-0', { font_size: 50 })
+          result.current.updateWidgetSize('speed-0', { font_size: 60 })
+          if (type === 'lap_timer') result.current.updateWidgetSize('speed-0', { label_font_size: 17.125 })
+          if (type === 'heading') result.current.updateWidgetSize('speed-0', { display_variants: { heading_tape: { label_font_size: 17.125 } } })
+        })
+        expect(useStore.getState().config.values[0].font_size).toBe(initialSize)
+        expect(vi.getTimerCount()).toBe(1)
+
+        act(() => result.current.commitWidgetSize('speed-0'))
+        expect(useStore.getState().config.values[0].font_size).toBe(60)
+        expect(result.current.widgets[0].data.font_size).toBe(60)
+        if (type === 'lap_timer') expect(result.current.widgets[0].data.label_font_size).toBe(17.125)
+        if (type === 'heading') expect(result.current.widgets[0].data.display_variants.heading_tape.label_font_size).toBe(17.125)
+        expect(useStore.temporal.getState().pastStates).toHaveLength(1)
+        expect(vi.getTimerCount()).toBe(0)
+        act(() => vi.advanceTimersToNextFrame())
+        expect(result.current.widgets[0].data.font_size).toBe(60)
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  )
+
+  test('heading offset commits the WASM height response before the pending frame', () => {
     const config = cloneSerializable(DEFAULT_CONFIG)
-    config.values = [
-      {
-        ...createMetricValueDefaults(type, undefined, { displayType: type === 'lean_angle' ? 'lean_angle' : 'text', lapTimerMode: 'current_lap' }),
-        id: 'speed-0',
-      },
-    ]
+    config.values = [{ ...createMetricValueDefaults('heading', undefined, { displayType: 'heading_tape' }), id: 'heading-0' }]
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
+    const originalTape = useStore.getState().config.values[0].display_variants.heading_tape
+    const node = document.createElement('div')
+    const resize = vi.fn().mockReturnValue({ display_variants: { heading_tape: { height: 96.125, label_offset: 9.125 } } })
+    registerWidgetInteraction(node, { resize })
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] })
     try {
-      useStore.temporal.getState().clear()
-      const initialSize = useStore.getState().config.values[0].font_size
-      const { result } = renderHook(() => useWidgetManager({ widgetLiveEdits: useWidgetDraftState() }))
-
-      act(() => result.current.updateWidgetData('speed-0', { font: 'Immediate.ttf' }))
-      expect(useStore.getState().config.values[0].font).toBe('Immediate.ttf')
-      expect(fontRequests.has('Immediate.ttf')).toBe(false)
-      if (type === 'lap_timer') {
-        act(() => result.current.updateWidgetData('speed-0', { label_font: 'ImmediateLabel.ttf' }))
-        expect(useStore.getState().config.values[0].label_font).toBe('ImmediateLabel.ttf')
-        expect(fontRequests.has('ImmediateLabel.ttf')).toBe(false)
-      }
-      useStore.temporal.getState().clear()
-
-      act(() => {
-        result.current.updateWidgetSize('speed-0', { font_size: 50 })
-        result.current.updateWidgetSize('speed-0', { font_size: 60 })
-        if (type === 'lap_timer') result.current.updateWidgetSize('speed-0', { label_font_size: 17.125 })
+      const { result } = renderHook(() => {
+        const liveEdits = useWidgetDraftState()
+        return { manager: useWidgetManager({ widgetLiveEdits: liveEdits }), liveEdits }
       })
-      expect(useStore.getState().config.values[0].font_size).toBe(initialSize)
-      expect(vi.getTimerCount()).toBe(1)
-
-      act(() => result.current.commitWidgetSize('speed-0'))
-      expect(useStore.getState().config.values[0].font_size).toBe(60)
-      expect(result.current.widgets[0].data.font_size).toBe(60)
-      if (type === 'lap_timer') expect(result.current.widgets[0].data.label_font_size).toBe(17.125)
+      result.current.liveEdits.setWidgetNode('heading-0', node)
+      useStore.temporal.getState().clear()
+      act(() => result.current.manager.updateWidgetSize('heading-0', { display_variants: { heading_tape: { label_offset: 9.125 } } }))
+      expect(resize).toHaveBeenCalledWith({ label_offset: 9.125 })
+      expect(useStore.getState().config.values[0].display_variants.heading_tape).toEqual(originalTape)
+      act(() => result.current.manager.commitWidgetSize('heading-0'))
+      expect(useStore.getState().config.values[0].display_variants.heading_tape).toEqual({ ...originalTape, height: 96.125, label_offset: 9.125 })
+      expect(result.current.manager.widgets[0].data.display_variants.heading_tape.height).toBe(96.125)
       expect(useStore.temporal.getState().pastStates).toHaveLength(1)
       expect(vi.getTimerCount()).toBe(0)
-      act(() => vi.advanceTimersToNextFrame())
-      expect(result.current.widgets[0].data.font_size).toBe(60)
     } finally {
+      unregisterWidgetInteraction(node)
       vi.useRealTimers()
     }
   })

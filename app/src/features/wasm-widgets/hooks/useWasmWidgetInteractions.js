@@ -102,7 +102,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       current.controller.update({
         type: 'resize',
         geometry: {
-          ...(selectedWidget.type === 'backdrop' || selectedWidget.type === 'raster'
+          ...(selectedWidget.type === 'backdrop' || selectedWidget.type === 'raster' || selectedWidget.data.display_type === 'heading_tape'
             ? { size: [Math.max(width, 0.01), Math.max(height, 0.01)] }
             : { factor: Math.max(width / current.origin.bounds.width, 0.01) }),
           ...current.anchor,

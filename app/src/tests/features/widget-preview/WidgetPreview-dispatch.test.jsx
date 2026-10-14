@@ -24,9 +24,6 @@ vi.mock('@/features/widget-preview/widgets/route/RoutePreview', () => ({
 vi.mock('@/features/widget-preview/widgets/elevation/ElevationPreview', () => ({
   OverlayElevationWidget: () => <div data-testid="elevation-renderer" />,
 }))
-vi.mock('@/features/widget-preview/widgets/heading/HeadingPreview', () => ({
-  OverlayHeadingWidget: (props) => <div data-testid="heading-renderer" data-widget-type={props.widget.type} />,
-}))
 vi.mock('@/features/widget-preview/widgets/linear-gauge/LinearGaugePreview', () => ({
   OverlayLinearGaugeWidget: (props) => (
     <div data-testid="linear-gauge-renderer" data-widget-type={props.widget.type} data-display-type={props.widget.data.display_type} />
@@ -89,16 +86,6 @@ describe('WidgetPreview dispatch by display_type', () => {
       />,
     )
     expect(getByTestId('metric-renderer')).toBeTruthy()
-  })
-
-  test('heading with heading_tape display_type uses the heading renderer', () => {
-    const { getByTestId } = render(
-      <WidgetPreview
-        widget={{ type: 'heading', category: 'values', data: { display_type: 'heading_tape', x: 0, y: 0, width: 400, height: 80 } }}
-        activity={ACTIVITY}
-      />,
-    )
-    expect(getByTestId('heading-renderer')).toBeTruthy()
   })
 
   test('speed with text display_type uses the metric renderer', () => {

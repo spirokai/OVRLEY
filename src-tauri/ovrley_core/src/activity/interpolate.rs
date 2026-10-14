@@ -17,12 +17,13 @@ use ovrley_widgets::model::standard_metrics::{
 };
 
 use ovrley_widgets::interpolation::{
-    collect_valid_numeric_points, interpolate_numeric_series_value, interpolate_points,
-    MissingSamplePolicy,
+    collect_valid_numeric_points, interpolate_heading_points, interpolate_numeric_series_value,
+    interpolate_points, MissingSamplePolicy,
 };
 
 #[derive(Clone, Copy)]
 pub(crate) enum InterpolationStrategy {
+    Angular,
     Hold,
     Numeric(MissingSamplePolicy),
 }
@@ -30,6 +31,10 @@ pub(crate) enum InterpolationStrategy {
 pub(crate) fn interpolation_strategy(
     kind: ovrley_widgets::model::types::MetricKind,
 ) -> InterpolationStrategy {
+    // Heading is linear in time along the shortest angular path.
+    if kind == ovrley_widgets::model::types::MetricKind::Heading {
+        return InterpolationStrategy::Angular;
+    }
     match standard_metric_interpolation(kind) {
         Some(StandardMetricInterpolationKind::Hold) => InterpolationStrategy::Hold,
         Some(StandardMetricInterpolationKind::Preserve) => {
@@ -202,10 +207,8 @@ pub(super) fn densify_hold_series<T: Clone>(
         .collect()
 }
 
-// Densifies a numeric series with forward-fill of nulls.
-// Null values are replaced by the last known valid value, so the widget
-// holds its last known state during data gaps.
-fn densify_forward_fill_series(
+// Prepare valid heading points once; missing gaps and edges retain bridge/clamp behavior.
+fn densify_heading_series(
     x_values: &[f64],
     y_values: &NumericSeries,
     target_x_values: &[f64],
@@ -213,24 +216,10 @@ fn densify_forward_fill_series(
     if y_values.is_empty() {
         return Vec::new();
     }
-    // First, do standard interpolation to get frame-aligned values
-    let interpolated = interpolate_numeric_series(
-        x_values,
-        y_values,
-        target_x_values,
-        MissingSamplePolicy::Bridge,
-    );
-    // Then forward-fill: carry last known value across null gaps
-    let mut last_known: Option<f64> = None;
-    interpolated
-        .into_iter()
-        .map(|value| match value {
-            Some(v) => {
-                last_known = Some(v);
-                Some(v)
-            }
-            None => last_known,
-        })
+    let points = collect_valid_numeric_points(x_values, y_values);
+    target_x_values
+        .iter()
+        .map(|target| interpolate_heading_points(&points, *target))
         .collect()
 }
 
@@ -374,6 +363,7 @@ pub fn densify_activity(
             return Vec::new();
         }
         let mut dense = match interpolation_strategy(kind) {
+            InterpolationStrategy::Angular => densify_heading_series(x, y, target),
             InterpolationStrategy::Hold => densify_hold_series(x, y, target),
             InterpolationStrategy::Numeric(policy) => {
                 interpolate_numeric_series(x, y, target, policy)
@@ -691,7 +681,7 @@ pub fn densify_activity(
                 ovrley_widgets::model::types::MetricKind::CoreTemperature,
             ),
             heading: if requirements.heading && !trimmed.heading.is_empty() {
-                densify_forward_fill_series(
+                densify_heading_series(
                     &trimmed.sample_elapsed_seconds,
                     &trimmed.heading,
                     &frame_elapsed_seconds,

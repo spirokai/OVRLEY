@@ -201,6 +201,48 @@ pub struct ValueConfig {
     pub label_offset_x: Option<f32>,
     #[serde(default)]
     pub label_offset_y: Option<f32>,
+    #[serde(default)]
+    pub pixels_per_degree: Option<f32>,
+    #[serde(default)]
+    pub major_tick_interval: Option<u32>,
+    #[serde(default)]
+    pub minor_ticks_per_major: Option<u32>,
+    #[serde(default)]
+    pub show_major_ticks: Option<bool>,
+    #[serde(default)]
+    pub show_minor_ticks: Option<bool>,
+    #[serde(default)]
+    pub major_tick_length_pct: Option<f32>,
+    #[serde(default)]
+    pub minor_tick_length_pct: Option<f32>,
+    #[serde(default)]
+    pub major_tick_thickness: Option<f32>,
+    #[serde(default)]
+    pub minor_tick_thickness: Option<f32>,
+    #[serde(default)]
+    pub tick_color: Option<String>,
+    #[serde(default)]
+    pub cardinal_tick_color: Option<String>,
+    #[serde(default)]
+    pub tick_alignment: Option<String>,
+    #[serde(default)]
+    pub show_minor_labels: Option<bool>,
+    #[serde(default)]
+    pub show_major_labels: Option<bool>,
+    #[serde(default)]
+    pub cardinal_label_color: Option<String>,
+    #[serde(default)]
+    pub label_offset: Option<f32>,
+    #[serde(default)]
+    pub show_indicator: Option<bool>,
+    #[serde(default)]
+    pub indicator_style: Option<String>,
+    #[serde(default)]
+    pub indicator_placement: Option<String>,
+    #[serde(default)]
+    pub indicator_color: Option<String>,
+    #[serde(default)]
+    pub indicator_size: Option<f32>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

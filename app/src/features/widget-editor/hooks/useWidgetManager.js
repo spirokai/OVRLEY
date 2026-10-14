@@ -19,6 +19,7 @@ import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDra
 import { useFontPreparation } from '@/hooks/useFonts'
 import { collectFontIds } from '@/lib/fonts'
 import { isWasmWidget } from '@/lib/widget/wasm-widget'
+import { getWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 
 const CONTENT_ALIGNMENT_FACTORS = {
   left: 0,
@@ -102,7 +103,12 @@ export function useWidgetManager({ widgetLiveEdits }) {
       liveEdits.beginWidgetInteraction(id, 'slider')
     }
     if (isWasmWidget(widget)) {
-      liveEdits.setLiveWidgetDraft(id, updates)
+      const tapeUpdate = updates.display_variants?.heading_tape
+      const patch =
+        widget.data.display_type === 'heading_tape' && tapeUpdate && Object.hasOwn(tapeUpdate, 'label_offset')
+          ? getWidgetInteraction(liveEdits.getWidgetNode(id)).resize({ label_offset: tapeUpdate.label_offset })
+          : updates
+      liveEdits.setLiveWidgetDraft(id, patch)
       return
     }
     updateLiveWidgetDraft({

@@ -66,6 +66,8 @@ function buildEffectiveValueData(widgetData = {}, globals, previewOverrides = nu
     if (!nextData.label_font) nextData.label_font = globals?.font_text
     if (!nextData.label_color) nextData.label_color = globals?.color_text || getThemeColor('ice')
   }
+  // An absent heading label font inherits the value font from global defaults.
+  if (resolved.display_type === 'heading_tape' && nextData.label_font == null) nextData.label_font = globals.font_values
   if (nextData.icon_color === undefined) nextData.icon_color = globals?.color_icons || getThemeColor('aqua')
   if (nextData.unit_color === undefined && resolved.value !== 'time') nextData.unit_color = globals?.color_units || '#ffffff'
   if (nextData.opacity === undefined) nextData.opacity = globals?.opacity

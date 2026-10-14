@@ -42,7 +42,7 @@ function editor(type = 'speed') {
   }
 }
 
-test.each(['speed', 'time', 'gradient', 'lean_angle', 'backdrop', 'raster', 'lap_timer'])(
+test.each(['speed', 'time', 'gradient', 'lean_angle', 'backdrop', 'raster', 'lap_timer', 'heading'])(
   '%s drag coalesces from the captured origin and flushes the final movement without rounding',
   (type) => {
     const { interaction, presentations, original } = editor(type)
@@ -97,7 +97,7 @@ test('resize uses original configuration and a fixed content corner across live 
   expect(interaction.finish()).toBeNull()
 })
 
-test.each(['label', 'time', 'gradient', 'lean_angle', 'lap_timer'])('%s resize follows the playhead and flushes final intent', (type) => {
+test.each(['label', 'time', 'gradient', 'lean_angle', 'lap_timer', 'heading'])('%s resize follows the playhead and flushes final intent', (type) => {
   const { interaction, resize, original, setSnapshot, render } = editor(type)
   const draft = vi.fn()
   const origin = interaction.begin(draft)
@@ -157,6 +157,44 @@ test.each(['rectangle', 'circle'])(
     expect(committed.backdrops[0].width).toBeUndefined()
   },
 )
+
+test('heading frame drafts preserve inactive variants and match the committed fractional dimensions', () => {
+  const { interaction, resize, setSnapshot, presentations } = editor('heading')
+  const stored = {
+    id: 'widget',
+    value: 'heading',
+    x: 120.25,
+    y: 60.5,
+    display_type: 'heading_tape',
+    display_variants: { heading_tape: { width: 400, height: 80, pixels_per_degree: 9 }, text: { icon_size: 24 } },
+  }
+  const original = { id: 'widget', type: 'heading', category: 'values', data: resolveActiveMetricWidgetData(stored) }
+  setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second: 0 })
+  const patch = { x: 110.125, y: 50.25, display_variants: { heading_tape: { width: 495.125, height: 70.375 } } }
+  resize.mockReturnValue(patch)
+  const origin = interaction.begin(vi.fn())
+  interaction.update({ type: 'resize', geometry: { size: [742.6875, 105.5625], ...resizeAnchor(origin.bounds, [-1, -1]) } })
+  const committed = updateWidgetInConfig({ values: [stored] }, 'widget', interaction.finish())
+  const live = presentations.at(-1)[0].data
+  expect(resolveActiveMetricWidgetData(committed.values[0])).toEqual(live)
+  expect(live).toMatchObject({ x: 110.125, y: 50.25, width: 495.125, height: 70.375, pixels_per_degree: 9 })
+  expect(committed.values[0].display_variants.text).toEqual(stored.display_variants.text)
+  expect(committed.values[0]).not.toHaveProperty('width')
+
+  setSnapshot({ widgets: [{ ...original, data: live }], scene: { scale: 1.5 }, second: 2.25 })
+  const offsetPatch = { display_variants: { heading_tape: { height: 76.625, label_offset: 9.125 } } }
+  resize.mockReturnValue(offsetPatch)
+  expect(interaction.resize({ label_offset: 9.125 })).toEqual(offsetPatch)
+  expect(resize.mock.lastCall[0]).toEqual({
+    type: 'heading',
+    widget: live,
+    scene: { scale: 1.5 },
+    second: 2.25,
+    fixed: [0, 0],
+    point: [live.x, live.y],
+    label_offset: 9.125,
+  })
+})
 
 test.each(['lean_angle', 'g_force'])('%s resize resolves nested intrinsic drafts and commits the same effective config', (type) => {
   const { interaction, resize, setSnapshot, presentations } = editor(type)

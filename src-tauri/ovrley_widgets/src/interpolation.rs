@@ -1,6 +1,6 @@
 //! Shared interpolation utilities.
 //!
-//! Owns: linear interpolation over numeric series, optional series,
+//! Owns: linear interpolation over numeric series, shortest-arc headings, optional series,
 //!        and general point-list interpolation.
 //! Does not own: activity densification (that stays in `activity/interpolate`).
 //!
@@ -30,9 +30,28 @@ pub enum MissingSamplePolicy {
 
 /// Linearly interpolates y at `target_x` between two nearest points.
 ///
-/// Uses `partition_point` for O(log n) lookup. Returns `None` if
-/// `target_x` is outside the point range (clamped to endpoints).
+/// Uses `partition_point` for O(log n) lookup. Empty points return `None`;
+/// targets outside the point range are clamped to endpoints.
 pub fn interpolate_points(points: &[(f64, f64)], target_x: f64) -> Option<f64> {
+    interpolate_points_with(points, target_x, |left, right, ratio| {
+        left + (right - left) * ratio
+    })
+}
+
+/// Interpolates headings along the shortest arc, bridging gaps and clamping edges.
+pub fn interpolate_heading_points(points: &[(f64, f64)], target_x: f64) -> Option<f64> {
+    interpolate_points_with(points, target_x, |left, right, ratio| {
+        let delta = (right - left + 180.0).rem_euclid(360.0) - 180.0;
+        left + delta * ratio
+    })
+    .map(|heading| heading.rem_euclid(360.0))
+}
+
+fn interpolate_points_with(
+    points: &[(f64, f64)],
+    target_x: f64,
+    interpolate: impl Fn(f64, f64, f64) -> f64,
+) -> Option<f64> {
     match points.len() {
         0 => None,
         1 => Some(points[0].1),
@@ -55,7 +74,7 @@ pub fn interpolate_points(points: &[(f64, f64)], target_x: f64) -> Option<f64> {
                 return Some(right_y);
             }
             let ratio = (target_x - left_x) / (right_x - left_x);
-            Some(left_y + (right_y - left_y) * ratio)
+            Some(interpolate(left_y, right_y, ratio))
         }
     }
 }

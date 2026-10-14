@@ -4,8 +4,7 @@
 //! widget rendering based on `DisplayType`:
 //! - `Text` returns `None` (intrinsic text is handled by the value module)
 //! - `Tape` with a heading cache and Heading metric draws successfully
-//! - `Tape` without a cache returns `None`
-//! - `Tape` with a Text-mode cache returns `None` (presentation switched away)
+//! - `Tape` without a prepared cache fails loudly
 //! - `Tape` with a non-Heading metric returns `None`
 //! - Boxed display types without a matching cache return `None`
 //!
@@ -25,36 +24,12 @@ use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::{raw::RenderConfig, validate_render_config};
 use ovrley_core::render::surface::create_surface;
 use ovrley_core::render::widgets::metric_presentation::draw_metric_presentation;
-use ovrley_core::render::widgets::types::{HeadingWidgetCache, PreparedValue};
+use ovrley_core::render::widgets::types::PreparedValue;
 use ovrley_widgets::model::types::{DisplayType, MetricKind};
 use std::collections::BTreeMap;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
 
-fn default_heading_cache(display_type: DisplayType) -> HeadingWidgetCache {
-    HeadingWidgetCache {
-        tape_image: {
-            let mut surface = create_surface(1800, 80).unwrap();
-            surface.canvas().clear(skia_safe::Color::TRANSPARENT);
-            surface.image_snapshot()
-        },
-        tape_width: 1800.0,
-        tape_body_y: 15.0,
-        tape_body_height: 65.0,
-        x: 100.0,
-        y: 200.0,
-        width: 400,
-        height: 80,
-        pixels_per_degree: 5.0,
-        show_indicator: true,
-        indicator_style: "chevron".to_string(),
-        indicator_placement: "top".to_string(),
-        indicator_color: "#FF0000".to_string(),
-        indicator_size: 10.0,
-        display_type,
-        indicator_shadow: None,
-    }
-}
 
 fn validated_value(value: serde_json::Value) -> PreparedValue {
     let raw = RenderConfig {
@@ -69,12 +44,17 @@ fn validated_value(value: serde_json::Value) -> PreparedValue {
     validate_render_config(raw).unwrap().values.remove(0)
 }
 
-fn prepared_heading(cache_display_type: Option<DisplayType>) -> PreparedValue {
-    let mut value = validated_value(full_heading_tape_config(100, 200));
+fn prepared_heading(with_cache: bool) -> PreparedValue {
+    let mut value = validated_value(full_heading_tape_config_sized(100, 200, 400, 80));
     let PreparedValue::HeadingTape(widget) = &mut value else {
         panic!("heading tape config must produce a typed heading value")
     };
-    widget.cache = cache_display_type.map(default_heading_cache);
+    if with_cache {
+        let scene = ovrley_core::normalize::validate_scene_config(serde_json::from_value(common::builders::scene_json()).unwrap()).unwrap();
+        widget.cache = Some(ovrley_core::render::widgets::heading::prepare_heading_cache(
+            &scene, &widget.validated, &[common::test_config::repo_git_root().join("fonts")], &mut RenderProfiler::default(),
+        ).unwrap());
+    }
     value
 }
 
@@ -113,7 +93,7 @@ fn intrinsic_text_value_returns_none_from_presentation_dispatch() {
 
 #[test]
 fn typed_heading_value_with_cache_draws_successfully() {
-    let value = prepared_heading(Some(DisplayType::Tape));
+    let value = prepared_heading(true);
     let dense = default_dense_activity();
     let mut surface = create_surface(1920, 1080).unwrap();
     let mut profiler = RenderProfiler::default();
@@ -127,8 +107,9 @@ fn typed_heading_value_with_cache_draws_successfully() {
 }
 
 #[test]
-fn typed_heading_value_without_prepared_cache_returns_none() {
-    let value = prepared_heading(None);
+#[should_panic(expected = "heading tape requires its prepared cache")]
+fn typed_heading_value_without_prepared_cache_fails_loudly() {
+    let value = prepared_heading(false);
     let dense = default_dense_activity();
     let mut surface = create_surface(1920, 1080).unwrap();
     let mut profiler = RenderProfiler::default();
@@ -167,6 +148,7 @@ fn full_heading_tape_config_sized(x: i32, y: i32, width: u32, height: u32) -> se
         "show_major_labels": true,
         "label_color": "#ffffff",
         "cardinal_label_color": "#ff0000",
+        "label_font": "Arial.ttf",
         "label_font_size": 12.0,
         "label_offset": 4.0,
         "show_indicator": true,
@@ -248,7 +230,7 @@ fn prepare_assets_distinct_caches_per_value_index() {
     };
     let paths = AppPaths {
         repo_root: PathBuf::from(env!("CARGO_MANIFEST_DIR")),
-        font_dirs: vec![],
+        font_dirs: vec![common::test_config::repo_git_root().join("fonts")],
         debug_render_dir: std::env::temp_dir(),
         temp_dir: std::env::temp_dir(),
         bundled_templates_dirs: vec![],
@@ -271,9 +253,9 @@ fn prepare_assets_distinct_caches_per_value_index() {
     let cache_0 = widget_0.cache.as_ref().expect("index 0 must own its cache");
     let cache_2 = widget_2.cache.as_ref().expect("index 2 must own its cache");
 
-    assert_ne!(cache_0.x, cache_2.x);
-    assert_eq!(cache_0.x, 10.0);
-    assert_eq!(cache_2.x, 400.0);
+    assert_ne!(cache_0.frame.left, cache_2.frame.left);
+    assert_eq!(cache_0.frame.left, 10.0);
+    assert_eq!(cache_2.frame.left, 400.0);
 }
 
 // ── Full-frame: boxed-widget report collection ────────────────────────────

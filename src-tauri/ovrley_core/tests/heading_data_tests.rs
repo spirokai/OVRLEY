@@ -63,30 +63,37 @@ fn render_data_requirements_heading_derived_from_metric_kind() {
 }
 
 #[test]
-fn heading_trimmed_and_densified_with_forward_fill() {
-    use ovrley_core::activity::interpolate::{densify_activity, frame_timeline_for_fps};
-
-    let mut trimmed = common::builders::minimal_trimmed_activity(vec![0.0, 0.5, 1.0]);
-    trimmed.heading = vec![Some(90.0), None, Some(180.0)];
+fn heading_uses_the_shortest_path_in_preview_trim_boundaries_and_native_frames() {
+    use ovrley_core::activity::{interpolate::densify_activity, trim::trim_activity};
+    use ovrley_widgets::activity::ActivitySampler;
     let mut requirements = RenderDataRequirements::default();
     requirements.heading = true;
-
-    let report = densify_activity(
-        &trimmed,
-        frame_timeline_for_fps(1.0, 30.0).unwrap(),
-        &requirements,
-    );
-
-    assert_eq!(report.frame_count, 30);
-    assert_eq!(report.series.heading.len(), 30);
-    assert!((report.series.heading[0].unwrap() - 90.0).abs() < 1.0);
-    let mid_frame = 15;
-    let mid_heading = report.series.heading[mid_frame].unwrap();
-    assert!(
-        (mid_heading - 90.0).abs() < 1.0 || (mid_heading - 135.0).abs() < 1.0,
-        "mid heading should be near 90 (forward-fill) or 135 (interpolated), got {}",
-        mid_heading
-    );
+    for (left, right, expected) in [
+        (359.0, 1.0, [359.5, 359.75, 0.0, 0.25, 0.5]),
+        (1.0, 359.0, [0.5, 0.25, 0.0, 359.75, 359.5]),
+        (90.0, 180.0, [112.5, 123.75, 135.0, 146.25, 157.5]),
+    ] {
+        let activity: ParsedActivity = serde_json::from_value(json!({
+            "sample_elapsed_seconds": [0.0, 0.5, 1.0], "trim_end_seconds": 1.0,
+            "heading": [left, null, right],
+        }))
+        .unwrap();
+        let sampler = ActivitySampler::from_json(&serde_json::to_vec(&activity).unwrap()).unwrap();
+        let trimmed = trim_activity(&activity, 0.25, 0.75, &requirements).unwrap();
+        assert_eq!(
+            trimmed.heading,
+            vec![Some(expected[0]), None, Some(expected[4])]
+        );
+        let seconds = vec![0.0, 0.125, 0.25, 0.375, 0.5];
+        let report = densify_activity(&trimmed, seconds.clone(), &requirements);
+        assert_eq!(report.series.heading, expected.map(Some));
+        for index in [0, 1, 2, 3, 4, 2, 0] {
+            assert_eq!(
+                sampler.heading_at(seconds[index] + 0.25),
+                report.series.heading[index]
+            );
+        }
+    }
 }
 
 #[test]

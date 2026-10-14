@@ -16,6 +16,223 @@ use ovrley_widgets::{
 use serde_json::{json, Value};
 use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
 
+fn heading_preview() -> (PreviewSession, Value) {
+    let (preview, mut request) = lean_angle_preview();
+    request["type"] = json!("heading");
+    request["scene"]["opacity"] = json!(0.7);
+    request["widget"] = common::builders::heading_tape_json();
+    request["widget"]["label_font"] = json!("Inter.ttf");
+    request["widget"]["x"] = json!(100.25);
+    request["widget"]["y"] = json!(80.5);
+    request["widget"]["width"] = json!(400.125);
+    request["widget"]["height"] = json!(80.375);
+    request["widget"]["opacity"] = json!(0.8);
+    (preview, request)
+}
+
+#[test]
+fn heading_tape_matches_native_pixels_sampling_revisions_and_activity_replacement() {
+    use ovrley_core::{
+        activity::{interpolate::densify_activity, trim::trim_activity},
+        debug::RenderProfiler, paths::AppPaths,
+        render::widgets::{prepare_render_assets, metric_presentation::draw_metric_presentation},
+    };
+    use ovrley_widgets::activity::ActivitySampler;
+    let (mut preview, mut request) = heading_preview();
+    let activity = ovrley_core::activity::parse_activity_json(r#"{
+        "sample_elapsed_seconds": [0,0.5,1.5,2.5,4], "trim_end_seconds": 4,
+        "heading": [null,350,null,10,null]
+    }"#).unwrap();
+    let bytes = serde_json::to_vec(&activity).unwrap();
+    let sampler = ActivitySampler::from_json(&bytes).unwrap();
+    preview.replace_activity(&bytes).unwrap();
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
+    let seconds = vec![0.0, 0.5, 0.501, 0.75, 1.5, 2.25, 2.5, 3.75];
+    assert_eq!(sampler.heading_at(0.0), Some(350.0));
+    assert_eq!(sampler.heading_at(1.5), Some(0.0));
+    assert_eq!(sampler.heading_at(3.75), Some(10.0));
+    for (style, placement, visible) in [("chevron", "top", true), ("chevron", "bottom", true), ("chevron", "both", true), ("highlight_bar", "both", true), ("chevron", "top", false)] {
+        request["widget"]["indicator_style"] = json!(style);
+        request["widget"]["indicator_placement"] = json!(placement);
+        request["widget"]["show_indicator"] = json!(visible);
+        let config = common::seam::validated_config_from_value(json!({
+            "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
+        }));
+        let requirements = config.render_data_requirements().unwrap();
+        let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
+        let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
+        let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut RenderProfiler::default()).unwrap();
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        for index in [0,1,2,3,4,5,6,7,4,0] {
+            let second = seconds[index];
+            assert_eq!(sampler.heading_at(second), dense.series.heading[index]);
+            let previous = preview.widgets[&id].revision();
+            let previous_pixels = (index == 2).then(|| preview.widgets[&id].pixels().clone());
+            preview.render(second).unwrap();
+            if index == 2 { assert_ne!(preview.widgets[&id].revision(), previous, "sub-degree tape offset changes the revision"); }
+            let widget = &preview.widgets[&id];
+            if let Some(previous_pixels) = previous_pixels {
+                assert!(widget.pixels() != &previous_pixels, "fractional movement must change the raster below one degree and one pixel");
+            }
+            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            assert_eq!(geometry["content"]["left"], request["widget"]["x"], "tape frame does not travel horizontally");
+            let frame_width = request["widget"]["width"].as_f64().unwrap() * request["scene"]["scale"].as_f64().unwrap();
+            assert!((geometry["content"]["width"].as_f64().unwrap() - frame_width).abs() < 0.001, "tape width stays fixed as ticks and gaps cross its edges");
+            let info = ImageInfo::new((geometry["width"].as_i64().unwrap() as i32, geometry["height"].as_i64().unwrap() as i32), ColorType::RGBA8888, AlphaType::Premul, None);
+            let mut surface = surfaces::raster(&info, None, None).unwrap();
+            let canvas = surface.canvas();
+            canvas.clear(Color::TRANSPARENT);
+            canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
+            draw_metric_presentation(canvas, &assets.values()[0], &dense, index, 1.7, &paths.font_dirs, &mut RenderProfiler::default()).unwrap();
+            let mut pixels = vec![0; widget.pixels().len()];
+            assert!(surface.read_pixels(&info.with_alpha_type(AlphaType::Unpremul), &mut pixels, info.width() as usize * 4, (0,0)));
+            assert_eq!(&pixels, widget.pixels(), "{style}/{placement} at {second}");
+            assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+            let revision = widget.revision();
+            preview.render(second).unwrap();
+            assert_eq!(preview.widgets[&id].revision(), revision);
+        }
+        preview.render(1.25).unwrap();
+        let original = preview.widgets[&id].pixels().clone();
+        let geometry = preview.widgets[&id].geometry().clone();
+        preview.replace_activity(&[]).unwrap();
+        preview.render(1.25).unwrap();
+        assert_ne!(preview.widgets[&id].pixels(), &original);
+        preview.replace_activity(&bytes).unwrap();
+        preview.render(1.25).unwrap();
+        assert_eq!(preview.widgets[&id].pixels(), &original);
+        request["scene"]["shadow_strength"] = json!(0);
+        preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+        preview.render(1.25).unwrap();
+        assert_eq!(preview.widgets[&id].geometry(), &geometry, "shadows do not change selection bounds");
+        request["scene"]["shadow_strength"] = json!(3);
+        preview.widgets.remove(&id);
+    }
+    // Equal-width opaque ticks make the edge fade observable independently of glyph coverage.
+    request["scene"]["scale"] = json!(1);
+    request["scene"]["opacity"] = json!(1);
+    request["scene"]["shadow_strength"] = json!(0);
+    for (field, value) in [("x", 0), ("y", 0), ("width", 400), ("height", 80), ("opacity", 1), ("major_tick_thickness", 16), ("minor_tick_thickness", 16)] {
+        request["widget"][field] = json!(value);
+    }
+    preview.replace_activity(&[]).unwrap();
+    let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+    preview.render(0.0).unwrap();
+    let pixels = preview.widgets[&id].pixels();
+    let alpha = |x: usize| pixels[(25 * 400 + x) * 4 + 3];
+    assert!(alpha(0) < alpha(7) && alpha(7) < alpha(25), "left edge fades inward");
+    assert!(alpha(399) < alpha(392) && alpha(392) < alpha(375), "right edge fades inward");
+    assert_eq!((alpha(100), alpha(200), alpha(300)), (255, 255, 255), "interior remains opaque");
+    let config = common::seam::validated_config_from_value(json!({ "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [] }));
+    let ovrley_core::render::widgets::types::PreparedValue::HeadingTape(widget) = &config.values[0] else { panic!("heading dispatch"); };
+    let cache = ovrley_core::render::widgets::heading::prepare_heading_cache(&config.scene, &widget.validated, &paths.font_dirs, &mut RenderProfiler::default()).unwrap();
+    let info = ImageInfo::new((400, 80), ColorType::RGBA8888, AlphaType::Premul, None);
+    let mut surface = surfaces::raster(&info, None, None).unwrap();
+    surface.canvas().clear(Color::BLUE);
+    ovrley_core::render::widgets::heading::draw_heading_widget(surface.canvas(), &cache, 0.0, &mut RenderProfiler::default());
+    let mut composited = vec![0; 400 * 80 * 4];
+    assert!(surface.read_pixels(&info.with_alpha_type(AlphaType::Unpremul), &mut composited, 400 * 4, (0, 0)));
+    assert!(composited.chunks_exact(4).all(|pixel| pixel[3] == 255), "fade preserves content underneath the tape");
+    preview.widgets.remove(&id);
+    for (field, invalid) in [("pixels_per_degree", json!(0)), ("label_font", json!("")), ("major_tick_interval", Value::Null), ("tick_alignment", json!("invalid")), ("show_indicator", json!("true"))] {
+        let mut malformed = request.clone();
+        malformed["widget"][field] = invalid;
+        let result = serde_json::from_value(malformed).map_err(|error| error.to_string())
+            .and_then(|request| preview.create_widget(request).map_err(|error| error.to_string()));
+        assert!(result.is_err(), "invalid {field} must fail");
+    }
+}
+
+#[test]
+fn heading_tape_resize_preserves_opposite_corners_reflows_and_commits_fractional_dimensions() {
+    use ovrley_widgets::widgets::heading::{geometry::heading_tape_layout, validation::validate_heading};
+    let (mut preview, mut origin) = heading_preview();
+    let bytes = br#"{"sample_elapsed_seconds":[0,1,2,3],"heading":[350,null,10,45],"trim_end_seconds":3}"#;
+    preview.replace_activity(bytes).unwrap();
+    let sampler = ovrley_widgets::activity::ActivitySampler::from_json(bytes).unwrap();
+    for scale in [0.75, 1.7] {
+        origin["scene"]["scale"] = json!(scale);
+        for (style, placement) in [("chevron", "top"), ("chevron", "both"), ("highlight_bar", "both")] {
+            origin["widget"]["indicator_style"] = json!(style);
+            origin["widget"]["indicator_placement"] = json!(placement);
+            let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
+            preview.render(0.25).unwrap();
+            let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let bounds = &geometry["content"];
+            assert!(bounds["height"].as_f64().unwrap() <= origin["widget"]["height"].as_f64().unwrap() * scale + 0.001);
+            for fixed in [[0.0,0.0], [1.0,0.0], [0.0,1.0], [1.0,1.0]] {
+                let point = [bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0], bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1]];
+                for second in [0.25, 1.75, 3.0, 0.5] {
+                    let mut gesture = origin.clone();
+                    gesture["second"] = json!(second);
+                    gesture["fixed"] = json!(fixed);
+                    gesture["point"] = json!(point);
+                    gesture["size"] = json!([bounds["width"].as_f64().unwrap() * 1.2375, bounds["height"].as_f64().unwrap() * 0.875]);
+                    let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(gesture).unwrap()).unwrap()).unwrap();
+                    assert_eq!(patch.as_object().unwrap().len(), 3, "resize changes only position and the active frame variant");
+                    let variant = &patch["display_variants"]["heading_tape"];
+                    assert!(variant["width"].as_f64().unwrap().fract() != 0.0);
+                    let mut live = origin.clone();
+                    live["widget"]["x"] = patch["x"].clone();
+                    live["widget"]["y"] = patch["y"].clone();
+                    live["widget"]["width"] = variant["width"].clone();
+                    live["widget"]["height"] = variant["height"].clone();
+                    live["widget"]["display_variants"] = patch["display_variants"].clone();
+                    preview.update_widget(id, serde_json::from_value(live.clone()).unwrap()).unwrap();
+                    preview.render(second).unwrap();
+                    let geometry = preview.widgets[&id].geometry().clone();
+                    let actual: Value = serde_json::from_slice(&geometry).unwrap();
+                    for axis in 0..2 {
+                        let (start, extent) = if axis == 0 { ("left", "width") } else { ("top", "height") };
+                        let corner = actual["content"][start].as_f64().unwrap() + actual["content"][extent].as_f64().unwrap() * fixed[axis];
+                        assert!((corner - point[axis]).abs() < 0.001, "{style}/{placement} scale {scale} corner {fixed:?} at {second}");
+                    }
+                    // Native ingress consumes the same fractional variant after committing.
+                    let config = common::seam::validated_config_from_value(json!({ "scene": live["scene"], "values": [live["widget"]], "labels": [], "plots": [] }));
+                    let ovrley_core::render::widgets::types::PreparedValue::HeadingTape(committed) = &config.values[0] else { panic!("heading dispatch"); };
+                    let scene = validate_scene_presentation(serde_json::from_value(live["scene"].clone()).unwrap()).unwrap();
+                    let cache = ovrley_widgets::widgets::heading::layout::prepare_heading_cache(&committed.validated, &scene, &preview.fonts).unwrap();
+                    let frame = cache.prepare_frame(sampler.heading_at(second));
+                    let content: Value = serde_json::from_slice(&serde_json::to_vec(&ovrley_widgets::widgets::value::preview::ContentBounds::from(frame.content_bounds)).unwrap()).unwrap();
+                    assert_eq!(content, actual["content"]);
+                    preview.update_widget(id, serde_json::from_value(live).unwrap()).unwrap();
+                    preview.render(second).unwrap();
+                    assert_eq!(preview.widgets[&id].geometry(), &geometry);
+                }
+            }
+            preview.widgets.remove(&id);
+        }
+    }
+    for (style, visible) in [("chevron", true), ("highlight_bar", true), ("highlight_bar", false)] {
+        origin["widget"]["indicator_style"] = json!(style);
+        origin["widget"]["show_indicator"] = json!(visible);
+        let original = validate_heading(serde_json::from_value(origin["widget"].clone()).unwrap(), 0).unwrap();
+        let layout = |config: &ovrley_widgets::widgets::heading::validation::ValidatedHeading| heading_tape_layout(
+            config.height, config.show_indicator, &config.indicator_style, &config.indicator_placement,
+            config.indicator_size, config.major_tick_length_pct, config.label_offset, config.label_font_size,
+        );
+        for offset in [10.125, 0.0] {
+            let mut edit = origin.clone();
+            edit["second"] = json!(0.25);
+            edit["fixed"] = json!([0, 0]);
+            edit["point"] = json!([original.x, original.y]);
+            edit["label_offset"] = json!(offset);
+            let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(edit).unwrap()).unwrap()).unwrap();
+            let mut committed = origin["widget"].clone();
+            committed["height"] = patch["display_variants"]["heading_tape"]["height"].clone();
+            committed["label_offset"] = patch["display_variants"]["heading_tape"]["label_offset"].clone();
+            let committed = validate_heading(serde_json::from_value(committed).unwrap(), 0).unwrap();
+            assert_eq!(committed.label_offset, offset);
+            assert!((layout(&original).tick_scale_height - layout(&committed).tick_scale_height).abs() < 0.001,
+                "{style}, visible {visible}: offset changes frame height without shrinking ticks");
+            assert_eq!(patch["x"], json!(original.x));
+            assert_eq!(patch["y"], json!(original.y));
+            assert_ne!(committed.height, original.height);
+        }
+    }
+}
+
 fn lap_timer_activity() -> ovrley_core::activity::schema::ParsedActivity {
     ovrley_core::activity::parse_activity_json(r#"{
         "sample_elapsed_seconds": [0,0.5,1,2,2.5,3,3.75,4,5,64], "trim_end_seconds": 64,

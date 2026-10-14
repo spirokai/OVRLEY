@@ -61,10 +61,14 @@ test('raster loads once, creates without waiting for fonts, and ignores playhead
   expect(module._ovrley_preview_destroy).toHaveBeenCalledOnce()
 })
 
-test('G-force prepares its label font independently and reuses its handle through playback before disposal', async () => {
+test.each(['g_force', 'heading'])('%s prepares its label font independently and reuses its handle through playback before disposal', async (type) => {
   previewFont.mockImplementation((font) => (font === 'Label.ttf' ? Promise.resolve([1, 2, 3]) : new Promise(() => {})))
   const { module, session, snapshot, error } = setup()
-  const widget = { id: 'g', type: 'g_force', data: { value: 'g_force', display_type: 'g_force', font: 'Unused.ttf', label_font: 'Label.ttf' } }
+  const widget = {
+    id: 'g',
+    type,
+    data: { value: type, display_type: type === 'heading' ? 'heading_tape' : type, font: 'Unused.ttf', label_font: 'Label.ttf' },
+  }
   expect(isWasmWidget(widget)).toBe(true)
   const next = { ...snapshot, widgets: [widget] }
   session.setSnapshot(next)

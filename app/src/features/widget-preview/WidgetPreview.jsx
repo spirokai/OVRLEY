@@ -30,14 +30,12 @@ import { OverlayTextWidget } from './widgets/text/TextPreview'
 import { OverlayMetricWidget } from './widgets/metric/MetricPreview'
 import { OverlayRouteWidget } from './widgets/route/RoutePreview'
 import { OverlayElevationWidget } from './widgets/elevation/ElevationPreview'
-import { OverlayHeadingWidget } from './widgets/heading/HeadingPreview'
 import { OverlayLinearGaugeWidget } from './widgets/linear-gauge/LinearGaugePreview'
 import { OverlayArcGaugeWidget } from './widgets/arc-gauge/ArcGaugePreview'
 import OverlayBackdropWidget from './widgets/backdrop/BackdropPreview'
 import { isBoxedDisplayType } from '@/lib/widget/standard-metrics'
 
 const BOXED_PREVIEW_COMPONENTS = {
-  heading_tape: OverlayHeadingWidget,
   linear: OverlayLinearGaugeWidget,
   arc: OverlayArcGaugeWidget,
   corner: OverlayArcGaugeWidget,

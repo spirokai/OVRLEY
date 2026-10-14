@@ -2,8 +2,8 @@
 use crate::{
     error::{WidgetError, WidgetResult},
     interpolation::{
-        collect_valid_numeric_points, interpolate_numeric_series_value, interpolate_points,
-        MissingSamplePolicy,
+        collect_valid_numeric_points, interpolate_heading_points, interpolate_numeric_series_value,
+        interpolate_points, MissingSamplePolicy,
     },
     model::{
         standard_metrics::{standard_metric_interpolation, StandardMetricInterpolationKind},
@@ -273,6 +273,14 @@ impl ActivitySampler {
         column.at(&self.times, second)
     }
 
+    /// Heading uses the shortest arc while retaining gap bridging and edge clamping.
+    pub fn heading_at(&self, second: f64) -> Option<f64> {
+        if second < 0.0 || second > self.end {
+            return None;
+        }
+        interpolate_heading_points(&self.numeric[&MetricKind::Heading].points, second)
+    }
+
     pub fn g_force_at(&self, widget: &ValidatedGForceWidget, second: f64) -> GForceSample {
         let h = widget.axis_horizontal.index();
         let v = widget.axis_vertical.index();
@@ -323,7 +331,11 @@ impl ActivitySampler {
                     column.contains(second)
                 };
                 if sample.available {
-                    sample.numeric = column.at(&self.times, second);
+                    sample.numeric = if kind == MetricKind::Heading {
+                        self.heading_at(second)
+                    } else {
+                        column.at(&self.times, second)
+                    };
                     if kind == MetricKind::Altitude {
                         let offset = widget
                             .starting_altitude_m

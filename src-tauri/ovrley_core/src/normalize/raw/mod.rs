@@ -9,7 +9,6 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 use crate::error::{CoreError, CoreResult};
-use ovrley_widgets::model::types::{DisplayType, MetricKind};
 
 pub const TEMPLATE_FILE_FORMAT: &str = "ovrley-template";
 pub const TEMPLATE_FILE_VERSION: u32 = 3;
@@ -75,19 +74,6 @@ pub(crate) fn promote_value_variant(
     serde_json::from_value(raw).map_err(|e| CoreError::Config(format!("value config: {e}")))
 }
 
-pub(crate) fn to_heading_widget_config(value: &ValueConfig) -> CoreResult<HeadingWidgetConfig> {
-    let mut raw = serde_json::to_value(value)
-        .map_err(|e| CoreError::Config(format!("heading value serialization: {e}")))?;
-    strip_json_nulls(&mut raw);
-
-    // Promote all keys from display_variants.heading_tape to the top level
-    // so HeadingWidgetConfig can deserialize. The JS durable normalization
-    // stores heading-specific fields inside display_variants so they
-    // survive round-tripping alongside text defaults.
-    promote_variant_keys(&mut raw, "heading_tape");
-
-    serde_json::from_value(raw).map_err(|e| CoreError::Config(format!("heading value config: {e}")))
-}
 /// Promotes all keys from a nested display variant to the top level if they
 /// are not already present at the root. This ensures display-specific fields
 /// (e.g. width, height, pixels_per_degree, tick_color, etc.) are visible to
@@ -360,75 +346,6 @@ pub struct ElevationPlotConfig {
     pub fill: Option<FillStyleConfig>,
     #[serde(default)]
     pub point_label: Option<PointLabelConfig>,
-    #[serde(flatten)]
-    pub extra: BTreeMap<String, Value>,
-}
-
-/// Heading compass tape widget configuration.
-///
-/// Required fields are concrete types — missing fields cause serde rejection.
-/// Optional fields use `#[serde(default)]` — the normalize layer decides
-/// whether they are required.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct HeadingWidgetConfig {
-    pub value: MetricKind,
-    pub x: f32,
-    pub y: f32,
-    pub width: u32,
-    pub height: u32,
-    pub display_type: DisplayType,
-    #[serde(default)]
-    pub rotation: f32,
-    #[serde(default)]
-    pub opacity: Option<f32>,
-    #[serde(default)]
-    pub pixels_per_degree: Option<f32>,
-    #[serde(default)]
-    pub major_tick_interval: Option<u32>,
-    #[serde(default)]
-    pub minor_ticks_per_major: Option<u32>,
-    #[serde(default)]
-    pub show_major_ticks: Option<bool>,
-    #[serde(default)]
-    pub show_minor_ticks: Option<bool>,
-    #[serde(default)]
-    pub major_tick_length_pct: Option<f32>,
-    #[serde(default)]
-    pub minor_tick_length_pct: Option<f32>,
-    #[serde(default)]
-    pub major_tick_thickness: Option<f32>,
-    #[serde(default)]
-    pub minor_tick_thickness: Option<f32>,
-    #[serde(default)]
-    pub tick_color: Option<String>,
-    #[serde(default)]
-    pub cardinal_tick_color: Option<String>,
-    #[serde(default)]
-    pub tick_alignment: Option<String>,
-    #[serde(default, alias = "show_numeric_labels")]
-    pub show_minor_labels: Option<bool>,
-    #[serde(default, alias = "show_cardinal_labels")]
-    pub show_major_labels: Option<bool>,
-    #[serde(default, alias = "numeric_label_color", alias = "minor_label_color")]
-    pub label_color: Option<String>,
-    #[serde(default, alias = "major_label_color")]
-    pub cardinal_label_color: Option<String>,
-    #[serde(default)]
-    pub label_font: Option<String>,
-    #[serde(default)]
-    pub label_font_size: Option<f32>,
-    #[serde(default)]
-    pub label_offset: Option<f32>,
-    #[serde(default)]
-    pub indicator_style: Option<String>,
-    #[serde(default)]
-    pub indicator_placement: Option<String>,
-    #[serde(default)]
-    pub show_indicator: Option<bool>,
-    #[serde(default)]
-    pub indicator_color: Option<String>,
-    #[serde(default)]
-    pub indicator_size: Option<f32>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

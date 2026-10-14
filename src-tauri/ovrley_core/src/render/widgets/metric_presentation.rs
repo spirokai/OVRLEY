@@ -24,10 +24,10 @@ use crate::render::widgets::gauges::linear::draw_linear_gauge_widget;
 use crate::render::widgets::heading::draw_heading_widget;
 use crate::render::widgets::lean_angle::draw_lean_angle_widget;
 use crate::render::widgets::types::{
-    ArcGaugeCache, GForceWidgetCache, HeadingWidgetCache, LinearGaugeCache,
+    ArcGaugeCache, GForceWidgetCache, LinearGaugeCache,
     PreparedValue, WidgetRenderReport,
 };
-use ovrley_widgets::model::types::DisplayType;
+use ovrley_widgets::widgets::heading::layout::HeadingCache;
 use ovrley_widgets::widgets::lean_angle::layout::LeanAngleCache;
 use skia_safe::Canvas;
 
@@ -155,14 +155,10 @@ fn draw_tape_presentation(
     canvas: &Canvas,
     dense_activity: &DenseActivityReport,
     frame_index: usize,
-    cache: Option<&HeadingWidgetCache>,
+    cache: Option<&HeadingCache>,
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
-    let heading_cache = cache?;
-
-    if heading_cache.display_type == DisplayType::Text {
-        return None;
-    }
+    let heading_cache = cache.expect("heading tape requires its prepared cache");
 
     let heading = dense_activity
         .series

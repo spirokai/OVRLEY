@@ -65,6 +65,17 @@ impl PreviewSession {
             || request.point.iter().any(|v| !v.is_finite()) {
             return Err(WidgetError::Config("invalid widget resize gesture".into()));
         }
+        if let Some(label_offset) = request.label_offset {
+            if request.size.is_some() || request.factor.is_some() {
+                return Err(WidgetError::Config("label_offset resize cannot include size or factor".into()));
+            }
+            let WidgetRequest::HeadingTape(origin) = request.origin else {
+                return Err(WidgetError::Config("label_offset resize requires heading_tape".into()));
+            };
+            return Ok(ResizeUpdate::HeadingTape(crate::widgets::heading::interaction::resize_heading_label_offset(
+                origin.widget, origin.scene, label_offset,
+            )?));
+        }
         if let WidgetRequest::Backdrop {widget, scene} = request.origin {
             let size = request.size.ok_or_else(|| WidgetError::Config("backdrop resize size is required".into()))?;
             return Ok(ResizeUpdate::Backdrop(crate::widgets::backdrop::interaction::resize_backdrop(widget, scene, size, request.fixed, request.point)?));
@@ -73,9 +84,15 @@ impl PreviewSession {
             let size = request.size.ok_or_else(|| WidgetError::Config("raster resize size is required".into()))?;
             return Ok(ResizeUpdate::Raster(crate::widgets::raster::interaction::resize_raster(widget, scene, size, request.fixed, request.point)?));
         }
+        if let WidgetRequest::HeadingTape(origin) = request.origin {
+            let size = request.size.ok_or_else(|| WidgetError::Config("heading resize size is required".into()))?;
+            return Ok(ResizeUpdate::HeadingTape(crate::widgets::heading::interaction::resize_heading(
+                origin.widget, origin.scene, size, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
+            )?));
+        }
         let factor = crate::model::validation::require_positive_f32(request.factor, "resize factor")?;
         match request.origin {
-            WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } => unreachable!(),
+            WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } | WidgetRequest::HeadingTape(_) => unreachable!(),
             WidgetRequest::Label {widget, scene} => Ok(ResizeUpdate::Label(crate::widgets::label::interaction::resize_label(widget, scene, factor, request.fixed, request.point, &self.fonts)?)),
             WidgetRequest::Gradient(origin) => Ok(ResizeUpdate::Gradient(crate::widgets::gradient::interaction::resize_gradient(
                 origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
@@ -136,6 +153,7 @@ impl PreviewSession {
                 PreviewWidget::LeanAngle(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::GForce(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::LapTimer(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
+                PreviewWidget::HeadingTape(widget) => widget.render(self.activity.as_ref(), second)?,
                 _ => {},
             }
         }

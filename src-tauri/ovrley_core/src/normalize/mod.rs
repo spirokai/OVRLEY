@@ -7,7 +7,6 @@
 mod arc_gauge;
 mod bar_geometry;
 mod elevation;
-mod heading;
 mod linear_gauge;
 mod raster;
 pub mod raw;
@@ -24,8 +23,8 @@ use raw::RenderConfig;
 
 pub use raw::{
     find_plot_value, find_plot_values, parse_config_json, parse_config_value, parse_template_json,
-    parse_template_value, CoursePlotConfig, ElevationPlotConfig,
-    HeadingWidgetConfig, SceneConfig, TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION,
+    parse_template_value, CoursePlotConfig, ElevationPlotConfig, SceneConfig, TEMPLATE_FILE_FORMAT,
+    TEMPLATE_FILE_VERSION,
 };
 
 pub use arc_gauge::{
@@ -42,7 +41,7 @@ pub(crate) use bar_geometry::{
 pub use elevation::{validate_elevation_plot, validate_elevation_plots, ValidatedElevationPlot};
 use ovrley_widgets::widgets::g_force::validation::{validate_g_force, GForceAxis};
 use ovrley_widgets::widgets::gradient::validation::validate_gradient_widget;
-pub use heading::{validate_heading, ValidatedHeading};
+use ovrley_widgets::widgets::heading::validation::validate_heading;
 use ovrley_widgets::widgets::label::validation::{validate_label, ValidatedLabel};
 use ovrley_widgets::widgets::lap_timer::validation::{validate_lap_timer, LapTimerMode};
 use ovrley_widgets::widgets::lean_angle::validation::validate_lean_angle;
@@ -195,12 +194,19 @@ fn validate_render_contents(
                     .map_err(Into::into);
             }
             if value.value == MetricKind::Heading && value.display_type == DisplayType::Tape {
-                return validate_heading(&value, idx, &scene).map(|validated| {
-                    PreparedValue::HeadingTape(PreparedHeadingTape {
-                        validated,
-                        cache: None,
+                let mut value = raw::promote_value_variant(&value, "heading_tape")?;
+                // Heading's optional label font inherits the scene value font at ingress.
+                if value.label_font.is_none() {
+                    value.label_font = scene.font.clone();
+                }
+                return validate_heading(value, idx)
+                    .map(|validated| {
+                        PreparedValue::HeadingTape(PreparedHeadingTape {
+                            validated,
+                            cache: None,
+                        })
                     })
-                });
+                    .map_err(Into::into);
             }
             if value.value == MetricKind::LeanAngle && value.display_type == DisplayType::LeanAngle
             {

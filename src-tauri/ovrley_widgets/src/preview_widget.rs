@@ -8,6 +8,7 @@ use crate::widgets::gradient::preview::PreviewGradient;
 use crate::widgets::lean_angle::preview::PreviewLeanAngle;
 use crate::widgets::g_force::preview::PreviewGForce;
 use crate::widgets::lap_timer::preview::PreviewLapTimer;
+use crate::widgets::heading::preview::PreviewHeading;
 
 pub enum WidgetRequest {
     Raster { widget: RasterConfig, scene: ScenePresentationConfig },
@@ -17,6 +18,7 @@ pub enum WidgetRequest {
     LeanAngle(ValueRequest),
     GForce(ValueRequest),
     LapTimer(ValueRequest),
+    HeadingTape(ValueRequest),
     Value(ValueRequest),
 }
 
@@ -46,6 +48,7 @@ impl<'de> Deserialize<'de> for WidgetRequest {
                 else if metric == MetricKind::LapTimer { Self::LapTimer(request) }
                 else if metric == MetricKind::LeanAngle && request.widget.display_type == crate::model::types::DisplayType::LeanAngle { Self::LeanAngle(request) }
                 else if metric == MetricKind::GForce && request.widget.display_type == crate::model::types::DisplayType::GForce { Self::GForce(request) }
+                else if metric == MetricKind::Heading && request.widget.display_type == crate::model::types::DisplayType::Tape { Self::HeadingTape(request) }
                 else { Self::Value(request) })
         }
     }
@@ -59,6 +62,7 @@ pub enum PreviewWidget {
     LeanAngle(PreviewLeanAngle),
     GForce(PreviewGForce),
     LapTimer(PreviewLapTimer),
+    HeadingTape(PreviewHeading),
     Value(ValuePreview),
 }
 
@@ -72,17 +76,18 @@ impl PreviewWidget {
             WidgetRequest::LeanAngle(request) => Ok(Self::LeanAngle(PreviewLeanAngle::new(request.widget, request.scene)?)),
             WidgetRequest::GForce(request) => Ok(Self::GForce(PreviewGForce::new(request.widget, request.scene)?)),
             WidgetRequest::LapTimer(request) => Ok(Self::LapTimer(PreviewLapTimer::new(request.widget, request.scene)?)),
+            WidgetRequest::HeadingTape(request) => Ok(Self::HeadingTape(PreviewHeading::new(request.widget, request.scene, fonts)?)),
             WidgetRequest::Value(request) => Ok(Self::Value(ValuePreview::new(request, fonts)?)),
         }
     }
     pub fn pixels(&self) -> &Vec<u8> {
-        match self { Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::LeanAngle(widget) => &widget.pixels, Self::GForce(widget) => &widget.pixels, Self::LapTimer(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
+        match self { Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::LeanAngle(widget) => &widget.pixels, Self::GForce(widget) => &widget.pixels, Self::LapTimer(widget) => &widget.pixels, Self::HeadingTape(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
     }
     pub fn geometry(&self) -> &Vec<u8> {
-        match self { Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::LeanAngle(widget) => &widget.geometry, Self::GForce(widget) => &widget.geometry, Self::LapTimer(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
+        match self { Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::LeanAngle(widget) => &widget.geometry, Self::GForce(widget) => &widget.geometry, Self::LapTimer(widget) => &widget.geometry, Self::HeadingTape(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
     }
     pub fn revision(&self) -> u32 {
-        match self { Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::GForce(widget) => widget.revision, Self::LapTimer(widget) => widget.revision, Self::Value(widget) => widget.revision }
+        match self { Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::GForce(widget) => widget.revision, Self::LapTimer(widget) => widget.revision, Self::HeadingTape(widget) => widget.revision, Self::Value(widget) => widget.revision }
     }
     pub fn inherit_revision(&mut self, previous: u32) {
         match self {
@@ -93,6 +98,7 @@ impl PreviewWidget {
             Self::LeanAngle(widget) => widget.revision = previous,
             Self::GForce(widget) => widget.revision = previous,
             Self::LapTimer(widget) => widget.revision = previous,
+            Self::HeadingTape(widget) => widget.revision = previous,
             Self::Value(widget) => widget.revision = previous,
         }
     }
@@ -105,6 +111,8 @@ pub struct ResizeRequest {
     pub factor: Option<f32>,
     /// Framed families resize to scene-pixel dimensions instead of a uniform factor.
     pub size: Option<[f32; 2]>,
+    /// Heading inspector edits resize the frame to preserve tick lengths.
+    pub label_offset: Option<f32>,
     pub fixed: [f32; 2],
     pub point: [f32; 2],
     pub second: f64,
@@ -120,5 +128,6 @@ pub enum ResizeUpdate {
     LeanAngle(crate::widgets::lean_angle::interaction::ResizeUpdate),
     GForce(crate::widgets::g_force::interaction::ResizeUpdate),
     LapTimer(crate::widgets::lap_timer::interaction::ResizeUpdate),
+    HeadingTape(crate::widgets::heading::interaction::ResizeUpdate),
     Value(crate::widgets::value::interaction::ResizeUpdate),
 }

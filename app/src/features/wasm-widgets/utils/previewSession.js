@@ -12,7 +12,7 @@ let modulePromise
 function widgetFonts(widget) {
   if (widget.type === 'backdrop' || widget.type === 'raster') return []
   const valueFont = {
-    font: widget.type === 'g_force' ? widget.data.label_font : widget.data.font,
+    font: widget.type === 'g_force' || widget.data.display_type === 'heading_tape' ? widget.data.label_font : widget.data.font,
     font_weight: widget.type === 'label' ? widget.data.font_weight : WIDGET_FONT_WEIGHT,
     italic: widget.type === 'label' ? widget.data.italic : false,
   }
