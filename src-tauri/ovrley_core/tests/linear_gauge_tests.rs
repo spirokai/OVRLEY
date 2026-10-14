@@ -41,8 +41,8 @@ fn value_config_deserializes_linear_gauge_fields() {
     .unwrap();
 
     assert_eq!(value.display_type.as_str(), "linear");
-    assert_eq!(value.width, Some(240));
-    assert_eq!(value.height, Some(44));
+    assert_eq!(value.width, Some(240.0));
+    assert_eq!(value.height, Some(44.0));
     assert_eq!(value.orientation.as_deref(), Some("vertical"));
     assert_eq!(value.track_corner_radius, Some(8.0));
     assert_eq!(value.track_border_thickness, Some(2.0));

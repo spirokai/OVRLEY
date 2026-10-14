@@ -85,6 +85,17 @@ pub fn require_positive_u32(v: Option<u32>, field: &str) -> WidgetResult<u32> {
     }
 }
 
+/// Integer-framed presentations retain their contract when raw metric dimensions are fractional.
+pub fn require_integer_frame_dimension(v: Option<f32>, field: &str) -> WidgetResult<u32> {
+    let v = require_positive_f32(v, field)?;
+    if v.fract() != 0.0 || f64::from(v) > f64::from(u32::MAX) {
+        return Err(WidgetError::Config(format!(
+            "{field}: must be a positive u32 integer"
+        )));
+    }
+    Ok(v as u32)
+}
+
 pub fn require_non_negative_f32(v: f32, field: &str) -> WidgetResult<f32> {
     if v < 0.0 || !v.is_finite() {
         Err(WidgetError::Config(format!("{field}: must be >= 0")))

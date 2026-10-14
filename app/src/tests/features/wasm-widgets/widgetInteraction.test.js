@@ -158,40 +158,44 @@ test.each(['rectangle', 'circle'])(
   },
 )
 
-test('lean-angle resize resolves nested diameter drafts and commits the same effective config', () => {
-  const { interaction, resize, setSnapshot, presentations } = editor('lean_angle')
+test.each(['lean_angle', 'g_force'])('%s resize resolves nested intrinsic drafts and commits the same effective config', (type) => {
+  const { interaction, resize, setSnapshot, presentations } = editor(type)
   const stored = {
     id: 'widget',
-    value: 'lean_angle',
+    value: type,
     x: 120.25,
     y: 60.5,
     font_size: 60,
-    display_type: 'lean_angle',
+    display_type: type,
     display_variants: {
       text: { icon_size: 24 },
-      lean_angle: {
+      [type]: {
         diameter: 180,
-        track_thickness: 24,
-        track_border_thickness: 2,
-        value_offset_x: 5,
-        value_offset_y: -3,
-        track_empty_color: '#222222',
+        ...(type === 'g_force'
+          ? { width: 220, height: 220, border_thickness: 2, marker_size: 12, label_font_size: 14, label_offset_x: 5, fill_color: '#222222' }
+          : { track_thickness: 24, track_border_thickness: 2, value_offset_x: 5, value_offset_y: -3, track_empty_color: '#222222' }),
       },
     },
   }
-  const original = { id: 'widget', type: 'lean_angle', category: 'values', data: resolveActiveMetricWidgetData(stored) }
+  const original = { id: 'widget', type, category: 'values', data: resolveActiveMetricWidgetData(stored) }
   setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second: 0 })
   const patch = {
     x: 110.125,
     y: 50.25,
-    font_size: 74.0625,
+    ...(type === 'lean_angle' ? { font_size: 74.0625 } : {}),
     display_variants: {
-      lean_angle: {
+      [type]: {
         diameter: 222.1875,
-        track_thickness: 29.625,
-        track_border_thickness: 2.46875,
-        value_offset_x: 6.171875,
-        value_offset_y: -3.703125,
+        ...(type === 'g_force'
+          ? {
+              width: 271.5625,
+              height: 271.5625,
+              border_thickness: 2.46875,
+              marker_size: 14.8125,
+              label_font_size: 17.28125,
+              label_offset_x: 6.171875,
+            }
+          : { track_thickness: 29.625, track_border_thickness: 2.46875, value_offset_x: 6.171875, value_offset_y: -3.703125 }),
       },
     },
   }
@@ -202,9 +206,13 @@ test('lean-angle resize resolves nested diameter drafts and commits the same eff
   const committed = updateWidgetInConfig({ values: [stored] }, 'widget', interaction.finish())
   const live = presentations.at(-1)[0].data
   expect(resolveActiveMetricWidgetData(committed.values[0])).toEqual(live)
-  expect(live).toMatchObject({ x: 110.125, y: 50.25, diameter: 222.1875, font_size: 74.0625 })
-  expect(committed.values[0].display_variants).toMatchObject({ text: stored.display_variants.text, lean_angle: { track_empty_color: '#222222' } })
+  expect(live).toMatchObject({ x: 110.125, y: 50.25, diameter: 222.1875, font_size: type === 'lean_angle' ? 74.0625 : 60 })
+  expect(committed.values[0].display_variants.text).toEqual(stored.display_variants.text)
+  expect(committed.values[0].display_variants[type][type === 'g_force' ? 'fill_color' : 'track_empty_color']).toBe('#222222')
   expect(committed.values[0]).not.toHaveProperty('diameter')
-  expect(live).not.toHaveProperty('width')
-  expect(live).not.toHaveProperty('height')
+  if (type === 'g_force') expect(live).toMatchObject({ width: 271.5625, height: 271.5625, label_font_size: 17.28125 })
+  else {
+    expect(live).not.toHaveProperty('width')
+    expect(live).not.toHaveProperty('height')
+  }
 })

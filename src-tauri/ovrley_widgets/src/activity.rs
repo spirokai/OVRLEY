@@ -13,6 +13,10 @@ use crate::{
 };
 use serde::Deserialize;
 use std::collections::HashMap;
+use crate::widgets::g_force::{
+    format::{sorted_magnitudes, percentile_max_g, GForceSample},
+    validation::ValidatedGForceWidget,
+};
 
 macro_rules! activity_columns {
     ($($field:ident: $kind:ident),* $(,)?) => {
@@ -28,6 +32,9 @@ macro_rules! activity_columns {
             #[serde(default)] elevation: Vec<Option<f64>>,
             #[serde(default)] barometric_altitude: Vec<Option<f64>>,
             #[serde(default)] gradient: Vec<Option<f64>>,
+            #[serde(default)] g_force_x: Vec<Option<f64>>,
+            #[serde(default)] g_force_y: Vec<Option<f64>>,
+            #[serde(default)] g_force_z: Vec<Option<f64>>,
             #[serde(default)] gear_position: Vec<Option<String>>,
             #[serde(default)] course: Vec<(Option<f64>, Option<f64>)>,
         }
@@ -132,6 +139,8 @@ pub struct ActivitySampler {
     latitude: NumericColumn,
     longitude: NumericColumn,
     gradient: NumericColumn,
+    g_force_axes: [NumericColumn; 3],
+    g_force_magnitudes: [Vec<f64>; 3],
     full_activity_distance: Option<f64>,
     full_activity_total_ascent: Option<f64>,
 }
@@ -184,6 +193,12 @@ impl ActivitySampler {
         let times = activity.sample_elapsed_seconds;
         // Gradient bridges internal gaps; samples outside observed coverage stay missing.
         let gradient = NumericColumn::new(&times, activity.gradient, StandardMetricInterpolationKind::Linear)?;
+        let g_force_axes = [activity.g_force_x, activity.g_force_y, activity.g_force_z]
+            .map(|values| NumericColumn::new(&times, values, StandardMetricInterpolationKind::Preserve));
+        let [x, y, z] = g_force_axes;
+        let g_force_axes = [x?, y?, z?];
+        let g_force_magnitudes = [(0, 1), (0, 2), (1, 2)]
+            .map(|(h, v)| sorted_magnitudes(&g_force_axes[h].values, &g_force_axes[v].values));
         let numeric: HashMap<_, _> = columns
             .into_iter()
             .map(|(kind, values)| {
@@ -221,6 +236,8 @@ impl ActivitySampler {
             latitude,
             longitude,
             gradient,
+            g_force_axes,
+            g_force_magnitudes,
             full_activity_distance,
             full_activity_total_ascent,
         })
@@ -239,6 +256,26 @@ impl ActivitySampler {
             return None;
         }
         column.at(&self.times, second)
+    }
+
+    pub fn g_force_at(&self, widget: &ValidatedGForceWidget, second: f64) -> GForceSample {
+        let h = widget.axis_horizontal.index();
+        let v = widget.axis_vertical.index();
+        let pair = match (h.min(v), h.max(v)) {
+            (0, 1) => 0,
+            (0, 2) => 1,
+            (1, 2) => 2,
+            _ => unreachable!("validated G-force axes are different"),
+        };
+        let sample_axis = |axis: usize, invert: bool| {
+            if second < 0.0 || second > self.end { return None; }
+            self.g_force_axes[axis].at(&self.times, second).map(|value| if invert { -value } else { value })
+        };
+        GForceSample {
+            horizontal: sample_axis(h, widget.invert_horizontal),
+            vertical: sample_axis(v, widget.invert_vertical),
+            max_g: percentile_max_g(&self.g_force_magnitudes[pair], widget.clip_percentile),
+        }
     }
 
     pub fn sample(&self, widget: &ValidatedValueWidget, second: f64) -> MetricSample<'_> {

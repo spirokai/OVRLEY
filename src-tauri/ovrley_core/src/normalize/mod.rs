@@ -7,7 +7,6 @@
 mod arc_gauge;
 mod bar_geometry;
 mod elevation;
-mod g_force;
 mod heading;
 mod lap_timer;
 mod linear_gauge;
@@ -42,7 +41,7 @@ pub(crate) use bar_geometry::{
     scale_bar_geometry, track_corner_radius_max,
 };
 pub use elevation::{validate_elevation_plot, validate_elevation_plots, ValidatedElevationPlot};
-pub use g_force::{validate_g_force, GForceAxis, ValidatedGForceWidget};
+use ovrley_widgets::widgets::g_force::validation::{validate_g_force, GForceAxis};
 use ovrley_widgets::widgets::gradient::validation::validate_gradient_widget;
 pub use heading::{validate_heading, ValidatedHeading};
 use ovrley_widgets::widgets::label::validation::{validate_label, ValidatedLabel};
@@ -187,12 +186,14 @@ fn validate_render_contents(
         .map(|(idx, value)| {
             if value.value == MetricKind::GForce && value.display_type == DisplayType::GForce {
                 let value = raw::promote_value_variant(&value, "g_force")?;
-                return validate_g_force(value, idx).map(|validated| {
-                    PreparedValue::GForce(PreparedGForce {
-                        validated,
-                        cache: None,
+                return validate_g_force(value, idx)
+                    .map(|validated| {
+                        PreparedValue::GForce(PreparedGForce {
+                            validated,
+                            cache: None,
+                        })
                     })
-                });
+                    .map_err(Into::into);
             }
             if value.value == MetricKind::Heading && value.display_type == DisplayType::Tape {
                 return validate_heading(&value, idx, &scene).map(|validated| {

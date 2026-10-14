@@ -34,7 +34,6 @@ import { OverlayElevationWidget } from './widgets/elevation/ElevationPreview'
 import { OverlayHeadingWidget } from './widgets/heading/HeadingPreview'
 import { OverlayLinearGaugeWidget } from './widgets/linear-gauge/LinearGaugePreview'
 import { OverlayArcGaugeWidget } from './widgets/arc-gauge/ArcGaugePreview'
-import { OverlayGForceWidget } from './widgets/g-force/GForcePreview'
 import OverlayBackdropWidget from './widgets/backdrop/BackdropPreview'
 import { isBoxedDisplayType } from '@/lib/widget/standard-metrics'
 
@@ -43,7 +42,6 @@ const BOXED_PREVIEW_COMPONENTS = {
   linear: OverlayLinearGaugeWidget,
   arc: OverlayArcGaugeWidget,
   corner: OverlayArcGaugeWidget,
-  g_force: OverlayGForceWidget,
 }
 
 function getBoxedPreviewComponent(displayType) {

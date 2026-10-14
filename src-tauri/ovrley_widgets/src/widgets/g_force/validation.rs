@@ -1,12 +1,12 @@
 //! G-force friction-circle widget validation.
 
-use crate::error::{CoreError, CoreResult};
-use ovrley_widgets::model::types::{DisplayType, MetricKind};
-use ovrley_widgets::model::validation::{
-    require_bool, require_f32, require_hex_color, require_positive_f32, require_positive_u32,
-    require_string, require_unit_opacity,
+use crate::error::{WidgetError, WidgetResult};
+use crate::model::types::{DisplayType, MetricKind};
+use crate::model::validation::{
+    require_bool, require_f32, require_hex_color, require_positive_f32, require_string,
+    require_unit_opacity,
 };
-use ovrley_widgets::widgets::value::config::ValueConfig;
+use crate::widgets::value::config::ValueConfig;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GForceAxis {
@@ -16,14 +16,22 @@ pub enum GForceAxis {
 }
 
 impl GForceAxis {
-    fn parse(value: &str, field: &str) -> CoreResult<Self> {
+    fn parse(value: &str, field: &str) -> WidgetResult<Self> {
         match value {
             "x" => Ok(Self::X),
             "y" => Ok(Self::Y),
             "z" => Ok(Self::Z),
-            _ => Err(CoreError::Config(format!(
+            _ => Err(WidgetError::Config(format!(
                 "{field}: invalid value '{value}', expected 'x', 'y', or 'z'"
             ))),
+        }
+    }
+
+    pub(crate) fn index(self) -> usize {
+        match self {
+            Self::X => 0,
+            Self::Y => 1,
+            Self::Z => 2,
         }
     }
 }
@@ -32,8 +40,8 @@ impl GForceAxis {
 pub struct ValidatedGForceWidget {
     pub x: f32,
     pub y: f32,
-    pub width: u32,
-    pub height: u32,
+    pub width: f32,
+    pub height: f32,
     pub opacity: f32,
     pub diameter: f32,
     pub fill_color: String,
@@ -59,26 +67,26 @@ pub struct ValidatedGForceWidget {
     pub label_offset_y: f32,
 }
 
-pub fn validate_g_force(value: ValueConfig, index: usize) -> CoreResult<ValidatedGForceWidget> {
+pub fn validate_g_force(value: ValueConfig, index: usize) -> WidgetResult<ValidatedGForceWidget> {
     let p = |field: &str| format!("values[{index}].{field}");
     if value.value != MetricKind::GForce {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: expected g_force metric",
             p("value")
         )));
     }
     if value.display_type != DisplayType::GForce {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: expected g_force display_type",
             p("display_type")
         )));
     }
 
-    let width = require_positive_u32(value.width, &p("width"))?;
-    let height = require_positive_u32(value.height, &p("height"))?;
+    let width = require_positive_f32(value.width, &p("width"))?;
+    let height = require_positive_f32(value.height, &p("height"))?;
     let diameter = require_positive_f32(value.diameter, &p("diameter"))?;
-    if diameter > width.min(height) as f32 {
-        return Err(CoreError::Config(format!(
+    if diameter > width.min(height) {
+        return Err(WidgetError::Config(format!(
             "{}: must fit inside the widget frame",
             p("diameter")
         )));
@@ -86,7 +94,7 @@ pub fn validate_g_force(value: ValueConfig, index: usize) -> CoreResult<Validate
 
     let border_thickness = require_f32(value.border_thickness, &p("border_thickness"))?;
     if border_thickness < 0.0 || border_thickness * 2.0 >= diameter {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be non-negative and leave a positive inner circle",
             p("border_thickness")
         )));
@@ -95,7 +103,7 @@ pub fn validate_g_force(value: ValueConfig, index: usize) -> CoreResult<Validate
     let label_font_size = require_positive_f32(value.label_font_size, &p("label_font_size"))?;
     let clip_percentile = require_f32(value.clip_percentile, &p("clip_percentile"))?;
     if !(0.0..=100.0).contains(&clip_percentile) || clip_percentile == 0.0 {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be greater than 0 and at most 100",
             p("clip_percentile")
         )));
@@ -110,7 +118,7 @@ pub fn validate_g_force(value: ValueConfig, index: usize) -> CoreResult<Validate
         &p("axis_vertical"),
     )?;
     if axis_horizontal == axis_vertical {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{} and {}: axes must be different",
             p("axis_horizontal"),
             p("axis_vertical")
@@ -125,15 +133,15 @@ pub fn validate_g_force(value: ValueConfig, index: usize) -> CoreResult<Validate
         require_hex_color(value.label_unit_color.as_deref(), &p("label_unit_color"))?;
     let label_unit = require_string(value.label_unit, &p("label_unit"))?;
     if label_unit != "G" {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be 'G'",
             p("label_unit")
         )));
     }
 
     Ok(ValidatedGForceWidget {
-        x: value.x,
-        y: value.y,
+        x: require_f32(Some(value.x), &p("x"))?,
+        y: require_f32(Some(value.y), &p("y"))?,
         width,
         height,
         opacity: require_unit_opacity(value.opacity, &p("opacity"))?,
@@ -156,7 +164,7 @@ pub fn validate_g_force(value: ValueConfig, index: usize) -> CoreResult<Validate
         label_color,
         label_decimals: value
             .label_decimals
-            .ok_or_else(|| CoreError::Config(format!("{}: required", p("label_decimals"))))?,
+            .ok_or_else(|| WidgetError::Config(format!("{}: required", p("label_decimals"))))?,
         label_unit,
         label_unit_color,
         label_offset_x: require_f32(value.label_offset_x, &p("label_offset_x"))?,

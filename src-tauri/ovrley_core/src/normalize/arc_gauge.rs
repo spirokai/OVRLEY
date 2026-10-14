@@ -11,7 +11,9 @@ use super::{
 };
 use crate::error::{CoreError, CoreResult};
 use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
-use ovrley_widgets::model::validation::{require_bool, require_f32, require_string};
+use ovrley_widgets::model::validation::{
+    require_bool, require_f32, require_integer_frame_dimension, require_string,
+};
 use ovrley_widgets::widgets::value::config::ValueConfig;
 use ovrley_widgets::widgets::value::validation::validate_arc_inner_value_widget;
 
@@ -134,18 +136,8 @@ fn validate_arc_shaped_gauge(
 ) -> CoreResult<ValidatedArcGaugeWidget> {
     let p = |field: &str| format!("values[{index}].{field}");
 
-    let width = value
-        .width
-        .ok_or_else(|| CoreError::Config(format!("{}: required", p("width"))))?;
-    let height = value
-        .height
-        .ok_or_else(|| CoreError::Config(format!("{}: required", p("height"))))?;
-    if width == 0 {
-        return Err(CoreError::Config(format!("{}: must be > 0", p("width"))));
-    }
-    if height == 0 {
-        return Err(CoreError::Config(format!("{}: must be > 0", p("height"))));
-    }
+    let width = require_integer_frame_dimension(value.width, &p("width"))?;
+    let height = require_integer_frame_dimension(value.height, &p("height"))?;
 
     let track_thickness = require_f32(value.track_thickness, &p("track_thickness"))?;
     if track_thickness <= 0.0 {

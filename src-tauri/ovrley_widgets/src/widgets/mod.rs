@@ -2,6 +2,7 @@
 pub mod value;
 pub mod gradient;
 pub mod lean_angle;
+pub mod g_force;
 pub mod time;
 pub mod label;
 pub mod backdrop;

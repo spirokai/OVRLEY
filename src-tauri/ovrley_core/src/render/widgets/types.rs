@@ -9,8 +9,9 @@ use ovrley_widgets::widgets::label::validation::ValidatedLabel;
 use ovrley_widgets::widgets::backdrop::validation::ValidatedBackdrop;
 use ovrley_widgets::widgets::gradient::validation::ValidatedGradientWidget;
 use ovrley_widgets::widgets::lean_angle::{layout::LeanAngleCache, validation::ValidatedLeanAngleWidget};
+use ovrley_widgets::widgets::g_force::{layout::GForceCache, validation::ValidatedGForceWidget};
 use crate::normalize::{
-    ResolvedBarGeometry, ValidatedArcGaugeWidget, ValidatedGForceWidget,
+    ResolvedBarGeometry, ValidatedArcGaugeWidget,
     ValidatedHeading, ValidatedLapTimer,
     ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
     ValidatedSceneConfig,
@@ -331,40 +332,10 @@ pub struct HeadingWidgetCache {
 /// Cached static circle and dynamic drawing contract for a G-force widget.
 #[derive(Clone, Debug)]
 pub struct GForceWidgetCache {
-    pub parent_circle_image: Image,
-    pub parent_circle_image_x: f32,
-    pub parent_circle_image_y: f32,
+    pub drawing: GForceCache,
     pub max_g: f64,
-    pub x: f32,
-    pub y: f32,
-    pub width: u32,
-    pub height: u32,
-    pub center_x: f32,
-    pub center_y: f32,
-    pub radius: f32,
-    pub opacity: f32,
-    pub marker_radius: f32,
-    pub marker_color: String,
-    pub marker_opacity: f32,
-    pub label_font: String,
-    pub label_font_size: f32,
-    pub label_color: String,
-    pub label_decimals: usize,
-    pub label_unit: String,
-    pub label_unit_color: String,
-    pub label_offset_x: f32,
-    pub label_offset_y: f32,
     pub horizontal_values: Vec<Option<f64>>,
     pub vertical_values: Vec<Option<f64>>,
-    pub shadow: Option<ShadowStyle>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct GForceFrameState {
-    pub marker_x: f32,
-    pub marker_y: f32,
-    pub magnitude: Option<f64>,
-    pub label: String,
 }
 
 /// Prepared resources owned by each lap-timer presentation mode.

@@ -108,9 +108,9 @@ pub struct ValueConfig {
     #[serde(default)]
     pub negative_delta_color: Option<String>,
     #[serde(default)]
-    pub width: Option<u32>,
+    pub width: Option<f32>,
     #[serde(default)]
-    pub height: Option<u32>,
+    pub height: Option<f32>,
     #[serde(default)]
     pub rotation: Option<f32>,
     #[serde(default)]

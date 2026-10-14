@@ -1,12 +1,13 @@
 //! G-force percentile, dense-axis, and frame-state tests.
 
-use super::super::g_force::{derive_max_g, g_force_frame_state, prepare_g_force_cache};
+use super::super::g_force::prepare_g_force_cache;
+use ovrley_widgets::widgets::g_force::{format::{derive_max_g, g_force_frame_state}, validation::{GForceAxis, ValidatedGForceWidget}};
 use crate::activity::interpolate::densify_activity;
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
 use crate::debug::RenderProfiler;
 use crate::normalize::{
-    GForceAxis, RenderDataRequirements, ValidatedGForceWidget, ValidatedSceneConfig,
+    RenderDataRequirements, ValidatedSceneConfig,
 };
 use serde::Deserialize;
 
@@ -45,8 +46,8 @@ fn widget(config: &FixtureConfig) -> ValidatedGForceWidget {
     ValidatedGForceWidget {
         x: 0.0,
         y: 0.0,
-        width: 220,
-        height: 220,
+        width: 220.0,
+        height: 220.0,
         opacity: 1.0,
         diameter: 200.0,
         fill_color: "#212121".to_string(),
@@ -116,7 +117,7 @@ fn fixture_max_g_matches_nearest_rank_percentile_exactly() {
     let fixture = fixture();
     let widget = widget(&fixture.config);
     assert_eq!(
-        derive_max_g(&fixture.activity, &widget),
+        derive_max_g(&fixture.activity.g_force_x, &fixture.activity.g_force_y, widget.clip_percentile),
         fixture.expected_max_g
     );
 
@@ -151,10 +152,10 @@ fn known_clamped_missing_and_zero_frames_match_contract() {
             cache.horizontal_values[index],
             cache.vertical_values[index],
             cache.max_g,
-            cache.center_x,
-            cache.center_y,
-            cache.radius,
-            cache.label_decimals,
+            cache.drawing.layout.center_x,
+            cache.drawing.layout.center_y,
+            cache.drawing.layout.radius,
+            widget.label_decimals,
         )
     };
 
@@ -194,10 +195,10 @@ fn invert_and_axis_remap_select_the_canonical_dense_series() {
         inverted.horizontal_values[1],
         inverted.vertical_values[1],
         inverted.max_g,
-        inverted.center_x,
-        inverted.center_y,
-        inverted.radius,
-        inverted.label_decimals,
+        inverted.drawing.layout.center_x,
+        inverted.drawing.layout.center_y,
+        inverted.drawing.layout.radius,
+        inverted_widget.label_decimals,
     );
     assert_eq!(
         (inverted_state.marker_x, inverted_state.marker_y),

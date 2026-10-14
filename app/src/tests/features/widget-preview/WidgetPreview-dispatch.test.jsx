@@ -37,9 +37,6 @@ vi.mock('@/features/widget-preview/widgets/arc-gauge/ArcGaugePreview', () => ({
     <div data-testid="arc-gauge-renderer" data-widget-type={props.widget.type} data-display-type={props.widget.data.display_type} />
   ),
 }))
-vi.mock('@/features/widget-preview/widgets/g-force/GForcePreview', () => ({
-  OverlayGForceWidget: (props) => <div data-testid="g-force-renderer" data-display-type={props.widget.data.display_type} />,
-}))
 vi.mock('@/features/widget-preview/widgets/backdrop/BackdropPreview', () => ({
   default: (props) => <div data-testid="backdrop-renderer" data-widget-type={props.widget.type} />,
 }))
@@ -158,15 +155,5 @@ describe('WidgetPreview dispatch by display_type', () => {
       />,
     )
     expect(getByTestId('arc-gauge-renderer')).toHaveAttribute('data-display-type', 'corner')
-  })
-
-  test('g_force display_type uses the dedicated G-force renderer', () => {
-    const { getByTestId } = render(
-      <WidgetPreview
-        widget={{ type: 'g_force', category: 'values', data: { display_type: 'g_force', x: 0, y: 0, width: 220, height: 220 } }}
-        activity={ACTIVITY}
-      />,
-    )
-    expect(getByTestId('g-force-renderer')).toHaveAttribute('data-display-type', 'g_force')
   })
 })

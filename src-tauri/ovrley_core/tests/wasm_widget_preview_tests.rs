@@ -16,6 +16,117 @@ use ovrley_widgets::{
 use serde_json::{json, Value};
 use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
 
+fn g_force_preview() -> (PreviewSession, Value) {
+    let (preview, mut request) = lean_angle_preview();
+    request["type"] = json!("g_force");
+    request["scene"]["end"] = json!(5);
+    request["widget"] = json!({
+        "value": "g_force", "display_type": "g_force", "x": 600.25, "y": 100.5,
+        "width": 220.25, "height": 220.25, "diameter": 200, "opacity": 0.8,
+        "fill_color": "#212121", "fill_opacity": 0.5,
+        "border_thickness": 2, "border_color": "#ffffff", "border_opacity": 0.7,
+        "marker_size": 12, "marker_color": "#40e0d0", "marker_opacity": 0.9,
+        "axis_horizontal": "x", "axis_vertical": "y", "invert_horizontal": false, "invert_vertical": false,
+        "clip_percentile": 80, "label_font": "Inter.ttf", "label_font_size": 24,
+        "label_color": "#abcdef", "label_decimals": 1, "label_unit": "G", "label_unit_color": "#aaaaaa",
+        "label_offset_x": 11.25, "label_offset_y": -17.5,
+    });
+    (preview, request)
+}
+
+#[test]
+fn g_force_preview_matches_native_pixels_and_tracks_marker_and_percentile_changes() {
+    use ovrley_core::{
+        activity::{interpolate::densify_activity, schema::ParsedActivity, trim::trim_activity},
+        debug::RenderProfiler,
+        render::widgets::{g_force::{draw_g_force_widget, prepare_g_force_cache}, types::PreparedValue},
+    };
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/g-force-frame-state.json")).unwrap();
+    let mut activity: ParsedActivity = serde_json::from_value(fixture["activity"].clone()).unwrap();
+    let (mut preview, request) = g_force_preview();
+    preview.replace_activity(&serde_json::to_vec(&activity).unwrap()).unwrap();
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
+    }));
+    let PreparedValue::GForce(widget) = &config.values[0] else { panic!("G-force dispatch"); };
+    let requirements = config.render_data_requirements().unwrap();
+    let trimmed = trim_activity(&activity, 0.0, 5.0, &requirements).unwrap();
+    let seconds = [1.0, 1.002, 3.0];
+    let dense = densify_activity(&trimmed, seconds.to_vec(), &requirements);
+    let mut profiler = RenderProfiler::default();
+    let cache = prepare_g_force_cache(&widget.validated, &config.scene, &activity, &dense, &mut profiler).unwrap();
+    let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
+    let id = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
+    for index in [0, 1, 2, 0] {
+        preview.render(seconds[index]).unwrap();
+        let widget = &preview.widgets[&id];
+        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let info = ImageInfo::new(
+            (geometry["width"].as_i64().unwrap() as i32, geometry["height"].as_i64().unwrap() as i32),
+            ColorType::RGBA8888, AlphaType::Premul, None,
+        );
+        let mut surface = surfaces::raster(&info, None, None).unwrap();
+        let canvas = surface.canvas();
+        canvas.clear(Color::TRANSPARENT);
+        canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
+        draw_g_force_widget(canvas, &cache, index, &font_dirs, &mut profiler).unwrap();
+        let mut pixels = vec![0; widget.pixels().len()];
+        assert!(surface.read_pixels(
+            &info.with_alpha_type(AlphaType::Unpremul), &mut pixels, info.width() as usize * 4, (0, 0),
+        ));
+        assert_eq!(&pixels, widget.pixels(), "G-force at {}", seconds[index]);
+    }
+    let revision = preview.widgets[&id].revision();
+    preview.render(1.0).unwrap();
+    assert_eq!(preview.widgets[&id].revision(), revision);
+    let pixels = preview.widgets[&id].pixels().clone();
+    activity.g_force_y[2] = Some(120.0); // Same current axes, different whole-activity clipping scale.
+    preview.replace_activity(&serde_json::to_vec(&activity).unwrap()).unwrap();
+    preview.render(1.0).unwrap();
+    assert_ne!(preview.widgets[&id].pixels(), &pixels);
+}
+
+#[test]
+fn g_force_resize_keeps_visible_corners_fixed_and_commits_fractional_variant_geometry() {
+    let (mut preview, origin) = g_force_preview();
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/g-force-frame-state.json")).unwrap();
+    preview.replace_activity(&serde_json::to_vec(&fixture["activity"]).unwrap()).unwrap();
+    let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
+    preview.render(1.0).unwrap();
+    let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let bounds = &geometry["content"];
+    for fixed in [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]] {
+        let point = [
+            bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0],
+            bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1],
+        ];
+        for second in [1.0, 3.0] {
+            let mut resize = origin.clone();
+            resize["factor"] = json!(1.234375);
+            resize["fixed"] = json!(fixed);
+            resize["point"] = json!(point);
+            resize["second"] = json!(second);
+            let patch = serde_json::to_value(
+                preview.resize_widget(serde_json::from_value(resize).unwrap()).unwrap(),
+            ).unwrap();
+            let variant = &patch["display_variants"]["g_force"];
+            assert_eq!(variant["width"], json!(271.87109375));
+            assert_eq!(variant["height"], variant["width"]);
+            let mut committed = origin.clone();
+            committed["widget"]["x"] = patch["x"].clone();
+            committed["widget"]["y"] = patch["y"].clone();
+            for (field, value) in variant.as_object().unwrap() { committed["widget"][field] = value.clone(); }
+            preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
+            preview.render(second).unwrap();
+            let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            for (axis, start, size) in [(0, "left", "width"), (1, "top", "height")] {
+                let actual = geometry["content"][start].as_f64().unwrap() + geometry["content"][size].as_f64().unwrap() * fixed[axis];
+                assert!((actual - point[axis]).abs() < 0.003);
+            }
+        }
+    }
+}
+
 fn lean_angle_preview() -> (PreviewSession, Value) {
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
     let mut preview = PreviewSession::default();
