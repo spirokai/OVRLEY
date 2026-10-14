@@ -34,7 +34,7 @@ pub(super) fn draw_static_layer(
                 image_filters::drop_shadow_only(
                     (scene.shadow_distance * scale, scene.shadow_distance * scale),
                     (scene.shadow_strength * scale, scene.shadow_strength * scale),
-                    parse_color(&scene.shadow_color, 1.0),
+                    parse_color(&scene.shadow_color, scene.opacity),
                     None,
                     None,
                     None,
@@ -55,7 +55,15 @@ pub(super) fn draw_static_layer(
                 height_px,
                 gauge.orientation,
             );
-            draw_static_track(canvas, gauge, rect, radius, border, shadow_filter.as_ref());
+            draw_static_track(
+                canvas,
+                gauge,
+                rect,
+                radius,
+                border,
+                scene.opacity,
+                shadow_filter.as_ref(),
+            );
         }
     } else {
         draw_static_track(
@@ -64,6 +72,7 @@ pub(super) fn draw_static_layer(
             Rect::from_xywh(0.0, 0.0, width_px, height_px),
             radius,
             border,
+            scene.opacity,
             shadow_filter.as_ref(),
         );
     }
@@ -75,6 +84,7 @@ fn draw_static_track(
     rect: Rect,
     configured_radius: f32,
     border: f32,
+    opacity: f32,
     shadow_filter: Option<&skia_safe::ImageFilter>,
 ) {
     let radius = configured_radius
@@ -108,7 +118,7 @@ fn draw_static_track(
     if border > 0.0 {
         let mut border_paint = Paint::default();
         border_paint.set_anti_alias(true);
-        border_paint.set_color(parse_color(&gauge.track_border_color, 1.0));
+        border_paint.set_color(parse_color(&gauge.track_border_color, opacity));
         canvas.draw_rrect(outer_rrect, &border_paint);
 
         let mut clear_paint = Paint::default();
@@ -121,7 +131,7 @@ fn draw_static_track(
     empty_paint.set_anti_alias(true);
     empty_paint.set_color(parse_color(
         &gauge.track_empty_color,
-        gauge.track_empty_opacity,
+        gauge.track_empty_opacity * opacity,
     ));
     canvas.draw_rrect(inner_rrect, &empty_paint);
 }

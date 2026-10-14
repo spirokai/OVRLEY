@@ -5,7 +5,8 @@
 //! formatted metric value is painted during per-frame composition.
 
 use super::geometry::ArcGaugeGeometry;
-use crate::render::text::{origin_x_for_centered_text, ResolvedTextStyle};
+use crate::model::scene::ValidatedScenePresentation;
+use crate::render::text::{origin_x_for_centered_text, rgba_color, ResolvedTextStyle};
 use crate::widgets::gauges::validation::ValidatedArcGaugeWidget;
 
 pub(crate) const LINE_HEIGHT: f32 = 0.92;
@@ -56,20 +57,16 @@ pub(crate) fn inner_widget_layout(
 pub(super) fn unit_style(
     gauge: &ValidatedArcGaugeWidget,
     geometry: ArcGaugeGeometry,
-    scale: f32,
+    scene: &ValidatedScenePresentation,
     unit_text: &str,
     font: &skia_safe::Font,
     text_style: &ResolvedTextStyle,
 ) -> ResolvedTextStyle {
+    let scale = scene.scale;
     let mut unit_style = text_style.clone();
     unit_style.font_size = unit_font_size(text_style, scale);
     unit_style.line_height = unit_style.font_size * LINE_HEIGHT;
-    unit_style.color = skia_safe::Color::from_argb(
-        gauge.inner_value.unit_color[3],
-        gauge.inner_value.unit_color[0],
-        gauge.inner_value.unit_color[1],
-        gauge.inner_value.unit_color[2],
-    );
+    unit_style.color = rgba_color(gauge.inner_value.unit_color, scene.opacity);
     let layout = inner_widget_layout(
         geometry,
         gauge.inner_widget_offset_x * scale,

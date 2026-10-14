@@ -80,7 +80,8 @@ fn gauges_match_native_pixels_sampling_cache_revisions_and_activity_replacement(
         ("corner", "altitude", "bottom-left", "fill"),
         ("corner", "altitude", "bottom-right", "bars"),
     ] {
-        let (mut preview, request) = gauge_preview(display, metric, placement, fill);
+        let (mut preview, mut request) = gauge_preview(display, metric, placement, fill);
+        request["scene"]["opacity"] = json!(0.5);
         preview.replace_activity(&bytes).unwrap();
         let config = common::seam::validated_config_from_value(
             json!({"scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": []}),
@@ -196,6 +197,20 @@ fn gauges_match_native_pixels_sampling_cache_revisions_and_activity_replacement(
                         .map_err(|error| error.to_string())
                 });
             assert!(result.is_err(), "malformed {field} must fail");
+        }
+        request["scene"]["opacity"] = json!(0);
+        preview
+            .update_widget(id, serde_json::from_value(request).unwrap())
+            .unwrap();
+        for second in [0.5, 2.25] {
+            preview.render(second).unwrap();
+            assert!(
+                preview.widgets[&id]
+                    .pixels()
+                    .chunks_exact(4)
+                    .all(|pixel| pixel[3] == 0),
+                "{display}/{fill} must be transparent at zero global opacity"
+            );
         }
     }
 }

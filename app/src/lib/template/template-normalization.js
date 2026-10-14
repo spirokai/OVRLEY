@@ -224,7 +224,7 @@ function normalizeValue(value = {}, globalDefaults) {
       throw new Error(`Invalid show_hundredths: ${String(withDefaults.show_hundredths)}`)
     }
   }
-  const supportsContentAlignment = withDefaults.display_type === 'text' && type !== 'gradient' && type !== 'lap_timer'
+  const supportsContentAlignment = type !== 'gradient' && type !== 'lap_timer'
   if (supportsContentAlignment && !['left', 'center', 'right'].includes(withDefaults.content_alignment)) {
     throw new Error(`Invalid content_alignment: ${String(withDefaults.content_alignment)}`)
   }

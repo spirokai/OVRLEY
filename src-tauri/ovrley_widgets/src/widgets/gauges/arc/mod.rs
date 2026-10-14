@@ -120,7 +120,7 @@ pub fn prepare_arc_gauge_cache(
     let unit_size = unit_font_size(&text_style, scale);
     if let Some(text) = unit_text {
         let font = resolve_font(fonts, text_style.font_name.as_deref(), unit_size)?;
-        let style = unit_style(gauge, geometry, scale, text, &font, &text_style);
+        let style = unit_style(gauge, geometry, scene, text, &font, &text_style);
         texts.push(prepare_text(text, text, style, fonts)?);
     }
     for text in &texts {

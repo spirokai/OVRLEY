@@ -45,12 +45,12 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.registerPreviewVideo.mockResolvedValue({ importId: 'owner-import-id', previewUrl: 'http://preview/video' })
   })
 
-  test('normalizes legacy widget alignment at the frontend project-load seam', async () => {
+  test.each(['text', 'linear', 'arc', 'corner'])('normalizes legacy %s widget alignment at the frontend project-load seam', async (displayType) => {
     const initialState = useStore.getState()
     const editor = createDurableEditorState({
       config: {
         ...initialState.config,
-        values: [{ id: 'legacy-speed', value: 'speed', x: 300, y: 100 }],
+        values: [{ id: 'legacy-speed', value: 'speed', display_type: displayType, x: 300, y: 100 }],
       },
       globalDefaults: initialState.globalDefaults,
     })
