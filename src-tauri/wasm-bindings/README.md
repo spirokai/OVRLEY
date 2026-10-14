@@ -3,7 +3,7 @@
 This crate is OVRLEY's Emscripten binding boundary. It is an isolated Cargo
 workspace to isolate its Emscripten toolchain and output. Native and WASM both
 pin rust-skia 0.153.3 at `b7f043e0b1e2a850e702245de811f01df1f6b0ff`.
-Speed/text in OverlayEditor uses the shared `ovrley_widgets` renderer.
+OverlayEditor uses the shared `ovrley_widgets` renderer for every widget family.
 
 ## Daily development
 
@@ -15,8 +15,6 @@ Speed/text in OverlayEditor uses the shared `ovrley_widgets` renderer.
 3. Run `pnpm dev` from the repository root to test OverlayEditor in Tauri.
    Both the Tauri launcher and WASM scripts load `.env.local` automatically.
    No checkpoint launcher or native Skia source-tool paths are needed.
-   The standalone diagnostic is also available through `pnpm dev:frontend`
-   at `http://localhost:5173/#/debug/wasm-preview`.
 
 App bootstrap initializes the module under the existing “OVRLEY is starting”
 screen and waits for it before showing the editor. The first WASM
@@ -29,8 +27,7 @@ standard HMR and releases renderer allocations on effect cleanup. Tauri ignores
 this crate for native restarts. No extra watcher process or watch dependency is
 needed. Ordinary bindings builds reuse the stored Skia archive; they need
 Emscripten and Python, but no Skia source, Ninja or libclang. The Tauri
-development CSP explicitly permits Wasm compilation;
-the standalone debug route skips desktop-only preference hydration.
+development CSP explicitly permits Wasm compilation.
 
 `pnpm wasm:build` also runs independently. It verifies the stored bundle's pins
 and SHA-256 and forces rust-skia's local binary-cache import with `no-compile`.
@@ -86,13 +83,11 @@ The Emscripten output is an ES module factory. OverlayEditor caches that module
 and owns a disposable preview session with activity, fonts and widget surfaces.
 Native supplies immutable activity snapshots and serialized Skia font faces.
 Rust owns sampling and drawing; JS coalesces the latest snapshot per animation
-frame and presents the pixels. The separate diagnostic owns its own renderer
-handle, font and pixel buffer.
+frame and presents the pixels.
 
 The C ABI is internal: pointers must refer to live allocations in this module;
 callers must not double-free or reuse destroyed handles. Rendering is synchronous
-and single-threaded. Widget pixels use ImageData's straight-alpha RGBA format;
-the diagnostic is opaque RGBA.
+and single-threaded. Widget pixels use ImageData's straight-alpha RGBA format.
 
 Vite builds and emits the JS/WASM pair for production and serves it during
 development. Further widget families, interaction support and representative
