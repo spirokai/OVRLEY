@@ -1,9 +1,10 @@
-//! Prepared glyph runs supply painting and tight interaction bounds together.
+//! Prepared glyph runs supply painting and text-layout interaction bounds together.
 use super::{LINE_HEIGHT_RATIO, TABLE_VERTICAL_METRICS_TEXT};
 use crate::{
     error::{WidgetError, WidgetResult},
     render::text::{
-        baseline_for_text_top_with_line_height, draw_text_blob, layout_text, ResolvedTextStyle,
+        baseline_for_text_top_with_line_height, draw_text_blob, layout_text, text_selection_bounds,
+        ResolvedTextStyle,
     },
 };
 use skia_safe::{Canvas, Font, Rect, TextBlob};
@@ -39,6 +40,10 @@ impl TextRun {
             content.outset((style.border_thickness * 0.5, style.border_thickness * 0.5));
         }
         let mut bounds = content;
+        content = text_selection_bounds(&measurement, style.x, baseline);
+        if style.border_color.is_some() {
+            content.outset((style.border_thickness * 0.5, style.border_thickness * 0.5));
+        }
         let shadow = if style.shadow_color.is_some() && style.shadow_strength > 0.0 {
             style.shadow_distance.abs() + style.shadow_strength * 3.0
         } else {

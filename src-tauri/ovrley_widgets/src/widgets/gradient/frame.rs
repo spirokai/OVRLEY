@@ -3,7 +3,10 @@ use super::{format::format_validated_gradient, validation::ValidatedGradientWidg
 use crate::{
     error::WidgetResult,
     model::{scene::ValidatedScenePresentation, standard_widgets::widget_font_weight},
-    render::text::{draw_text, measure_text, parse_color, rgba_color, FontResolver, ResolvedTextStyle},
+    render::text::{
+        draw_text, measure_text, parse_color, rgba_color, text_selection_bounds, FontResolver,
+        ResolvedTextStyle,
+    },
 };
 use skia_safe::{paint::Style, Canvas, Paint, PaintCap, Path, PathBuilder, Point, Rect};
 
@@ -91,11 +94,17 @@ pub fn prepare_gradient_frame(
     } else {
         (formatted, None)
     };
-    let mut content_bounds = text_bounds(&value_text, &value_style, fonts)?;
+    let (mut bounds, mut content_bounds) = text_bounds(&value_text, &value_style, fonts)?;
     if let Some(style) = &unit {
-        content_bounds.join(text_bounds("%", style, fonts)?);
+        let (unit_bounds, unit_content) = text_bounds("%", style, fonts)?;
+        bounds.join(unit_bounds);
+        content_bounds.join(unit_content);
     }
     if base_style.border_color.is_some() {
+        bounds.outset((
+            base_style.border_thickness * 0.5,
+            base_style.border_thickness * 0.5,
+        ));
         content_bounds.outset((
             base_style.border_thickness * 0.5,
             base_style.border_thickness * 0.5,
@@ -122,30 +131,33 @@ pub fn prepare_gradient_frame(
             paint.set_style(Style::Stroke);
             paint.set_stroke_width(stroke_width);
             paint.set_stroke_cap(PaintCap::Round);
-            content_bounds.join(Rect::new(
+            let triangle_bounds = Rect::new(
                 left - stroke_width * 0.5,
                 zero_baseline - stroke_width * 0.5,
                 left + triangle_width + stroke_width * 0.5,
                 zero_baseline + stroke_width * 0.5,
-            ));
+            );
+            bounds.join(triangle_bounds);
+            content_bounds.join(triangle_bounds);
         } else {
             let height = gradient_triangle_height(raw, triangle_width);
             let tip = zero_baseline + if grade < 0.0 { height } else { -height };
             path.line_to(Point::new(left + triangle_width, tip));
             path.close();
             paint.set_style(Style::Fill);
-            content_bounds.join(Rect::new(
+            let triangle_bounds = Rect::new(
                 left,
                 zero_baseline.min(tip),
                 left + triangle_width,
                 zero_baseline.max(tip),
-            ));
+            );
+            bounds.join(triangle_bounds);
+            content_bounds.join(triangle_bounds);
         }
         Some((path.detach(), paint))
     } else {
         None
     };
-    let mut bounds = content_bounds;
     let padding = 2.0
         + if base_style.shadow_color.is_some() {
             base_style.shadow_strength * 3.0 + base_style.shadow_distance.abs()
@@ -173,15 +185,18 @@ fn text_bounds(
     text: &str,
     style: &ResolvedTextStyle,
     fonts: &dyn FontResolver,
-) -> WidgetResult<Rect> {
+) -> WidgetResult<(Rect, Rect)> {
     let ink = measure_text(text, style, fonts)?;
     let baseline =
         style.y + (style.line_height - (ink.bounds_bottom - ink.bounds_top)) * 0.5 - ink.bounds_top;
-    Ok(Rect::new(
-        style.x + ink.bounds_left,
-        baseline + ink.bounds_top,
-        style.x + ink.bounds_right,
-        baseline + ink.bounds_bottom,
+    Ok((
+        Rect::new(
+            style.x + ink.bounds_left,
+            baseline + ink.bounds_top,
+            style.x + ink.bounds_right,
+            baseline + ink.bounds_bottom,
+        ),
+        text_selection_bounds(&ink, style.x, baseline),
     ))
 }
 

@@ -2,7 +2,7 @@
 use super::{style::validated_label_style, validation::ValidatedLabel};
 use crate::{error::WidgetResult, model::scene::ValidatedScenePresentation, render::text::{
     baseline_for_top_with_line_height, draw_text_blob, layout_text, resolve_styled_font,
-    FontResolver, ResolvedTextStyle,
+    text_selection_bounds, FontResolver, ResolvedTextStyle,
 }};
 use skia_safe::{Canvas, Rect, TextBlob};
 
@@ -41,6 +41,12 @@ pub fn prepare_label_frame(label: &ValidatedLabel, scene: &ValidatedScenePresent
         content_bounds.outset((style.border_thickness * 0.5, style.border_thickness * 0.5));
     }
     let mut bounds = content_bounds;
+    if !label.text.is_empty() {
+        content_bounds = text_selection_bounds(&ink, style.x, baseline);
+        if style.border_color.is_some() {
+            content_bounds.outset((style.border_thickness * 0.5, style.border_thickness * 0.5));
+        }
+    }
     let padding = 2.0 + if style.shadow_color.is_some() { style.shadow_strength * 3.0 + style.shadow_distance.abs() } else { 0.0 };
     bounds.outset((padding, padding));
     bounds = Rect::new(bounds.left.floor(), bounds.top.floor(), bounds.right.ceil(), bounds.bottom.ceil());

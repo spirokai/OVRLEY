@@ -63,6 +63,17 @@ pub struct MeasuredText {
     pub descent: f32,
 }
 
+/// Interaction bounds use character advances horizontally and glyph bounds vertically.
+pub(crate) fn text_selection_bounds(measurement: &MeasuredText, x: f32, baseline: f32) -> Rect {
+    let end = x + measurement.width;
+    Rect::new(
+        x.min(end),
+        baseline + measurement.bounds_top,
+        x.max(end),
+        baseline + measurement.bounds_bottom,
+    )
+}
+
 /// Draws text with optional drop shadow and stroke.
 pub fn draw_text(
     canvas: &Canvas,

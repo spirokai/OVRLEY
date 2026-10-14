@@ -1,4 +1,4 @@
-//! One prepared sector/value frame owns painting and tight interaction bounds.
+//! One prepared sector/value frame owns painting and text-layout interaction bounds.
 use super::{
     format::{format_lean_angle_value, lean_angle_fill_sweep},
     layout::{
@@ -15,7 +15,7 @@ use crate::{
     },
     render::text::{
         draw_text_blob, layout_text, measure_text_with_font, parse_color, resolve_styled_font,
-        FontResolver, ResolvedTextStyle,
+        text_selection_bounds, FontResolver, ResolvedTextStyle,
     },
     widgets::value::layout::{
         metric_vertical_metrics_text, METRIC_WIDGET_LINE_HEIGHT, METRIC_WIDGET_UNITS_GAP_PX,
@@ -173,6 +173,7 @@ pub fn prepare_lean_angle_frame(
     let group_bottom = geometry.center_y + widget.value_offset_y * scale + group_height * 0.5;
     let value_baseline = group_bottom - value_vertical.bounds_bottom;
     let mut content_bounds = annular_sector_path(geometry).compute_tight_bounds();
+    let mut bounds = content_bounds;
     let text_bounds = |ink: &crate::render::text::MeasuredText, x: f32, baseline: f32| {
         let mut bounds = Rect::new(
             x + ink.bounds_left,
@@ -184,18 +185,24 @@ pub fn prepare_lean_angle_frame(
             value_style.border_thickness * 0.5,
             value_style.border_thickness * 0.5,
         ));
-        bounds
+        let mut content = text_selection_bounds(ink, x, baseline);
+        content.outset((
+            value_style.border_thickness * 0.5,
+            value_style.border_thickness * 0.5,
+        ));
+        (bounds, content)
     };
-    content_bounds.join(text_bounds(
-        &value.measurement,
-        value_style.x,
-        value_baseline,
-    ));
+    let (value_bounds, value_content) =
+        text_bounds(&value.measurement, value_style.x, value_baseline);
+    bounds.join(value_bounds);
+    content_bounds.join(value_content);
     let unit = unit
         .map(|(text, vertical, mut style)| -> WidgetResult<TextRun> {
             style.x = value_style.x + value.measurement.width + METRIC_WIDGET_UNITS_GAP_PX * scale;
             let baseline = group_bottom - vertical.bounds_bottom;
-            content_bounds.join(text_bounds(&text.measurement, style.x, baseline));
+            let (unit_bounds, unit_content) = text_bounds(&text.measurement, style.x, baseline);
+            bounds.join(unit_bounds);
+            content_bounds.join(unit_content);
             Ok(TextRun {
                 blob: text.blob.ok_or_else(|| {
                     WidgetError::Render("unable to lay out lean-angle unit".into())
@@ -205,7 +212,6 @@ pub fn prepare_lean_angle_frame(
             })
         })
         .transpose()?;
-    let mut bounds = content_bounds;
     let shadow_padding = if scene.shadow_strength > 0.0 {
         (scene.shadow_strength * 3.0 + scene.shadow_distance) * scale
     } else {

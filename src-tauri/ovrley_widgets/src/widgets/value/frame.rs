@@ -6,7 +6,9 @@ use crate::widgets::value::layout::{
 use crate::{
     error::WidgetResult,
     render::icons::metric_icon_bounds,
-    render::text::{measure_text, parse_color, FontResolver, ResolvedTextStyle},
+    render::text::{
+        measure_text, parse_color, text_selection_bounds, FontResolver, ResolvedTextStyle,
+    },
     widgets::value::{format::MetricDisplayParts, validation::ValidatedValueWidget},
 };
 use skia_safe::Rect;
@@ -32,17 +34,20 @@ fn text_bounds(
     reference: &str,
     style: &ResolvedTextStyle,
     fonts: &dyn FontResolver,
-) -> WidgetResult<Rect> {
+) -> WidgetResult<(Rect, Rect)> {
     let ink = measure_text(text, style, fonts)?;
     let vertical = measure_text(reference, style, fonts)?;
     let baseline = style.y
         + (style.line_height - (vertical.bounds_bottom - vertical.bounds_top)) * 0.5
         - vertical.bounds_top;
-    Ok(Rect::new(
-        style.x + ink.bounds_left,
-        baseline + ink.bounds_top,
-        style.x + ink.bounds_right,
-        baseline + ink.bounds_bottom,
+    Ok((
+        Rect::new(
+            style.x + ink.bounds_left,
+            baseline + ink.bounds_top,
+            style.x + ink.bounds_right,
+            baseline + ink.bounds_bottom,
+        ),
+        text_selection_bounds(&ink, style.x, baseline),
     ))
 }
 
@@ -97,7 +102,7 @@ pub fn prepare_metric_frame(
     value_style.y =
         bottom - (value_height + (vertical.bounds_bottom - vertical.bounds_top).abs()) * 0.5;
     value_style.line_height = value_height;
-    let mut bounds = text_bounds(
+    let (mut bounds, mut content_bounds) = text_bounds(
         value,
         metric_vertical_metrics_text(value),
         &value_style,
@@ -144,7 +149,9 @@ pub fn prepare_metric_frame(
             ),
             style.opacity,
         );
-        bounds.join(text_bounds(text, reference, &unit_style, fonts)?);
+        let (unit_bounds, unit_content) = text_bounds(text, reference, &unit_style, fonts)?;
+        bounds.join(unit_bounds);
+        content_bounds.join(unit_content);
         Some((unit_style, reference.to_owned()))
     } else {
         None
@@ -155,7 +162,7 @@ pub fn prepare_metric_frame(
             unit,
             icon,
             bounds,
-            content_bounds: bounds,
+            content_bounds,
             content_width: horizontal.content_width,
             coordinate_text: Vec::new(),
         },
@@ -288,6 +295,7 @@ fn prepare_coordinate_frame(
     });
     let mut texts = Vec::new();
     let mut bounds = Rect::new_empty();
+    let mut content_bounds = Rect::new_empty();
     for (index, line) in coordinate.lines.iter().enumerate() {
         let line_y = text_top + index as f32 * (line_height + line_gap);
         let (_, value_width) = line_measurements[index];
@@ -298,12 +306,14 @@ fn prepare_coordinate_frame(
             direction_style.x = line_x;
             direction_style.y = line_y;
             direction_style.color = parse_color(&unit_color_hex, base_style.opacity);
-            bounds.join(text_bounds(
+            let (direction_bounds, direction_content) = text_bounds(
                 direction,
                 line_vertical_metrics_text,
                 &direction_style,
                 fonts,
-            )?);
+            )?;
+            bounds.join(direction_bounds);
+            content_bounds.join(direction_content);
             texts.push(PreparedText {
                 text: direction.to_owned(),
                 reference: line_vertical_metrics_text.to_owned(),
@@ -319,12 +329,14 @@ fn prepare_coordinate_frame(
                 value_column_width - value_width
             };
         number_style.y = line_y;
-        bounds.join(text_bounds(
+        let (number_bounds, number_content) = text_bounds(
             &line.value_text,
             line_vertical_metrics_text,
             &number_style,
             fonts,
-        )?);
+        )?;
+        bounds.join(number_bounds);
+        content_bounds.join(number_content);
         texts.push(PreparedText {
             text: line.value_text.clone(),
             reference: line_vertical_metrics_text.to_owned(),
@@ -337,7 +349,7 @@ fn prepare_coordinate_frame(
             unit: None,
             icon,
             bounds,
-            content_bounds: bounds,
+            content_bounds,
             content_width: horizontal_layout.content_width,
             coordinate_text: texts,
         },

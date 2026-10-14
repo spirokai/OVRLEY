@@ -34,7 +34,7 @@ pub struct WidgetGeometry {
     pub content: ContentBounds,
 }
 
-/// Tight interaction rectangle in scene pixels, independent of raster allocation.
+/// Interaction rectangle in scene pixels, independent of raster allocation.
 #[derive(Serialize)]
 pub struct ContentBounds {
     pub left: f32,

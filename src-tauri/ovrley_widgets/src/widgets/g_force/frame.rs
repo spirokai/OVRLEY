@@ -8,7 +8,8 @@ use crate::{
     error::{WidgetError, WidgetResult},
     model::{scene::ValidatedScenePresentation, standard_widgets::widget_font_weight},
     render::text::{
-        draw_text_blob, layout_text, parse_color, resolve_font, FontResolver, ResolvedTextStyle,
+        draw_text_blob, layout_text, parse_color, resolve_font, text_selection_bounds, FontResolver,
+        ResolvedTextStyle,
     },
 };
 use skia_safe::{Canvas, Paint, Point, Rect, TextBlob};
@@ -108,17 +109,19 @@ pub fn prepare_g_force_frame(
         marker_radius * 2.0,
         marker_radius * 2.0,
     ));
+    let mut bounds = content_bounds;
     let mut prepare_text = |text: &str, style: ResolvedTextStyle| -> WidgetResult<(TextRun, f32)> {
         let text = layout_text(text, &font, 0.0);
         let ink = &text.measurement;
         let baseline =
             style.y + (line_height - (ink.bounds_bottom - ink.bounds_top)) * 0.5 - ink.bounds_top;
-        content_bounds.join(Rect::new(
+        bounds.join(Rect::new(
             style.x + ink.bounds_left,
             baseline + ink.bounds_top,
             style.x + ink.bounds_right,
             baseline + ink.bounds_bottom,
         ));
+        content_bounds.join(text_selection_bounds(ink, style.x, baseline));
         Ok((
             TextRun {
                 blob: text
@@ -154,7 +157,6 @@ pub fn prepare_g_force_frame(
     } else {
         None
     };
-    let mut bounds = content_bounds;
     let shadow_padding = if scene.shadow_strength > 0.0 {
         (scene.shadow_strength * 3.0 + scene.shadow_distance) * scale
     } else {
