@@ -12,7 +12,7 @@
 //! - Noise-level barometric variation preserved as vertical scribble
 //! - Mixed forward-progress + vertical runs mishandled
 
-use super::super::elevation::downsample_elevation_points;
+use super::super::reduction::downsample_elevation_points;
 
 /// 10 consecutive same-progress samples spanning 5m — real vertical flight.
 /// Multiple points must survive downsampling.

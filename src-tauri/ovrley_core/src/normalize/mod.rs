@@ -20,13 +20,14 @@ use raw::RenderConfig;
 
 pub use raw::{
     find_plot_value, find_plot_values, parse_config_json, parse_config_value, parse_template_json,
-    parse_template_value, ElevationPlotConfig, SceneConfig, TEMPLATE_FILE_FORMAT,
+    parse_template_value, SceneConfig, TEMPLATE_FILE_FORMAT,
     TEMPLATE_FILE_VERSION,
 };
 
 use ovrley_widgets::widgets::gauges::validation::{validate_arc_gauge, validate_corner_gauge};
 use ovrley_widgets::widgets::backdrop::validation::{validate_backdrop, ValidatedBackdrop};
-pub use elevation::{validate_elevation_plot, validate_elevation_plots, ValidatedElevationPlot};
+pub use elevation::validate_elevation_plots;
+use ovrley_widgets::widgets::elevation::validation::ValidatedElevationPlot;
 use ovrley_widgets::widgets::g_force::validation::{validate_g_force, GForceAxis};
 use ovrley_widgets::widgets::gradient::validation::validate_gradient_widget;
 use ovrley_widgets::widgets::heading::validation::validate_heading;

@@ -10,6 +10,7 @@ test.each([
   ['backdrop', 'rectangle'],
   ['raster', 'raster'],
   ['course', undefined],
+  ['elevation', undefined],
   ['lap_timer', 'lap_timer'],
   ['heading', 'heading_tape'],
   ['power', 'linear'],
@@ -53,7 +54,9 @@ test.each([
   expect(controller.update).toHaveBeenCalledWith({
     type: 'resize',
     geometry: {
-      ...(type === 'backdrop' || type === 'raster' || ['heading_tape', 'linear'].includes(displayType) ? { size: [240, 75.5] } : { factor: 1.5 }),
+      ...(type === 'backdrop' || type === 'raster' || type === 'elevation' || ['heading_tape', 'linear'].includes(displayType)
+        ? { size: [240, 75.5] }
+        : { factor: 1.5 }),
       fixed: [1, 1],
       point: [240, 95],
     },

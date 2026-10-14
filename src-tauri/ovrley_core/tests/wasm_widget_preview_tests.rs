@@ -16,6 +16,199 @@ use ovrley_widgets::{
 use serde_json::{json, Value};
 use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
 
+fn elevation_request() -> Value {
+    let defaults: Value = serde_json::from_str(include_str!("../../../assets/standard-widgets.json")).unwrap();
+    let mut request = route_request();
+    request["type"] = json!("elevation");
+    request["widget"] = defaults["plot"]["definitions"]["elevation"]["defaults"].clone();
+    request["widget"].as_object_mut().unwrap().extend(json!({
+        "id": "elevation", "x": 150.25, "y": 90.5, "width": 280.125, "height": 145.25, "rotation": 27.0,
+        "show_elevation_imperial": true, "starting_altitude": 3500, "starting_altitude_unit": "ft",
+        "metric_label_offset_x": 7.25, "metric_label_offset_y": -22.5,
+        "imperial_label_offset_x": 18.5, "imperial_label_offset_y": 4.25,
+        "point_label": {"font": "Inter.ttf", "font_size": 19.5, "color": "#abcdef"}
+    }).as_object().unwrap().clone());
+    request
+}
+
+fn elevation_activity() -> ovrley_core::activity::schema::ParsedActivity {
+    ovrley_core::activity::parse_activity_json(&json!({
+        "sample_elapsed_seconds": [0.0, 0.5, 1.5, 2.5, 3.0, 4.0], "trim_end_seconds": 4.0,
+        "sample_distance_progress": [0.0, 0.2, 0.2, 0.2, 0.8, 1.0],
+        "sample_elevations": [100.0, 115.0, null, 165.0, 180.0, 125.0],
+        "barometric_altitude": [100.0, 115.0, null, 165.0, 180.0, 125.0],
+        "elevation": [10.0, 15.0, 20.0, 30.0, 35.0, 25.0]
+    }).to_string()).unwrap()
+}
+
+fn elevation_preview(request: &Value, activity: &[u8]) -> (PreviewSession, u32) {
+    let mut preview = PreviewSession::default();
+    let font: ovrley_widgets::preview::FontRequest = serde_json::from_value(json!({"font": "Inter.ttf"})).unwrap();
+    let dirs = vec![common::test_config::repo_git_root().join("fonts")];
+    let bytes = preview_font_resource(&dirs, &font.font, font.font_weight, font.italic).unwrap();
+    preview.fonts.register(font, &bytes).unwrap();
+    preview.replace_activity(activity).unwrap();
+    let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+    (preview, id)
+}
+
+fn prepared_elevation(preview: &PreviewSession, id: u32) -> std::sync::Arc<ovrley_widgets::widgets::elevation::geometry::ElevationGeometry> {
+    let ovrley_widgets::preview_widget::PreviewWidget::Elevation(widget) = &preview.widgets[&id] else { panic!("expected elevation handle"); };
+    widget.prepared_geometry.as_ref().unwrap().clone()
+}
+
+#[test]
+fn elevation_preview_matches_native_export_labels_hover_seeking_and_activity_replacement() {
+    use ovrley_core::{activity::{interpolate::densify_activity, trim::trim_activity}, debug::RenderProfiler, paths::AppPaths, render::{prepare_preview_assets, FrameSize, VideoFrameRenderer}};
+    let activity = elevation_activity();
+    let bytes = serde_json::to_vec(&activity).unwrap();
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
+    for (variant, full) in [("single", true), ("ring", false), ("halo", false)] {
+        let mut request = elevation_request();
+        request["widget"]["marker_variant"] = json!(variant);
+        request["widget"]["show_full_activity"] = json!(full);
+        request["scene"]["custom_export_range_active"] = json!(true);
+        request["scene"]["start"] = json!(0.25);
+        request["scene"]["end"] = json!(3.25);
+        let config = common::seam::validated_config_from_value(json!({"scene": request["scene"], "values": [], "labels": [], "plots": [request["widget"]]}));
+        let requirements = config.render_data_requirements().unwrap();
+        let trimmed = trim_activity(&activity, 0.25, 3.25, &requirements).unwrap();
+        let seconds = vec![0.0, 0.75, 1.5, 2.2, 2.9];
+        let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
+        let (assets, _, _, _) = prepare_preview_assets(&paths, &config, &activity, &dense).unwrap();
+        let renderer = VideoFrameRenderer::new(&paths, &dense, &assets, FrameSize {width: 700, height: 500}, 0).unwrap();
+        let (mut preview, id) = elevation_preview(&request, &bytes);
+        let raw = serde_json::from_value(request["widget"].clone()).unwrap();
+        let scene = validate_scene_presentation(serde_json::from_value(request["scene"].clone()).unwrap()).unwrap();
+        assert_eq!(config.elevation_plots[0], ovrley_widgets::widgets::elevation::validation::validate_elevation_plot(&raw, 0, &scene).unwrap());
+        let mut selection = None;
+        for index in [0, 1, 2, 3, 4, 2, 0] {
+            let second = 0.25 + seconds[index];
+            preview.render(second).unwrap();
+            let prepared = prepared_elevation(&preview, id);
+            assert_eq!(assets.elevation_geometry_json().unwrap()["points"], serde_json::to_value(&prepared.points).unwrap());
+            let widget = &preview.widgets[&id];
+            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            if let Some(selection) = &selection { assert_eq!(&geometry["content"], selection, "labels and hover must not move the selection frame"); }
+            else { selection = Some(geometry["content"].clone()); }
+            let (w, h, left, top) = (geometry["width"].as_u64().unwrap() as usize, geometry["height"].as_u64().unwrap() as usize, geometry["left"].as_f64().unwrap() as usize, geometry["top"].as_f64().unwrap() as usize);
+            let mut native = vec![0; 700 * 500 * 4];
+            renderer.render_rgba(index, &mut native, &mut RenderProfiler::default()).unwrap();
+            let mut difference = 0;
+            let mut largest = (0, 0, [0; 4], [0; 4]);
+            for y in 0..h {
+                let native = &native[((top + y) * 700 + left) * 4..((top + y) * 700 + left + w) * 4];
+                let pixels = &widget.pixels()[y * w * 4..(y + 1) * w * 4];
+                for (x, (a, b)) in native.chunks_exact(4).zip(pixels.chunks_exact(4)).enumerate() {
+                    let previous = difference;
+                    difference = difference.max(a[3].abs_diff(b[3]) as u16);
+                    for c in 0..3 { difference = difference.max((a[c] as u16 * a[3] as u16).abs_diff(b[c] as u16 * b[3] as u16) / 255); }
+                    if difference > previous { largest = (x + left, y + top, <[u8; 4]>::try_from(a).unwrap(), <[u8; 4]>::try_from(b).unwrap()); }
+                }
+            }
+            assert!(difference <= 8, "{variant}/{full} native elevation differs at {second}: {difference}; {largest:?}");
+            assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] > 0));
+            let revision = widget.revision();
+            preview.render(second).unwrap();
+            assert_eq!(preview.widgets[&id].revision(), revision);
+        }
+        let pixels = preview.widgets[&id].pixels().clone();
+        preview.replace_activity(&[]).unwrap();
+        preview.render(0.25).unwrap();
+        assert_ne!(preview.widgets[&id].pixels(), &pixels);
+        preview.replace_activity(&bytes).unwrap();
+        preview.render(0.25).unwrap();
+        assert_eq!(preview.widgets[&id].pixels(), &pixels);
+        let mut replacement = activity.clone();
+        replacement.barometric_altitude[1] = Some(210.0);
+        replacement.sample_elevations[1] = Some(210.0);
+        preview.replace_activity(&serde_json::to_vec(&replacement).unwrap()).unwrap();
+        preview.render(0.25).unwrap();
+        assert_ne!(preview.widgets[&id].pixels(), &pixels);
+        preview.render(5.0).unwrap();
+        assert_ne!(preview.widgets[&id].pixels(), &pixels);
+    }
+    let request = elevation_request();
+    let (mut preview, _) = elevation_preview(&request, &bytes);
+    for (field, value) in [("width", json!(0)), ("height", json!("145")), ("marker_variant", json!("unknown")), ("show_full_activity", json!("true")), ("y_scale", json!(9)), ("starting_altitude", json!("bad"))] {
+        let mut invalid = request.clone();
+        invalid["widget"][field] = value;
+        let decoded = serde_json::from_value::<ovrley_widgets::preview_widget::WidgetRequest>(invalid);
+        assert!(decoded.is_err() || preview.create_widget(decoded.unwrap()).is_err(), "malformed {field} must fail");
+    }
+    let mut missing = request;
+    missing["widget"].as_object_mut().unwrap().remove("remaining_line_width");
+    assert!(serde_json::from_value::<ovrley_widgets::preview_widget::WidgetRequest>(missing).is_err());
+}
+
+#[test]
+fn elevation_resize_updates_size_reuses_geometry_until_commit_and_preserves_fixed_corners() {
+    use std::sync::Arc;
+    let opposite = |geometry: &Value, fixed: [f64; 2]| {
+        let c = &geometry["content"];
+        let angle = geometry["rotation"].as_f64().unwrap().to_radians();
+        let (ox, oy) = (c["width"].as_f64().unwrap() * 0.5, c["height"].as_f64().unwrap() * 0.5);
+        let (dx, dy) = (c["width"].as_f64().unwrap() * fixed[0] - ox, c["height"].as_f64().unwrap() * fixed[1] - oy);
+        [c["left"].as_f64().unwrap() + ox + dx * angle.cos() - dy * angle.sin(), c["top"].as_f64().unwrap() + oy + dx * angle.sin() + dy * angle.cos()]
+    };
+    for (fixed, flat) in [([0.0, 0.0], false), ([0.0, 1.0], false), ([1.0, 0.0], false), ([1.0, 1.0], false), ([0.5, 1.0], true)] {
+        let mut activity = elevation_activity();
+        if flat {
+            activity.sample_elevations.fill(Some(100.0));
+            activity.barometric_altitude.fill(Some(100.0));
+        }
+        let bytes = serde_json::to_vec(&activity).unwrap();
+        let request = elevation_request();
+        let (mut preview, id) = elevation_preview(&request, &bytes);
+        preview.render(0.75).unwrap();
+        let original = prepared_elevation(&preview, id);
+        let original_pixels = preview.widgets[&id].pixels().clone();
+        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let point = opposite(&geometry, fixed);
+        let resize_request = |size, second, commit| {
+            let mut resize = request.clone();
+            resize.as_object_mut().unwrap().extend(json!({"handle": id, "size": size, "fixed": fixed, "point": point, "second": second, "commit": commit}).as_object().unwrap().clone());
+            serde_json::from_value(resize).unwrap()
+        };
+        for (size, second) in [([235.125, 230.375], 0.75), ([425.375, 120.125], 2.15)] {
+            let patch = serde_json::to_value(preview.resize_widget(resize_request(size, second, false)).unwrap()).unwrap();
+            let mut live = request.clone();
+            live["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+            live["transient"] = json!(true);
+            preview.update_widget(id, serde_json::from_value(live).unwrap()).unwrap();
+            preview.render(second).unwrap();
+            assert!(Arc::ptr_eq(&original, &prepared_elevation(&preview, id)), "live resizing must retain prepared vectors");
+            let live: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let anchored = opposite(&live, fixed);
+            assert!((anchored[0] - point[0]).abs() < 0.001 && (anchored[1] - point[1]).abs() < 0.001);
+            assert!((live["content"]["width"].as_f64().unwrap() - size[0]).abs() < 0.001);
+            assert!((live["content"]["height"].as_f64().unwrap() - size[1]).abs() < 0.001);
+            assert_ne!(preview.widgets[&id].pixels(), &original_pixels, "the resized profile must redraw immediately");
+        }
+        preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+        preview.render(0.75).unwrap();
+        assert!(Arc::ptr_eq(&original, &prepared_elevation(&preview, id)));
+        assert_eq!(preview.widgets[&id].pixels(), &original_pixels, "cancel restores committed pixels");
+        let patch = serde_json::to_value(preview.resize_widget(resize_request([425.375, 120.125], 2.15, true)).unwrap()).unwrap();
+        let prepared = prepared_elevation(&preview, id);
+        assert!(!Arc::ptr_eq(&original, &prepared), "commit rebuilds profile geometry");
+        assert_ne!(patch["width"].as_f64().unwrap().fract(), 0.0);
+        let mut committed = request;
+        committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+        preview.update_widget(id, serde_json::from_value(committed.clone()).unwrap()).unwrap();
+        preview.render(2.15).unwrap();
+        assert!(Arc::ptr_eq(&prepared, &prepared_elevation(&preview, id)), "committed snapshot must reuse the final preparation");
+        let live: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let anchored = opposite(&live, fixed);
+        assert!((anchored[0] - point[0]).abs() < 0.001 && (anchored[1] - point[1]).abs() < 0.001);
+        let (mut reloaded, reloaded_id) = elevation_preview(&committed, &bytes);
+        reloaded.render(2.15).unwrap();
+        assert_eq!(preview.widgets[&id].geometry(), reloaded.widgets[&reloaded_id].geometry());
+        assert_eq!(preview.widgets[&id].pixels(), reloaded.widgets[&reloaded_id].pixels());
+    }
+}
+
 fn route_request() -> Value {
     let defaults: Value = serde_json::from_str(include_str!("../../../assets/standard-widgets.json")).unwrap();
     let mut widget = defaults["plot"]["definitions"]["course"]["defaults"].clone();

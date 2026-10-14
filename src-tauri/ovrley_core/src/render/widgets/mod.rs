@@ -13,24 +13,16 @@ pub(crate) mod elevation;
 pub mod g_force;
 /// Gauge renderers and gauge-specific shared infrastructure.
 pub mod gauges;
-/// Point/rect/math and layout-fitting helpers.
-mod geometry;
 /// Heading compass tape widget implementation.
 pub mod heading;
 /// Current and best lap timer text widget implementation.
 pub mod lap_timer;
 /// Lean-angle sector widget implementation.
 pub mod lean_angle;
-/// Marker and dot drawing helpers.
-mod marker;
 /// DisplayType-driven metric presentation dispatch.
 pub mod metric_presentation;
-/// Polyline and area drawing helpers.
-mod polyline;
 /// Route/course widget implementation.
 pub(crate) mod route;
-/// Skia path and coordinate transform helpers.
-mod transform;
 /// Shared widget cache and report types.
 pub mod types;
 /// Metric value widgets, including icons and gradient triangles.
@@ -128,6 +120,7 @@ pub fn prepare_render_assets(
                 dense_activity,
                 validated,
                 &assets.scene,
+                paths,
                 prepare_profiler,
             )?);
     }

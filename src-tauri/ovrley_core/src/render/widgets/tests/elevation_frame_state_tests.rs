@@ -11,8 +11,8 @@
 //! - Marker_y stuck at geometry y-coordinate during drone hover
 //! - Marker_y not tracking elevation changes at same GPS position
 
-use super::super::elevation::{build_elevation_completed_points, build_elevation_frame_states};
-use super::super::types::{NormalizedElevationPlot, WidgetGeometry};
+use super::super::elevation::build_elevation_frame_states;
+use ovrley_widgets::widgets::elevation::{geometry::{build_elevation_completed_points, ElevationGeometry}, validation::ValidatedElevationPlot};
 use crate::activity::schema::{DenseActivityReport, DenseSeriesReport, ParsedActivity};
 use crate::normalize::ValidatedSceneConfig;
 use std::collections::BTreeMap;
@@ -177,26 +177,20 @@ fn minimal_dense_activity() -> DenseActivityReport {
     }
 }
 
-fn vertical_segment_geometry() -> WidgetGeometry {
+fn vertical_segment_geometry() -> ElevationGeometry {
     // All points at the SAME y-coordinate — proving marker_y is driven by
     // elevation data, not geometry point lookup.
-    WidgetGeometry {
-        points: vec![(100.0, 400.0), (100.0, 400.0), (100.0, 400.0)],
-        bbox: (0.0, 0.0, 200.0, 600.0),
-        progress_values: vec![0.0, 0.5, 1.0],
-        elapsed_fractions: vec![0.0, 0.5, 1.0],
-        elevation_data_range: Some((100.0, 300.0)),
-        source_point_count: 3,
-        simplification: "test".into(),
-    }
+    let mut geometry = ElevationGeometry::new(&minimal_plot(), 1.0, &[(0.5, 100.0, 0.0), (0.5, 100.0, 0.5), (0.5, 100.0, 1.0)]).unwrap();
+    geometry.elevation_data_range = Some((100.0, 300.0));
+    geometry
 }
 
-fn minimal_plot() -> NormalizedElevationPlot {
-    NormalizedElevationPlot {
+fn minimal_plot() -> ValidatedElevationPlot {
+    ValidatedElevationPlot {
         x: 0.0,
         y: 0.0,
-        width: 200,
-        height: 600,
+        width: 200.0,
+        height: 600.0,
         rotation: 0.0,
         y_scale: 1.0,
         simplify_tolerance_px: 0.0,
@@ -204,7 +198,8 @@ fn minimal_plot() -> NormalizedElevationPlot {
         remaining_line_width: 1.0,
         remaining_line_color: "#ffffff".into(),
         remaining_line_opacity: 1.0,
-        remaining_line_shadow: None,
+        show_full_activity: true,
+        starting_altitude_m: None,
         completed_line_width: 2.0,
         completed_line_color: "#00ff00".into(),
         completed_line_opacity: 1.0,
@@ -212,7 +207,7 @@ fn minimal_plot() -> NormalizedElevationPlot {
         area_remaining_opacity: 0.3,
         area_completed_color: "#00ff00".into(),
         area_completed_opacity: 0.5,
-        marker_variant: "circle".into(),
+        marker_variant: "single".into(),
         marker_variant_diameter: 0.0,
         marker_size: 8.0,
         marker_color: "#ff0000".into(),
@@ -262,9 +257,9 @@ fn marker_y_follows_elevation_during_hover() {
     );
 
     // Elevation values must match the dense data
-    assert_eq!(states[0].elevation_m, 100.0);
-    assert_eq!(states[1].elevation_m, 200.0);
-    assert_eq!(states[2].elevation_m, 300.0);
+    assert_eq!(states[0].elevation_m, Some(100.0));
+    assert_eq!(states[1].elevation_m, Some(200.0));
+    assert_eq!(states[2].elevation_m, Some(300.0));
 }
 
 /// Completed profile fills a vertical segment chronologically — mid-hover

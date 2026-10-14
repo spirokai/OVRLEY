@@ -37,7 +37,7 @@ pub struct RouteFrame {
     pub content_bounds: ContentBounds,
 }
 
-fn scaled_rect(rect: Rect, scale: [f32; 2]) -> Rect {
+pub(crate) fn scaled_rect(rect: Rect, scale: [f32; 2]) -> Rect {
     Rect::new(
         rect.left * scale[0],
         rect.top * scale[1],
@@ -46,7 +46,7 @@ fn scaled_rect(rect: Rect, scale: [f32; 2]) -> Rect {
     )
 }
 
-fn rotated_rect(rect: Rect, rotation: f32, x: f32, y: f32) -> Rect {
+pub(crate) fn rotated_rect(rect: Rect, rotation: f32, x: f32, y: f32) -> Rect {
     let (sin, cos) = rotation.to_radians().sin_cos();
     let corners = [
         (rect.left, rect.top),
@@ -72,7 +72,7 @@ fn rotated_rect(rect: Rect, rotation: f32, x: f32, y: f32) -> Rect {
     bounds
 }
 
-fn outward(rect: Rect) -> Rect {
+pub(crate) fn outward(rect: Rect) -> Rect {
     Rect::new(
         rect.left.floor(),
         rect.top.floor(),
@@ -81,7 +81,7 @@ fn outward(rect: Rect) -> Rect {
     )
 }
 
-fn stroke_paint(color: &str, width: f32, opacity: f32) -> Paint {
+pub(crate) fn stroke_paint(color: &str, width: f32, opacity: f32) -> Paint {
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
     paint.set_style(skia_safe::paint::Style::Stroke);

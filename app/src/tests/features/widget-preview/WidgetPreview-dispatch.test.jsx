@@ -18,9 +18,6 @@ vi.mock('@/features/widget-preview/widgets/text/TextPreview', () => ({
 vi.mock('@/features/widget-preview/widgets/metric/MetricPreview', () => ({
   OverlayMetricWidget: (props) => <div data-testid="metric-renderer" data-widget-type={props.widget.type} />,
 }))
-vi.mock('@/features/widget-preview/widgets/elevation/ElevationPreview', () => ({
-  OverlayElevationWidget: () => <div data-testid="elevation-renderer" />,
-}))
 vi.mock('@/features/widget-preview/widgets/backdrop/BackdropPreview', () => ({
   default: (props) => <div data-testid="backdrop-renderer" data-widget-type={props.widget.type} />,
 }))
@@ -54,15 +51,10 @@ describe('WidgetPreview dispatch by display_type', () => {
     expect(getByTestId('backdrop-renderer')).toBeTruthy()
   })
 
-  test('course widgets require the WASM canvas', () => {
-    expect(() => render(<WidgetPreview widget={{ type: 'course', category: 'plots', data: { x: 0, y: 0 } }} activity={ACTIVITY} />)).toThrow(
+  test.each(['course', 'elevation'])('%s widgets require the WASM canvas', (type) => {
+    expect(() => render(<WidgetPreview widget={{ type, category: 'plots', data: { x: 0, y: 0 } }} activity={ACTIVITY} />)).toThrow(
       'requires the WASM widget canvas',
     )
-  })
-
-  test('elevation widgets use the elevation renderer', () => {
-    const { getByTestId } = render(<WidgetPreview widget={{ type: 'elevation', category: 'plots', data: { x: 0, y: 0 } }} activity={ACTIVITY} />)
-    expect(getByTestId('elevation-renderer')).toBeTruthy()
   })
 
   test('heading with text display_type uses the metric (text) renderer', () => {

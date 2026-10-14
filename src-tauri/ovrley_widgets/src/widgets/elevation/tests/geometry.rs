@@ -11,19 +11,18 @@
 //! - Elevation data range not stored or mismatched with source data
 //! - Elapsed fractions not parallel to progress values in output
 
-use super::super::elevation::prepare::build_elevation_geometry;
-use super::super::types::NormalizedElevationPlot;
+use super::super::{geometry::ElevationGeometry, validation::ValidatedElevationPlot};
 
 /// Builds a minimal `NormalizedElevationPlot` for testing.
 ///
 /// All dimensions and style values are arbitrary — the test exercises
 /// elapsed-fraction propagation, not rendering.
-fn minimal_plot() -> NormalizedElevationPlot {
-    NormalizedElevationPlot {
+fn minimal_plot() -> ValidatedElevationPlot {
+    ValidatedElevationPlot {
         x: 0.0,
         y: 0.0,
-        width: 400,
-        height: 200,
+        width: 400.0,
+        height: 200.0,
         rotation: 0.0,
         y_scale: 1.0,
         simplify_tolerance_px: 0.0,
@@ -31,7 +30,8 @@ fn minimal_plot() -> NormalizedElevationPlot {
         remaining_line_width: 1.0,
         remaining_line_color: "#ffffff".into(),
         remaining_line_opacity: 1.0,
-        remaining_line_shadow: None,
+        show_full_activity: true,
+        starting_altitude_m: None,
         completed_line_width: 2.0,
         completed_line_color: "#00ff00".into(),
         completed_line_opacity: 1.0,
@@ -39,7 +39,7 @@ fn minimal_plot() -> NormalizedElevationPlot {
         area_remaining_opacity: 0.3,
         area_completed_color: "#00ff00".into(),
         area_completed_opacity: 0.5,
-        marker_variant: "circle".into(),
+        marker_variant: "single".into(),
         marker_variant_diameter: 0.0,
         marker_size: 8.0,
         marker_color: "#ff0000".into(),
@@ -70,7 +70,7 @@ fn geometry_has_elapsed_fractions_parallel_to_progress() {
         })
         .collect();
 
-    let geometry = build_elevation_geometry(&plot, &raw_points).unwrap();
+    let geometry = ElevationGeometry::new(&plot, 1.0, &raw_points).unwrap();
 
     assert_eq!(
         geometry.elapsed_fractions.len(),
@@ -105,7 +105,7 @@ fn geometry_elevation_data_range_matches_source() {
         })
         .collect();
 
-    let geometry = build_elevation_geometry(&plot, &raw_points).unwrap();
+    let geometry = ElevationGeometry::new(&plot, 1.0, &raw_points).unwrap();
 
     let (min_elev, max_elev) = geometry.elevation_data_range.unwrap();
     assert!(
@@ -131,7 +131,7 @@ fn geometry_elapsed_fractions_bounded_0_1() {
         })
         .collect();
 
-    let geometry = build_elevation_geometry(&plot, &raw_points).unwrap();
+    let geometry = ElevationGeometry::new(&plot, 1.0, &raw_points).unwrap();
 
     for &frac in &geometry.elapsed_fractions {
         assert!(

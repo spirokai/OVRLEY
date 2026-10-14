@@ -95,7 +95,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       current.anchor = resizeAnchor(
         bounds,
         direction,
-        ['course', 'raster'].includes(selectedWidget.type) ? current.origin.data.rotation : 0,
+        ['course', 'elevation', 'raster'].includes(selectedWidget.type) ? current.origin.data.rotation : 0,
         current.origin.rotationOrigin,
       )
       set([bounds.width, bounds.height])
@@ -109,6 +109,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
         geometry: {
           ...(selectedWidget.type === 'backdrop' ||
           selectedWidget.type === 'raster' ||
+          selectedWidget.type === 'elevation' ||
           ['heading_tape', 'linear'].includes(selectedWidget.data.display_type)
             ? { size: [Math.max(width, 0.01), Math.max(height, 0.01)] }
             : { factor: Math.max(width / current.origin.bounds.width, 0.01) }),

@@ -10,8 +10,5 @@
 //! state, projection, reduction, and RDP behavior.
 
 mod elevation_frame_state_tests;
-mod elevation_geometry_tests;
-mod elevation_reduction_tests;
 mod g_force_frame_state_tests;
 mod gauge_metric_tests;
-mod rdp_elevation_tests;

@@ -11,3 +11,4 @@ pub mod label;
 pub mod backdrop;
 pub mod raster;
 pub mod route;
+pub mod elevation;

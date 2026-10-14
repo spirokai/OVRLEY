@@ -28,7 +28,6 @@
 import { memo } from 'react'
 import { OverlayTextWidget } from './widgets/text/TextPreview'
 import { OverlayMetricWidget } from './widgets/metric/MetricPreview'
-import { OverlayElevationWidget } from './widgets/elevation/ElevationPreview'
 import OverlayBackdropWidget from './widgets/backdrop/BackdropPreview'
 import { isBoxedDisplayType } from '@/lib/widget/standard-metrics'
 
@@ -37,20 +36,7 @@ import { isBoxedDisplayType } from '@/lib/widget/standard-metrics'
  * @param {object} props - Widget, activity, presentation models, and scene preview state.
  * @returns {JSX.Element} The selected widget preview.
  */
-function WidgetPreview({
-  widget,
-  activity,
-  previewSecond,
-  globalOpacity,
-  globalScale,
-  metricPreviewModel,
-  textPreviewModel,
-  sceneFont,
-  sceneFontSize,
-  sceneStyle,
-  valueFont,
-  exportRange,
-}) {
+function WidgetPreview({ widget, activity, previewSecond, globalOpacity, globalScale, metricPreviewModel, textPreviewModel, sceneStyle }) {
   if (widget.type === 'backdrop') {
     return <OverlayBackdropWidget widget={widget} globalOpacity={globalOpacity} globalScale={globalScale} />
   }
@@ -59,24 +45,7 @@ function WidgetPreview({
     return <OverlayTextWidget widget={widget} globalOpacity={globalOpacity} sceneStyle={sceneStyle} textPreviewModel={textPreviewModel} />
   }
 
-  if (widget.type === 'course') throw new Error('Course requires the WASM widget canvas')
-
-  if (widget.type === 'elevation') {
-    return (
-      <OverlayElevationWidget
-        widget={widget}
-        activity={activity}
-        previewSecond={previewSecond}
-        globalOpacity={globalOpacity}
-        globalScale={globalScale}
-        sceneFont={sceneFont}
-        sceneFontSize={sceneFontSize}
-        sceneStyle={sceneStyle}
-        valueFont={valueFont}
-        exportRange={exportRange}
-      />
-    )
-  }
+  if (widget.type === 'course' || widget.type === 'elevation') throw new Error(`${widget.type} requires the WASM widget canvas`)
 
   // Metric widgets: dispatch by display_type.
   if (isBoxedDisplayType(widget.data.display_type)) {

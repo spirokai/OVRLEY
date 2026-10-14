@@ -46,7 +46,7 @@ pub struct ScenePresentationConfig {
 }
 
 /// Shared presentation validated once before per-job timing is available.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedScenePresentation {
     pub width: u32,
     pub height: u32,

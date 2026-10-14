@@ -102,7 +102,7 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
         },
         finish() {
           if (!active || active.id !== id) return null
-          active.committing = active.type === 'course' && active.intent?.type === 'resize'
+          active.committing = ['course', 'elevation'].includes(active.type) && active.intent?.type === 'resize'
           flush() // Mouseup can precede the pending animation frame.
           const patch = active.patch
           active = null
@@ -137,7 +137,7 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
                     widget: active.data,
                     scene: active.scene,
                     second: snapshot.second,
-                    ...(active.type === 'course' ? { commit: active.committing } : {}),
+                    ...(['course', 'elevation'].includes(active.type) ? { commit: active.committing } : {}),
                     ...intent.geometry,
                   },
                   active.id,

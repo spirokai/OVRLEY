@@ -11,6 +11,9 @@ let modulePromise
 
 function widgetFonts(widget) {
   if (widget.type === 'backdrop' || widget.type === 'raster' || widget.type === 'course') return []
+  if (widget.type === 'elevation') {
+    return widget.data.show_elevation_metric || widget.data.show_elevation_imperial ? [{ font: widget.data.point_label.font }] : []
+  }
   if (['linear', 'arc', 'corner'].includes(widget.data.display_type)) {
     const fonts = widget.data.display_type === 'linear' ? [] : [{ font: widget.data.font }]
     if (widget.data.show_min_max_labels) fonts.push({ font: widget.data.min_max_label_font })
@@ -61,7 +64,7 @@ export function createPreviewSession(module, onError) {
     getSnapshot: () => snapshot,
     getGeometry: (id) => widgets.get(id).geometry,
     resize(request, id) {
-      const input = request.type === 'course' ? { ...request, handle: widgets.get(id).handle } : request
+      const input = ['course', 'elevation'].includes(request.type) ? { ...request, handle: widgets.get(id).handle } : request
       upload(encoder.encode(JSON.stringify(input)), (ptr, len) => check(module._ovrley_preview_resize(handle, ptr, len)))
       return JSON.parse(read(module._ovrley_preview_resize_ptr(handle), module._ovrley_preview_resize_len(handle)))
     },
@@ -161,13 +164,13 @@ export function createPreviewSession(module, onError) {
         if (fontResources.some((resource) => !resource.ready)) continue
         if (isTimeDependentWasmWidget(widget) && !activityReady) continue
         let instance = widgets.get(widget.id)
-        const transient = widget.type === 'course' && interaction.isResizing(widget.id)
+        const transient = ['course', 'elevation'].includes(widget.type) && interaction.isResizing(widget.id)
         if (instance?.data === widget.data && instance.scene === snapshot.scene && instance.transient === transient) continue
         const config = JSON.stringify({
           type: widget.type,
           widget: widget.data,
           scene: snapshot.scene,
-          ...(widget.type === 'course' ? { transient } : {}),
+          ...(['course', 'elevation'].includes(widget.type) ? { transient } : {}),
         })
         if (!instance) {
           const widgetHandle = upload(encoder.encode(config), (ptr, len) => module._ovrley_preview_widget_create(handle, ptr, len))

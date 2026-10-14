@@ -61,39 +61,48 @@ test('raster loads once, creates without waiting for fonts, and ignores playhead
   expect(module._ovrley_preview_destroy).toHaveBeenCalledOnce()
 })
 
-test.each(['g_force', 'heading'])('%s prepares its label font independently and reuses its handle through playback before disposal', async (type) => {
-  previewFont.mockImplementation(({ font }) => (font === 'Label.ttf' ? Promise.resolve([1, 2, 3]) : new Promise(() => {})))
-  const { module, session, snapshot, error } = setup()
-  const widget = {
-    id: 'g',
-    type,
-    data: { value: type, display_type: type === 'heading' ? 'heading_tape' : type, font: 'Unused.ttf', label_font: 'Label.ttf' },
-  }
-  expect(isWasmWidget(widget)).toBe(true)
-  const next = { ...snapshot, widgets: [widget] }
-  session.setSnapshot(next)
-  vi.advanceTimersToNextFrame()
-  expect(module._ovrley_preview_widget_create).not.toHaveBeenCalled()
-  await Promise.resolve()
-  vi.advanceTimersToNextFrame()
-  expect(previewFont).toHaveBeenCalledWith({ font: 'Label.ttf' })
-  expect(previewFont).not.toHaveBeenCalledWith({ font: 'Unused.ttf' })
-  expect(module._ovrley_preview_font).toHaveBeenCalledOnce()
-  expect(module._ovrley_preview_widget_create).toHaveBeenCalledOnce()
-  for (const second of [1.25, 3.5, 0.5]) {
-    session.setSnapshot({ ...next, second })
+test.each(['g_force', 'heading', 'elevation'])(
+  '%s prepares its label font independently and reuses its handle through playback before disposal',
+  async (type) => {
+    previewFont.mockImplementation(({ font }) => (font === 'Label.ttf' ? Promise.resolve([1, 2, 3]) : new Promise(() => {})))
+    const { module, session, snapshot, error } = setup()
+    const widget = {
+      id: 'g',
+      type,
+      data: {
+        value: type,
+        display_type: type === 'heading' ? 'heading_tape' : type,
+        font: 'Unused.ttf',
+        label_font: 'Label.ttf',
+        ...(type === 'elevation' ? { point_label: { font: 'Label.ttf' }, show_elevation_metric: true, show_elevation_imperial: false } : {}),
+      },
+    }
+    expect(isWasmWidget(widget)).toBe(true)
+    const next = { ...snapshot, widgets: [widget] }
+    session.setSnapshot(next)
     vi.advanceTimersToNextFrame()
-  }
-  expect(module._ovrley_preview_render.mock.calls.map((call) => call[1])).toEqual([0, 0, 1.25, 3.5, 0.5])
-  expect(module._ovrley_preview_widget_update).not.toHaveBeenCalled()
-  session.setSnapshot({ ...next, widgets: [] })
-  vi.advanceTimersToNextFrame()
-  expect(module._ovrley_preview_widget_destroy).toHaveBeenCalledWith(1, 2)
-  expect(module._ovrley_preview_destroy).not.toHaveBeenCalled()
-  expect(error).toHaveBeenLastCalledWith(null)
-  session.dispose()
-  expect(module._ovrley_preview_destroy).toHaveBeenCalledOnce()
-})
+    expect(module._ovrley_preview_widget_create).not.toHaveBeenCalled()
+    await Promise.resolve()
+    vi.advanceTimersToNextFrame()
+    expect(previewFont).toHaveBeenCalledWith({ font: 'Label.ttf' })
+    expect(previewFont).not.toHaveBeenCalledWith({ font: 'Unused.ttf' })
+    expect(module._ovrley_preview_font).toHaveBeenCalledOnce()
+    expect(module._ovrley_preview_widget_create).toHaveBeenCalledOnce()
+    for (const second of [1.25, 3.5, 0.5]) {
+      session.setSnapshot({ ...next, second })
+      vi.advanceTimersToNextFrame()
+    }
+    expect(module._ovrley_preview_render.mock.calls.map((call) => call[1])).toEqual([0, 0, 1.25, 3.5, 0.5])
+    expect(module._ovrley_preview_widget_update).not.toHaveBeenCalled()
+    session.setSnapshot({ ...next, widgets: [] })
+    vi.advanceTimersToNextFrame()
+    expect(module._ovrley_preview_widget_destroy).toHaveBeenCalledWith(1, 2)
+    expect(module._ovrley_preview_destroy).not.toHaveBeenCalled()
+    expect(error).toHaveBeenLastCalledWith(null)
+    session.dispose()
+    expect(module._ovrley_preview_destroy).toHaveBeenCalledOnce()
+  },
+)
 
 test.each(['linear', 'arc', 'corner'])(
   '%s transports its required gauge fonts and keeps the handle through fractional playback',

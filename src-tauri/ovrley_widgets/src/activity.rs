@@ -30,6 +30,7 @@ macro_rules! activity_columns {
             #[serde(default)] metadata: serde_json::Value,
             $(#[serde(default)] $field: Vec<Option<f64>> ,)*
             #[serde(default)] elevation: Vec<Option<f64>>,
+            #[serde(default)] sample_elevations: Vec<Option<f64>>,
             #[serde(default)] barometric_altitude: Vec<Option<f64>>,
             #[serde(default)] gradient: Vec<Option<f64>>,
             #[serde(default)] g_force_x: Vec<Option<f64>>,
@@ -141,6 +142,7 @@ impl NumericColumn {
 }
 
 pub struct ActivitySampler {
+    pub(crate) elevation: crate::widgets::elevation::sampling::ElevationActivity,
     pub(crate) route: crate::widgets::route::sampling::RouteActivity,
     pub(crate) time: crate::widgets::time::sampling::TimeSampler,
     pub(crate) timezone: Option<chrono_tz::Tz>,
@@ -178,6 +180,7 @@ impl ActivitySampler {
             activity.sample_course_points.len(),
             activity.sample_distance_progress.len(),
             activity.elevation.len(),
+            activity.sample_elevations.len(),
             activity.barometric_altitude.len(),
         ] {
             if len != 0 && len != times.len() {
@@ -187,6 +190,9 @@ impl ActivitySampler {
             }
         }
         activity.lap_timing.validate(times)?;
+        let profile = if activity.sample_elevations.is_empty() { &activity.elevation } else { &activity.sample_elevations };
+        let preferred = if activity.barometric_altitude.iter().any(Option::is_some) { &activity.barometric_altitude } else { &activity.elevation };
+        let elevation = crate::widgets::elevation::sampling::ElevationActivity::new(times, profile, preferred, &activity.sample_distance_progress, activity.trim_end_seconds);
         let altitude = if activity.barometric_altitude.iter().any(Option::is_some) {
             std::mem::take(&mut activity.barometric_altitude)
         } else {
@@ -246,6 +252,7 @@ impl ActivitySampler {
             &times, &activity.sample_course_points, &activity.sample_distance_progress, activity.trim_end_seconds,
         );
         Ok(Self {
+            elevation,
             route,
             time,
             timezone,

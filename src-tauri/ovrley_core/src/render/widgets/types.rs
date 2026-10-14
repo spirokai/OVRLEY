@@ -18,8 +18,7 @@ use chrono_tz::Tz;
 use ovrley_widgets::widgets::time::validation::ValidatedTimeValue;
 use ovrley_widgets::model::types::{DisplayType, MetricKind};
 use ovrley_widgets::widgets::value::validation::ValidatedValueWidget;
-use skia_safe::Image;
-use std::fmt;
+use ovrley_widgets::widgets::elevation::{geometry::ElevationFrameState, layout::ElevationLayout};
 
 /// Geometry diagnostics emitted for preview reports.
 #[derive(Clone, Debug, serde::Serialize)]
@@ -210,13 +209,13 @@ impl PreparedRenderAssets {
     /// Returns `None` when no elevation widget is configured.
     pub fn elevation_geometry_json(&self) -> Option<serde_json::Value> {
         let cache = self.elevation_caches.first()?;
-        let geom = &cache.geometry;
+let geom = &cache.drawing.geometry;
         Some(serde_json::json!({
             "points": geom.points.iter().map(|(x, y)| [x, y]).collect::<Vec<_>>(),
             "progressValues": geom.progress_values,
             "elapsedFractions": geom.elapsed_fractions,
             "dataRange": geom.elevation_data_range.map(|(min, max)| [min, max]),
-            "bbox": [geom.bbox.0, geom.bbox.1, geom.bbox.2, geom.bbox.3],
+"bbox": [0.0, 0.0, geom.key.width, geom.key.height],
             "sourcePointCount": geom.source_point_count,
             "simplification": geom.simplification,
         }))
@@ -241,38 +240,6 @@ impl PreparedRenderAssets {
     }
 }
 
-/// Widget-local polyline geometry and progress mapping.
-#[derive(Clone, Debug)]
-pub(crate) struct WidgetGeometry {
-    pub(crate) points: Vec<(f32, f32)>,
-    pub(crate) bbox: (f32, f32, f32, f32),
-    pub(crate) progress_values: Vec<f32>,
-    pub(crate) elapsed_fractions: Vec<f32>,
-    pub(crate) elevation_data_range: Option<(f64, f64)>,
-    pub(crate) source_point_count: usize,
-    pub(crate) simplification: String,
-}
-
-
-/// Precomputed elevation marker state for one frame.
-#[derive(Clone, Debug)]
-pub(crate) struct ElevationFrameState {
-    pub(crate) progress01: f32,
-    pub(crate) marker_x: f32,
-    pub(crate) marker_y: f32,
-    pub(crate) elevation_m: f64,
-    pub(crate) frame_elapsed_fraction: f32,
-}
-
-/// One visual layer of a configurable marker.
-#[derive(Clone, Debug)]
-pub(crate) struct MarkerLayer {
-    pub(crate) radius: f32,
-    pub(crate) color: String,
-    pub(crate) opacity: f32,
-    pub(crate) solid_fill: bool,
-    pub(crate) stroke_width: f32,
-}
 
 /// Prepared route widget cache.
 #[derive(Clone, Debug)]
@@ -298,81 +265,9 @@ pub struct GaugeCache {
     pub frame_states: Vec<GaugeFrameState>,
 }
 
-/// Prepared elevation widget cache.
+/// Shared elevation layout paired with native export samples.
 #[derive(Clone, Debug)]
 pub(crate) struct ElevationWidgetCache {
-    pub(crate) plot: NormalizedElevationPlot,
-    pub(crate) label_altitude_offset_m: f64,
-    pub(crate) geometry: WidgetGeometry,
+    pub(crate) drawing: ElevationLayout,
     pub(crate) frame_states: Vec<ElevationFrameState>,
-    pub(crate) marker_layers: Vec<MarkerLayer>,
-    pub(crate) remaining_layer: Option<StaticLayer>,
-}
-
-/// Static Skia image positioned relative to a widget.
-#[derive(Clone)]
-pub(crate) struct StaticLayer {
-    pub(crate) image: Image,
-    pub(crate) x: f32,
-    pub(crate) y: f32,
-}
-
-impl fmt::Debug for StaticLayer {
-    // Formats static layers without dumping the underlying image pixels.
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("StaticLayer")
-            .field("x", &self.x)
-            .field("y", &self.y)
-            .finish_non_exhaustive()
-    }
-}
-
-/// Drop-shadow style normalized from scene/template fields.
-#[derive(Clone, Debug)]
-pub struct ShadowStyle {
-    pub(crate) color: String,
-    pub(crate) strength: f32,
-    pub(crate) distance: f32,
-    pub(crate) offset_x: f32,
-    pub(crate) offset_y: f32,
-}
-
-
-/// Normalized elevation plot settings after defaults and scale are applied.
-#[derive(Clone, Debug)]
-pub(crate) struct NormalizedElevationPlot {
-    pub(crate) x: f32,
-    pub(crate) y: f32,
-    pub(crate) width: u32,
-    pub(crate) height: u32,
-    pub(crate) rotation: f32,
-    pub(crate) y_scale: f32,
-    pub(crate) simplify_tolerance_px: f32,
-    pub(crate) target_density: f32,
-    pub(crate) remaining_line_width: f32,
-    pub(crate) remaining_line_color: String,
-    pub(crate) remaining_line_opacity: f32,
-    pub(crate) remaining_line_shadow: Option<ShadowStyle>,
-    pub(crate) completed_line_width: f32,
-    pub(crate) completed_line_color: String,
-    pub(crate) completed_line_opacity: f32,
-    pub(crate) area_remaining_color: String,
-    pub(crate) area_remaining_opacity: f32,
-    pub(crate) area_completed_color: String,
-    pub(crate) area_completed_opacity: f32,
-    pub(crate) marker_variant: String,
-    pub(crate) marker_variant_diameter: f32,
-    pub(crate) marker_size: f32,
-    pub(crate) marker_color: String,
-    pub(crate) marker_opacity: f32,
-    pub(crate) show_elevation_metric: bool,
-    pub(crate) show_elevation_imperial: bool,
-    pub(crate) metric_label_offset_x: f32,
-    pub(crate) metric_label_offset_y: f32,
-    pub(crate) imperial_label_offset_x: f32,
-    pub(crate) imperial_label_offset_y: f32,
-    pub(crate) label_font: Option<String>,
-    pub(crate) label_font_size: f32,
-    pub(crate) label_color: String,
 }

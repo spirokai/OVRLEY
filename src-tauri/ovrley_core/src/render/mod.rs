@@ -721,10 +721,8 @@ fn render_frame_to_surface(
     for cache in &prepared_assets.elevation_caches {
         if let Some(report) = draw_elevation_widget(
             canvas,
-            paths,
             cache,
             frame_index,
-            &prepared_assets.scene,
             frame_profiler,
         )? {
             elevation_widgets.push(report);

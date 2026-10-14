@@ -21,7 +21,7 @@
 //! - Empty or single-point inputs panicking
 //! - Collinear points producing wrong simplification
 
-use super::super::elevation::{
+use super::super::reduction::{
     simplify_elevation_samples, simplify_elevation_samples_segment, ElevationSample,
 };
 

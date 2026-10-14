@@ -42,7 +42,7 @@ function editor(type = 'speed') {
   }
 }
 
-test.each(['speed', 'time', 'gradient', 'lean_angle', 'backdrop', 'raster', 'course', 'lap_timer', 'heading'])(
+test.each(['speed', 'time', 'gradient', 'lean_angle', 'backdrop', 'raster', 'course', 'elevation', 'lap_timer', 'heading'])(
   '%s drag coalesces from the captured origin and flushes the final movement without rounding',
   (type) => {
     const { interaction, presentations, original } = editor(type)
@@ -76,35 +76,38 @@ test('course slider and handle rotation share the same patch and preserve positi
   expect(restored.y).toBeCloseTo(original.data.y, 10)
 })
 
-test('course resize defers geometry preparation to the final flush and preserves fractional committed dimensions', () => {
-  const { interaction, resize, setSnapshot, presentations } = editor('course')
-  const original = {
-    id: 'widget',
-    type: 'course',
-    category: 'plots',
-    data: { id: 'widget', value: 'course', x: 120.25, y: 60.5, width: 400.25, height: 210.5 },
-  }
-  setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second: 0.75 })
-  resize.mockImplementation(({ widget, factor, commit }) => ({
-    x: commit ? 81.125 : 80.25,
-    y: 30.5,
-    width: widget.width * factor,
-    height: widget.height * factor,
-  }))
-  const origin = interaction.begin(vi.fn())
-  const anchor = resizeAnchor(origin.bounds, [-1, -1])
-  interaction.update({ type: 'resize', geometry: { factor: 0.75, ...anchor } })
-  vi.advanceTimersToNextFrame()
-  expect(resize.mock.lastCall[0]).toMatchObject({ widget: original.data, second: 0.75, commit: false })
-  interaction.update({ type: 'resize', geometry: { factor: 1.375, ...anchor } })
-  const patch = interaction.finish() // Mouseup before RAF still resolves the final size as a commit.
-  expect(resize).toHaveBeenCalledTimes(2)
-  expect(resize.mock.lastCall[0]).toMatchObject({ widget: original.data, second: 0.75, commit: true })
-  expect(patch).toEqual({ x: 81.125, y: 30.5, width: 550.34375, height: 289.4375 })
-  expect(presentations.at(-1)[0].data).toEqual({ ...original.data, ...patch })
-  expect(updateWidgetInConfig({ plots: [original.data] }, 'widget', patch).plots[0]).toMatchObject(patch)
-  expect(vi.getTimerCount()).toBe(0)
-})
+test.each(['course', 'elevation'])(
+  '%s resize defers geometry preparation to the final flush and preserves fractional committed dimensions',
+  (type) => {
+    const { interaction, resize, setSnapshot, presentations } = editor(type)
+    const original = {
+      id: 'widget',
+      type,
+      category: 'plots',
+      data: { id: 'widget', value: type, x: 120.25, y: 60.5, width: 400.25, height: 210.5 },
+    }
+    setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second: 0.75 })
+    resize.mockImplementation(({ widget, factor, size, commit }) => ({
+      x: commit ? 81.125 : 80.25,
+      y: 30.5,
+      width: size ? size[0] : widget.width * factor,
+      height: size ? size[1] : widget.height * factor,
+    }))
+    const origin = interaction.begin(vi.fn())
+    const anchor = resizeAnchor(origin.bounds, [-1, -1])
+    interaction.update({ type: 'resize', geometry: { ...(type === 'elevation' ? { size: [300.1875, 157.875] } : { factor: 0.75 }), ...anchor } })
+    vi.advanceTimersToNextFrame()
+    expect(resize.mock.lastCall[0]).toMatchObject({ widget: original.data, second: 0.75, commit: false })
+    interaction.update({ type: 'resize', geometry: { ...(type === 'elevation' ? { size: [550.34375, 289.4375] } : { factor: 1.375 }), ...anchor } })
+    const patch = interaction.finish() // Mouseup before RAF still resolves the final size as a commit.
+    expect(resize).toHaveBeenCalledTimes(2)
+    expect(resize.mock.lastCall[0]).toMatchObject({ widget: original.data, second: 0.75, commit: true })
+    expect(patch).toEqual({ x: 81.125, y: 30.5, width: 550.34375, height: 289.4375 })
+    expect(presentations.at(-1)[0].data).toEqual({ ...original.data, ...patch })
+    expect(updateWidgetInConfig({ plots: [original.data] }, 'widget', patch).plots[0]).toMatchObject(patch)
+    expect(vi.getTimerCount()).toBe(0)
+  },
+)
 
 test('resize uses original configuration and a fixed content corner across live drafts/playback; cancellation restores the document', () => {
   const { interaction, presentations, resize, original, setSnapshot } = editor()

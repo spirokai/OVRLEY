@@ -95,6 +95,14 @@ impl PreviewSession {
         if let WidgetRequest::Gauge(origin) = request.origin {
             return Ok(ResizeUpdate::Gauge(crate::widgets::gauges::interaction::resize_gauge(origin.widget, origin.scene, request.factor, request.size, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts)?));
         }
+        if let WidgetRequest::Elevation {widget, scene, ..} = request.origin {
+            let size = request.size.ok_or_else(|| WidgetError::Config("elevation resize size is required".into()))?;
+            let handle = request.handle.ok_or_else(|| WidgetError::Config("elevation resize requires its preview handle".into()))?;
+            let Some(PreviewWidget::Elevation(elevation)) = self.widgets.get_mut(&handle) else {
+                return Err(WidgetError::Config("elevation resize requires an elevation handle".into()));
+            };
+            return Ok(ResizeUpdate::Elevation(elevation.resize(widget, scene, size, request.fixed, request.point, request.second, request.commit, self.activity.as_ref())?));
+        }
         let factor = crate::model::validation::require_positive_f32(request.factor, "resize factor")?;
         match request.origin {
             WidgetRequest::Route {widget, scene, ..} => {
@@ -104,7 +112,7 @@ impl PreviewSession {
                 };
                 Ok(ResizeUpdate::Route(route.resize(widget, scene, factor, request.fixed, request.point, request.second, request.commit, self.activity.as_ref())?))
             },
-            WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } | WidgetRequest::HeadingTape(_) | WidgetRequest::Gauge(_) => unreachable!(),
+            WidgetRequest::Elevation { .. } | WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } | WidgetRequest::HeadingTape(_) | WidgetRequest::Gauge(_) => unreachable!(),
             WidgetRequest::Label {widget, scene} => Ok(ResizeUpdate::Label(crate::widgets::label::interaction::resize_label(widget, scene, factor, request.fixed, request.point, &self.fonts)?)),
             WidgetRequest::Gradient(origin) => Ok(ResizeUpdate::Gradient(crate::widgets::gradient::interaction::resize_gradient(
                 origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
@@ -130,6 +138,7 @@ impl PreviewSession {
             Some(ActivitySampler::from_json(bytes)?)
         };
         for widget in self.widgets.values_mut() {
+            if let PreviewWidget::Elevation(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::Route(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::LapTimer(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::Gauge(widget) = widget { widget.invalidate_activity(); }
@@ -146,6 +155,16 @@ impl PreviewSession {
         Ok(self.next_id)
     }
     pub fn update_widget(&mut self, id: u32, request: WidgetRequest) -> WidgetResult<()> {
+        if let WidgetRequest::Elevation {widget, scene, transient} = request {
+            let previous = self.widgets.get_mut(&id).ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?;
+            if let PreviewWidget::Elevation(elevation) = previous {
+                return elevation.update(widget, scene, transient);
+            }
+            let mut replacement = PreviewWidget::Elevation(crate::widgets::elevation::preview::PreviewElevation::new(widget, scene)?);
+            replacement.inherit_revision(previous.revision());
+            self.widgets.insert(id, replacement);
+            return Ok(());
+        }
         if let WidgetRequest::Route {widget, scene, transient} = request {
             let previous = self.widgets.get_mut(&id).ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?;
             if let PreviewWidget::Route(route) = previous {
@@ -182,6 +201,7 @@ impl PreviewSession {
         for widget in self.widgets.values_mut() {
             // Static families are fully rendered on creation/update and never visit the playhead path.
             match widget {
+                PreviewWidget::Elevation(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::Route(widget) => widget.render(self.activity.as_ref(), second)?,
                 PreviewWidget::Value(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::Gradient(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,

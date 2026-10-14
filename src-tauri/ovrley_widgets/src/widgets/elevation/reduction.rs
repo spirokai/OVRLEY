@@ -4,11 +4,11 @@
 /// Smooths using a Savitzky-Golay kernel, downsamples via even spacing, then
 /// applies RDP in screen space to produce geometry that preserves the visual
 /// profile shape with fewer points.
-use ovrley_widgets::rdp::simplify_rdp_indices;
+use crate::rdp::simplify_rdp_indices;
 
 /// Elevation sample selected for geometry reduction.
 #[derive(Clone, Copy)]
-pub(crate) struct ReducedElevationPoint {
+pub struct ReducedElevationPoint {
     pub(crate) progress01: f32,
     pub(crate) elevation: f64,
     pub(crate) elapsed_fraction: f32,
@@ -16,7 +16,7 @@ pub(crate) struct ReducedElevationPoint {
 }
 
 /// Reduces dense elevation samples before screen-space projection.
-pub(crate) fn downsample_elevation_points(
+pub fn downsample_elevation_points(
     points: &[(f32, f64, f32)],
     target_count: usize,
 ) -> Vec<ReducedElevationPoint> {
@@ -183,15 +183,15 @@ fn select_evenly_spaced_elevation_points(
 
 /// Projected elevation sample used during screen-space simplification.
 #[derive(Clone, Copy)]
-pub(crate) struct ElevationSample {
-    pub(crate) point: (f32, f32),
-    pub(crate) progress01: f32,
-    pub(crate) elapsed_fraction: f32,
-    pub(crate) preserve: bool,
+pub struct ElevationSample {
+    pub point: (f32, f32),
+    pub progress01: f32,
+    pub elapsed_fraction: f32,
+    pub preserve: bool,
 }
 
 /// Simplifies projected elevation samples while preserving protected endpoints.
-pub(crate) fn simplify_elevation_samples(
+pub fn simplify_elevation_samples(
     points: &[ElevationSample],
     tolerance: f32,
 ) -> Vec<ElevationSample> {
@@ -224,7 +224,7 @@ pub(crate) fn simplify_elevation_samples(
 }
 
 /// Runs RDP simplification over one continuous elevation segment.
-pub(crate) fn simplify_elevation_samples_segment(
+pub fn simplify_elevation_samples_segment(
     points: &[ElevationSample],
     tolerance: f32,
 ) -> Vec<ElevationSample> {
