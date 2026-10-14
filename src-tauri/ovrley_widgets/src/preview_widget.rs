@@ -5,12 +5,14 @@ use crate::widgets::backdrop::{config::BackdropConfig, preview::PreviewBackdrop}
 
 use crate::widgets::raster::{config::RasterConfig, preview::{PreviewRaster, PreviewImages}};
 use crate::widgets::gradient::preview::PreviewGradient;
+use crate::widgets::lean_angle::preview::PreviewLeanAngle;
 
 pub enum WidgetRequest {
     Raster { widget: RasterConfig, scene: ScenePresentationConfig },
     Backdrop { widget: BackdropConfig, scene: ScenePresentationConfig },
     Label { widget: LabelConfig, scene: ScenePresentationConfig },
     Gradient(ValueRequest),
+    LeanAngle(ValueRequest),
     Value(ValueRequest),
 }
 
@@ -36,7 +38,9 @@ impl<'de> Deserialize<'de> for WidgetRequest {
                 return Err(serde::de::Error::custom("widget type must match its value metric"));
             }
             let request = ValueRequest { widget, scene: input.scene };
-            Ok(if metric == MetricKind::Gradient { Self::Gradient(request) } else { Self::Value(request) })
+            Ok(if metric == MetricKind::Gradient { Self::Gradient(request) }
+                else if metric == MetricKind::LeanAngle && request.widget.display_type == crate::model::types::DisplayType::LeanAngle { Self::LeanAngle(request) }
+                else { Self::Value(request) })
         }
     }
 }
@@ -46,6 +50,7 @@ pub enum PreviewWidget {
     Backdrop(PreviewBackdrop),
     Label(PreviewLabel),
     Gradient(PreviewGradient),
+    LeanAngle(PreviewLeanAngle),
     Value(ValuePreview),
 }
 
@@ -56,17 +61,18 @@ impl PreviewWidget {
             WidgetRequest::Backdrop {widget, scene} => Ok(Self::Backdrop(PreviewBackdrop::new(widget, scene)?)),
             WidgetRequest::Label {widget, scene} => Ok(Self::Label(PreviewLabel::new(widget, scene, fonts)?)),
             WidgetRequest::Gradient(request) => Ok(Self::Gradient(PreviewGradient::new(request.widget, request.scene)?)),
+            WidgetRequest::LeanAngle(request) => Ok(Self::LeanAngle(PreviewLeanAngle::new(request.widget, request.scene)?)),
             WidgetRequest::Value(request) => Ok(Self::Value(ValuePreview::new(request, fonts)?)),
         }
     }
     pub fn pixels(&self) -> &Vec<u8> {
-        match self { Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
+        match self { Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::LeanAngle(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
     }
     pub fn geometry(&self) -> &Vec<u8> {
-        match self { Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
+        match self { Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::LeanAngle(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
     }
     pub fn revision(&self) -> u32 {
-        match self { Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::Value(widget) => widget.revision }
+        match self { Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::Value(widget) => widget.revision }
     }
     pub fn inherit_revision(&mut self, previous: u32) {
         match self {
@@ -74,6 +80,7 @@ impl PreviewWidget {
             Self::Backdrop(widget) => widget.revision = previous.wrapping_add(1),
             Self::Label(widget) => widget.revision = previous.wrapping_add(1),
             Self::Gradient(widget) => widget.revision = previous,
+            Self::LeanAngle(widget) => widget.revision = previous,
             Self::Value(widget) => widget.revision = previous,
         }
     }
@@ -98,5 +105,6 @@ pub enum ResizeUpdate {
     Backdrop(crate::widgets::backdrop::interaction::ResizeUpdate),
     Label(crate::widgets::label::interaction::ResizeUpdate),
     Gradient(crate::widgets::gradient::interaction::ResizeUpdate),
+    LeanAngle(crate::widgets::lean_angle::interaction::ResizeUpdate),
     Value(crate::widgets::value::interaction::ResizeUpdate),
 }

@@ -1,63 +1,11 @@
 //! Lean-angle sector metric widget validation.
 
-use crate::error::{CoreError, CoreResult};
-use ovrley_widgets::model::types::{DisplayType, MetricKind};
-use ovrley_widgets::model::validation::{
+use crate::error::{WidgetError, WidgetResult};
+use crate::model::types::{DisplayType, MetricKind};
+use crate::model::validation::{
     require_bool, require_f32, require_str, require_string, rgba_from_hex,
 };
-use ovrley_widgets::widgets::value::config::ValueConfig;
-
-const START_ANGLE: f32 = 210.0;
-const SWEEP_ANGLE: f32 = 120.0;
-pub(crate) const LEAN_ANGLE_MAX_FILL_SWEEP: f32 = SWEEP_ANGLE * 0.5;
-const LABEL_LINE_HEIGHT_RATIO: f32 = 0.92;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct LeanAngleLayout {
-    pub width: f32,
-    pub height: f32,
-    pub min_x: f32,
-    pub min_y: f32,
-    pub max_x: f32,
-    pub max_y: f32,
-    pub center_x: f32,
-    pub center_y: f32,
-    pub outer_radius: f32,
-    pub inner_radius: f32,
-    pub start_angle: f32,
-    pub sweep_angle: f32,
-}
-
-/// Derives the logical lean-angle frame from the canonical diameter geometry.
-pub fn lean_angle_layout(diameter: f32, track_thickness: f32, font_size: f32) -> LeanAngleLayout {
-    let outer_radius = diameter * 0.5;
-    let inner_radius = outer_radius - track_thickness;
-    let half_sweep_radians = (SWEEP_ANGLE * 0.5).to_radians();
-    let sector_min_x = -outer_radius * half_sweep_radians.sin();
-    let sector_max_x = outer_radius * half_sweep_radians.sin();
-    let sector_min_y = -outer_radius;
-    let sector_max_y = -inner_radius * half_sweep_radians.cos();
-    let label_line_height = font_size * LABEL_LINE_HEIGHT_RATIO;
-    let min_x = sector_min_x;
-    let max_x = sector_max_x;
-    let min_y = sector_min_y.min(-label_line_height * 0.5);
-    let max_y = sector_max_y.max(label_line_height * 0.5);
-
-    LeanAngleLayout {
-        width: max_x - min_x,
-        height: max_y - min_y,
-        min_x,
-        min_y,
-        max_x,
-        max_y,
-        center_x: -min_x,
-        center_y: -min_y,
-        outer_radius,
-        inner_radius,
-        start_angle: START_ANGLE,
-        sweep_angle: SWEEP_ANGLE,
-    }
-}
+use crate::widgets::value::config::ValueConfig;
 
 #[derive(Clone, Debug)]
 pub struct ValidatedLeanAngleWidget {
@@ -86,17 +34,17 @@ pub struct ValidatedLeanAngleWidget {
 pub fn validate_lean_angle(
     value: ValueConfig,
     index: usize,
-) -> CoreResult<ValidatedLeanAngleWidget> {
+) -> WidgetResult<ValidatedLeanAngleWidget> {
     let p = |field: &str| format!("values[{index}].{field}");
 
     if value.value != MetricKind::LeanAngle {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: expected lean_angle metric",
             p("value")
         )));
     }
     if value.display_type != DisplayType::LeanAngle {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: expected lean_angle display_type, got '{}'",
             p("display_type"),
             value.display_type.as_str()
@@ -104,7 +52,7 @@ pub fn validate_lean_angle(
     }
 
     if value.width.is_some() || value.height.is_some() {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{} and {}: must be absent for diameter-based geometry",
             p("width"),
             p("height")
@@ -113,7 +61,10 @@ pub fn validate_lean_angle(
 
     let diameter = require_f32(value.diameter, &p("diameter"))?;
     if diameter <= 0.0 {
-        return Err(CoreError::Config(format!("{}: must be > 0", p("diameter"))));
+        return Err(WidgetError::Config(format!(
+            "{}: must be > 0",
+            p("diameter")
+        )));
     }
 
     let opacity = require_f32(value.opacity, &p("opacity"))?;
@@ -125,7 +76,7 @@ pub fn validate_lean_angle(
         ("track_filled_opacity", track_filled_opacity),
     ] {
         if !(0.0..=1.0).contains(&field_opacity) {
-            return Err(CoreError::Config(format!(
+            return Err(WidgetError::Config(format!(
                 "{}: must be 0.0..1.0, got {field_opacity}",
                 p(field)
             )));
@@ -135,26 +86,26 @@ pub fn validate_lean_angle(
     let track_border_thickness =
         require_f32(value.track_border_thickness, &p("track_border_thickness"))?;
     if track_border_thickness < 0.0 {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be >= 0",
             p("track_border_thickness")
         )));
     }
     let track_thickness = require_f32(value.track_thickness, &p("track_thickness"))?;
     if track_thickness <= 0.0 {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be > 0",
             p("track_thickness")
         )));
     }
     if track_thickness >= diameter * 0.5 {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be less than diameter / 2",
             p("track_thickness")
         )));
     }
     if track_border_thickness * 2.0 >= track_thickness {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must leave a positive usable width inside {}",
             p("track_border_thickness"),
             p("track_thickness")
@@ -162,7 +113,7 @@ pub fn validate_lean_angle(
     }
     let font_size = require_f32(value.font_size, &p("font_size"))?;
     if font_size <= 0.0 {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be > 0",
             p("font_size")
         )));
@@ -184,10 +135,15 @@ pub fn validate_lean_angle(
     }
 
     Ok(ValidatedLeanAngleWidget {
-        x: value.x,
-        y: value.y,
+        x: require_f32(Some(value.x), &p("x"))?,
+        y: require_f32(Some(value.y), &p("y"))?,
         diameter,
-        rotation: value.rotation.unwrap_or(0.0),
+        // Rotation is optional legacy metadata; this presentation has no rotation gesture.
+        rotation: value
+            .rotation
+            .map(|rotation| require_f32(Some(rotation), &p("rotation")))
+            .transpose()?
+            .unwrap_or(0.0),
         opacity,
         show_icon: require_bool(value.show_icon, &p("show_icon"))?,
         track_empty_color,

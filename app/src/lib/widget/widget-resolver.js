@@ -11,7 +11,6 @@
 
 import { TEXT_DEFAULTS, BACKDROP_CIRCLE_DEFAULTS, BACKDROP_RECTANGLE_DEFAULTS } from './standard-widgets'
 import { getDefaultFrameDimensions, getDisplayTypeConfigDefaults } from './standard-metrics'
-import { getLeanAngleLayout } from '@/features/widget-preview/widgets/lean-angle/geometry'
 
 /** @param {object} variants Current variants. @param {object} updates Partial fields keyed by display type. @returns {object} Updated variants. */
 export function mergeDisplayVariantUpdates(variants, updates) {
@@ -169,13 +168,7 @@ export function resolveActiveMetricWidgetData(widgetData) {
   }
 
   if (displayType === 'lean_angle') {
-    const layout = getLeanAngleLayout(resolved)
-
-    return {
-      ...resolved,
-      width: layout.width,
-      height: layout.height,
-    }
+    return resolved
   }
 
   const frameDefaults = getDefaultFrameDimensions(displayType)

@@ -17,12 +17,8 @@ function scaleNumber(value, scaleFactor, { min = -Infinity, max = Infinity, roun
   return clamp(roundedValue, min, max)
 }
 
-const GAUGE_DISPLAY_TYPES = new Set(['arc', 'corner', 'lean_angle'])
+const GAUGE_DISPLAY_TYPES = new Set(['arc', 'corner'])
 const G_FORCE_DISPLAY_TYPE = 'g_force'
-
-function isLeanAngleDisplayType(displayType) {
-  return displayType === 'lean_angle'
-}
 
 /**
  * Returns whether a display type uses the uniform content-resize policy.
@@ -31,7 +27,7 @@ function isLeanAngleDisplayType(displayType) {
  * @returns {boolean} Whether the display type scales its dimensional content with the frame.
  */
 export function isUniformResizeDisplayType(displayType) {
-  return GAUGE_DISPLAY_TYPES.has(displayType) || displayType === G_FORCE_DISPLAY_TYPE
+  return GAUGE_DISPLAY_TYPES.has(displayType) || displayType === 'lean_angle' || displayType === G_FORCE_DISPLAY_TYPE
 }
 
 function isGauge(widget) {
@@ -131,13 +127,11 @@ function buildGForceResizeContentDraft(origin, scaleFactor, { round = true } = {
 }
 
 function getResizeScaleFactor(origin, width, height) {
-  if (isLeanAngleDisplayType(origin.displayType)) return width / origin.width
   return (width / origin.width + height / origin.height) * 0.5
 }
 
 function buildResizeContentDraft(origin, scaleFactor, options) {
   if (origin.displayType === G_FORCE_DISPLAY_TYPE) return buildGForceResizeContentDraft(origin, scaleFactor, options)
-  if (isLeanAngleDisplayType(origin.displayType)) return buildLeanAngleResizeContentDraft(origin, scaleFactor, options)
   if (GAUGE_DISPLAY_TYPES.has(origin.displayType)) return buildGaugeResizeContentDraft(origin, scaleFactor, options)
   return buildMarkerResizeContentDraft(origin, scaleFactor)
 }
@@ -264,14 +258,16 @@ export function buildLiveResizeUpdate(origin, framePatch, widget) {
  * @returns {object|null} Commit-ready widget update patch, or null for invalid geometry.
  */
 export function buildUniformResizeUpdate(widget, size) {
-  const origin = captureResizeOrigin(widget)
-  if (!origin || !Number.isFinite(size)) return null
+  if (!widget?.data || !Number.isFinite(size)) return null
 
-  if (origin.displayType === 'lean_angle') {
+  // The inspector edits diameter directly; Moveable resizing belongs to Rust.
+  if (widget.data.display_type === 'lean_angle') {
+    const origin = { widgetData: widget.data, ...captureVariantResizeOrigin(widget, resolveActiveMetricWidgetData(widget.data)) }
     const contentDraft = buildLeanAngleResizeContentDraft(origin, size / origin.data.diameter, { round: true })
     return mergeResizeUpdate(origin.widgetData, { x: origin.widgetData.x, y: origin.widgetData.y }, contentDraft)
   }
 
+  const origin = captureResizeOrigin(widget)
   const framePatch = {
     width: Math.round(size),
     height: origin.displayType === G_FORCE_DISPLAY_TYPE ? Math.round(size) : Math.round(origin.height * (size / origin.width)),

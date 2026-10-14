@@ -3,9 +3,6 @@
 //! Supplies dense samples to shared metric formatting.
 
 use crate::activity::schema::DenseActivityReport;
-use ovrley_widgets::model::standard_metrics::{
-    standard_metric_formatter, StandardMetricFormatterKind,
-};
 use ovrley_widgets::model::types::MetricKind;
 use ovrley_widgets::widgets::value::validation::ValidatedValueWidget;
 
@@ -112,19 +109,6 @@ pub(crate) fn format_metric_presentation_parts(
     ))
 }
 
-/// Formats the signed lean-angle sample as the absolute integer shown by the
-/// dedicated lean-angle presentation.
-pub fn format_lean_angle_value(raw: Option<f64>) -> String {
-    let Some(raw) = raw else {
-        return "--".to_string();
-    };
-
-    match standard_metric_formatter(MetricKind::LeanAngle) {
-        Some(StandardMetricFormatterKind::Integer) => format_number(raw.abs(), 0),
-        _ => unreachable!("lean_angle must use the integer standard metric formatter"),
-    }
-}
-
 /// Returns whether the finalized metric has any dense samples.
 ///
 /// Finalization represents an unavailable metric with an empty series, so this
@@ -139,9 +123,3 @@ fn dense_metric_series_is_available(
         .numeric_series_for(kind)
         .is_some_and(|series| !series.is_empty())
 }
-
-// Converts a number to display text, preserving requested fractional places.
-//
-// Zero-decimal values intentionally round instead of truncating so backend
-// preview PNGs match the editor canvas' metric formatting.
-use ovrley_widgets::widgets::value::format::format_number;

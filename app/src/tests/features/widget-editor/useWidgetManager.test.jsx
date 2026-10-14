@@ -76,9 +76,9 @@ describe('useWidgetManager alignment updates', () => {
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
   })
 
-  test.each(['speed', 'time', 'gradient'])('commits the latest %s font size when the slider is released before its pending frame', (type) => {
+  test.each(['speed', 'time', 'gradient', 'lean_angle'])('commits the latest %s font size on release before its pending frame', (type) => {
     const config = cloneSerializable(DEFAULT_CONFIG)
-    config.values = [{ ...createMetricValueDefaults(type), id: 'speed-0' }]
+    config.values = [{ ...createMetricValueDefaults(type, undefined, { displayType: type === 'lean_angle' ? 'lean_angle' : 'text' }), id: 'speed-0' }]
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] })
     try {

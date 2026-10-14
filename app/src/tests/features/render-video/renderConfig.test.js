@@ -53,7 +53,7 @@ describe('render config preparation', () => {
     expect(renderConfig.values[0].content_alignment).toBe('right')
   })
 
-  test('removes lean-angle ephemeral frame dimensions from the backend payload', () => {
+  test('sends the canonical lean-angle diameter config to the backend', () => {
     const config = {
       scene: {
         width: 1920,

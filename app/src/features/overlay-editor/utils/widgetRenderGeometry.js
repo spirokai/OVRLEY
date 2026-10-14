@@ -1,7 +1,6 @@
 import { buildWidgetTransform } from '@/lib/geometryUtils'
 import { isWasmWidget } from '@/lib/widget/wasm-widget'
 import { isFramedWidget } from '@/lib/widget/display-type-behavior'
-import { getLeanAngleSelectionFrame } from '@/features/widget-preview/widgets/lean-angle/geometry'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
 import { getLiveWidgetTransform } from './widgetInteractionGeometry'
 
@@ -20,17 +19,8 @@ export function resolveWidgetRenderGeometry(widget, visualBounds, globalScale, p
   const isScaling = Number.isFinite(scaleFactor)
   const rotation = widget.type === 'raster' ? widget.data.rotation : widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
   const resolvedData = widget.data
-  const leanSelectionFrame =
-    resolvedData.display_type === 'lean_angle'
-      ? getLeanAngleSelectionFrame({
-          diameter: resolvedData.diameter,
-          track_thickness: resolvedData.track_thickness,
-          font_size: resolvedData.font_size,
-          value_offset_y: resolvedData.value_offset_y,
-        })
-      : null
-  const frameWidth = (leanSelectionFrame?.width ?? resolvedData.width) * globalScale
-  const frameHeight = (leanSelectionFrame?.height ?? resolvedData.height) * globalScale
+  const frameWidth = resolvedData.width * globalScale
+  const frameHeight = resolvedData.height * globalScale
   const staticOrigin = getWidgetSceneOrigin(widget, null, visualBounds, {
     boundsScale: isFramed ? 1 : globalScale,
   })

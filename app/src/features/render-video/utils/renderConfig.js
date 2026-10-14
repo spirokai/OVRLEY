@@ -42,11 +42,7 @@ function resolveCompositeFps(fpsNum, fpsDen, fps) {
 }
 
 function renderValues(values) {
-  return values.map(({ display_variants: _displayVariants, ...value }) => {
-    if (value.display_type !== 'lean_angle') return value
-    const { width: _width, height: _height, ...renderValue } = value
-    return renderValue
-  })
+  return values.map(({ display_variants: _displayVariants, ...value }) => value)
 }
 
 /**

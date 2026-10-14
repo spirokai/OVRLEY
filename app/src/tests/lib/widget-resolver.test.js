@@ -218,7 +218,7 @@ describe('resolveActiveMetricWidgetData', () => {
     expect(resolved.display_type).toBe('heading_tape')
   })
 
-  test('can resolve an already-derived lean-angle widget without stripping its frame', () => {
+  test('resolves lean-angle diameter config without manufacturing frame dimensions', () => {
     const data = {
       value: 'lean_angle',
       display_type: 'lean_angle',
@@ -233,6 +233,9 @@ describe('resolveActiveMetricWidgetData', () => {
     const resolved = resolveActiveMetricWidgetData(data)
 
     expect(resolveActiveMetricWidgetData(resolved)).toEqual(resolved)
+    expect(resolved).toMatchObject({ diameter: 180, track_thickness: 24, font_size: 60 })
+    expect(resolved).not.toHaveProperty('width')
+    expect(resolved).not.toHaveProperty('height')
   })
 })
 

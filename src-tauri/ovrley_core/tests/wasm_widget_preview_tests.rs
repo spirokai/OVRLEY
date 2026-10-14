@@ -16,6 +16,287 @@ use ovrley_widgets::{
 use serde_json::{json, Value};
 use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
 
+fn lean_angle_preview() -> (PreviewSession, Value) {
+    let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
+    let mut preview = PreviewSession::default();
+    let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
+    preview
+        .fonts
+        .register(
+            ovrley_widgets::preview::FontRequest {
+                font: "Inter.ttf".into(),
+                font_weight: weight,
+                italic: false,
+            },
+            &preview_font_resource(&font_dirs, "Inter.ttf", weight, false).unwrap(),
+        )
+        .unwrap();
+    let mut scene = common::seam::explicit_scene_json();
+    scene["end"] = json!(4);
+    scene["scale"] = json!(1.7);
+    scene["shadow_strength"] = json!(3);
+    scene["shadow_distance"] = json!(4);
+    scene["border_thickness"] = json!(1.5);
+    (
+        preview,
+        json!({
+            "type": "lean_angle", "scene": scene,
+            "widget": {
+                "value": "lean_angle", "display_type": "lean_angle", "x": 600.25, "y": 100.5,
+                "diameter": 180, "rotation": 0, "opacity": 0.8, "show_icon": false,
+                "track_empty_color": "#222222", "track_empty_opacity": 0.5,
+                "track_filled_color": "#40e0d0", "track_filled_opacity": 0.7,
+                "track_border_thickness": 2, "track_border_color": "#ffffff", "track_thickness": 24,
+                "font": "Inter.ttf", "font_size": 60, "color": "#abcdef", "unit_color": "#aaaaaa",
+                "show_units": true, "value_offset_x": 11.25, "value_offset_y": -17.5,
+            },
+        }),
+    )
+}
+
+#[test]
+fn lean_angle_preview_matches_native_export_and_tracks_signed_fill_resources_and_validation() {
+    use ovrley_core::{
+        activity::{interpolate::densify_activity, schema::ParsedActivity, trim::trim_activity},
+        debug::RenderProfiler,
+        paths::AppPaths,
+        render::widgets::{draw_metric_presentation, prepare_render_assets},
+    };
+    use ovrley_widgets::activity::ActivitySampler;
+    let (mut preview, request) = lean_angle_preview();
+    let parsed: ParsedActivity = serde_json::from_value(json!({
+        "sample_elapsed_seconds": [0,1,2,3,4], "trim_end_seconds": 4,
+        "lean_angle": [null,30,null,-70,null],
+    }))
+    .unwrap();
+    let bytes = serde_json::to_vec(&parsed).unwrap();
+    let sampler = ActivitySampler::from_json(&bytes).unwrap();
+    preview.replace_activity(&bytes).unwrap();
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
+    }));
+    let requirements = config.render_data_requirements().unwrap();
+    let trimmed = trim_activity(&parsed, 0.0, 4.0, &requirements).unwrap();
+    let seconds = vec![0.0, 0.5, 1.0, 1.002, 2.0, 2.5, 3.0, 4.0];
+    let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths {
+        repo_root: root.clone(),
+        font_dirs: vec![root.join("fonts")],
+        debug_render_dir: std::env::temp_dir(),
+        temp_dir: std::env::temp_dir(),
+        bundled_templates_dirs: vec![],
+        user_templates_dir: std::env::temp_dir(),
+        downloads_dir: std::env::temp_dir(),
+    };
+    let mut profiler = RenderProfiler::default();
+    let assets = prepare_render_assets(&paths, &config, &parsed, &dense, &mut profiler).unwrap();
+    let id = preview
+        .create_widget(serde_json::from_value(request.clone()).unwrap())
+        .unwrap();
+    for index in [0, 1, 2, 3, 4, 5, 6, 7, 2, 0] {
+        let second = seconds[index];
+        assert_eq!(
+            sampler.lean_angle_at(second),
+            dense.series.lean_angle[index]
+        );
+        preview.render(second).unwrap();
+        let widget = &preview.widgets[&id];
+        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let info = ImageInfo::new(
+            (
+                geometry["width"].as_i64().unwrap() as i32,
+                geometry["height"].as_i64().unwrap() as i32,
+            ),
+            ColorType::RGBA8888,
+            AlphaType::Premul,
+            None,
+        );
+        let mut surface = surfaces::raster(&info, None, None).unwrap();
+        let canvas = surface.canvas();
+        canvas.clear(Color::TRANSPARENT);
+        canvas.translate((
+            -geometry["left"].as_f64().unwrap() as f32,
+            -geometry["top"].as_f64().unwrap() as f32,
+        ));
+        draw_metric_presentation(
+            canvas,
+            &assets.values()[0],
+            &dense,
+            index,
+            config.scene.presentation.scale,
+            &paths.font_dirs,
+            &mut profiler,
+        )
+        .unwrap();
+        let mut pixels = vec![0; widget.pixels().len()];
+        assert!(surface.read_pixels(
+            &info.with_alpha_type(AlphaType::Unpremul),
+            &mut pixels,
+            info.width() as usize * 4,
+            (0, 0)
+        ));
+        assert_eq!(&pixels, widget.pixels(), "lean-angle at {second}");
+        assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+        let revision = widget.revision();
+        preview.render(second).unwrap();
+        assert_eq!(preview.widgets[&id].revision(), revision);
+    }
+    preview.render(1.0).unwrap();
+    let previous = preview.widgets[&id].pixels().clone();
+    let revision = preview.widgets[&id].revision();
+    preview.render(1.002).unwrap();
+    assert_ne!(
+        preview.widgets[&id].revision(),
+        revision,
+        "fill changes within the same integer label"
+    );
+    assert_ne!(preview.widgets[&id].pixels(), &previous);
+    let original = preview.widgets[&id].pixels().clone();
+    preview.replace_activity(&[]).unwrap();
+    preview.render(1.002).unwrap();
+    assert_ne!(preview.widgets[&id].pixels(), &original);
+    preview.replace_activity(&bytes).unwrap();
+    preview.render(1.002).unwrap();
+    assert_eq!(preview.widgets[&id].pixels(), &original);
+    preview
+        .replace_activity(
+            br#"{"sample_elapsed_seconds":[0,4],"trim_end_seconds":4,"lean_angle":[-30,-30]}"#,
+        )
+        .unwrap();
+    preview.render(1.002).unwrap();
+    assert_ne!(
+        preview.widgets[&id].pixels(),
+        &original,
+        "signed fill changes even for equal magnitudes"
+    );
+    assert_eq!(sampler.lean_angle_at(-1.0), None);
+    assert_eq!(sampler.lean_angle_at(5.0), None);
+    for (field, malformed) in [
+        ("diameter", Value::Null),
+        ("width", json!(180)),
+        ("track_thickness", json!(90)),
+        ("track_border_thickness", json!(12)),
+        ("track_empty_color", json!("invalid")),
+        ("show_units", Value::Null),
+        ("value_offset_x", Value::Null),
+        ("font_size", json!(0)),
+        ("opacity", json!(2)),
+    ] {
+        let mut invalid = request.clone();
+        invalid["widget"][field] = malformed;
+        assert!(
+            preview
+                .create_widget(serde_json::from_value(invalid).unwrap())
+                .is_err(),
+            "{field}"
+        );
+    }
+    let mut changed = request;
+    changed["widget"]["track_filled_color"] = json!("#123456");
+    let revision = preview.widgets[&id].revision();
+    let pixels = preview.widgets[&id].pixels().clone();
+    preview
+        .update_widget(id, serde_json::from_value(changed).unwrap())
+        .unwrap();
+    preview.render(1.002).unwrap();
+    assert_ne!(preview.widgets[&id].revision(), revision);
+    assert_ne!(preview.widgets[&id].pixels(), &pixels);
+}
+
+#[test]
+fn lean_angle_resize_preserves_visible_corners_across_playback_and_commits_diameter_variants() {
+    let (mut preview, mut origin) = lean_angle_preview();
+    preview.replace_activity(br#"{"sample_elapsed_seconds":[0,1,2,3],"lean_angle":[30,70,-30,0],"trim_end_seconds":3}"#).unwrap();
+    let id = preview
+        .create_widget(serde_json::from_value(origin.clone()).unwrap())
+        .unwrap();
+    for (scale, offset, show_units, border) in [
+        (1.7, [11.25, -17.5], true, 2),
+        (0.8, [200.0, 100.0], false, 0),
+    ] {
+        origin["scene"]["scale"] = json!(scale);
+        origin["widget"]["value_offset_x"] = json!(offset[0]);
+        origin["widget"]["value_offset_y"] = json!(offset[1]);
+        origin["widget"]["show_units"] = json!(show_units);
+        origin["widget"]["track_border_thickness"] = json!(border);
+        preview
+            .update_widget(id, serde_json::from_value(origin.clone()).unwrap())
+            .unwrap();
+        preview.render(0.5).unwrap();
+        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let bounds = &geometry["content"];
+        assert!(bounds["width"].as_f64().unwrap() < geometry["width"].as_f64().unwrap());
+        assert!(bounds["height"].as_f64().unwrap() < geometry["height"].as_f64().unwrap());
+        for fixed in [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] {
+            let point = [
+                bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0],
+                bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1],
+            ];
+            for factor in [0.01, 0.55, 1.234375] {
+                for second in [2.25, 3.0, 0.25] {
+                    let mut gesture = origin.clone();
+                    gesture["factor"] = json!(factor);
+                    gesture["fixed"] = json!(fixed);
+                    gesture["point"] = json!(point);
+                    gesture["second"] = json!(second);
+                    let patch = serde_json::to_value(
+                        preview
+                            .resize_widget(serde_json::from_value(gesture).unwrap())
+                            .unwrap(),
+                    )
+                    .unwrap();
+                    let variant = &patch["display_variants"]["lean_angle"];
+                    assert!(patch.get("width").is_none() && patch.get("height").is_none());
+                    assert!(
+                        variant.get("font_size").is_none()
+                            && variant.get("width").is_none()
+                            && variant.get("height").is_none()
+                    );
+                    if factor == 1.234375 {
+                        assert_eq!(variant["diameter"], json!(222.1875));
+                        assert_eq!(variant["track_thickness"], json!(29.625));
+                        assert_eq!(
+                            variant["track_border_thickness"],
+                            json!(f64::from(border) * factor)
+                        );
+                        assert_eq!(patch["font_size"], json!(74.0625));
+                    }
+                    // Match the frontend's variant merge and effective-config resolution.
+                    let mut committed = origin.clone();
+                    committed["widget"]
+                        .as_object_mut()
+                        .unwrap()
+                        .extend(variant.as_object().unwrap().clone());
+                    committed["widget"]
+                        .as_object_mut()
+                        .unwrap()
+                        .extend(patch.as_object().unwrap().clone());
+                    preview
+                        .update_widget(id, serde_json::from_value(committed.clone()).unwrap())
+                        .unwrap();
+                    preview.render(second).unwrap();
+                    let live_geometry = preview.widgets[&id].geometry().clone();
+                    let actual: Value = serde_json::from_slice(&live_geometry).unwrap();
+                    for (axis, position, size) in [(0, "left", "width"), (1, "top", "height")] {
+                        let corner = actual["content"][position].as_f64().unwrap()
+                            + actual["content"][size].as_f64().unwrap() * fixed[axis];
+                        assert!(
+                            (corner - point[axis]).abs() < 0.002,
+                            "lean-angle corner moved at {second}, factor {factor}"
+                        );
+                    }
+                    preview
+                        .update_widget(id, serde_json::from_value(committed).unwrap())
+                        .unwrap();
+                    preview.render(second).unwrap();
+                    assert_eq!(preview.widgets[&id].geometry(), &live_geometry);
+                }
+            }
+        }
+    }
+}
+
 fn gradient_preview() -> (PreviewSession, Value) {
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
     let mut preview = PreviewSession::default();

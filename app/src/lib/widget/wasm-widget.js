@@ -7,6 +7,7 @@ export function isWasmWidget(widget) {
     widget.type === 'backdrop' ||
     widget.type === 'label' ||
     widget.type === 'gradient' ||
+    (widget.type === 'lean_angle' && widget.data.display_type === 'lean_angle') ||
     (widget.type === 'time' && widget.data.display_type === 'text') ||
     (isStandardMetricWidgetType(widget.type) && widget.data.display_type === 'text' && getSupportedDisplayTypes(widget.type).includes('text'))
   )

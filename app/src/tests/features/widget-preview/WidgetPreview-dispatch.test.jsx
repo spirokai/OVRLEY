@@ -37,9 +37,6 @@ vi.mock('@/features/widget-preview/widgets/arc-gauge/ArcGaugePreview', () => ({
     <div data-testid="arc-gauge-renderer" data-widget-type={props.widget.type} data-display-type={props.widget.data.display_type} />
   ),
 }))
-vi.mock('@/features/widget-preview/widgets/lean-angle/LeanAnglePreview', () => ({
-  OverlayLeanAngleWidget: (props) => <div data-testid="lean-angle-renderer" data-display-type={props.widget.data.display_type} />,
-}))
 vi.mock('@/features/widget-preview/widgets/g-force/GForcePreview', () => ({
   OverlayGForceWidget: (props) => <div data-testid="g-force-renderer" data-display-type={props.widget.data.display_type} />,
 }))
@@ -161,20 +158,6 @@ describe('WidgetPreview dispatch by display_type', () => {
       />,
     )
     expect(getByTestId('arc-gauge-renderer')).toHaveAttribute('data-display-type', 'corner')
-  })
-
-  test('lean_angle display_type uses the dedicated lean-angle renderer', () => {
-    const { getByTestId } = render(
-      <WidgetPreview
-        widget={{
-          type: 'lean_angle',
-          category: 'values',
-          data: { display_type: 'lean_angle', x: 0, y: 0, display_variants: { lean_angle: { diameter: 300 } } },
-        }}
-        activity={ACTIVITY}
-      />,
-    )
-    expect(getByTestId('lean-angle-renderer')).toHaveAttribute('data-display-type', 'lean_angle')
   })
 
   test('g_force display_type uses the dedicated G-force renderer', () => {

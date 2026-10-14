@@ -10,7 +10,6 @@ mod elevation;
 mod g_force;
 mod heading;
 mod lap_timer;
-mod lean_angle;
 mod linear_gauge;
 mod raster;
 pub mod raw;
@@ -48,10 +47,7 @@ use ovrley_widgets::widgets::gradient::validation::validate_gradient_widget;
 pub use heading::{validate_heading, ValidatedHeading};
 use ovrley_widgets::widgets::label::validation::{validate_label, ValidatedLabel};
 pub use lap_timer::{validate_lap_timer, LapTimerMode, ValidatedLapTimer};
-pub(crate) use lean_angle::LEAN_ANGLE_MAX_FILL_SWEEP;
-pub use lean_angle::{
-    lean_angle_layout, validate_lean_angle, LeanAngleLayout, ValidatedLeanAngleWidget,
-};
+use ovrley_widgets::widgets::lean_angle::validation::validate_lean_angle;
 pub use linear_gauge::{
     validate_linear_gauge, ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation,
     ValidatedLinearGaugeWidget,
@@ -209,12 +205,14 @@ fn validate_render_contents(
             if value.value == MetricKind::LeanAngle && value.display_type == DisplayType::LeanAngle
             {
                 let value = raw::promote_value_variant(&value, "lean_angle")?;
-                return validate_lean_angle(value, idx).map(|validated| {
-                    PreparedValue::LeanAngle(PreparedLeanAngle {
-                        validated,
-                        cache: None,
+                return validate_lean_angle(value, idx)
+                    .map(|validated| {
+                        PreparedValue::LeanAngle(PreparedLeanAngle {
+                            validated,
+                            cache: None,
+                        })
                     })
-                });
+                    .map_err(Into::into);
             }
             if value.value == MetricKind::Gradient {
                 return Ok(PreparedValue::Gradient(validate_gradient_widget(value, idx)?));

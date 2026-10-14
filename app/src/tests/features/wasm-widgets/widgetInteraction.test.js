@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 import { resizeAnchor } from '@/features/wasm-widgets/utils/widgetGestureGeometry'
-import { resolveActiveBackdropData } from '@/lib/widget/widget-resolver'
+import { resolveActiveBackdropData, resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
 import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
 import { updateWidgetInConfig } from '@/lib/widget/widget-config'
 
@@ -42,7 +42,7 @@ function editor(type = 'speed') {
   }
 }
 
-test.each(['speed', 'time', 'gradient', 'backdrop', 'raster'])(
+test.each(['speed', 'time', 'gradient', 'lean_angle', 'backdrop', 'raster'])(
   '%s drag coalesces from the captured origin and flushes the final movement without rounding',
   (type) => {
     const { interaction, presentations, original } = editor(type)
@@ -97,7 +97,7 @@ test('resize uses original configuration and a fixed content corner across live 
   expect(interaction.finish()).toBeNull()
 })
 
-test.each(['label', 'time', 'gradient'])('%s resize follows its playhead policy and flushes the final pointer intent', (type) => {
+test.each(['label', 'time', 'gradient', 'lean_angle'])('%s resize follows its playhead policy and flushes the final pointer intent', (type) => {
   const { interaction, resize, original, setSnapshot, render } = editor(type)
   const draft = vi.fn()
   const origin = interaction.begin(draft)
@@ -157,3 +157,54 @@ test.each(['rectangle', 'circle'])(
     expect(committed.backdrops[0].width).toBeUndefined()
   },
 )
+
+test('lean-angle resize resolves nested diameter drafts and commits the same effective config', () => {
+  const { interaction, resize, setSnapshot, presentations } = editor('lean_angle')
+  const stored = {
+    id: 'widget',
+    value: 'lean_angle',
+    x: 120.25,
+    y: 60.5,
+    font_size: 60,
+    display_type: 'lean_angle',
+    display_variants: {
+      text: { icon_size: 24 },
+      lean_angle: {
+        diameter: 180,
+        track_thickness: 24,
+        track_border_thickness: 2,
+        value_offset_x: 5,
+        value_offset_y: -3,
+        track_empty_color: '#222222',
+      },
+    },
+  }
+  const original = { id: 'widget', type: 'lean_angle', category: 'values', data: resolveActiveMetricWidgetData(stored) }
+  setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second: 0 })
+  const patch = {
+    x: 110.125,
+    y: 50.25,
+    font_size: 74.0625,
+    display_variants: {
+      lean_angle: {
+        diameter: 222.1875,
+        track_thickness: 29.625,
+        track_border_thickness: 2.46875,
+        value_offset_x: 6.171875,
+        value_offset_y: -3.703125,
+      },
+    },
+  }
+  resize.mockReturnValue(patch)
+  const draft = vi.fn()
+  const origin = interaction.begin(draft)
+  interaction.update({ type: 'resize', geometry: { factor: 1.234375, ...resizeAnchor(origin.bounds, [-1, -1]) } })
+  const committed = updateWidgetInConfig({ values: [stored] }, 'widget', interaction.finish())
+  const live = presentations.at(-1)[0].data
+  expect(resolveActiveMetricWidgetData(committed.values[0])).toEqual(live)
+  expect(live).toMatchObject({ x: 110.125, y: 50.25, diameter: 222.1875, font_size: 74.0625 })
+  expect(committed.values[0].display_variants).toMatchObject({ text: stored.display_variants.text, lean_angle: { track_empty_color: '#222222' } })
+  expect(committed.values[0]).not.toHaveProperty('diameter')
+  expect(live).not.toHaveProperty('width')
+  expect(live).not.toHaveProperty('height')
+})

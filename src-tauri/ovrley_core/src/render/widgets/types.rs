@@ -8,10 +8,11 @@
 use ovrley_widgets::widgets::label::validation::ValidatedLabel;
 use ovrley_widgets::widgets::backdrop::validation::ValidatedBackdrop;
 use ovrley_widgets::widgets::gradient::validation::ValidatedGradientWidget;
+use ovrley_widgets::widgets::lean_angle::{layout::LeanAngleCache, validation::ValidatedLeanAngleWidget};
 use crate::normalize::{
     ResolvedBarGeometry, ValidatedArcGaugeWidget, ValidatedGForceWidget,
     ValidatedHeading, ValidatedLapTimer,
-    ValidatedLeanAngleWidget, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
+    ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
     ValidatedSceneConfig,
 };
 use chrono_tz::Tz;
@@ -378,35 +379,6 @@ pub(crate) enum LapTimerWidgetCache {
         column_rights: [f32; 3],
         completed_row_layers: Vec<StaticLayer>,
     },
-}
-
-/// Cached static empty track and border for a lean-angle sector.
-#[derive(Clone, Debug)]
-pub struct LeanAngleCache {
-    pub static_image: Image,
-    pub static_image_x: f32,
-    pub static_image_y: f32,
-    pub x: f32,
-    pub y: f32,
-    pub width: u32,
-    pub height: u32,
-    pub rotation: f32,
-    pub layout: crate::normalize::LeanAngleLayout,
-    pub track_thickness: f32,
-    pub track_border_thickness: f32,
-    pub shadow: Option<ShadowStyle>,
-    pub opacity: f32,
-    pub track_filled_color: String,
-    pub track_filled_opacity: f32,
-    pub font: String,
-    pub font_size: f32,
-    pub color: String,
-    pub unit_color: String,
-    pub text_border_color: String,
-    pub text_border_thickness: f32,
-    pub show_units: bool,
-    pub value_offset_x: f32,
-    pub value_offset_y: f32,
 }
 
 /// Prepared linear gauge widget cache — holds the pre-rendered static track image

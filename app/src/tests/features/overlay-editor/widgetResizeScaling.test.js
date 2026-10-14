@@ -180,34 +180,6 @@ describe('widgetResizeScaling', () => {
     })
   })
 
-  test('scales lean-angle diameter and dependent geometry without persisting frame dimensions', () => {
-    const widget = makeLeanAngleWidget()
-    const origin = captureResizeOrigin(widget)
-    const update = buildResizeUpdate(origin, { x: 30, y: 40, width: 311.769145, height: 200 }, { round: true })
-
-    expect(update).toMatchObject({ x: 30, y: 40, font_size: 120 })
-    expect(update).not.toHaveProperty('width')
-    expect(update).not.toHaveProperty('height')
-    expect(update.display_variants.lean_angle).toMatchObject({
-      diameter: 360,
-      track_thickness: 48,
-      track_border_thickness: 4,
-      value_offset_x: 10,
-      value_offset_y: -6,
-      track_empty_color: '#222222',
-      track_empty_opacity: 0.5,
-    })
-    expect(update.display_variants.lean_angle).not.toHaveProperty('width')
-    expect(update.display_variants.lean_angle).not.toHaveProperty('height')
-    expect(update.display_variants.lean_angle).not.toHaveProperty('font_size')
-    expect(update).not.toHaveProperty('show_units')
-    expect(update).not.toHaveProperty('show_icon')
-    expect(update).not.toHaveProperty('prefix')
-    expect(update).not.toHaveProperty('suffix')
-    expect(update).not.toHaveProperty('opacity')
-    expect(update).not.toHaveProperty('display_type')
-  })
-
   test('builds lean-angle Diameter updates without frame dimensions', () => {
     const update = buildUniformResizeUpdate(makeLeanAngleWidget(), 360)
 

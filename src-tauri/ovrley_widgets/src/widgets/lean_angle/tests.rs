@@ -1,6 +1,5 @@
-use crate::normalize::lean_angle_layout;
-use crate::render::format::format_lean_angle_value;
-use crate::render::widgets::lean_angle::lean_angle_fill_sweep;
+use super::format::{format_lean_angle_value, lean_angle_fill_sweep};
+use super::layout::lean_angle_layout;
 
 #[test]
 fn lean_angle_layout_uses_diameter_and_includes_the_stable_label_frame() {

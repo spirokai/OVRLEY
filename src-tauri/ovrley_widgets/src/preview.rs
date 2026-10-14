@@ -80,6 +80,9 @@ impl PreviewSession {
             WidgetRequest::Gradient(origin) => Ok(ResizeUpdate::Gradient(crate::widgets::gradient::interaction::resize_gradient(
                 origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
             )?)),
+            WidgetRequest::LeanAngle(origin) => Ok(ResizeUpdate::LeanAngle(crate::widgets::lean_angle::interaction::resize_lean_angle(
+                origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
+            )?)),
             WidgetRequest::Value(origin) => Ok(ResizeUpdate::Value(crate::widgets::value::interaction::resize_value(
                 crate::widgets::value::interaction::ResizeRequest {origin, factor, fixed: request.fixed, point: request.point, second: request.second}, self.activity.as_ref(), &self.fonts,
             )?)),
@@ -121,6 +124,7 @@ impl PreviewSession {
             match widget {
                 PreviewWidget::Value(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::Gradient(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
+                PreviewWidget::LeanAngle(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 _ => {},
             }
         }

@@ -233,6 +233,14 @@ impl ActivitySampler {
         self.gradient.at(&self.times, second)
     }
 
+    pub fn lean_angle_at(&self, second: f64) -> Option<f64> {
+        let column = &self.numeric[&MetricKind::LeanAngle];
+        if second < 0.0 || second > self.end || !column.contains(second) {
+            return None;
+        }
+        column.at(&self.times, second)
+    }
+
     pub fn sample(&self, widget: &ValidatedValueWidget, second: f64) -> MetricSample<'_> {
         if second < 0.0 || second > self.end {
             return MetricSample::default();

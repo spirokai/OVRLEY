@@ -24,10 +24,11 @@ use crate::render::widgets::gauges::linear::draw_linear_gauge_widget;
 use crate::render::widgets::heading::draw_heading_widget;
 use crate::render::widgets::lean_angle::draw_lean_angle_widget;
 use crate::render::widgets::types::{
-    ArcGaugeCache, GForceWidgetCache, HeadingWidgetCache, LeanAngleCache, LinearGaugeCache,
+    ArcGaugeCache, GForceWidgetCache, HeadingWidgetCache, LinearGaugeCache,
     PreparedValue, WidgetRenderReport,
 };
 use ovrley_widgets::model::types::DisplayType;
+use ovrley_widgets::widgets::lean_angle::layout::LeanAngleCache;
 use skia_safe::Canvas;
 
 /// Draws a boxed metric presentation for a value widget.
@@ -43,7 +44,7 @@ pub fn draw_metric_presentation(
     value: &PreparedValue,
     dense_activity: &DenseActivityReport,
     frame_index: usize,
-    scale: f32,
+    _scale: f32,
     font_dirs: &[std::path::PathBuf],
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
@@ -66,7 +67,6 @@ pub fn draw_metric_presentation(
             widget.cache.as_ref(),
             dense_activity,
             frame_index,
-            scale,
             font_dirs,
             frame_profiler,
         ),
@@ -108,7 +108,6 @@ fn draw_lean_angle_presentation(
     cache: Option<&LeanAngleCache>,
     dense_activity: &DenseActivityReport,
     frame_index: usize,
-    scale: f32,
     font_dirs: &[std::path::PathBuf],
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
@@ -118,7 +117,6 @@ fn draw_lean_angle_presentation(
         lean_angle_cache,
         dense_activity,
         frame_index,
-        scale,
         font_dirs,
         frame_profiler,
     )

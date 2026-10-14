@@ -11,8 +11,8 @@ import { act, fireEvent, render, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import OverlayEditorView from '@/features/overlay-editor/components/OverlayEditor'
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
-import { resolveWidgetRenderGeometry } from '@/features/overlay-editor/utils/widgetRenderGeometry'
-import { createBackdropDefaults } from '@/features/widget-editor/utils/widgetUtils'
+import { buildWidgetRenderGeometryModels, resolveWidgetRenderGeometry } from '@/features/overlay-editor/utils/widgetRenderGeometry'
+import { createBackdropDefaults, createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
@@ -471,33 +471,7 @@ describe('OverlayEditor selection flow', () => {
     expect(renderGeometry.height).toBe(80)
   })
 
-  test('uses already-resolved lean-angle dimensions without re-resolving ephemeral frame fields', () => {
-    const renderGeometry = resolveWidgetRenderGeometry(
-      {
-        id: 'lean-angle-1',
-        type: 'lean_angle',
-        category: 'values',
-        data: {
-          x: 10,
-          y: 20,
-          display_type: 'lean_angle',
-          diameter: 180,
-          track_thickness: 24,
-          font_size: 60,
-          value_offset_y: 0,
-          width: 155.88457268119896,
-          height: 117.6,
-        },
-      },
-      null,
-      1,
-    )
-
-    expect(renderGeometry.width).toBeCloseTo(155.884573, 5)
-    expect(renderGeometry.height).toBeCloseTo(117.6, 5)
-  })
-
-  test('expands and contracts the lean-angle selection frame with vertical label offset', () => {
+  test('leaves lean-angle geometry to WASM instead of computing a legacy selection frame', () => {
     const widget = {
       id: 'lean-angle-1',
       type: 'lean_angle',
@@ -510,27 +484,20 @@ describe('OverlayEditor selection flow', () => {
         track_thickness: 24,
         font_size: 60,
         value_offset_y: -20,
-        width: 155.88457268119896,
-        height: 117.6,
       },
     }
 
-    const contracted = resolveWidgetRenderGeometry(widget, null, 1)
-    expect(contracted.top).toBe(20)
-    expect(contracted.height).toBeCloseTo(97.6, 5)
-
-    const expanded = resolveWidgetRenderGeometry({ ...widget, data: { ...widget.data, value_offset_y: 100 } }, null, 1)
-    expect(expanded.top).toBe(20)
-    expect(expanded.height).toBeCloseTo(217.6, 5)
+    expect(buildWidgetRenderGeometryModels({ widgets: [widget], metricPreviewModels: {}, textPreviewModels: {}, globalScale: 1 })).toEqual({})
   })
 
-  test('enables resize handles for selected backdrop frames', () => {
+  test.each(['backdrop', 'lean_angle'])('enables the supported resize handles for selected %s widgets', (type) => {
     const config = {
       ...DEFAULT_CONFIG,
-      backdrops: [{ ...createBackdropDefaults('rectangle'), id: 'widget-backdrop' }],
+      backdrops: type === 'backdrop' ? [{ ...createBackdropDefaults('rectangle'), id: 'widget-resize' }] : [],
       labels: [],
       plots: [],
-      values: [],
+      values:
+        type === 'lean_angle' ? [{ ...createMetricValueDefaults('lean_angle', undefined, { displayType: 'lean_angle' }), id: 'widget-resize' }] : [],
     }
 
     useStore.getState().setConfig(config)
@@ -553,13 +520,14 @@ describe('OverlayEditor selection flow', () => {
       />,
     )
 
-    const backdrop = container.querySelector('[data-widget-id="widget-backdrop"]')
-    expect(backdrop).toBeTruthy()
+    const target = container.querySelector('[data-widget-id="widget-resize"]')
+    expect(target).toBeTruthy()
 
-    fireEvent.mouseDown(backdrop, { button: 0 })
+    fireEvent.mouseDown(target, { button: 0 })
 
     expect(getByTestId('moveable-props')).toHaveAttribute('data-can-resize', 'true')
-    expect(getByTestId('moveable-props')).toHaveAttribute('data-maintain-ratio', 'false')
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-maintain-ratio', String(type === 'lean_angle'))
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-edge-handles', 'false')
   })
 
   test('maintains a square frame for selected arc widgets', () => {
