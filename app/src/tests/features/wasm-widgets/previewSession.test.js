@@ -10,7 +10,10 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] })
   previewFont.mockReturnValue(new Promise(() => {}))
 })
-afterEach(() => vi.useRealTimers())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
 
 function setup() {
   const module = {
@@ -59,6 +62,60 @@ test('raster loads once, creates without waiting for fonts, and ignores playhead
   expect(rasterPreviewPng).toHaveBeenCalledTimes(1)
   session.dispose()
   expect(module._ovrley_preview_destroy).toHaveBeenCalledOnce()
+})
+
+test('elevation playback reuses its raster allocation and skips placement work when only pixels change', async () => {
+  previewFont.mockResolvedValue([1, 2, 3])
+  const { module, session, snapshot, error } = setup()
+  const geometry = new TextEncoder().encode(
+    JSON.stringify({ left: 0, top: 0, width: 2, height: 2, content_width: 2, content: { left: 0, top: 0, width: 2, height: 2 } }),
+  )
+  module.HEAPU8.set(geometry, 512)
+  module._ovrley_preview_revision = vi.fn(() => module._ovrley_preview_render.mock.calls.length)
+  module._ovrley_preview_geometry_ptr = vi.fn(() => 512)
+  module._ovrley_preview_geometry_len = vi.fn(() => geometry.length)
+  module._ovrley_preview_pixels = vi.fn(() => 256)
+  const allocateImage = vi.fn()
+  vi.stubGlobal(
+    'ImageData',
+    class {
+      constructor(width, height) {
+        allocateImage(width, height)
+        this.width = width
+        this.height = height
+        this.data = new Uint8ClampedArray(width * height * 4)
+      }
+    },
+  )
+  const target = document.createElement('div')
+  const canvas = document.createElement('canvas')
+  target.append(canvas)
+  const putImageData = vi.fn()
+  canvas.getContext = vi.fn(() => ({ putImageData }))
+  const placement = vi.fn()
+  target.addEventListener('wasm-widget-render', placement)
+  const next = {
+    ...snapshot,
+    widgets: [
+      { id: 'e', type: 'elevation', data: { show_elevation_metric: true, show_elevation_imperial: false, point_label: { font: 'Label.ttf' } } },
+    ],
+  }
+  session.attach('e', canvas)
+  session.setSnapshot(next)
+  await Promise.resolve()
+  vi.advanceTimersToNextFrame()
+  for (const second of [0.125, 1.5, 0.5]) {
+    session.setSnapshot({ ...next, second })
+    vi.advanceTimersToNextFrame()
+  }
+  expect(error).toHaveBeenLastCalledWith(null)
+  expect(allocateImage).toHaveBeenCalledOnce()
+  expect(putImageData).toHaveBeenCalledTimes(4)
+  expect(placement).toHaveBeenCalledOnce()
+  expect(module._ovrley_preview_widget_create).toHaveBeenCalledOnce()
+  expect(module._ovrley_preview_widget_update).not.toHaveBeenCalled()
+  expect(previewFont).toHaveBeenCalledTimes(2)
+  session.dispose()
 })
 
 test.each(['g_force', 'heading', 'elevation'])(

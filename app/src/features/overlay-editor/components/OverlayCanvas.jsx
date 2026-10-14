@@ -6,7 +6,6 @@ import { memo, useEffect, useMemo, useRef } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { cn } from '@/lib/utils'
 import { buildWasmScene, getEditorGridSize } from '../utils/overlayEditorUtils'
-import { WidgetPreview } from '@/features/widget-preview'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { VideoPreviewSurface } from '@/features/video-preview'
 import useStore from '@/store/useStore'
@@ -80,17 +79,8 @@ const OverlayCanvasWidget = memo(
   function OverlayCanvasWidget({
     widget,
     globalScale,
-    globalOpacity,
-    activity,
-    previewSecond,
     metricPreviewModel,
-    textPreviewModel,
     renderGeometryModel,
-    sceneFont,
-    sceneFontSize,
-    sceneStyle,
-    valueFont,
-    exportRange,
     registerNode,
     handleWidgetMouseDown,
     setHoveredWidgetId,
@@ -134,22 +124,7 @@ const OverlayCanvasWidget = memo(
         onMouseLeave={() => {
           setHoveredWidgetId((current) => (current === widget.id ? null : current))
         }}
-      >
-        <WidgetPreview
-          widget={widget}
-          activity={activity}
-          previewSecond={previewSecond}
-          globalOpacity={globalOpacity}
-          globalScale={globalScale}
-          metricPreviewModel={metricPreviewModel}
-          textPreviewModel={textPreviewModel}
-          sceneFont={sceneFont}
-          sceneFontSize={sceneFontSize}
-          sceneStyle={sceneStyle}
-          valueFont={valueFont}
-          exportRange={exportRange}
-        />
-      </div>
+      ></div>
     )
   },
   (previousProps, nextProps) =>

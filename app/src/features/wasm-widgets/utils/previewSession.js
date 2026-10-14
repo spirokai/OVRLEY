@@ -144,10 +144,12 @@ export function createPreviewSession(module, onError) {
         }
       }
       for (const widget of interaction.resolve(snapshot)) {
+        let instance = widgets.get(widget.id)
+        const transient = ['course', 'elevation'].includes(widget.type) && interaction.isResizing(widget.id)
+        if (instance?.data === widget.data && instance.scene === snapshot.scene && instance.transient === transient) continue
         const resource = widget.type === 'raster' && images.get(widget.data.resourceId)
         if (resource?.error) throw resource.error
         if (resource && !resource.ready) {
-          const instance = widgets.get(widget.id)
           if (instance) {
             module._ovrley_preview_widget_destroy(handle, instance.handle)
             widgets.delete(widget.id)
@@ -163,9 +165,6 @@ export function createPreviewSession(module, onError) {
         for (const resource of fontResources) if (resource.error) throw resource.error
         if (fontResources.some((resource) => !resource.ready)) continue
         if (isTimeDependentWasmWidget(widget) && !activityReady) continue
-        let instance = widgets.get(widget.id)
-        const transient = ['course', 'elevation'].includes(widget.type) && interaction.isResizing(widget.id)
-        if (instance?.data === widget.data && instance.scene === snapshot.scene && instance.transient === transient) continue
         const config = JSON.stringify({
           type: widget.type,
           widget: widget.data,
@@ -209,7 +208,7 @@ export function createPreviewSession(module, onError) {
             canvas.height = geometry.height
             widget.image = new ImageData(geometry.width, geometry.height)
           }
-          const measurePixels = measure && (widget.type === 'course' || widget.type === 'raster')
+          const measurePixels = measure && (widget.type === 'course' || widget.type === 'elevation' || widget.type === 'raster')
           const widgetLabel = measurePixels ? `${widget.type}:${id}` : null
           const copyStarted = measurePixels ? performance.now() : 0
           const ptr = module._ovrley_preview_pixels(handle, widget.handle)
@@ -256,10 +255,12 @@ export function createPreviewSession(module, onError) {
         !next.widgets.some(isTimeDependentWasmWidget)
       )
         return
-      loadFont({ font: next.defaultFont })
-      for (const widget of next.widgets) {
-        for (const font of widgetFonts(widget)) loadFont(font)
-        if (widget.type === 'raster' && widget.data.resourceId !== undefined) loadImage(widget.data.resourceId)
+      if (previous?.defaultFont !== next.defaultFont) loadFont({ font: next.defaultFont })
+      if (previous?.widgets !== next.widgets) {
+        for (const widget of next.widgets) {
+          for (const font of widgetFonts(widget)) loadFont(font)
+          if (widget.type === 'raster' && widget.data.resourceId !== undefined) loadImage(widget.data.resourceId)
+        }
       }
       const nextId = next.activityId
       if (nextId !== activityId) {

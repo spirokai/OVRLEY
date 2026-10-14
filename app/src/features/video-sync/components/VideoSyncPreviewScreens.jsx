@@ -4,14 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { VideoPreviewSurface } from '@/features/video-preview'
-import { getPreviewFontFamily } from '@/features/widget-preview/shared/textMeasurement'
 import useVideoSyncPreview from '../hooks/useVideoSyncPreview'
-import {
-  VIDEO_SYNC_MAP_STYLES,
-  VIDEO_SYNC_NAVIGATION_MAP_MAX_PITCH,
-  VIDEO_SYNC_NAVIGATION_MAP_MIN_PITCH,
-  VIDEO_SYNC_SPEED_FONT,
-} from '../data/videoSyncConstants'
+import { VIDEO_SYNC_MAP_STYLES, VIDEO_SYNC_NAVIGATION_MAP_MAX_PITCH, VIDEO_SYNC_NAVIGATION_MAP_MIN_PITCH } from '../data/videoSyncConstants'
 
 function CourseLocationAction({ actionPoint, onConfirm }) {
   const { t } = useTranslation()
@@ -116,16 +110,28 @@ export default function VideoSyncPreviewScreens({
   sceneSize,
   setSceneElement,
 }) {
-  const { selectionMapRef, navigationMapRef, actionPoint, onConfirmActionPoint, pitch, onPitchChange, screenLayout, speed, style, onStyleChange } =
-    useVideoSyncPreview({
-      activity,
-      detection,
-      displayScale,
-      onSetCourseLocation,
-      onDeleteCourseLocation,
-      previewSecond,
-      sceneSize,
-    })
+  const {
+    selectionMapRef,
+    navigationMapRef,
+    actionPoint,
+    onConfirmActionPoint,
+    pitch,
+    onPitchChange,
+    screenLayout,
+    hasSpeed,
+    speedCanvasRef,
+    speedError,
+    style,
+    onStyleChange,
+  } = useVideoSyncPreview({
+    activity,
+    detection,
+    displayScale,
+    onSetCourseLocation,
+    onDeleteCourseLocation,
+    previewSecond,
+    sceneSize,
+  })
 
   return (
     <div ref={setSceneElement} data-testid="video-sync-preview-screens" className="grid shrink-0" style={screenLayout.pairStyle}>
@@ -137,15 +143,12 @@ export default function VideoSyncPreviewScreens({
         <VideoPreviewSurface displayScale={1} isActive>
           <div data-testid="video-sync-canvas-diagnostics" className="pointer-events-none absolute inset-0 z-40">
             <div data-testid="video-sync-speed-diagnostic" className="absolute top-[6%] left-[4%] whitespace-nowrap">
-              {speed ? (
-                <div
-                  className="flex items-baseline text-white"
-                  style={{ fontFamily: getPreviewFontFamily(VIDEO_SYNC_SPEED_FONT), gap: 8 * displayScale }}
-                >
-                  <span style={screenLayout.speedValueStyle}>{speed.value}</span>
-                  <span style={screenLayout.speedUnitsStyle}>{speed.units}</span>
+              {hasSpeed ? (
+                <div className="absolute" style={{ visibility: 'hidden' }}>
+                  <canvas ref={speedCanvasRef} aria-label="Speed preview" className="pointer-events-none absolute" />
                 </div>
               ) : null}
+              {speedError ? <div role="alert">{speedError.message}</div> : null}
             </div>
           </div>
         </VideoPreviewSurface>

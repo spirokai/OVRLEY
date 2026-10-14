@@ -4,7 +4,6 @@ import {
   getStandardMetricUnitOptions,
   getStandardMetricUnitsMode,
 } from '@/lib/widget/standard-metrics'
-import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/widgets/metric/format'
 import { FontSection, IconSection, UnitsControlRow } from '../widgetEditorSections'
 import { SelectField, SliderField, ToggleField } from '../widgetFormControls'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
@@ -15,6 +14,13 @@ import { translateOptions } from '@/i18n'
 const COORDINATE_FORMAT_OPTIONS = [
   { value: 'dms', labelKey: 'widget-editor.coordinateFormatDms', defaultLabel: 'Deg / Min / Sec' },
   { value: 'ddm', labelKey: 'widget-editor.coordinateFormatDdm', defaultLabel: 'Deg / Dec Min' },
+]
+
+const BALANCE_FORMAT_OPTIONS = [
+  { value: 'percent_label', label: '52%/48%' },
+  { value: 'plain', label: '52/48' },
+  { value: 'l_prefix', label: 'L52/R48' },
+  { value: 'l_suffix', label: '52L/48R' },
 ]
 
 /**

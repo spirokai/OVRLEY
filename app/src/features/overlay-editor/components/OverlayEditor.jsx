@@ -14,7 +14,6 @@ import OverlayCanvas from './OverlayCanvas'
 import OverlayMoveable from './OverlayMoveable'
 import { WIDGET_ICONS } from '../data/overlayEditorConfig'
 import { useOverlayEditorStateWithLiveEdits } from '../hooks/useOverlayEditorState'
-import useOverlayPreviewModels from '../hooks/useOverlayPreviewModels'
 import useWidgetSelection from '../hooks/useWidgetSelection'
 import { useEditorViewport } from '../hooks/useEditorViewport'
 import { useEditorKeyboard } from '../hooks/useEditorKeyboard'
@@ -165,24 +164,16 @@ function OverlayEditorContent({
   const overlayState = useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onConfigChange }, widgetLiveEdits)
   const activity = overlayState.activity
   const resolvedVideoSyncMarkControls = resolveVideoSyncMarkControls(videoSyncMarkControls, overlayState.previewSecond, videoSyncMode)
-  const { metricPreviewModels, textPreviewModels } = useOverlayPreviewModels({
-    activity,
-    globalScale: overlayState.globalScale,
-    previewSecond: overlayState.previewSecond,
-    exportStartSecond: overlayState.previewExportStartSecond,
-    renderedWidgets: overlayState.canvasWidgets,
-  })
 
   const renderGeometryModels = useMemo(
     () =>
       buildWidgetRenderGeometryModels({
         widgets: overlayState.canvasWidgets,
-        metricPreviewModels,
-        textPreviewModels,
+
         globalScale: overlayState.globalScale,
         liveWidgetDrafts: overlayState.liveWidgetDrafts,
       }),
-    [metricPreviewModels, overlayState.canvasWidgets, overlayState.globalScale, overlayState.liveWidgetDrafts, textPreviewModels],
+    [overlayState.canvasWidgets, overlayState.globalScale, overlayState.liveWidgetDrafts],
   )
 
   // Selection management — composed after overlayState so it can consume orderedWidgetIds, renderedWidgetMap, widgetNodes
@@ -393,20 +384,18 @@ function OverlayEditorContent({
       activity,
       previewSecond: overlayState.previewSecond,
       exportStartSecond: overlayState.previewExportStartSecond,
-      metricPreviewModels,
-      textPreviewModels,
+
       renderGeometryModels,
       exportRange: overlayState.previewExportRange,
     }),
     [
       activity,
-      metricPreviewModels,
+
       overlayState.previewExportRange,
       overlayState.previewExportStartSecond,
       overlayState.previewSecond,
       overlayState.canvasWidgets,
       renderGeometryModels,
-      textPreviewModels,
     ],
   )
   const canvasCallbacks = useMemo(
@@ -511,7 +500,7 @@ function OverlayEditorContent({
             ) : null}
             {videoSyncMode ? (
               <div
-                className="pointer-events-none absolute left-0 top-0 [container-type:size]"
+                className="pointer-events-none absolute left-0 top-0 @container-[size]"
                 style={{ width: overlayState.sceneSize.width * displayScale, height: '100%' }}
               >
                 <VideoSyncMarkControls {...resolvedVideoSyncMarkControls} />

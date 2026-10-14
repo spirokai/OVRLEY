@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getMapStyleUrlTemplate } from '@/api/backend'
 import { getPreference, setPreference } from '@/lib/preferences-store'
-import { prepareFont } from '@/lib/font-resources'
+import { useWasmWidgets } from '@/features/wasm-widgets/hooks/useWasmWidgets'
 import {
   VIDEO_SYNC_DEFAULT_MAP_STYLE,
   VIDEO_SYNC_MAP_STYLES,
   VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY,
   VIDEO_SYNC_NAVIGATION_MAP_PITCH,
   VIDEO_SYNC_SPEED_FONT,
+  VIDEO_SYNC_SPEED_WIDGETS,
+  VIDEO_SYNC_SPEED_SCENE,
+  VIDEO_SYNC_EMPTY_WIDGETS,
 } from '../data/videoSyncConstants'
 import { buildActivityCourseSegments } from '../utils/activitySyncInput'
-import { buildVideoSyncScreenLayout, getVideoSyncPreviewSpeed } from '../utils/videoSyncPresentation'
+import { buildVideoSyncScreenLayout } from '../utils/videoSyncPresentation'
 import NavigationMapController from '../map/NavigationMapController'
 import SelectionMapController from '../map/SelectionMapController'
 
@@ -48,16 +51,24 @@ export default function useVideoSyncPreview({
   const [error, setError] = useState(null)
   const screenLayout = buildVideoSyncScreenLayout(sceneSize, displayScale)
   const courseSegments = useMemo(() => buildActivityCourseSegments(activity), [activity])
-  const speed = useMemo(() => getVideoSyncPreviewSpeed(activity, previewSecond), [activity, previewSecond])
+  const hasSpeed = useMemo(() => activity?.speed?.some((value) => value !== null && value !== undefined) ?? false, [activity])
+  const speedScene = useMemo(
+    () => ({ ...VIDEO_SYNC_SPEED_SCENE, width: sceneSize.width, height: sceneSize.height, scale: displayScale }),
+    [sceneSize.width, sceneSize.height, displayScale],
+  )
+  const { attach, error: speedError } = useWasmWidgets({
+    widgets: hasSpeed ? VIDEO_SYNC_SPEED_WIDGETS : VIDEO_SYNC_EMPTY_WIDGETS,
+    scene: speedScene,
+    activity,
+    second: previewSecond,
+    defaultFont: VIDEO_SYNC_SPEED_FONT,
+  })
+  const speedCanvasRef = useCallback((canvas) => attach(VIDEO_SYNC_SPEED_WIDGETS[0].id, canvas), [attach])
   const styleUrl = styleUrlTemplate === null ? null : styleUrlTemplate.replace('{style}', style)
 
   useEffect(() => {
     let mounted = true
-    Promise.all([
-      getMapStyleUrlTemplate(),
-      getPreference(VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY).catch(() => undefined),
-      prepareFont(VIDEO_SYNC_SPEED_FONT),
-    ])
+    Promise.all([getMapStyleUrlTemplate(), getPreference(VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY).catch(() => undefined)])
       .then(([template, storedStyle]) => {
         if (!mounted) return
         setStyleUrlTemplate(template)
@@ -131,5 +142,18 @@ export default function useVideoSyncPreview({
   }, [actionPoint, onSetCourseLocation])
 
   if (error) throw error
-  return { selectionMapRef, navigationMapRef, actionPoint, onConfirmActionPoint, pitch, onPitchChange, screenLayout, speed, style, onStyleChange }
+  return {
+    selectionMapRef,
+    navigationMapRef,
+    actionPoint,
+    onConfirmActionPoint,
+    pitch,
+    onPitchChange,
+    screenLayout,
+    hasSpeed,
+    speedCanvasRef,
+    speedError,
+    style,
+    onStyleChange,
+  }
 }
