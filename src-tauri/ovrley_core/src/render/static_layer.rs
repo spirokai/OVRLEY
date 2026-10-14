@@ -118,7 +118,7 @@ impl StaticLayer<'_> {
     fn draw(&self, canvas: &skia_safe::Canvas, font_dirs: &[std::path::PathBuf]) -> CoreResult<()> {
         let scene = self.scene;
         let scale = scene.presentation.scale;
-        draw_backdrops_static_layer(canvas, self.backdrops, scale);
+        draw_backdrops_static_layer(canvas, self.backdrops, scale, scene.presentation.opacity);
         draw_rasters(canvas, self.rasters, scale, scene.presentation.opacity);
         for label in self.labels {
             let frame = ovrley_widgets::widgets::label::frame::prepare_label_frame(

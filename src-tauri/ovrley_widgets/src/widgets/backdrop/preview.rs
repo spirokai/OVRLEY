@@ -25,7 +25,7 @@ impl PreviewBackdrop {
         let canvas = surface.canvas();
         canvas.clear(Color::TRANSPARENT);
         canvas.translate((-bounds.left, -bounds.top));
-        frame.draw(canvas);
+        frame.draw(canvas, scene.opacity);
         let mut pixels = vec![0; width as usize * height as usize * 4];
         let info = ImageInfo::new((width as i32, height as i32), ColorType::RGBA8888, AlphaType::Unpremul, None);
         if !surface.read_pixels(&info, &mut pixels, width as usize * 4, (0, 0)) {

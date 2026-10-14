@@ -326,6 +326,16 @@ pub fn parse_color(input: &str, opacity: f32) -> Color {
     Color::from_argb(scaled_alpha, r, g, b)
 }
 
+/// Applies an additional opacity to an RGBA color whose widget opacity is already resolved.
+pub fn rgba_color(color: [u8; 4], opacity: f32) -> Color {
+    Color::from_argb(
+        (f32::from(color[3]) * opacity).round() as u8,
+        color[0],
+        color[1],
+        color[2],
+    )
+}
+
 // Creates the anti-aliased Skia paint used for text fills and strokes.
 fn text_paint(color: Color) -> Paint {
     let mut paint = Paint::default();
@@ -340,13 +350,8 @@ pub fn validated_value_style(
     scene: &crate::model::scene::ValidatedScenePresentation,
     scale: f32,
 ) -> ResolvedTextStyle {
-    let opacity = validated.opacity;
-    let color = Color::from_argb(
-        validated.color[3],
-        validated.color[0],
-        validated.color[1],
-        validated.color[2],
-    );
+    let opacity = validated.opacity * scene.opacity;
+    let color = rgba_color(validated.color, scene.opacity);
 
     ResolvedTextStyle {
         x: validated.x,

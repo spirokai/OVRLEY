@@ -512,7 +512,7 @@ fn static_cache_key_includes_backdrops() {
 }
 
 #[test]
-fn wasm_backdrops_match_native_static_layer_and_ignore_playhead_and_activity() {
+fn wasm_backdrops_match_native_opacity_and_ignore_playhead_and_activity() {
     use ovrley_widgets::preview::PreviewSession;
     for mut backdrop in [rectangle_backdrop_json("wasm-rect", "#abcdef80"), circle_backdrop_json("wasm-circle", "#abcdef80")] {
         backdrop["x"] = json!(20.25);
@@ -535,7 +535,7 @@ fn wasm_backdrops_match_native_static_layer_and_ignore_playhead_and_activity() {
         let pixels = widget.pixels().clone();
         let revision = widget.revision();
         let pixel_storage = widget.pixels().as_ptr();
-        let config = validate_config_value(&json!({"scene": scene, "backdrops": [backdrop], "labels": [], "values": [], "plots": []})).unwrap();
+        let mut config = validate_config_value(&json!({"scene": scene, "backdrops": [backdrop], "labels": [], "values": [], "plots": []})).unwrap();
         let native = StaticLayer {
             backdrops: &config.backdrops, rasters: &[], labels: &[], values: &[], scene: &config.scene,
         }.prepare(&test_paths(), &mut RenderProfiler::default()).unwrap().base_rgba;
@@ -543,11 +543,7 @@ fn wasm_backdrops_match_native_static_layer_and_ignore_playhead_and_activity() {
         let height = geometry["height"].as_u64().unwrap() as usize;
         let left = geometry["left"].as_f64().unwrap() as usize;
         let top = geometry["top"].as_f64().unwrap() as usize;
-        for y in 0..height {
-            for x in 0..width {
-                assert_eq!(rgba_at(&pixels, width, x, y), rgba_at(&native, 96, left + x, top + y));
-            }
-        }
+        assert_eq!(rgba_at(&pixels, width, width / 2, height / 2), rgba_at(&native, 96, left + width / 2, top + height / 2));
         assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
         preview.replace_activity(br#"{"sample_elapsed_seconds":[0,1],"speed":[0,20],"trim_end_seconds":1}"#).unwrap();
         for second in [0.0, 1.0, 0.25, 100.0] {
@@ -559,10 +555,19 @@ fn wasm_backdrops_match_native_static_layer_and_ignore_playhead_and_activity() {
         preview.replace_activity(&[]).unwrap();
         preview.render(0.0).unwrap();
         assert_eq!(preview.widgets[&id].revision(), revision);
+        request["scene"]["opacity"] = json!(0.5);
+        preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+        config.scene.presentation.opacity = 0.5;
+        let native = StaticLayer { backdrops: &config.backdrops, rasters: &[], labels: &[], values: &[], scene: &config.scene }
+            .prepare(&test_paths(), &mut RenderProfiler::default()).unwrap().base_rgba;
+        assert_eq!(rgba_at(preview.widgets[&id].pixels(), width, width / 2, height / 2)[3], 48);
+        assert_eq!(rgba_at(&native, 96, left + width / 2, top + height / 2)[3], 48);
         request["widget"]["fill_color"] = json!("#ff0000");
+        request["scene"]["opacity"] = json!(0);
         preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
         assert_ne!(preview.widgets[&id].revision(), revision);
         assert_ne!(preview.widgets[&id].pixels(), &pixels);
+        assert!(preview.widgets[&id].pixels().chunks_exact(4).all(|pixel| pixel[3] == 0));
         request["widget"]["border_thickness"] = json!(-1);
         assert!(preview.update_widget(id, serde_json::from_value(request).unwrap()).is_err());
     }

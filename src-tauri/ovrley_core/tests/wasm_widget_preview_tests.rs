@@ -458,6 +458,7 @@ fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_tri
         },
     };
     let (mut preview, mut request) = gradient_preview();
+    request["scene"]["opacity"] = json!(0.5);
     let parsed: ParsedActivity = serde_json::from_value(json!({
         "sample_elapsed_seconds": [0,1,2,3,4], "trim_end_seconds": 4,
         "gradient": [null,6,null,-6,null],
@@ -482,6 +483,8 @@ fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_tri
         validate_scene_presentation(serde_json::from_value(request["scene"].clone()).unwrap())
             .unwrap();
     let style = validated_gradient_style(&validated, &scene, scene.scale);
+    assert_eq!(style.opacity, 0.4);
+    assert_eq!(style.color.a(), 102);
     let fonts = NativeFonts(&[common::test_config::repo_git_root().join("fonts")]);
     let id = preview
         .create_widget(serde_json::from_value(request.clone()).unwrap())
@@ -514,6 +517,7 @@ fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_tri
             &style,
             dense.series.gradient[index],
             scene.scale,
+            scene.opacity,
             &fonts,
         )
         .unwrap()
@@ -582,12 +586,14 @@ fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_tri
         );
     }
     request["widget"]["triangle_positive_color"] = json!("#123456");
+    request["scene"]["opacity"] = json!(0);
     let revision = preview.widgets[&id].revision();
     preview
         .update_widget(id, serde_json::from_value(request).unwrap())
         .unwrap();
     preview.render(1.002).unwrap();
     assert_ne!(preview.widgets[&id].revision(), revision);
+    assert!(preview.widgets[&id].pixels().chunks_exact(4).all(|pixel| pixel[3] == 0));
 }
 
 #[test]
@@ -1016,6 +1022,9 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
     request["scene"]["shadow_strength"] = json!(3);
     request["scene"]["shadow_distance"] = json!(4);
     request["scene"]["border_thickness"] = json!(2);
+    request["scene"]["opacity"] = json!(0.5);
+    request["widget"]["opacity"] = json!(0.8);
+    request["widget"]["color"] = json!("#abcdef");
     let mut preview = PreviewSession::default();
     preview
         .fonts
@@ -1050,6 +1059,8 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
             let validated = validate_value_widget(input.widget, 0).unwrap();
             let scene = validate_scene_presentation(input.scene).unwrap();
             let style = validated_value_style(&validated, &scene, scene.scale);
+            assert_eq!(style.opacity, 0.4);
+            assert_eq!(style.color.a(), 102);
             let info = ImageInfo::new(
                 (
                     geometry["width"].as_i64().unwrap() as i32,
@@ -1109,6 +1120,10 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
     let empty = preview.widgets[&id].pixels().clone();
     preview.render(1.5).unwrap();
     assert_eq!(preview.widgets[&id].pixels(), &empty);
+    request["scene"]["opacity"] = json!(0);
+    preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+    preview.render(0.5).unwrap();
+    assert!(preview.widgets[&id].pixels().chunks_exact(4).all(|pixel| pixel[3] == 0));
     request["widget"]["font_size"] = json!(0);
     assert!(preview
         .update_widget(id, serde_json::from_value(request).unwrap())

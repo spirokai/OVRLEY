@@ -19,6 +19,7 @@ pub struct PreviewGradient {
     config: ValidatedGradientWidget,
     style: ResolvedTextStyle,
     scale: f32,
+    scene_opacity: f32,
     surface: Option<Surface>,
     last_sample: Option<Option<f64>>,
     pub pixels: Vec<u8>,
@@ -35,6 +36,7 @@ impl PreviewGradient {
             config,
             style,
             scale: scene.scale,
+            scene_opacity: scene.opacity,
             surface: None,
             last_sample: None,
             pixels: Vec::new(),
@@ -54,7 +56,9 @@ impl PreviewGradient {
         if self.last_sample == Some(raw) {
             return Ok(());
         }
-        let frame = prepare_gradient_frame(&self.config, &self.style, raw, self.scale, fonts)?;
+        let frame = prepare_gradient_frame(
+            &self.config, &self.style, raw, self.scale, self.scene_opacity, fonts,
+        )?;
         let bounds = frame.bounds;
         let width = bounds.width() as u32;
         let height = bounds.height() as u32;

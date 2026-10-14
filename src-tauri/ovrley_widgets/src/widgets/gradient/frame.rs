@@ -3,9 +3,9 @@ use super::{format::format_validated_gradient, validation::ValidatedGradientWidg
 use crate::{
     error::WidgetResult,
     model::{scene::ValidatedScenePresentation, standard_widgets::widget_font_weight},
-    render::text::{draw_text, measure_text, parse_color, FontResolver, ResolvedTextStyle},
+    render::text::{draw_text, measure_text, parse_color, rgba_color, FontResolver, ResolvedTextStyle},
 };
-use skia_safe::{paint::Style, Canvas, Color, Paint, PaintCap, Path, PathBuilder, Point, Rect};
+use skia_safe::{paint::Style, Canvas, Paint, PaintCap, Path, PathBuilder, Point, Rect};
 
 const TRIANGLE_GAP: f32 = 8.0;
 const ZERO_EPSILON: f64 = 0.05;
@@ -16,6 +16,7 @@ pub fn validated_gradient_style(
     scene: &ValidatedScenePresentation,
     scale: f32,
 ) -> ResolvedTextStyle {
+    let opacity = widget.opacity * scene.opacity;
     ResolvedTextStyle {
         x: widget.x,
         y: widget.y,
@@ -25,14 +26,14 @@ pub fn validated_gradient_style(
         italic: false,
         letter_spacing: 0.0,
         line_height: widget.font_size * scale * 0.92,
-        color: rgba_color(widget.color),
-        opacity: widget.opacity,
+        color: rgba_color(widget.color, scene.opacity),
+        opacity,
         shadow_color: (!scene.shadow_color.is_empty())
-            .then(|| parse_color(&scene.shadow_color, widget.opacity)),
+            .then(|| parse_color(&scene.shadow_color, opacity)),
         shadow_strength: scene.shadow_strength * scale,
         shadow_distance: scene.shadow_distance * scale,
         border_color: (!scene.border_color.is_empty())
-            .then(|| parse_color(&scene.border_color, widget.opacity)),
+            .then(|| parse_color(&scene.border_color, opacity)),
         border_thickness: scene.border_thickness * scale,
     }
 }
@@ -64,6 +65,7 @@ pub fn prepare_gradient_frame(
     base_style: &ResolvedTextStyle,
     raw: Option<f64>,
     scale: f32,
+    scene_opacity: f32,
     fonts: &dyn FontResolver,
 ) -> WidgetResult<GradientFrame> {
     let formatted = format_validated_gradient(widget, raw);
@@ -84,7 +86,7 @@ pub fn prepare_gradient_frame(
     let (value_text, unit) = if let Some(prefix) = formatted.strip_suffix('%') {
         let mut unit_style = value_style.clone();
         unit_style.x += measure_text(prefix, &value_style, fonts)?.width;
-        unit_style.color = rgba_color(widget.unit_color);
+        unit_style.color = rgba_color(widget.unit_color, scene_opacity);
         (prefix.to_owned(), Some(unit_style))
     } else {
         (formatted, None)
@@ -104,11 +106,14 @@ pub fn prepare_gradient_frame(
         let grade = raw.unwrap_or(0.0);
         let mut paint = Paint::default();
         paint.set_anti_alias(true);
-        paint.set_color(rgba_color(if grade < 0.0 {
-            widget.triangle_negative_color
-        } else {
-            widget.triangle_positive_color
-        }));
+        paint.set_color(rgba_color(
+            if grade < 0.0 {
+                widget.triangle_negative_color
+            } else {
+                widget.triangle_positive_color
+            },
+            scene_opacity,
+        ));
         let mut path = PathBuilder::new();
         path.move_to(Point::new(left, zero_baseline));
         path.line_to(Point::new(left + triangle_width, zero_baseline));
@@ -178,10 +183,6 @@ fn text_bounds(
         style.x + ink.bounds_right,
         baseline + ink.bounds_bottom,
     ))
-}
-
-fn rgba_color(color: [u8; 4]) -> Color {
-    Color::from_argb(color[3], color[0], color[1], color[2])
 }
 
 /// Preserves the existing full-angle triangle mapping, capped at 25 percent.

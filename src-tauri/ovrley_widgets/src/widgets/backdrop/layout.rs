@@ -17,16 +17,17 @@ pub fn draw_backdrops_static_layer(
     canvas: &Canvas,
     backdrops: &[ValidatedBackdrop],
     scale: f32,
+    scene_opacity: f32,
 ) {
     for backdrop in backdrops {
-        prepare_backdrop_frame(backdrop, scale).draw(canvas);
+        prepare_backdrop_frame(backdrop, scale).draw(canvas, scene_opacity);
     }
 }
 
-pub(crate) fn draw_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f32) {
+pub(crate) fn draw_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f32, opacity: f32) {
     match backdrop.display_type {
-        BackdropType::Circle => draw_circle_backdrop(canvas, backdrop, scale),
-        BackdropType::Rectangle => draw_rectangle_backdrop(canvas, backdrop, scale),
+        BackdropType::Circle => draw_circle_backdrop(canvas, backdrop, scale, opacity),
+        BackdropType::Rectangle => draw_rectangle_backdrop(canvas, backdrop, scale, opacity),
     }
 }
 
@@ -38,11 +39,11 @@ fn backdrop_paint(color: &str, opacity: f32, style: Style) -> Paint {
     paint
 }
 
-fn draw_circle_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f32) {
+fn draw_circle_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f32, opacity: f32) {
     let diameter = backdrop.diameter * scale;
     let border = (backdrop.border_thickness * scale).max(0.0);
     let center = Point::new(backdrop.x + diameter * 0.5, backdrop.y + diameter * 0.5);
-    let fill_alpha = backdrop.opacity * backdrop.fill_opacity;
+    let fill_alpha = opacity * backdrop.fill_opacity;
     let fill_paint = backdrop_paint(&backdrop.fill_color, fill_alpha, Style::Fill);
 
     canvas.draw_circle(center, (diameter * 0.5 - border).max(0.0), &fill_paint);
@@ -51,13 +52,13 @@ fn draw_circle_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f3
         return;
     }
 
-    let border_alpha = backdrop.opacity * backdrop.border_opacity;
+    let border_alpha = opacity * backdrop.border_opacity;
     let mut border_paint = backdrop_paint(&backdrop.border_color, border_alpha, Style::Stroke);
     border_paint.set_stroke_width(border);
     canvas.draw_circle(center, (diameter - border).max(0.0) * 0.5, &border_paint);
 }
 
-fn draw_rectangle_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f32) {
+fn draw_rectangle_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f32, opacity: f32) {
     let width = backdrop.width * scale;
     let height = backdrop.height * scale;
     let border = (backdrop.border_thickness * scale).max(0.0);
@@ -68,7 +69,7 @@ fn draw_rectangle_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale:
         bottom_right: backdrop.round_bottom_right,
         bottom_left: backdrop.round_bottom_left,
     };
-    let fill_alpha = backdrop.opacity * backdrop.fill_opacity;
+    let fill_alpha = opacity * backdrop.fill_opacity;
     let fill_paint = backdrop_paint(&backdrop.fill_color, fill_alpha, Style::Fill);
     let fill_path = rounded_rect_path(
         backdrop.x + border,
@@ -85,7 +86,7 @@ fn draw_rectangle_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale:
         return;
     }
 
-    let border_alpha = backdrop.opacity * backdrop.border_opacity;
+    let border_alpha = opacity * backdrop.border_opacity;
     let mut border_paint = backdrop_paint(&backdrop.border_color, border_alpha, Style::Stroke);
     border_paint.set_stroke_width(border);
     let stroke_inset = border * 0.5;

@@ -11,8 +11,10 @@ pub struct BackdropFrame<'a> {
 }
 
 impl BackdropFrame<'_> {
-    pub fn draw(&self, canvas: &Canvas) {
-        draw_backdrop(canvas, self.backdrop, self.scale);
+    pub fn draw(&self, canvas: &Canvas, scene_opacity: f32) {
+        draw_backdrop(
+            canvas, self.backdrop, self.scale, self.backdrop.opacity * scene_opacity,
+        );
     }
 }
 

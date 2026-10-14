@@ -38,7 +38,8 @@ pub fn resize_gradient(
     config.value_offset *= factor;
     let style = validated_gradient_style(&config, &scene, scene.scale);
     let raw = activity.and_then(|activity| activity.gradient_at(second));
-    let bounds = prepare_gradient_frame(&config, &style, raw, scene.scale, fonts)?.content_bounds;
+    let bounds = prepare_gradient_frame(&config, &style, raw, scene.scale, scene.opacity, fonts)?
+        .content_bounds;
     Ok(ResizeUpdate {
         x: config.x + point[0] - (bounds.left + bounds.width() * fixed[0]),
         y: config.y + point[1] - (bounds.top + bounds.height() * fixed[1]),

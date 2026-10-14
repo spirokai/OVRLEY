@@ -36,6 +36,7 @@ pub(crate) struct MetricWidgetRequest<'a> {
     pub dense_activity: &'a DenseActivityReport,
     pub frame_index: usize,
     pub scale: f32,
+    pub scene_opacity: f32,
     pub font_dirs: &'a [PathBuf],
     pub static_parts: StaticMetricParts,
     /// Pre-validated value widget. When present, the validated path is used
@@ -77,6 +78,7 @@ pub(crate) fn draw_metric_value_widget_with_config(
             request.base_style,
             raw,
             request.scale,
+            request.scene_opacity,
             &crate::fonts::NativeFonts(request.font_dirs),
         )?.draw(request.canvas, &crate::fonts::NativeFonts(request.font_dirs))?;
         return Ok(true);
@@ -253,6 +255,7 @@ mod tests {
                     dense_activity: &dense,
                     frame_index: 0,
                     scale: 1.0,
+                    scene_opacity: 1.0,
                     font_dirs: &[],
                     static_parts: StaticMetricParts::default(),
                     validated: None,
@@ -386,6 +389,7 @@ mod tests {
                 dense_activity: &dense,
                 frame_index: 0,
                 scale: 1.0,
+                scene_opacity: 1.0,
                 font_dirs: &[],
                 static_parts: StaticMetricParts::default(),
                 validated: Some(&validated),
@@ -415,6 +419,7 @@ mod tests {
                 dense_activity: &dense,
                 frame_index: 0,
                 scale: 1.0,
+                scene_opacity: 1.0,
                 font_dirs: &[],
                 static_parts: StaticMetricParts::default(),
                 validated: Some(&validated),
