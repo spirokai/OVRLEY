@@ -92,7 +92,12 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     onResizeStart: ({ target, direction, set, dragStart }) => {
       const current = begin(target, 'wasm-resize')
       const { bounds } = current.origin
-      current.anchor = resizeAnchor(bounds, direction, selectedWidget.type === 'raster' ? current.origin.data.rotation : 0)
+      current.anchor = resizeAnchor(
+        bounds,
+        direction,
+        ['course', 'raster'].includes(selectedWidget.type) ? current.origin.data.rotation : 0,
+        current.origin.rotationOrigin,
+      )
       set([bounds.width, bounds.height])
       if (dragStart) dragStart.set([0, 0])
     },

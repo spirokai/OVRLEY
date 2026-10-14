@@ -11,6 +11,7 @@ import { getThemeColor } from '@/lib/theme'
 import { Label } from '@/components/ui/label'
 import { useTranslation } from 'react-i18next'
 import { translateOptions } from '@/i18n'
+import { normalizeRotation } from '@/features/wasm-widgets/utils/widgetGestureGeometry'
 
 const MARKER_VARIANT_OPTIONS = [
   { value: 'single', labelKey: 'widget-editor.singleCircle', defaultLabel: 'Single Circle' },
@@ -37,7 +38,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
   const markerOpacity = widget.data.marker_opacity
   const markerVariant = widget.data.marker_variant
   const markerVariantDiameter = widget.data.marker_variant_diameter
-  const rotation = widget.data.rotation
+  const rotation = normalizeRotation(widget.data.rotation)
   const simplifyTolerance = widget.data.simplify_tolerance_px
   const targetDensity = widget.data.target_density
   const showVariantDiameter = markerVariant !== 'single'
@@ -52,10 +53,10 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
         editable
         label={t('widget-editor.mapRotation', 'Map Rotation')}
         value={rotation}
-        min={-180}
-        max={180}
+        min={0}
+        max={360}
         step={1}
-        valueDisplay={`${rotation}`}
+        integerDisplay
         suffix="°"
         onSliderChange={(rawValue) => updateWidgetSize(widget.id, { rotation: rawValue })}
         onSliderCommit={() => commitWidgetSize(widget.id)}

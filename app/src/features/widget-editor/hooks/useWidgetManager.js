@@ -105,9 +105,11 @@ export function useWidgetManager({ widgetLiveEdits }) {
     if (isWasmWidget(widget)) {
       const tapeUpdate = updates.display_variants?.heading_tape
       const patch =
-        widget.data.display_type === 'heading_tape' && tapeUpdate && Object.hasOwn(tapeUpdate, 'label_offset')
-          ? getWidgetInteraction(liveEdits.getWidgetNode(id)).resize({ label_offset: tapeUpdate.label_offset })
-          : updates
+        widget.type === 'course' && Object.hasOwn(updates, 'rotation')
+          ? { ...updates, ...getWidgetInteraction(liveEdits.getWidgetNode(id)).rotate(updates.rotation) }
+          : widget.data.display_type === 'heading_tape' && tapeUpdate && Object.hasOwn(tapeUpdate, 'label_offset')
+            ? getWidgetInteraction(liveEdits.getWidgetNode(id)).resize({ label_offset: tapeUpdate.label_offset })
+            : updates
       liveEdits.setLiveWidgetDraft(id, patch)
       return
     }

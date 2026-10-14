@@ -12,6 +12,8 @@ import { act, render, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useOverlayEditorState from '@/features/overlay-editor/hooks/useOverlayEditorState'
 import { WasmWidgetCanvas } from '@/features/wasm-widgets/components/WasmWidgetCanvas'
+import { presentWidgetGeometry } from '@/features/wasm-widgets/utils/widgetPresentation'
+import { COURSE_PLOT_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { getPrimarySelectionId, normalizeSelectionIds } from '@/features/overlay-editor/utils/overlayEditorHelpers'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
@@ -52,6 +54,41 @@ describe('useOverlayEditorState module contract', () => {
     rerender(<WasmCanvases config={{ ...config, values: [otherSpeed] }} attach={attach} />)
     expect(attach).toHaveBeenCalledTimes(3)
     expect(attach.mock.calls[2]).toEqual(['speed-widget', null])
+  })
+
+  test('route rotation centers the selection while its sibling raster stays in scene coordinates', () => {
+    const route = { ...COURSE_PLOT_DEFAULTS, id: 'route-widget' }
+    const config = { ...DEFAULT_CONFIG, plots: [route] }
+    const attach = vi.fn()
+    const { rerender, unmount } = render(<WasmCanvases config={config} attach={attach} />)
+    const [, canvas, target] = attach.mock.calls[0]
+    expect(target.dataset.widgetId).toBe(route.id)
+    expect(canvas.parentElement).toBe(target.parentElement)
+    for (const rotation of [0, 45, 135]) {
+      presentWidgetGeometry(
+        canvas,
+        {
+          left: 90,
+          top: 40,
+          width: 180,
+          height: 150,
+          content_width: 160,
+          content: { left: 100, top: 60, width: 160, height: 80 },
+          rotation,
+          rotation_origin: [80, 40],
+        },
+        target,
+      )
+      expect(target.style.transformOrigin).toBe('80px 40px')
+      expect(target.style.left).toBe('100px')
+      expect(target.style.top).toBe('60px')
+      expect(canvas.style.left).toBe('90px')
+      expect(canvas.style.transform).toBe('none')
+    }
+    rerender(<WasmCanvases config={{ ...config, plots: [{ ...route, rotation: 90 }] }} attach={attach} />)
+    expect(attach).toHaveBeenCalledTimes(1)
+    unmount()
+    expect(attach.mock.lastCall[1]).toBeNull()
   })
 
   test('changes node registration when a widget switches from WASM to the legacy renderer', () => {

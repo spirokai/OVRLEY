@@ -37,6 +37,8 @@ macro_rules! activity_columns {
             #[serde(default)] g_force_z: Vec<Option<f64>>,
             #[serde(default)] gear_position: Vec<Option<String>>,
             #[serde(default)] course: Vec<(Option<f64>, Option<f64>)>,
+            #[serde(default)] sample_course_points: Vec<(Option<f64>, Option<f64>)>,
+            #[serde(default)] sample_distance_progress: Vec<f64>,
             #[serde(flatten)] lap_timing: crate::widgets::lap_timer::sampling::LapTiming,
         }
         impl PreviewActivity {
@@ -139,6 +141,7 @@ impl NumericColumn {
 }
 
 pub struct ActivitySampler {
+    pub(crate) route: crate::widgets::route::sampling::RouteActivity,
     pub(crate) time: crate::widgets::time::sampling::TimeSampler,
     pub(crate) timezone: Option<chrono_tz::Tz>,
     times: Vec<f64>,
@@ -172,6 +175,8 @@ impl ActivitySampler {
             activity.time.len(),
             activity.gear_position.len(),
             activity.course.len(),
+            activity.sample_course_points.len(),
+            activity.sample_distance_progress.len(),
             activity.elevation.len(),
             activity.barometric_altitude.len(),
         ] {
@@ -237,7 +242,11 @@ impl ActivitySampler {
             .zip(activity.gear_position)
             .filter_map(|(time, value)| value.map(|value| (time, value)))
             .collect();
+        let route = crate::widgets::route::sampling::RouteActivity::new(
+            &times, &activity.sample_course_points, &activity.sample_distance_progress, activity.trim_end_seconds,
+        );
         Ok(Self {
+            route,
             time,
             timezone,
             times,

@@ -9,6 +9,7 @@ test.each([
   ['lean_angle', 'lean_angle'],
   ['backdrop', 'rectangle'],
   ['raster', 'raster'],
+  ['course', undefined],
   ['lap_timer', 'lap_timer'],
   ['heading', 'heading_tape'],
   ['power', 'linear'],

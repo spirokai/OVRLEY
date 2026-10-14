@@ -20,7 +20,7 @@ export function useWasmWidgets({ widgets, scene, activity, second, defaultFont }
         if (cancelled) return
         const current = createPreviewSession(module, setError)
         session.current = current
-        for (const [id, canvas] of canvases.current) current.attach(id, canvas)
+        for (const [id, { canvas, target }] of canvases.current) current.attach(id, canvas, target)
         current.setSnapshot(latest.current)
       })
       .catch((cause) => {
@@ -32,10 +32,10 @@ export function useWasmWidgets({ widgets, scene, activity, second, defaultFont }
       session.current = null
     }
   }, [])
-  const attach = useCallback((id, canvas) => {
-    if (canvas) canvases.current.set(id, canvas)
+  const attach = useCallback((id, canvas, target) => {
+    if (canvas) canvases.current.set(id, { canvas, target })
     else canvases.current.delete(id)
-    session.current?.attach(id, canvas)
+    session.current?.attach(id, canvas, target)
   }, [])
   return { attach, error }
 }

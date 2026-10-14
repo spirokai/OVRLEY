@@ -9,7 +9,7 @@ const decoder = new TextDecoder()
 let modulePromise
 
 function widgetFonts(widget) {
-  if (widget.type === 'backdrop' || widget.type === 'raster') return []
+  if (widget.type === 'backdrop' || widget.type === 'raster' || widget.type === 'course') return []
   if (['linear', 'arc', 'corner'].includes(widget.data.display_type)) {
     const fonts = widget.data.display_type === 'linear' ? [] : [{ font: widget.data.font }]
     if (widget.data.show_min_max_labels) fonts.push({ font: widget.data.min_max_label_font })
@@ -41,6 +41,7 @@ export function createPreviewSession(module, onError) {
   const handle = module._ovrley_preview_create()
   const widgets = new Map()
   const canvases = new Map()
+  const targets = new Map()
   const fonts = new Map()
   const images = new Map()
   let snapshot
@@ -58,8 +59,9 @@ export function createPreviewSession(module, onError) {
     },
     getSnapshot: () => snapshot,
     getGeometry: (id) => widgets.get(id).geometry,
-    resize(request) {
-      upload(encoder.encode(JSON.stringify(request)), (ptr, len) => check(module._ovrley_preview_resize(handle, ptr, len)))
+    resize(request, id) {
+      const input = request.type === 'course' ? { ...request, handle: widgets.get(id).handle } : request
+      upload(encoder.encode(JSON.stringify(input)), (ptr, len) => check(module._ovrley_preview_resize(handle, ptr, len)))
       return JSON.parse(read(module._ovrley_preview_resize_ptr(handle), module._ovrley_preview_resize_len(handle)))
     },
   })
@@ -147,7 +149,7 @@ export function createPreviewSession(module, onError) {
           const canvas = canvases.get(widget.id)
           if (canvas) {
             canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
-            canvas.parentElement.style.visibility = 'hidden'
+            targets.get(widget.id).style.visibility = 'hidden'
           }
           continue
         }
@@ -156,8 +158,14 @@ export function createPreviewSession(module, onError) {
         if (fontResources.some((resource) => !resource.ready)) continue
         if (isTimeDependentWasmWidget(widget) && !activityReady) continue
         let instance = widgets.get(widget.id)
-        if (instance?.data === widget.data && instance.scene === snapshot.scene) continue
-        const config = JSON.stringify({ type: widget.type, widget: widget.data, scene: snapshot.scene })
+        const transient = widget.type === 'course' && interaction.isResizing(widget.id)
+        if (instance?.data === widget.data && instance.scene === snapshot.scene && instance.transient === transient) continue
+        const config = JSON.stringify({
+          type: widget.type,
+          widget: widget.data,
+          scene: snapshot.scene,
+          ...(widget.type === 'course' ? { transient } : {}),
+        })
         if (!instance) {
           const widgetHandle = upload(encoder.encode(config), (ptr, len) => module._ovrley_preview_widget_create(handle, ptr, len))
           if (!widgetHandle) fail()
@@ -169,6 +177,7 @@ export function createPreviewSession(module, onError) {
         }
         instance.data = widget.data
         instance.scene = snapshot.scene
+        instance.transient = transient
       }
       if (activityReady && snapshot.widgets.some(isTimeDependentWasmWidget)) check(module._ovrley_preview_render(handle, snapshot.second))
       for (const [id, widget] of widgets) {
@@ -188,7 +197,7 @@ export function createPreviewSession(module, onError) {
         const ptr = module._ovrley_preview_pixels(handle, widget.handle)
         widget.image.data.set(module.HEAPU8.subarray(ptr, ptr + widget.image.data.length))
         canvas.getContext('2d').putImageData(widget.image, 0, 0)
-        presentWidgetGeometry(canvas, geometry)
+        presentWidgetGeometry(canvas, geometry, targets.get(id))
         widget.geometry = geometry
         widget.revision = revision
       }
@@ -250,13 +259,17 @@ export function createPreviewSession(module, onError) {
       }
       schedule()
     },
-    attach(id, canvas) {
-      const previous = canvases.get(id)
-      if (previous) unregisterWidgetInteraction(previous.parentElement)
+    attach(id, canvas, target = canvas?.parentElement) {
+      const previous = targets.get(id)
+      if (previous) unregisterWidgetInteraction(previous)
       if (canvas) {
         canvases.set(id, canvas)
-        registerWidgetInteraction(canvas.parentElement, interaction.forWidget(id))
-      } else canvases.delete(id)
+        targets.set(id, target)
+        registerWidgetInteraction(target, interaction.forWidget(id))
+      } else {
+        canvases.delete(id)
+        targets.delete(id)
+      }
       const widget = widgets.get(id)
       if (widget) {
         widget.revision = -1
@@ -268,10 +281,11 @@ export function createPreviewSession(module, onError) {
       disposed = true
       if (frame !== null) cancelAnimationFrame(frame)
       interaction.dispose()
-      for (const canvas of canvases.values()) unregisterWidgetInteraction(canvas.parentElement)
+      for (const target of targets.values()) unregisterWidgetInteraction(target)
       module._ovrley_preview_destroy(handle)
       widgets.clear()
       canvases.clear()
+      targets.clear()
       fonts.clear()
       images.clear()
     },

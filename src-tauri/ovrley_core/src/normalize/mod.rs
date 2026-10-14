@@ -20,7 +20,7 @@ use raw::RenderConfig;
 
 pub use raw::{
     find_plot_value, find_plot_values, parse_config_json, parse_config_value, parse_template_json,
-    parse_template_value, CoursePlotConfig, ElevationPlotConfig, SceneConfig, TEMPLATE_FILE_FORMAT,
+    parse_template_value, ElevationPlotConfig, SceneConfig, TEMPLATE_FILE_FORMAT,
     TEMPLATE_FILE_VERSION,
 };
 
@@ -40,7 +40,8 @@ use ovrley_widgets::model::scene::{
 use ovrley_widgets::widgets::value::validation::validate_value_widget;
 pub use raster::validate_template_rasters;
 pub use raster::{RasterSource, ValidatedRaster};
-pub use route::{validate_route_plot, validate_route_plots, ValidatedRoutePlot};
+pub use route::validate_route_plots;
+use ovrley_widgets::widgets::route::validation::ValidatedRoutePlot;
 pub use scene::{
     validate_ffmpeg_config, validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig,
 };

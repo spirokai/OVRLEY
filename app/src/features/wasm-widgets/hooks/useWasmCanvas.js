@@ -1,11 +1,21 @@
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 
-/** @param {object} props Widget identity and native canvas registration. @returns {Function} Canvas ref. */
-export function useWasmCanvas({ id, attach }) {
-  return useCallback(
+/** @param {object} props Widget identity, selection wrapper and canvas registration. @returns {object} Stable DOM refs. */
+export function useWasmCanvas({ id, attach, registerNode, separateRaster }) {
+  const target = useRef(null)
+  const wrapperRef = useCallback(
     (node) => {
-      attach(id, node)
+      target.current = node
+      registerNode(node)
     },
-    [attach, id],
+    [registerNode],
   )
+  const canvasRef = useCallback(
+    (node) => {
+      if (separateRaster) attach(id, node, target.current)
+      else attach(id, node)
+    },
+    [attach, id, separateRaster],
+  )
+  return { wrapperRef, canvasRef }
 }

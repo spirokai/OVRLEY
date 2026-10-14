@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
 import { createLabelDefaults, createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
+import { COURSE_PLOT_DEFAULTS } from '@/lib/widget/standard-widgets'
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { registerWidgetInteraction, unregisterWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 import { redoHistory, replaceEditorDocument, undoHistory } from '@/features/undo-redo/undoHistory'
@@ -146,6 +147,26 @@ describe('useWidgetManager alignment updates', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  test('course rotation slider uses the canvas controller and commits its exact patch', () => {
+    const config = cloneSerializable(DEFAULT_CONFIG)
+    config.plots = [{ ...COURSE_PLOT_DEFAULTS, id: 'route-0' }]
+    useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
+    const node = document.createElement('div')
+    const patch = { x: 123.125, y: 80.25, rotation: 314.75 }
+    const rotate = vi.fn(() => patch)
+    registerWidgetInteraction(node, { rotate })
+    const { result } = renderHook(() => {
+      const liveEdits = useWidgetDraftState()
+      return { manager: useWidgetManager({ widgetLiveEdits: liveEdits }), liveEdits }
+    })
+    result.current.liveEdits.setWidgetNode('route-0', node)
+    act(() => result.current.manager.updateWidgetSize('route-0', { rotation: -45.25 }))
+    expect(rotate).toHaveBeenCalledWith(-45.25)
+    act(() => result.current.manager.commitWidgetSize('route-0'))
+    expect(useStore.getState().config.plots[0]).toMatchObject(patch)
+    unregisterWidgetInteraction(node)
   })
 
   test('heading offset commits the WASM height response before the pending frame', () => {

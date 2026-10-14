@@ -6,6 +6,7 @@ export function isWasmWidget(widget) {
     widget.type === 'raster' ||
     widget.type === 'backdrop' ||
     widget.type === 'label' ||
+    widget.type === 'course' ||
     widget.type === 'gradient' ||
     (widget.type === 'lean_angle' && widget.data.display_type === 'lean_angle') ||
     (widget.type === 'g_force' && widget.data.display_type === 'g_force') ||

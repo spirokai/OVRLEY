@@ -28,7 +28,6 @@
 import { memo } from 'react'
 import { OverlayTextWidget } from './widgets/text/TextPreview'
 import { OverlayMetricWidget } from './widgets/metric/MetricPreview'
-import { OverlayRouteWidget } from './widgets/route/RoutePreview'
 import { OverlayElevationWidget } from './widgets/elevation/ElevationPreview'
 import OverlayBackdropWidget from './widgets/backdrop/BackdropPreview'
 import { isBoxedDisplayType } from '@/lib/widget/standard-metrics'
@@ -60,19 +59,7 @@ function WidgetPreview({
     return <OverlayTextWidget widget={widget} globalOpacity={globalOpacity} sceneStyle={sceneStyle} textPreviewModel={textPreviewModel} />
   }
 
-  if (widget.type === 'course') {
-    return (
-      <OverlayRouteWidget
-        widget={widget}
-        activity={activity}
-        previewSecond={previewSecond}
-        globalOpacity={globalOpacity}
-        globalScale={globalScale}
-        sceneStyle={sceneStyle}
-        exportRange={exportRange}
-      />
-    )
-  }
+  if (widget.type === 'course') throw new Error('Course requires the WASM widget canvas')
 
   if (widget.type === 'elevation') {
     return (

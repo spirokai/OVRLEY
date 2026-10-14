@@ -5,7 +5,7 @@
 import { memo, useEffect, useMemo, useRef } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { cn } from '@/lib/utils'
-import { getEditorGridSize } from '../utils/overlayEditorUtils'
+import { buildWasmScene, getEditorGridSize } from '../utils/overlayEditorUtils'
 import { WidgetPreview } from '@/features/widget-preview'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { VideoPreviewSurface } from '@/features/video-preview'
@@ -191,11 +191,12 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const { widgets, activity, previewSecond, exportStartSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange } = dataProps
   const { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
+  const fallbackDurationSeconds = useStore((state) => state.fallbackDurationSeconds)
   const hasTransparentBackground = backgroundMode === 'transparent'
   const backgroundImageSrc = importedBackgroundImagePath ? convertFileSrc(importedBackgroundImagePath) : ''
   const wasmScene = useMemo(
-    () => ({ ...sceneStyle, ...sceneSize, scale: globalScale, opacity: globalOpacity, export_start_seconds: exportStartSecond }),
-    [sceneStyle, sceneSize, globalScale, globalOpacity, exportStartSecond],
+    () => buildWasmScene({ sceneStyle, sceneSize, globalScale, globalOpacity, exportStartSecond, exportRange, activity, fallbackDurationSeconds }),
+    [sceneStyle, sceneSize, globalScale, globalOpacity, exportStartSecond, exportRange, activity, fallbackDurationSeconds],
   )
   const wasm = useWasmWidgets({ widgets, scene: wasmScene, activity, second: previewSecond, defaultFont: defaultValueFont })
 

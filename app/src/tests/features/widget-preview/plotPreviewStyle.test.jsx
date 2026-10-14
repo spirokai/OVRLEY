@@ -1,5 +1,4 @@
 import { describe, expect, test, vi } from 'vitest'
-import { getRoutePreviewStyle } from '@/features/widget-preview/widgets/route/style'
 import { buildElevationPreviewStyle } from '@/features/widget-preview/widgets/elevation/style'
 
 vi.mock('@/features/widget-preview/shared/textMeasurement', async () => {
@@ -11,28 +10,6 @@ vi.mock('@/features/widget-preview/shared/textMeasurement', async () => {
 })
 
 describe('plot preview style scaling', () => {
-  test('route preview derives opacity and marker presentation', () => {
-    const data = {
-      width: 400,
-      height: 200,
-      remaining_line_width: 6,
-      completed_line_width: 4,
-      marker_size: 18,
-      marker_variant_diameter: 44,
-      marker_color: '#ffffff',
-      marker_opacity: 100,
-      remaining_line_color: '#ffffff',
-      completed_line_color: '#ffffff',
-      remaining_line_opacity: 35,
-      completed_line_opacity: 100,
-    }
-
-    const result = { current: getRoutePreviewStyle(data, 2) }
-
-    expect(result.current.remainingLineOpacity).toBe(0.35)
-    expect(result.current.completedLineOpacity).toBe(1)
-  })
-
   test('elevation preview derives opacity and scale presentation', () => {
     const data = {
       width: 400,

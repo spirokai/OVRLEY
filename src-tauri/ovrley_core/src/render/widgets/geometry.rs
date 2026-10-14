@@ -1,7 +1,7 @@
 //! Point/rect/math and layout-fitting helpers for overlay widgets.
 //!
 //! Owns: `distance` (Euclidean distance between 2D points).
-//! Does not own: RDP simplification (see [`crate::rdp`]), polyline/area drawing
+//! Does not own: RDP simplification (see [`ovrley_widgets::rdp`]), polyline/area drawing
 //!       (see [`super::polyline`]), marker drawing (see [`super::marker`]).
 //!
 //! Allowed dependencies: `std`.

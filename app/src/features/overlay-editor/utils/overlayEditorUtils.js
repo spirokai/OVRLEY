@@ -13,6 +13,32 @@ import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
 import { interpolateNumericSeries, MISSING_SAMPLE_POLICY } from '@/lib/interpolation'
 import { getStandardMetricDefinition, getStandardMetricInterpolation } from '@/lib/widget/standard-metrics'
 import { applyAltitudeOffset, getAltitudeCorrectionMeters, getPreferredElevationSeries } from '@/lib/widget/altitude'
+import { resolveExportRangeWindow } from './exportRange'
+
+/** @param {object} options Effective scene, activity, and export timing. @returns {object} Shared preview scene contract. */
+export function buildWasmScene({
+  sceneStyle,
+  sceneSize,
+  globalScale,
+  globalOpacity,
+  exportStartSecond,
+  exportRange,
+  activity,
+  fallbackDurationSeconds,
+}) {
+  const window = resolveExportRangeWindow(activity, exportRange)
+  return {
+    ...sceneStyle,
+    ...sceneSize,
+    scale: globalScale,
+    opacity: globalOpacity,
+    export_start_seconds: exportStartSecond,
+    start: window.start,
+    end: window.end,
+    custom_export_range_active: window.active,
+    preview_duration_seconds: fallbackDurationSeconds,
+  }
+}
 
 /**
  * Returns the configured scene dimensions with defaults of 1920x1080.

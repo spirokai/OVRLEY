@@ -187,7 +187,7 @@ fn test_command_returns_geometry_for_valid_input() {
             "completed_line_width": 2.0,
             "completed_line_color": "#00ff00",
             "completed_line_opacity": 1.0,
-            "marker_variant": "circle",
+            "marker_variant": "single",
             "marker_variant_diameter": 10.0,
             "marker_size": 6.0,
             "marker_color": "#ffffff",

@@ -1,7 +1,7 @@
 //! Shared Ramer-Douglas-Peucker line simplification.
 //!
 //! Owns: the RDP algorithm and perpendicular distance calculation.
-//! Does not own: route or elevation domain types.
+//! Shared by route and elevation geometry in both rendering hosts.
 //!
 //! Allowed dependencies: std.
 //! Forbidden dependencies: config, activity, render, encode, commands.

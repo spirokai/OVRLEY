@@ -9,7 +9,7 @@ beforeEach(() => vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAni
 afterEach(() => vi.useRealTimers())
 
 function editor(type = 'speed') {
-  const original = { id: 'widget', type, data: { x: 120.25, y: 60.5, font_size: 48 } }
+  const original = { id: 'widget', type, data: { x: 120.25, y: 60.5, font_size: 48, rotation: 0 } }
   let snapshot = { widgets: [original], scene: { scale: 1.5 }, second: 0 }
   let frame = null
   const presentations = []
@@ -27,7 +27,7 @@ function editor(type = 'speed') {
       render()
     },
     getSnapshot: () => snapshot,
-    getGeometry: () => ({ content: { left: 100, top: 65, width: 160, height: 40 } }),
+    getGeometry: () => ({ content: { left: 100, top: 65, width: 160, height: 40 }, rotation_origin: [80, 20] }),
     resize,
   })
   return {
@@ -42,7 +42,7 @@ function editor(type = 'speed') {
   }
 }
 
-test.each(['speed', 'time', 'gradient', 'lean_angle', 'backdrop', 'raster', 'lap_timer', 'heading'])(
+test.each(['speed', 'time', 'gradient', 'lean_angle', 'backdrop', 'raster', 'course', 'lap_timer', 'heading'])(
   '%s drag coalesces from the captured origin and flushes the final movement without rounding',
   (type) => {
     const { interaction, presentations, original } = editor(type)
@@ -62,6 +62,49 @@ test.each(['speed', 'time', 'gradient', 'lean_angle', 'backdrop', 'raster', 'lap
     expect(original.data.x).toBe(120.25)
   },
 )
+
+test('course slider and handle rotation share the same patch and preserve position when switching controls', () => {
+  const { interaction, original, setSnapshot } = editor('course')
+  const slider = interaction.rotate(-45.25)
+  interaction.begin(vi.fn())
+  interaction.update({ type: 'rotate', rotation: -45.25, translate: [0, 0] })
+  expect(interaction.finish()).toEqual(slider)
+  expect(slider.rotation).toBe(315)
+  setSnapshot({ widgets: [{ ...original, data: { ...original.data, ...slider } }], scene: { scale: 1.5 }, second: 0 })
+  const restored = interaction.rotate(0)
+  expect(restored.x).toBeCloseTo(original.data.x, 10)
+  expect(restored.y).toBeCloseTo(original.data.y, 10)
+})
+
+test('course resize defers geometry preparation to the final flush and preserves fractional committed dimensions', () => {
+  const { interaction, resize, setSnapshot, presentations } = editor('course')
+  const original = {
+    id: 'widget',
+    type: 'course',
+    category: 'plots',
+    data: { id: 'widget', value: 'course', x: 120.25, y: 60.5, width: 400.25, height: 210.5 },
+  }
+  setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second: 0.75 })
+  resize.mockImplementation(({ widget, factor, commit }) => ({
+    x: commit ? 81.125 : 80.25,
+    y: 30.5,
+    width: widget.width * factor,
+    height: widget.height * factor,
+  }))
+  const origin = interaction.begin(vi.fn())
+  const anchor = resizeAnchor(origin.bounds, [-1, -1])
+  interaction.update({ type: 'resize', geometry: { factor: 0.75, ...anchor } })
+  vi.advanceTimersToNextFrame()
+  expect(resize.mock.lastCall[0]).toMatchObject({ widget: original.data, second: 0.75, commit: false })
+  interaction.update({ type: 'resize', geometry: { factor: 1.375, ...anchor } })
+  const patch = interaction.finish() // Mouseup before RAF still resolves the final size as a commit.
+  expect(resize).toHaveBeenCalledTimes(2)
+  expect(resize.mock.lastCall[0]).toMatchObject({ widget: original.data, second: 0.75, commit: true })
+  expect(patch).toEqual({ x: 81.125, y: 30.5, width: 550.34375, height: 289.4375 })
+  expect(presentations.at(-1)[0].data).toEqual({ ...original.data, ...patch })
+  expect(updateWidgetInConfig({ plots: [original.data] }, 'widget', patch).plots[0]).toMatchObject(patch)
+  expect(vi.getTimerCount()).toBe(0)
+})
 
 test('resize uses original configuration and a fixed content corner across live drafts/playback; cancellation restores the document', () => {
   const { interaction, presentations, resize, original, setSnapshot } = editor()

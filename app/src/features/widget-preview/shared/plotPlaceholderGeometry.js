@@ -6,20 +6,10 @@
  */
 
 import { areaToSvg, findPointAtProgress, pointsToSvg } from '@/lib/geometryUtils'
-import { buildElevationCompletedPoints, buildRouteFramePreview } from './svgPreviewUtils'
+import { buildElevationCompletedPoints } from './svgPreviewUtils'
 
 function buildLinearProgressValues(points) {
   return points.map((_, index) => (points.length > 1 ? index / (points.length - 1) : 0))
-}
-
-function buildPlaceholderRoutePoints(width, height) {
-  return [
-    [width * 0.12, height * 0.82],
-    [width * 0.3, height * 0.64],
-    [width * 0.46, height * 0.72],
-    [width * 0.64, height * 0.3],
-    [width * 0.84, height * 0.18],
-  ]
 }
 
 function buildPlaceholderElevationPoints(width, height) {
@@ -34,25 +24,6 @@ function buildPlaceholderElevationPoints(width, height) {
 
 function resolvePlaceholderProgress(previewSecond, fallbackDurationSeconds) {
   return Math.min(Math.max(previewSecond / fallbackDurationSeconds, 0), 1)
-}
-
-/**
- * Builds static route placeholder geometry for the requested dimensions.
- *
- * @param {object} params
- * @param {number} params.width - Placeholder width.
- * @param {number} params.height - Placeholder height.
- * @returns {{ points: number[][], progressValues: number[], remainingSvgPoints: string }} Static route geometry.
- */
-export function buildPlaceholderRouteStaticGeometry({ width, height }) {
-  const points = buildPlaceholderRoutePoints(width, height)
-  const progressValues = buildLinearProgressValues(points)
-
-  return {
-    points,
-    progressValues,
-    remainingSvgPoints: pointsToSvg(points),
-  }
 }
 
 /**
@@ -71,29 +42,6 @@ export function buildPlaceholderElevationStaticGeometry({ width, height }) {
     progressValues,
     remainingSvgPoints: pointsToSvg(points),
     areaSvgPoints: areaToSvg(points, width, height, null),
-  }
-}
-
-/**
- * Builds the complete route placeholder geometry.
- *
- * @param {object} params
- * @param {number} params.width - Placeholder width.
- * @param {number} params.height - Placeholder height.
- * @param {number} params.previewSecond - Current preview timestamp.
- * @param {number} params.fallbackDurationSeconds - Placeholder timeline duration.
- * @param {object} [params.staticGeometry] - Memoized static geometry.
- * @returns {object} Complete route placeholder geometry.
- */
-export function buildPlaceholderRoutePreviewGeometry({ width, height, previewSecond, fallbackDurationSeconds, staticGeometry = null }) {
-  const geometry = staticGeometry ?? buildPlaceholderRouteStaticGeometry({ width, height })
-  const progress01 = resolvePlaceholderProgress(previewSecond, fallbackDurationSeconds)
-  const { markerPoint, completedPoints } = buildRouteFramePreview(geometry.points, geometry.progressValues, progress01)
-
-  return {
-    markerPoint,
-    remainingSvgPoints: geometry.remainingSvgPoints,
-    completedSvgPoints: pointsToSvg(completedPoints),
   }
 }
 

@@ -16,6 +16,211 @@ use ovrley_widgets::{
 use serde_json::{json, Value};
 use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
 
+fn route_request() -> Value {
+    let defaults: Value = serde_json::from_str(include_str!("../../../assets/standard-widgets.json")).unwrap();
+    let mut widget = defaults["plot"]["definitions"]["course"]["defaults"].clone();
+    widget["id"] = json!("route");
+    widget["x"] = json!(150.25);
+    widget["y"] = json!(90.5);
+    widget["width"] = json!(300.125);
+    widget["height"] = json!(170.25);
+    widget["rotation"] = json!(27.0);
+    let mut scene = common::seam::explicit_scene_json();
+    scene["width"] = json!(700);
+    scene["height"] = json!(500);
+    scene["scale"] = json!(1.25);
+    scene["opacity"] = json!(0.65);
+    scene["shadow_strength"] = json!(2.0);
+    scene["shadow_distance"] = json!(3.0);
+    scene["preview_duration_seconds"] = json!(4.0);
+    json!({"type": "course", "widget": widget, "scene": scene})
+}
+
+fn route_activity() -> ovrley_core::activity::schema::ParsedActivity {
+    let points = json!([[48.0, 12.0], [48.01, 12.005], [null, null], [48.013, 12.02], [48.02, 12.013]]);
+    ovrley_core::activity::parse_activity_json(&json!({
+        "sample_elapsed_seconds": [0.0, 0.5, 1.5, 2.5, 4.0], "trim_end_seconds": 4.0,
+        "sample_distance_progress": [0.0, 0.01, 0.47, 0.8, 1.0],
+        "sample_course_points": points, "course": points,
+    }).to_string()).unwrap()
+}
+
+fn prepared_route(preview: &PreviewSession, id: u32) -> std::sync::Arc<ovrley_widgets::widgets::route::geometry::RouteGeometry> {
+    let ovrley_widgets::preview_widget::PreviewWidget::Route(route) = &preview.widgets[&id] else { panic!("expected route handle"); };
+    route.prepared_geometry.as_ref().unwrap().clone()
+}
+
+#[test]
+fn route_preview_matches_native_export_and_keeps_marker_out_of_selection_bounds() {
+    use ovrley_core::{
+        activity::{interpolate::densify_activity, trim::trim_activity}, debug::RenderProfiler, paths::AppPaths,
+        render::{prepare_preview_assets, FrameSize, VideoFrameRenderer},
+    };
+    let activity = route_activity();
+    let bytes = serde_json::to_vec(&activity).unwrap();
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
+    for (variant, full) in [("single", true), ("ring", false), ("halo", false)] {
+        let mut request = route_request();
+        request["widget"]["marker_variant"] = json!(variant);
+        request["widget"]["marker_size"] = json!(30.0);
+        request["widget"]["marker_variant_diameter"] = json!(95.0);
+        request["widget"]["show_full_activity"] = json!(full);
+        request["scene"]["custom_export_range_active"] = json!(true);
+        request["scene"]["start"] = json!(0.25);
+        request["scene"]["end"] = json!(3.25);
+        let config = common::seam::validated_config_from_value(json!({"scene": request["scene"], "values": [], "labels": [], "plots": [request["widget"]]}));
+        let requirements = config.render_data_requirements().unwrap();
+        let trimmed = trim_activity(&activity, 0.25, 3.25, &requirements).unwrap();
+        let seconds = vec![0.0, 0.75, 2.2, 2.9];
+        let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
+        let (assets, _, _, _) = prepare_preview_assets(&paths, &config, &activity, &dense).unwrap();
+        let renderer = VideoFrameRenderer::new(&paths, &dense, &assets, FrameSize {width: 700, height: 500}, 0).unwrap();
+        let mut preview = PreviewSession::default();
+        preview.replace_activity(&bytes).unwrap();
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        let mut selection = None;
+        for index in [0, 1, 2, 3, 1, 0] {
+            let second = 0.25 + seconds[index];
+            preview.render(second).unwrap();
+            let widget = &preview.widgets[&id];
+            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            if let Some(selection) = &selection { assert_eq!(&geometry["content"], selection, "marker movement must not resize selection"); }
+            else { selection = Some(geometry["content"].clone()); }
+            let width = geometry["width"].as_u64().unwrap() as usize;
+            let height = geometry["height"].as_u64().unwrap() as usize;
+            let left = geometry["left"].as_f64().unwrap() as usize;
+            let top = geometry["top"].as_f64().unwrap() as usize;
+            let mut native = vec![0; 700 * 500 * 4];
+            renderer.render_rgba(index, &mut native, &mut RenderProfiler::default()).unwrap();
+            let mut max_difference = 0;
+            for y in 0..height {
+                let native_row = &native[((top + y) * 700 + left) * 4..((top + y) * 700 + left + width) * 4];
+                let preview_row = &widget.pixels()[y * width * 4..(y + 1) * width * 4];
+                for (a, b) in native_row.chunks_exact(4).zip(preview_row.chunks_exact(4)) {
+                    max_difference = max_difference.max(a[3].abs_diff(b[3]) as u16);
+                    // Native video draws into straight alpha; compare visible premultiplied color.
+                    for channel in 0..3 {
+                        let native = a[channel] as u16 * a[3] as u16;
+                        let preview = b[channel] as u16 * b[3] as u16;
+                        max_difference = max_difference.max(native.abs_diff(preview) / 255);
+                    }
+                }
+            }
+            // Allow edge quantization between native straight-alpha and preview premultiplied surfaces.
+            assert!(max_difference <= 8, "{variant}/{full} native route differs at {second}: {max_difference}");
+            assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] > 0));
+            let revision = widget.revision();
+            preview.render(second).unwrap();
+            assert_eq!(preview.widgets[&id].revision(), revision);
+        }
+        let pixels = preview.widgets[&id].pixels().clone();
+        preview.replace_activity(&[]).unwrap();
+        preview.render(0.25).unwrap();
+        assert_ne!(preview.widgets[&id].pixels(), &pixels);
+        preview.replace_activity(&bytes).unwrap();
+        preview.render(0.25).unwrap();
+        assert_eq!(preview.widgets[&id].pixels(), &pixels);
+        let mut replacement = activity.clone();
+        replacement.sample_course_points[1] = (Some(48.03), Some(12.035));
+        preview.replace_activity(&serde_json::to_vec(&replacement).unwrap()).unwrap();
+        preview.render(0.25).unwrap();
+        assert_ne!(preview.widgets[&id].pixels(), &pixels);
+        for (field, value) in [("width", json!(0)), ("width", json!("300")), ("marker_variant", json!("unknown")), ("show_full_activity", json!("true"))] {
+            let mut invalid = request.clone();
+            invalid["widget"][field] = value;
+            let request = serde_json::from_value::<ovrley_widgets::preview_widget::WidgetRequest>(invalid);
+            assert!(request.is_err() || preview.create_widget(request.unwrap()).is_err());
+        }
+        let mut missing = request.clone();
+        missing["widget"].as_object_mut().unwrap().remove("width");
+        assert!(serde_json::from_value::<ovrley_widgets::preview_widget::WidgetRequest>(missing).is_err());
+    }
+}
+
+#[test]
+fn route_gestures_reuse_geometry_until_resize_commit_and_keep_every_opposite_corner_fixed() {
+    use std::sync::Arc;
+    let bytes = serde_json::to_vec(&route_activity()).unwrap();
+    let opposite = |geometry: &Value, fixed: [f64; 2]| {
+        let content = &geometry["content"];
+        let radians = geometry["rotation"].as_f64().unwrap().to_radians();
+        let ox = geometry["rotation_origin"][0].as_f64().unwrap();
+        let oy = geometry["rotation_origin"][1].as_f64().unwrap();
+        let dx = content["width"].as_f64().unwrap() * fixed[0] - ox;
+        let dy = content["height"].as_f64().unwrap() * fixed[1] - oy;
+        [content["left"].as_f64().unwrap() + ox + dx * radians.cos() - dy * radians.sin(), content["top"].as_f64().unwrap() + oy + dx * radians.sin() + dy * radians.cos()]
+    };
+    for fixed in [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] {
+        let request = route_request();
+        let mut preview = PreviewSession::default();
+        preview.replace_activity(&bytes).unwrap();
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        preview.render(0.75).unwrap();
+        let original = prepared_route(&preview, id);
+        let original_pixels = preview.widgets[&id].pixels().clone();
+        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let point = opposite(&geometry, fixed);
+        for rotation in [-125.75, 0.0, 90.0] {
+            let mut rotated = request.clone();
+            rotated["widget"]["rotation"] = json!(rotation);
+            preview.update_widget(id, serde_json::from_value(rotated).unwrap()).unwrap();
+            preview.render(0.75).unwrap();
+            let rotated_geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            assert_eq!(geometry["content"]["width"], rotated_geometry["content"]["width"]);
+            assert_eq!(geometry["content"]["height"], rotated_geometry["content"]["height"]);
+            assert!(Arc::ptr_eq(&original, &prepared_route(&preview, id)), "rotation must not rebuild curves");
+        }
+        let mut translated = request.clone();
+        translated["widget"]["x"] = json!(180.375);
+        translated["widget"]["y"] = json!(115.25);
+        preview.update_widget(id, serde_json::from_value(translated).unwrap()).unwrap();
+        preview.render(0.75).unwrap();
+        assert!(Arc::ptr_eq(&original, &prepared_route(&preview, id)), "drag must reuse projection and curves");
+        preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+        preview.render(0.75).unwrap();
+        for (factor, second) in [(0.625, 0.75), (1.375, 2.35)] {
+            let mut resize = request.clone();
+            resize.as_object_mut().unwrap().extend(json!({"handle": id, "factor": factor, "fixed": fixed, "point": point, "second": second, "commit": false}).as_object().unwrap().clone());
+            let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(resize).unwrap()).unwrap()).unwrap();
+            let mut live = request.clone();
+            live["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+            live["transient"] = json!(true);
+            preview.update_widget(id, serde_json::from_value(live).unwrap()).unwrap();
+            preview.render(second).unwrap();
+            assert!(Arc::ptr_eq(&original, &prepared_route(&preview, id)), "live resize must scale existing vectors");
+            let live_geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let anchored = opposite(&live_geometry, fixed);
+            assert!((anchored[0] - point[0]).abs() < 0.001 && (anchored[1] - point[1]).abs() < 0.001);
+            assert_eq!(patch["width"].as_f64().unwrap(), request["widget"]["width"].as_f64().unwrap() * factor);
+        }
+        // Escape restores the committed geometry without another preparation.
+        preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+        preview.render(0.75).unwrap();
+        assert!(Arc::ptr_eq(&original, &prepared_route(&preview, id)));
+        assert_eq!(preview.widgets[&id].pixels(), &original_pixels);
+        let mut resize = request.clone();
+        resize.as_object_mut().unwrap().extend(json!({"handle": id, "factor": 1.375, "fixed": fixed, "point": point, "second": 2.35, "commit": true}).as_object().unwrap().clone());
+        let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(resize).unwrap()).unwrap()).unwrap();
+        let committed_geometry = prepared_route(&preview, id);
+        assert!(!Arc::ptr_eq(&original, &committed_geometry), "prepare once at commit");
+        let mut committed = request.clone();
+        committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+        preview.update_widget(id, serde_json::from_value(committed.clone()).unwrap()).unwrap();
+        preview.render(2.35).unwrap();
+        assert!(Arc::ptr_eq(&committed_geometry, &prepared_route(&preview, id)), "committed snapshot reuses the final preparation");
+        let final_geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let anchored = opposite(&final_geometry, fixed);
+        assert!((anchored[0] - point[0]).abs() < 0.001 && (anchored[1] - point[1]).abs() < 0.001);
+        let mut reloaded = PreviewSession::default();
+        reloaded.replace_activity(&bytes).unwrap();
+        let reloaded_id = reloaded.create_widget(serde_json::from_value(committed).unwrap()).unwrap();
+        reloaded.render(2.35).unwrap();
+        assert_eq!(preview.widgets[&id].geometry(), reloaded.widgets[&reloaded_id].geometry());
+        assert_eq!(preview.widgets[&id].pixels(), reloaded.widgets[&reloaded_id].pixels());
+    }
+}
+
 fn gauge_preview(
     display: &str,
     metric: &str,

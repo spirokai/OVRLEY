@@ -19,8 +19,7 @@
 //! - Empty or single-point inputs panicking
 //! - Collinear simplification diverging from expected endpoints
 
-use super::super::route::simplify_route_samples;
-use super::super::types::RouteSample;
+use super::geometry::{simplify_route_samples, RouteSample};
 
 fn sample(x: f32, y: f32, progress01: f32) -> RouteSample {
     RouteSample {

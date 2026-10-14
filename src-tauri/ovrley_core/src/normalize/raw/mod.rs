@@ -210,60 +210,6 @@ pub struct PointLabelConfig {
     pub extra: BTreeMap<String, Value>,
 }
 
-/// Course/route plot configuration.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct CoursePlotConfig {
-    pub x: f32,
-    pub y: f32,
-    pub width: u32,
-    pub height: u32,
-    #[serde(default)]
-    pub rotation: f32,
-    #[serde(default)]
-    pub opacity: Option<f32>,
-    #[serde(default)]
-    pub color: Option<String>,
-    #[serde(default)]
-    pub margin: Option<f32>,
-    #[serde(default)]
-    pub simplify_tolerance_px: Option<f32>,
-    #[serde(default)]
-    pub target_density: Option<f32>,
-    #[serde(default)]
-    pub completed_line_width: Option<f32>,
-    #[serde(default)]
-    pub completed_line_color: Option<String>,
-    #[serde(default)]
-    pub completed_line_opacity: Option<f32>,
-    #[serde(default)]
-    pub remaining_line_width: Option<f32>,
-    #[serde(default)]
-    pub remaining_line_color: Option<String>,
-    #[serde(default)]
-    pub remaining_line_opacity: Option<f32>,
-    #[serde(default)]
-    pub marker_variant: Option<String>,
-    #[serde(default)]
-    pub marker_variant_diameter: Option<f32>,
-    #[serde(default)]
-    pub marker_size: Option<f32>,
-    #[serde(default)]
-    pub marker_color: Option<String>,
-    #[serde(default)]
-    pub marker_opacity: Option<f32>,
-    #[serde(default)]
-    pub shadow_color: Option<String>,
-    #[serde(default)]
-    pub shadow_strength: Option<f32>,
-    #[serde(default)]
-    pub shadow_distance: Option<f32>,
-    #[serde(default)]
-    pub show_full_activity: Option<bool>,
-    #[serde(default)]
-    pub line: Option<LineStyleConfig>,
-    #[serde(flatten)]
-    pub extra: BTreeMap<String, Value>,
-}
 
 /// Elevation profile plot configuration.
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -97,6 +97,13 @@ impl PreviewSession {
         }
         let factor = crate::model::validation::require_positive_f32(request.factor, "resize factor")?;
         match request.origin {
+            WidgetRequest::Route {widget, scene, ..} => {
+                let handle = request.handle.ok_or_else(|| WidgetError::Config("route resize requires its preview handle".into()))?;
+                let Some(PreviewWidget::Route(route)) = self.widgets.get_mut(&handle) else {
+                    return Err(WidgetError::Config("route resize requires a route handle".into()));
+                };
+                Ok(ResizeUpdate::Route(route.resize(widget, scene, factor, request.fixed, request.point, request.second, request.commit, self.activity.as_ref())?))
+            },
             WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } | WidgetRequest::HeadingTape(_) | WidgetRequest::Gauge(_) => unreachable!(),
             WidgetRequest::Label {widget, scene} => Ok(ResizeUpdate::Label(crate::widgets::label::interaction::resize_label(widget, scene, factor, request.fixed, request.point, &self.fonts)?)),
             WidgetRequest::Gradient(origin) => Ok(ResizeUpdate::Gradient(crate::widgets::gradient::interaction::resize_gradient(
@@ -123,6 +130,7 @@ impl PreviewSession {
             Some(ActivitySampler::from_json(bytes)?)
         };
         for widget in self.widgets.values_mut() {
+            if let PreviewWidget::Route(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::LapTimer(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::Gauge(widget) = widget { widget.invalidate_activity(); }
         }
@@ -138,6 +146,16 @@ impl PreviewSession {
         Ok(self.next_id)
     }
     pub fn update_widget(&mut self, id: u32, request: WidgetRequest) -> WidgetResult<()> {
+        if let WidgetRequest::Route {widget, scene, transient} = request {
+            let previous = self.widgets.get_mut(&id).ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?;
+            if let PreviewWidget::Route(route) = previous {
+                return route.update(widget, scene, transient);
+            }
+            let mut replacement = PreviewWidget::Route(crate::widgets::route::preview::PreviewRoute::new(widget, scene)?);
+            replacement.inherit_revision(previous.revision());
+            self.widgets.insert(id, replacement);
+            return Ok(());
+        }
         let mut replacement = PreviewWidget::new(request, &self.fonts, &self.images)?;
         let previous = self
             .widgets
@@ -154,6 +172,7 @@ impl PreviewSession {
         for widget in self.widgets.values_mut() {
             // Static families are fully rendered on creation/update and never visit the playhead path.
             match widget {
+                PreviewWidget::Route(widget) => widget.render(self.activity.as_ref(), second)?,
                 PreviewWidget::Value(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::Gradient(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::LeanAngle(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,

@@ -229,11 +229,12 @@ impl PreparedRenderAssets {
     /// Returns `None` when no route widget is configured.
     pub fn route_geometry_json(&self) -> Option<serde_json::Value> {
         let cache = self.route_caches.first()?;
-        let geom = &cache.geometry;
+        let geom = &cache.drawing.geometry;
+        let scale = cache.drawing.scene.scale;
         Some(serde_json::json!({
-            "points": geom.points.iter().map(|(x, y)| [x, y]).collect::<Vec<_>>(),
+            "points": geom.points.iter().map(|(x, y)| [x * scale, y * scale]).collect::<Vec<_>>(),
             "progressValues": geom.progress_values,
-            "bbox": [geom.bbox.0, geom.bbox.1, geom.bbox.2, geom.bbox.3],
+            "bbox": [0.0, 0.0, cache.drawing.config.width * scale, cache.drawing.config.height * scale],
             "sourcePointCount": geom.source_point_count,
             "simplification": geom.simplification,
         }))
@@ -252,14 +253,6 @@ pub(crate) struct WidgetGeometry {
     pub(crate) simplification: String,
 }
 
-/// Precomputed route marker state for one frame.
-#[derive(Clone, Debug)]
-pub(crate) struct RouteFrameState {
-    pub(crate) progress01: f32,
-    pub(crate) marker_x: f32,
-    pub(crate) marker_y: f32,
-    pub(crate) segment_index: usize,
-}
 
 /// Precomputed elevation marker state for one frame.
 #[derive(Clone, Debug)]
@@ -284,11 +277,8 @@ pub(crate) struct MarkerLayer {
 /// Prepared route widget cache.
 #[derive(Clone, Debug)]
 pub(crate) struct RouteWidgetCache {
-    pub(crate) plot: NormalizedRoutePlot,
-    pub(crate) geometry: WidgetGeometry,
-    pub(crate) frame_states: Vec<RouteFrameState>,
-    pub(crate) marker_layers: Vec<MarkerLayer>,
-    pub(crate) remaining_layer: Option<StaticLayer>,
+    pub(crate) drawing: ovrley_widgets::widgets::route::layout::RouteLayout,
+    pub(crate) frame_progress: Vec<f32>,
 }
 
 
@@ -348,29 +338,6 @@ pub struct ShadowStyle {
     pub(crate) offset_y: f32,
 }
 
-/// Normalized route plot settings after defaults and scale are applied.
-#[derive(Clone, Debug)]
-pub(crate) struct NormalizedRoutePlot {
-    pub(crate) x: f32,
-    pub(crate) y: f32,
-    pub(crate) width: u32,
-    pub(crate) height: u32,
-    pub(crate) rotation: f32,
-    pub(crate) simplify_tolerance_px: f32,
-    pub(crate) target_density: f32,
-    pub(crate) remaining_line_width: f32,
-    pub(crate) remaining_line_color: String,
-    pub(crate) remaining_line_opacity: f32,
-    pub(crate) remaining_line_shadow: Option<ShadowStyle>,
-    pub(crate) completed_line_width: f32,
-    pub(crate) completed_line_color: String,
-    pub(crate) completed_line_opacity: f32,
-    pub(crate) marker_variant: String,
-    pub(crate) marker_variant_diameter: f32,
-    pub(crate) marker_size: f32,
-    pub(crate) marker_color: String,
-    pub(crate) marker_opacity: f32,
-}
 
 /// Normalized elevation plot settings after defaults and scale are applied.
 #[derive(Clone, Debug)]
@@ -408,11 +375,4 @@ pub(crate) struct NormalizedElevationPlot {
     pub(crate) label_font: Option<String>,
     pub(crate) label_font_size: f32,
     pub(crate) label_color: String,
-}
-
-/// Projected route sample with distance progress.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct RouteSample {
-    pub(crate) point: (f64, f64),
-    pub(crate) progress01: f32,
 }

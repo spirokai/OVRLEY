@@ -3,6 +3,7 @@
 pub mod activity;
 pub mod error;
 pub mod interpolation;
+pub mod rdp;
 pub mod model;
 pub mod preview;
 pub mod render;

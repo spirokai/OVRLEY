@@ -35,8 +35,6 @@ pub mod output;
 pub mod paths;
 /// Validation and oriented preview decoding for user-selected bitmap resources.
 pub mod raster;
-/// Shared Ramer-Douglas-Peucker line simplification.
-pub mod rdp;
 /// Skia-based overlay rendering.
 pub mod render;
 /// Batch render submission and lifecycle vocabulary.
