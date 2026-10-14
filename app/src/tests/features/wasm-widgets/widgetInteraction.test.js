@@ -42,7 +42,7 @@ function editor(type = 'speed') {
   }
 }
 
-test.each(['speed', 'time', 'gradient', 'lean_angle', 'backdrop', 'raster'])(
+test.each(['speed', 'time', 'gradient', 'lean_angle', 'backdrop', 'raster', 'lap_timer'])(
   '%s drag coalesces from the captured origin and flushes the final movement without rounding',
   (type) => {
     const { interaction, presentations, original } = editor(type)
@@ -97,7 +97,7 @@ test('resize uses original configuration and a fixed content corner across live 
   expect(interaction.finish()).toBeNull()
 })
 
-test.each(['label', 'time', 'gradient', 'lean_angle'])('%s resize follows its playhead policy and flushes the final pointer intent', (type) => {
+test.each(['label', 'time', 'gradient', 'lean_angle', 'lap_timer'])('%s resize follows the playhead and flushes final intent', (type) => {
   const { interaction, resize, original, setSnapshot, render } = editor(type)
   const draft = vi.fn()
   const origin = interaction.begin(draft)

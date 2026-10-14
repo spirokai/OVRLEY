@@ -217,7 +217,7 @@ pub fn trim_activity(
             .iter()
             .zip(&lap_number)
             .map(|(elapsed, lap_number)| {
-                crate::activity::lap_timing::lap_time_at(
+                ovrley_widgets::widgets::lap_timer::sampling::lap_time_at(
                     &lap_start_elapsed_seconds,
                     *lap_number,
                     *elapsed,

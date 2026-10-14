@@ -9,6 +9,7 @@ export function isWasmWidget(widget) {
     widget.type === 'gradient' ||
     (widget.type === 'lean_angle' && widget.data.display_type === 'lean_angle') ||
     (widget.type === 'g_force' && widget.data.display_type === 'g_force') ||
+    (widget.type === 'lap_timer' && widget.data.display_type === 'lap_timer') ||
     (widget.type === 'time' && widget.data.display_type === 'text') ||
     (isStandardMetricWidgetType(widget.type) && widget.data.display_type === 'text' && getSupportedDisplayTypes(widget.type).includes('text'))
   )

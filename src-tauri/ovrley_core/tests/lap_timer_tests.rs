@@ -4,7 +4,7 @@ use common::builders::empty_dense_series;
 use ovrley_core::activity::parse_activity_json;
 use ovrley_core::activity::schema::DenseActivityReport;
 use ovrley_core::commands::validate_config_value;
-use ovrley_core::normalize::LapTimerMode;
+use ovrley_widgets::widgets::lap_timer::validation::LapTimerMode;
 use ovrley_core::render::widgets::{
     lap_log_text_state, lap_timer_value_text, types::PreparedValue,
 };

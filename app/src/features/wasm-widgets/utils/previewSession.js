@@ -9,13 +9,14 @@ const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 let modulePromise
 
-function widgetFont(widget) {
-  if (widget.type === 'backdrop' || widget.type === 'raster') return null
-  return {
+function widgetFonts(widget) {
+  if (widget.type === 'backdrop' || widget.type === 'raster') return []
+  const valueFont = {
     font: widget.type === 'g_force' ? widget.data.label_font : widget.data.font,
     font_weight: widget.type === 'label' ? widget.data.font_weight : WIDGET_FONT_WEIGHT,
     italic: widget.type === 'label' ? widget.data.italic : false,
   }
+  return widget.type === 'lap_timer' ? [valueFont, { font: widget.data.label_font, font_weight: WIDGET_FONT_WEIGHT, italic: false }] : [valueFont]
 }
 
 /** @returns {Promise<object>} One compiled module shared by independently disposable editor sessions. */
@@ -84,18 +85,21 @@ export function createPreviewSession(module, onError) {
   function loadFont(request) {
     const id = JSON.stringify(request)
     if (fonts.has(id)) return
-    fonts.set(id, 'loading')
+    const resource = { ready: false, error: null }
+    fonts.set(id, resource)
     previewFont(request.font, request.font_weight, request.italic)
       .then((bytes) => {
         if (disposed) return
         upload(encoder.encode(id), (idPtr, idLen) =>
           upload(new Uint8Array(bytes), (ptr, len) => check(module._ovrley_preview_font(handle, idPtr, idLen, ptr, len))),
         )
-        fonts.set(id, 'ready')
+        resource.ready = true
         schedule()
       })
       .catch((error) => {
-        if (!disposed) onError(error)
+        if (disposed) return
+        resource.error = error
+        schedule()
       })
   }
   function loadImage(id) {
@@ -119,6 +123,8 @@ export function createPreviewSession(module, onError) {
     frame = null
     if (!snapshot) return
     try {
+      const defaultFont = fonts.get(JSON.stringify({ font: snapshot.defaultFont, font_weight: WIDGET_FONT_WEIGHT, italic: false }))
+      if (defaultFont.error) throw defaultFont.error
       const active = new Set(snapshot.widgets.map((widget) => widget.id))
       for (const [id, widget] of widgets) {
         if (!active.has(id)) {
@@ -142,8 +148,9 @@ export function createPreviewSession(module, onError) {
           }
           continue
         }
-        const font = widgetFont(widget)
-        if (font && fonts.get(JSON.stringify(font)) !== 'ready') continue
+        const fontResources = widgetFonts(widget).map((font) => fonts.get(JSON.stringify(font)))
+        for (const resource of fontResources) if (resource.error) throw resource.error
+        if (fontResources.some((resource) => !resource.ready)) continue
         if (isTimeDependentWasmWidget(widget) && !activityReady) continue
         let instance = widgets.get(widget.id)
         if (instance?.data === widget.data && instance.scene === snapshot.scene) continue
@@ -209,8 +216,7 @@ export function createPreviewSession(module, onError) {
         return
       loadFont({ font: next.defaultFont, font_weight: WIDGET_FONT_WEIGHT, italic: false })
       for (const widget of next.widgets) {
-        const font = widgetFont(widget)
-        if (font) loadFont(font)
+        for (const font of widgetFonts(widget)) loadFont(font)
         if (widget.type === 'raster' && widget.data.resourceId !== undefined) loadImage(widget.data.resourceId)
       }
       const nextId = next.activityId

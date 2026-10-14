@@ -10,9 +10,10 @@ use ovrley_widgets::widgets::backdrop::validation::ValidatedBackdrop;
 use ovrley_widgets::widgets::gradient::validation::ValidatedGradientWidget;
 use ovrley_widgets::widgets::lean_angle::{layout::LeanAngleCache, validation::ValidatedLeanAngleWidget};
 use ovrley_widgets::widgets::g_force::{layout::GForceCache, validation::ValidatedGForceWidget};
+use ovrley_widgets::widgets::lap_timer::{layout::LapTimerLayout, validation::ValidatedLapTimer};
 use crate::normalize::{
     ResolvedBarGeometry, ValidatedArcGaugeWidget,
-    ValidatedHeading, ValidatedLapTimer,
+    ValidatedHeading,
     ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
     ValidatedSceneConfig,
 };
@@ -21,7 +22,6 @@ use ovrley_widgets::widgets::time::validation::ValidatedTimeValue;
 use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
 use ovrley_widgets::widgets::value::validation::ValidatedValueWidget;
 use skia_safe::Image;
-use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -112,7 +112,7 @@ pub struct PreparedGForce {
 #[derive(Clone, Debug)]
 pub struct PreparedLapTimer {
     pub validated: ValidatedLapTimer,
-    pub(crate) cache: Option<LapTimerWidgetCache>,
+    pub(crate) cache: Option<LapTimerLayout>,
 }
 
 /// One validated render value, keyed implicitly by its index in the config array.
@@ -336,20 +336,6 @@ pub struct GForceWidgetCache {
     pub max_g: f64,
     pub horizontal_values: Vec<Option<f64>>,
     pub vertical_values: Vec<Option<f64>>,
-}
-
-/// Prepared resources owned by each lap-timer presentation mode.
-#[derive(Clone, Debug)]
-pub(crate) enum LapTimerWidgetCache {
-    Dynamic,
-    BestLap {
-        state_layers: BTreeMap<usize, StaticLayer>,
-    },
-    LapLog {
-        header_layer: StaticLayer,
-        column_rights: [f32; 3],
-        completed_row_layers: Vec<StaticLayer>,
-    },
 }
 
 /// Prepared linear gauge widget cache — holds the pre-rendered static track image

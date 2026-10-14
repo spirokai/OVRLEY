@@ -16,6 +16,165 @@ use ovrley_widgets::{
 use serde_json::{json, Value};
 use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
 
+fn lap_timer_activity() -> ovrley_core::activity::schema::ParsedActivity {
+    ovrley_core::activity::parse_activity_json(r#"{
+        "sample_elapsed_seconds": [0,0.5,1,2,2.5,3,3.75,4,5,64], "trim_end_seconds": 64,
+        "lap_number": [-1,0,0,0,1,1,2,2,-1,-1],
+        "lap_time_seconds": [null,0,0.5,1.5,0,0.5,0,0.25,null,null],
+        "lap_start_elapsed_seconds": [0.5,2.5,3.75],
+        "lap_durations_seconds": [2,1.25], "lap_durations_best_so_far_seconds": [2,1.25],
+        "delta_to_best_lap_seconds": [null,null,null,null,0,-0.125,null,0.75,null,null]
+    }"#).unwrap()
+}
+
+fn lap_timer_preview() -> (PreviewSession, Value) {
+    let (mut preview, mut request) = lean_angle_preview();
+    let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
+    let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
+    preview.fonts.register(
+        ovrley_widgets::preview::FontRequest { font: "Teko.ttf".into(), font_weight: weight, italic: false },
+        &preview_font_resource(&font_dirs, "Teko.ttf", weight, false).unwrap(),
+    ).unwrap();
+    request["type"] = json!("lap_timer");
+    request["scene"]["end"] = json!(5);
+    request["widget"] = json!({
+        "value": "lap_timer", "display_type": "lap_timer", "x": 600.25, "y": 100.5,
+        "font": "Inter.ttf", "font_size": 48, "color": "#abcdef", "opacity": 0.8,
+        "label_font": "Teko.ttf", "label_font_size": 17.5, "label_color": "#123456",
+        "show_label": true, "label": "Current Lap", "lap_timer_mode": "current_lap",
+        "positive_delta_color": "#00ff00", "negative_delta_color": "#ff0000",
+    });
+    (preview, request)
+}
+
+#[test]
+fn lap_timer_modes_match_native_pixels_sampling_and_resource_replacement() {
+    use ovrley_core::{
+        activity::{interpolate::densify_activity, trim::trim_activity},
+        debug::RenderProfiler,
+        paths::AppPaths,
+        render::widgets::{prepare_render_assets, lap_timer::{draw_lap_timer, lap_history, lap_sample}, types::PreparedValue},
+    };
+    use ovrley_widgets::{activity::ActivitySampler, widgets::lap_timer::format::lap_timer_content};
+    let (mut preview, mut request) = lap_timer_preview();
+    let mut activity = lap_timer_activity();
+    let bytes = serde_json::to_vec(&activity).unwrap();
+    let sampler = ActivitySampler::from_json(&bytes).unwrap();
+    preview.replace_activity(&bytes).unwrap();
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
+    let seconds = vec![0.0, 0.25, 0.5, 1.121, 1.122, 2.25, 2.5, 3.375, 3.75, 4.0, 4.5, 5.0];
+    for mode in ["current_lap", "best_lap", "delta", "lap_log"] {
+        request["widget"]["lap_timer_mode"] = json!(mode);
+        let config = common::seam::validated_config_from_value(json!({
+            "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
+        }));
+        let requirements = config.render_data_requirements().unwrap();
+        let trimmed = trim_activity(&activity, 0.0, 5.0, &requirements).unwrap();
+        let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
+        let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut RenderProfiler::default()).unwrap();
+        let PreparedValue::LapTimer(native) = &assets.values()[0] else { panic!("lap timer dispatch"); };
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        for index in [0,1,2,3,4,5,6,7,8,9,10,11,6,3,0] {
+            let second = seconds[index];
+            assert_eq!(
+                lap_timer_content(&native.validated, sampler.lap_history(), sampler.lap_timer_at(second)).unwrap(),
+                lap_timer_content(&native.validated, lap_history(&dense), lap_sample(&dense, index, native.validated.mode).unwrap()).unwrap(),
+                "{mode} sampling at {second}",
+            );
+            preview.render(second).unwrap();
+            let widget = &preview.widgets[&id];
+            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let info = ImageInfo::new((geometry["width"].as_i64().unwrap() as i32, geometry["height"].as_i64().unwrap() as i32), ColorType::RGBA8888, AlphaType::Premul, None);
+            let mut surface = surfaces::raster(&info, None, None).unwrap();
+            let canvas = surface.canvas();
+            canvas.clear(Color::TRANSPARENT);
+            canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
+            draw_lap_timer(canvas, native, &dense, index).unwrap();
+            let mut pixels = vec![0; widget.pixels().len()];
+            assert!(surface.read_pixels(&info.with_alpha_type(AlphaType::Unpremul), &mut pixels, info.width() as usize * 4, (0,0)));
+            assert_eq!(&pixels, widget.pixels(), "{mode} at {second}");
+            assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+            let revision = widget.revision();
+            preview.render(second).unwrap();
+            assert_eq!(preview.widgets[&id].revision(), revision);
+        }
+        preview.render(1.121).unwrap();
+        let revision = preview.widgets[&id].revision();
+        preview.render(1.122).unwrap();
+        assert_eq!(preview.widgets[&id].revision(), revision, "rounded {mode} presentation is unchanged");
+        preview.widgets.remove(&id);
+    }
+    // The current row and completed count stay equal, but replaced lap history must repaint.
+    let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+    preview.render(4.0).unwrap();
+    let original = preview.widgets[&id].pixels().clone();
+    activity.lap_start_elapsed_seconds[0] = 0.0;
+    activity.lap_number[0] = 0;
+    for index in 0..4 { activity.lap_time_seconds[index] = Some(activity.sample_elapsed_seconds[index]); }
+    activity.lap_durations_seconds[0] = 2.5;
+    activity.lap_durations_best_so_far_seconds[0] = 2.5;
+    preview.replace_activity(&serde_json::to_vec(&activity).unwrap()).unwrap();
+    preview.render(4.0).unwrap();
+    assert_ne!(preview.widgets[&id].pixels(), &original);
+    preview.replace_activity(&[]).unwrap();
+    preview.render(4.0).unwrap();
+    assert_ne!(preview.widgets[&id].pixels(), &original);
+    preview.replace_activity(&bytes).unwrap();
+    preview.render(4.0).unwrap();
+    assert_eq!(preview.widgets[&id].pixels(), &original);
+    for (field, value) in [("label_font", Value::Null), ("font_size", json!(0)), ("label_color", json!("invalid")), ("show_label", Value::Null), ("lap_timer_mode", json!("unknown")), ("display_type", json!("text"))] {
+        let mut malformed = request.clone();
+        malformed["widget"][field] = value;
+        assert!(preview.create_widget(serde_json::from_value(malformed).unwrap()).is_err(), "{field}");
+    }
+    request["widget"]["label_font"] = json!("Missing.ttf");
+    preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
+    assert!(preview.render(4.0).unwrap_err().to_string().contains("font not registered"));
+}
+
+#[test]
+fn lap_timer_resize_keeps_all_opposite_corners_fixed_across_modes_and_playhead_changes() {
+    let (mut preview, mut origin) = lap_timer_preview();
+    preview.replace_activity(&serde_json::to_vec(&lap_timer_activity()).unwrap()).unwrap();
+    let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
+    for mode in ["current_lap", "best_lap", "delta", "lap_log"] {
+        origin["widget"]["lap_timer_mode"] = json!(mode);
+        for (scale, show_label) in [(1.7, true), (0.8, false)] {
+            origin["scene"]["scale"] = json!(scale);
+            origin["widget"]["show_label"] = json!(show_label);
+            preview.update_widget(id, serde_json::from_value(origin.clone()).unwrap()).unwrap();
+            preview.render(1.125).unwrap();
+            let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let bounds = &geometry["content"];
+            assert!(bounds["width"].as_f64().unwrap() < geometry["width"].as_f64().unwrap());
+            for fixed in [[0.0,0.0], [1.0,0.0], [0.0,1.0], [1.0,1.0]] {
+                let point = [bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0], bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1]];
+                for (factor, second) in [(1.234375, 4.0), (0.01, 5.0), (1.234375, 0.0)] {
+                    let mut gesture = origin.clone();
+                    gesture.as_object_mut().unwrap().extend(json!({"factor": factor, "fixed": fixed, "point": point, "second": second}).as_object().unwrap().clone());
+                    let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(gesture).unwrap()).unwrap()).unwrap();
+                    assert_eq!(patch["font_size"], json!(if factor == 0.01 { 8.0 } else { 59.25 }));
+                    assert_eq!(patch["label_font_size"], json!(if factor == 0.01 { 6.0 } else { 21.6015625 }));
+                    let mut committed = origin.clone();
+                    committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+                    preview.update_widget(id, serde_json::from_value(committed.clone()).unwrap()).unwrap();
+                    preview.render(second).unwrap();
+                    let live = preview.widgets[&id].geometry().clone();
+                    let actual: Value = serde_json::from_slice(&live).unwrap();
+                    for (axis, start, size) in [(0,"left","width"), (1,"top","height")] {
+                        let corner = actual["content"][start].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
+                        assert!((corner - point[axis]).abs() < 0.003, "{mode} at {second}");
+                    }
+                    preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
+                    preview.render(second).unwrap();
+                    assert_eq!(preview.widgets[&id].geometry(), &live, "live and committed {mode}");
+                }
+            }
+        }
+    }
+}
+
 fn g_force_preview() -> (PreviewSession, Value) {
     let (preview, mut request) = lean_angle_preview();
     request["type"] = json!("g_force");

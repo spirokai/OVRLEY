@@ -76,9 +76,14 @@ describe('useWidgetManager alignment updates', () => {
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
   })
 
-  test.each(['speed', 'time', 'gradient', 'lean_angle'])('commits the latest %s font size on release before its pending frame', (type) => {
+  test.each(['speed', 'time', 'gradient', 'lean_angle', 'lap_timer'])('%s font sizes commit on release before the pending frame', (type) => {
     const config = cloneSerializable(DEFAULT_CONFIG)
-    config.values = [{ ...createMetricValueDefaults(type, undefined, { displayType: type === 'lean_angle' ? 'lean_angle' : 'text' }), id: 'speed-0' }]
+    config.values = [
+      {
+        ...createMetricValueDefaults(type, undefined, { displayType: type === 'lean_angle' ? 'lean_angle' : 'text', lapTimerMode: 'current_lap' }),
+        id: 'speed-0',
+      },
+    ]
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] })
     try {
@@ -89,11 +94,17 @@ describe('useWidgetManager alignment updates', () => {
       act(() => result.current.updateWidgetData('speed-0', { font: 'Immediate.ttf' }))
       expect(useStore.getState().config.values[0].font).toBe('Immediate.ttf')
       expect(fontRequests.has('Immediate.ttf')).toBe(false)
+      if (type === 'lap_timer') {
+        act(() => result.current.updateWidgetData('speed-0', { label_font: 'ImmediateLabel.ttf' }))
+        expect(useStore.getState().config.values[0].label_font).toBe('ImmediateLabel.ttf')
+        expect(fontRequests.has('ImmediateLabel.ttf')).toBe(false)
+      }
       useStore.temporal.getState().clear()
 
       act(() => {
         result.current.updateWidgetSize('speed-0', { font_size: 50 })
         result.current.updateWidgetSize('speed-0', { font_size: 60 })
+        if (type === 'lap_timer') result.current.updateWidgetSize('speed-0', { label_font_size: 17.125 })
       })
       expect(useStore.getState().config.values[0].font_size).toBe(initialSize)
       expect(vi.getTimerCount()).toBe(1)
@@ -101,6 +112,7 @@ describe('useWidgetManager alignment updates', () => {
       act(() => result.current.commitWidgetSize('speed-0'))
       expect(useStore.getState().config.values[0].font_size).toBe(60)
       expect(result.current.widgets[0].data.font_size).toBe(60)
+      if (type === 'lap_timer') expect(result.current.widgets[0].data.label_font_size).toBe(17.125)
       expect(useStore.temporal.getState().pastStates).toHaveLength(1)
       expect(vi.getTimerCount()).toBe(0)
       act(() => vi.advanceTimersToNextFrame())

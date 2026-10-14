@@ -18,7 +18,7 @@ mod geometry;
 /// Heading compass tape widget implementation.
 pub mod heading;
 /// Current and best lap timer text widget implementation.
-pub(crate) mod lap_timer;
+pub mod lap_timer;
 /// Lean-angle sector widget implementation.
 pub mod lean_angle;
 /// Marker and dot drawing helpers.
@@ -69,7 +69,7 @@ pub(crate) use elevation::draw_elevation_widget;
 pub use g_force::{draw_g_force_widget, prepare_g_force_cache};
 pub use gauges::arc::{draw_arc_gauge_widget, prepare_arc_gauge_cache};
 pub use gauges::linear::{draw_linear_gauge_widget, prepare_linear_gauge_cache};
-pub use lap_timer::{lap_log_text_state, lap_timer_value_text, LapLogTextState};
+pub use lap_timer::{lap_log_text_state, lap_timer_value_text};
 pub use lean_angle::draw_lean_angle_widget;
 pub use metric_presentation::draw_metric_presentation;
 pub(crate) use route::draw_route_widget;
@@ -191,14 +191,19 @@ pub fn prepare_render_assets(
                 widget.cache = Some(cache);
             }
             PreparedValue::LapTimer(widget) => {
-                let cache = lap_timer::prepare_lap_timer_cache(
-                    &widget.validated,
-                    dense_activity,
-                    &assets.scene,
-                    assets.scene.presentation.scale,
-                    &paths.font_dirs,
-                    prepare_profiler,
-                )?;
+                let cache = prepare_profiler.measure("lap_timer.prepare", || {
+                    ovrley_widgets::widgets::lap_timer::layout::prepare_lap_timer_layout(
+                        &widget.validated, &assets.scene.presentation,
+                        // Stable columns use full activity coverage, including when export is trimmed.
+                        ovrley_widgets::widgets::lap_timer::format::LapHistory {
+                            starts: &activity.lap_start_elapsed_seconds,
+                            durations: &activity.lap_durations_seconds,
+                            best_so_far: &activity.lap_durations_best_so_far_seconds,
+                            end: activity.trim_end_seconds,
+                        },
+                        &crate::fonts::NativeFonts(&paths.font_dirs),
+                    )
+                })?;
                 widget.cache = Some(cache);
             }
             _ => {}

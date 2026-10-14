@@ -86,6 +86,9 @@ impl PreviewSession {
             WidgetRequest::GForce(origin) => Ok(ResizeUpdate::GForce(crate::widgets::g_force::interaction::resize_g_force(
                 origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
             )?)),
+            WidgetRequest::LapTimer(origin) => Ok(ResizeUpdate::LapTimer(crate::widgets::lap_timer::interaction::resize_lap_timer(
+                origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
+            )?)),
             WidgetRequest::Value(origin) => Ok(ResizeUpdate::Value(crate::widgets::value::interaction::resize_value(
                 crate::widgets::value::interaction::ResizeRequest {origin, factor, fixed: request.fixed, point: request.point, second: request.second}, self.activity.as_ref(), &self.fonts,
             )?)),
@@ -97,6 +100,9 @@ impl PreviewSession {
         } else {
             Some(ActivitySampler::from_json(bytes)?)
         };
+        for widget in self.widgets.values_mut() {
+            if let PreviewWidget::LapTimer(widget) = widget { widget.invalidate_activity(); }
+        }
         Ok(())
     }
     pub fn create_widget(&mut self, request: WidgetRequest) -> WidgetResult<u32> {
@@ -129,6 +135,7 @@ impl PreviewSession {
                 PreviewWidget::Gradient(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::LeanAngle(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::GForce(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
+                PreviewWidget::LapTimer(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 _ => {},
             }
         }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createPreviewSession } from '@/features/wasm-widgets/utils/previewSession'
-import { previewFont, rasterPreviewPng } from '@/api/backend'
+import { previewActivity, previewFont, rasterPreviewPng } from '@/api/backend'
 import { isWasmWidget } from '@/lib/widget/wasm-widget'
 
 vi.mock('@/api/backend', () => ({ previewFont: vi.fn(), previewActivity: vi.fn(), rasterPreviewPng: vi.fn() }))
@@ -89,4 +89,63 @@ test('G-force prepares its label font independently and reuses its handle throug
   expect(error).toHaveBeenLastCalledWith(null)
   session.dispose()
   expect(module._ovrley_preview_destroy).toHaveBeenCalledOnce()
+})
+
+test('lap timers load both fonts and activity independently, retain resources, and surface label-font errors', async () => {
+  let finishLabel
+  let finishLateFont
+  const failedFont = new Error('Unable to load label font')
+  previewFont.mockImplementation((font) => {
+    if (font === 'Value.ttf') return Promise.resolve([1, 2, 3])
+    if (font === 'Label.ttf') return new Promise((resolve) => (finishLabel = resolve))
+    if (font === 'Failed.ttf') return Promise.reject(failedFont)
+    if (font === 'Late.ttf') return new Promise((resolve) => (finishLateFont = resolve))
+    return new Promise(() => {})
+  })
+  previewActivity.mockResolvedValue([4, 5, 6])
+  const { module, session, snapshot, error } = setup()
+  const widget = { id: 'lap', type: 'lap_timer', data: { value: 'lap_timer', display_type: 'lap_timer', font: 'Value.ttf', label_font: 'Label.ttf' } }
+  expect(isWasmWidget(widget)).toBe(true)
+  const next = { ...snapshot, widgets: [widget], activityId: 'activity' }
+  session.setSnapshot(next)
+  expect(previewFont).toHaveBeenCalledWith('Value.ttf', 700, false)
+  expect(previewFont).toHaveBeenCalledWith('Label.ttf', 700, false)
+  expect(previewActivity).toHaveBeenCalledWith('activity')
+  await Promise.resolve()
+  vi.advanceTimersToNextFrame()
+  expect(module._ovrley_preview_activity).toHaveBeenCalledTimes(2) // Clear old samples, then transport new bytes.
+  expect(module._ovrley_preview_widget_create).not.toHaveBeenCalled()
+  finishLabel([7, 8, 9])
+  await Promise.resolve()
+  vi.advanceTimersToNextFrame()
+  expect(module._ovrley_preview_widget_create).toHaveBeenCalledOnce()
+  for (const second of [1.125, 4, 0.5]) {
+    session.setSnapshot({ ...next, second })
+    vi.advanceTimersToNextFrame()
+  }
+  expect(module._ovrley_preview_render.mock.lastCall[1]).toBe(0.5)
+  expect(module._ovrley_preview_widget_update).not.toHaveBeenCalled()
+  session.setSnapshot({ ...next, widgets: [] })
+  vi.advanceTimersToNextFrame()
+  expect(module._ovrley_preview_widget_destroy).toHaveBeenCalledWith(1, 2)
+  expect(module._ovrley_preview_destroy).not.toHaveBeenCalled()
+  session.setSnapshot(next)
+  vi.advanceTimersToNextFrame()
+  expect(previewFont).toHaveBeenCalledTimes(3) // Includes independently prewarmed default font.
+  const failed = { ...next, widgets: [{ ...widget, data: { ...widget.data, label_font: 'Failed.ttf' } }] }
+  session.setSnapshot(failed)
+  await Promise.resolve()
+  await Promise.resolve()
+  vi.advanceTimersToNextFrame()
+  expect(error).toHaveBeenLastCalledWith(failedFont)
+  session.setSnapshot({ ...failed, second: 2 })
+  vi.advanceTimersToNextFrame()
+  expect(error).toHaveBeenLastCalledWith(failedFont)
+  session.setSnapshot({ ...next, widgets: [{ ...widget, data: { ...widget.data, label_font: 'Late.ttf' } }] })
+  session.dispose()
+  finishLateFont([10, 11, 12])
+  await Promise.resolve()
+  expect(module._ovrley_preview_font).toHaveBeenCalledTimes(2)
+  expect(module._ovrley_preview_destroy).toHaveBeenCalledOnce()
+  expect(vi.getTimerCount()).toBe(0)
 })

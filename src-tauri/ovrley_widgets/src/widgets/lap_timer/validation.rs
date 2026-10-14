@@ -1,9 +1,9 @@
 //! Lap timer widget validation.
 
-use crate::error::{CoreError, CoreResult};
-use ovrley_widgets::model::types::{DisplayType, MetricKind};
-use ovrley_widgets::model::validation::{require_bool, require_f32, require_string, rgba_from_hex};
-use ovrley_widgets::widgets::value::config::ValueConfig;
+use crate::error::{WidgetError, WidgetResult};
+use crate::model::types::{DisplayType, MetricKind};
+use crate::model::validation::{require_bool, require_f32, require_string, rgba_from_hex};
+use crate::widgets::value::config::ValueConfig;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LapTimerMode {
@@ -31,16 +31,16 @@ pub struct ValidatedLapTimer {
     pub mode: LapTimerMode,
 }
 
-pub fn validate_lap_timer(value: ValueConfig, index: usize) -> CoreResult<ValidatedLapTimer> {
+pub fn validate_lap_timer(value: ValueConfig, index: usize) -> WidgetResult<ValidatedLapTimer> {
     let field = |name: &str| format!("values[{index}].{name}");
     if value.value != MetricKind::LapTimer {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: expected lap_timer metric",
             field("value")
         )));
     }
     if value.display_type != DisplayType::LapTimer {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: lap_timer widgets require display_type 'lap_timer'",
             field("display_type")
         )));
@@ -52,7 +52,7 @@ pub fn validate_lap_timer(value: ValueConfig, index: usize) -> CoreResult<Valida
         "delta" => LapTimerMode::Delta,
         "lap_log" => LapTimerMode::LapLog,
         other => {
-            return Err(CoreError::Config(format!(
+            return Err(WidgetError::Config(format!(
                 "{}: unsupported mode '{other}'",
                 field("lap_timer_mode")
             )))
@@ -61,21 +61,21 @@ pub fn validate_lap_timer(value: ValueConfig, index: usize) -> CoreResult<Valida
     let font_name = require_string(value.font, &field("font"))?;
     let font_size = require_f32(value.font_size, &field("font_size"))?;
     if font_size <= 0.0 {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be > 0, got {font_size}",
             field("font_size")
         )));
     }
     let label_font_size = require_f32(value.label_font_size, &field("label_font_size"))?;
     if label_font_size <= 0.0 {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be > 0, got {label_font_size}",
             field("label_font_size")
         )));
     }
     let opacity = require_f32(value.opacity, &field("opacity"))?;
     if !(0.0..=1.0).contains(&opacity) {
-        return Err(CoreError::Config(format!(
+        return Err(WidgetError::Config(format!(
             "{}: must be 0.0..1.0, got {opacity}",
             field("opacity")
         )));
@@ -102,8 +102,8 @@ pub fn validate_lap_timer(value: ValueConfig, index: usize) -> CoreResult<Valida
     )?;
 
     Ok(ValidatedLapTimer {
-        x: value.x,
-        y: value.y,
+        x: require_f32(Some(value.x), &field("x"))?,
+        y: require_f32(Some(value.y), &field("y"))?,
         font_name,
         font_size,
         color,

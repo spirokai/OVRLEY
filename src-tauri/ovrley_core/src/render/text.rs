@@ -5,34 +5,13 @@
 //! values reuse the same typefaces across many frames.
 
 use crate::error::CoreResult;
-use crate::normalize::{
-    ValidatedLapTimer, ValidatedSceneConfig,
-};
-use ovrley_widgets::model::standard_widgets::widget_font_weight;
+use crate::normalize::ValidatedSceneConfig;
 use ovrley_widgets::widgets::time::validation::ValidatedTimeValue;
 use ovrley_widgets::widgets::value::validation::ValidatedValueWidget;
-use skia_safe::{Canvas, Color, Font};
+use skia_safe::{Canvas, Font};
 use std::path::PathBuf;
 
-use ovrley_widgets::render::text::{parse_color, MeasuredText, ResolvedTextStyle};
-
-// Resolves the scene-level text shadow color with opacity applied.
-fn scene_shadow_color(scene: &ValidatedSceneConfig, opacity: f32) -> Option<Color> {
-    if scene.presentation.shadow_color.is_empty() {
-        None
-    } else {
-        Some(parse_color(&scene.presentation.shadow_color, opacity))
-    }
-}
-
-// Resolves the scene-level text border color with opacity applied.
-fn scene_border_color(scene: &ValidatedSceneConfig, opacity: f32) -> Option<Color> {
-    if scene.presentation.border_color.is_empty() {
-        None
-    } else {
-        Some(parse_color(&scene.presentation.border_color, opacity))
-    }
-}
+use ovrley_widgets::render::text::{MeasuredText, ResolvedTextStyle};
 
 /// Resolves a text style from a validated value widget and scene config.
 ///
@@ -56,58 +35,6 @@ pub fn validated_time_style(
     scale: f32,
 ) -> ResolvedTextStyle {
     validated_value_style(&validated.base, scene, scale)
-}
-
-/// Resolves the text style shared by current and best lap widgets.
-pub fn validated_lap_timer_style(
-    validated: &ValidatedLapTimer,
-    scene: &ValidatedSceneConfig,
-    scale: f32,
-) -> ResolvedTextStyle {
-    let opacity = validated.opacity;
-    let color = Color::from_argb(
-        validated.color[3],
-        validated.color[0],
-        validated.color[1],
-        validated.color[2],
-    );
-
-    ResolvedTextStyle {
-        x: validated.x,
-        y: validated.y,
-        font_name: Some(validated.font_name.clone()),
-        font_size: validated.font_size * scale,
-        font_weight: widget_font_weight(),
-        italic: false,
-        letter_spacing: 0.0,
-        line_height: validated.font_size * scale * 0.92,
-        color,
-        opacity,
-        shadow_color: scene_shadow_color(scene, opacity),
-        shadow_strength: scene.presentation.shadow_strength * scale,
-        shadow_distance: scene.presentation.shadow_distance * scale,
-        border_color: scene_border_color(scene, opacity),
-        border_thickness: scene.presentation.border_thickness * scale,
-    }
-}
-
-/// Resolves the independently configured label style for a lap timer.
-pub fn validated_lap_timer_label_style(
-    validated: &ValidatedLapTimer,
-    scene: &ValidatedSceneConfig,
-    scale: f32,
-) -> ResolvedTextStyle {
-    let mut style = validated_lap_timer_style(validated, scene, scale);
-    style.font_name = Some(validated.label_font_name.clone());
-    style.font_size = validated.label_font_size * scale;
-    style.line_height = style.font_size * 0.92;
-    style.color = Color::from_argb(
-        validated.label_color[3],
-        validated.label_color[0],
-        validated.label_color[1],
-        validated.label_color[2],
-    );
-    style
 }
 
 /// Native font acquisition boundary for shared text rendering.

@@ -3,7 +3,7 @@ import { expect, test, vi } from 'vitest'
 import { useWasmWidgetInteractions } from '@/features/wasm-widgets/hooks/useWasmWidgetInteractions'
 import { registerWidgetInteraction, unregisterWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 
-test.each(['speed', 'gradient', 'lean_angle', 'backdrop', 'raster'])('%s resize commits once; Escape cancels without committing', (type) => {
+test.each(['speed', 'gradient', 'lean_angle', 'backdrop', 'raster', 'lap_timer'])('%s resize commits once; Escape cancels', (type) => {
   const widget = { id: type, type, data: { x: 100, y: 50, rotation: 0 } }
   const target = document.createElement('div')
   const patch = { x: 70.25, y: 35.5, font_size: 72 }

@@ -348,7 +348,7 @@ pub fn densify_activity(
             .zip(&dense_lap_number)
             .map(|(elapsed, lap_number)| {
                 lap_number.and_then(|lap_number| {
-                    crate::activity::lap_timing::lap_time_at(
+                    ovrley_widgets::widgets::lap_timer::sampling::lap_time_at(
                         &trimmed.lap_start_elapsed_seconds,
                         lap_number,
                         *elapsed,

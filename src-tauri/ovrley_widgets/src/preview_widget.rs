@@ -7,6 +7,7 @@ use crate::widgets::raster::{config::RasterConfig, preview::{PreviewRaster, Prev
 use crate::widgets::gradient::preview::PreviewGradient;
 use crate::widgets::lean_angle::preview::PreviewLeanAngle;
 use crate::widgets::g_force::preview::PreviewGForce;
+use crate::widgets::lap_timer::preview::PreviewLapTimer;
 
 pub enum WidgetRequest {
     Raster { widget: RasterConfig, scene: ScenePresentationConfig },
@@ -15,6 +16,7 @@ pub enum WidgetRequest {
     Gradient(ValueRequest),
     LeanAngle(ValueRequest),
     GForce(ValueRequest),
+    LapTimer(ValueRequest),
     Value(ValueRequest),
 }
 
@@ -41,6 +43,7 @@ impl<'de> Deserialize<'de> for WidgetRequest {
             }
             let request = ValueRequest { widget, scene: input.scene };
             Ok(if metric == MetricKind::Gradient { Self::Gradient(request) }
+                else if metric == MetricKind::LapTimer { Self::LapTimer(request) }
                 else if metric == MetricKind::LeanAngle && request.widget.display_type == crate::model::types::DisplayType::LeanAngle { Self::LeanAngle(request) }
                 else if metric == MetricKind::GForce && request.widget.display_type == crate::model::types::DisplayType::GForce { Self::GForce(request) }
                 else { Self::Value(request) })
@@ -55,6 +58,7 @@ pub enum PreviewWidget {
     Gradient(PreviewGradient),
     LeanAngle(PreviewLeanAngle),
     GForce(PreviewGForce),
+    LapTimer(PreviewLapTimer),
     Value(ValuePreview),
 }
 
@@ -67,17 +71,18 @@ impl PreviewWidget {
             WidgetRequest::Gradient(request) => Ok(Self::Gradient(PreviewGradient::new(request.widget, request.scene)?)),
             WidgetRequest::LeanAngle(request) => Ok(Self::LeanAngle(PreviewLeanAngle::new(request.widget, request.scene)?)),
             WidgetRequest::GForce(request) => Ok(Self::GForce(PreviewGForce::new(request.widget, request.scene)?)),
+            WidgetRequest::LapTimer(request) => Ok(Self::LapTimer(PreviewLapTimer::new(request.widget, request.scene)?)),
             WidgetRequest::Value(request) => Ok(Self::Value(ValuePreview::new(request, fonts)?)),
         }
     }
     pub fn pixels(&self) -> &Vec<u8> {
-        match self { Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::LeanAngle(widget) => &widget.pixels, Self::GForce(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
+        match self { Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::LeanAngle(widget) => &widget.pixels, Self::GForce(widget) => &widget.pixels, Self::LapTimer(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
     }
     pub fn geometry(&self) -> &Vec<u8> {
-        match self { Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::LeanAngle(widget) => &widget.geometry, Self::GForce(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
+        match self { Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::LeanAngle(widget) => &widget.geometry, Self::GForce(widget) => &widget.geometry, Self::LapTimer(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
     }
     pub fn revision(&self) -> u32 {
-        match self { Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::GForce(widget) => widget.revision, Self::Value(widget) => widget.revision }
+        match self { Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::GForce(widget) => widget.revision, Self::LapTimer(widget) => widget.revision, Self::Value(widget) => widget.revision }
     }
     pub fn inherit_revision(&mut self, previous: u32) {
         match self {
@@ -87,6 +92,7 @@ impl PreviewWidget {
             Self::Gradient(widget) => widget.revision = previous,
             Self::LeanAngle(widget) => widget.revision = previous,
             Self::GForce(widget) => widget.revision = previous,
+            Self::LapTimer(widget) => widget.revision = previous,
             Self::Value(widget) => widget.revision = previous,
         }
     }
@@ -113,5 +119,6 @@ pub enum ResizeUpdate {
     Gradient(crate::widgets::gradient::interaction::ResizeUpdate),
     LeanAngle(crate::widgets::lean_angle::interaction::ResizeUpdate),
     GForce(crate::widgets::g_force::interaction::ResizeUpdate),
+    LapTimer(crate::widgets::lap_timer::interaction::ResizeUpdate),
     Value(crate::widgets::value::interaction::ResizeUpdate),
 }

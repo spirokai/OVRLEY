@@ -37,6 +37,7 @@ macro_rules! activity_columns {
             #[serde(default)] g_force_z: Vec<Option<f64>>,
             #[serde(default)] gear_position: Vec<Option<String>>,
             #[serde(default)] course: Vec<(Option<f64>, Option<f64>)>,
+            #[serde(flatten)] lap_timing: crate::widgets::lap_timer::sampling::LapTiming,
         }
         impl PreviewActivity {
             fn take_numeric(&mut self) -> HashMap<MetricKind, Vec<Option<f64>>> {
@@ -143,6 +144,7 @@ pub struct ActivitySampler {
     g_force_magnitudes: [Vec<f64>; 3],
     full_activity_distance: Option<f64>,
     full_activity_total_ascent: Option<f64>,
+    lap_timing: crate::widgets::lap_timer::sampling::LapTiming,
 }
 impl ActivitySampler {
     pub fn from_json(bytes: &[u8]) -> WidgetResult<Self> {
@@ -171,6 +173,7 @@ impl ActivitySampler {
                 ));
             }
         }
+        activity.lap_timing.validate(times)?;
         let altitude = if activity.barometric_altitude.iter().any(Option::is_some) {
             std::mem::take(&mut activity.barometric_altitude)
         } else {
@@ -240,7 +243,19 @@ impl ActivitySampler {
             g_force_magnitudes,
             full_activity_distance,
             full_activity_total_ascent,
+            lap_timing: activity.lap_timing,
         })
+    }
+
+    pub fn lap_history(&self) -> crate::widgets::lap_timer::format::LapHistory<'_> {
+        self.lap_timing.history(self.end)
+    }
+
+    pub fn lap_timer_at(&self, second: f64) -> crate::widgets::lap_timer::format::LapSample {
+        if second < 0.0 || second > self.end {
+            return crate::widgets::lap_timer::format::LapSample::default();
+        }
+        self.lap_timing.at(&self.times, second)
     }
 
     pub fn gradient_at(&self, second: f64) -> Option<f64> {

@@ -29,7 +29,7 @@ use crate::render::raster::prepare_rasters;
 use crate::render::static_layer::config_has_static_metric_parts;
 use crate::render::surface::{create_surface, wrap_native_surface, write_surface_png};
 use crate::render::text::{
-    validated_lap_timer_style, validated_time_style,
+    validated_time_style,
     validated_value_style,
 };
 use crate::render::widgets::types::PreparedValue;
@@ -671,25 +671,11 @@ fn render_frame_to_surface(
                     })?;
                 }
                 PreparedValue::LapTimer(widget) => {
-                    let validated = &widget.validated;
-                    let style = validated_lap_timer_style(validated, &prepared_assets.scene, scale);
-                    let label_style = crate::render::text::validated_lap_timer_label_style(
-                        validated,
-                        &prepared_assets.scene,
-                        scale,
-                    );
-                    let cache = widget.cache.as_ref().ok_or_else(|| {
-                        CoreError::Render(format!("lap timer cache is missing for value {idx}"))
-                    })?;
                     crate::render::widgets::lap_timer::draw_lap_timer(
                         canvas,
-                        validated,
-                        cache,
+                        widget,
                         dense_activity,
                         frame_index,
-                        &style,
-                        &label_style,
-                        &paths.font_dirs,
                     )?;
                 }
                 PreparedValue::HeadingTape(_)

@@ -8,7 +8,6 @@ mod arc_gauge;
 mod bar_geometry;
 mod elevation;
 mod heading;
-mod lap_timer;
 mod linear_gauge;
 mod raster;
 pub mod raw;
@@ -45,7 +44,7 @@ use ovrley_widgets::widgets::g_force::validation::{validate_g_force, GForceAxis}
 use ovrley_widgets::widgets::gradient::validation::validate_gradient_widget;
 pub use heading::{validate_heading, ValidatedHeading};
 use ovrley_widgets::widgets::label::validation::{validate_label, ValidatedLabel};
-pub use lap_timer::{validate_lap_timer, LapTimerMode, ValidatedLapTimer};
+use ovrley_widgets::widgets::lap_timer::validation::{validate_lap_timer, LapTimerMode};
 use ovrley_widgets::widgets::lean_angle::validation::validate_lean_angle;
 pub use linear_gauge::{
     validate_linear_gauge, ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation,
@@ -224,7 +223,7 @@ fn validate_render_contents(
                         validated,
                         cache: None,
                     })
-                });
+                }).map_err(Into::into);
             }
             if value.value == MetricKind::Time && value.display_type == DisplayType::Text {
                 return validate_time_value(value, idx).map(PreparedValue::TimeText).map_err(Into::into);
