@@ -66,6 +66,7 @@ pub(crate) fn prepare_elevation_cache(
             scene.presentation.clone(),
             geometry,
             sampler.altitude_offset(validated.starting_altitude_m),
+            sampler.elevation_range(),
             &NativeFonts(&paths.font_dirs),
         )?;
         let frame_states = super::frame_state::build_elevation_frame_states(

@@ -2,6 +2,7 @@
 pub mod config;
 pub mod geometry;
 pub mod interaction;
+mod label;
 pub mod layout;
 pub mod preview;
 pub mod reduction;

@@ -1,21 +1,23 @@
 //! Shared cached remaining profile, completed area, marker and upright labels.
 use super::{
     geometry::{ElevationFrameState, ElevationGeometry},
+    label::{ElevationLabel, LabelRun},
     validation::ValidatedElevationPlot,
 };
 use crate::{
     error::{WidgetError, WidgetResult},
     model::{scene::ValidatedScenePresentation, standard_widgets::widget_font_weight},
-    render::text::{
-        draw_text_blob, layout_text, parse_color, resolve_font, FontResolver, ResolvedTextStyle,
-    },
+    render::text::{parse_color, resolve_font, FontResolver, ResolvedTextStyle},
     widgets::{
         route::layout::{outward, rotated_rect, scaled_rect, stroke_paint},
         value::preview::{surface, ContentBounds},
     },
 };
-use skia_safe::{BlurStyle, Canvas, Color, Font, Image, MaskFilter, Matrix, Paint, Rect, TextBlob};
-use std::sync::Arc;
+use skia_safe::{
+    path_utils, BlurStyle, Canvas, ClipOp, Color, Image, MaskFilter, Matrix, Paint, Path,
+    PathBuilder, Rect,
+};
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug)]
 pub struct ElevationLayout {
@@ -27,24 +29,24 @@ pub struct ElevationLayout {
     remaining: Image,
     remaining_bounds: Rect,
     raster: Rect,
-    font: Option<Font>,
+    labels: [Option<ElevationLabel>; 2],
+    bounds: Rect,
+    content_bounds: ContentBounds,
+    rotation: (f32, f32),
+    matrix: Matrix,
     completed_line: Paint,
     completed_area: Paint,
+    completed_area_clip: Arc<Mutex<Path>>,
     marker: Paint,
     variant: Paint,
-}
-
-struct ElevationLabel {
-    blob: TextBlob,
-    baseline: f32,
-    style: ResolvedTextStyle,
 }
 
 pub struct ElevationFrame {
     pub state: ElevationFrameState,
     pub bounds: Rect,
     pub content_bounds: ContentBounds,
-    labels: Vec<ElevationLabel>,
+    marker: (f32, f32),
+    labels: [Option<Arc<LabelRun>>; 2],
 }
 
 fn fill_paint(color: &str, opacity: f32) -> Paint {
@@ -54,12 +56,23 @@ fn fill_paint(color: &str, opacity: f32) -> Paint {
     paint
 }
 
+fn stroke_outline(path: &Path, paint: &Paint) -> WidgetResult<Path> {
+    let mut outline = PathBuilder::new();
+    if !path_utils::fill_path_with_paint(path, paint, &mut outline, None, None) {
+        return Err(WidgetError::Render(
+            "unable to prepare elevation stroke boundary".into(),
+        ));
+    }
+    Ok(outline.detach())
+}
+
 impl ElevationLayout {
     pub fn new(
         config: ValidatedElevationPlot,
         scene: ValidatedScenePresentation,
         geometry: Arc<ElevationGeometry>,
         altitude_offset_m: f64,
+        elevation_range: Option<(f64, f64)>,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
         let scale = [
@@ -104,6 +117,23 @@ impl ElevationLayout {
         let matrix = Matrix::scale((scale[0], scale[1]));
         let path = paths.0.with_transform(&matrix);
         let area = paths.1.with_transform(&matrix);
+        let remaining_line = stroke_paint(
+            &config.remaining_line_color,
+            stroke,
+            config.remaining_line_opacity * scene.opacity,
+        );
+        let completed_line = stroke_paint(
+            &config.completed_line_color,
+            (config.completed_line_width * scene.scale).max(1.0),
+            config.completed_line_opacity * scene.opacity,
+        );
+        let completed_area_clip = Arc::new(Mutex::new(stroke_outline(&path, &completed_line)?));
+        canvas.save();
+        canvas.clip_path(
+            &stroke_outline(&path, &remaining_line)?,
+            ClipOp::Difference,
+            true,
+        );
         canvas.draw_path(
             &area,
             &fill_paint(
@@ -111,6 +141,7 @@ impl ElevationLayout {
                 config.area_remaining_opacity * scene.opacity,
             ),
         );
+        canvas.restore();
         if blur > 0.0 {
             canvas.save();
             canvas.translate(offset);
@@ -123,14 +154,7 @@ impl ElevationLayout {
             canvas.draw_path(&path, &shadow);
             canvas.restore();
         }
-        canvas.draw_path(
-            &path,
-            &stroke_paint(
-                &config.remaining_line_color,
-                stroke,
-                config.remaining_line_opacity * scene.opacity,
-            ),
-        );
+        canvas.draw_path(&path, &remaining_line);
         drop(paths);
         let content = Self::measure_content(&config, &scene);
         let radius =
@@ -162,11 +186,73 @@ impl ElevationLayout {
         } else {
             None
         };
-        let completed_line = stroke_paint(
-            &config.completed_line_color,
-            (config.completed_line_width * scene.scale).max(1.0),
-            config.completed_line_opacity * scene.opacity,
+        let label_style = ResolvedTextStyle {
+            x: 0.0,
+            y: 0.0,
+            font_name: config.label_font.clone(),
+            font_size: config.label_font_size * scene.scale,
+            font_weight: widget_font_weight(),
+            italic: false,
+            letter_spacing: 0.0,
+            line_height: config.label_font_size * scene.scale * 0.92,
+            color: parse_color(&config.label_color, scene.opacity),
+            opacity: scene.opacity,
+            shadow_color: Some(parse_color(&scene.shadow_color, scene.opacity)),
+            shadow_strength: scene.shadow_strength * scene.scale,
+            shadow_distance: scene.shadow_distance * scene.scale,
+            border_color: Some(parse_color(&scene.border_color, scene.opacity)),
+            border_thickness: scene.border_thickness * scene.scale,
+        };
+        let labels = [
+            (
+                config.show_elevation_metric,
+                "M",
+                1.0,
+                config.metric_label_offset_x,
+                config.metric_label_offset_y,
+            ),
+            (
+                config.show_elevation_imperial,
+                "FT",
+                3.280_84,
+                config.imperial_label_offset_x,
+                config.imperial_label_offset_y,
+            ),
+        ]
+        .map(|(enabled, unit, conversion, x, y)| {
+            enabled.then(|| {
+                ElevationLabel::new(
+                    unit,
+                    conversion,
+                    (x * scene.scale, y * scene.scale),
+                    font.as_ref()
+                        .expect("elevation label font resolved")
+                        .clone(),
+                    label_style.clone(),
+                )
+            })
+        });
+        let marker_bounds = rotated_rect(
+            Rect::new(
+                0.0,
+                0.0,
+                config.width * scene.scale,
+                config.height * scene.scale,
+            ),
+            config.rotation,
+            0.0,
+            0.0,
         );
+        for label in labels.iter().flatten() {
+            raster.join(label.raster_bounds(marker_bounds, elevation_range, altitude_offset_m));
+        }
+        let bounds = outward(
+            raster
+                .with_offset((config.x, config.y))
+                .with_outset((1.0, 1.0)),
+        );
+        let content_bounds =
+            ContentBounds::rotated_frame(content, config.rotation, config.x, config.y);
         let completed_area = fill_paint(
             &config.area_completed_color,
             config.area_completed_opacity * scene.opacity,
@@ -195,17 +281,32 @@ impl ElevationLayout {
             remaining: layer.image_snapshot(),
             remaining_bounds,
             raster,
-            font,
+            labels,
+            bounds,
+            content_bounds,
+            rotation: (sin, cos),
+            matrix,
             completed_line,
             completed_area,
+            completed_area_clip,
             marker,
             variant,
         })
     }
 
     pub fn set_position(&mut self, x: f32, y: f32) {
+        if self.config.x == x && self.config.y == y {
+            return;
+        }
         self.config.x = x;
         self.config.y = y;
+        self.bounds = outward(self.raster.with_offset((x, y)).with_outset((1.0, 1.0)));
+        self.content_bounds = ContentBounds::rotated_frame(
+            Self::measure_content(&self.config, &self.scene),
+            self.config.rotation,
+            x,
+            y,
+        );
     }
 
     /// Elevation keeps its plot frame, including for flat or stationary telemetry.
@@ -227,108 +328,26 @@ impl ElevationLayout {
     }
 
     pub fn frame(&self, state: ElevationFrameState) -> WidgetResult<ElevationFrame> {
-        let config = &self.config;
-        let scene = &self.scene;
-        let scale = scene.scale;
-        let content_bounds = ContentBounds::rotated_frame(
-            Self::measure_content(config, scene),
-            config.rotation,
-            config.x,
-            config.y,
+        let (sin, cos) = self.rotation;
+        let (x, y) = (
+            state.marker_x * self.scale[0],
+            state.marker_y * self.scale[1],
         );
-        let mut bounds = self.raster.with_offset((config.x, config.y));
-        let mut labels = Vec::with_capacity(2);
-        if let Some(font) = &self.font {
-            let (sin, cos) = config.rotation.to_radians().sin_cos();
-            let (mx, my) = (
-                state.marker_x * self.scale[0],
-                state.marker_y * self.scale[1],
-            );
-            let marker = (
-                config.x + mx * cos - my * sin,
-                config.y + mx * sin + my * cos,
-            );
-            for (enabled, unit, conversion, ox, oy) in [
-                (
-                    config.show_elevation_metric,
-                    "M",
-                    1.0,
-                    config.metric_label_offset_x,
-                    config.metric_label_offset_y,
-                ),
-                (
-                    config.show_elevation_imperial,
-                    "FT",
-                    3.280_84,
-                    config.imperial_label_offset_x,
-                    config.imperial_label_offset_y,
-                ),
-            ] {
-                if !enabled {
-                    continue;
-                }
-                let text = state.elevation_m.map_or_else(
-                    || format!("-- {unit}"),
-                    |value| {
-                        format!(
-                            "{} {unit}",
-                            ((value + self.altitude_offset_m) * conversion).round() as i64
-                        )
-                    },
-                );
-                let run = layout_text(&text, font, 0.0);
-                let blob = run.blob.ok_or_else(|| {
-                    WidgetError::Render("unable to lay out elevation label".into())
-                })?;
-                let m = run.measurement;
-                let (x, y) = (marker.0 + ox * scale, marker.1 + oy * scale);
-                let font_size = config.label_font_size * scale;
-                let baseline =
-                    y + (font_size * 0.92 - (m.bounds_bottom - m.bounds_top)) * 0.5 - m.bounds_top;
-                let border = scene.border_thickness * scale;
-                let ink = Rect::new(
-                    x + m.bounds_left,
-                    baseline + m.bounds_top,
-                    x + m.bounds_right,
-                    baseline + m.bounds_bottom,
-                )
-                .with_outset((border * 0.5, border * 0.5));
-                bounds.join(ink);
-                let blur = scene.shadow_strength * scale;
-                let offset = scene.shadow_distance * scale;
-                if blur > 0.0 {
-                    bounds.join(
-                        ink.with_outset((blur * 3.0, blur * 3.0))
-                            .with_offset((offset, offset)),
-                    );
-                }
-                labels.push(ElevationLabel {
-                    blob,
-                    baseline,
-                    style: ResolvedTextStyle {
-                        x,
-                        y,
-                        font_name: config.label_font.clone(),
-                        font_size,
-                        font_weight: widget_font_weight(),
-                        italic: false,
-                        letter_spacing: 0.0,
-                        line_height: font_size * 0.92,
-                        color: parse_color(&config.label_color, scene.opacity),
-                        opacity: scene.opacity,
-                        shadow_color: Some(parse_color(&scene.shadow_color, scene.opacity)),
-                        shadow_strength: blur,
-                        shadow_distance: offset,
-                        border_color: Some(parse_color(&scene.border_color, scene.opacity)),
-                        border_thickness: border,
-                    },
-                });
+        let marker = (
+            self.config.x + x * cos - y * sin,
+            self.config.y + x * sin + y * cos,
+        );
+        let mut labels = [None, None];
+        for (index, label) in self.labels.iter().enumerate() {
+            if let Some(label) = label {
+                labels[index] = Some(label.prepare(state.elevation_m, self.altitude_offset_m)?);
             }
         }
         Ok(ElevationFrame {
             state,
-            bounds: outward(bounds.with_outset((1.0, 1.0))),
-            content_bounds,
+            bounds: self.bounds,
+            content_bounds: self.content_bounds,
+            marker,
             labels,
         })
     }
@@ -342,35 +361,48 @@ impl ElevationLayout {
             None,
         );
         canvas.rotate(self.config.rotation, None);
-        let matrix = Matrix::scale((self.scale[0], self.scale[1]));
         let (line, area) = self.geometry.completed_paths(&frame.state);
-        canvas.draw_path(&area.with_transform(&matrix), &self.completed_area);
-        canvas.draw_path(&line.with_transform(&matrix), &self.completed_line);
-        let point = (
-            frame.state.marker_x * self.scale[0],
-            frame.state.marker_y * self.scale[1],
+        let (line, area) = if self.scale == [1.0, 1.0] {
+            (line, area)
+        } else {
+            (
+                line.with_transform(&self.matrix),
+                area.with_transform(&self.matrix),
+            )
+        };
+        canvas.save();
+        canvas.clip_path(
+            &*self
+                .completed_area_clip
+                .lock()
+                .expect("elevation stroke boundary lock"),
+            ClipOp::Difference,
+            true,
         );
+        canvas.draw_path(&area, &self.completed_area);
+        canvas.restore();
+        canvas.draw_path(&line, &self.completed_line);
         canvas.restore();
         // Circular markers need only their scene position; avoid rotating their rasterization.
-        let (sin, cos) = self.config.rotation.to_radians().sin_cos();
-        let point = (
-            self.config.x + point.0 * cos - point.1 * sin,
-            self.config.y + point.0 * sin + point.1 * cos,
-        );
         if self.config.marker_variant != "single" {
             canvas.draw_circle(
-                point,
+                frame.marker,
                 self.config.marker_variant_diameter * self.scene.scale * 0.5,
                 &self.variant,
             );
         }
         canvas.draw_circle(
-            point,
+            frame.marker,
             (self.config.marker_size * self.scene.scale).max(2.0),
             &self.marker,
         );
-        for label in &frame.labels {
-            draw_text_blob(canvas, &label.blob, label.baseline, &label.style);
+        for (index, run) in frame.labels.iter().enumerate() {
+            if let Some(run) = run {
+                self.labels[index]
+                    .as_ref()
+                    .expect("elevation frame label style")
+                    .draw(canvas, run, frame.marker);
+            }
         }
     }
 }

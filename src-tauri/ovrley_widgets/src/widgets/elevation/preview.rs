@@ -12,13 +12,13 @@ use crate::{
     model::scene::{
         validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
     },
-    render::text::FontResolver,
+    render::{pixels::read_surface_rgba, text::FontResolver},
     widgets::{
         route::sampling::RouteWindow,
         value::preview::{surface, WidgetGeometry},
     },
 };
-use skia_safe::{AlphaType, Color, ColorType, ImageInfo, Surface};
+use skia_safe::{Color, Surface};
 use std::sync::Arc;
 
 pub struct PreviewElevation {
@@ -97,6 +97,13 @@ impl PreviewElevation {
         {
             self.prepared_geometry = None;
             self.placeholder_geometry = None;
+        }
+        if self.config == config
+            && self.scene == scene
+            && self.window == window
+            && self.preview_duration == preview_duration
+        {
+            return Ok(());
         }
         if let Some(layout) = self.layout.as_mut() {
             layout.set_position(config.x, config.y);
@@ -232,6 +239,7 @@ impl PreviewElevation {
                 self.scene.clone(),
                 geometry,
                 offset,
+                activity.and_then(|a| a.elevation.elevation_range()),
                 fonts,
             )?);
         } else if self.last_state == Some(state) {
@@ -253,37 +261,29 @@ impl PreviewElevation {
         canvas.translate((-frame.bounds.left, -frame.bounds.top));
         layout.draw(canvas, &frame);
         canvas.restore();
-        let info = ImageInfo::new(
-            (width as i32, height as i32),
-            ColorType::RGBA8888,
-            AlphaType::Unpremul,
-            None,
-        );
-        if !surface.read_pixels(&info, &mut self.pixels, width as usize * 4, (0, 0)) {
-            return Err(WidgetError::Render(
-                "unable to read elevation RGBA pixels".into(),
-            ));
+        read_surface_rgba(surface, &mut self.pixels)?;
+        if changed || self.last_state.is_none() {
+            #[derive(serde::Serialize)]
+            struct Geometry {
+                #[serde(flatten)]
+                widget: WidgetGeometry,
+                rotation: f32,
+                rotation_origin: [f32; 2],
+            }
+            self.geometry = serde_json::to_vec(&Geometry {
+                widget: WidgetGeometry {
+                    left: frame.bounds.left,
+                    top: frame.bounds.top,
+                    width,
+                    height,
+                    content_width: frame.content_bounds.width,
+                    content: frame.content_bounds,
+                },
+                rotation: self.config.rotation,
+                rotation_origin: frame.content_bounds.rotation_origin(),
+            })
+            .map_err(|e| WidgetError::Render(e.to_string()))?;
         }
-        #[derive(serde::Serialize)]
-        struct Geometry {
-            #[serde(flatten)]
-            widget: WidgetGeometry,
-            rotation: f32,
-            rotation_origin: [f32; 2],
-        }
-        self.geometry = serde_json::to_vec(&Geometry {
-            widget: WidgetGeometry {
-                left: frame.bounds.left,
-                top: frame.bounds.top,
-                width,
-                height,
-                content_width: frame.content_bounds.width,
-                content: frame.content_bounds,
-            },
-            rotation: self.config.rotation,
-            rotation_origin: frame.content_bounds.rotation_origin(),
-        })
-        .map_err(|e| WidgetError::Render(e.to_string()))?;
         self.revision = self.revision.wrapping_add(1);
         self.last_state = Some(state);
         Ok(())

@@ -6,6 +6,7 @@ use std::sync::Arc;
 pub struct ElevationActivity {
     times: Vec<f64>,
     preferred: Vec<(f64, f64)>,
+    elevation_range: Option<(f64, f64)>,
     preferred_values: Vec<Option<f64>>,
     profile: Vec<(f64, f64)>,
     progress: Vec<(f64, f64)>,
@@ -35,6 +36,11 @@ impl ElevationActivity {
         let profile = numeric(profile);
         let preferred_values = preferred.to_vec();
         let preferred = numeric(preferred);
+        let elevation_range = preferred.iter().fold(None, |range, &(_, value)| {
+            Some(range.map_or((value, value), |(min, max): (f64, f64)| {
+                (min.min(value), max.max(value))
+            }))
+        });
         let duration = times.last().copied().unwrap_or(1.0).max(1e-9);
         let progress = times
             .iter()
@@ -68,6 +74,7 @@ impl ElevationActivity {
         Self {
             times: times.to_vec(),
             preferred,
+            elevation_range,
             preferred_values,
             profile,
             progress,
@@ -155,5 +162,9 @@ impl ElevationActivity {
         target
             .zip(self.profile.first())
             .map_or(0.0, |(target, first)| target - first.1)
+    }
+
+    pub fn elevation_range(&self) -> Option<(f64, f64)> {
+        self.elevation_range
     }
 }

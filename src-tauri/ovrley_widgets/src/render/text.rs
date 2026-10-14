@@ -131,35 +131,62 @@ pub fn draw_text_with_vertical_metrics_text(
 
 /// Paint an already prepared text run, shared by static label frames and text helpers.
 pub fn draw_text_blob(canvas: &Canvas, blob: &TextBlob, baseline: f32, style: &ResolvedTextStyle) {
-    if let Some(shadow_color) = style.shadow_color {
-        if style.shadow_strength > 0.0 {
-            if let Some(shadow_filter) = image_filters::drop_shadow_only(
-                (style.shadow_distance, style.shadow_distance),
-                (style.shadow_strength, style.shadow_strength),
-                shadow_color,
-                None,
-                None,
-                None,
-            ) {
-                let mut paint = text_paint(style.color);
-                paint.set_image_filter(shadow_filter);
-                canvas.draw_text_blob(&blob, Point::new(style.x, baseline), &paint);
-            }
+    TextPaints::new(style).draw(canvas, blob, (style.x, baseline));
+}
+
+/// Prepared fill, stroke, and shadow resources reusable while text moves or changes.
+#[derive(Clone, Debug)]
+pub struct TextPaints {
+    shadow: Option<Paint>,
+    border: Option<Paint>,
+    fill: Paint,
+}
+
+impl TextPaints {
+    pub fn new(style: &ResolvedTextStyle) -> Self {
+        let shadow = style
+            .shadow_color
+            .filter(|_| style.shadow_strength > 0.0)
+            .and_then(|color| {
+                image_filters::drop_shadow_only(
+                    (style.shadow_distance, style.shadow_distance),
+                    (style.shadow_strength, style.shadow_strength),
+                    color,
+                    None,
+                    None,
+                    None,
+                )
+                .map(|filter| {
+                    let mut paint = text_paint(style.color);
+                    paint.set_image_filter(filter);
+                    paint
+                })
+            });
+        let border = style
+            .border_color
+            .filter(|_| style.border_thickness > 0.0)
+            .map(|color| {
+                let mut paint = text_paint(color);
+                paint.set_style(Style::Stroke);
+                paint.set_stroke_width(style.border_thickness);
+                paint.set_stroke_join(Join::Round);
+                paint
+            });
+        Self {
+            shadow,
+            border,
+            fill: text_paint(style.color),
         }
     }
 
-    if let Some(border_color) = style.border_color {
-        if style.border_thickness > 0.0 {
-            let mut paint = text_paint(border_color);
-            paint.set_style(Style::Stroke);
-            paint.set_stroke_width(style.border_thickness);
-            paint.set_stroke_join(Join::Round);
-            canvas.draw_text_blob(&blob, Point::new(style.x, baseline), &paint);
+    pub fn draw(&self, canvas: &Canvas, blob: &TextBlob, position: (f32, f32)) {
+        for paint in [self.shadow.as_ref(), self.border.as_ref(), Some(&self.fill)]
+            .into_iter()
+            .flatten()
+        {
+            canvas.draw_text_blob(blob, Point::from(position), paint);
         }
     }
-
-    let paint = text_paint(style.color);
-    canvas.draw_text_blob(&blob, Point::new(style.x, baseline), &paint);
 }
 
 /// Resolves a font from configured font directories or system fonts.

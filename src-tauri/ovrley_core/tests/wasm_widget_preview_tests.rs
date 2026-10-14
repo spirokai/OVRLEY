@@ -82,7 +82,7 @@ fn elevation_preview_matches_native_export_labels_hover_seeking_and_activity_rep
         let raw = serde_json::from_value(request["widget"].clone()).unwrap();
         let scene = validate_scene_presentation(serde_json::from_value(request["scene"].clone()).unwrap()).unwrap();
         assert_eq!(config.elevation_plots[0], ovrley_widgets::widgets::elevation::validation::validate_elevation_plot(&raw, 0, &scene).unwrap());
-        let mut selection = None;
+        let mut placement = None;
         for index in [0, 1, 2, 3, 4, 2, 0] {
             let second = 0.25 + seconds[index];
             preview.render(second).unwrap();
@@ -90,8 +90,8 @@ fn elevation_preview_matches_native_export_labels_hover_seeking_and_activity_rep
             assert_eq!(assets.elevation_geometry_json().unwrap()["points"], serde_json::to_value(&prepared.points).unwrap());
             let widget = &preview.widgets[&id];
             let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
-            if let Some(selection) = &selection { assert_eq!(&geometry["content"], selection, "labels and hover must not move the selection frame"); }
-            else { selection = Some(geometry["content"].clone()); }
+            if let Some(placement) = &placement { assert_eq!(widget.geometry(), placement, "playback must retain raster and selection bounds"); }
+            else { placement = Some(widget.geometry().clone()); }
             let (w, h, left, top) = (geometry["width"].as_u64().unwrap() as usize, geometry["height"].as_u64().unwrap() as usize, geometry["left"].as_f64().unwrap() as usize, geometry["top"].as_f64().unwrap() as usize);
             let mut native = vec![0; 700 * 500 * 4];
             renderer.render_rgba(index, &mut native, &mut RenderProfiler::default()).unwrap();
@@ -112,6 +112,9 @@ fn elevation_preview_matches_native_export_labels_hover_seeking_and_activity_rep
             let revision = widget.revision();
             preview.render(second).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision);
+            preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+            preview.render(second).unwrap();
+            assert_eq!(preview.widgets[&id].revision(), revision, "identical config must retain cached presentation");
         }
         let pixels = preview.widgets[&id].pixels().clone();
         preview.replace_activity(&[]).unwrap();
@@ -140,6 +143,40 @@ fn elevation_preview_matches_native_export_labels_hover_seeking_and_activity_rep
     let mut missing = request;
     missing["widget"].as_object_mut().unwrap().remove("remaining_line_width");
     assert!(serde_json::from_value::<ovrley_widgets::preview_widget::WidgetRequest>(missing).is_err());
+}
+
+#[test]
+fn elevation_areas_stop_at_the_inner_stroke_edge() {
+    let mut activity = elevation_activity();
+    activity.sample_elevations.fill(Some(100.0));
+    activity.barometric_altitude.fill(Some(100.0));
+    let bytes = serde_json::to_vec(&activity).unwrap();
+    for (completed, width, second) in [(false, 24.0, 0.0), (true, 40.0, 4.0)] {
+        let mut request = elevation_request();
+        request["widget"].as_object_mut().unwrap().extend(json!({
+            "x": 40, "y": 40, "width": 240, "height": 160, "rotation": 0, "y_scale": 0.5,
+            "show_elevation_metric": false, "show_elevation_imperial": false,
+            "remaining_line_width": 24, "completed_line_width": 40,
+            "remaining_line_opacity": 0, "completed_line_opacity": 0, "marker_opacity": 0,
+            "area_remaining_opacity": if completed { 0 } else { 100 },
+            "area_completed_opacity": if completed { 100 } else { 0 }
+        }).as_object().unwrap().clone());
+        request["scene"].as_object_mut().unwrap().extend(json!({
+            "scale": 1, "opacity": 1, "shadow_strength": 0, "shadow_distance": 0, "border_thickness": 0
+        }).as_object().unwrap().clone());
+        let (mut preview, id) = elevation_preview(&request, &bytes);
+        preview.render(second).unwrap();
+        let widget = &preview.widgets[&id];
+        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let left = geometry["left"].as_f64().unwrap() as usize;
+        let top = geometry["top"].as_f64().unwrap() as usize;
+        let raster_width = geometry["width"].as_u64().unwrap() as usize;
+        let alpha = |y: usize| widget.pixels()[((y - top) * raster_width + 160 - left) * 4 + 3];
+        let edge = 160 + (width * 0.5) as usize;
+        assert_eq!(alpha(161), 0, "area must leave the stroke interior clear");
+        assert_eq!(alpha(edge - 2), 0, "area must stop at its own stroke width");
+        assert_eq!(alpha(edge + 2), 255, "area must reach the inner stroke edge");
+    }
 }
 
 #[test]
