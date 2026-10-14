@@ -1,4 +1,5 @@
 use super::validation::RasterGeometry;
+use crate::widgets::value::preview::ContentBounds;
 use skia_safe::{Canvas, Color, FilterMode, Image, Paint, Rect};
 
 /// One oriented frame for export pixels and editor interaction geometry.
@@ -55,11 +56,24 @@ impl RasterFrame {
         }
     }
 
+    pub fn content_bounds(&self) -> ContentBounds {
+        ContentBounds::rotated_frame(
+            Rect::from_wh(self.content.width(), self.content.height()),
+            self.rotation,
+            self.content.left,
+            self.content.top,
+        )
+    }
+
+    pub fn paint_opacity(&self, has_image: bool, scene_opacity: f32) -> f32 {
+        self.opacity * scene_opacity * if has_image { 1.0 } else { 0.5 }
+    }
+
     pub fn draw(&self, canvas: &Canvas, image: Option<&Image>, scene_opacity: f32) {
         let mut paint = Paint::default();
         paint.set_anti_alias(true);
         paint.set_color(Color::WHITE);
-        paint.set_alpha_f(self.opacity * scene_opacity * if image.is_some() { 1.0 } else { 0.5 });
+        paint.set_alpha_f(self.paint_opacity(image.is_some(), scene_opacity));
         canvas.save();
         canvas.translate((self.content.left, self.content.top));
         canvas.rotate(self.rotation, None);

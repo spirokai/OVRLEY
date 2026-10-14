@@ -156,6 +156,16 @@ impl PreviewSession {
             self.widgets.insert(id, replacement);
             return Ok(());
         }
+        if let WidgetRequest::Raster {widget, scene} = request {
+            let previous = self.widgets.get_mut(&id).ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?;
+            if let PreviewWidget::Raster(raster) = previous {
+                return raster.update(widget, scene, &self.images);
+            }
+            let mut replacement = PreviewWidget::Raster(crate::widgets::raster::preview::PreviewRaster::new(widget, scene, &self.images)?);
+            replacement.inherit_revision(previous.revision());
+            self.widgets.insert(id, replacement);
+            return Ok(());
+        }
         let mut replacement = PreviewWidget::new(request, &self.fonts, &self.images)?;
         let previous = self
             .widgets

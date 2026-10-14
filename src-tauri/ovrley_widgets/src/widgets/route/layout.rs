@@ -218,20 +218,9 @@ impl RouteLayout {
             raster.join(remaining_bounds);
         }
         raster.outset((1.0, 1.0));
-        let center = (
-            content.left + content.width() * 0.5,
-            content.top + content.height() * 0.5,
-        );
         let bounds = outward(rotated_rect(raster, config.rotation, config.x, config.y));
-        let (sin, cos) = config.rotation.to_radians().sin_cos();
-        // x/y retain the existing plot-origin contract. The DOM frame rotates around
-        // its center while occupying exactly the same scene pixels as the saved route.
-        let content_bounds = ContentBounds {
-            left: config.x + center.0 * cos - center.1 * sin - content.width() * 0.5,
-            top: config.y + center.0 * sin + center.1 * cos - content.height() * 0.5,
-            width: content.width(),
-            height: content.height(),
-        };
+        let content_bounds =
+            ContentBounds::rotated_frame(content, config.rotation, config.x, config.y);
         (bounds, content_bounds)
     }
 

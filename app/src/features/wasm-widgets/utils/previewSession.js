@@ -199,26 +199,30 @@ export function createPreviewSession(module, onError) {
         )
         const geometryChanged = widget.geometryJson !== geometryJson
         const geometry = geometryChanged ? JSON.parse(geometryJson) : widget.geometry
-        if (!widget.image || widget.image.width !== geometry.width || widget.image.height !== geometry.height) {
-          canvas.width = geometry.width
-          canvas.height = geometry.height
-          widget.image = new ImageData(geometry.width, geometry.height)
-        }
-        const measureRoute = measure && widget.type === 'course'
-        const routeLabel = measureRoute ? `course:${id}` : null
-        const copyStarted = measureRoute ? performance.now() : 0
-        const ptr = module._ovrley_preview_pixels(handle, widget.handle)
-        widget.image.data.set(module.HEAPU8.subarray(ptr, ptr + widget.image.data.length))
-        const uploadStarted = measureRoute ? performance.now() : 0
-        canvas.getContext('2d').putImageData(widget.image, 0, 0)
-        if (measureRoute) {
-          const uploaded = performance.now()
-          recordPreviewPerfDuration(`${routeLabel} pixel copy`, uploadStarted - copyStarted)
-          recordPreviewPerfDuration(`${routeLabel} canvas upload`, uploaded - uploadStarted)
-          setPreviewPerfValue(`${routeLabel} raster`, `${geometry.width} x ${geometry.height}`)
+        const pixelsRevision = widget.type === 'raster' ? geometry.pixels_revision : revision
+        if (widget.type !== 'raster' || !widget.image || widget.pixelsRevision !== pixelsRevision) {
+          if (!widget.image || widget.image.width !== geometry.width || widget.image.height !== geometry.height) {
+            canvas.width = geometry.width
+            canvas.height = geometry.height
+            widget.image = new ImageData(geometry.width, geometry.height)
+          }
+          const measurePixels = measure && (widget.type === 'course' || widget.type === 'raster')
+          const widgetLabel = measurePixels ? `${widget.type}:${id}` : null
+          const copyStarted = measurePixels ? performance.now() : 0
+          const ptr = module._ovrley_preview_pixels(handle, widget.handle)
+          widget.image.data.set(module.HEAPU8.subarray(ptr, ptr + widget.image.data.length))
+          const uploadStarted = measurePixels ? performance.now() : 0
+          canvas.getContext('2d').putImageData(widget.image, 0, 0)
+          if (measurePixels) {
+            const uploaded = performance.now()
+            recordPreviewPerfDuration(`${widgetLabel} pixel copy`, uploadStarted - copyStarted)
+            recordPreviewPerfDuration(`${widgetLabel} canvas upload`, uploaded - uploadStarted)
+            setPreviewPerfValue(`${widgetLabel} raster`, `${geometry.width} x ${geometry.height}`)
+          }
+          widget.pixelsRevision = pixelsRevision
         }
         // Pixel-only playback changes do not require DOM writes or a Moveable measurement.
-        if (geometryChanged) presentWidgetGeometry(canvas, geometry, targets.get(id))
+        if (geometryChanged) presentWidgetGeometry(canvas, geometry, targets.get(id), widget.type)
         widget.geometry = geometry
         widget.geometryJson = geometryJson
         widget.revision = revision

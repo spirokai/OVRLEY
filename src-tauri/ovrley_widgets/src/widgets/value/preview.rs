@@ -43,6 +43,27 @@ pub struct ContentBounds {
     pub height: f32,
 }
 
+impl ContentBounds {
+    /// Center-pivoted editor frame for a local rectangle drawn at the saved origin.
+    pub fn rotated_frame(rect: skia_safe::Rect, rotation: f32, x: f32, y: f32) -> Self {
+        let center = (
+            rect.left + rect.width() * 0.5,
+            rect.top + rect.height() * 0.5,
+        );
+        let (sin, cos) = rotation.to_radians().sin_cos();
+        Self {
+            left: x + center.0 * cos - center.1 * sin - rect.width() * 0.5,
+            top: y + center.0 * sin + center.1 * cos - rect.height() * 0.5,
+            width: rect.width(),
+            height: rect.height(),
+        }
+    }
+
+    pub fn rotation_origin(&self) -> [f32; 2] {
+        [self.width * 0.5, self.height * 0.5]
+    }
+}
+
 impl From<skia_safe::Rect> for ContentBounds {
     fn from(rect: skia_safe::Rect) -> Self {
         Self {

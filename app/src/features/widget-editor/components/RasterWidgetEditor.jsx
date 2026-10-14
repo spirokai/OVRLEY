@@ -4,6 +4,7 @@ import { ButtonGroup } from '@/components/ui/button-group'
 import { Input } from '@/components/ui/input'
 import { useTranslation } from 'react-i18next'
 import { useRasterSelection } from '../hooks/useRasterSelection'
+import { normalizeRotation } from '@/features/wasm-widgets/utils/widgetGestureGeometry'
 import { DimensionsSection } from './widgetEditorSections'
 import { SliderField } from './widgetFormControls'
 
@@ -11,6 +12,7 @@ import { SliderField } from './widgetFormControls'
 export default function RasterWidgetEditor({ widget, updateWidgetSize, commitWidgetSize, setNumericField }) {
   const { t } = useTranslation()
   const { error, isLoading, selectImage } = useRasterSelection(widget.id)
+  const rotation = normalizeRotation(widget.data.rotation)
 
   return (
     <div className="flex flex-col gap-2">
@@ -20,11 +22,11 @@ export default function RasterWidgetEditor({ widget, updateWidgetSize, commitWid
       <SliderField
         editable
         label={t('widget-editor.rotation', 'Rotation')}
-        value={widget.data.rotation}
-        min={-180}
-        max={180}
+        value={rotation}
+        min={0}
+        max={360}
         step={1}
-        valueDisplay={`${widget.data.rotation}`}
+        integerDisplay
         suffix="°"
         onSliderChange={(rotation) => updateWidgetSize(widget.id, { rotation })}
         onSliderCommit={() => commitWidgetSize(widget.id)}

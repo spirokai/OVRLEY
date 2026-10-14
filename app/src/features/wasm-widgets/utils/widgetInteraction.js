@@ -6,12 +6,13 @@ const targets = new WeakMap()
 
 function rotationPatch(widget, rotation, translate = [0, 0], geometry) {
   const { data } = widget
+  const centeredRotation = widget.type === 'course' || widget.type === 'raster'
   const patch = {
     x: data.x + translate[0],
     y: data.y + translate[1],
-    rotation: normalizeRotation(widget.type === 'course' ? Math.round(rotation) : rotation),
+    rotation: normalizeRotation(centeredRotation ? Math.round(rotation) : rotation),
   }
-  if (widget.type === 'course') {
+  if (centeredRotation) {
     const center = [geometry.content.left + geometry.rotation_origin[0], geometry.content.top + geometry.rotation_origin[1]]
     const angle = ((patch.rotation - data.rotation) * Math.PI) / 180
     const dx = data.x - center[0]

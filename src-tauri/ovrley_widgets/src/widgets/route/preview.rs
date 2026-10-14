@@ -284,10 +284,7 @@ impl PreviewRoute {
                 rotation: f32,
                 rotation_origin: [f32; 2],
             }
-            let rotation_origin = [
-                frame.content_bounds.width * 0.5,
-                frame.content_bounds.height * 0.5,
-            ];
+            let rotation_origin = frame.content_bounds.rotation_origin();
             self.geometry = serde_json::to_vec(&Geometry {
                 widget: WidgetGeometry {
                     left: frame.bounds.left,
