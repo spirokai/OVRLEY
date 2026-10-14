@@ -1,5 +1,6 @@
 import { previewActivity, previewFont, rasterPreviewPng } from '@/api/backend'
 import { isTimeDependentWasmWidget } from '@/lib/widget/wasm-widget'
+import { isPreviewPerfEnabled, recordPreviewPerfDuration, setPreviewPerfValue } from '@/lib/previewPerf'
 import { createWidgetInteraction, registerWidgetInteraction, unregisterWidgetInteraction } from './widgetInteraction'
 import { presentWidgetGeometry } from './widgetPresentation'
 
@@ -127,6 +128,8 @@ export function createPreviewSession(module, onError) {
   function render() {
     frame = null
     if (!snapshot) return
+    const measure = isPreviewPerfEnabled()
+    const frameStarted = measure ? performance.now() : 0
     try {
       const defaultFont = fonts.get(JSON.stringify({ font: snapshot.defaultFont }))
       if (defaultFont.error) throw defaultFont.error
@@ -179,7 +182,11 @@ export function createPreviewSession(module, onError) {
         instance.scene = snapshot.scene
         instance.transient = transient
       }
-      if (activityReady && snapshot.widgets.some(isTimeDependentWasmWidget)) check(module._ovrley_preview_render(handle, snapshot.second))
+      if (activityReady && snapshot.widgets.some(isTimeDependentWasmWidget)) {
+        const started = measure ? performance.now() : 0
+        check(module._ovrley_preview_render(handle, snapshot.second))
+        if (measure) recordPreviewPerfDuration('WASM render (all widgets)', performance.now() - started)
+      }
       for (const [id, widget] of widgets) {
         if (isTimeDependentWasmWidget(widget) && !activityReady) continue
         const canvas = canvases.get(id)
@@ -197,9 +204,19 @@ export function createPreviewSession(module, onError) {
           canvas.height = geometry.height
           widget.image = new ImageData(geometry.width, geometry.height)
         }
+        const measureRoute = measure && widget.type === 'course'
+        const routeLabel = measureRoute ? `course:${id}` : null
+        const copyStarted = measureRoute ? performance.now() : 0
         const ptr = module._ovrley_preview_pixels(handle, widget.handle)
         widget.image.data.set(module.HEAPU8.subarray(ptr, ptr + widget.image.data.length))
+        const uploadStarted = measureRoute ? performance.now() : 0
         canvas.getContext('2d').putImageData(widget.image, 0, 0)
+        if (measureRoute) {
+          const uploaded = performance.now()
+          recordPreviewPerfDuration(`${routeLabel} pixel copy`, uploadStarted - copyStarted)
+          recordPreviewPerfDuration(`${routeLabel} canvas upload`, uploaded - uploadStarted)
+          setPreviewPerfValue(`${routeLabel} raster`, `${geometry.width} x ${geometry.height}`)
+        }
         // Pixel-only playback changes do not require DOM writes or a Moveable measurement.
         if (geometryChanged) presentWidgetGeometry(canvas, geometry, targets.get(id))
         widget.geometry = geometry
@@ -208,6 +225,7 @@ export function createPreviewSession(module, onError) {
       }
       renderError = null
       onError(null)
+      if (measure) recordPreviewPerfDuration('WASM session frame', performance.now() - frameStarted)
     } catch (error) {
       renderError = error
       onError(error)

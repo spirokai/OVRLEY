@@ -21,6 +21,7 @@ pub struct RouteLayout {
     pub geometry: Arc<RouteGeometry>,
     remaining: Image,
     remaining_bounds: Rect,
+    remaining_image_bounds: Rect,
     bounds: Rect,
     content_bounds: ContentBounds,
     scale: [f32; 2],
@@ -113,16 +114,20 @@ impl RouteLayout {
                     .with_offset((offset[0], offset[1])),
             );
         }
-        // The cached image is local to the widget; dragging only changes its presentation.
+        // Cache at the final angle so playback can blit without resampling a rotated
+        // bitmap every frame. Positions stay relative to the widget for cheap dragging.
         remaining_bounds = outward(remaining_bounds.with_outset((1.0, 1.0)));
+        let remaining_image_bounds =
+            outward(rotated_rect(remaining_bounds, config.rotation, 0.0, 0.0));
         let mut layer = surface(
-            remaining_bounds.width() as u32,
-            remaining_bounds.height() as u32,
+            remaining_image_bounds.width() as u32,
+            remaining_image_bounds.height() as u32,
         )?;
         let canvas = layer.canvas();
         let path = geometry.path.lock().expect("route path lock");
         canvas.clear(Color::TRANSPARENT);
-        canvas.translate((-remaining_bounds.left, -remaining_bounds.top));
+        canvas.translate((-remaining_image_bounds.left, -remaining_image_bounds.top));
+        canvas.rotate(config.rotation, None);
         let opacity = config.remaining_line_opacity * scene.opacity;
         if blur > 0.0 {
             canvas.save();
@@ -169,6 +174,7 @@ impl RouteLayout {
             geometry,
             remaining: layer.image_snapshot(),
             remaining_bounds,
+            remaining_image_bounds,
             bounds,
             content_bounds,
             scale,
@@ -254,12 +260,15 @@ impl RouteLayout {
     pub fn draw(&self, canvas: &Canvas, frame: &RouteFrame) {
         canvas.save();
         canvas.translate((self.config.x, self.config.y));
-        canvas.rotate(self.config.rotation, None);
         canvas.draw_image(
             &self.remaining,
-            (self.remaining_bounds.left, self.remaining_bounds.top),
+            (
+                self.remaining_image_bounds.left,
+                self.remaining_image_bounds.top,
+            ),
             None,
         );
+        canvas.rotate(self.config.rotation, None);
         let scale = self.scale;
         let completed: Path = self.geometry.completed_path(&frame.state);
         canvas.save();

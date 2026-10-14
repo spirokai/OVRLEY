@@ -11,10 +11,12 @@ const PREVIEW_PERF_ENABLED_FLAG = '__OVRLEY_PREVIEW_PERF_ENABLED__'
 const counterState = {
   counts: Object.create(null),
   values: Object.create(null),
+  timings: Object.create(null),
   timerId: null,
 }
 
-function isPreviewPerfEnabled() {
+/** @returns {boolean} Whether preview diagnostics are enabled for this development session. */
+export function isPreviewPerfEnabled() {
   if (!import.meta.env.DEV || typeof window === 'undefined') {
     return false
   }
@@ -23,11 +25,18 @@ function isPreviewPerfEnabled() {
 }
 
 function flushPreviewPerfCounters() {
+  if (!ensurePreviewPerfTimer()) return
   const snapshot = {
     ...counterState.values,
     ...counterState.counts,
   }
+  for (const [label, timing] of Object.entries(counterState.timings)) {
+    snapshot[`${label} calls/s`] = timing.samples
+    snapshot[`${label} avg ms`] = Math.round((timing.totalMs / timing.samples) * 1000) / 1000
+    snapshot[`${label} max ms`] = Math.round(timing.maxMs * 1000) / 1000
+  }
   counterState.counts = Object.create(null)
+  counterState.timings = Object.create(null)
 
   if (!Object.keys(snapshot).length) {
     return
@@ -44,6 +53,7 @@ function ensurePreviewPerfTimer() {
       counterState.timerId = null
       counterState.counts = Object.create(null)
       counterState.values = Object.create(null)
+      counterState.timings = Object.create(null)
     }
 
     return false
@@ -75,4 +85,13 @@ export function setPreviewPerfValue(label, value) {
   }
 
   counterState.values[label] = value
+}
+
+/** @param {string} label Measured stage. @param {number} durationMs Synchronous duration in milliseconds. @returns {void} */
+export function recordPreviewPerfDuration(label, durationMs) {
+  if (!ensurePreviewPerfTimer()) return
+  const timing = (counterState.timings[label] ??= { samples: 0, totalMs: 0, maxMs: 0 })
+  timing.samples++
+  timing.totalMs += durationMs
+  timing.maxMs = Math.max(timing.maxMs, durationMs)
 }

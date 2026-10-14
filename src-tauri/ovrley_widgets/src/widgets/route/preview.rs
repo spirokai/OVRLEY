@@ -252,16 +252,29 @@ impl PreviewRoute {
         canvas.translate((-frame.bounds.left, -frame.bounds.top));
         layout.draw(canvas, &frame);
         canvas.restore();
+        // Matching the surface format keeps Skia on its row-copy path instead of
+        // running the floating-point conversion pipeline over the entire raster.
         let info = ImageInfo::new(
             (width as i32, height as i32),
             ColorType::RGBA8888,
-            AlphaType::Unpremul,
+            AlphaType::Premul,
             None,
         );
         if !surface.read_pixels(&info, &mut self.pixels, width as usize * 4, (0, 0)) {
             return Err(WidgetError::Render(
                 "unable to read route RGBA pixels".into(),
             ));
+        }
+        // Browser ImageData needs straight alpha. Transparent and opaque pixels
+        // already match; only translucent RGB channels need unpremultiplication.
+        for pixel in self.pixels.chunks_exact_mut(4) {
+            let alpha = u32::from(pixel[3]);
+            if alpha == 0 || alpha == 255 {
+                continue;
+            }
+            for channel in &mut pixel[..3] {
+                *channel = ((u32::from(*channel) * 255 + alpha / 2) / alpha) as u8;
+            }
         }
         if layout_changed || self.last_progress.is_none() {
             #[derive(serde::Serialize)]
