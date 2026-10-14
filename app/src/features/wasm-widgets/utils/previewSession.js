@@ -186,9 +186,12 @@ export function createPreviewSession(module, onError) {
         if (!canvas) continue
         const revision = module._ovrley_preview_revision(handle, widget.handle)
         if (widget.revision === revision) continue
-        const geometry = JSON.parse(
-          read(module._ovrley_preview_geometry_ptr(handle, widget.handle), module._ovrley_preview_geometry_len(handle, widget.handle)),
+        const geometryJson = read(
+          module._ovrley_preview_geometry_ptr(handle, widget.handle),
+          module._ovrley_preview_geometry_len(handle, widget.handle),
         )
+        const geometryChanged = widget.geometryJson !== geometryJson
+        const geometry = geometryChanged ? JSON.parse(geometryJson) : widget.geometry
         if (!widget.image || widget.image.width !== geometry.width || widget.image.height !== geometry.height) {
           canvas.width = geometry.width
           canvas.height = geometry.height
@@ -197,8 +200,10 @@ export function createPreviewSession(module, onError) {
         const ptr = module._ovrley_preview_pixels(handle, widget.handle)
         widget.image.data.set(module.HEAPU8.subarray(ptr, ptr + widget.image.data.length))
         canvas.getContext('2d').putImageData(widget.image, 0, 0)
-        presentWidgetGeometry(canvas, geometry, targets.get(id))
+        // Pixel-only playback changes do not require DOM writes or a Moveable measurement.
+        if (geometryChanged) presentWidgetGeometry(canvas, geometry, targets.get(id))
         widget.geometry = geometry
+        widget.geometryJson = geometryJson
         widget.revision = revision
       }
       renderError = null
@@ -274,6 +279,7 @@ export function createPreviewSession(module, onError) {
       if (widget) {
         widget.revision = -1
         widget.image = null
+        widget.geometryJson = null
       }
       schedule()
     },

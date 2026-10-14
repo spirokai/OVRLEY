@@ -96,8 +96,7 @@ impl PreviewRoute {
         }
         if let Some(layout) = self.layout.as_mut() {
             // x/y never participate in path or static-layer preparation.
-            layout.config.x = config.x;
-            layout.config.y = config.y;
+            layout.set_position(config.x, config.y);
             if layout.config != config
                 || self.scene.scale != scene.scale
                 || self.scene.opacity != scene.opacity
@@ -221,11 +220,11 @@ impl PreviewRoute {
     pub fn render(&mut self, activity: Option<&ActivitySampler>, second: f64) -> WidgetResult<()> {
         let geometry = self.geometry_at(activity, second)?;
         let progress = self.progress(activity, second, geometry.source_point_count == 0);
-        if self
+        let layout_changed = self
             .layout
             .as_ref()
-            .is_none_or(|layout| !Arc::ptr_eq(&layout.geometry, &geometry))
-        {
+            .is_none_or(|layout| !Arc::ptr_eq(&layout.geometry, &geometry));
+        if layout_changed {
             self.layout = Some(RouteLayout::new(
                 self.config.clone(),
                 self.scene.clone(),
@@ -264,30 +263,32 @@ impl PreviewRoute {
                 "unable to read route RGBA pixels".into(),
             ));
         }
-        #[derive(serde::Serialize)]
-        struct Geometry {
-            #[serde(flatten)]
-            widget: WidgetGeometry,
-            rotation: f32,
-            rotation_origin: [f32; 2],
+        if layout_changed || self.last_progress.is_none() {
+            #[derive(serde::Serialize)]
+            struct Geometry {
+                #[serde(flatten)]
+                widget: WidgetGeometry,
+                rotation: f32,
+                rotation_origin: [f32; 2],
+            }
+            let rotation_origin = [
+                frame.content_bounds.width * 0.5,
+                frame.content_bounds.height * 0.5,
+            ];
+            self.geometry = serde_json::to_vec(&Geometry {
+                widget: WidgetGeometry {
+                    left: frame.bounds.left,
+                    top: frame.bounds.top,
+                    width,
+                    height,
+                    content_width: frame.content_bounds.width,
+                    content: frame.content_bounds,
+                },
+                rotation: self.config.rotation,
+                rotation_origin,
+            })
+            .map_err(|e| WidgetError::Render(e.to_string()))?;
         }
-        let rotation_origin = [
-            frame.content_bounds.width * 0.5,
-            frame.content_bounds.height * 0.5,
-        ];
-        self.geometry = serde_json::to_vec(&Geometry {
-            widget: WidgetGeometry {
-                left: frame.bounds.left,
-                top: frame.bounds.top,
-                width,
-                height,
-                content_width: frame.content_bounds.width,
-                content: frame.content_bounds,
-            },
-            rotation: self.config.rotation,
-            rotation_origin,
-        })
-        .map_err(|e| WidgetError::Render(e.to_string()))?;
         self.revision = self.revision.wrapping_add(1);
         self.last_progress = Some(progress);
         Ok(())

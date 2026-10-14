@@ -35,7 +35,7 @@ pub struct WidgetGeometry {
 }
 
 /// Interaction rectangle in scene pixels, independent of raster allocation.
-#[derive(Serialize)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub struct ContentBounds {
     pub left: f32,
     pub top: f32,

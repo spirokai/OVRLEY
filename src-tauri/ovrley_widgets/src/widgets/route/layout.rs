@@ -21,6 +21,12 @@ pub struct RouteLayout {
     pub geometry: Arc<RouteGeometry>,
     remaining: Image,
     remaining_bounds: Rect,
+    bounds: Rect,
+    content_bounds: ContentBounds,
+    scale: [f32; 2],
+    completed_paint: Paint,
+    marker_paint: Paint,
+    variant_paint: Paint,
 }
 
 pub struct RouteFrame {
@@ -135,12 +141,40 @@ impl RouteLayout {
         );
         canvas.restore();
         drop(path);
+        let (bounds, content_bounds) =
+            Self::measure_bounds(&config, &scene, &geometry, remaining_bounds);
+        let completed_paint = stroke_paint(
+            &config.completed_line_color,
+            (config.completed_line_width * scene.scale).max(1.0) / scale[0],
+            config.completed_line_opacity * scene.opacity,
+        );
+        let mut marker_paint = Paint::default();
+        marker_paint.set_anti_alias(true);
+        let marker_opacity = config.marker_opacity * scene.opacity;
+        marker_paint.set_color(parse_color(&config.marker_color, marker_opacity));
+        let mut variant_paint = marker_paint.clone();
+        match config.marker_variant.as_str() {
+            "ring" => {
+                variant_paint.set_style(skia_safe::paint::Style::Stroke);
+                variant_paint.set_stroke_width(1.5);
+            }
+            "halo" => {
+                variant_paint.set_color(parse_color(&config.marker_color, marker_opacity * 0.35));
+            }
+            _ => {}
+        }
         Ok(Self {
             config,
             scene,
             geometry,
             remaining: layer.image_snapshot(),
             remaining_bounds,
+            bounds,
+            content_bounds,
+            scale,
+            completed_paint,
+            marker_paint,
+            variant_paint,
         })
     }
 
@@ -157,52 +191,63 @@ impl RouteLayout {
         scaled_rect(geometry.point_bounds, scale).with_outset((half_stroke, half_stroke))
     }
 
-    pub fn frame(&self, progress: f32) -> RouteFrame {
-        let state = self.geometry.state(progress);
-        let content = Self::measure_content(&self.config, &self.scene, &self.geometry);
+    fn measure_bounds(
+        config: &ValidatedRoutePlot,
+        scene: &ValidatedScenePresentation,
+        geometry: &RouteGeometry,
+        remaining_bounds: Rect,
+    ) -> (Rect, ContentBounds) {
+        let content = Self::measure_content(config, scene, geometry);
         let mut raster = content;
-        let scale = self
-            .geometry
-            .scale_to(&self.config)
-            .map(|value| value * self.scene.scale);
-        let marker_radius = (self.config.marker_size * self.scene.scale).max(2.0);
-        let radius = match self.config.marker_variant.as_str() {
-            "ring" => marker_radius
-                .max(self.config.marker_variant_diameter * self.scene.scale * 0.5 + 0.75),
-            "halo" => {
-                marker_radius.max(self.config.marker_variant_diameter * self.scene.scale * 0.5)
-            }
+        let scale = geometry.scale_to(config).map(|value| value * scene.scale);
+        let marker_radius = (config.marker_size * scene.scale).max(2.0);
+        let radius = match config.marker_variant.as_str() {
+            "ring" => marker_radius.max(config.marker_variant_diameter * scene.scale * 0.5 + 0.75),
+            "halo" => marker_radius.max(config.marker_variant_diameter * scene.scale * 0.5),
             _ => marker_radius,
         };
         // Allocate marker overflow for the entire path once; playback cannot resize the raster.
-        raster.join(scaled_rect(self.geometry.point_bounds, scale).with_outset((radius, radius)));
-        if self.config.remaining_line_opacity > 0.0 {
-            raster.join(self.remaining_bounds);
+        raster.join(scaled_rect(geometry.point_bounds, scale).with_outset((radius, radius)));
+        if config.remaining_line_opacity > 0.0 {
+            raster.join(remaining_bounds);
         }
         raster.outset((1.0, 1.0));
         let center = (
             content.left + content.width() * 0.5,
             content.top + content.height() * 0.5,
         );
-        let bounds = outward(rotated_rect(
-            raster,
-            self.config.rotation,
-            self.config.x,
-            self.config.y,
-        ));
-        let (sin, cos) = self.config.rotation.to_radians().sin_cos();
+        let bounds = outward(rotated_rect(raster, config.rotation, config.x, config.y));
+        let (sin, cos) = config.rotation.to_radians().sin_cos();
         // x/y retain the existing plot-origin contract. The DOM frame rotates around
         // its center while occupying exactly the same scene pixels as the saved route.
         let content_bounds = ContentBounds {
-            left: self.config.x + center.0 * cos - center.1 * sin - content.width() * 0.5,
-            top: self.config.y + center.0 * sin + center.1 * cos - content.height() * 0.5,
+            left: config.x + center.0 * cos - center.1 * sin - content.width() * 0.5,
+            top: config.y + center.0 * sin + center.1 * cos - content.height() * 0.5,
             width: content.width(),
             height: content.height(),
         };
+        (bounds, content_bounds)
+    }
+
+    pub fn set_position(&mut self, x: f32, y: f32) {
+        if self.config.x == x && self.config.y == y {
+            return;
+        }
+        self.config.x = x;
+        self.config.y = y;
+        (self.bounds, self.content_bounds) = Self::measure_bounds(
+            &self.config,
+            &self.scene,
+            &self.geometry,
+            self.remaining_bounds,
+        );
+    }
+
+    pub fn frame(&self, progress: f32) -> RouteFrame {
         RouteFrame {
-            state,
-            bounds,
-            content_bounds,
+            state: self.geometry.state(progress),
+            bounds: self.bounds,
+            content_bounds: self.content_bounds,
         }
     }
 
@@ -215,49 +260,24 @@ impl RouteLayout {
             (self.remaining_bounds.left, self.remaining_bounds.top),
             None,
         );
-        let scale = self
-            .geometry
-            .scale_to(&self.config)
-            .map(|value| value * self.scene.scale);
+        let scale = self.scale;
         let completed: Path = self.geometry.completed_path(&frame.state);
         canvas.save();
         canvas.scale((scale[0], scale[1]));
-        canvas.draw_path(
-            &completed,
-            &stroke_paint(
-                &self.config.completed_line_color,
-                (self.config.completed_line_width * self.scene.scale).max(1.0) / scale[0],
-                self.config.completed_line_opacity * self.scene.opacity,
-            ),
-        );
+        canvas.draw_path(&completed, &self.completed_paint);
         canvas.restore();
         let point = (
             frame.state.marker_x * scale[0],
             frame.state.marker_y * scale[1],
         );
-        let mut paint = Paint::default();
-        paint.set_anti_alias(true);
-        let opacity = self.config.marker_opacity * self.scene.opacity;
         let variant_radius = self.config.marker_variant_diameter * self.scene.scale * 0.5;
-        match self.config.marker_variant.as_str() {
-            "ring" => {
-                paint.set_color(parse_color(&self.config.marker_color, opacity));
-                paint.set_style(skia_safe::paint::Style::Stroke);
-                paint.set_stroke_width(1.5);
-                canvas.draw_circle(point, variant_radius, &paint);
-            }
-            "halo" => {
-                paint.set_color(parse_color(&self.config.marker_color, opacity * 0.35));
-                canvas.draw_circle(point, variant_radius, &paint);
-            }
-            _ => {}
+        if self.config.marker_variant != "single" {
+            canvas.draw_circle(point, variant_radius, &self.variant_paint);
         }
-        paint.set_style(skia_safe::paint::Style::Fill);
-        paint.set_color(parse_color(&self.config.marker_color, opacity));
         canvas.draw_circle(
             point,
             (self.config.marker_size * self.scene.scale).max(2.0),
-            &paint,
+            &self.marker_paint,
         );
         canvas.restore();
     }
