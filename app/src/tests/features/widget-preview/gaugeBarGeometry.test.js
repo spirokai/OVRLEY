@@ -1,24 +1,14 @@
 import { describe, expect, test } from 'vitest'
 import {
-  getArcBarSegments,
-  getBarFillCount,
   getBarGeometry,
   getLinearBarGapMax,
-  getLinearBarRects,
   getLinearTrackCornerRadiusMax,
   getArcTrackCornerRadiusMax,
   getSuggestedArcBarGeometry,
   getSuggestedLinearBarGeometry,
-} from '@/features/widget-preview/shared/gaugeBarGeometry'
+} from '@/features/widget-editor/utils/gaugeGeometry'
 
 describe('gaugeBarGeometry', () => {
-  test('uses whole-segment bucket thresholds', () => {
-    expect(getBarFillCount(0, 5)).toBe(0)
-    expect(getBarFillCount(0.1999, 5)).toBe(0)
-    expect(getBarFillCount(0.2, 5)).toBe(1)
-    expect(getBarFillCount(1, 5)).toBe(5)
-  })
-
   test('suggests a fixed bar count independent of track span', () => {
     const compact = getSuggestedLinearBarGeometry({ width: 100, height: 20, orientation: 'horizontal' })
     const wide = getSuggestedLinearBarGeometry({ width: 200, height: 20, orientation: 'horizontal' })
@@ -69,34 +59,5 @@ describe('gaugeBarGeometry', () => {
 
   test('clamps an explicit gap without overflowing the span', () => {
     expect(getBarGeometry({ span: 20, bar_count: 5, bar_gap: 10 })).toEqual({ count: 5, gap: 2.5, extent: 2 })
-  })
-
-  test('lays vertical bars out from bottom to top', () => {
-    const bars = getLinearBarRects({ width: 20, height: 100, orientation: 'vertical', bar_count: 4, bar_gap: 4 })
-    expect(bars.rects[0].y).toBeGreaterThan(bars.rects[3].y)
-  })
-
-  test('creates open sub-arcs for a full-circle segmented track', () => {
-    const bars = getArcBarSegments({
-      radius: 50,
-      startAngle: 90,
-      sweepAngle: 360,
-      trackThickness: 12,
-      borderThickness: 2,
-      cornerRadius: 6,
-      bar_count: 8,
-      bar_gap: 4,
-    })
-    expect(bars.segments).toHaveLength(8)
-    expect(bars.segments.every((segment) => Math.abs(segment.sweepAngle) < 360)).toBe(true)
-  })
-
-  test('keeps segmented arc footprints independent of corner radius', () => {
-    const shared = { radius: 50, startAngle: 180, sweepAngle: 180, trackThickness: 12, borderThickness: 2, bar_count: 8, bar_gap: 4 }
-    const square = getArcBarSegments({ ...shared, cornerRadius: 0 })
-    const rounded = getArcBarSegments({ ...shared, cornerRadius: 6 })
-
-    expect(rounded.segments).toEqual(square.segments)
-    expect(rounded.segments[0].sweepAngle).toBeGreaterThan(0.001)
   })
 })

@@ -12,7 +12,9 @@ export function isWasmWidget(widget) {
     (widget.type === 'lap_timer' && widget.data.display_type === 'lap_timer') ||
     (widget.type === 'heading' && widget.data.display_type === 'heading_tape') ||
     (widget.type === 'time' && widget.data.display_type === 'text') ||
-    (isStandardMetricWidgetType(widget.type) && widget.data.display_type === 'text' && getSupportedDisplayTypes(widget.type).includes('text'))
+    (isStandardMetricWidgetType(widget.type) &&
+      ['text', 'linear', 'arc', 'corner'].includes(widget.data.display_type) &&
+      getSupportedDisplayTypes(widget.type).includes(widget.data.display_type))
   )
 }
 

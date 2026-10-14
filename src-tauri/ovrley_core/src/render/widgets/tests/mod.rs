@@ -9,8 +9,6 @@
 //! and segmented wedge geometry. Elevation and route modules cover frame
 //! state, projection, reduction, and RDP behavior.
 
-mod arc_gauge_path_tests;
-mod arc_gauge_segment_tests;
 mod elevation_frame_state_tests;
 mod elevation_geometry_tests;
 mod elevation_reduction_tests;

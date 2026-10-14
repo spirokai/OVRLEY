@@ -86,6 +86,7 @@ activity_columns! {
 struct NumericColumn {
     values: Vec<Option<f64>>,
     points: Vec<(f64, f64)>,
+    range: Option<(f64, f64)>,
     policy: StandardMetricInterpolationKind,
 }
 impl NumericColumn {
@@ -100,9 +101,16 @@ impl NumericColumn {
             ));
         }
         let points = collect_valid_numeric_points(times, &values);
+        let range = points.iter().filter(|point| point.1.is_finite()).fold(None, |range, point| {
+            Some(match range {
+                None => (point.1, point.1),
+                Some((min, max)) => (f64::min(min, point.1), f64::max(max, point.1)),
+            })
+        });
         Ok(Self {
             values,
             points,
+            range,
             policy,
         })
     }
@@ -245,6 +253,32 @@ impl ActivitySampler {
             full_activity_total_ascent,
             lap_timing: activity.lap_timing,
         })
+    }
+
+    pub fn gauge_range(&self, metric: MetricKind) -> (f64, f64) {
+        crate::widgets::gauges::metric::metric_range(self.numeric[&metric].range)
+    }
+
+    pub fn gauge_altitude_offset(&self, target: Option<f64>) -> f64 {
+        target.zip(self.numeric[&MetricKind::Altitude].points.first())
+            .map_or(0.0, |(target, first)| target - first.1)
+    }
+
+    /// Gauges retain native bridge/hold/preserve policies and observed coverage.
+    pub fn gauge_sample(&self, metric: MetricKind, second: f64) -> MetricSample<'_> {
+        if second < 0.0 || second > self.end { return MetricSample::default(); }
+        let column = &self.numeric[&metric];
+        MetricSample {
+            numeric: if metric == MetricKind::Heading {
+                self.heading_at(second)
+            } else if column.points.is_empty() || column.contains(second) {
+                column.at(&self.times, second)
+            } else { None },
+            available: !column.values.is_empty(),
+            full_activity_distance: self.full_activity_distance,
+            full_activity_total_ascent: self.full_activity_total_ascent,
+            ..MetricSample::default()
+        }
     }
 
     pub fn lap_history(&self) -> crate::widgets::lap_timer::format::LapHistory<'_> {

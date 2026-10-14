@@ -67,8 +67,7 @@ fn apply_altitude_value_offset(value: &mut PreparedValue, altitude_series: &[Opt
 
 pub(crate) use elevation::draw_elevation_widget;
 pub use g_force::{draw_g_force_widget, prepare_g_force_cache};
-pub use gauges::arc::{draw_arc_gauge_widget, prepare_arc_gauge_cache};
-pub use gauges::linear::{draw_linear_gauge_widget, prepare_linear_gauge_cache};
+pub use gauges::{draw_gauge_widget, prepare_arc_gauge_cache, prepare_linear_gauge_cache};
 pub use lap_timer::{lap_log_text_state, lap_timer_value_text};
 pub use lean_angle::draw_lean_angle_widget;
 pub use metric_presentation::draw_metric_presentation;
@@ -149,24 +148,22 @@ pub fn prepare_render_assets(
                 widget.cache = Some(cache);
             }
             PreparedValue::LinearGauge(widget) => {
-                let cache = gauges::linear::prepare_linear_gauge_cache(
+                let cache = gauges::prepare_linear_gauge_cache(
                     &widget.validated,
                     widget.altitude_offset_m,
                     dense_activity,
                     &assets.scene,
-                    assets.scene.presentation.scale,
                     &paths.font_dirs,
                     prepare_profiler,
                 )?;
                 widget.cache = Some(cache);
             }
             PreparedValue::ArcGauge(widget) => {
-                let cache = gauges::arc::prepare_arc_gauge_cache(
+                let cache = gauges::prepare_arc_gauge_cache(
                     &widget.validated,
                     widget.altitude_offset_m,
                     dense_activity,
                     &assets.scene,
-                    assets.scene.presentation.scale,
                     &paths.font_dirs,
                     prepare_profiler,
                 )?;

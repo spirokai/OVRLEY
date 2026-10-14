@@ -4,7 +4,7 @@
 //! Label formatting is intentionally omitted because it is a thin formatting
 //! expression with no meaningful branching contract.
 
-use super::super::gauges::metric::{bar_fill_count, fill_percentage, metric_range};
+use ovrley_widgets::widgets::gauges::metric::{bar_fill_count, fill_percentage, metric_range};
 
 #[test]
 fn gauge_bounds_preserve_source_extrema_outside_export_window() {
@@ -40,10 +40,10 @@ fn gauge_bounds_preserve_source_extrema_outside_export_window() {
             .iter()
             .flatten()
             .all(|value| *value > 0.0 && *value < 40.0));
-        let (min, max) = metric_range(&dense, MetricKind::Speed);
+        let (min, max) = metric_range(dense.full_activity_metric_ranges.get(&MetricKind::Speed).copied());
         assert_eq!((min, max), (0.0, 40.0));
         assert_eq!(fill_percentage(20.0, min, max), 0.5);
-        assert_eq!(metric_range(&dense, MetricKind::Altitude), (500.0, 540.0));
+        assert_eq!(metric_range(dense.full_activity_metric_ranges.get(&MetricKind::Altitude).copied()), (500.0, 540.0));
     }
 }
 

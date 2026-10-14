@@ -5,7 +5,7 @@ use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::raw::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::widgets::gauges::arc::{
+use ovrley_widgets::widgets::gauges::arc::{
     arc_gauge_geometry, arc_point, arc_radius, arc_start_end_angles,
 };
 use ovrley_core::render::widgets::types::PreparedValue;
@@ -115,12 +115,13 @@ fn prepare_assets_builds_arc_cache_with_static_unit_and_frame_values() {
         .expect("arc gauge cache must be prepared");
     assert_eq!(cache.frame_states[1].fill01, 0.5);
     assert_eq!(cache.frame_states[1].value_text, "108");
+    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(layout) = &cache.layout else { panic!("arc layout"); };
     assert!(
-        cache.has_unit,
+        layout.has_unit,
         "the unit belongs to the cached static layer"
     );
-    assert_eq!(cache.track_thickness, 12.0);
-    assert!(cache.track_fill_flat);
+    assert_eq!(layout.track_thickness, 12.0);
+    assert!(layout.track_fill_flat);
 }
 
 #[test]
@@ -143,8 +144,9 @@ fn bars_style_resolves_configured_arc_geometry_into_the_cache() {
         .cache
         .as_ref()
         .expect("arc bars cache must be prepared");
-    assert_eq!(cache.track_fill_style, TrackFillStyle::Bars);
-    assert_eq!(cache.bar_geometry.unwrap().count, 8);
+    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(layout) = &cache.layout else { panic!("gauge layout"); };
+    assert_eq!(layout.track_fill_style, TrackFillStyle::Bars);
+    assert_eq!(layout.bar_geometry.unwrap().count, 8);
 }
 
 #[test]

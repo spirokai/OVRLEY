@@ -1,5 +1,4 @@
 import { previewActivity, previewFont, rasterPreviewPng } from '@/api/backend'
-import { WIDGET_FONT_WEIGHT } from '@/lib/widget/standard-widgets'
 import { isTimeDependentWasmWidget } from '@/lib/widget/wasm-widget'
 import { createWidgetInteraction, registerWidgetInteraction, unregisterWidgetInteraction } from './widgetInteraction'
 import { presentWidgetGeometry } from './widgetPresentation'
@@ -11,12 +10,16 @@ let modulePromise
 
 function widgetFonts(widget) {
   if (widget.type === 'backdrop' || widget.type === 'raster') return []
+  if (['linear', 'arc', 'corner'].includes(widget.data.display_type)) {
+    const fonts = widget.data.display_type === 'linear' ? [] : [{ font: widget.data.font }]
+    if (widget.data.show_min_max_labels) fonts.push({ font: widget.data.min_max_label_font })
+    return fonts
+  }
   const valueFont = {
     font: widget.type === 'g_force' || widget.data.display_type === 'heading_tape' ? widget.data.label_font : widget.data.font,
-    font_weight: widget.type === 'label' ? widget.data.font_weight : WIDGET_FONT_WEIGHT,
-    italic: widget.type === 'label' ? widget.data.italic : false,
+    ...(widget.type === 'label' ? { font_weight: widget.data.font_weight, italic: widget.data.italic } : {}),
   }
-  return widget.type === 'lap_timer' ? [valueFont, { font: widget.data.label_font, font_weight: WIDGET_FONT_WEIGHT, italic: false }] : [valueFont]
+  return widget.type === 'lap_timer' ? [valueFont, { font: widget.data.label_font }] : [valueFont]
 }
 
 /** @returns {Promise<object>} One compiled module shared by independently disposable editor sessions. */
@@ -87,7 +90,7 @@ export function createPreviewSession(module, onError) {
     if (fonts.has(id)) return
     const resource = { ready: false, error: null }
     fonts.set(id, resource)
-    previewFont(request.font, request.font_weight, request.italic)
+    previewFont(request)
       .then((bytes) => {
         if (disposed) return
         upload(encoder.encode(id), (idPtr, idLen) =>
@@ -123,7 +126,7 @@ export function createPreviewSession(module, onError) {
     frame = null
     if (!snapshot) return
     try {
-      const defaultFont = fonts.get(JSON.stringify({ font: snapshot.defaultFont, font_weight: WIDGET_FONT_WEIGHT, italic: false }))
+      const defaultFont = fonts.get(JSON.stringify({ font: snapshot.defaultFont }))
       if (defaultFont.error) throw defaultFont.error
       const active = new Set(snapshot.widgets.map((widget) => widget.id))
       for (const [id, widget] of widgets) {
@@ -214,7 +217,7 @@ export function createPreviewSession(module, onError) {
         !next.widgets.some(isTimeDependentWasmWidget)
       )
         return
-      loadFont({ font: next.defaultFont, font_weight: WIDGET_FONT_WEIGHT, italic: false })
+      loadFont({ font: next.defaultFont })
       for (const widget of next.widgets) {
         for (const font of widgetFonts(widget)) loadFont(font)
         if (widget.type === 'raster' && widget.data.resourceId !== undefined) loadImage(widget.data.resourceId)

@@ -14,8 +14,7 @@ import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { FontSection, UnitsControlRow } from '../widgetEditorSections'
 import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from '../widgetFormControls'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
-import { getArcGaugeLayout, getCornerGaugeLayout } from '@/features/widget-preview/widgets/arc-gauge/geometry'
-import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry } from '@/features/widget-preview/shared/gaugeBarGeometry'
+import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry, getArcTrackDimensions } from '../../utils/gaugeGeometry'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
 import { TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { useTranslation } from 'react-i18next'
@@ -28,19 +27,19 @@ const CORNER_ORIENTATION_OPTIONS = [
   { value: 'bottom-right', labelKey: 'widget-editor.bottomRight', defaultLabel: 'Bottom Right' },
 ]
 
-function suggestArcBarGeometry(data) {
-  const isCorner = data.corner_orientation != null
-  const layout = isCorner ? getCornerGaugeLayout(data, null, []) : getArcGaugeLayout(data, null, [])
+function suggestArcBarGeometry(data, displayType) {
+  const isCorner = displayType === 'corner'
+  const layout = getArcTrackDimensions(data, displayType)
   return getSuggestedArcBarGeometry({ ...layout, corner: isCorner, borderThickness: data.track_border_thickness })
 }
 
-function getArcGapMax(data) {
-  const layout = data.corner_orientation == null ? getArcGaugeLayout(data, null, []) : getCornerGaugeLayout(data, null, [])
+function getArcGapMax(data, displayType) {
+  const layout = getArcTrackDimensions(data, displayType)
   return getArcBarGapMax({ ...layout, bar_count: data.bar_count })
 }
 
-function getArcCornerRadiusMax(data) {
-  const layout = data.corner_orientation == null ? getArcGaugeLayout(data, null, []) : getCornerGaugeLayout(data, null, [])
+function getArcCornerRadiusMax(data, displayType) {
+  const layout = getArcTrackDimensions(data, displayType)
   return getArcTrackCornerRadiusMax({ ...data, ...layout })
 }
 
@@ -62,9 +61,9 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
   const unitOptions = getStandardMetricUnitOptions(widget.type)
   const unitsMode = getStandardMetricUnitsMode(widget.type)
   const supportsUnitSelection = unitOptions.length > 1
-  const cornerRadiusMax = getArcCornerRadiusMax(arcData)
+  const cornerRadiusMax = getArcCornerRadiusMax(arcData, displayType)
   const size = widget.data.width ?? arcData.width
-  const barGapMax = arcData.track_fill_style === 'bars' ? getArcGapMax(arcData) : 0
+  const barGapMax = arcData.track_fill_style === 'bars' ? getArcGapMax(arcData, displayType) : 0
   const hasDecimalControl = definition?.maxDecimals !== undefined || definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
   const maxDecimals = definition?.maxDecimals ?? 1
   const defaultDecimals = TYPE_DEFAULTS[widget.type]?.decimals ?? 1
@@ -136,14 +135,14 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             onSliderChange={(track_thickness) =>
               updateArcSize({
                 track_thickness,
-                track_corner_radius: Math.min(arcData.track_corner_radius, getArcCornerRadiusMax({ ...arcData, track_thickness })),
+                track_corner_radius: Math.min(arcData.track_corner_radius, getArcCornerRadiusMax({ ...arcData, track_thickness }, displayType)),
               })
             }
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <BarFillStyleField data={arcData} suggestBarGeometry={suggestArcBarGeometry} updateVariant={updateArc} />
+          <BarFillStyleField data={arcData} suggestBarGeometry={(data) => suggestArcBarGeometry(data, displayType)} updateVariant={updateArc} />
           <SliderField
             editable
             label={t('widget-editor.cornerRadius', 'Corner Radius')}

@@ -19,12 +19,11 @@
 use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::render::widgets::g_force::draw_g_force_widget;
-use crate::render::widgets::gauges::arc::draw_arc_gauge_widget;
-use crate::render::widgets::gauges::linear::draw_linear_gauge_widget;
+use crate::render::widgets::gauges::draw_gauge_widget;
 use crate::render::widgets::heading::draw_heading_widget;
 use crate::render::widgets::lean_angle::draw_lean_angle_widget;
 use crate::render::widgets::types::{
-    ArcGaugeCache, GForceWidgetCache, LinearGaugeCache,
+    GForceWidgetCache,
     PreparedValue, WidgetRenderReport,
 };
 use ovrley_widgets::widgets::heading::layout::HeadingCache;
@@ -57,10 +56,10 @@ pub fn draw_metric_presentation(
             frame_profiler,
         ),
         PreparedValue::LinearGauge(widget) => {
-            draw_linear_presentation(canvas, widget.cache.as_ref(), frame_index, frame_profiler)
+            draw_gauge_widget(canvas, widget.cache.as_ref().expect("prepared linear gauge"), frame_index, font_dirs, frame_profiler)
         }
         PreparedValue::ArcGauge(widget) => {
-            draw_arc_presentation(canvas, widget.cache.as_ref(), frame_index, frame_profiler)
+            draw_gauge_widget(canvas, widget.cache.as_ref().expect("prepared arc gauge"), frame_index, font_dirs, frame_profiler)
         }
         PreparedValue::LeanAngle(widget) => draw_lean_angle_presentation(
             canvas,
@@ -120,30 +119,6 @@ fn draw_lean_angle_presentation(
         font_dirs,
         frame_profiler,
     )
-}
-
-/// Draws the linear gauge presentation for a single frame. Delegates
-/// per-frame fill-composite rendering to the shared linear gauge module.
-fn draw_linear_presentation(
-    canvas: &Canvas,
-    cache: Option<&LinearGaugeCache>,
-    frame_index: usize,
-    frame_profiler: &mut RenderProfiler,
-) -> Option<WidgetRenderReport> {
-    let gauge_cache = cache?;
-    draw_linear_gauge_widget(canvas, gauge_cache, frame_index, frame_profiler)
-}
-
-/// Draws the arc gauge presentation for a single frame. The cache owns the
-/// static track/unit layer and all dynamic value/fill state.
-fn draw_arc_presentation(
-    canvas: &Canvas,
-    cache: Option<&ArcGaugeCache>,
-    frame_index: usize,
-    frame_profiler: &mut RenderProfiler,
-) -> Option<WidgetRenderReport> {
-    let gauge_cache = cache?;
-    draw_arc_gauge_widget(canvas, gauge_cache, frame_index, frame_profiler)
 }
 
 /// Draws the heading tape presentation for a heading metric value.

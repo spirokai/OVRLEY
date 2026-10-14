@@ -16,6 +16,327 @@ use ovrley_widgets::{
 use serde_json::{json, Value};
 use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
 
+fn gauge_preview(
+    display: &str,
+    metric: &str,
+    placement: &str,
+    fill: &str,
+) -> (PreviewSession, Value) {
+    let (mut preview, mut request) = lean_angle_preview();
+    let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
+    // Both native transport and WASM ingress resolve omitted metric styling in Rust.
+    let font: ovrley_widgets::preview::FontRequest =
+        serde_json::from_value(json!({"font": "Teko.ttf"})).unwrap();
+    let bytes =
+        preview_font_resource(&font_dirs, &font.font, font.font_weight, font.italic).unwrap();
+    preview.fonts.register(font, &bytes).unwrap();
+    request["type"] = json!(metric);
+    request["widget"] = json!({
+        "value": metric, "display_type": display, "x": 250.25, "y": 120.5,
+        "width": 190.125, "height": if display == "linear" { 47.375 } else { 190.125 }, "rotation": 0,
+        "orientation": placement, "corner_orientation": placement, "arc_angle": 220,
+        "inner_widget_offset_x": 11.25, "inner_widget_offset_y": -17.5,
+        "track_thickness": 18, "track_corner_radius": 6, "track_border_thickness": 2,
+        "track_border_color": "#ffffff", "track_empty_color": "#222222", "track_empty_opacity": 0.5,
+        "track_filled_color": "#40e0d0", "track_filled_opacity": 0.7, "track_fill_flat": false,
+        "track_fill_style": fill, "bar_count": 8, "bar_gap": 3,
+        "show_min_max_labels": true, "min_max_label_font": "Teko.ttf", "min_max_label_font_size": 16,
+        "min_max_label_position": if placement == "vertical" { "left" } else { "bottom" }, "min_max_label_color": "#cdefab",
+        "font": "Inter.ttf", "font_size": 60, "color": "#abcdef", "opacity": 0.8,
+        "show_units": true, "unit_color": "#aaaaaa", "display_unit": match metric { "speed" => "kmh", "altitude" => "ft", _ => "w" },
+        "prefix": "", "suffix": "", "decimals": 0,
+    });
+    if metric == "altitude" {
+        request["widget"]["starting_altitude"] = json!(4000);
+    }
+    (preview, request)
+}
+
+#[test]
+fn gauges_match_native_pixels_sampling_cache_revisions_and_activity_replacement() {
+    use ovrley_core::{
+        activity::{interpolate::densify_activity, trim::trim_activity},
+        debug::RenderProfiler,
+        paths::AppPaths,
+        render::widgets::{metric_presentation::draw_metric_presentation, prepare_render_assets},
+    };
+    let activity = ovrley_core::activity::parse_activity_json(
+        r#"{
+        "sample_elapsed_seconds": [0,0.5,1.5,2.5,4], "trim_end_seconds": 4,
+        "speed": [null,10,null,40,null], "power": [null,400,null,100,null],
+        "elevation": [10,20,30,40,50], "barometric_altitude": [800,820,840,860,880]
+    }"#,
+    )
+    .unwrap();
+    let bytes = serde_json::to_vec(&activity).unwrap();
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
+    let seconds = vec![0.0, 0.5, 0.501, 0.75, 1.5, 2.25, 2.5, 3.75];
+    for (display, metric, placement, fill) in [
+        ("linear", "speed", "horizontal", "fill"),
+        ("linear", "power", "vertical", "bars"),
+        ("arc", "speed", "bottom-left", "fill"),
+        ("arc", "power", "bottom-left", "bars"),
+        ("corner", "altitude", "bottom-left", "fill"),
+        ("corner", "altitude", "bottom-right", "bars"),
+    ] {
+        let (mut preview, request) = gauge_preview(display, metric, placement, fill);
+        preview.replace_activity(&bytes).unwrap();
+        let config = common::seam::validated_config_from_value(
+            json!({"scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": []}),
+        );
+        let requirements = config.render_data_requirements().unwrap();
+        let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
+        let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
+        let assets = prepare_render_assets(
+            &paths,
+            &config,
+            &activity,
+            &dense,
+            &mut RenderProfiler::default(),
+        )
+        .unwrap();
+        let id = preview
+            .create_widget(serde_json::from_value(request.clone()).unwrap())
+            .unwrap();
+        for index in [0, 1, 2, 3, 4, 5, 6, 7, 4, 0] {
+            let previous = preview.widgets[&id].revision();
+            preview.render(seconds[index]).unwrap();
+            let widget = &preview.widgets[&id];
+            if index == 2 && metric == "speed" {
+                assert_ne!(
+                    widget.revision(),
+                    previous,
+                    "fill changes below the formatted integer"
+                );
+            }
+            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let info = ImageInfo::new(
+                (
+                    geometry["width"].as_i64().unwrap() as i32,
+                    geometry["height"].as_i64().unwrap() as i32,
+                ),
+                ColorType::RGBA8888,
+                AlphaType::Premul,
+                None,
+            );
+            let mut surface = surfaces::raster(&info, None, None).unwrap();
+            let canvas = surface.canvas();
+            canvas.clear(Color::TRANSPARENT);
+            canvas.translate((
+                -geometry["left"].as_f64().unwrap() as f32,
+                -geometry["top"].as_f64().unwrap() as f32,
+            ));
+            draw_metric_presentation(
+                canvas,
+                &assets.values()[0],
+                &dense,
+                index,
+                config.scene.presentation.scale,
+                &paths.font_dirs,
+                &mut RenderProfiler::default(),
+            )
+            .unwrap();
+            let mut pixels = vec![0; widget.pixels().len()];
+            assert!(surface.read_pixels(
+                &info.with_alpha_type(AlphaType::Unpremul),
+                &mut pixels,
+                info.width() as usize * 4,
+                (0, 0)
+            ));
+            assert!(
+                pixels == *widget.pixels(),
+                "{display}/{metric}/{placement}/{fill} pixels differ at {}",
+                seconds[index]
+            );
+            assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+            let revision = widget.revision();
+            preview.render(seconds[index]).unwrap();
+            assert_eq!(preview.widgets[&id].revision(), revision);
+        }
+        preview.render(2.25).unwrap();
+        let pixels = preview.widgets[&id].pixels().clone();
+        preview.replace_activity(&[]).unwrap();
+        preview.render(2.25).unwrap();
+        assert_ne!(preview.widgets[&id].pixels(), &pixels);
+        preview.replace_activity(&bytes).unwrap();
+        preview.render(2.25).unwrap();
+        assert_eq!(preview.widgets[&id].pixels(), &pixels);
+        if metric == "speed" {
+            preview.render(0.5).unwrap();
+            let pixels = preview.widgets[&id].pixels().clone();
+            let revision = preview.widgets[&id].revision();
+            let mut replacement = activity.clone();
+            replacement.speed[4] = Some(100.0);
+            preview
+                .replace_activity(&serde_json::to_vec(&replacement).unwrap())
+                .unwrap();
+            preview.render(0.5).unwrap();
+            assert_ne!(preview.widgets[&id].revision(), revision);
+            assert_ne!(
+                preview.widgets[&id].pixels(),
+                &pixels,
+                "new range redraws labels even at the same current value and zero fill"
+            );
+        }
+        for (field, invalid) in [
+            ("width", json!(0)),
+            ("track_border_color", json!("invalid")),
+            ("track_fill_style", json!("unknown")),
+            ("track_fill_style", Value::Null),
+            ("show_min_max_labels", json!("true")),
+        ] {
+            let mut malformed = request.clone();
+            malformed["widget"][field] = invalid;
+            let result = serde_json::from_value(malformed)
+                .map_err(|error| error.to_string())
+                .and_then(|request| {
+                    preview
+                        .create_widget(request)
+                        .map_err(|error| error.to_string())
+                });
+            assert!(result.is_err(), "malformed {field} must fail");
+        }
+    }
+}
+
+#[test]
+fn gauge_resize_preserves_opposite_corners_and_commits_fractional_geometry_during_playback() {
+    use ovrley_widgets::widgets::gauges::{
+        frame::GaugeLayout, metric::sample_gauge, validation::ValidatedGauge,
+    };
+    let bytes =
+        br#"{"sample_elapsed_seconds":[0,1,2,3],"speed":[10,40,null,20],"trim_end_seconds":3}"#;
+    let sampler = ovrley_widgets::activity::ActivitySampler::from_json(bytes).unwrap();
+    let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
+    for (display, placement, fill) in [
+        ("linear", "horizontal", "fill"),
+        ("linear", "vertical", "bars"),
+        ("arc", "bottom-left", "bars"),
+        ("corner", "bottom-left", "fill"),
+        ("corner", "bottom-right", "bars"),
+    ] {
+        let (mut preview, mut origin) = gauge_preview(display, "speed", placement, fill);
+        origin["widget"]["track_corner_radius"] = json!(9);
+        preview.replace_activity(bytes).unwrap();
+        for scale in [0.75, 1.7] {
+            origin["scene"]["scale"] = json!(scale);
+            let id = preview
+                .create_widget(serde_json::from_value(origin.clone()).unwrap())
+                .unwrap();
+            preview.render(0.75).unwrap();
+            let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let bounds = &geometry["content"];
+            for fixed in [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]] {
+                let point = [
+                    bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0],
+                    bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1],
+                ];
+                for (factor, second) in [(0.54375, 0.75), (1.234375, 2.25)] {
+                    let mut resize = origin.clone();
+                    if display == "linear" {
+                        resize["size"] = json!([
+                            bounds["width"].as_f64().unwrap() * factor,
+                            bounds["height"].as_f64().unwrap() * 0.875
+                        ]);
+                    } else {
+                        resize["factor"] = json!(factor);
+                    }
+                    resize["fixed"] = json!(fixed);
+                    resize["point"] = json!(point);
+                    resize["second"] = json!(second);
+                    let patch = serde_json::to_value(
+                        preview
+                            .resize_widget(serde_json::from_value(resize).unwrap())
+                            .unwrap(),
+                    )
+                    .unwrap();
+                    let variant = &patch["display_variants"][display];
+                    assert_ne!(variant["width"].as_f64().unwrap().fract(), 0.0);
+                    if display == "linear" {
+                        assert!(patch.get("font_size").is_none());
+                        assert!(variant.get("track_thickness").is_none());
+                    } else {
+                        assert!(
+                            (patch["font_size"].as_f64().unwrap() - 60.0 * factor).abs() < 0.001
+                        );
+                    }
+                    let mut live = origin.clone();
+                    for (key, value) in patch.as_object().unwrap() {
+                        if key != "display_variants" {
+                            live["widget"][key] = value.clone();
+                        }
+                    }
+                    for (key, value) in variant.as_object().unwrap() {
+                        live["widget"][key] = value.clone();
+                    }
+                    preview
+                        .update_widget(id, serde_json::from_value(live.clone()).unwrap())
+                        .unwrap();
+                    preview.render(second).unwrap();
+                    let geometry: Value =
+                        serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+                    let actual = &geometry["content"];
+                    for (axis, (position, extent)) in [("left", "width"), ("top", "height")]
+                        .into_iter()
+                        .enumerate()
+                    {
+                        let corner = actual[position].as_f64().unwrap()
+                            + actual[extent].as_f64().unwrap() * fixed[axis];
+                        assert!(
+                            (corner - point[axis]).abs() < 0.002,
+                            "{display} fixed corner moved at {second}"
+                        );
+                    }
+                    // Persisted variants are promoted at native ingress, with no rounding on release.
+                    let mut committed = live["widget"].clone();
+                    for key in variant.as_object().unwrap().keys() {
+                        committed.as_object_mut().unwrap().remove(key);
+                    }
+                    committed["display_variants"] = patch["display_variants"].clone();
+                    let config = common::seam::validated_config_from_value(
+                        json!({"scene": origin["scene"], "values": [committed], "labels": [], "plots": []}),
+                    );
+                    let widget = match &config.values[0] {
+                        ovrley_core::render::widgets::types::PreparedValue::LinearGauge(widget) => {
+                            ValidatedGauge::Linear(widget.validated.clone())
+                        }
+                        ovrley_core::render::widgets::types::PreparedValue::ArcGauge(widget) => {
+                            ValidatedGauge::Arc(widget.validated.clone())
+                        }
+                        _ => panic!("gauge dispatch"),
+                    };
+                    let layout = GaugeLayout::new(
+                        &widget,
+                        &config.scene.presentation,
+                        sampler.gauge_range(widget.metric()),
+                        0.0,
+                        &NativeFonts(&font_dirs),
+                    )
+                    .unwrap();
+                    let frame = layout
+                        .prepare_frame(
+                            sample_gauge(&widget, Some(&sampler), second),
+                            &NativeFonts(&font_dirs),
+                        )
+                        .unwrap();
+                    let expected: Value = serde_json::from_slice(
+                        &serde_json::to_vec(
+                            &ovrley_widgets::widgets::value::preview::ContentBounds::from(
+                                frame.content_bounds,
+                            ),
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap();
+                    assert_eq!(actual, &expected, "live and committed gauge bounds");
+                }
+            }
+            preview.widgets.remove(&id);
+        }
+    }
+}
+
 fn heading_preview() -> (PreviewSession, Value) {
     let (preview, mut request) = lean_angle_preview();
     request["type"] = json!("heading");

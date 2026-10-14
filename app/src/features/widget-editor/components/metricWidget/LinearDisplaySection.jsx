@@ -6,7 +6,7 @@ import { SlidersHorizontal, Tags } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import { useAvailableFonts } from '@/hooks/useFonts'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
-import { getLinearBarGapMax, getLinearTrackCornerRadiusMax, getSuggestedLinearBarGeometry } from '@/features/widget-preview/shared/gaugeBarGeometry'
+import { getLinearBarGapMax, getLinearTrackCornerRadiusMax, getSuggestedLinearBarGeometry } from '../../utils/gaugeGeometry'
 import { useTranslation } from 'react-i18next'
 import { translateOptions } from '@/i18n'
 

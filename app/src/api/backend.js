@@ -188,9 +188,9 @@ export function releasePreviewActivity(activityId) {
   return invokeCommand('backend_release_preview_activity', { activityId })
 }
 
-/** @param {string} fontId Canonical font identity. @param {number} fontWeight Requested weight. @param {boolean} italic Requested style. @returns {Promise<ArrayBuffer>} Serialized Skia face. */
-export function previewFont(fontId, fontWeight, italic) {
-  return invokeCommand('backend_preview_font', { fontId, fontWeight, italic })
+/** @param {object} request Canonical font identity and optional explicit label styling; Rust owns metric defaults. @returns {Promise<ArrayBuffer>} Serialized Skia face. */
+export function previewFont(request) {
+  return invokeCommand('backend_preview_font', { request })
 }
 
 /**

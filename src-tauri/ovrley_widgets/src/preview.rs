@@ -14,8 +14,10 @@ pub struct PreviewFonts(BTreeMap<(String, u32, bool), Typeface>);
 #[derive(serde::Deserialize)]
 pub struct FontRequest {
     pub font: String,
-    #[serde(deserialize_with = "crate::widgets::label::config::deserialize_font_weight")]
+    /// Metric resources omit styling; the shared renderer owns their manifest weight.
+    #[serde(default = "crate::model::standard_widgets::widget_font_weight", deserialize_with = "crate::widgets::label::config::deserialize_font_weight")]
     pub font_weight: f32,
+    #[serde(default)]
     pub italic: bool,
 }
 
@@ -90,9 +92,12 @@ impl PreviewSession {
                 origin.widget, origin.scene, size, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
             )?));
         }
+        if let WidgetRequest::Gauge(origin) = request.origin {
+            return Ok(ResizeUpdate::Gauge(crate::widgets::gauges::interaction::resize_gauge(origin.widget, origin.scene, request.factor, request.size, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts)?));
+        }
         let factor = crate::model::validation::require_positive_f32(request.factor, "resize factor")?;
         match request.origin {
-            WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } | WidgetRequest::HeadingTape(_) => unreachable!(),
+            WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } | WidgetRequest::HeadingTape(_) | WidgetRequest::Gauge(_) => unreachable!(),
             WidgetRequest::Label {widget, scene} => Ok(ResizeUpdate::Label(crate::widgets::label::interaction::resize_label(widget, scene, factor, request.fixed, request.point, &self.fonts)?)),
             WidgetRequest::Gradient(origin) => Ok(ResizeUpdate::Gradient(crate::widgets::gradient::interaction::resize_gradient(
                 origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
@@ -119,6 +124,7 @@ impl PreviewSession {
         };
         for widget in self.widgets.values_mut() {
             if let PreviewWidget::LapTimer(widget) = widget { widget.invalidate_activity(); }
+            if let PreviewWidget::Gauge(widget) = widget { widget.invalidate_activity(); }
         }
         Ok(())
     }
@@ -153,6 +159,7 @@ impl PreviewSession {
                 PreviewWidget::LeanAngle(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::GForce(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::LapTimer(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
+                PreviewWidget::Gauge(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::HeadingTape(widget) => widget.render(self.activity.as_ref(), second)?,
                 _ => {},
             }

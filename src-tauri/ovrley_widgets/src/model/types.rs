@@ -203,7 +203,7 @@ impl<'de> Deserialize<'de> for DisplayType {
 }
 
 /// Geometry/paint mode used by gauge tracks.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TrackFillStyle {
     #[serde(rename = "fill")]
     #[default]
@@ -217,19 +217,6 @@ impl TrackFillStyle {
         match self {
             Self::Fill => "fill",
             Self::Bars => "bars",
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for TrackFillStyle {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let raw = serde_json::Value::deserialize(deserializer)?;
-        match raw.as_str() {
-            Some("bars") => Ok(Self::Bars),
-            _ => Ok(Self::Fill),
         }
     }
 }

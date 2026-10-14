@@ -4,10 +4,7 @@
 //! owns zero render-affecting defaults — missing fields are rejected. The
 //! frontend must materialise all defaults before sending the config.
 
-mod arc_gauge;
-mod bar_geometry;
 mod elevation;
-mod linear_gauge;
 mod raster;
 pub mod raw;
 mod route;
@@ -27,17 +24,8 @@ pub use raw::{
     TEMPLATE_FILE_VERSION,
 };
 
-pub use arc_gauge::{
-    validate_arc_gauge, validate_corner_gauge, ValidatedArcGaugeWidget,
-    ValidatedCornerGaugeOrientation, CORNER_GAUGE_ANGLE_DEGREES, MAX_ARC_ANGLE_DEGREES,
-    MIN_ARC_ANGLE_DEGREES,
-};
+use ovrley_widgets::widgets::gauges::validation::{validate_arc_gauge, validate_corner_gauge};
 use ovrley_widgets::widgets::backdrop::validation::{validate_backdrop, ValidatedBackdrop};
-pub use bar_geometry::ResolvedBarGeometry;
-pub(crate) use bar_geometry::{
-    arc_track_radius, corner_track_cap_padding, corner_track_radius, resolve_bar_style_geometry,
-    scale_bar_geometry, track_corner_radius_max,
-};
 pub use elevation::{validate_elevation_plot, validate_elevation_plots, ValidatedElevationPlot};
 use ovrley_widgets::widgets::g_force::validation::{validate_g_force, GForceAxis};
 use ovrley_widgets::widgets::gradient::validation::validate_gradient_widget;
@@ -45,14 +33,11 @@ use ovrley_widgets::widgets::heading::validation::validate_heading;
 use ovrley_widgets::widgets::label::validation::{validate_label, ValidatedLabel};
 use ovrley_widgets::widgets::lap_timer::validation::{validate_lap_timer, LapTimerMode};
 use ovrley_widgets::widgets::lean_angle::validation::validate_lean_angle;
-pub use linear_gauge::{
-    validate_linear_gauge, ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation,
-    ValidatedLinearGaugeWidget,
-};
+use ovrley_widgets::widgets::gauges::validation::validate_linear_gauge;
 use ovrley_widgets::model::scene::{
     validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
 };
-use ovrley_widgets::widgets::value::validation::{validate_value_widget, ValidatedValueWidget};
+use ovrley_widgets::widgets::value::validation::validate_value_widget;
 pub use raster::validate_template_rasters;
 pub use raster::{RasterSource, ValidatedRaster};
 pub use route::{validate_route_plot, validate_route_plots, ValidatedRoutePlot};
@@ -242,7 +227,7 @@ fn validate_render_contents(
                         altitude_offset_m: 0.0,
                         cache: None,
                     })
-                });
+                }).map_err(Into::into);
             }
             if value.display_type == DisplayType::Arc {
                 let value = raw::promote_value_variant(&value, "arc")?;
@@ -252,7 +237,7 @@ fn validate_render_contents(
                         altitude_offset_m: 0.0,
                         cache: None,
                     })
-                });
+                }).map_err(Into::into);
             }
             if value.display_type == DisplayType::Corner {
                 let value = raw::promote_value_variant(&value, "corner")?;
@@ -262,7 +247,7 @@ fn validate_render_contents(
                         altitude_offset_m: 0.0,
                         cache: None,
                     })
-                });
+                }).map_err(Into::into);
             }
             validate_value_widget(value, idx)
                 .map_err(crate::CoreError::from)

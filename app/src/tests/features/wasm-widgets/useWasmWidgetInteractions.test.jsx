@@ -3,8 +3,19 @@ import { expect, test, vi } from 'vitest'
 import { useWasmWidgetInteractions } from '@/features/wasm-widgets/hooks/useWasmWidgetInteractions'
 import { registerWidgetInteraction, unregisterWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 
-test.each(['speed', 'gradient', 'lean_angle', 'backdrop', 'raster', 'lap_timer', 'heading'])('%s resize commits once; Escape cancels', (type) => {
-  const widget = { id: type, type, data: { x: 100, y: 50, rotation: 0, display_type: type === 'heading' ? 'heading_tape' : type } }
+test.each([
+  ['speed', 'text'],
+  ['gradient', 'text'],
+  ['lean_angle', 'lean_angle'],
+  ['backdrop', 'rectangle'],
+  ['raster', 'raster'],
+  ['lap_timer', 'lap_timer'],
+  ['heading', 'heading_tape'],
+  ['power', 'linear'],
+  ['speed', 'arc'],
+  ['altitude', 'corner'],
+])('%s/%s resize commits once; Escape cancels', (type, displayType) => {
+  const widget = { id: type, type, data: { x: 100, y: 50, rotation: 0, display_type: displayType } }
   const target = document.createElement('div')
   const patch = { x: 70.25, y: 35.5, font_size: 72 }
   const controller = {
@@ -41,7 +52,7 @@ test.each(['speed', 'gradient', 'lean_angle', 'backdrop', 'raster', 'lap_timer',
   expect(controller.update).toHaveBeenCalledWith({
     type: 'resize',
     geometry: {
-      ...(type === 'backdrop' || type === 'raster' || type === 'heading' ? { size: [240, 75.5] } : { factor: 1.5 }),
+      ...(type === 'backdrop' || type === 'raster' || ['heading_tape', 'linear'].includes(displayType) ? { size: [240, 75.5] } : { factor: 1.5 }),
       fixed: [1, 1],
       point: [240, 95],
     },

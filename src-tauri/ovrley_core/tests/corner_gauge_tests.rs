@@ -3,9 +3,10 @@ mod common;
 use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::raw::RenderConfig;
-use ovrley_core::normalize::{validate_render_config, ValidatedCornerGaugeOrientation};
+use ovrley_core::normalize::validate_render_config;
+use ovrley_widgets::widgets::gauges::validation::ValidatedCornerGaugeOrientation;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::widgets::gauges::arc::{
+use ovrley_widgets::widgets::gauges::arc::{
     arc_point, corner_gauge_geometry, corner_start_end_angles,
 };
 use ovrley_core::render::widgets::types::PreparedValue;
@@ -127,8 +128,9 @@ fn corner_gauge_prepares_a_shared_arc_cache_and_renders_a_frame() {
         .cache
         .as_ref()
         .expect("corner gauge cache must be prepared");
-    assert_eq!(cache.start_angle, 180.0);
-    assert_eq!(cache.sweep_angle, 90.0);
+    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(layout) = &cache.layout else { panic!("corner layout"); };
+    assert_eq!(layout.geometry.start_angle, 180.0);
+    assert_eq!(layout.geometry.sweep_angle, 90.0);
     assert_eq!(cache.frame_states[1].fill01, 0.5);
 
     let out_path = std::env::temp_dir().join("corner_gauge_preview_report.png");

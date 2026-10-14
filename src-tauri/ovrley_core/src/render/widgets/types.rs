@@ -12,18 +12,14 @@ use ovrley_widgets::widgets::lean_angle::{layout::LeanAngleCache, validation::Va
 use ovrley_widgets::widgets::g_force::{layout::GForceCache, validation::ValidatedGForceWidget};
 use ovrley_widgets::widgets::lap_timer::{layout::LapTimerLayout, validation::ValidatedLapTimer};
 use ovrley_widgets::widgets::heading::{layout::HeadingCache, validation::ValidatedHeading};
-use crate::normalize::{
-    ResolvedBarGeometry, ValidatedArcGaugeWidget,
-    ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
-    ValidatedSceneConfig,
-};
+use crate::normalize::ValidatedSceneConfig;
+use ovrley_widgets::widgets::gauges::{frame::GaugeLayout, metric::GaugeFrameState, validation::{ValidatedArcGaugeWidget, ValidatedLinearGaugeWidget}};
 use chrono_tz::Tz;
 use ovrley_widgets::widgets::time::validation::ValidatedTimeValue;
-use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
+use ovrley_widgets::model::types::{DisplayType, MetricKind};
 use ovrley_widgets::widgets::value::validation::ValidatedValueWidget;
 use skia_safe::Image;
 use std::fmt;
-use std::path::PathBuf;
 
 /// Geometry diagnostics emitted for preview reports.
 #[derive(Clone, Debug, serde::Serialize)]
@@ -83,7 +79,7 @@ pub struct PreparedLeanAngle {
 pub struct PreparedLinearGauge {
     pub validated: ValidatedLinearGaugeWidget,
     pub altitude_offset_m: f64,
-    pub cache: Option<LinearGaugeCache>,
+    pub cache: Option<GaugeCache>,
 }
 
 /// Validated arc/corner-gauge configuration together with its typed cache.
@@ -91,7 +87,7 @@ pub struct PreparedLinearGauge {
 pub struct PreparedArcGauge {
     pub validated: ValidatedArcGaugeWidget,
     pub altitude_offset_m: f64,
-    pub cache: Option<ArcGaugeCache>,
+    pub cache: Option<GaugeCache>,
 }
 
 /// Validated text metric together with activity-derived presentation state.
@@ -305,79 +301,11 @@ pub struct GForceWidgetCache {
     pub vertical_values: Vec<Option<f64>>,
 }
 
-/// Prepared linear gauge widget cache — holds the pre-rendered static track image
-/// and per-frame fill states for efficient frame-by-frame compositing.
+/// Shared layout paired with native export frame samples.
 #[derive(Clone, Debug)]
-pub struct LinearGaugeCache {
-    pub static_image: Image,
-    pub static_image_x: f32,
-    pub static_image_y: f32,
-    pub x: f32,
-    pub y: f32,
-    pub width: u32,
-    pub height: u32,
-    pub rotation: f32,
-    pub orientation: ValidatedLinearGaugeOrientation,
-    pub track_corner_radius: f32,
-    pub track_border_thickness: f32,
-    pub track_filled_color: String,
-    pub track_filled_opacity: f32,
-    pub track_fill_flat: bool,
-    pub track_fill_style: TrackFillStyle,
-    pub bar_geometry: Option<ResolvedBarGeometry>,
-    pub frame_states: Vec<LinearGaugeFrameState>,
-}
-
-/// Precomputed linear gauge fill fraction for one frame.
-#[derive(Clone, Copy, Debug)]
-pub struct LinearGaugeFrameState {
-    pub fill01: f32,
-}
-
-/// Prepared arc gauge cache. The empty track, border, labels, and unit text
-/// are baked into `static_image`; the filled arc and numeric value are drawn
-/// per frame from the cached state below.
-#[derive(Clone, Debug)]
-pub struct ArcGaugeCache {
-    pub static_image: Image,
-    pub static_image_x: f32,
-    pub static_image_y: f32,
-    pub x: f32,
-    pub y: f32,
-    pub width: u32,
-    pub height: u32,
-    pub rotation: f32,
-    pub center_x: f32,
-    pub center_y: f32,
-    pub inner_widget_center_x: f32,
-    pub inner_widget_center_y: f32,
-    pub start_angle: f32,
-    pub sweep_angle: f32,
-    pub radius: f32,
-    pub track_thickness: f32,
-    pub track_corner_radius: f32,
-    pub track_border_thickness: f32,
-    pub track_filled_color: String,
-    pub track_filled_opacity: f32,
-    pub track_fill_flat: bool,
-    pub track_fill_style: TrackFillStyle,
-    pub bar_geometry: Option<ResolvedBarGeometry>,
-    pub text_style: ovrley_widgets::render::text::ResolvedTextStyle,
-    pub has_unit: bool,
-    pub unit_font_size: f32,
-    pub inner_widget_gap: f32,
-    pub inner_widget_offset_x: f32,
-    pub inner_widget_offset_y: f32,
-    pub font_dirs: Vec<PathBuf>,
-    pub frame_states: Vec<ArcGaugeFrameState>,
-}
-
-/// Per-frame arc gauge state: fill fraction and formatted value text for the
-/// dynamic inner metric layer.
-#[derive(Clone, Debug)]
-pub struct ArcGaugeFrameState {
-    pub fill01: f32,
-    pub value_text: String,
+pub struct GaugeCache {
+    pub layout: GaugeLayout,
+    pub frame_states: Vec<GaugeFrameState>,
 }
 
 /// Prepared elevation widget cache.

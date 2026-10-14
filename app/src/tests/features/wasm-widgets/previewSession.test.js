@@ -62,7 +62,7 @@ test('raster loads once, creates without waiting for fonts, and ignores playhead
 })
 
 test.each(['g_force', 'heading'])('%s prepares its label font independently and reuses its handle through playback before disposal', async (type) => {
-  previewFont.mockImplementation((font) => (font === 'Label.ttf' ? Promise.resolve([1, 2, 3]) : new Promise(() => {})))
+  previewFont.mockImplementation(({ font }) => (font === 'Label.ttf' ? Promise.resolve([1, 2, 3]) : new Promise(() => {})))
   const { module, session, snapshot, error } = setup()
   const widget = {
     id: 'g',
@@ -76,8 +76,8 @@ test.each(['g_force', 'heading'])('%s prepares its label font independently and 
   expect(module._ovrley_preview_widget_create).not.toHaveBeenCalled()
   await Promise.resolve()
   vi.advanceTimersToNextFrame()
-  expect(previewFont).toHaveBeenCalledWith('Label.ttf', 700, false)
-  expect(previewFont).not.toHaveBeenCalledWith('Unused.ttf', 700, false)
+  expect(previewFont).toHaveBeenCalledWith({ font: 'Label.ttf' })
+  expect(previewFont).not.toHaveBeenCalledWith({ font: 'Unused.ttf' })
   expect(module._ovrley_preview_font).toHaveBeenCalledOnce()
   expect(module._ovrley_preview_widget_create).toHaveBeenCalledOnce()
   for (const second of [1.25, 3.5, 0.5]) {
@@ -95,11 +95,44 @@ test.each(['g_force', 'heading'])('%s prepares its label font independently and 
   expect(module._ovrley_preview_destroy).toHaveBeenCalledOnce()
 })
 
+test.each(['linear', 'arc', 'corner'])(
+  '%s transports its required gauge fonts and keeps the handle through fractional playback',
+  async (displayType) => {
+    previewFont.mockResolvedValue([1, 2, 3])
+    const { module, session, snapshot, error } = setup()
+    const widget = {
+      id: 'gauge',
+      type: 'speed',
+      data: { value: 'speed', display_type: displayType, font: 'Value.ttf', min_max_label_font: 'Range.ttf', show_min_max_labels: true },
+    }
+    expect(isWasmWidget(widget)).toBe(true)
+    const next = { ...snapshot, widgets: [widget] }
+    session.setSnapshot(next)
+    await Promise.resolve()
+    vi.advanceTimersToNextFrame()
+    expect(previewFont).toHaveBeenCalledWith({ font: 'Range.ttf' })
+    if (displayType === 'linear') expect(previewFont).not.toHaveBeenCalledWith({ font: 'Value.ttf' })
+    else expect(previewFont).toHaveBeenCalledWith({ font: 'Value.ttf' })
+    expect(module._ovrley_preview_widget_create).toHaveBeenCalledOnce()
+    for (const second of [1.125, 0.501, 3.75]) {
+      session.setSnapshot({ ...next, second })
+      vi.advanceTimersToNextFrame()
+    }
+    expect(module._ovrley_preview_render.mock.calls.map((call) => call[1])).toEqual([0, 1.125, 0.501, 3.75])
+    expect(module._ovrley_preview_widget_update).not.toHaveBeenCalled()
+    session.setSnapshot({ ...next, widgets: [] })
+    vi.advanceTimersToNextFrame()
+    expect(module._ovrley_preview_widget_destroy).toHaveBeenCalledWith(1, 2)
+    expect(error).toHaveBeenLastCalledWith(null)
+    session.dispose()
+  },
+)
+
 test('lap timers load both fonts and activity independently, retain resources, and surface label-font errors', async () => {
   let finishLabel
   let finishLateFont
   const failedFont = new Error('Unable to load label font')
-  previewFont.mockImplementation((font) => {
+  previewFont.mockImplementation(({ font }) => {
     if (font === 'Value.ttf') return Promise.resolve([1, 2, 3])
     if (font === 'Label.ttf') return new Promise((resolve) => (finishLabel = resolve))
     if (font === 'Failed.ttf') return Promise.reject(failedFont)
@@ -112,8 +145,8 @@ test('lap timers load both fonts and activity independently, retain resources, a
   expect(isWasmWidget(widget)).toBe(true)
   const next = { ...snapshot, widgets: [widget], activityId: 'activity' }
   session.setSnapshot(next)
-  expect(previewFont).toHaveBeenCalledWith('Value.ttf', 700, false)
-  expect(previewFont).toHaveBeenCalledWith('Label.ttf', 700, false)
+  expect(previewFont).toHaveBeenCalledWith({ font: 'Value.ttf' })
+  expect(previewFont).toHaveBeenCalledWith({ font: 'Label.ttf' })
   expect(previewActivity).toHaveBeenCalledWith('activity')
   await Promise.resolve()
   vi.advanceTimersToNextFrame()

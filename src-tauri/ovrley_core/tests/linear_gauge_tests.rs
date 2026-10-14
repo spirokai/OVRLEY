@@ -3,9 +3,10 @@ mod common;
 use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::raw::RenderConfig;
-use ovrley_core::normalize::{validate_render_config, ValidatedLinearGaugeOrientation};
+use ovrley_core::normalize::validate_render_config;
+use ovrley_widgets::widgets::gauges::validation::ValidatedLinearGaugeOrientation;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::widgets::gauges::linear::{bar_fill_rect, bordered_bar_fill_rect};
+use ovrley_widgets::widgets::gauges::linear::{bar_fill_rect, bordered_bar_fill_rect};
 use ovrley_core::render::widgets::types::PreparedValue;
 use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
 use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
@@ -190,8 +191,9 @@ fn bars_style_resolves_configured_linear_geometry_into_the_cache() {
         .cache
         .as_ref()
         .expect("linear bars cache must be prepared");
-    assert_eq!(cache.track_fill_style, TrackFillStyle::Bars);
-    assert_eq!(cache.bar_geometry.unwrap().count, 8);
+    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Linear(layout) = &cache.layout else { panic!("gauge layout"); };
+    assert_eq!(layout.track_fill_style, TrackFillStyle::Bars);
+    assert_eq!(layout.bar_geometry.unwrap().count, 8);
 }
 
 #[test]

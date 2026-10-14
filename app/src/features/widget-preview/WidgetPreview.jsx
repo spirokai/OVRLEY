@@ -25,27 +25,13 @@
  * @returns {JSX.Element|null} Widget preview component.
  */
 
-import { createElement, memo } from 'react'
+import { memo } from 'react'
 import { OverlayTextWidget } from './widgets/text/TextPreview'
 import { OverlayMetricWidget } from './widgets/metric/MetricPreview'
 import { OverlayRouteWidget } from './widgets/route/RoutePreview'
 import { OverlayElevationWidget } from './widgets/elevation/ElevationPreview'
-import { OverlayLinearGaugeWidget } from './widgets/linear-gauge/LinearGaugePreview'
-import { OverlayArcGaugeWidget } from './widgets/arc-gauge/ArcGaugePreview'
 import OverlayBackdropWidget from './widgets/backdrop/BackdropPreview'
 import { isBoxedDisplayType } from '@/lib/widget/standard-metrics'
-
-const BOXED_PREVIEW_COMPONENTS = {
-  linear: OverlayLinearGaugeWidget,
-  arc: OverlayArcGaugeWidget,
-  corner: OverlayArcGaugeWidget,
-}
-
-function getBoxedPreviewComponent(displayType) {
-  const component = BOXED_PREVIEW_COMPONENTS[displayType]
-  if (!component) throw new Error(`Missing widget preview renderer for boxed display type: ${displayType}`)
-  return component
-}
 
 /**
  * Dispatches a widget to the preview renderer for its type and presentation.
@@ -107,18 +93,7 @@ function WidgetPreview({
 
   // Metric widgets: dispatch by display_type.
   if (isBoxedDisplayType(widget.data.display_type)) {
-    const BoxedPreview = getBoxedPreviewComponent(widget.data.display_type)
-    return createElement(BoxedPreview, {
-      widget,
-      activity,
-      previewSecond,
-      globalOpacity,
-      globalScale,
-      sceneFont,
-      sceneStyle,
-      valueFont,
-    })
-    // Boxed type with no renderer — show explicit fallback instead of silent null.
+    throw new Error(`Boxed display type requires the WASM widget canvas: ${widget.data.display_type}`)
   }
 
   // Intrinsic text presentation.

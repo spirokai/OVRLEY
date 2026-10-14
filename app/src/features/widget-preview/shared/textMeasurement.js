@@ -146,12 +146,6 @@ function measureSpacedText(text, context, letterSpacing) {
   }
 }
 
-/** Measures arc text using the Skia-compatible left-bound convention. */
-export function measureArcPreviewText(text, fontSize, fontFamily) {
-  const measurement = measurePreviewText(text, fontSize, fontFamily)
-  return { ...measurement, boundsLeft: -measurement.boundsLeft }
-}
-
 function resolvePreviewVerticalMetricsText(text) {
   if (!text) {
     return ''

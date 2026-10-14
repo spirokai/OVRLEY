@@ -23,7 +23,6 @@ import {
   getPreviewFontFamily,
   getPreviewTextBaseline,
   getPreviewVerticalMetrics,
-  measureArcPreviewText,
   measurePreviewText,
 } from '../../shared/textMeasurement'
 import {
@@ -33,7 +32,6 @@ import {
   getMetricSeries,
   resolveMetricPresentationValues,
 } from '@/features/overlay-editor/utils/overlayEditorUtils'
-import { NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT } from '@/features/overlay-editor/data/overlayEditorConstants'
 import { interpolateNumericSeries } from '@/lib/interpolation'
 import { isStandardMetricWidgetType, isBoxedDisplayType } from '@/lib/widget/standard-metrics'
 
@@ -223,42 +221,6 @@ function formatMetricWidgetValue({ widget, activity, previewSecond }) {
 
   const { value } = resolveMetricPresentationValues(widget, activity, previewSecond)
   return formatStandardMetricDisplay(widget.type, value, widget.data)
-}
-
-/**
- * Builds the text content consumed by boxed gauges that retain the metric
- * value in their frame. Unlike the intrinsic metric model, this deliberately
- * has no icon layout: arc gauges stack value and unit vertically.
- *
- * @param {object} params
- * @param {object} params.widget - Resolved metric widget.
- * @param {number|null} params.presentationValue - Resolved value shown by the gauge.
- * @returns {{ valueText: string, unitText: string, fontFamily: string, fontSize: number, valueMeasure: object, valueVerticalMeasure: object, unitMeasure: object|null }|null}
- */
-export function buildArcGaugeInnerWidgetModel({ widget, presentationValue }) {
-  const formatted = formatStandardMetricDisplay(widget.type, presentationValue, widget.data)
-  if (widget.type === 'gps_coordinates') {
-    throw new Error('GPS coordinate widgets only support text display')
-  }
-  const fontFamily = getPreviewFontFamily(widget.data.font)
-  const valueText = `${widget.data.prefix}${formatted.value}${widget.data.suffix}`
-  const unitText = widget.data.show_units ? formatted.units : ''
-  const valueMeasure = measureArcPreviewText(valueText, widget.data.font_size, fontFamily)
-  const valueVerticalMeasure = measureArcPreviewText(
-    valueText === 'N' || /^[0-9:.%+-]+$/.test(valueText) ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT : valueText,
-    widget.data.font_size,
-    fontFamily,
-  )
-  const unitMeasure = unitText ? measureArcPreviewText(unitText, Math.max(widget.data.font_size * 0.28, 12), fontFamily) : null
-
-  return {
-    valueText,
-    unitText,
-    fontFamily,
-    valueMeasure,
-    valueVerticalMeasure,
-    unitMeasure,
-  }
 }
 
 /**

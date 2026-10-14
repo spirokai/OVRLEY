@@ -39,12 +39,14 @@ fn legacy_bars_display_type_falls_back_to_text() {
 }
 
 #[test]
-fn track_fill_style_is_forgiving() {
+fn track_fill_style_rejects_malformed_present_values() {
     let bars: TrackFillStyle = serde_json::from_str(r#""bars""#).unwrap();
-    let unknown: TrackFillStyle = serde_json::from_str(r#""unknown""#).unwrap();
     assert_eq!(bars, TrackFillStyle::Bars);
     assert_eq!(bars.as_str(), "bars");
-    assert_eq!(unknown, TrackFillStyle::Fill);
+    assert_eq!(serde_json::from_str::<TrackFillStyle>(r#""fill""#).unwrap(), TrackFillStyle::Fill);
+    for malformed in [r#""unknown""#, "null", "3"] {
+        assert!(serde_json::from_str::<TrackFillStyle>(malformed).is_err());
+    }
 }
 
 #[test]
@@ -176,7 +178,7 @@ fn complete_linear_display_type_validates_as_gauge() {
         panic!("linear display type should validate as a linear gauge prepared value");
     };
     assert_eq!(value.validated.display_type, DisplayType::Linear);
-    assert_eq!(value.validated.width, 200);
+    assert_eq!(value.validated.width, 200.0);
 }
 
 #[test]

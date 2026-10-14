@@ -1,0 +1,911 @@
+"filename", "language", "YAML", "TOML", "XML", "JavaScript", "Rust", "JavaScript JSX", "PostCSS", "HTML", "JSON", "Ignore", "Diff", "CMake", "C", "comment", "blank", "total"
+"e:\Github\cyclemetry-reloaded\.agents\skills\code-review\agents\openai.yaml", "YAML", 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\.agents\skills\grill-with-docs\agents\openai.yaml", "YAML", 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\.agents\skills\grilling\agents\openai.yaml", "YAML", 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\.agents\skills\implement\agents\openai.yaml", "YAML", 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\.agents\skills\prototype\agents\openai.yaml", "YAML", 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\.agents\skills\resolving-merge-conflicts\agents\openai.yaml", "YAML", 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\.agents\skills\tdd\agents\openai.yaml", "YAML", 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\.agents\skills\to-spec\agents\openai.yaml", "YAML", 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\.agents\skills\to-tickets\agents\openai.yaml", "YAML", 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\.agents\skills\wayfinder\agents\openai.yaml", "YAML", 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\.agents\skills\writing-great-skills\agents\openai.yaml", "YAML", 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\.cargo\config.toml", "TOML", 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 5
+"e:\Github\cyclemetry-reloaded\.github\workflows\release-linux.yml", "YAML", 149, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 170
+"e:\Github\cyclemetry-reloaded\.github\workflows\release-ms-store.yml", "YAML", 77, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 20, 110
+"e:\Github\cyclemetry-reloaded\.github\workflows\semantic-release.yml", "YAML", 44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 54
+"e:\Github\cyclemetry-reloaded\.github\workflows\workflow_linux.yml", "YAML", 263, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29, 292
+"e:\Github\cyclemetry-reloaded\.github\workflows\workflow_macos.yml", "YAML", 246, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 273
+"e:\Github\cyclemetry-reloaded\.github\workflows\workflow_release.yml", "YAML", 306, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 330
+"e:\Github\cyclemetry-reloaded\.github\workflows\workflow_win.yml", "YAML", 168, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 192
+"e:\Github\cyclemetry-reloaded\app\.prettierignore", "Ignore", 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\app\.prettierrc", "JSON", 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 1, 9
+"e:\Github\cyclemetry-reloaded\app\eslint.config.js", "JavaScript", 0, 0, 0, 69, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 75
+"e:\Github\cyclemetry-reloaded\app\index.html", "HTML", 0, 0, 0, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 1, 14
+"e:\Github\cyclemetry-reloaded\app\public\logo.svg", "XML", 0, 0, 142, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 145
+"e:\Github\cyclemetry-reloaded\app\scripts\generate_parse_debug_from_raw_samples.mjs", "JavaScript", 0, 0, 0, 36, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 45
+"e:\Github\cyclemetry-reloaded\app\src\App.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 249, 0, 0, 0, 0, 0, 0, 0, 14, 14, 277
+"e:\Github\cyclemetry-reloaded\app\src\api\backend.js", "JavaScript", 0, 0, 0, 293, 0, 0, 0, 0, 0, 0, 0, 0, 0, 341, 72, 706
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\accordion.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 0, 29, 8, 74
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\alert.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 25, 8, 66
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\badge.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 12, 7, 44
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\blur-input.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 115, 0, 0, 0, 0, 0, 0, 0, 19, 19, 153
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\button-group.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 52, 0, 0, 0, 0, 0, 0, 0, 0, 8, 60
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\button.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 39, 0, 0, 0, 0, 0, 0, 0, 13, 7, 59
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\color-picker.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 1263, 0, 0, 0, 0, 0, 0, 0, 176, 177, 1616
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\dialog.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 27, 0, 0, 0, 0, 0, 0, 0, 37, 8, 72
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\font-select-field.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 52, 0, 0, 0, 0, 0, 0, 0, 16, 4, 72
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\help-tooltip.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 11, 2, 36
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\hex-color-picker.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 159, 0, 0, 0, 0, 0, 0, 0, 18, 16, 193
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\input.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 13, 6, 42
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\kbd.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 0, 4, 23
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\label.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 10, 5, 33
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\popover.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 38, 0, 0, 0, 0, 0, 0, 0, 51, 11, 100
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\progress.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 90, 0, 0, 0, 0, 0, 0, 0, 55, 19, 164
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\section-heading.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 35, 0, 0, 0, 0, 0, 0, 0, 12, 4, 51
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\select.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 118, 0, 0, 0, 0, 0, 0, 0, 76, 14, 208
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\separator.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 12, 6, 37
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\simple-tooltip.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, 0, 0, 17, 8, 75
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\slider.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 46, 0, 0, 0, 0, 0, 0, 0, 14, 7, 67
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\switch.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 10, 5, 38
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\tabs.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 54, 0, 0, 0, 0, 0, 0, 0, 29, 10, 93
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\toggle-group.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 35, 0, 0, 0, 0, 0, 0, 0, 11, 8, 54
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\toggle.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 4, 32
+"e:\Github\cyclemetry-reloaded\app\src\components\ui\visually-hidden-input.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 96, 0, 0, 0, 0, 0, 0, 0, 10, 26, 132
+"e:\Github\cyclemetry-reloaded\app\src\components\widgets\icons\widget-cadence.svg", "XML", 0, 0, 54, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 55
+"e:\Github\cyclemetry-reloaded\app\src\components\widgets\icons\widget-heartrate.svg", "XML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\app\src\components\widgets\icons\widget-label.svg", "XML", 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\app\src\components\widgets\icons\widget-power.svg", "XML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\app\src\components\widgets\icons\widget-speed.svg", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\app\src\components\widgets\icons\widget-temperature.svg", "XML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\app\src\components\widgets\icons\widget-time.svg", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\components\ActionButtons.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 71, 0, 0, 0, 0, 0, 0, 0, 19, 4, 94
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\components\ActivitySection.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 84, 0, 0, 0, 0, 0, 0, 0, 29, 12, 125
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\components\AppHeader.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 71, 0, 0, 0, 0, 0, 0, 0, 19, 8, 98
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\components\ControlPanel.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 34, 0, 0, 0, 0, 0, 0, 0, 12, 5, 51
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\components\EditorToolbar.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 139, 0, 0, 0, 0, 0, 0, 0, 23, 5, 167
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\components\ErrorAlert.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 7, 6, 46
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\components\KeyboardShortcutsDialog.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 0, 14, 5, 119
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\components\LoadingOverlay.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 18, 4, 48
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\components\TemplateSection.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 102, 0, 0, 0, 0, 0, 0, 0, 20, 5, 127
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\components\TitleBar.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 3, 2, 16
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\components\UnsavedChangesDialog.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 56, 0, 0, 0, 0, 0, 0, 0, 18, 4, 78
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\components\WindowControls.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 58, 0, 0, 0, 0, 0, 0, 0, 5, 6, 69
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\hooks\useActivityImport.js", "JavaScript", 0, 0, 0, 79, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 11, 93
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\hooks\useAppBootstrap.js", "JavaScript", 0, 0, 0, 29, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 7, 52
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\hooks\useAppShellComposition.js", "JavaScript", 0, 0, 0, 84, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22, 9, 115
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\hooks\useAppShellKeyboard.js", "JavaScript", 0, 0, 0, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 114
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\hooks\useBackendStatus.js", "JavaScript", 0, 0, 0, 70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 16, 94
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\hooks\useEditorShellState.js", "JavaScript", 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 67, 13, 144
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\hooks\useUnsavedChangesConfirm.js", "JavaScript", 0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 5, 28
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\hooks\useWindowCloseGuard.js", "JavaScript", 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 9, 54
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\index.js", "JavaScript", 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 2, 21
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\utils\backendDebug.js", "JavaScript", 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18, 13, 68
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\utils\keyboardShortcutGroups.js", "JavaScript", 0, 0, 0, 73, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 11, 90
+"e:\Github\cyclemetry-reloaded\app\src\features\app-shell\utils\templateGroups.js", "JavaScript", 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 8, 72
+"e:\Github\cyclemetry-reloaded\app\src\features\app-update\components\UpdatePromptDialog.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 91, 0, 0, 0, 0, 0, 0, 0, 15, 6, 112
+"e:\Github\cyclemetry-reloaded\app\src\features\app-update\hooks\useAppUpdate.js", "JavaScript", 0, 0, 0, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 18, 150
+"e:\Github\cyclemetry-reloaded\app\src\features\app-update\index.js", "JavaScript", 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3
+"e:\Github\cyclemetry-reloaded\app\src\features\app-update\utils\updateMetadata.js", "JavaScript", 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 6, 66
+"e:\Github\cyclemetry-reloaded\app\src\features\app-update\utils\updateProgress.js", "JavaScript", 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 2, 23
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\components\OverlayCanvas.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 0, 0, 0, 19, 16, 272
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\components\OverlayEditor.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 493, 0, 0, 0, 0, 0, 0, 0, 15, 36, 544
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\components\OverlayMoveable.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 109, 0, 0, 0, 0, 0, 0, 0, 25, 11, 145
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\data\overlayEditorConfig.js", "JavaScript", 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 4, 19
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\data\overlayEditorConstants.js", "JavaScript", 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 8, 48
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\hooks\useDragHandlers.js", "JavaScript", 0, 0, 0, 150, 0, 0, 0, 0, 0, 0, 0, 0, 0, 26, 26, 202
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\hooks\useEditorKeyboard.js", "JavaScript", 0, 0, 0, 92, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 7, 114
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\hooks\useEditorViewport.js", "JavaScript", 0, 0, 0, 92, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 20, 126
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\hooks\useOverlayEditorState.js", "JavaScript", 0, 0, 0, 136, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 16, 167
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\hooks\useOverlayPreviewModels.js", "JavaScript", 0, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 10, 55
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\hooks\useResizeHandlers.js", "JavaScript", 0, 0, 0, 80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 9, 108
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\hooks\useRotateHandlers.js", "JavaScript", 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 8, 91
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\hooks\useScaleHandlers.js", "JavaScript", 0, 0, 0, 106, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23, 17, 146
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\hooks\useWidgetDraftState.js", "JavaScript", 0, 0, 0, 141, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 16, 172
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\hooks\useWidgetSelection.js", "JavaScript", 0, 0, 0, 65, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 12, 90
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\index.js", "JavaScript", 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 6, 32
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\utils\createOverlayPointerHandlers.js", "JavaScript", 0, 0, 0, 213, 0, 0, 0, 0, 0, 0, 0, 0, 0, 54, 41, 308
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\utils\exportRange.js", "JavaScript", 0, 0, 0, 182, 0, 0, 0, 0, 0, 0, 0, 0, 0, 79, 42, 303
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\utils\overlayEditorHelpers.js", "JavaScript", 0, 0, 0, 44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 54, 10, 108
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\utils\overlayEditorUtils.js", "JavaScript", 0, 0, 0, 149, 0, 0, 0, 0, 0, 0, 0, 0, 0, 92, 43, 284
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\utils\widgetDomHelpers.js", "JavaScript", 0, 0, 0, 77, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 19, 160
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\utils\widgetInteractionGeometry.js", "JavaScript", 0, 0, 0, 89, 0, 0, 0, 0, 0, 0, 0, 0, 0, 53, 16, 158
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\utils\widgetRenderGeometry.js", "JavaScript", 0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 116
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\utils\widgetResizeScaling.js", "JavaScript", 0, 0, 0, 227, 0, 0, 0, 0, 0, 0, 0, 0, 0, 68, 46, 341
+"e:\Github\cyclemetry-reloaded\app\src\features\overlay-editor\utils\widgetScaleInteraction.js", "JavaScript", 0, 0, 0, 102, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 16, 151
+"e:\Github\cyclemetry-reloaded\app\src\features\player\components\OverlayPlayer.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 8, 5, 32
+"e:\Github\cyclemetry-reloaded\app\src\features\player\components\PlayerToolbar.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 180, 0, 0, 0, 0, 0, 0, 0, 5, 4, 189
+"e:\Github\cyclemetry-reloaded\app\src\features\player\components\TimelineLane.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 65, 0, 0, 0, 0, 0, 0, 0, 5, 2, 72
+"e:\Github\cyclemetry-reloaded\app\src\features\player\components\TimelineSurface.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 86, 0, 0, 0, 0, 0, 0, 0, 5, 6, 97
+"e:\Github\cyclemetry-reloaded\app\src\features\player\hooks\useClipDrag.js", "JavaScript", 0, 0, 0, 236, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 30, 278
+"e:\Github\cyclemetry-reloaded\app\src\features\player\hooks\useExportRangeTimeline.js", "JavaScript", 0, 0, 0, 136, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23, 24, 183
+"e:\Github\cyclemetry-reloaded\app\src\features\player\hooks\useOverlayPlayer.js", "JavaScript", 0, 0, 0, 422, 0, 0, 0, 0, 0, 0, 0, 0, 0, 26, 31, 479
+"e:\Github\cyclemetry-reloaded\app\src\features\player\hooks\usePlaybackEngine.js", "JavaScript", 0, 0, 0, 282, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 30, 352
+"e:\Github\cyclemetry-reloaded\app\src\features\player\hooks\useTimelineClips.js", "JavaScript", 0, 0, 0, 189, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34, 15, 238
+"e:\Github\cyclemetry-reloaded\app\src\features\player\hooks\useTimelineGestures.js", "JavaScript", 0, 0, 0, 193, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 18, 238
+"e:\Github\cyclemetry-reloaded\app\src\features\player\hooks\useTimelineViewport.js", "JavaScript", 0, 0, 0, 263, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 38, 338
+"e:\Github\cyclemetry-reloaded\app\src\features\player\index.js", "JavaScript", 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2, 6
+"e:\Github\cyclemetry-reloaded\app\src\features\player\utils\playerTiming.js", "JavaScript", 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42, 12, 97
+"e:\Github\cyclemetry-reloaded\app\src\features\player\utils\timelineGeometry.js", "JavaScript", 0, 0, 0, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 20, 167
+"e:\Github\cyclemetry-reloaded\app\src\features\player\utils\timelineViewport.js", "JavaScript", 0, 0, 0, 179, 0, 0, 0, 0, 0, 0, 0, 0, 0, 68, 37, 284
+"e:\Github\cyclemetry-reloaded\app\src\features\projects\components\MissingSourceDialog.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 0, 0, 2, 39
+"e:\Github\cyclemetry-reloaded\app\src\features\projects\components\StartupProjectsDialog.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 56, 0, 0, 0, 0, 0, 0, 0, 0, 5, 61
+"e:\Github\cyclemetry-reloaded\app\src\features\projects\hooks\useProjectDocumentState.js", "JavaScript", 0, 0, 0, 70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 9, 83
+"e:\Github\cyclemetry-reloaded\app\src\features\projects\hooks\useProjectLifecycle.js", "JavaScript", 0, 0, 0, 194, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 21, 226
+"e:\Github\cyclemetry-reloaded\app\src\features\projects\hooks\useProjectSourceRecovery.js", "JavaScript", 0, 0, 0, 74, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 12, 90
+"e:\Github\cyclemetry-reloaded\app\src\features\projects\index.js", "JavaScript", 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\app\src\features\projects\projectOperations.js", "JavaScript", 0, 0, 0, 60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 9, 85
+"e:\Github\cyclemetry-reloaded\app\src\features\projects\utils\projectHydration.js", "JavaScript", 0, 0, 0, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 9, 136
+"e:\Github\cyclemetry-reloaded\app\src\features\projects\utils\projectPaths.js", "JavaScript", 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 4, 32
+"e:\Github\cyclemetry-reloaded\app\src\features\projects\utils\projectSnapshot.js", "JavaScript", 0, 0, 0, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18, 7, 88
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\components\BatchRenderQueue.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 153, 0, 0, 0, 0, 0, 0, 0, 30, 5, 188
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\components\BatchRenderQueueRow.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 132, 0, 0, 0, 0, 0, 0, 0, 1, 3, 136
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\components\ExportRangeSettings.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 13, 7, 77
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\components\RenderExportSettings.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 316, 0, 0, 0, 0, 0, 0, 0, 10, 16, 342
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\components\RenderProgressPanel.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 124, 0, 0, 0, 0, 0, 0, 0, 17, 12, 153
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\components\RenderVideoDialog.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 169, 0, 0, 0, 0, 0, 0, 0, 16, 9, 194
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\data\bitrateDefaults.js", "JavaScript", 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 5, 63
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\data\qualityDefaults.js", "JavaScript", 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 9
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\data\renderConstants.js", "JavaScript", 0, 0, 0, 84, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 6, 98
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\hooks\useBatchInspection.js", "JavaScript", 0, 0, 0, 154, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 5, 166
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\hooks\useRenderExecution.js", "JavaScript", 0, 0, 0, 254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 16, 286
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\hooks\useRenderVideoDerivedState.js", "JavaScript", 0, 0, 0, 125, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 6, 143
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\hooks\useRenderVideoDialogState.js", "JavaScript", 0, 0, 0, 291, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18, 31, 340
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\hooks\useRenderWorkflow.js", "JavaScript", 0, 0, 0, 141, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 9, 156
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\index.js", "JavaScript", 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 2, 10
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\utils\codecUtils.js", "JavaScript", 0, 0, 0, 155, 0, 0, 0, 0, 0, 0, 0, 0, 0, 93, 36, 284
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\utils\renderConfig.js", "JavaScript", 0, 0, 0, 182, 0, 0, 0, 0, 0, 0, 0, 0, 0, 78, 29, 289
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\utils\renderPresentation.js", "JavaScript", 0, 0, 0, 168, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 18, 222
+"e:\Github\cyclemetry-reloaded\app\src\features\render-video\utils\renderRequest.js", "JavaScript", 0, 0, 0, 149, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 10, 166
+"e:\Github\cyclemetry-reloaded\app\src\features\scene-settings\components\GlobalSettingsSection.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 155, 0, 0, 0, 0, 0, 0, 0, 13, 7, 175
+"e:\Github\cyclemetry-reloaded\app\src\features\scene-settings\components\OverlaySettingsSection.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 160, 0, 0, 0, 0, 0, 0, 0, 24, 10, 194
+"e:\Github\cyclemetry-reloaded\app\src\features\scene-settings\components\SidebarSettingsTab.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 13, 5, 58
+"e:\Github\cyclemetry-reloaded\app\src\features\scene-settings\data\sceneSettingsConstants.js", "JavaScript", 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 36
+"e:\Github\cyclemetry-reloaded\app\src\features\scene-settings\hooks\useSceneSettingsState.js", "JavaScript", 0, 0, 0, 158, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 23, 195
+"e:\Github\cyclemetry-reloaded\app\src\features\scene-settings\index.js", "JavaScript", 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 2, 11
+"e:\Github\cyclemetry-reloaded\app\src\features\scene-settings\utils\sceneSettingsUtils.js", "JavaScript", 0, 0, 0, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 13, 90
+"e:\Github\cyclemetry-reloaded\app\src\features\template-manager\hooks\useTemplateFetching.js", "JavaScript", 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17, 4, 43
+"e:\Github\cyclemetry-reloaded\app\src\features\template-manager\hooks\useTemplateManagement.js", "JavaScript", 0, 0, 0, 234, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 33, 287
+"e:\Github\cyclemetry-reloaded\app\src\features\template-manager\hooks\useTemplateSaveStatus.js", "JavaScript", 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 8, 51
+"e:\Github\cyclemetry-reloaded\app\src\features\template-manager\index.js", "JavaScript", 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 2, 9
+"e:\Github\cyclemetry-reloaded\app\src\features\template-manager\utils\templateFileUtils.js", "JavaScript", 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 5, 28
+"e:\Github\cyclemetry-reloaded\app\src\features\template-manager\utils\templateSnapshot.js", "JavaScript", 0, 0, 0, 183, 0, 0, 0, 0, 0, 0, 0, 0, 0, 59, 24, 266
+"e:\Github\cyclemetry-reloaded\app\src\features\toolbar\components\ActivityDrawerContent.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 99, 0, 0, 0, 0, 0, 0, 0, 11, 10, 120
+"e:\Github\cyclemetry-reloaded\app\src\features\toolbar\components\FileDropZone.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 19, 4, 55
+"e:\Github\cyclemetry-reloaded\app\src\features\toolbar\components\ProjectsDrawerContent.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 80, 0, 0, 0, 0, 0, 0, 0, 0, 5, 85
+"e:\Github\cyclemetry-reloaded\app\src\features\toolbar\components\ToolbarDrawerLayout.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 68, 0, 0, 0, 0, 0, 0, 0, 18, 4, 90
+"e:\Github\cyclemetry-reloaded\app\src\features\toolbar\components\VerticalToolbar.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 39, 0, 0, 0, 0, 0, 0, 0, 14, 4, 57
+"e:\Github\cyclemetry-reloaded\app\src\features\toolbar\components\VideoDrawerContent.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 71, 0, 0, 0, 0, 0, 0, 0, 11, 7, 89
+"e:\Github\cyclemetry-reloaded\app\src\features\toolbar\hooks\useDrawerPreference.js", "JavaScript", 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 15, 77
+"e:\Github\cyclemetry-reloaded\app\src\features\toolbar\hooks\useFileDropZone.js", "JavaScript", 0, 0, 0, 115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 16, 137
+"e:\Github\cyclemetry-reloaded\app\src\features\toolbar\hooks\useToolbarDrawer.js", "JavaScript", 0, 0, 0, 53, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 13, 72
+"e:\Github\cyclemetry-reloaded\app\src\features\toolbar\hooks\useVideoSyncControls.js", "JavaScript", 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 11, 112
+"e:\Github\cyclemetry-reloaded\app\src\features\toolbar\index.js", "JavaScript", 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2, 15
+"e:\Github\cyclemetry-reloaded\app\src\features\toolbar\utils\activityDrawerUtils.js", "JavaScript", 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 9, 59
+"e:\Github\cyclemetry-reloaded\app\src\features\toolbar\utils\videoDrawerUtils.js", "JavaScript", 0, 0, 0, 59, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 6, 74
+"e:\Github\cyclemetry-reloaded\app\src\features\undo-redo\components\UndoRedoControls.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 21, 0, 0, 0, 0, 0, 0, 0, 10, 2, 33
+"e:\Github\cyclemetry-reloaded\app\src\features\undo-redo\hooks\useUndoRedo.js", "JavaScript", 0, 0, 0, 46, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 10, 63
+"e:\Github\cyclemetry-reloaded\app\src\features\undo-redo\index.js", "JavaScript", 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3
+"e:\Github\cyclemetry-reloaded\app\src\features\undo-redo\undoHistory.js", "JavaScript", 0, 0, 0, 70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 14, 124
+"e:\Github\cyclemetry-reloaded\app\src\features\video-preview\components\VideoPreviewSurface.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 91, 0, 0, 0, 0, 0, 0, 0, 9, 5, 105
+"e:\Github\cyclemetry-reloaded\app\src\features\video-preview\data\videoPreviewConstants.js", "JavaScript", 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 10, 35
+"e:\Github\cyclemetry-reloaded\app\src\features\video-preview\hooks\useVideoImport.js", "JavaScript", 0, 0, 0, 219, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 27, 254
+"e:\Github\cyclemetry-reloaded\app\src\features\video-preview\hooks\useVideoPlaybackClock.js", "JavaScript", 0, 0, 0, 145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 46, 37, 228
+"e:\Github\cyclemetry-reloaded\app\src\features\video-preview\hooks\useVideoPreview.js", "JavaScript", 0, 0, 0, 187, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 37, 244
+"e:\Github\cyclemetry-reloaded\app\src\features\video-preview\hooks\useVideoPreviewWarnings.js", "JavaScript", 0, 0, 0, 175, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 40, 228
+"e:\Github\cyclemetry-reloaded\app\src\features\video-preview\index.js", "JavaScript", 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 2, 10
+"e:\Github\cyclemetry-reloaded\app\src\features\video-preview\utils\videoPreviewPlayback.js", "JavaScript", 0, 0, 0, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 44, 18, 129
+"e:\Github\cyclemetry-reloaded\app\src\features\video-preview\utils\videoPreviewScrubScheduler.js", "JavaScript", 0, 0, 0, 39, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 11, 63
+"e:\Github\cyclemetry-reloaded\app\src\features\video-preview\utils\videoPreviewSource.js", "JavaScript", 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23, 12, 77
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\assets\navigation-marker.svg", "XML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\components\VideoSyncCandidateList.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 96, 0, 0, 0, 0, 0, 0, 0, 11, 6, 113
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\components\VideoSyncControls.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 143, 0, 0, 0, 0, 0, 0, 0, 6, 4, 153
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\components\VideoSyncDrawerContent.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 175, 0, 0, 0, 0, 0, 0, 0, 6, 12, 193
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\components\VideoSyncLandmarkList.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 85, 0, 0, 0, 0, 0, 0, 0, 10, 4, 99
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\components\VideoSyncMarkControls.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 77, 0, 0, 0, 0, 0, 0, 0, 14, 3, 94
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\components\VideoSyncPreviewScreens.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 148, 0, 0, 0, 0, 0, 0, 0, 14, 8, 170
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\components\VideoSyncTimelineGraph.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 63, 0, 0, 0, 0, 0, 0, 0, 9, 7, 79
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\components\VideoSyncTimelineLandmarks.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 49, 0, 0, 0, 0, 0, 0, 0, 10, 5, 64
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\data\videoSyncConstants.js", "JavaScript", 0, 0, 0, 59, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 9, 72
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\hooks\useVideoSyncCalculation.js", "JavaScript", 0, 0, 0, 153, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 15, 177
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\hooks\useVideoSyncLandmarkDrag.js", "JavaScript", 0, 0, 0, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 13, 161
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\hooks\useVideoSyncPreview.js", "JavaScript", 0, 0, 0, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 14, 136
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\hooks\useVideoSyncTimeline.js", "JavaScript", 0, 0, 0, 84, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 11, 119
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\hooks\useVideoSyncWorkspace.js", "JavaScript", 0, 0, 0, 117, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 8, 135
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\index.js", "JavaScript", 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 8
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\map\CourseMapController.js", "JavaScript", 0, 0, 0, 81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 11, 93
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\map\NavigationMapController.js", "JavaScript", 0, 0, 0, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 112
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\map\SelectionMapController.js", "JavaScript", 0, 0, 0, 176, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 206
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\utils\activitySyncInput.js", "JavaScript", 0, 0, 0, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 15, 113
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\utils\detectActivityEvents.js", "JavaScript", 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 4, 44
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\utils\detectStops.js", "JavaScript", 0, 0, 0, 176, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 26, 210
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\utils\detectTurns.js", "JavaScript", 0, 0, 0, 162, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43, 17, 222
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\utils\graphGeometry.js", "JavaScript", 0, 0, 0, 204, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42, 34, 280
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\utils\intervalConsensus.js", "JavaScript", 0, 0, 0, 219, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 38, 268
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\utils\landmarkTiming.js", "JavaScript", 0, 0, 0, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 16, 132
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\utils\manualVideoSyncContract.js", "JavaScript", 0, 0, 0, 87, 0, 0, 0, 0, 0, 0, 0, 0, 0, 68, 15, 170
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\utils\mapPreviewGeometry.js", "JavaScript", 0, 0, 0, 91, 0, 0, 0, 0, 0, 0, 0, 0, 0, 31, 14, 136
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\utils\matchScore.js", "JavaScript", 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 5, 58
+"e:\Github\cyclemetry-reloaded\app\src\features\video-sync\utils\videoSyncPresentation.js", "JavaScript", 0, 0, 0, 111, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 11, 142
+"e:\Github\cyclemetry-reloaded\app\src\features\wasm-preview-debug\WasmPreviewDebug.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 1, 2, 21
+"e:\Github\cyclemetry-reloaded\app\src\features\wasm-preview-debug\data\debugRoute.js", "JavaScript", 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2
+"e:\Github\cyclemetry-reloaded\app\src\features\wasm-preview-debug\hooks\useDebugRoute.js", "JavaScript", 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 14
+"e:\Github\cyclemetry-reloaded\app\src\features\wasm-preview-debug\hooks\useWasmPreviewDebug.js", "JavaScript", 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, 65
+"e:\Github\cyclemetry-reloaded\app\src\features\wasm-preview-debug\utils\wasmRenderer.js", "JavaScript", 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 2, 64
+"e:\Github\cyclemetry-reloaded\app\src\features\wasm-widgets\components\WasmWidgetCanvas.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 1, 2, 18
+"e:\Github\cyclemetry-reloaded\app\src\features\wasm-widgets\hooks\useWasmCanvas.js", "JavaScript", 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 12
+"e:\Github\cyclemetry-reloaded\app\src\features\wasm-widgets\hooks\useWasmWidgetInteractions.js", "JavaScript", 0, 0, 0, 135, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 4, 146
+"e:\Github\cyclemetry-reloaded\app\src\features\wasm-widgets\hooks\useWasmWidgets.js", "JavaScript", 0, 0, 0, 39, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 42
+"e:\Github\cyclemetry-reloaded\app\src\features\wasm-widgets\utils\previewSession.js", "JavaScript", 0, 0, 0, 264, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 6, 280
+"e:\Github\cyclemetry-reloaded\app\src\features\wasm-widgets\utils\widgetGestureGeometry.js", "JavaScript", 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 23
+"e:\Github\cyclemetry-reloaded\app\src\features\wasm-widgets\utils\widgetInteraction.js", "JavaScript", 0, 0, 0, 95, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 6, 110
+"e:\Github\cyclemetry-reloaded\app\src\features\wasm-widgets\utils\widgetPresentation.js", "JavaScript", 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1, 27
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-drawer\components\WidgetButtonGrid.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 47, 0, 0, 0, 0, 0, 0, 0, 11, 8, 66
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-drawer\components\WidgetDrawer.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 7, 5, 25
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-drawer\components\WidgetOptionPopover.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 9, 3, 44
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-drawer\index.js", "JavaScript", 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2, 6
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\BackdropWidgetEditor.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 259, 0, 0, 0, 0, 0, 0, 0, 0, 16, 275
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\ElevationWidgetEditor.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 378, 0, 0, 0, 0, 0, 0, 0, 13, 9, 400
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\GForceWidgetEditor.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 82, 0, 0, 0, 0, 0, 0, 0, 13, 5, 100
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\GradientWidgetEditor.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 98, 0, 0, 0, 0, 0, 0, 0, 11, 6, 115
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\RasterWidgetEditor.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 56, 0, 0, 0, 0, 0, 0, 0, 1, 3, 60
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\RouteMapWidgetEditor.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 209, 0, 0, 0, 0, 0, 0, 0, 12, 7, 228
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\SidebarWidgetsTab.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 165, 0, 0, 0, 0, 0, 0, 0, 28, 11, 204
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\TextWidgetEditor.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 11, 3, 32
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\TimeWidgetEditor.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 83, 0, 0, 0, 0, 0, 0, 0, 12, 6, 101
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\metricWidget\ArcDisplaySection.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 322, 0, 0, 0, 0, 0, 0, 0, 6, 12, 340
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\metricWidget\BarFillStyleControls.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 76, 0, 0, 0, 0, 0, 0, 0, 0, 9, 85
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\metricWidget\GForceDisplaySection.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 182, 0, 0, 0, 0, 0, 0, 0, 1, 5, 188
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\metricWidget\HeadingTapeDisplaySection.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 241, 0, 0, 0, 0, 0, 0, 0, 7, 9, 257
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\metricWidget\LapTimerDisplaySection.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 97, 0, 0, 0, 0, 0, 0, 0, 15, 5, 117
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\metricWidget\LeanAngleDisplaySection.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 178, 0, 0, 0, 0, 0, 0, 0, 8, 5, 191
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\metricWidget\LinearDisplaySection.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 248, 0, 0, 0, 0, 0, 0, 0, 8, 11, 267
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\metricWidget\MetricWidgetEditor.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 82, 0, 0, 0, 0, 0, 0, 0, 21, 9, 112
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\metricWidget\TextDisplaySection.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 140, 0, 0, 0, 0, 0, 0, 0, 8, 11, 159
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\widgetEditorSections.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 289, 0, 0, 0, 0, 0, 0, 0, 72, 13, 374
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\components\widgetFormControls.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 258, 0, 0, 0, 0, 0, 0, 0, 109, 22, 389
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\hooks\useAccordionAutoscroll.js", "JavaScript", 0, 0, 0, 58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17, 13, 88
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\hooks\useDisplayVariantUpdater.js", "JavaScript", 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 6, 34
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\hooks\useRasterSelection.js", "JavaScript", 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 49
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\hooks\useWidgetManager.js", "JavaScript", 0, 0, 0, 186, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29, 24, 239
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\index.js", "JavaScript", 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 2, 7
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\utils\gaugeGeometry.js", "JavaScript", 0, 0, 0, 107, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 22, 131
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-editor\utils\widgetUtils.js", "JavaScript", 0, 0, 0, 182, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 24, 270
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\WidgetPreview.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 90, 0, 0, 0, 0, 0, 0, 0, 33, 10, 133
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\index.js", "JavaScript", 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 2, 11
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\shared\PreviewSvgComponents.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 185, 0, 0, 0, 0, 0, 0, 0, 99, 19, 303
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\shared\plotPlaceholderGeometry.js", "JavaScript", 0, 0, 0, 69, 0, 0, 0, 0, 0, 0, 0, 0, 0, 44, 13, 126
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\shared\shadow.js", "JavaScript", 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 3, 24
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\shared\svgPreviewUtils.js", "JavaScript", 0, 0, 0, 132, 0, 0, 0, 0, 0, 0, 0, 0, 0, 79, 34, 245
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\shared\textMeasurement.js", "JavaScript", 0, 0, 0, 252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 89, 28, 369
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\shared\usePlotPreviewGeometry.js", "JavaScript", 0, 0, 0, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 14, 141
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\backdrop\BackdropPreview.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 74, 0, 0, 0, 0, 0, 0, 0, 8, 6, 88
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\backdrop\model.js", "JavaScript", 0, 0, 0, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 8, 67
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\elevation\ElevationPreview.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 89, 0, 0, 0, 0, 0, 0, 0, 17, 6, 112
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\elevation\style.js", "JavaScript", 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 2, 26
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\elevation\useElevationPreview.js", "JavaScript", 0, 0, 0, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 8, 58
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\elevation\useElevationPreviewGeometry.js", "JavaScript", 0, 0, 0, 70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22, 11, 103
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\metric\MetricPreview.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 131, 0, 0, 0, 0, 0, 0, 0, 21, 7, 159
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\metric\format.js", "JavaScript", 0, 0, 0, 381, 0, 0, 0, 0, 0, 0, 0, 0, 0, 118, 75, 574
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\metric\model.js", "JavaScript", 0, 0, 0, 229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 47, 29, 305
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\metric\useMetricPreview.js", "JavaScript", 0, 0, 0, 142, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 12, 182
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\route\RoutePreview.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 54, 0, 0, 0, 0, 0, 0, 0, 16, 6, 76
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\route\style.js", "JavaScript", 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 2, 28
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\route\useRoutePreview.js", "JavaScript", 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 4, 26
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\route\useRoutePreviewGeometry.js", "JavaScript", 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22, 7, 71
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\text\TextPreview.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 38, 0, 0, 0, 0, 0, 0, 0, 13, 4, 55
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\text\model.js", "JavaScript", 0, 0, 0, 45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 5, 60
+"e:\Github\cyclemetry-reloaded\app\src\features\widget-preview\widgets\text\useTextPreview.js", "JavaScript", 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 19
+"e:\Github\cyclemetry-reloaded\app\src\hooks\useAppStoreSelectors.js", "JavaScript", 0, 0, 0, 146, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 11, 162
+"e:\Github\cyclemetry-reloaded\app\src\hooks\useFonts.js", "JavaScript", 0, 0, 0, 85, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 10, 101
+"e:\Github\cyclemetry-reloaded\app\src\hooks\useFpsMode.js", "JavaScript", 0, 0, 0, 27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 32
+"e:\Github\cyclemetry-reloaded\app\src\hooks\useInlineNumberInput.js", "JavaScript", 0, 0, 0, 36, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 4, 47
+"e:\Github\cyclemetry-reloaded\app\src\i18n\index.js", "JavaScript", 0, 0, 0, 27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 8, 42
+"e:\Github\cyclemetry-reloaded\app\src\i18n\language-preference.js", "JavaScript", 0, 0, 0, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 4, 24
+"e:\Github\cyclemetry-reloaded\app\src\i18n\locales.js", "JavaScript", 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 4, 35
+"e:\Github\cyclemetry-reloaded\app\src\index.css", "PostCSS", 0, 0, 0, 0, 0, 0, 132, 0, 0, 0, 0, 0, 0, 13, 15, 160
+"e:\Github\cyclemetry-reloaded\app\src\lib\activity\fit-parser.js", "JavaScript", 0, 0, 0, 95, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 14, 125
+"e:\Github\cyclemetry-reloaded\app\src\lib\activity\gpx-parser.js", "JavaScript", 0, 0, 0, 129, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 17, 149
+"e:\Github\cyclemetry-reloaded\app\src\lib\activity\igc-parser.js", "JavaScript", 0, 0, 0, 119, 0, 0, 0, 0, 0, 0, 0, 0, 0, 97, 29, 245
+"e:\Github\cyclemetry-reloaded\app\src\lib\activity\import-activity.js", "JavaScript", 0, 0, 0, 95, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43, 16, 154
+"e:\Github\cyclemetry-reloaded\app\src\lib\activity\raw-sample-utils.js", "JavaScript", 0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 5, 25
+"e:\Github\cyclemetry-reloaded\app\src\lib\activity\srt-parser.js", "JavaScript", 0, 0, 0, 222, 0, 0, 0, 0, 0, 0, 0, 0, 0, 117, 32, 371
+"e:\Github\cyclemetry-reloaded\app\src\lib\cached-promise.js", "JavaScript", 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 5, 35
+"e:\Github\cyclemetry-reloaded\app\src\lib\color-utils.js", "JavaScript", 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22, 11, 70
+"e:\Github\cyclemetry-reloaded\app\src\lib\compose-refs.js", "JavaScript", 0, 0, 0, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 16, 96
+"e:\Github\cyclemetry-reloaded\app\src\lib\dev-config.js", "JavaScript", 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 6
+"e:\Github\cyclemetry-reloaded\app\src\lib\file-dialog.js", "JavaScript", 0, 0, 0, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 17, 138
+"e:\Github\cyclemetry-reloaded\app\src\lib\font-resources.js", "JavaScript", 0, 0, 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 10, 95
+"e:\Github\cyclemetry-reloaded\app\src\lib\fonts.js", "JavaScript", 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 44, 18, 150
+"e:\Github\cyclemetry-reloaded\app\src\lib\geometryUtils.js", "JavaScript", 0, 0, 0, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 58, 31, 192
+"e:\Github\cyclemetry-reloaded\app\src\lib\interpolation.js", "JavaScript", 0, 0, 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 31, 15, 121
+"e:\Github\cyclemetry-reloaded\app\src\lib\keyboard-shortcuts.js", "JavaScript", 0, 0, 0, 69, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23, 19, 111
+"e:\Github\cyclemetry-reloaded\app\src\lib\preferences-store.js", "JavaScript", 0, 0, 0, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 8, 48
+"e:\Github\cyclemetry-reloaded\app\src\lib\preview-timing.js", "JavaScript", 0, 0, 0, 21, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 7, 63
+"e:\Github\cyclemetry-reloaded\app\src\lib\previewPerf.js", "JavaScript", 0, 0, 0, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 17, 79
+"e:\Github\cyclemetry-reloaded\app\src\lib\template\template-constants.js", "JavaScript", 0, 0, 0, 59, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 22, 114
+"e:\Github\cyclemetry-reloaded\app\src\lib\template\template-normalization.js", "JavaScript", 0, 0, 0, 233, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73, 26, 332
+"e:\Github\cyclemetry-reloaded\app\src\lib\template\template-state.js", "JavaScript", 0, 0, 0, 144, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 12, 186
+"e:\Github\cyclemetry-reloaded\app\src\lib\theme.js", "JavaScript", 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 5, 29
+"e:\Github\cyclemetry-reloaded\app\src\lib\time-format.js", "JavaScript", 0, 0, 0, 41, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 6, 68
+"e:\Github\cyclemetry-reloaded\app\src\lib\update-rate.js", "JavaScript", 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 11, 85
+"e:\Github\cyclemetry-reloaded\app\src\lib\utils.js", "JavaScript", 0, 0, 0, 61, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 9, 95
+"e:\Github\cyclemetry-reloaded\app\src\lib\video-sync.js", "JavaScript", 0, 0, 0, 139, 0, 0, 0, 0, 0, 0, 0, 0, 0, 51, 9, 199
+"e:\Github\cyclemetry-reloaded\app\src\lib\video-timing.js", "JavaScript", 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 1, 13
+"e:\Github\cyclemetry-reloaded\app\src\lib\widget\altitude.js", "JavaScript", 0, 0, 0, 39, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42, 9, 90
+"e:\Github\cyclemetry-reloaded\app\src\lib\widget\display-type-behavior.js", "JavaScript", 0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 6, 63
+"e:\Github\cyclemetry-reloaded\app\src\lib\widget\editor-state.js", "JavaScript", 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 2, 18
+"e:\Github\cyclemetry-reloaded\app\src\lib\widget\raster-resources.js", "JavaScript", 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 27
+"e:\Github\cyclemetry-reloaded\app\src\lib\widget\standard-metrics.js", "JavaScript", 0, 0, 0, 114, 0, 0, 0, 0, 0, 0, 0, 0, 0, 114, 22, 250
+"e:\Github\cyclemetry-reloaded\app\src\lib\widget\standard-widgets.js", "JavaScript", 0, 0, 0, 107, 0, 0, 0, 0, 0, 0, 0, 0, 0, 78, 48, 233
+"e:\Github\cyclemetry-reloaded\app\src\lib\widget\wasm-widget.js", "JavaScript", 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 25
+"e:\Github\cyclemetry-reloaded\app\src\lib\widget\widget-config.js", "JavaScript", 0, 0, 0, 264, 0, 0, 0, 0, 0, 0, 0, 0, 0, 98, 62, 424
+"e:\Github\cyclemetry-reloaded\app\src\lib\widget\widget-draft.js", "JavaScript", 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 12, 81
+"e:\Github\cyclemetry-reloaded\app\src\lib\widget\widget-icons.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 116, 0, 0, 0, 0, 0, 0, 0, 1, 16, 133
+"e:\Github\cyclemetry-reloaded\app\src\lib\widget\widget-presentation.js", "JavaScript", 0, 0, 0, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 54, 15, 136
+"e:\Github\cyclemetry-reloaded\app\src\lib\widget\widget-resolver.js", "JavaScript", 0, 0, 0, 227, 0, 0, 0, 0, 0, 0, 0, 0, 0, 104, 54, 385
+"e:\Github\cyclemetry-reloaded\app\src\main.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 4, 6, 42
+"e:\Github\cyclemetry-reloaded\app\src\store\slices\createBatchRenderSlice.js", "JavaScript", 0, 0, 0, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 69
+"e:\Github\cyclemetry-reloaded\app\src\store\slices\createEditorSlice.js", "JavaScript", 0, 0, 0, 206, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 42, 280
+"e:\Github\cyclemetry-reloaded\app\src\store\slices\createLayoutSlice.js", "JavaScript", 0, 0, 0, 58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 11, 105
+"e:\Github\cyclemetry-reloaded\app\src\store\slices\createManualVideoSyncSlice.js", "JavaScript", 0, 0, 0, 311, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 41, 359
+"e:\Github\cyclemetry-reloaded\app\src\store\slices\createMediaSlice.js", "JavaScript", 0, 0, 0, 258, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 37, 304
+"e:\Github\cyclemetry-reloaded\app\src\store\slices\createRenderSettingsSlice.js", "JavaScript", 0, 0, 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 11, 87
+"e:\Github\cyclemetry-reloaded\app\src\store\slices\createTemplateSlice.js", "JavaScript", 0, 0, 0, 89, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 19, 123
+"e:\Github\cyclemetry-reloaded\app\src\store\slices\createVideoImportSlice.js", "JavaScript", 0, 0, 0, 258, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 290
+"e:\Github\cyclemetry-reloaded\app\src\store\store-utils.js", "JavaScript", 0, 0, 0, 95, 0, 0, 0, 0, 0, 0, 0, 0, 0, 75, 23, 193
+"e:\Github\cyclemetry-reloaded\app\src\store\useStore.js", "JavaScript", 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 7, 38
+"e:\Github\cyclemetry-reloaded\app\src\styles\moveable.css", "PostCSS", 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 3, 5, 32
+"e:\Github\cyclemetry-reloaded\app\src\styles\theme.css", "PostCSS", 0, 0, 0, 0, 0, 0, 60, 0, 0, 0, 0, 0, 0, 1, 1, 62
+"e:\Github\cyclemetry-reloaded\app\src\styles\utilities.css", "PostCSS", 0, 0, 0, 0, 0, 0, 62, 0, 0, 0, 0, 0, 0, 5, 10, 77
+"e:\Github\cyclemetry-reloaded\app\src\test-setup.js", "JavaScript", 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 22
+"e:\Github\cyclemetry-reloaded\app\src\tests\components\ui\BlurInput.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 7, 11, 41
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\app-shell\AppHeader-integration.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 91, 0, 0, 0, 0, 0, 0, 0, 3, 13, 107
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\app-shell\TitleBar-boundary.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 0, 5, 27
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\app-shell\keyboardShortcutGroups.test.js", "JavaScript", 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 62
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\app-shell\useActivityImport.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 78, 0, 0, 0, 0, 0, 0, 0, 0, 22, 100
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\app-shell\useAppShellKeyboard.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 138, 0, 0, 0, 0, 0, 0, 0, 0, 26, 164
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\app-shell\useEditorShellState-boundary.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 0, 5, 23
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\app-shell\useEditorShellState.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 10, 9, 50
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\overlay-editor\OverlayCanvas-background.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 91, 0, 0, 0, 0, 0, 0, 0, 5, 18, 114
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\overlay-editor\OverlayEditor.selection.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 646, 0, 0, 0, 0, 0, 0, 0, 6, 108, 760
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\overlay-editor\OverlayMoveable.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 54, 0, 0, 0, 0, 0, 0, 0, 0, 11, 65
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\overlay-editor\overlayEditorUtils.test.js", "JavaScript", 0, 0, 0, 140, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 24, 175
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\overlay-editor\useDragHandlers.test.js", "JavaScript", 0, 0, 0, 44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 49
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\overlay-editor\useEditorKeyboard.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 83, 0, 0, 0, 0, 0, 0, 0, 0, 16, 99
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\overlay-editor\useOverlayEditorState-boundary.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 122, 0, 0, 0, 0, 0, 0, 0, 8, 25, 155
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\overlay-editor\useScaleHandlers.test.js", "JavaScript", 0, 0, 0, 86, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 94
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\overlay-editor\useWidgetDraftState.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 15, 90
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\overlay-editor\widgetResizeScaling.test.js", "JavaScript", 0, 0, 0, 250, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 274
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\player\OverlayPlayer.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 99, 0, 0, 0, 0, 0, 0, 0, 0, 21, 120
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\player\TimelineLane.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 82, 0, 0, 0, 0, 0, 0, 0, 0, 13, 95
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\player\playerTiming.test.js", "JavaScript", 0, 0, 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\player\timelineGeometry.test.js", "JavaScript", 0, 0, 0, 102, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 115
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\player\timelineViewport.test.js", "JavaScript", 0, 0, 0, 78, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 93
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\player\useClipDrag.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 124, 0, 0, 0, 0, 0, 0, 0, 0, 26, 150
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\player\useExportRangeTimeline.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 63, 0, 0, 0, 0, 0, 0, 0, 0, 23, 86
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\player\useOverlayPlayer.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 118, 0, 0, 0, 0, 0, 0, 0, 0, 28, 146
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\player\usePlaybackEngine.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 208, 0, 0, 0, 0, 0, 0, 0, 0, 44, 252
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\player\useTimelineClips.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 94, 0, 0, 0, 0, 0, 0, 0, 0, 15, 109
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\player\useTimelineGestures.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 99, 0, 0, 0, 0, 0, 0, 0, 0, 21, 120
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\player\useTimelineViewport.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 190, 0, 0, 0, 0, 0, 0, 0, 0, 59, 249
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\projects\StartupProjectsDialog.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 3, 23
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\projects\projectCommands.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 83, 0, 0, 0, 0, 0, 0, 0, 0, 14, 97
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\projects\projectHydration.test.js", "JavaScript", 0, 0, 0, 102, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 110
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\projects\projectSnapshot.test.js", "JavaScript", 0, 0, 0, 188, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17, 205
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\projects\useProjectLifecycle.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 587, 0, 0, 0, 0, 0, 0, 0, 0, 52, 639
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\render-video\RenderVideoDialog.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 270, 0, 0, 0, 0, 0, 0, 0, 0, 44, 314
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\render-video\bitrateDefaults.test.js", "JavaScript", 0, 0, 0, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 70
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\render-video\renderConfig.test.js", "JavaScript", 0, 0, 0, 229, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 16, 251
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\render-video\renderOutput.test.js", "JavaScript", 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 14
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\render-video\renderVideo.test.js", "JavaScript", 0, 0, 0, 94, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 100
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\render-video\useBatchRenderWorkflow.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 443, 0, 0, 0, 0, 0, 0, 0, 3, 14, 460
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\render-video\useRenderVideoDialogState.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 162, 0, 0, 0, 0, 0, 0, 0, 7, 23, 192
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\render-video\useRenderWorkflow.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 319, 0, 0, 0, 0, 0, 0, 0, 0, 49, 368
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\scene-settings\sceneSettingsUtils.test.js", "JavaScript", 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 13
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\scene-settings\useSceneSettingsState.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 152, 0, 0, 0, 0, 0, 0, 0, 7, 41, 200
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\standard-metrics\standardMetricCatalog.test.js", "JavaScript", 0, 0, 0, 412, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 41, 453
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\standard-widgets\standardWidgetsCatalog.test.js", "JavaScript", 0, 0, 0, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 88
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\template-manager\templateSnapshot.test.js", "JavaScript", 0, 0, 0, 521, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 60, 581
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\toolbar\ActivityDrawerContent.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\toolbar\ToolbarDrawerLayout.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 39, 0, 0, 0, 0, 0, 0, 0, 0, 10, 49
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\toolbar\VideoDrawerContent.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 94, 0, 0, 0, 0, 0, 0, 0, 0, 14, 108
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\toolbar\useToolbarDrawer.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 49, 0, 0, 0, 0, 0, 0, 0, 0, 13, 62
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\toolbar\useVideoSyncControls.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 53, 0, 0, 0, 0, 0, 0, 0, 3, 15, 71
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\video-preview\resolveVideoPreviewSource.test.js", "JavaScript", 0, 0, 0, 77, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 17, 100
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\video-preview\useVideoPlaybackClock.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 67, 0, 0, 0, 0, 0, 0, 0, 8, 15, 90
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\video-preview\useVideoPreview.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 7, 18, 113
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\video-preview\useVideoPreviewWarnings.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 80, 0, 0, 0, 0, 0, 0, 0, 7, 18, 105
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\video-preview\videoPreviewPlayback.test.js", "JavaScript", 0, 0, 0, 47, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 62
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\video-sync\VideoSyncPhase5.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 69, 0, 0, 0, 0, 0, 0, 0, 0, 10, 79
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\video-sync\VideoSyncPreviewScreens.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 395, 0, 0, 0, 0, 0, 0, 0, 0, 29, 424
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\video-sync\activityDetection.test.js", "JavaScript", 0, 0, 0, 205, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 235
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\video-sync\graphGeometry.test.js", "JavaScript", 0, 0, 0, 77, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 91
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\video-sync\intervalConsensus.test.js", "JavaScript", 0, 0, 0, 177, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 198
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\video-sync\useVideoSyncCalculation.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 108, 0, 0, 0, 0, 0, 0, 0, 0, 25, 133
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\video-sync\useVideoSyncTimeline.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 84, 0, 0, 0, 0, 0, 0, 0, 0, 14, 98
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\video-sync\useVideoSyncWorkspace.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 129, 0, 0, 0, 0, 0, 0, 0, 0, 22, 151
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\wasm-preview-debug\useWasmPreviewDebug.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0, 0, 6, 57
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\wasm-widgets\previewSession.test.js", "JavaScript", 0, 0, 0, 178, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 186
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\wasm-widgets\useWasmWidgetInteractions.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 2, 77
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\wasm-widgets\widgetInteraction.test.js", "JavaScript", 0, 0, 0, 247, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 257
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-drawer\components\WidgetButtonGrid.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 84, 0, 0, 0, 0, 0, 0, 0, 4, 20, 108
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-drawer\components\WidgetDrawer.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 56, 0, 0, 0, 0, 0, 0, 0, 0, 13, 69
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\BackdropWidgetEditor.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 235, 0, 0, 0, 0, 0, 0, 0, 0, 28, 263
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\BarFillStyleControls.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 45, 0, 0, 0, 0, 0, 0, 0, 0, 7, 52
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\GForceDisplaySection.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 76, 0, 0, 0, 0, 0, 0, 0, 0, 9, 85
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\GForceWidgetEditor.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 72, 0, 0, 0, 0, 0, 0, 0, 0, 10, 82
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\HeadingTapeDisplaySection.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 149, 0, 0, 0, 0, 0, 0, 0, 0, 29, 178
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\MetricWidgetEditor.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 455, 0, 0, 0, 0, 0, 0, 0, 0, 52, 507
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\PlotMarkerVariants.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 63, 0, 0, 0, 0, 0, 0, 0, 0, 11, 74
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\SidebarWidgetsTab-dispatch.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 93, 0, 0, 0, 0, 0, 0, 0, 9, 16, 118
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\TextWidgetEditor.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 163, 0, 0, 0, 0, 0, 0, 0, 0, 10, 173
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\TimeWidgetEditor.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, 0, 0, 0, 10, 60
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\altitudePresentation.test.js", "JavaScript", 0, 0, 0, 27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 33
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\rasterSelection.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 137, 0, 0, 0, 0, 0, 0, 0, 0, 18, 155
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\useWidgetManager.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 179, 0, 0, 0, 0, 0, 0, 0, 0, 15, 194
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\widgetDefaults.test.js", "JavaScript", 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 3, 18
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-editor\widgetEditorSections-api.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 61, 0, 0, 0, 0, 0, 0, 0, 6, 19, 86
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\BackdropRenderer.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 136, 0, 0, 0, 0, 0, 0, 0, 0, 12, 148
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\ElevationRenderer.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 134, 0, 0, 0, 0, 0, 0, 0, 1, 15, 150
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\LabelSelectionBounds.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 124, 0, 0, 0, 0, 0, 0, 0, 0, 4, 128
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\LetterSpacing.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 107, 0, 0, 0, 0, 0, 0, 0, 0, 8, 115
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\TextRenderer.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 0, 5, 48
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\WidgetPreview-dispatch.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 86, 0, 0, 0, 0, 0, 0, 0, 10, 13, 109
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\formatUtils.test.js", "JavaScript", 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 39
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\gaugeBarGeometry.test.js", "JavaScript", 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 65
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\metricWidgetPreviewModel.test.js", "JavaScript", 0, 0, 0, 523, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50, 573
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\plotPreviewStyle.test.jsx", "JavaScript JSX", 0, 0, 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 8, 65
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\svgPreviewUtils.test.js", "JavaScript", 0, 0, 0, 142, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22, 164
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\useElevationPreviewGeometry.test.js", "JavaScript", 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 309
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\useFontMetrics.test.js", "JavaScript", 0, 0, 0, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 59
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\useRoutePreviewGeometry.test.js", "JavaScript", 0, 0, 0, 202, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 28, 236
+"e:\Github\cyclemetry-reloaded\app\src\tests\features\widget-preview\wave1Formatting.test.js", "JavaScript", 0, 0, 0, 596, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 67, 664
+"e:\Github\cyclemetry-reloaded\app\src\tests\i18n\language-preference.test.js", "JavaScript", 0, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 48
+"e:\Github\cyclemetry-reloaded\app\src\tests\i18n\locales.test.js", "JavaScript", 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 18
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\activity\gpx-parser.test.js", "JavaScript", 0, 0, 0, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 67
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\activity\igc-parser.test.js", "JavaScript", 0, 0, 0, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 14, 78
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\activity\srt-parser.test.js", "JavaScript", 0, 0, 0, 133, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 145
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\backend.extract-video-telemetry.test.js", "JavaScript", 0, 0, 0, 27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 38
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\backend.test.js", "JavaScript", 0, 0, 0, 81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 101
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\backendErrorMessage.test.js", "JavaScript", 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 19
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\cached-promise.test.js", "JavaScript", 0, 0, 0, 59, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 78
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\display-type-behavior.test.js", "JavaScript", 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 29
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\file-dialog-project-directory.test.js", "JavaScript", 0, 0, 0, 45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 56
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\fonts.test.js", "JavaScript", 0, 0, 0, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 60
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\import-activity-boundary.test.js", "JavaScript", 0, 0, 0, 132, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23, 155
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\interpolation.test.js", "JavaScript", 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 36
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\keyboard-shortcuts.test.js", "JavaScript", 0, 0, 0, 59, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 73
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\previewPerf.test.js", "JavaScript", 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 11, 69
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\previewTiming.test.js", "JavaScript", 0, 0, 0, 21, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 26
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\tauri-runtime.test.js", "JavaScript", 0, 0, 0, 21, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 27
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\templateState.test.js", "JavaScript", 0, 0, 0, 485, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 82, 595
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\widget-config.test.js", "JavaScript", 0, 0, 0, 240, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 50, 306
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\widget-draft.test.js", "JavaScript", 0, 0, 0, 144, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 157
+"e:\Github\cyclemetry-reloaded\app\src\tests\lib\widget-resolver.test.js", "JavaScript", 0, 0, 0, 383, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 68, 458
+"e:\Github\cyclemetry-reloaded\app\src\tests\store\configSynchronization.test.js", "JavaScript", 0, 0, 0, 90, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 31, 137
+"e:\Github\cyclemetry-reloaded\app\src\tests\store\editor-slice-transient.test.js", "JavaScript", 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 52
+"e:\Github\cyclemetry-reloaded\app\src\tests\store\slices\createEditorSlice.selection.test.js", "JavaScript", 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 22, 94
+"e:\Github\cyclemetry-reloaded\app\src\tests\store\slices\createLayoutSlice.test.js", "JavaScript", 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18, 75
+"e:\Github\cyclemetry-reloaded\app\src\tests\store\slices\createManualVideoSyncSlice.test.js", "JavaScript", 0, 0, 0, 179, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 219
+"e:\Github\cyclemetry-reloaded\app\src\tests\store\slices\createMediaSlice.mp4-activity.test.js", "JavaScript", 0, 0, 0, 296, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 85, 381
+"e:\Github\cyclemetry-reloaded\app\src\tests\store\slices\createMediaSlice.mp4-lifecycle.test.js", "JavaScript", 0, 0, 0, 139, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 179
+"e:\Github\cyclemetry-reloaded\app\src\tests\store\slices\createTemplateSlice.test.js", "JavaScript", 0, 0, 0, 139, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 38, 191
+"e:\Github\cyclemetry-reloaded\app\src\tests\store\slices\createVideoImportSlice.timezoneMode.test.js", "JavaScript", 0, 0, 0, 155, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 12, 170
+"e:\Github\cyclemetry-reloaded\app\src\tests\store\store-utils.test.js", "JavaScript", 0, 0, 0, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 25, 147
+"e:\Github\cyclemetry-reloaded\app\src\tests\store\useStore.node.test.js", "JavaScript", 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 6, 28
+"e:\Github\cyclemetry-reloaded\app\src\tests\store\useStore.test.js", "JavaScript", 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 16
+"e:\Github\cyclemetry-reloaded\app\src\tests\store\useStore.window-leak.test.js", "JavaScript", 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 21
+"e:\Github\cyclemetry-reloaded\app\vite.config.js", "JavaScript", 0, 0, 0, 92, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 12, 112
+"e:\Github\cyclemetry-reloaded\app\vitest.config.js", "JavaScript", 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 4, 26
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\display-mode-best-lap.svg", "XML", 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\display-mode-delta.svg", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\display-mode-lap-log.svg", "XML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\display-type-arc.svg", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\display-type-circle.svg", "XML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\display-type-corner.svg", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\display-type-g-force.svg", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\display-type-heading-tape.svg", "XML", 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\display-type-lean-angle.svg", "XML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\display-type-linear.svg", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\display-type-rectangle.svg", "XML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\display-type-text.svg", "XML", 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-air-pressure.svg", "XML", 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-altitude.svg", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-aperture.svg", "XML", 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 10
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-arrow-up-narrow-wide.svg", "XML", 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 8
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-brake-position.svg", "XML", 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-cadence.svg", "XML", 0, 0, 54, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 55
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-calories.svg", "XML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-color-temperature.svg", "XML", 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 11
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-core-temperature.svg", "XML", 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 11
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-course.svg", "XML", 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-distance.svg", "XML", 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 8
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-elevation.svg", "XML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-engine-load.svg", "XML", 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 10
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-ev.svg", "XML", 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-focal-length.svg", "XML", 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-g-force.svg", "XML", 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 10
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-gear-position.svg", "XML", 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 12
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-gradient.svg", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-ground-contact-time.svg", "XML", 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 8
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-heading.svg", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-heartrate.svg", "XML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-house.svg", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-iso.svg", "XML", 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-lean-angle.svg", "XML", 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-left-right-balance.svg", "XML", 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-pace.svg", "XML", 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-power.svg", "XML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-rpm.svg", "XML", 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-satellite.svg", "XML", 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 8
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-shutter-speed.svg", "XML", 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-speed.svg", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-stride-length.svg", "XML", 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-stroke-rate.svg", "XML", 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-temperature.svg", "XML", 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-throttle-position.svg", "XML", 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 9
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-time.svg", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-torque.svg", "XML", 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-vertical-oscillation.svg", "XML", 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 17
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-vertical-ratio.svg", "XML", 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2
+"e:\Github\cyclemetry-reloaded\assets\widget-icons\widget-vertical-speed.svg", "XML", 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2
+"e:\Github\cyclemetry-reloaded\pnpm-workspace.yaml", "YAML", 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3
+"e:\Github\cyclemetry-reloaded\scripts\build-environment.mjs", "JavaScript", 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 9
+"e:\Github\cyclemetry-reloaded\scripts\build-skia-wasm.mjs", "JavaScript", 0, 0, 0, 131, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 5, 147
+"e:\Github\cyclemetry-reloaded\scripts\build-wasm.mjs", "JavaScript", 0, 0, 0, 81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 6, 91
+"e:\Github\cyclemetry-reloaded\scripts\create-latest-json.mjs", "JavaScript", 0, 0, 0, 226, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 251
+"e:\Github\cyclemetry-reloaded\scripts\install-ffmpeg.mjs", "JavaScript", 0, 0, 0, 332, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 54, 386
+"e:\Github\cyclemetry-reloaded\scripts\package-portable.mjs", "JavaScript", 0, 0, 0, 396, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 58, 456
+"e:\Github\cyclemetry-reloaded\scripts\packaging-resources.mjs", "JavaScript", 0, 0, 0, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 16, 188
+"e:\Github\cyclemetry-reloaded\scripts\prepare-packaging-resources.mjs", "JavaScript", 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 11
+"e:\Github\cyclemetry-reloaded\scripts\set-release-version.mjs", "JavaScript", 0, 0, 0, 86, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22, 108
+"e:\Github\cyclemetry-reloaded\scripts\tauri.mjs", "JavaScript", 0, 0, 0, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 61
+"e:\Github\cyclemetry-reloaded\scripts\vite-wasm.mjs", "JavaScript", 0, 0, 0, 115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6, 122
+"e:\Github\cyclemetry-reloaded\src-tauri\Cargo.lock", "TOML", 0, 5782, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 610, 6394
+"e:\Github\cyclemetry-reloaded\src-tauri\Cargo.toml", "TOML", 0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6, 49
+"e:\Github\cyclemetry-reloaded\src-tauri\build.rs", "Rust", 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 8, 2, 16
+"e:\Github\cyclemetry-reloaded\src-tauri\icons\android\mipmap-anydpi-v26\ic_launcher.xml", "XML", 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5
+"e:\Github\cyclemetry-reloaded\src-tauri\icons\android\values\ic_launcher_background.xml", "XML", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4
+"e:\Github\cyclemetry-reloaded\src-tauri\icons\icon.svg", "XML", 0, 0, 135, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 138
+"e:\Github\cyclemetry-reloaded\src-tauri\icons\logo.svg", "XML", 0, 0, 142, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 145
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\Cargo.toml", "TOML", 0, 29, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 39
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\build.rs", "Rust", 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 19, 8, 75
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\patches\telemetry-parser-dji-camera-metadata.patch", "Diff", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73, 0, 0, 0, 3, 76
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\csv\columns.rs", "Rust", 0, 0, 0, 0, 462, 0, 0, 0, 0, 0, 0, 0, 0, 38, 20, 520
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\csv\data.rs", "Rust", 0, 0, 0, 0, 61, 0, 0, 0, 0, 0, 0, 0, 0, 17, 9, 87
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\csv\headers.rs", "Rust", 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 6, 2, 12
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\csv\metrics.rs", "Rust", 0, 0, 0, 0, 194, 0, 0, 0, 0, 0, 0, 0, 0, 43, 17, 254
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\csv\mod.rs", "Rust", 0, 0, 0, 0, 154, 0, 0, 0, 0, 0, 0, 0, 0, 63, 16, 233
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\csv\parser.rs", "Rust", 0, 0, 0, 0, 522, 0, 0, 0, 0, 0, 0, 0, 0, 49, 19, 590
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\csv\timing.rs", "Rust", 0, 0, 0, 0, 222, 0, 0, 0, 0, 0, 0, 0, 0, 54, 20, 296
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\csv\types.rs", "Rust", 0, 0, 0, 0, 58, 0, 0, 0, 0, 0, 0, 0, 0, 44, 9, 111
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\csv\units.rs", "Rust", 0, 0, 0, 0, 196, 0, 0, 0, 0, 0, 0, 0, 0, 60, 14, 270
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\elevation.rs", "Rust", 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 26
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\finalize.rs", "Rust", 0, 0, 0, 0, 807, 0, 0, 0, 0, 0, 0, 0, 0, 78, 50, 935
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\finalize\gap.rs", "Rust", 0, 0, 0, 0, 380, 0, 0, 0, 0, 0, 0, 0, 0, 80, 37, 497
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\finalize\metrics.rs", "Rust", 0, 0, 0, 0, 815, 0, 0, 0, 0, 0, 0, 0, 0, 94, 72, 981
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\finalize\smoothing.rs", "Rust", 0, 0, 0, 0, 130, 0, 0, 0, 0, 0, 0, 0, 0, 14, 23, 167
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\interpolate.rs", "Rust", 0, 0, 0, 0, 643, 0, 0, 0, 0, 0, 0, 0, 0, 58, 20, 721
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\lap_timing\boundaries.rs", "Rust", 0, 0, 0, 0, 208, 0, 0, 0, 0, 0, 0, 0, 0, 35, 23, 266
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\lap_timing\delta.rs", "Rust", 0, 0, 0, 0, 160, 0, 0, 0, 0, 0, 0, 0, 0, 24, 17, 201
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\lap_timing\derive.rs", "Rust", 0, 0, 0, 0, 188, 0, 0, 0, 0, 0, 0, 0, 0, 24, 28, 240
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\lap_timing\mod.rs", "Rust", 0, 0, 0, 0, 112, 0, 0, 0, 0, 0, 0, 0, 0, 23, 9, 144
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\metric_ranges.rs", "Rust", 0, 0, 0, 0, 66, 0, 0, 0, 0, 0, 0, 0, 0, 3, 4, 73
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\mod.rs", "Rust", 0, 0, 0, 0, 123, 0, 0, 0, 0, 0, 0, 0, 0, 26, 10, 159
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\schema.rs", "Rust", 0, 0, 0, 0, 543, 0, 0, 0, 0, 0, 0, 0, 0, 334, 25, 902
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\tcx\mod.rs", "Rust", 0, 0, 0, 0, 41, 0, 0, 0, 0, 0, 0, 0, 0, 6, 6, 53
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\tcx\parser.rs", "Rust", 0, 0, 0, 0, 217, 0, 0, 0, 0, 0, 0, 0, 0, 8, 9, 234
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\trim.rs", "Rust", 0, 0, 0, 0, 849, 0, 0, 0, 0, 0, 0, 0, 0, 52, 19, 920
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\vbo\channels.rs", "Rust", 0, 0, 0, 0, 553, 0, 0, 0, 0, 0, 0, 0, 0, 88, 29, 670
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\activity\vbo\mod.rs", "Rust", 0, 0, 0, 0, 562, 0, 0, 0, 0, 0, 0, 0, 0, 66, 43, 671
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\benchmark_common.rs", "Rust", 0, 0, 0, 0, 76, 0, 0, 0, 0, 0, 0, 0, 0, 63, 23, 162
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\bin\benchmark_composite.rs", "Rust", 0, 0, 0, 0, 403, 0, 0, 0, 0, 0, 0, 0, 0, 43, 55, 501
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\bin\benchmark_transparent.rs", "Rust", 0, 0, 0, 0, 323, 0, 0, 0, 0, 0, 0, 0, 0, 40, 51, 414
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\bin\benchmark_widget_rate.rs", "Rust", 0, 0, 0, 0, 431, 0, 0, 0, 0, 0, 0, 0, 0, 43, 62, 536
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\bin\render_preview.rs", "Rust", 0, 0, 0, 0, 191, 0, 0, 0, 0, 0, 0, 0, 0, 41, 20, 252
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\bin\render_video.rs", "Rust", 0, 0, 0, 0, 93, 0, 0, 0, 0, 0, 0, 0, 0, 32, 9, 134
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\bin\validate_activity.rs", "Rust", 0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 16, 7, 51
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\bin_common.rs", "Rust", 0, 0, 0, 0, 52, 0, 0, 0, 0, 0, 0, 0, 0, 23, 10, 85
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\commands\elevation_geometry.rs", "Rust", 0, 0, 0, 0, 59, 0, 0, 0, 0, 0, 0, 0, 0, 24, 10, 93
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\commands\mod.rs", "Rust", 0, 0, 0, 0, 338, 0, 0, 0, 0, 0, 0, 0, 0, 72, 46, 456
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\commands\route_geometry.rs", "Rust", 0, 0, 0, 0, 54, 0, 0, 0, 0, 0, 0, 0, 0, 22, 10, 86
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\debug\mod.rs", "Rust", 0, 0, 0, 0, 80, 0, 0, 0, 0, 0, 0, 0, 0, 33, 10, 123
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\debug\composite.rs", "Rust", 0, 0, 0, 0, 187, 0, 0, 0, 0, 0, 0, 0, 0, 24, 13, 224
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\debug\mod.rs", "Rust", 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 9
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\debug\video.rs", "Rust", 0, 0, 0, 0, 232, 0, 0, 0, 0, 0, 0, 0, 0, 23, 17, 272
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\ffmpeg\binary.rs", "Rust", 0, 0, 0, 0, 61, 0, 0, 0, 0, 0, 0, 0, 0, 13, 13, 87
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\ffmpeg\catalog.rs", "Rust", 0, 0, 0, 0, 442, 0, 0, 0, 0, 0, 0, 0, 0, 28, 25, 495
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\ffmpeg\composite.rs", "Rust", 0, 0, 0, 0, 311, 0, 0, 0, 0, 0, 0, 0, 0, 47, 25, 383
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\ffmpeg\composite_filters.rs", "Rust", 0, 0, 0, 0, 139, 0, 0, 0, 0, 0, 0, 0, 0, 41, 13, 193
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\ffmpeg\composite_profiles.rs", "Rust", 0, 0, 0, 0, 456, 0, 0, 0, 0, 0, 0, 0, 0, 9, 18, 483
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\ffmpeg\detect.rs", "Rust", 0, 0, 0, 0, 229, 0, 0, 0, 0, 0, 0, 0, 0, 86, 16, 331
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\ffmpeg\mod.rs", "Rust", 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 12
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\ffmpeg\probes.rs", "Rust", 0, 0, 0, 0, 200, 0, 0, 0, 0, 0, 0, 0, 0, 14, 17, 231
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\ffmpeg\settings.rs", "Rust", 0, 0, 0, 0, 103, 0, 0, 0, 0, 0, 0, 0, 0, 21, 8, 132
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\ffmpeg\transparent_profiles.rs", "Rust", 0, 0, 0, 0, 95, 0, 0, 0, 0, 0, 0, 0, 0, 12, 9, 116
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\fps.rs", "Rust", 0, 0, 0, 0, 110, 0, 0, 0, 0, 0, 0, 0, 0, 35, 16, 161
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\mod.rs", "Rust", 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 24, 2, 34
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\pipeline\buffers.rs", "Rust", 0, 0, 0, 0, 230, 0, 0, 0, 0, 0, 0, 0, 0, 11, 19, 260
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\pipeline\diagnostics.rs", "Rust", 0, 0, 0, 0, 111, 0, 0, 0, 0, 0, 0, 0, 0, 14, 15, 140
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\pipeline\frames.rs", "Rust", 0, 0, 0, 0, 497, 0, 0, 0, 0, 0, 0, 0, 0, 15, 34, 546
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\pipeline\mod.rs", "Rust", 0, 0, 0, 0, 302, 0, 0, 0, 0, 0, 0, 0, 0, 5, 14, 321
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\pipeline\process.rs", "Rust", 0, 0, 0, 0, 550, 0, 0, 0, 0, 0, 0, 0, 0, 28, 45, 623
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\plan.rs", "Rust", 0, 0, 0, 0, 69, 0, 0, 0, 0, 0, 0, 0, 0, 5, 11, 85
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\progress.rs", "Rust", 0, 0, 0, 0, 362, 0, 0, 0, 0, 0, 0, 0, 0, 36, 49, 447
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\quality.rs", "Rust", 0, 0, 0, 0, 71, 0, 0, 0, 0, 0, 0, 0, 0, 5, 7, 83
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\encode\video_timing.rs", "Rust", 0, 0, 0, 0, 71, 0, 0, 0, 0, 0, 0, 0, 0, 8, 6, 85
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\error.rs", "Rust", 0, 0, 0, 0, 124, 0, 0, 0, 0, 0, 0, 0, 0, 25, 19, 168
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\fonts.rs", "Rust", 0, 0, 0, 0, 471, 0, 0, 0, 0, 0, 0, 0, 0, 19, 26, 516
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\lib.rs", "Rust", 0, 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 0, 25, 3, 46
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\dji_ac004\mod.rs", "Rust", 0, 0, 0, 0, 112, 0, 0, 0, 0, 0, 0, 0, 0, 37, 21, 170
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\dji_ac004\parser.rs", "Rust", 0, 0, 0, 0, 122, 0, 0, 0, 0, 0, 0, 0, 0, 36, 21, 179
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\dji_ac004\protobuf.rs", "Rust", 0, 0, 0, 0, 121, 0, 0, 0, 0, 0, 0, 0, 0, 32, 17, 170
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\mod.rs", "Rust", 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 13, 3, 26
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\mp4_telemetry\activity.rs", "Rust", 0, 0, 0, 0, 366, 0, 0, 0, 0, 0, 0, 0, 0, 13, 17, 396
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\mp4_telemetry\extraction.rs", "Rust", 0, 0, 0, 0, 627, 0, 0, 0, 0, 0, 0, 0, 0, 47, 58, 732
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\mp4_telemetry\mod.rs", "Rust", 0, 0, 0, 0, 399, 0, 0, 0, 0, 0, 0, 0, 0, 100, 58, 557
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\mp4_telemetry\smoothing.rs", "Rust", 0, 0, 0, 0, 35, 0, 0, 0, 0, 0, 0, 0, 0, 20, 6, 61
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\mp4_telemetry\tags.rs", "Rust", 0, 0, 0, 0, 84, 0, 0, 0, 0, 0, 0, 0, 0, 32, 13, 129
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\mp4_telemetry\vendor.rs", "Rust", 0, 0, 0, 0, 180, 0, 0, 0, 0, 0, 0, 0, 0, 27, 18, 225
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\native_sample.rs", "Rust", 0, 0, 0, 0, 69, 0, 0, 0, 0, 0, 0, 0, 0, 25, 10, 104
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\prepared_video.rs", "Rust", 0, 0, 0, 0, 223, 0, 0, 0, 0, 0, 0, 0, 0, 14, 13, 250
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\source_video_metadata.rs", "Rust", 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 13, 4, 48
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\telemetry_math.rs", "Rust", 0, 0, 0, 0, 123, 0, 0, 0, 0, 0, 0, 0, 0, 60, 17, 200
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\time.rs", "Rust", 0, 0, 0, 0, 107, 0, 0, 0, 0, 0, 0, 0, 0, 22, 22, 151
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\timezone.rs", "Rust", 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 6, 9, 47
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\media\video_probe.rs", "Rust", 0, 0, 0, 0, 223, 0, 0, 0, 0, 0, 0, 0, 0, 61, 29, 313
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\normalize\elevation.rs", "Rust", 0, 0, 0, 0, 215, 0, 0, 0, 0, 0, 0, 0, 0, 7, 19, 241
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\normalize\mod.rs", "Rust", 0, 0, 0, 0, 381, 0, 0, 0, 0, 0, 0, 0, 0, 22, 26, 429
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\normalize\raster.rs", "Rust", 0, 0, 0, 0, 223, 0, 0, 0, 0, 0, 0, 0, 0, 6, 21, 250
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\normalize\raw\mod.rs", "Rust", 0, 0, 0, 0, 545, 0, 0, 0, 0, 0, 0, 0, 0, 38, 52, 635
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\normalize\route.rs", "Rust", 0, 0, 0, 0, 103, 0, 0, 0, 0, 0, 0, 0, 0, 6, 10, 119
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\normalize\scene.rs", "Rust", 0, 0, 0, 0, 147, 0, 0, 0, 0, 0, 0, 0, 0, 15, 14, 176
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\output.rs", "Rust", 0, 0, 0, 0, 392, 0, 0, 0, 0, 0, 0, 0, 0, 9, 34, 435
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\paths.rs", "Rust", 0, 0, 0, 0, 80, 0, 0, 0, 0, 0, 0, 0, 0, 27, 11, 118
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\raster.rs", "Rust", 0, 0, 0, 0, 240, 0, 0, 0, 0, 0, 0, 0, 0, 5, 26, 271
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\rdp.rs", "Rust", 0, 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 32, 12, 101
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\format.rs", "Rust", 0, 0, 0, 0, 94, 0, 0, 0, 0, 0, 0, 0, 0, 21, 11, 126
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\mod.rs", "Rust", 0, 0, 0, 0, 640, 0, 0, 0, 0, 0, 0, 0, 0, 65, 44, 749
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\raster.rs", "Rust", 0, 0, 0, 0, 176, 0, 0, 0, 0, 0, 0, 0, 0, 2, 11, 189
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\static_layer.rs", "Rust", 0, 0, 0, 0, 160, 0, 0, 0, 0, 0, 0, 0, 0, 8, 10, 178
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\surface.rs", "Rust", 0, 0, 0, 0, 39, 0, 0, 0, 0, 0, 0, 0, 0, 24, 6, 69
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\text.rs", "Rust", 0, 0, 0, 0, 84, 0, 0, 0, 0, 0, 0, 0, 0, 14, 6, 104
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\common.rs", "Rust", 0, 0, 0, 0, 351, 0, 0, 0, 0, 0, 0, 0, 0, 40, 35, 426
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\elevation\draw.rs", "Rust", 0, 0, 0, 0, 186, 0, 0, 0, 0, 0, 0, 0, 0, 19, 8, 213
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\elevation\frame_state.rs", "Rust", 0, 0, 0, 0, 197, 0, 0, 0, 0, 0, 0, 0, 0, 22, 22, 241
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\elevation\mod.rs", "Rust", 0, 0, 0, 0, 14, 0, 0, 0, 0, 0, 0, 0, 0, 13, 3, 30
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\elevation\normalize.rs", "Rust", 0, 0, 0, 0, 54, 0, 0, 0, 0, 0, 0, 0, 0, 4, 3, 61
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\elevation\prepare.rs", "Rust", 0, 0, 0, 0, 236, 0, 0, 0, 0, 0, 0, 0, 0, 21, 15, 272
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\elevation\reduction.rs", "Rust", 0, 0, 0, 0, 230, 0, 0, 0, 0, 0, 0, 0, 0, 35, 27, 292
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\g_force\draw.rs", "Rust", 0, 0, 0, 0, 59, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 62
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\g_force\mod.rs", "Rust", 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 8
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\g_force\prepare.rs", "Rust", 0, 0, 0, 0, 59, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 64
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\gauges\mod.rs", "Rust", 0, 0, 0, 0, 70, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6, 77
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\geometry.rs", "Rust", 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 12, 2, 17
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\heading\mod.rs", "Rust", 0, 0, 0, 0, 58, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 62
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\lap_timer\mod.rs", "Rust", 0, 0, 0, 0, 107, 0, 0, 0, 0, 0, 0, 0, 0, 2, 6, 115
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\lean_angle\mod.rs", "Rust", 0, 0, 0, 0, 46, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 49
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\marker.rs", "Rust", 0, 0, 0, 0, 84, 0, 0, 0, 0, 0, 0, 0, 0, 18, 8, 110
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\metric_presentation.rs", "Rust", 0, 0, 0, 0, 109, 0, 0, 0, 0, 0, 0, 0, 0, 30, 8, 147
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\mod.rs", "Rust", 0, 0, 0, 0, 170, 0, 0, 0, 0, 0, 0, 0, 0, 29, 13, 212
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\polyline.rs", "Rust", 0, 0, 0, 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 16, 7, 98
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\route\curve.rs", "Rust", 0, 0, 0, 0, 198, 0, 0, 0, 0, 0, 0, 0, 0, 7, 25, 230
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\route\draw.rs", "Rust", 0, 0, 0, 0, 63, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 73
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\route\frame_state.rs", "Rust", 0, 0, 0, 0, 105, 0, 0, 0, 0, 0, 0, 0, 0, 15, 5, 125
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\route\mod.rs", "Rust", 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 14, 3, 27
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\route\normalize.rs", "Rust", 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 4, 3, 47
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\route\prepare.rs", "Rust", 0, 0, 0, 0, 312, 0, 0, 0, 0, 0, 0, 0, 0, 19, 19, 350
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\route\simplify.rs", "Rust", 0, 0, 0, 0, 63, 0, 0, 0, 0, 0, 0, 0, 0, 11, 12, 86
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\tests\elevation_frame_state_tests.rs", "Rust", 0, 0, 0, 0, 320, 0, 0, 0, 0, 0, 0, 0, 0, 35, 27, 382
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\tests\elevation_geometry_tests.rs", "Rust", 0, 0, 0, 0, 110, 0, 0, 0, 0, 0, 0, 0, 0, 21, 12, 143
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\tests\elevation_reduction_tests.rs", "Rust", 0, 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 0, 30, 14, 132
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\tests\g_force_frame_state_tests.rs", "Rust", 0, 0, 0, 0, 233, 0, 0, 0, 0, 0, 0, 0, 0, 1, 24, 258
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\tests\gauge_metric_tests.rs", "Rust", 0, 0, 0, 0, 56, 0, 0, 0, 0, 0, 0, 0, 0, 5, 6, 67
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\tests\mod.rs", "Rust", 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 10, 2, 19
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\tests\rdp_elevation_tests.rs", "Rust", 0, 0, 0, 0, 71, 0, 0, 0, 0, 0, 0, 0, 0, 22, 9, 102
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\tests\rdp_route_tests.rs", "Rust", 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, 0, 0, 0, 20, 8, 78
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\transform.rs", "Rust", 0, 0, 0, 0, 41, 0, 0, 0, 0, 0, 0, 0, 0, 16, 4, 61
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\types.rs", "Rust", 0, 0, 0, 0, 337, 0, 0, 0, 0, 0, 0, 0, 0, 45, 37, 419
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\value\layout.rs", "Rust", 0, 0, 0, 0, 44, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 46
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render\widgets\value\mod.rs", "Rust", 0, 0, 0, 0, 391, 0, 0, 0, 0, 0, 0, 0, 0, 30, 16, 437
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render_jobs\batch.rs", "Rust", 0, 0, 0, 0, 235, 0, 0, 0, 0, 0, 0, 0, 0, 8, 16, 259
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render_jobs\batch_state.rs", "Rust", 0, 0, 0, 0, 345, 0, 0, 0, 0, 0, 0, 0, 0, 4, 17, 366
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render_jobs\contracts.rs", "Rust", 0, 0, 0, 0, 193, 0, 0, 0, 0, 0, 0, 0, 0, 50, 21, 264
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render_jobs\execution.rs", "Rust", 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 24, 25, 322
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render_jobs\inspection.rs", "Rust", 0, 0, 0, 0, 289, 0, 0, 0, 0, 0, 0, 0, 0, 17, 37, 343
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render_jobs\mod.rs", "Rust", 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 12
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render_jobs\planning.rs", "Rust", 0, 0, 0, 0, 597, 0, 0, 0, 0, 0, 0, 0, 0, 19, 30, 646
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\src\render_jobs\submission.rs", "Rust", 0, 0, 0, 0, 150, 0, 0, 0, 0, 0, 0, 0, 0, 2, 6, 158
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\activity_extraction_tests.rs", "Rust", 0, 0, 0, 0, 227, 0, 0, 0, 0, 0, 0, 0, 0, 14, 29, 270
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\activity_tests.rs", "Rust", 0, 0, 0, 0, 601, 0, 0, 0, 0, 0, 0, 0, 0, 8, 61, 670
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\arc_gauge_tests.rs", "Rust", 0, 0, 0, 0, 254, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22, 276
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\backdrop_contract_tests.rs", "Rust", 0, 0, 0, 0, 650, 0, 0, 0, 0, 0, 0, 0, 0, 0, 58, 708
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\batch_render_tests.rs", "Rust", 0, 0, 0, 0, 668, 0, 0, 0, 0, 0, 0, 0, 0, 5, 24, 697
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\cancellation_tests.rs", "Rust", 0, 0, 0, 0, 116, 0, 0, 0, 0, 0, 0, 0, 0, 6, 9, 131
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\canvas_parity_tests.rs", "Rust", 0, 0, 0, 0, 311, 0, 0, 0, 0, 0, 0, 0, 0, 32, 21, 364
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\codec_detect_tests.rs", "Rust", 0, 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 0, 13, 4, 39
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\commands_tests.rs", "Rust", 0, 0, 0, 0, 503, 0, 0, 0, 0, 0, 0, 0, 0, 92, 45, 640
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\common\builders.rs", "Rust", 0, 0, 0, 0, 268, 0, 0, 0, 0, 0, 0, 0, 0, 9, 18, 295
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\common\canvas_parity.rs", "Rust", 0, 0, 0, 0, 1366, 0, 0, 0, 0, 0, 0, 0, 0, 301, 175, 1842
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\common\composite.rs", "Rust", 0, 0, 0, 0, 446, 0, 0, 0, 0, 0, 0, 0, 0, 68, 34, 548
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\common\mod.rs", "Rust", 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 10, 2, 16
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\common\render_baseline_support.rs", "Rust", 0, 0, 0, 0, 783, 0, 0, 0, 0, 0, 0, 0, 0, 90, 81, 954
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\common\seam.rs", "Rust", 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 55
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\common\test_config.rs", "Rust", 0, 0, 0, 0, 52, 0, 0, 0, 0, 0, 0, 0, 0, 23, 14, 89
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\composite_profile_tests.rs", "Rust", 0, 0, 0, 0, 46, 0, 0, 0, 0, 0, 0, 0, 0, 11, 8, 65
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\config_tests.rs", "Rust", 0, 0, 0, 0, 567, 0, 0, 0, 0, 0, 0, 0, 0, 6, 43, 616
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\corner_gauge_tests.rs", "Rust", 0, 0, 0, 0, 227, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 247
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\csv_activity.rs", "Rust", 0, 0, 0, 0, 1484, 0, 0, 0, 0, 0, 0, 0, 0, 1, 205, 1690
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\display_type_tests.rs", "Rust", 0, 0, 0, 0, 238, 0, 0, 0, 0, 0, 0, 0, 0, 5, 19, 262
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\dji_ac004_tests.rs", "Rust", 0, 0, 0, 0, 272, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 299
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\elevation_geometry_tests.rs", "Rust", 0, 0, 0, 0, 231, 0, 0, 0, 0, 0, 0, 0, 0, 26, 25, 282
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\error_display_tests.rs", "Rust", 0, 0, 0, 0, 73, 0, 0, 0, 0, 0, 0, 0, 0, 13, 10, 96
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\ffmpeg_composite_tests.rs", "Rust", 0, 0, 0, 0, 664, 0, 0, 0, 0, 0, 0, 0, 0, 34, 62, 760
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\ffmpeg_settings_tests.rs", "Rust", 0, 0, 0, 0, 197, 0, 0, 0, 0, 0, 0, 0, 0, 16, 24, 237
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\font_weight_tests.rs", "Rust", 0, 0, 0, 0, 396, 0, 0, 0, 0, 0, 0, 0, 0, 2, 15, 413
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\format_tests.rs", "Rust", 0, 0, 0, 0, 351, 0, 0, 0, 0, 0, 0, 0, 0, 5, 26, 382
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\fps_tests.rs", "Rust", 0, 0, 0, 0, 114, 0, 0, 0, 0, 0, 0, 0, 0, 22, 17, 153
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\gradient_format_tests.rs", "Rust", 0, 0, 0, 0, 142, 0, 0, 0, 0, 0, 0, 0, 0, 9, 21, 172
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\heading_data_tests.rs", "Rust", 0, 0, 0, 0, 110, 0, 0, 0, 0, 0, 0, 0, 0, 5, 15, 130
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\heading_widget_tests.rs", "Rust", 0, 0, 0, 0, 398, 0, 0, 0, 0, 0, 0, 0, 0, 38, 55, 491
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\lap_timer_tests.rs", "Rust", 0, 0, 0, 0, 329, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 365
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\lean_angle_tests.rs", "Rust", 0, 0, 0, 0, 140, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 161
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\linear_gauge_tests.rs", "Rust", 0, 0, 0, 0, 276, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 297
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\metric_kind_serde_tests.rs", "Rust", 0, 0, 0, 0, 60, 0, 0, 0, 0, 0, 0, 0, 0, 14, 6, 80
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\metric_presentation_tests.rs", "Rust", 0, 0, 0, 0, 368, 0, 0, 0, 0, 0, 0, 0, 0, 22, 48, 438
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\mp4_telemetry_fixture_tests.rs", "Rust", 0, 0, 0, 0, 133, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18, 151
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\plot_multiplicity_tests.rs", "Rust", 0, 0, 0, 0, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 54
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\preview_canvas_parity_format_tests.rs", "Rust", 0, 0, 0, 0, 49, 0, 0, 0, 0, 0, 0, 0, 0, 6, 13, 68
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\progress_tests.rs", "Rust", 0, 0, 0, 0, 80, 0, 0, 0, 0, 0, 0, 0, 0, 46, 23, 149
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\rdp_tests.rs", "Rust", 0, 0, 0, 0, 62, 0, 0, 0, 0, 0, 0, 0, 0, 31, 10, 103
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\render_baseline_suite.rs", "Rust", 0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 14, 6, 48
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\render_execution_tests.rs", "Rust", 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 1, 9, 283
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\route_geometry_tests.rs", "Rust", 0, 0, 0, 0, 196, 0, 0, 0, 0, 0, 0, 0, 0, 26, 22, 244
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\scripts\canvas_screenshot.mjs", "JavaScript", 0, 0, 0, 236, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 302
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\standard_metrics_display_type_tests.rs", "Rust", 0, 0, 0, 0, 120, 0, 0, 0, 0, 0, 0, 0, 0, 16, 20, 156
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\tcx_activity.rs", "Rust", 0, 0, 0, 0, 143, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 154
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\value_widget_tests.rs", "Rust", 0, 0, 0, 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 21, 13, 109
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\vbo_activity.rs", "Rust", 0, 0, 0, 0, 302, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 342
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\video_composite_pipeline_tests.rs", "Rust", 0, 0, 0, 0, 756, 0, 0, 0, 0, 0, 0, 0, 0, 124, 73, 953
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\video_inspection_tests.rs", "Rust", 0, 0, 0, 0, 496, 0, 0, 0, 0, 0, 0, 0, 0, 4, 25, 525
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\video_probe_tests.rs", "Rust", 0, 0, 0, 0, 103, 0, 0, 0, 0, 0, 0, 0, 0, 22, 24, 149
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\wasm_metric_text_tests.rs", "Rust", 0, 0, 0, 0, 218, 0, 0, 0, 0, 0, 0, 0, 0, 2, 6, 226
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\wasm_widget_preview_tests.rs", "Rust", 0, 0, 0, 0, 1723, 0, 0, 0, 0, 0, 0, 0, 0, 8, 27, 1758
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_core\tests\wave1_format_tests.rs", "Rust", 0, 0, 0, 0, 685, 0, 0, 0, 0, 0, 0, 0, 0, 10, 55, 750
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\Cargo.toml", "TOML", 0, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 20
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\build.rs", "Rust", 0, 0, 0, 0, 56, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 60
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\activity.rs", "Rust", 0, 0, 0, 0, 366, 0, 0, 0, 0, 0, 0, 0, 0, 6, 14, 386
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\error.rs", "Rust", 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 10
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\interpolation.rs", "Rust", 0, 0, 0, 0, 92, 0, 0, 0, 0, 0, 0, 0, 0, 24, 8, 124
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\lib.rs", "Rust", 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 11
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\model\mod.rs", "Rust", 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 7
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\model\scene.rs", "Rust", 0, 0, 0, 0, 104, 0, 0, 0, 0, 0, 0, 0, 0, 2, 6, 112
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\model\standard_metrics.rs", "Rust", 0, 0, 0, 0, 379, 0, 0, 0, 0, 0, 0, 0, 0, 23, 43, 445
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\model\standard_widgets.rs", "Rust", 0, 0, 0, 0, 162, 0, 0, 0, 0, 0, 0, 0, 0, 6, 31, 199
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\model\types.rs", "Rust", 0, 0, 0, 0, 173, 0, 0, 0, 0, 0, 0, 0, 0, 40, 11, 224
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\model\validation.rs", "Rust", 0, 0, 0, 0, 166, 0, 0, 0, 0, 0, 0, 0, 0, 22, 24, 212
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\preview.rs", "Rust", 0, 0, 0, 0, 160, 0, 0, 0, 0, 0, 0, 0, 0, 3, 7, 170
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\preview_widget.rs", "Rust", 0, 0, 0, 0, 130, 0, 0, 0, 0, 0, 0, 0, 0, 3, 8, 141
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\render\icons.rs", "Rust", 0, 0, 0, 0, 235, 0, 0, 0, 0, 0, 0, 0, 0, 11, 15, 261
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\render\mod.rs", "Rust", 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 5
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\render\svg.rs", "Rust", 0, 0, 0, 0, 302, 0, 0, 0, 0, 0, 0, 0, 0, 42, 29, 373
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\render\text.rs", "Rust", 0, 0, 0, 0, 323, 0, 0, 0, 0, 0, 0, 0, 0, 36, 28, 387
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\backdrop\config.rs", "Rust", 0, 0, 0, 0, 60, 0, 0, 0, 0, 0, 0, 0, 0, 3, 4, 67
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\backdrop\frame.rs", "Rust", 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 36
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\backdrop\interaction.rs", "Rust", 0, 0, 0, 0, 44, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 49
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\backdrop\layout.rs", "Rust", 0, 0, 0, 0, 135, 0, 0, 0, 0, 0, 0, 0, 0, 1, 20, 156
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\backdrop\mod.rs", "Rust", 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\backdrop\preview.rs", "Rust", 0, 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 41
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\backdrop\validation.rs", "Rust", 0, 0, 0, 0, 164, 0, 0, 0, 0, 0, 0, 0, 0, 6, 15, 185
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\g_force\format.rs", "Rust", 0, 0, 0, 0, 73, 0, 0, 0, 0, 0, 0, 0, 0, 1, 9, 83
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\g_force\frame.rs", "Rust", 0, 0, 0, 0, 183, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 189
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\g_force\interaction.rs", "Rust", 0, 0, 0, 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 81
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\g_force\layout.rs", "Rust", 0, 0, 0, 0, 164, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, 172
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\g_force\mod.rs", "Rust", 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 8
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\g_force\preview.rs", "Rust", 0, 0, 0, 0, 97, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 102
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\g_force\validation.rs", "Rust", 0, 0, 0, 0, 161, 0, 0, 0, 0, 0, 0, 0, 0, 1, 12, 174
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\arc\geometry.rs", "Rust", 0, 0, 0, 0, 99, 0, 0, 0, 0, 0, 0, 0, 0, 20, 11, 130
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\arc\inner_widget.rs", "Rust", 0, 0, 0, 0, 70, 0, 0, 0, 0, 0, 0, 0, 0, 9, 8, 87
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\arc\layer.rs", "Rust", 0, 0, 0, 0, 223, 0, 0, 0, 0, 0, 0, 0, 0, 7, 15, 245
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\arc\mod.rs", "Rust", 0, 0, 0, 0, 149, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6, 156
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\arc\path.rs", "Rust", 0, 0, 0, 0, 330, 0, 0, 0, 0, 0, 0, 0, 0, 31, 31, 392
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\arc\segment.rs", "Rust", 0, 0, 0, 0, 300, 0, 0, 0, 0, 0, 0, 0, 0, 16, 21, 337
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\bar_geometry.rs", "Rust", 0, 0, 0, 0, 114, 0, 0, 0, 0, 0, 0, 0, 0, 1, 13, 128
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\frame.rs", "Rust", 0, 0, 0, 0, 94, 0, 0, 0, 0, 0, 0, 0, 0, 2, 10, 106
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\interaction.rs", "Rust", 0, 0, 0, 0, 91, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 96
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\linear\geometry.rs", "Rust", 0, 0, 0, 0, 87, 0, 0, 0, 0, 0, 0, 0, 0, 8, 6, 101
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\linear\labels.rs", "Rust", 0, 0, 0, 0, 102, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 116
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\linear\layer.rs", "Rust", 0, 0, 0, 0, 197, 0, 0, 0, 0, 0, 0, 0, 0, 8, 16, 221
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\linear\mod.rs", "Rust", 0, 0, 0, 0, 93, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 99
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\metric.rs", "Rust", 0, 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 0, 0, 2, 7, 46
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\mod.rs", "Rust", 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 12
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\preview.rs", "Rust", 0, 0, 0, 0, 65, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 70
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\track_path.rs", "Rust", 0, 0, 0, 0, 105, 0, 0, 0, 0, 0, 0, 0, 0, 10, 12, 127
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\validation\arc.rs", "Rust", 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 13, 23, 291
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\validation\linear.rs", "Rust", 0, 0, 0, 0, 197, 0, 0, 0, 0, 0, 0, 0, 0, 13, 15, 225
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gauges\validation\mod.rs", "Rust", 0, 0, 0, 0, 54, 0, 0, 0, 0, 0, 0, 0, 0, 1, 10, 65
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gradient\format.rs", "Rust", 0, 0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 20
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gradient\frame.rs", "Rust", 0, 0, 0, 0, 199, 0, 0, 0, 0, 0, 0, 0, 0, 4, 8, 211
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gradient\interaction.rs", "Rust", 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 51
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gradient\mod.rs", "Rust", 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 7
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gradient\preview.rs", "Rust", 0, 0, 0, 0, 99, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 104
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\gradient\validation.rs", "Rust", 0, 0, 0, 0, 147, 0, 0, 0, 0, 0, 0, 0, 0, 21, 22, 190
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\heading\frame.rs", "Rust", 0, 0, 0, 0, 104, 0, 0, 0, 0, 0, 0, 0, 0, 5, 4, 113
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\heading\geometry.rs", "Rust", 0, 0, 0, 0, 286, 0, 0, 0, 0, 0, 0, 0, 0, 62, 34, 382
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\heading\interaction.rs", "Rust", 0, 0, 0, 0, 103, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 109
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\heading\layout.rs", "Rust", 0, 0, 0, 0, 259, 0, 0, 0, 0, 0, 0, 0, 0, 8, 4, 271
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\heading\mod.rs", "Rust", 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 8
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\heading\preview.rs", "Rust", 0, 0, 0, 0, 91, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 96
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\heading\validation.rs", "Rust", 0, 0, 0, 0, 135, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 139
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\label\config.rs", "Rust", 0, 0, 0, 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 4, 6, 85
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\label\frame.rs", "Rust", 0, 0, 0, 0, 49, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 55
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\label\interaction.rs", "Rust", 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 23
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\label\mod.rs", "Rust", 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\label\preview.rs", "Rust", 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 34
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\label\style.rs", "Rust", 0, 0, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 41
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\label\validation.rs", "Rust", 0, 0, 0, 0, 65, 0, 0, 0, 0, 0, 0, 0, 0, 26, 18, 109
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lap_timer\format.rs", "Rust", 0, 0, 0, 0, 230, 0, 0, 0, 0, 0, 0, 0, 0, 3, 18, 251
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lap_timer\frame.rs", "Rust", 0, 0, 0, 0, 126, 0, 0, 0, 0, 0, 0, 0, 0, 1, 8, 135
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lap_timer\interaction.rs", "Rust", 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 52
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lap_timer\layout.rs", "Rust", 0, 0, 0, 0, 306, 0, 0, 0, 0, 0, 0, 0, 0, 1, 9, 316
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lap_timer\mod.rs", "Rust", 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 16
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lap_timer\preview.rs", "Rust", 0, 0, 0, 0, 115, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 121
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lap_timer\sampling.rs", "Rust", 0, 0, 0, 0, 129, 0, 0, 0, 0, 0, 0, 0, 0, 3, 8, 140
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lap_timer\validation.rs", "Rust", 0, 0, 0, 0, 113, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, 121
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lean_angle\format.rs", "Rust", 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 17
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lean_angle\frame.rs", "Rust", 0, 0, 0, 0, 244, 0, 0, 0, 0, 0, 0, 0, 0, 2, 5, 251
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lean_angle\interaction.rs", "Rust", 0, 0, 0, 0, 66, 0, 0, 0, 0, 0, 0, 0, 0, 2, 5, 73
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lean_angle\layout.rs", "Rust", 0, 0, 0, 0, 359, 0, 0, 0, 0, 0, 0, 0, 0, 3, 22, 384
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lean_angle\mod.rs", "Rust", 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 11
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lean_angle\preview.rs", "Rust", 0, 0, 0, 0, 92, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 97
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lean_angle\tests.rs", "Rust", 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 36
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\lean_angle\validation.rs", "Rust", 0, 0, 0, 0, 152, 0, 0, 0, 0, 0, 0, 0, 0, 2, 11, 165
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\mod.rs", "Rust", 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 13
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\raster\config.rs", "Rust", 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 45
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\raster\error.rs", "Rust", 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 55
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\raster\frame.rs", "Rust", 0, 0, 0, 0, 76, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 82
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\raster\image.rs", "Rust", 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 44
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\raster\interaction.rs", "Rust", 0, 0, 0, 0, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 52
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\raster\mod.rs", "Rust", 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 8
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\raster\preview.rs", "Rust", 0, 0, 0, 0, 103, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 109
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\raster\validation.rs", "Rust", 0, 0, 0, 0, 59, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 64
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\time\format.rs", "Rust", 0, 0, 0, 0, 140, 0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 162
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\time\mod.rs", "Rust", 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 5
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\time\sampling.rs", "Rust", 0, 0, 0, 0, 78, 0, 0, 0, 0, 0, 0, 0, 0, 3, 6, 87
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\time\validation.rs", "Rust", 0, 0, 0, 0, 169, 0, 0, 0, 0, 0, 0, 0, 0, 8, 16, 193
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\value\config.rs", "Rust", 0, 0, 0, 0, 249, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 255
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\value\format.rs", "Rust", 0, 0, 0, 0, 532, 0, 0, 0, 0, 0, 0, 0, 0, 17, 40, 589
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\value\frame.rs", "Rust", 0, 0, 0, 0, 353, 0, 0, 0, 0, 0, 0, 0, 0, 4, 9, 366
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\value\interaction.rs", "Rust", 0, 0, 0, 0, 53, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 61
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\value\layout.rs", "Rust", 0, 0, 0, 0, 419, 0, 0, 0, 0, 0, 0, 0, 0, 23, 31, 473
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\value\mod.rs", "Rust", 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 10
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\value\presentation.rs", "Rust", 0, 0, 0, 0, 78, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6, 85
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\value\preview.rs", "Rust", 0, 0, 0, 0, 194, 0, 0, 0, 0, 0, 0, 0, 0, 3, 10, 207
+"e:\Github\cyclemetry-reloaded\src-tauri\ovrley_widgets\src\widgets\value\validation.rs", "Rust", 0, 0, 0, 0, 396, 0, 0, 0, 0, 0, 0, 0, 0, 34, 32, 462
+"e:\Github\cyclemetry-reloaded\src-tauri\src\distribution.rs", "Rust", 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 37
+"e:\Github\cyclemetry-reloaded\src-tauri\src\file_ops.rs", "Rust", 0, 0, 0, 0, 125, 0, 0, 0, 0, 0, 0, 0, 0, 26, 20, 171
+"e:\Github\cyclemetry-reloaded\src-tauri\src\lib.rs", "Rust", 0, 0, 0, 0, 124, 0, 0, 0, 0, 0, 0, 0, 0, 35, 15, 174
+"e:\Github\cyclemetry-reloaded\src-tauri\src\main.rs", "Rust", 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 8, 3, 15
+"e:\Github\cyclemetry-reloaded\src-tauri\src\map_tile_service.rs", "Rust", 0, 0, 0, 0, 1055, 0, 0, 0, 0, 0, 0, 0, 0, 5, 82, 1142
+"e:\Github\cyclemetry-reloaded\src-tauri\src\map_tile_service_tests.rs", "Rust", 0, 0, 0, 0, 812, 0, 0, 0, 0, 0, 0, 0, 0, 1, 88, 901
+"e:\Github\cyclemetry-reloaded\src-tauri\src\preview_import.rs", "Rust", 0, 0, 0, 0, 39, 0, 0, 0, 0, 0, 0, 0, 0, 21, 7, 67
+"e:\Github\cyclemetry-reloaded\src-tauri\src\progress_sink.rs", "Rust", 0, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 0, 26, 7, 59
+"e:\Github\cyclemetry-reloaded\src-tauri\src\project_file.rs", "Rust", 0, 0, 0, 0, 1943, 0, 0, 0, 0, 0, 0, 0, 0, 14, 131, 2088
+"e:\Github\cyclemetry-reloaded\src-tauri\src\raster_resources.rs", "Rust", 0, 0, 0, 0, 69, 0, 0, 0, 0, 0, 0, 0, 0, 3, 10, 82
+"e:\Github\cyclemetry-reloaded\src-tauri\src\runtime_paths.rs", "Rust", 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 23, 6, 69
+"e:\Github\cyclemetry-reloaded\src-tauri\src\tauri_commands.rs", "Rust", 0, 0, 0, 0, 494, 0, 0, 0, 0, 0, 0, 0, 0, 82, 53, 629
+"e:\Github\cyclemetry-reloaded\src-tauri\src\video_server.rs", "Rust", 0, 0, 0, 0, 476, 0, 0, 0, 0, 0, 0, 0, 0, 114, 66, 656
+"e:\Github\cyclemetry-reloaded\src-tauri\src\video_server_tests.rs", "Rust", 0, 0, 0, 0, 215, 0, 0, 0, 0, 0, 0, 0, 0, 46, 26, 287
+"e:\Github\cyclemetry-reloaded\src-tauri\src\widget_preview.rs", "Rust", 0, 0, 0, 0, 54, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6, 61
+"e:\Github\cyclemetry-reloaded\src-tauri\target\wasm-preview-toolchain\rust-skia-1a80f6716b5ba787f6583443f7b62fa5f60e7084\skia-bindings\skia\third_party\externals\expat\expat\fuzz\xml_parse_fuzzer.c", "C", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71, 24, 15, 110
+"e:\Github\cyclemetry-reloaded\src-tauri\target\wasm-preview-toolchain\rust-skia-1a80f6716b5ba787f6583443f7b62fa5f60e7084\skia-bindings\skia\third_party\externals\expat\expat\fuzz\xml_parsebuffer_fuzzer.c", "C", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 82, 24, 16, 122
+"e:\Github\cyclemetry-reloaded\src-tauri\target\wasm-preview-toolchain\rust-skia-1a80f6716b5ba787f6583443f7b62fa5f60e7084\skia-bindings\skia\third_party\externals\spirv-cross\CMakeLists.txt", "CMake", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 552, 0, 0, 84, 636
+"e:\Github\cyclemetry-reloaded\src-tauri\wasm-bindings\.cargo\config.toml", "TOML", 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 12
+"e:\Github\cyclemetry-reloaded\src-tauri\wasm-bindings\Cargo.lock", "TOML", 0, 590, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 78, 670
+"e:\Github\cyclemetry-reloaded\src-tauri\wasm-bindings\Cargo.toml", "TOML", 0, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 23
+"e:\Github\cyclemetry-reloaded\src-tauri\wasm-bindings\rust-toolchain.toml", "TOML", 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"e:\Github\cyclemetry-reloaded\src-tauri\wasm-bindings\src\lib.rs", "Rust", 0, 0, 0, 0, 74, 0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 89
+"e:\Github\cyclemetry-reloaded\src-tauri\wasm-bindings\src\main.rs", "Rust", 0, 0, 0, 0, 56, 0, 0, 0, 0, 0, 0, 0, 0, 11, 9, 76
+"e:\Github\cyclemetry-reloaded\src-tauri\wasm-bindings\src\widget_abi.rs", "Rust", 0, 0, 0, 0, 180, 0, 0, 0, 0, 0, 0, 0, 0, 2, 18, 200
+"Total", "-", 1300, 6494, 809, 30948, 66932, 20608, 278, 13, 8, 5, 73, 552, 153, 13910, 14033, 156116
