@@ -1,18 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { isWasmWidget } from '@/lib/widget/wasm-widget'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPreviewSession, loadWidgetModule } from '../utils/previewSession'
 
 /** @param {object} props Effective scene/widgets and canonical playhead. @returns {object} Canvas binding and visible resource/render error. */
 export function useWasmWidgets({ widgets, scene, activity, second, defaultFont }) {
-  const migrated = useMemo(() => widgets.filter(isWasmWidget), [widgets])
   const session = useRef(null)
   const canvases = useRef(new Map())
   const latest = useRef(null)
   const [error, setError] = useState(null)
   useEffect(() => {
-    latest.current = { widgets: migrated, scene, activityId: activity === null ? null : activity.preview_activity_id, second, defaultFont }
+    latest.current = { widgets, scene, activityId: activity === null ? null : activity.preview_activity_id, second, defaultFont }
     session.current?.setSnapshot(latest.current)
-  }, [activity, migrated, scene, second, defaultFont])
+  }, [activity, widgets, scene, second, defaultFont])
   useEffect(() => {
     let cancelled = false
     loadWidgetModule()

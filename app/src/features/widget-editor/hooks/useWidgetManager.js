@@ -14,11 +14,7 @@ import { RASTER_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { clamp } from '@/lib/utils'
 import { createBackdropDefaults, createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'
 import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
-import { updateLiveWidgetDraft } from '@/features/overlay-editor/utils/widgetDomHelpers'
 import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
-import { useFontPreparation } from '@/hooks/useFonts'
-import { collectFontIds } from '@/lib/fonts'
-import { isWasmWidget } from '@/lib/widget/wasm-widget'
 import { getWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 
 const CONTENT_ALIGNMENT_FACTORS = {
@@ -59,7 +55,6 @@ export function useWidgetManager({ widgetLiveEdits }) {
     })),
   )
   const liveEdits = useWidgetDraftView(widgetLiveEdits)
-  const prepareFontEdit = useFontPreparation()
 
   // Derived state — group and build the sidebar widget list from config
   const widgets = useMemo(() => {
@@ -85,52 +80,28 @@ export function useWidgetManager({ widgetLiveEdits }) {
       }
     }
 
-    const fontIds = collectFontIds(updates, widget.data)
-    if (Object.hasOwn(updates, 'font') && !fontIds.includes(updates.font)) fontIds.push(updates.font)
-    const commit = () => {
-      const state = useStore.getState()
-      const currentWidget = buildConfigWidgets(state.config).find((item) => item.id === id)
-      if (!currentWidget) return // A pending font edit may outlive a deleted widget.
-      state.setConfig(updateWidgetInConfig(state.config, id, nextUpdates))
-    }
-    if (fontIds.length && !isWasmWidget(widget)) prepareFontEdit(id, fontIds, commit)
-    else commit()
+    const state = useStore.getState()
+    state.setConfig(updateWidgetInConfig(state.config, id, nextUpdates))
   }
 
   const updateWidgetSize = (id, updates) => {
     const widget = widgets.find((item) => item.id === id)
-    if (!liveEdits.draftWidgetsRef.current[id]) {
-      liveEdits.beginWidgetInteraction(id, 'slider')
-    }
-    if (isWasmWidget(widget)) {
-      const tapeUpdate = updates.display_variants?.heading_tape
-      const patch = Object.hasOwn(updates, 'rotation')
-        ? { ...updates, ...getWidgetInteraction(liveEdits.getWidgetNode(id)).rotate(updates.rotation) }
-        : widget.data.display_type === 'heading_tape' && tapeUpdate && Object.hasOwn(tapeUpdate, 'label_offset')
-          ? getWidgetInteraction(liveEdits.getWidgetNode(id)).resize({ label_offset: tapeUpdate.label_offset })
-          : updates
-      liveEdits.setLiveWidgetDraft(id, patch)
-      return
-    }
-    updateLiveWidgetDraft({
-      draftWidgetsRef: liveEdits.draftWidgetsRef,
-      setLiveWidgetDraft: liveEdits.setLiveWidgetDraft,
-      widgetId: id,
-      widget,
-      updates,
-      target: liveEdits.getWidgetNode(id),
-      globalScale: globalDefaults?.scale ?? 1,
-    })
+    const tapeUpdate = updates.display_variants?.heading_tape
+    const patch = Object.hasOwn(updates, 'rotation')
+      ? { ...updates, ...getWidgetInteraction(liveEdits.getWidgetNode(id)).rotate(updates.rotation) }
+      : widget.data.display_type === 'heading_tape' && tapeUpdate && Object.hasOwn(tapeUpdate, 'label_offset')
+        ? getWidgetInteraction(liveEdits.getWidgetNode(id)).resize({ label_offset: tapeUpdate.label_offset })
+        : updates
+    liveEdits.setLiveWidgetDraft(id, patch)
   }
 
   const commitWidgetSize = (id) => {
-    const draft = liveEdits.draftWidgetsRef.current[id]?.data
+    const draft = liveEdits.getWidgetDraft(id)
     if (draft) {
       setConfig(updateWidgetInConfig(config, id, draft))
     }
 
     liveEdits.clearWidgetDraft(id)
-    liveEdits.endWidgetInteraction(id)
   }
 
   // Numeric field handler — parses raw input, clamps to range, updates widget
@@ -172,14 +143,10 @@ export function useWidgetManager({ widgetLiveEdits }) {
       })
     } else throw new Error(`Unknown widget type: ${type}`)
 
-    const commit = () => {
-      const state = useStore.getState()
-      const nextConfig = ensureWidgetIdsInConfig({ ...state.config, [category]: [...state.config[category], data] })
-      state.setConfig(nextConfig)
-      state.setSelectedWidgetId(nextConfig[category].at(-1).id)
-    }
-    if (isWasmWidget({ type, data })) commit()
-    else prepareFontEdit(Symbol('add widget'), collectFontIds(data), commit)
+    const state = useStore.getState()
+    const nextConfig = ensureWidgetIdsInConfig({ ...state.config, [category]: [...state.config[category], data] })
+    state.setConfig(nextConfig)
+    state.setSelectedWidgetId(nextConfig[category].at(-1).id)
   }
 
   // Delete widget — removes the widget by id and updates config
@@ -192,35 +159,18 @@ export function useWidgetManager({ widgetLiveEdits }) {
     const widget = widgets.find((item) => item.id === id)
     if (!widget) return
 
-    const commitReset = (data) => {
-      const commit = () => {
-        const state = useStore.getState()
-        if (!buildConfigWidgets(state.config).some((item) => item.id === id)) return
-        state.setConfig(replaceWidgetInConfig(state.config, id, data))
-      }
-      if (isWasmWidget({ ...widget, data })) commit()
-      else prepareFontEdit(id, collectFontIds(data), commit)
+    let data
+    if (widget.type === 'label') data = createLabelDefaults(globalDefaults)
+    else if (widget.type === 'backdrop') data = createBackdropDefaults()
+    else if (widget.type === 'raster') data = { ...RASTER_DEFAULTS }
+    else if (widget.type === 'course' || widget.type === 'elevation') {
+      data = createPlotDefaults(widget.type, globalDefaults, { sceneFontSize: config.scene.font_size })
+    } else {
+      const selection = widget.type === 'lap_timer' ? { lapTimerMode: 'current_lap' } : {}
+      data = createMetricValueDefaults(widget.type, globalDefaults, selection)
     }
-
-    if (widget.type === 'label') return commitReset(createLabelDefaults(globalDefaults))
-
-    if (widget.type === 'backdrop') {
-      commitReset(createBackdropDefaults())
-      return
-    }
-
-    if (widget.type === 'raster') {
-      commitReset({ ...RASTER_DEFAULTS })
-      return
-    }
-
-    if (widget.type === 'course' || widget.type === 'elevation') {
-      commitReset(createPlotDefaults(widget.type, globalDefaults, { sceneFontSize: config.scene.font_size }))
-      return
-    }
-
-    const selection = widget.type === 'lap_timer' ? { lapTimerMode: 'current_lap' } : {}
-    commitReset(createMetricValueDefaults(widget.type, globalDefaults, selection))
+    const state = useStore.getState()
+    state.setConfig(replaceWidgetInConfig(state.config, id, data))
   }
 
   return {

@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
 import { useRasterSelection } from '@/features/widget-editor/hooks/useRasterSelection'
-import { isWasmWidget, isTimeDependentWasmWidget } from '@/lib/widget/wasm-widget'
+import { isTimeDependentWasmWidget } from '@/lib/widget/wasm-widget'
 import { redoHistory, undoHistory } from '@/features/undo-redo/undoHistory'
 import { deleteWidgetsInConfig, duplicateWidgetsInConfig } from '@/lib/widget/widget-config'
 import useStore from '@/store/useStore'
@@ -13,7 +13,7 @@ import { openSinglePath } from '@/lib/file-dialog'
 vi.mock('@/api/backend', () => ({ loadSelectedRaster: vi.fn(), rasterPreviewPng: vi.fn() }))
 vi.mock('@/lib/file-dialog', () => ({ openSinglePath: vi.fn() }))
 
-const liveEditsSnapshot = { activeWidgetInteraction: null, liveWidgetDrafts: {} }
+const liveEditsSnapshot = { liveWidgetDrafts: {}, widgetNodes: {} }
 const widgetLiveEdits = {
   getSnapshot: () => liveEditsSnapshot,
   subscribe: () => () => {},
@@ -35,7 +35,6 @@ describe('raster creation and selection', () => {
     expect(raster.path).toBeNull()
     expect(useStore.getState().selectedWidgetId).toBe(raster.id)
     expect(openSinglePath).not.toHaveBeenCalled()
-    expect(isWasmWidget({ type: 'raster', data: raster })).toBe(true)
     expect(isTimeDependentWasmWidget({ type: 'raster' })).toBe(false)
   })
 

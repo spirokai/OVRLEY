@@ -5,8 +5,7 @@
  * canonical domain objects to the render tree.
  */
 
-import { lazy, Suspense, useEffect } from 'react'
-import { useDebugRoute } from '@/features/wasm-preview-debug/hooks/useDebugRoute'
+import { useEffect } from 'react'
 import { OverlayEditor } from '@/features/overlay-editor'
 import { OverlayPlayer } from '@/features/player'
 import { RenderVideoDialog } from '@/features/render-video'
@@ -36,8 +35,6 @@ import * as backend from './api/backend'
 import { useTranslation } from 'react-i18next'
 import { changeLanguagePreference } from '@/i18n/language-preference'
 
-const WasmPreviewDebug = import.meta.env.DEV ? lazy(() => import('@/features/wasm-preview-debug/WasmPreviewDebug')) : null
-
 function useRightClickDevtools() {
   useEffect(() => {
     if (!backend.hasTauriRuntime()) {
@@ -64,7 +61,7 @@ function useRightClickDevtools() {
  * Renders the main application shell.
  * @returns {JSX.Element} Rendered component output.
  */
-function AppShell() {
+function App() {
   const { t, i18n } = useTranslation()
   useRightClickDevtools()
 
@@ -255,22 +252,6 @@ function AppShell() {
       </div>
     </div>
   )
-}
-
-/**
- * Renders the top-level application shell.
- * @returns {JSX.Element} Rendered component output.
- */
-function App() {
-  const debugRoute = useDebugRoute()
-  if (import.meta.env.DEV && debugRoute) {
-    return (
-      <Suspense fallback={<p>Loading Wasm diagnostics…</p>}>
-        <WasmPreviewDebug />
-      </Suspense>
-    )
-  }
-  return <AppShell />
 }
 
 export default App

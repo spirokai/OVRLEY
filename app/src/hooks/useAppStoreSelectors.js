@@ -2,6 +2,24 @@ import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { isRendererBusy } from '@/features/render-video/utils/renderRequest'
 
+function selectOverlayPreview(state) {
+  return {
+    selectedSecond: state.selectedSecond,
+    exportRange: state.renderSettings.range,
+    importedVideoPath: state.importedVideoPath,
+    importedVideoDuration: state.importedVideoDuration,
+    videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+    parsedActivity: state.parsedActivity,
+    importedBackgroundImagePath: state.importedBackgroundImagePath,
+    fallbackDurationSeconds: state.fallbackDurationSeconds,
+  }
+}
+
+/** @returns {object} Source data and canonical timing for the overlay preview. */
+export function useOverlayPreviewStore() {
+  return useStore(useShallow(selectOverlayPreview))
+}
+
 export function useLayoutStore() {
   return useStore(
     useShallow((state) => ({

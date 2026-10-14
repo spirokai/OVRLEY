@@ -6,32 +6,15 @@ import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
  * store remains the single owner of the selected-id list and primary widget.
  */
 
-import { useEffect } from 'react'
 import { act, fireEvent, render, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import OverlayEditorView from '@/features/overlay-editor/components/OverlayEditor'
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
-import { buildWidgetRenderGeometryModels, resolveWidgetRenderGeometry } from '@/features/overlay-editor/utils/widgetRenderGeometry'
 import { createBackdropDefaults, createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
 const moveableUpdateRectMock = vi.fn()
-const previewMocks = vi.hoisted(() => ({
-  buildMetricWidgetPreviewModel: vi.fn(() => null),
-  buildTextWidgetPreviewModel: vi.fn(({ widget }) => ({
-    visualBounds: {
-      minX: 0,
-      minY: 0,
-      maxX: (widget?.data?.font_size ?? 30) * 4,
-      maxY: Math.round((widget?.data?.font_size ?? 30) * 1.5),
-      width: (widget?.data?.font_size ?? 30) * 4,
-      height: Math.round((widget?.data?.font_size ?? 30) * 1.5),
-    },
-  })),
-  widgetPreview: vi.fn(),
-}))
-
 function OverlayEditor(props) {
   const widgetLiveEdits = useWidgetDraftState()
   return (
@@ -57,46 +40,9 @@ vi.mock('@/features/video-preview', () => ({
   }),
 }))
 
-vi.mock('@/features/widget-preview', () => ({
-  WidgetPreview: ({ widget, ...props }) => {
-    previewMocks.widgetPreview({ widget, ...props })
-    return <div>{widget.name}</div>
-  },
-  buildMetricWidgetPreviewModel: previewMocks.buildMetricWidgetPreviewModel,
-  buildTextWidgetPreviewModel: previewMocks.buildTextWidgetPreviewModel,
-}))
-
-vi.mock('@/features/widget-preview/widgets/metric/model', () => ({
-  buildMetricWidgetPreviewModel: previewMocks.buildMetricWidgetPreviewModel,
-}))
-
-vi.mock('@/features/widget-preview/widgets/text/model', () => ({
-  buildTextWidgetPreviewModel: previewMocks.buildTextWidgetPreviewModel,
-}))
-
-vi.mock('@/features/widget-preview/shared/textMeasurement', () => ({
-  getPreviewFontFamily: (fontFamily) => fontFamily || 'Arial',
-}))
-
 vi.mock('@/features/overlay-editor/components/OverlayMoveable', () => ({
-  default: function MockOverlayMoveable({
-    canResizeSelected,
-    geometryVersion,
-    maintainAspectRatio,
-    moveableRef,
-    selectedTarget,
-    selectedTargets,
-    showEdgeResizeHandles,
-  }) {
+  default: function MockOverlayMoveable({ canResizeSelected, maintainAspectRatio, moveableRef, showEdgeResizeHandles }) {
     moveableRef.current = { updateRect: moveableUpdateRectMock }
-
-    useEffect(() => {
-      if ((!selectedTarget && !selectedTargets.length) || geometryVersion === 'none') return undefined
-
-      const frameId = requestAnimationFrame(() => moveableRef.current?.updateRect())
-
-      return () => cancelAnimationFrame(frameId)
-    }, [geometryVersion, moveableRef, selectedTarget, selectedTargets])
 
     return (
       <div
@@ -160,9 +106,6 @@ describe('OverlayEditor selection flow', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
     moveableUpdateRectMock.mockReset()
-    previewMocks.buildMetricWidgetPreviewModel.mockClear()
-    previewMocks.buildTextWidgetPreviewModel.mockClear()
-    previewMocks.widgetPreview.mockClear()
     vi.stubGlobal('requestAnimationFrame', (callback) => {
       callback(0)
       return 1
@@ -406,90 +349,6 @@ describe('OverlayEditor selection flow', () => {
     fireEvent.mouseUp(window)
   })
 
-  test('anchors the badge to the live scale preview geometry', () => {
-    const widget = {
-      id: 'widget-1',
-      type: 'text',
-      category: 'labels',
-      data: {
-        x: 10,
-        y: 20,
-        font_size: 30,
-      },
-    }
-    const renderGeometry = resolveWidgetRenderGeometry(
-      widget,
-      {
-        minX: 0,
-        minY: 0,
-        maxX: 120,
-        maxY: 40,
-        width: 120,
-        height: 40,
-      },
-      1,
-      {
-        left: 100,
-        top: 200,
-        width: 120,
-        height: 40,
-        scaleFactor: 1.5,
-        translateX: 30,
-        translateY: 15,
-      },
-    )
-
-    expect(renderGeometry.badgeLeft).toBe(130)
-    expect(renderGeometry.badgeTop).toBe(215)
-  })
-
-  test('uses heading tape frame height for render geometry', () => {
-    const renderGeometry = resolveWidgetRenderGeometry(
-      {
-        id: 'heading-1',
-        type: 'heading',
-        category: 'values',
-        data: {
-          x: 10,
-          y: 20,
-          display_type: 'heading_tape',
-          width: 400,
-          height: 80,
-          display_variants: {
-            heading_tape: {
-              width: 400,
-              height: 80,
-            },
-          },
-        },
-      },
-      null,
-      1,
-    )
-
-    expect(renderGeometry.width).toBe(400)
-    expect(renderGeometry.height).toBe(80)
-  })
-
-  test('leaves lean-angle geometry to WASM instead of computing a legacy selection frame', () => {
-    const widget = {
-      id: 'lean-angle-1',
-      type: 'lean_angle',
-      category: 'values',
-      data: {
-        x: 10,
-        y: 20,
-        display_type: 'lean_angle',
-        diameter: 180,
-        track_thickness: 24,
-        font_size: 60,
-        value_offset_y: -20,
-      },
-    }
-
-    expect(buildWidgetRenderGeometryModels({ widgets: [widget], metricPreviewModels: {}, textPreviewModels: {}, globalScale: 1 })).toEqual({})
-  })
-
   test.each(['backdrop', 'lean_angle'])('enables the supported resize handles for selected %s widgets', (type) => {
     const config = {
       ...DEFAULT_CONFIG,
@@ -669,7 +528,7 @@ describe('OverlayEditor selection flow', () => {
     expect(toolbar.className).toContain('-translate-x-1/2')
   })
 
-  test('refreshes moveable bounds when the selected widget changes intrinsic size', () => {
+  test('refreshes moveable bounds when WASM publishes the selected widget geometry', () => {
     const config = makeConfig([makeLabel('A', { id: 'widget-1', font_size: 30 })])
     const nextConfig = makeConfig([makeLabel('A', { id: 'widget-1', font_size: 60 })])
 
@@ -720,40 +579,7 @@ describe('OverlayEditor selection flow', () => {
       )
     })
 
-    expect(moveableUpdateRectMock).toHaveBeenCalled()
-  })
-
-  test('reuses static label models and renderer output while the preview second changes', () => {
-    const config = makeConfig([makeLabel('A', { id: 'widget-1' })])
-
-    useStore.getState().setConfig(config)
-
-    render(
-      <OverlayEditor
-        config={config}
-        editorShell={defaultEditorShell}
-        globalDefaults={{ ...DEFAULT_GLOBAL_DEFAULTS, opacity: 1, scale: 1 }}
-        onConfigChange={vi.fn()}
-        zoomLevel={1}
-        onZoomLevelChange={vi.fn()}
-        backgroundMode="black"
-        gridVisible={false}
-        snapToGrid={false}
-        importedBackgroundImageFilename={null}
-        importedVideoFilename={null}
-        showProjectStatus={false}
-        projectStatus="Saved"
-      />,
-    )
-
-    const buildCount = previewMocks.buildTextWidgetPreviewModel.mock.calls.length
-    const renderCount = previewMocks.widgetPreview.mock.calls.length
-
-    act(() => {
-      useStore.getState().setSelectedSecond(10)
-    })
-
-    expect(previewMocks.buildTextWidgetPreviewModel).toHaveBeenCalledTimes(buildCount)
-    expect(previewMocks.widgetPreview).toHaveBeenCalledTimes(renderCount)
+    act(() => widget.dispatchEvent(new Event('wasm-widget-render', { bubbles: true })))
+    expect(moveableUpdateRectMock).toHaveBeenCalledTimes(1)
   })
 })

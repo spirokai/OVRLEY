@@ -149,7 +149,7 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
         if (changed) active.onDraft(patch)
       }
       const originWidgets = snapshot.widgets.map((widget) => (widget.id === active.id ? { ...widget, data: active.data } : widget))
-      return applyWidgetDrafts(originWidgets, { [active.id]: { data: active.patch } })
+      return applyWidgetDrafts(originWidgets, { [active.id]: active.patch })
     },
     dispose() {
       active = null

@@ -20,12 +20,8 @@ import {
 import { getContainerFps, getUpdateRateOptions } from '@/lib/update-rate'
 import { getDefaultBitrate } from '../data/bitrateDefaults'
 import { useRenderDialogInputs, useRenderRangeActivity } from '@/hooks/useAppStoreSelectors'
-import {
-  formatExportRangeTime,
-  getActivityDurationSeconds,
-  getCustomExportRangeDefault,
-  setExportRangeBoundaryFromTimeInput,
-} from '@/features/overlay-editor/utils/exportRange'
+import { formatExportRangeTime, getCustomExportRangeDefault, setExportRangeBoundaryFromTimeInput } from '@/lib/export-range'
+import { resolveActivityDuration } from '@/lib/preview-timing'
 import { createBatchItemProgress, createBatchProgress, isBatchFinished, sanitizeRangeTimeInput } from '../utils/renderPresentation'
 
 /** @param {object} options Editable range and commit callback. @returns {object} Shared range control presentation and input handlers. */
@@ -36,7 +32,9 @@ export function useExportRangeSettings({ range, onExportRangeChange }) {
     fromTime: formatExportRangeTime(range.from),
     toTime: formatExportRangeTime(range.to),
     handleCustomChange: (checked) =>
-      onExportRangeChange(checked ? getCustomExportRangeDefault(range, getActivityDurationSeconds(activity)) : { ...range, type: 'all' }),
+      onExportRangeChange(
+        checked ? getCustomExportRangeDefault(range, resolveActivityDuration({ sourceActivity: activity })) : { ...range, type: 'all' },
+      ),
     handleFromChange: (event) => onExportRangeChange(setExportRangeBoundaryFromTimeInput(range, 'from', sanitizeRangeTimeInput(event.target.value))),
     handleToChange: (event) => onExportRangeChange(setExportRangeBoundaryFromTimeInput(range, 'to', sanitizeRangeTimeInput(event.target.value))),
     preventDecimalInput: (event) => {

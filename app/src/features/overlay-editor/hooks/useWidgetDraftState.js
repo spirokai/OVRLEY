@@ -1,170 +1,140 @@
 /**
- * Live widget draft state - temporary edits during drag/resize/scale/rotate.
- *
- * Maintains mutable refs for synchronous access during interaction callbacks
- * and publishes a rendering snapshot once per animation frame. Each draft contains
- * the live data patch shown by editors and, when a Moveable interaction is active, the live
- * DOM layout used by the canvas. Drafts are committed to config only when the
- * interaction ends.
+ * Shared inspector and group-drag patches, published once per animation frame.
+ * WASM owns gesture geometry; drafts contain only canonical widget data updates.
  */
 
 import { useState, useSyncExternalStore } from 'react'
-import { clearLiveWidgetDraft, clearLiveWidgetDrafts } from '../utils/widgetDomHelpers'
+import { mergeDisplayVariantUpdates } from '@/lib/widget/widget-resolver'
 
-function createWidgetLiveEdits() {
-  const draftWidgetsRef = { current: {} }
-  const widgetNodesRef = { current: {} }
-  const widgetNodeCallbacks = new Map()
-  const activeWidgetInteractionRef = { current: null }
-  const listeners = new Set()
-  let frame = null
-  let snapshot = {
-    liveWidgetDrafts: {},
-    activeWidgetInteraction: null,
-  }
+function notify(state) {
+  for (const listener of state.listeners) listener()
+}
 
-  const notify = () => {
-    listeners.forEach((listener) => listener())
-  }
+function publishDrafts(state) {
+  if (state.frame !== null) cancelAnimationFrame(state.frame)
+  state.frame = null
+  state.snapshot = { ...state.snapshot, liveWidgetDrafts: { ...state.drafts } }
+  notify(state)
+}
 
-  const updateSnapshot = (nextSnapshot) => {
-    if (frame !== null) {
-      cancelAnimationFrame(frame)
-      frame = null
-    }
-    snapshot = nextSnapshot
-    notify()
-  }
+function scheduleDrafts(state) {
+  if (state.frame === null) state.frame = requestAnimationFrame(publishDrafts.bind(null, state))
+}
 
-  const publishDrafts = () =>
-    updateSnapshot({
-      activeWidgetInteraction: activeWidgetInteractionRef.current,
-      liveWidgetDrafts: { ...draftWidgetsRef.current },
-    })
-
-  const scheduleSnapshot = () => {
-    if (frame !== null) return
-    frame = requestAnimationFrame(() => {
-      frame = null
-      publishDrafts()
-    })
-  }
-
-  const setWidgetNode = (widgetId, node) => {
-    if (node && widgetNodesRef.current[widgetId] === node) return
-    if (!node && !widgetNodesRef.current[widgetId]) return
-
-    if (node) widgetNodesRef.current[widgetId] = node
-    else delete widgetNodesRef.current[widgetId]
-  }
-
-  return {
-    beginWidgetInteraction(widgetId, type) {
-      draftWidgetsRef.current[widgetId] = {
-        data: {},
-        layout: null,
-      }
-      activeWidgetInteractionRef.current = { widgetId, type }
-    },
-    clearWidgetDraft(widgetId) {
-      const hadDraft = Object.hasOwn(draftWidgetsRef.current, widgetId)
-      clearLiveWidgetDraft(draftWidgetsRef, widgetId)
-      if (!hadDraft && !Object.hasOwn(snapshot.liveWidgetDrafts, widgetId)) return
-
-      updateSnapshot({
-        ...snapshot,
-        activeWidgetInteraction: activeWidgetInteractionRef.current?.widgetId === widgetId ? null : activeWidgetInteractionRef.current,
-        liveWidgetDrafts: { ...draftWidgetsRef.current },
-      })
-    },
-    clearWidgetDrafts(widgetIds) {
-      const changed = widgetIds.some(
-        (widgetId) => Object.hasOwn(draftWidgetsRef.current, widgetId) || Object.hasOwn(snapshot.liveWidgetDrafts, widgetId),
-      )
-      clearLiveWidgetDrafts(draftWidgetsRef, widgetIds)
-
-      if (changed) {
-        const activeWidgetInteraction = widgetIds.includes(activeWidgetInteractionRef.current?.widgetId) ? null : activeWidgetInteractionRef.current
-        updateSnapshot({ ...snapshot, activeWidgetInteraction, liveWidgetDrafts: { ...draftWidgetsRef.current } })
-      }
-    },
-    draftWidgetsRef,
-    getSnapshot() {
-      return snapshot
-    },
-    getWidgetNode(widgetId) {
-      return widgetNodesRef.current[widgetId] ?? null
-    },
-    getWidgetNodeRef(widgetId) {
-      const current = widgetNodeCallbacks.get(widgetId)
-      if (current) return current
-
-      const callback = (node) => {
-        setWidgetNode(widgetId, node)
-        if (node) widgetNodeCallbacks.set(widgetId, callback)
-        else widgetNodeCallbacks.delete(widgetId)
-      }
-      return callback
-    },
-    resetWidgetDrafts() {
-      draftWidgetsRef.current = {}
-      activeWidgetInteractionRef.current = null
-      updateSnapshot({ ...snapshot, activeWidgetInteraction: null, liveWidgetDrafts: {} })
-    },
-    setLiveWidgetDraft(widgetId, nextData, nextLayout) {
-      const currentDraft = draftWidgetsRef.current[widgetId] || { data: {}, layout: null }
-      const nextDraft = {
-        data: {
-          ...currentDraft.data,
-          ...nextData,
-        },
-        layout: nextLayout === undefined ? currentDraft.layout : nextLayout,
-      }
-      draftWidgetsRef.current[widgetId] = nextDraft
-      scheduleSnapshot()
-    },
-    setLiveWidgetDraftsBatch(nextDraftsById) {
-      Object.entries(nextDraftsById).forEach(([widgetId, { data, layout }]) => {
-        const currentDraft = draftWidgetsRef.current[widgetId] || { data: {}, layout: null }
-        const nextDraft = {
-          data: {
-            ...currentDraft.data,
-            ...data,
-          },
-          layout: layout === undefined ? currentDraft.layout : layout,
-        }
-        draftWidgetsRef.current[widgetId] = nextDraft
-      })
-
-      scheduleSnapshot()
-    },
-    endWidgetInteraction(widgetId) {
-      if (activeWidgetInteractionRef.current?.widgetId !== widgetId) return
-      activeWidgetInteractionRef.current = null
-      updateSnapshot({ ...snapshot, activeWidgetInteraction: null, liveWidgetDrafts: { ...draftWidgetsRef.current } })
-    },
-    setWidgetNode,
-    subscribe(listener) {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-        if (listeners.size === 0 && frame !== null) publishDrafts()
-      }
-    },
+function mergeDraft(state, widgetId, updates) {
+  state.drafts[widgetId] = {
+    ...state.drafts[widgetId],
+    ...updates,
+    ...(updates.display_variants
+      ? { display_variants: mergeDisplayVariantUpdates(state.drafts[widgetId]?.display_variants, updates.display_variants) }
+      : {}),
   }
 }
 
+function setLiveWidgetDraft(state, widgetId, updates) {
+  mergeDraft(state, widgetId, updates)
+  scheduleDrafts(state)
+}
+
+function setLiveWidgetDrafts(state, updatesById) {
+  for (const [widgetId, updates] of Object.entries(updatesById)) mergeDraft(state, widgetId, updates)
+  scheduleDrafts(state)
+}
+
+function clearWidgetDrafts(state, widgetIds) {
+  let changed = false
+  for (const widgetId of widgetIds) {
+    changed ||= Object.hasOwn(state.drafts, widgetId) || Object.hasOwn(state.snapshot.liveWidgetDrafts, widgetId)
+    delete state.drafts[widgetId]
+  }
+  if (changed) publishDrafts(state)
+}
+
+function clearWidgetDraft(state, widgetId) {
+  clearWidgetDrafts(state, [widgetId])
+}
+
+function resetWidgetDrafts(state) {
+  state.drafts = {}
+  publishDrafts(state)
+}
+
+function getWidgetDraft(state, widgetId) {
+  return state.drafts[widgetId] ?? null
+}
+
+function getWidgetNode(state, widgetId) {
+  return state.snapshot.widgetNodes[widgetId] ?? null
+}
+
+function registerWidgetNode(registration, node) {
+  const { state, widgetId } = registration
+  const widgetNodes = { ...state.snapshot.widgetNodes }
+  if (node) {
+    state.nodeCallbacks.set(widgetId, registration.callback)
+    if (widgetNodes[widgetId] === node) return
+    widgetNodes[widgetId] = node
+  } else {
+    state.nodeCallbacks.delete(widgetId)
+    if (!Object.hasOwn(widgetNodes, widgetId)) return
+    delete widgetNodes[widgetId]
+  }
+  state.snapshot = { ...state.snapshot, widgetNodes }
+  notify(state)
+}
+
+function getWidgetNodeRef(state, widgetId) {
+  if (!state.nodeCallbacks.has(widgetId)) {
+    const registration = { state, widgetId }
+    registration.callback = registerWidgetNode.bind(null, registration)
+    state.nodeCallbacks.set(widgetId, registration.callback)
+  }
+  return state.nodeCallbacks.get(widgetId)
+}
+
+function getSnapshot(state) {
+  return state.snapshot
+}
+
+function unsubscribe(state, listener) {
+  state.listeners.delete(listener)
+  if (state.listeners.size === 0 && state.frame !== null) publishDrafts(state)
+}
+
+function subscribe(state, listener) {
+  state.listeners.add(listener)
+  return unsubscribe.bind(null, state, listener)
+}
+
+function createWidgetLiveEdits() {
+  const state = {
+    drafts: {},
+    frame: null,
+    listeners: new Set(),
+    nodeCallbacks: new Map(),
+    snapshot: { liveWidgetDrafts: {}, widgetNodes: {} },
+  }
+  return {
+    clearWidgetDraft: clearWidgetDraft.bind(null, state),
+    clearWidgetDrafts: clearWidgetDrafts.bind(null, state),
+    getSnapshot: getSnapshot.bind(null, state),
+    getWidgetDraft: getWidgetDraft.bind(null, state),
+    getWidgetNode: getWidgetNode.bind(null, state),
+    getWidgetNodeRef: getWidgetNodeRef.bind(null, state),
+    resetWidgetDrafts: resetWidgetDrafts.bind(null, state),
+    setLiveWidgetDraft: setLiveWidgetDraft.bind(null, state),
+    setLiveWidgetDrafts: setLiveWidgetDrafts.bind(null, state),
+    subscribe: subscribe.bind(null, state),
+  }
+}
+
+/** @returns {object} Shared controller for widget drafts and canvas registration. */
 export default function useWidgetDraftState() {
   const [controller] = useState(createWidgetLiveEdits)
   return controller
 }
 
-/**
- * Subscribes a component to a shared live-edit controller.
- *
- * @param {object} controller - Shared live-edit controller.
- * @returns {object} Controller methods and current render snapshot.
- */
+/** @param {object} controller Shared controller. @returns {object} Controller methods and current drafts/nodes. */
 export function useWidgetDraftView(controller) {
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot)
   return { ...controller, ...snapshot }

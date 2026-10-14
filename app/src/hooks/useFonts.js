@@ -48,10 +48,16 @@ export function useLabelTypography(widget, updateWidgetData) {
     let cancelled = false
     if (fontId !== null) {
       getFontCapabilities(fontId)
-        .then((font) => { if (!cancelled) setCapabilities(font) })
-        .catch((error) => { if (!cancelled) useStore.getState().setErrorMessage(error.message) })
+        .then((font) => {
+          if (!cancelled) setCapabilities(font)
+        })
+        .catch((error) => {
+          if (!cancelled) useStore.getState().setErrorMessage(error.message)
+        })
     }
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [fontId])
   const font = capabilities?.id === fontId ? capabilities : null
   const controls = font ? getFontWeightControl(font, widget.data.font_weight, widget.data.italic) : null

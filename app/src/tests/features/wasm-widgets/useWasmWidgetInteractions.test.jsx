@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 import { useWasmWidgetInteractions } from '@/features/wasm-widgets/hooks/useWasmWidgetInteractions'
 import { registerWidgetInteraction, unregisterWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
+import useWidgetDraftState, { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
 
 test.each([
   ['speed', 'text'],
@@ -31,9 +32,7 @@ test.each([
     config: {},
     sceneElement: document.createElement('div'),
     setLiveWidgetDraft: vi.fn(),
-    beginWidgetInteraction: vi.fn(),
     clearWidgetDrafts: vi.fn(),
-    endWidgetInteraction: vi.fn(),
     commitWidgetUpdate: vi.fn(),
     moveableRef: { current: { stopDrag: vi.fn(), updateRect: vi.fn() } },
   }
@@ -77,4 +76,51 @@ test.each([
   expect(state.clearWidgetDrafts).toHaveBeenLastCalledWith([type])
   unmount()
   unregisterWidgetInteraction(target)
+})
+
+test('group translation shares canonical data patches and commits once before a pending frame', () => {
+  vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] })
+  try {
+    const selectedWidgets = [
+      { id: 'speed', type: 'speed', data: { x: 100, y: 50 } },
+      { id: 'label', type: 'label', data: { x: 200, y: 75 } },
+    ]
+    const commitWidgetUpdates = vi.fn()
+    const config = {}
+    const sceneElement = document.createElement('div')
+    const moveableRef = { current: { stopDrag: vi.fn(), updateRect: vi.fn() } }
+    const { result } = renderHook(() => {
+      const controller = useWidgetDraftState()
+      const liveEdits = useWidgetDraftView(controller)
+      const state = { ...liveEdits, config, sceneElement, moveableRef, commitWidgetUpdates }
+      const handlers = useWasmWidgetInteractions({
+        selectedWidget: selectedWidgets[0],
+        selectedWidgets,
+        state,
+        setIsGroupDragActive: vi.fn(),
+        setGroupDragSelectionIds: vi.fn(),
+      })
+      return { controller, liveEdits, handlers }
+    })
+    const events = [
+      { set: vi.fn(), beforeTranslate: [12.125, 8.25] },
+      { set: vi.fn(), beforeTranslate: [12.125, 8.25] },
+    ]
+    act(() => {
+      result.current.handlers.onDragGroupStart({ events })
+      result.current.handlers.onDragGroup({ events, inputEvent: { ctrlKey: false } })
+    })
+    expect(result.current.controller.getWidgetDraft('speed')).toEqual({ x: 112.125, y: 58.25 })
+    expect(result.current.controller.getWidgetDraft('label')).toEqual({ x: 212.125, y: 83.25 })
+    expect(commitWidgetUpdates).not.toHaveBeenCalled()
+    act(() => result.current.handlers.onDragGroupEnd())
+    expect(commitWidgetUpdates).toHaveBeenCalledExactlyOnceWith({
+      speed: { x: 112.125, y: 58.25 },
+      label: { x: 212.125, y: 83.25 },
+    })
+    expect(result.current.liveEdits.liveWidgetDrafts).toEqual({})
+    expect(vi.getTimerCount()).toBe(0)
+  } finally {
+    vi.useRealTimers()
+  }
 })

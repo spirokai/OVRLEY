@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { CircleGauge, Type } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import { SectionHeading } from '@/components/ui/section-heading'
-import { buildUniformResizeUpdate } from '@/features/overlay-editor/utils/widgetResizeScaling'
+import { buildUniformResizeUpdate } from '../../utils/widgetSize'
 import { useAvailableFonts } from '@/hooks/useFonts'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { ColorField, SizeSlider, SliderField } from '../widgetFormControls'
@@ -20,7 +20,7 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
   const handleDiameterChange = (diameter) => {
     const frameSize = data.width * (diameter / data.diameter)
     const update = buildUniformResizeUpdate(widget, frameSize)
-    if (update) updateWidgetSize(widget.id, update)
+    updateWidgetSize(widget.id, update)
   }
 
   return (

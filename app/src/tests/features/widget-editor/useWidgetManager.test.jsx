@@ -18,12 +18,9 @@ vi.mock('@/lib/font-resources', () => ({
 }))
 
 function createWidgetLiveEdits(renderedContentWidth) {
-  const snapshot = { activeWidgetInteraction: null, liveWidgetDrafts: {} }
+  const snapshot = { liveWidgetDrafts: {}, widgetNodes: {} }
   return {
-    beginWidgetInteraction() {},
     clearWidgetDraft() {},
-    draftWidgetsRef: { current: {} },
-    endWidgetInteraction() {},
     getSnapshot: () => snapshot,
     getWidgetNode: () => ({ dataset: { widgetContentWidth: String(renderedContentWidth) } }),
     setLiveWidgetDraft() {},
@@ -161,7 +158,7 @@ describe('useWidgetManager alignment updates', () => {
       const liveEdits = useWidgetDraftState()
       return { manager: useWidgetManager({ widgetLiveEdits: liveEdits }), liveEdits }
     })
-    result.current.liveEdits.setWidgetNode('route-0', node)
+    result.current.liveEdits.getWidgetNodeRef('route-0')(node)
     act(() => result.current.manager.updateWidgetSize('route-0', { rotation: -45.25 }))
     expect(rotate).toHaveBeenCalledWith(-45.25)
     act(() => result.current.manager.commitWidgetSize('route-0'))
@@ -183,7 +180,7 @@ describe('useWidgetManager alignment updates', () => {
         const liveEdits = useWidgetDraftState()
         return { manager: useWidgetManager({ widgetLiveEdits: liveEdits }), liveEdits }
       })
-      result.current.liveEdits.setWidgetNode('heading-0', node)
+      result.current.liveEdits.getWidgetNodeRef('heading-0')(node)
       useStore.temporal.getState().clear()
       act(() => result.current.manager.updateWidgetSize('heading-0', { display_variants: { heading_tape: { label_offset: 9.125 } } }))
       expect(resize).toHaveBeenCalledWith({ label_offset: 9.125 })

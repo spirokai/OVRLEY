@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createPreviewSession } from '@/features/wasm-widgets/utils/previewSession'
 import { previewActivity, previewFont, rasterPreviewPng } from '@/api/backend'
-import { isWasmWidget } from '@/lib/widget/wasm-widget'
 
 vi.mock('@/api/backend', () => ({ previewFont: vi.fn(), previewActivity: vi.fn(), rasterPreviewPng: vi.fn() }))
 
@@ -134,7 +133,6 @@ test.each(['g_force', 'heading', 'elevation'])(
         ...(type === 'elevation' ? { point_label: { font: 'Label.ttf' }, show_elevation_metric: true, show_elevation_imperial: false } : {}),
       },
     }
-    expect(isWasmWidget(widget)).toBe(true)
     const next = { ...snapshot, widgets: [widget] }
     session.setSnapshot(next)
     vi.advanceTimersToNextFrame()
@@ -171,7 +169,6 @@ test.each(['linear', 'arc', 'corner'])(
       type: 'speed',
       data: { value: 'speed', display_type: displayType, font: 'Value.ttf', min_max_label_font: 'Range.ttf', show_min_max_labels: true },
     }
-    expect(isWasmWidget(widget)).toBe(true)
     const next = { ...snapshot, widgets: [widget] }
     session.setSnapshot(next)
     await Promise.resolve()
@@ -208,7 +205,6 @@ test('lap timers load both fonts and activity independently, retain resources, a
   previewActivity.mockResolvedValue([4, 5, 6])
   const { module, session, snapshot, error } = setup()
   const widget = { id: 'lap', type: 'lap_timer', data: { value: 'lap_timer', display_type: 'lap_timer', font: 'Value.ttf', label_font: 'Label.ttf' } }
-  expect(isWasmWidget(widget)).toBe(true)
   const next = { ...snapshot, widgets: [widget], activityId: 'activity' }
   session.setSnapshot(next)
   expect(previewFont).toHaveBeenCalledWith({ font: 'Value.ttf' })

@@ -1,166 +1,213 @@
 /**
- * @file useOverlayEditorState – Derived state hook for the overlay editor.
- *
- * Owns the store selectors and derived state for widgets, scene dimensions,
- * preview values, global defaults, and widget capability flags. Does NOT
- * own selection management (see useWidgetSelection.js), keyboard shortcuts
- * (see useEditorKeyboard.js), viewport tracking (see useEditorViewport.js),
- * pointer handling (see createOverlayPointerHandlers.js), or moveable
- * interaction handlers.
- *
- * Those concerns are composed at the component level in OverlayEditor.jsx
- * so each hook is independently testable and replaceable.
- *
- * @module useOverlayEditorState
+ * Resolved widgets, shared drafts/nodes, scene dimensions, and preview timing.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import useStore from '@/store/useStore'
+import { convertFileSrc } from '@tauri-apps/api/core'
+import { resolveVideoSyncMarkControls } from '@/features/video-sync'
+import { useWasmWidgetInteractions } from '@/features/wasm-widgets/hooks/useWasmWidgetInteractions'
+import { buildWasmScene } from '@/features/wasm-widgets/utils/previewScene'
+import {
+  getEditorGridSize,
+  getOrderedWidgetIds,
+  getPreviewExportRange,
+  getSceneSize,
+  getViewportContentSize,
+  getWidgetMap,
+  getWidgetResizeOptions,
+  materializeWidgets,
+} from '../utils/overlayEditorUtils'
+import useWidgetSelection from './useWidgetSelection'
+import { useEditorViewport } from './useEditorViewport'
+import { useEditorKeyboard } from './useEditorKeyboard'
+import { useOverlayPreviewStore } from '@/hooks/useAppStoreSelectors'
 import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
-import { getEffectiveWidgetData } from '@/lib/template/template-state'
-import { applyWidgetDrafts, applyWidgetDraftsForCanvas } from '@/lib/widget/widget-draft'
+import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
-import { getSceneSize } from '../utils/overlayEditorUtils'
-import useWidgetDraftState, { useWidgetDraftView } from './useWidgetDraftState'
+import { useWidgetDraftView } from './useWidgetDraftState'
 
-function materializeWidgets(rawWidgets, globalDefaults) {
-  return rawWidgets.map((widget) => ({ ...widget, data: getEffectiveWidgetData(widget, globalDefaults) }))
+function getWidgetRefCallbacks(widgetLiveEdits, orderedWidgetIds) {
+  const callbacks = {}
+  for (const id of orderedWidgetIds) callbacks[id] = widgetLiveEdits.getWidgetNodeRef(id)
+  return callbacks
 }
 
-export function useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onConfigChange }, widgetLiveEdits) {
-  const selectedSecond = useStore((state) => state.selectedSecond)
-  const exportRange = useStore((state) => state.renderSettings.range)
-  const importedVideoPath = useStore((state) => state.importedVideoPath)
-  const importedVideoDuration = useStore((state) => state.importedVideoDuration)
-  const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)
-  const activity = useStore((state) => state.parsedActivity)
+function commitWidgetUpdate(config, onConfigChange, widgetId, updates) {
+  onConfigChange(updateWidgetInConfig(config, widgetId, updates))
+}
 
-  const moveableRef = useRef(null)
-  const interactionStartRef = useRef(null)
+function commitWidgetUpdates(config, onConfigChange, updatesById) {
+  onConfigChange(updateWidgetsInConfig(config, updatesById))
+}
 
-  const [sceneElement, setSceneElement] = useState(null)
-  const [widgetNodes, setWidgetNodes] = useState({})
-  const liveDraftState = useWidgetDraftView(widgetLiveEdits)
+function recordPreviewUpdate() {
+  incrementPreviewPerfCounter(previewPerfCounterName('React preview updates'))
+}
+
+/** @param {object} options Committed config, global defaults, commit callback, and shared edits. @returns {object} Editor preview state. */
+export default function useOverlayEditorState({
+  config,
+  globalDefaults,
+  onConfigChange,
+  widgetLiveEdits,
+  editorShell,
+  zoomLevel,
+  onZoomLevelChange,
+  gridVisible,
+  snapToGrid,
+  videoSyncMode = false,
+  videoSyncMarkControls = null,
+}) {
   const {
-    activeWidgetInteraction,
-    beginWidgetInteraction,
-    clearWidgetDraft,
-    clearWidgetDrafts,
-    draftWidgetsRef,
-    liveWidgetDrafts,
-    resetWidgetDrafts,
-    setLiveWidgetDraft,
-    setLiveWidgetDraftsBatch,
-    endWidgetInteraction,
-  } = liveDraftState
-
-  const setWidgetNode = useCallback(
-    (widgetId, node) => {
-      widgetLiveEdits.setWidgetNode(widgetId, node)
-      setWidgetNodes((current) => {
-        if (node && current[widgetId] === node) return current
-        if (!node && !current[widgetId]) return current
-
-        const next = { ...current }
-        if (node) next[widgetId] = node
-        else delete next[widgetId]
-        return next
-      })
-    },
-    [widgetLiveEdits],
-  )
+    selectedSecond,
+    exportRange,
+    importedVideoPath,
+    importedVideoDuration,
+    videoSyncOffsetSeconds,
+    parsedActivity,
+    importedBackgroundImagePath,
+    fallbackDurationSeconds,
+  } = useOverlayPreviewStore()
+  const moveableRef = useRef(null)
+  const clipboardRef = useRef(null)
+  const gridRef = useRef(null)
+  const [sceneElement, setSceneElement] = useState(null)
+  const { liveWidgetDrafts, widgetNodes, clearWidgetDrafts, resetWidgetDrafts, setLiveWidgetDraft, setLiveWidgetDrafts } =
+    useWidgetDraftView(widgetLiveEdits)
 
   const rawWidgets = useMemo(() => buildConfigWidgets(config), [config])
-  const widgets = useMemo(() => materializeWidgets(rawWidgets, globalDefaults), [globalDefaults, rawWidgets])
+  const effectiveWidgets = useMemo(() => materializeWidgets(rawWidgets, globalDefaults), [globalDefaults, rawWidgets])
+  const widgets = useMemo(() => applyWidgetDrafts(effectiveWidgets, liveWidgetDrafts), [effectiveWidgets, liveWidgetDrafts])
+  const widgetMap = useMemo(() => getWidgetMap(widgets), [widgets])
+  const orderedWidgetIds = useMemo(() => getOrderedWidgetIds(rawWidgets), [rawWidgets])
+  const widgetRefCallbacks = useMemo(() => getWidgetRefCallbacks(widgetLiveEdits, orderedWidgetIds), [orderedWidgetIds, widgetLiveEdits])
   const sceneSize = useMemo(() => getSceneSize(config), [config])
-  const globalOpacity = globalDefaults.opacity
-  const globalScale = globalDefaults.scale
-  const sceneStyle = useMemo(
-    () => ({
-      border_color: globalDefaults?.border_color ?? config?.scene?.border_color,
-      border_thickness: globalDefaults?.border_thickness ?? config?.scene?.border_thickness ?? 0,
-      shadow_color: globalDefaults?.shadow_color ?? config?.scene?.shadow_color,
-      shadow_strength: globalDefaults?.shadow_strength ?? config?.scene?.shadow_strength ?? 0,
-      shadow_distance: globalDefaults?.shadow_distance ?? config?.scene?.shadow_distance ?? 0,
-    }),
-    [globalDefaults, config?.scene],
+  const previewExportRange = useMemo(
+    () => getPreviewExportRange(exportRange, importedVideoPath, importedVideoDuration, videoSyncOffsetSeconds),
+    [exportRange, importedVideoDuration, importedVideoPath, videoSyncOffsetSeconds],
   )
-  const previewExportRange = useMemo(() => {
-    if (!importedVideoPath || exportRange.type === 'custom') return exportRange
-    return {
-      type: 'custom',
-      from: videoSyncOffsetSeconds,
-      to: videoSyncOffsetSeconds + importedVideoDuration,
-    }
-  }, [exportRange, importedVideoDuration, importedVideoPath, videoSyncOffsetSeconds])
-  const previewExportStartSecond = previewExportRange.from
+  const commitUpdate = useCallback((widgetId, updates) => commitWidgetUpdate(config, onConfigChange, widgetId, updates), [config, onConfigChange])
+  const commitUpdates = useCallback((updatesById) => commitWidgetUpdates(config, onConfigChange, updatesById), [config, onConfigChange])
 
-  useEffect(() => {
-    incrementPreviewPerfCounter(previewPerfCounterName('React preview updates'))
-  }, [selectedSecond])
+  useEffect(recordPreviewUpdate, [selectedSecond])
+  useEffect(() => resetWidgetDrafts(), [config, resetWidgetDrafts])
 
-  useEffect(() => {
-    resetWidgetDrafts()
-  }, [config, resetWidgetDrafts])
-
-  const renderedWidgets = useMemo(() => applyWidgetDrafts(widgets, liveWidgetDrafts), [liveWidgetDrafts, widgets])
-  const canvasWidgets = useMemo(() => applyWidgetDraftsForCanvas(widgets, liveWidgetDrafts), [liveWidgetDrafts, widgets])
-  const renderedWidgetMap = useMemo(() => Object.fromEntries(renderedWidgets.map((w) => [w.id, w])), [renderedWidgets])
-  const orderedWidgetIds = useMemo(() => renderedWidgets.map((w) => w.id), [renderedWidgets])
-
-  const widgetRefCallbacks = useMemo(
-    () => Object.fromEntries(widgets.map((widget) => [widget.id, (node) => setWidgetNode(widget.id, node)])),
-    [setWidgetNode, widgets],
-  )
-
-  const commitWidgetUpdate = (widgetId, updates) => {
-    if (!config) return
-    onConfigChange(updateWidgetInConfig(config, widgetId, updates))
-  }
-  const commitWidgetUpdates = (updatesById) => {
-    if (!config) return
-    onConfigChange(updateWidgetsInConfig(config, updatesById))
-  }
-
-  return {
-    activeWidgetInteraction,
-    beginWidgetInteraction,
-    clearWidgetDraft,
+  const state = {
+    activity: parsedActivity,
     clearWidgetDrafts,
-    commitWidgetUpdate,
-    commitWidgetUpdates,
+    commitWidgetUpdate: commitUpdate,
+    commitWidgetUpdates: commitUpdates,
     config,
-    canvasWidgets,
-    draftWidgetsRef,
     globalDefaults,
-    globalOpacity,
-    globalScale,
-    activity,
-    interactionStartRef,
-    liveWidgetDrafts,
     moveableRef,
-    onConfigChange,
     orderedWidgetIds,
-    previewExportRange,
-    previewExportStartSecond,
     previewSecond: selectedSecond,
-    renderedWidgetMap,
-    renderedWidgets,
+    widgetMap,
     sceneElement,
     sceneSize,
-    sceneStyle,
     setLiveWidgetDraft,
-    setLiveWidgetDraftsBatch,
-    endWidgetInteraction,
+    setLiveWidgetDrafts,
     setSceneElement,
     widgetNodes,
     widgetRefCallbacks,
     widgets,
   }
+  const viewportContentSize = useMemo(() => getViewportContentSize(sceneSize, videoSyncMode), [sceneSize, videoSyncMode])
+  const viewport = useEditorViewport({ contentSize: viewportContentSize, onZoomLevelChange, sceneElement, sceneSize, snapToGrid, zoomLevel })
+  const selection = useWidgetSelection({ ...state, displayScale: viewport.displayScale })
+  useEditorKeyboard({
+    config,
+    editorShell,
+    onConfigChange,
+    clipboardRef,
+    selectedWidgetIds: selection.selectedWidgetIds,
+    selectedWidgets: selection.selectedWidgets,
+    setWidgetSelection: selection.setWidgetSelection,
+  })
+  const handlers = useWasmWidgetInteractions({
+    selectedWidget: selection.selectedWidget,
+    selectedWidgets: selection.selectedWidgets,
+    state,
+    setIsGroupDragActive: selection.setIsGroupDragActive,
+    setGroupDragSelectionIds: selection.setGroupDragSelectionIds,
+  })
+  const scene = useMemo(
+    () => buildWasmScene({ globalDefaults, sceneSize, exportRange: previewExportRange, activity: parsedActivity, fallbackDurationSeconds }),
+    [globalDefaults, sceneSize, previewExportRange, parsedActivity, fallbackDurationSeconds],
+  )
+  const markControls = resolveVideoSyncMarkControls(videoSyncMarkControls, selectedSecond, videoSyncMode)
+  if (videoSyncMode && markControls === null) throw new Error('Video sync editor requires mark controls')
+  useEffect(
+    () => drawGrid(gridRef, sceneSize, viewport.displayScale, gridVisible && !videoSyncMode),
+    [sceneSize, viewport.displayScale, gridVisible, videoSyncMode],
+  )
+  return {
+    activity: parsedActivity,
+    globalDefaults,
+    previewSecond: selectedSecond,
+    sceneSize,
+    setSceneElement,
+    widgets,
+    widgetRefCallbacks,
+    viewport,
+    viewportContentSize,
+    scene,
+    gridRef,
+    backgroundImageSrc: importedBackgroundImagePath === null ? null : convertFileSrc(importedBackgroundImagePath),
+    gridStyle: { transform: `scale(${1 / viewport.displayScale})`, transformOrigin: 'top left' },
+    handleSceneMouseDown: selection.handleSceneMouseDown,
+    handleWidgetMouseDown: selection.handleWidgetMouseDown,
+    handleCanvasMouseOver: selection.handleCanvasMouseOver,
+    handleCanvasMouseLeave: selection.handleCanvasMouseLeave,
+    widgetBadges: selection.widgetBadges,
+    selectionRect: selection.selectionRect,
+    setStageElement: selection.setStageElement,
+    videoSyncMarkControls: markControls,
+    moveableProps: {
+      ...getWidgetResizeOptions(selection.selectedWidget, selection.isGroupSelection),
+      moveableRef,
+      sceneElement,
+      selectedTarget: selection.selectedTarget,
+      selectedTargets: selection.selectedTargets,
+      isGroupSelection: selection.isGroupSelection,
+      isGroupDragActive: selection.isGroupDragActive,
+      elementGuidelines: selection.elementGuidelines,
+      horizontalGuidelines: viewport.horizontalGuidelines,
+      verticalGuidelines: viewport.verticalGuidelines,
+      zoom: viewport.moveableZoom,
+      handlers,
+    },
+  }
 }
 
-export default function useOverlayEditorState(options) {
-  const widgetLiveEdits = useWidgetDraftState()
-  return useOverlayEditorStateWithLiveEdits(options, widgetLiveEdits)
+function drawGrid(canvasRef, sceneSize, displayScale, visible) {
+  const canvas = canvasRef.current
+  if (!visible || !canvas) return
+  const context = canvas.getContext('2d')
+  if (!context) return
+  const width = sceneSize.width * displayScale
+  const height = sceneSize.height * displayScale
+  const gridSize = getEditorGridSize(sceneSize)
+  const pixelRatio = window.devicePixelRatio
+  canvas.width = Math.max(1, Math.round(width * pixelRatio))
+  canvas.height = Math.max(1, Math.round(height * pixelRatio))
+  canvas.style.width = `${width}px`
+  canvas.style.height = `${height}px`
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+  context.clearRect(0, 0, width, height)
+  context.strokeStyle = '#003836'
+  context.lineWidth = 1
+  context.beginPath()
+  for (let x = 0; x <= sceneSize.width; x += gridSize) {
+    const displayX = Math.min(Math.round(x * displayScale) + 0.5, Math.max(0.5, Math.round(width) - 0.5))
+    context.moveTo(displayX, 0)
+    context.lineTo(displayX, height)
+  }
+  for (let y = 0; y <= sceneSize.height; y += gridSize) {
+    const displayY = Math.min(Math.round(y * displayScale) + 0.5, Math.max(0.5, Math.round(height) - 0.5))
+    context.moveTo(0, displayY)
+    context.lineTo(width, displayY)
+  }
+  context.stroke()
 }

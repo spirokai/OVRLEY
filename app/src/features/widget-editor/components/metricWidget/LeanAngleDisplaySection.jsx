@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { SlidersHorizontal, Type } from 'lucide-react'
 import { SectionHeading } from '@/components/ui/section-heading'
-import { buildUniformResizeUpdate } from '@/features/overlay-editor/utils/widgetResizeScaling'
+import { buildUniformResizeUpdate } from '../../utils/widgetSize'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { ColorField, SizeSlider, SliderField } from '../widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
@@ -29,7 +29,7 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
 
   const handleDiameterChange = (nextDiameter) => {
     const update = buildUniformResizeUpdate(widget, nextDiameter)
-    if (update) updateWidgetSize(widget.id, update)
+    updateWidgetSize(widget.id, update)
   }
 
   return (

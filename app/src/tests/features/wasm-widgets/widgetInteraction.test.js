@@ -190,7 +190,7 @@ test.each(['rectangle', 'circle'])(
     expect(live.width).toBe(125.25)
     expect(live.height).toBe(displayType === 'circle' ? 125.25 : 80.5)
     expect(live.display_variants.rectangle.corner_radius).toBe(10)
-    const drafts = { widget: { data: patch, layout: null } }
+    const drafts = { widget: patch }
     expect(applyWidgetDrafts([original], drafts)[0].data).toEqual(live)
     for (const second of [1, 10, 2]) {
       setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second })

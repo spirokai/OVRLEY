@@ -28,10 +28,6 @@ vi.mock('@/store/useStore', () => ({
   ),
 }))
 
-vi.mock('@/features/overlay-editor', () => ({
-  getEffectivePreviewFps: vi.fn(() => 30),
-}))
-
 vi.mock('@/lib/previewPerf', () => ({
   incrementPreviewPerfCounter: vi.fn(),
   previewPerfCounterName: vi.fn((label) => `${label}/s`),

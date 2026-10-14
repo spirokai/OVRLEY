@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { SlidersHorizontal, Tags } from 'lucide-react'
-import { buildUniformResizeUpdate } from '@/features/overlay-editor/utils/widgetResizeScaling'
+import { buildUniformResizeUpdate } from '../../utils/widgetSize'
 import {
   getStandardMetricDefinition,
   getStandardMetricDisplayUnit,
@@ -77,7 +77,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
 
   const handleSizeChange = (nextSize) => {
     const update = buildUniformResizeUpdate(widget, nextSize)
-    if (update) updateWidgetSize(widget.id, update)
+    updateWidgetSize(widget.id, update)
   }
 
   return (

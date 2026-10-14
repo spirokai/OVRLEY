@@ -1,7 +1,7 @@
 # WASM widget interactions
 
 The document keeps the canonical widget configuration. No persisted scale field or
-CSS bitmap scaling is involved in dragging/resizing metric text widgets.
+CSS bitmap scaling is involved in dragging/resizing widgets.
 
 Every standard metric supporting `display_type: text` uses this path, including
 gear labels and GPS coordinate rows. Shared Rust formatting handles units,
@@ -11,7 +11,8 @@ current `previewSecond`. Outside the activity's time range, preview shows missin
 value placeholders. Time text also uses this path, including timezone-aware
 daytime and activity/export-relative elapsed time. The scene supplies the current
 export start second, and native export shares the timestamp sampler and formatter.
-Other display types and gradient widgets remain on their existing render paths.
+WASM also owns gauges, gradient, lean-angle, G-force, lap timers, heading tapes,
+labels, backdrops, raster images, routes, and elevation profiles.
 
 WASM module loading starts at canvas mount and does not gate app startup. Module
 initialization errors are displayed by the canvas. The preview session lives for
@@ -41,10 +42,14 @@ Mouseup flushes pending intent before committing one configuration patch. The
 commit preserves the preview's fractional coordinates and sizes. Escape, window
 blur, selection changes, document replacement and unmount cancel the gesture.
 
-Single WASM widgets support dragging and corner resizing. Groups containing WASM
-widgets support translation through shared data drafts; group scaling is disabled
-until a shared multi-widget resize policy is implemented. Legacy-only selections
-continue using the existing interaction handlers.
+Single widgets support dragging and resizing, with rotation for routes and raster
+images. Groups support translation through shared data drafts; group scaling is
+disabled until a shared multi-widget resize policy is implemented.
+
+The overlay editor keeps one data-patch draft model for the canvas and inspector,
+and one node registry with stable callbacks across appearance and display edits.
+Inspector size controls retain their editable-content policies in
+`features/widget-editor/utils/widgetSize.js`; canvas resize geometry belongs to Rust.
 
 Future widget implementations should supply their resize policy and content bounds
 in Rust and reuse the frontend lifecycle. A widget that reflows when resized should

@@ -1,22 +1,32 @@
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 /**
- * Characterization test for the useOverlayEditorState hook.
- *
- * Pins down the current public contract so that decomposition
- * cannot accidentally change what callers receive. Verifies the
- * hook is importable as a default export with the expected
- * function signature.
+ * Preview state and stable WASM canvas attachment across document edits.
  */
 
 import { act, render, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import useOverlayEditorState from '@/features/overlay-editor/hooks/useOverlayEditorState'
+import useOverlayEditorStateView from '@/features/overlay-editor/hooks/useOverlayEditorState'
+import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { WasmWidgetCanvas } from '@/features/wasm-widgets/components/WasmWidgetCanvas'
 import { presentWidgetGeometry } from '@/features/wasm-widgets/utils/widgetPresentation'
 import { COURSE_PLOT_DEFAULTS } from '@/lib/widget/standard-widgets'
-import { getPrimarySelectionId, normalizeSelectionIds } from '@/features/overlay-editor/utils/overlayEditorHelpers'
+import { getPrimarySelectionId, normalizeSelectionIds } from '@/lib/widget/widget-selection'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
+
+function useOverlayEditorState(options) {
+  const widgetLiveEdits = useWidgetDraftState()
+  const preview = useOverlayEditorStateView({
+    editorShell: { activeKeyboardWorkspace: 'editor' },
+    gridVisible: false,
+    snapToGrid: false,
+    zoomLevel: 1,
+    onZoomLevelChange: vi.fn(),
+    ...options,
+    widgetLiveEdits,
+  })
+  return { ...preview, widgetLiveEdits }
+}
 
 function resetStore() {
   useStore.setState(useStore.getInitialState(), true)
@@ -26,7 +36,7 @@ const globalDefaults = { ...DEFAULT_GLOBAL_DEFAULTS }
 
 function WasmCanvases({ config, attach }) {
   const state = useOverlayEditorState({ config, globalDefaults, onConfigChange: vi.fn() })
-  return state.canvasWidgets.map((widget) => (
+  return state.widgets.map((widget) => (
     <WasmWidgetCanvas key={widget.id} widget={widget} attach={attach} registerNode={state.widgetRefCallbacks[widget.id]} />
   ))
 }
@@ -91,7 +101,7 @@ describe('useOverlayEditorState module contract', () => {
     expect(attach.mock.lastCall[1]).toBeNull()
   })
 
-  test('changes node registration when a widget switches from WASM to the legacy renderer', () => {
+  test('keeps node registration stable across display changes', () => {
     const speed = { id: 'speed-widget', value: 'speed', x: 0, y: 0, display_type: 'text' }
     const { result, rerender } = renderHook(({ config }) => useOverlayEditorState({ config, globalDefaults, onConfigChange: vi.fn() }), {
       initialProps: { config: { ...DEFAULT_CONFIG, values: [speed] } },
@@ -99,24 +109,16 @@ describe('useOverlayEditorState module contract', () => {
     const wasmRef = result.current.widgetRefCallbacks['speed-widget']
     const node = document.createElement('canvas')
     act(() => wasmRef(node))
-    expect(result.current.widgetNodes['speed-widget']).toBe(node)
+    expect(result.current.widgetLiveEdits.getWidgetNode('speed-widget')).toBe(node)
 
     rerender({ config: { ...DEFAULT_CONFIG, values: [{ ...speed, display_type: 'linear' }] } })
-    const legacyRef = result.current.widgetRefCallbacks['speed-widget']
-    expect(legacyRef).not.toBe(wasmRef)
+    const linearRef = result.current.widgetRefCallbacks['speed-widget']
+    expect(linearRef).toBe(wasmRef)
     act(() => {
       wasmRef(null)
-      legacyRef(node)
+      linearRef(node)
     })
-    expect(result.current.widgetNodes['speed-widget']).toBe(node)
-  })
-
-  test('exports a function as default', () => {
-    expect(typeof useOverlayEditorState).toBe('function')
-  })
-
-  test('accepts config, globalDefaults, onConfigChange, zoomLevel, onZoomLevelChange', () => {
-    expect(useOverlayEditorState.length).toBe(1)
+    expect(result.current.widgetLiveEdits.getWidgetNode('speed-widget')).toBe(node)
   })
 
   test('keeps widgets and interaction refs available after the playhead leaves activity data', () => {
@@ -141,7 +143,7 @@ describe('useOverlayEditorState module contract', () => {
     )
 
     expect(result.current.previewSecond).toBe(9)
-    expect(result.current.renderedWidgets).toHaveLength(1)
+    expect(result.current.widgets).toHaveLength(1)
     expect(result.current.widgetRefCallbacks['speed-widget']).toEqual(expect.any(Function))
 
     act(() => {
@@ -158,7 +160,7 @@ describe('useOverlayEditorState module contract', () => {
       trim_end_seconds: 3,
       metadata: { duration_seconds: 3 },
     })
-    expect(result.current.renderedWidgets).toHaveLength(1)
+    expect(result.current.widgets).toHaveLength(1)
     expect(result.current.widgetRefCallbacks['speed-widget']).toEqual(expect.any(Function))
   })
 })

@@ -1,113 +1,50 @@
-/**
- * Background mode rendering tests for OverlayCanvas.
- *
- * Verifies the correct visual elements render for each backgroundMode value.
- */
-
 import { render } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
-
-vi.mock('@tauri-apps/api/core', () => ({ convertFileSrc: (path) => path }))
-
-vi.mock('@/features/video-preview', () => ({
-  VideoPreviewSurface: () => <div data-testid="video-preview-surface" />,
-}))
-
-vi.mock('@/features/widget-preview', () => ({
-  WidgetPreview: () => <div data-testid="widget-preview" />,
-  buildMetricWidgetPreviewModel: () => null,
-  buildTextWidgetPreviewModel: () => null,
-}))
-
-vi.mock('@/features/widget-preview/shared/textMeasurement', () => ({
-  getPreviewFontFamily: (fontFamily) => fontFamily || 'Arial',
-}))
-
 import OverlayCanvas from '@/features/overlay-editor/components/OverlayCanvas'
+import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 
-const defaultSceneProps = { sceneFont: 'Arial', sceneFontSize: 30, sceneStyle: {}, valueFont: 'Arial', sceneSize: { width: 1920, height: 1080 } }
-const defaultDisplayProps = (mode) => ({ displayScale: 1, globalScale: 1, globalOpacity: 1, backgroundMode: mode, gridVisible: false })
-const defaultDataProps = {
+vi.mock('@/features/video-preview', () => ({ VideoPreviewSurface: () => <div data-testid="video-preview-surface" /> }))
+vi.mock('@/features/wasm-widgets/hooks/useWasmWidgets', () => ({ useWasmWidgets: () => ({ attach: vi.fn(), error: null }) }))
+
+const state = {
+  globalDefaults: DEFAULT_GLOBAL_DEFAULTS,
+  sceneSize: { width: 1920, height: 1080 },
+  scene: {},
   widgets: [],
   activity: null,
   previewSecond: 0,
-  metricPreviewModels: {},
-  textPreviewModels: {},
-  selectionRect: null,
-  exportRange: null,
-}
-const defaultCallbacks = {
   setSceneElement: vi.fn(),
-  handleSceneMouseDown: vi.fn(),
-  handleWidgetMouseDown: vi.fn(),
-  setHoveredWidgetId: vi.fn(),
   widgetRefCallbacks: {},
+  backgroundImageSrc: null,
+  gridRef: { current: null },
+  gridStyle: { transform: 'scale(1)', transformOrigin: 'top left' },
 }
 
 describe('OverlayCanvas background modes', () => {
-  test('checker mode renders checkered background', () => {
-    const { container } = render(
-      <OverlayCanvas
-        sceneProps={defaultSceneProps}
-        displayProps={defaultDisplayProps('checker')}
-        dataProps={defaultDataProps}
-        callbacks={defaultCallbacks}
-      />,
+  test.each([
+    ['checker', 'rgb(0, 0, 0)'],
+    ['black', 'rgb(0, 0, 0)'],
+    ['white', 'rgb(244, 234, 210)'],
+  ])('%s mode renders its configured background', (backgroundMode, color) => {
+    const { getByTestId } = render(
+      <OverlayCanvas state={state} backgroundMode={backgroundMode} displayScale={1} gridVisible={false} handleWidgetMouseDown={vi.fn()} />,
     )
-
-    expect(container.querySelector('.bg-overlay-grid-muted')).toBeTruthy()
+    const background = getByTestId('overlay-scene').firstElementChild
+    expect(background.style.backgroundColor).toBe(color)
+    expect(background.classList.contains('bg-overlay-grid-muted')).toBe(backgroundMode === 'checker')
   })
 
-  test('black mode renders black background', () => {
-    const { container } = render(
-      <OverlayCanvas
-        sceneProps={defaultSceneProps}
-        displayProps={defaultDisplayProps('black')}
-        dataProps={defaultDataProps}
-        callbacks={defaultCallbacks}
-      />,
+  test('transparent mode omits the background layer', () => {
+    const { getByTestId } = render(
+      <OverlayCanvas state={state} backgroundMode="transparent" displayScale={1} gridVisible={false} handleWidgetMouseDown={vi.fn()} />,
     )
-
-    const scene = container.querySelector('[data-testid="overlay-scene"]')
-    expect(scene).toBeTruthy()
+    expect(getByTestId('overlay-scene').firstElementChild).toBe(getByTestId('widget-layer'))
   })
 
-  test('white mode renders white background', () => {
-    const { container } = render(
-      <OverlayCanvas
-        sceneProps={defaultSceneProps}
-        displayProps={defaultDisplayProps('white')}
-        dataProps={defaultDataProps}
-        callbacks={defaultCallbacks}
-      />,
+  test('video mode mounts the video surface', () => {
+    const { getByTestId } = render(
+      <OverlayCanvas state={state} backgroundMode="video" displayScale={1} gridVisible={false} handleWidgetMouseDown={vi.fn()} />,
     )
-
-    expect(container.querySelector('[data-testid="overlay-scene"]')).toBeTruthy()
-  })
-
-  test('transparent mode omits background div', () => {
-    const { container } = render(
-      <OverlayCanvas
-        sceneProps={defaultSceneProps}
-        displayProps={defaultDisplayProps('transparent')}
-        dataProps={defaultDataProps}
-        callbacks={defaultCallbacks}
-      />,
-    )
-
-    expect(container.querySelector('.bg-overlay-grid-muted')).toBeNull()
-  })
-
-  test('video mode renders the scene container', () => {
-    const { container } = render(
-      <OverlayCanvas
-        sceneProps={defaultSceneProps}
-        displayProps={defaultDisplayProps('video')}
-        dataProps={defaultDataProps}
-        callbacks={defaultCallbacks}
-      />,
-    )
-
-    expect(container.querySelector('[data-testid="overlay-scene"]')).toBeTruthy()
+    expect(getByTestId('video-preview-surface')).toBeTruthy()
   })
 })

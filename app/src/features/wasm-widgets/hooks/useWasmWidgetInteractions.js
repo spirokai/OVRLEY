@@ -5,9 +5,8 @@ import { dragTranslation, resizeAnchor } from '../utils/widgetGestureGeometry'
 
 /**
  * Moveable owns pointer coordinates; WASM owns live configuration and tight geometry.
- * No legacy widget layout or scale policy is used here.
  * @param {object} options Selection, draft lifecycle, commits and Moveable reference.
- * @returns {object} Single-widget drag/resize and mixed-selection drag handlers.
+ * @returns {object} Single-widget gestures and group translation handlers.
  */
 export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, state, setIsGroupDragActive, setGroupDragSelectionIds }) {
   const gesture = useRef(null)
@@ -17,7 +16,6 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     gesture.current = null
     if (!current) return
     state.clearWidgetDrafts(current.ids)
-    state.endWidgetInteraction(current.ids[0])
     setIsGroupDragActive(false)
     setGroupDragSelectionIds([])
   }
@@ -60,11 +58,10 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     }
   }, [])
 
-  const begin = (target, type) => {
+  const begin = (target) => {
     const controller = getWidgetInteraction(target)
-    const origin = controller.begin((patch) => state.setLiveWidgetDraft(selectedWidget.id, patch, null))
-    state.beginWidgetInteraction(selectedWidget.id, type)
-    gesture.current = { controller, origin, ids: [selectedWidget.id], type, axis: null }
+    const origin = controller.begin((patch) => state.setLiveWidgetDraft(selectedWidget.id, patch))
+    gesture.current = { controller, origin, ids: [selectedWidget.id], axis: null }
     return gesture.current
   }
   const finish = () => {
@@ -81,7 +78,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
   return {
     onDragStart: ({ target, set }) => {
       set([0, 0])
-      begin(target, 'wasm-drag')
+      begin(target)
     },
     onDrag: ({ beforeTranslate, inputEvent }) => {
       const current = gesture.current
@@ -90,7 +87,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     },
     onDragEnd: finish,
     onResizeStart: ({ target, direction, set, dragStart }) => {
-      const current = begin(target, 'wasm-resize')
+      const current = begin(target)
       const { bounds } = current.origin
       current.anchor = resizeAnchor(
         bounds,
@@ -119,7 +116,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     },
     onResizeEnd: finish,
     onRotateStart: ({ target, set }) => {
-      const current = begin(target, 'wasm-rotate')
+      const current = begin(target)
       set(current.origin.data.rotation)
     },
     onRotate: ({ beforeRotate, drag }) => {
@@ -130,7 +127,6 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     onRotateEnd: finish,
     onDragGroupStart: ({ events }) => {
       const ids = selectedWidgets.map((widget) => widget.id)
-      state.beginWidgetInteraction(ids[0], 'wasm-group-drag')
       gesture.current = { ids, widgets: selectedWidgets, axis: null, updates: null }
       setIsGroupDragActive(true)
       setGroupDragSelectionIds(ids)
@@ -141,7 +137,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       if (!current) return
       const [x, y] = dragTranslation(current, events[0].beforeTranslate, inputEvent.ctrlKey)
       current.updates = Object.fromEntries(current.widgets.map((widget) => [widget.id, { x: widget.data.x + x, y: widget.data.y + y }]))
-      state.setLiveWidgetDraftsBatch(Object.fromEntries(Object.entries(current.updates).map(([id, data]) => [id, { data, layout: null }])))
+      state.setLiveWidgetDrafts(current.updates)
     },
     onDragGroupEnd: () => {
       const current = gesture.current
