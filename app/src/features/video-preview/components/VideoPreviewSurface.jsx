@@ -75,6 +75,8 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
   )
   const hasHevcPlaybackError = Boolean(hevcPlaybackWarning)
 
+  // An identity filter keeps video in a browser render pass. DirectComposition
+  // video underlays can wash out translucent widgets and editor chrome when scaled.
   return (
     <>
       {videoSrc && !hasHevcPlaybackError ? (
@@ -83,6 +85,7 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
           ref={videoRef}
           src={videoSrc}
           className={cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')}
+          style={{ filter: 'opacity(1)' }}
           preload="metadata"
           playsInline
           muted={isVideoMuted}
