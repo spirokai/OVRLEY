@@ -78,7 +78,7 @@ function OverlayEditorContent(props) {
           undoRedoControls={undoRedoControls}
         />
       </div>
-      <div ref={scrollViewportRef} className="absolute left-0 right-0 top-12 bottom-0 overflow-auto" onWheel={handleWheel}>
+      <div ref={scrollViewportRef} data-overlay-viewport className="absolute left-0 right-0 top-12 bottom-0 overflow-auto" onWheel={handleWheel}>
         <div
           ref={setStageElement}
           data-testid="overlay-editor-stage"

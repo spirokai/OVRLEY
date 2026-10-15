@@ -7,6 +7,11 @@
   background-color: var(--theme-color-accent) !important;
 }
 
+/* Group child borders are also drawn by the screen-space selection renderer. */
+.ovrley-moveable .moveable-line[data-line-key^='render-line-'] {
+  display: none !important;
+}
+
 /* control box points */
 .moveable-control {
   height: calc(10px / var(--app-scale, 1)) !important;
