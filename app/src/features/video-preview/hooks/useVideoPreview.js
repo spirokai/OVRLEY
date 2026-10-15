@@ -3,15 +3,17 @@
  * scheduling, and playback synchronization around the active <video> element.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { openHevcSupport } from '@/api/backend'
+import { useVideoTimeline } from '@/hooks/useVideoTimeline'
+import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
 import useStore from '@/store/useStore'
 import { useVideoPlaybackClock } from './useVideoPlaybackClock'
 import { useVideoPreviewWarnings } from './useVideoPreviewWarnings'
 import { SCRUB_SEEK_EPSILON_SECONDS, SCRUB_SEEK_INTERVAL_MS } from '../data/videoPreviewConstants'
 import { primeVideoFirstFrame, syncVideoCurrentTime } from '../utils/videoPreviewPlayback'
 import { createVideoPreviewScrubScheduler } from '../utils/videoPreviewScrubScheduler'
-import { isVideoPreviewOutOfRange, resolveVideoPreviewSource } from '../utils/videoPreviewSource'
+import { resolveVideoPreviewSource } from '../utils/videoPreviewSource'
 import i18next from 'i18next'
 
 /**
@@ -22,40 +24,30 @@ import i18next from 'i18next'
  * @returns {{ videoSrc: string, importId: string|null, isOutOfRange: boolean, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
  */
 export function useVideoPreview(videoRef, isActive = true) {
-  // Store selectors - subscribes to video import state, playhead position, playback mode, and sync offset.
-  const importedVideoPath = useStore((state) => state.importedVideoPath)
-  const importedVideoImportId = useStore((state) => state.importedVideoImportId)
-  const importedVideoPreviewUrl = useStore((state) => state.importedVideoPreviewUrl)
-  const importedVideoPreviewWarnings = useStore((state) => state.importedVideoPreviewWarnings)
-  const importedVideoCodecName = useStore((state) => state.importedVideoCodecName)
+  // Store selectors - subscribes to the displayed clips, playhead position, playback mode, and drag state.
+  const { clips, program } = useVideoTimeline().displayed
+  const isDragPreview = useStore((state) => state.videoDragPreview !== null)
   const platformOs = useStore((state) => state.platformOs)
-  const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)
-  const videoSyncOffsetPreviewSeconds = useStore((state) => state.videoSyncOffsetPreviewSeconds)
   const selectedSecond = useStore((state) => state.selectedSecond)
   const previewPlaybackState = useStore((state) => state.previewPlaybackState)
   const previewPlaybackSource = useStore((state) => state.previewPlaybackSource)
   const pausePreviewPlayback = useStore((state) => state.pausePreviewPlayback)
   const setSelectedSecond = useStore((state) => state.setSelectedSecond)
   const startPreviewPlayback = useStore((state) => state.startPreviewPlayback)
-  const videoDuration = useStore((state) => state.importedVideoDuration || 0)
-  const effectiveVideoSyncOffsetSeconds = videoSyncOffsetPreviewSeconds ?? videoSyncOffsetSeconds
 
-  // Derived state - determines whether the video should play and which source URL to load.
-  const videoEndSecond = videoSyncOffsetSeconds + videoDuration
-  const isVideoPlaybackMode =
-    isActive && previewPlaybackState === 'playing' && previewPlaybackSource === 'video' && videoSyncOffsetPreviewSeconds === null
-  const videoSrc = useMemo(
-    () =>
-      resolveVideoPreviewSource({
-        importedVideoPath,
-        importedVideoPreviewUrl,
-      }),
-    [importedVideoPath, importedVideoPreviewUrl],
-  )
+  // Derived state - the clip at the playhead (or the upcoming/last clip outside clips) owns the video element.
+  const target = resolvePreviewTarget(program, selectedSecond)
+  const activeClip = target === null ? null : clips.find((clip) => clip.id === target.videoId)
+  const videoOffsetSeconds = activeClip?.offsetSeconds ?? 0
+  const videoEndSecond = activeClip === null ? 0 : activeClip.offsetSeconds + activeClip.durationSeconds
+  const activePath = activeClip?.path ?? null
+  const activePreviewUrl = activeClip?.preview.url ?? null
+  const isVideoPlaybackMode = isActive && previewPlaybackState === 'playing' && previewPlaybackSource === 'video' && !isDragPreview
+  const videoSrc = activePath === null ? '' : resolveVideoPreviewSource({ importedVideoPath: activePath, importedVideoPreviewUrl: activePreviewUrl })
 
   // Warning lifecycle - tracks metadata, native-player, and slow-seek messages separately from playback sync.
   const { hevcPlaybackWarning, metadataStatusMessage, nativeVideoError, seekWarning } = useVideoPreviewWarnings({
-    codecName: importedVideoCodecName,
+    codecName: activeClip?.codecName ?? null,
     isActive,
     videoRef,
     videoSrc,
@@ -75,7 +67,8 @@ export function useVideoPreview(videoRef, isActive = true) {
   useVideoPlaybackClock({
     videoRef,
     isActive: Boolean(videoSrc) && isVideoPlaybackMode,
-    videoSyncOffsetSeconds,
+    videoFps: activeClip?.fps ?? null,
+    videoOffsetSeconds,
     onPreviewSecond: setSelectedSecond,
     onPlaybackEnded: handoffVideoPlaybackToTimeline,
   })
@@ -85,7 +78,7 @@ export function useVideoPreview(videoRef, isActive = true) {
 
   // Drag preview - seek the video directly from the transient offset without committing global sync state.
   useEffect(() => {
-    if (videoSyncOffsetPreviewSeconds === null) {
+    if (!isDragPreview) {
       return
     }
 
@@ -98,8 +91,8 @@ export function useVideoPreview(videoRef, isActive = true) {
       video.pause()
     }
 
-    scrubSchedulerRef.current?.schedule(selectedSecond - videoSyncOffsetPreviewSeconds)
-  }, [selectedSecond, videoRef, videoSrc, videoSyncOffsetPreviewSeconds])
+    scrubSchedulerRef.current?.schedule(selectedSecond - videoOffsetSeconds)
+  }, [isDragPreview, selectedSecond, videoOffsetSeconds, videoRef, videoSrc])
 
   // Scrub scheduler ownership - preserve throttle state across playhead updates.
   useEffect(() => {
@@ -131,12 +124,12 @@ export function useVideoPreview(videoRef, isActive = true) {
     }
 
     const syncPlaybackState = () => {
-      if (videoSyncOffsetPreviewSeconds !== null) {
+      if (isDragPreview) {
         videoPlaybackOwnerRef.current = null
         return
       }
 
-      const desiredVideoSecond = selectedSecond - videoSyncOffsetSeconds
+      const desiredVideoSecond = selectedSecond - videoOffsetSeconds
 
       const handlePlaybackFailure = (error) => {
         const currentState = useStore.getState()
@@ -165,9 +158,9 @@ export function useVideoPreview(videoRef, isActive = true) {
       if (isVideoPlaybackMode) {
         scrubSchedulerRef.current?.clear()
         const owner = videoPlaybackOwnerRef.current
-        if (owner?.video !== video || owner.videoSyncOffsetSeconds !== videoSyncOffsetSeconds) {
+        if (owner?.video !== video || owner.videoSrc !== videoSrc || owner.videoOffsetSeconds !== videoOffsetSeconds) {
           syncVideoCurrentTime(video, desiredVideoSecond)
-          videoPlaybackOwnerRef.current = { video, videoSyncOffsetSeconds }
+          videoPlaybackOwnerRef.current = { video, videoSrc, videoOffsetSeconds }
         }
 
         if (video.paused) {
@@ -210,30 +203,30 @@ export function useVideoPreview(videoRef, isActive = true) {
     }
   }, [
     isActive,
+    isDragPreview,
     isVideoPlaybackMode,
     pausePreviewPlayback,
     previewPlaybackState,
     selectedSecond,
+    videoOffsetSeconds,
     videoRef,
     videoSrc,
-    videoSyncOffsetPreviewSeconds,
-    videoSyncOffsetSeconds,
   ])
 
   // Derived return values - aggregate imported-video warnings with local preview messages.
-  const isOutOfRange = isVideoPreviewOutOfRange({
-    selectedSecond,
-    videoDuration,
-    videoSyncOffsetSeconds: effectiveVideoSyncOffsetSeconds,
-  })
+  const isOutOfRange = target === null || !target.isInside
   const videoPreviewHelpAvailable = Boolean(hevcPlaybackWarning) && platformOs === 'windows'
-  const videoPreviewMessages = [hevcPlaybackWarning, ...importedVideoPreviewWarnings, metadataStatusMessage, seekWarning, nativeVideoError].filter(
-    Boolean,
-  )
+  const videoPreviewMessages = [
+    hevcPlaybackWarning,
+    ...(activeClip?.preview.warnings ?? []),
+    metadataStatusMessage,
+    seekWarning,
+    nativeVideoError,
+  ].filter(Boolean)
 
   return {
     videoSrc,
-    importId: importedVideoImportId,
+    importId: activeClip?.preview.importId ?? null,
     isOutOfRange,
     hevcPlaybackWarning,
     openVideoPreviewHelp,

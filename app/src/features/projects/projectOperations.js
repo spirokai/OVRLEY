@@ -1,6 +1,7 @@
 import * as backend from '@/api/backend'
 import { replaceEditorDocument } from '@/features/undo-redo/undoHistory'
 import { createDurableEditorState } from '@/lib/widget/editor-state'
+import { createImportedVideo } from '@/store/slices/createVideoImportSlice'
 import { attachRasterLoadResults } from '@/lib/widget/raster-resources'
 import useStore from '@/store/useStore'
 import { prepareDocumentFonts } from '@/lib/font-resources'
@@ -33,17 +34,19 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
 
   const activity = sourceLoadResults[0].value
   const preparedVideo = sourceLoadResults[1].value
-  const previousImportId = useStore.getState().importedVideoImportId
+  const previousImportIds = useStore.getState().importedVideos.map((importedVideo) => importedVideo.preview.importId)
   let video = null
   if (preparedVideo) {
     const registration = await backend.registerPreviewVideo(preparedVideo.path)
-    video = {
-      ...preparedVideo,
-      importedVideoState: {
-        ...preparedVideo.importedVideoState,
-        importedVideoImportId: registration.importId,
-        importedVideoPreviewUrl: registration.previewUrl,
-      },
+    try {
+      video = createImportedVideo(preparedVideo.metadata, {
+        importOrder: 0,
+        preview: { importId: registration.importId, url: registration.previewUrl, warnings: preparedVideo.previewWarnings },
+        telemetry: preparedVideo.telemetry,
+      })
+    } catch (error) {
+      await backend.removePreviewVideo(registration.importId)
+      throw error
     }
   } else {
     await backend.clearPreviewVideos()
@@ -52,10 +55,10 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
   try {
     replaceEditorDocument(useStore, () => applyPreparedProjectState(useStore, hydratedProject, { activity, video }))
   } catch (error) {
-    if (video) await backend.removePreviewVideo(video.importedVideoState.importedVideoImportId)
+    if (video) await backend.removePreviewVideo(video.preview.importId)
     throw error
   }
-  if (video && previousImportId !== null) await backend.removePreviewVideo(previousImportId)
+  if (video) for (const importId of previousImportIds) await backend.removePreviewVideo(importId)
   if (video) onSetBackgroundMode?.('video')
   return project
 }
@@ -65,14 +68,14 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
  * @param {object} options Project media-owner operations.
  * @returns {Promise<void>} Completion promise.
  */
-export async function createNewProject({ clearImportedVideo }) {
+export async function createNewProject({ clearImportedVideos }) {
   const state = useStore.getState()
   const templateSource = state.loadedTemplateSource
   const templateState = state.lastSavedTemplateState
   if (templateSource && !templateState) throw new Error('the loaded template has no saved widget state')
 
   if (templateState) await prepareDocumentFonts(templateState)
-  await clearImportedVideo()
+  await clearImportedVideos()
   replaceEditorDocument(useStore, () => applyNewProjectState(useStore, { templateSource, templateState }))
 }
 

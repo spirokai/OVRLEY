@@ -27,7 +27,7 @@ function renderShellKeyboard(configure = () => {}) {
       activitySummary: { durationSeconds: 20 },
       computeVideoSync: actions.computeVideoSync,
       config: { scene: {} },
-      importedVideoPath: 'ride.mp4',
+      hasVideos: true,
     },
     backendState: {
       backendStatus: 'connected',
@@ -140,7 +140,31 @@ describe('useAppShellKeyboard', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 'a', shiftKey: true }))
     })
 
-    expect(actions.computeVideoSync).toHaveBeenCalledWith({ durationSeconds: 20 })
+    expect(actions.computeVideoSync).toHaveBeenCalledOnce()
+    expect(actions.computeVideoSync).toHaveBeenCalledWith()
+  })
+
+  test('ignores auto-sync without imported videos or an external activity', () => {
+    const withoutVideos = renderShellKeyboard((options) => {
+      options.appShell.hasVideos = false
+    })
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 'a', shiftKey: true }))
+    })
+
+    expect(withoutVideos.actions.computeVideoSync).not.toHaveBeenCalled()
+    withoutVideos.unmount()
+
+    const withoutActivity = renderShellKeyboard((options) => {
+      options.appShell.activitySummary = null
+    })
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 'a', shiftKey: true }))
+    })
+
+    expect(withoutActivity.actions.computeVideoSync).not.toHaveBeenCalled()
   })
 
   test('keeps disabled actions as no-ops', () => {

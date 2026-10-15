@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useMemo } from 'react'
+import { deriveCompatibility, getVideosTimelineBounds, joinVideoEdits } from '@/lib/video-program/video-collection'
 import { OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
 import {
   getAccelerationValueForSettings,
@@ -52,11 +53,8 @@ export default function useRenderVideoDerivedState({ settings }) {
     platformOs,
     availableCodecs,
     config,
-    importedVideoPath,
-    importedVideoDuration,
-    importedVideoFps,
-    importedVideoResolution,
-    videoSyncOffsetSeconds,
+    importedVideos,
+    videoEdits,
     renderProgress,
     batchSnapshot,
     renderSettings,
@@ -65,7 +63,11 @@ export default function useRenderVideoDerivedState({ settings }) {
   } = useRenderDialogInputs()
   // A closed dialog has no draft; its hidden controls read committed settings.
   const displaySettings = settings === null ? renderSettings : settings
-  const hasImportedVideo = importedVideoPath !== null
+  const hasImportedVideo = importedVideos.length > 0
+  const videoFormat = useMemo(() => deriveCompatibility(importedVideos).reference, [importedVideos])
+  const videoBounds = useMemo(() => getVideosTimelineBounds(joinVideoEdits(importedVideos, videoEdits)), [importedVideos, videoEdits])
+  const importedVideoFps = videoFormat === null ? null : videoFormat.fps.num / videoFormat.fps.den
+  const importedVideoResolution = videoFormat?.resolution ?? null
   const isBatchTarget = displaySettings.renderTarget === 'batch'
   // Native jobs own their FPS; the current source only drives single rendering.
   const lockedVideoFps = isBatchTarget || !hasImportedVideo ? null : importedVideoFps
@@ -118,7 +120,6 @@ export default function useRenderVideoDerivedState({ settings }) {
     defaultBitrateForCodec,
     exportMode,
     hasImportedVideo,
-    importedVideoDuration,
     importedVideoFps,
     importedVideoResolution,
     isBatchTarget,
@@ -137,6 +138,6 @@ export default function useRenderVideoDerivedState({ settings }) {
     selectedOutputFormatValue,
     updateRateFps,
     updateRateOptions,
-    videoSyncOffsetSeconds,
+    videoBounds,
   }
 }

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
-import { createRenderRequest } from '@/features/render-video/utils/renderRequest'
+import { createPreviewRenderRequest, createRenderRequest } from '@/features/render-video/utils/renderRequest'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 describe('render request preparation', () => {
   beforeEach(() => {
@@ -64,15 +65,7 @@ describe('render request preparation', () => {
   })
 
   test('clamps a composite custom range to the imported video when submitting the job', () => {
-    useStore.setState({
-      importedVideoPath: 'C:/clip.mp4',
-      importedVideoDuration: 30,
-      importedVideoFps: 30,
-      importedVideoFpsNum: 30,
-      importedVideoFpsDen: 1,
-      importedVideoResolution: { width: 1920, height: 1080 },
-      videoSyncOffsetSeconds: 10,
-    })
+    useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:/clip.mp4', durationSeconds: 30 })], { clip: 10 }))
     const settings = {
       ...useStore.getState().renderSettings,
       exportMode: 'composite',
@@ -95,5 +88,59 @@ describe('render request preparation', () => {
         settings: { ...settings, range: { type: 'custom', from: 0, to: 5 } },
       }),
     ).toThrow('Custom export range must overlap the imported video range')
+  })
+
+  test('renders an MP4-only clip against its own telemetry in clip-local time', () => {
+    const telemetryActivity = { sample_elapsed_seconds: [0, 15, 30], trim_end_seconds: 30 }
+    const video = createTestVideo({
+      id: 'clip',
+      path: 'C:/clip.mp4',
+      durationSeconds: 30,
+      telemetry: { status: 'ready', activity: telemetryActivity },
+    })
+    useStore.setState({ parsedActivity: null, startSecond: 0, endSecond: 0, selectedSecond: 112, ...videoStoreState([video], { clip: 100 }) })
+    const settings = {
+      ...useStore.getState().renderSettings,
+      exportMode: 'composite',
+      codec: 'libx264',
+      range: { type: 'custom', from: 105, to: 120 },
+      outputPath: 'C:/renders/video.mp4',
+    }
+
+    const request = createRenderRequest({ editorSnapshot: useStore.getState(), settings })
+    expect(request.payload.parsedActivity).toBe(telemetryActivity)
+    expect(request.payload.config.scene).toMatchObject({
+      start: 5,
+      end: 20,
+      composite_video_path: 'C:/clip.mp4',
+      composite_sync_offset: 5,
+      composite_video_trim_start: 5,
+      composite_render_duration: 15,
+    })
+
+    const fullRequest = createRenderRequest({
+      editorSnapshot: useStore.getState(),
+      settings: { ...settings, range: { type: 'all', from: 0, to: 0 } },
+    })
+    expect(fullRequest.payload.config.scene).toMatchObject({ start: 0, end: 30, composite_sync_offset: 0, composite_render_duration: 30 })
+
+    const preview = createPreviewRenderRequest(useStore.getState())
+    expect(preview.parsedActivity).toBe(telemetryActivity)
+    expect(preview.second).toBe(12)
+  })
+
+  test('rejects a current-video render of several clips', () => {
+    useStore.setState(
+      videoStoreState([createTestVideo({ id: 'a', path: 'C:/a.mp4' }), createTestVideo({ id: 'b', path: 'C:/b.mp4', importOrder: 1 })], {
+        a: 0,
+        b: 5,
+      }),
+    )
+    expect(() =>
+      createRenderRequest({
+        editorSnapshot: useStore.getState(),
+        settings: { ...useStore.getState().renderSettings, exportMode: 'composite', codec: 'libx264', outputPath: 'C:/renders/video.mp4' },
+      }),
+    ).toThrow('Exporting several videos is not supported yet')
   })
 })

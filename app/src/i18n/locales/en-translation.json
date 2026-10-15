@@ -363,7 +363,8 @@
     "couldNotDetermineVideoCreationTime": "Could not determine video creation time",
     "invalidTimestampFormats": "Invalid timestamp formats",
     "timezoneIsRequiredForVideoSync": "timezone is required for video sync",
-    "videoCouldNotBeSyncedWithActivity": "Video could not be synced with activity"
+    "videoCouldNotBeSyncedWithActivity": "Video could not be synced with activity",
+    "videoOutsideActivity": "Video is outside the activity"
   },
   "template-manager": {
     "cancel": "Cancel",
@@ -500,6 +501,7 @@
       "unsupportedFormat": "This video format is not supported by the system video player."
     },
     "theVideoPreviewCouldNotBeLoaded": "The video preview could not be loaded.",
+    "videoCount": "{{count}} videos",
     "videoOrImage": "Video or Image",
     "videoPreviewLoadingWasAborted": "Video preview loading was aborted."
   },

@@ -7,6 +7,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
+import { useActivityContext } from '@/hooks/useVideoTimeline'
 import { deleteWidgetInConfig, ensureWidgetIdsInConfig, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget/widget-config'
 import { buildConfigWidgets, getWidgetTypeName, groupWidgetsForSidebar, withAltitudeEditorPresentation } from '@/lib/widget/widget-presentation'
 import { isStandardMetricWidgetType } from '@/lib/widget/standard-metrics'
@@ -47,11 +48,11 @@ const CONTENT_ALIGNMENT_FACTORS = {
 export function useWidgetManager({ widgetLiveEdits }) {
   const { t } = useTranslation()
   // Store selectors — shallow-pick zustand state needed for widget management
-  const { config, globalDefaults, parsedActivity, selectedWidgetId, setConfig, setSelectedWidgetId } = useStore(
+  const activity = useActivityContext()?.activity ?? null
+  const { config, globalDefaults, selectedWidgetId, setConfig, setSelectedWidgetId } = useStore(
     useShallow((state) => ({
       config: state.config,
       globalDefaults: state.globalDefaults,
-      parsedActivity: state.parsedActivity,
       selectedWidgetId: state.selectedWidgetId,
       setConfig: state.setConfig,
       setSelectedWidgetId: state.setSelectedWidgetId,
@@ -63,9 +64,9 @@ export function useWidgetManager({ widgetLiveEdits }) {
   // Derived state — group and build the sidebar widget list from config
   const widgets = useMemo(() => {
     const configWidgets = applyWidgetDrafts(buildConfigWidgets(config), liveEdits.liveWidgetDrafts)
-    const presentedWidgets = configWidgets.map((widget) => withAltitudeEditorPresentation(widget, parsedActivity))
+    const presentedWidgets = configWidgets.map((widget) => withAltitudeEditorPresentation(widget, activity))
     return groupWidgetsForSidebar(presentedWidgets, (type) => getWidgetTypeName(type, t))
-  }, [config, liveEdits.liveWidgetDrafts, parsedActivity, t])
+  }, [activity, config, liveEdits.liveWidgetDrafts, t])
 
   // Update handler — applies partial updates to a widget via config utility
   const updateWidgetData = (id, updates) => {
@@ -160,7 +161,7 @@ export function useWidgetManager({ widgetLiveEdits }) {
     } else if (['course', 'elevation'].includes(type)) {
       category = 'plots'
       data = createPlotDefaults(type, globalDefaults, {
-        coursePoints: parsedActivity?.sample_course_points,
+        coursePoints: activity?.sample_course_points,
         sceneFontSize: globalDefaults.font_size,
       })
     } else throw new Error(`Unknown widget type: ${type}`)

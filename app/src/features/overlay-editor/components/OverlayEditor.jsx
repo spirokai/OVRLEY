@@ -92,14 +92,14 @@ function CanvasStatusBadges({ height, showProjectStatus, status, width }) {
   )
 }
 
-function CanvasToolbar({ editorShell, importedBackgroundImageFilename, importedVideoFilename, undoRedoControls }) {
+function CanvasToolbar({ editorShell, importedBackgroundImageFilename, importedVideoLabel, undoRedoControls }) {
   return (
     <div data-testid="canvas-editor-toolbar" className="pointer-events-auto absolute left-1/2 top-4 z-50 -translate-x-1/2">
       <EditorToolbar
         backgroundMode={editorShell.editorBackgroundMode}
         onSetBackgroundMode={editorShell.setEditorBackgroundMode}
         importedBackgroundImageFilename={importedBackgroundImageFilename}
-        importedVideoFilename={importedVideoFilename}
+        importedVideoLabel={importedVideoLabel}
         zoomLevel={editorShell.editorZoomLevel}
         onZoomIn={editorShell.increaseZoom}
         onZoomOut={editorShell.decreaseZoom}
@@ -142,7 +142,7 @@ function OverlayEditorContent({
   gridVisible,
   snapToGrid,
   importedBackgroundImageFilename,
-  importedVideoFilename,
+  importedVideoLabel,
   showProjectStatus,
   projectStatus,
   videoSyncMode = false,
@@ -422,7 +422,7 @@ function OverlayEditorContent({
       <CanvasToolbar
         editorShell={editorShell}
         importedBackgroundImageFilename={importedBackgroundImageFilename}
-        importedVideoFilename={importedVideoFilename}
+        importedVideoLabel={importedVideoLabel}
         undoRedoControls={undoRedoControls}
       />
       <div ref={scrollViewportRef} className="absolute left-0 right-0 top-12 bottom-0 overflow-auto" onWheel={handleWheel}>

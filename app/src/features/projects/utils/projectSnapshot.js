@@ -5,6 +5,13 @@ export const PROJECT_FORMAT = 'ovrley-project'
 export const PROJECT_VERSION = 3
 export const LAST_PROJECT_DIRECTORY_KEY = 'last-project-dir'
 
+// Project format version 3 stores at most one video; version 4 stores the collection.
+function projectVideo(state) {
+  if (state.importedVideos.length > 1) throw new Error('Project format version 3 cannot store several videos')
+  const video = state.importedVideos[0]
+  return video === undefined ? null : { path: video.path, offsetSeconds: state.videoEdits[video.id].offsetSeconds }
+}
+
 /**
  * Builds the project content that participates in dirty-state comparison.
  * @param {object} state Complete application state.
@@ -13,6 +20,8 @@ export const LAST_PROJECT_DIRECTORY_KEY = 'last-project-dir'
  */
 export function createProjectContentSnapshot(state, projectPath) {
   const source = (path) => (path ? { path: createPathLocator(path, projectPath) } : null)
+  const video = projectVideo(state)
+  const { landmarks, detectedLocationSecond, speedThresholdKmh, turnThresholdDegrees } = state.manualVideoSync
   const editor = createDurableEditorState({ config: state.config, globalDefaults: state.globalDefaults })
   editor.config.scene.fps = state.renderSettings.fps
   editor.config.scene.updateRate = state.renderSettings.widgetUpdateRate
@@ -21,12 +30,12 @@ export function createProjectContentSnapshot(state, projectPath) {
     editor,
     sources: {
       activity: source(state.activitySource?.path),
-      video: source(state.importedVideoPath),
+      video: source(video?.path),
     },
     sync: {
-      videoOffsetSeconds: state.videoSyncOffsetSeconds,
+      videoOffsetSeconds: video?.offsetSeconds ?? 0,
       videoTimezoneMode: state.videoSyncTimezoneMode,
-      manual: state.manualVideoSync,
+      manual: { landmarks, detectedLocationSecond, speedThresholdKmh, turnThresholdDegrees },
     },
     render: {
       renderTarget: state.renderSettings.renderTarget,
@@ -34,7 +43,7 @@ export function createProjectContentSnapshot(state, projectPath) {
       batchOutputFolder: state.batchOutputFolder,
       fps: state.renderSettings.fps,
       widgetUpdateRate: state.renderSettings.widgetUpdateRate,
-      exportMode: state.renderSettings.renderTarget === 'batch' || state.importedVideoPath ? state.renderSettings.exportMode : 'transparent',
+      exportMode: state.renderSettings.renderTarget === 'batch' || video !== null ? state.renderSettings.exportMode : 'transparent',
       codec: state.renderSettings.codec,
       qualityType: state.renderSettings.qualityType,
       qualityValue: state.renderSettings.qualityValue,

@@ -22,7 +22,6 @@ vi.mock('@/store/useStore', () => ({
           fps: 30,
         },
       },
-      importedVideoFps: undefined,
       renderSettings: { fps: 30, widgetUpdateRate: 1 },
     }),
   ),
@@ -63,7 +62,8 @@ describe('useVideoPlaybackClock', () => {
         isActive: false,
         onPlaybackEnded: vi.fn(),
         onPreviewSecond: vi.fn(),
-        videoSyncOffsetSeconds: 0,
+        videoFps: null,
+        videoOffsetSeconds: 0,
       }),
     )
 
@@ -80,7 +80,8 @@ describe('useVideoPlaybackClock', () => {
         isActive: false,
         onPlaybackEnded: vi.fn(),
         onPreviewSecond: vi.fn(),
-        videoSyncOffsetSeconds: 0,
+        videoFps: null,
+        videoOffsetSeconds: 0,
       }),
     )
 

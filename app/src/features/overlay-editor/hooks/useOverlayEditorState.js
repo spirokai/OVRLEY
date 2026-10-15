@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useStore from '@/store/useStore'
+import { useActivityContext, useVideoTimeline } from '@/hooks/useVideoTimeline'
 import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
 import { getEffectiveWidgetData } from '@/lib/template/template-state'
@@ -31,10 +32,14 @@ function materializeWidgets(rawWidgets, globalDefaults) {
 export function useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onConfigChange }, widgetLiveEdits) {
   const selectedSecond = useStore((state) => state.selectedSecond)
   const exportRange = useStore((state) => state.renderSettings.range)
-  const importedVideoPath = useStore((state) => state.importedVideoPath)
-  const importedVideoDuration = useStore((state) => state.importedVideoDuration)
-  const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)
-  const activity = useStore((state) => state.parsedActivity)
+  const activityContext = useActivityContext()
+  const activity = activityContext?.activity ?? null
+  const activityOriginSecond = activityContext?.originSecond ?? 0
+  const activityClipVideoId = activityContext?.videoId ?? null
+  const timeline = useVideoTimeline()
+  const activityClipDurationSeconds =
+    activityClipVideoId === null ? null : timeline.clips.find((clip) => clip.id === activityClipVideoId).durationSeconds
+  const videoBounds = timeline.bounds
 
   const moveableRef = useRef(null)
   const interactionStartRef = useRef(null)
@@ -86,14 +91,16 @@ export function useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onC
     }),
     [globalDefaults, config?.scene],
   )
+  // Widgets read activity time: timeline seconds shifted by the activity origin. Without an
+  // external activity the clip at the playhead supplies its own telemetry from its start.
   const previewExportRange = useMemo(() => {
-    if (!importedVideoPath || exportRange.type === 'custom') return exportRange
-    return {
-      type: 'custom',
-      from: videoSyncOffsetSeconds,
-      to: videoSyncOffsetSeconds + importedVideoDuration,
+    if (exportRange.type === 'custom') {
+      return { ...exportRange, from: exportRange.from - activityOriginSecond, to: exportRange.to - activityOriginSecond }
     }
-  }, [exportRange, importedVideoDuration, importedVideoPath, videoSyncOffsetSeconds])
+    if (activityClipDurationSeconds !== null) return { type: 'custom', from: 0, to: activityClipDurationSeconds }
+    if (videoBounds === null) return exportRange
+    return { type: 'custom', from: videoBounds.startSecond, to: videoBounds.endSecond }
+  }, [activityClipDurationSeconds, activityOriginSecond, exportRange, videoBounds])
   const previewExportStartSecond = previewExportRange.from
 
   useEffect(() => {
@@ -152,7 +159,7 @@ export function useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onC
     orderedWidgetIds,
     previewExportRange,
     previewExportStartSecond,
-    previewSecond: selectedSecond,
+    previewSecond: selectedSecond - activityOriginSecond,
     renderedWidgetMap,
     renderedWidgets,
     sceneElement,

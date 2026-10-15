@@ -20,9 +20,9 @@ const EMPTY_GRAPH_SERIES = Object.freeze({ speed: [], turning: [] })
  * @param {number} options.widthPx Measured timeline width.
  * @param {number} options.timelineMinimum Minimum legal timeline second.
  * @param {number} options.totalDuration Maximum legal timeline second.
- * @param {number|null} options.videoDuration Imported video duration.
- * @param {number} options.videoSyncOffsetSeconds Committed video offset.
- * @param {number|null} options.videoSyncOffsetPreviewSeconds Display-only video offset preview.
+ * @param {number|null} options.videoDuration Duration of the video whose landmarks are matched.
+ * @param {number} options.videoOffsetSeconds Committed offset of that video.
+ * @param {number} options.displayedVideoOffsetSeconds Displayed offset of that video, including drag previews.
  * @param {object|null} options.detection Detector result containing graph series and events.
  * @param {object[]} options.landmarks Canonical video landmarks.
  * @param {function} options.scrubTo Timeline scrub callback for in-view handles.
@@ -39,8 +39,8 @@ export default function useVideoSyncTimeline({
   timelineMinimum,
   totalDuration,
   videoDuration,
-  videoSyncOffsetSeconds,
-  videoSyncOffsetPreviewSeconds,
+  videoOffsetSeconds,
+  displayedVideoOffsetSeconds,
   detection,
   landmarks,
   scrubTo,
@@ -54,7 +54,7 @@ export default function useVideoSyncTimeline({
     [graphScales, graphSeries, viewEnd, viewStart, widthPx],
   )
 
-  const displayedVideoOffset = videoSyncOffsetPreviewSeconds ?? videoSyncOffsetSeconds
+  const displayedVideoOffset = displayedVideoOffsetSeconds
 
   const { dragPreview, getLandmarkPointerProps } = useVideoSyncLandmarkDrag({
     containerElement,
@@ -65,7 +65,7 @@ export default function useVideoSyncTimeline({
     timelineMinimum,
     totalDuration,
     videoDuration,
-    videoSyncOffsetSeconds,
+    videoOffsetSeconds,
     viewEnd,
     viewStart,
     widthPx,

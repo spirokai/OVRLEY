@@ -26,7 +26,7 @@ export function useAppShellStore() {
       isProcessing: state.isProcessing,
       globalDefaults: state.globalDefaults,
       importingVideo: state.importingVideo,
-      importedVideoPath: state.importedVideoPath,
+      hasVideos: state.importedVideos.length > 0,
       setConfig: state.setConfig,
       setErrorMessage: state.setErrorMessage,
     })),
@@ -49,7 +49,7 @@ export function useActivityStore() {
       activityFilename: state.activitySource?.path?.split(/[/\\]/).at(-1) ?? state.activitySummary?.fileName ?? null,
       activitySource: state.activitySource,
       clearActivityFile: state.clearActivityFile,
-      parsedActivitySource: state.parsedActivitySource,
+      hasExternalActivity: state.parsedActivity !== null,
       setErrorMessage: state.setErrorMessage,
       setProcessing: state.setProcessing,
     })),
@@ -81,6 +81,7 @@ export function useRenderStore() {
   return useStore(
     useShallow((state) => ({
       activitySummary: state.activitySummary,
+      hasVideoTelemetry: state.importedVideos.some((video) => video.telemetry.status === 'ready'),
       activeRenderId: state.activeRenderId,
       activeBatchId: state.batchSnapshot?.rendererBusy ? state.batchSnapshot.batchId : null,
       config: state.config,
@@ -103,10 +104,8 @@ export function useRenderDialogInputs() {
     useShallow((state) => ({
       availableCodecs: state.availableCodecs,
       config: state.config,
-      importedVideoPath: state.importedVideoPath,
-      importedVideoDuration: state.importedVideoDuration,
-      importedVideoFps: state.importedVideoFps,
-      importedVideoResolution: state.importedVideoResolution,
+      importedVideos: state.importedVideos,
+      videoEdits: state.videoEdits,
       platformOs: state.platformOs,
       rendererBusy: isRendererBusy(state),
       renderingVideo: state.renderingVideo,
@@ -115,7 +114,6 @@ export function useRenderDialogInputs() {
       renderProgress: state.renderProgress,
       batchSnapshot: state.batchSnapshot,
       renderSettings: state.renderSettings,
-      videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
     })),
   )
 }
@@ -147,11 +145,7 @@ export function useBatchSyncInputs() {
     useShallow((state) => ({
       activitySummary: state.activitySummary,
       parsedActivity: state.parsedActivity,
-      parsedActivitySource: state.parsedActivitySource,
-      importedVideoPath: state.importedVideoPath,
-      importedVideoCreationTime: state.importedVideoCreationTime,
-      importedVideoTimeSource: state.importedVideoTimeSource,
-      videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+      importedVideos: state.importedVideos,
       videoSyncTimezoneMode: state.videoSyncTimezoneMode,
       availableCodecs: state.availableCodecs,
     })),

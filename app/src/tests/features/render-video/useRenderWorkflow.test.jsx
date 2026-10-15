@@ -5,6 +5,7 @@ import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG, DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import * as renderOutput from '@/lib/file-dialog'
 import * as backend from '@/api/backend'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 vi.mock('@/api/backend', () => ({
   renderVideo: vi.fn(),
@@ -30,6 +31,12 @@ vi.mock('@/api/backend', () => ({
 
 const renderVideoMock = vi.mocked(backend.renderVideo)
 
+function importVideo({ offsetSeconds = 0, telemetry } = {}) {
+  useStore.setState(
+    videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12, telemetry })], { clip: offsetSeconds }),
+  )
+}
+
 vi.mock('@/lib/file-dialog', async () => {
   const actual = await vi.importActual('@/lib/file-dialog')
   return {
@@ -52,11 +59,6 @@ describe('useRenderWorkflow', () => {
       activitySummary: { durationSeconds: 73 },
       parsedActivity: { sample_elapsed_seconds: [0, 73] },
       endSecond: 73,
-      importedVideoFps: 30,
-      importedVideoFpsNum: 30,
-      importedVideoFpsDen: 1,
-      importedVideoDuration: 12,
-      importedVideoResolution: { width: 1920, height: 1080 },
       config: {
         ...DEFAULT_CONFIG,
         scene: {
@@ -76,7 +78,7 @@ describe('useRenderWorkflow', () => {
     ['quality', 18],
     ['bitrate', 35],
   ])('passes and persists %s settings after a successful render', async (qualityType, qualityValue) => {
-    useStore.setState({ importedVideoPath: 'C:\\video.mp4' })
+    importVideo()
     const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
     await act(async () => result.current.openRenderDialog())
     expect(result.current.renderSettingsDraft).toMatchObject({ qualityType: 'quality', qualityValue: 21 })
@@ -111,15 +113,7 @@ describe('useRenderWorkflow', () => {
   })
 
   test('dispatches transparent override without imported-video compositing inputs and persists transparent settings', async () => {
-    useStore.setState({
-      importedVideoPath: 'C:\\video.mp4',
-      importedVideoFps: 30,
-      importedVideoDuration: 12,
-      importedVideoFpsNum: 30,
-      importedVideoFpsDen: 1,
-      importedVideoResolution: { width: 1920, height: 1080 },
-      videoSyncOffsetSeconds: 5,
-    })
+    importVideo({ offsetSeconds: 5 })
 
     const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
 
@@ -156,14 +150,14 @@ describe('useRenderWorkflow', () => {
   })
 
   test('defaults to composite with a video and to transparent without one', async () => {
-    useStore.setState({ importedVideoPath: 'C:\\video.mp4' })
+    importVideo()
     const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
 
     await act(async () => result.current.openRenderDialog())
     expect(result.current.renderSettingsDraft.exportMode).toBe('composite')
 
     act(() => result.current.closeRenderDialog())
-    act(() => useStore.setState({ importedVideoPath: null }))
+    act(() => useStore.setState(videoStoreState([])))
     await act(async () => result.current.openRenderDialog())
     expect(result.current.renderSettingsDraft.exportMode).toBe('transparent')
   })
@@ -206,10 +200,8 @@ describe('useRenderWorkflow', () => {
   })
 
   test('preserves an explicit transparent project setting when a video is present', async () => {
-    useStore.setState({
-      importedVideoPath: 'C:\\video.mp4',
-      renderSettings: { ...useStore.getState().renderSettings, exportMode: 'transparent' },
-    })
+    importVideo()
+    useStore.setState({ renderSettings: { ...useStore.getState().renderSettings, exportMode: 'transparent' } })
     const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
 
     await act(async () => result.current.openRenderDialog())
@@ -218,13 +210,8 @@ describe('useRenderWorkflow', () => {
   })
 
   test('dispatches committed composite mode with imported-video compositing inputs', async () => {
+    importVideo()
     useStore.setState({
-      importedVideoPath: 'C:\\video.mp4',
-      importedVideoFps: 30,
-      importedVideoDuration: 12,
-      importedVideoFpsNum: 30,
-      importedVideoFpsDen: 1,
-      importedVideoResolution: { width: 1920, height: 1080 },
       renderSettings: {
         ...useStore.getState().renderSettings,
         exportMode: 'composite',
@@ -249,6 +236,53 @@ describe('useRenderWorkflow', () => {
       expect.any(Object),
       expect.any(Object),
     )
+  })
+
+  test('enables an MP4-only render from ready clip telemetry and renders it in clip-local time', async () => {
+    const telemetryActivity = { sample_elapsed_seconds: [0, 12], trim_end_seconds: 12 }
+    useStore.setState({ activitySummary: null, parsedActivity: null, startSecond: 0, endSecond: 0 })
+    importVideo({ offsetSeconds: 40, telemetry: { status: 'absent', activity: null } })
+    const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
+
+    expect(result.current.renderDisabled).toBe(true)
+    expect(result.current.renderTooltipContent).toBe('Load a GPX/FIT activity first')
+
+    act(() => importVideo({ offsetSeconds: 40, telemetry: { status: 'ready', activity: telemetryActivity } }))
+    expect(result.current.renderDisabled).toBe(false)
+    expect(result.current.renderTooltipContent).toBe(null)
+
+    await act(async () => result.current.openRenderDialog())
+    expect(result.current.renderSettingsDraft.exportMode).toBe('composite')
+    act(() => result.current.updateRenderSettingsDraft({ codec: 'libx264' }))
+    await act(async () => result.current.handleRenderVideoConfirm())
+
+    expect(renderVideoMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scene: expect.objectContaining({ start: 0, end: 12, composite_video_path: 'C:\\video.mp4', composite_sync_offset: 0 }),
+      }),
+      telemetryActivity,
+      expect.objectContaining({ outputPath: 'C:\\renders\\video.mp4' }),
+    )
+  })
+
+  test('routes the several-clip rejection globally without dispatching a render', async () => {
+    useStore.setState(
+      videoStoreState(
+        [
+          createTestVideo({ id: 'a', path: 'C:\\a.mp4', durationSeconds: 12 }),
+          createTestVideo({ id: 'b', path: 'C:\\b.mp4', durationSeconds: 12, importOrder: 1 }),
+        ],
+        { a: 0, b: 20 },
+      ),
+    )
+    const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
+    await act(async () => result.current.openRenderDialog())
+    act(() => result.current.updateRenderSettingsDraft({ codec: 'libx264' }))
+    await act(async () => result.current.handleRenderVideoConfirm())
+
+    expect(renderVideoMock).not.toHaveBeenCalled()
+    expect(result.current.renderDialogPhase).toBe('closed')
+    expect(useStore.getState().errorMessage).toBe('Exporting several videos is not supported yet')
   })
 
   test('keeps the confirmation draft for output rejection and retries the unchanged path only after overwrite confirmation', async () => {

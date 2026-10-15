@@ -14,6 +14,7 @@ vi.mock('@/features/toolbar/hooks/useFileDropZone', () => ({
 import { VideoDrawerContent } from '@/features/toolbar'
 
 const videoSummary = {
+  id: 'video-1',
   path: '/videos/ride.mp4',
   filename: 'ride.mp4',
   duration: 3723,
@@ -34,14 +35,15 @@ const videoSync = {
   filenameCreationTimeAvailable: true,
   offsetInput: '0',
   timezone: 'Europe/Zurich',
+  timezoneDisabled: false,
   videoSyncTimezoneMode: 'local',
   videoSyncWarning: null,
   computeVideoSync: vi.fn(),
   incrementOffset: vi.fn(),
   submitOffsetInput: vi.fn(),
   setOffsetInput: vi.fn(),
-  resetVideoCreationTime: vi.fn(),
-  setVideoCreationTimeFromFilename: vi.fn(),
+  resetVideoCreationTimes: vi.fn(),
+  setVideoCreationTimesFromFilenames: vi.fn(),
   setVideoSyncTimezoneMode: vi.fn(),
 }
 
@@ -50,7 +52,7 @@ describe('VideoDrawerContent', () => {
     const onBrowseVideo = vi.fn()
     render(
       <VideoDrawerContent
-        videoSummary={null}
+        videoSummaries={[]}
         onBrowseVideo={onBrowseVideo}
         onDeleteVideo={vi.fn()}
         onDropVideoFiles={vi.fn()}
@@ -69,7 +71,7 @@ describe('VideoDrawerContent', () => {
     const onDeleteVideo = vi.fn()
     render(
       <VideoDrawerContent
-        videoSummary={videoSummary}
+        videoSummaries={[videoSummary]}
         onBrowseVideo={vi.fn()}
         onDeleteVideo={onDeleteVideo}
         onDropVideoFiles={vi.fn()}
@@ -92,7 +94,7 @@ describe('VideoDrawerContent', () => {
     const openManualVideoSync = vi.fn()
     render(
       <VideoDrawerContent
-        videoSummary={videoSummary}
+        videoSummaries={[videoSummary]}
         onBrowseVideo={vi.fn()}
         onDeleteVideo={vi.fn()}
         onDropVideoFiles={vi.fn()}
@@ -103,5 +105,25 @@ describe('VideoDrawerContent', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Manual Sync' }))
 
     expect(openManualVideoSync).toHaveBeenCalledOnce()
+  })
+
+  test('renders details for every imported video with one shared sync section', () => {
+    const secondSummary = { ...videoSummary, id: 'video-2', path: '/videos/climb.mp4', filename: 'climb.mp4', duration: 65, fps: 30 }
+    render(
+      <VideoDrawerContent
+        videoSummaries={[videoSummary, secondSummary]}
+        onBrowseVideo={vi.fn()}
+        onDeleteVideo={vi.fn()}
+        onDropVideoFiles={vi.fn()}
+        videoSync={videoSync}
+      />,
+    )
+
+    expect(screen.getByText('ride.mp4')).toBeInTheDocument()
+    expect(screen.getByText('climb.mp4')).toBeInTheDocument()
+    expect(screen.getByText('59.94 fps')).toBeInTheDocument()
+    expect(screen.getByText('30 fps')).toBeInTheDocument()
+    expect(screen.getAllByText('Details')).toHaveLength(2)
+    expect(screen.getAllByRole('heading', { name: 'Sync Doctor' })).toHaveLength(1)
   })
 })

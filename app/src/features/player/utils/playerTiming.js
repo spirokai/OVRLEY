@@ -2,6 +2,8 @@
  * Pure playback and timeline timing helpers for the player feature.
  */
 
+import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
+
 /**
  * Snaps a timeline timestamp to the nearest source-video frame.
  *
@@ -17,51 +19,39 @@ export function snapTimelineSecondToFrame(second, fps, originSecond = 0) {
 /**
  * Resolves whether preview playback should be driven by the timeline or video element.
  *
- * @param {{ shouldUseVideoPlayback: boolean, playheadSecond: number, videoSyncOffsetSeconds: number, importedVideoDuration: number }} options
+ * @param {{ shouldUseVideoPlayback: boolean, playheadSecond: number, program: object }} options
  * @returns {'timeline'|'video'} Playback source for the current playhead.
  */
-export function resolvePlaybackSource({ shouldUseVideoPlayback, playheadSecond, videoSyncOffsetSeconds, importedVideoDuration }) {
+export function resolvePlaybackSource({ shouldUseVideoPlayback, playheadSecond, program }) {
   if (!shouldUseVideoPlayback) {
     return 'timeline'
   }
 
-  const videoEndSecond = videoSyncOffsetSeconds + importedVideoDuration
-
-  if (playheadSecond < videoSyncOffsetSeconds || playheadSecond >= videoEndSecond) {
-    return 'timeline'
-  }
-
-  return 'video'
+  return resolvePreviewTarget(program, playheadSecond)?.isInside ? 'video' : 'timeline'
 }
 
 /**
- * Resolves the first timeline second occupied by imported video.
+ * Resolves the first timeline second occupied by media.
  *
- * @param {{ hasVideo: boolean, videoSyncOffsetSeconds: number }} options
+ * @param {{ videoBounds: {startSecond: number, endSecond: number}|null }} options
  * @returns {number} Timeline minimum for the active media.
  */
-export function getTimelineMinimum({ hasVideo, videoSyncOffsetSeconds }) {
-  return hasVideo ? Math.min(0, videoSyncOffsetSeconds) : 0
+export function getTimelineMinimum({ videoBounds }) {
+  return videoBounds === null ? 0 : Math.min(0, videoBounds.startSecond)
 }
 
 /**
  * Computes the largest playable duration across activity, template fallback,
  * and imported-video timing.
  *
- * @param {{ activityDurationSeconds: number, fallbackDurationSeconds: number, importedVideoDuration: number, importedVideoPath: string|null, videoSyncOffsetSeconds: number }} options
+ * @param {{ activityDurationSeconds: number|undefined, fallbackDurationSeconds: number, videoBounds: {startSecond: number, endSecond: number}|null }} options
  * @returns {number} Total playable duration in seconds.
  */
-export function getTotalPlaybackDuration({
-  activityDurationSeconds,
-  fallbackDurationSeconds,
-  importedVideoDuration,
-  importedVideoPath,
-  videoSyncOffsetSeconds,
-}) {
+export function getTotalPlaybackDuration({ activityDurationSeconds, fallbackDurationSeconds, videoBounds }) {
   const activityDuration = activityDurationSeconds ?? 0
-  const videoEnd = importedVideoPath ? videoSyncOffsetSeconds + importedVideoDuration : 0
+  const videoEnd = videoBounds === null ? 0 : videoBounds.endSecond
 
-  const contentDuration = activityDuration > 0 ? activityDuration : importedVideoPath ? 0 : fallbackDurationSeconds
+  const contentDuration = activityDuration > 0 ? activityDuration : videoBounds !== null ? 0 : fallbackDurationSeconds
   return Math.max(contentDuration, videoEnd, 0)
 }
 

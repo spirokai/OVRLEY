@@ -6,10 +6,11 @@
  * playback stays paused.
  */
 
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useStore from '@/store/useStore'
 import { useVideoPreview } from '@/features/video-preview/hooks/useVideoPreview'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 vi.mock('@/features/video-preview/hooks/useVideoPlaybackClock', () => ({
   useVideoPlaybackClock: vi.fn(),
@@ -40,13 +41,10 @@ describe('useVideoPreview', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
     useStore.setState({
-      importedVideoDuration: 30,
-      importedVideoPath: 'C:\\clips\\ride.mp4',
-      importedVideoPreviewUrl: 'http://127.0.0.1:3210/preview/ride.mp4',
+      ...videoStoreState([createTestVideo({ path: 'C:\\clips\\ride.mp4', durationSeconds: 30 })], { 'video-1': 5 }),
       previewPlaybackSource: 'timeline',
       previewPlaybackState: 'paused',
       selectedSecond: 8,
-      videoSyncOffsetSeconds: 5,
     })
   })
 
@@ -73,11 +71,9 @@ describe('useVideoPreview', () => {
 
   test('does not seek or restart the ended video while timeline playback continues', () => {
     useStore.setState({
-      importedVideoDuration: 30,
       previewPlaybackSource: 'timeline',
       previewPlaybackState: 'playing',
       selectedSecond: 35,
-      videoSyncOffsetSeconds: 5,
     })
 
     const video = createVideoStub({ currentTime: 30 })
@@ -108,5 +104,39 @@ describe('useVideoPreview', () => {
 
     expect(useStore.getState().previewPlaybackSource).toBe('video')
     expect(useStore.getState().selectedSecond).toBe(8)
+  })
+
+  test('hands the video element to the clip under the playhead', async () => {
+    useStore.setState(
+      videoStoreState(
+        [
+          createTestVideo({ id: 'video-1', path: 'C:\\clips\\first.mp4', durationSeconds: 10 }),
+          createTestVideo({ id: 'video-2', path: 'C:\\clips\\second.mp4', durationSeconds: 10, importOrder: 1 }),
+        ],
+        { 'video-1': 0, 'video-2': 20 },
+      ),
+    )
+    act(() => useStore.getState().setSelectedSecond(24))
+
+    const video = createVideoStub({ duration: 10 })
+    const videoRef = { current: video }
+    const { result } = renderHook(() => useVideoPreview(videoRef, true))
+
+    expect(result.current.videoSrc).toBe('http://127.0.0.1:4321/video/import-video-2')
+    expect(result.current.importId).toBe('import-video-2')
+    expect(result.current.isOutOfRange).toBe(false)
+    await waitFor(() => expect(video.currentTime).toBe(4))
+
+    act(() => useStore.getState().setSelectedSecond(3))
+
+    expect(result.current.videoSrc).toBe('http://127.0.0.1:4321/video/import-video-1')
+    expect(result.current.importId).toBe('import-video-1')
+    expect(result.current.isOutOfRange).toBe(false)
+    await waitFor(() => expect(video.currentTime).toBe(3))
+
+    act(() => useStore.getState().setSelectedSecond(15))
+
+    expect(result.current.importId).toBe('import-video-2')
+    expect(result.current.isOutOfRange).toBe(true)
   })
 })

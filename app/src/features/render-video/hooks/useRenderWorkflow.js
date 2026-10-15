@@ -19,11 +19,11 @@ export default function useRenderWorkflow({ backendStatus }) {
   const [renderDialogPhase, setRenderDialogPhase] = useState('closed')
   const [renderSettingsDraft, setRenderSettingsDraft] = useState(null)
   const execution = useRenderExecution({ reviewTarget: renderDialogPhase === 'confirm' ? renderSettingsDraft.renderTarget : null })
-  const { activitySummary, config, renderStatus, renderingVideo, rendererBusy, setErrorMessage } = execution
+  const { activitySummary, config, hasVideoTelemetry, renderStatus, renderingVideo, rendererBusy, setErrorMessage } = execution
   const [outputPathError, setOutputPathError] = useState(null)
   const [pendingOverwritePath, setPendingOverwritePath] = useState(null)
   const opening = useRef(false)
-  const hasParsedActivity = activitySummary !== null
+  const hasParsedActivity = activitySummary !== null || hasVideoTelemetry
   const renderDisabled = config === null || !hasParsedActivity || rendererBusy || backendStatus !== 'connected'
   const renderTooltipContent = useMemo(() => {
     if (config === null) {

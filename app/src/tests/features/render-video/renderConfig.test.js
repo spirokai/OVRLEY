@@ -8,6 +8,7 @@
 import { describe, expect, test } from 'vitest'
 import { DEFAULT_EXPORT_RANGE } from '@/lib/template/template-constants'
 import { createBatchRenderTemplate, createRenderEffectiveConfig } from '@/features/render-video/utils/renderConfig'
+import { createTestVideo } from '@/tests/helpers/videoFixtures'
 
 describe('render config preparation', () => {
   test('materializes render-effective config without changing durable template semantics', () => {
@@ -40,7 +41,8 @@ describe('render config preparation', () => {
         to: 15.75,
       },
       codec: 'prores_ks',
-      importedVideoPath: null,
+      video: null,
+      videoOffsetSeconds: 0,
       availableCodecs: null,
     })
 
@@ -93,7 +95,8 @@ describe('render config preparation', () => {
       widgetUpdateRate: 1,
       range: { ...DEFAULT_EXPORT_RANGE },
       codec: 'prores_ks',
-      importedVideoPath: null,
+      video: null,
+      videoOffsetSeconds: 0,
       availableCodecs: null,
     })
 
@@ -131,15 +134,10 @@ describe('render config preparation', () => {
       widgetUpdateRate: 1,
       range: { ...DEFAULT_EXPORT_RANGE },
       codec: 'libx264',
-      importedVideoPath: 'C:\\clip.mp4',
-      importedVideoDuration: 24,
-      importedVideoFps: 30,
-      importedVideoFpsNum: 30,
-      importedVideoFpsDen: 1,
-      importedVideoResolution: { width: 1920, height: 1080 },
+      video: createTestVideo({ path: 'C:\\clip.mp4', durationSeconds: 24 }),
       timelineStart: 3,
       timelineEnd: 21,
-      videoSyncOffsetSeconds: 0,
+      videoOffsetSeconds: 0,
       availableCodecs: null,
     })
 
@@ -173,12 +171,8 @@ describe('render config preparation', () => {
       },
       exportMode: 'transparent',
       codec: 'prores_ks',
-      importedVideoPath: 'C:\\clip.mp4',
-      importedVideoDuration: 24,
-      importedVideoFps: 30,
-      importedVideoFpsNum: 30,
-      importedVideoFpsDen: 1,
-      importedVideoResolution: { width: 1920, height: 1080 },
+      video: createTestVideo({ path: 'C:\\clip.mp4', durationSeconds: 24 }),
+      videoOffsetSeconds: 0,
       timelineStart: 3,
       timelineEnd: 21,
       availableCodecs: null,
@@ -206,15 +200,10 @@ describe('render config preparation', () => {
       widgetUpdateRate: 1,
       range: { ...DEFAULT_EXPORT_RANGE },
       codec: 'libx264',
-      importedVideoPath: 'C:\\clip.mp4',
-      importedVideoDuration: 30,
-      importedVideoFps: 30,
-      importedVideoFpsNum: 30,
-      importedVideoFpsDen: 1,
-      importedVideoResolution: { width: 1920, height: 1080 },
+      video: createTestVideo({ path: 'C:\\clip.mp4', durationSeconds: 30 }),
       timelineStart: 0,
       timelineEnd: 25,
-      videoSyncOffsetSeconds: -5,
+      videoOffsetSeconds: -5,
       availableCodecs: null,
     })
 
@@ -222,6 +211,60 @@ describe('render config preparation', () => {
     expect(renderConfig.scene.composite_render_duration).toBe(30)
     expect(renderConfig.scene.start).toBe(0)
     expect(renderConfig.scene.end).toBe(25)
+  })
+
+  test('takes composite source fields from the imported video entity', () => {
+    const video = createTestVideo({ path: 'C:\\portrait.mp4', durationSeconds: 20, fps: { num: 60000, den: 2002 }, width: 1080, height: 1920 })
+    const renderConfig = createRenderEffectiveConfig({
+      config: { scene: { width: 1920, height: 1080, fps: 60 }, labels: [], values: [], plots: [] },
+      globalDefaults: {},
+      fps: 60,
+      exportMode: 'composite',
+      widgetUpdateRate: 2,
+      range: { ...DEFAULT_EXPORT_RANGE },
+      codec: 'libx264',
+      qualityType: 'quality',
+      qualityValue: 18,
+      video,
+      videoOffsetSeconds: 4,
+      timelineStart: 0,
+      timelineEnd: 40,
+      availableCodecs: null,
+    })
+
+    expect(renderConfig.scene).toMatchObject({
+      width: 1080,
+      height: 1920,
+      composite_video_path: 'C:\\portrait.mp4',
+      composite_sync_offset: 4,
+      composite_video_fps_num: 30000,
+      composite_video_fps_den: 1001,
+      composite_video_duration: video.durationSeconds,
+      composite_render_duration: video.durationSeconds,
+      composite_video_trim_start: 0,
+      composite_widget_update_rate: 2,
+      qualityType: 'quality',
+      qualityValue: 18,
+    })
+  })
+
+  test('requires an imported video for composite export', () => {
+    expect(() =>
+      createRenderEffectiveConfig({
+        config: { scene: { width: 1920, height: 1080, fps: 60 }, labels: [], values: [], plots: [] },
+        globalDefaults: {},
+        fps: 60,
+        exportMode: 'composite',
+        widgetUpdateRate: 1,
+        range: { ...DEFAULT_EXPORT_RANGE },
+        codec: 'libx264',
+        video: null,
+        videoOffsetSeconds: 0,
+        timelineStart: 0,
+        timelineEnd: 25,
+        availableCodecs: null,
+      }),
+    ).toThrow('Imported video is required for composite export')
   })
 
   test('rejects composite ranges with no activity overlap', () => {
@@ -234,15 +277,10 @@ describe('render config preparation', () => {
         widgetUpdateRate: 1,
         range: { ...DEFAULT_EXPORT_RANGE },
         codec: 'libx264',
-        importedVideoPath: 'C:\\clip.mp4',
-        importedVideoDuration: 10,
-        importedVideoFps: 30,
-        importedVideoFpsNum: 30,
-        importedVideoFpsDen: 1,
-        importedVideoResolution: { width: 1920, height: 1080 },
+        video: createTestVideo({ path: 'C:\\clip.mp4', durationSeconds: 10 }),
         timelineStart: 0,
         timelineEnd: 25,
-        videoSyncOffsetSeconds: -10,
+        videoOffsetSeconds: -10,
         availableCodecs: null,
       }),
     ).toThrow(/positive overlap/)

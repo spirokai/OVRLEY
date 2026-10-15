@@ -17,13 +17,15 @@ import {
  * Manages the player clock and exposes direct second-based playback commands.
  *
  * @param {object} options Playback engine inputs from the player store.
- * @param {object|null} options.activitySummary Imported activity summary metadata.
+ * @param {number} options.activityDurationSeconds External activity duration, or 0 without one.
+ * @param {boolean} options.hasActivityData Whether external activity or any video telemetry drives widgets.
  * @param {string} options.backgroundMode Active preview background mode.
  * @param {function} options.beginPreviewScrub Store action for entering scrub mode.
  * @param {function} options.commitPreviewScrub Store action for committing scrub mode.
  * @param {number} options.fallbackDurationSeconds Fallback timeline duration without activity metadata.
- * @param {number|null} options.importedVideoDuration Imported video duration in seconds.
- * @param {string|null} options.importedVideoPath Imported video path when video is available.
+ * @param {object} options.program Committed timeline program of the imported videos.
+ * @param {{startSecond: number, endSecond: number}|null} options.videoBounds Committed interval covered by videos.
+ * @param {string} options.videoIdentity Identity of the imported videos.
  * @param {function} options.pausePreviewPlayback Store action for pausing preview playback.
  * @param {string} options.previewPlaybackSource Current playback clock owner.
  * @param {string} options.previewPlaybackState Current playback state.
@@ -33,17 +35,18 @@ import {
  * @param {function} options.startPreviewPlayback Store action for starting playback.
  * @param {function} options.updatePreviewScrub Store action for updating active scrub mode.
  * @param {number} options.updateRate Preview update-rate divisor.
- * @param {number} options.videoSyncOffsetSeconds Timeline second where video starts.
  * @returns {object} Playback state and direct second-based commands.
  */
 export default function usePlaybackEngine({
-  activitySummary,
+  activityDurationSeconds,
+  hasActivityData,
   backgroundMode,
   beginPreviewScrub,
   commitPreviewScrub,
   fallbackDurationSeconds,
-  importedVideoDuration,
-  importedVideoPath,
+  program,
+  videoBounds,
+  videoIdentity,
   pausePreviewPlayback,
   previewPlaybackSource,
   previewPlaybackState,
@@ -53,13 +56,12 @@ export default function usePlaybackEngine({
   startPreviewPlayback,
   updatePreviewScrub,
   updateRate,
-  videoSyncOffsetSeconds,
 }) {
   // Imperative playback refs - RAF reads these without forcing React renders every frame.
   const playbackAnchorRef = useRef({ startedAtMs: 0, startedSecond: 0 })
   const playbackAnchorSourceRef = useRef(previewPlaybackSource)
   const playbackSecondRef = useRef(selectedSecond)
-  const previousVideoPathRef = useRef(null)
+  const previousVideoIdentityRef = useRef('')
   const scrubFrameRef = useRef(null)
   const latestScrubSecondRef = useRef(null)
   const totalDurationRef = useRef(0)
@@ -67,22 +69,15 @@ export default function usePlaybackEngine({
 
   // Duration derivation - activity, fallback templates, and imported video can each extend the playable range.
   const totalDuration = useMemo(
-    () =>
-      getTotalPlaybackDuration({
-        activityDurationSeconds: activitySummary?.durationSeconds,
-        fallbackDurationSeconds,
-        importedVideoDuration,
-        importedVideoPath,
-        videoSyncOffsetSeconds,
-      }),
-    [activitySummary?.durationSeconds, fallbackDurationSeconds, importedVideoDuration, importedVideoPath, videoSyncOffsetSeconds],
+    () => getTotalPlaybackDuration({ activityDurationSeconds, fallbackDurationSeconds, videoBounds }),
+    [activityDurationSeconds, fallbackDurationSeconds, videoBounds],
   )
 
-  const hasActivity = Boolean(activitySummary && totalDuration > 0)
-  const shouldUseVideoPlayback = backgroundMode === 'video' && Boolean(importedVideoPath)
+  const hasActivity = hasActivityData && totalDuration > 0
+  const shouldUseVideoPlayback = backgroundMode === 'video' && videoBounds !== null
   const isPlaying = previewPlaybackState === 'playing'
   const isTimelinePlaybackActive = previewPlaybackState === 'playing' && previewPlaybackSource === 'timeline'
-  const timelineMinimum = getTimelineMinimum({ hasVideo: Boolean(importedVideoPath), videoSyncOffsetSeconds })
+  const timelineMinimum = getTimelineMinimum({ videoBounds })
   const clampedPlayhead = clamp(selectedSecond, timelineMinimum, totalDuration)
   const effectivePreviewFps = useMemo(() => getContainerFps(sceneFps, updateRate), [sceneFps, updateRate])
 
@@ -151,15 +146,15 @@ export default function usePlaybackEngine({
     totalDurationRef.current = totalDuration
   }, [totalDuration])
 
-  // Video-import sync - a playhead at zero follows a newly imported negative video start, but later sync edits preserve it.
+  // Video-import sync - a playhead at zero follows newly imported videos that start before zero, but later sync edits preserve it.
   useEffect(() => {
-    const previousVideoPath = previousVideoPathRef.current
-    previousVideoPathRef.current = importedVideoPath
-    if (!importedVideoPath || importedVideoPath === previousVideoPath) return
+    const previousVideoIdentity = previousVideoIdentityRef.current
+    previousVideoIdentityRef.current = videoIdentity
+    if (videoIdentity === '' || videoIdentity === previousVideoIdentity) return
     if (selectedSecond === 0 && timelineMinimum < 0) {
       setSelectedSecond(timelineMinimum)
     }
-  }, [importedVideoPath, selectedSecond, setSelectedSecond, timelineMinimum])
+  }, [selectedSecond, setSelectedSecond, timelineMinimum, videoIdentity])
 
   // Playhead bounds sync - clamps stale store values when media duration changes under the player.
   useEffect(() => {
@@ -191,8 +186,7 @@ export default function usePlaybackEngine({
     const nextSource = resolvePlaybackSource({
       shouldUseVideoPlayback,
       playheadSecond: clampedPlayhead,
-      videoSyncOffsetSeconds,
-      importedVideoDuration,
+      program,
     })
     if (nextSource !== 'video') {
       return
@@ -205,14 +199,13 @@ export default function usePlaybackEngine({
     })
   }, [
     clampedPlayhead,
-    importedVideoDuration,
     isPlaying,
     previewPlaybackSource,
+    program,
     resetPlaybackOrchestration,
     setPlaybackAnchor,
     shouldUseVideoPlayback,
     startPreviewPlayback,
-    videoSyncOffsetSeconds,
   ])
 
   // Timeline clock - advances the store playhead from RAF when the video element is not the active clock.
@@ -263,8 +256,7 @@ export default function usePlaybackEngine({
     const nextSource = resolvePlaybackSource({
       shouldUseVideoPlayback,
       playheadSecond: initialSecond,
-      videoSyncOffsetSeconds,
-      importedVideoDuration,
+      program,
     })
 
     setPlaybackAnchor(nextSource, initialSecond)
@@ -276,14 +268,13 @@ export default function usePlaybackEngine({
   }, [
     clampedPlayhead,
     hasActivity,
-    importedVideoDuration,
+    program,
     resetPlaybackOrchestration,
     setPlaybackAnchor,
     shouldUseVideoPlayback,
     startPreviewPlayback,
     totalDuration,
     timelineMinimum,
-    videoSyncOffsetSeconds,
   ])
 
   // Transport commands - all non-play actions resolve to a paused playhead position.
@@ -335,8 +326,6 @@ export default function usePlaybackEngine({
     cancelScrub,
     commitScrub,
     hasActivity,
-    importedVideoDuration,
-    importedVideoPath,
     isPlaying,
     jumpToEnd,
     pause,
@@ -346,6 +335,5 @@ export default function usePlaybackEngine({
     stepBySeconds,
     totalDuration,
     timelineMinimum,
-    videoSyncOffsetSeconds,
   }
 }

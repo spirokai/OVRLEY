@@ -4,6 +4,7 @@ import { createPathLocator } from '@/features/projects/utils/projectPaths'
 import { VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
 import { createRenderEffectiveConfig } from '@/features/render-video/utils/renderConfig'
 import useStore from '@/store/useStore'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 describe('project snapshot contract', () => {
   test('projects only sources and project-owned settings', () => {
@@ -11,12 +12,9 @@ describe('project snapshot contract', () => {
     useStore.setState((state) => ({
       loadedTemplateSource: { kind: 'file', path: 'C:\\Events\\templates\\race.json' },
       activitySource: { kind: 'file', path: 'C:\\Events\\media\\ride.fit' },
-      importedVideoPath: 'D:\\video\\lap.mp4',
+      ...videoStoreState([createTestVideo({ id: 'runtime-video', path: 'D:\\video\\lap.mp4', durationSeconds: 100 })], { 'runtime-video': 7.5 }),
       parsedActivity: { samples: [1, 2, 3] },
       activitySummary: { durationSeconds: 100 },
-      importedVideoImportId: 'runtime-id',
-      importedVideoPreviewUrl: 'http://127.0.0.1/runtime-id',
-      importedVideoDuration: 100,
       renderSettings: {
         ...state.renderSettings,
         renderTarget: 'batch',
@@ -43,6 +41,7 @@ describe('project snapshot contract', () => {
       activity: { path: { kind: 'project-relative', value: 'media/ride.fit' } },
       video: { path: { kind: 'absolute', value: 'D:\\video\\lap.mp4' } },
     })
+    expect(project.sync.videoOffsetSeconds).toBe(7.5)
     expect(project.render.fps).toBe(60)
     expect(project.render).toMatchObject({
       renderTarget: 'batch',
@@ -57,9 +56,11 @@ describe('project snapshot contract', () => {
     for (const forbidden of [
       'parsedActivity',
       'activitySummary',
-      'importedVideoImportId',
-      'importedVideoPreviewUrl',
-      'importedVideoDuration',
+      'importedVideos',
+      'videoEdits',
+      'runtime-video',
+      'http://127.0.0.1',
+      'durationSeconds',
       'isVideoMuted',
       'selectedWidgetIds',
       'batchQueue',
@@ -96,7 +97,7 @@ describe('project snapshot contract', () => {
     const resourceId = 'session-image-resource'
     useStore.setState((state) => ({
       config: { ...state.config, rasters: [{ ...raster, resourceId }] },
-      importedVideoPath: 'C:\\Events\\video.mp4',
+      ...videoStoreState([createTestVideo({ path: 'C:\\Events\\video.mp4', durationSeconds: 30 })]),
       renderSettings: { ...state.renderSettings, codec: 'libx265', qualityType, qualityValue },
     }))
     const state = useStore.getState()
@@ -119,12 +120,8 @@ describe('project snapshot contract', () => {
       codec: state.renderSettings.codec,
       qualityType,
       qualityValue,
-      importedVideoPath: state.importedVideoPath,
-      importedVideoDuration: 30,
-      importedVideoFpsNum: 30,
-      importedVideoFpsDen: 1,
-      importedVideoResolution: { width: 1920, height: 1080 },
-      videoSyncOffsetSeconds: 0,
+      video: state.importedVideos[0],
+      videoOffsetSeconds: state.videoEdits[state.importedVideos[0].id].offsetSeconds,
       timelineStart: 0,
       timelineEnd: 30,
     })
@@ -171,9 +168,10 @@ describe('project snapshot contract', () => {
     useStore.setState(useStore.getInitialState(), true)
     useStore.setState({
       activitySource: { kind: 'file', path: 'C:\\Events\\ride.fit' },
-      importedVideoPath: 'C:\\Events\\video.mp4',
+      ...videoStoreState([createTestVideo({ path: 'C:\\Events\\video.mp4', durationSeconds: 30 })]),
     })
     useStore.getState().hydrateVideoSyncState({
+      videoId: 'video-1',
       landmarks: [
         { id: 'stop-1', type: 'stop', videoSecond: 4 },
         { id: 'left-1', type: 'leftTurn', videoSecond: 8 },
@@ -200,5 +198,18 @@ describe('project snapshot contract', () => {
       turnThresholdDegrees: 120,
     })
     expect(JSON.stringify(project)).not.toContain('manualVideoSyncResults')
+    expect(project.sync.manual).not.toHaveProperty('videoId')
+  })
+
+  test('rejects saving several videos in the version 3 project format', () => {
+    useStore.setState(useStore.getInitialState(), true)
+    useStore.setState(
+      videoStoreState([
+        createTestVideo({ id: 'video-1', path: 'C:\\Events\\a.mp4' }),
+        createTestVideo({ id: 'video-2', path: 'C:\\Events\\b.mp4', importOrder: 1 }),
+      ]),
+    )
+
+    expect(() => createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')).toThrow(/cannot store several videos/)
   })
 })

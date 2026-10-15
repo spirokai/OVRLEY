@@ -17,7 +17,7 @@ const PROJECT_FILTER = [{ name: 'OVRLEY Project', extensions: ['oly'] }]
  * Coordinates project commands with project UI state.
  * @param {object} options Project media-owner operations.
  * @param {function} options.prepareActivityPath Parses one activity source without committing it.
- * @param {function} options.clearImportedVideo Clears the active video source.
+ * @param {function} options.clearImportedVideos Clears every imported video source.
  * @param {function} options.prepareVideoPath Probes one video source without committing it.
  * @param {function} [options.onSetBackgroundMode] Shell setter for the editor background mode.
  * @param {boolean} [options.startupReady] Whether application startup completed successfully.
@@ -25,7 +25,7 @@ const PROJECT_FILTER = [{ name: 'OVRLEY Project', extensions: ['oly'] }]
  */
 export default function useProjectLifecycle({
   prepareActivityPath,
-  clearImportedVideo,
+  clearImportedVideos,
   prepareVideoPath,
   onSetBackgroundMode,
   startupReady = false,
@@ -132,11 +132,11 @@ export default function useProjectLifecycle({
   const createProject = useCallback(
     () =>
       runOperation(i18next.t('projects.createProject', 'create project'), async () => {
-        await createNewProject({ clearImportedVideo })
+        await createNewProject({ clearImportedVideos })
         markNew()
         return true
       }),
-    [clearImportedVideo, markNew, runOperation],
+    [clearImportedVideos, markNew, runOperation],
   )
 
   const handleStartupNewProject = useCallback(async () => {

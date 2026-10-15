@@ -6,6 +6,7 @@ import RenderVideoDialog from '@/features/render-video/components/RenderVideoDia
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG, DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 globalThis.ResizeObserver ??= class ResizeObserver {
   observe() {}
@@ -47,13 +48,7 @@ describe('RenderVideoDialog', () => {
   })
 
   test('shows composite export title and lets imported-video users switch to transparent export', async () => {
-    useStore.setState({
-      importedVideoPath: 'C:\\video.mp4',
-      importedVideoFps: 30,
-      importedVideoDuration: 12,
-      importedVideoResolution: { width: 1920, height: 1080 },
-      videoSyncOffsetSeconds: 5,
-    })
+    useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12 })], { clip: 5 }))
 
     const user = userEvent.setup()
 
@@ -96,13 +91,7 @@ describe('RenderVideoDialog', () => {
   })
 
   test('preserves export markers when switching an imported-video dialog to transparent export', async () => {
-    useStore.setState({
-      importedVideoPath: 'C:\\video.mp4',
-      importedVideoFps: 30,
-      importedVideoDuration: 12,
-      importedVideoResolution: { width: 1920, height: 1080 },
-      videoSyncOffsetSeconds: 5,
-    })
+    useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12 })], { clip: 5 }))
 
     const user = userEvent.setup()
 
@@ -181,12 +170,7 @@ describe('RenderVideoDialog', () => {
   })
 
   test('does not block batch mode on the current video resolution mismatch', async () => {
-    useStore.setState({
-      importedVideoPath: 'C:\\video.mp4',
-      importedVideoFps: 30,
-      importedVideoDuration: 12,
-      importedVideoResolution: { width: 640, height: 360 },
-    })
+    useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12, width: 640, height: 360 })]))
     const user = userEvent.setup()
 
     render(<RenderVideoDialogHarness initialSettings={transparentSettings()} />)

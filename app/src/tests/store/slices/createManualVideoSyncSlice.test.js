@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { VIDEO_SYNC_LANDMARK_TYPES, VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
 import useStore from '@/store/useStore'
+import { createTestVideo, videoStoreState } from '../../helpers/videoFixtures'
+
+const target = createTestVideo({ id: 'target', durationSeconds: 60 })
 
 describe('manual video sync store contract', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
-    useStore.setState({ importedVideoDuration: 60 })
+    useStore.setState(videoStoreState([target]))
+    useStore.getState().selectVideoSyncVideo(target.id)
     let nextId = 0
     vi.stubGlobal('crypto', {
       randomUUID: vi.fn(() => `landmark-${++nextId}`),
@@ -51,7 +55,8 @@ describe('manual video sync store contract', () => {
   })
 
   test('sets and overwrites the detected course location without a video or video landmark', () => {
-    useStore.setState({ importedVideoDuration: null })
+    useStore.getState().selectVideoSyncVideo(null)
+    useStore.setState({ importedVideos: [], videoEdits: {} })
     const state = useStore.getState()
 
     state.setVideoSyncDetectedLocation(30)
@@ -74,10 +79,10 @@ describe('manual video sync store contract', () => {
 
   test('restores a saved map location and keeps it when only the video is cleared', () => {
     const state = useStore.getState()
-    state.hydrateVideoSyncState({ landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 80 })
+    state.hydrateVideoSyncState({ videoId: target.id, landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 80 })
 
     expect(useStore.getState().manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 30 })
-    state.clearVideoSyncForVideo()
+    state.selectVideoSyncVideo(null)
     expect(useStore.getState().manualVideoSync.detectedLocationSecond).toBe(30)
     expect(useStore.getState().manualVideoSyncDetection.location.time).toBe(30)
 
@@ -150,6 +155,7 @@ describe('manual video sync store contract', () => {
   test('keeps activity-owned manual state but clears its derived calculation state', () => {
     const state = useStore.getState()
     state.hydrateVideoSyncState({
+      videoId: target.id,
       landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 4 }],
       detectedLocationSecond: null,
       speedThresholdKmh: 7,
@@ -162,6 +168,7 @@ describe('manual video sync store contract', () => {
 
     const afterActivityReset = useStore.getState()
     expect(afterActivityReset.manualVideoSync).toEqual({
+      videoId: target.id,
       landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 4 }],
       detectedLocationSecond: null,
       speedThresholdKmh: 7,
@@ -171,26 +178,31 @@ describe('manual video sync store contract', () => {
     expect(afterActivityReset.manualVideoSyncResults.all).toMatchObject({ candidates: [], status: 'idle' })
     expect(afterActivityReset.manualVideoSyncResults.location).toMatchObject({ candidates: [], status: 'idle' })
 
-    afterActivityReset.clearVideoSyncForVideo()
+    afterActivityReset.selectVideoSyncVideo(null)
 
     const afterVideoReset = useStore.getState()
+    expect(afterVideoReset.manualVideoSync.videoId).toBeNull()
     expect(afterVideoReset.manualVideoSync.landmarks).toEqual([])
     expect(afterVideoReset.manualVideoSync.speedThresholdKmh).toBe(7)
     expect(afterVideoReset.manualVideoSync.turnThresholdDegrees).toBe(120)
   })
 
-  test('blocks stale candidates and compensates an out-of-video playhead atomically', () => {
+  test('rejects selecting a video that is not imported', () => {
+    expect(() => useStore.getState().selectVideoSyncVideo('missing')).toThrow(/Unknown manual video sync video/)
+  })
+
+  test('blocks stale candidates and shifts every clip by the target correction atomically', () => {
+    const other = createTestVideo({ id: 'other', durationSeconds: 20, importOrder: 1 })
     useStore.setState({
       activitySummary: { durationSeconds: 100 },
-      importedVideoPath: 'C:\\video.mp4',
-      importedVideoDuration: 20,
+      ...videoStoreState([createTestVideo({ id: 'target', durationSeconds: 20 }), other], { target: 0, other: 30 }),
       selectedSecond: 80,
-      videoSyncOffsetSeconds: 0,
       manualVideoSyncResults: {
         ...useStore.getState().manualVideoSyncResults,
         all: { candidates: [{ offset: 10 }], error: null, hasSearched: true, revision: 0, status: 'fresh' },
       },
     })
+    const offsets = () => Object.fromEntries(Object.entries(useStore.getState().videoEdits).map(([id, edits]) => [id, edits.offsetSeconds]))
 
     let updateCount = 0
     const unsubscribe = useStore.subscribe(() => {
@@ -200,7 +212,7 @@ describe('manual video sync store contract', () => {
     unsubscribe()
 
     expect(updateCount).toBe(1)
-    expect(useStore.getState().videoSyncOffsetSeconds).toBe(10)
+    expect(offsets()).toEqual({ target: 10, other: 40 })
     expect(useStore.getState().selectedSecond).toBe(90)
 
     useStore.setState({
@@ -208,11 +220,11 @@ describe('manual video sync store contract', () => {
         ...useStore.getState().manualVideoSyncResults,
         all: { ...useStore.getState().manualVideoSyncResults.all, status: 'stale' },
       },
-      videoSyncOffsetSeconds: 0,
+      ...videoStoreState(useStore.getState().importedVideos, { target: 0, other: 30 }),
       selectedSecond: 80,
     })
     expect(() => useStore.getState().applyVideoSyncCandidate(VIDEO_SYNC_MATCH_SCOPES.ALL, { offset: 10 })).toThrow(/stale/)
-    expect(useStore.getState().videoSyncOffsetSeconds).toBe(0)
+    expect(offsets()).toEqual({ target: 0, other: 30 })
     expect(useStore.getState().selectedSecond).toBe(80)
   })
 })

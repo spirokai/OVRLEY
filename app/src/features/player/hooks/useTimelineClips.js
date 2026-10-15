@@ -8,6 +8,7 @@ import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatClockDuration } from '@/lib/time-format'
 import { getClipGeometry, getExportRangeHighlightGeometry } from '../utils/timelineGeometry'
 import { getActivityAttributeLabel } from '@/lib/widget/widget-presentation'
+import { sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import i18next from 'i18next'
 
 const TEXT_HIDE_THRESHOLD_REM = 3
@@ -25,7 +26,7 @@ function clampPx(value, min, max) {
 }
 
 function getBasename(path) {
-  return path?.split(/[\\/]/).pop() ?? ''
+  return path.split(/[\\/]/).pop()
 }
 
 /**
@@ -33,19 +34,16 @@ function getBasename(path) {
  *
  * @param {object} options Clip timeline inputs.
  * @param {string|null} options.activityFilename Imported activity filename.
- * @param {object|null} options.activitySummary Imported activity summary metadata.
- * @param {boolean} options.canSelect Whether both video and activity are loaded so selection is available.
+ * @param {object|null} options.activitySummary External activity summary metadata.
+ * @param {boolean} options.canSelect Whether clips can be selected for keyboard nudges.
+ * @param {Array<object>} options.clips Displayed timeline clips.
  * @param {function} options.commitClipNudge Callback to commit a keyboard sync adjustment.
  * @param {{ fromSecond: number, toSecond: number }|null} options.exportHighlightRange Active export highlight range.
  * @param {function} options.getLaneDragProps Per-lane drag handler factory from useClipDrag.
- * @param {boolean} options.hasActivity Whether the activity lane should be present.
- * @param {boolean} options.hasVideo Whether the video lane should be present.
- * @param {number|null} options.importedVideoDuration Imported video duration.
- * @param {string|null} options.importedVideoPath Imported video path.
+ * @param {boolean} options.hasActivity Whether the external activity lane should be present.
  * @param {function} options.nudgeClip Callback to move a clip by a relative number of seconds.
  * @param {string|null} options.selectedClipId Currently selected clip lane id.
  * @param {function} options.setSelectedClipId Callback to set selected clip lane id.
- * @param {number} options.videoSyncOffsetSeconds Timeline second where video starts.
  * @param {number} options.viewEnd Visible viewport end second.
  * @param {number} options.viewStart Visible viewport start second.
  * @param {number} options.widthPx Measured timeline width.
@@ -55,17 +53,14 @@ export default function useTimelineClips({
   activityFilename,
   activitySummary,
   canSelect,
+  clips,
   commitClipNudge,
   exportHighlightRange,
   getLaneDragProps,
   hasActivity,
-  hasVideo,
-  importedVideoDuration,
-  importedVideoPath,
   nudgeClip,
   selectedClipId,
   setSelectedClipId,
-  videoSyncOffsetSeconds,
   viewEnd,
   viewStart,
   widthPx,
@@ -84,21 +79,21 @@ export default function useTimelineClips({
     const laneInputs = []
     const activityDurationSeconds = activitySummary?.durationSeconds ?? 0
 
-    // Video lane - starts at the sync offset so clip geometry represents real timeline placement.
-    if (hasVideo) {
+    // Video lanes - each clip starts at its offset so clip geometry represents real timeline placement.
+    for (const clip of sortVideosByTimeline(clips)) {
       laneInputs.push({
         ariaLabel: i18next.t('player.videoClipLane', 'Video clip lane'),
-        durationSeconds: importedVideoDuration ?? 0,
+        durationSeconds: clip.durationSeconds,
         formatLabel: 'MP4',
         icon: Video,
-        id: 'video',
+        id: `video:${clip.id}`,
         isVideo: true,
-        label: getBasename(importedVideoPath),
-        startSecond: videoSyncOffsetSeconds,
+        label: getBasename(clip.path),
+        startSecond: clip.offsetSeconds,
       })
     }
 
-    // Activity lane - always starts at zero and uses activity metadata for label/duration.
+    // Activity lane - always starts at zero and uses external activity metadata for label/duration.
     if (hasActivity) {
       const availableMetrics = activitySummary.availableMetrics
         .map((metric) => getActivityAttributeLabel(metric.attribute, i18next.t))
@@ -108,7 +103,7 @@ export default function useTimelineClips({
         ariaLabel: i18next.t('player.activityClipLane', 'Activity clip lane'),
         availableMetrics,
         durationSeconds: activityDurationSeconds,
-        formatLabel: activitySummary?.fileFormat === 'mp4_telemetry' ? 'MP4' : activitySummary?.fileFormat?.toUpperCase() || 'DATA',
+        formatLabel: activitySummary.fileFormat?.toUpperCase() || 'DATA',
         icon: null,
         id: 'activity',
         isVideo: false,
@@ -216,20 +211,17 @@ export default function useTimelineClips({
     activityFilename,
     activitySummary,
     canSelect,
+    clips,
     commitClipNudge,
     exportHighlightRange,
     getLaneDragProps,
     hasActivity,
-    hasVideo,
     hoveredLaneId,
-    importedVideoDuration,
-    importedVideoPath,
     nudgeClip,
     selectedClipId,
     setSelectedClipId,
     stopClipEvent,
     tooltipBaseId,
-    videoSyncOffsetSeconds,
     viewEnd,
     viewStart,
     widthPx,

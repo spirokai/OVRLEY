@@ -1,18 +1,16 @@
 import { expect, test } from 'vitest'
 import { applyProjectOwnedState } from '@/features/projects/utils/projectHydration'
 import useStore from '@/store/useStore'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 test('project restoration changes only project-owned settings', () => {
   useStore.setState(useStore.getInitialState(), true)
   const parsedActivity = { canonical: 'activity' }
-  const videoResolution = { width: 1920, height: 1080 }
+  const video = createTestVideo({ id: 'canonical-video', path: 'C:\\video.mp4', durationSeconds: 30 })
   useStore.setState({
     activitySummary: { durationSeconds: 100 },
     parsedActivity,
-    importedVideoPath: 'C:\\video.mp4',
-    importedVideoDuration: 30,
-    importedVideoResolution: videoResolution,
-    importedVideoImportId: 'canonical-import',
+    ...videoStoreState([video]),
   })
   useStore.getState().setBatchQueueFromPaths(['C:\\old\\queued.mp4'])
   useStore.setState({ batchSnapshot: { batchId: 'old-batch', rendererBusy: false } })
@@ -48,9 +46,11 @@ test('project restoration changes only project-owned settings', () => {
   expect(state.globalDefaults.color_text).toBe('#123456')
   expect(state.loadedTemplateSource).toBeNull()
   expect(state.lastSavedTemplateState).toBeNull()
-  expect(state.importedVideoResolution).toBe(videoResolution)
-  expect(state.importedVideoImportId).toBe('canonical-import')
-  expect(state.videoSyncOffsetSeconds).toBe(20)
+  expect(state.importedVideos).toHaveLength(1)
+  expect(state.importedVideos[0].resolution).toBe(video.resolution)
+  expect(state.importedVideos[0].preview).toBe(video.preview)
+  expect(state.videoEdits['canonical-video'].offsetSeconds).toBe(20)
+  expect(state.manualVideoSync.videoId).toBe('canonical-video')
   expect(state.videoSyncTimezoneMode).toBe('utc')
   expect(state.manualVideoSync.detectedLocationSecond).toBe(30)
   expect(state.manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 30 })
@@ -69,7 +69,7 @@ test('project restoration changes only project-owned settings', () => {
 
 test('project hydration rejects landmarks without matching staged video bounds', () => {
   useStore.setState(useStore.getInitialState(), true)
-  useStore.setState({ importedVideoPath: 'C:\\video.mp4', importedVideoDuration: 30 })
+  useStore.setState(videoStoreState([createTestVideo({ path: 'C:\\video.mp4', durationSeconds: 30 })]))
 
   const project = {
     editor: {
@@ -103,7 +103,7 @@ test('project hydration rejects landmarks without matching staged video bounds',
 
   expect(() => applyProjectOwnedState(useStore, project)).toThrow(/within the imported video duration/)
 
-  useStore.setState({ importedVideoPath: null, importedVideoDuration: null })
+  useStore.setState(videoStoreState([]))
   project.sync.manual.landmarks[0].videoSecond = 1
   expect(() => applyProjectOwnedState(useStore, project)).toThrow(/require an imported video/)
 })

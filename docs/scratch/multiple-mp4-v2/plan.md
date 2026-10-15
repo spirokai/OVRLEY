@@ -31,6 +31,15 @@ Status: implemented (awaiting owner commit).
 
 Delivered as three commits: **M2a** pure utilities (item 4), **M2b** model switch (items 1–3, 5–7, 9), **M2c** project format v4 (item 8).
 
+M2b status: implemented (awaiting owner commit). Decisions made during implementation:
+- Canonical state is split: `importedVideos` (validated source entities: metadata, preview registration, telemetry, sync warning) and `videoEdits[videoId]` (`offsetSeconds`, `deletedParts`, `transitionIn`). Timeline clips are the derived join (`joinVideoEdits`).
+- Undo tracks `videoEdits` (replacing `videoSyncOffsetSeconds`). Collection changes run through `changeVideoCollection`, which rebases history so undo never resurrects removed clips and keeps edits of remaining clips.
+- `parsedActivity`/`activitySummary` hold only the external activity. Embedded telemetry stays on each clip; without an external activity widgets use the telemetry of the clip shown at the playhead in clip-local time (`useActivityContext`). The timeline activity lane now shows only an external activity.
+- Drag preview is `{ videoId | null, deltaSeconds }`; dragging the activity lane shifts every clip. Snapping includes other clips' edges.
+- Preview still uses one `<video>` element: it shows the clip at the playhead (upcoming clip in gaps, last clip after the end) and hands over through the timeline clock (dual-element hand-off is M4).
+- Current-video render and project format v3 hold at most one clip until M6/M2c; multi-file import arrives in M3, so this limit is unreachable from the UI.
+- Exact `fpsNum/fpsDen` are required at import; the float-FPS fallback in render config is removed.
+
 1. Replace singleton fields in `createVideoImportSlice.js` with `importedVideos[]` and ID-addressed actions (add batch, remove, set clip offset, set deleted parts, set transition). Session-level sync actions (timezone mode, shared offset, filename timestamps, reset) keep their current semantics and apply to every clip.
 2. Move embedded telemetry into the entity (remove global stash in `createMediaSlice.js`).
 3. Keep the time chain and timezone inference untouched (`media/video_probe.rs`, `media/mp4_telemetry/mod.rs`, `media/prepared_video.rs`, `lib/video-sync.js`). Only change `resolveVideoSyncState`: a non-overlapping clip keeps its signed offset with a "no activity coverage" warning instead of offset 0. Apply it per clip.

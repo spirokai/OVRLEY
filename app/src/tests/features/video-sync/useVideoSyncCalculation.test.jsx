@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 import useStore from '@/store/useStore'
 import useVideoSyncCalculation from '@/features/video-sync/hooks/useVideoSyncCalculation'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 const LANDMARKS = [
   { id: 'video-stop-1', type: 'stop', videoSecond: 4 },
@@ -17,12 +18,12 @@ function createActivity(speed = [3, 3, 3, 3, 3]) {
   }
 }
 
-function resetStore(activity = createActivity()) {
+function resetStore(activity = createActivity(), videos = [createTestVideo({ path: 'C:\\video.mp4', durationSeconds: 30 })], offsets = {}) {
   useStore.setState(useStore.getInitialState(), true)
   useStore.setState({
-    importedVideoPath: 'C:\\video.mp4',
-    importedVideoDuration: 30,
+    ...videoStoreState(videos, offsets),
     manualVideoSync: {
+      videoId: 'video-1',
       landmarks: structuredClone(LANDMARKS),
       detectedLocationSecond: null,
       speedThresholdKmh: 5,
@@ -108,7 +109,14 @@ describe('manual video-sync calculation orchestration', () => {
   })
 
   test('stores and applies a location-only result through the canonical candidate workflow', async () => {
-    resetStore()
+    resetStore(
+      createActivity(),
+      [
+        createTestVideo({ id: 'video-1', path: 'C:\\video.mp4', durationSeconds: 30 }),
+        createTestVideo({ id: 'video-2', path: 'C:\\video-2.mp4', durationSeconds: 30, importOrder: 1 }),
+      ],
+      { 'video-1': 0, 'video-2': 35 },
+    )
     useStore.setState((state) => ({
       manualVideoSync: {
         ...state.manualVideoSync,
@@ -127,6 +135,21 @@ describe('manual video-sync calculation orchestration', () => {
     expect(candidate).toMatchObject({ variant: 'locationOnly', offset: 8, matchedCount: 1, eligibleCount: 1 })
 
     act(() => useStore.getState().applyVideoSyncCandidate('location', candidate))
-    expect(useStore.getState().videoSyncOffsetSeconds).toBe(8)
+    expect(useStore.getState().videoEdits['video-1'].offsetSeconds).toBe(8)
+    expect(useStore.getState().videoEdits['video-2'].offsetSeconds).toBe(43)
+  })
+
+  test('reports no video until a manual-sync target clip is selected', async () => {
+    resetStore()
+    useStore.setState((state) => ({ manualVideoSync: { ...state.manualVideoSync, videoId: null } }))
+    const { result } = renderHook(() => useVideoSyncCalculation())
+
+    await waitForDetection(result)
+
+    expect(result.current.eligibility).toMatchObject({
+      canCalculateAll: false,
+      canCalculateLocation: false,
+      allExplanation: 'A video is required for Landmark Sync',
+    })
   })
 })

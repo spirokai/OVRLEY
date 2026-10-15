@@ -1,9 +1,10 @@
 /**
  * Pure helpers over the imported-video collection.
  *
- * Videos are canonical entities validated at import ingress: `offsetSeconds`
- * is the committed timeline start, `durationSeconds` is frame-exact, `fps` is
- * an exact rational, and `resolution` is display-oriented.
+ * Timeline clips join a canonical video entity (validated at import ingress:
+ * `durationSeconds` is frame-exact, `fps` is an exact rational, `resolution` is
+ * display-oriented) with its user edits (`offsetSeconds` committed timeline
+ * start, `deletedParts`, `transitionIn`).
  */
 
 import { fpsEquals } from './frame-grid'
@@ -37,6 +38,31 @@ export function getVideosTimelineBounds(videos) {
     startSecond: Math.min(...videos.map((video) => video.offsetSeconds)),
     endSecond: Math.max(...videos.map(getVideoEndSecond)),
   }
+}
+
+/**
+ * Joins imported video entities with their user edits into timeline clips.
+ * @param {Array<object>} videos Imported video entities.
+ * @param {Object<string, {offsetSeconds: number, deletedParts: Array<object>, transitionIn: object|null}>} videoEdits Edits keyed by video ID.
+ * @returns {Array<object>} Timeline clips.
+ */
+export function joinVideoEdits(videos, videoEdits) {
+  return videos.map((video) => ({ ...video, ...videoEdits[video.id] }))
+}
+
+/**
+ * Returns clips with a transient drag shift applied to one clip, or to every clip when `videoId` is null.
+ * @param {Array<object>} clips Timeline clips.
+ * @param {{videoId: string|null, deltaSeconds: number}|null} dragPreview Transient drag shift.
+ * @returns {Array<object>} Clips as displayed during the drag.
+ */
+export function applyVideoDragPreview(clips, dragPreview) {
+  if (dragPreview === null) return clips
+  return clips.map((clip) =>
+    dragPreview.videoId === null || clip.id === dragPreview.videoId
+      ? { ...clip, offsetSeconds: clip.offsetSeconds + dragPreview.deltaSeconds }
+      : clip,
+  )
 }
 
 function sameFormat(left, right) {

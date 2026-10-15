@@ -25,7 +25,8 @@ export default function useBatchInspection({ phase, settings }) {
   const [revision, setRevision] = useState(0)
   const [inspection, setInspection] = useState(null)
   const [plan, setPlan] = useState(null)
-  const referencePath = sync.error || sync.activitySummary === null ? null : inputs.importedVideoPath
+  // The editor holds at most one video until batch export renders the collection.
+  const referencePath = sync.error || sync.activitySummary === null ? null : (inputs.importedVideos[0]?.path ?? null)
   const context = useMemo(() => ({ folder, referencePath, revision }), [folder, referencePath, revision])
   const current = inspection?.context === context ? inspection : null
   const inspectionContext = open || current !== null ? context : null

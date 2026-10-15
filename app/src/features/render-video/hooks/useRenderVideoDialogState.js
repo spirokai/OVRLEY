@@ -62,7 +62,6 @@ export default function useRenderVideoDialogState({
     defaultBitrateForCodec,
     exportMode,
     hasImportedVideo,
-    importedVideoDuration,
     importedVideoFps,
     importedVideoResolution,
     isBatchTarget,
@@ -81,7 +80,7 @@ export default function useRenderVideoDialogState({
     selectedOutputFormatValue,
     updateRateFps,
     updateRateOptions,
-    videoSyncOffsetSeconds,
+    videoBounds,
   } = derived
 
   const { fpsMode, handleFpsModeChange, handleCustomFpsChange } = useFpsMode({
@@ -153,9 +152,9 @@ export default function useRenderVideoDialogState({
 
     importedVideoRangePrefilledRef.current = true
     onSettingsChange({
-      range: getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
+      range: getImportedVideoExportRange(videoBounds),
     })
-  }, [hasImportedVideo, importedVideoDuration, onSettingsChange, videoSyncOffsetSeconds])
+  }, [hasImportedVideo, onSettingsChange, videoBounds])
 
   const handleRenderTargetChange = useCallback(
     (renderTarget) => {
@@ -176,10 +175,10 @@ export default function useRenderVideoDialogState({
       importedVideoRangePrefilledRef.current = true
       onSettingsChange({
         exportMode,
-        range: getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
+        range: getImportedVideoExportRange(videoBounds),
       })
     },
-    [range, hasImportedVideo, importedVideoDuration, isBatchTarget, onSettingsChange, videoSyncOffsetSeconds],
+    [range, hasImportedVideo, isBatchTarget, onSettingsChange, videoBounds],
   )
 
   const handleOutputPathCommit = useCallback(
@@ -293,11 +292,11 @@ export default function useRenderVideoDialogState({
     handleQualityValueChange,
     qualitySliderValue: settings?.qualityType === 'quality' ? invertQualityValue(settings.qualityValue) : settings?.qualityValue,
     hasImportedVideo,
-    importedVideoDuration,
     importedVideoFps,
     importedVideoResolution,
     isBatchTarget,
     isProgress,
+    videoBounds,
     isOutputFormatAvailable,
     lockedVideoFps,
     onClose,

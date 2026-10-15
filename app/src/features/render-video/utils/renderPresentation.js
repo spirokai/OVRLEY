@@ -5,9 +5,9 @@ import { formatClockDuration } from '@/lib/time-format'
 import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { captureBatchSync } from './renderRequest'
 
-/** @param {number} durationSeconds Imported video duration. @param {number} offsetSeconds Committed activity offset. @returns {object} Activity-timeline export range. */
-export function getImportedVideoExportRange(durationSeconds, offsetSeconds) {
-  return { type: 'custom', from: offsetSeconds, to: offsetSeconds + durationSeconds }
+/** @param {{startSecond: number, endSecond: number}} videoBounds Committed interval covered by videos. @returns {object} Activity-timeline export range. */
+export function getImportedVideoExportRange(videoBounds) {
+  return { type: 'custom', from: videoBounds.startSecond, to: videoBounds.endSecond }
 }
 
 /** @param {string} value Editable range time. @returns {string} Whole-second input preserving its optional negative sign. */
@@ -184,7 +184,9 @@ export function getRenderSummaryItems(ctx, t) {
     (option) => option.value === ctx.selectedAccelerationValue && option.available && option.value !== 'cpu',
   )?.label
   const durationSeconds = isCompositeExport
-    ? ctx.importedVideoDuration
+    ? ctx.videoBounds === null
+      ? null
+      : ctx.videoBounds.endSecond - ctx.videoBounds.startSecond
     : ctx.settings.range?.type === 'custom'
       ? ctx.settings.range.to - ctx.settings.range.from
       : ctx.config?.scene?.start !== undefined && ctx.config?.scene?.end !== undefined

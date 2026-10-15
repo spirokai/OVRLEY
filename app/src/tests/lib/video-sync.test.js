@@ -1,0 +1,218 @@
+import { describe, expect, test } from 'vitest'
+import { createBatchCalibration, placeVideosByCreationTime, resolveBatchVideoTiming, resolveVideoSync, resolveVideosSync } from '@/lib/video-sync'
+import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
+import { captureBatchSync, createBatchRenderRequest } from '@/features/render-video/utils/renderRequest'
+import { createTestVideo, videoStoreState } from '../helpers/videoFixtures'
+
+// 5:47:13 activity ending 17:29 Sofia time (UTC+3).
+const activitySummary = {
+  syncTime: '2026-07-18T08:41:47.000Z',
+  endTime: '2026-07-18T14:29:00.000Z',
+  timezone: 'Europe/Sofia',
+}
+
+describe('resolveVideoSync with an explicit timezone mode', () => {
+  // 14:30Z is 17:30 Sofia (after the activity) with the timezone applied, 14:30 Sofia (inside it) without.
+  const video = createTestVideo({ creationTime: '2026-07-18T14:30:00Z', timeSource: 'ffprobe' })
+
+  test("'utc' places a clip recorded after the activity behind it with a warning", () => {
+    const sync = resolveVideoSync(video, activitySummary, 'utc')
+    expect(sync.syncWarning).toBe('Video is outside the activity')
+    expect(sync.offsetSeconds).toBe(Date.parse('2026-07-18T14:30:00Z') / 1000 - Date.parse(activitySummary.syncTime) / 1000)
+    expect(sync.timezoneMode).toBe('utc')
+  })
+
+  test("'local' keeps the clock-text reading", () => {
+    expect(resolveVideoSync(video, activitySummary, 'local').syncWarning).toBeNull()
+  })
+})
+
+describe('resolveVideosSync session timezone inference', () => {
+  const summary = { syncTime: '2026-07-18T08:00:00Z', endTime: '2026-07-18T08:02:00Z', timezone: 'Europe/Sofia' }
+
+  test('each ambiguous clip infers its own interpretation and the session adopts an agreed one', () => {
+    // 08:00:30Z only overlaps when read as UTC; 11:00:30 only when read as Sofia local clock text.
+    const utcClip = createTestVideo({ id: 'utc', creationTime: '2026-07-18T08:00:30Z', timeSource: 'ffprobe', durationSeconds: 20 })
+    const localClip = createTestVideo({ id: 'local', creationTime: '2026-07-18T11:00:30Z', timeSource: 'ffprobe', durationSeconds: 20 })
+
+    const both = resolveVideosSync([utcClip, localClip], summary, null)
+    expect(both.placements).toEqual([
+      { offsetSeconds: 30, syncWarning: null },
+      { offsetSeconds: 30, syncWarning: null },
+    ])
+    // A sole local match stays automatic, so the clips do not agree on an explicit interpretation.
+    expect(both.timezoneMode).toBeNull()
+    expect(resolveVideosSync([utcClip], summary, null).timezoneMode).toBe('utc')
+    expect(resolveVideosSync([localClip], summary, null).timezoneMode).toBeNull()
+  })
+
+  test('an explicit session mode applies to every clip', () => {
+    const first = createTestVideo({ id: 'a', creationTime: '2026-07-18T08:00:30Z', timeSource: 'ffprobe', durationSeconds: 20 })
+    const second = createTestVideo({ id: 'b', creationTime: '2026-07-18T08:01:00Z', timeSource: 'ffprobe', durationSeconds: 20 })
+    const result = resolveVideosSync([first, second], summary, 'utc')
+    expect(result.placements.map(({ offsetSeconds }) => offsetSeconds)).toEqual([30, 60])
+    expect(result.timezoneMode).toBe('utc')
+  })
+
+  test('trusted GPS clips leave the session mode unset', () => {
+    const gps = createTestVideo({ creationTime: '2026-07-18T08:00:30Z', timeSource: 'gps', durationSeconds: 20 })
+    expect(resolveVideosSync([gps], summary, 'local').timezoneMode).toBeNull()
+  })
+})
+
+describe('placeVideosByCreationTime without an external activity', () => {
+  test('places clips at real time relative to the earliest clip and keeps gaps', () => {
+    const videos = [
+      createTestVideo({ id: 'b', creationTime: '2026-07-18T08:01:05Z', timeSource: 'ffprobe' }),
+      createTestVideo({ id: 'a', creationTime: '2026-07-18T08:00:00Z', timeSource: 'ffprobe' }),
+      createTestVideo({ id: 'c', creationTime: '2026-07-18T08:10:00.000Z', timeSource: 'gps' }),
+    ]
+    expect(placeVideosByCreationTime(videos)).toEqual([
+      { offsetSeconds: 65, syncWarning: null },
+      { offsetSeconds: 0, syncWarning: null },
+      { offsetSeconds: 600, syncWarning: null },
+    ])
+  })
+
+  test('a clip without a usable time starts at zero with a warning', () => {
+    const videos = [createTestVideo({ id: 'a', creationTime: null }), createTestVideo({ id: 'b', creationTime: 'invalid', timeSource: 'ffprobe' })]
+    expect(placeVideosByCreationTime(videos)).toEqual([
+      { offsetSeconds: 0, syncWarning: 'Could not determine video creation time' },
+      { offsetSeconds: 0, syncWarning: 'Could not determine video creation time' },
+    ])
+  })
+})
+
+describe('signed automatic synchronization and shared calibration', () => {
+  const summary = { syncTime: '2026-07-18T08:00:00Z', endTime: '2026-07-18T08:02:00Z', timezone: 'Europe/Sofia' }
+
+  function source(id, creationTime) {
+    return {
+      sourceId: id,
+      metadata: {
+        path: `C:/recordings/${id}.mp4`,
+        creationTime,
+        timeSource: 'ffprobe',
+        duration: 20,
+        fps: 30,
+        fpsNum: 30,
+        fpsDen: 1,
+        rotationDegrees: 0,
+        hasAudio: true,
+        resolution: { width: 1920, height: 1080 },
+      },
+      stamp: { sizeBytes: 1000, modifiedAtUnixNanos: '1784361600000000000' },
+    }
+  }
+
+  test('captures effective reference calibration at submission while inspection keeps the detected timestamp', () => {
+    const reference = source('reference', '2026-07-18T07:59:00Z')
+    const queued = source('queued', '2026-07-18T08:00:40Z')
+    const clip = createTestVideo({
+      id: 'reference-clip',
+      path: reference.metadata.path,
+      durationSeconds: reference.metadata.duration,
+      creationTime: '2026-07-18T07:59:48Z',
+      timeSource: 'filename',
+    })
+    const editorSnapshot = {
+      config: { scene: { width: 1920, height: 1080 }, backdrops: [], rasters: [], labels: [], values: [], plots: [] },
+      globalDefaults: DEFAULT_GLOBAL_DEFAULTS,
+      parsedActivity: { sync_time: summary.syncTime, metadata: { timezone: summary.timezone }, sample_elapsed_seconds: [0, 120] },
+      activitySummary: summary,
+      ...videoStoreState([clip], { [clip.id]: -9 }),
+      videoSyncTimezoneMode: 'utc',
+    }
+    expect(resolveVideoSync(clip, summary, 'utc').offsetSeconds).toBe(-12)
+    const sync = captureBatchSync(editorSnapshot)
+    expect(resolveBatchVideoTiming(reference.metadata, summary, sync.timezoneMode)).toEqual({
+      timing: { mode: 'externalActivity', automaticOffsetSeconds: -60 },
+      hasPositiveOverlap: false,
+    })
+    const request = createBatchRenderRequest({
+      editorSnapshot,
+      sync,
+      settings: { exportMode: 'composite', codec: 'libx264', fps: 30, widgetUpdateRate: 1, qualityType: 'quality', qualityValue: 20 },
+      inspectionId: 'inspection',
+      calibrationSource: reference,
+      outputDirectory: 'C:/output',
+      jobs: [reference, queued].map((video) => ({
+        id: video.sourceId,
+        source: video,
+        timing: resolveBatchVideoTiming(video.metadata, summary, sync.timezoneMode).timing,
+        skipOverlay: false,
+      })),
+    })
+    const { reference: captured, automaticOffsets } = request.activity
+    const correction = captured.committedOffsetSeconds - captured.automaticOffsetSeconds
+    expect(correction).toBe(3)
+    expect(request.jobs.map((job) => automaticOffsets[job.sourceId] + correction)).toEqual([-9, 43])
+    // A different live checkbox value cannot reinterpret this calibration.
+    editorSnapshot.videoSyncTimezoneMode = 'local'
+    expect(request.activity.timezoneMode).toBe('utc')
+    // Read as Sofia clock text, 07:59:48 is three hours before the 11:00 activity start.
+    const local = resolveVideoSync(clip, summary, 'local')
+    expect(local.offsetSeconds).toBe(-(3 * 3600 + 12))
+    expect(local.syncWarning).toBe('Video is outside the activity')
+  })
+
+  test.each([
+    ['2026-05-10T07:36:51Z', true],
+    ['2026-07-18T07:59:30Z', true], // Video ends before activity.
+    ['2026-07-18T07:59:40Z', true], // Video ends exactly at activity start.
+    ['2026-07-18T07:59:48Z', false], // Video starts before activity and overlaps.
+    ['2026-07-18T08:01:59Z', false], // Video starts just before activity ends.
+    ['2026-07-18T08:02:00Z', true], // Video starts exactly at activity end.
+    ['2026-07-18T08:02:01Z', true], // Video starts after activity.
+  ])('keeps the signed offset of GPS creation time %s (outside=%s)', (creationTime, outside) => {
+    const sync = resolveVideoSync(createTestVideo({ creationTime, timeSource: 'gps', durationSeconds: 20 }), summary, null)
+    expect(sync.offsetSeconds).toBe((Date.parse(creationTime) - Date.parse(summary.syncTime)) / 1000)
+    expect(sync.syncWarning).toBe(outside ? 'Video is outside the activity' : null)
+  })
+
+  test.each([[null], ['invalid-timestamp']])('falls back to zero with a warning for unusable creation time %s', (creationTime) => {
+    const sync = resolveVideoSync(createTestVideo({ creationTime, timeSource: 'gps', durationSeconds: 20 }), summary, null)
+    expect(sync.offsetSeconds).toBe(0)
+    expect(sync.syncWarning).not.toBeNull()
+  })
+
+  test('keeps a clip outside the activity at its raw baseline, matching batch calibration', () => {
+    const video = { creationTime: '2026-07-18T07:59:30Z', timeSource: 'gps', duration: 20 }
+    const interactive = resolveVideoSync(
+      createTestVideo({ creationTime: video.creationTime, timeSource: video.timeSource, durationSeconds: 20 }),
+      summary,
+      null,
+    )
+    expect(interactive.offsetSeconds).toBe(-30)
+    expect(interactive.syncWarning).toBe('Video is outside the activity')
+    const calibration = createBatchCalibration({
+      activitySummary: summary,
+      referenceVideo: { ...video, path: 'C:/reference.mp4', committedOffsetSeconds: -10 },
+      timezoneMode: null,
+    })
+    expect(calibration.correctionSeconds).toBe(20)
+    expect(resolveBatchVideoTiming(video, summary, calibration.timezoneMode)).toEqual({
+      timing: { mode: 'externalActivity', automaticOffsetSeconds: -30 },
+      hasPositiveOverlap: false,
+    })
+    const noCorrection = createBatchCalibration({ activitySummary: summary, referenceVideo: null, timezoneMode: null })
+    expect(resolveBatchVideoTiming({ ...video, creationTime: '2026-07-18T07:59:40Z' }, summary, noCorrection.timezoneMode).hasPositiveOverlap).toBe(
+      false,
+    )
+  })
+
+  test('rejects an unresolved reference baseline and uses local zero for per-video embedded telemetry', () => {
+    expect(() =>
+      createBatchCalibration({
+        activitySummary: summary,
+        referenceVideo: { path: 'C:/reference.mp4', creationTime: null, timeSource: null, committedOffsetSeconds: 5 },
+        timezoneMode: 'utc',
+      }),
+    ).toThrow('Could not calibrate reference video')
+    expect(createBatchCalibration({ activitySummary: null, referenceVideo: null, timezoneMode: 'utc' })).toEqual({ mode: 'embeddedActivity' })
+    expect(resolveBatchVideoTiming({ creationTime: null }, null, 'utc')).toEqual({
+      timing: { mode: 'embeddedActivity' },
+      hasPositiveOverlap: null,
+    })
+  })
+})

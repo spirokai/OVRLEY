@@ -8,6 +8,7 @@ import useProjectLifecycle from '@/features/projects/hooks/useProjectLifecycle'
 import { prepareDocumentFonts } from '@/lib/font-resources'
 import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlice'
 import useStore from '@/store/useStore'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 const boundaries = vi.hoisted(() => ({
   clearPreviewVideos: vi.fn(),
@@ -37,6 +38,15 @@ vi.mock('@/lib/file-dialog', async (importOriginal) => ({
   openSinglePath: boundaries.openSinglePath,
   saveSinglePath: boundaries.saveSinglePath,
 }))
+
+function preparedVideo(path, durationSeconds = 40) {
+  return {
+    path,
+    metadata: { path, duration: durationSeconds, fpsNum: 30, fpsDen: 1, resolution: { width: 1920, height: 1080 }, hasAudio: true },
+    previewWarnings: [],
+    telemetry: { status: 'absent', activity: null },
+  }
+}
 
 describe('useProjectLifecycle canonical load orchestration', () => {
   beforeEach(() => {
@@ -106,10 +116,15 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 40 },
     }
-    useStore.setState({ importedVideoImportId: 'previous-import-id' })
+    useStore.setState(
+      videoStoreState([
+        createTestVideo({ id: 'previous-1', path: 'C:\\Previous\\a.mp4' }),
+        createTestVideo({ id: 'previous-2', path: 'C:\\Previous\\b.mp4', importOrder: 1 }),
+      ]),
+    )
     boundaries.readProjectFile.mockResolvedValue({ project, resolvedSources: { activityPath: null, videoPath }, rasterLoadResults: {} })
     boundaries.removePreviewVideo.mockImplementation(async () => {
-      expect(useStore.getState().importedVideoImportId).toBe('owner-import-id')
+      expect(useStore.getState().importedVideos.map((video) => video.preview.importId)).toEqual(['owner-import-id'])
       return null
     })
 
@@ -117,19 +132,13 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       path: 'C:\\Events\\Ride.oly',
       resolveProjectSources: vi.fn().mockResolvedValue({ activityPath: null, videoPath }),
       prepareActivityPath: vi.fn(),
-      prepareVideoPath: vi.fn().mockResolvedValue({
-        path: videoPath,
-        telemetry: null,
-        importedVideoState: {
-          importedVideoPath: videoPath,
-          importedVideoDuration: 40,
-          importedVideoResolution: { width: 1920, height: 1080 },
-        },
-      }),
+      prepareVideoPath: vi.fn().mockResolvedValue(preparedVideo(videoPath)),
     })
 
     expect(boundaries.registerPreviewVideo).toHaveBeenCalledWith(videoPath)
-    expect(boundaries.removePreviewVideo).toHaveBeenCalledExactlyOnceWith('previous-import-id')
+    expect(boundaries.removePreviewVideo).toHaveBeenCalledTimes(2)
+    expect(boundaries.removePreviewVideo).toHaveBeenNthCalledWith(1, 'import-previous-1')
+    expect(boundaries.removePreviewVideo).toHaveBeenNthCalledWith(2, 'import-previous-2')
     expect(boundaries.clearPreviewVideos).not.toHaveBeenCalled()
   })
 
@@ -202,23 +211,14 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const prepareVideoPath = vi.fn(
       (path) =>
         new Promise((resolve) => {
-          finishVideoPreparation = () =>
-            resolve({
-              path,
-              telemetry: null,
-              importedVideoState: {
-                importedVideoPath: path,
-                importedVideoDuration: 40,
-                importedVideoResolution: { width: 1920, height: 1080 },
-              },
-            })
+          finishVideoPreparation = () => resolve(preparedVideo(path))
         }),
     )
     const clearHistory = vi.spyOn(useStore.temporal.getState(), 'clear')
     const onSetBackgroundMode = vi.fn()
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo: vi.fn(),
+        clearImportedVideos: vi.fn(),
         onSetBackgroundMode,
         prepareActivityPath,
         prepareVideoPath,
@@ -242,12 +242,12 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     })
     expect(result.current.loadingProject).toBe(true)
     expect(useStore.getState().activitySource).toBeNull()
-    expect(useStore.getState().importedVideoPath).toBeNull()
+    expect(useStore.getState().importedVideos).toEqual([])
     finishActivityPreparation()
     finishVideoPreparation()
     await act(async () => Promise.resolve())
     expect(boundaries.registerPreviewVideo).not.toHaveBeenCalled()
-    expect(useStore.getState().importedVideoPath).toBeNull()
+    expect(useStore.getState().importedVideos).toEqual([])
     finishFonts()
     await act(async () => openPromise)
     expect(result.current.loadingProject).toBe(false)
@@ -265,8 +265,12 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(state.config.scene.width).toBe(1280)
     expect(state.globalDefaults.color_text).toBe('#123456')
     expect(state.loadedTemplateSource).toBeNull()
-    expect(state.importedVideoImportId).toBe('owner-import-id')
-    expect(state.videoSyncOffsetSeconds).toBe(12)
+    expect(state.importedVideos).toHaveLength(1)
+    const [video] = state.importedVideos
+    expect(video).toMatchObject({ path: videoPath, durationSeconds: 40, telemetry: { status: 'absent', activity: null } })
+    expect(video.preview).toEqual({ importId: 'owner-import-id', url: 'http://preview/video', warnings: [] })
+    expect(state.videoEdits[video.id].offsetSeconds).toBe(12)
+    expect(state.manualVideoSync.videoId).toBe(video.id)
     expect(state.videoSyncTimezoneMode).toBe('utc')
     const { batchVideoFolder, batchOutputFolder, ...renderSettings } = project.render
     expect(state.renderSettings).toEqual(renderSettings)
@@ -325,7 +329,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.saveSinglePath.mockResolvedValue(null)
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo: vi.fn(),
+        clearImportedVideos: vi.fn(),
         prepareActivityPath: vi.fn(),
         prepareVideoPath: vi.fn(),
       }),
@@ -357,13 +361,10 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       },
       activitySource: { kind: 'file', path: 'C:\\Media\\ride.fit' },
       parsedActivity: { samples: [] },
-      parsedActivitySource: 'activity-file',
       activitySummary: { durationSeconds: 120 },
-      importedVideoPath: 'C:\\Media\\ride.mp4',
-      importedVideoDuration: 120,
+      ...videoStoreState([createTestVideo({ path: 'C:\\Media\\ride.mp4', durationSeconds: 120 })], { 'video-1': 12 }),
       selectedSecond: 45,
       timelineViewport: { viewStart: 30, viewEnd: 60 },
-      videoSyncOffsetSeconds: 12,
       batchVideoFolder: 'C:\\batch-videos',
       batchOutputFolder: 'C:\\batch-renders',
       renderSettings: {
@@ -375,10 +376,10 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     })
 
     useStore.getState().setBatchQueueFromPaths(['C:\\batch-videos\\ride.mp4'])
-    const clearImportedVideo = vi.fn(async () => useStore.getState().clearImportedVideo())
+    const clearImportedVideos = vi.fn(async () => useStore.getState().clearImportedVideos())
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo,
+        clearImportedVideos,
         prepareActivityPath: vi.fn(),
         prepareVideoPath: vi.fn(),
       }),
@@ -389,20 +390,20 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       createPromise = result.current.handleNewProject()
     })
     await waitFor(() => expect(result.current.unsavedProjectDialog.open).toBe(true))
-    expect(clearImportedVideo).not.toHaveBeenCalled()
+    expect(clearImportedVideos).not.toHaveBeenCalled()
 
     act(() => result.current.unsavedProjectDialog.onDiscard())
     await act(async () => createPromise)
 
     const state = useStore.getState()
-    expect(clearImportedVideo).toHaveBeenCalledOnce()
+    expect(clearImportedVideos).toHaveBeenCalledOnce()
     expect(state.config.labels.map((widget) => widget.id)).toEqual(['template-widget'])
     expect(state.loadedTemplateSource).toEqual(templateSource)
     expect(state.lastSavedTemplateState).toEqual(templateState)
     expect(state.activitySource).toBeNull()
     expect(state.parsedActivity).toBeNull()
-    expect(state.importedVideoPath).toBeNull()
-    expect(state.videoSyncOffsetSeconds).toBe(0)
+    expect(state.importedVideos).toEqual([])
+    expect(state.videoEdits).toEqual({})
     expect(state.renderSettings).toEqual(DEFAULT_RENDER_SETTINGS)
     expect(state.batchVideoFolder).toBeNull()
     expect(state.batchOutputFolder).toBeNull()
@@ -435,10 +436,10 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.saveSinglePath.mockResolvedValue('C:\\Projects\\project.oly')
     boundaries.writeProjectFile.mockResolvedValue(null)
 
-    const clearImportedVideo = vi.fn(async () => useStore.getState().clearImportedVideo())
+    const clearImportedVideos = vi.fn(async () => useStore.getState().clearImportedVideos())
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo,
+        clearImportedVideos,
         prepareActivityPath: vi.fn(),
         prepareVideoPath: vi.fn(),
       }),
@@ -463,10 +464,10 @@ describe('useProjectLifecycle canonical load orchestration', () => {
   test('New Project keeps the session when the user cancels the confirmation', async () => {
     useStore.setState({ activitySource: { kind: 'file', path: 'C:\\Media\\ride.fit' }, parsedActivity: { samples: [] } })
 
-    const clearImportedVideo = vi.fn()
+    const clearImportedVideos = vi.fn()
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo,
+        clearImportedVideos,
         prepareActivityPath: vi.fn(),
         prepareVideoPath: vi.fn(),
       }),
@@ -482,7 +483,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const outcome = await act(async () => createPromise)
 
     expect(outcome).toBe(false)
-    expect(clearImportedVideo).not.toHaveBeenCalled()
+    expect(clearImportedVideos).not.toHaveBeenCalled()
     expect(useStore.getState().activitySource).toEqual({ kind: 'file', path: 'C:\\Media\\ride.fit' })
     expect(result.current.status).toBe('Unsaved')
   })
@@ -511,7 +512,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     useStore.setState({
       activitySource: { kind: 'file', path: 'C:\\Previous\\activity.fit' },
       parsedActivity: { samples: [] },
-      parsedActivitySource: 'activity-file',
       activitySummary: { durationSeconds: 50 },
     })
     boundaries.openSinglePath.mockResolvedValue(projectPath)
@@ -526,7 +526,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const onSetBackgroundMode = vi.fn()
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo: vi.fn(),
+        clearImportedVideos: vi.fn(),
         onSetBackgroundMode,
         prepareActivityPath,
         prepareVideoPath: vi.fn(),
@@ -581,10 +581,10 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     })
     boundaries.selectedPathIsFile.mockResolvedValue(true)
     const prepareActivityPath = vi.fn().mockRejectedValue(new Error('invalid activity'))
-    const prepareVideoPath = vi.fn().mockResolvedValue({ path: 'C:\\Events\\ride.mp4' })
+    const prepareVideoPath = vi.fn().mockResolvedValue(preparedVideo('C:\\Events\\ride.mp4'))
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo: vi.fn(),
+        clearImportedVideos: vi.fn(),
         prepareActivityPath,
         prepareVideoPath,
       }),
@@ -630,7 +630,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.readProjectFile.mockResolvedValue({ project, resolvedSources: { activityPath: null, videoPath: null }, rasterLoadResults: {} })
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo: vi.fn(),
+        clearImportedVideos: vi.fn(),
         prepareActivityPath: vi.fn(),
         prepareVideoPath: vi.fn(),
       }),
@@ -657,7 +657,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     )
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo: vi.fn(),
+        clearImportedVideos: vi.fn(),
         prepareActivityPath: vi.fn(),
         prepareVideoPath: vi.fn(),
       }),
