@@ -4,7 +4,6 @@ mod common;
 use ovrley_core::{
     activity::{interpolate::densify_activity, schema::ParsedActivity, trim::trim_activity},
     fonts::{preview_font_resource, NativeFonts},
-    render::format::format_validated_metric_parts,
 };
 use ovrley_widgets::{
     activity::ActivitySampler,
@@ -105,7 +104,7 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
                 for index in [0, 1, 2, 3, 4, 1] {
                     let second = seconds[index];
                     let expected =
-                        format_validated_metric_parts(&validated, &dense, index).unwrap();
+                        ovrley_widgets::widgets::value::format::format_metric_parts(&validated, &dense.metric_sample(validated.metric, index, 0.0));
                     let sampled =
                         format_metric_parts(&validated, &sampler.sample(&validated, second));
                     assert_eq!(sampled, expected, "{metric}/{unit:?} at {second}");

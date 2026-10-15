@@ -142,7 +142,7 @@ pub(crate) fn encode_video(
         VideoEncoding::Transparent(plan) => &plan.coverage,
     };
     let renderer = VideoFrameRenderer::new(
-        paths,
+        &paths.font_dirs,
         dense,
         &assets,
         size,

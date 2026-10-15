@@ -73,12 +73,12 @@ fn metric_icon_top_centers_on_value_glyph_box() {
 #[test]
 // Verifies stable numeric baseline measurement removes per-digit vertical drift.
 fn stable_numeric_vertical_metrics_keep_baseline_constant() {
-    use ovrley_core::render::text::resolve_font;
+    use ovrley_widgets::render::text::resolve_font;
     use ovrley_widgets::render::text::baseline_for_text_top_with_line_height;
 
     let workspace_root = common::test_config::repo_git_root();
     let font_dirs = vec![workspace_root.join("fonts")];
-    let font = resolve_font(&font_dirs, Some("JetBrains Mono.ttf"), 90.0).unwrap();
+    let font = resolve_font(&ovrley_core::fonts::NativeFonts(&font_dirs), Some("JetBrains Mono.ttf"), 90.0).unwrap();
     let top = 100.0;
     let line_height = 90.0 * 0.92;
 

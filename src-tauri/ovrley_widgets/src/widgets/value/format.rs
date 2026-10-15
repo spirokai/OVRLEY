@@ -5,6 +5,13 @@ use crate::model::standard_metrics::{
 use crate::model::types::MetricKind;
 use crate::widgets::value::validation::{ValidatedValueFormatting, ValidatedValueWidget};
 
+/// Starting-altitude presentation adjustment, independent of host storage.
+pub fn altitude_offset_m(target: Option<f64>, first: Option<f64>) -> f64 {
+    target
+        .zip(first)
+        .map_or(0.0, |(target, first)| target - first)
+}
+
 /// One sample and activity context supplied by either host. Empty external series are unavailable.
 #[derive(Default)]
 pub struct MetricSample<'a> {

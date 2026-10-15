@@ -158,6 +158,21 @@ impl ElevationActivity {
             .and_then(|_| interpolate_points(&self.preferred, second))
     }
 
+    /// The same progress, elevation and chronological fill drive both rendering hosts.
+    pub fn frame_state(
+        &self,
+        geometry: &super::geometry::ElevationGeometry,
+        second: f64,
+        window: Option<RouteWindow>,
+        elevation: Option<f64>,
+    ) -> super::geometry::ElevationFrameState {
+        geometry.state(
+            self.progress_at(second, window),
+            Some(elevation.unwrap_or(0.0)),
+            self.elapsed_fraction(second, window),
+        )
+    }
+
     pub fn altitude_offset(&self, target: Option<f64>) -> f64 {
         target
             .zip(self.profile.first())
@@ -166,5 +181,29 @@ impl ElevationActivity {
 
     pub fn elevation_range(&self) -> Option<(f64, f64)> {
         self.elevation_range
+    }
+}
+
+/// Selects barometric altitude when the source provides it, otherwise generic elevation.
+pub fn preferred_elevation_series<'a>(
+    barometric: &'a [Option<f64>],
+    elevation: &'a [Option<f64>],
+) -> &'a [Option<f64>] {
+    if barometric.iter().any(Option::is_some) {
+        barometric
+    } else {
+        elevation
+    }
+}
+
+/// Finalized profile samples are authoritative when present.
+pub fn elevation_profile_series<'a>(
+    profile: &'a [Option<f64>],
+    elevation: &'a [Option<f64>],
+) -> &'a [Option<f64>] {
+    if profile.is_empty() {
+        elevation
+    } else {
+        profile
     }
 }

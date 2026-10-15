@@ -1,20 +1,22 @@
 //! Elevation frame-state marker-y tests.
 //!
-//! Verifies that `build_elevation_frame_states` drives marker_y from
+//! Verifies that shared elevation frame sampling drives marker_y from
 //! elapsed-time elevation data when `elevation_data_range` is available,
 //! instead of relying solely on geometry polyline lookup.
 //!
 //! ## Type
-//! Unit test (module-local). No I/O — pure frame-state computation.
+//! Integration test. No I/O — shared frame-state computation over native samples.
 //!
 //! ## Regressions guarded
 //! - Marker_y stuck at geometry y-coordinate during drone hover
 //! - Marker_y not tracking elevation changes at same GPS position
 
-use super::super::elevation::build_elevation_frame_states;
-use ovrley_widgets::widgets::elevation::{geometry::{build_elevation_completed_points, ElevationGeometry}, validation::ValidatedElevationPlot};
-use crate::activity::schema::{DenseActivityReport, DenseSeriesReport, ParsedActivity};
-use crate::normalize::ValidatedSceneConfig;
+use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport, ParsedActivity};
+use ovrley_core::normalize::ValidatedSceneConfig;
+use ovrley_widgets::widgets::elevation::{
+    geometry::{build_elevation_completed_points, ElevationGeometry},
+    validation::ValidatedElevationPlot,
+};
 use std::collections::BTreeMap;
 
 fn minimal_scene() -> ValidatedSceneConfig {
@@ -180,61 +182,36 @@ fn minimal_dense_activity() -> DenseActivityReport {
 fn vertical_segment_geometry() -> ElevationGeometry {
     // All points at the SAME y-coordinate — proving marker_y is driven by
     // elevation data, not geometry point lookup.
-    let mut geometry = ElevationGeometry::new(&minimal_plot(), 1.0, &[(0.5, 100.0, 0.0), (0.5, 100.0, 0.5), (0.5, 100.0, 1.0)]).unwrap();
+    let mut geometry = ElevationGeometry::new(
+        &minimal_plot(),
+        1.0,
+        &[(0.5, 100.0, 0.0), (0.5, 100.0, 0.5), (0.5, 100.0, 1.0)],
+    )
+    .unwrap();
     geometry.elevation_data_range = Some((100.0, 300.0));
     geometry
 }
 
-fn minimal_plot() -> ValidatedElevationPlot {
-    ValidatedElevationPlot {
-        x: 0.0,
-        y: 0.0,
-        width: 200.0,
-        height: 600.0,
-        rotation: 0.0,
-        y_scale: 1.0,
-        simplify_tolerance_px: 0.0,
-        target_density: 2.0,
-        remaining_line_width: 1.0,
-        remaining_line_color: "#ffffff".into(),
-        remaining_line_opacity: 1.0,
-        show_full_activity: true,
-        starting_altitude_m: None,
-        completed_line_width: 2.0,
-        completed_line_color: "#00ff00".into(),
-        completed_line_opacity: 1.0,
-        area_remaining_color: "#000000".into(),
-        area_remaining_opacity: 0.3,
-        area_completed_color: "#00ff00".into(),
-        area_completed_opacity: 0.5,
-        marker_variant: "single".into(),
-        marker_variant_diameter: 0.0,
-        marker_size: 8.0,
-        marker_color: "#ff0000".into(),
-        marker_opacity: 1.0,
-        show_elevation_metric: false,
-        show_elevation_imperial: false,
-        metric_label_offset_x: 0.0,
-        metric_label_offset_y: 0.0,
-        imperial_label_offset_x: 0.0,
-        imperial_label_offset_y: 0.0,
-        label_font: None,
-        label_font_size: 14.0,
-        label_color: "#ffffff".into(),
-    }
-}
-
-/// Marker_y must change across frames when elevation_data_range is set,
-/// even though all geometry points share the same x-coordinate.
 #[test]
 fn marker_y_follows_elevation_during_hover() {
     let scene = minimal_scene();
     let activity = minimal_activity();
     let dense = minimal_dense_activity();
     let geometry = vertical_segment_geometry();
-    let plot = minimal_plot();
-
-    let states = build_elevation_frame_states(&scene, &activity, &dense, &geometry, &plot, true);
+    let sampler = activity.elevation_activity();
+    let states = dense
+        .frame_elapsed_seconds
+        .iter()
+        .enumerate()
+        .map(|(index, elapsed)| {
+            sampler.frame_state(
+                &geometry,
+                scene.start + elapsed,
+                None,
+                dense.series.elevation[index],
+            )
+        })
+        .collect::<Vec<_>>();
 
     assert_eq!(states.len(), 3, "should produce 3 frame states");
 
@@ -373,4 +350,43 @@ fn completed_points_use_geometry_endpoint_not_marker_y() {
         (100.0, 380.0),
         "endpoint should interpolate within the geometry run"
     );
+}
+
+fn minimal_plot() -> ValidatedElevationPlot {
+    ValidatedElevationPlot {
+        x: 0.0,
+        y: 0.0,
+        width: 200.0,
+        height: 600.0,
+        rotation: 0.0,
+        y_scale: 1.0,
+        simplify_tolerance_px: 0.0,
+        target_density: 2.0,
+        remaining_line_width: 1.0,
+        remaining_line_color: "#ffffff".into(),
+        remaining_line_opacity: 1.0,
+        show_full_activity: true,
+        starting_altitude_m: None,
+        completed_line_width: 2.0,
+        completed_line_color: "#00ff00".into(),
+        completed_line_opacity: 1.0,
+        area_remaining_color: "#000000".into(),
+        area_remaining_opacity: 0.3,
+        area_completed_color: "#00ff00".into(),
+        area_completed_opacity: 0.5,
+        marker_variant: "single".into(),
+        marker_variant_diameter: 0.0,
+        marker_size: 8.0,
+        marker_color: "#ff0000".into(),
+        marker_opacity: 1.0,
+        show_elevation_metric: false,
+        show_elevation_imperial: false,
+        metric_label_offset_x: 0.0,
+        metric_label_offset_y: 0.0,
+        imperial_label_offset_x: 0.0,
+        imperial_label_offset_y: 0.0,
+        label_font: None,
+        label_font_size: 14.0,
+        label_color: "#ffffff".into(),
+    }
 }

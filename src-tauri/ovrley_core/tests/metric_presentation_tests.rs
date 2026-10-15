@@ -1,123 +1,17 @@
-//! DisplayType-driven metric presentation dispatch tests.
-//!
-//! Verifies that [`draw_metric_presentation`] correctly dispatches metric
-//! widget rendering based on `DisplayType`:
-//! - `Text` returns `None` (intrinsic text is handled by the value module)
-//! - `Tape` with a heading cache and Heading metric draws successfully
-//! - `Tape` without a prepared cache fails loudly
-//! - `Tape` with a non-Heading metric returns `None`
-//! - Boxed display types without a matching cache return `None`
-//!
-//! ## Type
-//! Integration test. Uses the public `ovrley_core::render::widgets::metric_presentation`
-//! API with Skia surface rendering.
-//!
-//! ## Regressions guarded
-//! - Heading tape not rendering through the metric presentation pipeline
-//! - DisplayType dispatch returning wrong variant for Text
-//! - Future display types crashing instead of returning None
-
+//! Native preparation and full-frame reports retain per-value widget identities.
 mod common;
 
-use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport};
-use ovrley_core::debug::RenderProfiler;
-use ovrley_core::normalize::{raw::RenderConfig, validate_render_config};
-use ovrley_core::render::surface::create_surface;
-use ovrley_core::render::widgets::metric_presentation::draw_metric_presentation;
-use ovrley_core::render::widgets::types::PreparedValue;
+use ovrley_core::{
+    activity::schema::DenseSeriesReport,
+    render::assets::PreparedWidget,
+};
 use ovrley_widgets::model::types::{DisplayType, MetricKind};
 use std::collections::BTreeMap;
 
-// ── Fixtures ──────────────────────────────────────────────────────────────
-
-
-fn validated_value(value: serde_json::Value) -> PreparedValue {
-    let raw = RenderConfig {
-        scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
-        backdrops: vec![],
-        rasters: vec![],
-        labels: vec![],
-        values: vec![serde_json::from_value(value).unwrap()],
-        plots: serde_json::Value::Object(serde_json::Map::new()),
-        extra: BTreeMap::new(),
-    };
-    validate_render_config(raw).unwrap().values.remove(0)
-}
-
-fn prepared_heading(with_cache: bool) -> PreparedValue {
-    let mut value = validated_value(full_heading_tape_config_sized(100, 200, 400, 80));
-    let PreparedValue::HeadingTape(widget) = &mut value else {
-        panic!("heading tape config must produce a typed heading value")
-    };
-    if with_cache {
-        let scene = ovrley_core::normalize::validate_scene_config(serde_json::from_value(common::builders::scene_json()).unwrap()).unwrap();
-        widget.cache = Some(ovrley_core::render::widgets::heading::prepare_heading_cache(
-            &scene, &widget.validated, &[common::test_config::repo_git_root().join("fonts")], &mut RenderProfiler::default(),
-        ).unwrap());
-    }
-    value
-}
-
 fn empty_dense_series() -> DenseSeriesReport {
-    let mut s = common::builders::empty_dense_series();
-    s.heading = vec![Some(90.0)];
-    s
-}
-
-fn default_dense_activity() -> DenseActivityReport {
-    DenseActivityReport {
-        frame_count: 1,
-        frame_elapsed_seconds: vec![0.0],
-        frame_distance_progress: vec![Some(0.0)],
-        full_activity_distance: None,
-        full_activity_total_ascent: None,
-        full_activity_metric_ranges: Default::default(),
-        series: empty_dense_series(),
-    }
-}
-
-// ── Typed prepared-value dispatch ──────────────────────────────────────────
-
-#[test]
-fn intrinsic_text_value_returns_none_from_presentation_dispatch() {
-    let value = validated_value(full_speed_text_config(100, 200));
-    let dense = default_dense_activity();
-    let mut surface = create_surface(1920, 1080).unwrap();
-    let mut profiler = RenderProfiler::default();
-
-    let result =
-        draw_metric_presentation(surface.canvas(), &value, &dense, 0, 1.0, &[], &mut profiler);
-
-    assert!(result.is_none());
-}
-
-#[test]
-fn typed_heading_value_with_cache_draws_successfully() {
-    let value = prepared_heading(true);
-    let dense = default_dense_activity();
-    let mut surface = create_surface(1920, 1080).unwrap();
-    let mut profiler = RenderProfiler::default();
-
-    let result =
-        draw_metric_presentation(surface.canvas(), &value, &dense, 0, 1.0, &[], &mut profiler)
-            .expect("prepared heading tape must draw");
-
-    assert_eq!(result.geometry.widget_width, 400);
-    assert_eq!(result.geometry.widget_height, 80);
-}
-
-#[test]
-#[should_panic(expected = "heading tape requires its prepared cache")]
-fn typed_heading_value_without_prepared_cache_fails_loudly() {
-    let value = prepared_heading(false);
-    let dense = default_dense_activity();
-    let mut surface = create_surface(1920, 1080).unwrap();
-    let mut profiler = RenderProfiler::default();
-
-    let result =
-        draw_metric_presentation(surface.canvas(), &value, &dense, 0, 1.0, &[], &mut profiler);
-
-    assert!(result.is_none());
+    let mut series = common::builders::empty_dense_series();
+    series.heading = vec![Some(90.0)];
+    series
 }
 
 fn full_heading_tape_config(x: i32, y: i32) -> serde_json::Value {
@@ -195,7 +89,7 @@ fn prepare_assets_distinct_caches_per_value_index() {
     use ovrley_core::normalize::raw::RenderConfig;
     use ovrley_core::normalize::validate_render_config;
     use ovrley_core::paths::AppPaths;
-    use ovrley_core::render::widgets::prepare_render_assets;
+    use ovrley_core::render::assets::prepare_render_assets;
     use std::path::PathBuf;
 
     let heading_tape_at_pos_0 = full_heading_tape_config(10, 20);
@@ -239,19 +133,19 @@ fn prepare_assets_distinct_caches_per_value_index() {
     };
     let mut profiler = RenderProfiler::default();
 
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
 
-    let PreparedValue::HeadingTape(widget_0) = &assets.values()[0] else {
+    let PreparedWidget::HeadingTape(widget_0) = &assets.values[0].widget else {
         panic!("index 0 must remain a heading tape")
     };
-    let PreparedValue::StandardText(_) = &assets.values()[1] else {
+    let PreparedWidget::StandardText(_) = &assets.values[1].widget else {
         panic!("index 1 must remain intrinsic text")
     };
-    let PreparedValue::HeadingTape(widget_2) = &assets.values()[2] else {
+    let PreparedWidget::HeadingTape(widget_2) = &assets.values[2].widget else {
         panic!("index 2 must remain a heading tape")
     };
-    let cache_0 = widget_0.cache.as_ref().expect("index 0 must own its cache");
-    let cache_2 = widget_2.cache.as_ref().expect("index 2 must own its cache");
+    let cache_0 = widget_0;
+    let cache_2 = widget_2;
 
     assert_ne!(cache_0.frame.left, cache_2.frame.left);
     assert_eq!(cache_0.frame.left, 10.0);

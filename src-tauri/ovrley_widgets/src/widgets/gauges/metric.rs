@@ -36,22 +36,32 @@ pub fn sample_gauge(
     activity: Option<&crate::activity::ActivitySampler>,
     second: f64,
 ) -> GaugeFrameState {
-    use crate::widgets::value::format::{format_metric_parts, resolve_metric_display_value};
     let range = activity.map_or((0.0, 100.0), |activity| {
         activity.gauge_range(widget.metric())
     });
-    let mut sample = activity
+    let sample = activity
         .map(|activity| activity.gauge_sample(widget.metric(), second))
         .unwrap_or_default();
+    let offset = activity.map_or(0.0, |activity| {
+        activity.gauge_altitude_offset(widget.starting_altitude_m())
+    });
+    gauge_frame_state(widget, sample, range, offset)
+}
+
+/// Both hosts derive gauge fill and inner text from the same canonical sample.
+pub fn gauge_frame_state(
+    widget: &super::validation::ValidatedGauge,
+    mut sample: crate::widgets::value::format::MetricSample<'_>,
+    range: (f64, f64),
+    altitude_offset_m: f64,
+) -> GaugeFrameState {
+    use crate::widgets::value::format::{format_metric_parts, resolve_metric_display_value};
     let value = resolve_metric_display_value(widget.metric(), sample.numeric, sample.available)
         .unwrap_or(range.0);
     let value_text = match widget {
         super::validation::ValidatedGauge::Linear(_) => String::new(),
         super::validation::ValidatedGauge::Arc(config) => {
-            let offset = activity.map_or(0.0, |activity| {
-                activity.gauge_altitude_offset(widget.starting_altitude_m())
-            });
-            sample.numeric = sample.numeric.map(|value| value + offset);
+            sample.numeric = sample.numeric.map(|value| value + altitude_offset_m);
             format_metric_parts(&config.inner_value, &sample)
                 .standard_text()
                 .0

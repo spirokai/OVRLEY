@@ -11,43 +11,37 @@ mod route;
 mod scene;
 
 use crate::error::CoreResult;
-use crate::render::widgets::types::{
-    PreparedArcGauge, PreparedGForce, PreparedHeadingTape, PreparedLapTimer, PreparedLeanAngle,
-    PreparedLinearGauge, PreparedStandardText, PreparedValue,
-};
 use ovrley_widgets::model::types::{DisplayType, MetricKind};
+use ovrley_widgets::widgets::value::validation::ValidatedValue;
 use raw::RenderConfig;
 
 pub use raw::{
     find_plot_value, find_plot_values, parse_config_json, parse_config_value, parse_template_json,
-    parse_template_value, SceneConfig, TEMPLATE_FILE_FORMAT,
-    TEMPLATE_FILE_VERSION,
+    parse_template_value, SceneConfig, TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION,
 };
 
-use ovrley_widgets::widgets::gauges::validation::{validate_arc_gauge, validate_corner_gauge};
-use ovrley_widgets::widgets::backdrop::validation::{validate_backdrop, ValidatedBackdrop};
 pub use elevation::validate_elevation_plots;
+use ovrley_widgets::model::scene::{
+    validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
+};
+use ovrley_widgets::widgets::backdrop::validation::{validate_backdrop, ValidatedBackdrop};
 use ovrley_widgets::widgets::elevation::validation::ValidatedElevationPlot;
 use ovrley_widgets::widgets::g_force::validation::{validate_g_force, GForceAxis};
+use ovrley_widgets::widgets::gauges::validation::validate_linear_gauge;
+use ovrley_widgets::widgets::gauges::validation::{validate_arc_gauge, validate_corner_gauge};
 use ovrley_widgets::widgets::gradient::validation::validate_gradient_widget;
 use ovrley_widgets::widgets::heading::validation::validate_heading;
 use ovrley_widgets::widgets::label::validation::{validate_label, ValidatedLabel};
 use ovrley_widgets::widgets::lap_timer::validation::{validate_lap_timer, LapTimerMode};
 use ovrley_widgets::widgets::lean_angle::validation::validate_lean_angle;
-use ovrley_widgets::widgets::gauges::validation::validate_linear_gauge;
-use ovrley_widgets::model::scene::{
-    validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
-};
+use ovrley_widgets::widgets::route::validation::ValidatedRoutePlot;
+use ovrley_widgets::widgets::time::validation::{validate_time_value, ValidatedTimeFormatting};
 use ovrley_widgets::widgets::value::validation::validate_value_widget;
 pub use raster::validate_template_rasters;
 pub use raster::{RasterSource, ValidatedRaster};
 pub use route::validate_route_plots;
-use ovrley_widgets::widgets::route::validation::ValidatedRoutePlot;
 pub use scene::{
     validate_ffmpeg_config, validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig,
-};
-use ovrley_widgets::widgets::time::validation::{
-    validate_time_value, ValidatedTimeFormatting,
 };
 
 /// Telemetry series needed by a template.
@@ -112,7 +106,7 @@ pub struct ValidatedRenderConfig<S = ValidatedSceneConfig> {
     pub backdrops: Vec<ValidatedBackdrop>,
     pub rasters: Vec<ValidatedRaster>,
     pub labels: Vec<ValidatedLabel>,
-    pub values: Vec<PreparedValue>,
+    pub values: Vec<ValidatedValue>,
     pub course_plots: Vec<ValidatedRoutePlot>,
     pub elevation_plots: Vec<ValidatedElevationPlot>,
 }
@@ -172,12 +166,7 @@ fn validate_render_contents(
             if value.value == MetricKind::GForce && value.display_type == DisplayType::GForce {
                 let value = raw::promote_value_variant(&value, "g_force")?;
                 return validate_g_force(value, idx)
-                    .map(|validated| {
-                        PreparedValue::GForce(PreparedGForce {
-                            validated,
-                            cache: None,
-                        })
-                    })
+                    .map(ValidatedValue::GForce)
                     .map_err(Into::into);
             }
             if value.value == MetricKind::Heading && value.display_type == DisplayType::Tape {
@@ -187,78 +176,52 @@ fn validate_render_contents(
                     value.label_font = scene.font.clone();
                 }
                 return validate_heading(value, idx)
-                    .map(|validated| {
-                        PreparedValue::HeadingTape(PreparedHeadingTape {
-                            validated,
-                            cache: None,
-                        })
-                    })
+                    .map(ValidatedValue::HeadingTape)
                     .map_err(Into::into);
             }
             if value.value == MetricKind::LeanAngle && value.display_type == DisplayType::LeanAngle
             {
                 let value = raw::promote_value_variant(&value, "lean_angle")?;
                 return validate_lean_angle(value, idx)
-                    .map(|validated| {
-                        PreparedValue::LeanAngle(PreparedLeanAngle {
-                            validated,
-                            cache: None,
-                        })
-                    })
+                    .map(ValidatedValue::LeanAngle)
                     .map_err(Into::into);
             }
             if value.value == MetricKind::Gradient {
-                return Ok(PreparedValue::Gradient(validate_gradient_widget(value, idx)?));
+                return Ok(ValidatedValue::Gradient(validate_gradient_widget(
+                    value, idx,
+                )?));
             }
             if value.value == MetricKind::LapTimer {
-                return validate_lap_timer(value, idx).map(|validated| {
-                    PreparedValue::LapTimer(PreparedLapTimer {
-                        validated,
-                        cache: None,
-                    })
-                }).map_err(Into::into);
+                return validate_lap_timer(value, idx)
+                    .map(ValidatedValue::LapTimer)
+                    .map_err(Into::into);
             }
             if value.value == MetricKind::Time && value.display_type == DisplayType::Text {
-                return validate_time_value(value, idx).map(PreparedValue::TimeText).map_err(Into::into);
+                return validate_time_value(value, idx)
+                    .map(ValidatedValue::TimeText)
+                    .map_err(Into::into);
             }
             if value.display_type == DisplayType::Linear {
                 let value = raw::promote_value_variant(&value, "linear")?;
-                return validate_linear_gauge(value, idx).map(|validated| {
-                    PreparedValue::LinearGauge(PreparedLinearGauge {
-                        validated,
-                        altitude_offset_m: 0.0,
-                        cache: None,
-                    })
-                }).map_err(Into::into);
+                return validate_linear_gauge(value, idx)
+                    .map(ValidatedValue::LinearGauge)
+                    .map_err(Into::into);
             }
             if value.display_type == DisplayType::Arc {
                 let value = raw::promote_value_variant(&value, "arc")?;
-                return validate_arc_gauge(value, idx).map(|validated| {
-                    PreparedValue::ArcGauge(PreparedArcGauge {
-                        validated,
-                        altitude_offset_m: 0.0,
-                        cache: None,
-                    })
-                }).map_err(Into::into);
+                return validate_arc_gauge(value, idx)
+                    .map(ValidatedValue::ArcGauge)
+                    .map_err(Into::into);
             }
             if value.display_type == DisplayType::Corner {
                 let value = raw::promote_value_variant(&value, "corner")?;
-                return validate_corner_gauge(value, idx).map(|validated| {
-                    PreparedValue::ArcGauge(PreparedArcGauge {
-                        validated,
-                        altitude_offset_m: 0.0,
-                        cache: None,
-                    })
-                }).map_err(Into::into);
+                return validate_corner_gauge(value, idx)
+                    .map(ValidatedValue::ArcGauge)
+                    .map_err(Into::into);
             }
             validate_value_widget(value, idx)
                 .map_err(crate::CoreError::from)
-                .map(|validated| {
-                    PreparedValue::StandardText(PreparedStandardText {
-                        validated,
-                        altitude_offset_m: 0.0,
-                    })
-                })
+                .map(ValidatedValue::StandardText)
         })
         .collect::<CoreResult<Vec<_>>>()?;
 
@@ -312,7 +275,7 @@ impl ValidatedRenderConfig {
     pub fn has_heading_tape_value(&self) -> bool {
         self.values
             .iter()
-            .any(|v| matches!(v, PreparedValue::HeadingTape(_)))
+            .any(|v| matches!(v, ValidatedValue::HeadingTape(_)))
     }
 
     /// Computes which telemetry series are required by this configuration.
@@ -323,16 +286,13 @@ impl ValidatedRenderConfig {
         let mut requirements = RenderDataRequirements::default();
 
         for value in &self.values {
-            if let PreparedValue::TimeText(widget) = value {
+            if let ValidatedValue::TimeText(widget) = value {
                 requirements.time |=
                     matches!(&widget.formatting, ValidatedTimeFormatting::Daytime(_));
                 continue;
             }
-            if let PreparedValue::GForce(widget) = value {
-                for axis in [
-                    widget.validated.axis_horizontal,
-                    widget.validated.axis_vertical,
-                ] {
+            if let ValidatedValue::GForce(widget) = value {
+                for axis in [widget.axis_horizontal, widget.axis_vertical] {
                     match axis {
                         GForceAxis::X => requirements.g_force_x = true,
                         GForceAxis::Y => requirements.g_force_y = true,
@@ -341,8 +301,8 @@ impl ValidatedRenderConfig {
                 }
                 continue;
             }
-            if let PreparedValue::LapTimer(widget) = value {
-                match widget.validated.mode {
+            if let ValidatedValue::LapTimer(widget) = value {
+                match widget.mode {
                     LapTimerMode::CurrentLap | LapTimerMode::BestLap => {
                         requirements.lap_number = true;
                         requirements.lap_time_seconds = true;

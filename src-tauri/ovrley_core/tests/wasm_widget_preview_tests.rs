@@ -77,7 +77,7 @@ fn elevation_preview_matches_native_export_labels_hover_seeking_and_activity_rep
         let seconds = vec![0.0, 0.75, 1.5, 2.2, 2.9];
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
         let (assets, _, _, _) = prepare_preview_assets(&paths, &config, &activity, &dense).unwrap();
-        let renderer = VideoFrameRenderer::new(&paths, &dense, &assets, FrameSize {width: 700, height: 500}, 0).unwrap();
+        let renderer = VideoFrameRenderer::new(&paths.font_dirs, &dense, &assets, FrameSize {width: 700, height: 500}, 0).unwrap();
         let (mut preview, id) = elevation_preview(&request, &bytes);
         let raw = serde_json::from_value(request["widget"].clone()).unwrap();
         let scene = validate_scene_presentation(serde_json::from_value(request["scene"].clone()).unwrap()).unwrap();
@@ -87,7 +87,7 @@ fn elevation_preview_matches_native_export_labels_hover_seeking_and_activity_rep
             let second = 0.25 + seconds[index];
             preview.render(second).unwrap();
             let prepared = prepared_elevation(&preview, id);
-            assert_eq!(assets.elevation_geometry_json().unwrap()["points"], serde_json::to_value(&prepared.points).unwrap());
+            assert_eq!(assets.prepared_assets.elevation_geometry_json().unwrap()["points"], serde_json::to_value(&prepared.points).unwrap());
             let widget = &preview.widgets[&id];
             let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
             if let Some(placement) = &placement { assert_eq!(widget.geometry(), placement, "playback must retain raster and selection bounds"); }
@@ -305,7 +305,7 @@ fn route_preview_matches_native_export_and_keeps_marker_out_of_selection_bounds(
         let seconds = vec![0.0, 0.75, 2.2, 2.9];
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
         let (assets, _, _, _) = prepare_preview_assets(&paths, &config, &activity, &dense).unwrap();
-        let renderer = VideoFrameRenderer::new(&paths, &dense, &assets, FrameSize {width: 700, height: 500}, 0).unwrap();
+        let renderer = VideoFrameRenderer::new(&paths.font_dirs, &dense, &assets, FrameSize {width: 700, height: 500}, 0).unwrap();
         let mut preview = PreviewSession::default();
         preview.replace_activity(&bytes).unwrap();
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
@@ -493,7 +493,7 @@ fn gauges_match_native_pixels_sampling_cache_revisions_and_activity_replacement(
         activity::{interpolate::densify_activity, trim::trim_activity},
         debug::RenderProfiler,
         paths::AppPaths,
-        render::widgets::{metric_presentation::draw_metric_presentation, prepare_render_assets},
+        render::assets::prepare_render_assets,
     };
     let activity = ovrley_core::activity::parse_activity_json(
         r#"{
@@ -525,7 +525,7 @@ fn gauges_match_native_pixels_sampling_cache_revisions_and_activity_replacement(
         let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
         let assets = prepare_render_assets(
-            &paths,
+            &ovrley_core::fonts::NativeFonts(&paths.font_dirs),
             &config,
             &activity,
             &dense,
@@ -563,15 +563,7 @@ fn gauges_match_native_pixels_sampling_cache_revisions_and_activity_replacement(
                 -geometry["left"].as_f64().unwrap() as f32,
                 -geometry["top"].as_f64().unwrap() as f32,
             ));
-            draw_metric_presentation(
-                canvas,
-                &assets.values()[0],
-                &dense,
-                index,
-                config.scene.presentation.scale,
-                &paths.font_dirs,
-                &mut RenderProfiler::default(),
-            )
+            assets.draw(canvas, &dense, index, &NativeFonts(&paths.font_dirs), false, &mut RenderProfiler::default())
             .unwrap();
             let mut pixels = vec![0; widget.pixels().len()];
             assert!(surface.read_pixels(
@@ -748,11 +740,11 @@ fn gauge_resize_preserves_opposite_corners_and_commits_fractional_geometry_durin
                         json!({"scene": origin["scene"], "values": [committed], "labels": [], "plots": []}),
                     );
                     let widget = match &config.values[0] {
-                        ovrley_core::render::widgets::types::PreparedValue::LinearGauge(widget) => {
-                            ValidatedGauge::Linear(widget.validated.clone())
+                        ovrley_widgets::widgets::value::validation::ValidatedValue::LinearGauge(widget) => {
+                            ValidatedGauge::Linear(widget.clone())
                         }
-                        ovrley_core::render::widgets::types::PreparedValue::ArcGauge(widget) => {
-                            ValidatedGauge::Arc(widget.validated.clone())
+                        ovrley_widgets::widgets::value::validation::ValidatedValue::ArcGauge(widget) => {
+                            ValidatedGauge::Arc(widget.clone())
                         }
                         _ => panic!("gauge dispatch"),
                     };
@@ -806,7 +798,7 @@ fn heading_tape_matches_native_pixels_sampling_revisions_and_activity_replacemen
     use ovrley_core::{
         activity::{interpolate::densify_activity, trim::trim_activity},
         debug::RenderProfiler, paths::AppPaths,
-        render::widgets::{prepare_render_assets, metric_presentation::draw_metric_presentation},
+        render::assets::prepare_render_assets,
     };
     use ovrley_widgets::activity::ActivitySampler;
     let (mut preview, mut request) = heading_preview();
@@ -833,7 +825,7 @@ fn heading_tape_matches_native_pixels_sampling_revisions_and_activity_replacemen
         let requirements = config.render_data_requirements().unwrap();
         let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut RenderProfiler::default()).unwrap();
+        let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut RenderProfiler::default()).unwrap();
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         for index in [0,1,2,3,4,5,6,7,4,0] {
             let second = seconds[index];
@@ -855,7 +847,7 @@ fn heading_tape_matches_native_pixels_sampling_revisions_and_activity_replacemen
             let canvas = surface.canvas();
             canvas.clear(Color::TRANSPARENT);
             canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
-            draw_metric_presentation(canvas, &assets.values()[0], &dense, index, 1.7, &paths.font_dirs, &mut RenderProfiler::default()).unwrap();
+            assets.draw(canvas, &dense, index, &NativeFonts(&paths.font_dirs), false, &mut RenderProfiler::default()).unwrap();
             let mut pixels = vec![0; widget.pixels().len()];
             assert!(surface.read_pixels(&info.with_alpha_type(AlphaType::Unpremul), &mut pixels, info.width() as usize * 4, (0,0)));
             assert_eq!(&pixels, widget.pixels(), "{style}/{placement} at {second}");
@@ -896,12 +888,12 @@ fn heading_tape_matches_native_pixels_sampling_revisions_and_activity_replacemen
     assert!(alpha(399) < alpha(392) && alpha(392) < alpha(375), "right edge fades inward");
     assert_eq!((alpha(100), alpha(200), alpha(300)), (255, 255, 255), "interior remains opaque");
     let config = common::seam::validated_config_from_value(json!({ "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [] }));
-    let ovrley_core::render::widgets::types::PreparedValue::HeadingTape(widget) = &config.values[0] else { panic!("heading dispatch"); };
-    let cache = ovrley_core::render::widgets::heading::prepare_heading_cache(&config.scene, &widget.validated, &paths.font_dirs, &mut RenderProfiler::default()).unwrap();
+    let ovrley_widgets::widgets::value::validation::ValidatedValue::HeadingTape(widget) = &config.values[0] else { panic!("heading dispatch"); };
+    let cache = ovrley_widgets::widgets::heading::layout::prepare_heading_cache(widget, &config.scene.presentation, &NativeFonts(&paths.font_dirs)).unwrap();
     let info = ImageInfo::new((400, 80), ColorType::RGBA8888, AlphaType::Premul, None);
     let mut surface = surfaces::raster(&info, None, None).unwrap();
     surface.canvas().clear(Color::BLUE);
-    ovrley_core::render::widgets::heading::draw_heading_widget(surface.canvas(), &cache, 0.0, &mut RenderProfiler::default());
+    cache.prepare_frame(Some(0.0)).draw(surface.canvas(), &cache);
     let mut composited = vec![0; 400 * 80 * 4];
     assert!(surface.read_pixels(&info.with_alpha_type(AlphaType::Unpremul), &mut composited, 400 * 4, (0, 0)));
     assert!(composited.chunks_exact(4).all(|pixel| pixel[3] == 255), "fade preserves content underneath the tape");
@@ -961,9 +953,9 @@ fn heading_tape_resize_preserves_opposite_corners_reflows_and_commits_fractional
                     }
                     // Native ingress consumes the same fractional variant after committing.
                     let config = common::seam::validated_config_from_value(json!({ "scene": live["scene"], "values": [live["widget"]], "labels": [], "plots": [] }));
-                    let ovrley_core::render::widgets::types::PreparedValue::HeadingTape(committed) = &config.values[0] else { panic!("heading dispatch"); };
+                    let ovrley_widgets::widgets::value::validation::ValidatedValue::HeadingTape(committed) = &config.values[0] else { panic!("heading dispatch"); };
                     let scene = validate_scene_presentation(serde_json::from_value(live["scene"].clone()).unwrap()).unwrap();
-                    let cache = ovrley_widgets::widgets::heading::layout::prepare_heading_cache(&committed.validated, &scene, &preview.fonts).unwrap();
+                    let cache = ovrley_widgets::widgets::heading::layout::prepare_heading_cache(committed, &scene, &preview.fonts).unwrap();
                     let frame = cache.prepare_frame(sampler.heading_at(second));
                     let content: Value = serde_json::from_slice(&serde_json::to_vec(&ovrley_widgets::widgets::value::preview::ContentBounds::from(frame.content_bounds)).unwrap()).unwrap();
                     assert_eq!(content, actual["content"]);
@@ -1041,7 +1033,7 @@ fn lap_timer_modes_match_native_pixels_sampling_and_resource_replacement() {
         activity::{interpolate::densify_activity, trim::trim_activity},
         debug::RenderProfiler,
         paths::AppPaths,
-        render::widgets::{prepare_render_assets, lap_timer::{draw_lap_timer, lap_history, lap_sample}, types::PreparedValue},
+        render::assets::{prepare_render_assets, PreparedWidget},
     };
     use ovrley_widgets::{activity::ActivitySampler, widgets::lap_timer::format::lap_timer_content};
     let (mut preview, mut request) = lap_timer_preview();
@@ -1060,14 +1052,14 @@ fn lap_timer_modes_match_native_pixels_sampling_and_resource_replacement() {
         let requirements = config.render_data_requirements().unwrap();
         let trimmed = trim_activity(&activity, 0.0, 5.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut RenderProfiler::default()).unwrap();
-        let PreparedValue::LapTimer(native) = &assets.values()[0] else { panic!("lap timer dispatch"); };
+        let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut RenderProfiler::default()).unwrap();
+        let PreparedWidget::LapTimer(native) = &assets.values[0].widget else { panic!("lap timer dispatch"); };
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         for index in [0,1,2,3,4,5,6,7,8,9,10,11,6,3,0] {
             let second = seconds[index];
             assert_eq!(
                 lap_timer_content(&native.validated, sampler.lap_history(), sampler.lap_timer_at(second)).unwrap(),
-                lap_timer_content(&native.validated, lap_history(&dense), lap_sample(&dense, index, native.validated.mode).unwrap()).unwrap(),
+                lap_timer_content(&native.validated, dense.lap_history(), dense.lap_sample(index)).unwrap(),
                 "{mode} sampling at {second}",
             );
             preview.render(second).unwrap();
@@ -1078,7 +1070,9 @@ fn lap_timer_modes_match_native_pixels_sampling_and_resource_replacement() {
             let canvas = surface.canvas();
             canvas.clear(Color::TRANSPARENT);
             canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
-            draw_lap_timer(canvas, native, &dense, index).unwrap();
+            let history = dense.lap_history();
+            let content = lap_timer_content(&native.validated, history, dense.lap_sample(index)).unwrap();
+            native.layout.prepare_frame(history, &content).unwrap().draw(canvas);
             let mut pixels = vec![0; widget.pixels().len()];
             assert!(surface.read_pixels(&info.with_alpha_type(AlphaType::Unpremul), &mut pixels, info.width() as usize * 4, (0,0)));
             assert_eq!(&pixels, widget.pixels(), "{mode} at {second}");
@@ -1186,7 +1180,7 @@ fn g_force_preview_matches_native_pixels_and_tracks_marker_and_percentile_change
     use ovrley_core::{
         activity::{interpolate::densify_activity, schema::ParsedActivity, trim::trim_activity},
         debug::RenderProfiler,
-        render::widgets::{g_force::{draw_g_force_widget, prepare_g_force_cache}, types::PreparedValue},
+        render::assets::prepare_render_assets,
     };
     let fixture: Value = serde_json::from_str(include_str!("fixtures/g-force-frame-state.json")).unwrap();
     let mut activity: ParsedActivity = serde_json::from_value(fixture["activity"].clone()).unwrap();
@@ -1195,13 +1189,13 @@ fn g_force_preview_matches_native_pixels_and_tracks_marker_and_percentile_change
     let config = common::seam::validated_config_from_value(json!({
         "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
     }));
-    let PreparedValue::GForce(widget) = &config.values[0] else { panic!("G-force dispatch"); };
     let requirements = config.render_data_requirements().unwrap();
     let trimmed = trim_activity(&activity, 0.0, 5.0, &requirements).unwrap();
     let seconds = [1.0, 1.002, 3.0];
     let dense = densify_activity(&trimmed, seconds.to_vec(), &requirements);
     let mut profiler = RenderProfiler::default();
-    let cache = prepare_g_force_cache(&widget.validated, &config.scene, &activity, &dense, &mut profiler).unwrap();
+    let paths = ovrley_core::paths::AppPaths::from_repo_root(common::test_config::repo_git_root());
+    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
     let id = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
     for index in [0, 1, 2, 0] {
@@ -1216,7 +1210,7 @@ fn g_force_preview_matches_native_pixels_and_tracks_marker_and_percentile_change
         let canvas = surface.canvas();
         canvas.clear(Color::TRANSPARENT);
         canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
-        draw_g_force_widget(canvas, &cache, index, &font_dirs, &mut profiler).unwrap();
+        assets.draw(canvas, &dense, index, &NativeFonts(&font_dirs), false, &mut profiler).unwrap();
         let mut pixels = vec![0; widget.pixels().len()];
         assert!(surface.read_pixels(
             &info.with_alpha_type(AlphaType::Unpremul), &mut pixels, info.width() as usize * 4, (0, 0),
@@ -1318,7 +1312,7 @@ fn lean_angle_preview_matches_native_export_and_tracks_signed_fill_resources_and
         activity::{interpolate::densify_activity, schema::ParsedActivity, trim::trim_activity},
         debug::RenderProfiler,
         paths::AppPaths,
-        render::widgets::{draw_metric_presentation, prepare_render_assets},
+        render::assets::prepare_render_assets,
     };
     use ovrley_widgets::activity::ActivitySampler;
     let (mut preview, request) = lean_angle_preview();
@@ -1348,7 +1342,7 @@ fn lean_angle_preview_matches_native_export_and_tracks_signed_fill_resources_and
         downloads_dir: std::env::temp_dir(),
     };
     let mut profiler = RenderProfiler::default();
-    let assets = prepare_render_assets(&paths, &config, &parsed, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &parsed, &dense, &mut profiler).unwrap();
     let id = preview
         .create_widget(serde_json::from_value(request.clone()).unwrap())
         .unwrap();
@@ -1377,15 +1371,7 @@ fn lean_angle_preview_matches_native_export_and_tracks_signed_fill_resources_and
             -geometry["left"].as_f64().unwrap() as f32,
             -geometry["top"].as_f64().unwrap() as f32,
         ));
-        draw_metric_presentation(
-            canvas,
-            &assets.values()[0],
-            &dense,
-            index,
-            config.scene.presentation.scale,
-            &paths.font_dirs,
-            &mut profiler,
-        )
+        assets.draw(canvas, &dense, index, &NativeFonts(&paths.font_dirs), false, &mut profiler)
         .unwrap();
         let mut pixels = vec![0; widget.pixels().len()];
         assert!(surface.read_pixels(
@@ -2091,9 +2077,9 @@ fn label_pixels_match_native_and_only_config_changes_invalidate_the_static_revis
     let canvas = surface.canvas();
     canvas.clear(Color::TRANSPARENT);
     canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
-    ovrley_core::render::text::draw_text(
+    ovrley_widgets::render::text::draw_text(
         canvas, &label.text, &validated_label_style(&label, &scene, scene.scale),
-        &[common::test_config::repo_git_root().join("fonts")],
+        &NativeFonts(&[common::test_config::repo_git_root().join("fonts")]),
     ).unwrap();
     let mut pixels = vec![0; widget.pixels().len()];
     assert!(surface.read_pixels(&info.with_alpha_type(AlphaType::Unpremul), &mut pixels, info.width() as usize * 4, (0, 0)));

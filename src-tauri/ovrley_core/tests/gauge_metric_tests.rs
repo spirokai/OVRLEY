@@ -8,10 +8,10 @@ use ovrley_widgets::widgets::gauges::metric::{bar_fill_count, fill_percentage, m
 
 #[test]
 fn gauge_bounds_preserve_source_extrema_outside_export_window() {
-    use crate::activity::interpolate::{densify_activity, frame_timeline_for_fps};
-    use crate::activity::schema::ParsedActivity;
-    use crate::activity::trim::trim_activity;
-    use crate::normalize::RenderDataRequirements;
+    use ovrley_core::activity::interpolate::{densify_activity, frame_timeline_for_fps};
+    use ovrley_core::activity::schema::ParsedActivity;
+    use ovrley_core::activity::trim::trim_activity;
+    use ovrley_core::normalize::RenderDataRequirements;
     use ovrley_widgets::model::types::MetricKind;
 
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({
@@ -40,10 +40,23 @@ fn gauge_bounds_preserve_source_extrema_outside_export_window() {
             .iter()
             .flatten()
             .all(|value| *value > 0.0 && *value < 40.0));
-        let (min, max) = metric_range(dense.full_activity_metric_ranges.get(&MetricKind::Speed).copied());
+        let (min, max) = metric_range(
+            dense
+                .full_activity_metric_ranges
+                .get(&MetricKind::Speed)
+                .copied(),
+        );
         assert_eq!((min, max), (0.0, 40.0));
         assert_eq!(fill_percentage(20.0, min, max), 0.5);
-        assert_eq!(metric_range(dense.full_activity_metric_ranges.get(&MetricKind::Altitude).copied()), (500.0, 540.0));
+        assert_eq!(
+            metric_range(
+                dense
+                    .full_activity_metric_ranges
+                    .get(&MetricKind::Altitude)
+                    .copied()
+            ),
+            (500.0, 540.0)
+        );
     }
 }
 

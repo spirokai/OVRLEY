@@ -206,7 +206,7 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
                 height: 64,
             };
             let renderer = VideoFrameRenderer::new(
-                &paths,
+                &paths.font_dirs,
                 &dense,
                 &assets,
                 frame_size,

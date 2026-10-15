@@ -8,8 +8,8 @@ use ovrley_core::paths::AppPaths;
 use ovrley_widgets::widgets::gauges::arc::{
     arc_gauge_geometry, arc_point, arc_radius, arc_start_end_angles,
 };
-use ovrley_core::render::widgets::types::PreparedValue;
-use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
+use ovrley_core::render::assets::PreparedWidget;
+use ovrley_core::render::{render_preview_with_report, assets::prepare_render_assets};
 use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
 use ovrley_widgets::widgets::value::config::ValueConfig;
 use std::collections::BTreeMap;
@@ -104,15 +104,12 @@ fn prepare_assets_builds_arc_cache_with_static_unit_and_frame_values() {
     let dense = dense_speed_activity(vec![Some(10.0), Some(30.0), Some(50.0)]);
     let mut profiler = RenderProfiler::default();
 
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
 
-    let PreparedValue::ArcGauge(widget) = &assets.values()[0] else {
+    let PreparedWidget::Gauge(widget) = &assets.values[0].widget else {
         panic!("arc gauge should prepare a gauge cache at value index 0");
     };
-    let cache = widget
-        .cache
-        .as_ref()
-        .expect("arc gauge cache must be prepared");
+    let cache = widget;
     assert_eq!(cache.frame_states[1].fill01, 0.5);
     assert_eq!(cache.frame_states[1].value_text, "108");
     let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(layout) = &cache.layout else { panic!("arc layout"); };
@@ -135,15 +132,12 @@ fn bars_style_resolves_configured_arc_geometry_into_the_cache() {
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
     let mut profiler = RenderProfiler::default();
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
 
-    let PreparedValue::ArcGauge(widget) = &assets.values()[0] else {
+    let PreparedWidget::Gauge(widget) = &assets.values[0].widget else {
         panic!("arc bars should use the arc gauge cache");
     };
-    let cache = widget
-        .cache
-        .as_ref()
-        .expect("arc bars cache must be prepared");
+    let cache = widget;
     let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(layout) = &cache.layout else { panic!("gauge layout"); };
     assert_eq!(layout.track_fill_style, TrackFillStyle::Bars);
     assert_eq!(layout.bar_geometry.unwrap().count, 8);

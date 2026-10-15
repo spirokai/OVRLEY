@@ -14,7 +14,6 @@ pub mod gap;
 pub mod metrics;
 pub mod smoothing;
 
-use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::finalize::gap::{
     build_distance_series, build_progress_series, insert_idle_gap_samples, skipped_gap_debug,
 };
@@ -34,6 +33,7 @@ use crate::media::telemetry_math::{finite_f64, round_f64};
 use crate::media::timezone::timezone_for_coordinates;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Tz;
+use ovrley_widgets::widgets::elevation::sampling::preferred_elevation_series;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};

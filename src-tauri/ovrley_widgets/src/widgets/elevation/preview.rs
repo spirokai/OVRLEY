@@ -220,10 +220,11 @@ impl PreviewElevation {
             geometry.state(progress, None, progress)
         } else {
             let activity = &activity.expect("elevation activity prepared").elevation;
-            geometry.state(
-                activity.progress_at(second, self.window),
-                Some(activity.elevation_at(second).unwrap_or(0.0)),
-                activity.elapsed_fraction(second, self.window),
+            activity.frame_state(
+                &geometry,
+                second,
+                self.window,
+                activity.elevation_at(second),
             )
         };
         let changed = self

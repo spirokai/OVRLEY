@@ -26,9 +26,9 @@
 //! parse-and-prepare phase. The `DenseActivityReport` is read heavily during
 //! per-frame rendering (O(1) lookup via `frame_index`).
 
-use super::elevation::preferred_elevation_series;
 use chrono_tz::Tz;
 use ovrley_widgets::model::types::MetricKind;
+use ovrley_widgets::widgets::elevation::sampling::preferred_elevation_series;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;

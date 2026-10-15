@@ -8,7 +8,6 @@
 
 /// Native CSV extraction into canonical activity columns.
 pub mod csv;
-pub(crate) mod elevation;
 /// Backend-owned post-processing from raw extraction samples to ParsedActivity.
 pub mod finalize;
 /// Interpolation helpers used for numeric, coordinate, and timestamp series.
@@ -25,6 +24,7 @@ pub mod tcx;
 pub mod trim;
 /// Native Racelogic VBOX extraction into canonical activity columns.
 pub mod vbo;
+mod widget_samples;
 
 use crate::activity::interpolate::{densify_activity, frame_timeline_for_fps};
 use crate::activity::schema::{DebugPayload, DenseActivityReport, ParsedActivity};

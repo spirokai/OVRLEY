@@ -1,4 +1,8 @@
 //! Original-density metric sampling. Columns and bridge/hold indices are prepared once.
+use crate::widgets::g_force::{
+    format::{percentile_max_g, sorted_magnitudes, GForceSample},
+    validation::ValidatedGForceWidget,
+};
 use crate::{
     error::{WidgetError, WidgetResult},
     interpolation::{
@@ -13,10 +17,6 @@ use crate::{
 };
 use serde::Deserialize;
 use std::collections::HashMap;
-use crate::widgets::g_force::{
-    format::{sorted_magnitudes, percentile_max_g, GForceSample},
-    validation::ValidatedGForceWidget,
-};
 
 macro_rules! activity_columns {
     ($($field:ident: $kind:ident),* $(,)?) => {
@@ -104,12 +104,15 @@ impl NumericColumn {
             ));
         }
         let points = collect_valid_numeric_points(times, &values);
-        let range = points.iter().filter(|point| point.1.is_finite()).fold(None, |range, point| {
-            Some(match range {
-                None => (point.1, point.1),
-                Some((min, max)) => (f64::min(min, point.1), f64::max(max, point.1)),
-            })
-        });
+        let range = points
+            .iter()
+            .filter(|point| point.1.is_finite())
+            .fold(None, |range, point| {
+                Some(match range {
+                    None => (point.1, point.1),
+                    Some((min, max)) => (f64::min(min, point.1), f64::max(max, point.1)),
+                })
+            });
         Ok(Self {
             values,
             points,
@@ -190,9 +193,21 @@ impl ActivitySampler {
             }
         }
         activity.lap_timing.validate(times)?;
-        let profile = if activity.sample_elevations.is_empty() { &activity.elevation } else { &activity.sample_elevations };
-        let preferred = if activity.barometric_altitude.iter().any(Option::is_some) { &activity.barometric_altitude } else { &activity.elevation };
-        let elevation = crate::widgets::elevation::sampling::ElevationActivity::new(times, profile, preferred, &activity.sample_distance_progress, activity.trim_end_seconds);
+        let profile = crate::widgets::elevation::sampling::elevation_profile_series(
+            &activity.sample_elevations,
+            &activity.elevation,
+        );
+        let preferred = crate::widgets::elevation::sampling::preferred_elevation_series(
+            &activity.barometric_altitude,
+            &activity.elevation,
+        );
+        let elevation = crate::widgets::elevation::sampling::ElevationActivity::new(
+            times,
+            profile,
+            preferred,
+            &activity.sample_distance_progress,
+            activity.trim_end_seconds,
+        );
         let altitude = if activity.barometric_altitude.iter().any(Option::is_some) {
             std::mem::take(&mut activity.barometric_altitude)
         } else {
@@ -204,19 +219,34 @@ impl ActivitySampler {
             &activity.sample_elapsed_seconds,
             &activity.time,
         );
-        let timezone = activity.metadata.get("timezone").filter(|v| !v.is_null())
+        let timezone = activity
+            .metadata
+            .get("timezone")
+            .filter(|v| !v.is_null())
             .map(|value| {
-                value.as_str()
-                    .ok_or_else(|| WidgetError::Config("activity timezone must be an IANA timezone string".into()))?
-                    .parse().map_err(|e| WidgetError::Config(format!("activity timezone: {e}")))
+                value
+                    .as_str()
+                    .ok_or_else(|| {
+                        WidgetError::Config(
+                            "activity timezone must be an IANA timezone string".into(),
+                        )
+                    })?
+                    .parse()
+                    .map_err(|e| WidgetError::Config(format!("activity timezone: {e}")))
             })
             .transpose()?;
         columns.insert(MetricKind::Altitude, altitude);
         let times = activity.sample_elapsed_seconds;
         // Gradient bridges internal gaps; samples outside observed coverage stay missing.
-        let gradient = NumericColumn::new(&times, activity.gradient, StandardMetricInterpolationKind::Linear)?;
-        let g_force_axes = [activity.g_force_x, activity.g_force_y, activity.g_force_z]
-            .map(|values| NumericColumn::new(&times, values, StandardMetricInterpolationKind::Preserve));
+        let gradient = NumericColumn::new(
+            &times,
+            activity.gradient,
+            StandardMetricInterpolationKind::Linear,
+        )?;
+        let g_force_axes =
+            [activity.g_force_x, activity.g_force_y, activity.g_force_z].map(|values| {
+                NumericColumn::new(&times, values, StandardMetricInterpolationKind::Preserve)
+            });
         let [x, y, z] = g_force_axes;
         let g_force_axes = [x?, y?, z?];
         let g_force_magnitudes = [(0, 1), (0, 2), (1, 2)]
@@ -249,7 +279,10 @@ impl ActivitySampler {
             .filter_map(|(time, value)| value.map(|value| (time, value)))
             .collect();
         let route = crate::widgets::route::sampling::RouteActivity::new(
-            &times, &activity.sample_course_points, &activity.sample_distance_progress, activity.trim_end_seconds,
+            &times,
+            &activity.sample_course_points,
+            &activity.sample_distance_progress,
+            activity.trim_end_seconds,
         );
         Ok(Self {
             elevation,
@@ -276,20 +309,29 @@ impl ActivitySampler {
     }
 
     pub fn gauge_altitude_offset(&self, target: Option<f64>) -> f64 {
-        target.zip(self.numeric[&MetricKind::Altitude].points.first())
-            .map_or(0.0, |(target, first)| target - first.1)
+        crate::widgets::value::format::altitude_offset_m(
+            target,
+            self.numeric[&MetricKind::Altitude]
+                .points
+                .first()
+                .map(|point| point.1),
+        )
     }
 
     /// Gauges retain native bridge/hold/preserve policies and observed coverage.
     pub fn gauge_sample(&self, metric: MetricKind, second: f64) -> MetricSample<'_> {
-        if second < 0.0 || second > self.end { return MetricSample::default(); }
+        if second < 0.0 || second > self.end {
+            return MetricSample::default();
+        }
         let column = &self.numeric[&metric];
         MetricSample {
             numeric: if metric == MetricKind::Heading {
                 self.heading_at(second)
             } else if column.points.is_empty() || column.contains(second) {
                 column.at(&self.times, second)
-            } else { None },
+            } else {
+                None
+            },
             available: !column.values.is_empty(),
             full_activity_distance: self.full_activity_distance,
             full_activity_total_ascent: self.full_activity_total_ascent,
@@ -340,15 +382,18 @@ impl ActivitySampler {
             (1, 2) => 2,
             _ => unreachable!("validated G-force axes are different"),
         };
-        let sample_axis = |axis: usize, invert: bool| {
-            if second < 0.0 || second > self.end { return None; }
-            self.g_force_axes[axis].at(&self.times, second).map(|value| if invert { -value } else { value })
+        let sample_axis = |axis: usize| {
+            if second < 0.0 || second > self.end {
+                return None;
+            }
+            self.g_force_axes[axis].at(&self.times, second)
         };
-        GForceSample {
-            horizontal: sample_axis(h, widget.invert_horizontal),
-            vertical: sample_axis(v, widget.invert_vertical),
-            max_g: percentile_max_g(&self.g_force_magnitudes[pair], widget.clip_percentile),
-        }
+        GForceSample::new(
+            widget,
+            sample_axis(h),
+            sample_axis(v),
+            percentile_max_g(&self.g_force_magnitudes[pair], widget.clip_percentile),
+        )
     }
 
     pub fn sample(&self, widget: &ValidatedValueWidget, second: f64) -> MetricSample<'_> {
@@ -387,10 +432,10 @@ impl ActivitySampler {
                         column.at(&self.times, second)
                     };
                     if kind == MetricKind::Altitude {
-                        let offset = widget
-                            .starting_altitude_m
-                            .zip(column.points.first())
-                            .map_or(0.0, |(target, first)| target - first.1);
+                        let offset = crate::widgets::value::format::altitude_offset_m(
+                            widget.starting_altitude_m,
+                            column.points.first().map(|point| point.1),
+                        );
                         sample.numeric = sample.numeric.map(|v| v + offset);
                     }
                 }

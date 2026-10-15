@@ -6,7 +6,7 @@
 
 mod common;
 
-use ovrley_core::render::widgets::types::PreparedValue;
+use ovrley_widgets::widgets::value::validation::ValidatedValue;
 use ovrley_widgets::model::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
 use ovrley_widgets::model::types::{DisplayType, TrackFillStyle};
 use serde_json::json;
@@ -174,11 +174,11 @@ fn complete_linear_display_type_validates_as_gauge() {
         "plots": []
     }));
 
-    let PreparedValue::LinearGauge(value) = config.values.into_iter().next().unwrap() else {
+    let ValidatedValue::LinearGauge(value) = config.values.into_iter().next().unwrap() else {
         panic!("linear display type should validate as a linear gauge prepared value");
     };
-    assert_eq!(value.validated.display_type, DisplayType::Linear);
-    assert_eq!(value.validated.width, 200.0);
+    assert_eq!(value.display_type, DisplayType::Linear);
+    assert_eq!(value.width, 200.0);
 }
 
 #[test]
@@ -221,11 +221,11 @@ fn complete_g_force_display_type_validates_with_canonical_marker_and_label_field
         "plots": []
     }));
 
-    let PreparedValue::GForce(value) = config.values.into_iter().next().unwrap() else {
+    let ValidatedValue::GForce(value) = config.values.into_iter().next().unwrap() else {
         panic!("g_force display type should validate as a G-force prepared value");
     };
-    assert_eq!(value.validated.marker_size, 12.0);
-    assert_eq!(value.validated.label_decimals, 1);
+    assert_eq!(value.marker_size, 12.0);
+    assert_eq!(value.label_decimals, 1);
 }
 
 #[test]

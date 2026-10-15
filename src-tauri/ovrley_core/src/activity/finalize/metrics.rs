@@ -9,9 +9,9 @@
 //! Phase 0 intentionally uses the standard gradient derivation for every format;
 //! the legacy GPX path is not ported.
 
-use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::schema::{ActivityColumns, GearSeries, NumericSeries};
 use crate::media::telemetry_math::{bearing_degrees, finite_f64, haversine_distance, round_f64};
+use ovrley_widgets::widgets::elevation::sampling::preferred_elevation_series;
 use serde::Serialize;
 use std::collections::BTreeMap;
 

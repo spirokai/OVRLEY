@@ -173,3 +173,17 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         export_start_seconds,
     })
 }
+
+impl ValidatedSceneConfig {
+    pub(crate) fn plot_window(
+        &self,
+        show_full_activity: bool,
+    ) -> Option<ovrley_widgets::widgets::route::sampling::RouteWindow> {
+        (self.custom_export_range_active.unwrap_or(false) && !show_full_activity).then_some(
+            ovrley_widgets::widgets::route::sampling::RouteWindow {
+                start: self.start,
+                end: self.end,
+            },
+        )
+    }
+}

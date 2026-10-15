@@ -7,6 +7,33 @@ pub struct GForceSample {
     pub max_g: f64,
 }
 
+impl GForceSample {
+    pub fn new(
+        widget: &super::validation::ValidatedGForceWidget,
+        horizontal: Option<f64>,
+        vertical: Option<f64>,
+        max_g: f64,
+    ) -> Self {
+        Self {
+            horizontal: horizontal.map(|value| {
+                if widget.invert_horizontal {
+                    -value
+                } else {
+                    value
+                }
+            }),
+            vertical: vertical.map(|value| {
+                if widget.invert_vertical {
+                    -value
+                } else {
+                    value
+                }
+            }),
+            max_g,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct GForceFrameState {
     pub marker_x: f32,

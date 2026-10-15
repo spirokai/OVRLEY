@@ -1,13 +1,13 @@
 //! G-force percentile, dense-axis, and frame-state tests.
 
-use super::super::g_force::prepare_g_force_cache;
-use ovrley_widgets::widgets::g_force::{format::{derive_max_g, g_force_frame_state}, validation::{GForceAxis, ValidatedGForceWidget}};
-use crate::activity::interpolate::densify_activity;
-use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::activity::trim::trim_activity;
-use crate::debug::RenderProfiler;
-use crate::normalize::{
-    RenderDataRequirements, ValidatedSceneConfig,
+use ovrley_core::activity::interpolate::densify_activity;
+use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
+use ovrley_core::activity::trim::trim_activity;
+use ovrley_core::debug::RenderProfiler;
+use ovrley_core::normalize::{RenderDataRequirements, ValidatedSceneConfig};
+use ovrley_widgets::widgets::g_force::{
+    format::{derive_max_g, g_force_frame_state},
+    validation::{GForceAxis, ValidatedGForceWidget},
 };
 use serde::Deserialize;
 
@@ -117,7 +117,11 @@ fn fixture_max_g_matches_nearest_rank_percentile_exactly() {
     let fixture = fixture();
     let widget = widget(&fixture.config);
     assert_eq!(
-        derive_max_g(&fixture.activity.g_force_x, &fixture.activity.g_force_y, widget.clip_percentile),
+        derive_max_g(
+            &fixture.activity.g_force_x,
+            &fixture.activity.g_force_y,
+            widget.clip_percentile
+        ),
         fixture.expected_max_g
     );
 
@@ -130,7 +134,7 @@ fn fixture_max_g_matches_nearest_rank_percentile_exactly() {
         &mut RenderProfiler::default(),
     )
     .unwrap();
-    assert_eq!(cache.max_g, fixture.expected_max_g);
+    assert_eq!(cache.samples[0].max_g, fixture.expected_max_g);
 }
 
 #[test]
@@ -147,14 +151,14 @@ fn known_clamped_missing_and_zero_frames_match_contract() {
     )
     .unwrap();
 
-    let state = |index| {
+    let state = |index: usize| {
         g_force_frame_state(
-            cache.horizontal_values[index],
-            cache.vertical_values[index],
-            cache.max_g,
-            cache.drawing.layout.center_x,
-            cache.drawing.layout.center_y,
-            cache.drawing.layout.radius,
+            cache.samples[index].horizontal,
+            cache.samples[index].vertical,
+            cache.samples[0].max_g,
+            cache.layout.layout.center_x,
+            cache.layout.layout.center_y,
+            cache.layout.layout.radius,
             widget.label_decimals,
         )
     };
@@ -192,12 +196,12 @@ fn invert_and_axis_remap_select_the_canonical_dense_series() {
     )
     .unwrap();
     let inverted_state = g_force_frame_state(
-        inverted.horizontal_values[1],
-        inverted.vertical_values[1],
-        inverted.max_g,
-        inverted.drawing.layout.center_x,
-        inverted.drawing.layout.center_y,
-        inverted.drawing.layout.radius,
+        inverted.samples[1].horizontal,
+        inverted.samples[1].vertical,
+        inverted.samples[0].max_g,
+        inverted.layout.layout.center_x,
+        inverted.layout.layout.center_y,
+        inverted.layout.layout.radius,
         inverted_widget.label_decimals,
     );
     assert_eq!(
@@ -216,8 +220,8 @@ fn invert_and_axis_remap_select_the_canonical_dense_series() {
         &mut RenderProfiler::default(),
     )
     .unwrap();
-    assert_eq!(remapped.horizontal_values[1], Some(4.0));
-    assert_eq!(remapped.vertical_values[1], Some(2.0));
+    assert_eq!(remapped.samples[1].horizontal, Some(4.0));
+    assert_eq!(remapped.samples[1].vertical, Some(2.0));
 }
 
 #[test]
@@ -238,7 +242,10 @@ fn absent_selected_series_is_missing() {
         &mut RenderProfiler::default(),
     )
     .unwrap();
-    assert!(cache.horizontal_values.is_empty());
+    assert!(cache
+        .samples
+        .iter()
+        .all(|sample| sample.horizontal.is_none()));
 }
 
 #[test]
@@ -254,4 +261,35 @@ fn trim_boundary_preserves_an_explicit_null_axis_sample() {
 
     assert_eq!(dense.series.g_force_x, [None, Some(8.0)]);
     assert_eq!(dense.series.g_force_y, [Some(1.0), Some(6.0)]);
+}
+
+fn prepare_g_force_cache(
+    widget: &ValidatedGForceWidget,
+    scene: &ValidatedSceneConfig,
+    activity: &ParsedActivity,
+    dense: &DenseActivityReport,
+    profiler: &mut RenderProfiler,
+) -> ovrley_core::CoreResult<ovrley_core::render::assets::GForceWidgetCache> {
+    let config = ovrley_core::normalize::ValidatedRenderConfig {
+        scene: scene.clone(),
+        backdrops: vec![],
+        rasters: vec![],
+        labels: vec![],
+        values: vec![
+            ovrley_widgets::widgets::value::validation::ValidatedValue::GForce(widget.clone()),
+        ],
+        course_plots: vec![],
+        elevation_plots: vec![],
+    };
+    let paths = ovrley_core::paths::AppPaths::from_repo_root(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
+    );
+    let mut assets = ovrley_core::render::assets::prepare_render_assets(
+        &ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, activity, dense, profiler,
+    )?;
+    let ovrley_core::render::assets::PreparedWidget::GForce(cache) = assets.values.remove(0).widget
+    else {
+        unreachable!()
+    };
+    Ok(cache)
 }

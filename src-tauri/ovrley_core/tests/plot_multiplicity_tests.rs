@@ -8,7 +8,7 @@ fn validation_preserves_multiple_route_and_elevation_plots() {
         "show_full_activity": true,
         "remaining_line_width": 2.0, "remaining_line_color": "#ffffff", "remaining_line_opacity": 1.0,
         "completed_line_width": 2.0, "completed_line_color": "#00ff00", "completed_line_opacity": 1.0,
-        "marker_variant": "circle", "marker_variant_diameter": 10.0,
+        "marker_variant": "single", "marker_variant_diameter": 10.0,
         "marker_size": 6.0, "marker_color": "#ffffff", "marker_opacity": 1.0
     });
     let elevation = serde_json::json!({
@@ -19,7 +19,7 @@ fn validation_preserves_multiple_route_and_elevation_plots() {
         "completed_line_width": 2.0, "completed_line_color": "#00ff00", "completed_line_opacity": 1.0,
         "area_remaining_color": "#333333", "area_remaining_opacity": 0.3,
         "area_completed_color": "#00ff00", "area_completed_opacity": 0.3,
-        "marker_variant": "circle", "marker_variant_diameter": 10.0,
+        "marker_variant": "single", "marker_variant_diameter": 10.0,
         "marker_size": 6.0, "marker_color": "#ffffff", "marker_opacity": 1.0,
         "show_elevation_metric": true, "show_elevation_imperial": false,
         "metric_label_offset_x": 10.0, "metric_label_offset_y": -10.0,

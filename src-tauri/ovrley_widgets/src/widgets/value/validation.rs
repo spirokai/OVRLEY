@@ -18,6 +18,15 @@ use crate::model::validation::{
     require_bool, require_f32, require_str, require_string, rgba_from_hex,
 };
 use crate::widgets::value::config::ValueConfig;
+use crate::widgets::{
+    g_force::validation::ValidatedGForceWidget,
+    gauges::validation::{ValidatedArcGaugeWidget, ValidatedLinearGaugeWidget},
+    gradient::validation::ValidatedGradientWidget,
+    heading::validation::ValidatedHeading,
+    lap_timer::validation::ValidatedLapTimer,
+    lean_angle::validation::ValidatedLeanAngleWidget,
+    time::validation::ValidatedTimeValue,
+};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -458,4 +467,55 @@ fn validate_value_widget_fields(
         hours_offset: value.hours_offset.map(i64::from),
         format: value.format,
     })
+}
+
+#[derive(Clone, Debug)]
+pub enum ValidatedValue {
+    StandardText(ValidatedValueWidget),
+    TimeText(ValidatedTimeValue),
+    Gradient(ValidatedGradientWidget),
+    HeadingTape(ValidatedHeading),
+    LeanAngle(ValidatedLeanAngleWidget),
+    LinearGauge(ValidatedLinearGaugeWidget),
+    ArcGauge(ValidatedArcGaugeWidget),
+    GForce(ValidatedGForceWidget),
+    LapTimer(ValidatedLapTimer),
+}
+
+impl ValidatedValue {
+    pub fn metric_kind(&self) -> MetricKind {
+        match self {
+            Self::StandardText(value) => value.metric,
+            Self::TimeText(_) => MetricKind::Time,
+            Self::Gradient(_) => MetricKind::Gradient,
+            Self::HeadingTape(_) => MetricKind::Heading,
+            Self::LeanAngle(_) => MetricKind::LeanAngle,
+            Self::LinearGauge(value) => value.metric,
+            Self::ArcGauge(value) => value.metric,
+            Self::GForce(_) => MetricKind::GForce,
+            Self::LapTimer(_) => MetricKind::LapTimer,
+        }
+    }
+
+    pub fn display_type(&self) -> DisplayType {
+        match self {
+            Self::StandardText(value) => value.display_type,
+            Self::TimeText(value) => value.base.display_type,
+            Self::Gradient(_) => DisplayType::Text,
+            Self::HeadingTape(_) => DisplayType::Tape,
+            Self::LeanAngle(_) => DisplayType::LeanAngle,
+            Self::LinearGauge(_) => DisplayType::Linear,
+            Self::ArcGauge(value) => value.display_type,
+            Self::GForce(_) => DisplayType::GForce,
+            Self::LapTimer(_) => DisplayType::LapTimer,
+        }
+    }
+
+    pub fn text_widget(&self) -> Option<&ValidatedValueWidget> {
+        match self {
+            Self::StandardText(value) => Some(value),
+            Self::TimeText(value) => Some(&value.base),
+            _ => None,
+        }
+    }
 }

@@ -57,23 +57,24 @@ pub fn build_elevation_geometry_command(
 
     let show_full_activity = elevation_plot.show_full_activity;
 
-    let samples = crate::render::widgets::elevation::prepare::build_elevation_samples(&activity, show_full_activity, &scene);
-    let geometry = ovrley_widgets::widgets::elevation::geometry::ElevationGeometry::new(elevation_plot, scene.presentation.scale, &samples)?;
+    let samples = activity
+        .elevation_activity()
+        .samples(scene.plot_window(show_full_activity));
+    let geometry = ovrley_widgets::widgets::elevation::geometry::ElevationGeometry::new(
+        elevation_plot,
+        scene.presentation.scale,
+        &samples,
+    )?;
 
     Ok(ElevationGeometryResponse {
         points: geometry.points.into_iter().map(|(x, y)| [x, y]).collect(),
         progress_values: geometry.progress_values,
         elapsed_fractions: geometry.elapsed_fractions,
         data_range: geometry.elevation_data_range.map(|(min, max)| [min, max]),
-        bbox: [
-0.0,
-            0.0,
-            geometry.key.width,
-            geometry.key.height,
-        ],
+        bbox: [0.0, 0.0, geometry.key.width, geometry.key.height],
         source_point_count: geometry.source_point_count,
         simplification: geometry.simplification,
-widget_width: geometry.key.width.round() as u32,
+        widget_width: geometry.key.width.round() as u32,
         widget_height: geometry.key.height.round() as u32,
     })
 }

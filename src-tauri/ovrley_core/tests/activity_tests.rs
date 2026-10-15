@@ -391,7 +391,7 @@ fn only_densifies_series_requested_by_template() {
             "values": [speed_value()],
             "plots": {
                 "course": {
-                    "value": "course", "x": 0, "y": 0, "width": 200, "height": 100,
+                    "value": "course", "x": 0, "y": 0, "width": 200, "height": 100, "rotation": 0.0,
                     "simplify_tolerance_px": 1.0, "target_density": 1.0,
                     "completed_line_width": 2.0, "completed_line_color": "#000000",
                     "completed_line_opacity": 1.0,
@@ -427,7 +427,7 @@ fn trimmed_exports_keep_absolute_distance_progress() {
             "scene": full_scene(30.0, 600.0, 630.0),
             "plots": {
                 "course": {
-                    "value": "course", "x": 0, "y": 0, "width": 200, "height": 100,
+                    "value": "course", "x": 0, "y": 0, "width": 200, "height": 100, "rotation": 0.0,
                     "simplify_tolerance_px": 1.0, "target_density": 1.0,
                     "completed_line_width": 2.0, "completed_line_color": "#000000",
                     "completed_line_opacity": 1.0,

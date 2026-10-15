@@ -11,7 +11,6 @@
 mod common;
 
 use ovrley_core::activity::schema::DenseActivityReport;
-use ovrley_core::render::format::format_validated_metric_parts;
 use serde_json::json;
 
 fn config_json(values_json: &str) -> ovrley_core::normalize::ValidatedRenderConfig {
@@ -112,14 +111,9 @@ fn format_parts_for_activity(
     let config = config_json(&format!("[{}]", vc_json));
     let validated =
         common::seam::expect_standard_value(config.values.into_iter().next().unwrap(), 0);
-    let parts = format_validated_metric_parts(&validated, &report, 0);
-    match parts {
-        Some(p) => {
-            let (value_text, unit_text) = p.standard_text();
-            (value_text.to_string(), unit_text.map(str::to_string))
-        }
-        None => ("--".to_string(), None),
-    }
+    let parts = ovrley_widgets::widgets::value::format::format_metric_parts(&validated, &report.metric_sample(validated.metric, 0, 0.0));
+    let (value_text, unit_text) = parts.standard_text();
+    (value_text.to_string(), unit_text.map(str::to_string))
 }
 
 #[test]

@@ -7,8 +7,8 @@ use ovrley_core::normalize::validate_render_config;
 use ovrley_widgets::widgets::gauges::validation::ValidatedLinearGaugeOrientation;
 use ovrley_core::paths::AppPaths;
 use ovrley_widgets::widgets::gauges::linear::{bar_fill_rect, bordered_bar_fill_rect};
-use ovrley_core::render::widgets::types::PreparedValue;
-use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
+use ovrley_core::render::assets::PreparedWidget;
+use ovrley_core::render::{render_preview_with_report, assets::prepare_render_assets};
 use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
 use ovrley_widgets::widgets::value::config::ValueConfig;
 use std::collections::BTreeMap;
@@ -150,15 +150,12 @@ fn prepare_assets_builds_linear_gauge_cache_with_activity_range() {
     let dense = dense_speed_activity(vec![Some(10.0), Some(30.0), Some(50.0)]);
     let mut profiler = RenderProfiler::default();
 
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
 
-    let PreparedValue::LinearGauge(widget) = &assets.values()[0] else {
+    let PreparedWidget::Gauge(widget) = &assets.values[0].widget else {
         panic!("linear gauge should prepare a gauge cache at value index 0");
     };
-    let cache = widget
-        .cache
-        .as_ref()
-        .expect("linear gauge cache must be prepared");
+    let cache = widget;
     assert_eq!(cache.frame_states[1].fill01, 0.5);
 }
 
@@ -182,15 +179,12 @@ fn bars_style_resolves_configured_linear_geometry_into_the_cache() {
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
     let mut profiler = RenderProfiler::default();
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
 
-    let PreparedValue::LinearGauge(widget) = &assets.values()[0] else {
+    let PreparedWidget::Gauge(widget) = &assets.values[0].widget else {
         panic!("linear bars should use the linear gauge cache");
     };
-    let cache = widget
-        .cache
-        .as_ref()
-        .expect("linear bars cache must be prepared");
+    let cache = widget;
     let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Linear(layout) = &cache.layout else { panic!("gauge layout"); };
     assert_eq!(layout.track_fill_style, TrackFillStyle::Bars);
     assert_eq!(layout.bar_geometry.unwrap().count, 8);

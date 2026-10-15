@@ -34,7 +34,8 @@ use ovrley_core::activity::{build_dense_activity_report_validated, parse_activit
 use ovrley_core::debug::RenderProgress;
 use ovrley_core::error::CoreError;
 use ovrley_core::normalize::raw::parse_config_json;
-use ovrley_core::normalize::raw::{RasterConfig, RenderConfig};
+use ovrley_core::normalize::raw::RenderConfig;
+use ovrley_widgets::widgets::raster::config::RasterConfig;
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::raster::{RasterResourceResolver, SelectedRaster};

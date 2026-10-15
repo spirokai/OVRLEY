@@ -5,8 +5,8 @@ use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::raw::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::widgets::prepare_render_assets;
-use ovrley_core::render::widgets::types::PreparedValue;
+use ovrley_core::render::assets::prepare_render_assets;
+use ovrley_core::render::assets::PreparedWidget;
 use std::collections::BTreeMap;
 
 #[test]
@@ -22,25 +22,22 @@ fn full_lean_angle_config_validates_and_prepares_one_static_cache() {
     })
     .unwrap();
 
-    let PreparedValue::LeanAngle(widget) = &config.values[0] else {
+    let ovrley_widgets::widgets::value::validation::ValidatedValue::LeanAngle(widget) = &config.values[0] else {
         panic!("lean_angle display type must use the dedicated prepared value");
     };
-    assert_eq!(widget.validated.diameter, 180.0);
-    assert_eq!(widget.validated.track_thickness, 24.0);
+    assert_eq!(widget.diameter, 180.0);
+    assert_eq!(widget.track_thickness, 24.0);
 
     let paths = test_paths();
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = common::builders::minimal_dense_activity();
     let mut profiler = RenderProfiler::default();
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
 
-    let PreparedValue::LeanAngle(widget) = &assets.values()[0] else {
+    let PreparedWidget::LeanAngle(widget) = &assets.values[0].widget else {
         panic!("lean-angle value index must own the static lean-angle cache");
     };
-    let cache = widget
-        .cache
-        .as_ref()
-        .expect("lean-angle cache must be prepared");
+    let cache = widget;
     assert!((cache.layout.center_x - 77.94229).abs() < 0.0001);
     assert_eq!(cache.layout.center_y, 90.0);
     assert_eq!(

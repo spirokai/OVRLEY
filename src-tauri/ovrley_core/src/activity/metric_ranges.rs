@@ -1,8 +1,8 @@
 //! Numeric bounds from finalized source telemetry, before scene trimming.
 
-use super::elevation::preferred_elevation_series;
 use super::schema::ParsedActivity;
 use ovrley_widgets::model::types::MetricKind;
+use ovrley_widgets::widgets::elevation::sampling::preferred_elevation_series;
 use std::collections::HashMap;
 
 /// Returns observed finite bounds; missing external telemetry has no range.
