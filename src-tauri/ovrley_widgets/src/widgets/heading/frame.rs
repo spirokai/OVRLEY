@@ -3,7 +3,7 @@ use super::{
     geometry::heading_offset,
     layout::{HeadingCache, IndicatorShape},
 };
-use skia_safe::{canvas::SaveLayerRec, Canvas, ClipOp, Paint, Path, PathBuilder, Rect};
+use skia_safe::{canvas::SaveLayerRec, Canvas, ClipOp, FilterMode, Paint, Path, PathBuilder, Rect};
 
 pub struct HeadingFrame {
     pub bounds: Rect,
@@ -83,21 +83,29 @@ impl HeadingFrame {
         let mut opacity = Paint::default();
         opacity.set_alpha_f(cache.opacity);
         canvas.save_layer(&SaveLayerRec::default().bounds(&cache.frame).paint(&opacity));
-        // One repeated texture lets linear sampling cross north without compositing two edges.
-        canvas.save();
-        canvas.translate((self.first_copy, cache.frame.top + cache.tape_content_y));
-        canvas.draw_rect(
-            Rect::from_xywh(
-                cache.frame.left - self.first_copy,
-                0.0,
-                cache.frame.width(),
-                cache.tape_image.height() as f32,
-            ),
-            &cache.tape_paint,
-        );
-        canvas.restore();
-        // Mask only the scrolling strip inside its isolated layer, then draw the indicator.
-        canvas.draw_rect(cache.frame, &cache.edge_fade);
+        let mut x = self.first_copy;
+        while x < cache.frame.right {
+            // Adjacent hard clips assign each destination pixel to exactly one copy.
+            // Sampling gutters keep north continuous without blending two image edges.
+            canvas.save();
+            canvas.clip_rect(
+                Rect::new(x, cache.frame.top, x + cache.tape_width, cache.frame.bottom),
+                ClipOp::Intersect,
+                false,
+            );
+            canvas.draw_image_with_sampling_options(
+                &cache.tape_image,
+                (x - 1.0, cache.frame.top + cache.tape_content_y),
+                FilterMode::Linear,
+                None,
+            );
+            canvas.restore();
+            x += cache.tape_width;
+        }
+        // The opaque centre of the mask is a no-op; only shade the fading edges.
+        for bounds in &cache.edge_fade_bounds {
+            canvas.draw_rect(bounds, &cache.edge_fade);
+        }
         if let Some(shadow) = &cache.indicator_shadow {
             for (path, _) in &self.indicators {
                 canvas.draw_path(path, shadow);
