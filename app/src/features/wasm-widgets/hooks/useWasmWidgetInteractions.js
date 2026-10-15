@@ -1,12 +1,12 @@
 import { useEffect, useEffectEvent, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import { getWidgetInteraction } from '../utils/widgetInteraction'
-import { dragTranslation, resizeAnchor } from '../utils/widgetGestureGeometry'
+import { dragTranslation, resizeAnchor, widgetResizeGeometry } from '../utils/widgetGestureGeometry'
 
 /**
  * Moveable owns pointer coordinates; WASM owns live configuration and tight geometry.
  * @param {object} options Selection, draft lifecycle, commits and Moveable reference.
- * @returns {object} Single-widget gestures and group translation handlers.
+ * @returns {object} Widget and group gesture handlers.
  */
 export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, state, setIsGroupDragActive, setGroupDragSelectionIds }) {
   const gesture = useRef(null)
@@ -104,17 +104,63 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       current.controller.update({
         type: 'resize',
         geometry: {
-          ...(selectedWidget.type === 'backdrop' ||
-          selectedWidget.type === 'raster' ||
-          selectedWidget.type === 'elevation' ||
-          ['heading_tape', 'linear'].includes(selectedWidget.data.display_type)
-            ? { size: [Math.max(width, 0.01), Math.max(height, 0.01)] }
-            : { factor: Math.max(width / current.origin.bounds.width, 0.01) }),
+          ...widgetResizeGeometry(selectedWidget, current.origin.bounds, width, height),
           ...current.anchor,
         },
       })
     },
     onResizeEnd: finish,
+    onResizeGroupStart: ({ events }) => {
+      const ids = selectedWidgets.map((widget) => widget.id)
+      const controller = getWidgetInteraction(events[0].target).group(ids)
+      const origins = controller.begin(state.setLiveWidgetDrafts)
+      gesture.current = { controller, origins, ids, widgets: selectedWidgets }
+      events.forEach(({ target, set, dragStart }) => {
+        const { bounds } = origins[target.dataset.widgetId]
+        set([bounds.width, bounds.height])
+        if (dragStart) dragStart.set([0, 0])
+      })
+    },
+    onResizeGroup: ({ events }) => {
+      const current = gesture.current
+      if (!current) return
+      const intents = Object.fromEntries(
+        events.map(({ target, width, height, drag }) => {
+          const id = target.dataset.widgetId
+          const widget = current.widgets.find((item) => item.id === id)
+          const origin = current.origins[id]
+          const anchor = resizeAnchor(
+            origin.bounds,
+            [1, 1],
+            ['course', 'elevation', 'raster'].includes(widget.type) ? origin.data.rotation : 0,
+            origin.rotationOrigin,
+          )
+          return [
+            id,
+            {
+              type: 'resize',
+              geometry: {
+                ...widgetResizeGeometry(widget, origin.bounds, width, height),
+                fixed: anchor.fixed,
+                point: anchor.point.map((value, index) => value + drag.beforeTranslate[index]),
+              },
+            },
+          ]
+        }),
+      )
+      current.controller.update(intents)
+    },
+    onResizeGroupEnd: () => {
+      const current = gesture.current
+      if (!current) return
+      try {
+        const patches = current.controller.finish()
+        if (patches) state.commitWidgetUpdates(patches)
+      } finally {
+        current.controller.cancel()
+        clear()
+      }
+    },
     onRotateStart: ({ target, set }) => {
       const current = begin(target)
       set(current.origin.data.rotation)

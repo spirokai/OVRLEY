@@ -12,7 +12,7 @@ const props = {
   horizontalGuidelines: [0, 540, 1080],
   verticalGuidelines: [0, 960, 1920],
   zoom: 0.75,
-  handlers: { onResize: vi.fn(), onDragGroup: vi.fn() },
+  handlers: { onResize: vi.fn(), onDragGroup: vi.fn(), onResizeGroupStart: vi.fn(), onResizeGroup: vi.fn(), onResizeGroupEnd: vi.fn() },
   isGroupDragActive: false,
   isGroupSelection: false,
   maintainAspectRatio: true,
@@ -41,25 +41,21 @@ describe('OverlayMoveable WASM gestures', () => {
     expect(moveable.mock.lastCall[0].onScale).toBeUndefined()
   })
 
-  test('keeps group translation enabled and group scaling disabled', () => {
+  test('enables proportional group resize through the bounding-box handles', () => {
     const selectedTargets = [document.createElement('div'), document.createElement('div')]
-    render(
-      <OverlayMoveable
-        {...props}
-        selectedTarget={null}
-        selectedTargets={selectedTargets}
-        isGroupSelection
-        isGroupDragActive
-        canResizeSelected={false}
-      />,
-    )
+    render(<OverlayMoveable {...props} selectedTarget={null} selectedTargets={selectedTargets} isGroupSelection isGroupDragActive />)
     expect(moveable.mock.lastCall[0]).toMatchObject({
       targets: selectedTargets,
       groupable: true,
       hideChildMoveableDefaultLines: true,
-      resizable: false,
+      resizable: true,
       scalable: false,
+      keepRatio: true,
+      renderDirections: ['nw', 'ne', 'se', 'sw'],
       onDragGroup: props.handlers.onDragGroup,
+      onResizeGroupStart: props.handlers.onResizeGroupStart,
+      onResizeGroup: props.handlers.onResizeGroup,
+      onResizeGroupEnd: props.handlers.onResizeGroupEnd,
     })
   })
 })

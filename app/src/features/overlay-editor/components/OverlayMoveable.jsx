@@ -60,6 +60,9 @@ export default function OverlayMoveable({
       onResizeStart={handlers.onResizeStart}
       onResize={handlers.onResize}
       onResizeEnd={handlers.onResizeEnd}
+      onResizeGroupStart={handlers.onResizeGroupStart}
+      onResizeGroup={handlers.onResizeGroup}
+      onResizeGroupEnd={handlers.onResizeGroupEnd}
       onRotateStart={handlers.onRotateStart}
       onRotate={handlers.onRotate}
       onRotateEnd={handlers.onRotateEnd}

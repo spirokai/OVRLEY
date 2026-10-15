@@ -152,6 +152,8 @@ describe('OverlayEditor selection flow', () => {
 
     expect(useStore.getState().selectedWidgetIds).toEqual(['widget-1', 'widget-2'])
     expect(useStore.getState().selectedWidgetId).toBe('widget-2')
+    expect(container.querySelector('[data-testid="moveable-props"]')).toHaveAttribute('data-can-resize', 'true')
+    expect(container.querySelector('[data-testid="moveable-props"]')).toHaveAttribute('data-maintain-ratio', 'true')
 
     fireEvent.keyDown(window, { key: 'Delete' })
 

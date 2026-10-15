@@ -213,23 +213,18 @@ function updateWidgetEntry(config, widgetId, updater) {
   }
 }
 
-/**
- * Updates widget in config.
- *
- * @param {*} config - Overlay template configuration data.
- * @param {*} widgetId - Identifier of the target widget.
- * @param {*} updates - Partial changes to merge into the target.
- * @returns {*} Result produced by the helper.
- */
-export function updateWidgetInConfig(config, widgetId, updates) {
+function mergeWidgetUpdates(currentWidget, updates) {
   const normalizedUpdates = normalizeColorFields(updates)
-  return updateWidgetEntry(config, widgetId, (currentWidget) => {
-    const nextWidget = { ...currentWidget, ...normalizedUpdates, id: currentWidget.id }
-    if (normalizedUpdates.display_variants) {
-      nextWidget.display_variants = mergeDisplayVariantUpdates(currentWidget.display_variants, normalizedUpdates.display_variants)
-    }
-    return nextWidget
-  })
+  const nextWidget = { ...currentWidget, ...normalizedUpdates, id: currentWidget.id }
+  if (normalizedUpdates.display_variants) {
+    nextWidget.display_variants = mergeDisplayVariantUpdates(currentWidget.display_variants, normalizedUpdates.display_variants)
+  }
+  return nextWidget
+}
+
+/** @param {object} config Template configuration. @param {string} widgetId Widget identity. @param {object} updates Partial widget changes. @returns {object} Updated configuration. */
+export function updateWidgetInConfig(config, widgetId, updates) {
+  return updateWidgetEntry(config, widgetId, (currentWidget) => mergeWidgetUpdates(currentWidget, updates))
 }
 
 /**
@@ -268,11 +263,7 @@ export function updateWidgetsInConfig(config, updatesById) {
       return
     }
 
-    const nextWidget = {
-      ...currentWidget,
-      ...normalizeColorFields(updates),
-      id: currentWidget.id,
-    }
+    const nextWidget = mergeWidgetUpdates(currentWidget, updates)
     const nextCollection = [...sourceCollection]
     nextCollection[target.index] = nextWidget
     nextCollectionsByCategory.set(target.category, nextCollection)

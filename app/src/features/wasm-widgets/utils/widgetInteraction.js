@@ -48,6 +48,62 @@ export function unregisterWidgetInteraction(target) {
  */
 export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeometry, resize }) {
   let active = null
+
+  function begin(ids, onDraft) {
+    flush()
+    const snapshot = getSnapshot()
+    active = {
+      onDraft,
+      widgets: new Map(
+        ids.map((id) => {
+          const widget = snapshot.widgets.find((item) => item.id === id)
+          if (!widget) throw new Error(`Missing WASM widget: ${id}`)
+          return [
+            id,
+            {
+              id,
+              type: widget.type,
+              data: widget.data,
+              scene: snapshot.scene,
+              geometry: getGeometry(id),
+              intent: null,
+              patch: null,
+              resolvedIntent: null,
+              second: null,
+              committing: false,
+            },
+          ]
+        }),
+      ),
+    }
+    return Object.fromEntries(
+      [...active.widgets].map(([id, { data, geometry }]) => [id, { data, bounds: geometry.content, rotationOrigin: geometry.rotation_origin }]),
+    )
+  }
+
+  function update(intents) {
+    if (!active) return
+    for (const [id, intent] of Object.entries(intents)) active.widgets.get(id).intent = intent
+    schedule()
+  }
+
+  function finish() {
+    if (!active) return null
+    for (const widget of active.widgets.values()) {
+      widget.committing = ['course', 'elevation'].includes(widget.type) && widget.intent?.type === 'resize'
+    }
+    flush() // Mouseup can precede the pending animation frame.
+    const patches = [...active.widgets].filter(([, widget]) => widget.patch !== null).map(([id, widget]) => [id, widget.patch])
+    active = null
+    return patches.length ? Object.fromEntries(patches) : null
+  }
+
+  function cancel() {
+    if (!active) return
+    active = null
+    schedule()
+  }
+
   return {
     forWidget(id) {
       return {
@@ -75,81 +131,70 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
           )
         },
         begin(onDraft) {
-          flush()
-          const snapshot = getSnapshot()
-          const widget = snapshot.widgets.find((item) => item.id === id)
-          if (!widget) throw new Error(`Missing WASM widget: ${id}`)
-          const geometry = getGeometry(id)
-          active = {
-            id,
-            type: widget.type,
-            data: widget.data,
-            scene: snapshot.scene,
-            geometry,
-            intent: null,
-            patch: null,
-            onDraft,
-            resolvedIntent: null,
-            second: null,
-            committing: false,
-          }
-          return { data: widget.data, bounds: geometry.content, rotationOrigin: geometry.rotation_origin }
+          return begin([id], (patches) => onDraft(patches[id]))[id]
         },
         update(intent) {
-          if (!active || active.id !== id) return
-          active.intent = intent
-          schedule()
+          if (!active?.widgets.has(id)) return
+          update({ [id]: intent })
         },
         finish() {
-          if (!active || active.id !== id) return null
-          active.committing = ['course', 'elevation'].includes(active.type) && active.intent?.type === 'resize'
-          flush() // Mouseup can precede the pending animation frame.
-          const patch = active.patch
-          active = null
-          return patch
+          if (!active?.widgets.has(id)) return null
+          const patches = finish()
+          return patches === null ? null : patches[id]
         },
         cancel() {
-          if (!active || active.id !== id) return
-          active = null
-          schedule()
+          if (active?.widgets.has(id)) cancel()
+        },
+        group(ids) {
+          return { begin: (onDraft) => begin(ids, onDraft), update, finish, cancel }
         },
       }
     },
     isResizing(id) {
-      return active?.id === id && active.intent?.type === 'resize' && !active.committing
+      const widget = active?.widgets.get(id)
+      return widget?.intent?.type === 'resize' && !widget.committing
     },
     resolve(snapshot) {
-      if (!active || !active.intent) return snapshot.widgets
-      const { intent } = active
-      if (
-        active.resolvedIntent !== intent ||
-        active.committing ||
-        (intent.type === 'resize' && isTimeDependentWasmWidget(active) && active.second !== snapshot.second)
-      ) {
-        const patch =
-          intent.type === 'drag'
-            ? { x: active.data.x + intent.translate[0], y: active.data.y + intent.translate[1] }
-            : intent.type === 'rotate'
-              ? rotationPatch(active, intent.rotation, intent.translate, active.geometry)
-              : resize(
-                  {
-                    type: active.type,
-                    widget: active.data,
-                    scene: active.scene,
-                    second: snapshot.second,
-                    ...(['course', 'elevation'].includes(active.type) ? { commit: active.committing } : {}),
-                    ...intent.geometry,
-                  },
-                  active.id,
-                )
-        const changed = JSON.stringify(patch) !== JSON.stringify(active.patch)
-        active.patch = patch
-        active.resolvedIntent = intent
-        active.second = snapshot.second
-        if (changed) active.onDraft(patch)
+      if (!active) return snapshot.widgets
+      const patches = {}
+      let changed = false
+      for (const widget of active.widgets.values()) {
+        const { intent } = widget
+        if (!intent) continue
+        if (
+          widget.resolvedIntent !== intent ||
+          widget.committing ||
+          (intent.type === 'resize' && isTimeDependentWasmWidget(widget) && widget.second !== snapshot.second)
+        ) {
+          const patch =
+            intent.type === 'drag'
+              ? { x: widget.data.x + intent.translate[0], y: widget.data.y + intent.translate[1] }
+              : intent.type === 'rotate'
+                ? rotationPatch(widget, intent.rotation, intent.translate, widget.geometry)
+                : resize(
+                    {
+                      type: widget.type,
+                      widget: widget.data,
+                      scene: widget.scene,
+                      second: snapshot.second,
+                      ...(['course', 'elevation'].includes(widget.type) ? { commit: widget.committing } : {}),
+                      ...intent.geometry,
+                    },
+                    widget.id,
+                  )
+          changed ||= JSON.stringify(patch) !== JSON.stringify(widget.patch)
+          widget.patch = patch
+          widget.resolvedIntent = intent
+          widget.second = snapshot.second
+        }
+        patches[widget.id] = widget.patch
       }
-      const originWidgets = snapshot.widgets.map((widget) => (widget.id === active.id ? { ...widget, data: active.data } : widget))
-      return applyWidgetDrafts(originWidgets, { [active.id]: active.patch })
+      if (changed) active.onDraft(patches)
+      const originWidgets = snapshot.widgets.map((widget) => {
+        const origin = active.widgets.get(widget.id)
+        return origin === undefined ? widget : { ...widget, data: origin.data }
+      })
+      return applyWidgetDrafts(originWidgets, patches)
     },
     dispose() {
       active = null

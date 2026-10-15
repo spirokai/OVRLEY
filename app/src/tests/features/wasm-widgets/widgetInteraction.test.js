@@ -63,6 +63,38 @@ test.each(['speed', 'time', 'gradient', 'lean_angle', 'backdrop', 'raster', 'cou
   },
 )
 
+test('group resize shares one frame, preserves each origin, and flushes all final patches together', () => {
+  const { interaction, original, resize, setSnapshot } = editor()
+  const second = { ...original, id: 'other', type: 'course', data: { ...original.data, x: 300, font_size: 24 } }
+  const scene = { scale: 1.5 }
+  setSnapshot({ widgets: [original, second], scene, second: 0 })
+  const group = interaction.group(['widget', 'other'])
+  const draft = vi.fn()
+  group.begin(draft)
+  group.update({ widget: { type: 'resize', geometry: { factor: 1.25 } }, other: { type: 'resize', geometry: { factor: 1.5 } } })
+  expect(resize).not.toHaveBeenCalled()
+  vi.advanceTimersToNextFrame()
+  expect(draft).toHaveBeenCalledExactlyOnceWith({
+    widget: { x: 87.125, y: 30.25, font_size: 60 },
+    other: { x: 87.125, y: 30.25, font_size: 36 },
+  })
+  setSnapshot({ widgets: applyWidgetDrafts([original, second], draft.mock.lastCall[0]), scene, second: 2.25 })
+  group.update({ widget: { type: 'resize', geometry: { factor: 2 } }, other: { type: 'resize', geometry: { factor: 3 } } })
+  expect(group.finish()).toEqual({
+    widget: { x: 87.125, y: 30.25, font_size: 96 },
+    other: { x: 87.125, y: 30.25, font_size: 72 },
+  })
+  expect(resize.mock.calls[2][0]).toMatchObject({ widget: original.data, second: 2.25 })
+  expect(resize.mock.calls[3][0]).toMatchObject({ widget: second.data, second: 2.25, commit: true })
+  expect(vi.getTimerCount()).toBe(0)
+  group.begin(draft)
+  group.update({ widget: { type: 'resize', geometry: { factor: 4 } }, other: { type: 'resize', geometry: { factor: 4 } } })
+  group.cancel()
+  vi.advanceTimersToNextFrame()
+  expect(resize).toHaveBeenCalledTimes(4)
+  expect(group.finish()).toBeNull()
+})
+
 test('course slider and handle rotation share the same patch and preserve position when switching controls', () => {
   const { interaction, original, setSnapshot } = editor('course')
   const slider = interaction.rotate(-45.25)

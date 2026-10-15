@@ -32,8 +32,11 @@ export function getViewportContentSize(sceneSize, videoSyncMode) {
 
 /** @param {object|null} widget Primary selection. @param {boolean} isGroupSelection Whether multiple widgets are selected. @returns {object} Resize/rotation handle options. */
 export function getWidgetResizeOptions(widget, isGroupSelection) {
-  if (widget === null || isGroupSelection) {
+  if (widget === null) {
     return { canResizeSelected: false, canRotateSelected: false, maintainAspectRatio: false, showEdgeResizeHandles: false }
+  }
+  if (isGroupSelection) {
+    return { canResizeSelected: true, canRotateSelected: false, maintainAspectRatio: true, showEdgeResizeHandles: false }
   }
   return {
     canResizeSelected: true,

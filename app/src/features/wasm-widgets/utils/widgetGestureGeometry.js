@@ -17,6 +17,16 @@ export function normalizeRotation(rotation) {
   return ((rotation % 360) + 360) % 360
 }
 
+/** @param {object} widget Resolved widget. @param {object} bounds Initial content rectangle. @param {number} width Requested scene width. @param {number} height Requested scene height. @returns {object} Intrinsic resize request. */
+export function widgetResizeGeometry(widget, bounds, width, height) {
+  return widget.type === 'backdrop' ||
+    widget.type === 'raster' ||
+    widget.type === 'elevation' ||
+    ['heading_tape', 'linear'].includes(widget.data.display_type)
+    ? { size: [Math.max(width, 0.01), Math.max(height, 0.01)] }
+    : { factor: Math.max(width / bounds.width, 0.01) }
+}
+
 /** @param {object} bounds Rust content rectangle. @param {number[]} direction Moveable handle direction. @param {number} rotation Frame rotation in degrees. @param {number[]} origin Rotation origin within the frame. @returns {object} Fixed corner constraint. */
 export function resizeAnchor(bounds, direction, rotation = 0, origin = [0, 0]) {
   const fixed = direction.map((value) => (1 - value) / 2)

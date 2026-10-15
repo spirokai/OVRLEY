@@ -158,6 +158,39 @@ describe('widget-config batch operations', () => {
     expect(updateWidgetsInConfig(makeConfig(), null)).toEqual(makeConfig())
   })
 
+  test.each([
+    [
+      'backdrops',
+      'rectangle',
+      { corner_radius: 12, round_top_left: true, round_top_right: false, round_bottom_left: true, round_bottom_right: false },
+    ],
+    ['values', 'linear', { orientation: 'horizontal', track_thickness: 16, track_empty_opacity: 0.5 }],
+    ['values', 'linear', { orientation: 'vertical', track_thickness: 16, track_empty_opacity: 0.5 }],
+  ])('consecutive batch resizes preserve required %s/%s settings and inactive variants', (category, displayType, settings) => {
+    const variant = { width: 200, height: 80, ...settings }
+    const original = {
+      id: 'widget-resize',
+      x: 20,
+      y: 30,
+      display_type: displayType,
+      display_variants: { [displayType]: variant, text: { icon_size: 24 } },
+    }
+    const config = makeConfig({ [category]: [original], labels: [{ id: 'widget-label', text: 'Untouched' }] })
+    const firstPatch = { x: 15.25, display_variants: { [displayType]: { width: 250.5, height: 100.25 } } }
+    const first = updateWidgetsInConfig(config, { 'widget-resize': firstPatch })
+    const secondPatch = { x: 10.125, display_variants: { [displayType]: { width: 300.75, height: 120.5 } } }
+    const second = updateWidgetsInConfig(first, { 'widget-resize': secondPatch })
+
+    expect(first).toEqual(updateWidgetInConfig(config, 'widget-resize', firstPatch))
+    expect(second[category][0].display_variants).toEqual({
+      [displayType]: { ...variant, width: 300.75, height: 120.5 },
+      text: { icon_size: 24 },
+    })
+    expect(second.labels).toBe(config.labels)
+    expect(config[category][0]).toBe(original)
+    expect(variant).toEqual({ width: 200, height: 80, ...settings })
+  })
+
   test('deleteWidgetsInConfig removes multiple widgets at once', () => {
     const config = makeConfig({
       labels: [
