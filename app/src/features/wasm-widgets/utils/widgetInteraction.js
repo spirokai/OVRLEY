@@ -148,7 +148,7 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
         group(ids) {
           return {
             bounds() {
-              flush()
+              // Read the presented geometry without bypassing the frame scheduler on every slider change.
               return groupContentBounds(ids.map(getGeometry))
             },
             begin: (onDraft) => begin(ids, onDraft),

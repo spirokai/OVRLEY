@@ -155,8 +155,10 @@ export default function useWidgetSelection({ displayScale, orderedWidgetIds, wid
     () => normalizeSelectionIds(isGroupDragActive ? groupDragSelectionIds : selectedWidgetIds, orderedWidgetIds),
     [groupDragSelectionIds, isGroupDragActive, orderedWidgetIds, selectedWidgetIds],
   )
-  const refreshBadges = useEffectEvent((event) => {
-    if (event && event.target.dataset.widgetId !== hoveredWidgetId && !effectiveIds.includes(event.target.dataset.widgetId)) return
+  const shouldRefreshBadges = useEffectEvent(
+    (event) => event.target.dataset.widgetId === hoveredWidgetId || effectiveIds.includes(event.target.dataset.widgetId),
+  )
+  const refreshBadges = useEffectEvent(() => {
     const next = buildWidgetBadges({
       displayScale,
       hoveredWidgetId,
@@ -171,9 +173,21 @@ export default function useWidgetSelection({ displayScale, orderedWidgetIds, wid
   useLayoutEffect(() => refreshBadges(), [displayScale, effectiveIds, hoveredWidgetId, sceneElement, widgetNodes])
   useEffect(() => {
     if (sceneElement === null) return
-    const rendered = (event) => refreshBadges(event)
+    let pending = false
+    let active = true
+    const rendered = (event) => {
+      if (pending || !shouldRefreshBadges(event)) return
+      pending = true
+      queueMicrotask(() => {
+        pending = false
+        if (active) refreshBadges()
+      })
+    }
     sceneElement.addEventListener('wasm-widget-render', rendered)
-    return () => sceneElement.removeEventListener('wasm-widget-render', rendered)
+    return () => {
+      active = false
+      sceneElement.removeEventListener('wasm-widget-render', rendered)
+    }
   }, [sceneElement])
   const canvasMouseOver = useCallback((event) => setHoveredWidgetFromEvent(setHoveredWidgetId, event), [])
   const canvasMouseLeave = useCallback(() => setHoveredWidgetId(null), [])

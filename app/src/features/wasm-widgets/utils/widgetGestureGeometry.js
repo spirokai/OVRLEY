@@ -39,6 +39,15 @@ export function resizeAnchor(bounds, direction, rotation = 0, origin = [0, 0]) {
   }
 }
 
+/** @param {object} rect Moveable group rectangle in scene coordinates. @param {number[]} direction Handle direction. @returns {object} Initial width and fixed scene point. */
+export function groupResizeOrigin(rect, direction) {
+  const fixed = direction.map((value) => (1 - value) / 2)
+  return {
+    width: rect.offsetWidth,
+    point: rect.pos1.map((value, index) => value + (rect.pos2[index] - value) * fixed[0] + (rect.pos3[index] - value) * fixed[1]),
+  }
+}
+
 /** @param {object[]} geometries WASM widget geometry, including optional frame rotation. @returns {object} Combined content bounds in scene coordinates. */
 export function groupContentBounds(geometries) {
   const points = geometries.flatMap((geometry) =>

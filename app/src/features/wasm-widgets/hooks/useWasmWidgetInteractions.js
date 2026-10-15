@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import { getWidgetInteraction } from '../utils/widgetInteraction'
-import { dragTranslation, resizeAnchor, widgetResizeGeometry } from '../utils/widgetGestureGeometry'
+import { dragTranslation, groupResizeOrigin, resizeAnchor, widgetResizeGeometry } from '../utils/widgetGestureGeometry'
 
 /**
  * Moveable owns pointer coordinates; WASM owns live configuration and tight geometry.
@@ -25,18 +25,27 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     clear()
     state.moveableRef.current?.stopDrag()
   })
-  const refreshGeometry = useEffectEvent((event) => {
-    if (!selectedWidgets.some((widget) => widget.id === event.target.dataset.widgetId)) return
-    // Commit the outline before the browser paints the newly presented WASM pixels and bounds.
-    flushSync(() => state.moveableRef.current?.updateRect())
-  })
+  const shouldRefreshGeometry = useEffectEvent((event) => selectedWidgets.some((widget) => widget.id === event.target.dataset.widgetId))
   useEffect(() => {
     const scene = state.sceneElement
     if (!scene) return
-    const rendered = (event) => refreshGeometry(event)
+    let pending = false
+    let active = true
+    const rendered = (event) => {
+      if (pending || !shouldRefreshGeometry(event)) return
+      pending = true
+      // Measure once after all widgets in the frame have updated, before the browser paints.
+      queueMicrotask(() => {
+        pending = false
+        if (active) flushSync(() => state.moveableRef.current?.updateRect())
+      })
+    }
     scene.addEventListener('wasm-widget-render', rendered)
-    return () => scene.removeEventListener('wasm-widget-render', rendered)
-  }, [state.sceneElement])
+    return () => {
+      active = false
+      scene.removeEventListener('wasm-widget-render', rendered)
+    }
+  }, [state.sceneElement, state.moveableRef])
   const selectionIds = selectedWidgets.map((widget) => widget.id).join('|')
   useEffect(() => {
     cancel()
@@ -110,25 +119,26 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       })
     },
     onResizeEnd: finish,
-    onResizeGroupStart: ({ events }) => {
+    onResizeGroupStart: ({ events, direction, moveable }) => {
       const ids = selectedWidgets.map((widget) => widget.id)
       const controller = getWidgetInteraction(events[0].target).group(ids)
       const origins = controller.begin(state.setLiveWidgetDrafts)
-      gesture.current = { controller, origins, ids, widgets: selectedWidgets }
+      gesture.current = { controller, origins, ids, widgets: selectedWidgets, groupOrigin: groupResizeOrigin(moveable.getRect(), direction) }
       events.forEach(({ target, set, dragStart }) => {
         const { bounds } = origins[target.dataset.widgetId]
         set([bounds.width, bounds.height])
         if (dragStart) dragStart.set([0, 0])
       })
     },
-    onResizeGroup: ({ events }) => {
+    onResizeGroup: ({ boundingWidth }) => {
       const current = gesture.current
       if (!current) return
+      // Child drag offsets depend on live DOM positions; resize everything from the captured group frame instead.
+      const { width, point } = current.groupOrigin
+      const factor = boundingWidth / width
       const intents = Object.fromEntries(
-        events.map(({ target, width, height, drag }) => {
-          const id = target.dataset.widgetId
-          const widget = current.widgets.find((item) => item.id === id)
-          const origin = current.origins[id]
+        current.widgets.map((widget) => {
+          const origin = current.origins[widget.id]
           const anchor = resizeAnchor(
             origin.bounds,
             [1, 1],
@@ -136,13 +146,13 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
             origin.rotationOrigin,
           )
           return [
-            id,
+            widget.id,
             {
               type: 'resize',
               geometry: {
-                ...widgetResizeGeometry(widget, origin.bounds, width, height),
+                ...widgetResizeGeometry(widget, origin.bounds, origin.bounds.width * factor, origin.bounds.height * factor),
                 fixed: anchor.fixed,
-                point: anchor.point.map((value, index) => value + drag.beforeTranslate[index]),
+                point: anchor.point.map((value, index) => point[index] + (value - point[index]) * factor),
               },
             },
           ]
