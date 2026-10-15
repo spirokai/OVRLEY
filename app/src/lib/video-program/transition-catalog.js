@@ -1,0 +1,76 @@
+/**
+ * Built-in FFmpeg `xfade` transitions (FFmpeg 8.1, `transition=custom` excluded) and transition defaults.
+ */
+
+export const NO_TRANSITION = 'none'
+
+export const XFADE_TRANSITIONS = Object.freeze([
+  'fade',
+  'wipeleft',
+  'wiperight',
+  'wipeup',
+  'wipedown',
+  'slideleft',
+  'slideright',
+  'slideup',
+  'slidedown',
+  'circlecrop',
+  'rectcrop',
+  'distance',
+  'fadeblack',
+  'fadewhite',
+  'radial',
+  'smoothleft',
+  'smoothright',
+  'smoothup',
+  'smoothdown',
+  'circleopen',
+  'circleclose',
+  'vertopen',
+  'vertclose',
+  'horzopen',
+  'horzclose',
+  'dissolve',
+  'pixelize',
+  'diagtl',
+  'diagtr',
+  'diagbl',
+  'diagbr',
+  'hlslice',
+  'hrslice',
+  'vuslice',
+  'vdslice',
+  'hblur',
+  'fadegrays',
+  'wipetl',
+  'wipetr',
+  'wipebl',
+  'wipebr',
+  'squeezeh',
+  'squeezev',
+  'zoomin',
+  'fadefast',
+  'fadeslow',
+  'hlwind',
+  'hrwind',
+  'vuwind',
+  'vdwind',
+  'coverleft',
+  'coverright',
+  'coverup',
+  'coverdown',
+  'revealleft',
+  'revealright',
+  'revealup',
+  'revealdown',
+])
+
+/** Hard defaults for new and migrated projects. */
+export const DEFAULT_TRANSITION_SETTINGS = Object.freeze({
+  type: 'wipeleft',
+  durationSeconds: 2,
+  splitGapThresholdSeconds: 2,
+  dialogShown: false,
+})
+
+export const HARD_CUT = Object.freeze({ type: NO_TRANSITION, durationSeconds: 0 })

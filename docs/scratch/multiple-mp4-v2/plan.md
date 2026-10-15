@@ -29,18 +29,17 @@ Status: implemented (awaiting owner commit).
 
 ## M2 — Canonical model, program derivation, persistence
 
+Delivered as three commits: **M2a** pure utilities (item 4), **M2b** model switch (items 1–3, 5–7, 9), **M2c** project format v4 (item 8).
+
 1. Replace singleton fields in `createVideoImportSlice.js` with `importedVideos[]` and ID-addressed actions (add batch, remove, set clip offset, set deleted parts, set transition). Session-level sync actions (timezone mode, shared offset, filename timestamps, reset) keep their current semantics and apply to every clip.
 2. Move embedded telemetry into the entity (remove global stash in `createMediaSlice.js`).
 3. Keep the time chain and timezone inference untouched (`media/video_probe.rs`, `media/mp4_telemetry/mod.rs`, `media/prepared_video.rs`, `lib/video-sync.js`). Only change `resolveVideoSyncState`: a non-overlapping clip keeps its signed offset with a "no activity coverage" warning instead of offset 0. Apply it per clip.
-4. Pure utilities (new `app/src/lib/video-program/` or similar):
-   - `placeClips` (detected-time placement with and without activity, user anchors for undeterminable clips)
-   - `findOverlaps` (computed on pieces, i.e. after deleted parts, so deleting the overlapping part of a clip resolves the overlap)
-   - `deriveCompatibility` (largest resolution+FPS group compatible, others flagged; recomputed on add/remove)
-   - `buildProgram` (pieces + joins, deleted parts, export range, frame grid)
-   - `defaultTransitionFor(join, transitionDefaults)` (gap ≤ `splitGapThresholdSeconds` → none, else project default type/duration — `wipeleft` 2 s unless changed, may be `none`; none if it does not fit; overridden joins untouched)
-   - `validateTransitions(program)`
-   - `resolvePlayback(program, second)` (active piece, next piece, gap/deleted/transition-window state)
-   - `combinedDuration(program)` (`Σ pieces − Σ transitions`)
+4. Pure utilities in `app/src/lib/video-program/` — **M2a commit** (implemented, awaiting owner commit):
+   - `frame-grid.js`: `secondsToFrames`, `framesToSeconds`, `fpsEquals` (exact rationals)
+   - `transition-catalog.js`: 58 `xfade` names, `DEFAULT_TRANSITION_SETTINGS` (`wipeleft`, 2 s, threshold 2 s, `dialogShown: false`), `HARD_CUT`
+   - `video-collection.js`: `sortVideosByTimeline`, `getVideoEndSecond`, `getVideosTimelineBounds`, `deriveCompatibility` (largest resolution+FPS group compatible, ties → earliest import)
+   - `program.js`: `buildProgram` (pieces after deleted parts + export range on the frame grid; overlaps reported and resolved for playback; joins keyed `clip:<videoId>` / `deletedPart:<partId>`; stored transition `null` = default; default rule gap ≤ threshold → hard cut, else project default, hard cut if it does not fit; `durationSeconds` = Σ pieces − Σ transitions), `findInvalidTransitions`, `resolveProgramPosition` (before / piece / gap / transition window / after)
+   - Detected-time placement and user anchors move to M2b next to timestamp parsing in `lib/video-sync.js`.
 5. Manual landmark sync works on a chosen clip (`createManualVideoSyncSlice.js`); the resulting correction is a shared shift like the shared offset (notes O10).
 6. Shared offset: changing it shifts every clip by the same delta and keeps each clip's individual adjustment; per-clip edits change only that clip.
 7. Migrate every singleton consumer (≈46 production files, ≈31 test files) to the collection or to derived program values.
