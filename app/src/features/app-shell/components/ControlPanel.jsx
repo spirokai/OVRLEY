@@ -37,7 +37,7 @@ export default function ControlPanel({ config, onConfigChange, widgetLiveEdits }
 
         <div className="flex-1 overflow-y-auto min-h-0 [scrollbar-gutter:stable]">
           <TabsContent value="settings" className="outline-none">
-            <SidebarSettingsTab config={config} onConfigChange={onConfigChange} />
+            <SidebarSettingsTab config={config} onConfigChange={onConfigChange} widgetLiveEdits={widgetLiveEdits} />
           </TabsContent>
 
           <TabsContent value="widgets" className="outline-none">

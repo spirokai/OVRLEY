@@ -1,6 +1,6 @@
 import { isTimeDependentWasmWidget } from '@/lib/widget/wasm-widget'
 import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
-import { normalizeRotation } from './widgetGestureGeometry'
+import { groupContentBounds, normalizeRotation } from './widgetGestureGeometry'
 
 const targets = new WeakMap()
 
@@ -146,7 +146,16 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
           if (active?.widgets.has(id)) cancel()
         },
         group(ids) {
-          return { begin: (onDraft) => begin(ids, onDraft), update, finish, cancel }
+          return {
+            bounds() {
+              flush()
+              return groupContentBounds(ids.map(getGeometry))
+            },
+            begin: (onDraft) => begin(ids, onDraft),
+            update,
+            finish,
+            cancel,
+          }
         },
       }
     },

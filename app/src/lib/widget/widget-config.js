@@ -295,6 +295,24 @@ export function replaceWidgetInConfig(config, widgetId, nextWidgetData) {
   }))
 }
 
+/** @param {object} config Canonical template configuration. @param {number} factor Relative scale change. @param {object|null} origin Fixed scene point; null only for an empty overlay. @returns {object} Config with all positions scaled around the origin. */
+export function scaleWidgetPositions(config, factor, origin) {
+  if (factor === 1) return config
+  return {
+    ...config,
+    ...Object.fromEntries(
+      WIDGET_CATEGORIES.map((category) => [
+        category,
+        config[category].map((widget) => ({
+          ...widget,
+          x: origin.left + (widget.x - origin.left) * factor,
+          y: origin.top + (widget.y - origin.top) * factor,
+        })),
+      ]),
+    ),
+  }
+}
+
 /**
  * Deletes widget in config.
  *

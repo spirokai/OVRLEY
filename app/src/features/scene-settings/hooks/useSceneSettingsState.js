@@ -24,6 +24,8 @@ import { getUpdateRateOptions, normalizeUpdateRateForFps } from '@/lib/update-ra
 import { useFpsMode } from '@/hooks/useFpsMode'
 import { RESOLUTIONS } from '../data/sceneSettingsConstants'
 import { sanitizeNumber } from '../utils/sceneSettingsUtils'
+import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
+import { getWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 
 function getResolutionPresetId(scene) {
   if (!scene) return '1080p'
@@ -59,7 +61,7 @@ function getDefaultResolutionPreset(aspectRatio) {
   return presets[0]
 }
 
-export default function useSceneSettingsState({ config, onConfigChange }) {
+export default function useSceneSettingsState({ config, onConfigChange, widgetLiveEdits }) {
   const {
     activitySummary,
     aspectRatio,
@@ -92,16 +94,25 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
 
   const availableFonts = useAvailableFonts()
   const prepareFontEdit = useFontPreparation()
+  const getScaleOrigin = (nextScale) => {
+    if (nextScale === useStore.getState().globalDefaults.scale) return null
+    const widgets = buildConfigWidgets(useStore.getState().config)
+    if (!widgets.length) return null
+    return getWidgetInteraction(widgetLiveEdits.getWidgetNode(widgets[0].id))
+      .group(widgets.map((widget) => widget.id))
+      .bounds()
+  }
   const changeGlobalDefault = (key, value) => {
     if (key === 'font_text' || key === 'font_values') {
       prepareFontEdit(key, [value], () => {
         useStore.getState().setGlobalDefault(key, value, key === 'font_text' ? getPreparedFont(value) : undefined)
       })
-    } else setGlobalDefault(key, value)
+    } else if (key === 'scale') setGlobalDefault(key, value, undefined, getScaleOrigin(value))
+    else setGlobalDefault(key, value)
   }
   const resetGlobalDefaults = () =>
     prepareFontEdit(['font_text', 'font_values'], [DEFAULT_GLOBAL_DEFAULTS.font_text, DEFAULT_GLOBAL_DEFAULTS.font_values], () => {
-      useStore.getState().resetGlobalDefaults(getPreparedFont(DEFAULT_GLOBAL_DEFAULTS.font_text))
+      useStore.getState().resetGlobalDefaults(getPreparedFont(DEFAULT_GLOBAL_DEFAULTS.font_text), getScaleOrigin(DEFAULT_GLOBAL_DEFAULTS.scale))
     })
   const editorConfig = useMemo(() => createEditorEffectiveConfig({ config, globalDefaults }), [config, globalDefaults])
   const scene = editorConfig?.scene ? { ...editorConfig.scene, fps: renderSettings.fps } : null

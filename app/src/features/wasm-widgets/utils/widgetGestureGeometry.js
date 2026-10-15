@@ -38,3 +38,18 @@ export function resizeAnchor(bounds, direction, rotation = 0, origin = [0, 0]) {
     point: [bounds.left + origin[0] + x * Math.cos(angle) - y * Math.sin(angle), bounds.top + origin[1] + x * Math.sin(angle) + y * Math.cos(angle)],
   }
 }
+
+/** @param {object[]} geometries WASM widget geometry, including optional frame rotation. @returns {object} Combined content bounds in scene coordinates. */
+export function groupContentBounds(geometries) {
+  const points = geometries.flatMap((geometry) =>
+    [
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1],
+    ].map((direction) => resizeAnchor(geometry.content, direction, geometry.rotation, geometry.rotation_origin).point),
+  )
+  const left = Math.min(...points.map(([x]) => x))
+  const top = Math.min(...points.map(([, y]) => y))
+  return { left, top, width: Math.max(...points.map(([x]) => x)) - left, height: Math.max(...points.map(([, y]) => y)) - top }
+}
