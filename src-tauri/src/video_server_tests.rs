@@ -1,10 +1,10 @@
 //! Video preview HTTP server integration tests.
 //!
-//! Verifies the `VideoServerHandle` lifecycle (startup, video set/clear,
-//! port allocation) and the full HTTP range-request behavior: full
-//! responses (200), HEAD requests, byte-range requests (206), suffix
-//! ranges, unsatisfiable ranges (416), stale import IDs (404), cleared
-//! videos (404), and deleted source files (404).
+//! Verifies the `VideoServerHandle` lifecycle (startup, registry
+//! register/remove/clear, port allocation) and the full HTTP range-request
+//! behavior: full responses (200), HEAD requests, byte-range requests (206),
+//! suffix ranges, unsatisfiable ranges (416), unknown/removed import IDs
+//! (404), independent concurrent registrations, and deleted source files (404).
 //!
 //! ## Fixtures/resources
 //!
@@ -22,7 +22,8 @@
 //! - Range parsing rejecting valid multi-range headers (must ignore)
 //! - Unsatisfiable ranges returning 200 instead of 416
 //! - Content-Length mismatch for range responses
-//! - Server leaking state: old import IDs still serving after clear/set
+//! - Server leaking state: removed or cleared import IDs still serving
+//! - A new registration invalidating another registration's URL
 //! - Deleted source files causing panics instead of 404
 //! - Server failing to start on a random available port
 
@@ -89,19 +90,19 @@ fn rejects_unsatisfiable_ranges() {
 /// Exercises the server lifecycle and HTTP behavior with real loopback IO.
 ///
 /// The test covers startup, full/HEAD responses, range responses, suffix
-/// ranges, unsatisfiable ranges, stale import IDs, clear, and deleted source
-/// files.
+/// ranges, unsatisfiable ranges, unknown IDs, and deleted source files.
 #[test]
-fn serves_full_range_stale_clear_and_deleted_file_behaviors() {
+fn serves_full_range_unknown_and_deleted_file_behaviors() {
     let (path_a, data_a) = write_temp_file("a", 64 * 1024);
     let (path_b, _data_b) = write_temp_file("b", 1024);
     let server = VideoServerHandle::new();
     server.start().expect("server starts");
 
-    let url_a = server
-        .set_video(path_a.clone(), "video/mp4".to_string())
-        .expect("set first video");
-    let (port, id_a) = split_url(&url_a);
+    let registration_a = server
+        .register_video(path_a.clone(), "video/mp4".to_string())
+        .expect("register first video");
+    let (port, id_a) = split_url(&registration_a.preview_url);
+    assert_eq!(id_a, registration_a.import_id);
 
     let head = request(
         port,
@@ -150,36 +151,105 @@ fn serves_full_range_stale_clear_and_deleted_file_behaviors() {
     assert!(headers(&unsat).starts_with("HTTP/1.1 416 Range Not Satisfiable"));
     assert!(headers(&unsat).contains("Content-Range: bytes */65536"));
 
-    let url_b = server
-        .set_video(path_b.clone(), "video/mp4".to_string())
-        .expect("set second video");
-    assert_ne!(url_a, url_b);
-    let stale = request(
+    let unknown = request(
         port,
-        &format!("GET /video/{id_a} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),
+        &format!(
+            "GET /video/{} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+            Uuid::new_v4()
+        ),
     );
-    assert!(headers(&stale).starts_with("HTTP/1.1 404 Not Found"));
+    assert!(headers(&unknown).starts_with("HTTP/1.1 404 Not Found"));
 
-    let (_, id_b) = split_url(&url_b);
-    server.clear_video().expect("clear video");
-    let cleared = request(
-        port,
-        &format!("GET /video/{id_b} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),
-    );
-    assert!(headers(&cleared).starts_with("HTTP/1.1 404 Not Found"));
-
-    let url_b = server
-        .set_video(path_b.clone(), "video/mp4".to_string())
-        .expect("set deleted video");
-    let (_, id_b) = split_url(&url_b);
+    let registration_b = server
+        .register_video(path_b.clone(), "video/mp4".to_string())
+        .expect("register deleted video");
     std::fs::remove_file(&path_b).expect("delete temp video");
     let deleted = request(
         port,
-        &format!("GET /video/{id_b} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),
+        &format!(
+            "GET /video/{} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+            registration_b.import_id
+        ),
     );
     assert!(headers(&deleted).starts_with("HTTP/1.1 404 Not Found"));
 
     let _ = std::fs::remove_file(path_a);
+}
+
+/// Verifies registrations are independent: a later registration keeps earlier
+/// URLs valid, removing one ID invalidates only that ID, and clearing removes
+/// every registration.
+#[test]
+fn keeps_multiple_registrations_independent() {
+    let (path_a, data_a) = write_temp_file("multi-a", 4096);
+    let (path_b, data_b) = write_temp_file("multi-b", 2048);
+    let server = VideoServerHandle::new();
+    server.start().expect("server starts");
+
+    let registration_a = server
+        .register_video(path_a.clone(), "video/mp4".to_string())
+        .expect("register first video");
+    let registration_b = server
+        .register_video(path_b.clone(), "video/mp4".to_string())
+        .expect("register second video");
+    let same_path = server
+        .register_video(path_a.clone(), "video/mp4".to_string())
+        .expect("register first video again");
+    assert_ne!(registration_a.import_id, registration_b.import_id);
+    assert_ne!(registration_a.import_id, same_path.import_id);
+    let (port, id_a) = split_url(&registration_a.preview_url);
+    let (_, id_b) = split_url(&registration_b.preview_url);
+    let (_, id_same) = split_url(&same_path.preview_url);
+
+    let range_a = request(
+        port,
+        &format!("GET /video/{id_a} HTTP/1.1\r\nHost: 127.0.0.1\r\nRange: bytes=100-199\r\n\r\n"),
+    );
+    let range_b = request(
+        port,
+        &format!("GET /video/{id_b} HTTP/1.1\r\nHost: 127.0.0.1\r\nRange: bytes=100-199\r\n\r\n"),
+    );
+    assert!(headers(&range_a).contains("Content-Range: bytes 100-199/4096"));
+    assert!(headers(&range_b).contains("Content-Range: bytes 100-199/2048"));
+    assert_eq!(body(&range_a), data_a[100..200]);
+    assert_eq!(body(&range_b), data_b[100..200]);
+
+    let states = server.video_states().expect("diagnostic states");
+    assert_eq!(states.len(), 3);
+    assert!(states.iter().all(|state| state.path_exists));
+
+    server
+        .remove_video(&id_a)
+        .expect("remove first registration");
+    assert!(server.remove_video(&id_a).is_err());
+    let removed = request(
+        port,
+        &format!("GET /video/{id_a} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),
+    );
+    assert!(headers(&removed).starts_with("HTTP/1.1 404 Not Found"));
+    let still_b = request(
+        port,
+        &format!("GET /video/{id_b} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),
+    );
+    assert_eq!(body(&still_b), data_b);
+    let still_same_path = request(
+        port,
+        &format!("GET /video/{id_same} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),
+    );
+    assert_eq!(body(&still_same_path), data_a);
+
+    server.clear_videos().expect("clear all registrations");
+    assert!(server.video_states().expect("diagnostic states").is_empty());
+    for id in [&id_b, &id_same] {
+        let cleared = request(
+            port,
+            &format!("GET /video/{id} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),
+        );
+        assert!(headers(&cleared).starts_with("HTTP/1.1 404 Not Found"));
+    }
+
+    let _ = std::fs::remove_file(path_a);
+    let _ = std::fs::remove_file(path_b);
 }
 
 /// Extracts a valid range from a parsed range result for parser assertions.

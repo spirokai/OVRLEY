@@ -33,6 +33,7 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
 
   const activity = sourceLoadResults[0].value
   const preparedVideo = sourceLoadResults[1].value
+  const previousImportId = useStore.getState().importedVideoImportId
   let video = null
   if (preparedVideo) {
     const registration = await backend.registerPreviewVideo(preparedVideo.path)
@@ -45,10 +46,16 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
       },
     }
   } else {
-    await backend.clearPreviewVideo()
+    await backend.clearPreviewVideos()
   }
 
-  replaceEditorDocument(useStore, () => applyPreparedProjectState(useStore, hydratedProject, { activity, video }))
+  try {
+    replaceEditorDocument(useStore, () => applyPreparedProjectState(useStore, hydratedProject, { activity, video }))
+  } catch (error) {
+    if (video) await backend.removePreviewVideo(video.importedVideoState.importedVideoImportId)
+    throw error
+  }
+  if (video && previousImportId !== null) await backend.removePreviewVideo(previousImportId)
   if (video) onSetBackgroundMode?.('video')
   return project
 }

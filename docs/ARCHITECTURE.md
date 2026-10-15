@@ -496,9 +496,11 @@ All defined in `lib.rs` and implemented in `ovrley_core/src/commands/mod.rs`:
 | `backend_list_templates`       | List bundled + user templates                 |
 | `backend_get_template`         | Read template JSON                            |
 | `backend_probe_video`          | ffprobe metadata extraction                   |
-| `backend_import_preview_video` | Register video for preview                    |
-| `backend_clear_preview_video`  | Clear preview registration                    |
-| `backend_get_video_state`      | Diagnostic server state                       |
+| `backend_import_preview_video` | Probe + register video for preview (adds)     |
+| `backend_register_preview_video` | Register probed video for preview (adds)    |
+| `backend_remove_preview_video` | Remove one preview registration by import ID  |
+| `backend_clear_preview_videos` | Remove all preview registrations              |
+| `backend_get_preview_videos`   | Diagnostic state of all registrations         |
 | `backend_detect_codecs`        | Probe encoder availability                    |
 | `backend_build_elevation_geometry` | Build elevation widget geometry via IPC   |
 | `backend_build_route_geometry` | Build route widget geometry via IPC           |
@@ -808,9 +810,9 @@ On completion: backend_open_video → OS file manager opens output
 [User imports video]
     │
     ▼
-VideoServerHandle.set_video(path)
-    ├── Starts HTTP server on random port (if not running)
-    └── Returns preview URL
+VideoServerHandle.register_video(path)
+    ├── Adds a registration under a fresh import ID (other registrations stay valid)
+    └── Returns import ID + preview URL (/video/<import_id>)
     │
     ▼
 useVideoPreview sets <video src>

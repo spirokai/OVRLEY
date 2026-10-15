@@ -15,7 +15,7 @@
 use crate::distribution::DistributionKind;
 use crate::preview_import::{content_type_for_path, preview_warnings_for_metadata};
 use crate::runtime_paths;
-use crate::video_server::VideoServerHandle;
+use crate::video_server::{PreviewVideoRegistration, VideoServerHandle};
 use crate::BackendState;
 use ovrley_core::activity::finalize::FinalizeActivityResponse;
 use ovrley_core::commands;
@@ -441,13 +441,6 @@ struct ImportPreviewVideoResponse {
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-struct RegisterPreviewVideoResponse {
-    import_id: String,
-    preview_url: String,
-}
-
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
 struct PreparePreviewVideoResponse {
     metadata: serde_json::Value,
     warnings: Vec<String>,
@@ -482,23 +475,16 @@ pub(crate) async fn backend_prepare_preview_video(
 fn register_preview_video(
     state: &VideoServerHandle,
     path: String,
-) -> Result<RegisterPreviewVideoResponse, String> {
-    let preview_url = state.set_video(PathBuf::from(&path), content_type_for_path(&path))?;
-    let import_id = preview_url
-        .rsplit('/')
-        .next()
-        .ok_or_else(|| "Failed to read import ID from preview URL".to_string())?
-        .to_string();
-    Ok(RegisterPreviewVideoResponse {
-        import_id,
-        preview_url,
-    })
+) -> Result<PreviewVideoRegistration, String> {
+    let content_type = content_type_for_path(&path);
+    state.register_video(PathBuf::from(path), content_type)
 }
 
 /// Registers an already-probed video with the preview server.
 ///
 /// Project loading probes sources in parallel before entering its commit
 /// phase. This command performs only the fast, fallible preview registration.
+/// Existing registrations stay valid.
 #[tauri::command]
 pub(crate) async fn backend_register_preview_video(
     state: tauri::State<'_, VideoServerHandle>,
@@ -543,27 +529,36 @@ pub(crate) async fn backend_extract_video_telemetry(
         .map_err(|error| error.to_string())
 }
 
-/// Clears the currently registered local HTTP preview video.
+/// Removes one local HTTP preview video registration.
 ///
-/// Any previously issued `/video/<import_id>` URL becomes invalid after this
-/// command because the server only serves the current import.
+/// Only `/video/<import_id>` becomes invalid; other registrations keep serving.
 #[tauri::command]
-pub(crate) async fn backend_clear_preview_video(
+pub(crate) async fn backend_remove_preview_video(
     state: tauri::State<'_, VideoServerHandle>,
+    import_id: String,
 ) -> Result<String, String> {
-    state.clear_video()?;
+    state.remove_video(&import_id)?;
     Ok("null".to_string())
 }
 
-/// Returns diagnostic state for the currently registered preview video.
+/// Removes every local HTTP preview video registration.
+#[tauri::command]
+pub(crate) async fn backend_clear_preview_videos(
+    state: tauri::State<'_, VideoServerHandle>,
+) -> Result<String, String> {
+    state.clear_videos()?;
+    Ok("null".to_string())
+}
+
+/// Returns diagnostic state for every registered preview video.
 ///
 /// This is not needed for normal playback, but is useful for DevTools/manual
 /// verification of server state and source-file availability.
 #[tauri::command]
-pub(crate) async fn backend_get_video_state(
+pub(crate) async fn backend_get_preview_videos(
     state: tauri::State<'_, VideoServerHandle>,
 ) -> Result<String, String> {
-    serialize_command_result(&state.current_state())
+    serialize_command_result(&state.video_states()?)
 }
 
 /// Returns the loopback URL template used by MapLibre to request cached map styles.

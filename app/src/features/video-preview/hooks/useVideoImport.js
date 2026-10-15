@@ -2,7 +2,7 @@
  * Video import - background media selection and preview management.
  */
 
-import { clearPreviewVideo, extractVideoTelemetry, importPreviewVideo, preparePreviewVideo } from '@/api/backend'
+import { clearPreviewVideos, extractVideoTelemetry, importPreviewVideo, preparePreviewVideo, removePreviewVideo } from '@/api/backend'
 import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import { openSinglePath } from '@/lib/file-dialog'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
@@ -69,6 +69,7 @@ async function importVideoSelection(selection, { setImportingVideo, setImportedV
   setImportingVideo(true)
   clearVideoTelemetry()
 
+  const previousImportId = useStore.getState().importedVideoImportId
   const response = await importPreviewVideo(path)
   const metadata = {
     ...response.metadata,
@@ -76,27 +77,33 @@ async function importVideoSelection(selection, { setImportingVideo, setImportedV
     previewUrl: response.previewUrl,
     previewWarnings: response.warnings ?? [],
   }
-  const currentConfig = useStore.getState().config
-  if (!currentConfig?.scene) {
-    throw new Error('Cannot import video without an active template scene')
-  }
-
-  await runWithoutEditorHistory(useStore, () => {
-    const importedVideoResolution = setImportedVideo(metadata)
-    setConfig({
-      ...currentConfig,
-      scene: {
-        ...currentConfig.scene,
-        width: importedVideoResolution.width,
-        height: importedVideoResolution.height,
-      },
-    })
-    if (metadata.fps) {
-      const { renderSettings, setRenderFpsAndUpdateRate } = useStore.getState()
-      const fps = Math.round(metadata.fps)
-      setRenderFpsAndUpdateRate(fps, normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate))
+  try {
+    const currentConfig = useStore.getState().config
+    if (!currentConfig?.scene) {
+      throw new Error('Cannot import video without an active template scene')
     }
-  })
+
+    await runWithoutEditorHistory(useStore, () => {
+      const importedVideoResolution = setImportedVideo(metadata)
+      setConfig({
+        ...currentConfig,
+        scene: {
+          ...currentConfig.scene,
+          width: importedVideoResolution.width,
+          height: importedVideoResolution.height,
+        },
+      })
+      if (metadata.fps) {
+        const { renderSettings, setRenderFpsAndUpdateRate } = useStore.getState()
+        const fps = Math.round(metadata.fps)
+        setRenderFpsAndUpdateRate(fps, normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate))
+      }
+    })
+  } catch (error) {
+    await removePreviewVideo(response.importId)
+    throw error
+  }
+  if (previousImportId !== null) await removePreviewVideo(previousImportId)
   onSetBackgroundMode?.('video')
 
   await extractAndStoreVideoTelemetry(path)
@@ -160,7 +167,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
         setImportingVideo(true)
         try {
           if (importedVideoPath) {
-            await clearPreviewVideo()
+            await clearPreviewVideos()
           }
           setImportedBackgroundImage(selected)
           onSetBackgroundMode?.('image')
@@ -191,7 +198,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
         setImportingVideo(true)
         try {
           if (importedVideoPath) {
-            await clearPreviewVideo()
+            await clearPreviewVideos()
           }
           setImportedBackgroundImage(path)
           onSetBackgroundMode?.('image')
@@ -213,7 +220,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   const handleClearImportedVideo = async () => {
     try {
       if (importedVideoPath) {
-        await clearPreviewVideo()
+        await clearPreviewVideos()
       }
     } catch (err) {
       console.error('Failed to clear preview video:', err)

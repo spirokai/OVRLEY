@@ -20,10 +20,12 @@ Rules that apply throughout:
 ## M1 — Native groundwork
 
 1. Video server: replace `current: Option<CurrentVideo>` with a registry keyed by import ID (`src-tauri/src/video_server.rs`). Register, remove one, clear all, diagnostics for all.
-2. Tauri commands: register/remove/clear by ID (`src-tauri/src/tauri_commands.rs`, `app/src/api/backend.js`).
-3. Probe: expose exact frame count, exact rational FPS (avg + nominal), display-oriented resolution, `has_audio` (already present) at ingress (`ovrley_core/src/media/video_probe.rs`). Fail the file on missing/malformed required timing.
+2. Tauri commands: `backend_register_preview_video` / `backend_import_preview_video` add a registration; `backend_remove_preview_video(importId)`, `backend_clear_preview_videos`, `backend_get_preview_videos` (`src-tauri/src/tauri_commands.rs`, `app/src/api/backend.js`). Single-video frontend callers remove the previous registration only after the new state is committed.
+3. ~~Probe changes~~ — not needed natively (decided during M1). The probe already returns exact `fpsNum/fpsDen`, `hasAudio`, resolution, and rotation. `nb_frames` is absent in MKV and other containers, so frame count is derived once at frontend ingress in M2 as `round(duration × fpsNum / fpsDen)`. VFR files stay accepted as today (no new rejection).
 
-Tests: video-server integration (multiple registrations, ranges, isolated removal, stale IDs); probe fixtures.
+Tests: video-server integration (multiple registrations, ranges, isolated removal, unknown IDs, clear-all); project-load replacement order.
+
+Status: implemented (awaiting owner commit).
 
 ## M2 — Canonical model, program derivation, persistence
 
