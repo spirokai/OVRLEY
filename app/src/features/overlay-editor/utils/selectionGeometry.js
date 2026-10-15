@@ -71,13 +71,20 @@ export function buildWidgetBadges({ displayScale, hoveredWidgetId, orderedWidget
   const badges = []
   for (const id of orderedWidgetIds) {
     const node = widgetNodes[id]
-    if (!visibleIds.has(id) || !node) continue
+    if (!visibleIds.has(id) || !node || node.style.visibility === 'hidden') continue
     const bounds = node.getBoundingClientRect()
+    const matrix = new DOMMatrixReadOnly(node.style.transform)
+    const width = Number.parseFloat(node.style.width)
+    const height = Number.parseFloat(node.style.height)
+    // Recover the rotated top-left corner; the DOM bounds already account for the widget's transform-origin.
+    const left = bounds.left - Math.min(0, matrix.a * width, matrix.c * height, matrix.a * width + matrix.c * height) * scale.x
+    const top = bounds.top - Math.min(0, matrix.b * width, matrix.d * height, matrix.b * width + matrix.d * height) * scale.y
     badges.push({
       id,
       type: widgetMap[id].type,
-      left: ((bounds.left - sceneBounds.left) / scale.x) * displayScale - 2,
-      top: Math.max(((bounds.top - sceneBounds.top) / scale.y) * displayScale - 20, 0),
+      left: ((left - sceneBounds.left) / scale.x) * displayScale + 2 * matrix.a - 20 * matrix.c,
+      top: Math.max(((top - sceneBounds.top) / scale.y) * displayScale + 2 * matrix.b - 20 * matrix.d, 0),
+      rotation: (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI,
     })
   }
   return badges
@@ -90,6 +97,7 @@ export function areWidgetBadgesEqual(previous, next) {
     const left = previous[index]
     const right = next[index]
     if (left.id !== right.id || left.type !== right.type || left.left !== right.left || left.top !== right.top) return false
+    if (left.rotation !== right.rotation) return false
   }
   return true
 }
