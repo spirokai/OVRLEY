@@ -13,8 +13,7 @@ use crate::{
     widgets::value::preview::surface,
 };
 use skia_safe::{
-    gradient, image_filters, BlendMode, Color, Color4f, FilterMode, Image, Paint, Point, Rect,
-    TileMode,
+    gradient, image_filters, BlendMode, Color, Color4f, Image, Paint, Point, Rect, TileMode,
 };
 
 /// Plain geometry keeps the native cache shareable by export worker threads.
@@ -33,11 +32,11 @@ pub struct HeadingCache {
     pub frame: Rect,
     pub pixels_per_degree: f32,
     pub(crate) tape_content_y: f32,
-    pub(crate) tape_paint: Paint,
     pub(crate) tape_ink: Vec<Rect>,
     pub(crate) indicators: Vec<(IndicatorShape, Paint)>,
     pub(crate) indicator_shadow: Option<Paint>,
     pub(crate) edge_fade: Paint,
+    pub(crate) edge_fade_bounds: [Rect; 2],
     pub(crate) opacity: f32,
 }
 
@@ -48,7 +47,7 @@ pub fn prepare_heading_cache(
 ) -> WidgetResult<HeadingCache> {
     let scale = scene.scale;
     let tape_width = (360.0 * heading.pixels_per_degree * scale).ceil() as u32;
-    // Keep the scroll period identical to the cached image's whole-pixel repeat width.
+    // The scroll period excludes the one-pixel sampling gutter at each image edge.
     let pixels_per_degree = tape_width as f32 / 360.0;
     let frame = Rect::from_xywh(
         heading.x,
@@ -58,6 +57,16 @@ pub fn prepare_heading_cache(
     );
     // Fade the outer 45 intrinsic pixels; keep narrow tapes' centre fully visible.
     let fade_stop = (45.0 * scale / frame.width()).min(0.25);
+    let fade_width = fade_stop * frame.width();
+    let edge_fade_bounds = [
+        Rect::new(frame.left, frame.top, frame.left + fade_width, frame.bottom),
+        Rect::new(
+            frame.right - fade_width,
+            frame.top,
+            frame.right,
+            frame.bottom,
+        ),
+    ];
     let colors = [
         Color4f::from(Color::TRANSPARENT),
         Color4f::from(Color::WHITE),
@@ -91,11 +100,20 @@ pub fn prepare_heading_cache(
         label_offset,
         font_size,
     );
-    let mut tape = surface(tape_width, layout.body_height.ceil() as u32)?;
+    let image_width = tape_width
+        .checked_add(2)
+        .ok_or_else(|| WidgetError::Render("heading strip image width overflow".into()))?;
+    let mut tape = surface(image_width, layout.body_height.ceil() as u32)?;
     let canvas = tape.canvas();
     canvas.clear(skia_safe::Color::TRANSPARENT);
+    // Wrapped strokes/labels also fill these gutters, so bilinear sampling sees across north.
+    canvas.translate((1.0, 0.0));
     let clip = Rect::from_xywh(0.0, 0.0, tape_width as f32, layout.body_height);
-    canvas.clip_rect(clip, skia_safe::ClipOp::Intersect, false);
+    canvas.clip_rect(
+        Rect::from_xywh(-1.0, 0.0, image_width as f32, layout.body_height),
+        skia_safe::ClipOp::Intersect,
+        false,
+    );
     let font = resolve_font(fonts, Some(&heading.label_font), font_size)?;
     let label_y = heading_label_baseline(
         layout.tick_scale_height,
@@ -199,18 +217,6 @@ pub fn prepare_heading_cache(
     let tape_content_y =
         layout.body_y + (layout.body_height - tape_bounds.height()) * 0.5 - tape_bounds.top;
     let tape_image = tape.image_snapshot();
-    let mut tape_paint = Paint::default();
-    tape_paint.set_shader(
-        tape_image
-            .to_shader(
-                (TileMode::Repeat, TileMode::Decal),
-                FilterMode::Linear,
-                None,
-            )
-            .ok_or_else(|| {
-                WidgetError::Render("unable to prepare repeating heading strip".into())
-            })?,
-    );
     let mut indicator_paint = Paint::default();
     indicator_paint.set_anti_alias(true);
     indicator_paint.set_color(parse_color(&heading.indicator_color, 1.0));
@@ -260,11 +266,11 @@ pub fn prepare_heading_cache(
         frame,
         pixels_per_degree,
         tape_content_y,
-        tape_paint,
         tape_ink: ink,
         indicators,
         indicator_shadow,
         edge_fade,
+        edge_fade_bounds,
         opacity: heading.opacity * scene.opacity,
     })
 }
