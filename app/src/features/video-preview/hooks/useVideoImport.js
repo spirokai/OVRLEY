@@ -2,7 +2,7 @@
  * Video import - background media selection and preview management.
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { clearPreviewVideos, extractVideoTelemetry, importPreviewVideo, preparePreviewVideo, removePreviewVideo } from '@/api/backend'
 import { changeVideoCollection, runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import { openMultiplePaths } from '@/lib/file-dialog'
@@ -11,6 +11,7 @@ import { deriveCompatibility, joinVideoEdits, sortVideosByTimeline } from '@/lib
 import { createImportedVideo, nextImportOrder } from '@/store/slices/createVideoImportSlice'
 import useStore from '@/store/useStore'
 import i18next from 'i18next'
+import useVideoImportFollowUp from './useVideoImportFollowUp'
 
 const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'mkv'])
 const DEBUG_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
@@ -99,7 +100,8 @@ function errorMessage(error) {
  * collection in one change. A file that is not a video, is already imported, or
  * fails to probe is reported and skipped; the others still import.
  * @param {Array<string>} paths Absolute file paths in selection order.
- * @returns {Promise<{videos: Array<object>, failures: Array<{path: string, message: string}>, duplicates: Array<string>}>} Import result.
+ * @returns {Promise<{videos: Array<object>, undeterminedIds: Array<string>, failures: Array<{path: string, message: string}>, duplicates: Array<string>}>}
+ *   Import result; `undeterminedIds` are added clips whose time could not be determined.
  */
 async function importVideoPaths(paths) {
   const state = useStore.getState()
@@ -136,18 +138,20 @@ async function importVideoPaths(paths) {
     }
   }
 
+  let undeterminedIds = []
   if (videos.length > 0) {
     try {
-      changeVideoCollection(useStore, () => {
-        useStore.getState().addImportedVideos(videos)
+      undeterminedIds = changeVideoCollection(useStore, () => {
+        const ids = useStore.getState().addImportedVideos(videos)
         if (wasEmpty) adoptVideoFormat(deriveCompatibility(videos).reference)
+        return ids
       })
     } catch (error) {
       for (const video of videos) await removePreviewVideo(video.preview.importId)
       throw error
     }
   }
-  return { videos, failures, duplicates }
+  return { videos, undeterminedIds, failures, duplicates }
 }
 
 /**
@@ -213,11 +217,12 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   const importedBackgroundImageFilename = importedBackgroundImagePath ? basename(importedBackgroundImagePath) : null
   const importedMediaFilename = importedBackgroundImageFilename || importedVideoLabel
 
-  const [importReport, setImportReport] = useState(null)
+  const followUp = useVideoImportFollowUp()
 
   /**
-   * Imports the given paths behind the blocking loader, then reports failures,
-   * duplicates, and new incompatibilities. Telemetry extraction continues afterwards.
+   * Imports the given paths behind the blocking loader, then runs the follow-up
+   * dialogs (report, placement, transition defaults, overlaps). Telemetry
+   * extraction continues in the background.
    */
   const loadVideoPaths = async (paths) => {
     const incompatibleBefore = deriveCompatibility(useStore.getState().importedVideos).incompatibleIds
@@ -232,7 +237,11 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
       onSetBackgroundMode?.('video')
       void queueTelemetryExtraction(result.videos)
     }
-    setImportReport(createImportReport(result, incompatibleBefore))
+    followUp.start({
+      report: createImportReport(result, incompatibleBefore),
+      undeterminedIds: result.undeterminedIds,
+      videoIds: result.videos.map((video) => video.id),
+    })
   }
 
   const applyBackgroundImage = async (path) => {
@@ -316,11 +325,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
     clearImportedVideos: handleClearImportedVideos,
     handleImportVideo,
     handleVideoFilesDrop,
-    importReportDialog: {
-      open: importReport !== null,
-      report: importReport,
-      onClose: () => setImportReport(null),
-    },
+    importDialogs: followUp.dialogs,
     loadVideoPaths,
     prepareVideoPath,
   }

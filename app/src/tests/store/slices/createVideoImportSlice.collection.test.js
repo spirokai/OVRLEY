@@ -236,6 +236,64 @@ describe('adding videos to the collection', () => {
   })
 })
 
+describe('placement anchors', () => {
+  beforeEach(resetStore)
+
+  function clip(id, options = {}) {
+    return createTestVideo({ id, path: `/videos/${id}.mp4`, durationSeconds: 20, ...options })
+  }
+
+  test('anchored clips sit next to their anchor and follow it through a full sync until their time is known', () => {
+    const known = clip('known', { creationTime: '2026-07-18T08:00:30Z', timeSource: 'gps' })
+    const first = clip('first', { importOrder: 1 })
+    const second = clip('second', { importOrder: 2 })
+    useStore.getState().addImportedVideos([known, first, second])
+    useStore.getState().anchorVideo('second', 'first', 'after')
+    useStore.getState().anchorVideo('first', 'known', 'before')
+    expect(offsets()).toEqual({ known: 0, first: -20, second: 0 })
+    expect(warnings()).toEqual({ known: null, first: null, second: null })
+
+    useStore.getState().activateActivityFile(activityFile)
+    expect(offsets()).toEqual({ known: 30, first: 10, second: 30 })
+    expect(warnings()).toEqual({ known: null, first: null, second: null })
+
+    useStore.setState((draft) => {
+      draft.importedVideos.find((video) => video.id === 'first').creationTime = '2026-07-18T08:01:00Z'
+      draft.importedVideos.find((video) => video.id === 'first').timeSource = 'gps'
+    })
+    useStore.getState().computeVideoSync()
+    expect(offsets()).toEqual({ known: 30, first: 60, second: 80 })
+  })
+
+  test('rejects anchors to unknown clips, to the clip itself, through cycles, and unknown sides', () => {
+    useStore.getState().addImportedVideos([clip('a'), clip('b', { importOrder: 1 })])
+    useStore.getState().anchorVideo('b', 'a', 'after')
+
+    expect(() => useStore.getState().anchorVideo('a', 'missing', 'after')).toThrow('Unknown imported video')
+    expect(() => useStore.getState().anchorVideo('a', 'a', 'after')).toThrow('relative to itself')
+    expect(() => useStore.getState().anchorVideo('a', 'b', 'before')).toThrow('relative to itself')
+    expect(() => useStore.getState().anchorVideo('b', 'a', 'over')).toThrow('before or after')
+  })
+})
+
+describe('transition defaults', () => {
+  beforeEach(resetStore)
+
+  test('stores chosen defaults, marks the dialog as shown, and rejects malformed values', () => {
+    useStore.getState().setTransitionDefaults({ type: 'none', durationSeconds: 3, splitGapThresholdSeconds: 0 })
+    expect(useStore.getState().transitionDefaults).toEqual({ type: 'none', durationSeconds: 3, splitGapThresholdSeconds: 0, dialogShown: true })
+
+    for (const [defaults, message] of [
+      [{ type: 'swirl', durationSeconds: 2, splitGapThresholdSeconds: 2 }, 'Unknown transition type'],
+      [{ type: 'fade', durationSeconds: 0, splitGapThresholdSeconds: 2 }, 'positive number'],
+      [{ type: 'fade', durationSeconds: Number.NaN, splitGapThresholdSeconds: 2 }, 'positive number'],
+      [{ type: 'fade', durationSeconds: 2, splitGapThresholdSeconds: -1 }, 'Continuity threshold'],
+    ]) {
+      expect(() => useStore.getState().setTransitionDefaults(defaults)).toThrow(message)
+    }
+  })
+})
+
 describe('offset edits', () => {
   beforeEach(resetStore)
 

@@ -318,6 +318,23 @@ struct ProjectVideo {
     deleted_parts: Vec<ProjectDeletedPart>,
     #[serde(deserialize_with = "deserialize_required_option")]
     transition_in: Option<ProjectTransition>,
+    /// Places a video whose time cannot be determined next to another video.
+    #[serde(deserialize_with = "deserialize_required_option")]
+    placement_anchor: Option<ProjectPlacementAnchor>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectPlacementAnchor {
+    video_id: String,
+    side: PlacementSide,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum PlacementSide {
+    Before,
+    After,
 }
 
 /// A clip-local source range excluded from output and the transition of the join it leaves.
@@ -812,6 +829,39 @@ fn validate_videos(videos: &[ProjectVideo]) -> Result<(), String> {
             return Err("sources.videos deletedParts must not overlap".into());
         }
     }
+    validate_placement_anchors(videos)
+}
+
+/// Anchors reference another project video and never form a cycle.
+fn validate_placement_anchors(videos: &[ProjectVideo]) -> Result<(), String> {
+    let anchors: HashMap<&str, &str> = videos
+        .iter()
+        .filter_map(|video| {
+            video
+                .placement_anchor
+                .as_ref()
+                .map(|anchor| (video.id.as_str(), anchor.video_id.as_str()))
+        })
+        .collect();
+    for (video_id, anchor_id) in &anchors {
+        if !videos.iter().any(|video| video.id == *anchor_id) {
+            return Err(format!(
+                "sources.videos placementAnchor does not reference a project video: {anchor_id}"
+            ));
+        }
+        let mut current = Some(*anchor_id);
+        for _ in 0..=anchors.len() {
+            match current {
+                Some(id) if id == *video_id => {
+                    return Err(format!(
+                        "sources.videos placementAnchor forms a cycle: {video_id}"
+                    ))
+                }
+                Some(id) => current = anchors.get(id).copied(),
+                None => break,
+            }
+        }
+    }
     Ok(())
 }
 
@@ -1052,6 +1102,7 @@ fn migrate_v3_project(project: ProjectDocumentV3) -> ProjectDocument {
         offset_seconds: project.sync.video_offset_seconds,
         deleted_parts: Vec::new(),
         transition_in: None,
+        placement_anchor: None,
     });
     let manual = project.sync.manual;
     ProjectDocument {
@@ -1903,7 +1954,8 @@ mod tests {
             "path": { "kind": "project-relative", "value": path },
             "offsetSeconds": offset_seconds,
             "deletedParts": [],
-            "transitionIn": null
+            "transitionIn": null,
+            "placementAnchor": null
         })
     }
 
@@ -1916,6 +1968,7 @@ mod tests {
               "transition": { "type": "dissolve", "durationSeconds": 1.5 } }
         ]);
         second["transitionIn"] = serde_json::json!({ "type": "none", "durationSeconds": 0.0 });
+        second["placementAnchor"] = serde_json::json!({ "videoId": "clip-a", "side": "after" });
         project["sources"]["videos"] =
             serde_json::json!([video("clip-a", "media/a.mp4", -12.5), second]);
         project["sync"]["manual"]["videoId"] = Value::from("clip-b");
@@ -2546,6 +2599,7 @@ mod tests {
         assert_eq!(video.offset_seconds, 12.5);
         assert!(video.deleted_parts.is_empty());
         assert!(video.transition_in.is_none());
+        assert!(video.placement_anchor.is_none());
         assert_eq!(
             parsed.sync.manual.video_id.as_deref(),
             Some(video.id.as_str())
@@ -2607,7 +2661,28 @@ mod tests {
 
     #[test]
     fn rejects_malformed_v4_video_collection_contracts() {
-        let cases: [(&str, fn(&mut Value)); 20] = [
+        let cases: [(&str, fn(&mut Value)); 25] = [
+            ("missing placementAnchor", |project| {
+                project["sources"]["videos"][0]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("placementAnchor");
+            }),
+            ("unknown anchor video", |project| {
+                project["sources"]["videos"][1]["placementAnchor"]["videoId"] =
+                    Value::from("missing");
+            }),
+            ("anchor to itself", |project| {
+                project["sources"]["videos"][1]["placementAnchor"]["videoId"] =
+                    Value::from("clip-b");
+            }),
+            ("anchor cycle", |project| {
+                project["sources"]["videos"][0]["placementAnchor"] =
+                    serde_json::json!({ "videoId": "clip-b", "side": "before" });
+            }),
+            ("unknown anchor side", |project| {
+                project["sources"]["videos"][1]["placementAnchor"]["side"] = Value::from("over");
+            }),
             ("empty video id", |project| {
                 project["sources"]["videos"][0]["id"] = Value::from(" ")
             }),

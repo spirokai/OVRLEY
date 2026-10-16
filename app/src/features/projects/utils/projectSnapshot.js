@@ -29,6 +29,7 @@ function projectVideos(state, projectPath) {
           transition: cloneTransition(part.transition),
         })),
         transitionIn: cloneTransition(edits.transitionIn),
+        placementAnchor: edits.placementAnchor === null ? null : { ...edits.placementAnchor },
       }
     })
 }

@@ -80,7 +80,7 @@ describe('useVideoImport multi-file import', () => {
     expect(state.renderSettings.fps).toBe(60)
     expect(state.importingVideo).toBe(false)
     expect(onSetBackgroundMode).toHaveBeenCalledWith('video')
-    expect(result.current.importReportDialog.open).toBe(false)
+    expect(result.current.importDialogs.report.open).toBe(false)
     await waitFor(() => expect(useStore.getState().importedVideos.every((video) => video.telemetry.status === 'absent')).toBe(true))
     expect(boundaries.extractVideoTelemetry.mock.calls.map(([path]) => path)).toEqual(['/clips/a.mp4', '/clips/b.mp4'])
     expect(useStore.temporal.getState().pastStates).toEqual([])
@@ -104,7 +104,7 @@ describe('useVideoImport multi-file import', () => {
 
     expect(importedPaths()).toEqual(['/clips/existing.mp4', '/clips/good.mp4'])
     expect(boundaries.removePreviewVideo).toHaveBeenCalledExactlyOnceWith('import:/clips/no-fps.mp4')
-    const { open, report } = result.current.importReportDialog
+    const { open, report } = result.current.importDialogs.report
     expect(open).toBe(true)
     expect(report.duplicates).toEqual(['/clips/existing.mp4', '/clips/good.mp4'])
     expect(report.failures).toEqual([
@@ -114,8 +114,8 @@ describe('useVideoImport multi-file import', () => {
     ])
     expect(report.incompatibleVideos).toEqual([])
 
-    act(() => result.current.importReportDialog.onClose())
-    expect(result.current.importReportDialog.open).toBe(false)
+    act(() => result.current.importDialogs.report.onClose())
+    expect(result.current.importDialogs.report.open).toBe(false)
   })
 
   test('warns when an import adds clips that cannot be combined, and only the first import sizes the scene', async () => {
@@ -129,7 +129,7 @@ describe('useVideoImport multi-file import', () => {
 
     await importPaths(result, ['/clips/b.mp4', '/clips/c.mp4'])
 
-    const { report } = result.current.importReportDialog
+    const { report } = result.current.importDialogs.report
     expect(report.reference).toEqual({ resolution: { width: 1920, height: 1080 }, fps: { num: 30, den: 1 } })
     expect(report.incompatibleVideos.map((video) => video.path)).toEqual(['/clips/c.mp4'])
     expect(buildVideoImportReportSections(report, i18next.t)).toEqual([
@@ -143,9 +143,9 @@ describe('useVideoImport multi-file import', () => {
     ])
     expect(useStore.getState().config.scene).toMatchObject({ width: 1280, height: 720 })
 
-    act(() => result.current.importReportDialog.onClose())
+    act(() => result.current.importDialogs.report.onClose())
     await importPaths(result, ['/clips/d.mp4'])
-    expect(result.current.importReportDialog.open).toBe(false)
+    expect(result.current.importDialogs.report.open).toBe(false)
   })
 
   test('commits nothing when every file fails', async () => {
@@ -155,7 +155,7 @@ describe('useVideoImport multi-file import', () => {
 
     expect(importedPaths()).toEqual([])
     expect(onSetBackgroundMode).not.toHaveBeenCalled()
-    expect(result.current.importReportDialog.report.failures).toHaveLength(1)
+    expect(result.current.importDialogs.report.report.failures).toHaveLength(1)
   })
 
   test('imports several dropped native paths and rejects browser files without a path', async () => {
@@ -169,5 +169,140 @@ describe('useVideoImport multi-file import', () => {
     await act(() => result.current.handleVideoFilesDrop([new File([], 'c.mp4')]))
     expect(useStore.getState().errorMessage).toBe('Video drop failed: Dropped files must be local files.')
     expect(importedPaths()).toEqual(['/clips/a.mp4', '/clips/b.mp4'])
+  })
+})
+
+describe('useVideoImport follow-up dialogs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useStore.setState(useStore.getInitialState(), true)
+    useStore.temporal.getState().clear()
+    probes = {}
+    boundaries.importPreviewVideo.mockImplementation(async (path) => {
+      if (!probes[path]) throw new Error(`probe failed: ${path}`)
+      return { importId: `import:${path}`, previewUrl: `http://preview/${path}`, metadata: probes[path], warnings: [] }
+    })
+    boundaries.removePreviewVideo.mockResolvedValue(null)
+    boundaries.extractVideoTelemetry.mockResolvedValue({ parsed_activity: null })
+  })
+
+  function openDialog(result) {
+    const dialogs = result.current.importDialogs
+    return Object.keys(dialogs).filter((kind) => dialogs[kind].open)
+  }
+
+  function offsetOf(path) {
+    const video = useStore.getState().importedVideos.find((candidate) => candidate.path === path)
+    return useStore.getState().videoEdits[video.id].offsetSeconds
+  }
+
+  test('runs report, placement, transition defaults, and overlap dialogs one after another', async () => {
+    probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:00Z' })
+    probe('/clips/b.mp4', { creationTime: '2026-07-18T08:00:20Z' })
+    probe('/clips/unknown.mp4')
+    const { result } = renderImport()
+
+    await importPaths(result, ['/clips/a.mp4', '/clips/b.mp4', '/clips/unknown.mp4', '/clips/missing.mp4'])
+
+    expect(openDialog(result)).toEqual(['report'])
+    act(() => result.current.importDialogs.report.onClose())
+
+    expect(openDialog(result)).toEqual(['placement'])
+    const placement = result.current.importDialogs.placement
+    expect(placement.videoName).toBe('unknown.mp4')
+    expect(placement.candidates.map((candidate) => candidate.name)).toEqual(['a.mp4', 'b.mp4'])
+    expect(placement).toMatchObject({ anchorVideoId: placement.candidates[1].id, side: 'after' })
+    act(() => result.current.importDialogs.placement.onAnchorChange(placement.candidates[0].id))
+    act(() => result.current.importDialogs.placement.onSideChange('before'))
+    act(() => result.current.importDialogs.placement.onConfirm())
+    expect(offsetOf('/clips/unknown.mp4')).toBe(-30)
+    expect(useStore.temporal.getState().pastStates).toEqual([])
+
+    expect(openDialog(result)).toEqual(['transitionDefaults'])
+    expect(result.current.importDialogs.transitionDefaults).toMatchObject({
+      type: 'wipeleft',
+      duration: '2',
+      threshold: '2',
+      durationDisabled: false,
+    })
+    act(() => result.current.importDialogs.transitionDefaults.onTypeChange('none'))
+    expect(result.current.importDialogs.transitionDefaults.durationDisabled).toBe(true)
+    act(() => result.current.importDialogs.transitionDefaults.onThresholdChange('5'))
+    act(() => result.current.importDialogs.transitionDefaults.onConfirm())
+    expect(useStore.getState().transitionDefaults).toEqual({ type: 'none', durationSeconds: 2, splitGapThresholdSeconds: 5, dialogShown: true })
+
+    expect(openDialog(result)).toEqual(['overlaps'])
+    expect(result.current.importDialogs.overlaps.overlaps).toEqual([
+      expect.objectContaining({ earlierName: 'a.mp4', laterName: 'b.mp4', seconds: 10 }),
+    ])
+    act(() => result.current.importDialogs.overlaps.onClose())
+    expect(openDialog(result)).toEqual([])
+  })
+
+  test('asks for transition defaults once, when a project first holds several videos', async () => {
+    probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:00Z' })
+    probe('/clips/b.mp4', { creationTime: '2026-07-18T08:05:00Z' })
+    probe('/clips/c.mp4', { creationTime: '2026-07-18T08:10:00Z' })
+    const { result } = renderImport()
+
+    await importPaths(result, ['/clips/a.mp4'])
+    expect(openDialog(result)).toEqual([])
+
+    await importPaths(result, ['/clips/b.mp4'])
+    expect(openDialog(result)).toEqual(['transitionDefaults'])
+    act(() => result.current.importDialogs.transitionDefaults.onDismiss())
+    expect(useStore.getState().transitionDefaults).toEqual({ type: 'wipeleft', durationSeconds: 2, splitGapThresholdSeconds: 2, dialogShown: true })
+
+    await importPaths(result, ['/clips/c.mp4'])
+    expect(openDialog(result)).toEqual([])
+  })
+
+  test('keeps the transition dialog open with an error for an invalid duration', async () => {
+    probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:00Z' })
+    probe('/clips/b.mp4', { creationTime: '2026-07-18T08:05:00Z' })
+    const { result } = renderImport()
+    await importPaths(result, ['/clips/a.mp4', '/clips/b.mp4'])
+
+    act(() => result.current.importDialogs.transitionDefaults.onDurationChange('0'))
+    act(() => result.current.importDialogs.transitionDefaults.onConfirm())
+
+    expect(result.current.importDialogs.transitionDefaults.error).toBe('Transition duration must be a positive number of seconds')
+    expect(useStore.getState().transitionDefaults.dialogShown).toBe(false)
+    act(() => result.current.importDialogs.transitionDefaults.onDurationChange('1.5'))
+    expect(result.current.importDialogs.transitionDefaults.error).toBeNull()
+    act(() => result.current.importDialogs.transitionDefaults.onConfirm())
+    expect(useStore.getState().transitionDefaults).toMatchObject({ durationSeconds: 1.5, dialogShown: true })
+  })
+
+  test('the first undeterminable clip of an empty timeline stays at the start and anchors the next one', async () => {
+    probe('/clips/first.mp4')
+    probe('/clips/second.mp4')
+    useStore.setState((state) => ({ transitionDefaults: { ...state.transitionDefaults, dialogShown: true } }))
+    const { result } = renderImport()
+
+    await importPaths(result, ['/clips/first.mp4', '/clips/second.mp4'])
+
+    expect(openDialog(result)).toEqual(['placement'])
+    expect(result.current.importDialogs.placement.videoName).toBe('second.mp4')
+    expect(result.current.importDialogs.placement.candidates.map((candidate) => candidate.name)).toEqual(['first.mp4'])
+    act(() => result.current.importDialogs.placement.onConfirm())
+    expect([offsetOf('/clips/first.mp4'), offsetOf('/clips/second.mp4')]).toEqual([0, 30])
+    expect(openDialog(result)).toEqual([])
+  })
+
+  test('skipping the placement leaves the clip at the start with its warning', async () => {
+    probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:00Z' })
+    probe('/clips/unknown.mp4')
+    useStore.setState((state) => ({ transitionDefaults: { ...state.transitionDefaults, dialogShown: true } }))
+    const { result } = renderImport()
+
+    await importPaths(result, ['/clips/a.mp4', '/clips/unknown.mp4'])
+    act(() => result.current.importDialogs.placement.onSkip())
+
+    const unknown = useStore.getState().importedVideos.find((video) => video.path === '/clips/unknown.mp4')
+    expect(offsetOf('/clips/unknown.mp4')).toBe(0)
+    expect(unknown.syncWarning).toBe('Could not determine video creation time')
+    expect(useStore.getState().videoEdits[unknown.id].placementAnchor).toBeNull()
+    expect(openDialog(result)).toEqual(['overlaps'])
   })
 })

@@ -3,7 +3,7 @@ import { parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/
 import { getTimelineMinimum, getTotalPlaybackDuration } from '@/features/player/utils/playerTiming'
 import { createCachedPromise } from '@/lib/cached-promise'
 import { clamp } from '@/lib/utils'
-import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
+import { DEFAULT_TRANSITION_SETTINGS, NO_TRANSITION, XFADE_TRANSITIONS } from '@/lib/video-program/transition-catalog'
 import { getVideosTimelineBounds, joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import { placeVideosByCreationTime, resolveVideosSync } from '@/lib/video-sync'
 import { applyCoursePlotDimensions } from '../store-utils'
@@ -119,11 +119,23 @@ export function createImportedVideo(metadata, { importOrder, preview, telemetry 
 }
 
 /**
- * Creates the user edits of a newly imported video.
- * @returns {{offsetSeconds: number, deletedParts: Array<object>, transitionIn: object|null}} Initial edits.
+ * Creates the user edits of a newly imported video. `placementAnchor` places a
+ * clip whose time cannot be determined directly before or after another clip.
+ * @returns {{offsetSeconds: number, deletedParts: Array<object>, transitionIn: object|null, placementAnchor: {videoId: string, side: 'before'|'after'}|null}} Initial edits.
  */
 export function createVideoEdits() {
-  return { offsetSeconds: 0, deletedParts: [], transitionIn: null }
+  return { offsetSeconds: 0, deletedParts: [], transitionIn: null, placementAnchor: null }
+}
+
+/**
+ * Returns the timeline start that puts a clip directly before or after its anchor clip.
+ * @param {{durationSeconds: number}} video Placed clip.
+ * @param {{offsetSeconds: number, durationSeconds: number}} anchor Anchor clip with its committed offset.
+ * @param {'before'|'after'} side Side of the anchor.
+ * @returns {number} Timeline start second.
+ */
+export function anchoredOffsetSeconds(video, anchor, side) {
+  return side === 'before' ? anchor.offsetSeconds - video.durationSeconds : anchor.offsetSeconds + anchor.durationSeconds
 }
 
 /**
@@ -154,11 +166,41 @@ function detectVideoPlacements(state, videos) {
   return resolveVideosSync(videos, state.activitySummary, state.videoSyncTimezoneMode)
 }
 
+/**
+ * Commits detected placements. A clip whose time cannot be determined but that has
+ * a placement anchor sits next to its anchor instead; anchors are resolved after
+ * the clips they point to (anchors never form cycles).
+ */
 function applyPlacements(draft, placements) {
+  const anchored = []
   draft.importedVideos.forEach((video, index) => {
-    draft.videoEdits[video.id].offsetSeconds = placements[index].offsetSeconds
+    const edits = draft.videoEdits[video.id]
+    if (!placements[index].determined && edits.placementAnchor !== null) {
+      anchored.push(video)
+      return
+    }
+    edits.offsetSeconds = placements[index].offsetSeconds
     video.syncWarning = placements[index].syncWarning
   })
+  const resolved = new Set(draft.importedVideos.filter((video) => !anchored.includes(video)).map((video) => video.id))
+  while (anchored.length > 0) {
+    const index = anchored.findIndex((video) => resolved.has(draft.videoEdits[video.id].placementAnchor.videoId))
+    if (index === -1) throw new Error('Video placement anchors must reference imported videos')
+    const [video] = anchored.splice(index, 1)
+    const { videoId, side } = draft.videoEdits[video.id].placementAnchor
+    const anchor = draft.importedVideos.find((candidate) => candidate.id === videoId)
+    draft.videoEdits[video.id].offsetSeconds = anchoredOffsetSeconds(video, { ...anchor, ...draft.videoEdits[videoId] }, side)
+    video.syncWarning = null
+    resolved.add(video.id)
+  }
+}
+
+function requireTransitionDefaults({ type, durationSeconds, splitGapThresholdSeconds }) {
+  if (type !== NO_TRANSITION && !XFADE_TRANSITIONS.includes(type)) throw new Error(`Unknown transition type: ${type}`)
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) throw new Error('Transition duration must be a positive number of seconds')
+  if (!Number.isFinite(splitGapThresholdSeconds) || splitGapThresholdSeconds < 0) {
+    throw new Error('Continuity threshold must be zero or a positive number of seconds')
+  }
 }
 
 function clampPlayheadToVideos(draft, deltaSeconds) {
@@ -221,6 +263,7 @@ export const createVideoImportSlice = (set, get) => ({
    * correction of the collection: committed minus detected offset of the earliest
    * existing clip whose time can be determined (zero without one).
    * @param {Array<object>} videos Imported video entities with paths not yet in the collection.
+   * @returns {Array<string>} IDs of added clips whose time could not be determined, in input order.
    */
   addImportedVideos: (videos) => {
     const state = get()
@@ -253,6 +296,48 @@ export const createVideoImportSlice = (set, get) => ({
       draft.videoSyncTimezoneMode = timezoneMode
     })
     if (existingCount === 0) get().selectVideoSyncVideo(videos[0].id)
+    return videos.filter((video) => !placementsById.get(video.id).determined).map((video) => video.id)
+  },
+
+  /**
+   * Places a clip directly before or after another clip and keeps that placement
+   * for as long as the clip's own time cannot be determined.
+   */
+  anchorVideo: (videoId, anchorVideoId, side) => {
+    const state = get()
+    requireVideo(state, videoId)
+    requireVideo(state, anchorVideoId)
+    if (side !== 'before' && side !== 'after') throw new Error('Placement side must be before or after')
+    for (let current = anchorVideoId; current !== null; current = state.videoEdits[current].placementAnchor?.videoId ?? null) {
+      if (current === videoId) throw new Error('A video cannot be placed relative to itself')
+    }
+    set((draft) => {
+      const video = draft.importedVideos.find((candidate) => candidate.id === videoId)
+      draft.videoEdits[videoId].placementAnchor = { videoId: anchorVideoId, side }
+      video.syncWarning = null
+      draft.videoDragPreview = null
+      // The placed clip moves next to its anchor, and clips anchored to it follow.
+      const moved = [videoId]
+      while (moved.length > 0) {
+        const movedId = moved.shift()
+        const { videoId: currentAnchorId, side: currentSide } = draft.videoEdits[movedId].placementAnchor
+        const movedVideo = draft.importedVideos.find((candidate) => candidate.id === movedId)
+        const anchor = draft.importedVideos.find((candidate) => candidate.id === currentAnchorId)
+        draft.videoEdits[movedId].offsetSeconds = anchoredOffsetSeconds(movedVideo, { ...anchor, ...draft.videoEdits[currentAnchorId] }, currentSide)
+        moved.push(
+          ...draft.importedVideos
+            .filter((candidate) => draft.videoEdits[candidate.id].placementAnchor?.videoId === movedId)
+            .map((candidate) => candidate.id),
+        )
+      }
+    })
+  },
+
+  /** Stores the project transition defaults chosen by the user and marks the defaults dialog as shown. */
+  setTransitionDefaults: (defaults) => {
+    requireTransitionDefaults(defaults)
+    const { type, durationSeconds, splitGapThresholdSeconds } = defaults
+    set({ transitionDefaults: { type, durationSeconds, splitGapThresholdSeconds, dialogShown: true } })
   },
 
   /** Places every clip by detected time (see `detectVideoPlacements`). */

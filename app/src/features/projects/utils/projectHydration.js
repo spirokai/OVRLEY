@@ -12,9 +12,11 @@ function cloneTransition(transition) {
 
 /**
  * Restores the saved edits of every loaded video. The native boundary validated
- * their shape; bounds that need the probed duration are checked here.
+ * their shape; bounds that need the probed duration are checked here. An anchor
+ * to a video skipped as a missing source is dropped; the clip keeps its offset.
  */
 function createProjectVideoEdits(videos, projectVideos) {
+  const loadedIds = new Set(videos.map((video) => video.id))
   const projectVideosById = new Map(projectVideos.map((projectVideo) => [projectVideo.id, projectVideo]))
   return Object.fromEntries(
     videos.map((video) => {
@@ -29,6 +31,8 @@ function createProjectVideoEdits(videos, projectVideos) {
           offsetSeconds: projectVideo.offsetSeconds,
           deletedParts: projectVideo.deletedParts.map((part) => ({ ...part, transition: cloneTransition(part.transition) })),
           transitionIn: cloneTransition(projectVideo.transitionIn),
+          placementAnchor:
+            projectVideo.placementAnchor !== null && loadedIds.has(projectVideo.placementAnchor.videoId) ? { ...projectVideo.placementAnchor } : null,
         },
       ]
     }),

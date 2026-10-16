@@ -50,7 +50,7 @@ function preparedVideo(path, durationSeconds = 40) {
 }
 
 function projectVideo(id, path, offsetSeconds = 0) {
-  return { id, path: { kind: 'project-relative', value: path }, offsetSeconds, deletedParts: [], transitionIn: null }
+  return { id, path: { kind: 'project-relative', value: path }, offsetSeconds, deletedParts: [], transitionIn: null, placementAnchor: null }
 }
 
 describe('useProjectLifecycle canonical load orchestration', () => {
@@ -706,6 +706,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
             ...projectVideo('clip-c', 'c.mp4', 100),
             deletedParts: [{ id: 'cut-1', fromSecond: 5, toSecond: 10, transition: null }],
             transitionIn: { type: 'fade', durationSeconds: 1 },
+            placementAnchor: { videoId: 'clip-missing', side: 'after' },
           },
         ],
       },
@@ -754,11 +755,12 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     ])
     expect(state.importedVideos.map((video) => video.preview.importId)).toEqual(['import:C:\\Events\\a.mp4', 'import:C:\\Events\\c.mp4'])
     expect(state.videoEdits).toEqual({
-      'clip-a': { offsetSeconds: -5, deletedParts: [], transitionIn: null },
+      'clip-a': { offsetSeconds: -5, deletedParts: [], transitionIn: null, placementAnchor: null },
       'clip-c': {
         offsetSeconds: 100,
         deletedParts: [{ id: 'cut-1', fromSecond: 5, toSecond: 10, transition: null }],
         transitionIn: { type: 'fade', durationSeconds: 1 },
+        placementAnchor: null,
       },
     })
     expect(state.manualVideoSync.videoId).toBe('clip-c')

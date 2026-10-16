@@ -46,6 +46,7 @@ describe('project snapshot contract', () => {
           offsetSeconds: 7.5,
           deletedParts: [],
           transitionIn: null,
+          placementAnchor: null,
         },
       ],
     })
@@ -219,8 +220,13 @@ describe('project snapshot contract', () => {
     useStore.setState({
       importedVideos: [later, earlier],
       videoEdits: {
-        'video-1': { offsetSeconds: -12.5, deletedParts: [], transitionIn: null },
-        'video-2': { offsetSeconds: 70, deletedParts: [deletedPart], transitionIn: { type: 'none', durationSeconds: 0 } },
+        'video-1': { offsetSeconds: -12.5, deletedParts: [], transitionIn: null, placementAnchor: null },
+        'video-2': {
+          offsetSeconds: 70,
+          deletedParts: [deletedPart],
+          transitionIn: { type: 'none', durationSeconds: 0 },
+          placementAnchor: { videoId: 'video-1', side: 'after' },
+        },
       },
       transitionDefaults: { type: 'none', durationSeconds: 3, splitGapThresholdSeconds: 0.5, dialogShown: true },
     })
@@ -228,13 +234,21 @@ describe('project snapshot contract', () => {
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
 
     expect(project.sources.videos).toEqual([
-      { id: 'video-1', path: { kind: 'absolute', value: 'D:\\a.mp4' }, offsetSeconds: -12.5, deletedParts: [], transitionIn: null },
+      {
+        id: 'video-1',
+        path: { kind: 'absolute', value: 'D:\\a.mp4' },
+        offsetSeconds: -12.5,
+        deletedParts: [],
+        transitionIn: null,
+        placementAnchor: null,
+      },
       {
         id: 'video-2',
         path: { kind: 'project-relative', value: 'clips/b.mp4' },
         offsetSeconds: 70,
         deletedParts: [deletedPart],
         transitionIn: { type: 'none', durationSeconds: 0 },
+        placementAnchor: { videoId: 'video-1', side: 'after' },
       },
     ])
     expect(project.sources.videos[1].deletedParts[0]).not.toBe(deletedPart)

@@ -70,7 +70,15 @@ test('project restoration changes only project-owned settings', () => {
 })
 
 function projectVideo(id, offsetSeconds, edits = {}) {
-  return { id, path: { kind: 'absolute', value: `C:\\${id}.mp4` }, offsetSeconds, deletedParts: [], transitionIn: null, ...edits }
+  return {
+    id,
+    path: { kind: 'absolute', value: `C:\\${id}.mp4` },
+    offsetSeconds,
+    deletedParts: [],
+    transitionIn: null,
+    placementAnchor: null,
+    ...edits,
+  }
 }
 
 function createProject({ videos, manual = {}, timeline = { playheadSecond: 0, viewStart: 0, viewEnd: 30 } }) {
@@ -117,7 +125,11 @@ test('project hydration restores every loaded video with its saved edits', () =>
   const project = createProject({
     videos: [
       projectVideo('clip-a', -12.5),
-      projectVideo('clip-b', 70, { deletedParts: [deletedPart], transitionIn: { type: 'none', durationSeconds: 0 } }),
+      projectVideo('clip-b', 70, {
+        deletedParts: [deletedPart],
+        transitionIn: { type: 'none', durationSeconds: 0 },
+        placementAnchor: { videoId: 'clip-a', side: 'after' },
+      }),
     ],
     manual: { videoId: 'clip-b', landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 40 }] },
     timeline: { playheadSecond: -20, viewStart: -12.5, viewEnd: 110 },
@@ -127,8 +139,13 @@ test('project hydration restores every loaded video with its saved edits', () =>
 
   const state = useStore.getState()
   expect(state.videoEdits).toEqual({
-    'clip-a': { offsetSeconds: -12.5, deletedParts: [], transitionIn: null },
-    'clip-b': { offsetSeconds: 70, deletedParts: [deletedPart], transitionIn: { type: 'none', durationSeconds: 0 } },
+    'clip-a': { offsetSeconds: -12.5, deletedParts: [], transitionIn: null, placementAnchor: null },
+    'clip-b': {
+      offsetSeconds: 70,
+      deletedParts: [deletedPart],
+      transitionIn: { type: 'none', durationSeconds: 0 },
+      placementAnchor: { videoId: 'clip-a', side: 'after' },
+    },
   })
   expect(state.videoEdits['clip-b'].deletedParts[0]).not.toBe(deletedPart)
   expect(state.manualVideoSync.videoId).toBe('clip-b')
