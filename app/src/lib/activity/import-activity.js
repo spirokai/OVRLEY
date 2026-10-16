@@ -4,7 +4,8 @@
  */
 
 import * as backend from '@/api/backend'
-import { getCourseWidgetDimensions } from '@/features/widget-editor/utils/widgetUtils'
+import { getCourseWidgetDimensions } from '@/lib/widget/widget-defaults'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import useStore from '@/store/useStore'
 import { syncSceneTimingToConfig } from '@/store/store-utils'
 import parseFitActivityFile from './fit-parser.js'
@@ -50,7 +51,7 @@ export function activateParsedActivity({ source, parsedActivity }, storeState) {
 
       const coursePoints = parsedActivity?.sample_course_points
       if (coursePoints && state.config?.plots) {
-        const dims = getCourseWidgetDimensions(coursePoints)
+        const dims = getCourseWidgetDimensions(coursePoints, WIDGET_TYPE_DEFINITIONS.course.courseSizing)
         if (dims) {
           for (const plot of state.config.plots) {
             if (plot.value === 'course') {

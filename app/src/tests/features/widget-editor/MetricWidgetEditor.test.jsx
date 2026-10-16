@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeAll } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MetricWidgetEditor from '@/features/widget-editor/components/metricWidget/MetricWidgetEditor'
+import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
 
 vi.mock('@/hooks/useFonts', async () => ({
   ...(await vi.importActual('@/hooks/useFonts')),
@@ -20,7 +21,7 @@ function makeWidget(type, data = {}) {
   return {
     id: 'value-0',
     type,
-    data,
+    data: { ...createWidgetDefaults({ type: type, displayType: data.display_type, lapTimerMode: 'current_lap' }, undefined), ...data },
   }
 }
 

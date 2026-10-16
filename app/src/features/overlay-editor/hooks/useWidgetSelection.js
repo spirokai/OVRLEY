@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
-import { getPrimarySelectionId, normalizeSelectionIds } from '@/lib/widget/widget-selection'
+import { getPrimarySelectionId, normalizeSelectionIds } from '@/lib/widget/widget-config'
 import {
   areWidgetBadgesEqual,
   buildSelectionRect,

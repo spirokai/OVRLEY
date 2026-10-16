@@ -3,7 +3,8 @@
  */
 
 import { DEFAULT_RENDER_PROGRESS, syncSceneTimingToConfig } from '../store-utils'
-import { getCourseWidgetDimensions } from '@/features/widget-editor/utils/widgetUtils'
+import { getCourseWidgetDimensions } from '@/lib/widget/widget-defaults'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { releasePreviewActivity } from '@/api/backend'
 
 function previewActivityIds(state) {
@@ -49,7 +50,7 @@ function applyParsedDataToScene(state, activity) {
     const coursePoints = activity?.sample_course_points
     for (const plot of state.config.plots) {
       if (plot.value === 'course' && coursePoints) {
-        const dims = getCourseWidgetDimensions(coursePoints)
+        const dims = getCourseWidgetDimensions(coursePoints, WIDGET_TYPE_DEFINITIONS[plot.value].courseSizing)
         if (dims) {
           plot.width = dims.width
           plot.height = dims.height

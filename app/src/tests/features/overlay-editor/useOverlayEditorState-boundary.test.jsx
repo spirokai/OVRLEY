@@ -1,3 +1,4 @@
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 /**
  * Preview state and stable WASM canvas attachment across document edits.
@@ -9,10 +10,11 @@ import useOverlayEditorStateView from '@/features/overlay-editor/hooks/useOverla
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { WasmWidgetCanvas } from '@/features/wasm-widgets/components/WasmWidgetCanvas'
 import { presentWidgetGeometry } from '@/features/wasm-widgets/utils/widgetPresentation'
-import { COURSE_PLOT_DEFAULTS } from '@/lib/widget/standard-widgets'
-import { getPrimarySelectionId, normalizeSelectionIds } from '@/lib/widget/widget-selection'
+
+import { getPrimarySelectionId, normalizeSelectionIds } from '@/lib/widget/widget-config'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
+import { buildDisplayTypeChangeUpdate } from '@/lib/widget/widget-resolver'
 
 function useOverlayEditorState(options) {
   const widgetLiveEdits = useWidgetDraftState()
@@ -67,7 +69,7 @@ describe('useOverlayEditorState module contract', () => {
   })
 
   test('route rotation centers the selection while its sibling raster stays in scene coordinates', () => {
-    const route = { ...COURSE_PLOT_DEFAULTS, id: 'route-widget' }
+    const route = { ...WIDGET_TYPE_DEFINITIONS.course.defaults, id: 'route-widget' }
     const config = { ...DEFAULT_CONFIG, plots: [route] }
     const attach = vi.fn()
     const { rerender, unmount } = render(<WasmCanvases config={config} attach={attach} />)
@@ -111,7 +113,7 @@ describe('useOverlayEditorState module contract', () => {
     act(() => wasmRef(node))
     expect(result.current.widgetLiveEdits.getWidgetNode('speed-widget')).toBe(node)
 
-    rerender({ config: { ...DEFAULT_CONFIG, values: [{ ...speed, display_type: 'linear' }] } })
+    rerender({ config: { ...DEFAULT_CONFIG, values: [{ ...speed, ...buildDisplayTypeChangeUpdate(speed, 'linear') }] } })
     const linearRef = result.current.widgetRefCallbacks['speed-widget']
     expect(linearRef).toBe(wasmRef)
     act(() => {

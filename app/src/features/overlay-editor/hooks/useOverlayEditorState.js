@@ -23,7 +23,7 @@ import { useEditorKeyboard } from './useEditorKeyboard'
 import { useOverlayPreviewStore } from '@/hooks/useAppStoreSelectors'
 import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
-import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
+import { applyWidgetDrafts } from '@/lib/widget/widget-resolver'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
 import { useWidgetDraftView } from './useWidgetDraftState'
 

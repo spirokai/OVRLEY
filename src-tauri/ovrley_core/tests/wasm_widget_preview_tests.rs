@@ -20,7 +20,13 @@ fn elevation_request() -> Value {
     let defaults: Value = serde_json::from_str(include_str!("../../../assets/standard-widgets.json")).unwrap();
     let mut request = route_request();
     request["type"] = json!("elevation");
-    request["widget"] = defaults["plot"]["definitions"]["elevation"]["defaults"].clone();
+    request["widget"] = defaults["definitions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|definition| definition["type"] == "elevation")
+        .unwrap()["defaults"]
+        .clone();
     request["widget"].as_object_mut().unwrap().extend(json!({
         "id": "elevation", "x": 150.25, "y": 90.5, "width": 280.125, "height": 145.25, "rotation": 27.0,
         "show_elevation_imperial": true, "starting_altitude": 3500, "starting_altitude_unit": "ft",
@@ -248,7 +254,13 @@ fn elevation_resize_updates_size_reuses_geometry_until_commit_and_preserves_fixe
 
 fn route_request() -> Value {
     let defaults: Value = serde_json::from_str(include_str!("../../../assets/standard-widgets.json")).unwrap();
-    let mut widget = defaults["plot"]["definitions"]["course"]["defaults"].clone();
+    let mut widget = defaults["definitions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|definition| definition["type"] == "course")
+        .unwrap()["defaults"]
+        .clone();
     widget["id"] = json!("route");
     widget["x"] = json!(150.25);
     widget["y"] = json!(90.5);

@@ -1,5 +1,5 @@
-import { isTimeDependentWasmWidget } from '@/lib/widget/wasm-widget'
-import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
+import { applyWidgetDrafts } from '@/lib/widget/widget-resolver'
 import { groupContentBounds, normalizeRotation } from './widgetGestureGeometry'
 
 const targets = new WeakMap()
@@ -173,7 +173,7 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
         if (
           widget.resolvedIntent !== intent ||
           widget.committing ||
-          (intent.type === 'resize' && isTimeDependentWasmWidget(widget) && widget.second !== snapshot.second)
+          (intent.type === 'resize' && WIDGET_TYPE_DEFINITIONS[widget.type].timeDependent && widget.second !== snapshot.second)
         ) {
           const patch =
             intent.type === 'drag'

@@ -10,7 +10,7 @@ import { act, fireEvent, render, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import OverlayEditorView from '@/features/overlay-editor/components/OverlayEditor'
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
-import { createBackdropDefaults, createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
+import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
@@ -354,11 +354,11 @@ describe('OverlayEditor selection flow', () => {
   test.each(['backdrop', 'lean_angle'])('enables the supported resize handles for selected %s widgets', (type) => {
     const config = {
       ...DEFAULT_CONFIG,
-      backdrops: type === 'backdrop' ? [{ ...createBackdropDefaults('rectangle'), id: 'widget-resize' }] : [],
+      backdrops: type === 'backdrop' ? [{ ...createWidgetDefaults({ type: 'backdrop', displayType: 'rectangle' }), id: 'widget-resize' }] : [],
       labels: [],
       plots: [],
       values:
-        type === 'lean_angle' ? [{ ...createMetricValueDefaults('lean_angle', undefined, { displayType: 'lean_angle' }), id: 'widget-resize' }] : [],
+        type === 'lean_angle' ? [{ ...createWidgetDefaults({ type: 'lean_angle', displayType: 'lean_angle' }, undefined), id: 'widget-resize' }] : [],
     }
 
     useStore.getState().setConfig(config)

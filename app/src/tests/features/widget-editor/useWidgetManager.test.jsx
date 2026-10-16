@@ -1,8 +1,9 @@
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
-import { createLabelDefaults, createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
-import { COURSE_PLOT_DEFAULTS } from '@/lib/widget/standard-widgets'
+import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
+
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { registerWidgetInteraction, unregisterWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 import { redoHistory, replaceEditorDocument, undoHistory } from '@/features/undo-redo/undoHistory'
@@ -31,8 +32,8 @@ function createWidgetLiveEdits(renderedContentWidth) {
 describe('useWidgetManager alignment updates', () => {
   test('preserves label drafts and commits WASM font edits without browser font preparation', async () => {
     const config = cloneSerializable(DEFAULT_CONFIG)
-    config.labels = [{ ...createLabelDefaults(), id: 'label-spacing', letter_spacing: 0, font_weight: 537, italic: true }]
-    config.values = [{ ...createMetricValueDefaults('speed', undefined, { displayType: 'linear' }), id: 'speed-0' }]
+    config.labels = [{ ...createWidgetDefaults({ type: 'label' }), id: 'label-spacing', letter_spacing: 0, font_weight: 537, italic: true }]
+    config.values = [{ ...createWidgetDefaults({ type: 'speed', displayType: 'linear' }, undefined), id: 'speed-0' }]
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
     useStore.temporal.getState().clear()
     const { result } = renderHook(() => useWidgetManager({ widgetLiveEdits: useWidgetDraftState() }))
@@ -71,7 +72,7 @@ describe('useWidgetManager alignment updates', () => {
   })
   beforeEach(() => {
     const config = cloneSerializable(DEFAULT_CONFIG)
-    config.values = [{ ...createMetricValueDefaults('speed'), id: 'speed-0', x: 300 }]
+    config.values = [{ ...createWidgetDefaults({ type: 'speed' }), id: 'speed-0', x: 300 }]
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
   })
 
@@ -80,7 +81,7 @@ describe('useWidgetManager alignment updates', () => {
     ['time', 'text'],
     ['gradient', 'text'],
     ['lean_angle', 'lean_angle'],
-    ['lap_timer', 'text'],
+    ['lap_timer', 'lap_timer'],
     ['heading', 'heading_tape'],
     ['speed', 'linear'],
     ['speed', 'arc'],
@@ -89,10 +90,7 @@ describe('useWidgetManager alignment updates', () => {
     const config = cloneSerializable(DEFAULT_CONFIG)
     config.values = [
       {
-        ...createMetricValueDefaults(type, undefined, {
-          displayType,
-          lapTimerMode: 'current_lap',
-        }),
+        ...createWidgetDefaults({ type: type, displayType, lapTimerMode: 'current_lap' }, undefined),
         id: 'speed-0',
       },
     ]
@@ -148,7 +146,7 @@ describe('useWidgetManager alignment updates', () => {
 
   test('course rotation slider uses the canvas controller and commits its exact patch', () => {
     const config = cloneSerializable(DEFAULT_CONFIG)
-    config.plots = [{ ...COURSE_PLOT_DEFAULTS, id: 'route-0' }]
+    config.plots = [{ ...WIDGET_TYPE_DEFINITIONS.course.defaults, id: 'route-0' }]
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
     const node = document.createElement('div')
     const patch = { x: 123.125, y: 80.25, rotation: 314.75 }
@@ -168,7 +166,7 @@ describe('useWidgetManager alignment updates', () => {
 
   test('heading offset commits the WASM height response before the pending frame', () => {
     const config = cloneSerializable(DEFAULT_CONFIG)
-    config.values = [{ ...createMetricValueDefaults('heading', undefined, { displayType: 'heading_tape' }), id: 'heading-0' }]
+    config.values = [{ ...createWidgetDefaults({ type: 'heading', displayType: 'heading_tape' }, undefined), id: 'heading-0' }]
     useStore.getState().setConfig(ensureWidgetIdsInConfig(config))
     const originalTape = useStore.getState().config.values[0].display_variants.heading_tape
     const node = document.createElement('div')

@@ -4,7 +4,7 @@
  */
 
 import { clamp } from '@/lib/utils'
-import { resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
+import { resolveActiveWidgetData } from '@/lib/widget/widget-resolver'
 
 const GAUGE_SIZE_FIELDS = [
   ['track_border_thickness', 0, 24],
@@ -65,7 +65,7 @@ function buildGForceSize(data, factor) {
 /** @param {object} widget Resolved gauge, lean-angle, or G-force widget. @param {number} size Inspector size in widget pixels. @returns {object} Canonical data patch. */
 export function buildUniformResizeUpdate(widget, size) {
   const displayType = widget.data.display_type
-  const data = resolveActiveMetricWidgetData(widget.data)
+  const data = resolveActiveWidgetData(widget.data)
   const variant = widget.data.display_variants[displayType]
   if (displayType === 'lean_angle') {
     const factor = size / data.diameter

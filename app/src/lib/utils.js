@@ -56,6 +56,15 @@ export function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
+/** @param {object|null|undefined} source Optional source record. @param {string[]} keys Fields to copy. @returns {object} Present fields, excluding undefined. */
+export function pickDefined(source, keys) {
+  const result = {}
+  for (const key of keys) {
+    if (source?.[key] !== undefined) result[key] = source[key]
+  }
+  return result
+}
+
 /** @param {string} path Native path. @returns {string|null} Final path component. */
 export function filenameFromSelectedPath(path) {
   if (!path) return null

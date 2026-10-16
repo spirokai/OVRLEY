@@ -1,13 +1,7 @@
-import {
-  getStandardMetricDefinition,
-  getStandardMetricDisplayUnit,
-  getStandardMetricUnitOptions,
-  getStandardMetricUnitsMode,
-} from '@/lib/widget/standard-metrics'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { FontSection, IconSection, UnitsControlRow } from '../widgetEditorSections'
 import { SelectField, SliderField, ToggleField } from '../widgetFormControls'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
-import { TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { useTranslation } from 'react-i18next'
 import { translateOptions } from '@/i18n'
 
@@ -33,25 +27,18 @@ const BALANCE_FORMAT_OPTIONS = [
  */
 export default function TextDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
   const { t } = useTranslation()
-  const definition = getStandardMetricDefinition(widget.type)
-  const unitsMode = getStandardMetricUnitsMode(widget.type)
-  const unitOptions = getStandardMetricUnitOptions(widget.type)
+  const definition = WIDGET_TYPE_DEFINITIONS[widget.type]
+  const unitsMode = definition.unitsMode
+  const unitOptions = definition.supportedDisplayUnits
   const showUnits = widget.data.show_units
   const supportsUnitSelection = unitOptions.length > 1
   const isDistanceWidget = widget.type === 'distance'
   const isCoordinateWidget = widget.type === 'gps_coordinates'
   const isTotalAscentWidget = widget.type === 'total_ascent'
-  const hasDecimalControl = definition?.maxDecimals !== undefined || definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
-  const hasBalanceFormat = definition?.formatter === 'balance'
-  const maxDecimals = definition?.maxDecimals ?? 1
-  const defaultDecimals = TYPE_DEFAULTS[widget.type]?.decimals ?? 1
-  const decimals = Number.isFinite(widget.data.decimals) ? Math.min(Math.max(widget.data.decimals, 0), maxDecimals) : defaultDecimals
+  const hasBalanceFormat = definition.formatter === 'balance'
 
   const handleUnitChange = (value) => {
-    updateWidgetData(
-      widget.id,
-      buildMetricUnitUpdate(widget.type, widget.data.starting_altitude, getStandardMetricDisplayUnit(widget.type, widget.data), value),
-    )
+    updateWidgetData(widget.id, buildMetricUnitUpdate(widget.type, widget.data.starting_altitude, widget.data.display_unit, value))
   }
 
   return (
@@ -64,16 +51,16 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
         showContentAlignment
       />
 
-      {hasDecimalControl ? (
+      {definition.hasDecimalControl ? (
         <div className="grid grid-cols-2 gap-4">
           <SliderField
             editable
             label={t('widget-editor.decimals', 'Decimals')}
-            value={decimals}
+            value={widget.data.decimals}
             min={0}
-            max={maxDecimals}
+            max={definition.maxDecimals}
             step={1}
-            valueDisplay={String(decimals)}
+            valueDisplay={String(widget.data.decimals)}
             onSliderChange={(value) => updateWidgetData(widget.id, { decimals: value })}
           />
         </div>
@@ -106,7 +93,7 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
         <div className="grid grid-cols-2 gap-4">
           <SelectField
             label={t('widget-editor.format', 'Format')}
-            value={getStandardMetricDisplayUnit(widget.type, widget.data)}
+            value={widget.data.display_unit}
             onValueChange={(value) => updateWidgetData(widget.id, { display_unit: value })}
             options={translateOptions(unitOptions, t)}
           />
@@ -151,7 +138,7 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
               colorValue={widget.data.unit_color}
               onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
               selectLabel={t('widget-editor.unit', 'Unit')}
-              value={getStandardMetricDisplayUnit(widget.type, widget.data)}
+              value={widget.data.display_unit}
               onValueChange={handleUnitChange}
               options={isCoordinateWidget ? undefined : supportsUnitSelection ? unitOptions : undefined}
               showToggle={!isCoordinateWidget}

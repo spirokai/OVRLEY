@@ -29,11 +29,14 @@ fn main() {
             );
         }
     }
-    asset_files.insert(
-        widgets["time"]["icon"]["assetFile"]
-            .as_str()
-            .expect("time icon must declare assetFile"),
-    );
+    for widget in widgets["definitions"]
+        .as_array()
+        .expect("widget definitions must be an array")
+    {
+        if let Some(asset_file) = widget["icon"]["assetFile"].as_str() {
+            asset_files.insert(asset_file);
+        }
+    }
 
     let mut generated = String::from(
         "fn icon_asset(asset_file: &str) -> &'static IconAsset {\nmatch asset_file {\n",

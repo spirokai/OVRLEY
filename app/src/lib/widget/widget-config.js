@@ -1,432 +1,168 @@
-/**
- * @file widget-config – Widget identity management and config mutation (CRUD).
- *
- * Owns all config-level widget operations: ID assignment, find, update
- * (single and batch), replace, and delete. Does NOT own sidebar presentation
- * concerns — those live in the sibling module widget-presentation.js.
- *
- * What this module owns:
- * - ensureWidgetIdsInConfig, findWidgetInConfig
- * - updateWidgetInConfig, updateWidgetsInConfig, replaceWidgetInConfig
- * - deleteWidgetInConfig, deleteWidgetsInConfig
- *
- * What widget-presentation.js owns:
- * - buildConfigWidgets, groupWidgetsForSidebar
- *
- * @module widget-config
- */
+/** Widget document ingress, immutable edits, resource identities, and selection. */
 
 import { cloneSerializable } from '@/store/store-utils'
+import { produce } from 'immer'
 import { normalizeColorFields } from '../color-utils'
-import { mergeDisplayVariantUpdates } from './widget-resolver'
+import { mergeWidgetData } from './widget-resolver'
+import { WIDGET_COLLECTIONS } from './widget-catalog'
 
-const LEGACY_WIDGET_ID_PATTERN = /^(backdrop|label|value|plot)-\d+$/
 const GENERATED_WIDGET_ID_PATTERN = /^widget-(\d+)$/
-const WIDGET_ID_PREFIX = 'widget-'
-const WIDGET_CATEGORIES = ['backdrops', 'rasters', 'labels', 'values', 'plots']
-
-/**
- * Returns whether a widget id is durable enough to preserve across saves.
- *
- * Legacy index-derived ids are treated as unstable even if they are present in
- * widget data, because they still encode array position.
- *
- * @param {*} widgetId - Identifier to validate.
- * @returns {boolean} Whether the id can be preserved as-is.
- */
-function isDurableWidgetId(widgetId) {
-  if (typeof widgetId !== 'string') {
-    return false
-  }
-
-  const normalizedId = widgetId.trim()
-  if (!normalizedId) {
-    return false
-  }
-
-  return !LEGACY_WIDGET_ID_PATTERN.test(normalizedId)
-}
-
-function getNextGeneratedId(usedIds, nextIdRef) {
-  let nextWidgetId = `${WIDGET_ID_PREFIX}${nextIdRef.current}`
-  while (usedIds.has(nextWidgetId)) {
-    nextIdRef.current += 1
-    nextWidgetId = `${WIDGET_ID_PREFIX}${nextIdRef.current}`
-  }
-
-  usedIds.add(nextWidgetId)
-  nextIdRef.current += 1
-  return nextWidgetId
-}
 
 function getStartingGeneratedId(config) {
-  let maxGeneratedId = 0
-
-  WIDGET_CATEGORIES.forEach((category) => {
-    const collection = config?.[category]
-    if (!Array.isArray(collection)) {
-      return
+  let nextId = 1
+  for (const category of Object.keys(WIDGET_COLLECTIONS)) {
+    for (const widget of config[category]) {
+      const match = GENERATED_WIDGET_ID_PATTERN.exec(widget.id)
+      if (match) nextId = Math.max(nextId, Number(match[1]) + 1)
     }
-
-    collection.forEach((widget) => {
-      const match = GENERATED_WIDGET_ID_PATTERN.exec(String(widget?.id || ''))
-      if (!match) {
-        return
-      }
-
-      maxGeneratedId = Math.max(maxGeneratedId, Number.parseInt(match[1], 10) || 0)
-    })
-  })
-
-  return maxGeneratedId + 1
+  }
+  return nextId
 }
 
 /**
- * Ensures every persisted widget carries a unique durable id.
- *
- * The helper upgrades legacy templates on contact by copying the config only
- * when a widget is missing an id, carries an index-derived legacy id, or
- * collides with another widget's id.
- *
- * @param {*} config - Overlay template configuration data.
- * @returns {*} Config with durable widget ids.
+ * Document ingress: absent collections become empty and absent IDs are assigned.
+ * Present collections and IDs must be valid; duplicate IDs are rejected.
+ * @param {object|null} config Incoming document, or null when no document is open.
+ * @returns {object|null} Document with canonical collections and identities.
  */
-export function ensureWidgetIdsInConfig(config) {
-  if (!config) {
-    return config
-  }
-
+export const ensureWidgetIdsInConfig = produce(function ensureWidgetIdsInConfig(config) {
+  if (config === null) return null
+  if (typeof config !== 'object' || Array.isArray(config)) throw new Error('Widget config must be an object')
   const usedIds = new Set()
-  const nextIdRef = { current: getStartingGeneratedId(config) }
-  let nextConfig = config
-
-  WIDGET_CATEGORIES.forEach((category) => {
-    const collection = config[category]
-    if (!Array.isArray(collection)) {
-      return
+  for (const category of Object.keys(WIDGET_COLLECTIONS)) {
+    if (config[category] === undefined) config[category] = []
+    if (!Array.isArray(config[category])) throw new Error(`Invalid widget collection: ${category}`)
+    for (const widget of config[category]) {
+      if (widget.id === undefined) continue
+      if (typeof widget.id !== 'string' || widget.id.trim() === '') throw new Error('Invalid widget ID')
+      if (usedIds.has(widget.id)) throw new Error(`Duplicate widget ID: ${widget.id}`)
+      usedIds.add(widget.id)
     }
-
-    let nextCollection = null
-
-    collection.forEach((widget, index) => {
-      const currentId = widget?.id
-      const nextId = isDurableWidgetId(currentId) && !usedIds.has(currentId) ? currentId : getNextGeneratedId(usedIds, nextIdRef)
-
-      if (nextId !== currentId) {
-        if (!nextCollection) {
-          nextCollection = [...collection]
-        }
-
-        nextCollection[index] = {
-          ...widget,
-          id: nextId,
-        }
-      } else {
-        usedIds.add(nextId)
-      }
-    })
-
-    if (nextCollection) {
-      if (nextConfig === config) {
-        nextConfig = { ...config }
-      }
-
-      nextConfig[category] = nextCollection
+  }
+  let nextId = getStartingGeneratedId(config)
+  for (const category of Object.keys(WIDGET_COLLECTIONS)) {
+    for (const widget of config[category]) {
+      if (widget.id === undefined) widget.id = `widget-${nextId++}`
     }
-  })
+  }
+})
 
-  return nextConfig
+function findWidgetInConfig(config, widgetId) {
+  for (const category of Object.keys(WIDGET_COLLECTIONS)) {
+    for (let index = 0; index < config[category].length; index += 1) {
+      if (config[category][index].id === widgetId) return { category, index }
+    }
+  }
+  throw new Error(`Unknown widget ID: ${widgetId}`)
 }
 
-/**
- * Finds a widget by durable id inside the config's widget collections.
- *
- * @param {*} config - Overlay template configuration data.
- * @param {*} widgetId - Identifier of the target widget.
- * @returns {object|null} Resolved widget location and data.
- */
-export function findWidgetInConfig(config, widgetId) {
-  const normalizedConfig = ensureWidgetIdsInConfig(config)
-
-  for (const category of WIDGET_CATEGORIES) {
-    const currentCollection = normalizedConfig?.[category]
-    if (!Array.isArray(currentCollection)) {
-      continue
-    }
-
-    const index = currentCollection.findIndex((widget) => widget?.id === widgetId)
-    if (index === -1) {
-      continue
-    }
-
-    return {
-      category,
-      config: normalizedConfig,
-      data: currentCollection[index],
-      id: widgetId,
-      index,
-    }
-  }
-
-  return null
-}
-
-/**
- * Updates a single widget entry immutably while preserving untouched branches.
- *
- * @param {*} config - Overlay template configuration data.
- * @param {*} widgetId - Identifier of the target widget.
- * @param {*} updater - Value for updater.
- * @returns {*} Result produced by the helper.
- */
-function updateWidgetEntry(config, widgetId, updater) {
-  if (!config || typeof updater !== 'function') {
-    return config
-  }
-
-  const target = findWidgetInConfig(config, widgetId)
-  if (!target) {
-    return config
-  }
-
-  const currentCollection = target.config[target.category]
-  if (!Array.isArray(currentCollection)) {
-    return config
-  }
-
-  const currentWidget = currentCollection[target.index]
-  if (!currentWidget) {
-    return config
-  }
-
-  const nextWidget = updater(currentWidget, target)
-  if (!nextWidget || nextWidget === currentWidget) {
-    return target.config
-  }
-
-  const nextCollection = [...currentCollection]
-  nextCollection[target.index] = nextWidget
-
-  return {
-    ...target.config,
-    [target.category]: nextCollection,
-  }
-}
-
-function mergeWidgetUpdates(currentWidget, updates) {
-  const normalizedUpdates = normalizeColorFields(updates)
-  const nextWidget = { ...currentWidget, ...normalizedUpdates, id: currentWidget.id }
-  if (normalizedUpdates.display_variants) {
-    nextWidget.display_variants = mergeDisplayVariantUpdates(currentWidget.display_variants, normalizedUpdates.display_variants)
-  }
-  return nextWidget
-}
-
-/** @param {object} config Template configuration. @param {string} widgetId Widget identity. @param {object} updates Partial widget changes. @returns {object} Updated configuration. */
+/** @param {object} config Canonical document. @param {string} widgetId Widget ID. @param {object} updates Partial data. @returns {object} Edited document. */
 export function updateWidgetInConfig(config, widgetId, updates) {
-  return updateWidgetEntry(config, widgetId, (currentWidget) => mergeWidgetUpdates(currentWidget, updates))
+  return updateWidgetsInConfig(config, { [widgetId]: updates })
 }
 
-/**
- * Updates widgets in config.
- *
- * @param {*} config - Overlay template configuration data.
- * @param {*} updatesById - Value for updates by id.
- * @returns {*} Result produced by the helper.
- */
-export function updateWidgetsInConfig(config, updatesById) {
-  if (!config || !updatesById || typeof updatesById !== 'object') {
-    return config
+/** @param {object} config Canonical document. @param {object} updatesById Partial data keyed by ID. @returns {object} Atomically edited document. */
+export const updateWidgetsInConfig = produce(function updateWidgetsInConfig(config, updatesById) {
+  for (const [widgetId, updates] of Object.entries(updatesById)) {
+    const { category, index } = findWidgetInConfig(config, widgetId)
+    config[category][index] = { ...mergeWidgetData(config[category][index], normalizeColorFields(updates)), id: widgetId }
   }
+})
 
-  const normalizedConfig = ensureWidgetIdsInConfig(config)
-  const widgetUpdates = Object.entries(updatesById).filter(([, updates]) => updates && typeof updates === 'object')
-  if (!widgetUpdates.length) {
-    return normalizedConfig
-  }
+/** @param {object} config Canonical document. @param {string} widgetId Widget ID. @param {object} data Replacement data. @returns {object} Edited document. */
+export const replaceWidgetInConfig = produce(function replaceWidgetInConfig(config, widgetId, data) {
+  const { category, index } = findWidgetInConfig(config, widgetId)
+  config[category][index] = { ...data, id: widgetId }
+})
 
-  const nextCollectionsByCategory = new Map()
-  let hasChanges = false
-
-  widgetUpdates.forEach(([widgetId, updates]) => {
-    const target = findWidgetInConfig(normalizedConfig, widgetId)
-    if (!target) {
-      return
+/** @param {object} config Canonical document. @param {number} factor Relative scale. @param {object|null} origin Fixed point; null for an empty document. @returns {object} Scaled document. */
+export const scaleWidgetPositions = produce(function scaleWidgetPositions(config, factor, origin) {
+  if (factor === 1) return
+  for (const category of Object.keys(WIDGET_COLLECTIONS)) {
+    for (const widget of config[category]) {
+      widget.x = origin.left + (widget.x - origin.left) * factor
+      widget.y = origin.top + (widget.y - origin.top) * factor
     }
+  }
+})
 
-    const sourceCollection = nextCollectionsByCategory.has(target.category)
-      ? nextCollectionsByCategory.get(target.category)
-      : normalizedConfig[target.category]
-    const currentWidget = Array.isArray(sourceCollection) ? sourceCollection[target.index] : null
-
-    if (!currentWidget) {
-      return
+/** @param {object} config Canonical document. @param {string[]} widgetIds Widget IDs. @returns {object} Document with the widgets removed. */
+export const deleteWidgetsInConfig = produce(function deleteWidgetsInConfig(config, widgetIds) {
+  const ids = new Set(widgetIds)
+  for (const category of Object.keys(WIDGET_COLLECTIONS)) {
+    const collection = config[category]
+    for (let index = collection.length - 1; index >= 0; index -= 1) {
+      if (ids.has(collection[index].id)) collection.splice(index, 1)
     }
-
-    const nextWidget = mergeWidgetUpdates(currentWidget, updates)
-    const nextCollection = [...sourceCollection]
-    nextCollection[target.index] = nextWidget
-    nextCollectionsByCategory.set(target.category, nextCollection)
-    hasChanges = true
-  })
-
-  if (!hasChanges) {
-    return normalizedConfig
   }
+})
 
-  return {
-    ...normalizedConfig,
-    ...Object.fromEntries(nextCollectionsByCategory),
+const appendDuplicatedWidgets = produce(function appendDuplicatedWidgets(config, widgets, { offsetX = 24, offsetY = 24 }) {
+  let nextId = getStartingGeneratedId(config)
+  for (const widget of widgets) {
+    if (!Object.hasOwn(WIDGET_COLLECTIONS, widget.category)) throw new Error(`Unknown widget collection: ${widget.category}`)
+    const data = cloneSerializable(widget.data)
+    data.id = `widget-${nextId++}`
+    data.x += offsetX
+    data.y += offsetY
+    config[widget.category].push(data)
   }
-}
+})
 
 /**
- * Replaces widget in config.
- *
- * @param {*} config - Overlay template configuration data.
- * @param {*} widgetId - Identifier of the target widget.
- * @param {*} nextWidgetData - Value for next widget data.
- * @returns {*} Result produced by the helper.
- */
-export function replaceWidgetInConfig(config, widgetId, nextWidgetData) {
-  return updateWidgetEntry(config, widgetId, (currentWidget) => ({
-    ...nextWidgetData,
-    id: currentWidget.id,
-  }))
-}
-
-/** @param {object} config Canonical template configuration. @param {number} factor Relative scale change. @param {object|null} origin Fixed scene point; null only for an empty overlay. @returns {object} Config with all positions scaled around the origin. */
-export function scaleWidgetPositions(config, factor, origin) {
-  if (factor === 1) return config
-  return {
-    ...config,
-    ...Object.fromEntries(
-      WIDGET_CATEGORIES.map((category) => [
-        category,
-        config[category].map((widget) => ({
-          ...widget,
-          x: origin.left + (widget.x - origin.left) * factor,
-          y: origin.top + (widget.y - origin.top) * factor,
-        })),
-      ]),
-    ),
-  }
-}
-
-/**
- * Deletes widget in config.
- *
- * @param {*} config - Overlay template configuration data.
- * @param {*} widgetId - Identifier of the target widget.
- * @returns {*} Result produced by the helper.
- */
-export function deleteWidgetInConfig(config, widgetId) {
-  if (!config) return config
-
-  const target = findWidgetInConfig(config, widgetId)
-  if (!target) {
-    return config
-  }
-
-  const currentCollection = target.config[target.category]
-  if (!Array.isArray(currentCollection) || !currentCollection[target.index]) {
-    return config
-  }
-
-  return {
-    ...target.config,
-    [target.category]: currentCollection.filter((_, index) => index !== target.index),
-  }
-}
-
-/**
- * Deletes widgets in config.
- *
- * @param {*} config - Overlay template configuration data.
- * @param {*} widgetIds - Value for widget ids.
- * @returns {*} Result produced by the helper.
- */
-export function deleteWidgetsInConfig(config, widgetIds) {
-  if (!config || !Array.isArray(widgetIds) || !widgetIds.length) {
-    return config
-  }
-
-  const normalizedConfig = ensureWidgetIdsInConfig(config)
-  const indexesByCategory = widgetIds.reduce((accumulator, widgetId) => {
-    const target = findWidgetInConfig(normalizedConfig, widgetId)
-    if (!target || !normalizedConfig?.[target.category]?.[target.index]) {
-      return accumulator
-    }
-
-    if (!accumulator[target.category]) {
-      accumulator[target.category] = new Set()
-    }
-
-    accumulator[target.category].add(target.index)
-    return accumulator
-  }, {})
-
-  const categories = Object.keys(indexesByCategory)
-  if (!categories.length) {
-    return config
-  }
-
-  return categories.reduce(
-    (nextConfig, category) => ({
-      ...nextConfig,
-      [category]: (nextConfig[category] || []).filter((_, index) => !indexesByCategory[category].has(index)),
-    }),
-    normalizedConfig,
-  )
-}
-
-/**
- * Duplicates the provided widgets into the config and returns their new ids.
- *
- * @param {*} config - Overlay template configuration data.
- * @param {Array<{ category: string, data: object }>} widgetsToDuplicate - Widgets to duplicate.
- * @param {object} [options] - Duplication options.
- * @param {number} [options.offsetX=24] - Horizontal paste offset.
- * @param {number} [options.offsetY=24] - Vertical paste offset.
- * @returns {{ config: object, insertedWidgetIds: string[] }} Updated config and duplicated widget ids.
+ * @param {object} config Canonical document.
+ * @param {Array<{category: string, data: object}>} widgetsToDuplicate Clipboard widgets.
+ * @param {{offsetX?: number, offsetY?: number}} options Optional paste offsets.
+ * @returns {{config: object, insertedWidgetIds: string[]}} Document and new identities in document order.
  */
 export function duplicateWidgetsInConfig(config, widgetsToDuplicate, options = {}) {
-  if (!config || !Array.isArray(widgetsToDuplicate) || !widgetsToDuplicate.length) {
-    return { config, insertedWidgetIds: [] }
+  const nextConfig = appendDuplicatedWidgets(config, widgetsToDuplicate, options)
+  const insertedWidgetIds = []
+  for (const category of Object.keys(WIDGET_COLLECTIONS)) {
+    for (const widget of nextConfig[category].slice(config[category].length)) insertedWidgetIds.push(widget.id)
   }
+  return { config: nextConfig, insertedWidgetIds }
+}
 
-  const { offsetX = 24, offsetY = 24 } = options
-  const previousWidgetIds = new Set(
-    WIDGET_CATEGORIES.flatMap((category) => (Array.isArray(config?.[category]) ? config[category].map((widget) => widget?.id).filter(Boolean) : [])),
-  )
-  const nextConfig = {
-    ...config,
-    backdrops: [...(config.backdrops || [])],
-    rasters: [...(config.rasters || [])],
-    labels: [...(config.labels || [])],
-    values: [...(config.values || [])],
-    plots: [...(config.plots || [])],
+/** @param {string[]} widgetIds Requested IDs. @param {string[]} orderedWidgetIds Document order. @returns {string[]} Existing IDs in document order. */
+export function normalizeSelectionIds(widgetIds, orderedWidgetIds) {
+  const ids = new Set(widgetIds)
+  const selectedIds = []
+  for (const id of orderedWidgetIds) {
+    if (ids.has(id)) selectedIds.push(id)
   }
+  return selectedIds
+}
 
-  widgetsToDuplicate.forEach((widget) => {
-    if (!WIDGET_CATEGORIES.includes(widget?.category) || !widget?.data) {
-      return
+/** @param {string[]} widgetIds Selected IDs. @param {string|null} preferredId Preferred primary selection. @returns {string|null} Primary ID or null for no selection. */
+export function getPrimarySelectionId(widgetIds, preferredId = null) {
+  return preferredId !== null && widgetIds.includes(preferredId) ? preferredId : (widgetIds.at(-1) ?? null)
+}
+
+/** @param {object} config Document being loaded. @param {object} results Rust resource results by widget ID. @returns {object} Document with resource identities. */
+export function attachRasterLoadResults(config, results) {
+  const rasters = []
+  for (const raster of config.rasters) {
+    if (raster.path === null) {
+      rasters.push(raster)
+      continue
     }
-
-    const duplicatedWidget = cloneSerializable(widget.data)
-    delete duplicatedWidget.id
-    duplicatedWidget.x = (Number(duplicatedWidget.x) || 0) + offsetX
-    duplicatedWidget.y = (Number(duplicatedWidget.y) || 0) + offsetY
-    nextConfig[widget.category].push(duplicatedWidget)
-  })
-
-  const normalizedConfig = ensureWidgetIdsInConfig(nextConfig)
-  const insertedWidgetIds = WIDGET_CATEGORIES.flatMap((category) =>
-    (normalizedConfig[category] || []).map((widget) => widget?.id).filter((widgetId) => widgetId && !previousWidgetIds.has(widgetId)),
-  )
-
-  return {
-    config: normalizedConfig,
-    insertedWidgetIds,
+    const resource = results[raster.id]
+    if (!resource) throw new Error(`Raster ${raster.id} has no resource result`)
+    if (resource.status === 'ready') rasters.push({ ...raster, resourceId: resource.resourceId })
+    else if (resource.status === 'error') rasters.push({ ...raster, resourceErrorCode: resource.errorCode })
+    else throw new Error(`Raster ${raster.id} has an invalid resource result`)
   }
+  return { ...config, rasters }
+}
+
+/** @param {object} config Canonical document. @returns {object} Rust handles keyed by widget ID for project archives. */
+export function rasterResourceIds(config) {
+  const ids = {}
+  for (const raster of config.rasters) {
+    if (raster.path === null) continue
+    if (!raster.resourceId) throw new Error(`Raster ${raster.id} has no loaded image resource`)
+    ids[raster.id] = raster.resourceId
+  }
+  return ids
 }

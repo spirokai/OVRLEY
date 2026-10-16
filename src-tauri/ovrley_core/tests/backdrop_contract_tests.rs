@@ -6,79 +6,8 @@ use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::parse_config_value;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::{prepare_preview_assets, LabelCacheStatus, StaticLayer};
-use ovrley_widgets::model::standard_widgets::{
-    backdrop_type_definition, backdrop_type_label, default_backdrop_display_types,
-    gradient_widget_definition, is_backdrop_type_supported, label_widget_definition,
-    plot_widget_definition,
-};
 use ovrley_widgets::model::types::BackdropType;
 use serde_json::json;
-
-#[test]
-fn standard_widgets_manifest_exposes_legacy_sections_through_definitions() {
-    let course = plot_widget_definition("course").expect("course plot definition");
-    assert_eq!(course.defaults["value"], "course");
-    assert_eq!(course.defaults["width"], 400);
-
-    let elevation = plot_widget_definition("elevation").expect("elevation plot definition");
-    assert_eq!(elevation.defaults["point_label"]["font"], "Arial.ttf");
-
-    let gradient = gradient_widget_definition("gradient").expect("gradient definition");
-    assert_eq!(gradient.defaults["triangle_width"], 72);
-
-    let label = label_widget_definition("label").expect("label definition");
-    assert_eq!(label.defaults["text"], "New Text");
-}
-
-#[test]
-fn backdrop_manifest_exposes_expected_types_and_defaults() {
-    assert_eq!(default_backdrop_display_types(), ["rectangle"]);
-    assert!(is_backdrop_type_supported("circle"));
-    assert!(is_backdrop_type_supported("rectangle"));
-    assert!(!is_backdrop_type_supported("triangle"));
-    assert_eq!(backdrop_type_label("circle"), "Circle");
-    assert_eq!(backdrop_type_label("unknown"), "unknown");
-
-    let circle = backdrop_type_definition("circle").expect("circle backdrop definition");
-    assert_eq!(
-        circle.defaults,
-        json!({
-            "display_type": "circle",
-            "x": 100,
-            "y": 100,
-            "opacity": 1,
-            "diameter": 200,
-            "fill_color": "#212121",
-            "fill_opacity": 0.5,
-            "border_thickness": 0,
-            "border_color": "#D6D6D6",
-            "border_opacity": 1
-        })
-    );
-
-    let rectangle = backdrop_type_definition("rectangle").expect("rectangle backdrop definition");
-    assert_eq!(
-        rectangle.defaults,
-        json!({
-            "display_type": "rectangle",
-            "x": 100,
-            "y": 100,
-            "opacity": 1,
-            "width": 300,
-            "height": 150,
-            "fill_color": "#212121",
-            "fill_opacity": 0.5,
-            "border_thickness": 0,
-            "border_color": "#D6D6D6",
-            "border_opacity": 1,
-            "corner_radius": 20,
-            "round_top_left": true,
-            "round_top_right": false,
-            "round_bottom_left": false,
-            "round_bottom_right": true
-        })
-    );
-}
 
 #[test]
 fn backdrop_type_deserializes_strictly() {

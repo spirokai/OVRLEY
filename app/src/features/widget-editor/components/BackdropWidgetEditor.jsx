@@ -1,9 +1,9 @@
+import { getWidgetDisplayTypeOptions } from '@/lib/widget/widget-catalog'
 import { Palette, Shapes } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
-import { getBackdropTypeOptions } from '@/lib/widget/standard-widgets'
-import { initBackdropVariant } from '@/lib/widget/widget-resolver'
+import { initDisplayVariant } from '@/lib/widget/widget-resolver'
 import { SectionHeading } from '@/components/ui/section-heading'
-import { parseInteger } from '../utils/widgetUtils'
+import { parseInteger } from '../utils/widgetInput'
 import { ColorField, NumberField, SelectField, SliderField } from './widgetFormControls'
 import { useTranslation } from 'react-i18next'
 
@@ -61,8 +61,8 @@ function CornerGrid({ rectangleData, onToggle }) {
 
 export default function BackdropWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   const { t } = useTranslation()
-  const displayType = widget.data.display_type || 'rectangle'
-  const displayOptions = useMemo(() => getBackdropTypeOptions(t), [t])
+  const displayType = widget.data.display_type
+  const displayOptions = useMemo(() => getWidgetDisplayTypeOptions('backdrop', t), [t])
   const activeData = useMemo(() => widget.data.display_variants?.[displayType] ?? {}, [displayType, widget.data.display_variants])
   const resolvedData = { ...widget.data, ...activeData, display_type: displayType }
   const borderMax = maxBorderThickness(resolvedData)
@@ -96,7 +96,7 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
 
   const handleDisplayTypeChange = useCallback(
     (value) => {
-      const nextData = initBackdropVariant(widget.data, value)
+      const nextData = initDisplayVariant(widget.data, value)
       updateWidgetData(widget.id, { display_type: value, display_variants: nextData.display_variants })
     },
     [updateWidgetData, widget.data, widget.id],

@@ -1,8 +1,8 @@
+import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
 import { describe, test, expect, vi, beforeAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import HeadingTapeDisplaySection from '@/features/widget-editor/components/metricWidget/HeadingTapeDisplaySection'
-import { HEADING_TAPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 
 vi.mock('@/hooks/useFonts', async () => ({
   ...(await vi.importActual('@/hooks/useFonts')),
@@ -21,15 +21,15 @@ beforeAll(() => {
 })
 
 function makeHeadingWidget(overrides = {}) {
+  const data = createWidgetDefaults({ type: 'heading', displayType: 'heading_tape' })
   return {
     id: 'plot-0',
     type: 'heading',
     category: 'values',
     data: {
-      value: 'heading',
-      display_type: 'heading_tape',
+      ...data,
       display_variants: {
-        heading_tape: { ...HEADING_TAPE_DEFAULTS, ...overrides },
+        heading_tape: { ...data.display_variants.heading_tape, ...overrides },
       },
     },
   }
@@ -155,20 +155,23 @@ describe('HeadingTapeDisplaySection', () => {
   })
 
   test('tape defaults match the PRD spec', () => {
-    expect(HEADING_TAPE_DEFAULTS.major_tick_interval).toBe(15)
-    expect(HEADING_TAPE_DEFAULTS.minor_ticks_per_major).toBe(3)
-    expect(HEADING_TAPE_DEFAULTS.show_major_ticks).toBe(true)
-    expect(HEADING_TAPE_DEFAULTS.show_minor_ticks).toBe(true)
-    expect(HEADING_TAPE_DEFAULTS.major_tick_thickness).toBe(2)
-    expect(HEADING_TAPE_DEFAULTS.minor_tick_thickness).toBe(2)
-    expect(HEADING_TAPE_DEFAULTS.label_font_size).toBe(12)
-    expect(HEADING_TAPE_DEFAULTS.tick_alignment).toBe('below')
-    expect(HEADING_TAPE_DEFAULTS.indicator_style).toBe('chevron')
-    expect(HEADING_TAPE_DEFAULTS.show_indicator).toBe(true)
+    const defaults = createWidgetDefaults({ type: 'heading', displayType: 'heading_tape' }).display_variants.heading_tape
+    expect(defaults).toMatchObject({
+      major_tick_interval: 15,
+      minor_ticks_per_major: 3,
+      show_major_ticks: true,
+      show_minor_ticks: true,
+      major_tick_thickness: 2,
+      minor_tick_thickness: 2,
+      label_font_size: 12,
+      tick_alignment: 'below',
+      indicator_style: 'chevron',
+      show_indicator: true,
+    })
   })
 
   test('widget data serializes cleanly (no undefined values in defaults)', () => {
-    const defaults = HEADING_TAPE_DEFAULTS
+    const defaults = createWidgetDefaults({ type: 'heading', displayType: 'heading_tape' }).display_variants.heading_tape
     Object.entries(defaults).forEach(([key, value]) => {
       expect(value).not.toBeUndefined()
       expect(key).not.toContain('undefined')

@@ -1,15 +1,24 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 import { resizeAnchor } from '@/features/wasm-widgets/utils/widgetGestureGeometry'
-import { resolveActiveBackdropData, resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
-import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
+import { resolveActiveWidgetData, applyWidgetDrafts } from '@/lib/widget/widget-resolver'
+import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { updateWidgetInConfig } from '@/lib/widget/widget-config'
+import { DEFAULT_CONFIG } from '@/store/store-utils'
 
 beforeEach(() => vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] }))
 afterEach(() => vi.useRealTimers())
 
 function editor(type = 'speed') {
-  const original = { id: 'widget', type, data: { x: 120.25, y: 60.5, font_size: 48, rotation: 0 } }
+  const definition = WIDGET_TYPE_DEFINITIONS[type]
+  const data = { ...createWidgetDefaults({ type, ...definition.resetSelection }), x: 120.25, y: 60.5, font_size: 48, rotation: 0 }
+  const original = {
+    id: 'widget',
+    type,
+    category: definition.collection,
+    data: resolveActiveWidgetData(data),
+  }
   let snapshot = { widgets: [original], scene: { scale: 1.5 }, second: 0 }
   let frame = null
   const presentations = []
@@ -136,7 +145,7 @@ test.each(['course', 'elevation'])(
     expect(resize.mock.lastCall[0]).toMatchObject({ widget: original.data, second: 0.75, commit: true })
     expect(patch).toEqual({ x: 81.125, y: 30.5, width: 550.34375, height: 289.4375 })
     expect(presentations.at(-1)[0].data).toEqual({ ...original.data, ...patch })
-    expect(updateWidgetInConfig({ plots: [original.data] }, 'widget', patch).plots[0]).toMatchObject(patch)
+    expect(updateWidgetInConfig({ ...DEFAULT_CONFIG, plots: [original.data] }, 'widget', patch).plots[0]).toMatchObject(patch)
     expect(vi.getTimerCount()).toBe(0)
   },
 )
@@ -206,7 +215,7 @@ test.each(['rectangle', 'circle'])(
       display_type: displayType,
       display_variants: { rectangle: { width: 100, height: 60, corner_radius: 10 }, circle: { diameter: 100 } },
     }
-    const original = { id: 'widget', type: 'backdrop', category: 'backdrops', data: resolveActiveBackdropData(stored) }
+    const original = { id: 'widget', type: 'backdrop', category: 'backdrops', data: resolveActiveWidgetData(stored) }
     setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second: 0 })
     const patch = {
       x: 110.125,
@@ -231,7 +240,7 @@ test.each(['rectangle', 'circle'])(
     expect(resize).toHaveBeenCalledTimes(1)
     expect(draft).toHaveBeenCalledTimes(1)
     const committed = updateWidgetInConfig({ backdrops: [stored] }, 'widget', interaction.finish())
-    expect(resolveActiveBackdropData(committed.backdrops[0])).toEqual(live)
+    expect(resolveActiveWidgetData(committed.backdrops[0])).toEqual(live)
     expect(committed.backdrops[0].width).toBeUndefined()
   },
 )
@@ -246,15 +255,15 @@ test('heading frame drafts preserve inactive variants and match the committed fr
     display_type: 'heading_tape',
     display_variants: { heading_tape: { width: 400, height: 80, pixels_per_degree: 9 }, text: { icon_size: 24 } },
   }
-  const original = { id: 'widget', type: 'heading', category: 'values', data: resolveActiveMetricWidgetData(stored) }
+  const original = { id: 'widget', type: 'heading', category: 'values', data: resolveActiveWidgetData(stored) }
   setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second: 0 })
   const patch = { x: 110.125, y: 50.25, display_variants: { heading_tape: { width: 495.125, height: 70.375 } } }
   resize.mockReturnValue(patch)
   const origin = interaction.begin(vi.fn())
   interaction.update({ type: 'resize', geometry: { size: [742.6875, 105.5625], ...resizeAnchor(origin.bounds, [-1, -1]) } })
-  const committed = updateWidgetInConfig({ values: [stored] }, 'widget', interaction.finish())
+  const committed = updateWidgetInConfig({ ...DEFAULT_CONFIG, values: [stored] }, 'widget', interaction.finish())
   const live = presentations.at(-1)[0].data
-  expect(resolveActiveMetricWidgetData(committed.values[0])).toEqual(live)
+  expect(resolveActiveWidgetData(committed.values[0])).toEqual(live)
   expect(live).toMatchObject({ x: 110.125, y: 50.25, width: 495.125, height: 70.375, pixels_per_degree: 9 })
   expect(committed.values[0].display_variants.text).toEqual(stored.display_variants.text)
   expect(committed.values[0]).not.toHaveProperty('width')
@@ -293,7 +302,7 @@ test.each(['lean_angle', 'g_force'])('%s resize resolves nested intrinsic drafts
       },
     },
   }
-  const original = { id: 'widget', type, category: 'values', data: resolveActiveMetricWidgetData(stored) }
+  const original = { id: 'widget', type, category: 'values', data: resolveActiveWidgetData(stored) }
   setSnapshot({ widgets: [original], scene: { scale: 1.5 }, second: 0 })
   const patch = {
     x: 110.125,
@@ -319,9 +328,9 @@ test.each(['lean_angle', 'g_force'])('%s resize resolves nested intrinsic drafts
   const draft = vi.fn()
   const origin = interaction.begin(draft)
   interaction.update({ type: 'resize', geometry: { factor: 1.234375, ...resizeAnchor(origin.bounds, [-1, -1]) } })
-  const committed = updateWidgetInConfig({ values: [stored] }, 'widget', interaction.finish())
+  const committed = updateWidgetInConfig({ ...DEFAULT_CONFIG, values: [stored] }, 'widget', interaction.finish())
   const live = presentations.at(-1)[0].data
-  expect(resolveActiveMetricWidgetData(committed.values[0])).toEqual(live)
+  expect(resolveActiveWidgetData(committed.values[0])).toEqual(live)
   expect(live).toMatchObject({ x: 110.125, y: 50.25, diameter: 222.1875, font_size: type === 'lean_angle' ? 74.0625 : 60 })
   expect(committed.values[0].display_variants.text).toEqual(stored.display_variants.text)
   expect(committed.values[0].display_variants[type][type === 'g_force' ? 'fill_color' : 'track_empty_color']).toBe('#222222')

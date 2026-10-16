@@ -1,4 +1,4 @@
-import { createDurableEditorState } from '@/lib/widget/editor-state'
+import { createDurableEditorState } from '@/lib/template/template-state'
 import { createPathLocator } from './projectPaths'
 
 export const PROJECT_FORMAT = 'ovrley-project'

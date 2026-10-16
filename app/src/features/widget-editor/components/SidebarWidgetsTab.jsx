@@ -7,7 +7,7 @@ import { RotateCcw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { WIDGET_ICONS } from '@/lib/widget/widget-icons'
-import { isStandardMetricWidgetType } from '@/lib/widget/standard-metrics'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { useWidgetManager } from '../hooks/useWidgetManager'
 import { PositionSection } from './widgetEditorSections'
 import BackdropWidgetEditor from './BackdropWidgetEditor'
@@ -64,7 +64,7 @@ function renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWi
       />
     )
   }
-  if (isStandardMetricWidgetType(widget.type)) {
+  if (WIDGET_TYPE_DEFINITIONS[widget.type].metric) {
     return (
       <MetricWidgetEditor
         widget={widget}

@@ -1,9 +1,9 @@
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { beforeAll, describe, expect, test, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
 import ElevationWidgetEditor from '@/features/widget-editor/components/ElevationWidgetEditor'
 import RouteMapWidgetEditor from '@/features/widget-editor/components/RouteMapWidgetEditor'
-import { COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS } from '@/lib/widget/standard-widgets'
 
 beforeAll(() => {
   globalThis.ResizeObserver = class ResizeObserver {
@@ -21,7 +21,7 @@ function makeRouteWidget(overrides = {}) {
     data: {
       width: 400,
       height: 200,
-      ...COURSE_PLOT_DEFAULTS,
+      ...WIDGET_TYPE_DEFINITIONS.course.defaults,
       ...overrides,
     },
   }
@@ -36,7 +36,7 @@ function makeElevationWidget(overrides = {}) {
       width: 400,
       height: 200,
       point_label: {},
-      ...ELEVATION_PLOT_DEFAULTS,
+      ...WIDGET_TYPE_DEFINITIONS.elevation.defaults,
       ...overrides,
     },
   }

@@ -10,204 +10,71 @@
     "camera": "widgets.categories.camera",
     "other": "widgets.categories.other"
   },
-  "raster": {
-    "type": "raster",
-    "nameKey": "widgets.types.raster.name",
-    "shortNameKey": "widgets.types.raster.shortName",
-    "category": "general",
-    "icon": { "source": "lucide", "name": "Image" },
-    "defaults": {
-      "x": 100,
-      "y": 100,
-      "width": 320,
-      "height": 180,
-      "rotation": 0,
-      "opacity": 1,
-      "path": null
+  "collections": {
+    "backdrops": {
+      "type": "backdrop",
+      "typeField": null
+    },
+    "rasters": {
+      "type": "raster",
+      "typeField": null
+    },
+    "labels": {
+      "type": "label",
+      "typeField": null
+    },
+    "values": {
+      "type": null,
+      "typeField": "value"
+    },
+    "plots": {
+      "type": null,
+      "typeField": "value"
     }
   },
-  "time": {
-    "type": "time",
-    "nameKey": "widgets.types.time.name",
-    "shortNameKey": "widgets.types.time.shortName",
-    "category": "general",
-    "icon": { "source": "shared", "assetFile": "widget-time.svg" },
-    "modes": [
-      {
-        "value": "daytime",
-        "labelKey": "widget-editor.daytime",
-        "defaultLabel": "Daytime"
-      },
-      {
-        "value": "elapsed",
-        "labelKey": "widget-editor.elapsedTime",
-        "defaultLabel": "Elapsed Time"
-      }
-    ],
-    "elapsedOrigins": [
-      {
-        "value": "activity",
-        "labelKey": "widget-editor.activityStart",
-        "defaultLabel": "Activity Start"
-      },
-      {
-        "value": "export",
-        "labelKey": "widget-editor.exportStart",
-        "defaultLabel": "Export Start"
-      }
-    ]
+  "altitudeUnitScales": {
+    "m": 1,
+    "ft": 3.28084
   },
-  "plot": {
-    "definitions": {
-      "course": {
-        "type": "course",
-        "nameKey": "widgets.types.course.name",
-        "shortNameKey": "widgets.types.course.shortName",
-        "category": "general",
-        "icon": { "source": "custom", "assetFile": "widget-course.svg" },
-        "defaults": {
-          "value": "course",
-          "x": 100,
-          "y": 100,
-          "rotation": 0,
-          "opacity": 1,
-          "completed_line_width": 6,
-          "remaining_line_width": 6,
-          "width": 400,
-          "height": 200,
-          "completed_line_opacity": 100,
-          "remaining_line_opacity": 35,
-          "simplify_tolerance_px": 0.3,
-          "target_density": 1,
-          "show_full_activity": true,
-          "marker_variant": "single",
-          "marker_variant_diameter": 44,
-          "marker_size": 10,
-          "marker_opacity": 100,
-          "completed_line_color": "#ffffff",
-          "remaining_line_color": "#ffffff",
-          "marker_color": "#ffffff",
-          "color": "#ffffff"
-        }
-      },
-      "elevation": {
-        "type": "elevation",
-        "nameKey": "widgets.types.elevation.name",
-        "shortNameKey": "widgets.types.elevation.shortName",
-        "category": "general",
-        "icon": { "source": "custom", "assetFile": "widget-elevation.svg" },
-        "defaults": {
-          "value": "elevation",
-          "x": 100,
-          "y": 100,
-          "rotation": 0,
-          "opacity": 1,
-          "completed_line_width": 6,
-          "remaining_line_width": 6,
-          "width": 400,
-          "height": 200,
-          "completed_line_opacity": 100,
-          "remaining_line_opacity": 35,
-          "area_completed_opacity": 24,
-          "area_remaining_opacity": 12,
-          "marker_variant": "single",
-          "marker_variant_diameter": 40,
-          "marker_size": 10,
-          "marker_opacity": 100,
-          "show_elevation_metric": true,
-          "show_elevation_imperial": false,
-          "starting_altitude": null,
-          "starting_altitude_unit": "m",
-          "show_full_activity": true,
-          "y_scale": 1,
-          "simplify_tolerance_px": 1,
-          "target_density": 0.75,
-          "metric_label_offset_x": 0,
-          "metric_label_offset_y": 0,
-          "imperial_label_offset_x": 0,
-          "imperial_label_offset_y": 0,
-          "completed_line_color": "#ffffff",
-          "remaining_line_color": "#ffffff",
-          "area_completed_color": "#ffffff",
-          "area_remaining_color": "#ffffff",
-          "marker_color": "#ffffff",
-          "color": "#ffffff",
-          "point_label": {
-            "font": "Arial.ttf",
-            "font_size": 12.5,
-            "color": "#ffffff"
-          }
-        }
-      }
-    }
+  "widgetDefaults": {
+    "current": true,
+    "metric": false,
+    "layoutMode": "intrinsic",
+    "displayTypes": [],
+    "initialDisplayTypes": [],
+    "globalBindings": {},
+    "nameField": null,
+    "sidebarPriority": 0,
+    "altitudeSource": null,
+    "courseSizing": null,
+    "resetSelection": {},
+    "contentAlignment": false,
+    "timeDependent": false,
+    "defaultsPreset": "none",
+    "defaults": {},
+    "optionalFields": [],
+    "initializers": []
   },
-  "gradient": {
-    "definitions": {
-      "gradient": {
-        "type": "gradient",
-        "nameKey": "widgets.types.gradient.name",
-        "shortNameKey": "widgets.types.gradient.shortName",
-        "category": "general",
-        "icon": { "source": "custom", "assetFile": "widget-gradient.svg" },
-        "defaults": {
-          "decimals": 1,
-          "unit_color": "#ffffff",
-          "value_offset": 0,
-          "show_sign": true,
-          "show_triangle": true,
-          "triangle_width": 72,
-          "triangle_positive_color": "#40e0d0",
-          "triangle_negative_color": "#c65102"
-        }
-      }
-    }
-  },
-  "label": {
-    "definitions": {
-      "label": {
-        "type": "label",
-        "nameKey": "widgets.types.label.name",
-        "shortNameKey": "widgets.types.label.shortName",
-        "category": "general",
-        "icon": { "source": "lucide", "name": "Type" },
-        "defaults": {
-          "x": 100,
-          "y": 100,
-          "font": "Arial.ttf",
-          "font_size": 60,
-          "text": "New Text",
-          "font_weight": 400,
-          "italic": false,
-          "letter_spacing": 0,
-          "color": "#ffffff",
-          "opacity": 1
-        }
-      }
-    }
-  },
-  "backdrops": {
-    "type": "backdrop",
-    "nameKey": "widgets.types.backdrop.name",
-    "shortNameKey": "widgets.types.backdrop.shortName",
-    "category": "general",
-    "icon": { "source": "lucide", "name": "Presentation" },
-    "defaults": ["rectangle"],
+  "displayTypes": {
     "definitions": {
       "circle": {
         "label": "Circle",
         "labelKey": "widgets.backdropTypes.circle",
-        "icon": { "source": "shared", "assetFile": "display-type-circle.svg" },
-        "defaults": {
-          "display_type": "circle",
-          "x": 100,
-          "y": 100,
-          "opacity": 1,
-          "diameter": 200,
-          "fill_color": "#212121",
-          "fill_opacity": 0.5,
-          "border_thickness": 0,
-          "border_color": "#D6D6D6",
-          "border_opacity": 1
+        "icon": {
+          "source": "shared",
+          "assetFile": "display-type-circle.svg"
+        },
+        "defaults": {},
+        "layoutMode": "boxed",
+        "geometryBindings": {
+          "diameter": ["width", "height"]
+        },
+        "resolvedFrame": {
+          "width": "diameter",
+          "height": "diameter"
+        },
+        "variantDefaults": {
+          "diameter": 200
         }
       },
       "rectangle": {
@@ -217,18 +84,16 @@
           "source": "shared",
           "assetFile": "display-type-rectangle.svg"
         },
-        "defaults": {
-          "display_type": "rectangle",
-          "x": 100,
-          "y": 100,
-          "opacity": 1,
+        "defaults": {},
+        "layoutMode": "boxed",
+        "geometryBindings": {
+          "width": ["width"],
+          "height": ["height"]
+        },
+        "resolvedFrame": {},
+        "variantDefaults": {
           "width": 300,
           "height": 150,
-          "fill_color": "#212121",
-          "fill_opacity": 0.5,
-          "border_thickness": 0,
-          "border_color": "#D6D6D6",
-          "border_opacity": 1,
           "corner_radius": 20,
           "round_top_left": true,
           "round_top_right": false,
@@ -236,6 +101,330 @@
           "round_bottom_right": true
         }
       }
+    }
+  },
+  "definitions": [
+    {
+      "type": "backdrop",
+      "nameKey": "widgets.types.backdrop.name",
+      "shortNameKey": "widgets.types.backdrop.shortName",
+      "category": "general",
+      "icon": {
+        "source": "lucide",
+        "name": "Presentation"
+      },
+      "defaults": {
+        "display_type": "rectangle",
+        "x": 100,
+        "y": 100,
+        "opacity": 1,
+        "fill_color": "#212121",
+        "fill_opacity": 0.5,
+        "border_thickness": 0,
+        "border_color": "#D6D6D6",
+        "border_opacity": 1
+      },
+      "collection": "backdrops",
+      "layoutMode": "boxed",
+      "displayTypes": ["circle", "rectangle"],
+      "sidebarPriority": -1,
+      "optionalFields": ["display_variants"]
+    },
+    {
+      "type": "label",
+      "nameKey": "widgets.types.label.name",
+      "shortNameKey": "widgets.types.label.shortName",
+      "category": "general",
+      "icon": {
+        "source": "lucide",
+        "name": "Type"
+      },
+      "defaults": {
+        "x": 100,
+        "y": 100,
+        "font": "Arial.ttf",
+        "font_size": 60,
+        "text": "New Text",
+        "font_weight": 400,
+        "italic": false,
+        "letter_spacing": 0,
+        "color": "#ffffff",
+        "opacity": 1
+      },
+      "collection": "labels",
+      "nameField": "text",
+      "globalBindings": {
+        "font": "font_text",
+        "color": "color_text",
+        "opacity": "opacity"
+      }
+    },
+    {
+      "type": "gradient",
+      "nameKey": "widgets.types.gradient.name",
+      "shortNameKey": "widgets.types.gradient.shortName",
+      "category": "general",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-gradient.svg"
+      },
+      "defaults": {
+        "decimals": 1,
+        "unit_color": "#ffffff",
+        "value_offset": 0,
+        "show_sign": true,
+        "show_triangle": true,
+        "triangle_width": 72,
+        "triangle_positive_color": "#40e0d0",
+        "triangle_negative_color": "#c65102",
+        "display_type": "text"
+      },
+      "collection": "values",
+      "timeDependent": true,
+      "globalBindings": {
+        "font": "font_values",
+        "color": "color_values",
+        "unit_color": "color_units",
+        "opacity": "opacity"
+      },
+      "defaultsPreset": "value",
+      "optionalFields": ["display_variants"]
+    },
+    {
+      "type": "elevation",
+      "nameKey": "widgets.types.elevation.name",
+      "shortNameKey": "widgets.types.elevation.shortName",
+      "category": "general",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-elevation.svg"
+      },
+      "defaults": {
+        "value": "elevation",
+        "x": 100,
+        "y": 100,
+        "rotation": 0,
+        "opacity": 1,
+        "completed_line_width": 6,
+        "remaining_line_width": 6,
+        "width": 400,
+        "height": 200,
+        "completed_line_opacity": 100,
+        "remaining_line_opacity": 35,
+        "area_completed_opacity": 24,
+        "area_remaining_opacity": 12,
+        "marker_variant": "single",
+        "marker_variant_diameter": 40,
+        "marker_size": 10,
+        "marker_opacity": 100,
+        "show_elevation_metric": true,
+        "show_elevation_imperial": false,
+        "starting_altitude": null,
+        "starting_altitude_unit": "m",
+        "show_full_activity": true,
+        "y_scale": 1,
+        "simplify_tolerance_px": 1,
+        "target_density": 0.75,
+        "metric_label_offset_x": 0,
+        "metric_label_offset_y": 0,
+        "imperial_label_offset_x": 0,
+        "imperial_label_offset_y": 0,
+        "completed_line_color": "#ffffff",
+        "remaining_line_color": "#ffffff",
+        "area_completed_color": "#ffffff",
+        "area_remaining_color": "#ffffff",
+        "marker_color": "#ffffff",
+        "color": "#ffffff",
+        "point_label": {
+          "font": "Arial.ttf",
+          "font_size": 12.5,
+          "color": "#ffffff"
+        }
+      },
+      "collection": "plots",
+      "layoutMode": "boxed",
+      "timeDependent": true,
+      "globalBindings": {
+        "color": "color_values",
+        "opacity": "opacity",
+        "point_label.font": "font_values",
+        "point_label.color": "color_values"
+      },
+      "altitudeSource": {
+        "series": [
+          {
+            "field": "sample_elevations",
+            "requireValue": false
+          },
+          {
+            "field": "elevation",
+            "requireValue": false
+          }
+        ],
+        "unitField": "starting_altitude_unit"
+      },
+      "initializers": ["pointLabelFontSize"]
+    },
+    {
+      "type": "course",
+      "nameKey": "widgets.types.course.name",
+      "shortNameKey": "widgets.types.course.shortName",
+      "category": "general",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-course.svg"
+      },
+      "defaults": {
+        "value": "course",
+        "x": 100,
+        "y": 100,
+        "rotation": 0,
+        "opacity": 1,
+        "completed_line_width": 6,
+        "remaining_line_width": 6,
+        "width": 400,
+        "height": 200,
+        "completed_line_opacity": 100,
+        "remaining_line_opacity": 35,
+        "simplify_tolerance_px": 0.3,
+        "target_density": 1,
+        "show_full_activity": true,
+        "marker_variant": "single",
+        "marker_variant_diameter": 44,
+        "marker_size": 10,
+        "marker_opacity": 100,
+        "completed_line_color": "#ffffff",
+        "remaining_line_color": "#ffffff",
+        "marker_color": "#ffffff",
+        "color": "#ffffff"
+      },
+      "collection": "plots",
+      "layoutMode": "boxed",
+      "timeDependent": true,
+      "globalBindings": {
+        "color": "color_values",
+        "opacity": "opacity"
+      },
+      "courseSizing": {
+        "maxDimension": 400,
+        "minDimension": 80
+      },
+      "initializers": ["courseSizing"]
+    },
+    {
+      "type": "time",
+      "nameKey": "widgets.types.time.name",
+      "shortNameKey": "widgets.types.time.shortName",
+      "category": "general",
+      "icon": {
+        "source": "shared",
+        "assetFile": "widget-time.svg"
+      },
+      "modes": [
+        {
+          "value": "daytime",
+          "labelKey": "widget-editor.daytime",
+          "defaultLabel": "Daytime"
+        },
+        {
+          "value": "elapsed",
+          "labelKey": "widget-editor.elapsedTime",
+          "defaultLabel": "Elapsed Time"
+        }
+      ],
+      "elapsedOrigins": [
+        {
+          "value": "activity",
+          "labelKey": "widget-editor.activityStart",
+          "defaultLabel": "Activity Start"
+        },
+        {
+          "value": "export",
+          "labelKey": "widget-editor.exportStart",
+          "defaultLabel": "Export Start"
+        }
+      ],
+      "collection": "values",
+      "timeDependent": true,
+      "globalBindings": {
+        "font": "font_values",
+        "color": "color_values",
+        "icon_color": "color_icons",
+        "unit_color": "color_units",
+        "opacity": "opacity"
+      },
+      "defaults": {
+        "time_mode": "daytime",
+        "format": "time-24",
+        "hours_offset": 0,
+        "elapsed_origin": "activity",
+        "show_hundredths": false,
+        "display_type": "text"
+      },
+      "contentAlignment": true,
+      "defaultsPreset": "value",
+      "optionalFields": ["display_variants"]
+    },
+    {
+      "type": "raster",
+      "nameKey": "widgets.types.raster.name",
+      "shortNameKey": "widgets.types.raster.shortName",
+      "category": "general",
+      "icon": {
+        "source": "lucide",
+        "name": "Image"
+      },
+      "defaults": {
+        "x": 100,
+        "y": 100,
+        "width": 320,
+        "height": 180,
+        "rotation": 0,
+        "opacity": 1,
+        "path": null
+      },
+      "collection": "rasters",
+      "layoutMode": "boxed"
+    }
+  ],
+  "displayDefaults": {
+    "defaults": {},
+    "variantDefaults": {},
+    "conditionalKeys": [],
+    "inheritedFields": {},
+    "globalBindings": {},
+    "geometryBindings": {},
+    "geometryFields": ["x", "y"],
+    "resolvedFrame": {},
+    "modes": [],
+    "modeDefaults": {},
+    "modeFields": {},
+    "modeSelectionField": null,
+    "forbiddenFrameFields": [],
+    "requiredPositiveFields": []
+  },
+  "dataDefaults": {
+    "none": {},
+    "value": {
+      "x": 100,
+      "y": 100,
+      "prefix": "",
+      "suffix": "",
+      "decimals": 0,
+      "display_type": "text",
+      "content_alignment": "left",
+      "unit_color": "#ffffff",
+      "show_icon": true,
+      "icon_size": 45,
+      "icon_offset_x": 0,
+      "icon_offset_y": 0,
+      "icon_color": "#ffffff",
+      "font": "Arial.ttf",
+      "font_size": 100,
+      "color": "#ffffff",
+      "opacity": 1,
+      "show_units": false,
+      "display_unit": null
     }
   }
 }

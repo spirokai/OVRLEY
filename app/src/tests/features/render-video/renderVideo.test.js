@@ -14,7 +14,7 @@ describe('render request preparation', () => {
       config: {
         ...DEFAULT_CONFIG,
         scene: { ...DEFAULT_CONFIG.scene, fps: 60 },
-        values: [{ id: 'value-1', value: 'speed', x: 10, y: 20 }],
+        values: [{ id: 'value-1', value: 'speed', display_type: 'text', x: 10, y: 20 }],
       },
       globalDefaults: { ...useStore.getState().globalDefaults, color_values: '#abcdef' },
     })

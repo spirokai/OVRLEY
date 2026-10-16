@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { loadSelectedRaster } from '@/api/backend'
 import { prepareDocumentFonts } from '@/lib/font-resources'
-import { TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template/template-constants'
+import { DEFAULT_GLOBAL_DEFAULTS, TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template/template-constants'
 import {
   createTemplateFilePayload,
   createTemplateState,
@@ -10,7 +10,7 @@ import {
   normalizeTemplateFilePayload,
   prepareTemplateFilePayload,
 } from '@/features/template-manager/utils/templateSnapshot'
-import { createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
+import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
 import { deepEqual } from '@/store/store-utils'
 
 vi.mock('@/lib/font-resources', () => ({ prepareDocumentFonts: vi.fn(async () => {}) }))
@@ -98,8 +98,8 @@ describe('label font weight at template load', () => {
 
 describe('template snapshot standard metric schema', () => {
   test('creates standard metric defaults with display_unit as the canonical unit field', () => {
-    const speedDefaults = createMetricValueDefaults('speed')
-    const temperatureDefaults = createMetricValueDefaults('temperature')
+    const speedDefaults = createWidgetDefaults({ type: 'speed' })
+    const temperatureDefaults = createWidgetDefaults({ type: 'temperature' })
 
     expect(speedDefaults.display_unit).toBe('kmh')
     expect(speedDefaults).not.toHaveProperty('speed_unit')
@@ -108,14 +108,14 @@ describe('template snapshot standard metric schema', () => {
   })
 
   test('seeds the arc font size as shared widget data rather than variant data', () => {
-    const speedDefaults = createMetricValueDefaults('speed', undefined, { displayType: 'arc' })
+    const speedDefaults = createWidgetDefaults({ type: 'speed', displayType: 'arc' }, undefined)
 
     expect(speedDefaults.font_size).toBe(60)
     expect(speedDefaults.display_variants.arc).not.toHaveProperty('font_size')
   })
 
   test('preserves the flat lap timer contract during durable normalization', () => {
-    const lapTimer = createMetricValueDefaults('lap_timer', undefined, { lapTimerMode: 'best_lap' })
+    const lapTimer = createWidgetDefaults({ type: 'lap_timer', lapTimerMode: 'best_lap' }, undefined)
 
     const normalized = normalizeTemplateConfig({ scene: {}, rasters: [], values: [lapTimer] })
 
@@ -125,7 +125,7 @@ describe('template snapshot standard metric schema', () => {
       lap_timer_mode: 'best_lap',
       show_label: true,
       label: 'Best Lap',
-      label_font: 'Arial.ttf',
+      label_font: DEFAULT_GLOBAL_DEFAULTS.font_text,
       label_font_size: 17.5,
       label_color: '#ffffff',
       positive_delta_color: '#ff6e83',
@@ -135,7 +135,7 @@ describe('template snapshot standard metric schema', () => {
   })
 
   test('populates missing lap timer label typography from globals and mode defaults on template load', () => {
-    const lapTimer = createMetricValueDefaults('lap_timer', undefined, { lapTimerMode: 'lap_log' })
+    const lapTimer = createWidgetDefaults({ type: 'lap_timer', lapTimerMode: 'lap_log' }, undefined)
     delete lapTimer.label_font
     delete lapTimer.label_font_size
     delete lapTimer.label_color
@@ -150,10 +150,9 @@ describe('template snapshot standard metric schema', () => {
   })
 
   test('creates Delta with its label and manifest colors instead of the global text color', () => {
-    const lapTimer = createMetricValueDefaults(
-      'lap_timer',
-      { color_values: '#ffffff', font_text: 'Teko.ttf', color_text: '#123456' },
-      { lapTimerMode: 'delta' },
+    const lapTimer = createWidgetDefaults(
+      { type: 'lap_timer', lapTimerMode: 'delta' },
+      { ...DEFAULT_GLOBAL_DEFAULTS, color_values: '#ffffff', font_text: 'Teko.ttf', color_text: '#123456' },
     )
 
     expect(lapTimer).toMatchObject({
@@ -171,7 +170,7 @@ describe('template snapshot standard metric schema', () => {
   })
 
   test('creates the canonical lap-log display with its default label', () => {
-    const lapTimer = createMetricValueDefaults('lap_timer', { color_values: '#abcdef' }, { lapTimerMode: 'lap_log' })
+    const lapTimer = createWidgetDefaults({ type: 'lap_timer', lapTimerMode: 'lap_log' }, { ...DEFAULT_GLOBAL_DEFAULTS, color_values: '#abcdef' })
 
     expect(lapTimer).toMatchObject({
       value: 'lap_timer',
@@ -186,19 +185,19 @@ describe('template snapshot standard metric schema', () => {
   })
 
   test('partitions lean-angle shared defaults from variant geometry', () => {
-    const leanAngleDefaults = createMetricValueDefaults('lean_angle', undefined, { displayType: 'lean_angle' })
-    const themedLeanAngleDefaults = createMetricValueDefaults(
-      'lean_angle',
+    const leanAngleDefaults = createWidgetDefaults({ type: 'lean_angle', displayType: 'lean_angle' }, undefined)
+    const themedLeanAngleDefaults = createWidgetDefaults(
+      { type: 'lean_angle', displayType: 'lean_angle' },
       {
+        ...DEFAULT_GLOBAL_DEFAULTS,
         font_values: 'Roboto.ttf',
         color_values: '#123456',
         color_units: '#abcdef',
       },
-      { displayType: 'lean_angle' },
     )
 
     expect(leanAngleDefaults).toMatchObject({
-      font: 'Arial.ttf',
+      font: DEFAULT_GLOBAL_DEFAULTS.font_values,
       font_size: 90,
       color: '#ffffff',
       unit_color: '#ffffff',
@@ -222,7 +221,7 @@ describe('template snapshot standard metric schema', () => {
   })
 
   test('rejects malformed durable lean-angle geometry at normalization', () => {
-    const leanAngle = createMetricValueDefaults('lean_angle', undefined, { displayType: 'lean_angle' })
+    const leanAngle = createWidgetDefaults({ type: 'lean_angle', displayType: 'lean_angle' }, undefined)
     const { diameter: _diameter, ...missingDiameter } = leanAngle.display_variants.lean_angle
 
     expect(() =>
@@ -247,7 +246,7 @@ describe('template snapshot standard metric schema', () => {
   })
 
   test('seeds G-force label typography from value globals', () => {
-    const defaults = createMetricValueDefaults('g_force', { font_values: 'Roboto.ttf' }, { displayType: 'g_force' })
+    const defaults = createWidgetDefaults({ type: 'g_force', displayType: 'g_force' }, { ...DEFAULT_GLOBAL_DEFAULTS, font_values: 'Roboto.ttf' })
 
     expect(defaults.display_variants.g_force.label_font).toBe('Roboto.ttf')
     expect(defaults.display_variants.g_force.label_font_size).toBe(50)

@@ -88,13 +88,26 @@ struct RawStandardMetricDefinition {
     #[serde(rename = "type")]
     key: String,
     current: bool,
-    default_display_unit: String,
+    defaults: RawMetricDefaults,
     supported_display_units: Vec<StandardMetricUnitOption>,
-    show_units_by_default: bool,
     formatter: StandardMetricFormatterKind,
     icon: StandardMetricIconDefinition,
     interpolation: StandardMetricInterpolationKind,
     units_mode: StandardMetricUnitsMode,
+    #[serde(default)]
+    display_types: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+struct RawMetricDefaults {
+    display_unit: String,
+    show_units: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+struct RawDisplayVariantDefaults {
+    width: Option<u32>,
+    height: Option<u32>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -103,24 +116,26 @@ struct RawDisplayTypeDefinition {
     label_key: String,
     layout_mode: DisplayTypeLayoutMode,
     #[serde(default)]
-    default_frame_width: Option<u32>,
-    #[serde(default)]
-    default_frame_height: Option<u32>,
+    variant_defaults: RawDisplayVariantDefaults,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RawDisplayTypeManifest {
     definitions: HashMap<String, RawDisplayTypeDefinition>,
-    defaults: Vec<String>,
-    #[serde(default)]
-    overrides: HashMap<String, Vec<String>>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawMetricWidgetDefaults {
+    display_types: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RawStandardMetricManifest {
     display_types: RawDisplayTypeManifest,
+    widget_defaults: RawMetricWidgetDefaults,
     definitions: Vec<RawStandardMetricDefinition>,
 }
 
@@ -132,7 +147,11 @@ struct DisplayTypeManifest {
 }
 
 impl DisplayTypeManifest {
-    fn from_raw(raw: RawDisplayTypeManifest) -> Self {
+    fn from_raw(
+        raw: RawDisplayTypeManifest,
+        defaults: Vec<String>,
+        overrides: HashMap<String, Vec<String>>,
+    ) -> Self {
         let definitions = raw
             .definitions
             .into_iter()
@@ -142,8 +161,8 @@ impl DisplayTypeManifest {
                     DisplayTypeDefinition {
                         label_key: raw_def.label_key,
                         layout_mode: raw_def.layout_mode,
-                        default_frame_width: raw_def.default_frame_width,
-                        default_frame_height: raw_def.default_frame_height,
+                        default_frame_width: raw_def.variant_defaults.width,
+                        default_frame_height: raw_def.variant_defaults.height,
                     },
                 )
             })
@@ -151,8 +170,8 @@ impl DisplayTypeManifest {
 
         DisplayTypeManifest {
             definitions,
-            defaults: raw.defaults,
-            overrides: raw.overrides,
+            defaults,
+            overrides,
         }
     }
 }
@@ -176,6 +195,32 @@ fn load_manifest() -> StandardMetricManifest {
     )))
     .expect("shared standard metrics manifest must be valid JSON");
 
+    let mut display_overrides = HashMap::new();
+    let widgets: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../assets/standard-widgets.json"
+    )))
+    .expect("shared widget manifest must be valid JSON");
+    for definition in widgets["definitions"]
+        .as_array()
+        .expect("widget definitions must be an array")
+    {
+        if let Some(display_type) = definition["defaults"].get("display_type") {
+            let key = definition["type"]
+                .as_str()
+                .expect("widget type must be a string");
+            let display_type = display_type
+                .as_str()
+                .expect("display_type must be a string");
+            display_overrides.insert(key.to_owned(), vec![display_type.to_owned()]);
+        }
+    }
+    for definition in &raw.definitions {
+        if let Some(display_types) = &definition.display_types {
+            display_overrides.insert(definition.key.clone(), display_types.clone());
+        }
+    }
+
     let definitions = raw
         .definitions
         .into_iter()
@@ -194,9 +239,9 @@ fn load_manifest() -> StandardMetricManifest {
                     kind,
                     key: definition.key,
                     current: definition.current,
-                    default_display_unit: definition.default_display_unit,
+                    default_display_unit: definition.defaults.display_unit,
                     supported_display_units: definition.supported_display_units,
-                    show_units_by_default: definition.show_units_by_default,
+                    show_units_by_default: definition.defaults.show_units,
                     formatter: definition.formatter,
                     icon: definition.icon,
                     interpolation: definition.interpolation,
@@ -208,7 +253,11 @@ fn load_manifest() -> StandardMetricManifest {
 
     StandardMetricManifest {
         definitions,
-        display_types: DisplayTypeManifest::from_raw(raw.display_types),
+        display_types: DisplayTypeManifest::from_raw(
+            raw.display_types,
+            raw.widget_defaults.display_types,
+            display_overrides,
+        ),
     }
 }
 

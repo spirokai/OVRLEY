@@ -2,7 +2,7 @@
  * Implements API helpers for backend.
  */
 
-import { rasterResourceIds } from '@/lib/widget/raster-resources'
+import { rasterResourceIds } from '@/lib/widget/widget-config'
 
 /**
  * Shared Tauri runtime detection.

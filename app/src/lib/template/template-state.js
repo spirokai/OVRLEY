@@ -22,15 +22,10 @@
 
 import { createFontSelection, createLabelFontSelection, getFontFamilyName } from '@/lib/fonts'
 import { getThemeColor } from '@/lib/theme'
-import { resolveActiveBackdropData, resolveActiveMetricWidgetData } from '../widget/widget-resolver'
+import { resolveActiveWidgetData } from '../widget/widget-resolver'
 import { DEFAULT_GLOBAL_DEFAULTS } from './template-constants'
-import {
-  applyPreviewOverrides,
-  mergeSceneGlobalDefaults,
-  normalizeGlobalDefaults,
-  normalizeTemplateConfig,
-  pickDefined,
-} from './template-normalization'
+import { mergeSceneGlobalDefaults, normalizeGlobalDefaults, normalizeTemplateConfig } from './template-normalization'
+import { pickDefined } from '@/lib/utils'
 
 function buildEffectiveSceneData(sceneData, globals) {
   if (!sceneData) return sceneData
@@ -41,19 +36,19 @@ function buildEffectiveSceneData(sceneData, globals) {
   }
 }
 
-function buildEffectiveLabelData(widgetData = {}, globals, previewOverrides = null) {
+function buildEffectiveLabelData(widgetData = {}, globals) {
   const nextData = { ...widgetData }
   const font = widgetData.font || globals?.font_text
   if (!nextData.font && font) nextData.font = font
   if (!nextData.font_family) nextData.font_family = getFontFamilyName(font || nextData.font_family)
   if (!nextData.color) nextData.color = globals?.color_text || getThemeColor('ice')
   if (nextData.opacity === undefined) nextData.opacity = globals?.opacity
-  return applyPreviewOverrides(nextData, previewOverrides)
+  return nextData
 }
 
-function buildEffectiveValueData(widgetData = {}, globals, previewOverrides = null) {
+function buildEffectiveValueData(widgetData = {}, globals) {
   // Resolve display_variants for non-text display types
-  const resolved = resolveActiveMetricWidgetData(widgetData)
+  const resolved = resolveActiveWidgetData(widgetData)
 
   const nextData = { ...resolved }
   const font = resolved.font || globals?.font_values
@@ -71,10 +66,10 @@ function buildEffectiveValueData(widgetData = {}, globals, previewOverrides = nu
   if (nextData.icon_color === undefined) nextData.icon_color = globals?.color_icons || getThemeColor('aqua')
   if (nextData.unit_color === undefined && resolved.value !== 'time') nextData.unit_color = globals?.color_units || '#ffffff'
   if (nextData.opacity === undefined) nextData.opacity = globals?.opacity
-  return applyPreviewOverrides(nextData, previewOverrides)
+  return nextData
 }
 
-function buildEffectivePlotData(widgetData = {}, globals, previewOverrides = null) {
+function buildEffectivePlotData(widgetData = {}, globals) {
   const nextData = { ...widgetData }
   if (!nextData.color) nextData.color = globals?.color_values || getThemeColor('ice')
   if (nextData.opacity === undefined) nextData.opacity = globals?.opacity
@@ -84,16 +79,16 @@ function buildEffectivePlotData(widgetData = {}, globals, previewOverrides = nul
       ...(!nextData.point_label?.font ? createFontSelection(globals.font_values) : {}),
     }
   }
-  return applyPreviewOverrides(nextData, previewOverrides)
+  return nextData
 }
 
-export function getEffectiveWidgetData(widget, globals, previewOverrides = null) {
+export function getEffectiveWidgetData(widget, globals) {
   if (!widget) return widget
-  if (widget.category === 'backdrops') return resolveActiveBackdropData(widget.data, previewOverrides)
-  if (widget.category === 'labels') return buildEffectiveLabelData(widget.data, globals, previewOverrides)
-  if (widget.category === 'values') return buildEffectiveValueData(widget.data, globals, previewOverrides)
-  if (widget.category === 'plots') return buildEffectivePlotData(widget.data, globals, previewOverrides)
-  return applyPreviewOverrides({ ...widget.data }, previewOverrides)
+  if (widget.category === 'backdrops') return resolveActiveWidgetData(widget.data)
+  if (widget.category === 'labels') return buildEffectiveLabelData(widget.data, globals)
+  if (widget.category === 'values') return buildEffectiveValueData(widget.data, globals)
+  if (widget.category === 'plots') return buildEffectivePlotData(widget.data, globals)
+  return widget.data
 }
 
 export function createDurableTemplateState({ config, globalDefaults }) {
@@ -102,6 +97,12 @@ export function createDurableTemplateState({ config, globalDefaults }) {
     config: normalizeTemplateConfig(config, nextGlobalDefaults),
     settings: { globalDefaults: nextGlobalDefaults },
   }
+}
+
+/** @param {object} state Editor config and global defaults. @returns {{config: object, globalDefaults: object}} Canonical durable editor state. */
+export function createDurableEditorState({ config, globalDefaults }) {
+  const nextGlobalDefaults = mergeSceneGlobalDefaults(config.scene, globalDefaults)
+  return { config: normalizeTemplateConfig(config, nextGlobalDefaults), globalDefaults: nextGlobalDefaults }
 }
 
 export function createEditorEffectiveConfig({ config, globalDefaults }) {
@@ -118,7 +119,7 @@ export function createEditorEffectiveConfig({ config, globalDefaults }) {
   }
   if (Array.isArray(config.backdrops)) {
     nextConfig.backdrops = []
-    for (const backdrop of config.backdrops) nextConfig.backdrops.push(resolveActiveBackdropData(backdrop))
+    for (const backdrop of config.backdrops) nextConfig.backdrops.push(resolveActiveWidgetData(backdrop))
   }
   if (Array.isArray(config.labels)) {
     nextConfig.labels = []
@@ -133,10 +134,6 @@ export function createEditorEffectiveConfig({ config, globalDefaults }) {
     for (const plot of config.plots) nextConfig.plots.push(buildEffectivePlotData(plot, normalizedGlobals))
   }
   return nextConfig
-}
-
-export function applyGlobalDefaults(config, globalDefaults) {
-  return createEditorEffectiveConfig({ config, globalDefaults })
 }
 
 /**

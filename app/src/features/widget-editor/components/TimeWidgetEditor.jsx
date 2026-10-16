@@ -4,7 +4,7 @@
 
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Label } from '@/components/ui/label'
-import { ELAPSED_TIME_ORIGINS, TIME_WIDGET_MODES } from '@/lib/widget/standard-widgets'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { useTranslation } from 'react-i18next'
 import { FieldBlock, SelectField, TIME_FORMATS, ToggleField } from './widgetFormControls'
 import { translateOptions } from '@/i18n'
@@ -35,7 +35,7 @@ export default function TimeWidgetEditor({ widget, updateWidgetData, updateWidge
               if (timeMode) updateWidgetData(widget.id, { time_mode: timeMode })
             }}
           >
-            {TIME_WIDGET_MODES.map((mode) => (
+            {WIDGET_TYPE_DEFINITIONS.time.modes.map((mode) => (
               <ToggleGroupItem key={mode.value} value={mode.value} className="h-7 w-full px-3 text-xs">
                 {t(mode.labelKey, mode.defaultLabel)}
               </ToggleGroupItem>
@@ -54,7 +54,7 @@ export default function TimeWidgetEditor({ widget, updateWidgetData, updateWidge
                   if (elapsedOrigin) updateWidgetData(widget.id, { elapsed_origin: elapsedOrigin })
                 }}
               >
-                {ELAPSED_TIME_ORIGINS.map((origin) => (
+                {WIDGET_TYPE_DEFINITIONS.time.elapsedOrigins.map((origin) => (
                   <ToggleGroupItem key={origin.value} value={origin.value} className="h-7 w-full px-3 text-xs">
                     {t(origin.labelKey, origin.defaultLabel)}
                   </ToggleGroupItem>

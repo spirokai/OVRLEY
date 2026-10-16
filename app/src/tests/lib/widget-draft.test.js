@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'vitest'
-import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
+import { applyWidgetDrafts } from '@/lib/widget/widget-resolver'
 
 describe('widget draft projection', () => {
   test('projects metric display variant geometry into the live canvas widget', () => {
     const widget = {
       id: 'linear-widget',
+      type: 'speed',
       category: 'values',
       data: {
         display_type: 'linear',
@@ -14,7 +15,7 @@ describe('widget draft projection', () => {
           linear: {
             width: 300,
             height: 40,
-            track_thickness: 6,
+            track_border_thickness: 6,
             track_corner_radius: 4,
           },
         },
@@ -25,20 +26,21 @@ describe('widget draft projection', () => {
       [widget.id]: {
         display_variants: {
           linear: {
-            track_thickness: 18,
+            track_border_thickness: 18,
             track_corner_radius: 12,
           },
         },
       },
     })
 
-    expect(liveWidget.data.track_thickness).toBe(18)
+    expect(liveWidget.data.track_border_thickness).toBe(18)
     expect(liveWidget.data.track_corner_radius).toBe(12)
   })
 
   test('projects backdrop variant geometry into the live canvas widget', () => {
     const widget = {
       id: 'backdrop-widget',
+      type: 'backdrop',
       category: 'backdrops',
       data: {
         display_type: 'rectangle',
@@ -71,6 +73,7 @@ describe('widget draft projection', () => {
   test('projects heading tape variant settings into the live canvas widget', () => {
     const widget = {
       id: 'heading-widget',
+      type: 'heading',
       category: 'values',
       data: {
         display_type: 'heading_tape',

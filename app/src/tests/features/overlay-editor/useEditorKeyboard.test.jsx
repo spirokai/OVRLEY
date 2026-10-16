@@ -1,12 +1,14 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 import { useEditorKeyboard } from '@/features/overlay-editor/hooks/useEditorKeyboard'
+import { DEFAULT_CONFIG } from '@/store/store-utils'
 
 function renderEditorKeyboard(overrides = {}) {
   const onConfigChange = vi.fn()
   const setWidgetSelection = vi.fn()
   const clipboardRef = { current: null }
   const config = {
+    ...DEFAULT_CONFIG,
     backdrops: [{ id: 'widget-1', x: 10, y: 20 }],
     ...overrides.config,
   }
@@ -53,6 +55,7 @@ describe('useEditorKeyboard', () => {
     })
 
     expect(onConfigChange).toHaveBeenCalledWith({
+      ...DEFAULT_CONFIG,
       backdrops: [{ id: 'widget-1', x: 11, y: 20 }],
     })
   })

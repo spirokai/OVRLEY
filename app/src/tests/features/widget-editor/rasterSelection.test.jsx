@@ -1,8 +1,10 @@
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
+
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
 import { useRasterSelection } from '@/features/widget-editor/hooks/useRasterSelection'
-import { isTimeDependentWasmWidget } from '@/lib/widget/wasm-widget'
+
 import { redoHistory, undoHistory } from '@/features/undo-redo/undoHistory'
 import { deleteWidgetsInConfig, duplicateWidgetsInConfig } from '@/lib/widget/widget-config'
 import useStore from '@/store/useStore'
@@ -35,7 +37,7 @@ describe('raster creation and selection', () => {
     expect(raster.path).toBeNull()
     expect(useStore.getState().selectedWidgetId).toBe(raster.id)
     expect(openSinglePath).not.toHaveBeenCalled()
-    expect(isTimeDependentWasmWidget({ type: 'raster' })).toBe(false)
+    expect(WIDGET_TYPE_DEFINITIONS[{ type: 'raster' }.type].timeDependent).toBe(false)
   })
 
   test('selects Rust-owned image bytes at exact oriented dimensions', async () => {

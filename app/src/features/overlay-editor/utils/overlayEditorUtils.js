@@ -3,7 +3,7 @@
  */
 
 import { getEffectiveWidgetData } from '@/lib/template/template-state'
-import { isFramedWidget } from '@/lib/widget/display-type-behavior'
+import { isFramedWidget } from '@/lib/widget/widget-catalog'
 import { VIDEO_SYNC_PREVIEW_SCREEN_GAP } from '@/features/video-sync'
 import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
 

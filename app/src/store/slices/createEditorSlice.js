@@ -8,7 +8,7 @@
 import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, syncSceneTimingFromConfig, syncSceneTimingToConfig } from '../store-utils'
 import { ensureWidgetIdsInConfig, replaceWidgetInConfig } from '../../lib/widget/widget-config'
 import { buildConfigWidgets } from '../../lib/widget/widget-presentation'
-import { getPrimarySelectionId, normalizeSelectionIds } from '@/lib/widget/widget-selection'
+import { getPrimarySelectionId, normalizeSelectionIds } from '@/lib/widget/widget-config'
 
 /**
  * Reconciles selection after a config replacement.

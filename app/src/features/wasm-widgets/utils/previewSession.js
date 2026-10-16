@@ -1,5 +1,5 @@
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { previewActivity, previewFont, rasterPreviewPng } from '@/api/backend'
-import { isTimeDependentWasmWidget } from '@/lib/widget/wasm-widget'
 import { isPreviewPerfEnabled, recordPreviewPerfDuration, setPreviewPerfValue } from '@/lib/previewPerf'
 import { createWidgetInteraction, registerWidgetInteraction, unregisterWidgetInteraction } from './widgetInteraction'
 import { presentWidgetGeometry } from './widgetPresentation'
@@ -8,6 +8,10 @@ const BASE_URL = '/wasm-bindings'
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 let modulePromise
+
+function isTimeDependentWidget(widget) {
+  return WIDGET_TYPE_DEFINITIONS[widget.type].timeDependent
+}
 
 function widgetFonts(widget) {
   if (widget.type === 'backdrop' || widget.type === 'raster' || widget.type === 'course') return []
@@ -164,7 +168,7 @@ export function createPreviewSession(module, onError) {
         const fontResources = widgetFonts(widget).map((font) => fonts.get(JSON.stringify(font)))
         for (const resource of fontResources) if (resource.error) throw resource.error
         if (fontResources.some((resource) => !resource.ready)) continue
-        if (isTimeDependentWasmWidget(widget) && !activityReady) continue
+        if (WIDGET_TYPE_DEFINITIONS[widget.type].timeDependent && !activityReady) continue
         const config = JSON.stringify({
           type: widget.type,
           widget: widget.data,
@@ -184,13 +188,13 @@ export function createPreviewSession(module, onError) {
         instance.scene = snapshot.scene
         instance.transient = transient
       }
-      if (activityReady && snapshot.widgets.some(isTimeDependentWasmWidget)) {
+      if (activityReady && snapshot.widgets.some(isTimeDependentWidget)) {
         const started = measure ? performance.now() : 0
         check(module._ovrley_preview_render(handle, snapshot.second))
         if (measure) recordPreviewPerfDuration('WASM render (all widgets)', performance.now() - started)
       }
       for (const [id, widget] of widgets) {
-        if (isTimeDependentWasmWidget(widget) && !activityReady) continue
+        if (WIDGET_TYPE_DEFINITIONS[widget.type].timeDependent && !activityReady) continue
         const canvas = canvases.get(id)
         if (!canvas) continue
         const revision = module._ovrley_preview_revision(handle, widget.handle)
@@ -252,7 +256,7 @@ export function createPreviewSession(module, onError) {
         previous.scene === next.scene &&
         previous.activityId === next.activityId &&
         previous.defaultFont === next.defaultFont &&
-        !next.widgets.some(isTimeDependentWasmWidget)
+        !next.widgets.some(isTimeDependentWidget)
       )
         return
       if (previous?.defaultFont !== next.defaultFont) loadFont({ font: next.defaultFont })
@@ -269,7 +273,7 @@ export function createPreviewSession(module, onError) {
         // Explicitly clear old values while replacement bytes are in flight.
         check(module._ovrley_preview_activity(handle, 0, 0))
         for (const [id, widget] of widgets) {
-          if (!isTimeDependentWasmWidget(widget)) continue
+          if (!WIDGET_TYPE_DEFINITIONS[widget.type].timeDependent) continue
           const canvas = canvases.get(id)
           if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
           widget.revision = -1
@@ -281,7 +285,7 @@ export function createPreviewSession(module, onError) {
               if (disposed || activityId !== nextId) return
               upload(new Uint8Array(bytes), (ptr, len) => check(module._ovrley_preview_activity(handle, ptr, len)))
               activityReady = true
-              for (const widget of widgets.values()) if (isTimeDependentWasmWidget(widget)) widget.revision = -1
+              for (const widget of widgets.values()) if (WIDGET_TYPE_DEFINITIONS[widget.type].timeDependent) widget.revision = -1
               schedule()
             })
             .catch((error) => {

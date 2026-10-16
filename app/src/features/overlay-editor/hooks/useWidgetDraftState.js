@@ -4,7 +4,7 @@
  */
 
 import { useState, useSyncExternalStore } from 'react'
-import { mergeDisplayVariantUpdates } from '@/lib/widget/widget-resolver'
+import { mergeWidgetData } from '@/lib/widget/widget-resolver'
 
 function notify(state) {
   for (const listener of state.listeners) listener()
@@ -22,13 +22,7 @@ function scheduleDrafts(state) {
 }
 
 function mergeDraft(state, widgetId, updates) {
-  state.drafts[widgetId] = {
-    ...state.drafts[widgetId],
-    ...updates,
-    ...(updates.display_variants
-      ? { display_variants: mergeDisplayVariantUpdates(state.drafts[widgetId]?.display_variants, updates.display_variants) }
-      : {}),
-  }
+  state.drafts[widgetId] = mergeWidgetData(state.drafts[widgetId], updates)
 }
 
 function setLiveWidgetDraft(state, widgetId, updates) {

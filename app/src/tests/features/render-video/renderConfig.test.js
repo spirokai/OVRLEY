@@ -20,7 +20,7 @@ describe('render config preparation', () => {
         end: 50,
       },
       labels: [],
-      values: [{ id: 'value-1', value: 'speed', x: 10, y: 20, content_alignment: 'right' }],
+      values: [{ id: 'value-1', value: 'speed', display_type: 'text', x: 10, y: 20, content_alignment: 'right' }],
       plots: [],
     }
     const renderConfig = createRenderEffectiveConfig({

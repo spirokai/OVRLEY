@@ -9,7 +9,6 @@ import { SectionHeading } from '@/components/ui/section-heading'
 import { ColorField, ContentAlignmentControl, NumberField, SelectField, SizeSlider, SliderField, TextField, ToggleField } from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
 import { useAvailableFonts, useLabelTypography } from '@/hooks/useFonts'
-import { getWidgetFont } from '../utils/widgetUtils'
 import { getThemeColor } from '@/lib/theme'
 import { useTranslation } from 'react-i18next'
 
@@ -177,7 +176,7 @@ export function FontSection({
       <div className="grid grid-cols-2 gap-4 items-end">
         <FontSelectField
           label={t('widget-editor.fontFamily', 'Font Family')}
-          value={getWidgetFont(widget)}
+          value={widget.data.font}
           onValueChange={typography.changeFont}
           recommendedFonts={availableFonts.recommendedFonts}
           systemFonts={availableFonts.systemFonts}

@@ -6,11 +6,10 @@
  * creating a new section component and registering it below.
  */
 
-import { getDisplayTypeDefaultFontSize, getDisplayTypeOptions, getStandardMetricDisplayUnit } from '@/lib/widget/standard-metrics'
 import { NumberField, SelectField } from '../widgetFormControls'
 import { useCallback } from 'react'
 import { buildDisplayTypeChangeUpdate } from '@/lib/widget/widget-resolver'
-import { isTextDisplayType } from '@/lib/widget/display-type-behavior'
+import { getWidgetDisplayTypeOptions } from '@/lib/widget/widget-catalog'
 import TextDisplaySection from './TextDisplaySection'
 import LinearDisplaySection from './LinearDisplaySection'
 import ArcDisplaySection from './ArcDisplaySection'
@@ -52,14 +51,12 @@ export default function MetricWidgetEditor({
   showDisplayControls = true,
 }) {
   const { t } = useTranslation()
-  const displayType = widget.data.display_type || 'text'
-  const displayOptions = getDisplayTypeOptions(widget.type, t)
+  const displayType = widget.data.display_type
+  const displayOptions = getWidgetDisplayTypeOptions(widget.type, t)
 
   const handleDisplayTypeChange = useCallback(
     (value) => {
       const patch = buildDisplayTypeChangeUpdate(widget.data, value)
-      const defaultFontSize = getDisplayTypeDefaultFontSize(value)
-      if (defaultFontSize !== null) patch.font_size = defaultFontSize
       updateWidgetData(widget.id, patch)
     },
     [widget.id, widget.data, updateWidgetData],
@@ -82,7 +79,7 @@ export default function MetricWidgetEditor({
         </div>
       ) : null}
 
-      {isTextDisplayType(displayType) ? (
+      {displayType === 'text' ? (
         <TextDisplaySection
           widget={widget}
           updateWidgetData={updateWidgetData}
@@ -100,7 +97,7 @@ export default function MetricWidgetEditor({
             label={t('widget-editor.altitudeAtStart', 'Altitude at start')}
             value={widget.data.starting_altitude}
             placeholder={widget.startingAltitudePlaceholder}
-            suffix={getStandardMetricDisplayUnit(widget.type, widget.data)}
+            suffix={widget.data.display_unit}
             onChange={(rawValue) => setNumericField(widget.id, 'starting_altitude', rawValue, { optional: true, round: true })}
             onReset={() => updateWidgetData(widget.id, { starting_altitude: null })}
           />

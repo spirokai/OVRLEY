@@ -7,13 +7,13 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
-import { deleteWidgetInConfig, ensureWidgetIdsInConfig, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget/widget-config'
+import { requireWidgetTypeDefinition } from '@/lib/widget/widget-catalog'
+import { deleteWidgetsInConfig, ensureWidgetIdsInConfig, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget/widget-config'
 import { buildConfigWidgets, getWidgetTypeName, groupWidgetsForSidebar, withAltitudeEditorPresentation } from '@/lib/widget/widget-presentation'
-import { isStandardMetricWidgetType } from '@/lib/widget/standard-metrics'
-import { RASTER_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { clamp } from '@/lib/utils'
-import { createBackdropDefaults, createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'
-import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
+import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
+import { parseInteger } from '../utils/widgetInput'
+import { applyWidgetDrafts } from '@/lib/widget/widget-resolver'
 import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { getWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 
@@ -120,28 +120,12 @@ export function useWidgetManager({ widgetLiveEdits }) {
   }
 
   // Add widget — creates a new widget of the given type with defaults and appends to config
-  const addWidget = ({ type, displayType, lapTimerMode }) => {
-    let category
-    let data
-    if (type === 'backdrop') {
-      category = 'backdrops'
-      data = createBackdropDefaults(displayType)
-    } else if (type === 'raster') {
-      category = 'rasters'
-      data = { ...RASTER_DEFAULTS }
-    } else if (type === 'label') {
-      category = 'labels'
-      data = createLabelDefaults(globalDefaults)
-    } else if (isStandardMetricWidgetType(type) || ['gradient', 'time'].includes(type)) {
-      category = 'values'
-      data = createMetricValueDefaults(type, globalDefaults, { displayType, lapTimerMode })
-    } else if (['course', 'elevation'].includes(type)) {
-      category = 'plots'
-      data = createPlotDefaults(type, globalDefaults, {
-        coursePoints: parsedActivity?.sample_course_points,
-        sceneFontSize: globalDefaults.font_size,
-      })
-    } else throw new Error(`Unknown widget type: ${type}`)
+  const addWidget = (selection) => {
+    const category = requireWidgetTypeDefinition(selection.type).collection
+    const data = createWidgetDefaults(selection, globalDefaults, {
+      coursePoints: parsedActivity?.sample_course_points,
+      sceneFontSize: globalDefaults.font_size,
+    })
 
     const state = useStore.getState()
     const nextConfig = ensureWidgetIdsInConfig({ ...state.config, [category]: [...state.config[category], data] })
@@ -151,7 +135,7 @@ export function useWidgetManager({ widgetLiveEdits }) {
 
   // Delete widget — removes the widget by id and updates config
   const deleteWidget = (id) => {
-    setConfig(deleteWidgetInConfig(config, id))
+    setConfig(deleteWidgetsInConfig(config, [id]))
   }
 
   // Reset widget — replaces widget data with fresh defaults for its type
@@ -159,16 +143,9 @@ export function useWidgetManager({ widgetLiveEdits }) {
     const widget = widgets.find((item) => item.id === id)
     if (!widget) return
 
-    let data
-    if (widget.type === 'label') data = createLabelDefaults(globalDefaults)
-    else if (widget.type === 'backdrop') data = createBackdropDefaults()
-    else if (widget.type === 'raster') data = { ...RASTER_DEFAULTS }
-    else if (widget.type === 'course' || widget.type === 'elevation') {
-      data = createPlotDefaults(widget.type, globalDefaults, { sceneFontSize: config.scene.font_size })
-    } else {
-      const selection = widget.type === 'lap_timer' ? { lapTimerMode: 'current_lap' } : {}
-      data = createMetricValueDefaults(widget.type, globalDefaults, selection)
-    }
+    const data = createWidgetDefaults({ type: widget.type, ...requireWidgetTypeDefinition(widget.type).resetSelection }, globalDefaults, {
+      sceneFontSize: config.scene.font_size,
+    })
     const state = useStore.getState()
     state.setConfig(replaceWidgetInConfig(state.config, id, data))
   }

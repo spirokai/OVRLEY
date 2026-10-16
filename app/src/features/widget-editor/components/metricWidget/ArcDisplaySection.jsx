@@ -1,12 +1,7 @@
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { useMemo } from 'react'
 import { SlidersHorizontal, Tags } from 'lucide-react'
 import { buildUniformResizeUpdate } from '../../utils/widgetSize'
-import {
-  getStandardMetricDefinition,
-  getStandardMetricDisplayUnit,
-  getStandardMetricUnitOptions,
-  getStandardMetricUnitsMode,
-} from '@/lib/widget/standard-metrics'
 import FontSelectField from '@/components/ui/font-select-field'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { useAvailableFonts } from '@/hooks/useFonts'
@@ -16,7 +11,6 @@ import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from '.
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
 import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry, getArcTrackDimensions } from '../../utils/gaugeGeometry'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
-import { TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { useTranslation } from 'react-i18next'
 import { translateOptions } from '@/i18n'
 
@@ -57,17 +51,13 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
   const updateArc = useDisplayVariantUpdater(widget, displayType, updateWidgetData)
   const updateArcSize = useDisplayVariantUpdater(widget, displayType, updateWidgetSize)
   const availableFonts = useAvailableFonts()
-  const definition = getStandardMetricDefinition(widget.type)
-  const unitOptions = getStandardMetricUnitOptions(widget.type)
-  const unitsMode = getStandardMetricUnitsMode(widget.type)
+  const definition = WIDGET_TYPE_DEFINITIONS[widget.type]
+  const unitOptions = definition.supportedDisplayUnits
+  const unitsMode = definition.unitsMode
   const supportsUnitSelection = unitOptions.length > 1
   const cornerRadiusMax = getArcCornerRadiusMax(arcData, displayType)
   const size = widget.data.width ?? arcData.width
   const barGapMax = arcData.track_fill_style === 'bars' ? getArcGapMax(arcData, displayType) : 0
-  const hasDecimalControl = definition?.maxDecimals !== undefined || definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
-  const maxDecimals = definition?.maxDecimals ?? 1
-  const defaultDecimals = TYPE_DEFAULTS[widget.type]?.decimals ?? 1
-  const decimals = Number.isFinite(widget.data.decimals) ? Math.min(Math.max(widget.data.decimals, 0), maxDecimals) : defaultDecimals
 
   const updateBoundedNumber = (updateVariant, key, rawValue, min, max) => {
     const value = Number(rawValue)
@@ -262,16 +252,16 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           onSliderCommit={() => commitWidgetSize(widget.id)}
         />
       </div>
-      {hasDecimalControl ? (
+      {definition.hasDecimalControl ? (
         <div className="grid grid-cols-2 gap-4">
           <SliderField
             editable
             label={t('widget-editor.decimals', 'Decimals')}
-            value={decimals}
+            value={widget.data.decimals}
             min={0}
-            max={maxDecimals}
+            max={definition.maxDecimals}
             step={1}
-            valueDisplay={String(decimals)}
+            valueDisplay={String(widget.data.decimals)}
             onSliderChange={(value) => updateWidgetData(widget.id, { decimals: value })}
           />
         </div>
@@ -280,17 +270,14 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
       {unitsMode !== 'hidden' ? (
         <UnitsControlRow
           title={t('widget-editor.unit', 'Unit')}
-          checked={widget.data.show_units ?? definition?.showUnitsByDefault ?? false}
+          checked={widget.data.show_units}
           onCheckedChange={(show_units) => updateWidgetData(widget.id, { show_units })}
           colorValue={widget.data.unit_color}
           onColorChange={(unit_color) => updateWidgetData(widget.id, { unit_color })}
           selectLabel={t('widget-editor.unit', 'Unit')}
-          value={getStandardMetricDisplayUnit(widget.type, widget.data)}
+          value={widget.data.display_unit}
           onValueChange={(displayUnit) =>
-            updateWidgetData(
-              widget.id,
-              buildMetricUnitUpdate(widget.type, widget.data.starting_altitude, getStandardMetricDisplayUnit(widget.type, widget.data), displayUnit),
-            )
+            updateWidgetData(widget.id, buildMetricUnitUpdate(widget.type, widget.data.starting_altitude, widget.data.display_unit, displayUnit))
           }
           options={supportsUnitSelection ? unitOptions : undefined}
         />

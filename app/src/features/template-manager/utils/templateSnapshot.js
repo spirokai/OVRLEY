@@ -7,9 +7,10 @@
  */
 
 import { createDurableTemplateState } from '@/lib/template/template-state'
-import { RASTER_KEYS, TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template/template-constants'
+import { TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template/template-constants'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { loadSelectedRaster } from '@/api/backend'
-import { attachRasterLoadResults } from '@/lib/widget/raster-resources'
+import { attachRasterLoadResults } from '@/lib/widget/widget-config'
 import { prepareDocumentFonts } from '@/lib/font-resources'
 
 export { normalizeTemplateConfig } from '@/lib/template/template-normalization'
@@ -71,9 +72,9 @@ function validateTemplateRasters(config) {
       throw new Error('Template raster resources must not be persisted.')
     }
     const keys = Object.keys(raster)
-    if (keys.length !== RASTER_KEYS.length) throw new Error('Invalid raster config')
+    if (keys.length !== WIDGET_TYPE_DEFINITIONS.raster.configKeys.length) throw new Error('Invalid raster config')
     for (const key of keys) {
-      if (!RASTER_KEYS.includes(key)) throw new Error('Invalid raster config')
+      if (!WIDGET_TYPE_DEFINITIONS.raster.configKeys.includes(key)) throw new Error('Invalid raster config')
     }
     if (typeof raster.id !== 'string' || !/^[A-Za-z0-9_-]+$/.test(raster.id)) throw new Error('Invalid raster id')
     for (const key of ['x', 'y', 'width', 'height', 'rotation', 'opacity']) {

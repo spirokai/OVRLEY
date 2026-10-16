@@ -1,25 +1,12 @@
+import { DISPLAY_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
+import { buildDisplayModeUpdate } from '@/lib/widget/widget-resolver'
 import { Type } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { useAvailableFonts } from '@/hooks/useFonts'
 import { FontSection } from '../widgetEditorSections'
 import { ColorField, SelectField, SizeSlider, TextField, ToggleField } from '../widgetFormControls'
-import { LAP_TIMER_MODES } from '@/lib/widget/standard-widgets'
 import { useTranslation } from 'react-i18next'
-
-const LAP_TIMER_MODES_BY_VALUE = Object.fromEntries(LAP_TIMER_MODES.map((mode) => [mode.value, mode]))
-
-/**
- * Translation keys for LAP_TIMER_MODES labels, keyed by mode value.
- * The modes come from the shared manifest consumed by the backend and must
- * stay unchanged, so its English labels are only used as fallback defaults.
- */
-const LAP_TIMER_MODE_LABEL_KEYS = {
-  current_lap: 'widgets.lapTimerModes.currentLap',
-  best_lap: 'widgets.lapTimerModes.bestLap',
-  delta: 'widgets.lapTimerModes.delta',
-  lap_log: 'widgets.lapTimerModes.lapLog',
-}
 
 /**
  * Renders lap timer configuration controls.
@@ -40,17 +27,8 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
       <SelectField
         label={t('widget-editor.readout', 'Readout')}
         value={widget.data.lap_timer_mode}
-        onValueChange={(mode) => {
-          const selectedMode = LAP_TIMER_MODES_BY_VALUE[mode]
-          if (!selectedMode) throw new Error(`Unsupported lap timer mode: ${mode}`)
-          updateWidgetData(widget.id, {
-            lap_timer_mode: mode,
-            label: selectedMode.label,
-            font_size: selectedMode.font_size,
-            label_font_size: selectedMode.label_font_size,
-          })
-        }}
-        options={LAP_TIMER_MODES.map(({ value, label }) => ({ value, label: t(LAP_TIMER_MODE_LABEL_KEYS[value], label) }))}
+        onValueChange={(mode) => updateWidgetData(widget.id, buildDisplayModeUpdate(widget.data.display_type, mode))}
+        options={DISPLAY_TYPE_DEFINITIONS.lap_timer.modes.map(({ value, label, labelKey }) => ({ value, label: t(labelKey, label) }))}
       />
       <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
       <div className="space-y-4">

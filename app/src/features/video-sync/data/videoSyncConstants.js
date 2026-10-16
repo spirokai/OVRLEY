@@ -1,4 +1,4 @@
-import { TEXT_DEFAULTS, TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 
 export const VIDEO_SYNC_LANDMARK_TYPES = {
   STOP: 'stop',
@@ -16,8 +16,7 @@ export const VIDEO_SYNC_SPEED_WIDGETS = [
     id: 'video-sync-speed',
     type: 'speed',
     data: {
-      ...TEXT_DEFAULTS,
-      ...TYPE_DEFAULTS.speed,
+      ...WIDGET_TYPE_DEFINITIONS.speed.defaults,
       value: 'speed',
       x: 0,
       y: 0,

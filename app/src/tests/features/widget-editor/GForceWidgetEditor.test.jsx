@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, test, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import GForceWidgetEditor from '@/features/widget-editor/components/GForceWidgetEditor'
-import { createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
+import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
 
 vi.mock('@/hooks/useFonts', async () => ({
   ...(await vi.importActual('@/hooks/useFonts')),
@@ -18,7 +18,7 @@ beforeAll(() => {
 })
 
 function makeWidget(variant = {}) {
-  const data = createMetricValueDefaults('g_force', { font_values: 'Arial.ttf' }, { displayType: 'g_force' })
+  const data = createWidgetDefaults({ type: 'g_force', displayType: 'g_force' }, { font_values: 'Arial.ttf' })
   return {
     id: 'g-force-1',
     type: 'g_force',
