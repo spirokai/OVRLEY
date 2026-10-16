@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { placeVideosByCreationTime, resolveVideoSync, resolveVideosSync } from '@/lib/video-sync'
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
-import { captureBatchSync, createBatchOutputs, createBatchRenderRequest } from '@/features/render-video/utils/renderRequest'
+import { captureBatchSync, createBatchRenderRequest } from '@/features/render-video/utils/renderRequest'
 import { createTestVideo } from '../helpers/videoFixtures'
 
 // 5:47:13 activity ending 17:29 Sofia time (UTC+3).
@@ -108,7 +108,7 @@ describe('signed automatic synchronization and shared calibration', () => {
     }
   }
 
-  test('builds separate-file jobs at their committed offsets, or with embedded telemetry without an activity', () => {
+  test('renders reviewed outputs at the committed offsets of their sources, or with embedded telemetry without an activity', () => {
     const first = source('first', '2026-07-18T07:59:00Z')
     const second = source('second', '2026-07-18T08:00:40Z')
     const editorSnapshot = {
@@ -119,23 +119,19 @@ describe('signed automatic synchronization and shared calibration', () => {
       videoSyncTimezoneMode: 'utc',
     }
     const settings = { exportMode: 'composite', codec: 'libx264', fps: 30, widgetUpdateRate: 1, qualityType: 'quality', qualityValue: 20 }
-    const jobs = [
-      { path: first.metadata.path, source: first, offsetSeconds: -9, skipOverlay: false, pieces: [{ sourceStartFrame: 0, sourceEndFrame: 600 }] },
-      { path: second.metadata.path, source: second, offsetSeconds: 43, skipOverlay: true, pieces: [{ sourceStartFrame: 30, sourceEndFrame: 300 }] },
+    const outputs = [
+      { id: first.metadata.path, pieces: [{ sourceId: first.sourceId, startFrame: 0, endFrame: 600, skipOverlay: false }], transitions: [] },
+      { id: second.metadata.path, pieces: [{ sourceId: second.sourceId, startFrame: 30, endFrame: 300, skipOverlay: true }], transitions: [] },
     ]
+    const offsets = { [first.sourceId]: -9, [second.sourceId]: 43 }
     const destination = { kind: 'sourceNamed', directory: 'C:/output' }
-    const request = createBatchRenderRequest({ editorSnapshot, settings, inspectionId: 'inspection', destination, jobs })
+    const request = createBatchRenderRequest({ editorSnapshot, settings, inspectionId: 'inspection', outputs, offsets, destination })
 
     expect(request.destination).toEqual(destination)
 
     expect(request.activity).toEqual({ mode: 'externalActivity', activity: editorSnapshot.parsedActivity, offsets: { first: -9, second: 43 } })
-    expect(request.outputs).toEqual([
-      { id: 'C:/recordings/first.mp4', pieces: [{ sourceId: 'first', startFrame: 0, endFrame: 600, skipOverlay: false }], transitions: [] },
-      { id: 'C:/recordings/second.mp4', pieces: [{ sourceId: 'second', startFrame: 30, endFrame: 300, skipOverlay: true }], transitions: [] },
-    ])
-    // The pieces left around a deleted part join with a hard cut.
-    const [split] = createBatchOutputs([{ ...jobs[0], pieces: [jobs[0].pieces[0], { sourceStartFrame: 700, sourceEndFrame: 900 }] }])
-    expect(split.transitions).toEqual([{ type: 'none', durationSeconds: 0 }])
+    expect(request.outputs).toEqual(outputs)
+    expect(Object.isFrozen(request.outputs[0].pieces)).toBe(true)
     expect(Object.isFrozen(request.activity.offsets)).toBe(true)
     expect(captureBatchSync(editorSnapshot)).toEqual({ activitySummary: summary, timezoneMode: 'utc' })
 
@@ -143,8 +139,9 @@ describe('signed automatic synchronization and shared calibration', () => {
       editorSnapshot: { ...editorSnapshot, parsedActivity: null, activitySummary: null },
       settings,
       inspectionId: 'inspection',
+      outputs,
+      offsets: {},
       destination,
-      jobs,
     })
     expect(embedded.activity).toEqual({ mode: 'embeddedActivity' })
   })

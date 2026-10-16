@@ -17,7 +17,7 @@ describe('project snapshot contract', () => {
       activitySummary: { durationSeconds: 100 },
       renderSettings: {
         ...state.renderSettings,
-        renderTarget: 'batch',
+        outputMode: 'separate',
         fps: 60,
         codec: 'h264_nvenc',
         qualityType: 'bitrate',
@@ -53,7 +53,7 @@ describe('project snapshot contract', () => {
     expect(project.transitionDefaults).toEqual({ type: 'wipeleft', durationSeconds: 2, splitGapThresholdSeconds: 2, dialogShown: false })
     expect(project.render.fps).toBe(60)
     expect(project.render).toMatchObject({
-      renderTarget: 'batch',
+      outputMode: 'separate',
       batchOutputFolder: 'C:\\Events\\batch-renders',
     })
     expect(project.render).toMatchObject({ qualityType: 'bitrate', qualityValue: 35 })
@@ -169,9 +169,9 @@ describe('project snapshot contract', () => {
     expect(useStore.getState().renderSettings.exportMode).toBe('composite')
     expect(project.sources.videos).toEqual([])
     expect(project.render.exportMode).toBe('transparent')
-    useStore.getState().setRenderTarget('batch')
+    useStore.getState().setOutputMode('separate')
     const batchProject = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
-    expect(batchProject.render.renderTarget).toBe('batch')
+    expect(batchProject.render.outputMode).toBe('separate')
     expect(batchProject.render.exportMode).toBe('composite')
   })
 

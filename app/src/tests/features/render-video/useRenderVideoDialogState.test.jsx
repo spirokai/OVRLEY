@@ -40,7 +40,7 @@ describe('useRenderVideoDialogState', () => {
     const onClose = vi.fn()
     const onConfirm = vi.fn()
     const initialSettings = {
-      renderTarget: 'current',
+      outputMode: 'combined',
       exportMode: 'transparent',
       fps: 30,
       widgetUpdateRate: 1,
@@ -93,7 +93,7 @@ describe('useRenderVideoDialogState', () => {
 
     const { result } = renderHook(() => {
       const [settings, setSettings] = useState({
-        renderTarget: 'current',
+        outputMode: 'combined',
         exportMode: 'composite',
         fps: 30,
         widgetUpdateRate: 1,
@@ -196,7 +196,7 @@ describe('useRenderVideoDialogState', () => {
     )
     const onSettingsChange = vi.fn()
     const transparent = {
-      renderTarget: 'current',
+      outputMode: 'combined',
       exportMode: 'transparent',
       fps: 30,
       widgetUpdateRate: 1,

@@ -957,12 +957,15 @@ fn outputs_must_fit_their_destination_and_join_compatible_sources() {
         matches!(submit(incompatible), Err(BatchServiceError::InvalidRequest { message }) if message.contains("different display resolution"))
     );
     fs::write(fixture.directory.join("existing.mov"), b"previous output").unwrap();
-    assert!(submit(combined_request(
-        &fixture,
-        &["2-first.mp4", "4-second.mp4"],
-        "existing.mov"
-    ))
-    .is_err());
+    // The frontend asks before replacing an existing combined output.
+    assert!(matches!(
+        submit(combined_request(
+            &fixture,
+            &["2-first.mp4", "4-second.mp4"],
+            "existing.mov"
+        )),
+        Err(BatchServiceError::AlreadyExists { .. })
+    ));
     assert_eq!(
         fs::read(fixture.directory.join("existing.mov")).unwrap(),
         b"previous output"

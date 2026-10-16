@@ -68,9 +68,9 @@ export default function useRenderVideoDerivedState({ settings }) {
   const videoBounds = useMemo(() => getVideosTimelineBounds(joinVideoEdits(importedVideos, videoEdits)), [importedVideos, videoEdits])
   const importedVideoFps = videoFormat === null ? null : videoFormat.fps.num / videoFormat.fps.den
   const importedVideoResolution = videoFormat?.resolution ?? null
-  const isBatchTarget = displaySettings.renderTarget === 'batch'
-  // Native jobs own their FPS; the current source only drives single rendering.
-  const lockedVideoFps = isBatchTarget || !hasImportedVideo ? null : importedVideoFps
+  const isSeparate = displaySettings.outputMode === 'separate'
+  // Separate files keep each video's FPS; a combined file has the videos' shared FPS.
+  const lockedVideoFps = isSeparate || !hasImportedVideo ? null : importedVideoFps
   const exportMode = displaySettings.exportMode
   const updateRateFps = useMemo(
     () => (exportMode === 'composite' && lockedVideoFps !== null ? Math.round(lockedVideoFps) : displaySettings.fps),
@@ -90,7 +90,7 @@ export default function useRenderVideoDerivedState({ settings }) {
   )
   const selectedCodecIsMp4 = isMp4Codec(displaySettings.codec)
   const selectedExportCodecAvailable = selectedAccelerationOptions.some((option) => option.value === selectedAccelerationValue && option.available)
-  const resolutionMismatch = !isBatchTarget && resolutionsMismatch(config?.scene, importedVideoResolution)
+  const resolutionMismatch = !isSeparate && resolutionsMismatch(config?.scene, importedVideoResolution)
   const renderStartDisabled =
     rendererBusy ||
     resolutionMismatch ||
@@ -122,14 +122,14 @@ export default function useRenderVideoDerivedState({ settings }) {
     hasImportedVideo,
     importedVideoFps,
     importedVideoResolution,
-    isBatchTarget,
+    isSeparate,
     isCancelling,
     lockedVideoFps,
     platformOs,
     renderProgress,
     renderStartDisabled,
     renderingVideo,
-    submissionPending: renderSubmissionTarget === 'current',
+    submissionPending: renderSubmissionTarget === 'single',
     resolutionMismatch,
     selectedAccelerationOptions,
     selectedAccelerationValue,

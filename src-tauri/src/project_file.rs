@@ -410,11 +410,12 @@ enum VideoTimezoneMode {
     Utc,
 }
 
-/// `renderTarget: batch` renders every project video to its own file in `batchOutputFolder`.
+/// `outputMode: combined` renders the whole program to one file; `separate`
+/// renders every project video to its own file in `batchOutputFolder`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectRender {
-    render_target: RenderTarget,
+    output_mode: OutputMode,
     batch_output_folder: Option<String>,
     fps: f64,
     widget_update_rate: u32,
@@ -461,6 +462,14 @@ enum ExportMode {
     Composite,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum OutputMode {
+    Combined,
+    Separate,
+}
+
+/// Version 3 render target: the current video or a batch of a video folder.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum RenderTarget {
@@ -660,7 +669,7 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
         return Err("render.codec must not be empty".into());
     }
     if matches!(project.render.export_mode, ExportMode::Composite)
-        && matches!(project.render.render_target, RenderTarget::Current)
+        && matches!(project.render.output_mode, OutputMode::Combined)
         && project.sources.videos.is_empty()
     {
         return Err("Composite export mode requires a video source".into());
@@ -1106,7 +1115,10 @@ fn migrate_v3_project(project: ProjectDocumentV3) -> Result<MigratedProject, Str
         },
         transition_defaults: ProjectTransitionDefaults::default(),
         render: ProjectRender {
-            render_target: render.render_target,
+            output_mode: match render.render_target {
+                RenderTarget::Current => OutputMode::Combined,
+                RenderTarget::Batch => OutputMode::Separate,
+            },
             batch_output_folder: render.batch_output_folder,
             fps: render.fps,
             widget_update_rate: render.widget_update_rate,
@@ -1760,7 +1772,7 @@ mod tests {
                 "type": "wipeleft", "durationSeconds": 2.0, "splitGapThresholdSeconds": 2.0, "dialogShown": false
             },
             "render": {
-                "renderTarget": "current", "batchOutputFolder": null,
+                "outputMode": "combined", "batchOutputFolder": null,
                 "fps": 30.0, "widgetUpdateRate": 1, "exportMode": "transparent", "codec": "prores_ks",
                 "qualityType": "quality", "qualityValue": 18, "range": { "type": "all", "from": 0.0, "to": 0.0 }
             },
@@ -1787,6 +1799,9 @@ mod tests {
         sources.remove("videos");
         sources.insert("video".into(), Value::Null);
         project["render"]["batchVideoFolder"] = Value::Null;
+        let render = project["render"].as_object_mut().unwrap();
+        render.remove("outputMode");
+        render.insert("renderTarget".into(), Value::from("current"));
         let sync = project["sync"].as_object_mut().unwrap();
         sync.insert("videoOffsetSeconds".into(), Value::from(0.0));
         sync["manual"].as_object_mut().unwrap().remove("videoId");
@@ -2150,7 +2165,7 @@ mod tests {
         fs::create_dir_all(&directory).unwrap();
         let path = directory.join("Race.oly");
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
-        project["render"]["renderTarget"] = Value::from("batch");
+        project["render"]["outputMode"] = Value::from("separate");
         project["render"]["exportMode"] = Value::from("composite");
         project["render"]["codec"] = Value::from("libx264");
         project["render"]["batchOutputFolder"] =
@@ -2166,8 +2181,8 @@ mod tests {
             read_project_file_sync(&RasterResources::default(), path_string(path)).unwrap();
         assert_eq!(result.project.version, PROJECT_VERSION);
         assert!(matches!(
-            result.project.render.render_target,
-            RenderTarget::Batch
+            result.project.render.output_mode,
+            OutputMode::Separate
         ));
         assert_eq!(result.legacy_batch_video_folder, None);
         assert_eq!(
@@ -2309,8 +2324,10 @@ mod tests {
             assert!(parse_project(&invalid).is_err());
         }
         for (field, value) in [
-            ("renderTarget", serde_json::json!("invalid")),
-            ("renderTarget", Value::Null),
+            ("outputMode", serde_json::json!("invalid")),
+            ("outputMode", Value::Null),
+            // Version 3 render targets are not v4 fields.
+            ("renderTarget", serde_json::json!("current")),
             ("batchVideoFolder", Value::Null),
             ("batchOutputFolder", serde_json::json!(false)),
             ("batchOutputFolder", serde_json::json!("relative/folder")),
@@ -2333,7 +2350,7 @@ mod tests {
         project["render"]
             .as_object_mut()
             .unwrap()
-            .remove("renderTarget");
+            .remove("outputMode");
         assert!(parse_project(&project.to_string()).is_err());
         for folder in [
             serde_json::json!(42),
@@ -2362,10 +2379,11 @@ mod tests {
             let parsed = parse_project(&input).unwrap();
             assert_eq!(parsed.legacy_batch_video_folder, None);
             let parsed = parsed.document;
-            assert!(matches!(parsed.render.render_target, RenderTarget::Current));
+            assert!(matches!(parsed.render.output_mode, OutputMode::Combined));
             assert!(parsed.render.batch_output_folder.is_none());
             let serialized = serde_json::to_value(parsed).unwrap();
-            assert_eq!(serialized["render"]["renderTarget"], "current");
+            assert_eq!(serialized["render"]["outputMode"], "combined");
+            assert!(serialized["render"].get("renderTarget").is_none());
             assert!(serialized["render"].get("batchVideoFolder").is_none());
             assert!(serialized["render"]["batchOutputFolder"].is_null());
         }
@@ -2385,8 +2403,8 @@ mod tests {
         let parsed = parse_project(&project.to_string()).unwrap();
         assert_eq!(parsed.legacy_batch_video_folder, Some(videos.clone()));
         assert!(matches!(
-            parsed.document.render.render_target,
-            RenderTarget::Batch
+            parsed.document.render.output_mode,
+            OutputMode::Separate
         ));
         assert_eq!(parsed.document.render.batch_output_folder, Some(renders));
         let serialized = serde_json::to_value(&parsed.document).unwrap();

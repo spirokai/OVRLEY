@@ -3,7 +3,7 @@ import { QUALITY_DEFAULTS } from '@/features/render-video/data/qualityDefaults'
 import { validateRenderQuality } from '@/features/render-video/utils/codecUtils'
 
 export const DEFAULT_RENDER_SETTINGS = Object.freeze({
-  renderTarget: 'current',
+  outputMode: 'combined',
   fps: 30,
   widgetUpdateRate: 1,
   exportMode: 'composite',
@@ -15,7 +15,7 @@ export const DEFAULT_RENDER_SETTINGS = Object.freeze({
 
 /** @param {object} settings Canonical settings at store or submission ingress. @returns {void} */
 export function validateRenderSettings(settings) {
-  validateRenderTarget(settings.renderTarget)
+  validateOutputMode(settings.outputMode)
   if (!Number.isFinite(settings.fps) || settings.fps <= 0) throw new Error('Render FPS must be a positive finite number')
   if (!Number.isInteger(settings.widgetUpdateRate) || settings.widgetUpdateRate <= 0) {
     throw new Error('Widget update rate must be a positive integer')
@@ -28,8 +28,8 @@ export function validateRenderSettings(settings) {
   if (settings.range.type === 'custom' && settings.range.from >= settings.range.to) throw new Error('Custom export range requires from < to')
 }
 
-function validateRenderTarget(renderTarget) {
-  if (renderTarget !== 'current' && renderTarget !== 'batch') throw new Error('Invalid render target')
+function validateOutputMode(outputMode) {
+  if (outputMode !== 'combined' && outputMode !== 'separate') throw new Error('Invalid output mode')
 }
 
 export function createRenderSettingsSlice(set) {
@@ -40,10 +40,10 @@ export function createRenderSettingsSlice(set) {
     },
     platformOs: 'unknown',
 
-    setRenderTarget: (renderTarget) => {
-      validateRenderTarget(renderTarget)
+    setOutputMode: (outputMode) => {
+      validateOutputMode(outputMode)
       set((state) => {
-        state.renderSettings.renderTarget = renderTarget
+        state.renderSettings.outputMode = outputMode
       })
     },
 

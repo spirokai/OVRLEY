@@ -64,33 +64,42 @@ describe('render request preparation', () => {
     expect(request.payload).toMatchObject({ outputPath: 'C:/renders/overlay.mov', overwrite: false })
   })
 
-  test('clamps a composite custom range to the imported video when submitting the job', () => {
+  test('renders videos through the batch service at the destination of their output mode', () => {
     useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:/clip.mp4', durationSeconds: 30 })], { clip: 10 }))
     const settings = {
       ...useStore.getState().renderSettings,
       exportMode: 'composite',
       codec: 'libx264',
-      range: { type: 'custom', from: 5.25, to: 39.75 },
       outputPath: 'C:/renders/video.mp4',
     }
-    const request = createRenderRequest({ editorSnapshot: useStore.getState(), settings })
-    expect(request.payload.config.scene).toMatchObject({
-      start: 10,
-      end: 39.75,
-      composite_sync_offset: 10,
-      composite_video_trim_start: 0,
-      composite_render_duration: 29.75,
+    const outputs = [
+      { id: 'C:/renders/video.mp4', pieces: [{ sourceId: 'source', startFrame: 0, endFrame: 900, skipOverlay: false }], transitions: [] },
+    ]
+    const batchReview = { inspectionId: 'inspection', outputs, offsets: { source: 10 } }
+    const request = createRenderRequest({ editorSnapshot: useStore.getState(), settings, batchReview })
+    expect(request.target).toBe('batch')
+    expect(request.payload).toMatchObject({
+      inspectionId: 'inspection',
+      activity: { mode: 'externalActivity', offsets: { source: 10 } },
+      destination: { kind: 'file', path: 'C:/renders/video.mp4', overwrite: false },
+      outputs,
     })
-    expect(request.payload).toMatchObject({ outputPath: 'C:/renders/video.mp4', overwrite: false })
-    expect(() =>
-      createRenderRequest({
-        editorSnapshot: useStore.getState(),
-        settings: { ...settings, range: { type: 'custom', from: 0, to: 5 } },
-      }),
-    ).toThrow('Custom export range must overlap the imported video range')
+    expect(createRenderRequest({ editorSnapshot: useStore.getState(), settings, batchReview, overwrite: true }).payload.destination.overwrite).toBe(
+      true,
+    )
+
+    const separate = { ...settings, outputMode: 'separate' }
+    expect(() => createRenderRequest({ editorSnapshot: useStore.getState(), settings: separate, batchReview })).toThrow(
+      'Render output target is required',
+    )
+    useStore.setState({ batchOutputFolder: 'C:/renders' })
+    expect(createRenderRequest({ editorSnapshot: useStore.getState(), settings: separate, batchReview }).payload.destination).toEqual({
+      kind: 'sourceNamed',
+      directory: 'C:/renders',
+    })
   })
 
-  test('renders an MP4-only clip against its own telemetry in clip-local time', () => {
+  test('previews the frame of the clip the preview shows, against its own telemetry in clip-local time', () => {
     const telemetryActivity = { sample_elapsed_seconds: [0, 15, 30], trim_end_seconds: 30 }
     const video = createTestVideo({
       id: 'clip',
@@ -98,49 +107,18 @@ describe('render request preparation', () => {
       durationSeconds: 30,
       telemetry: { status: 'ready', activity: telemetryActivity },
     })
-    useStore.setState({ parsedActivity: null, startSecond: 0, endSecond: 0, selectedSecond: 112, ...videoStoreState([video], { clip: 100 }) })
-    const settings = {
-      ...useStore.getState().renderSettings,
-      exportMode: 'composite',
-      codec: 'libx264',
-      range: { type: 'custom', from: 105, to: 120 },
-      outputPath: 'C:/renders/video.mp4',
-    }
-
-    const request = createRenderRequest({ editorSnapshot: useStore.getState(), settings })
-    expect(request.payload.parsedActivity).toBe(telemetryActivity)
-    expect(request.payload.config.scene).toMatchObject({
-      start: 5,
-      end: 20,
-      composite_video_path: 'C:/clip.mp4',
-      composite_sync_offset: 5,
-      composite_video_trim_start: 5,
-      composite_render_duration: 15,
+    const other = createTestVideo({ id: 'other', path: 'C:/other.mp4', durationSeconds: 30, importOrder: 1 })
+    useStore.setState({
+      parsedActivity: null,
+      startSecond: 0,
+      endSecond: 0,
+      selectedSecond: 112,
+      ...videoStoreState([other, video], { other: 0, clip: 100 }),
     })
-
-    const fullRequest = createRenderRequest({
-      editorSnapshot: useStore.getState(),
-      settings: { ...settings, range: { type: 'all', from: 0, to: 0 } },
-    })
-    expect(fullRequest.payload.config.scene).toMatchObject({ start: 0, end: 30, composite_sync_offset: 0, composite_render_duration: 30 })
 
     const preview = createPreviewRenderRequest(useStore.getState())
     expect(preview.parsedActivity).toBe(telemetryActivity)
     expect(preview.second).toBe(12)
-  })
-
-  test('rejects a current-video render of several clips', () => {
-    useStore.setState(
-      videoStoreState([createTestVideo({ id: 'a', path: 'C:/a.mp4' }), createTestVideo({ id: 'b', path: 'C:/b.mp4', importOrder: 1 })], {
-        a: 0,
-        b: 5,
-      }),
-    )
-    expect(() =>
-      createRenderRequest({
-        editorSnapshot: useStore.getState(),
-        settings: { ...useStore.getState().renderSettings, exportMode: 'composite', codec: 'libx264', outputPath: 'C:/renders/video.mp4' },
-      }),
-    ).toThrow('Exporting several videos is not supported yet')
+    expect(preview.config.scene.composite_video_path).toBe('C:/clip.mp4')
   })
 })

@@ -27,7 +27,7 @@ test('project restoration changes only project-owned settings', () => {
     },
     transitionDefaults: { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 4, dialogShown: true },
     render: {
-      renderTarget: 'batch',
+      outputMode: 'separate',
       batchOutputFolder: 'C:\\renders',
       fps: 60,
       widgetUpdateRate: 2,
@@ -56,7 +56,7 @@ test('project restoration changes only project-owned settings', () => {
   expect(state.manualVideoSync.detectedLocationSecond).toBe(30)
   expect(state.manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 30 })
   expect(state.renderSettings).toMatchObject({ fps: 60, codec: 'libx264', qualityType: 'bitrate', qualityValue: 20 })
-  expect(state.renderSettings.renderTarget).toBe('batch')
+  expect(state.renderSettings.outputMode).toBe('separate')
   expect(state.batchOutputFolder).toBe('C:\\renders')
   expect(state.batchSkipOverlay).toEqual({})
   expect(state.batchSnapshot).toBeNull()
@@ -98,7 +98,7 @@ function createProject({ videos, manual = {}, timeline = { playheadSecond: 0, vi
     },
     transitionDefaults: { type: 'wipeleft', durationSeconds: 2, splitGapThresholdSeconds: 2, dialogShown: false },
     render: {
-      renderTarget: 'current',
+      outputMode: 'combined',
       batchOutputFolder: null,
       fps: 30,
       widgetUpdateRate: 1,

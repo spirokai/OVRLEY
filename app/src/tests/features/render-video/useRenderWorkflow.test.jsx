@@ -9,6 +9,7 @@ import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 vi.mock('@/api/backend', () => ({
   renderVideo: vi.fn(),
+  submitBatchRender: vi.fn(),
   subscribeBatchRenderProgress: vi.fn().mockResolvedValue(vi.fn()),
   getBatchRenderSnapshot: vi.fn(),
   getRenderProgress: vi.fn().mockResolvedValue({
@@ -30,6 +31,38 @@ vi.mock('@/api/backend', () => ({
 }))
 
 const renderVideoMock = vi.mocked(backend.renderVideo)
+const submitBatchMock = vi.mocked(backend.submitBatchRender)
+
+function finishedBatch() {
+  return {
+    batchId: 'batch-1',
+    snapshot: {
+      batchId: 'batch-1',
+      revision: 1,
+      snapshotRevision: 1,
+      rendererBusy: false,
+      phase: 'completed',
+      activeItemId: null,
+      items: [],
+      plannedFrames: 360,
+      processedFrames: 360,
+      renderedFrames: 360,
+      encodedFrames: 360,
+      elapsedSeconds: 1,
+      estimatedSecondsRemaining: null,
+      currentItemProgress: null,
+      outputs: [],
+    },
+  }
+}
+
+// The dialog's review of the imported clip; its inputs were not changed afterwards.
+const batchReview = {
+  inspectionId: 'inspection',
+  outputs: [{ id: 'C:\\renders\\video.mp4', pieces: [{ sourceId: 'source', startFrame: 0, endFrame: 360, skipOverlay: false }], transitions: [] }],
+  offsets: { source: 0 },
+  reviewedInputs: {},
+}
 
 function importVideo({ offsetSeconds = 0, telemetry } = {}) {
   useStore.setState(
@@ -49,6 +82,8 @@ vi.mock('@/lib/file-dialog', async () => {
 describe('useRenderWorkflow', () => {
   beforeEach(() => {
     renderVideoMock.mockReset().mockResolvedValue({ started: true, render_id: 'render-1', outputPath: 'C:\\renders\\overlay.mov' })
+    submitBatchMock.mockReset().mockResolvedValue(finishedBatch())
+    vi.mocked(backend.getBatchRenderSnapshot).mockResolvedValue(finishedBatch().snapshot)
     vi.mocked(backend.openVideo).mockClear()
     vi.mocked(backend.suggestRenderOutputPath).mockImplementation((outputKind) =>
       Promise.resolve(outputKind === 'composite' ? 'C:\\renders\\video.mp4' : 'C:\\renders\\overlay.mov'),
@@ -83,14 +118,10 @@ describe('useRenderWorkflow', () => {
     await act(async () => result.current.openRenderDialog())
     expect(result.current.renderSettingsDraft).toMatchObject({ qualityType: 'quality', qualityValue: 21 })
     act(() => result.current.updateRenderSettingsDraft({ codec: 'libx264', qualityType, qualityValue }))
-    await act(async () => result.current.handleRenderVideoConfirm())
-    expect(renderVideoMock).toHaveBeenCalledWith(
-      expect.objectContaining({ scene: expect.objectContaining({ qualityType, qualityValue }) }),
-      expect.any(Object),
-      expect.any(Object),
-    )
+    await act(async () => result.current.handleRenderVideoConfirm(batchReview))
+    expect(submitBatchMock).toHaveBeenCalledWith(expect.objectContaining({ encoding: expect.objectContaining({ qualityType, qualityValue }) }))
     expect(useStore.getState().renderSettings).toMatchObject({ qualityType, qualityValue })
-    act(() => useStore.getState().clearRenderSession())
+    act(() => result.current.closeRenderDialog())
     await act(async () => result.current.openRenderDialog())
     expect(result.current.renderSettingsDraft).toMatchObject({ qualityType, qualityValue })
   })
@@ -112,9 +143,7 @@ describe('useRenderWorkflow', () => {
     expect(renderCount).toBe(initialRenderCount)
   })
 
-  test('dispatches transparent override without imported-video compositing inputs and persists transparent settings', async () => {
-    importVideo({ offsetSeconds: 5 })
-
+  test('renders the activity overlay without videos and persists its settings', async () => {
     const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
 
     await act(async () => {
@@ -140,7 +169,7 @@ describe('useRenderWorkflow', () => {
         scene: expect.objectContaining({ start: 5.25, end: 15.75, ffmpeg: expect.objectContaining({ codec: 'prores_ks' }) }),
       }),
       expect.any(Object),
-      expect.objectContaining({ outputPath: 'C:\\renders\\video.mov' }),
+      expect.objectContaining({ outputPath: 'C:\\renders\\overlay.mov' }),
     )
     expect(useStore.getState().renderSettings).toMatchObject({
       exportMode: 'transparent',
@@ -166,10 +195,10 @@ describe('useRenderWorkflow', () => {
     const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
 
     await act(async () => result.current.openRenderDialog())
-    expect(result.current.renderSettingsDraft.renderTarget).toBe('current')
+    expect(result.current.renderSettingsDraft.outputMode).toBe('combined')
 
-    act(() => result.current.updateRenderSettingsDraft({ renderTarget: 'batch' }))
-    expect(useStore.getState().renderSettings.renderTarget).toBe('batch')
+    act(() => result.current.updateRenderSettingsDraft({ outputMode: 'separate' }))
+    expect(useStore.getState().renderSettings.outputMode).toBe('separate')
     const batchSnapshot = {
       batchId: 'batch-1',
       revision: 1,
@@ -194,9 +223,9 @@ describe('useRenderWorkflow', () => {
     act(() => result.current.closeRenderDialog())
     expect(result.current.renderDialogPhase).toBe('closed')
     await act(async () => result.current.openRenderDialog())
-    expect(result.current.renderSettingsDraft.renderTarget).toBe('batch')
+    expect(result.current.renderSettingsDraft.outputMode).toBe('separate')
     expect(result.current.renderSettingsDraft.exportMode).toBe('composite')
-    expect(() => useStore.getState().setRenderTarget('invalid')).toThrow('Invalid render target')
+    expect(() => useStore.getState().setOutputMode('invalid')).toThrow('Invalid output mode')
   })
 
   test('preserves an explicit transparent project setting when a video is present', async () => {
@@ -209,36 +238,39 @@ describe('useRenderWorkflow', () => {
     expect(result.current.renderSettingsDraft.exportMode).toBe('transparent')
   })
 
-  test('dispatches committed composite mode with imported-video compositing inputs', async () => {
+  test('renders videos as one combined file and asks before replacing it', async () => {
     importVideo()
-    useStore.setState({
-      renderSettings: {
-        ...useStore.getState().renderSettings,
-        exportMode: 'composite',
-        codec: 'libx264',
-      },
-    })
-
+    useStore.setState({ renderSettings: { ...useStore.getState().renderSettings, exportMode: 'composite', codec: 'libx264' } })
+    const existsError = Object.assign(new Error('Output already exists'), { code: 'already_exists' })
+    submitBatchMock.mockRejectedValueOnce(existsError)
     const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
+    await act(async () => result.current.openRenderDialog())
 
-    await act(async () => {
-      await result.current.openRenderDialog()
-    })
-
-    await act(async () => {
-      await result.current.handleRenderVideoConfirm()
-    })
-
-    expect(renderVideoMock).toHaveBeenCalledWith(
+    // Videos render only from the dialog's review.
+    await act(async () => result.current.handleRenderVideoConfirm(null))
+    expect(submitBatchMock).not.toHaveBeenCalled()
+    await act(async () => result.current.handleRenderVideoConfirm(batchReview))
+    expect(renderVideoMock).not.toHaveBeenCalled()
+    expect(submitBatchMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        scene: expect.objectContaining({ composite_video_path: 'C:\\video.mp4' }),
+        inspectionId: 'inspection',
+        outputs: batchReview.outputs,
+        destination: { kind: 'file', path: 'C:\\renders\\video.mp4', overwrite: false },
       }),
-      expect.any(Object),
-      expect.any(Object),
     )
+    expect(result.current.overwriteOpen).toBe(true)
+    expect(result.current.pendingOverwritePath).toBe('C:\\renders\\video.mp4')
+
+    await act(async () => result.current.handleOverwriteConfirm())
+    expect(submitBatchMock).toHaveBeenCalledTimes(2)
+    expect(submitBatchMock.mock.calls[1][0]).toMatchObject({
+      outputs: batchReview.outputs,
+      destination: { kind: 'file', path: 'C:\\renders\\video.mp4', overwrite: true },
+    })
+    expect(result.current.overwriteOpen).toBe(false)
   })
 
-  test('enables an MP4-only render from ready clip telemetry and renders it in clip-local time', async () => {
+  test('enables an MP4-only render from ready clip telemetry and renders it with its embedded telemetry', async () => {
     const telemetryActivity = { sample_elapsed_seconds: [0, 12], trim_end_seconds: 12 }
     useStore.setState({ activitySummary: null, parsedActivity: null, startSecond: 0, endSecond: 0 })
     importVideo({ offsetSeconds: 40, telemetry: { status: 'absent', activity: null } })
@@ -254,35 +286,9 @@ describe('useRenderWorkflow', () => {
     await act(async () => result.current.openRenderDialog())
     expect(result.current.renderSettingsDraft.exportMode).toBe('composite')
     act(() => result.current.updateRenderSettingsDraft({ codec: 'libx264' }))
-    await act(async () => result.current.handleRenderVideoConfirm())
+    await act(async () => result.current.handleRenderVideoConfirm(batchReview))
 
-    expect(renderVideoMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        scene: expect.objectContaining({ start: 0, end: 12, composite_video_path: 'C:\\video.mp4', composite_sync_offset: 0 }),
-      }),
-      telemetryActivity,
-      expect.objectContaining({ outputPath: 'C:\\renders\\video.mp4' }),
-    )
-  })
-
-  test('routes the several-clip rejection globally without dispatching a render', async () => {
-    useStore.setState(
-      videoStoreState(
-        [
-          createTestVideo({ id: 'a', path: 'C:\\a.mp4', durationSeconds: 12 }),
-          createTestVideo({ id: 'b', path: 'C:\\b.mp4', durationSeconds: 12, importOrder: 1 }),
-        ],
-        { a: 0, b: 20 },
-      ),
-    )
-    const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
-    await act(async () => result.current.openRenderDialog())
-    act(() => result.current.updateRenderSettingsDraft({ codec: 'libx264' }))
-    await act(async () => result.current.handleRenderVideoConfirm())
-
-    expect(renderVideoMock).not.toHaveBeenCalled()
-    expect(result.current.renderDialogPhase).toBe('closed')
-    expect(useStore.getState().errorMessage).toBe('Exporting several videos is not supported yet')
+    expect(submitBatchMock).toHaveBeenCalledWith(expect.objectContaining({ activity: { mode: 'embeddedActivity' } }))
   })
 
   test('keeps the confirmation draft for output rejection and retries the unchanged path only after overwrite confirmation', async () => {
@@ -335,7 +341,7 @@ describe('useRenderWorkflow', () => {
       await Promise.resolve()
     })
 
-    expect(useStore.getState().renderSubmissionTarget).toBe('current')
+    expect(useStore.getState().renderSubmissionTarget).toBe('single')
     act(() => result.current.closeRenderDialog())
     expect(result.current.renderDialogPhase).toBe('confirm')
 

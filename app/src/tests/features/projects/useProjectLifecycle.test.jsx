@@ -176,7 +176,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       },
       transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
       render: {
-        renderTarget: 'current',
+        outputMode: 'combined',
         batchOutputFolder: null,
         fps: 60,
         widgetUpdateRate: 2,
@@ -308,9 +308,9 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     act(() => useStore.getState().setLoadedTemplateSource({ kind: 'bundled', templateId: 'another-template.json' }))
     expect(result.current.status).toBe('Saved')
 
-    act(() => useStore.getState().setRenderTarget('batch'))
+    act(() => useStore.getState().setOutputMode('separate'))
     expect(result.current.status).toBe('Modified')
-    act(() => useStore.getState().setRenderTarget('current'))
+    act(() => useStore.getState().setOutputMode('combined'))
     expect(result.current.status).toBe('Saved')
     act(() => useStore.getState().setBatchOutputFolder('C:\\batch-renders'))
     expect(result.current.status).toBe('Modified')
@@ -375,7 +375,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       batchSkipOverlay: { 'video-1': true },
       renderSettings: {
         ...DEFAULT_RENDER_SETTINGS,
-        renderTarget: 'batch',
+        outputMode: 'separate',
         fps: 60,
         range: { type: 'custom', from: 10, to: 80 },
       },

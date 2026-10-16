@@ -138,11 +138,12 @@ function defaultTransition(previous, next, gapSeconds, transitionDefaults) {
   return { type: transitionDefaults.type, durationSeconds }
 }
 
+function deletedPartsOf(videos) {
+  return new Map([...videos].flatMap((video) => video.deletedParts.map((part) => [part.id, part])))
+}
+
 function buildJoins(pieces, videosById, transitionDefaults) {
-  const deletedPartsById = new Map()
-  for (const video of videosById.values()) {
-    for (const part of video.deletedParts) deletedPartsById.set(part.id, part)
-  }
+  const deletedPartsById = deletedPartsOf(videosById.values())
 
   const seenVideoIds = new Set(pieces.length > 0 ? [pieces[0].videoId] : [])
   const joins = []
@@ -166,6 +167,23 @@ function buildJoins(pieces, videosById, transitionDefaults) {
     })
   }
   return joins
+}
+
+/**
+ * Lists the transitions between consecutive pieces of one video (its separate
+ * output): the joins at its deleted parts, by the same rule as the program.
+ * @param {object} video Imported video joined with its edits.
+ * @param {Array<object>} pieces The video's pieces in source order (`collectVideoPieces`).
+ * @param {{type: string, durationSeconds: number, splitGapThresholdSeconds: number}} transitionDefaults Project transition defaults.
+ * @returns {Array<{type: string, durationSeconds: number}>} One transition per join.
+ */
+export function buildVideoPieceTransitions(video, pieces, transitionDefaults) {
+  const deletedPartsById = deletedPartsOf([video])
+  return pieces.slice(1).map((next, index) => {
+    const previous = pieces[index]
+    const gapSeconds = next.timelineStartSecond - previous.timelineEndSecond
+    return deletedPartsById.get(next.leadingDeletedPartId).transition ?? defaultTransition(previous, next, gapSeconds, transitionDefaults)
+  })
 }
 
 /**

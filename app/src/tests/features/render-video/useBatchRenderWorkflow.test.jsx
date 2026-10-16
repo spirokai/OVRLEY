@@ -30,7 +30,7 @@ const next = `${folder}/ride.part 2.mp4`
 const blocked = `${folder}/outside.mp4`
 const settings = {
   ...DEFAULT_RENDER_SETTINGS,
-  renderTarget: 'batch',
+  outputMode: 'separate',
   fps: 24,
   widgetUpdateRate: 2,
   exportMode: 'composite',
@@ -351,7 +351,7 @@ describe('native batch workflow', () => {
     const history = useStore.temporal.getState().pastStates
     const { result, unmount } = renderHook(() => ({
       batch: useBatchRenderWorkflow({ phase: 'confirm', settings }),
-      render: useRenderVideoDerivedState({ settings: { ...settings, renderTarget: 'current' } }),
+      render: useRenderVideoDerivedState({ settings: { ...settings, outputMode: 'combined' } }),
       project: useProjectDocumentState(),
     }))
     await waitFor(() => expect(result.current.batch.batchReady).toBe(true))

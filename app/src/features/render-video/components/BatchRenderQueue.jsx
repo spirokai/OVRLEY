@@ -1,5 +1,6 @@
 /**
- * Imported videos rendered as separate files, with overlay toggles and render progress.
+ * Imported videos of an export, with overlay toggles, the reasons a combined file
+ * cannot be rendered, and render progress.
  * Pure presentational - inspection and execution are owned by their hooks.
  */
 
@@ -25,6 +26,7 @@ import { useTranslation } from 'react-i18next'
  * @param {string|null} props.batchActiveItemId - Queue item currently rendering.
  * @param {object} props.currentItemProgress - Frontend progress for the active item.
  * @param {function} props.setBatchItemSkipOverlay - Toggles the activity overlay for an item.
+ * @param {string[]} props.combinedBlockers - Reasons the combined file cannot be rendered.
  * @returns {JSX.Element} Rendered component output.
  */
 export default function BatchRenderQueue({
@@ -40,6 +42,7 @@ export default function BatchRenderQueue({
   batchReviewError,
   batchInspecting,
   refreshInspection,
+  combinedBlockers,
 }) {
   const { t } = useTranslation()
 
@@ -51,7 +54,7 @@ export default function BatchRenderQueue({
             <div className="flex min-w-0 items-center gap-3">
               <Files className="h-4 w-4 shrink-0 text-primary" />
               <div className="flex min-w-0 items-center gap-1">
-                <h2 className="truncate text-sm font-semibold text-foreground">{t('render-video.batchSettings', 'Batch Settings')}</h2>
+                <h2 className="truncate text-sm font-semibold text-foreground">{t('render-video.videos', 'Videos')}</h2>
                 <HelpTooltip className="-mt-0.5 self-start" content={t('render-video.batchAutoSyncRequirement')} />
               </div>
             </div>
@@ -73,6 +76,17 @@ export default function BatchRenderQueue({
               </Label>
             </div>
           </div>
+          {combinedBlockers.length > 0 && (
+            <ul
+              role="alert"
+              aria-label={t('render-video.combinedUnavailableTitle', 'One video file cannot be rendered')}
+              className="shrink-0 space-y-1 text-xs text-red-700"
+            >
+              {combinedBlockers.map((blocker) => (
+                <li key={blocker}>{blocker}</li>
+              ))}
+            </ul>
+          )}
           {batchReviewError && (
             <div role="alert" className="shrink-0 space-y-2 text-xs text-red-700">
               <p>{batchReviewError === 'reinspectionRequired' ? t('render-video.reinspectionRequired') : batchReviewError}</p>
@@ -86,7 +100,7 @@ export default function BatchRenderQueue({
         {visibleBatchQueue.length === 0 ? (
           <p className="p-4 text-center text-xs text-muted-foreground my-auto">
             {batchQueue.length === 0
-              ? t('render-video.noVideosQueued', 'Import videos to render each of them to its own file.')
+              ? t('render-video.noVideosQueued', 'Import videos to render them.')
               : t('render-video.noRenderableVideos', 'No renderable videos.')}
           </p>
         ) : (

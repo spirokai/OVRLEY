@@ -59,11 +59,11 @@ export function createProjectContentSnapshot(state, projectPath) {
     },
     transitionDefaults: { ...state.transitionDefaults },
     render: {
-      renderTarget: state.renderSettings.renderTarget,
+      outputMode: state.renderSettings.outputMode,
       batchOutputFolder: state.batchOutputFolder,
       fps: state.renderSettings.fps,
       widgetUpdateRate: state.renderSettings.widgetUpdateRate,
-      exportMode: state.renderSettings.renderTarget === 'batch' || state.importedVideos.length > 0 ? state.renderSettings.exportMode : 'transparent',
+      exportMode: state.renderSettings.outputMode === 'separate' || state.importedVideos.length > 0 ? state.renderSettings.exportMode : 'transparent',
       codec: state.renderSettings.codec,
       qualityType: state.renderSettings.qualityType,
       qualityValue: state.renderSettings.qualityValue,

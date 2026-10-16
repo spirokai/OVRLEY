@@ -4,32 +4,32 @@ import * as backend from '@/api/backend'
 import useStore from '@/store/useStore'
 import { useBatchRenderStore, useBatchSyncInputs } from '@/hooks/useAppStoreSelectors'
 import { openDirectoryPath } from '@/lib/file-dialog'
-import { collectVideoPieces } from '@/lib/video-program/program'
 import { joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
-import { captureRenderEncoding, createBatchOutputs, createSeparateDestination } from '../utils/renderRequest'
-import { formatRenderPathError, reviewBatchQueue, reviewBatchSync } from '../utils/renderPresentation'
+import { captureRenderEncoding, createExportDestination } from '../utils/renderRequest'
+import { reviewExport } from '../utils/exportOutputs'
+import { formatRenderPathError, reviewBatchSync } from '../utils/renderPresentation'
 
 /**
- * Inspects every imported video for separate-file export, retains the inspection
- * across dialog openings, and plans outputs while confirmation is open. Context
- * identities prevent late results from authorizing Start.
+ * Inspects every imported video for export, retains the inspection across dialog
+ * openings, and plans the outputs of the selected output mode while confirmation
+ * is open. Context identities prevent late results from authorizing Start.
  * @param {object} options Dialog phase and canonical settings.
- * @returns {object} Reviewed submission inputs and output-folder controls. Execution and progress have separate owners.
+ * @returns {object} Reviewed submission inputs, combined-export blockers and output-folder controls.
+ *   Execution and progress have separate owners.
  */
 export default function useBatchInspection({ phase, settings }) {
   const { i18n, t } = useTranslation()
   const store = useBatchRenderStore()
   const inputs = useBatchSyncInputs()
-  const open = phase === 'confirm' && settings?.renderTarget === 'batch' && !store.hasBatchResults
-  const outputDirectory = store.batchOutputFolder
   const clips = useMemo(
     () => sortVideosByTimeline(joinVideoEdits(inputs.importedVideos, inputs.videoEdits)),
     [inputs.importedVideos, inputs.videoEdits],
   )
+  const open = phase === 'confirm' && clips.length > 0 && !store.hasBatchResults
+  const outputMode = settings?.outputMode ?? null
+  const outputDirectory = store.batchOutputFolder
+  const outputPath = settings?.outputPath ?? ''
   const sourcePaths = useMemo(() => clips.map((clip) => clip.path).join('\n'), [clips])
-  // Each video renders its own pieces within the export range; overlaps between videos do not trim them.
-  const exportRange = settings?.range ?? null
-  const piecesByVideo = useMemo(() => (exportRange === null ? new Map() : collectVideoPieces({ videos: clips, exportRange })), [clips, exportRange])
   const sync = useMemo(() => reviewBatchSync(inputs), [inputs])
   const [revision, setRevision] = useState(0)
   const [inspection, setInspection] = useState(null)
@@ -37,14 +37,32 @@ export default function useBatchInspection({ phase, settings }) {
   const context = useMemo(() => ({ sourcePaths, revision }), [sourcePaths, revision])
   const current = inspection?.context === context ? inspection : null
   const inspectionContext = open || current !== null ? context : null
-  const rows = useMemo(
-    () => reviewBatchQueue(clips, piecesByVideo, store.batchSkipOverlay, current, sync, i18n.resolvedLanguage),
-    [clips, piecesByVideo, store.batchSkipOverlay, current, sync, i18n.resolvedLanguage],
+  const reviewed = useMemo(
+    () =>
+      settings === null
+        ? { rows: [], blockers: [], outputs: null, offsets: {} }
+        : reviewExport({
+            outputMode,
+            exportMode: settings.exportMode,
+            clips,
+            exportRange: settings.range,
+            transitionDefaults: inputs.transitionDefaults,
+            skipOverlay: store.batchSkipOverlay,
+            inspection: current,
+            sync,
+            locale: i18n.resolvedLanguage,
+            outputPath,
+          }),
+    [clips, current, i18n.resolvedLanguage, inputs.transitionDefaults, outputMode, outputPath, settings, store.batchSkipOverlay, sync],
   )
-  const jobs = useMemo(() => rows.filter((row) => row.status === 'pending'), [rows])
+  // Review the destination without replacing an existing combined file; submission asks first.
+  const destination = useMemo(
+    () => (outputMode === null ? null : createExportDestination({ outputMode, outputPath, outputDirectory, overwrite: true })),
+    [outputMode, outputPath, outputDirectory],
+  )
   const review = useMemo(
-    () => ({ current, rows, sync, outputDirectory, encoding: settings ? captureRenderEncoding(settings, inputs.availableCodecs) : null }),
-    [current, rows, sync, outputDirectory, settings, inputs.availableCodecs],
+    () => ({ current, reviewed, sync, destination, encoding: settings ? captureRenderEncoding(settings, inputs.availableCodecs) : null }),
+    [current, reviewed, sync, destination, settings, inputs.availableCodecs],
   )
 
   useEffect(() => {
@@ -86,13 +104,11 @@ export default function useBatchInspection({ phase, settings }) {
   }, [inspectionContext])
 
   useEffect(() => {
-    if (!open || !current?.complete || current.error || sync.error || jobs.length === 0 || outputDirectory === null) return
+    if (!open || !current?.complete || current.error || sync.error || reviewed.outputs === null || reviewed.outputs.length === 0) return
+    if (destination === null) return
     let closed = false
     void backend
-      .planBatchOutputs(
-        { inspectionId: current.inspectionId, outputs: createBatchOutputs(jobs), destination: createSeparateDestination(outputDirectory) },
-        review.encoding,
-      )
+      .planBatchOutputs({ inspectionId: current.inspectionId, outputs: reviewed.outputs, destination }, review.encoding)
       .then((result) => {
         if (closed) return
         if (result.status === 'rejected') setInspection({ ...current, error: new Error('reinspectionRequired'), issues: result.issues })
@@ -104,13 +120,13 @@ export default function useBatchInspection({ phase, settings }) {
     return () => {
       closed = true
     }
-  }, [open, current, sync, jobs, outputDirectory, review])
+  }, [open, current, sync, reviewed, destination, review])
 
   const currentPlan = plan?.review === review ? plan : null
   const rowsWithIssues = useMemo(() => {
     const staleIds = new Set((current?.issues ?? []).map((issue) => issue.sourceId))
-    return rows.map((row) => (staleIds.has(row.source?.sourceId) ? { ...row, status: 'blocked', error: 'reinspectionRequired' } : row))
-  }, [rows, current?.issues])
+    return reviewed.rows.map((row) => (staleIds.has(row.source?.sourceId) ? { ...row, status: 'blocked', error: 'reinspectionRequired' } : row))
+  }, [reviewed.rows, current?.issues])
   const ready = open && currentPlan?.status === 'planned'
   const batchRunning = store.batchRunning || store.batchSubmissionPending
   const pickOutputFolder = async () => {
@@ -125,9 +141,8 @@ export default function useBatchInspection({ phase, settings }) {
     batchReady: ready && !batchRunning,
     batchReviewError: formatRenderPathError(current?.error ?? sync.error ?? null, t),
     batchOutputError: formatRenderPathError(currentPlan?.error ?? null, t),
-    request: ready
-      ? { inspectionId: current.inspectionId, destination: createSeparateDestination(outputDirectory), jobs, reviewedInputs: inputs }
-      : null,
+    combinedBlockers: reviewed.blockers,
+    request: ready ? { inspectionId: current.inspectionId, outputs: reviewed.outputs, offsets: reviewed.offsets, reviewedInputs: inputs } : null,
     pickOutputFolder,
     refreshInspection: () => setRevision((value) => value + 1),
     reject: (error) => setInspection({ ...current, error: new Error('reinspectionRequired'), issues: error.issues }),

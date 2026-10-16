@@ -26,6 +26,11 @@ use crate::raster::RasterResourceResolver;
 #[derive(Debug, Serialize)]
 #[serde(tag = "code", rename_all = "camelCase")]
 pub enum BatchServiceError {
+    /// A combined output file exists and was not cleared for overwriting.
+    #[serde(rename = "already_exists")]
+    AlreadyExists {
+        message: String,
+    },
     #[serde(rename = "output_error")]
     OutputError {
         #[serde(flatten)]
@@ -54,6 +59,7 @@ impl From<CoreError> for BatchServiceError {
     fn from(error: CoreError) -> Self {
         match error {
             CoreError::OutputInvalid(error) => Self::OutputError { error },
+            CoreError::OutputExists(message) => Self::AlreadyExists { message },
             CoreError::OutputIo { path, source } => Self::OutputError {
                 error: RenderPathError::output_io(path, source),
             },
