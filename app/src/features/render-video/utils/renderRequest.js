@@ -1,6 +1,6 @@
 import { getActivityDurationSeconds } from '@/lib/activity/activity-summary'
 import { joinVideoEdits } from '@/lib/video-program/video-collection'
-import { captureVideoSyncTimezoneMode, createBatchCalibration } from '@/lib/video-sync'
+import { captureVideoSyncTimezoneMode } from '@/lib/video-sync'
 import { buildPreviewFrameWindow } from '@/lib/preview-timing'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { validateRenderSettings } from '@/store/slices/createRenderSettingsSlice'
@@ -77,42 +77,21 @@ export function captureBatchSync(editorSnapshot) {
   return { activitySummary, timezoneMode: captureVideoSyncTimezoneMode(editorSnapshot.videoSyncTimezoneMode) }
 }
 
-/** @param {object} options Captured editor/settings and inspected batch sources. @returns {Readonly<object>} Native BatchRenderRequest. */
-export function createBatchRenderRequest({ editorSnapshot, settings, inspectionId, outputDirectory, jobs, calibrationSource, sync }) {
-  const { clip } = resolveCurrentRenderInputs(editorSnapshot)
-  const referenceVideo =
-    sync.activitySummary !== null && clip !== null
-      ? {
-          path: clip.path,
-          creationTime: clip.creationTime,
-          timeSource: clip.timeSource,
-          committedOffsetSeconds: clip.offsetSeconds,
-        }
-      : null
-  const calibration = createBatchCalibration({ activitySummary: sync.activitySummary, referenceVideo, timezoneMode: sync.timezoneMode })
+/**
+ * Builds the native separate-file export of every reviewed video. With an external
+ * activity each video renders at its committed offset; without one each video
+ * uses its own embedded telemetry.
+ * @param {object} options Captured editor/settings and reviewed, inspected jobs.
+ * @returns {Readonly<object>} Native BatchRenderRequest.
+ */
+export function createBatchRenderRequest({ editorSnapshot, settings, inspectionId, outputDirectory, jobs }) {
   const activity =
-    calibration.mode === 'embeddedActivity'
+    editorSnapshot.parsedActivity === null
       ? { mode: 'embeddedActivity' }
       : {
           mode: 'externalActivity',
           activity: editorSnapshot.parsedActivity,
-          timezoneMode: calibration.timezoneMode,
-          reference:
-            calibration.reference === null
-              ? null
-              : {
-                  sourceId: calibrationSource.sourceId,
-                  creationTime: calibration.reference.creationTime,
-                  timeSource: calibration.reference.timeSource,
-                  committedOffsetSeconds: calibration.reference.committedOffsetSeconds,
-                  automaticOffsetSeconds: calibration.reference.automaticOffsetSeconds,
-                },
-          automaticOffsets: Object.fromEntries(
-            jobs.map(({ source, timing }) => [
-              source.sourceId,
-              source.sourceId === calibrationSource?.sourceId ? calibration.reference.automaticOffsetSeconds : timing.automaticOffsetSeconds,
-            ]),
-          ),
+          offsets: Object.fromEntries(jobs.map(({ source, offsetSeconds }) => [source.sourceId, offsetSeconds])),
         }
   return freezeRequest(
     structuredClone({
@@ -121,7 +100,8 @@ export function createBatchRenderRequest({ editorSnapshot, settings, inspectionI
       encoding: captureRenderEncoding(settings, editorSnapshot.availableCodecs),
       activity,
       outputDirectory,
-      jobs: jobs.map(({ id, source, skipOverlay }) => ({ id, sourceId: source.sourceId, skipOverlay })),
+      // Job IDs are the source paths, which are unique in the collection.
+      jobs: jobs.map(({ path, source, skipOverlay }) => ({ id: path, sourceId: source.sourceId, skipOverlay })),
     }),
   )
 }

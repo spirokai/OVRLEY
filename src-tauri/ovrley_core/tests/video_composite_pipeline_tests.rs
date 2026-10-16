@@ -194,10 +194,9 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
         } else {
             RenderOutputKind::Transparent
         };
-        let target =
-            plan_batch_output_targets(&paths.downloads_dir, kind, &[rotated.clone()], None)
-                .unwrap()
-                .remove(0);
+        let target = plan_batch_output_targets(&paths.downloads_dir, kind, &[rotated.clone()])
+            .unwrap()
+            .remove(0);
         let outcome = execution.render(&paths, plan, &activity, &target);
         outcome.unwrap();
         let metadata = ovrley_core::media::video_probe::probe_video(

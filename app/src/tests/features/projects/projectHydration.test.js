@@ -12,7 +12,7 @@ test('project restoration changes only project-owned settings', () => {
     parsedActivity,
     ...videoStoreState([video]),
   })
-  useStore.getState().setBatchQueueFromPaths(['C:\\old\\queued.mp4'])
+  useStore.getState().setBatchItemSkipOverlay('canonical-video', true)
   useStore.setState({ batchSnapshot: { batchId: 'old-batch', rendererBusy: false } })
 
   applyProjectOwnedState(useStore, {
@@ -28,7 +28,6 @@ test('project restoration changes only project-owned settings', () => {
     transitionDefaults: { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 4, dialogShown: true },
     render: {
       renderTarget: 'batch',
-      batchVideoFolder: 'C:\\videos',
       batchOutputFolder: 'C:\\renders',
       fps: 60,
       widgetUpdateRate: 2,
@@ -58,11 +57,9 @@ test('project restoration changes only project-owned settings', () => {
   expect(state.manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 30 })
   expect(state.renderSettings).toMatchObject({ fps: 60, codec: 'libx264', qualityType: 'bitrate', qualityValue: 20 })
   expect(state.renderSettings.renderTarget).toBe('batch')
-  expect(state.batchVideoFolder).toBe('C:\\videos')
   expect(state.batchOutputFolder).toBe('C:\\renders')
-  expect(state.batchQueue).toEqual([])
+  expect(state.batchSkipOverlay).toEqual({})
   expect(state.batchSnapshot).toBeNull()
-  expect(state.renderSettings).not.toHaveProperty('batchVideoFolder')
   expect(state.renderSettings).not.toHaveProperty('batchOutputFolder')
   expect(state.selectedSecond).toBe(50)
   expect(state.timelineViewport).toEqual({ viewStart: 25, viewEnd: 75 })
@@ -102,7 +99,6 @@ function createProject({ videos, manual = {}, timeline = { playheadSecond: 0, vi
     transitionDefaults: { type: 'wipeleft', durationSeconds: 2, splitGapThresholdSeconds: 2, dialogShown: false },
     render: {
       renderTarget: 'current',
-      batchVideoFolder: null,
       batchOutputFolder: null,
       fps: 30,
       widgetUpdateRate: 1,

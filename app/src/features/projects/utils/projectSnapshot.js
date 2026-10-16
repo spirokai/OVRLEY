@@ -60,7 +60,6 @@ export function createProjectContentSnapshot(state, projectPath) {
     transitionDefaults: { ...state.transitionDefaults },
     render: {
       renderTarget: state.renderSettings.renderTarget,
-      batchVideoFolder: state.batchVideoFolder,
       batchOutputFolder: state.batchOutputFolder,
       fps: state.renderSettings.fps,
       widgetUpdateRate: state.renderSettings.widgetUpdateRate,

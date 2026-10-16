@@ -48,12 +48,6 @@ pub(super) fn accept_batch(
         }
     }
     let offsets = validate_batch_activity(&request.activity, &request.jobs)?;
-    let calibration_source_id = match &request.activity {
-        BatchActivity::EmbeddedActivity {} => None,
-        BatchActivity::ExternalActivity { reference, .. } => reference
-            .as_ref()
-            .map(|reference| reference.source_id.clone()),
-    };
     let owned = match inspection.validate_sources(&InspectionSourceSelection {
         inspection_id: request.inspection_id.clone(),
         source_ids: request
@@ -61,7 +55,6 @@ pub(super) fn accept_batch(
             .iter()
             .map(|job| job.source_id.clone())
             .collect(),
-        calibration_source_id,
     }) {
         InspectionValidation::Valid(sources) => sources,
         InspectionValidation::Rejected(rejection) => {
@@ -103,53 +96,30 @@ pub(super) fn accept_batch(
     })
 }
 
-/// Validate calibration consistency at submission and derive each signed offset once.
+/// Validate the committed offsets at submission: exactly one finite offset per queued source.
 fn validate_batch_activity(
     activity: &BatchActivity,
     jobs: &[BatchRenderJob],
 ) -> CoreResult<Vec<f64>> {
-    let BatchActivity::ExternalActivity {
-        reference,
-        automatic_offsets,
-        ..
-    } = activity
-    else {
+    let BatchActivity::ExternalActivity { offsets, .. } = activity else {
         return Ok(vec![0.0; jobs.len()]);
     };
-    let correction = match reference {
-        None => 0.0,
-        Some(reference) => {
-            if reference.creation_time.trim().is_empty()
-                || !reference.committed_offset_seconds.is_finite()
-                || !reference.automatic_offset_seconds.is_finite()
-                || automatic_offsets
-                    .get(&reference.source_id)
-                    .is_some_and(|offset| *offset != reference.automatic_offset_seconds)
-            {
-                return Err(CoreError::Config(
-                    "Batch calibration reference must have a consistent finite baseline".into(),
-                ));
-            }
-            reference.committed_offset_seconds - reference.automatic_offset_seconds
-        }
-    };
-    if automatic_offsets.len() != jobs.len() {
+    if offsets.len() != jobs.len() {
         return Err(CoreError::Config(
-            "Batch automatic offsets must identify exactly the queued sources".into(),
+            "Batch offsets must identify exactly the queued sources".into(),
         ));
     }
     jobs.iter()
         .map(|job| {
-            let automatic = automatic_offsets.get(&job.source_id).ok_or_else(|| {
-                CoreError::Config(format!("Missing automatic offset for {}", job.source_id))
+            let offset = offsets.get(&job.source_id).ok_or_else(|| {
+                CoreError::Config(format!("Missing offset for {}", job.source_id))
             })?;
-            let offset = automatic + correction;
-            if !automatic.is_finite() || !offset.is_finite() {
+            if !offset.is_finite() {
                 return Err(CoreError::Config(
                     "Batch activity offsets must be finite".into(),
                 ));
             }
-            Ok(offset)
+            Ok(*offset)
         })
         .collect()
 }

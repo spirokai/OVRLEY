@@ -85,9 +85,8 @@ export function applyNewProjectState(store, { templateSource, templateState }) {
       range: { ...DEFAULT_RENDER_SETTINGS.range },
     }
     draft.errorMessage = null
-    draft.batchVideoFolder = null
     draft.batchOutputFolder = null
-    draft.batchQueue = []
+    draft.batchSkipOverlay = {}
     draft.batchSnapshot = null
   })
   state.resetVideoSyncState()
@@ -111,7 +110,7 @@ export function applyProjectOwnedState(store, project) {
   const timelineEnd = Math.max(activityDuration, videoEnd, timelineMinimum + 0.001)
   const timelineViewport = clampToView(project.timeline.viewStart, project.timeline.viewEnd, timelineEnd, timelineMinimum)
   const range = { ...project.render.range }
-  const { batchVideoFolder, batchOutputFolder, ...renderSettings } = project.render
+  const { batchOutputFolder, ...renderSettings } = project.render
 
   if (range.type === 'custom') {
     range.from = clamp(range.from, timelineMinimum, timelineEnd)
@@ -133,9 +132,8 @@ export function applyProjectOwnedState(store, project) {
     draft.transitionDefaults = { ...project.transitionDefaults }
     draft.videoDragPreview = null
     draft.renderSettings = { ...renderSettings, range }
-    draft.batchVideoFolder = batchVideoFolder
     draft.batchOutputFolder = batchOutputFolder
-    draft.batchQueue = []
+    draft.batchSkipOverlay = {}
     draft.batchSnapshot = null
     draft.selectedSecond = clamp(project.timeline.playheadSecond, timelineMinimum, timelineEnd)
     draft.timelineViewport = timelineViewport

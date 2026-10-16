@@ -145,7 +145,6 @@ pub fn plan_batch_output_targets(
     directory: &Path,
     kind: RenderOutputKind,
     sources: &[PathBuf],
-    calibration_source: Option<&Path>,
 ) -> CoreResult<Vec<RenderOutputTarget>> {
     if !directory.is_absolute() || !directory.is_dir() {
         return Err(CoreError::OutputInvalid(
@@ -166,7 +165,6 @@ pub fn plan_batch_output_targets(
     let input_handles = sources
         .iter()
         .map(PathBuf::as_path)
-        .chain(calibration_source)
         .map(file_handle)
         .collect::<CoreResult<Vec<_>>>()?;
     let mut output_handles = Vec::new();
@@ -386,40 +384,32 @@ mod tests {
     }
 
     #[test]
-    fn batch_outputs_reject_input_and_calibration_aliases_before_overwrite() {
+    fn batch_outputs_reject_input_aliases_before_overwrite() {
         let directory = temp_target("batch-aliases");
         fs::create_dir_all(&directory).unwrap();
         let source = directory.join("ride.mp4");
         let target = directory.join("ride_video.mp4");
         fs::write(&source, b"source video").unwrap();
-        fs::write(&target, b"reference video").unwrap();
-        for (inputs, reference) in [
-            (vec![source.clone(), target.clone()], None),
-            (vec![source.clone()], Some(target.as_path())),
-        ] {
-            let error = plan_batch_output_targets(
-                &directory,
-                RenderOutputKind::Composite,
-                &inputs,
-                reference,
-            )
-            .unwrap_err();
-            assert!(error.to_string().contains("aliases an input"));
-            assert_eq!(fs::read(&target).unwrap(), b"reference video");
-        }
+        fs::write(&target, b"other video").unwrap();
+        let error = plan_batch_output_targets(
+            &directory,
+            RenderOutputKind::Composite,
+            &[source.clone(), target.clone()],
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("aliases an input"));
+        assert_eq!(fs::read(&target).unwrap(), b"other video");
         fs::remove_file(&target).unwrap();
         fs::hard_link(&source, &target).unwrap();
         assert!(plan_batch_output_targets(
             &directory,
             RenderOutputKind::Composite,
             &[source.clone()],
-            None
         )
         .is_err());
         assert_eq!(fs::read(&source).unwrap(), b"source video");
         fs::remove_file(&target).unwrap();
-        plan_batch_output_targets(&directory, RenderOutputKind::Composite, &[source], None)
-            .unwrap();
+        plan_batch_output_targets(&directory, RenderOutputKind::Composite, &[source]).unwrap();
         fs::remove_dir_all(directory).unwrap();
     }
 

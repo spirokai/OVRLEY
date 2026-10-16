@@ -36,28 +36,9 @@ pub struct BatchEncodingSettings {
     pub qsv_full_init_args: Option<Vec<String>>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum VideoSyncTimezoneMode {
-    Local,
-    Utc,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct BatchCalibrationReference {
-    pub source_id: String,
-    /// Effective editor timestamp, including an override when selected.
-    pub creation_time: String,
-    /// Null when the external probe did not identify timestamp provenance.
-    pub time_source: Option<String>,
-    pub committed_offset_seconds: f64,
-    pub automatic_offset_seconds: f64,
-}
-
-/// Embedded mode has no shared activity calibration. With external activity,
-/// absent reference means exactly zero correction; a present reference must
-/// have a resolved signed baseline. Drag preview offsets never enter this DTO.
+/// Embedded mode uses each source's own telemetry. With external activity, every
+/// queued source carries its committed editor offset (activity second where the
+/// video starts). Drag preview offsets never enter this DTO.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(
     tag = "mode",
@@ -69,11 +50,8 @@ pub enum BatchActivity {
     EmbeddedActivity {},
     ExternalActivity {
         activity: ParsedActivity,
-        timezone_mode: VideoSyncTimezoneMode,
-        reference: Option<BatchCalibrationReference>,
-        /// Automatic baselines keyed by the queued source identities. The backend
-        /// applies the reference correction once; jobs carry no timing mode.
-        automatic_offsets: HashMap<String, f64>,
+        /// Committed offsets keyed by the queued source identities.
+        offsets: HashMap<String, f64>,
     },
 }
 

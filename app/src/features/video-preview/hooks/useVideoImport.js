@@ -3,7 +3,14 @@
  */
 
 import { useMemo } from 'react'
-import { clearPreviewVideos, extractVideoTelemetry, importPreviewVideo, preparePreviewVideo, removePreviewVideo } from '@/api/backend'
+import {
+  clearPreviewVideos,
+  extractVideoTelemetry,
+  importPreviewVideo,
+  listDirectoryVideoFiles,
+  preparePreviewVideo,
+  removePreviewVideo,
+} from '@/api/backend'
 import { changeVideoCollection, runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import { openMultiplePaths } from '@/lib/file-dialog'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
@@ -155,18 +162,18 @@ async function importVideoPaths(paths) {
 }
 
 /**
- * Describes what an import needs to tell the user: files that failed or were
- * already imported, and clips that cannot be combined into one output when the
- * import made the collection incompatible in a new way.
+ * Describes what an import needs to tell the user: an optional notice about why it
+ * happened, files that failed or were already imported, and clips that cannot be
+ * combined into one output when the import made the collection incompatible in a new way.
  * @returns {object|null} Import report, or null when there is nothing to report.
  */
-function createImportReport({ failures, duplicates }, incompatibleBefore) {
+function createImportReport({ failures, duplicates }, incompatibleBefore, notice) {
   const { importedVideos } = useStore.getState()
   const { reference, incompatibleIds } = deriveCompatibility(importedVideos)
   const newlyIncompatible = [...incompatibleIds].some((id) => !incompatibleBefore.has(id))
   const incompatibleVideos = newlyIncompatible ? importedVideos.filter((video) => incompatibleIds.has(video.id)) : []
-  if (failures.length === 0 && duplicates.length === 0 && incompatibleVideos.length === 0) return null
-  return { failures, duplicates, reference: incompatibleVideos.length > 0 ? reference : null, incompatibleVideos }
+  if (notice === null && failures.length === 0 && duplicates.length === 0 && incompatibleVideos.length === 0) return null
+  return { notice, failures, duplicates, reference: incompatibleVideos.length > 0 ? reference : null, incompatibleVideos }
 }
 
 function basename(path) {
@@ -225,8 +232,10 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
    * Imports the given paths behind the blocking loader, then runs the follow-up
    * dialogs (report, placement, transition defaults, overlaps). Telemetry
    * extraction continues in the background.
+   * @param {Array<string>} paths Absolute file paths.
+   * @param {{notice?: string|null}} [options] Notice shown at the top of the import report.
    */
-  const loadVideoPaths = async (paths) => {
+  const loadVideoPaths = async (paths, { notice = null } = {}) => {
     const incompatibleBefore = deriveCompatibility(useStore.getState().importedVideos).incompatibleIds
     setImportingVideo(true)
     let result
@@ -240,7 +249,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
       void queueTelemetryExtraction(result.videos)
     }
     followUp.start({
-      report: createImportReport(result, incompatibleBefore),
+      report: createImportReport(result, incompatibleBefore, notice),
       undeterminedIds: result.undeterminedIds,
       videoIds: result.videos.map((video) => video.id),
     })
@@ -305,6 +314,41 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   }
 
   /**
+   * Imports the videos of the folder a version 3 project rendered as a batch. The
+   * project keeps rendering separate files; a notice explains what happened, also
+   * when the folder is missing or holds no videos.
+   * @param {string} folder Absolute folder path saved in the project.
+   */
+  const importLegacyBatchFolder = async (folder) => {
+    let paths
+    try {
+      paths = await listDirectoryVideoFiles(folder)
+    } catch (error) {
+      console.warn('Batch project video folder could not be read:', error)
+      paths = []
+    }
+    if (paths.length === 0) {
+      const notice = i18next.t('video-preview.legacyBatchFolderMissing', {
+        defaultValue:
+          'This project rendered the videos of {{folder}} as a batch, but the folder is missing or holds no videos. The project keeps its own video.',
+        folder,
+      })
+      followUp.start({
+        report: { notice, failures: [], duplicates: [], reference: null, incompatibleVideos: [] },
+        undeterminedIds: [],
+        videoIds: [],
+      })
+      return
+    }
+    const notice = i18next.t('video-preview.legacyBatchFolderImported', {
+      defaultValue:
+        'This project rendered the videos of {{folder}} as a batch. They were added to the timeline and will be exported as separate files to the same output folder.',
+      folder,
+    })
+    await loadVideoPaths(paths, { notice })
+  }
+
+  /**
    * Removes one clip from the collection, then releases its preview registration.
    * @param {string} videoId Clip to remove.
    */
@@ -344,6 +388,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
     handleImportVideo,
     handleVideoFilesDrop,
     importDialogs: followUp.dialogs,
+    importLegacyBatchFolder,
     loadVideoPaths,
     prepareVideoPath,
     removeVideo,

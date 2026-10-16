@@ -84,13 +84,14 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         manual: { videoId: null, landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
-      render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     boundaries.readProjectFile.mockResolvedValue({
       project,
       resolvedSources: { activityPath: null, videoPaths: [] },
       rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
     })
 
     const loaded = await loadProject({
@@ -100,7 +101,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       prepareVideoPath: vi.fn(),
     })
 
-    expect(loaded.editor.config.values[0].content_alignment).toBe('left')
+    expect(loaded.project.editor.config.values[0].content_alignment).toBe('left')
     expect(useStore.getState().config.values[0].content_alignment).toBe('left')
   })
 
@@ -118,7 +119,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         manual: { videoId: 'ride-video', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
-      render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 40 },
     }
     useStore.setState(
@@ -127,7 +128,12 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         createTestVideo({ id: 'previous-2', path: 'C:\\Previous\\b.mp4', importOrder: 1 }),
       ]),
     )
-    boundaries.readProjectFile.mockResolvedValue({ project, resolvedSources: { activityPath: null, videoPaths: [videoPath] }, rasterLoadResults: {} })
+    boundaries.readProjectFile.mockResolvedValue({
+      project,
+      resolvedSources: { activityPath: null, videoPaths: [videoPath] },
+      rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
+    })
     boundaries.removePreviewVideo.mockImplementation(async () => {
       expect(useStore.getState().importedVideos.map((video) => video.preview.importId)).toEqual(['owner-import-id'])
       return null
@@ -171,7 +177,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
       render: {
         renderTarget: 'current',
-        batchVideoFolder: null,
         batchOutputFolder: null,
         fps: 60,
         widgetUpdateRate: 2,
@@ -192,6 +197,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       project,
       resolvedSources: { activityPath, videoPaths: [videoPath] },
       rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
     })
     boundaries.selectedPathIsFile.mockResolvedValue(true)
     let finishActivityPreparation
@@ -277,9 +283,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(state.videoEdits[video.id].offsetSeconds).toBe(12)
     expect(state.manualVideoSync.videoId).toBe(video.id)
     expect(state.videoSyncTimezoneMode).toBe('utc')
-    const { batchVideoFolder, batchOutputFolder, ...renderSettings } = project.render
+    const { batchOutputFolder, ...renderSettings } = project.render
     expect(state.renderSettings).toEqual(renderSettings)
-    expect(state.batchVideoFolder).toBe(batchVideoFolder)
     expect(state.batchOutputFolder).toBe(batchOutputFolder)
     expect(state.selectedSecond).toBe(30)
     expect(state.timelineViewport).toEqual({ viewStart: 20, viewEnd: 60 })
@@ -307,16 +312,11 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(result.current.status).toBe('Modified')
     act(() => useStore.getState().setRenderTarget('current'))
     expect(result.current.status).toBe('Saved')
-    act(() => useStore.getState().setBatchVideoFolder('C:\\batch-videos'))
-    expect(result.current.status).toBe('Modified')
-    act(() => useStore.getState().setBatchVideoFolder(null))
-    expect(result.current.status).toBe('Saved')
     act(() => useStore.getState().setBatchOutputFolder('C:\\batch-renders'))
     expect(result.current.status).toBe('Modified')
     act(() => useStore.getState().setBatchOutputFolder(null))
     expect(result.current.status).toBe('Saved')
-    act(() => useStore.getState().setBatchQueueFromPaths(['C:\\batch-videos\\ride.mp4']))
-    expect(result.current.status).toBe('Saved')
+    act(() => useStore.getState().setBatchItemSkipOverlay('ride-video', true))
     expect(result.current.status).toBe('Saved')
 
     act(() => useStore.getState().setVideoSyncDetectedLocation(20))
@@ -371,8 +371,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       transitionDefaults: { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 5, dialogShown: true },
       selectedSecond: 45,
       timelineViewport: { viewStart: 30, viewEnd: 60 },
-      batchVideoFolder: 'C:\\batch-videos',
       batchOutputFolder: 'C:\\batch-renders',
+      batchSkipOverlay: { 'video-1': true },
       renderSettings: {
         ...DEFAULT_RENDER_SETTINGS,
         renderTarget: 'batch',
@@ -381,7 +381,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       },
     })
 
-    useStore.getState().setBatchQueueFromPaths(['C:\\batch-videos\\ride.mp4'])
     const clearImportedVideos = vi.fn(async () => useStore.getState().clearImportedVideos())
     const { result } = renderHook(() =>
       useProjectLifecycle({
@@ -412,9 +411,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(state.videoEdits).toEqual({})
     expect(state.transitionDefaults).toEqual(DEFAULT_TRANSITION_SETTINGS)
     expect(state.renderSettings).toEqual(DEFAULT_RENDER_SETTINGS)
-    expect(state.batchVideoFolder).toBeNull()
     expect(state.batchOutputFolder).toBeNull()
-    expect(state.batchQueue).toEqual([])
+    expect(state.batchSkipOverlay).toEqual({})
     expect(state.selectedSecond).toBe(0)
     expect(state.timelineViewport).toEqual({ viewStart: 0, viewEnd: 73 })
     expect(result.current.loadedProjectPath).toBeNull()
@@ -513,7 +511,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         manual: { videoId: null, landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
-      render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     useStore.setState({
@@ -527,6 +525,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       project,
       resolvedSources: { activityPath: missingActivityPath, videoPaths: [] },
       rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
     })
     boundaries.selectedPathIsFile.mockResolvedValue(false)
     const prepareActivityPath = vi.fn()
@@ -572,7 +571,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         manual: { videoId: 'ride-video', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
-      render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     useStore.setState({
@@ -585,6 +584,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       project,
       resolvedSources: { activityPath: 'C:\\Events\\broken.fit', videoPaths: ['C:\\Events\\ride.mp4'] },
       rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
     })
     boundaries.selectedPathIsFile.mockResolvedValue(true)
     const prepareActivityPath = vi.fn().mockRejectedValue(new Error('invalid activity'))
@@ -624,7 +624,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
       render: {
         ...DEFAULT_RENDER_SETTINGS,
-        batchVideoFolder: null,
         batchOutputFolder: null,
         exportMode: 'transparent',
         range: { ...DEFAULT_RENDER_SETTINGS.range },
@@ -634,7 +633,12 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     useStore.setState({ importedBackgroundImagePath: 'C:\\Current\\background.png' })
     boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
     boundaries.openSinglePath.mockResolvedValue(projectPath)
-    boundaries.readProjectFile.mockResolvedValue({ project, resolvedSources: { activityPath: null, videoPaths: [] }, rasterLoadResults: {} })
+    boundaries.readProjectFile.mockResolvedValue({
+      project,
+      resolvedSources: { activityPath: null, videoPaths: [] },
+      rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
+    })
     const { result } = renderHook(() =>
       useProjectLifecycle({
         clearImportedVideos: vi.fn(),
@@ -715,7 +719,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         manual: { videoId: 'clip-c', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       transitionDefaults: { type: 'none', durationSeconds: 2, splitGapThresholdSeconds: 3, dialogShown: true },
-      render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: -5, viewEnd: 140 },
     }
   }
@@ -730,6 +734,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       project,
       resolvedSources: { activityPath: null, videoPaths: multiVideoPaths },
       rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
     })
     boundaries.selectedPathIsFile.mockImplementation(async (path) => path !== 'C:\\Events\\missing.mp4')
     boundaries.registerPreviewVideo.mockImplementation(async (path) => ({ importId: `import:${path}`, previewUrl: `http://preview/${path}` }))
@@ -775,6 +780,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       project,
       resolvedSources: { activityPath: null, videoPaths: multiVideoPaths },
       rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
     })
     boundaries.registerPreviewVideo
       .mockResolvedValueOnce({ importId: 'first-import', previewUrl: 'http://preview/a' })
@@ -794,6 +800,30 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(boundaries.clearPreviewVideos).not.toHaveBeenCalled()
     expect(useStore.getState().importedVideos).toEqual([])
     expect(useStore.getState().activitySource.path).toBe('C:\\Current\\ride.fit')
+  })
+
+  test('imports the video folder of a version 3 batch project after opening it', async () => {
+    const project = multiVideoProject()
+    project.sources.videos = []
+    project.sync.manual.videoId = null
+    boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
+    boundaries.openSinglePath.mockResolvedValue('C:\\Events\\Batch.oly')
+    boundaries.readProjectFile.mockResolvedValue({
+      project,
+      resolvedSources: { activityPath: null, videoPaths: [] },
+      rasterLoadResults: {},
+      legacyBatchVideoFolder: 'C:\\Events\\videos',
+    })
+    const importLegacyBatchFolder = vi.fn(async () => {
+      expect(result.current.loadedProjectPath).toBe('C:\\Events\\Batch.oly')
+    })
+    const { result } = renderHook(() =>
+      useProjectLifecycle({ clearImportedVideos: vi.fn(), prepareActivityPath: vi.fn(), prepareVideoPath: vi.fn(), importLegacyBatchFolder }),
+    )
+
+    await act(() => result.current.handleOpenProject())
+
+    expect(importLegacyBatchFolder).toHaveBeenCalledExactlyOnceWith('C:\\Events\\videos')
   })
 
   test('tells the user once when a save replaced an older-format project', async () => {

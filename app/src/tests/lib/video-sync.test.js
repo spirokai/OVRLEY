@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest'
-import { createBatchCalibration, placeVideosByCreationTime, resolveBatchVideoTiming, resolveVideoSync, resolveVideosSync } from '@/lib/video-sync'
+import { placeVideosByCreationTime, resolveVideoSync, resolveVideosSync } from '@/lib/video-sync'
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 import { captureBatchSync, createBatchRenderRequest } from '@/features/render-video/utils/renderRequest'
-import { createTestVideo, videoStoreState } from '../helpers/videoFixtures'
+import { createTestVideo } from '../helpers/videoFixtures'
 
 // 5:47:13 activity ending 17:29 Sofia time (UTC+3).
 const activitySummary = {
@@ -108,55 +108,39 @@ describe('signed automatic synchronization and shared calibration', () => {
     }
   }
 
-  test('captures effective reference calibration at submission while inspection keeps the detected timestamp', () => {
-    const reference = source('reference', '2026-07-18T07:59:00Z')
-    const queued = source('queued', '2026-07-18T08:00:40Z')
-    const clip = createTestVideo({
-      id: 'reference-clip',
-      path: reference.metadata.path,
-      durationSeconds: reference.metadata.duration,
-      creationTime: '2026-07-18T07:59:48Z',
-      timeSource: 'filename',
-    })
+  test('builds separate-file jobs at their committed offsets, or with embedded telemetry without an activity', () => {
+    const first = source('first', '2026-07-18T07:59:00Z')
+    const second = source('second', '2026-07-18T08:00:40Z')
     const editorSnapshot = {
       config: { scene: { width: 1920, height: 1080 }, backdrops: [], rasters: [], labels: [], values: [], plots: [] },
       globalDefaults: DEFAULT_GLOBAL_DEFAULTS,
       parsedActivity: { sync_time: summary.syncTime, metadata: { timezone: summary.timezone }, sample_elapsed_seconds: [0, 120] },
       activitySummary: summary,
-      ...videoStoreState([clip], { [clip.id]: -9 }),
       videoSyncTimezoneMode: 'utc',
     }
-    expect(resolveVideoSync(clip, summary, 'utc').offsetSeconds).toBe(-12)
-    const sync = captureBatchSync(editorSnapshot)
-    expect(resolveBatchVideoTiming(reference.metadata, summary, sync.timezoneMode)).toEqual({
-      timing: { mode: 'externalActivity', automaticOffsetSeconds: -60 },
-      hasPositiveOverlap: false,
-    })
-    const request = createBatchRenderRequest({
-      editorSnapshot,
-      sync,
-      settings: { exportMode: 'composite', codec: 'libx264', fps: 30, widgetUpdateRate: 1, qualityType: 'quality', qualityValue: 20 },
+    const settings = { exportMode: 'composite', codec: 'libx264', fps: 30, widgetUpdateRate: 1, qualityType: 'quality', qualityValue: 20 }
+    const jobs = [
+      { path: first.metadata.path, source: first, offsetSeconds: -9, skipOverlay: false },
+      { path: second.metadata.path, source: second, offsetSeconds: 43, skipOverlay: true },
+    ]
+    const request = createBatchRenderRequest({ editorSnapshot, settings, inspectionId: 'inspection', outputDirectory: 'C:/output', jobs })
+
+    expect(request.activity).toEqual({ mode: 'externalActivity', activity: editorSnapshot.parsedActivity, offsets: { first: -9, second: 43 } })
+    expect(request.jobs).toEqual([
+      { id: 'C:/recordings/first.mp4', sourceId: 'first', skipOverlay: false },
+      { id: 'C:/recordings/second.mp4', sourceId: 'second', skipOverlay: true },
+    ])
+    expect(Object.isFrozen(request.activity.offsets)).toBe(true)
+    expect(captureBatchSync(editorSnapshot)).toEqual({ activitySummary: summary, timezoneMode: 'utc' })
+
+    const embedded = createBatchRenderRequest({
+      editorSnapshot: { ...editorSnapshot, parsedActivity: null, activitySummary: null },
+      settings,
       inspectionId: 'inspection',
-      calibrationSource: reference,
       outputDirectory: 'C:/output',
-      jobs: [reference, queued].map((video) => ({
-        id: video.sourceId,
-        source: video,
-        timing: resolveBatchVideoTiming(video.metadata, summary, sync.timezoneMode).timing,
-        skipOverlay: false,
-      })),
+      jobs,
     })
-    const { reference: captured, automaticOffsets } = request.activity
-    const correction = captured.committedOffsetSeconds - captured.automaticOffsetSeconds
-    expect(correction).toBe(3)
-    expect(request.jobs.map((job) => automaticOffsets[job.sourceId] + correction)).toEqual([-9, 43])
-    // A different live checkbox value cannot reinterpret this calibration.
-    editorSnapshot.videoSyncTimezoneMode = 'local'
-    expect(request.activity.timezoneMode).toBe('utc')
-    // Read as Sofia clock text, 07:59:48 is three hours before the 11:00 activity start.
-    const local = resolveVideoSync(clip, summary, 'local')
-    expect(local.offsetSeconds).toBe(-(3 * 3600 + 12))
-    expect(local.syncWarning).toBe('Video is outside the activity')
+    expect(embedded.activity).toEqual({ mode: 'embeddedActivity' })
   })
 
   test.each([
@@ -179,43 +163,21 @@ describe('signed automatic synchronization and shared calibration', () => {
     expect(sync.syncWarning).not.toBeNull()
   })
 
-  test('keeps a clip outside the activity at its raw baseline, matching batch calibration', () => {
-    const video = { creationTime: '2026-07-18T07:59:30Z', timeSource: 'gps', duration: 20 }
+  test('keeps a clip outside the activity at its raw baseline', () => {
     const interactive = resolveVideoSync(
-      createTestVideo({ creationTime: video.creationTime, timeSource: video.timeSource, durationSeconds: 20 }),
+      createTestVideo({ creationTime: '2026-07-18T07:59:30Z', timeSource: 'gps', durationSeconds: 20 }),
       summary,
       null,
     )
     expect(interactive.offsetSeconds).toBe(-30)
     expect(interactive.syncWarning).toBe('Video is outside the activity')
-    const calibration = createBatchCalibration({
-      activitySummary: summary,
-      referenceVideo: { ...video, path: 'C:/reference.mp4', committedOffsetSeconds: -10 },
-      timezoneMode: null,
-    })
-    expect(calibration.correctionSeconds).toBe(20)
-    expect(resolveBatchVideoTiming(video, summary, calibration.timezoneMode)).toEqual({
-      timing: { mode: 'externalActivity', automaticOffsetSeconds: -30 },
-      hasPositiveOverlap: false,
-    })
-    const noCorrection = createBatchCalibration({ activitySummary: summary, referenceVideo: null, timezoneMode: null })
-    expect(resolveBatchVideoTiming({ ...video, creationTime: '2026-07-18T07:59:40Z' }, summary, noCorrection.timezoneMode).hasPositiveOverlap).toBe(
-      false,
+    // Read as Sofia clock text, 07:59:48 is three hours before the 11:00 activity start.
+    const local = resolveVideoSync(
+      createTestVideo({ creationTime: '2026-07-18T07:59:48Z', timeSource: 'filename', durationSeconds: 20 }),
+      summary,
+      'local',
     )
-  })
-
-  test('rejects an unresolved reference baseline and uses local zero for per-video embedded telemetry', () => {
-    expect(() =>
-      createBatchCalibration({
-        activitySummary: summary,
-        referenceVideo: { path: 'C:/reference.mp4', creationTime: null, timeSource: null, committedOffsetSeconds: 5 },
-        timezoneMode: 'utc',
-      }),
-    ).toThrow('Could not calibrate reference video')
-    expect(createBatchCalibration({ activitySummary: null, referenceVideo: null, timezoneMode: 'utc' })).toEqual({ mode: 'embeddedActivity' })
-    expect(resolveBatchVideoTiming({ creationTime: null }, null, 'utc')).toEqual({
-      timing: { mode: 'embeddedActivity' },
-      hasPositiveOverlap: null,
-    })
+    expect(local.offsetSeconds).toBe(-(3 * 3600 + 12))
+    expect(local.syncWarning).toBe('Video is outside the activity')
   })
 })

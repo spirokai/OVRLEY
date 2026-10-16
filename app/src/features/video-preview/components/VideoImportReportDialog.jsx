@@ -19,6 +19,7 @@ export function VideoImportReportDialog({ open, report, onClose }) {
         <DialogTitle className="text-lg font-bold">{t('video-preview.importReportTitle', 'Video import')}</DialogTitle>
         <DialogDescription className="sr-only">{t('video-preview.importReportDescription', 'Files that need your attention')}</DialogDescription>
         <div className="mt-2 max-h-[60vh] space-y-5 overflow-y-auto thin-scrollbar">
+          {report?.notice && <p className="text-sm text-foreground">{report.notice}</p>}
           {sections.map((section) => (
             <section key={section.id} aria-label={section.title}>
               <h3 className="text-sm font-bold text-foreground">{section.title}</h3>

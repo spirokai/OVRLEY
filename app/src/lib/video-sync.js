@@ -48,8 +48,7 @@ export function captureVideoSyncTimezoneMode(mode) {
 /**
  * Calculates a signed baseline independently of clip overlap. GPS and other
  * trusted sources keep absolute-time handling; camera/filename timestamps use
- * the selected interpretation. Interactive auto-sync resolves that selection
- * before batch calibration captures it.
+ * the selected interpretation.
  * @param {object} video Source metadata with creationTime and timeSource.
  * @param {object} activitySummary Activity syncTime, endTime and timezone.
  * @param {'utc'|'local'} timezoneMode Captured Apply Timezone interpretation.
@@ -81,7 +80,7 @@ function isAmbiguousTimeSource(timeSource) {
 }
 
 /**
- * Resolves interactive sync state using the same baseline as batch calibration.
+ * Resolves the automatic sync state of one clip.
  * Ambiguous camera timestamps try both interpretations until a mode is selected;
  * prefer local when both overlap and retain an explicit selection.
  * A sole local match remains automatic for subsequent activity changes.
@@ -183,63 +182,4 @@ export function placeVideosByCreationTime(videos) {
         }
       : { offsetSeconds: (startMs - originMs) / 1000, determined: true, syncWarning: null },
   )
-}
-
-/**
- * Captures the shared correction from the committed reference offset. A null
- * activity selects per-video embedded telemetry; a null reference explicitly
- * means zero correction. A present reference must have a resolvable baseline.
- * @param {object} options Calibration inputs from one synchronous snapshot.
- * @param {object|null} options.activitySummary Shared external activity summary, or null.
- * @param {object|null} options.referenceVideo Effective path, creationTime, timeSource and committedOffsetSeconds, or null.
- * @param {'utc'|'local'|null|undefined} options.timezoneMode Apply Timezone selection.
- * @returns {object} Serializable calibration, matching the Rust BatchCalibration contract.
- */
-export function createBatchCalibration({ activitySummary, referenceVideo, timezoneMode }) {
-  const mode = captureVideoSyncTimezoneMode(timezoneMode)
-  if (activitySummary === null) return { mode: 'embeddedActivity' }
-  if (referenceVideo === null) return { mode: 'externalActivity', timezoneMode: mode, correctionSeconds: 0, reference: null }
-  if (!Number.isFinite(referenceVideo.committedOffsetSeconds)) throw new Error('Committed video sync offset must be a finite number')
-  let baseline
-  try {
-    baseline = calculateAutomaticVideoOffset(referenceVideo, activitySummary, mode)
-  } catch (error) {
-    throw new Error(`Could not calibrate reference video: ${error.message}`)
-  }
-  const { automaticOffsetSeconds } = baseline
-  return {
-    mode: 'externalActivity',
-    timezoneMode: mode,
-    correctionSeconds: referenceVideo.committedOffsetSeconds - automaticOffsetSeconds,
-    reference: {
-      path: referenceVideo.path,
-      creationTime: referenceVideo.creationTime,
-      timeSource: referenceVideo.timeSource,
-      committedOffsetSeconds: referenceVideo.committedOffsetSeconds,
-      automaticOffsetSeconds,
-    },
-  }
-}
-
-/**
- * Evaluates automatic overlap using only the inspected video's timestamp.
- * Reference overrides and shared calibration belong to render submission.
- * Embedded telemetry is prepared later by its owning job; null overlap
- * explicitly means coverage has not yet been inspected.
- * @param {object} video Inspected source metadata with creationTime, timeSource and duration.
- * @param {object|null} activitySummary Shared external activity summary, or null.
- * @param {'utc'|'local'} timezoneMode Captured Apply Timezone interpretation.
- * @returns {{timing: object, hasPositiveOverlap: boolean|null}} Job timing and eligibility.
- */
-export function resolveBatchVideoTiming(video, activitySummary, timezoneMode) {
-  if (activitySummary === null) return { timing: { mode: 'embeddedActivity' }, hasPositiveOverlap: null }
-  const { automaticOffsetSeconds, activityDurationSeconds } = calculateAutomaticVideoOffset(video, activitySummary, timezoneMode)
-  return {
-    timing: { mode: 'externalActivity', automaticOffsetSeconds },
-    hasPositiveOverlap: videoOverlapsActivity({
-      videoStart: automaticOffsetSeconds,
-      videoDuration: video.duration,
-      activityEnd: activityDurationSeconds,
-    }),
-  }
 }

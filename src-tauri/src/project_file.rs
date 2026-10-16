@@ -217,7 +217,7 @@ struct ProjectDocumentV3 {
     editor: ProjectEditor,
     sources: ProjectSourcesV3,
     sync: ProjectSyncV3,
-    render: ProjectRender,
+    render: ProjectRenderV3,
     timeline: ProjectTimeline,
     raster_assets: BTreeMap<String, String>,
 }
@@ -472,9 +472,25 @@ enum VideoTimezoneMode {
     Utc,
 }
 
+/// `renderTarget: batch` renders every project video to its own file in `batchOutputFolder`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectRender {
+    render_target: RenderTarget,
+    batch_output_folder: Option<String>,
+    fps: f64,
+    widget_update_rate: u32,
+    export_mode: ExportMode,
+    codec: String,
+    quality_type: QualityType,
+    quality_value: f64,
+    range: ProjectRange,
+}
+
+/// Version 3 rendered batches from a video folder.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectRenderV3 {
     // Older projects omit these choices; absent values mean current / no folders.
     #[serde(default)]
     render_target: RenderTarget,
@@ -553,6 +569,8 @@ pub(crate) struct ReadProjectResult {
     project: ProjectDocument,
     resolved_sources: ResolvedSources,
     raster_load_results: HashMap<String, RasterLoadResult>,
+    /// Video folder of a version 3 batch project, whose videos the frontend imports on open.
+    legacy_batch_video_folder: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -571,11 +589,27 @@ enum RasterLoadResult {
 struct ValidatedProject {
     document: ProjectDocument,
     populated_rasters: HashSet<String>,
+    legacy_batch_video_folder: Option<String>,
 }
 
 struct LoadedArchive {
     project: ProjectDocument,
     rasters: HashMap<String, Result<SelectedRaster, RasterError>>,
+    legacy_batch_video_folder: Option<String>,
+}
+
+/// A project in the current format and, for a version 3 batch project, its video folder.
+struct MigratedProject {
+    document: ProjectDocument,
+    legacy_batch_video_folder: Option<String>,
+}
+
+fn validate_folder(folder: &str) -> Result<(), String> {
+    validate_locator(&PathLocator::Absolute(folder.to_string()))?;
+    if folder.trim() != folder {
+        return Err("Batch folder paths must not contain surrounding whitespace".into());
+    }
+    Ok(())
 }
 
 struct RasterAsset {
@@ -664,17 +698,8 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
     }
     validate_videos(&project.sources.videos)?;
     validate_transition_defaults(&project.transition_defaults)?;
-    for folder in [
-        &project.render.batch_video_folder,
-        &project.render.batch_output_folder,
-    ]
-    .into_iter()
-    .flatten()
-    {
-        validate_locator(&PathLocator::Absolute(folder.clone()))?;
-        if folder.trim() != folder {
-            return Err("Batch folder paths must not contain surrounding whitespace".into());
-        }
+    if let Some(folder) = &project.render.batch_output_folder {
+        validate_folder(folder)?;
     }
     for (label, value) in [
         ("render.fps", project.render.fps),
@@ -1031,7 +1056,7 @@ fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
     Ok(())
 }
 
-fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, String> {
+fn migrate_project(version: u32, mut value: Value) -> Result<MigratedProject, String> {
     ovrley_core::normalize::raw::migrate_saved_font_input(&mut value);
     let mut legacy = match version {
         PROJECT_VERSION_V1 => {
@@ -1062,10 +1087,14 @@ fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, St
         PROJECT_VERSION_V3 => {
             let project = serde_json::from_value(value)
                 .map_err(|error| format!("Invalid version 3 project: {error}"))?;
-            return Ok(migrate_v3_project(project));
+            return migrate_v3_project(project);
         }
         PROJECT_VERSION => {
             return serde_json::from_value(value)
+                .map(|document| MigratedProject {
+                    document,
+                    legacy_batch_video_folder: None,
+                })
                 .map_err(|error| format!("Invalid version 4 project: {error}"));
         }
         other => return Err(format!("Unsupported project version: {other}")),
@@ -1079,7 +1108,7 @@ fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, St
         return Err("Legacy project cannot contain rasters".into());
     }
     config.insert("rasters".into(), Value::Array(Vec::new()));
-    Ok(migrate_v3_project(ProjectDocumentV3 {
+    migrate_v3_project(ProjectDocumentV3 {
         format: legacy.format,
         version: PROJECT_VERSION_V3,
         saved_at: legacy.saved_at,
@@ -1089,13 +1118,26 @@ fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, St
         render: migrate_legacy_render(legacy.render)?,
         timeline: legacy.timeline,
         raster_assets: BTreeMap::new(),
-    }))
+    })
 }
 
 /// Version 3 stores at most one video. It becomes a one-clip collection at its
 /// saved offset that owns the manual sync landmarks, with no deleted parts,
 /// transitions following the defaults, and the hard transition defaults.
-fn migrate_v3_project(project: ProjectDocumentV3) -> ProjectDocument {
+/// A batch render from a video folder keeps rendering separate files to the
+/// same output folder; the folder itself is handed to the frontend to import.
+fn migrate_v3_project(project: ProjectDocumentV3) -> Result<MigratedProject, String> {
+    let render = project.render;
+    for folder in [&render.batch_video_folder, &render.batch_output_folder]
+        .into_iter()
+        .flatten()
+    {
+        validate_folder(folder)?;
+    }
+    let legacy_batch_video_folder = match render.render_target {
+        RenderTarget::Batch => render.batch_video_folder,
+        RenderTarget::Current => None,
+    };
     let video = project.sources.video.map(|source| ProjectVideo {
         id: Uuid::new_v4().to_string(),
         path: source.path,
@@ -1105,7 +1147,7 @@ fn migrate_v3_project(project: ProjectDocumentV3) -> ProjectDocument {
         placement_anchor: None,
     });
     let manual = project.sync.manual;
-    ProjectDocument {
+    let document = ProjectDocument {
         format: project.format,
         version: PROJECT_VERSION,
         saved_at: project.saved_at,
@@ -1125,13 +1167,27 @@ fn migrate_v3_project(project: ProjectDocumentV3) -> ProjectDocument {
             videos: video.into_iter().collect(),
         },
         transition_defaults: ProjectTransitionDefaults::default(),
-        render: project.render,
+        render: ProjectRender {
+            render_target: render.render_target,
+            batch_output_folder: render.batch_output_folder,
+            fps: render.fps,
+            widget_update_rate: render.widget_update_rate,
+            export_mode: render.export_mode,
+            codec: render.codec,
+            quality_type: render.quality_type,
+            quality_value: render.quality_value,
+            range: render.range,
+        },
         timeline: project.timeline,
         raster_assets: project.raster_assets,
-    }
+    };
+    Ok(MigratedProject {
+        document,
+        legacy_batch_video_folder,
+    })
 }
 
-fn migrate_legacy_render(render: LegacyProjectRender) -> Result<ProjectRender, String> {
+fn migrate_legacy_render(render: LegacyProjectRender) -> Result<ProjectRenderV3, String> {
     if let Some(bitrate) = render.bitrate_mbps {
         if !bitrate.is_finite() || bitrate <= 0.0 {
             return Err("render.bitrateMbps must be a positive finite number or null".into());
@@ -1151,7 +1207,7 @@ fn migrate_legacy_render(render: LegacyProjectRender) -> Result<ProjectRender, S
         ),
         CodecSelection::Transparent(_) => false,
     };
-    Ok(ProjectRender {
+    Ok(ProjectRenderV3 {
         render_target: RenderTarget::Current,
         batch_video_folder: None,
         batch_output_folder: None,
@@ -1191,7 +1247,10 @@ fn parse_project(input: &str) -> Result<ValidatedProject, String> {
     if format != PROJECT_FORMAT {
         return Err(format!("Unsupported project format: {format}"));
     }
-    let mut project = migrate_project(version, value)?;
+    let MigratedProject {
+        document: mut project,
+        legacy_batch_video_folder,
+    } = migrate_project(version, value)?;
     let populated_rasters = validate_project(&project)?;
     let scene = project
         .editor
@@ -1208,6 +1267,7 @@ fn parse_project(input: &str) -> Result<ValidatedProject, String> {
     Ok(ValidatedProject {
         document: project,
         populated_rasters,
+        legacy_batch_video_folder,
     })
 }
 
@@ -1328,6 +1388,7 @@ fn read_archive(path: &Path) -> Result<LoadedArchive, ProjectFileError> {
     let ValidatedProject {
         document,
         populated_rasters,
+        legacy_batch_video_folder,
     } = parse_project(&contents)?;
     let mapped_names: HashSet<_> = document.raster_assets.values().collect();
     for name in entries.rasters.keys() {
@@ -1344,6 +1405,7 @@ fn read_archive(path: &Path) -> Result<LoadedArchive, ProjectFileError> {
     Ok(LoadedArchive {
         project: document,
         rasters,
+        legacy_batch_video_folder,
     })
 }
 
@@ -1407,7 +1469,11 @@ fn read_project_file_sync(
     path: String,
 ) -> Result<ReadProjectResult, ProjectFileError> {
     let project_path = PathBuf::from(path);
-    let LoadedArchive { project, rasters } = read_archive(&project_path)?;
+    let LoadedArchive {
+        project,
+        rasters,
+        legacy_batch_video_folder,
+    } = read_archive(&project_path)?;
     let resolved_sources = resolved_sources(&project_path, &project)?;
     let mut raster_load_results = HashMap::with_capacity(rasters.len());
     for (id, image) in rasters {
@@ -1423,6 +1489,7 @@ fn read_project_file_sync(
         project,
         resolved_sources,
         raster_load_results,
+        legacy_batch_video_folder,
     })
 }
 
@@ -1653,6 +1720,7 @@ fn write_project_file_sync(
     let ValidatedProject {
         document: mut project,
         populated_rasters,
+        ..
     } = parse_project(&project_json)?;
     let assets = prepare_raster_assets(&populated_rasters, images)?;
     project.raster_assets = assets
@@ -1754,7 +1822,7 @@ mod tests {
                 "type": "wipeleft", "durationSeconds": 2.0, "splitGapThresholdSeconds": 2.0, "dialogShown": false
             },
             "render": {
-                "renderTarget": "current", "batchVideoFolder": null, "batchOutputFolder": null,
+                "renderTarget": "current", "batchOutputFolder": null,
                 "fps": 30.0, "widgetUpdateRate": 1, "exportMode": "transparent", "codec": "prores_ks",
                 "qualityType": "quality", "qualityValue": 18, "range": { "type": "all", "from": 0.0, "to": 0.0 }
             },
@@ -1780,6 +1848,7 @@ mod tests {
         let sources = project["sources"].as_object_mut().unwrap();
         sources.remove("videos");
         sources.insert("video".into(), Value::Null);
+        project["render"]["batchVideoFolder"] = Value::Null;
         let sync = project["sync"].as_object_mut().unwrap();
         sync.insert("videoOffsetSeconds".into(), Value::from(0.0));
         sync["manual"].as_object_mut().unwrap().remove("videoId");
@@ -2024,6 +2093,7 @@ mod tests {
         let LoadedArchive {
             project,
             rasters: images,
+            ..
         } = read_archive(&path).unwrap();
         assert_eq!(project.raster_assets.len(), 1);
         assert_eq!(
@@ -2145,7 +2215,6 @@ mod tests {
         project["render"]["renderTarget"] = Value::from("batch");
         project["render"]["exportMode"] = Value::from("composite");
         project["render"]["codec"] = Value::from("libx264");
-        project["render"]["batchVideoFolder"] = Value::from(path_string(directory.join("videos")));
         project["render"]["batchOutputFolder"] =
             Value::from(path_string(directory.join("renders")));
         write_project_file_sync(
@@ -2162,10 +2231,7 @@ mod tests {
             result.project.render.render_target,
             RenderTarget::Batch
         ));
-        assert_eq!(
-            result.project.render.batch_video_folder,
-            Some(path_string(directory.join("videos")))
-        );
+        assert_eq!(result.legacy_batch_video_folder, None);
         assert_eq!(
             result.project.render.batch_output_folder,
             Some(path_string(directory.join("renders")))
@@ -2307,9 +2373,8 @@ mod tests {
         for (field, value) in [
             ("renderTarget", serde_json::json!("invalid")),
             ("renderTarget", Value::Null),
-            ("batchVideoFolder", serde_json::json!(42)),
+            ("batchVideoFolder", Value::Null),
             ("batchOutputFolder", serde_json::json!(false)),
-            ("batchVideoFolder", serde_json::json!("")),
             ("batchOutputFolder", serde_json::json!("relative/folder")),
             (
                 "batchOutputFolder",
@@ -2326,11 +2391,26 @@ mod tests {
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
         project["render"]["batchQueue"] = serde_json::json!([]);
         assert!(parse_project(&project.to_string()).is_err());
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["render"]
+            .as_object_mut()
+            .unwrap()
+            .remove("renderTarget");
+        assert!(parse_project(&project.to_string()).is_err());
+        for folder in [
+            serde_json::json!(42),
+            serde_json::json!(""),
+            serde_json::json!("relative/folder"),
+        ] {
+            let mut project: Value = serde_json::from_str(&valid_v3_project_json()).unwrap();
+            project["render"]["batchVideoFolder"] = folder;
+            assert!(parse_project(&project.to_string()).is_err());
+        }
     }
 
     #[test]
-    fn projects_without_batch_choices_load_with_documented_defaults() {
-        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+    fn legacy_projects_without_batch_choices_load_with_documented_defaults() {
+        let mut project: Value = serde_json::from_str(&valid_v3_project_json()).unwrap();
         let render = project["render"].as_object_mut().unwrap();
         render.remove("renderTarget");
         render.remove("batchVideoFolder");
@@ -2341,15 +2421,47 @@ mod tests {
             valid_v2_project_json(),
             valid_v3_project_json(),
         ] {
-            let parsed = parse_project(&input).unwrap().document;
+            let parsed = parse_project(&input).unwrap();
+            assert_eq!(parsed.legacy_batch_video_folder, None);
+            let parsed = parsed.document;
             assert!(matches!(parsed.render.render_target, RenderTarget::Current));
-            assert!(parsed.render.batch_video_folder.is_none());
             assert!(parsed.render.batch_output_folder.is_none());
             let serialized = serde_json::to_value(parsed).unwrap();
             assert_eq!(serialized["render"]["renderTarget"], "current");
-            assert!(serialized["render"]["batchVideoFolder"].is_null());
+            assert!(serialized["render"].get("batchVideoFolder").is_none());
             assert!(serialized["render"]["batchOutputFolder"].is_null());
         }
+    }
+
+    #[test]
+    fn v3_batch_folder_projects_hand_their_video_folder_to_the_frontend() {
+        let videos = path_string(std::env::temp_dir().join("ovrley-batch-videos"));
+        let renders = path_string(std::env::temp_dir().join("ovrley-batch-renders"));
+        let mut project: Value = serde_json::from_str(&valid_v3_project_json()).unwrap();
+        project["render"]["renderTarget"] = Value::from("batch");
+        project["render"]["exportMode"] = Value::from("composite");
+        project["render"]["codec"] = Value::from("libx264");
+        project["render"]["batchVideoFolder"] = Value::from(videos.clone());
+        project["render"]["batchOutputFolder"] = Value::from(renders.clone());
+
+        let parsed = parse_project(&project.to_string()).unwrap();
+        assert_eq!(parsed.legacy_batch_video_folder, Some(videos.clone()));
+        assert!(matches!(
+            parsed.document.render.render_target,
+            RenderTarget::Batch
+        ));
+        assert_eq!(parsed.document.render.batch_output_folder, Some(renders));
+        let serialized = serde_json::to_value(&parsed.document).unwrap();
+        assert!(serialized["render"].get("batchVideoFolder").is_none());
+
+        project["render"]["renderTarget"] = Value::from("current");
+        project["render"]["exportMode"] = Value::from("transparent");
+        assert_eq!(
+            parse_project(&project.to_string())
+                .unwrap()
+                .legacy_batch_video_folder,
+            None
+        );
     }
 
     #[test]

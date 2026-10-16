@@ -8,6 +8,7 @@ import useStore from '@/store/useStore'
 const boundaries = vi.hoisted(() => ({
   extractVideoTelemetry: vi.fn(),
   importPreviewVideo: vi.fn(),
+  listDirectoryVideoFiles: vi.fn(),
   openMultiplePaths: vi.fn(),
   removePreviewVideo: vi.fn(),
 }))
@@ -16,6 +17,7 @@ vi.mock('@/api/backend', async (importOriginal) => ({
   ...(await importOriginal()),
   extractVideoTelemetry: boundaries.extractVideoTelemetry,
   importPreviewVideo: boundaries.importPreviewVideo,
+  listDirectoryVideoFiles: boundaries.listDirectoryVideoFiles,
   removePreviewVideo: boundaries.removePreviewVideo,
 }))
 
@@ -176,6 +178,33 @@ describe('useVideoImport multi-file import', () => {
 
     await act(() => result.current.removeVideo(second.id))
     expect(useStore.getState().errorMessage).toBe(`Removing the video failed: Unknown imported video: ${second.id}`)
+  })
+
+  test('imports the video folder of a version 3 batch project with a notice, or explains a missing folder', async () => {
+    probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:00Z' })
+    probe('/clips/b.mp4', { creationTime: '2026-07-18T08:05:00Z' })
+    boundaries.listDirectoryVideoFiles.mockResolvedValueOnce(['/clips/a.mp4', '/clips/b.mp4'])
+    const { result } = renderImport()
+
+    await act(() => result.current.importLegacyBatchFolder('/clips'))
+
+    expect(boundaries.listDirectoryVideoFiles).toHaveBeenCalledWith('/clips')
+    expect(importedPaths()).toEqual(['/clips/a.mp4', '/clips/b.mp4'])
+    expect(result.current.importDialogs.report.report.notice).toBe(
+      'This project rendered the videos of /clips as a batch. They were added to the timeline and will be exported as separate files to the same output folder.',
+    )
+
+    boundaries.listDirectoryVideoFiles.mockRejectedValueOnce(new Error('The video directory does not exist'))
+    await act(() => result.current.importLegacyBatchFolder('/missing'))
+    expect(importedPaths()).toEqual(['/clips/a.mp4', '/clips/b.mp4'])
+    expect(result.current.importDialogs.report).toMatchObject({
+      open: true,
+      report: {
+        notice:
+          'This project rendered the videos of /missing as a batch, but the folder is missing or holds no videos. The project keeps its own video.',
+        failures: [],
+      },
+    })
   })
 
   test('imports several dropped native paths and rejects browser files without a path', async () => {

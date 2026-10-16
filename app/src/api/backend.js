@@ -570,11 +570,10 @@ export async function createVideoInspection() {
  */
 
 /**
- * Inspects a queued or calibration video without registering a preview or extracting its parsed activity.
+ * Inspects a queued video without registering a preview or extracting its parsed activity.
  * Embedded activity resolution remains job preparation; duration supplies provisional work estimates.
- * Effective editor timestamp overrides stay in calibration inputs, separate from this file descriptor.
  * @param {string} inspectionId Active configuration inspection identity.
- * @param {string} path Source path, including reference videos outside the queued folder.
+ * @param {string} path Source path.
  * @returns {Promise<InspectedVideoSource>} Session-owned metadata descriptor.
  */
 export async function inspectVideoSource(inspectionId, path) {
@@ -584,7 +583,7 @@ export async function inspectVideoSource(inspectionId, path) {
 /**
  * Plans native batch destinations and frame totals for fresh inspected sources.
  * Coverage for embedded telemetry is finalized during owning-job preparation.
- * @param {{inspectionId: string, sourceIds: string[], calibrationSourceId: string|null}} selection Session-owned source identities.
+ * @param {{inspectionId: string, sourceIds: string[]}} selection Session-owned source identities.
  * @param {{exportMode: string, exportCodec: string, fps: number, updateRate: number, qualityType: string, qualityValue: number, qsvFullInitArgs: string[]|null}} encoding Captured encoder settings.
  * @param {string} outputDirectory Absolute output folder.
  * @returns {Promise<{status: 'planned', plans: Array<{sourceId: string, outputPath: string, outputDurationSeconds: number, plannedFrames: number, containerFpsNum: number, containerFpsDen: number}>}|{status: 'rejected', inspectionId: string, issues: object[]}>} Native planning result.

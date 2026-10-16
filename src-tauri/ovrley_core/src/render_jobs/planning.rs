@@ -208,9 +208,6 @@ impl ValidatedBatchEncoding {
                 CodecSelection::Transparent(_) => RenderOutputKind::Transparent,
             },
             &paths,
-            sources
-                .calibration_source()
-                .map(|source| Path::new(&source.metadata.path)),
         )?;
         sources
             .sources()

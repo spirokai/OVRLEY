@@ -19,7 +19,6 @@ export default function useProjectDocumentState() {
   const projectOwnedState = useStore(
     useShallow((state) => ({
       activitySource: state.activitySource,
-      batchVideoFolder: state.batchVideoFolder,
       batchOutputFolder: state.batchOutputFolder,
       config: state.config,
       globalDefaults: state.globalDefaults,

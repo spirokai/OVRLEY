@@ -52,7 +52,6 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
     let mut selection = InspectionSourceSelection {
         inspection_id: session.inspection_id.clone(),
         source_ids: vec![source.source_id],
-        calibration_source_id: None,
     };
     for (mode, filename, frames, rate) in [
         (
@@ -327,8 +326,7 @@ fn accepted_sources_survive_disposal_but_closed_and_foreign_sessions_reject() {
     assert_eq!(queued.metadata.fps, Some(30000.0 / 1001.0));
     let mut selection = InspectionSourceSelection {
         inspection_id: session.inspection_id.clone(),
-        source_ids: vec![queued.source_id.clone()],
-        calibration_source_id: Some(reference.source_id.clone()),
+        source_ids: vec![queued.source_id.clone(), reference.source_id.clone()],
     };
     let accepted = match service.validate_sources(&selection) {
         InspectionValidation::Valid(accepted) => accepted,
@@ -336,7 +334,7 @@ fn accepted_sources_survive_disposal_but_closed_and_foreign_sessions_reject() {
     };
     service.dispose_session(&session.inspection_id);
     assert_eq!(accepted.sources()[0].as_ref(), &queued);
-    assert_eq!(accepted.calibration_source(), Some(&reference));
+    assert_eq!(accepted.sources()[1].as_ref(), &reference);
     check_source_freshness(&accepted.sources()[0]).unwrap();
     let response = serde_json::to_value(
         plan_batch_configuration(
@@ -365,7 +363,7 @@ fn accepted_sources_survive_disposal_but_closed_and_foreign_sessions_reject() {
 }
 
 #[test]
-fn submission_requires_reinspection_of_changed_queue_and_calibration_files() {
+fn submission_requires_reinspection_of_every_changed_queued_file() {
     let directory = SourcesDirectory::new();
     let queue_path = directory.source("queue/clip.mp4");
     let reference_path = directory.source("outside/reference.mp4");
@@ -378,15 +376,13 @@ fn submission_requires_reinspection_of_changed_queue_and_calibration_files() {
                 .inspect_source(&directory.paths(), &session.inspection_id, &queue_path)
                 .unwrap()
                 .source_id,
-        ],
-        calibration_source_id: Some(
             service
                 .inspect_source(&directory.paths(), &session.inspection_id, &reference_path)
                 .unwrap()
                 .source_id,
-        ),
+        ],
     };
-    // Same-size edits must be caught by mtime; reference edits must also block.
+    // Same-size edits must be caught by mtime; content edits of another file must also block.
     fs::File::options()
         .write(true)
         .open(&queue_path)
@@ -402,23 +398,18 @@ fn submission_requires_reinspection_of_changed_queue_and_calibration_files() {
                 .iter()
                 .all(|issue| issue.reason == ReinspectionReason::SourceChanged));
             assert_eq!(rejection.issues[0].source_id, selection.source_ids[0]);
-            assert_eq!(
-                rejection.issues[1].source_id,
-                selection.calibration_source_id.as_ref().unwrap().as_str()
-            );
+            assert_eq!(rejection.issues[1].source_id, selection.source_ids[1]);
         }
-        _ => panic!("stale queue or calibration must prevent acceptance"),
+        _ => panic!("stale queued files must prevent acceptance"),
     }
     selection.source_ids[0] = service
         .inspect_source(&directory.paths(), &session.inspection_id, &queue_path)
         .unwrap()
         .source_id;
-    selection.calibration_source_id = Some(
-        service
-            .inspect_source(&directory.paths(), &session.inspection_id, &reference_path)
-            .unwrap()
-            .source_id,
-    );
+    selection.source_ids[1] = service
+        .inspect_source(&directory.paths(), &session.inspection_id, &reference_path)
+        .unwrap()
+        .source_id;
     assert!(matches!(
         service.validate_sources(&selection),
         InspectionValidation::Valid(_)

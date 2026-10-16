@@ -100,7 +100,6 @@ impl Fixture {
                 .iter()
                 .map(|source| source.source_id.clone())
                 .collect(),
-            calibration_source_id: None,
         };
         let BatchPlanningResponse::Planned { .. } =
             plan_batch_configuration(&self.inspection, &selection, &encoding, &self.directory)
@@ -123,9 +122,7 @@ impl Fixture {
             activity: if external {
                 BatchActivity::ExternalActivity {
                     activity: activity(),
-                    timezone_mode: VideoSyncTimezoneMode::Utc,
-                    reference: None,
-                    automatic_offsets: sources
+                    offsets: sources
                         .iter()
                         .map(|source| (source.source_id.clone(), 0.0))
                         .collect(),
@@ -569,26 +566,14 @@ fn cancellation_waits_for_cleanup_retains_success_and_never_launches_later_jobs(
 }
 
 #[test]
-fn batch_calibration_applies_one_correction_to_each_automatic_baseline() {
+fn batch_jobs_render_at_their_committed_offsets() {
     let fixture = Fixture::new();
     let mut request = fixture.request(&["1-first.mp4", "2-second.mp4"], true);
-    let BatchActivity::ExternalActivity {
-        reference,
-        automatic_offsets,
-        ..
-    } = &mut request.activity
-    else {
+    let BatchActivity::ExternalActivity { offsets, .. } = &mut request.activity else {
         unreachable!();
     };
-    *reference = Some(BatchCalibrationReference {
-        source_id: request.jobs[0].source_id.clone(),
-        creation_time: "2026-05-20T12:00:00Z".into(),
-        time_source: Some("gps".into()),
-        automatic_offset_seconds: -5.0,
-        committed_offset_seconds: -1.0,
-    });
-    automatic_offsets.insert(request.jobs[0].source_id.clone(), -5.0);
-    automatic_offsets.insert(request.jobs[1].source_id.clone(), 20.0);
+    offsets.insert(request.jobs[0].source_id.clone(), -1.0);
+    offsets.insert(request.jobs[1].source_id.clone(), 24.0);
     let (service, _, terminal) = service();
     let (executor, entered, resume) = executor(None);
     service
@@ -612,38 +597,24 @@ fn batch_calibration_applies_one_correction_to_each_automatic_baseline() {
 }
 
 #[test]
-fn invalid_calibration_and_missing_baselines_reject_before_reserving_the_renderer() {
+fn missing_foreign_or_non_finite_offsets_reject_before_reserving_the_renderer() {
     let fixture = Fixture::new();
     let request = fixture.request(&["1-first.mp4"], true);
     let (service, _, _) = service();
     let (executor, entered, _) = executor(None);
-    for case in 0..4 {
+    for case in 0..3 {
         let mut malformed = request.clone();
-        let BatchActivity::ExternalActivity {
-            reference,
-            automatic_offsets,
-            ..
-        } = &mut malformed.activity
-        else {
+        let BatchActivity::ExternalActivity { offsets, .. } = &mut malformed.activity else {
             unreachable!();
         };
         match case {
-            0 => automatic_offsets.clear(),
+            0 => offsets.clear(),
             1 => {
-                automatic_offsets.insert(request.jobs[0].source_id.clone(), f64::INFINITY);
+                offsets.insert(request.jobs[0].source_id.clone(), f64::INFINITY);
             }
             2 => {
-                automatic_offsets.clear();
-                automatic_offsets.insert("foreign-source".into(), 0.0);
-            }
-            3 => {
-                *reference = Some(BatchCalibrationReference {
-                    source_id: request.jobs[0].source_id.clone(),
-                    creation_time: "2026-05-20T12:00:00Z".into(),
-                    time_source: None,
-                    automatic_offset_seconds: 1.0,
-                    committed_offset_seconds: 2.0,
-                });
+                offsets.clear();
+                offsets.insert("foreign-source".into(), 0.0);
             }
             _ => unreachable!(),
         }

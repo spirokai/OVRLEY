@@ -1,6 +1,6 @@
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import i18next from 'i18next'
-import { resolveBatchVideoTiming } from '@/lib/video-sync'
+import { videoOverlapsActivity } from '@/lib/video-timing'
 import { formatClockDuration } from '@/lib/time-format'
 import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { captureBatchSync } from './renderRequest'
@@ -117,36 +117,65 @@ export function reviewBatchSync(inputs) {
   }
 }
 
-/** @param {object[]} choices User queue. @param {object|null} inspection Current descriptors. @param {object} sync Automatic synchronization context. @param {string} locale Display language. @returns {object[]} Reviewed rows. */
-export function reviewBatchQueue(choices, inspection, sync, locale) {
-  return choices.map((item) => {
+// Camera timestamps are external data; an unreadable one only hides the date.
+function formatCreationLabels(clip, sync, locale) {
+  try {
+    const [creationDateLabel, creationTimeLabel] = formatVideoCreationTime(
+      clip.creationTime,
+      clip.timeSource,
+      sync.activitySummary?.timezone ?? null,
+      sync.timezoneMode,
+      locale,
+    ).split(/(?=\d{2}:\d{2}:\d{2}$)/)
+    return { creationDateLabel: creationDateLabel.trimEnd(), creationTimeLabel }
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error
+    return { creationDateLabel: null, creationTimeLabel: null }
+  }
+}
+
+/**
+ * Reviews every imported video for separate-file export. A video renders at its
+ * committed timeline offset; with an external activity it must overlap the activity.
+ * @param {object[]} clips Timeline clips in timeline order.
+ * @param {Object<string, boolean>} skipOverlay Video IDs that render without activity widgets.
+ * @param {object|null} inspection Current native descriptors keyed by path.
+ * @param {object} sync Activity summary and display timezone mode.
+ * @param {string} locale Display language.
+ * @returns {object[]} Reviewed rows keyed by video ID.
+ */
+export function reviewBatchQueue(clips, skipOverlay, inspection, sync, locale) {
+  return clips.map((clip) => {
+    const item = {
+      id: clip.id,
+      path: clip.path,
+      filename: clip.path.split(/[/\\]/).at(-1),
+      offsetSeconds: clip.offsetSeconds,
+      skipOverlay: skipOverlay[clip.id] === true,
+    }
     if (inspection?.error && inspection.error.message !== 'reinspectionRequired')
       return { ...item, status: 'blocked', error: formatRenderPathError(inspection.error, i18next.getFixedT(locale)) }
-    const result = inspection?.sources.get(item.path)
+    const result = inspection?.sources.get(clip.path)
     if (!result) return { ...item, status: 'checking', error: null }
     if (result.error || sync.error)
       return { ...item, status: 'blocked', error: formatRenderPathError(result.error ?? sync.error, i18next.getFixedT(locale)) }
-    const { metadata } = result.source
-    const inspectedItem = { ...item, source: result.source, durationLabel: formatClockDuration(metadata.duration) }
-    try {
-      const [creationDateLabel, creationTimeLabel] = formatVideoCreationTime(
-        metadata.creationTime,
-        metadata.timeSource,
-        sync.activitySummary?.timezone ?? null,
-        sync.timezoneMode,
-        locale,
-      ).split(/(?=\d{2}:\d{2}:\d{2}$)/)
-      inspectedItem.creationDateLabel = creationDateLabel.trimEnd()
-      inspectedItem.creationTimeLabel = creationTimeLabel
-      const { timing, hasPositiveOverlap } = resolveBatchVideoTiming(metadata, sync.activitySummary, sync.timezoneMode)
-      return {
-        ...inspectedItem,
-        timing,
-        status: hasPositiveOverlap === false ? 'blocked' : 'pending',
-        error: hasPositiveOverlap === false ? i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity') : null,
-      }
-    } catch (error) {
-      return { ...inspectedItem, status: 'blocked', error: error.message }
+    const inspectedItem = {
+      ...item,
+      source: result.source,
+      durationLabel: formatClockDuration(clip.durationSeconds),
+      ...formatCreationLabels(clip, sync, locale),
+    }
+    const outsideActivity =
+      sync.activitySummary !== null &&
+      !videoOverlapsActivity({
+        videoStart: clip.offsetSeconds,
+        videoDuration: clip.durationSeconds,
+        activityEnd: sync.activitySummary.durationSeconds,
+      })
+    return {
+      ...inspectedItem,
+      status: outsideActivity ? 'blocked' : 'pending',
+      error: outsideActivity ? i18next.t('store.videoOutsideActivity', 'Video is outside the activity') : null,
     }
   })
 }

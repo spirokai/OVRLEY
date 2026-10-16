@@ -150,7 +150,7 @@ describe('RenderVideoDialog', () => {
     expect(outputPathInput).toHaveValue('C:\\missing\\nested\\output.mov')
   })
 
-  test('switches to batch mode with folder pickers in place of the single output file', async () => {
+  test('switches to batch mode with an output folder picker in place of the single output file', async () => {
     const user = userEvent.setup()
 
     render(<RenderVideoDialogHarness initialSettings={transparentSettings()} />)
@@ -158,7 +158,8 @@ describe('RenderVideoDialog', () => {
     expect(screen.queryByRole('tab', { name: 'Full Video' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('tab', { name: 'Batch' }))
 
-    expect(screen.getByText('Video folder')).toBeInTheDocument()
+    expect(screen.queryByText('Video folder')).not.toBeInTheDocument()
+    expect(screen.getByText('Import videos to render each of them to its own file.')).toBeInTheDocument()
     expect(screen.getByText('Output folder')).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Output path' })).not.toBeInTheDocument()
     expect(screen.queryByText('Custom Export Range')).not.toBeInTheDocument()
@@ -179,11 +180,11 @@ describe('RenderVideoDialog', () => {
     await user.click(screen.getByRole('tab', { name: 'Batch' }))
 
     expect(screen.queryByText(/must match imported video/i)).not.toBeInTheDocument()
-    expect(screen.getByText('Video folder')).toBeInTheDocument()
+    expect(screen.getByText('video.mp4')).toBeInTheDocument()
   })
 
-  test('keeps batch start disabled until queued sources have fresh native inspection', () => {
-    useStore.getState().setBatchQueueFromPaths(['C:\\videos\\ride.mp4'])
+  test('keeps batch start disabled until imported videos have fresh native inspection', () => {
+    useStore.setState(videoStoreState([createTestVideo({ id: 'ride', path: 'C:\\videos\\ride.mp4' })]))
     useStore.getState().setBatchOutputFolder('C:\\renders')
 
     render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
@@ -256,17 +257,6 @@ describe('RenderVideoDialog', () => {
     expect(screen.queryByText(/1 completed/)).not.toBeInTheDocument()
     expect(screen.queryByText('Est. Remaining')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled()
-  })
-
-  test('lets the user clear a restored video folder while its empty queue is being loaded', async () => {
-    useStore.getState().setBatchVideoFolder('C:\\videos')
-    const user = userEvent.setup()
-    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
-    const clearButton = screen.getByRole('button', { name: 'Clear' })
-    expect(clearButton).toBeEnabled()
-    await user.click(clearButton)
-    expect(useStore.getState().batchVideoFolder).toBeNull()
-    expect(clearButton).toBeDisabled()
   })
 
   test('falls back to transparent export when returning to the current video without an import', async () => {

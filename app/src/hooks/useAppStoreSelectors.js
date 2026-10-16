@@ -118,34 +118,30 @@ export function useRenderDialogInputs() {
   )
 }
 
-/** @returns {object} Batch inspection inputs and queue choices, without native frame progress. */
+/** @returns {object} Batch output choices, without native frame progress. */
 export function useBatchRenderStore() {
   return useStore(
     useShallow((state) => ({
-      batchVideoFolder: state.batchVideoFolder,
       batchOutputFolder: state.batchOutputFolder,
-      batchQueue: state.batchQueue,
+      batchSkipOverlay: state.batchSkipOverlay,
       hasBatchResults: state.batchSnapshot !== null,
       batchRunning: state.batchSnapshot?.rendererBusy ?? false,
       batchSubmissionPending: state.renderSubmissionTarget === 'batch',
-      setBatchVideoFolder: state.setBatchVideoFolder,
       setBatchOutputFolder: state.setBatchOutputFolder,
-      setBatchQueueFromPaths: state.setBatchQueueFromPaths,
-      removeBatchQueueItem: state.removeBatchQueueItem,
-      clearBatchQueue: state.clearBatchQueue,
       setBatchItemSkipOverlay: state.setBatchItemSkipOverlay,
       setErrorMessage: state.setErrorMessage,
     })),
   )
 }
 
-/** @returns {object} Inputs that invalidate reviewed batch synchronization. */
+/** @returns {object} Inputs that invalidate a reviewed batch: the videos, their offsets, and the activity. */
 export function useBatchSyncInputs() {
   return useStore(
     useShallow((state) => ({
       activitySummary: state.activitySummary,
       parsedActivity: state.parsedActivity,
       importedVideos: state.importedVideos,
+      videoEdits: state.videoEdits,
       videoSyncTimezoneMode: state.videoSyncTimezoneMode,
       availableCodecs: state.availableCodecs,
     })),

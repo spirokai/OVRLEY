@@ -54,6 +54,7 @@ export default function useAppShellComposition() {
     onSetBackgroundMode: editorShell.setEditorBackgroundMode,
     prepareActivityPath: activityImport.prepareActivityPath,
     prepareVideoPath: videoControls.prepareVideoPath,
+    importLegacyBatchFolder: videoControls.importLegacyBatchFolder,
     startupReady: backendState.backendReady && templateRestoreComplete,
   })
   useWindowCloseGuard(projectLifecycle.handleCloseRequest)

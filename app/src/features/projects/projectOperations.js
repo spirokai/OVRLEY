@@ -50,10 +50,11 @@ async function registerProjectVideos(projectVideos, preparedVideos) {
  * Loads project dependencies through their owners, then applies project-owned settings.
  * @param {object} options Project path, source resolver, and media-owner operations.
  * @param {function} [options.onSetBackgroundMode] Shell setter for the editor background mode.
- * @returns {Promise<object|null>} Loaded project, or null when source recovery is cancelled.
+ * @returns {Promise<{project: object, legacyBatchVideoFolder: string|null}|null>} Loaded project and, for a version 3
+ *   batch project, the video folder to import; null when source recovery is cancelled.
  */
 export async function loadProject({ path, resolveProjectSources, prepareActivityPath, prepareVideoPath, onSetBackgroundMode }) {
-  const { project, resolvedSources, rasterLoadResults } = await backend.readProjectFile(path)
+  const { project, resolvedSources, rasterLoadResults, legacyBatchVideoFolder } = await backend.readProjectFile(path)
   project.editor = createDurableEditorState(project.editor)
   const hydratedProject = {
     ...project,
@@ -84,7 +85,7 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
   }
   if (videos.length > 0) for (const importId of previousImportIds) await backend.removePreviewVideo(importId)
   if (videos.length > 0) onSetBackgroundMode?.('video')
-  return project
+  return { project, legacyBatchVideoFolder }
 }
 
 /**

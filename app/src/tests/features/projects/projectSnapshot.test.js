@@ -26,9 +26,8 @@ describe('project snapshot contract', () => {
       selectedSecond: 12.5,
       timelineViewport: { viewStart: 10, viewEnd: 30 },
     }))
-    useStore.getState().setBatchVideoFolder('C:\\Events\\batch-videos')
     useStore.getState().setBatchOutputFolder('C:\\Events\\batch-renders')
-    useStore.getState().setBatchQueueFromPaths(['C:\\Events\\batch-videos\\blocked.mp4'])
+    useStore.getState().setBatchItemSkipOverlay('runtime-video', true)
 
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
 
@@ -55,7 +54,6 @@ describe('project snapshot contract', () => {
     expect(project.render.fps).toBe(60)
     expect(project.render).toMatchObject({
       renderTarget: 'batch',
-      batchVideoFolder: 'C:\\Events\\batch-videos',
       batchOutputFolder: 'C:\\Events\\batch-renders',
     })
     expect(project.render).toMatchObject({ qualityType: 'bitrate', qualityValue: 35 })
@@ -74,6 +72,8 @@ describe('project snapshot contract', () => {
       'isVideoMuted',
       'selectedWidgetIds',
       'batchQueue',
+      'batchSkipOverlay',
+      'batchVideoFolder',
       'batchActiveItemId',
       'batchRunning',
       'skipOverlay',

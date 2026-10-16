@@ -8,7 +8,6 @@ import useRenderVideoDerivedState from '@/features/render-video/hooks/useRenderV
 import useProjectDocumentState from '@/features/projects/hooks/useProjectDocumentState'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
-import { openDirectoryPath } from '@/lib/file-dialog'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 import batchTemplate from '../../../../../src-tauri/ovrley_core/tests/fixtures/config/batch-template.json'
 
@@ -21,7 +20,6 @@ vi.mock('@/api/backend', () => ({
   subscribeBatchRenderProgress: vi.fn(),
   getBatchRenderSnapshot: vi.fn(),
   cancelBatchRender: vi.fn(),
-  listDirectoryVideoFiles: vi.fn(),
   listAvailableFonts: vi.fn().mockResolvedValue({ recommendedFonts: [], systemFonts: [] }),
 }))
 vi.mock('@/lib/file-dialog', () => ({ openDirectoryPath: vi.fn() }))
@@ -29,7 +27,6 @@ vi.mock('@/lib/file-dialog', () => ({ openDirectoryPath: vi.fn() }))
 const folder = 'C:/videos'
 const reference = `${folder}/reference.mp4`
 const next = `${folder}/ride.part 2.mp4`
-const removed = `${folder}/removed.mp4`
 const blocked = `${folder}/outside.mp4`
 const settings = {
   ...DEFAULT_RENDER_SETTINGS,
@@ -47,23 +44,20 @@ let acceptedRequest
 let latest
 let unlisten
 
-function setReferenceVideo({ path = reference, creationTime = '2026-10-05T11:59:48Z', offsetSeconds = -9 } = {}) {
-  const video = createTestVideo({
-    id: 'reference',
-    path,
-    durationSeconds: 120,
-    fps: { num: 30, den: 1 },
-    width: 640,
-    height: 480,
-    creationTime,
-    timeSource: 'ffprobe',
-  })
-  useStore.setState(videoStoreState([video], { reference: offsetSeconds }))
+// Activity 12:00–13:00. "outside" starts an hour after the activity ends.
+function setVideos({ creationTime = '2026-10-05T11:59:48Z', offsets = {} } = {}) {
+  const video = (id, path, options) => createTestVideo({ id, path, durationSeconds: 120, timeSource: 'ffprobe', ...options })
+  const videos = [
+    video('reference', reference, { creationTime, importOrder: 0 }),
+    video('next', next, { creationTime: '2026-10-05T12:00:40Z', importOrder: 1 }),
+    video('outside', blocked, { creationTime: '2026-10-05T14:00:00Z', importOrder: 2 }),
+  ]
+  useStore.setState(videoStoreState(videos, { reference: -9, next: 40, outside: 7200, ...offsets }))
 }
 
-function setReferenceOffset(offsetSeconds) {
+function setOffset(videoId, offsetSeconds) {
   const { videoEdits } = useStore.getState()
-  useStore.setState({ videoEdits: { ...videoEdits, reference: { ...videoEdits.reference, offsetSeconds } } })
+  useStore.setState({ videoEdits: { ...videoEdits, [videoId]: { ...videoEdits[videoId], offsetSeconds } } })
 }
 
 function useBatchRenderWorkflow(options) {
@@ -83,7 +77,6 @@ function useBatchRenderWorkflow(options) {
 }
 
 function source(inspectionId, path) {
-  const creationTime = path === reference ? '2026-10-05T11:59:48Z' : path === blocked ? '2026-10-05T14:00:00Z' : '2026-10-05T12:00:40Z'
   return {
     sourceId: `${inspectionId}:${path}`,
     metadata: {
@@ -94,7 +87,7 @@ function source(inspectionId, path) {
       fpsDen: 1,
       resolution: { width: 1920, height: 1080 },
       rotationDegrees: 0,
-      creationTime,
+      creationTime: null,
       syncTime: null,
       timeSource: 'ffprobe',
     },
@@ -160,7 +153,6 @@ beforeEach(() => {
   vi.mocked(backend.createVideoInspection).mockImplementation(async () => ({ inspectionId: `inspection-${++sessionNumber}` }))
   vi.mocked(backend.inspectVideoSource).mockImplementation(async (id, path) => source(id, path))
   vi.mocked(backend.disposeVideoInspection).mockResolvedValue(undefined)
-  vi.mocked(backend.listDirectoryVideoFiles).mockResolvedValue([reference, next, removed, blocked])
   vi.mocked(backend.planBatchOutputs).mockImplementation(async ({ sourceIds }) => ({
     status: 'planned',
     plans: sourceIds.map((sourceId) => ({ sourceId, plannedFrames: 3600 })),
@@ -181,7 +173,7 @@ beforeEach(() => {
   useStore.setState({
     config: structuredClone(DEFAULT_CONFIG),
     parsedActivity: { sample_elapsed_seconds: [0, 3600] },
-    activitySummary: { syncTime: '2026-10-05T12:00:00Z', endTime: '2026-10-05T13:00:00Z', timezone: 'UTC' },
+    activitySummary: { syncTime: '2026-10-05T12:00:00Z', endTime: '2026-10-05T13:00:00Z', timezone: 'UTC', durationSeconds: 3600 },
     videoDragPreview: { videoId: 'reference', deltaSeconds: 123 },
     videoSyncTimezoneMode: 'utc',
     selectedSecond: 27,
@@ -189,8 +181,7 @@ beforeEach(() => {
     availableCodecs: { libx264: true },
     platformOs: 'windows',
   })
-  setReferenceVideo()
-  useStore.getState().setBatchVideoFolder(folder)
+  setVideos()
   useStore.getState().setBatchOutputFolder('C:/renders')
 })
 
@@ -271,50 +262,57 @@ describe('native batch workflow', () => {
     act(() => observe({ kind: 'snapshot', data: snapshot('cancelled', 7) }))
   })
 
-  test('keeps an automatically non-overlapping clip blocked even when calibration would move it into the activity', async () => {
-    setReferenceOffset(-4009)
+  test('renders every imported video in timeline order and blocks videos outside the activity at their committed offset', async () => {
     const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
     await waitFor(() => expect(result.current.batchReady).toBe(true))
-    expect(result.current.batchQueue.find((row) => row.path === next).status).toBe('pending')
-    expect(result.current.batchQueue.find((row) => row.path === blocked).status).toBe('blocked')
+    expect(result.current.batchQueue.map((row) => [row.id, row.status])).toEqual([
+      ['reference', 'pending'],
+      ['next', 'pending'],
+      ['outside', 'blocked'],
+    ])
+    expect(result.current.batchQueue[2].error).toBe('Video is outside the activity')
+    expect(backend.inspectVideoSource.mock.calls.map(([, path]) => path)).toEqual([reference, next, blocked])
+
+    act(() => setOffset('outside', 3500))
+    await waitFor(() => expect(result.current.batchReady).toBe(true))
+    expect(result.current.batchQueue.map((row) => row.status)).toEqual(['pending', 'pending', 'pending'])
     await act(async () => result.current.runBatch())
-    expect(acceptedRequest.jobs.some((job) => job.id === blocked)).toBe(false)
+    expect(acceptedRequest.jobs.map((job) => job.id)).toEqual([reference, next, blocked])
+    expect(acceptedRequest.activity.offsets[`inspection-1:${blocked}`]).toBe(3500)
   })
 
-  test('defers an invalid reference timestamp to submission without blocking candidate inspection', async () => {
-    setReferenceVideo({ creationTime: null })
+  test('an unreadable camera timestamp only hides the date of its row', async () => {
+    setVideos({ creationTime: 'not-a-time' })
     const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
     await waitFor(() => expect(result.current.batchReady).toBe(true))
-    expect(result.current.batchQueue.find((row) => row.path === next).status).toBe('pending')
-    await expect(result.current.runBatch()).rejects.toThrow('Could not calibrate reference video')
-    expect(backend.submitBatchRender).not.toHaveBeenCalled()
+    expect(result.current.batchQueue[0]).toMatchObject({ status: 'pending', creationDateLabel: null, durationLabel: '02:00' })
   })
 
-  test('keeps candidate eligibility independent of an unavailable out-of-folder reference', async () => {
-    const referencePath = 'C:/reference/missing.mp4'
-    setReferenceVideo({ path: referencePath })
+  test('a video that cannot be inspected blocks only its own row', async () => {
     vi.mocked(backend.inspectVideoSource).mockImplementation(async (id, path) => {
-      if (path === referencePath) throw new Error('Reference video is unavailable')
+      if (path === next) throw new Error('Video is unavailable')
       return source(id, path)
     })
     const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
-    await waitFor(() => expect(result.current.batchReviewError).toBe('Reference video is unavailable'))
-    expect(result.current.batchQueue.find((row) => row.path === next).status).toBe('pending')
-    expect(result.current.batchReady).toBe(false)
+    await waitFor(() => expect(result.current.batchReady).toBe(true))
+    expect(result.current.batchQueue.find((row) => row.id === 'next')).toMatchObject({ status: 'blocked', error: 'Video is unavailable' })
+    expect(result.current.batchQueue.find((row) => row.id === 'reference').status).toBe('pending')
+    await act(async () => result.current.runBatch())
+    expect(acceptedRequest.jobs.map((job) => job.id)).toEqual([reference])
   })
 
-  test('submits embedded-telemetry batches without an external activity or reference calibration', async () => {
+  test('submits embedded-telemetry batches without an external activity', async () => {
     useStore.setState({ parsedActivity: null, activitySummary: null })
     const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
     await waitFor(() => expect(result.current.batchReady).toBe(true))
     expect(backend.planBatchOutputs).toHaveBeenLastCalledWith(
-      expect.objectContaining({ calibrationSourceId: null }),
+      { inspectionId: 'inspection-1', sourceIds: [reference, next, blocked].map((path) => `inspection-1:${path}`) },
       expect.any(Object),
       'C:/renders',
     )
     await act(async () => result.current.runBatch())
     expect(acceptedRequest.activity).toEqual({ mode: 'embeddedActivity' })
-    expect(acceptedRequest.jobs.map((job) => job.id)).toEqual([reference, next, removed, blocked])
+    expect(acceptedRequest.jobs.map((job) => job.id)).toEqual([reference, next, blocked])
   })
 
   test('publishes each inspected row immediately while later sources are still probing', async () => {
@@ -334,7 +332,7 @@ describe('native batch workflow', () => {
     await act(async () => finish())
     await waitFor(() => expect(result.current.batchReady).toBe(true))
   })
-  test('submits once with shared calibration and queue choices; keeps the editor and history through mixed results and unmount', async () => {
+  test('submits once with committed offsets and overlay choices; keeps the editor and history through mixed results and unmount', async () => {
     const before = editorState()
     const history = useStore.temporal.getState().pastStates
     const { result, unmount } = renderHook(() => ({
@@ -344,10 +342,7 @@ describe('native batch workflow', () => {
     }))
     await waitFor(() => expect(result.current.batch.batchReady).toBe(true))
     expect(result.current.batch.batchQueue.find((row) => row.path === blocked).status).toBe('blocked')
-    act(() => {
-      result.current.batch.setBatchItemSkipOverlay(next, true)
-      result.current.batch.removeBatchQueueItem(removed)
-    })
+    act(() => result.current.batch.setBatchItemSkipOverlay('next', true))
     await waitFor(() => expect(result.current.batch.batchReady).toBe(true))
     await act(async () => result.current.batch.runBatch())
     expect(backend.submitBatchRender).toHaveBeenCalledOnce()
@@ -358,9 +353,7 @@ describe('native batch workflow', () => {
       encoding: { fps: 24, updateRate: 2 },
       activity: {
         mode: 'externalActivity',
-        timezoneMode: 'utc',
-        reference: { committedOffsetSeconds: -9, automaticOffsetSeconds: -12 },
-        automaticOffsets: { [`inspection-1:${reference}`]: -12, [`inspection-1:${next}`]: 40 },
+        offsets: { [`inspection-1:${reference}`]: -9, [`inspection-1:${next}`]: 40 },
       },
       jobs: [
         { id: reference, sourceId: `inspection-1:${reference}`, skipOverlay: false },
@@ -392,7 +385,7 @@ describe('native batch workflow', () => {
     expect(useStore.temporal.getState().pastStates).toBe(history)
   })
 
-  test('close/reopen retains in-flight inspections; folder replacement disposes sessions and context changes invalidate Start', async () => {
+  test('close/reopen retains in-flight inspections; collection changes dispose sessions and edits invalidate Start', async () => {
     let finish
     vi.mocked(backend.inspectVideoSource).mockImplementationOnce(
       (id, path) =>
@@ -409,7 +402,6 @@ describe('native batch workflow', () => {
     rerender({ phase: 'confirm' })
     await waitFor(() => expect(result.current.batchReady).toBe(true))
     expect(result.current.batchQueue[0].source.sourceId).toContain('inspection-1:')
-    expect(backend.listDirectoryVideoFiles).toHaveBeenCalledOnce()
     let finishPlan
     vi.mocked(backend.planBatchOutputs).mockImplementationOnce(
       () =>
@@ -418,7 +410,7 @@ describe('native batch workflow', () => {
         }),
     )
     act(() => {
-      setReferenceOffset(-8)
+      setOffset('reference', -8)
       useStore.setState({ videoSyncTimezoneMode: 'local' })
     })
     expect(result.current.batchReady).toBe(false)
@@ -426,18 +418,17 @@ describe('native batch workflow', () => {
     expect(backend.submitBatchRender).not.toHaveBeenCalled()
     await act(async () => finishPlan({ status: 'planned', plans: [] }))
     await waitFor(() => expect(result.current.batchReady).toBe(true))
-    vi.mocked(openDirectoryPath).mockResolvedValue('C:/other')
-    await act(async () => result.current.pickVideoFolder())
+    const added = createTestVideo({ id: 'added', path: `${folder}/added.mp4`, durationSeconds: 60, importOrder: 3 })
+    act(() => useStore.getState().addImportedVideos([added]))
     await waitFor(() => expect(result.current.batchReady).toBe(true))
     expect(backend.disposeVideoInspection).toHaveBeenCalledWith('inspection-1')
-    expect(backend.listDirectoryVideoFiles).toHaveBeenLastCalledWith('C:/other')
+    expect(result.current.batchQueue.map((row) => row.id)).toContain('added')
+    expect(result.current.batchQueue[0].source.sourceId).toContain('inspection-2:')
   })
 
-  test('identifies stale submission sources and requires explicit fresh inspection, including an out-of-folder reference', async () => {
-    setReferenceVideo({ path: 'C:/reference/reference.mp4' })
+  test('identifies stale submission sources and requires explicit fresh inspection', async () => {
     const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
     await waitFor(() => expect(result.current.batchReady).toBe(true))
-    expect(backend.inspectVideoSource).toHaveBeenCalledWith('inspection-1', 'C:/reference/reference.mp4')
     vi.mocked(backend.submitBatchRender).mockRejectedValueOnce({
       code: 'reinspectionRequired',
       message: 'Sources changed',
@@ -449,7 +440,7 @@ describe('native batch workflow', () => {
     expect(result.current.batchQueue.find((row) => row.path === next).status).toBe('blocked')
     await act(async () => result.current.runBatch())
     expect(backend.submitBatchRender).toHaveBeenCalledOnce()
-    act(() => result.current.setBatchItemSkipOverlay(reference, true))
+    act(() => result.current.setBatchItemSkipOverlay('reference', true))
     expect(result.current.batchReady).toBe(false)
     act(() => result.current.refreshInspection())
     await waitFor(() => expect(result.current.batchReady).toBe(true))

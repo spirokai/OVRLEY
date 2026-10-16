@@ -19,6 +19,7 @@ const PROJECT_FILTER = [{ name: 'OVRLEY Project', extensions: ['oly'] }]
  * @param {function} options.prepareActivityPath Parses one activity source without committing it.
  * @param {function} options.clearImportedVideos Clears every imported video source.
  * @param {function} options.prepareVideoPath Probes one video source without committing it.
+ * @param {function} options.importLegacyBatchFolder Imports the video folder of an opened version 3 batch project.
  * @param {function} [options.onSetBackgroundMode] Shell setter for the editor background mode.
  * @param {boolean} [options.startupReady] Whether application startup completed successfully.
  * @returns {object} Project lifecycle state and command handlers.
@@ -27,6 +28,7 @@ export default function useProjectLifecycle({
   prepareActivityPath,
   clearImportedVideos,
   prepareVideoPath,
+  importLegacyBatchFolder,
   onSetBackgroundMode,
   startupReady = false,
 }) {
@@ -86,12 +88,13 @@ export default function useProjectLifecycle({
   const loadProjectPath = useCallback(
     async (path) => {
       setOperationPhase('loading')
-      const project = await loadProject({ path, resolveProjectSources, prepareActivityPath, prepareVideoPath, onSetBackgroundMode })
-      if (!project) return false
-      markSaved(path, project)
+      const loaded = await loadProject({ path, resolveProjectSources, prepareActivityPath, prepareVideoPath, onSetBackgroundMode })
+      if (!loaded) return false
+      markSaved(path, loaded.project)
+      if (loaded.legacyBatchVideoFolder !== null) await importLegacyBatchFolder(loaded.legacyBatchVideoFolder)
       return true
     },
-    [markSaved, onSetBackgroundMode, prepareActivityPath, prepareVideoPath, resolveProjectSources],
+    [importLegacyBatchFolder, markSaved, onSetBackgroundMode, prepareActivityPath, prepareVideoPath, resolveProjectSources],
   )
 
   const handleOpenProject = useCallback(
