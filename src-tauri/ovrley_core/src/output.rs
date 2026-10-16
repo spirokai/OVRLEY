@@ -224,6 +224,56 @@ pub fn plan_batch_output_targets(
         .collect()
 }
 
+/// Validates one exact combined-output path that must not replace any input.
+pub fn plan_file_output_target(
+    raw_path: &str,
+    kind: RenderOutputKind,
+    overwrite: bool,
+    sources: &[PathBuf],
+) -> CoreResult<RenderOutputTarget> {
+    let path = Path::new(raw_path);
+    if path.is_absolute() && path.is_file() {
+        let output = same_file::Handle::from_path(path).map_err(|source| CoreError::OutputIo {
+            path: path.to_path_buf(),
+            source,
+        })?;
+        for source in sources {
+            let input =
+                same_file::Handle::from_path(source).map_err(|error| CoreError::OutputIo {
+                    path: source.clone(),
+                    source: error,
+                })?;
+            if input == output {
+                return Err(CoreError::OutputInvalid(
+                    RenderPathError::OutputAliasesInput {
+                        path: path.display().to_string(),
+                    },
+                ));
+            }
+        }
+    }
+    RenderOutputTarget::validate(raw_path, kind, overwrite)
+}
+
+/// Creates a new hidden directory next to the target for its rendered parts.
+pub fn create_parts_directory(target: &RenderOutputTarget) -> CoreResult<PathBuf> {
+    let parent = target.path().parent().expect("absolute output path");
+    let stem = target
+        .path()
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .expect("validated Unicode output");
+    for attempt in 0u32.. {
+        let path = parent.join(format!(".ovrley-parts-{stem}-{attempt}"));
+        match fs::create_dir(&path) {
+            Ok(()) => return Ok(path),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(source) => return Err(CoreError::OutputIo { path, source }),
+        }
+    }
+    unreachable!("an unused parts directory name exists")
+}
+
 /// Query the selected filesystem rather than assuming the host's default case
 /// rules (case-sensitive directories and mounted volumes can differ).
 fn directory_is_case_sensitive(directory: &Path) -> CoreResult<bool> {

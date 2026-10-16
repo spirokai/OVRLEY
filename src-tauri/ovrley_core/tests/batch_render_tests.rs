@@ -11,6 +11,7 @@ use std::time::Duration;
 
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::debug::RenderProgress;
+use ovrley_core::encode::ffmpeg::assemble::OutputAssembly;
 use ovrley_core::encode::progress::ProgressSink;
 use ovrley_core::encode::quality::QualityType;
 use ovrley_core::error::{CoreError, CoreResult};
@@ -45,9 +46,10 @@ impl SourceMetadataProbe for Probe {
             .unwrap()
             .to_owned();
         let duration = name.chars().next().unwrap().to_digit(10).unwrap() as f64 * 2.0;
+        let width = if name.contains("wide") { 128 } else { 64 };
         Ok(serde_json::from_value(json!({
             "path":path, "duration":duration, "fps":30, "fpsNum":30, "fpsDen":1,
-            "resolution":{"width":64,"height":32}, "hasAudio":false,
+            "resolution":{"width":width,"height":32}, "hasAudio":false,
             "creationTime":"2026-05-20T12:00:00Z", "timeSource":"gps"
         }))
         .unwrap())
@@ -100,13 +102,16 @@ impl Fixture {
                 pieces: vec![common::builders::whole_source_piece(source, index == 0)],
             })
             .collect::<Vec<_>>();
+        let destination = BatchDestination::SourceNamed {
+            directory: self.directory.to_str().unwrap().into(),
+        };
         let selection = BatchOutputSelection {
             inspection_id: session.inspection_id.clone(),
             outputs: outputs.clone(),
+            destination: destination.clone(),
         };
         let BatchPlanningResponse::Planned { .. } =
-            plan_batch_configuration(&self.inspection, &selection, &encoding, &self.directory)
-                .unwrap()
+            plan_batch_configuration(&self.inspection, &selection, &encoding).unwrap()
         else {
             panic!("fresh sources")
         };
@@ -133,7 +138,7 @@ impl Fixture {
             } else {
                 BatchActivity::EmbeddedActivity {}
             },
-            output_directory: self.directory.to_str().unwrap().into(),
+            destination,
             outputs,
         }
     }
@@ -193,6 +198,7 @@ struct ControlledExecutor {
     offsets: Mutex<Vec<f64>>,
     /// Per executed job: whether it received an activity and its covered frame count.
     activities: Mutex<Vec<(bool, u64)>>,
+    assemblies: Mutex<Vec<OutputAssembly>>,
     cleanup: Option<(mpsc::Sender<()>, Mutex<mpsc::Receiver<()>>)>,
 }
 
@@ -288,6 +294,22 @@ impl BatchJobExecutor for ControlledExecutor {
         fs::write(target.path(), b"completed output").unwrap();
         Ok(filename)
     }
+
+    fn assemble(
+        &self,
+        _: &AppPaths,
+        assembly: &OutputAssembly,
+        session: &RendererReservation,
+    ) -> CoreResult<()> {
+        assert!(assembly.parts.iter().all(|part| part.is_file()));
+        self.assemblies.lock().unwrap().push(assembly.clone());
+        session.check_cancelled()?;
+        if assembly.target.to_str().unwrap().contains("joinfail") {
+            return Err(CoreError::Encode("Controlled join failure".into()));
+        }
+        fs::write(&assembly.target, b"joined output").unwrap();
+        Ok(())
+    }
 }
 
 fn executor(
@@ -306,6 +328,7 @@ fn executor(
             embedded: Mutex::new(Vec::new()),
             offsets: Mutex::new(Vec::new()),
             activities: Mutex::new(Vec::new()),
+            assemblies: Mutex::new(Vec::new()),
             cleanup,
         }),
         entered_rx,
@@ -736,4 +759,276 @@ fn a_trimmed_piece_renders_its_window_at_the_activity_second_of_its_first_frame(
     // 4 s at 30 fps decimated by 2.
     assert_eq!(plan.planned_frames(), 60);
     assert_eq!(render.coverage.blank_leading_frame_count, 0);
+}
+
+fn piece(
+    request: &BatchRenderRequest,
+    output: usize,
+    start_frame: u64,
+    end_frame: u64,
+) -> BatchRenderPiece {
+    BatchRenderPiece {
+        source_id: request.outputs[output].pieces[0].source_id.clone(),
+        start_frame,
+        end_frame,
+        skip_overlay: false,
+    }
+}
+
+fn parts_directories(directory: &std::path::Path) -> Vec<PathBuf> {
+    fs::read_dir(directory)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| {
+            path.file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with(".ovrley-parts-")
+        })
+        .collect()
+}
+
+/// One combined output joining a window of each of two sources.
+fn combined_request(fixture: &Fixture, names: &[&str], file: &str) -> BatchRenderRequest {
+    let mut request = fixture.request(names, true);
+    let pieces = vec![piece(&request, 0, 0, 60), piece(&request, 1, 30, 90)];
+    request.outputs = vec![BatchRenderOutput {
+        id: "joined".into(),
+        pieces,
+    }];
+    request.destination = BatchDestination::File {
+        path: fixture.directory.join(file).to_str().unwrap().into(),
+        overwrite: false,
+    };
+    request
+}
+
+#[test]
+fn a_separate_output_renders_its_pieces_to_parts_and_joins_them() {
+    let fixture = Fixture::new();
+    let mut request = fixture.request(&["4-ride.mp4"], true);
+    let BatchActivity::ExternalActivity { offsets, .. } = &mut request.activity else {
+        unreachable!();
+    };
+    *offsets.values_mut().next().unwrap() = 10.0;
+    // A deleted part between seconds 2 and 4.
+    request.outputs[0].pieces = vec![piece(&request, 0, 0, 60), piece(&request, 0, 120, 240)];
+    let (service, sink, terminal) = service();
+    let (executor, entered, resume) = executor(None);
+    let acceptance = service
+        .submit_batch_with_executor(
+            &fixture.paths,
+            &fixture.inspection,
+            request,
+            None,
+            executor.clone(),
+        )
+        .unwrap();
+    // 2 s and 4 s at 30 fps, decimated by 2.
+    assert_eq!(acceptance.snapshot.items[0].planned_frames, 90);
+    for expected in ["part-0000.mov", "part-0001.mov"] {
+        assert_eq!(entered.recv_timeout(WAIT).unwrap(), expected);
+        resume.send(()).unwrap();
+    }
+    let snapshot = terminal.recv_timeout(WAIT).unwrap();
+    assert_eq!(snapshot.phase, BatchPhase::Completed);
+    let target = fixture.directory.join("4-ride_overlay.mov");
+    assert_eq!(snapshot.outputs[0].output_path, target.to_str().unwrap());
+    assert_eq!(fs::read(&target).unwrap(), b"joined output");
+    assert_eq!(*executor.offsets.lock().unwrap(), vec![10.0, 14.0]);
+    let assemblies = executor.assemblies.lock().unwrap().clone();
+    assert_eq!(assemblies.len(), 1);
+    let assembly = &assemblies[0];
+    assert_eq!(assembly.target, target);
+    assert_eq!(assembly.frames, 90);
+    assert_eq!(
+        assembly.parts,
+        vec![
+            assembly.parts_directory.join("part-0000.mov"),
+            assembly.parts_directory.join("part-0001.mov")
+        ]
+    );
+    assert!(assembly
+        .parts_directory
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .starts_with(".ovrley-parts-4-ride_overlay-"));
+    // Verified output: the parts are gone.
+    assert!(parts_directories(&fixture.directory).is_empty());
+    // The second piece reports item progress after the first piece's 30 frames.
+    let progress = sink
+        .events
+        .lock()
+        .unwrap()
+        .iter()
+        .filter_map(|event| match event {
+            BatchRenderEvent::Snapshot(snapshot) => snapshot.current_item_progress.clone(),
+            BatchRenderEvent::Progress(update) => update.current_item_progress.clone(),
+        })
+        .map(|progress| (progress.current_frames, progress.planned_frames))
+        .collect::<Vec<_>>();
+    assert!(progress.contains(&(15, 90)), "{progress:?}");
+    assert!(progress.contains(&(60, 90)), "{progress:?}");
+}
+
+#[test]
+fn a_combined_output_joins_pieces_of_several_sources_into_one_file() {
+    let fixture = Fixture::new();
+    let request = combined_request(&fixture, &["2-first.mp4", "4-second.mp4"], "joined.mov");
+    let (service, _, terminal) = service();
+    let (executor, entered, resume) = executor(None);
+    service
+        .submit_batch_with_executor(
+            &fixture.paths,
+            &fixture.inspection,
+            request,
+            None,
+            executor.clone(),
+        )
+        .unwrap();
+    for _ in 0..2 {
+        entered.recv_timeout(WAIT).unwrap();
+        resume.send(()).unwrap();
+    }
+    let snapshot = terminal.recv_timeout(WAIT).unwrap();
+    assert_eq!(snapshot.phase, BatchPhase::Completed);
+    let target = fixture.directory.join("joined.mov");
+    assert_eq!(snapshot.outputs[0].output_path, target.to_str().unwrap());
+    assert_eq!(fs::read(&target).unwrap(), b"joined output");
+    // Each piece starts at the activity second of its own first frame.
+    assert_eq!(*executor.offsets.lock().unwrap(), vec![0.0, 1.0]);
+    assert!(parts_directories(&fixture.directory).is_empty());
+}
+
+#[test]
+fn outputs_must_fit_their_destination_and_join_compatible_sources() {
+    let fixture = Fixture::new();
+    let (service, _, _) = service();
+    let (executor, entered, _) = executor(None);
+    let submit = |request: BatchRenderRequest| {
+        service.submit_batch_with_executor(
+            &fixture.paths,
+            &fixture.inspection,
+            request,
+            None,
+            executor.clone(),
+        )
+    };
+    let mut two_outputs = fixture.request(&["2-first.mp4", "4-second.mp4"], true);
+    two_outputs.destination = BatchDestination::File {
+        path: fixture
+            .directory
+            .join("joined.mov")
+            .to_str()
+            .unwrap()
+            .into(),
+        overwrite: false,
+    };
+    assert!(
+        matches!(submit(two_outputs), Err(BatchServiceError::InvalidRequest { message }) if message.contains("exactly one output"))
+    );
+    let mut mixed = combined_request(&fixture, &["2-first.mp4", "4-second.mp4"], "joined.mov");
+    mixed.destination = BatchDestination::SourceNamed {
+        directory: fixture.directory.to_str().unwrap().into(),
+    };
+    assert!(
+        matches!(submit(mixed), Err(BatchServiceError::InvalidRequest { message }) if message.contains("pieces of one source"))
+    );
+    let mut empty = fixture.request(&["2-first.mp4"], true);
+    empty.outputs[0].pieces.clear();
+    assert!(
+        matches!(submit(empty), Err(BatchServiceError::InvalidRequest { message }) if message.contains("at least one piece"))
+    );
+    let incompatible = combined_request(&fixture, &["2-first.mp4", "4-wide.mp4"], "joined.mov");
+    assert!(
+        matches!(submit(incompatible), Err(BatchServiceError::InvalidRequest { message }) if message.contains("different display resolution"))
+    );
+    fs::write(fixture.directory.join("existing.mov"), b"previous output").unwrap();
+    assert!(submit(combined_request(
+        &fixture,
+        &["2-first.mp4", "4-second.mp4"],
+        "existing.mov"
+    ))
+    .is_err());
+    assert_eq!(
+        fs::read(fixture.directory.join("existing.mov")).unwrap(),
+        b"previous output"
+    );
+    let mut aliasing = combined_request(&fixture, &["2-first.mp4", "4-second.mov"], "joined.mov");
+    aliasing.destination = BatchDestination::File {
+        path: fixture
+            .directory
+            .join("4-second.mov")
+            .to_str()
+            .unwrap()
+            .into(),
+        overwrite: true,
+    };
+    assert!(matches!(
+        submit(aliasing),
+        Err(BatchServiceError::OutputError { .. })
+    ));
+    assert!(!service.progress().busy);
+    assert!(entered.try_recv().is_err());
+}
+
+#[test]
+fn a_failed_join_keeps_the_parts_and_a_cancelled_one_removes_them() {
+    let fixture = Fixture::new();
+    let request = combined_request(&fixture, &["2-first.mp4", "4-second.mp4"], "joinfail.mov");
+    let (service, _, terminal) = service();
+    let (executor, entered, resume) = executor(None);
+    service
+        .submit_batch_with_executor(
+            &fixture.paths,
+            &fixture.inspection,
+            request,
+            None,
+            executor.clone(),
+        )
+        .unwrap();
+    for _ in 0..2 {
+        entered.recv_timeout(WAIT).unwrap();
+        resume.send(()).unwrap();
+    }
+    let snapshot = terminal.recv_timeout(WAIT).unwrap();
+    assert_eq!(snapshot.phase, BatchPhase::Failed);
+    let retained = parts_directories(&fixture.directory);
+    assert_eq!(retained.len(), 1);
+    assert!(retained[0].join("part-0000.mov").is_file());
+    assert!(retained[0].join("part-0001.mov").is_file());
+    let Some(BatchItemOutcome::Failed { message }) = &snapshot.items[0].outcome else {
+        panic!("failed join")
+    };
+    assert!(message.contains("Controlled join failure"));
+    assert!(message.contains(retained[0].to_str().unwrap()));
+    assert!(!fixture.directory.join("joinfail.mov").exists());
+    fs::remove_dir_all(&retained[0]).unwrap();
+
+    let request = combined_request(&fixture, &["2-first.mp4", "4-second.mp4"], "joined.mov");
+    let acceptance = service
+        .submit_batch_with_executor(
+            &fixture.paths,
+            &fixture.inspection,
+            request,
+            None,
+            executor.clone(),
+        )
+        .unwrap();
+    entered.recv_timeout(WAIT).unwrap();
+    resume.send(()).unwrap();
+    entered.recv_timeout(WAIT).unwrap();
+    service.cancel_batch(&acceptance.batch_id).unwrap();
+    resume.send(()).unwrap();
+    let snapshot = terminal.recv_timeout(WAIT).unwrap();
+    assert_eq!(snapshot.phase, BatchPhase::Cancelled);
+    assert!(matches!(
+        snapshot.items[0].outcome,
+        Some(BatchItemOutcome::Cancelled)
+    ));
+    assert!(parts_directories(&fixture.directory).is_empty());
+    assert!(!fixture.directory.join("joined.mov").exists());
 }

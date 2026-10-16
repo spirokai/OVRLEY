@@ -405,16 +405,10 @@ pub(crate) async fn backend_plan_batch_outputs(
     state: tauri::State<'_, BackendState>,
     selection: BatchOutputSelection,
     encoding: BatchEncodingSettings,
-    output_directory: String,
 ) -> Result<String, BackendRenderError> {
     let service = state.video_inspection.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        plan_batch_configuration(
-            &service,
-            &selection,
-            &encoding,
-            Path::new(&output_directory),
-        )
+        plan_batch_configuration(&service, &selection, &encoding)
     })
     .await
     .map_err(|error| BackendRenderError::RenderError {

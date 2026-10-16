@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 use super::contracts::{
-    BatchEncodingSettings, BatchExportMode, BatchOutputSelection, BatchRenderOutput,
-    BatchRenderPiece,
+    BatchDestination, BatchEncodingSettings, BatchExportMode, BatchOutputSelection,
+    BatchRenderOutput, BatchRenderPiece,
 };
 use super::inspection::CompositeSourceMetadata;
 use super::inspection::{
@@ -19,6 +19,7 @@ use crate::activity::{
     build_dense_activity_report_for_timeline,
     schema::{DenseActivityReport, ParsedActivity},
 };
+use crate::encode::ffmpeg::assemble::{AssemblyKind, AudioPiece, OutputAssembly};
 use crate::encode::ffmpeg::catalog::{
     CodecSelection, CompositeCodecId, CompositeFilterStackKind, TransparentCodecId,
 };
@@ -37,7 +38,7 @@ use crate::normalize::{
     validate_ffmpeg_config, validate_render_config_with_resources, validate_render_presentation,
     ValidatedFfmpegConfig, ValidatedRenderConfig, ValidatedSceneConfig, ValidatedScenePresentation,
 };
-use crate::output::{plan_batch_output_targets, RenderOutputKind};
+use crate::output::{plan_batch_output_targets, plan_file_output_target, RenderOutputKind};
 use crate::raster::RasterResourceResolver;
 
 /// Validated once at configuration/acceptance ingress; private fields keep
@@ -167,14 +168,36 @@ fn video_output_work(
     Ok((frames, fps))
 }
 
-/// Combined outputs (several pieces, concatenated) arrive with the concat step.
-pub(crate) fn single_piece(output: &BatchRenderOutput) -> CoreResult<&BatchRenderPiece> {
-    match output.pieces.as_slice() {
-        [piece] => Ok(piece),
-        _ => Err(CoreError::Config(format!(
-            "Batch output {} must contain exactly one piece",
+/// Validates the outputs against their destination before any source is touched:
+/// every output holds pieces; a file destination takes exactly one output; a
+/// source-named output holds pieces of one source.
+pub(crate) fn validate_batch_outputs(
+    outputs: &[BatchRenderOutput],
+    destination: &BatchDestination,
+) -> CoreResult<()> {
+    if let Some(output) = outputs.iter().find(|output| output.pieces.is_empty()) {
+        return Err(CoreError::Config(format!(
+            "Batch output {} must contain at least one piece",
             output.id
-        ))),
+        )));
+    }
+    match destination {
+        BatchDestination::File { .. } if outputs.len() != 1 => Err(CoreError::Config(
+            "A combined batch destination takes exactly one output".into(),
+        )),
+        BatchDestination::SourceNamed { .. } => match outputs.iter().find(|output| {
+            output
+                .pieces
+                .iter()
+                .any(|piece| piece.source_id != output.pieces[0].source_id)
+        }) {
+            Some(output) => Err(CoreError::Config(format!(
+                "Separate batch output {} must contain pieces of one source",
+                output.id
+            ))),
+            None => Ok(()),
+        },
+        BatchDestination::File { .. } => Ok(()),
     }
 }
 
@@ -212,8 +235,8 @@ pub fn plan_batch_configuration(
     inspection: &VideoInspectionService,
     selection: &BatchOutputSelection,
     encoding: &BatchEncodingSettings,
-    output_directory: &Path,
 ) -> CoreResult<BatchPlanningResponse> {
+    validate_batch_outputs(&selection.outputs, &selection.destination)?;
     let encoding = validate_batch_encoding(encoding)?;
     let sources = match inspection.validate_sources(&InspectionSourceSelection {
         inspection_id: selection.inspection_id.clone(),
@@ -224,7 +247,7 @@ pub fn plan_batch_configuration(
             return Ok(BatchPlanningResponse::Rejected(rejection))
         }
     };
-    let planned = encoding.plan_outputs(&selection.outputs, &sources, output_directory)?;
+    let planned = encoding.plan_outputs(&selection.outputs, &sources, &selection.destination)?;
     let plans = selection
         .outputs
         .iter()
@@ -234,7 +257,7 @@ pub fn plan_batch_configuration(
             BatchVideoOutputPlan {
                 output_id: output.id.clone(),
                 output_path: planned.target.path().to_path_buf(),
-                output_duration_seconds: planned.window.duration,
+                output_duration_seconds: planned.duration,
                 planned_frames: u64::from(planned.frames),
                 container_fps_num,
                 container_fps_den,
@@ -250,72 +273,216 @@ pub(crate) struct ValidatedBatchTemplate {
     encoding: ValidatedBatchEncoding,
 }
 
+/// One piece of a planned output: a window of one source.
+pub(crate) struct PlannedPiece {
+    pub source: std::sync::Arc<InspectedVideoSource>,
+    pub window: PieceWindow,
+    /// Output frames of this piece.
+    pub frames: u32,
+    pub skip_overlay: bool,
+}
+
 /// Reviewed and accepted jobs share the same output contract.
 pub(crate) struct PlannedBatchOutput {
     pub target: crate::output::RenderOutputTarget,
-    pub source: std::sync::Arc<InspectedVideoSource>,
-    pub window: PieceWindow,
+    pub pieces: Vec<PlannedPiece>,
+    /// Output frames of all pieces.
     pub frames: u32,
+    /// Sum of the piece window durations.
+    pub duration: f64,
     pub container_fps: Fps,
 }
 
 impl ValidatedBatchEncoding {
-    /// Plans one output per requested output, named after its source.
+    /// Plans every requested output at its destination. The pieces of an output
+    /// must join by stream copy: one display resolution, and for composite output
+    /// one source FPS (and one rotation where the encoder keeps the display matrix).
     pub(crate) fn plan_outputs(
         &self,
         outputs: &[BatchRenderOutput],
         sources: &super::inspection::AcceptedInspectionSources,
-        directory: &Path,
+        destination: &BatchDestination,
     ) -> CoreResult<Vec<PlannedBatchOutput>> {
-        let pieces = outputs
-            .iter()
-            .map(single_piece)
-            .collect::<CoreResult<Vec<_>>>()?;
-        let piece_sources = pieces
-            .iter()
-            .map(|piece| {
-                sources
+        let source_of = |piece: &BatchRenderPiece| {
+            sources
+                .sources()
+                .iter()
+                .find(|source| source.source_id == piece.source_id)
+                .cloned()
+                .expect("validated sources cover every piece")
+        };
+        let kind = self.output_kind();
+        let targets = match destination {
+            BatchDestination::SourceNamed { directory } => plan_batch_output_targets(
+                Path::new(directory),
+                kind,
+                &outputs
+                    .iter()
+                    .map(|output| PathBuf::from(&source_of(&output.pieces[0]).metadata.path))
+                    .collect::<Vec<_>>(),
+            )?,
+            BatchDestination::File { path, overwrite } => vec![plan_file_output_target(
+                path,
+                kind,
+                *overwrite,
+                &sources
                     .sources()
                     .iter()
-                    .find(|source| source.source_id == piece.source_id)
-                    .cloned()
-                    .expect("validated sources cover every piece")
-            })
-            .collect::<Vec<_>>();
-        let paths = piece_sources
+                    .map(|source| PathBuf::from(&source.metadata.path))
+                    .collect::<Vec<_>>(),
+            )?],
+        };
+        outputs
             .iter()
-            .map(|source| PathBuf::from(&source.metadata.path))
-            .collect::<Vec<_>>();
-        let targets = plan_batch_output_targets(
-            directory,
-            match self.codec {
-                CodecSelection::Composite(_) => RenderOutputKind::Composite,
-                CodecSelection::Transparent(_) => RenderOutputKind::Transparent,
-            },
-            &paths,
-        )?;
-        pieces
-            .into_iter()
-            .zip(piece_sources)
             .zip(targets)
-            .map(|((piece, source), target)| {
-                let window = piece_window(&source, piece)?;
-                let (frames, container_fps) = video_output_work(
-                    &source,
-                    window,
+            .map(|(output, target)| {
+                let pieces = output
+                    .pieces
+                    .iter()
+                    .map(|piece| {
+                        let source = source_of(piece);
+                        let window = piece_window(&source, piece)?;
+                        let (frames, _) = video_output_work(
+                            &source,
+                            window,
+                            self.codec,
+                            self.layout_fps,
+                            self.update_rate,
+                        )?;
+                        Ok(PlannedPiece {
+                            source,
+                            window,
+                            frames,
+                            skip_overlay: piece.skip_overlay,
+                        })
+                    })
+                    .collect::<CoreResult<Vec<_>>>()?;
+                self.check_joinable(&output.id, &pieces)?;
+                let (_, container_fps) = video_output_work(
+                    &pieces[0].source,
+                    pieces[0].window,
                     self.codec,
                     self.layout_fps,
                     self.update_rate,
                 )?;
+                let frames = pieces
+                    .iter()
+                    .try_fold(0u32, |total, piece| total.checked_add(piece.frames))
+                    .ok_or_else(|| {
+                        CoreError::Encode("Batch output frame count exceeds u32".into())
+                    })?;
                 Ok(PlannedBatchOutput {
                     target,
-                    source,
-                    window,
+                    duration: pieces.iter().map(|piece| piece.window.duration).sum(),
+                    pieces,
                     frames,
                     container_fps,
                 })
             })
             .collect()
+    }
+
+    fn output_kind(&self) -> RenderOutputKind {
+        match self.codec {
+            CodecSelection::Composite(_) => RenderOutputKind::Composite,
+            CodecSelection::Transparent(_) => RenderOutputKind::Transparent,
+        }
+    }
+
+    fn check_joinable(&self, output_id: &str, pieces: &[PlannedPiece]) -> CoreResult<()> {
+        let first = &pieces[0].source;
+        let keeps_display_matrix = matches!(self.codec, CodecSelection::Composite(id)
+            if id.metadata().filter_stack_kind == CompositeFilterStackKind::QsvFullOverlay);
+        for piece in &pieces[1..] {
+            let source = &piece.source;
+            let reason = if source.display_resolution != first.display_resolution {
+                Some("display resolution")
+            } else if matches!(self.codec, CodecSelection::Composite(_))
+                && source_fps(source)? != source_fps(first)?
+            {
+                Some("frame rate")
+            } else if keeps_display_matrix
+                && source
+                    .metadata
+                    .rotation_degrees
+                    .unwrap_or(0)
+                    .rem_euclid(360)
+                    != first.metadata.rotation_degrees.unwrap_or(0).rem_euclid(360)
+            {
+                Some("rotation")
+            } else {
+                None
+            };
+            if let Some(reason) = reason {
+                return Err(CoreError::Config(format!(
+                    "Batch output {output_id} joins sources with a different {reason}: {} and {}",
+                    first.metadata.path, source.metadata.path
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ValidatedBatchTemplate {
+    pub(crate) fn output_kind(&self) -> RenderOutputKind {
+        self.encoding.output_kind()
+    }
+
+    /// How the rendered parts of a multi-piece output join into its target.
+    pub(crate) fn plan_assembly(
+        &self,
+        output: &PlannedBatchOutput,
+        parts_directory: PathBuf,
+        parts: Vec<PathBuf>,
+    ) -> OutputAssembly {
+        let kind = match self.encoding.codec {
+            CodecSelection::Composite(id) => {
+                let (num, den) = output.container_fps.components();
+                let has_audio = output
+                    .pieces
+                    .iter()
+                    .any(|piece| piece.source.metadata.has_audio);
+                AssemblyKind::Composite {
+                    hevc: id.metadata().encoder_id.is_hevc(),
+                    // Joinable pieces share one rotation for this encoder.
+                    display_rotation: (id.metadata().filter_stack_kind
+                        == CompositeFilterStackKind::QsvFullOverlay)
+                        .then(|| {
+                            output.pieces[0]
+                                .source
+                                .metadata
+                                .rotation_degrees
+                                .map(|degrees| degrees.rem_euclid(360))
+                        })
+                        .flatten()
+                        .filter(|degrees| *degrees != 0),
+                    audio: has_audio.then(|| {
+                        output
+                            .pieces
+                            .iter()
+                            .map(|piece| AudioPiece {
+                                source: piece
+                                    .source
+                                    .metadata
+                                    .has_audio
+                                    .then(|| PathBuf::from(&piece.source.metadata.path)),
+                                trim_start: piece.window.trim_start,
+                                duration: f64::from(piece.frames) * f64::from(den) / f64::from(num),
+                            })
+                            .collect()
+                    }),
+                }
+            }
+            CodecSelection::Transparent(_) => AssemblyKind::Transparent,
+        };
+        OutputAssembly {
+            target: output.target.path().to_path_buf(),
+            parts_directory,
+            parts,
+            frames: u64::from(output.frames),
+            kind,
+        }
     }
 }
 
@@ -364,6 +531,18 @@ impl PlannedVideoRender {
             VideoRenderModePlan::Composite { render: plan, .. } => plan.output_frame_count,
             VideoRenderModePlan::Transparent(plan) => plan.output_frame_count,
         }
+    }
+    /// Drops the source audio of a composite piece: a joined output encodes its
+    /// audio once from the sources.
+    pub(crate) fn without_audio(mut self) -> Self {
+        if let VideoRenderModePlan::Composite {
+            source_metadata: Some(metadata),
+            ..
+        } = &mut self.mode
+        {
+            metadata.has_audio = false;
+        }
+        self
     }
     pub fn prepare_activity(&self, activity: &ParsedActivity) -> CoreResult<DenseActivityReport> {
         let coverage = match &self.mode {

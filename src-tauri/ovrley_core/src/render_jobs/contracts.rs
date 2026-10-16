@@ -67,12 +67,29 @@ pub struct BatchRenderPiece {
     pub skip_overlay: bool,
 }
 
-/// One output file assembled from its pieces in order.
+/// One output file assembled from its pieces in order. Pieces of one output share
+/// their display resolution (and composite FPS) so they join without re-encoding.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BatchRenderOutput {
     pub id: String,
     pub pieces: Vec<BatchRenderPiece>,
+}
+
+/// Where the outputs are written.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub enum BatchDestination {
+    /// Separate files: every output holds pieces of one source and is written to
+    /// `{directory}/{source stem}_{video|overlay}.{mp4|mov}`, replacing existing files.
+    SourceNamed { directory: String },
+    /// One combined output at an exact path.
+    File { path: String, overwrite: bool },
 }
 
 /// Session-owned outputs to review before submission.
@@ -81,6 +98,7 @@ pub struct BatchRenderOutput {
 pub struct BatchOutputSelection {
     pub inspection_id: String,
     pub outputs: Vec<BatchRenderOutput>,
+    pub destination: BatchDestination,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -91,7 +109,7 @@ pub struct BatchRenderRequest {
     pub template: RenderConfig<ScenePresentationConfig>,
     pub encoding: BatchEncodingSettings,
     pub activity: BatchActivity,
-    pub output_directory: String,
+    pub destination: BatchDestination,
     /// Ordered outputs; accepted order and inputs are immutable.
     pub outputs: Vec<BatchRenderOutput>,
 }

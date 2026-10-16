@@ -123,7 +123,10 @@ describe('signed automatic synchronization and shared calibration', () => {
       { path: first.metadata.path, source: first, offsetSeconds: -9, skipOverlay: false, pieces: [{ sourceStartFrame: 0, sourceEndFrame: 600 }] },
       { path: second.metadata.path, source: second, offsetSeconds: 43, skipOverlay: true, pieces: [{ sourceStartFrame: 30, sourceEndFrame: 300 }] },
     ]
-    const request = createBatchRenderRequest({ editorSnapshot, settings, inspectionId: 'inspection', outputDirectory: 'C:/output', jobs })
+    const destination = { kind: 'sourceNamed', directory: 'C:/output' }
+    const request = createBatchRenderRequest({ editorSnapshot, settings, inspectionId: 'inspection', destination, jobs })
+
+    expect(request.destination).toEqual(destination)
 
     expect(request.activity).toEqual({ mode: 'externalActivity', activity: editorSnapshot.parsedActivity, offsets: { first: -9, second: 43 } })
     expect(request.outputs).toEqual([
@@ -137,7 +140,7 @@ describe('signed automatic synchronization and shared calibration', () => {
       editorSnapshot: { ...editorSnapshot, parsedActivity: null, activitySummary: null },
       settings,
       inspectionId: 'inspection',
-      outputDirectory: 'C:/output',
+      destination,
       jobs,
     })
     expect(embedded.activity).toEqual({ mode: 'embeddedActivity' })

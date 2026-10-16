@@ -94,6 +94,14 @@ pub fn batch_video_plan(
                 .unwrap()
                 .to_owned())
         }
+        fn assemble(
+            &self,
+            _: &ovrley_core::paths::AppPaths,
+            _: &ovrley_core::encode::ffmpeg::assemble::OutputAssembly,
+            _: &RendererReservation,
+        ) -> CoreResult<()> {
+            unreachable!("single-piece output")
+        }
     }
     assert_eq!(request.inspection_id, inspection_id);
     let (send, receive) = std::sync::mpsc::channel();
@@ -136,7 +144,9 @@ pub fn video_batch_request(
             activity,
             offsets: [(source.source_id.clone(), offset)].into(),
         },
-        output_directory: directory.to_str().unwrap().into(),
+        destination: BatchDestination::SourceNamed {
+            directory: directory.to_str().unwrap().into(),
+        },
         outputs: vec![BatchRenderOutput {
             id: "video".into(),
             pieces: vec![whole_source_piece(source, skip_overlay)],

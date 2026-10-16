@@ -32,6 +32,19 @@ pub enum EncoderId {
 }
 
 impl EncoderId {
+    /// Whether the encoder writes H.265 (composite encoders write H.264 or H.265).
+    pub fn is_hevc(self) -> bool {
+        matches!(
+            self,
+            Self::Libx265
+                | Self::HevcNvenc
+                | Self::HevcQsv
+                | Self::HevcVideotoolbox
+                | Self::HevcVaapi
+                | Self::HevcAmf
+        )
+    }
+
     /// Returns the catalog metadata for this encoder.
     pub fn metadata(self) -> &'static EncoderMetadata {
         ENCODERS

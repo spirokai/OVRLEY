@@ -14,7 +14,8 @@ use ovrley_core::media::prepared_video::{check_source_freshness, InspectedVideoS
 use ovrley_core::media::SourceVideoMetadata;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render_jobs::contracts::{
-    BatchEncodingSettings, BatchExportMode, BatchOutputSelection, BatchRenderOutput,
+    BatchDestination, BatchEncodingSettings, BatchExportMode, BatchOutputSelection,
+    BatchRenderOutput,
 };
 use ovrley_core::render_jobs::inspection::{
     InspectionSourceSelection, InspectionValidation, ReinspectionReason, SourceMetadataProbe,
@@ -58,6 +59,9 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
     let mut selection = BatchOutputSelection {
         inspection_id: session.inspection_id.clone(),
         outputs: vec![output("ride", &source)],
+        destination: BatchDestination::SourceNamed {
+            directory: directory.0.to_str().unwrap().into(),
+        },
     };
     for (mode, filename, frames, rate) in [
         (
@@ -75,8 +79,7 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
     ] {
         let existing = directory.0.join(filename);
         fs::write(&existing, b"previous completed output").unwrap();
-        let response =
-            plan_batch_configuration(&service, &selection, &encoding(mode), &directory.0).unwrap();
+        let response = plan_batch_configuration(&service, &selection, &encoding(mode)).unwrap();
         let BatchPlanningResponse::Planned { plans } = response else {
             panic!("fresh plan")
         };
@@ -92,13 +95,10 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
     // A piece plans only its own window of the source.
     selection.outputs[0].pieces[0].start_frame = 60;
     selection.outputs[0].pieces[0].end_frame = 300;
-    let BatchPlanningResponse::Planned { plans } = plan_batch_configuration(
-        &service,
-        &selection,
-        &encoding(BatchExportMode::Composite),
-        &directory.0,
-    )
-    .unwrap() else {
+    let BatchPlanningResponse::Planned { plans } =
+        plan_batch_configuration(&service, &selection, &encoding(BatchExportMode::Composite))
+            .unwrap()
+    else {
         panic!("fresh plan")
     };
     assert_eq!(plans[0].output_id, "ride");
@@ -112,47 +112,46 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
             &service,
             &invalid,
             &encoding(BatchExportMode::Composite),
-            &directory.0
         )
         .unwrap_err()
         .to_string()
         .contains("must lie within the 600 frames"));
     }
-    let mut combined = selection.clone();
-    let repeated = combined.outputs[0].pieces[0].clone();
-    combined.outputs[0].pieces.push(repeated);
-    assert!(plan_batch_configuration(
-        &service,
-        &combined,
-        &encoding(BatchExportMode::Composite),
-        &directory.0
-    )
-    .unwrap_err()
-    .to_string()
-    .contains("exactly one piece"));
+    // An output joins its pieces: frames and durations add up.
+    let mut joined = selection.clone();
+    let mut later = joined.outputs[0].pieces[0].clone();
+    (later.start_frame, later.end_frame) = (400, 600);
+    joined.outputs[0].pieces.push(later);
+    let BatchPlanningResponse::Planned { plans } =
+        plan_batch_configuration(&service, &joined, &encoding(BatchExportMode::Composite)).unwrap()
+    else {
+        panic!("fresh plan")
+    };
+    assert_eq!(plans[0].planned_frames, 440);
+    // [60, 300) plus [400, 600), which ends where the 20 s source ends.
+    assert!((plans[0].output_duration_seconds - 20.0 + 160.0 * 1001.0 / 30000.0).abs() < 1e-9);
+    let mut empty = selection.clone();
+    empty.outputs[0].pieces.clear();
+    assert!(
+        plan_batch_configuration(&service, &empty, &encoding(BatchExportMode::Composite))
+            .unwrap_err()
+            .to_string()
+            .contains("at least one piece")
+    );
     selection.outputs[0] = output("ride", &source);
     let duplicate = directory.source("queue/ride.朝 morning.mov");
     let duplicate = service
         .inspect_source(&directory.paths(), &session.inspection_id, &duplicate)
         .unwrap();
     selection.outputs.push(output("ride-mov", &duplicate));
-    let error = plan_batch_configuration(
-        &service,
-        &selection,
-        &encoding(BatchExportMode::Composite),
-        &directory.0,
-    )
-    .unwrap_err();
+    let error =
+        plan_batch_configuration(&service, &selection, &encoding(BatchExportMode::Composite))
+            .unwrap_err();
     assert!(error.to_string().contains("conflicting destinations"));
     service.dispose_session(&session.inspection_id);
     assert!(matches!(
-        plan_batch_configuration(
-            &service,
-            &selection,
-            &encoding(BatchExportMode::Composite),
-            &directory.0
-        )
-        .unwrap(),
+        plan_batch_configuration(&service, &selection, &encoding(BatchExportMode::Composite),)
+            .unwrap(),
         BatchPlanningResponse::Rejected(_)
     ));
 }
@@ -420,15 +419,13 @@ fn accepted_sources_survive_disposal_but_closed_and_foreign_sessions_reject() {
                 pieces: vec![common::builders::whole_source_piece(source, false)],
             })
             .collect(),
+        destination: BatchDestination::SourceNamed {
+            directory: directory.0.to_str().unwrap().into(),
+        },
     };
     let response = serde_json::to_value(
-        plan_batch_configuration(
-            &service,
-            &outputs,
-            &encoding(BatchExportMode::Composite),
-            &directory.0,
-        )
-        .unwrap(),
+        plan_batch_configuration(&service, &outputs, &encoding(BatchExportMode::Composite))
+            .unwrap(),
     )
     .unwrap();
     assert_eq!(response["status"], "rejected");

@@ -4,24 +4,21 @@ use super::batch::BatchServiceError;
 use super::contracts::*;
 use super::inspection::{InspectionSourceSelection, InspectionValidation, VideoInspectionService};
 use super::planning::{
-    referenced_source_ids, single_piece, validate_batch_encoding, validate_batch_template,
-    PlannedBatchOutput, ValidatedBatchTemplate,
+    referenced_source_ids, validate_batch_encoding, validate_batch_outputs,
+    validate_batch_template, PlannedBatchOutput, ValidatedBatchTemplate,
 };
 use crate::activity::schema::ParsedActivity;
 use crate::activity::validate_render_activity;
 use crate::error::{CoreError, CoreResult};
 use crate::raster::RasterResourceResolver;
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
-use std::sync::Arc;
 
 pub(super) struct AcceptedJob {
     pub(super) id: String,
-    pub(super) source: Arc<InspectedVideoSource>,
-    /// Activity second where source frame 0 sits (0 for embedded telemetry).
-    pub(super) offset: f64,
-    pub(super) skip_overlay: bool,
     pub(super) output: PlannedBatchOutput,
+    /// Per piece, in piece order: the activity second where frame 0 of the
+    /// piece's source sits (0 for embedded telemetry).
+    pub(super) piece_offsets: Vec<f64>,
 }
 
 pub(super) struct AcceptedBatch {
@@ -48,8 +45,8 @@ pub(super) fn accept_batch(
             )
             .into());
         }
-        single_piece(output)?;
     }
+    validate_batch_outputs(&request.outputs, &request.destination)?;
     let source_ids = referenced_source_ids(&request.outputs);
     let offsets = validate_batch_activity(&request.activity, &source_ids)?;
     let owned = match inspection.validate_sources(&InspectionSourceSelection {
@@ -65,11 +62,7 @@ pub(super) fn accept_batch(
         }
     };
     let encoding = validate_batch_encoding(&request.encoding)?;
-    let planned = encoding.plan_outputs(
-        &request.outputs,
-        &owned,
-        Path::new(&request.output_directory),
-    )?;
+    let planned = encoding.plan_outputs(&request.outputs, &owned, &request.destination)?;
     let template = validate_batch_template(request.template, encoding, resources)?;
     let external_activity = match request.activity {
         BatchActivity::EmbeddedActivity {} => None,
@@ -83,18 +76,19 @@ pub(super) fn accept_batch(
         .outputs
         .into_iter()
         .zip(planned)
-        .map(|(output, planned)| {
-            let piece = &output.pieces[0];
-            AcceptedJob {
-                // Embedded telemetry is video-local: frame 0 is activity second 0.
-                offset: offsets
-                    .as_ref()
-                    .map_or(0.0, |offsets| offsets[&piece.source_id]),
-                skip_overlay: piece.skip_overlay,
-                source: planned.source.clone(),
-                id: output.id,
-                output: planned,
-            }
+        .map(|(output, planned)| AcceptedJob {
+            // Embedded telemetry is video-local: frame 0 is activity second 0.
+            piece_offsets: output
+                .pieces
+                .iter()
+                .map(|piece| {
+                    offsets
+                        .as_ref()
+                        .map_or(0.0, |offsets| offsets[&piece.source_id])
+                })
+                .collect(),
+            id: output.id,
+            output: planned,
         })
         .collect();
     Ok(AcceptedBatch {

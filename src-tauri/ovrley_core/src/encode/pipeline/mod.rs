@@ -1,5 +1,6 @@
 //! Shared video preparation and encoding, with one supervised native pipeline.
 
+pub(crate) mod assemble;
 mod buffers;
 #[doc(hidden)]
 pub mod diagnostics;

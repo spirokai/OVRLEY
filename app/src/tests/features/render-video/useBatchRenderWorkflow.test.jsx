@@ -319,9 +319,9 @@ describe('native batch workflow', () => {
           id: path,
           pieces: [{ sourceId: `inspection-1:${path}`, startFrame: 0, endFrame: 3600, skipOverlay: false }],
         })),
+        destination: { kind: 'sourceNamed', directory: 'C:/renders' },
       },
       expect.any(Object),
-      'C:/renders',
     )
     await act(async () => result.current.runBatch())
     expect(acceptedRequest.activity).toEqual({ mode: 'embeddedActivity' })
@@ -362,7 +362,7 @@ describe('native batch workflow', () => {
     expect(backend.subscribeBatchRenderProgress.mock.invocationCallOrder[0]).toBeLessThan(backend.submitBatchRender.mock.invocationCallOrder[0])
     expect(acceptedRequest).toMatchObject({
       inspectionId: 'inspection-1',
-      outputDirectory: 'C:/renders',
+      destination: { kind: 'sourceNamed', directory: 'C:/renders' },
       encoding: { fps: 24, updateRate: 2 },
       activity: {
         mode: 'externalActivity',

@@ -97,13 +97,23 @@ export function createBatchOutputs(jobs) {
 }
 
 /**
+ * Native destination of separate-file export: one file per video in the folder,
+ * named after its source.
+ * @param {string} directory Absolute output folder.
+ * @returns {{kind: 'sourceNamed', directory: string}} Native BatchDestination.
+ */
+export function createSeparateDestination(directory) {
+  return { kind: 'sourceNamed', directory }
+}
+
+/**
  * Builds the native separate-file export of every reviewed video. With an external
  * activity each video renders at its committed offset; without one each video
  * uses its own embedded telemetry.
  * @param {object} options Captured editor/settings and reviewed, inspected jobs.
  * @returns {Readonly<object>} Native BatchRenderRequest.
  */
-export function createBatchRenderRequest({ editorSnapshot, settings, inspectionId, outputDirectory, jobs }) {
+export function createBatchRenderRequest({ editorSnapshot, settings, inspectionId, destination, jobs }) {
   const activity =
     editorSnapshot.parsedActivity === null
       ? { mode: 'embeddedActivity' }
@@ -118,7 +128,7 @@ export function createBatchRenderRequest({ editorSnapshot, settings, inspectionI
       template: createBatchRenderTemplate(editorSnapshot.config, editorSnapshot.globalDefaults),
       encoding: captureRenderEncoding(settings, editorSnapshot.availableCodecs),
       activity,
-      outputDirectory,
+      destination,
       outputs: createBatchOutputs(jobs),
     }),
   )

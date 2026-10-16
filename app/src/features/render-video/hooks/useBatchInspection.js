@@ -6,7 +6,7 @@ import { useBatchRenderStore, useBatchSyncInputs } from '@/hooks/useAppStoreSele
 import { openDirectoryPath } from '@/lib/file-dialog'
 import { collectVideoPieces } from '@/lib/video-program/program'
 import { joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
-import { captureRenderEncoding, createBatchOutputs } from '../utils/renderRequest'
+import { captureRenderEncoding, createBatchOutputs, createSeparateDestination } from '../utils/renderRequest'
 import { formatRenderPathError, reviewBatchQueue, reviewBatchSync } from '../utils/renderPresentation'
 
 /**
@@ -89,7 +89,10 @@ export default function useBatchInspection({ phase, settings }) {
     if (!open || !current?.complete || current.error || sync.error || jobs.length === 0 || outputDirectory === null) return
     let closed = false
     void backend
-      .planBatchOutputs({ inspectionId: current.inspectionId, outputs: createBatchOutputs(jobs) }, review.encoding, outputDirectory)
+      .planBatchOutputs(
+        { inspectionId: current.inspectionId, outputs: createBatchOutputs(jobs), destination: createSeparateDestination(outputDirectory) },
+        review.encoding,
+      )
       .then((result) => {
         if (closed) return
         if (result.status === 'rejected') setInspection({ ...current, error: new Error('reinspectionRequired'), issues: result.issues })
@@ -122,7 +125,9 @@ export default function useBatchInspection({ phase, settings }) {
     batchReady: ready && !batchRunning,
     batchReviewError: formatRenderPathError(current?.error ?? sync.error ?? null, t),
     batchOutputError: formatRenderPathError(currentPlan?.error ?? null, t),
-    request: ready ? { inspectionId: current.inspectionId, outputDirectory, jobs, reviewedInputs: inputs } : null,
+    request: ready
+      ? { inspectionId: current.inspectionId, destination: createSeparateDestination(outputDirectory), jobs, reviewedInputs: inputs }
+      : null,
     pickOutputFolder,
     refreshInspection: () => setRevision((value) => value + 1),
     reject: (error) => setInspection({ ...current, error: new Error('reinspectionRequired'), issues: error.issues }),
