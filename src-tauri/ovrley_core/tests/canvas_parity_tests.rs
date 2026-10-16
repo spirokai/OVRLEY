@@ -1,5 +1,5 @@
 //! Pixel parity test comparing Rust Skia rendering to the
-//! frontend React SVG canvas via Playwright.
+//! frontend WASM widget canvases via Playwright.
 //!
 //! Feature-gated behind `canvas-parity`:
 //!   cargo test -p ovrley_core --features canvas-parity --test canvas_parity_tests -- --nocapture
@@ -10,7 +10,8 @@
 //! with intermediate temp files under:
 //!   src-tauri/target/canvas-parity/
 //!
-//! Requires: Node.js, pnpm, ffmpeg, Playwright browsers installed.
+//! Requires: Node.js, pnpm, ffmpeg, Playwright browsers, and a current WASM build
+//! (`pnpm wasm:build`). The test reuses compiled WASM assets without rebuilding.
 
 #[path = "common/canvas_parity.rs"]
 mod canvas_parity;
@@ -29,11 +30,11 @@ use std::path::PathBuf;
 /// The second within the activity to render (mid-activity, all widgets active).
 const SELECTED_SECOND: u32 = 200;
 
-/// SSIM threshold — accounts for minor glyph rasterization differences between
-/// Skia's FreeType and Chromium's FreeType.
+/// SSIM threshold — allows minor native/WASM glyph rasterization and browser
+/// compositing differences.
 const SSIM_THRESHOLD: f64 = 0.98;
 
-/// Compares a Skia-rendered frame to a Playwright-captured browser SVG frame.
+/// Compares a native Skia frame to the current editor's WASM widget canvases.
 #[test]
 fn canvas_parity() -> Result<()> {
     // ── Resolve paths ──────────────────────────────────────────────────
@@ -65,7 +66,7 @@ fn canvas_parity() -> Result<()> {
 
     // 1. Parse fixtures
     println!("[1/9] Parsing fixtures...");
-    let (activity, mut config, activity_raw, mut config_raw) =
+    let (activity, mut config, _activity_raw, mut config_raw) =
         parse_fixtures_with_config(&fixture_root, "test-template-4k.json")?;
     // Set the scene window to the full activity duration so the dense report
     // contains all telemetry data. The gauge range is derived from the full
@@ -104,7 +105,7 @@ fn canvas_parity() -> Result<()> {
 
     // 4. Render Skia PNG
     println!("[4/9] Rendering Skia preview...");
-    let prepared = render_skia_preview(
+    render_skia_preview(
         &app_paths,
         &config,
         &activity,
@@ -120,9 +121,8 @@ fn canvas_parity() -> Result<()> {
         &config,
         &config_raw,
         &activity,
-        &activity_raw,
         SELECTED_SECOND,
-        Some(&prepared),
+        &app_paths,
     )?;
 
     // 6. Spawn Vite dev server
