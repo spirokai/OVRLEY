@@ -66,28 +66,37 @@ function HevcPlaybackPlaceholder({ displayScale, importId, openVideoPreviewHelp,
  * @returns {JSX.Element} Video preview surface.
  */
 export default function VideoPreviewSurface({ children, displayScale, isActive }) {
-  const videoRef = useRef(null)
+  const firstVideoRef = useRef(null)
+  const secondVideoRef = useRef(null)
   const isVideoMuted = useStore((state) => state.isVideoMuted)
   const platformOs = useStore((state) => state.platformOs)
   const { t } = useTranslation()
-  const { videoSrc, importId, isOutOfRange, isDeleted, isInOverlap, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } =
-    useVideoPreview(videoRef, isActive)
+  const slotRefs = [firstVideoRef, secondVideoRef]
+  const { slots, videoSrc, importId, isOutOfRange, isDeleted, isInOverlap, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } =
+    useVideoPreview(slotRefs, isActive)
   const hasHevcPlaybackError = Boolean(hevcPlaybackWarning)
 
   return (
     <>
-      {videoSrc && !hasHevcPlaybackError ? (
-        <video
-          key={importId ?? 'no-video'}
-          ref={videoRef}
-          src={videoSrc}
-          className={cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')}
-          preload="metadata"
-          playsInline
-          muted={isVideoMuted}
-          onError={(event) => console.error('[VideoPreviewSurface] Video Error:', event)}
-        />
-      ) : null}
+      {/* Both elements stay mounted; the parked one is invisible and silent until a cut swaps them. */}
+      {slots.map((slot, index) =>
+        slot.src && !(slot.isActive && hasHevcPlaybackError) ? (
+          <video
+            key={index}
+            ref={slotRefs[index]}
+            src={slot.src}
+            data-slot={slot.isActive ? 'active' : 'parked'}
+            className={cn(
+              'pointer-events-none absolute inset-0 h-full w-full object-cover',
+              !slot.isActive ? 'opacity-0' : isOutOfRange ? 'opacity-20' : 'opacity-100',
+            )}
+            preload={slot.isActive ? 'metadata' : 'auto'}
+            playsInline
+            muted={!slot.isActive || isVideoMuted}
+            onError={(event) => console.error('[VideoPreviewSurface] Video Error:', event)}
+          />
+        ) : null,
+      )}
       {children}
       {videoSrc && isDeleted ? (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center p-4">

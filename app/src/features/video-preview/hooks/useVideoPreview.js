@@ -1,13 +1,16 @@
 /**
  * Composes preview-video source resolution, warning lifecycle, scrub
- * scheduling, and playback synchronization around the active <video> element.
+ * scheduling, and playback synchronization around two <video> elements: the
+ * active one shows the piece at the playhead, the parked one waits on the next
+ * piece so a cut swaps elements instead of reloading one.
  */
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { openHevcSupport } from '@/api/backend'
 import { useVideoTimeline } from '@/hooks/useVideoTimeline'
 import { framesToSeconds } from '@/lib/video-program/frame-grid'
 import { findNextPiece, resolvePreviewTarget } from '@/lib/video-program/playback-target'
+import { assignPreviewSlots, EMPTY_PREVIEW_SLOTS } from '@/lib/video-program/preview-slots'
 import useStore from '@/store/useStore'
 import { useVideoPlaybackClock } from './useVideoPlaybackClock'
 import { useVideoPreviewWarnings } from './useVideoPreviewWarnings'
@@ -17,14 +20,18 @@ import { createVideoPreviewScrubScheduler } from '../utils/videoPreviewScrubSche
 import { resolveVideoPreviewSource } from '../utils/videoPreviewSource'
 import i18next from 'i18next'
 
+function previewSourceOf(clip) {
+  return resolveVideoPreviewSource({ importedVideoPath: clip.path, importedVideoPreviewUrl: clip.preview.url })
+}
+
 /**
- * Manages the video preview element and synchronization with the global playhead.
+ * Manages the two preview video elements and their synchronization with the global playhead.
  *
- * @param {React.RefObject<HTMLVideoElement>} videoRef - Ref to the video element.
+ * @param {Array<React.RefObject<HTMLVideoElement>>} slotRefs - Refs to the two video elements.
  * @param {boolean} isActive - Whether the imported video preview is currently visible.
- * @returns {{ videoSrc: string, importId: string|null, isOutOfRange: boolean, isDeleted: boolean, isInOverlap: boolean, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
+ * @returns {{ slots: Array<{src: string, isActive: boolean}>, videoSrc: string, importId: string|null, isOutOfRange: boolean, isDeleted: boolean, isInOverlap: boolean, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
  */
-export function useVideoPreview(videoRef, isActive = true) {
+export function useVideoPreview(slotRefs, isActive = true) {
   // Store selectors - subscribes to the displayed clips, playhead position, playback mode, and drag state.
   const { clips, program } = useVideoTimeline().displayed
   const isDragPreview = useStore((state) => state.videoDragPreview !== null)
@@ -47,6 +54,20 @@ export function useVideoPreview(videoRef, isActive = true) {
   const activePreviewUrl = activeClip?.preview.url ?? null
   const isVideoPlaybackMode = isActive && previewPlaybackState === 'playing' && previewPlaybackSource === 'video' && !isDragPreview
   const videoSrc = activePath === null ? '' : resolveVideoPreviewSource({ importedVideoPath: activePath, importedVideoPreviewUrl: activePreviewUrl })
+
+  // Element slots - the active element shows the target piece; the parked one waits on the piece after it.
+  const preloadPiece = target === null ? null : findNextPiece(program, target.piece.id)
+  const preloadClip = preloadPiece === null ? null : clips.find((clip) => clip.id === preloadPiece.videoId)
+  const [previousSlots, setPreviousSlots] = useState(EMPTY_PREVIEW_SLOTS)
+  const slotState = assignPreviewSlots(previousSlots, {
+    active: videoSrc ? { src: videoSrc, pieceId: target.piece.id } : null,
+    preload: preloadClip ? { src: previewSourceOf(preloadClip), pieceId: preloadPiece.id } : null,
+  })
+  if (slotState !== previousSlots) setPreviousSlots(slotState)
+  const videoRef = slotRefs[slotState.activeIndex]
+  const parkedRef = slotRefs[1 - slotState.activeIndex]
+  const parkedSlot = slotState.slots[1 - slotState.activeIndex]
+  const parkedSecond = parkedSlot !== null && parkedSlot.pieceId === preloadPiece?.id ? preloadPiece.sourceStartSecond : null
 
   // Warning lifecycle - tracks metadata, native-player, and slow-seek messages separately from playback sync.
   const { hevcPlaybackWarning, metadataStatusMessage, nativeVideoError, seekWarning } = useVideoPreviewWarnings({
@@ -235,6 +256,33 @@ export function useVideoPreview(videoRef, isActive = true) {
     videoSrc,
   ])
 
+  // Parked element - stays paused on the first frame of the next piece, ready to take over at the cut.
+  useEffect(() => {
+    const video = parkedRef.current
+    if (!video || parkedSlot === null) {
+      return undefined
+    }
+
+    const park = () => {
+      if (!video.paused) {
+        video.pause()
+      }
+      if (parkedSecond !== null) {
+        syncVideoCurrentTime(video, parkedSecond)
+      }
+    }
+    const handleLoadedMetadata = () => {
+      park()
+      primeVideoFirstFrame(video)
+    }
+
+    park()
+    video.addEventListener('loadedmetadata', handleLoadedMetadata)
+    return () => {
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata)
+    }
+  }, [parkedRef, parkedSecond, parkedSlot])
+
   // Derived return values - aggregate imported-video warnings with local preview messages.
   const isOutOfRange = target === null || !target.isInside
   const isInOverlap = program.overlaps.some((overlap) => selectedSecond >= overlap.startSecond && selectedSecond < overlap.endSecond)
@@ -248,6 +296,7 @@ export function useVideoPreview(videoRef, isActive = true) {
   ].filter(Boolean)
 
   return {
+    slots: slotState.slots.map((slot, index) => ({ src: slot?.src ?? '', isActive: index === slotState.activeIndex })),
     videoSrc,
     importId: activeClip?.preview.importId ?? null,
     isOutOfRange,

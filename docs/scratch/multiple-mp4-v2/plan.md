@@ -112,13 +112,18 @@ Tests: import hook, panel, timeline lane/drag/geometry tests.
 
 Delivered as two commits: **M4a** program-driven playback with the existing single element (items 2, 3, 4, 5), **M4b** two video elements with preloading and hand-off (item 1).
 
-M4a status: implemented (awaiting owner commit). Decisions made during implementation:
+M4a status: committed (`26478df2`). Decisions made during implementation:
 - The video clock ends a piece when the presented frame passes the piece's source end (not only on `ended`), so deleted parts end a piece mid-file. At a piece end playback continues at the next piece's start (gaps and deleted parts skipped, hard cut); after the last piece the element holds the piece's last frame and the timeline clock plays the rest of the activity.
 - Playback started inside a gap or deleted part starts at the next piece. Before the first and after the last piece the timeline clock plays the activity as before (gap skipping applies between pieces only, and only with video playback).
 - The element re-seeks when the playing piece changes, also within the same video (after a deleted part).
 - Scrubbing into a deleted part shows that video's frame with a "Deleted part – not exported" indicator; gaps keep showing the next piece's first frame (dimmed). A red banner shows while the playhead is inside an overlap.
 - Removing a clip pauses playback first; the removal clamps the playhead.
 - The hand-off reaches the clock through `useEffectEvent`, so the frame loop does not restart on every render.
+
+M4b status: implemented (awaiting owner commit); native WebView check pending. Decisions made during implementation:
+- Two persistent `<video>` elements. A pure assignment (`lib/video-program/preview-slots.js`) keeps the active element on the piece at the playhead (the upcoming piece in a gap) and parks the other one, paused and muted, on the first frame of the piece after it — also the same video after a deleted part. A cut to the parked piece swaps elements; a jump within the shown video seeks; only a jump to an unprepared video reloads an element.
+- The existing playback, scrub, drag, clock, and warning logic runs on whichever element is active (its ref switches), so a swap re-syncs the new element and the demoted element is parked again.
+- The parked element is always prepared (also while paused); it only decodes its parked frame, so two elements never play at once. Verify on WebKitGTK/WebView2 with two 4K/HEVC clips (plan risk) and fall back to preloading near the piece end if needed.
 
 1. Two reusable video elements with active/preload roles (`useVideoPreview.js`, `useVideoPlaybackClock.js`, `usePlaybackEngine.js`, `videoPreviewSource.js`).
 2. Continue at piece end → next piece start, skipping gaps and deleted parts; hard cut at every join (transition windows are added in M8).
