@@ -2,13 +2,13 @@
  * Video import - background media selection and preview management.
  */
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { clearPreviewVideos, extractVideoTelemetry, importPreviewVideo, preparePreviewVideo, removePreviewVideo } from '@/api/backend'
 import { changeVideoCollection, runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
-import { openSinglePath } from '@/lib/file-dialog'
+import { openMultiplePaths } from '@/lib/file-dialog'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
-import { joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
-import { createImportedVideo } from '@/store/slices/createVideoImportSlice'
+import { deriveCompatibility, joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
+import { createImportedVideo, nextImportOrder } from '@/store/slices/createVideoImportSlice'
 import useStore from '@/store/useStore'
 import i18next from 'i18next'
 
@@ -39,9 +39,28 @@ async function extractTelemetryResult(path) {
   }
 }
 
-async function extractAndStoreVideoTelemetry(videoId, path) {
-  const telemetry = await extractTelemetryResult(path)
-  await runWithoutEditorHistory(useStore, () => useStore.getState().setVideoTelemetry(videoId, telemetry))
+let telemetryQueue = Promise.resolve()
+
+/**
+ * Queues embedded telemetry extraction for imported clips. Extraction runs one clip
+ * at a time in timeline order; results for clips removed meanwhile are discarded.
+ * @param {Array<object>} videos Newly imported video entities.
+ * @returns {Promise<void>} Completion of this batch of the queue.
+ */
+function queueTelemetryExtraction(videos) {
+  const { videoEdits } = useStore.getState()
+  const ordered = sortVideosByTimeline(joinVideoEdits(videos, videoEdits))
+  telemetryQueue = telemetryQueue
+    .then(async () => {
+      for (const video of ordered) {
+        if (!useStore.getState().importedVideos.some((candidate) => candidate.id === video.id)) continue
+        const telemetry = await extractTelemetryResult(video.path)
+        runWithoutEditorHistory(useStore, () => useStore.getState().setVideoTelemetry(video.id, telemetry))
+      }
+    })
+    // Later imports must still get their telemetry after an unexpected failure.
+    .catch((error) => useStore.getState().setErrorMessage(`Video telemetry failed: ${errorMessage(error)}`))
+  return telemetryQueue
 }
 
 /**
@@ -58,55 +77,92 @@ export async function prepareVideoPath(path) {
 }
 
 /**
- * Sizes the scene and render FPS to an imported video.
- * @param {object} video Imported video entity.
+ * Sizes the scene and render FPS to the compatible format of the first import.
+ * @param {{resolution: {width: number, height: number}, fps: {num: number, den: number}}} format Reference format.
  */
-function adoptVideoFormat(video) {
+function adoptVideoFormat(format) {
   const { config, renderSettings, setConfig, setRenderFpsAndUpdateRate } = useStore.getState()
   if (!config?.scene) {
     throw new Error('Cannot import video without an active template scene')
   }
-  setConfig({ ...config, scene: { ...config.scene, width: video.resolution.width, height: video.resolution.height } })
-  const fps = Math.round(video.fps.num / video.fps.den)
+  setConfig({ ...config, scene: { ...config.scene, width: format.resolution.width, height: format.resolution.height } })
+  const fps = Math.round(format.fps.num / format.fps.den)
   setRenderFpsAndUpdateRate(fps, normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate))
 }
 
-async function importVideoSelection(selection, { setImportingVideo, onSetBackgroundMode }) {
-  if (typeof selection !== 'string') {
-    throw new Error('Video import requires a file path.')
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * Probes and registers every selected file, then adds the successful ones to the
+ * collection in one change. A file that is not a video, is already imported, or
+ * fails to probe is reported and skipped; the others still import.
+ * @param {Array<string>} paths Absolute file paths in selection order.
+ * @returns {Promise<{videos: Array<object>, failures: Array<{path: string, message: string}>, duplicates: Array<string>}>} Import result.
+ */
+async function importVideoPaths(paths) {
+  const state = useStore.getState()
+  const knownPaths = new Set(state.importedVideos.map((video) => video.path))
+  const wasEmpty = state.importedVideos.length === 0
+  let importOrder = nextImportOrder(state.importedVideos)
+  const videos = []
+  const failures = []
+  const duplicates = []
+
+  for (const path of paths) {
+    if (!isVideoPath(path)) {
+      failures.push({ path, message: i18next.t('video-preview.unsupportedVideoFile', 'Not a supported video file (MP4, MOV, MKV).') })
+      continue
+    }
+    if (knownPaths.has(path)) {
+      duplicates.push(path)
+      continue
+    }
+    knownPaths.add(path)
+    let registration
+    try {
+      registration = await importPreviewVideo(path)
+      videos.push(
+        createImportedVideo(registration.metadata, {
+          importOrder,
+          preview: { importId: registration.importId, url: registration.previewUrl, warnings: registration.warnings },
+        }),
+      )
+      importOrder += 1
+    } catch (error) {
+      if (registration) await removePreviewVideo(registration.importId)
+      failures.push({ path, message: errorMessage(error) })
+    }
   }
 
-  const path = selection
-  if (path.length === 0) {
-    throw new Error('Video import requires a file path.')
+  if (videos.length > 0) {
+    try {
+      changeVideoCollection(useStore, () => {
+        useStore.getState().addImportedVideos(videos)
+        if (wasEmpty) adoptVideoFormat(deriveCompatibility(videos).reference)
+      })
+    } catch (error) {
+      for (const video of videos) await removePreviewVideo(video.preview.importId)
+      throw error
+    }
   }
+  return { videos, failures, duplicates }
+}
 
-  if (!isVideoPath(path)) {
-    throw new Error('Dropped file is not a supported video.')
-  }
-
-  setImportingVideo(true)
-
-  const previousImportIds = useStore.getState().importedVideos.map((video) => video.preview.importId)
-  const response = await importPreviewVideo(path)
-  let video
-  try {
-    video = createImportedVideo(response.metadata, {
-      importOrder: 0,
-      preview: { importId: response.importId, url: response.previewUrl, warnings: response.warnings },
-    })
-    changeVideoCollection(useStore, () => {
-      useStore.getState().setImportedVideos([video])
-      adoptVideoFormat(video)
-    })
-  } catch (error) {
-    await removePreviewVideo(response.importId)
-    throw error
-  }
-  for (const importId of previousImportIds) await removePreviewVideo(importId)
-  onSetBackgroundMode?.('video')
-
-  await extractAndStoreVideoTelemetry(video.id, path)
+/**
+ * Describes what an import needs to tell the user: files that failed or were
+ * already imported, and clips that cannot be combined into one output when the
+ * import made the collection incompatible in a new way.
+ * @returns {object|null} Import report, or null when there is nothing to report.
+ */
+function createImportReport({ failures, duplicates }, incompatibleBefore) {
+  const { importedVideos } = useStore.getState()
+  const { reference, incompatibleIds } = deriveCompatibility(importedVideos)
+  const newlyIncompatible = [...incompatibleIds].some((id) => !incompatibleBefore.has(id))
+  const incompatibleVideos = newlyIncompatible ? importedVideos.filter((video) => incompatibleIds.has(video.id)) : []
+  if (failures.length === 0 && duplicates.length === 0 && incompatibleVideos.length === 0) return null
+  return { failures, duplicates, reference: incompatibleVideos.length > 0 ? reference : null, incompatibleVideos }
 }
 
 function basename(path) {
@@ -157,12 +213,26 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   const importedBackgroundImageFilename = importedBackgroundImagePath ? basename(importedBackgroundImagePath) : null
   const importedMediaFilename = importedBackgroundImageFilename || importedVideoLabel
 
-  const loadVideoPath = async (path) => {
+  const [importReport, setImportReport] = useState(null)
+
+  /**
+   * Imports the given paths behind the blocking loader, then reports failures,
+   * duplicates, and new incompatibilities. Telemetry extraction continues afterwards.
+   */
+  const loadVideoPaths = async (paths) => {
+    const incompatibleBefore = deriveCompatibility(useStore.getState().importedVideos).incompatibleIds
+    setImportingVideo(true)
+    let result
     try {
-      await importVideoSelection(path, { setImportingVideo, onSetBackgroundMode })
+      result = await importVideoPaths(paths)
     } finally {
       setImportingVideo(false)
     }
+    if (result.videos.length > 0) {
+      onSetBackgroundMode?.('video')
+      void queueTelemetryExtraction(result.videos)
+    }
+    setImportReport(createImportReport(result, incompatibleBefore))
   }
 
   const applyBackgroundImage = async (path) => {
@@ -180,7 +250,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
 
   const handleImportVideo = async () => {
     try {
-      const selected = await openSinglePath(
+      const selected = await openMultiplePaths(
         [
           {
             name: debugModeEnabled ? i18next.t('video-preview.videoOrImage', 'Video or Image') : 'Video',
@@ -193,39 +263,33 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
         return
       }
 
-      if (debugModeEnabled && DEBUG_IMAGE_EXTENSIONS.has(pathExtension(selected))) {
-        await applyBackgroundImage(selected)
+      if (debugModeEnabled && selected.length === 1 && DEBUG_IMAGE_EXTENSIONS.has(pathExtension(selected[0]))) {
+        await applyBackgroundImage(selected[0])
         return
       }
 
-      await loadVideoPath(selected)
+      await loadVideoPaths(selected)
     } catch (err) {
       console.error('Failed to import background media:', err)
       setErrorMessage(`Video import failed: ${err.message}`)
-    } finally {
-      setImportingVideo(false)
     }
   }
 
   const handleVideoFilesDrop = async (selections) => {
     try {
-      if (selections.length !== 1) {
-        throw new Error('Drop exactly one video file.')
+      // Only native drops carry file paths; browser File objects cannot be registered.
+      if (selections.some((selection) => typeof selection !== 'string')) {
+        throw new Error('Dropped files must be local files.')
       }
-
-      const selection = selections[0]
-      const path = typeof selection === 'string' ? selection : selection.name
-      if (debugModeEnabled && typeof path === 'string' && DEBUG_IMAGE_EXTENSIONS.has(pathExtension(path))) {
-        await applyBackgroundImage(path)
+      if (debugModeEnabled && selections.length === 1 && DEBUG_IMAGE_EXTENSIONS.has(pathExtension(selections[0]))) {
+        await applyBackgroundImage(selections[0])
         return
       }
 
-      await loadVideoPath(selection)
+      await loadVideoPaths(selections)
     } catch (err) {
       console.error('Video drop failed:', err)
       setErrorMessage(`Video drop failed: ${err.message}`)
-    } finally {
-      setImportingVideo(false)
     }
   }
 
@@ -252,7 +316,12 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
     clearImportedVideos: handleClearImportedVideos,
     handleImportVideo,
     handleVideoFilesDrop,
-    loadVideoPath,
+    importReportDialog: {
+      open: importReport !== null,
+      report: importReport,
+      onClose: () => setImportReport(null),
+    },
+    loadVideoPaths,
     prepareVideoPath,
   }
 }

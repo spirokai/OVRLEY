@@ -40,7 +40,7 @@ M2a status: committed (`0286c401`). M2b status: committed (`af7c48a4`). Decision
 - Current-video render and project format v3 hold at most one clip until M6/M2c; multi-file import arrives in M3, so this limit is unreachable from the UI.
 - Exact `fpsNum/fpsDen` are required at import; the float-FPS fallback in render config is removed.
 
-M2c status: implemented (awaiting owner commit). Decisions made during implementation:
+M2c status: committed (`4a5d0bec`). Decisions made during implementation:
 - v4 layout: `sources.videos[]` (import order) = `{ id, path, offsetSeconds, deletedParts[{ id, fromSecond, toSecond, transition }], transitionIn }`; a transition is `null` (follows the defaults) or `{ type, durationSeconds }` (override; `none` has duration 0). Top-level `transitionDefaults`. `sync.videoOffsetSeconds` is gone; `sync.manual.videoId` names the clip that owns the landmarks (matches the M2b workspace model).
 - Clip IDs are persisted; v3 → v4 generates one UUID for the single video. Deleted-part IDs are unique across the project (join keys).
 - Rust validates structure and the transition catalogue (Rust copy, tested against the JS catalogue); the frontend checks deleted parts and landmarks against probed durations.
@@ -69,6 +69,15 @@ M2c status: implemented (awaiting owner commit). Decisions made during implement
 Tests: table-driven utility tests; slice tests; project migration tests.
 
 ## M3 — Import and editing UX
+
+Delivered as four commits: **M3a** multi-file import (items 1 import part, 2), **M3b** post-import dialogs and placement anchors (items 3, 3a, 4 dialog), **M3c** videos panel, clip removal and the shared video lane (items 4 timeline/panel part, 5, 6, 7), **M3d** folder batch removal, batch sources from the collection, and v3 batch-folder projects (item 1 batch part, M2c deferral).
+
+M3a status: implemented (awaiting owner commit). Decisions made during implementation:
+- Adding files never re-places existing clips. New clips are placed by detected time plus the shared correction of the collection (committed − detected offset of the earliest existing clip whose time can be determined; zero without one) — the same reference-correction idea as batch calibration. Activity changes, timezone mode, and filename-time actions still re-place every clip as before.
+- Placements report `determined`; undetermined clips still start at 0 with a warning until M3b's placement prompt.
+- Files are probed and registered one at a time; the successful ones are committed in one collection change. Non-videos, probe/validation failures, and paths already in the collection (or repeated in the selection) are reported per file in the import dialog. The dialog also lists incompatible clips when an import makes the collection incompatible in a new way.
+- Only the first import into an empty collection sizes the scene and render FPS (from the compatible group).
+- Telemetry extraction is a module-level sequential queue in timeline order; it no longer holds the import loader.
 
 1. Single import button → multi-select dialog (`lib/file-dialog`, `useVideoImport.js`). Remove the folder batch queue (`createBatchRenderSlice.js` folder state, `useBatchInspection.js` folder listing, `BatchRenderQueue*`) and source batch jobs from the collection.
 2. Blocking import: probe + register all, atomic commit, per-file failure report. Compatibility warning shown immediately in the import result (incompatible clips listed with resolution/FPS; they are still imported).

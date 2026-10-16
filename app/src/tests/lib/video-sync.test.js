@@ -37,8 +37,8 @@ describe('resolveVideosSync session timezone inference', () => {
 
     const both = resolveVideosSync([utcClip, localClip], summary, null)
     expect(both.placements).toEqual([
-      { offsetSeconds: 30, syncWarning: null },
-      { offsetSeconds: 30, syncWarning: null },
+      { offsetSeconds: 30, determined: true, syncWarning: null },
+      { offsetSeconds: 30, determined: true, syncWarning: null },
     ])
     // A sole local match stays automatic, so the clips do not agree on an explicit interpretation.
     expect(both.timezoneMode).toBeNull()
@@ -51,6 +51,9 @@ describe('resolveVideosSync session timezone inference', () => {
     const second = createTestVideo({ id: 'b', creationTime: '2026-07-18T08:01:00Z', timeSource: 'ffprobe', durationSeconds: 20 })
     const result = resolveVideosSync([first, second], summary, 'utc')
     expect(result.placements.map(({ offsetSeconds }) => offsetSeconds)).toEqual([30, 60])
+    expect(resolveVideosSync([createTestVideo({ creationTime: null })], summary, 'utc').placements).toEqual([
+      { offsetSeconds: 0, determined: false, syncWarning: 'Could not determine video creation time' },
+    ])
     expect(result.timezoneMode).toBe('utc')
   })
 
@@ -68,17 +71,17 @@ describe('placeVideosByCreationTime without an external activity', () => {
       createTestVideo({ id: 'c', creationTime: '2026-07-18T08:10:00.000Z', timeSource: 'gps' }),
     ]
     expect(placeVideosByCreationTime(videos)).toEqual([
-      { offsetSeconds: 65, syncWarning: null },
-      { offsetSeconds: 0, syncWarning: null },
-      { offsetSeconds: 600, syncWarning: null },
+      { offsetSeconds: 65, determined: true, syncWarning: null },
+      { offsetSeconds: 0, determined: true, syncWarning: null },
+      { offsetSeconds: 600, determined: true, syncWarning: null },
     ])
   })
 
-  test('a clip without a usable time starts at zero with a warning', () => {
+  test('a clip without a usable time is undetermined and starts at zero with a warning', () => {
     const videos = [createTestVideo({ id: 'a', creationTime: null }), createTestVideo({ id: 'b', creationTime: 'invalid', timeSource: 'ffprobe' })]
     expect(placeVideosByCreationTime(videos)).toEqual([
-      { offsetSeconds: 0, syncWarning: 'Could not determine video creation time' },
-      { offsetSeconds: 0, syncWarning: 'Could not determine video creation time' },
+      { offsetSeconds: 0, determined: false, syncWarning: 'Could not determine video creation time' },
+      { offsetSeconds: 0, determined: false, syncWarning: 'Could not determine video creation time' },
     ])
   })
 })

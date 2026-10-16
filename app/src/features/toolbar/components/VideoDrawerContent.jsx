@@ -58,14 +58,14 @@ export function VideoDrawerContent({ videoSummaries, onBrowseVideo, onDeleteVide
 
       <Button type="button" className="h-9 w-full gap-2" onClick={onBrowseVideo} aria-keyshortcuts="Mod+I">
         <Film className="h-4 w-4" />
-        {t('toolbar.loadVideo', 'Load video')}
+        {t('toolbar.loadVideo', 'Load videos')}
       </Button>
 
       <FileDropZone
         dropZoneRef={dropZoneRef}
         dropZoneProps={dropZoneProps}
         isOverDropZone={isOverDropZone}
-        label={t('toolbar.dropVideoFile', 'Drop video file')}
+        label={t('toolbar.dropVideoFile', 'Drop video files')}
         sublabel="MP4, MOV, MKV"
       />
 

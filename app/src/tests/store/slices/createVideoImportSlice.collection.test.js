@@ -169,6 +169,73 @@ describe('placement', () => {
   })
 })
 
+describe('adding videos to the collection', () => {
+  beforeEach(resetStore)
+
+  function clip(id, options = {}) {
+    return createTestVideo({ id, path: `/videos/${id}.mp4`, ...options })
+  }
+
+  test('the first import places clips like a full sync and selects the first clip for manual sync', () => {
+    const late = clip('late', { creationTime: '2026-07-18T08:05:00Z', timeSource: 'ffprobe' })
+    const early = clip('early', { creationTime: '2026-07-18T08:00:00Z', timeSource: 'ffprobe', importOrder: 1 })
+    useStore.setState({ importedBackgroundImagePath: '/images/background.png' })
+
+    useStore.getState().addImportedVideos([late, early])
+
+    expect(offsets()).toEqual({ late: 300, early: 0 })
+    expect(useStore.getState().manualVideoSync.videoId).toBe('late')
+    expect(useStore.getState().importedBackgroundImagePath).toBeNull()
+  })
+
+  test('existing clips keep their edits and new clips follow the shared correction of the collection', () => {
+    useStore.getState().activateActivityFile(activityFile)
+    const first = clip('first', { creationTime: '2026-07-18T08:00:10Z', timeSource: 'gps', durationSeconds: 20 })
+    const second = clip('second', { creationTime: '2026-07-18T08:00:40Z', timeSource: 'gps', durationSeconds: 20, importOrder: 1 })
+    useStore.getState().addImportedVideos([first, second])
+    useStore.getState().shiftVideoOffsets(2)
+    useStore.getState().setVideoOffset('second', 50)
+    useStore.getState().selectVideoSyncVideo('second')
+
+    const added = clip('added', { creationTime: '2026-07-18T08:01:20Z', timeSource: 'gps', durationSeconds: 20, importOrder: 2 })
+    useStore.getState().addImportedVideos([added])
+
+    expect(offsets()).toEqual({ first: 12, second: 50, added: 82 })
+    expect(useStore.getState().manualVideoSync.videoId).toBe('second')
+    expect(useStore.getState().importedVideos.map((video) => video.id)).toEqual(['first', 'second', 'added'])
+  })
+
+  test('without an external activity new clips keep their real-time distance to the existing clips', () => {
+    const existing = clip('existing', { creationTime: '2026-07-18T08:10:00Z', timeSource: 'ffprobe' })
+    useStore.getState().addImportedVideos([existing])
+    useStore.getState().setVideoOffset('existing', 40)
+
+    const earlier = clip('earlier', { creationTime: '2026-07-18T08:05:00Z', timeSource: 'ffprobe', importOrder: 1 })
+    const unknown = clip('unknown', { creationTime: null, importOrder: 2 })
+    useStore.getState().addImportedVideos([earlier, unknown])
+
+    expect(offsets()).toEqual({ existing: 40, earlier: -260, unknown: 0 })
+    expect(warnings()).toEqual({ existing: null, earlier: null, unknown: 'Could not determine video creation time' })
+  })
+
+  test('rejects an empty addition and paths already in the collection', () => {
+    useStore.getState().addImportedVideos([createTestVideo({ id: 'a', path: '/videos/a.mp4' })])
+    expect(() => useStore.getState().addImportedVideos([])).toThrow('At least one video')
+    expect(() => useStore.getState().addImportedVideos([createTestVideo({ id: 'b', path: '/videos/a.mp4', importOrder: 1 })])).toThrow(
+      'already imported',
+    )
+    expect(() =>
+      useStore
+        .getState()
+        .addImportedVideos([
+          createTestVideo({ id: 'c', path: '/videos/c.mp4', importOrder: 1 }),
+          createTestVideo({ id: 'd', path: '/videos/c.mp4', importOrder: 2 }),
+        ]),
+    ).toThrow('already imported')
+    expect(useStore.getState().importedVideos.map((video) => video.id)).toEqual(['a'])
+  })
+})
+
 describe('offset edits', () => {
   beforeEach(resetStore)
 

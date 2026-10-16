@@ -21,6 +21,7 @@ import {
 import { VideoSyncDrawerContent, useVideoSyncWorkspace } from '@/features/video-sync'
 import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_SYNC_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
 import { MissingSourceDialog, ProjectFormatUpgradeDialog, StartupProjectsDialog } from '@/features/projects'
+import { VideoImportReportDialog } from '@/features/video-preview'
 import { UpdatePromptDialog } from '@/features/app-update'
 import {
   AppHeader,
@@ -166,6 +167,7 @@ function AppShell() {
         <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />
         <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
         <ProjectFormatUpgradeDialog {...projectLifecycle.formatUpgradeDialog} />
+        <VideoImportReportDialog {...videoControls.importReportDialog} />
         <KeyboardShortcutsDialog
           open={editorShell.keyboardShortcutsOpen}
           locale={i18n.resolvedLanguage}

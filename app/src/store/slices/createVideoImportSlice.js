@@ -4,7 +4,7 @@ import { getTimelineMinimum, getTotalPlaybackDuration } from '@/features/player/
 import { createCachedPromise } from '@/lib/cached-promise'
 import { clamp } from '@/lib/utils'
 import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
-import { getVideosTimelineBounds, joinVideoEdits } from '@/lib/video-program/video-collection'
+import { getVideosTimelineBounds, joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import { placeVideosByCreationTime, resolveVideosSync } from '@/lib/video-sync'
 import { applyCoursePlotDimensions } from '../store-utils'
 
@@ -143,6 +143,17 @@ function requireFiniteOffset(seconds, label) {
   if (!Number.isFinite(seconds)) throw new Error(`${label} must be a finite number`)
 }
 
+/**
+ * Detects the placement of every given clip: against the external activity when
+ * one is loaded, otherwise at detected real time relative to the earliest clip.
+ * @returns {{placements: Array<{offsetSeconds: number, determined: boolean, syncWarning: string|null}>, timezoneMode: 'utc'|'local'|null}}
+ *   Placements in input order and the resulting session timezone mode.
+ */
+function detectVideoPlacements(state, videos) {
+  if (state.parsedActivity === null) return { placements: placeVideosByCreationTime(videos), timezoneMode: null }
+  return resolveVideosSync(videos, state.activitySummary, state.videoSyncTimezoneMode)
+}
+
 function applyPlacements(draft, placements) {
   draft.importedVideos.forEach((video, index) => {
     draft.videoEdits[video.id].offsetSeconds = placements[index].offsetSeconds
@@ -205,21 +216,50 @@ export const createVideoImportSlice = (set, get) => ({
   },
 
   /**
-   * Places every clip: against the external activity when one is loaded, otherwise
-   * at detected real time relative to the earliest clip.
+   * Adds already-registered videos to the collection. Existing clips keep their
+   * committed placement. New clips are placed by detected time plus the shared
+   * correction of the collection: committed minus detected offset of the earliest
+   * existing clip whose time can be determined (zero without one).
+   * @param {Array<object>} videos Imported video entities with paths not yet in the collection.
    */
+  addImportedVideos: (videos) => {
+    const state = get()
+    if (videos.length === 0) throw new Error('At least one video is required')
+    const paths = new Set(state.importedVideos.map((video) => video.path))
+    for (const video of videos) {
+      if (paths.has(video.path)) throw new Error(`Video is already imported: ${video.path}`)
+      paths.add(video.path)
+    }
+
+    const existingCount = state.importedVideos.length
+    const { placements, timezoneMode } = detectVideoPlacements(state, [...state.importedVideos, ...videos])
+    const placementsById = new Map([...state.importedVideos, ...videos].map((video, index) => [video.id, placements[index]]))
+    const reference = sortVideosByTimeline(joinVideoEdits(state.importedVideos, state.videoEdits)).find(
+      (clip) => placementsById.get(clip.id).determined,
+    )
+    const correctionSeconds = reference ? reference.offsetSeconds - placementsById.get(reference.id).offsetSeconds : 0
+
+    set((draft) => {
+      for (const video of videos) {
+        const placement = placementsById.get(video.id)
+        draft.importedVideos.push({ ...video, syncWarning: placement.syncWarning })
+        draft.videoEdits[video.id] = {
+          ...createVideoEdits(),
+          offsetSeconds: placement.determined ? placement.offsetSeconds + correctionSeconds : placement.offsetSeconds,
+        }
+      }
+      draft.importedBackgroundImagePath = null
+      draft.videoDragPreview = null
+      draft.videoSyncTimezoneMode = timezoneMode
+    })
+    if (existingCount === 0) get().selectVideoSyncVideo(videos[0].id)
+  },
+
+  /** Places every clip by detected time (see `detectVideoPlacements`). */
   computeVideoSync: () => {
     const state = get()
     if (state.importedVideos.length === 0) return
-    if (state.parsedActivity === null) {
-      const placements = placeVideosByCreationTime(state.importedVideos)
-      set((draft) => {
-        applyPlacements(draft, placements)
-        draft.videoSyncTimezoneMode = null
-      })
-      return
-    }
-    const { placements, timezoneMode } = resolveVideosSync(state.importedVideos, state.activitySummary, state.videoSyncTimezoneMode)
+    const { placements, timezoneMode } = detectVideoPlacements(state, state.importedVideos)
     set((draft) => {
       applyPlacements(draft, placements)
       draft.videoSyncTimezoneMode = timezoneMode

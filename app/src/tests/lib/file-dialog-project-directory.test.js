@@ -7,7 +7,7 @@ vi.mock('@tauri-apps/plugin-dialog', () => dialog)
 vi.mock('@/api/backend', () => ({ readSelectedFileBytes: vi.fn() }))
 vi.mock('@/lib/preferences-store', () => preferences)
 
-import { openSinglePath, saveSinglePath } from '@/lib/file-dialog'
+import { openMultiplePaths, openSinglePath, saveSinglePath } from '@/lib/file-dialog'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -52,4 +52,22 @@ test('cancelled project dialogs do not change the remembered directory', async (
   await saveSinglePath('D:\\OVRLEY Projects\\Race.oly', 'oly', 'OVRLEY Project', { lastDirectoryKey: 'last-project-dir' })
 
   expect(preferences.setPreference).not.toHaveBeenCalled()
+})
+
+test('multi-selection returns every path, remembers their directory, and maps cancel or an empty selection to null', async () => {
+  preferences.getOptionalPathPreference.mockResolvedValue('D:\\Footage')
+  const filters = [{ name: 'Video', extensions: ['mp4'] }]
+  dialog.open.mockResolvedValueOnce(['E:\\Ride\\GX010001.MP4', 'E:\\Ride\\GX020001.MP4'])
+
+  expect(await openMultiplePaths(filters, { lastDirectoryKey: 'last-video-import-dir' })).toEqual([
+    'E:\\Ride\\GX010001.MP4',
+    'E:\\Ride\\GX020001.MP4',
+  ])
+  expect(dialog.open).toHaveBeenCalledWith({ multiple: true, filters, defaultPath: 'D:\\Footage' })
+  expect(preferences.setPreference).toHaveBeenCalledExactlyOnceWith('last-video-import-dir', 'E:\\Ride')
+
+  dialog.open.mockResolvedValueOnce(null)
+  expect(await openMultiplePaths(filters)).toBeNull()
+  dialog.open.mockResolvedValueOnce([])
+  expect(await openMultiplePaths(filters)).toBeNull()
 })

@@ -90,7 +90,8 @@ function isAmbiguousTimeSource(timeSource) {
  * @param {object} video Imported video entity.
  * @param {object} activitySummary External activity summary.
  * @param {'utc'|'local'|null} sessionMode Explicit Apply Timezone selection, or null to infer.
- * @returns {{offsetSeconds: number, syncWarning: string|null, timezoneMode: 'utc'|'local'|null}} Clip sync result.
+ * @returns {{offsetSeconds: number, determined: boolean, syncWarning: string|null, timezoneMode: 'utc'|'local'|null}} Clip sync
+ *   result; `determined` is false when the clip's time could not be resolved against the activity.
  */
 export function resolveVideoSync(video, activitySummary, sessionMode) {
   const mode = captureVideoSyncTimezoneMode(sessionMode)
@@ -115,6 +116,7 @@ export function resolveVideoSync(video, activitySummary, sessionMode) {
     const inferredLocalOnly = inferMode && matches.length === 1 && selected.timezoneMode === 'local'
     return {
       offsetSeconds: selected.automaticOffsetSeconds,
+      determined: true,
       syncWarning: selected.overlaps ? null : i18next.t('store.videoOutsideActivity', 'Video is outside the activity'),
       timezoneMode: ambiguous && !inferredLocalOnly ? selected.timezoneMode : null,
     }
@@ -122,6 +124,7 @@ export function resolveVideoSync(video, activitySummary, sessionMode) {
     if (!(error instanceof VideoSyncError)) throw error
     return {
       offsetSeconds: 0,
+      determined: false,
       syncWarning: i18next.t(error.translationKey, error.message),
       timezoneMode: null,
     }
@@ -136,7 +139,8 @@ export function resolveVideoSync(video, activitySummary, sessionMode) {
  * @param {Array<object>} videos Imported video entities.
  * @param {object} activitySummary External activity summary.
  * @param {'utc'|'local'|null} sessionMode Explicit Apply Timezone selection, or null to infer.
- * @returns {{placements: Array<{offsetSeconds: number, syncWarning: string|null}>, timezoneMode: 'utc'|'local'|null}} Placements in input order and the resulting session mode.
+ * @returns {{placements: Array<{offsetSeconds: number, determined: boolean, syncWarning: string|null}>, timezoneMode: 'utc'|'local'|null}}
+ *   Placements in input order and the resulting session mode.
  */
 export function resolveVideosSync(videos, activitySummary, sessionMode) {
   const results = videos.map((video) => resolveVideoSync(video, activitySummary, sessionMode))
@@ -145,7 +149,7 @@ export function resolveVideosSync(videos, activitySummary, sessionMode) {
   if (sessionMode !== null) timezoneMode = ambiguousModes.length > 0 ? sessionMode : null
   else if (ambiguousModes.length > 0 && ambiguousModes.every((mode) => mode !== null && mode === ambiguousModes[0])) timezoneMode = ambiguousModes[0]
   return {
-    placements: results.map(({ offsetSeconds, syncWarning }) => ({ offsetSeconds, syncWarning })),
+    placements: results.map(({ offsetSeconds, determined, syncWarning }) => ({ offsetSeconds, determined, syncWarning })),
     timezoneMode,
   }
 }
@@ -164,7 +168,7 @@ function parseCreationTimeMs(video) {
  * to the earliest clip, keeping the gaps between recordings. Ambiguous camera
  * clock text is compared as wall-clock time.
  * @param {Array<object>} videos Imported video entities.
- * @returns {Array<{offsetSeconds: number, syncWarning: string|null}>} Placements in input order.
+ * @returns {Array<{offsetSeconds: number, determined: boolean, syncWarning: string|null}>} Placements in input order.
  */
 export function placeVideosByCreationTime(videos) {
   const startsMs = videos.map(parseCreationTimeMs)
@@ -172,8 +176,12 @@ export function placeVideosByCreationTime(videos) {
   const originMs = knownStartsMs.length > 0 ? Math.min(...knownStartsMs) : null
   return startsMs.map((startMs) =>
     startMs === null
-      ? { offsetSeconds: 0, syncWarning: i18next.t('store.couldNotDetermineVideoCreationTime', 'Could not determine video creation time') }
-      : { offsetSeconds: (startMs - originMs) / 1000, syncWarning: null },
+      ? {
+          offsetSeconds: 0,
+          determined: false,
+          syncWarning: i18next.t('store.couldNotDetermineVideoCreationTime', 'Could not determine video creation time'),
+        }
+      : { offsetSeconds: (startMs - originMs) / 1000, determined: true, syncWarning: null },
   )
 }
 
