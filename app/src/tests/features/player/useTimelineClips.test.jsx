@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vite-plus/test'
 import useTimelineClips from '@/features/player/hooks/useTimelineClips'
 
 function renderClips(overrides = {}) {

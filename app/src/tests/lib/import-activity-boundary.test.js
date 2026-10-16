@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { describe, expect, test, vi, beforeEach } from 'vitest'
+import { describe, expect, test, vi, beforeEach } from 'vite-plus/test'
 
 const finalizeActivity = vi.hoisted(() => vi.fn())
 const parseCsvActivity = vi.hoisted(() => vi.fn())

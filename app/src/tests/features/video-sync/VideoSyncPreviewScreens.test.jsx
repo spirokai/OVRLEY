@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 
 const getMapStyleUrlTemplate = vi.hoisted(() => vi.fn())
 const attachSpeedCanvas = vi.hoisted(() => vi.fn())

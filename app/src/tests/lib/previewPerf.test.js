@@ -7,7 +7,7 @@
  * disabled unless explicitly enabled for the current session.
  */
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 
 /**
  * Loads a fresh copy of the preview perf module.

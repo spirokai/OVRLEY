@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import { expect, test, vi } from 'vitest'
+import { expect, test, vi } from 'vite-plus/test'
 import { useWasmWidgetInteractions } from '@/features/wasm-widgets/hooks/useWasmWidgetInteractions'
 import { registerWidgetInteraction, unregisterWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 import useWidgetDraftState, { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'

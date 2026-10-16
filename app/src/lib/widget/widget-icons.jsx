@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+/* oxlint-disable react/only-export-components */
 
 import { Image, Presentation, Timer, Type } from 'lucide-react'
 import { DISPLAY_TYPE_DEFINITIONS, WIDGET_CATEGORY_NAME_KEYS, WIDGET_TYPE_DEFINITIONS } from './widget-catalog'

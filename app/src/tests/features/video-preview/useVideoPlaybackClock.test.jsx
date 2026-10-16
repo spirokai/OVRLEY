@@ -8,7 +8,7 @@
  */
 
 import { renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 
 const { setPreviewPerfValueSpy } = vi.hoisted(() => ({
   setPreviewPerfValueSpy: vi.fn(),

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { parseSrtActivityFile } from '@/lib/activity/srt-parser'
 
 const FORMAT_A_SRT = [

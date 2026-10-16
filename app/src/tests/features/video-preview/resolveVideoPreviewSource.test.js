@@ -5,7 +5,7 @@
  * element and keep out-of-range detection independent from the DOM effect.
  */
 
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vite-plus/test'
 import { isVideoPreviewOutOfRange, resolveVideoPreviewSource } from '@/features/video-preview/utils/videoPreviewSource'
 
 describe('videoPreviewSource helpers', () => {

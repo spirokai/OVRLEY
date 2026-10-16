@@ -2,7 +2,7 @@
  * Tests for WidgetButtonGrid — verifies the widget button grid renders and handles clicks.
  */
 
-import { describe, test, expect, vi } from 'vitest'
+import { describe, test, expect, vi } from 'vite-plus/test'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { WidgetButtonGrid } from '@/features/widget-drawer/components/WidgetButtonGrid'

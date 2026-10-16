@@ -8,7 +8,7 @@
 
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { useState } from 'react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import useRenderVideoDialogState from '@/features/render-video/hooks/useRenderVideoDialogState'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
 import useStore from '@/store/useStore'

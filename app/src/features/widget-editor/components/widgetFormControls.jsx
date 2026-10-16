@@ -3,7 +3,7 @@
  * Each component is a thin wrapper around a shadcn/ui primitive with consistent widget-editor styling.
  */
 
-/* eslint-disable react-refresh/only-export-components */
+/* oxlint-disable react/only-export-components */
 
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'

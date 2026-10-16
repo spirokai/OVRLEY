@@ -7,7 +7,7 @@
  */
 
 import { act, renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import { METADATA_SOFT_WARNING_MS, SLOW_SEEK_WARNING_COUNT, SLOW_SEEK_WARNING_MS } from '@/features/video-preview/data/videoPreviewConstants'
 import { useVideoPreviewWarnings } from '@/features/video-preview/hooks/useVideoPreviewWarnings'
 

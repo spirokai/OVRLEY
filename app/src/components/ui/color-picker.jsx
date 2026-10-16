@@ -2,7 +2,7 @@
  * Provides reusable color picker UI primitives for the application.
  */
 
-/* eslint-disable react-hooks/preserve-manual-memoization */
+/* oxlint-disable react/preserve-manual-memoization */
 
 'use client'
 import { cva } from 'class-variance-authority'

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vite-plus/test'
 import { createWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 import { resizeAnchor } from '@/features/wasm-widgets/utils/widgetGestureGeometry'
 import { resolveActiveWidgetData, applyWidgetDrafts } from '@/lib/widget/widget-resolver'

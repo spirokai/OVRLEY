@@ -6,7 +6,7 @@
  */
 
 import { render, fireEvent } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vite-plus/test'
 import { UnitsControlRow } from '@/features/widget-editor/components/widgetEditorSections'
 
 vi.mock('@/features/widget-editor/components/widgetFormControls', () => ({

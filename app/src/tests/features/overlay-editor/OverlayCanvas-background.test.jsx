@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vite-plus/test'
 import OverlayCanvas from '@/features/overlay-editor/components/OverlayCanvas'
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 

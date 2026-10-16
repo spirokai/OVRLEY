@@ -8,7 +8,7 @@
  * the storage-hydration refactor.
  */
 
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vite-plus/test'
 
 describe('useStore without browser globals', () => {
   test('imports and creates state without window or localStorage', async () => {

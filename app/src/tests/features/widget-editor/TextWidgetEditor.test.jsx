@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeAll, describe, expect, test, vi } from 'vitest'
+import { beforeAll, describe, expect, test, vi } from 'vite-plus/test'
 import TextWidgetEditor from '@/features/widget-editor/components/TextWidgetEditor'
 
 const fonts = vi.hoisted(() => [

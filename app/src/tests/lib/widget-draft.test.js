@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { applyWidgetDrafts } from '@/lib/widget/widget-resolver'
 
 describe('widget draft projection', () => {

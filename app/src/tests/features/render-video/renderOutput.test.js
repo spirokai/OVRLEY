@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { normalizeRenderOutputPath } from '@/features/render-video/utils/renderPresentation'
 
 describe('render output path normalization', () => {

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { createBatchCalibration, resolveBatchVideoTiming, resolveVideoSyncState } from '@/lib/video-sync'
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 import { captureBatchSync, createBatchRenderRequest } from '@/features/render-video/utils/renderRequest'

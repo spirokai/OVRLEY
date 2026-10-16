@@ -1,5 +1,5 @@
 import { DISPLAY_TYPE_DEFINITIONS, WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { resolveActiveWidgetData, initDisplayVariant, buildFrameGeometryUpdate, mergeWidgetData } from '@/lib/widget/widget-resolver'
 import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
 

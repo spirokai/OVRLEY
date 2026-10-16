@@ -5,7 +5,7 @@ import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
  */
 
 import { act, render, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import useOverlayEditorStateView from '@/features/overlay-editor/hooks/useOverlayEditorState'
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { WasmWidgetCanvas } from '@/features/wasm-widgets/components/WasmWidgetCanvas'

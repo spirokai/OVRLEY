@@ -16,13 +16,7 @@
 /* #c65102; */
 :root,
 .radix-themes {
-  font-family:
-    'Figtree Variable',
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  font-family: 'Figtree Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   font-size: clamp(10px, 0.5vw + 7px, 13.5px);

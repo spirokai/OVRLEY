@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test, vi } from 'vitest'
+import { beforeAll, describe, expect, test, vi } from 'vite-plus/test'
 import { render, screen } from '@testing-library/react'
 import MetricWidgetEditor from '@/features/widget-editor/components/metricWidget/MetricWidgetEditor'
 import { createWidgetDefaults } from '@/lib/widget/widget-defaults'

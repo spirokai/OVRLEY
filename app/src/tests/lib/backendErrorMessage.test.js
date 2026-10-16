@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { translateBackendError } from '@/lib/utils'
 
 describe('backend error messages for display', () => {

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { formatClockDuration } from '@/lib/time-format'
 import {
   createPlaybackAnchor,

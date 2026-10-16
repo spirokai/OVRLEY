@@ -7,7 +7,7 @@
  */
 
 import { renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import useStore from '@/store/useStore'
 import { useVideoPreview } from '@/features/video-preview/hooks/useVideoPreview'
 

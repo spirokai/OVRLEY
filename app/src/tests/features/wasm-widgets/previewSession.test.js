@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vite-plus/test'
 import { createPreviewSession } from '@/features/wasm-widgets/utils/previewSession'
 import { previewActivity, previewFont, rasterPreviewPng } from '@/api/backend'
 

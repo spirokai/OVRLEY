@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import OverlayMoveable from '@/features/overlay-editor/components/OverlayMoveable'
 
 const moveable = vi.hoisted(() => vi.fn(() => null))

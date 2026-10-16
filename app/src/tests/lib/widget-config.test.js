@@ -6,7 +6,7 @@
  * config-to-widget mapping no longer depends on array position.
  */
 
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { buildConfigWidgets, groupWidgetsForSidebar } from '@/lib/widget/widget-presentation'
 import {
   deleteWidgetsInConfig,

@@ -3,7 +3,7 @@
  * Container hook — composes sub-hooks and exposes template actions.
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 import { hasTauriRuntime, useUnsavedChangesConfirm } from '@/features/app-shell'
 import { fileFromSelectedPath, openSinglePath } from '@/lib/file-dialog'
@@ -243,7 +243,9 @@ export default function useTemplateManagement({ onTemplateCreated }) {
   // Always point to the latest handleTemplateChange so restoreLastLoadedTemplate
   // can invoke the current handler without depending on it.
   const handleTemplateChangeRef = useRef(handleTemplateChange)
-  handleTemplateChangeRef.current = handleTemplateChange
+  useLayoutEffect(() => {
+    handleTemplateChangeRef.current = handleTemplateChange
+  }, [handleTemplateChange])
 
   const restoreLastLoadedTemplate = useCallback(async () => {
     try {

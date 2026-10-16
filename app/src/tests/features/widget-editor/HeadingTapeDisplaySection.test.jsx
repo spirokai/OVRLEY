@@ -1,5 +1,5 @@
 import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
-import { describe, test, expect, vi, beforeAll } from 'vitest'
+import { describe, test, expect, vi, beforeAll } from 'vite-plus/test'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import HeadingTapeDisplaySection from '@/features/widget-editor/components/metricWidget/HeadingTapeDisplaySection'

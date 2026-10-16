@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { DISPLAY_TYPE_DEFINITIONS, WIDGET_TYPE_DEFINITIONS, getWidgetDisplayTypeOptions, isFramedWidget } from '@/lib/widget/widget-catalog'
 import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
 import { GROUPED_QUICKMENU_ITEMS, WIDGET_ICONS } from '@/lib/widget/widget-icons'

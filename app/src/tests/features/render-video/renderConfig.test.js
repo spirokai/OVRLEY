@@ -5,7 +5,7 @@
  * state into the backend-ready render payload.
  */
 
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { DEFAULT_EXPORT_RANGE } from '@/lib/template/template-constants'
 import { createBatchRenderTemplate, createRenderEffectiveConfig } from '@/features/render-video/utils/renderConfig'
 

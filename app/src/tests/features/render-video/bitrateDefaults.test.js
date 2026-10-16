@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { getDefaultBitrate, BITRATE_BINS, BITRATE_FALLBACK } from '@/features/render-video/data/bitrateDefaults'
 
 describe('getDefaultBitrate', () => {

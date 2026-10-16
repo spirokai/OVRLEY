@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test, vi } from 'vitest'
+import { beforeAll, describe, expect, test, vi } from 'vite-plus/test'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import GForceWidgetEditor from '@/features/widget-editor/components/GForceWidgetEditor'

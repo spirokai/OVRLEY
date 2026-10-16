@@ -1,7 +1,7 @@
 import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 
 import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
 import { useRasterSelection } from '@/features/widget-editor/hooks/useRasterSelection'
 

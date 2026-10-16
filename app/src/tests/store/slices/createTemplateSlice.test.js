@@ -7,7 +7,7 @@
  * for the side-effect extraction refactoring.
  */
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 import { createDurableTemplateState, createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { DEFAULT_CONFIG } from '@/store/store-utils'

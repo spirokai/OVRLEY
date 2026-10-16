@@ -1,5 +1,5 @@
 import { act, render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import OverlayPlayer from '@/features/player/components/OverlayPlayer'
 import useStore from '@/store/useStore'
 

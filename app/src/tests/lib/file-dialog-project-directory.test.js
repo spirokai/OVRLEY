@@ -1,4 +1,4 @@
-import { beforeEach, expect, test, vi } from 'vitest'
+import { beforeEach, expect, test, vi } from 'vite-plus/test'
 
 const dialog = vi.hoisted(() => ({ open: vi.fn(), save: vi.fn() }))
 const preferences = vi.hoisted(() => ({ getOptionalPathPreference: vi.fn(), setPreference: vi.fn() }))

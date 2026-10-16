@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { VIDEO_SYNC_TOOL } from '@/store/slices/createLayoutSlice'

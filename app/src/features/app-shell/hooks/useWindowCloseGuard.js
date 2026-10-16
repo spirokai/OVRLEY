@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import * as backend from '@/api/backend'
 
 /**
@@ -9,7 +9,9 @@ import * as backend from '@/api/backend'
 export default function useWindowCloseGuard(onCloseRequest) {
   const closeRequestRef = useRef(onCloseRequest)
   const handlingClose = useRef(false)
-  closeRequestRef.current = onCloseRequest
+  useLayoutEffect(() => {
+    closeRequestRef.current = onCloseRequest
+  }, [onCloseRequest])
 
   useEffect(() => {
     if (!backend.hasTauriRuntime()) return undefined

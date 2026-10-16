@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { DEFAULT_LOCALE, locales, localeValues, requireLocale } from '@/i18n/locales'
 
 describe('locale registry', () => {

@@ -1,5 +1,5 @@
 import { DISPLAY_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
-import { beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vite-plus/test'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { WidgetDrawerContent as WidgetDrawerView } from '@/features/widget-drawer'

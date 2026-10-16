@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vite-plus/test'
 import ActivitySection from '@/features/app-shell/components/ActivitySection'
 import { MissingSourceDialog } from '@/features/projects'
 import { ProjectsDrawerContent } from '@/features/toolbar'

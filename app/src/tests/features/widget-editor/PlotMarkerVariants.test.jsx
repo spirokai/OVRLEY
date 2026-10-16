@@ -1,5 +1,5 @@
 import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
-import { beforeAll, describe, expect, test, vi } from 'vitest'
+import { beforeAll, describe, expect, test, vi } from 'vite-plus/test'
 import { render, screen } from '@testing-library/react'
 
 import ElevationWidgetEditor from '@/features/widget-editor/components/ElevationWidgetEditor'

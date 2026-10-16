@@ -5,7 +5,7 @@
  * and dirty-state tracking before refactoring away from JSON.stringify.
  */
 
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged } from '@/store/store-utils'
 
 describe('cloneSerializable', () => {

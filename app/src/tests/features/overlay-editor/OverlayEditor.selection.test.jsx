@@ -7,7 +7,7 @@ import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
  */
 
 import { act, fireEvent, render, within } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import OverlayEditorView from '@/features/overlay-editor/components/OverlayEditor'
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
@@ -530,7 +530,7 @@ describe('OverlayEditor selection flow', () => {
     expect(toolbar.className).toContain('-translate-x-1/2')
   })
 
-  test('refreshes moveable bounds when WASM publishes the selected widget geometry', () => {
+  test('refreshes moveable bounds when WASM publishes the selected widget geometry', async () => {
     const config = makeConfig([makeLabel('A', { id: 'widget-1', font_size: 30 })])
     const nextConfig = makeConfig([makeLabel('A', { id: 'widget-1', font_size: 60 })])
 
@@ -581,7 +581,9 @@ describe('OverlayEditor selection flow', () => {
       )
     })
 
-    act(() => widget.dispatchEvent(new Event('wasm-widget-render', { bubbles: true })))
+    await act(async () => {
+      widget.dispatchEvent(new Event('wasm-widget-render', { bubbles: true }))
+    })
     expect(moveableUpdateRectMock).toHaveBeenCalledTimes(1)
   })
 })

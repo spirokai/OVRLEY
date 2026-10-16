@@ -2,7 +2,7 @@
  * Provides shared compose refs utilities for the app.
  */
 
-/* eslint-disable react-hooks/exhaustive-deps */
+/* oxlint-disable react/exhaustive-deps */
 
 import * as React from 'react'
 

@@ -1,6 +1,6 @@
 vi.mock('@/lib/font-resources', () => ({ prepareDocumentFonts: vi.fn(async () => {}) }))
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import { createDurableTemplateState, createDurableEditorState } from '@/lib/template/template-state'
 import { loadProject } from '@/features/projects/projectOperations'
 import useProjectLifecycle from '@/features/projects/hooks/useProjectLifecycle'

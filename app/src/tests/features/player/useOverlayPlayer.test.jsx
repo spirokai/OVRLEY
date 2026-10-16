@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vite-plus/test'
 import useOverlayPlayer from '@/features/player/hooks/useOverlayPlayer'
 import useStore from '@/store/useStore'
 

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { createProjectDirtyState, createProjectSnapshot } from '@/features/projects/utils/projectSnapshot'
 import { createPathLocator } from '@/features/projects/utils/projectPaths'
 import { VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
