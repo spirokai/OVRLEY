@@ -181,15 +181,25 @@ const OverlayCanvasWidget = memo(
  * @param {object} props
  * @param {object} props.sceneProps - { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize }
  * @param {object} props.displayProps - { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible }
- * @param {object} props.dataProps - { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange, hasActivityCoverage }
+ * @param {object} props.dataProps - { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange, hasActivityCoverage, incomingOverlay }
+ *   `incomingOverlay` (inside a shown transition) holds the incoming piece's widget inputs and the blend progress.
  * @param {object} props.callbacks - { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks }
  * @returns {JSX.Element} Rendered component output.
  */
 export default function OverlayCanvas({ sceneProps, displayProps, dataProps, callbacks }) {
   const { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize } = sceneProps
   const { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible } = displayProps
-  const { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange, hasActivityCoverage } =
-    dataProps
+  const {
+    widgets,
+    activity,
+    previewSecond,
+    metricPreviewModels,
+    textPreviewModels,
+    renderGeometryModels,
+    exportRange,
+    hasActivityCoverage,
+    incomingOverlay,
+  } = dataProps
   const { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
   const hasTransparentBackground = backgroundMode === 'transparent'
@@ -221,32 +231,118 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
         <img src={backgroundImageSrc} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" draggable="false" />
       ) : null}
       {gridVisible ? <CanvasGrid displayScale={displayScale} sceneSize={sceneSize} /> : null}
-      <div data-testid="widget-layer" className="absolute inset-0 overflow-visible">
-        {widgets.map((widget) => {
-          return (
-            <OverlayCanvasWidget
-              key={widget.id}
+      {/* The outgoing and incoming layers of a transition add up like the exported xfade. */}
+      <div className="pointer-events-none absolute inset-0 isolate overflow-visible">
+        <div
+          data-testid="widget-layer"
+          className="pointer-events-auto absolute inset-0 overflow-visible"
+          style={incomingOverlay ? { opacity: 1 - incomingOverlay.progress } : undefined}
+        >
+          {widgets.map((widget) => {
+            return (
+              <OverlayCanvasWidget
+                key={widget.id}
+                widget={widget}
+                globalScale={globalScale}
+                globalOpacity={globalOpacity}
+                activity={activity}
+                previewSecond={previewSecond}
+                metricPreviewModel={metricPreviewModels[widget.id] ?? null}
+                textPreviewModel={textPreviewModels[widget.id] ?? null}
+                renderGeometryModel={renderGeometryModels[widget.id]}
+                sceneFont={sceneFont}
+                sceneFontSize={sceneFontSize}
+                sceneStyle={sceneStyle}
+                valueFont={valueFont}
+                exportRange={exportRange}
+                isHidden={!hasActivityCoverage && widget.category !== 'rasters'}
+                registerNode={widgetRefCallbacks[widget.id]}
+                handleWidgetMouseDown={handleWidgetMouseDown}
+                setHoveredWidgetId={setHoveredWidgetId}
+              />
+            )
+          })}
+        </div>
+        {incomingOverlay ? (
+          <IncomingWidgetLayer
+            widgets={widgets}
+            incomingOverlay={incomingOverlay}
+            renderGeometryModels={renderGeometryModels}
+            globalScale={globalScale}
+            globalOpacity={globalOpacity}
+            sceneFont={sceneFont}
+            sceneFontSize={sceneFontSize}
+            sceneStyle={sceneStyle}
+            valueFont={valueFont}
+          />
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The incoming piece's widgets during a transition, laid out like the editable
+ * layer and added onto it (`plus-lighter`) at the blend progress.
+ */
+function IncomingWidgetLayer({
+  widgets,
+  incomingOverlay,
+  renderGeometryModels,
+  globalScale,
+  globalOpacity,
+  sceneFont,
+  sceneFontSize,
+  sceneStyle,
+  valueFont,
+}) {
+  return (
+    <div
+      data-testid="incoming-widget-layer"
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 overflow-visible"
+      style={{ opacity: incomingOverlay.progress, mixBlendMode: 'plus-lighter' }}
+    >
+      {widgets.map((widget) => {
+        const renderGeometry = renderGeometryModels[widget.id].renderGeometry
+        return (
+          <div
+            key={widget.id}
+            className={cn(
+              'absolute',
+              widget.category === 'backdrops' && 'z-1',
+              widget.category === 'rasters' && 'z-2',
+              widget.category === 'labels' && 'z-20',
+              widget.category === 'plots' && 'z-3',
+              widget.category === 'values' && 'z-10',
+              !incomingOverlay.hasActivityCoverage && widget.category !== 'rasters' && 'invisible',
+            )}
+            style={{
+              left: renderGeometry.left,
+              top: renderGeometry.top,
+              width: renderGeometry.width,
+              height: renderGeometry.height,
+              transform: renderGeometry.transform,
+              transformOrigin: renderGeometry.transformOrigin,
+            }}
+          >
+            <WidgetPreview
               widget={widget}
-              globalScale={globalScale}
+              activity={incomingOverlay.activity}
+              previewSecond={incomingOverlay.previewSecond}
               globalOpacity={globalOpacity}
-              activity={activity}
-              previewSecond={previewSecond}
-              metricPreviewModel={metricPreviewModels[widget.id] ?? null}
-              textPreviewModel={textPreviewModels[widget.id] ?? null}
-              renderGeometryModel={renderGeometryModels[widget.id]}
+              globalScale={globalScale}
+              metricPreviewModel={incomingOverlay.metricPreviewModels[widget.id] ?? null}
+              textPreviewModel={incomingOverlay.textPreviewModels[widget.id] ?? null}
               sceneFont={sceneFont}
               sceneFontSize={sceneFontSize}
               sceneStyle={sceneStyle}
               valueFont={valueFont}
-              exportRange={exportRange}
-              isHidden={!hasActivityCoverage && widget.category !== 'rasters'}
-              registerNode={widgetRefCallbacks[widget.id]}
-              handleWidgetMouseDown={handleWidgetMouseDown}
-              setHoveredWidgetId={setHoveredWidgetId}
+              exportRange={incomingOverlay.exportRange}
             />
-          )
-        })}
-      </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

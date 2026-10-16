@@ -93,6 +93,8 @@ pub fn run() {
             tauri_commands::backend_list_templates,
             tauri_commands::backend_get_template,
             tauri_commands::backend_open_output_directory,
+            tauri_commands::backend_render_transition_proxy,
+            tauri_commands::backend_release_transition_proxy,
             tauri_commands::backend_open_templates,
             tauri_commands::backend_open_video,
             tauri_commands::backend_probe_video,
@@ -127,6 +129,10 @@ pub fn run() {
         .setup(|app| {
             app.manage(distribution::detect()?);
             app.manage(raster_resources::RasterResources::default());
+            // Transition proxies of earlier sessions are no longer registered anywhere.
+            ovrley_core::encode::ffmpeg::transition_proxy::clear_transition_proxies(
+                &runtime_paths::app_paths(app.handle())?,
+            )?;
 
             #[cfg(debug_assertions)]
             {

@@ -260,6 +260,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
     try {
       if (hasVideos) {
         await clearPreviewVideos()
+        useStore.getState().clearTransitionProxies()
       }
       changeVideoCollection(useStore, () => setImportedBackgroundImage(path))
       onSetBackgroundMode?.('image')
@@ -371,6 +372,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
     try {
       if (hasVideos) {
         await clearPreviewVideos()
+        useStore.getState().clearTransitionProxies()
       }
     } catch (err) {
       console.error('Failed to clear preview videos:', err)

@@ -22,6 +22,7 @@ import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget
 import { getEffectiveWidgetData } from '@/lib/template/template-state'
 import { applyWidgetDrafts, applyWidgetDraftsForCanvas } from '@/lib/widget/widget-draft'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
+import { resolvePreviewExportRange } from '../utils/exportRange'
 import { getSceneSize } from '../utils/overlayEditorUtils'
 import useWidgetDraftState, { useWidgetDraftView } from './useWidgetDraftState'
 
@@ -94,14 +95,10 @@ export function useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onC
   )
   // Widgets read activity time: timeline seconds shifted by the activity origin. Without an
   // external activity the clip at the playhead supplies its own telemetry from its start.
-  const previewExportRange = useMemo(() => {
-    if (exportRange.type === 'custom') {
-      return { ...exportRange, from: exportRange.from - activityOriginSecond, to: exportRange.to - activityOriginSecond }
-    }
-    if (activityClipDurationSeconds !== null) return { type: 'custom', from: 0, to: activityClipDurationSeconds }
-    if (videoBounds === null) return exportRange
-    return { type: 'custom', from: videoBounds.startSecond, to: videoBounds.endSecond }
-  }, [activityClipDurationSeconds, activityOriginSecond, exportRange, videoBounds])
+  const previewExportRange = useMemo(
+    () => resolvePreviewExportRange({ exportRange, activityOriginSecond, activityClipDurationSeconds, videoBounds }),
+    [activityClipDurationSeconds, activityOriginSecond, exportRange, videoBounds],
+  )
   const previewExportStartSecond = previewExportRange.from
 
   useEffect(() => {

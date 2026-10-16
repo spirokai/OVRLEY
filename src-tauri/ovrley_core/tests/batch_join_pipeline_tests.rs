@@ -440,3 +440,129 @@ fn hevc_transitions_at_deleted_parts_encode_with_the_output_encoder() {
     let video_seconds = 46.0 * 1001.0 / 30000.0;
     assert!((seconds(&stream(&streams, "audio")[0]["duration"]) - video_seconds).abs() < 0.03);
 }
+
+#[test]
+fn transition_proxies_blend_the_join_at_preview_size() {
+    use ovrley_core::encode::ffmpeg::transition_proxy::{
+        clear_transition_proxies, remove_transition_proxy, render_transition_proxy,
+        TransitionProxyRequest, TransitionProxySource,
+    };
+    let workspace = Workspace::new("transition-proxy");
+    let first = workspace.source("first.mp4", 3.0, true);
+    let silent = workspace.source("silent.mp4", 2.0, false);
+    let request = TransitionProxyRequest {
+        outgoing: TransitionProxySource {
+            path: first.metadata.path.clone(),
+            start_second: 2.0,
+            has_audio: true,
+        },
+        incoming: TransitionProxySource {
+            path: silent.metadata.path.clone(),
+            start_second: 0.0,
+            has_audio: false,
+        },
+        transition: "circleopen".into(),
+        duration_seconds: 1.0,
+        width: 32,
+        height: 16,
+        fps_num: 30,
+        fps_den: 1,
+    };
+    let proxy = render_transition_proxy(&workspace.paths, &request).unwrap();
+    let streams = workspace.probe_streams(&proxy);
+    assert_eq!(stream(&streams, "video")[0]["nb_read_packets"], "30");
+    assert!((seconds(&stream(&streams, "audio")[0]["duration"]) - 1.0).abs() < 0.03);
+    remove_transition_proxy(&proxy).unwrap();
+    assert!(!proxy.exists());
+    let stale = render_transition_proxy(&workspace.paths, &request).unwrap();
+    clear_transition_proxies(&workspace.paths).unwrap();
+    assert!(!stale.exists());
+}
+
+#[test]
+fn frames_without_activity_coverage_keep_only_raster_widgets() {
+    let workspace = Workspace::new("raster-only-outside-coverage");
+    let source = workspace.source("ride.mp4", 3.0, false);
+    let logo = workspace.paths.temp_dir.join("logo.png");
+    let generated = Command::new(&workspace.ffmpeg)
+        .args([
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=red:s=8x8",
+            "-frames:v",
+            "1",
+        ])
+        .arg(&logo)
+        .output()
+        .unwrap();
+    assert!(generated.status.success());
+    let mut request = workspace.request(
+        BatchExportMode::Transparent,
+        BatchDestination::SourceNamed {
+            directory: workspace.paths.downloads_dir.to_str().unwrap().into(),
+        },
+        vec![BatchRenderOutput {
+            id: "ride".into(),
+            pieces: vec![common::builders::whole_source_piece(&source, false)],
+            transitions: Vec::new(),
+        }],
+    );
+    // The 120 s activity ends 1.5 s into the video.
+    let BatchActivity::ExternalActivity { offsets, .. } = &mut request.activity else {
+        unreachable!()
+    };
+    *offsets.values_mut().next().unwrap() = 118.5;
+    request.template.rasters.push(
+        serde_json::from_value(json!({
+            "id": "logo", "x": 56, "y": 24, "width": 8, "height": 8,
+            "rotation": 0, "opacity": 1, "path": logo
+        }))
+        .unwrap(),
+    );
+    let snapshot = workspace.render(request);
+    assert_eq!(
+        snapshot.phase,
+        BatchPhase::Completed,
+        "{:?}",
+        snapshot.items[0].outcome
+    );
+    let output = workspace.paths.downloads_dir.join("ride_overlay.mov");
+    let frame_at = |second: &str| {
+        let decoded = Command::new(&workspace.ffmpeg)
+            .args(["-v", "error", "-ss", second, "-i"])
+            .arg(&output)
+            .args([
+                "-frames:v",
+                "1",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "rgba",
+                "pipe:1",
+            ])
+            .output()
+            .unwrap();
+        assert!(decoded.status.success());
+        assert_eq!(decoded.stdout.len(), 64 * 32 * 4);
+        decoded.stdout
+    };
+    let in_logo = |index: usize| (index % 64) >= 56 && (index / 64) >= 24;
+    let covered = frame_at("0.5");
+    let uncovered = frame_at("2.5");
+    for frame in [&covered, &uncovered] {
+        // The raster shows in every frame.
+        let pixel = &frame[(28 * 64 + 60) * 4..(28 * 64 + 60) * 4 + 4];
+        assert!(pixel[0] > 200 && pixel[3] > 200, "{pixel:?}");
+    }
+    let opaque_outside_logo = |frame: &[u8]| {
+        (0..64 * 32)
+            .filter(|index| !in_logo(*index) && frame[index * 4 + 3] > 0)
+            .count()
+    };
+    assert!(opaque_outside_logo(&covered) > 0);
+    assert_eq!(opaque_outside_logo(&uncovered), 0);
+}

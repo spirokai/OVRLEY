@@ -560,6 +560,7 @@
     "ok": "OK",
     "overlapDescription": "These videos cover the same time. One combined export is not possible until you move a video or remove the overlapping part.",
     "overlapPair": "{{earlier}} and {{later}}",
+    "renderingTransition": "Rendering transition preview…",
     "overlapPlaybackWarning": "Videos overlap here. The preview plays the earlier video first; one combined export is not possible.",
     "overlapSeconds": "Overlap: {{seconds}} s",
     "overlapTitle": "Videos overlap",

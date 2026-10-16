@@ -15,6 +15,7 @@ import OverlayMoveable from './OverlayMoveable'
 import { WIDGET_ICONS } from '../data/overlayEditorConfig'
 import { useOverlayEditorStateWithLiveEdits } from '../hooks/useOverlayEditorState'
 import useOverlayPreviewModels from '../hooks/useOverlayPreviewModels'
+import { useTransitionOverlay } from '../hooks/useTransitionOverlay'
 import useWidgetSelection from '../hooks/useWidgetSelection'
 import { useEditorViewport } from '../hooks/useEditorViewport'
 import { useEditorKeyboard } from '../hooks/useEditorKeyboard'
@@ -35,6 +36,9 @@ const PROJECT_STATUS_TRANSLATIONS = {
   Saved: { key: 'overlay-editor.statusSaved', defaultLabel: 'Saved' },
   Modified: { key: 'overlay-editor.statusModified', defaultLabel: 'Modified' },
 }
+
+// Without a transition no incoming widget models are built.
+const NO_WIDGETS = []
 
 function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels, selectedWidgetIds, widgets }) {
   const { t } = useTranslation()
@@ -170,6 +174,26 @@ function OverlayEditorContent({
     exportStartSecond: overlayState.previewExportStartSecond,
     renderedWidgets: overlayState.canvasWidgets,
   })
+  // Inside a shown transition the overlay blends into the incoming piece's widgets.
+  const transitionOverlay = useTransitionOverlay()
+  const incomingPreviewModels = useOverlayPreviewModels({
+    activity: transitionOverlay?.activity ?? null,
+    globalScale: overlayState.globalScale,
+    previewSecond: transitionOverlay?.previewSecond ?? 0,
+    exportStartSecond: transitionOverlay?.exportRange.from ?? 0,
+    renderedWidgets: transitionOverlay === null ? NO_WIDGETS : overlayState.canvasWidgets,
+  })
+  const incomingOverlay = useMemo(
+    () =>
+      transitionOverlay === null || videoSyncMode
+        ? null
+        : {
+            ...transitionOverlay,
+            metricPreviewModels: incomingPreviewModels.metricPreviewModels,
+            textPreviewModels: incomingPreviewModels.textPreviewModels,
+          },
+    [incomingPreviewModels, transitionOverlay, videoSyncMode],
+  )
 
   const renderGeometryModels = useMemo(
     () =>
@@ -385,9 +409,11 @@ function OverlayEditorContent({
       renderGeometryModels,
       exportRange: overlayState.previewExportRange,
       hasActivityCoverage: overlayState.hasActivityCoverage,
+      incomingOverlay,
     }),
     [
       activity,
+      incomingOverlay,
       metricPreviewModels,
       overlayState.hasActivityCoverage,
       overlayState.previewExportRange,

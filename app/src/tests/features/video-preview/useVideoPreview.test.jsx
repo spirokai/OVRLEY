@@ -11,6 +11,9 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useStore from '@/store/useStore'
 import { useVideoPreview } from '@/features/video-preview/hooks/useVideoPreview'
 import { useVideoPlaybackClock } from '@/features/video-preview/hooks/useVideoPlaybackClock'
+import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
+import { listTransitionProxyJobs } from '@/lib/video-program/transition-proxies'
+import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 vi.mock('@/features/video-preview/hooks/useVideoPlaybackClock', () => ({
@@ -46,6 +49,8 @@ describe('useVideoPreview', () => {
       previewPlaybackSource: 'timeline',
       previewPlaybackState: 'paused',
       selectedSecond: 8,
+      // Hard cuts unless a test adds transitions.
+      transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS, type: 'none' },
     })
   })
 
@@ -210,6 +215,37 @@ describe('useVideoPreview', () => {
     expect(lastClock()).toMatchObject({ pieceEndSourceSecond: 30, videoRef: slotRefs[1] })
     expect(twin.play).toHaveBeenCalled()
     expect(element.pause).toHaveBeenCalled()
+  })
+
+  test('shows the proxy over a transition window and continues after the start it showed', () => {
+    useStore.setState({
+      ...videoStoreState(
+        [
+          createTestVideo({ id: 'video-1', path: 'C:\\clips\\first.mp4', durationSeconds: 10 }),
+          createTestVideo({ id: 'video-2', path: 'C:\\clips\\second.mp4', durationSeconds: 10, importOrder: 1 }),
+        ],
+        { 'video-1': 0, 'video-2': 20 },
+      ),
+      transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS, type: 'fade', durationSeconds: 2 },
+    })
+    playingAt(8.5)
+    const playing = createVideoStub({ duration: 10, paused: false, currentTime: 8.5 })
+    const parked = createVideoStub({ duration: 10 })
+    const slotRefs = [{ current: playing }, { current: parked }]
+    const { result } = renderHook(() => useVideoPreview(slotRefs, true))
+    // The second video waits where playback continues: after the two seconds the fade showed.
+    expect(parked.currentTime).toBe(2)
+    expect(result.current.transition).toEqual({ proxyStatus: 'queued', proxyUrl: null, elapsedSeconds: 0.5, isPlaying: true })
+
+    const { importedVideos, videoEdits, transitionDefaults } = useStore.getState()
+    const { clips, program } = buildTimelineProgram({ videos: importedVideos, videoEdits, dragPreview: null, transitionDefaults })
+    const [job] = listTransitionProxyJobs(program, clips)
+    act(() => useStore.getState().setTransitionProxy(job.key, { status: 'ready', importId: 'proxy', url: 'http://127.0.0.1:4321/video/proxy' }))
+    expect(result.current.transition).toMatchObject({ proxyStatus: 'ready', proxyUrl: 'http://127.0.0.1:4321/video/proxy' })
+
+    act(() => lastClock().onPlaybackEnded())
+    expect(useStore.getState().selectedSecond).toBe(22)
+    expect(result.current.transition).toBeNull()
   })
 
   test('after the last piece hands the activity to the timeline clock and holds the last frame', () => {

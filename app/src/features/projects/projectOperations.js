@@ -75,7 +75,10 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
   const preparedVideos = sourceLoadResults.slice(2).map((result) => result.value)
   const previousImportIds = useStore.getState().importedVideos.map((importedVideo) => importedVideo.preview.importId)
   const videos = await registerProjectVideos(project.sources.videos, preparedVideos)
-  if (videos.length === 0) await backend.clearPreviewVideos()
+  if (videos.length === 0) {
+    await backend.clearPreviewVideos()
+    useStore.getState().clearTransitionProxies()
+  }
 
   try {
     replaceEditorDocument(useStore, () => applyPreparedProjectState(useStore, hydratedProject, { activity, videos }))

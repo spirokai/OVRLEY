@@ -7,6 +7,7 @@ import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { hasActivityCoverage, resolveActivityClipId, resolveActivityContext, resolveAvailableMetrics } from '@/lib/activity/activity-context'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
+import { listTransitionProxyJobs } from '@/lib/video-program/transition-proxies'
 import { deriveVideoWarnings } from '@/lib/video-program/video-warnings'
 
 /**
@@ -95,4 +96,13 @@ export function useAvailableMetrics() {
     useShallow((state) => ({ activitySummary: state.activitySummary, importedVideos: state.importedVideos })),
   )
   return useMemo(() => resolveAvailableMetrics(activitySummary, importedVideos), [activitySummary, importedVideos])
+}
+
+/**
+ * Returns the transition proxy jobs of the committed program.
+ * @returns {Array<object>} Jobs (see `listTransitionProxyJobs`).
+ */
+export function useTransitionProxyJobs() {
+  const { clips, program } = useVideoTimeline()
+  return useMemo(() => listTransitionProxyJobs(program, clips), [clips, program])
 }

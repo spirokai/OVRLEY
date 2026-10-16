@@ -238,17 +238,17 @@ impl VideoServerHandle {
         })
     }
 
-    /// Removes one video registration.
+    /// Removes one video registration and returns the path it served.
     ///
     /// Afterwards `/video/<import_id>` returns `404`; other registrations are
     /// unaffected. Unknown IDs are an error so callers cannot silently lose track
     /// of registrations they own.
-    pub fn remove_video(&self, import_id: &str) -> Result<(), String> {
+    pub fn remove_video(&self, import_id: &str) -> Result<PathBuf, String> {
         let mut guard = self.inner.lock().map_err(|error| error.to_string())?;
         guard
             .videos
             .remove(import_id)
-            .map(|_| ())
+            .map(|video| video.path)
             .ok_or_else(|| format!("Unknown preview video import ID: {import_id}"))
     }
 

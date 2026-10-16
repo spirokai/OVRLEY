@@ -141,7 +141,7 @@ M5 status: committed (`a8c3833a`). Decisions made during implementation:
 - Frontend: single-file composite export no longer rejects a clip outside the activity, and batch rows outside the activity are no longer blocked. The clip keeps its "outside the activity" warning in the panel.
 - Preview: `hasActivityCoverage` (external activity: inside it; otherwise inside the telemetry of the clip playing at the playhead; with no activity and no clip everything counts as covered) makes non-raster widgets invisible (`invisible`, so they cannot be clicked) in the editor canvas.
 - ~~Deferred to M6~~ (done in M6a): a clip without any embedded telemetry in embedded mode renders rasters only. Frames past the end of a clip's own telemetry are rasters-only already.
-- No FFmpeg end-to-end test of raster pixels outside coverage yet; covered by the frame-mapping unit test and planning tests. Add with M6's FFmpeg integration tests.
+- ~~No FFmpeg end-to-end test of raster pixels outside coverage yet~~ (done in M9: `frames_without_activity_coverage_keep_only_raster_widgets` decodes a covered and an uncovered frame of a real transparent export).
 
 1. Native: frames without activity coverage render rasters only instead of `pixels.fill(0)` (`ovrley_core/src/render/mod.rs` `prepare_output_frame`, `encode/video_timing.rs` coverage incl. trailing frames). Reuse the raster-only widget filtering that `skip_overlay` already does (`render_jobs/planning.rs`).
 2. Composite planning: allow clips/pieces with no activity overlap (remove the "does not overlap activity" error path in `derive_composite_render_plan` and the batch equivalent) — coverage becomes empty, overlay is rasters only.
@@ -170,7 +170,7 @@ M6b status: implemented (committed). Decisions made during implementation:
 - Progress: an item's planned frames are the sum of its pieces; each piece pipeline reports item progress offset by the frames before it (ETA adds the later pieces at the observed rate), then "Joining output pieces...". Every FFmpeg join step polls cancellation and kills/reaps the process.
 - Frontend changed only the wire shape (`createSeparateDestination`); separate-file export with deleted parts now renders through native joining. Output mode and combined export UI remain M6c.
 
-M6c status: implemented (awaiting owner commit). Decisions made during implementation:
+M6c status: implemented (committed). Decisions made during implementation:
 - Project v4 `render.outputMode: 'combined' | 'separate'` replaces `renderTarget` (v3 `current` → `combined`, `batch` → `separate`); `batchOutputFolder` stays the folder of separate files. The store, settings and dialog use the same name.
 - With videos every export goes through the batch service: combined = one output at the chosen path holding the program's pieces (export range applied, overlaps resolved) joined by the program's transitions; separate = one output per video holding its pieces (no overlap trimming) joined by the transitions at its deleted parts (`buildVideoPieceTransitions`, same default rule as the program). Transparent outputs join with hard cuts. Without videos the single render still produces the activity overlay; the PNG preview frame renders the clip the preview shows at the playhead.
 - The review (`reviewExport`) lists every video (outside the export range, unreadable, checking, or ready, each with its overlay switch) and, for a combined file, the reasons it cannot be rendered: nothing in the export range, overlaps, a different resolution or frame rate, transitions too long for their pieces, unreadable videos. A separate file whose own transitions do not fit is blocked on its row. Pending embedded telemetry is not a reason: the native batch reads each source's telemetry itself.
@@ -219,6 +219,12 @@ M8b status: implemented (committed). Decisions made during implementation:
 - Audio: per piece as before, joined pairwise with `acrossfade=d=…:c1=tri:c2=tri` at transitions and `concat` at hard cuts, so audio and video both last Σ pieces − Σ transitions.
 - The frontend sends hard cuts between the pieces of a separate-file output for now; M6c builds outputs (separate and combined) from the program, including its join transitions.
 
+M8c status: implemented (awaiting owner commit). Decisions made during implementation:
+- Native: `ovrley_core::encode::ffmpeg::transition_proxy` renders `xfade(tail(A), head(B))` with `acrossfade` audio (silence for sources without audio) from the sources with frame-accurate input seeks, fitted into an even preview size (at most 360 px tall, the outgoing video's aspect) at the outgoing video's FPS: H.264 ultrafast, a keyframe every 10 frames, AAC. Tauri `backend_render_transition_proxy` renders on a blocking task and registers the file with the preview server; `backend_release_transition_proxy` removes the registration and deletes the file. Proxies live in `<runtime>/tmp/transition-proxies`, cleared at startup.
+- Frontend: `listTransitionProxyJobs` describes one proxy per `xfade` join; its content key is the whole request (sources, windows, type, duration, size, FPS), so any change makes a new proxy. `useTransitionProxyQueue` (mounted with the video preview) renders one proxy at a time, the missing one nearest the playhead first, releases proxies no join needs, and does not retry failed ones (hard cut). Clearing every preview registration forgets the proxies too.
+- Player: inside a transition window (the last `d` seconds of the outgoing piece) a ready proxy plays over the outgoing video, synced to the elapsed time (drift ≤ 0.15 s), with its crossfaded audio; the outgoing video keeps the clock and is muted. Without a ready proxy the preview cuts and shows "Rendering transition preview…". At the piece end playback continues at `incoming.timelineStart + d` (`resolveContinuationSecond`), and the parked element waits there.
+- Overlay: during a shown transition the editable widget layer fades out (1 − progress) while a non-interactive layer of the incoming clip's widgets, at `incoming.timelineStart + elapsed` with the incoming activity/coverage, fades in; the layers add up (`mix-blend-mode: plus-lighter` in an isolated group), so widgets that are the same on both sides stay unchanged, as in the exported `xfade`.
+
 1. Transition catalogue (58 `xfade` names) already exists as data from M3. Project transition defaults (type, duration, split gap threshold) are editable in the project settings; changes re-derive only joins still on their default. Every join can override type and duration.
 2. Picker popup with an animated preview per transition (like https://trac.ffmpeg.org/wiki/Xfade). Previews generated by a script using the bundled FFmpeg from neutral sample frames (do not copy the wiki GIFs — licensing), committed as small animated WebP assets.
 3. Per-join selection in the videos panel and on the timeline join marker; immediate validation of durations.
@@ -229,6 +235,12 @@ M8b status: implemented (committed). Decisions made during implementation:
 Tests: catalogue/validation tests; proxy key/invalidation tests; transition-window timing tests (overlay times, jump target); command builder tests; FFmpeg integration asserting `Σ − Σd` duration for video and audio.
 
 ## M9 — Audit, docs, manual pass
+
+M9 status: implemented up to the manual pass (awaiting owner commit together with M8c or separately; the manual verification matrix is the owner's). Done:
+- Audit: no single-video assumptions remain. Remaining `importedVideo*` names describe the collection's shared format or one clip; `batchVideoFolder` / `list_directory_video_files` exist only for the v3 batch-folder migration on project open.
+- `docs/ARCHITECTURE.md`: overview, store slices, feature modules, the video model and preview (program, preview registry, two elements, transition proxies), batch IPC commands, the render export and the video import workflows. `README.md`: multiple videos, deleted parts and transitions, combined or separate export.
+- FFmpeg end-to-end test of raster-only frames outside activity coverage (open since M5).
+- Lint (ESLint, Prettier), frontend suite, `ovrley_core` and Tauri crate suites green.
 
 1. Search for leftover singleton assumptions (`importedVideo*`, `videoSyncOffset*`, `composite_video_path` single-source assumptions, `batchVideoFolder`).
 2. Update `docs/ARCHITECTURE.md` (preview registry, video model, render lifecycle) and README features.

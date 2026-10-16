@@ -1,9 +1,11 @@
 import { useRef } from 'react'
-import { AlertTriangle, ExternalLink, Scissors } from 'lucide-react'
+import { AlertTriangle, ExternalLink, Loader2, Scissors } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import useStore from '@/store/useStore'
 import { useVideoPreview } from '../hooks/useVideoPreview'
+import { useTransitionProxyQueue } from '../hooks/useTransitionProxies'
+import { useTransitionProxyPlayback } from '../hooks/useTransitionProxyPlayback'
 
 function HevcPlaybackPlaceholder({ displayScale, importId, openVideoPreviewHelp, platformOs, videoPreviewHelpAvailable }) {
   const { t } = useTranslation()
@@ -68,13 +70,28 @@ function HevcPlaybackPlaceholder({ displayScale, importId, openVideoPreviewHelp,
 export default function VideoPreviewSurface({ children, displayScale, isActive }) {
   const firstVideoRef = useRef(null)
   const secondVideoRef = useRef(null)
+  const proxyVideoRef = useRef(null)
   const isVideoMuted = useStore((state) => state.isVideoMuted)
   const platformOs = useStore((state) => state.platformOs)
   const { t } = useTranslation()
   const slotRefs = [firstVideoRef, secondVideoRef]
-  const { slots, videoSrc, importId, isOutOfRange, isDeleted, isInOverlap, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } =
-    useVideoPreview(slotRefs, isActive)
+  const {
+    slots,
+    videoSrc,
+    importId,
+    isOutOfRange,
+    isDeleted,
+    isInOverlap,
+    transition,
+    hevcPlaybackWarning,
+    openVideoPreviewHelp,
+    videoPreviewHelpAvailable,
+  } = useVideoPreview(slotRefs, isActive)
+  useTransitionProxyQueue()
+  useTransitionProxyPlayback(proxyVideoRef, transition)
   const hasHevcPlaybackError = Boolean(hevcPlaybackWarning)
+  // Inside a transition window the proxy shows the blend and plays its crossfaded audio.
+  const showsProxy = transition?.proxyUrl != null
 
   return (
     <>
@@ -92,12 +109,31 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
             )}
             preload={slot.isActive ? 'metadata' : 'auto'}
             playsInline
-            muted={!slot.isActive || isVideoMuted}
+            muted={!slot.isActive || isVideoMuted || showsProxy}
             onError={(event) => console.error('[VideoPreviewSurface] Video Error:', event)}
           />
         ) : null,
       )}
+      {showsProxy ? (
+        <video
+          ref={proxyVideoRef}
+          src={transition.proxyUrl}
+          data-slot="transition"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+          preload="auto"
+          playsInline
+          muted={isVideoMuted}
+        />
+      ) : null}
       {children}
+      {transition !== null && !showsProxy && transition.proxyStatus !== 'failed' ? (
+        <div className="pointer-events-none absolute right-0 top-0 z-30 p-4">
+          <div role="status" className="flex items-center gap-2 rounded-sm bg-black/70 px-3 py-1.5 text-xs font-semibold text-white">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            {t('video-preview.renderingTransition', 'Rendering transition preview…')}
+          </div>
+        </div>
+      ) : null}
       {videoSrc && isDeleted ? (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center p-4">
           <div role="status" className="flex items-center gap-2 rounded-sm bg-black/80 px-4 py-2 text-sm font-semibold text-white shadow-lg">

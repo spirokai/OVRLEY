@@ -625,11 +625,31 @@ export async function removePreviewVideo(importId) {
 }
 
 /**
- * Removes every local HTTP preview registration.
+ * Removes every local HTTP preview registration, transition proxies included.
  * @returns {Promise<null>} Resolves when all registrations have been removed.
  */
 export async function clearPreviewVideos() {
   return apiCall('backend_clear_preview_videos', {})
+}
+
+/**
+ * Renders the preview proxy of one transition (`xfade` of the outgoing tail into
+ * the incoming head, crossfaded audio) and serves it like an imported video.
+ * @param {{outgoing: {path: string, startSecond: number, hasAudio: boolean}, incoming: {path: string, startSecond: number, hasAudio: boolean}, transition: string, durationSeconds: number, width: number, height: number, fpsNum: number, fpsDen: number}} request
+ *   Proxy request (see `listTransitionProxyJobs`).
+ * @returns {Promise<{importId: string, previewUrl: string}>} Runtime preview identity of the proxy.
+ */
+export async function renderTransitionProxy(request) {
+  return apiCall('backend_render_transition_proxy', { request })
+}
+
+/**
+ * Stops serving a transition proxy and deletes its file.
+ * @param {string} importId Proxy preview import ID.
+ * @returns {Promise<null>} Resolves when the proxy is gone.
+ */
+export async function releaseTransitionProxy(importId) {
+  return apiCall('backend_release_transition_proxy', { importId })
 }
 
 /**

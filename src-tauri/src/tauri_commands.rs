@@ -19,6 +19,9 @@ use crate::video_server::{PreviewVideoRegistration, VideoServerHandle};
 use crate::BackendState;
 use ovrley_core::activity::finalize::FinalizeActivityResponse;
 use ovrley_core::commands;
+use ovrley_core::encode::ffmpeg::transition_proxy::{
+    remove_transition_proxy, render_transition_proxy, TransitionProxyRequest,
+};
 use ovrley_core::error::{CoreError, RenderPathError};
 use ovrley_core::output::RenderOutputKind;
 use ovrley_core::render_jobs::{
@@ -534,6 +537,34 @@ pub(crate) async fn backend_remove_preview_video(
     import_id: String,
 ) -> Result<String, String> {
     state.remove_video(&import_id)?;
+    Ok("null".to_string())
+}
+
+/// Renders the preview proxy of one transition and serves it like an imported
+/// video. The proxy file lives until it is released (or the app restarts).
+#[tauri::command]
+pub(crate) async fn backend_render_transition_proxy(
+    app: AppHandle,
+    state: tauri::State<'_, VideoServerHandle>,
+    request: TransitionProxyRequest,
+) -> Result<String, String> {
+    let paths = runtime_paths::app_paths(&app)?;
+    let path = tauri::async_runtime::spawn_blocking(move || {
+        render_transition_proxy(&paths, &request).map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    serialize_command_result(&state.register_video(path, "video/mp4".into())?)
+}
+
+/// Stops serving a transition proxy and deletes its file.
+#[tauri::command]
+pub(crate) async fn backend_release_transition_proxy(
+    state: tauri::State<'_, VideoServerHandle>,
+    import_id: String,
+) -> Result<String, String> {
+    let path = state.remove_video(&import_id)?;
+    remove_transition_proxy(&path).map_err(|error| error.to_string())?;
     Ok("null".to_string())
 }
 
