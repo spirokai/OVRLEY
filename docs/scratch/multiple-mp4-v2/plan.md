@@ -92,7 +92,7 @@ M3c status: committed (`48794576`). Decisions made during implementation:
 - `removeImportedVideo`: drops the clip and its edits; clips anchored to it inherit its anchor (or lose it) and keep their position; manual sync moves to the first remaining clip; the playhead is clamped. The preview registration is released after the collection change; the last removal resets the background. Pausing playback of a removed playing clip stays with M4.
 - Timeline: one video lane holds every clip (clip IDs stay `video:<id>`, so drag/nudge/snapping are unchanged) plus striped overlap bands; clips with warnings get a red outline and list the warnings in their tooltip. Delete/Backspace removes the selected video clip (shortcut `timelineClip.remove`). No timeline context menu yet (keyboard and panel cover removal).
 
-M3d status: implemented (awaiting owner commit). Decisions made during implementation:
+M3d status: committed (`3e658b5a`). Decisions made during implementation:
 - The folder batch queue is gone (video folder, folder listing, Clear, per-row removal). `renderTarget: batch` now renders every imported video to its own file in the output folder, inspected by path, in timeline order. The per-video "Activity overlay" toggle stays (`batchSkipOverlay`, keyed by video ID, not persisted). M6 replaces this with output groups of pieces.
 - Each job renders at its clip's committed offset. Native contract fixed at its owner: `BatchActivity::ExternalActivity { activity, offsets }` (per source); the calibration reference, batch timezone mode, and calibration-source plumbing (inspection selection, output alias check) are removed, as are `createBatchCalibration`/`resolveBatchVideoTiming`. With an external activity a video outside it is blocked (until M5's rasters-only rule); an unreadable camera timestamp only hides the row's date.
 - Project v4 `render` drops `batchVideoFolder` (and `renderTarget` is required). Reading a v3 project with `renderTarget: batch` returns `legacyBatchVideoFolder`; after the project is applied the frontend imports that folder through the normal import path (dedupe, warnings, placement, transition dialog), with a notice at the top of the import report; a missing, unreadable, or empty folder only shows a notice. In-branch v4 files that still contain `render.batchVideoFolder` no longer load.
@@ -109,6 +109,16 @@ M3d status: implemented (awaiting owner commit). Decisions made during implement
 Tests: import hook, panel, timeline lane/drag/geometry tests.
 
 ## M4 — Sequenced preview playback
+
+Delivered as two commits: **M4a** program-driven playback with the existing single element (items 2, 3, 4, 5), **M4b** two video elements with preloading and hand-off (item 1).
+
+M4a status: implemented (awaiting owner commit). Decisions made during implementation:
+- The video clock ends a piece when the presented frame passes the piece's source end (not only on `ended`), so deleted parts end a piece mid-file. At a piece end playback continues at the next piece's start (gaps and deleted parts skipped, hard cut); after the last piece the element holds the piece's last frame and the timeline clock plays the rest of the activity.
+- Playback started inside a gap or deleted part starts at the next piece. Before the first and after the last piece the timeline clock plays the activity as before (gap skipping applies between pieces only, and only with video playback).
+- The element re-seeks when the playing piece changes, also within the same video (after a deleted part).
+- Scrubbing into a deleted part shows that video's frame with a "Deleted part – not exported" indicator; gaps keep showing the next piece's first frame (dimmed). A red banner shows while the playhead is inside an overlap.
+- Removing a clip pauses playback first; the removal clamps the playhead.
+- The hand-off reaches the clock through `useEffectEvent`, so the frame loop does not restart on every render.
 
 1. Two reusable video elements with active/preload roles (`useVideoPreview.js`, `useVideoPlaybackClock.js`, `usePlaybackEngine.js`, `videoPreviewSource.js`).
 2. Continue at piece end → next piece start, skipping gaps and deleted parts; hard cut at every join (transition windows are added in M8).

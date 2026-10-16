@@ -354,7 +354,10 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
    */
   const removeVideo = async (videoId) => {
     try {
-      const { importId } = useStore.getState().importedVideos.find((video) => video.id === videoId)?.preview ?? {}
+      const state = useStore.getState()
+      const { importId } = state.importedVideos.find((video) => video.id === videoId)?.preview ?? {}
+      // Playback stops before the clip leaves; the removal clamps the playhead.
+      if (state.previewPlaybackState === 'playing') state.pausePreviewPlayback(state.selectedSecond)
       changeVideoCollection(useStore, () => useStore.getState().removeImportedVideo(videoId))
       await removePreviewVideo(importId)
       if (useStore.getState().importedVideos.length === 0) onSetBackgroundMode?.('checker')

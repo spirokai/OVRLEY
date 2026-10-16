@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { AlertTriangle, ExternalLink } from 'lucide-react'
+import { AlertTriangle, ExternalLink, Scissors } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import useStore from '@/store/useStore'
@@ -69,10 +69,9 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
   const videoRef = useRef(null)
   const isVideoMuted = useStore((state) => state.isVideoMuted)
   const platformOs = useStore((state) => state.platformOs)
-  const { videoSrc, importId, isOutOfRange, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } = useVideoPreview(
-    videoRef,
-    isActive,
-  )
+  const { t } = useTranslation()
+  const { videoSrc, importId, isOutOfRange, isDeleted, isInOverlap, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } =
+    useVideoPreview(videoRef, isActive)
   const hasHevcPlaybackError = Boolean(hevcPlaybackWarning)
 
   return (
@@ -90,6 +89,28 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
         />
       ) : null}
       {children}
+      {videoSrc && isDeleted ? (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center p-4">
+          <div role="status" className="flex items-center gap-2 rounded-sm bg-black/80 px-4 py-2 text-sm font-semibold text-white shadow-lg">
+            <Scissors className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {t('video-preview.deletedPartIndicator', 'Deleted part – not exported')}
+          </div>
+        </div>
+      ) : null}
+      {videoSrc && isInOverlap ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center p-4">
+          <div
+            role="alert"
+            className="flex max-w-[90%] items-center gap-3 rounded-sm border-2 border-destructive bg-destructive/90 px-5 py-3 text-base font-bold text-white shadow-2xl"
+          >
+            <AlertTriangle className="h-6 w-6 shrink-0" aria-hidden="true" />
+            {t(
+              'video-preview.overlapPlaybackWarning',
+              'Videos overlap here. The preview plays the earlier video first; one combined export is not possible.',
+            )}
+          </div>
+        </div>
+      ) : null}
       {videoSrc && hasHevcPlaybackError ? (
         <HevcPlaybackPlaceholder
           displayScale={displayScale}

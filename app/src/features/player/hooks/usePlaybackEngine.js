@@ -178,25 +178,23 @@ export default function usePlaybackEngine({
     pausePreviewPlayback(clampedPlayhead)
   }, [clampedPlayhead, pausePreviewPlayback, previewPlaybackSource, resetPlaybackOrchestration, setPlaybackAnchor, shouldUseVideoPlayback])
 
-  // Clock handoff - timeline playback enters the video region; the video clock owns its ended handoff back to the timeline.
+  // Clock handoff - timeline playback entering the program hands over to the video clock (skipping a gap
+  // to the next piece); the video clock owns its piece-end handoffs.
   useEffect(() => {
     if (!isPlaying || !shouldUseVideoPlayback || previewPlaybackSource !== 'timeline') {
       return
     }
-    const nextSource = resolvePlaybackSource({
+    const start = resolvePlaybackSource({
       shouldUseVideoPlayback,
       playheadSecond: clampedPlayhead,
       program,
     })
-    if (nextSource !== 'video') {
+    if (start.source !== 'video') {
       return
     }
     resetPlaybackOrchestration()
-    setPlaybackAnchor(nextSource, clampedPlayhead)
-    startPreviewPlayback({
-      source: nextSource,
-      second: clampedPlayhead,
-    })
+    setPlaybackAnchor(start.source, start.second)
+    startPreviewPlayback(start)
   }, [
     clampedPlayhead,
     isPlaying,
@@ -246,25 +244,23 @@ export default function usePlaybackEngine({
     return () => window.cancelAnimationFrame(animationFrameId)
   }, [effectivePreviewFps, hasActivity, isTimelinePlaybackActive, pausePreviewPlayback, setPlaybackAnchor, setSelectedSecond, timelineMinimum])
 
-  // Play command - restart from the timeline start at the end and otherwise resume the current playhead.
+  // Play command - restart from the timeline start at the end and otherwise resume the current playhead
+  // (from the next piece when the playhead is in a gap or deleted part).
   const play = useCallback(() => {
     if (!hasActivity) {
       return
     }
     let initialSecond = clampedPlayhead
     if (clampedPlayhead >= totalDuration) initialSecond = timelineMinimum
-    const nextSource = resolvePlaybackSource({
+    const start = resolvePlaybackSource({
       shouldUseVideoPlayback,
       playheadSecond: initialSecond,
       program,
     })
 
-    setPlaybackAnchor(nextSource, initialSecond)
+    setPlaybackAnchor(start.source, start.second)
     resetPlaybackOrchestration()
-    startPreviewPlayback({
-      source: nextSource,
-      second: initialSecond,
-    })
+    startPreviewPlayback(start)
   }, [
     clampedPlayhead,
     hasActivity,

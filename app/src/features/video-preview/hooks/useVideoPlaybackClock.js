@@ -6,7 +6,7 @@
  * that the timeline only advances when the video actually produces a new frame.
  */
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef } from 'react'
 import useStore from '@/store/useStore'
 import { getContainerFps } from '@/lib/update-rate'
 import { incrementPreviewPerfCounter, previewPerfCounterName, setPreviewPerfValue } from '@/lib/previewPerf'
@@ -38,15 +38,20 @@ function resolvePreviewClockMode() {
  * @param {boolean} options.isActive Whether video-clock playback is active.
  * @param {{num: number, den: number}|null} options.videoFps Exact frame rate of the playing video.
  * @param {number} options.videoOffsetSeconds Timeline offset of the playing video.
+ * @param {number|null} options.pieceEndSourceSecond Source second where the playing piece ends (exclusive), or null.
  * @param {(second: number) => void} options.onPreviewSecond Callback receiving timeline time while the video owns playback.
- * @param {() => void} options.onPlaybackEnded Callback transferring playback to the timeline at the video-end boundary.
+ * @param {() => void} options.onPlaybackEnded Callback continuing playback after the playing piece (or the video) ends.
  * @returns {void}
  */
-export function useVideoPlaybackClock({ videoRef, isActive, videoFps, videoOffsetSeconds, onPreviewSecond, onPlaybackEnded }) {
+export function useVideoPlaybackClock({ videoRef, isActive, videoFps, videoOffsetSeconds, pieceEndSourceSecond, onPreviewSecond, onPlaybackEnded }) {
   // Store selectors — picks scene FPS and update rate from Zustand
   const sceneFps = useStore((state) => state.renderSettings.fps)
   const updateRate = useStore((state) => state.renderSettings.widgetUpdateRate)
   const importedVideoFps = videoFps === null ? null : videoFps.num / videoFps.den
+  // The latest hand-off reads current program state without restarting the frame loop.
+  const continuePlayback = useEffectEvent(() => onPlaybackEnded())
+  // A presented frame at or past half a frame before the piece end lies outside the piece.
+  const pieceEndThresholdSecond = pieceEndSourceSecond === null || importedVideoFps === null ? null : pieceEndSourceSecond - 0.5 / importedVideoFps
 
   // Internal refs — tracks scheduled callback handle, callback type ('video'|'animation'),
   // last published frame index for dedup, and last video source URL to detect source changes
@@ -86,6 +91,8 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoFps, videoOffse
     }
 
     /** Cancels whichever scheduled frame type is pending ('video' via cancelVideoFrameCallback or 'animation' via cancelAnimationFrame). */
+    let pieceEnded = false
+
     const cancelScheduledFrame = () => {
       if (callbackIdRef.current === null) {
         return
@@ -111,6 +118,10 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoFps, videoOffse
       incrementPreviewPerfCounter(previewPerfCounterName('video frame callbacks'))
 
       const presentedMediaTime = Number(mediaTime)
+      if (pieceEndThresholdSecond !== null && presentedMediaTime >= pieceEndThresholdSecond) {
+        endPiece()
+        return
+      }
       if (Number.isFinite(presentedMediaTime) && presentedMediaTime >= 0) {
         lastPresentedMediaTimeRef.current = presentedMediaTime
       }
@@ -124,6 +135,14 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoFps, videoOffse
 
       publishedFrameRef.current = nextFrame
       onPreviewSecond(previewSecond)
+    }
+
+    /** Hands playback on once when the playing piece ends before the end of its video. */
+    const endPiece = () => {
+      if (pieceEnded) return
+      pieceEnded = true
+      cancelScheduledFrame()
+      continuePlayback()
     }
 
     /** Restores the last frame reported by the presentation clock. */
@@ -152,7 +171,7 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoFps, videoOffse
 
     /** Schedules the next frame callback — prefers requestVideoFrameCallback, falls back to requestAnimationFrame. */
     const scheduleNextFrame = () => {
-      if (!isActive || video.paused || video.ended) {
+      if (!isActive || pieceEnded || video.paused || video.ended) {
         cancelScheduledFrame()
         return
       }
@@ -188,9 +207,11 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoFps, videoOffse
     }
 
     const handlePlaybackEnded = () => {
+      if (pieceEnded) return
+      pieceEnded = true
       cancelScheduledFrame()
       freezeLastPresentedFrame()
-      onPlaybackEnded()
+      continuePlayback()
     }
 
     const handleSourceChange = () => {
@@ -224,5 +245,5 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoFps, videoOffse
       publishedFrameRef.current = -1
       lastPresentedMediaTimeRef.current = null
     }
-  }, [effectivePreviewFps, isActive, onPlaybackEnded, onPreviewSecond, shouldForceAnimationClock, videoOffsetSeconds, videoRef])
+  }, [effectivePreviewFps, isActive, onPreviewSecond, pieceEndThresholdSecond, shouldForceAnimationClock, videoOffsetSeconds, videoRef])
 }

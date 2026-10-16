@@ -2,7 +2,7 @@
  * Pure playback and timeline timing helpers for the player feature.
  */
 
-import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
+import { resolvePlaybackStart } from '@/lib/video-program/playback-target'
 
 /**
  * Snaps a timeline timestamp to the nearest source-video frame.
@@ -17,17 +17,19 @@ export function snapTimelineSecondToFrame(second, fps, originSecond = 0) {
 }
 
 /**
- * Resolves whether preview playback should be driven by the timeline or video element.
+ * Resolves where preview playback starts and whether the timeline or the video
+ * element drives it. Without video playback the timeline clock plays from the
+ * requested second.
  *
  * @param {{ shouldUseVideoPlayback: boolean, playheadSecond: number, program: object }} options
- * @returns {'timeline'|'video'} Playback source for the current playhead.
+ * @returns {{source: 'timeline'|'video', second: number}} Playback start.
  */
 export function resolvePlaybackSource({ shouldUseVideoPlayback, playheadSecond, program }) {
   if (!shouldUseVideoPlayback) {
-    return 'timeline'
+    return { source: 'timeline', second: playheadSecond }
   }
 
-  return resolvePreviewTarget(program, playheadSecond)?.isInside ? 'video' : 'timeline'
+  return resolvePlaybackStart(program, playheadSecond)
 }
 
 /**

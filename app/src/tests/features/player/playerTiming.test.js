@@ -53,17 +53,19 @@ describe('playerTiming utilities', () => {
     const shifted = timelineProgram([createTestVideo({ durationSeconds: 4 })], { 'video-1': 5 })
     const negative = timelineProgram([createTestVideo({ durationSeconds: 4 })], { 'video-1': -5 })
 
-    expect(resolvePlaybackSource({ shouldUseVideoPlayback: true, program: shifted, playheadSecond: 4.99 })).toBe('timeline')
-    expect(resolvePlaybackSource({ shouldUseVideoPlayback: true, program: shifted, playheadSecond: 5 })).toBe('video')
-    expect(resolvePlaybackSource({ shouldUseVideoPlayback: true, program: shifted, playheadSecond: 8.99 })).toBe('video')
-    expect(resolvePlaybackSource({ shouldUseVideoPlayback: true, program: shifted, playheadSecond: 9 })).toBe('timeline')
-    expect(resolvePlaybackSource({ shouldUseVideoPlayback: false, program: shifted, playheadSecond: 6 })).toBe('timeline')
+    const source = (program, playheadSecond, shouldUseVideoPlayback = true) =>
+      resolvePlaybackSource({ shouldUseVideoPlayback, program, playheadSecond })
+    expect(source(shifted, 4.99)).toEqual({ source: 'timeline', second: 4.99 })
+    expect(source(shifted, 5)).toEqual({ source: 'video', second: 5 })
+    expect(source(shifted, 8.99)).toEqual({ source: 'video', second: 8.99 })
+    expect(source(shifted, 9)).toEqual({ source: 'timeline', second: 9 })
+    expect(source(shifted, 6, false)).toEqual({ source: 'timeline', second: 6 })
 
-    expect(resolvePlaybackSource({ shouldUseVideoPlayback: true, program: negative, playheadSecond: -4.99 })).toBe('video')
-    expect(resolvePlaybackSource({ shouldUseVideoPlayback: true, program: negative, playheadSecond: -1 })).toBe('timeline')
+    expect(source(negative, -4.99)).toEqual({ source: 'video', second: -4.99 })
+    expect(source(negative, -1)).toEqual({ source: 'timeline', second: -1 })
   })
 
-  test('uses the timeline clock in gaps between imported clips', () => {
+  test('skips gaps between imported clips to the next clip', () => {
     const program = timelineProgram(
       [
         createTestVideo({ id: 'first', durationSeconds: 4 }),
@@ -72,10 +74,11 @@ describe('playerTiming utilities', () => {
       { first: 0, second: 10 },
     )
 
-    expect(resolvePlaybackSource({ shouldUseVideoPlayback: true, program, playheadSecond: 2 })).toBe('video')
-    expect(resolvePlaybackSource({ shouldUseVideoPlayback: true, program, playheadSecond: 6 })).toBe('timeline')
-    expect(resolvePlaybackSource({ shouldUseVideoPlayback: true, program, playheadSecond: 12 })).toBe('video')
-    expect(resolvePlaybackSource({ shouldUseVideoPlayback: true, program, playheadSecond: 14 })).toBe('timeline')
+    const source = (playheadSecond) => resolvePlaybackSource({ shouldUseVideoPlayback: true, program, playheadSecond })
+    expect(source(2)).toEqual({ source: 'video', second: 2 })
+    expect(source(6)).toEqual({ source: 'video', second: 10 })
+    expect(source(12)).toEqual({ source: 'video', second: 12 })
+    expect(source(14)).toEqual({ source: 'timeline', second: 14 })
   })
 
   test('uses the negative video start as the timeline minimum', () => {

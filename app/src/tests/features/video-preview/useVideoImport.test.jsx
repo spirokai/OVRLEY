@@ -167,8 +167,10 @@ describe('useVideoImport multi-file import', () => {
     await importPaths(result, ['/clips/a.mp4', '/clips/b.mp4'])
     const [first, second] = useStore.getState().importedVideos
 
+    act(() => useStore.getState().startPreviewPlayback({ source: 'video', second: 10 }))
     await act(() => result.current.removeVideo(first.id))
     expect(importedPaths()).toEqual(['/clips/b.mp4'])
+    expect(useStore.getState().previewPlaybackState).toBe('paused')
     expect(boundaries.removePreviewVideo).toHaveBeenCalledExactlyOnceWith('import:/clips/a.mp4')
     expect(onSetBackgroundMode).not.toHaveBeenCalledWith('checker')
 

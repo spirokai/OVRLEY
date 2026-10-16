@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
+import { findNextPiece, resolvePlaybackStart, resolvePreviewTarget } from '@/lib/video-program/playback-target'
+import { buildProgram } from '@/lib/video-program/program'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
 import { createTestVideo, videoStoreState } from '../../helpers/videoFixtures'
@@ -32,17 +33,42 @@ describe('buildTimelineProgram', () => {
 describe('resolvePreviewTarget', () => {
   const { program } = timeline({ first: 5, second: 30 })
 
+  const [firstPiece, secondPiece] = program.pieces
+
   test.each([
-    [0, { videoId: 'first', sourceSecond: 0, isInside: false }],
-    [7.5, { videoId: 'first', sourceSecond: 2.5, isInside: true }],
-    [20, { videoId: 'second', sourceSecond: 0, isInside: false }],
-    [31, { videoId: 'second', sourceSecond: 1, isInside: true }],
-    [50, { videoId: 'second', sourceSecond: 299 / 30, isInside: false }],
+    [0, { videoId: 'first', piece: firstPiece, sourceSecond: 0, isInside: false, isDeleted: false }],
+    [7.5, { videoId: 'first', piece: firstPiece, sourceSecond: 2.5, isInside: true, isDeleted: false }],
+    [20, { videoId: 'second', piece: secondPiece, sourceSecond: 0, isInside: false, isDeleted: false }],
+    [31, { videoId: 'second', piece: secondPiece, sourceSecond: 1, isInside: true, isDeleted: false }],
+    [50, { videoId: 'second', piece: secondPiece, sourceSecond: 299 / 30, isInside: false, isDeleted: false }],
   ])('at %s', (second, expected) => {
     expect(resolvePreviewTarget(program, second)).toEqual(expected)
   })
 
+  test('shows the deleted frame of a video inside its deleted part', () => {
+    const { importedVideos, videoEdits } = videoStoreState([first], { first: 5 })
+    videoEdits.first.deletedParts = [{ id: 'cut', fromSecond: 2, toSecond: 4, transition: null }]
+    const cut = buildProgram({
+      videos: importedVideos.map((video) => ({ ...video, ...videoEdits[video.id] })),
+      exportRange: { type: 'all', from: 0, to: 0 },
+      transitionDefaults: DEFAULT_TRANSITION_SETTINGS,
+    })
+    expect(resolvePreviewTarget(cut, 8)).toEqual({ videoId: 'first', piece: cut.pieces[0], sourceSecond: 3, isInside: false, isDeleted: true })
+    expect(resolvePlaybackStart(cut, 8)).toEqual({ source: 'video', second: 9 })
+    expect(findNextPiece(cut, cut.pieces[0].id)).toBe(cut.pieces[1])
+  })
+
   test('is null without clips', () => {
     expect(resolvePreviewTarget({ pieces: [], joins: [] }, 0)).toBeNull()
+  })
+
+  test('playback skips gaps to the next piece and plays the activity before and after the videos on the timeline clock', () => {
+    expect(resolvePlaybackStart(program, 0)).toEqual({ source: 'timeline', second: 0 })
+    expect(resolvePlaybackStart(program, 7.5)).toEqual({ source: 'video', second: 7.5 })
+    expect(resolvePlaybackStart(program, 20)).toEqual({ source: 'video', second: 30 })
+    expect(resolvePlaybackStart(program, 50)).toEqual({ source: 'timeline', second: 50 })
+    expect(findNextPiece(program, firstPiece.id)).toBe(secondPiece)
+    expect(findNextPiece(program, secondPiece.id)).toBeNull()
+    expect(() => findNextPiece(program, 'missing')).toThrow('Unknown program piece')
   })
 })

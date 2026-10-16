@@ -261,7 +261,7 @@ describe('usePlaybackEngine', () => {
     expect(options.pausePreviewPlayback).toHaveBeenCalledWith(8)
   })
 
-  test('uses the timeline clock in a gap and the video clock inside a later clip', () => {
+  test('starts playback in a gap at the next clip and inside a clip at the playhead', () => {
     const timeline = videoTimeline(
       [
         createTestVideo({ id: 'first', durationSeconds: 4 }),
@@ -277,7 +277,7 @@ describe('usePlaybackEngine', () => {
     act(() => {
       result.current.play()
     })
-    expect(options.startPreviewPlayback).toHaveBeenLastCalledWith({ source: 'timeline', second: 6 })
+    expect(options.startPreviewPlayback).toHaveBeenLastCalledWith({ source: 'video', second: 10 })
 
     rerender({ ...options, selectedSecond: 11 })
     act(() => {

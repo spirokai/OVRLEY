@@ -10,6 +10,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useStore from '@/store/useStore'
 import { useVideoPreview } from '@/features/video-preview/hooks/useVideoPreview'
+import { useVideoPlaybackClock } from '@/features/video-preview/hooks/useVideoPlaybackClock'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 vi.mock('@/features/video-preview/hooks/useVideoPlaybackClock', () => ({
@@ -138,5 +139,79 @@ describe('useVideoPreview', () => {
 
     expect(result.current.importId).toBe('import-video-2')
     expect(result.current.isOutOfRange).toBe(true)
+  })
+
+  function lastClock() {
+    return vi.mocked(useVideoPlaybackClock).mock.calls.at(-1)[0]
+  }
+
+  function playingAt(second) {
+    useStore.setState({ previewPlaybackSource: 'video', previewPlaybackState: 'playing', selectedSecond: second })
+  }
+
+  test('continues with the next piece at its start when a piece ends, skipping the gap', () => {
+    useStore.setState(
+      videoStoreState(
+        [
+          createTestVideo({ id: 'video-1', path: 'C:\\clips\\first.mp4', durationSeconds: 10 }),
+          createTestVideo({ id: 'video-2', path: 'C:\\clips\\second.mp4', durationSeconds: 10, importOrder: 1 }),
+        ],
+        { 'video-1': 0, 'video-2': 20 },
+      ),
+    )
+    playingAt(9)
+    const video = createVideoStub({ duration: 10, paused: false })
+    renderHook(() => useVideoPreview({ current: video }, true))
+    expect(lastClock()).toMatchObject({ isActive: true, pieceEndSourceSecond: 10, videoOffsetSeconds: 0 })
+
+    act(() => lastClock().onPlaybackEnded())
+
+    expect(useStore.getState()).toMatchObject({ previewPlaybackState: 'playing', previewPlaybackSource: 'video', selectedSecond: 20 })
+    expect(lastClock()).toMatchObject({ pieceEndSourceSecond: 10, videoOffsetSeconds: 20 })
+  })
+
+  test('jumps over a deleted part within the same video and re-seeks the element', () => {
+    const video = createTestVideo({ id: 'video-1', path: 'C:\\clips\\ride.mp4', durationSeconds: 30 })
+    const state = videoStoreState([video], { 'video-1': 5 })
+    state.videoEdits['video-1'].deletedParts = [{ id: 'cut', fromSecond: 10, toSecond: 20, transition: null }]
+    useStore.setState(state)
+    playingAt(14.9)
+    const element = createVideoStub({ duration: 30, paused: false, currentTime: 9.9 })
+    renderHook(() => useVideoPreview({ current: element }, true))
+    expect(lastClock()).toMatchObject({ pieceEndSourceSecond: 10 })
+
+    act(() => lastClock().onPlaybackEnded())
+
+    expect(useStore.getState().selectedSecond).toBe(25)
+    expect(element.currentTime).toBe(20)
+    expect(lastClock()).toMatchObject({ pieceEndSourceSecond: 30 })
+  })
+
+  test('after the last piece hands the activity to the timeline clock and holds the last frame', () => {
+    playingAt(34.9)
+    const video = createVideoStub({ duration: 30, paused: false, currentTime: 29.9 })
+    renderHook(() => useVideoPreview({ current: video }, true))
+
+    act(() => lastClock().onPlaybackEnded())
+
+    expect(video.pause).toHaveBeenCalled()
+    expect(video.currentTime).toBeCloseTo(899 / 30, 9)
+    expect(useStore.getState()).toMatchObject({ previewPlaybackState: 'playing', previewPlaybackSource: 'timeline', selectedSecond: 35 })
+  })
+
+  test('flags deleted parts and overlaps at the playhead', () => {
+    const first = createTestVideo({ id: 'video-1', path: 'C:\\clips\\first.mp4', durationSeconds: 30 })
+    const second = createTestVideo({ id: 'video-2', path: 'C:\\clips\\second.mp4', durationSeconds: 10, importOrder: 1 })
+    const state = videoStoreState([first, second], { 'video-1': 0, 'video-2': 25 })
+    state.videoEdits['video-1'].deletedParts = [{ id: 'cut', fromSecond: 5, toSecond: 10, transition: null }]
+    useStore.setState({ ...state, selectedSecond: 7 })
+    const { result } = renderHook(() => useVideoPreview({ current: createVideoStub() }, true))
+    expect(result.current).toMatchObject({ isDeleted: true, isInOverlap: false, isOutOfRange: true })
+
+    act(() => useStore.getState().setSelectedSecond(27))
+    expect(result.current).toMatchObject({ isDeleted: false, isInOverlap: true, isOutOfRange: false, importId: 'import-video-1' })
+
+    act(() => useStore.getState().setSelectedSecond(31))
+    expect(result.current).toMatchObject({ isInOverlap: false, importId: 'import-video-2' })
   })
 })
