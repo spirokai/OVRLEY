@@ -1,4 +1,4 @@
-//! Raw configuration types deserialized directly from frontend JSON.
+//! Deserialized render contracts and saved-template ingress.
 //!
 //! These types intentionally allow extra fields (`#[serde(flatten)]`) so
 //! templates can remain forward-compatible across app versions. The
@@ -52,7 +52,6 @@ pub struct SceneConfig {
 }
 
 use ovrley_widgets::model::scene::ScenePresentationConfig;
-
 
 use ovrley_widgets::widgets::backdrop::config::BackdropConfig;
 
@@ -163,37 +162,12 @@ fn deserialize_render_rasters<'de, D: serde::Deserializer<'de>>(
     })
 }
 
-/// Shared polyline style fragment for plot widgets.
-#[derive(Clone, Debug, Deserialize, Serialize, Default)]
-pub struct LineStyleConfig {
-    #[serde(default)]
-    pub width: Option<f32>,
-    #[serde(default)]
-    pub color: Option<String>,
-    #[serde(default)]
-    pub opacity: Option<f32>,
-    #[serde(flatten)]
-    pub extra: BTreeMap<String, Value>,
-}
-
-/// Shared area fill style fragment for plot widgets.
-#[derive(Clone, Debug, Deserialize, Serialize, Default)]
-pub struct FillStyleConfig {
-    #[serde(default)]
-    pub color: Option<String>,
-    #[serde(default)]
-    pub opacity: Option<f32>,
-    #[serde(flatten)]
-    pub extra: BTreeMap<String, Value>,
-}
-
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 /// Finds a plot config by value key in either array or object-shaped template data.
-pub fn find_plot_value<'a>(plots: &'a Value, value_key: &str) -> Option<&'a Value> {
+fn find_plot_value<'a>(plots: &'a Value, value_key: &str) -> Option<&'a Value> {
     match plots {
         Value::Array(items) => items.iter().find(|item| {
             item.get("value")
@@ -214,7 +188,7 @@ pub fn find_plot_value<'a>(plots: &'a Value, value_key: &str) -> Option<&'a Valu
 }
 
 /// Finds every plot config with the requested value key, preserving array order.
-pub fn find_plot_values<'a>(plots: &'a Value, value_key: &str) -> Vec<(usize, &'a Value)> {
+pub(super) fn find_plot_values<'a>(plots: &'a Value, value_key: &str) -> Vec<(usize, &'a Value)> {
     match plots {
         Value::Array(items) => items
             .iter()
@@ -230,7 +204,7 @@ pub fn find_plot_values<'a>(plots: &'a Value, value_key: &str) -> Vec<(usize, &'
 
 /// Removes all `null` values from a JSON object tree so that `#[serde(default)]`
 /// attributes on struct fields can take effect during deserialization.
-pub fn strip_json_nulls(value: &mut Value) {
+fn strip_json_nulls(value: &mut Value) {
     if let Value::Object(map) = value {
         map.retain(|_, v| !v.is_null());
         for v in map.values_mut() {
@@ -433,40 +407,5 @@ fn apply_template_global_defaults(config: &mut RenderConfig, template: &Value) {
                 value.font_family = Some(font_values.clone());
             }
         }
-        apply_heading_label_font_default(&mut config.plots, &font_values);
-    }
-}
-
-fn apply_heading_label_font_default(plots: &mut Value, font_values: &str) {
-    match plots {
-        Value::Array(items) => {
-            for item in items {
-                apply_heading_label_font_default_to_plot(item, font_values);
-            }
-        }
-        Value::Object(map) => {
-            for item in map.values_mut() {
-                apply_heading_label_font_default_to_plot(item, font_values);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn apply_heading_label_font_default_to_plot(plot: &mut Value, font_values: &str) {
-    let Some(object) = plot.as_object_mut() else {
-        return;
-    };
-    let is_heading = object
-        .get("value")
-        .and_then(Value::as_str)
-        .map(|value| value == "heading")
-        .unwrap_or(false);
-
-    if is_heading && !object.contains_key("label_font") {
-        object.insert(
-            "label_font".to_string(),
-            Value::String(font_values.to_string()),
-        );
     }
 }

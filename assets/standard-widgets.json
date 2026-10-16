@@ -161,6 +161,16 @@
     },
     {
       "type": "gradient",
+      "activity": {
+        "column": {
+          "idleValue": "zero",
+          "unit": "percent",
+          "smoothing": "zero_phase_ma"
+        },
+        "sources": ["gradient"],
+        "requires": []
+      },
+      "interpolation": "linear",
       "nameKey": "widgets.types.gradient.name",
       "shortNameKey": "widgets.types.gradient.shortName",
       "category": "general",
@@ -192,6 +202,15 @@
     },
     {
       "type": "elevation",
+      "activity": {
+        "column": {
+          "unit": "m",
+          "smoothing": "zero_phase_ma"
+        },
+        "sources": ["elevation"],
+        "requires": ["barometric_altitude", "distance_progress"]
+      },
+      "interpolation": "linear",
       "nameKey": "widgets.types.elevation.name",
       "shortNameKey": "widgets.types.elevation.shortName",
       "category": "general",
@@ -267,6 +286,17 @@
     },
     {
       "type": "course",
+      "activity": {
+        "column": {
+          "specialized": true,
+          "inputType": null,
+          "rawSample": false,
+          "unit": null,
+          "interpolation": "linear"
+        },
+        "sources": [],
+        "requires": ["distance_progress"]
+      },
       "nameKey": "widgets.types.course.name",
       "shortNameKey": "widgets.types.course.shortName",
       "category": "general",
@@ -313,6 +343,17 @@
     },
     {
       "type": "time",
+      "activity": {
+        "column": {
+          "specialized": true,
+          "inputType": null,
+          "rawSample": false,
+          "unit": null,
+          "interpolation": "linear"
+        },
+        "sources": [],
+        "requires": []
+      },
       "nameKey": "widgets.types.time.name",
       "shortNameKey": "widgets.types.time.shortName",
       "category": "general",
@@ -323,11 +364,13 @@
       "modes": [
         {
           "value": "daytime",
+          "activity": ["time"],
           "labelKey": "widget-editor.daytime",
           "defaultLabel": "Daytime"
         },
         {
           "value": "elapsed",
+          "activity": [],
           "labelKey": "widget-editor.elapsedTime",
           "defaultLabel": "Elapsed Time"
         }

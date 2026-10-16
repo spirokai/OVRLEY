@@ -30,7 +30,7 @@ pub fn heading_tape_json() -> Value {
 
 /// Materialized shared presentation for video-local planning/pipeline tests.
 pub fn batch_template(
-) -> ovrley_core::normalize::raw::RenderConfig<ovrley_widgets::model::scene::ScenePresentationConfig>
+) -> ovrley_core::normalize::RenderConfig<ovrley_widgets::model::scene::ScenePresentationConfig>
 {
     let mut scene = super::seam::explicit_scene_json();
     for key in [
@@ -117,7 +117,7 @@ pub fn video_batch_request(
     inspection_id: &str,
     source: &ovrley_core::media::prepared_video::InspectedVideoSource,
     encoding: ovrley_core::render_jobs::contracts::BatchEncodingSettings,
-    template: ovrley_core::normalize::raw::RenderConfig<
+    template: ovrley_core::normalize::RenderConfig<
         ovrley_widgets::model::scene::ScenePresentationConfig,
     >,
     activity: ovrley_core::activity::schema::ParsedActivity,

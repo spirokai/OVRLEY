@@ -1,5 +1,7 @@
-//! Native column access for shared widget samples. Formatting and frame rules belong to widgets.
-use super::schema::{DenseActivityReport, ParsedActivity};
+//! Native activity column access, source bounds, and shared widget sampling.
+
+use super::schema::{DenseActivityReport, DenseSeriesReport, ParsedActivity, TrimmedActivity};
+use ovrley_widgets::model::telemetry::{numeric_metrics, ActivitySeries, NumericActivity};
 use ovrley_widgets::{
     model::types::MetricKind,
     widgets::{
@@ -12,6 +14,55 @@ use ovrley_widgets::{
         value::format::MetricSample,
     },
 };
+
+use std::collections::HashMap;
+
+macro_rules! implement_numeric_activity {
+    ($kind:ident numeric { $($field:ident: $variant:ident),* } other { $($other:ident: $unused:ident),* }) => {
+        impl NumericActivity for $kind {
+            fn numeric_series(&self, series: ActivitySeries) -> &[Option<f64>] {
+                match series {
+                    $(ActivitySeries::$variant => &self.$field,)*
+                    _ => panic!("manifest numeric sources must be numeric activity columns"),
+                }
+            }
+        }
+
+    };
+}
+
+ovrley_widgets::activity_series!(implement_numeric_activity, ParsedActivity);
+ovrley_widgets::activity_series!(implement_numeric_activity, TrimmedActivity);
+ovrley_widgets::activity_series!(implement_numeric_activity, DenseSeriesReport);
+
+/// Returns observed finite bounds; missing external telemetry has no range.
+pub fn calculate_metric_range(values: &[Option<f64>]) -> Option<(f64, f64)> {
+    values
+        .iter()
+        .copied()
+        .flatten()
+        .filter(|value| value.is_finite())
+        .fold(None, |range, value| {
+            Some(match range {
+                None => (value, value),
+                Some((min, max)) => (min.min(value), max.max(value)),
+            })
+        })
+}
+
+/// Calculates each numeric metric's bounds in canonical units from the full activity.
+pub fn calculate_metric_ranges(activity: &ParsedActivity) -> HashMap<MetricKind, (f64, f64)> {
+    let mut ranges = HashMap::new();
+    for &metric in numeric_metrics() {
+        let values = activity
+            .numeric_series_for(metric)
+            .expect("numeric metrics declare numeric sources");
+        if let Some(range) = calculate_metric_range(values) {
+            ranges.insert(metric, range);
+        }
+    }
+    ranges
+}
 
 impl ParsedActivity {
     pub fn route_activity(&self) -> RouteActivity {

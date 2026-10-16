@@ -2,7 +2,7 @@ mod common;
 
 use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
 use ovrley_core::debug::RenderProfiler;
-use ovrley_core::normalize::raw::RenderConfig;
+use ovrley_core::normalize::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
 use ovrley_widgets::widgets::gauges::arc::{
@@ -245,7 +245,7 @@ fn dense_speed_activity(speed: Vec<Option<f64>>) -> DenseActivityReport {
         frame_distance_progress: vec![Some(0.0); frame_count],
         full_activity_distance: None,
         full_activity_total_ascent: None,
-        full_activity_metric_ranges: ovrley_core::activity::metric_ranges::calculate_metric_range(
+        full_activity_metric_ranges: ovrley_core::activity::sampling::calculate_metric_range(
             &series.speed,
         )
         .map(|range| (ovrley_widgets::model::types::MetricKind::Speed, range))

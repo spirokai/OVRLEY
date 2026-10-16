@@ -13,6 +13,18 @@ pub enum LapTimerMode {
     LapLog,
 }
 
+impl LapTimerMode {
+    /// Canonical manifest mode for the validated lap timer.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::CurrentLap => "current_lap",
+            Self::BestLap => "best_lap",
+            Self::Delta => "delta",
+            Self::LapLog => "lap_log",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ValidatedLapTimer {
     pub x: f32,

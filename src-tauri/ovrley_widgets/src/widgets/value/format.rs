@@ -1,7 +1,7 @@
 use crate::model::standard_metrics::{
-    standard_metric_formatter, standard_metric_interpolation, standard_metric_unit_label,
-    StandardMetricFormatterKind, StandardMetricInterpolationKind,
+    standard_metric_formatter, standard_metric_unit_label, StandardMetricFormatterKind,
 };
+use crate::model::telemetry::{metric_interpolation, InterpolationKind};
 use crate::model::types::MetricKind;
 use crate::widgets::value::validation::{ValidatedValueFormatting, ValidatedValueWidget};
 
@@ -97,9 +97,7 @@ pub fn resolve_metric_display_value(
         return raw;
     }
 
-    if standard_metric_interpolation(kind) == Some(StandardMetricInterpolationKind::Preserve)
-        && available
-    {
+    if metric_interpolation(kind) == Some(InterpolationKind::Preserve) && available {
         Some(0.0)
     } else {
         None

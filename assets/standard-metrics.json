@@ -1,4 +1,126 @@
 {
+  "activitySeries": {
+    "numericDefaults": {
+      "idleValue": "preserve",
+      "inputFormat": "numeric",
+      "input": true,
+      "rawSample": true,
+      "limitToObserved": true,
+      "finalize": true,
+      "smoothing": null
+    },
+    "auxiliary": {
+      "barometric_altitude": {
+        "interpolation": "linear",
+        "unit": "m"
+      },
+      "g_force_x": {
+        "idleValue": "zero",
+        "interpolation": "preserve",
+        "limitToObserved": false,
+        "unit": "g",
+        "smoothing": "zero_phase_ma"
+      },
+      "g_force_y": {
+        "idleValue": "zero",
+        "interpolation": "preserve",
+        "limitToObserved": false,
+        "unit": "g",
+        "smoothing": "zero_phase_ma"
+      },
+      "g_force_z": {
+        "idleValue": "zero",
+        "interpolation": "preserve",
+        "limitToObserved": false,
+        "unit": "g",
+        "smoothing": "zero_phase_ma"
+      },
+      "distance_progress": {
+        "specialized": true,
+        "inputType": null,
+        "rawSample": false,
+        "unit": null,
+        "interpolation": "linear"
+      },
+      "lap_number": {
+        "specialized": true,
+        "inputType": "i64",
+        "rawSample": true,
+        "unit": null,
+        "interpolation": "hold"
+      },
+      "lap_time_seconds": {
+        "specialized": true,
+        "inputType": null,
+        "rawSample": false,
+        "unit": "s",
+        "interpolation": "hold"
+      },
+      "delta_to_best_lap_seconds": {
+        "specialized": true,
+        "inputType": null,
+        "rawSample": false,
+        "unit": "s",
+        "interpolation": "preserve"
+      }
+    },
+    "inputColumns": {
+      "timestamp": "String",
+      "elapsed_seconds": "f64",
+      "latitude": "f64",
+      "longitude": "f64"
+    },
+    "attributes": {
+      "core": [
+        "altitude",
+        "cadence",
+        "course",
+        "elevation",
+        "gps_coordinates",
+        "gradient",
+        "heartrate",
+        "engine_power",
+        "power",
+        "speed",
+        "time",
+        "temperature"
+      ],
+      "extended": [
+        "air_pressure",
+        "barometric_altitude",
+        "calories",
+        "aperture",
+        "color_temperature",
+        "core_temperature",
+        "distance",
+        "distance_to_home",
+        "ev",
+        "focal_length",
+        "engine_load",
+        "brake_position",
+        "g_force",
+        "g_force_x",
+        "g_force_y",
+        "g_force_z",
+        "gear_position",
+        "ground_contact_time",
+        "heading",
+        "iso",
+        "left_right_balance",
+        "lean_angle",
+        "pace",
+        "rpm",
+        "shutter_speed",
+        "stroke_rate",
+        "stride_length",
+        "total_ascent",
+        "torque",
+        "throttle_position",
+        "vertical_oscillation",
+        "vertical_speed"
+      ]
+    }
+  },
   "displayTypes": {
     "definitions": {
       "text": {
@@ -27,6 +149,7 @@
         "modes": [
           {
             "value": "current_lap",
+            "activity": ["lap_number", "lap_time_seconds"],
             "label": "Current Lap",
             "labelKey": "widgets.lapTimerModes.currentLap",
             "icon": {
@@ -37,6 +160,7 @@
           },
           {
             "value": "best_lap",
+            "activity": ["lap_number", "lap_time_seconds"],
             "label": "Best Lap",
             "labelKey": "widgets.lapTimerModes.bestLap",
             "icon": {
@@ -47,6 +171,7 @@
           },
           {
             "value": "delta",
+            "activity": ["delta_to_best_lap_seconds"],
             "label": "Delta",
             "labelKey": "widgets.lapTimerModes.delta",
             "icon": {
@@ -57,6 +182,7 @@
           },
           {
             "value": "lap_log",
+            "activity": ["lap_number", "lap_time_seconds", "delta_to_best_lap_seconds"],
             "label": "Lap Log",
             "labelKey": "widgets.lapTimerModes.lapLog",
             "icon": {
@@ -310,6 +436,15 @@
   "definitions": [
     {
       "type": "speed",
+      "activity": {
+        "column": {
+          "idleValue": "zero",
+          "unit": "mps",
+          "smoothing": "zero_phase_ma"
+        },
+        "sources": ["speed"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.speed.name",
       "shortNameKey": "widgets.types.speed.shortName",
@@ -352,6 +487,13 @@
     },
     {
       "type": "distance",
+      "activity": {
+        "column": {
+          "unit": "m"
+        },
+        "sources": ["distance"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.distance.name",
       "shortNameKey": "widgets.types.distance.shortName",
@@ -395,6 +537,11 @@
     },
     {
       "type": "gps_coordinates",
+      "activity": {
+        "coverageSource": "course",
+        "sources": [],
+        "requires": ["course"]
+      },
       "current": true,
       "nameKey": "widgets.types.gps_coordinates.name",
       "shortNameKey": "widgets.types.gps_coordinates.shortName",
@@ -416,7 +563,6 @@
         }
       ],
       "formatter": "coordinates",
-      "interpolation": "linear",
       "unitsMode": "selectable",
       "icon": {
         "source": "custom",
@@ -432,6 +578,14 @@
     },
     {
       "type": "distance_to_home",
+      "activity": {
+        "column": {
+          "rawSample": false,
+          "unit": "m"
+        },
+        "sources": ["distance_to_home"],
+        "requires": ["course"]
+      },
       "current": true,
       "nameKey": "widgets.types.distance_to_home.name",
       "shortNameKey": "widgets.types.distance_to_home.shortName",
@@ -474,6 +628,15 @@
     },
     {
       "type": "total_ascent",
+      "activity": {
+        "column": {
+          "input": false,
+          "rawSample": false,
+          "unit": "m"
+        },
+        "sources": ["total_ascent"],
+        "requires": ["elevation", "barometric_altitude"]
+      },
       "current": true,
       "nameKey": "widgets.types.total_ascent.name",
       "shortNameKey": "widgets.types.total_ascent.shortName",
@@ -508,6 +671,13 @@
     },
     {
       "type": "calories",
+      "activity": {
+        "column": {
+          "unit": "kcal"
+        },
+        "sources": ["calories"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.calories.name",
       "shortNameKey": "widgets.types.calories.shortName",
@@ -534,6 +704,13 @@
     },
     {
       "type": "heartrate",
+      "activity": {
+        "column": {
+          "unit": "bpm"
+        },
+        "sources": ["heartrate"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.heartrate.name",
       "shortNameKey": "widgets.types.heartrate.shortName",
@@ -558,6 +735,14 @@
     },
     {
       "type": "cadence",
+      "activity": {
+        "column": {
+          "idleValue": "zero",
+          "unit": "rpm"
+        },
+        "sources": ["cadence"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.cadence.name",
       "shortNameKey": "widgets.types.cadence.shortName",
@@ -582,6 +767,14 @@
     },
     {
       "type": "power",
+      "activity": {
+        "column": {
+          "idleValue": "zero",
+          "unit": "watts"
+        },
+        "sources": ["power"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.power.name",
       "shortNameKey": "widgets.types.power.shortName",
@@ -606,6 +799,13 @@
     },
     {
       "type": "engine_power",
+      "activity": {
+        "column": {
+          "unit": "watts"
+        },
+        "sources": ["engine_power"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.engine_power.name",
       "shortNameKey": "widgets.types.engine_power.shortName",
@@ -630,6 +830,13 @@
     },
     {
       "type": "engine_load",
+      "activity": {
+        "column": {
+          "unit": "percent"
+        },
+        "sources": ["engine_load"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.engine_load.name",
       "shortNameKey": "widgets.types.engine_load.shortName",
@@ -654,6 +861,13 @@
     },
     {
       "type": "temperature",
+      "activity": {
+        "column": {
+          "unit": "celsius"
+        },
+        "sources": ["temperature"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.temperature.name",
       "shortNameKey": "widgets.types.temperature.shortName",
@@ -682,6 +896,15 @@
     },
     {
       "type": "pace",
+      "activity": {
+        "column": {
+          "idleValue": "missing",
+          "unit": "seconds_per_km",
+          "smoothing": "zero_phase_ma"
+        },
+        "sources": ["pace"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.pace.name",
       "shortNameKey": "widgets.types.pace.shortName",
@@ -713,6 +936,15 @@
     },
     {
       "type": "g_force",
+      "activity": {
+        "column": {
+          "idleValue": "zero",
+          "unit": "g",
+          "smoothing": "zero_phase_ma"
+        },
+        "sources": ["g_force"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.g_force.name",
       "shortNameKey": "widgets.types.g_force.shortName",
@@ -744,6 +976,13 @@
     },
     {
       "type": "air_pressure",
+      "activity": {
+        "column": {
+          "unit": "bar"
+        },
+        "sources": ["air_pressure"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.air_pressure.name",
       "shortNameKey": "widgets.types.air_pressure.shortName",
@@ -785,6 +1024,14 @@
     },
     {
       "type": "ground_contact_time",
+      "activity": {
+        "column": {
+          "idleValue": "missing",
+          "unit": "ms"
+        },
+        "sources": ["ground_contact_time"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.ground_contact_time.name",
       "shortNameKey": "widgets.types.ground_contact_time.shortName",
@@ -810,6 +1057,14 @@
     },
     {
       "type": "left_right_balance",
+      "activity": {
+        "column": {
+          "inputFormat": "balance",
+          "unit": "raw"
+        },
+        "sources": ["left_right_balance"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.left_right_balance.name",
       "shortNameKey": "widgets.types.left_right_balance.shortName",
@@ -838,6 +1093,14 @@
     },
     {
       "type": "stride_length",
+      "activity": {
+        "column": {
+          "idleValue": "missing",
+          "unit": "raw"
+        },
+        "sources": ["stride_length"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.stride_length.name",
       "shortNameKey": "widgets.types.stride_length.shortName",
@@ -879,6 +1142,14 @@
     },
     {
       "type": "stroke_rate",
+      "activity": {
+        "column": {
+          "idleValue": "zero",
+          "unit": "strokes_per_minute"
+        },
+        "sources": ["stroke_rate"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.stroke_rate.name",
       "shortNameKey": "widgets.types.stroke_rate.shortName",
@@ -904,6 +1175,14 @@
     },
     {
       "type": "torque",
+      "activity": {
+        "column": {
+          "idleValue": "missing",
+          "unit": "nm"
+        },
+        "sources": ["torque"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.torque.name",
       "shortNameKey": "widgets.types.torque.shortName",
@@ -929,6 +1208,15 @@
     },
     {
       "type": "vertical_speed",
+      "activity": {
+        "column": {
+          "idleValue": "zero",
+          "unit": "mps",
+          "smoothing": "zero_phase_ma"
+        },
+        "sources": ["vertical_speed"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.vertical_speed.name",
       "shortNameKey": "widgets.types.vertical_speed.shortName",
@@ -971,6 +1259,16 @@
     },
     {
       "type": "gear_position",
+      "activity": {
+        "column": {
+          "specialized": true,
+          "inputType": "String",
+          "rawSample": true,
+          "unit": "raw"
+        },
+        "sources": [],
+        "requires": ["gear_position"]
+      },
       "current": true,
       "nameKey": "widgets.types.gear_position.name",
       "shortNameKey": "widgets.types.gear_position.shortName",
@@ -997,6 +1295,16 @@
     },
     {
       "type": "vertical_ratio",
+      "activity": {
+        "column": {
+          "input": false,
+          "rawSample": false,
+          "finalize": false,
+          "unit": null
+        },
+        "sources": ["vertical_ratio"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.vertical_ratio.name",
       "shortNameKey": "widgets.types.vertical_ratio.shortName",
@@ -1022,6 +1330,14 @@
     },
     {
       "type": "vertical_oscillation",
+      "activity": {
+        "column": {
+          "idleValue": "missing",
+          "unit": "raw"
+        },
+        "sources": ["vertical_oscillation"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.vertical_oscillation.name",
       "shortNameKey": "widgets.types.vertical_oscillation.shortName",
@@ -1053,6 +1369,13 @@
     },
     {
       "type": "core_temperature",
+      "activity": {
+        "column": {
+          "unit": "celsius"
+        },
+        "sources": ["core_temperature"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.core_temperature.name",
       "shortNameKey": "widgets.types.core_temperature.shortName",
@@ -1083,6 +1406,15 @@
     },
     {
       "type": "heading",
+      "activity": {
+        "column": {
+          "limitToObserved": false,
+          "unit": "degrees",
+          "smoothing": "circular_ema"
+        },
+        "sources": ["heading"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.heading.name",
       "shortNameKey": "widgets.types.heading.shortName",
@@ -1093,7 +1425,7 @@
         }
       ],
       "formatter": "integer",
-      "interpolation": "linear",
+      "interpolation": "angular",
       "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
@@ -1110,6 +1442,11 @@
     },
     {
       "type": "altitude",
+      "activity": {
+        "coverageSource": "elevation",
+        "sources": ["barometric_altitude", "elevation"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.altitude.name",
       "shortNameKey": "widgets.types.altitude.shortName",
@@ -1127,7 +1464,6 @@
         }
       ],
       "formatter": "decimal",
-      "interpolation": "linear",
       "unitsMode": "selectable",
       "defaults": {
         "show_units": true,
@@ -1155,6 +1491,13 @@
     },
     {
       "type": "iso",
+      "activity": {
+        "column": {
+          "unit": "iso"
+        },
+        "sources": ["iso"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.iso.name",
       "shortNameKey": "widgets.types.iso.shortName",
@@ -1180,6 +1523,13 @@
     },
     {
       "type": "aperture",
+      "activity": {
+        "column": {
+          "unit": "fnum"
+        },
+        "sources": ["aperture"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.aperture.name",
       "shortNameKey": "widgets.types.aperture.shortName",
@@ -1205,6 +1555,13 @@
     },
     {
       "type": "shutter_speed",
+      "activity": {
+        "column": {
+          "unit": "seconds"
+        },
+        "sources": ["shutter_speed"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.shutter_speed.name",
       "shortNameKey": "widgets.types.shutter_speed.shortName",
@@ -1230,6 +1587,13 @@
     },
     {
       "type": "focal_length",
+      "activity": {
+        "column": {
+          "unit": "mm"
+        },
+        "sources": ["focal_length"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.focal_length.name",
       "shortNameKey": "widgets.types.focal_length.shortName",
@@ -1256,6 +1620,13 @@
     },
     {
       "type": "ev",
+      "activity": {
+        "column": {
+          "unit": "ev"
+        },
+        "sources": ["ev"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.ev.name",
       "shortNameKey": "widgets.types.ev.shortName",
@@ -1281,6 +1652,13 @@
     },
     {
       "type": "color_temperature",
+      "activity": {
+        "column": {
+          "unit": "kelvin"
+        },
+        "sources": ["color_temperature"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.color_temperature.name",
       "shortNameKey": "widgets.types.color_temperature.shortName",
@@ -1307,6 +1685,14 @@
     },
     {
       "type": "rpm",
+      "activity": {
+        "column": {
+          "rawSample": false,
+          "unit": "rpm"
+        },
+        "sources": ["rpm"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.rpm.name",
       "shortNameKey": "widgets.types.rpm.shortName",
@@ -1332,6 +1718,14 @@
     },
     {
       "type": "throttle_position",
+      "activity": {
+        "column": {
+          "rawSample": false,
+          "unit": "percent"
+        },
+        "sources": ["throttle_position"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.throttle_position.name",
       "shortNameKey": "widgets.types.throttle_position.shortName",
@@ -1356,6 +1750,14 @@
     },
     {
       "type": "brake_position",
+      "activity": {
+        "column": {
+          "rawSample": false,
+          "unit": "percent"
+        },
+        "sources": ["brake_position"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.brake_position.name",
       "shortNameKey": "widgets.types.brake_position.shortName",
@@ -1380,6 +1782,14 @@
     },
     {
       "type": "lean_angle",
+      "activity": {
+        "column": {
+          "idleValue": "zero",
+          "unit": "degrees"
+        },
+        "sources": ["lean_angle"],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.lean_angle.name",
       "shortNameKey": "widgets.types.lean_angle.shortName",
@@ -1405,12 +1815,15 @@
     },
     {
       "type": "lap_timer",
+      "activity": {
+        "sources": [],
+        "requires": []
+      },
       "current": true,
       "nameKey": "widgets.types.lap_timer.name",
       "shortNameKey": "widgets.types.lap_timer.shortName",
       "supportedDisplayUnits": [],
       "formatter": "laptimer",
-      "interpolation": "hold",
       "unitsMode": "hidden",
       "icon": {
         "source": "shared",

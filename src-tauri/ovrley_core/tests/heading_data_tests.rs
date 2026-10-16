@@ -58,7 +58,7 @@ fn render_data_requirements_heading_derived_from_metric_kind() {
         "plots": []
     }));
 
-    let reqs = config.render_data_requirements().unwrap();
+    let reqs = config.render_data_requirements();
     assert!(!reqs.heading);
 }
 
@@ -121,7 +121,7 @@ fn heading_values_triggers_heading_data_requirement() {
         "plots": []
     }));
 
-    let reqs = config.render_data_requirements().unwrap();
+    let reqs = config.render_data_requirements();
     assert!(
         reqs.heading,
         "heading value should trigger heading requirement"

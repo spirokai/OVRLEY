@@ -1,4 +1,4 @@
-use ovrley_core::normalize::{raw::RenderConfig, validate_render_config};
+use ovrley_core::normalize::{RenderConfig, validate_render_config};
 
 #[test]
 fn validation_preserves_multiple_route_and_elevation_plots() {

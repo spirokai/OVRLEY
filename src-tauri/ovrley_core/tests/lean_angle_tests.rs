@@ -2,7 +2,7 @@ mod common;
 
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::debug::RenderProfiler;
-use ovrley_core::normalize::raw::RenderConfig;
+use ovrley_core::normalize::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::assets::prepare_render_assets;

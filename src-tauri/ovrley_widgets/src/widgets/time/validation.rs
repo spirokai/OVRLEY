@@ -25,6 +25,16 @@ pub enum ValidatedTimeFormatting {
     },
 }
 
+impl ValidatedTimeFormatting {
+    /// Canonical manifest mode for the validated formatting behavior.
+    pub fn mode(&self) -> &'static str {
+        match self {
+            Self::Daytime(_) => "daytime",
+            Self::Elapsed { .. } => "elapsed",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ElapsedTimeOrigin {
     Activity,

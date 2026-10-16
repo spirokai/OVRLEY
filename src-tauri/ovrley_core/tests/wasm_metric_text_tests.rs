@@ -87,7 +87,7 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
             let config = common::seam::validated_config_from_value(json!({
                 "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
             }));
-            let requirements = config.render_data_requirements().unwrap();
+            let requirements = config.render_data_requirements();
             let trimmed = trim_activity(&parsed, 0.0, 3.0, &requirements).unwrap();
             let seconds = vec![0.0, 0.5, 1.0, 1.5, 2.5];
             let dense = densify_activity(&trimmed, seconds.clone(), &requirements);

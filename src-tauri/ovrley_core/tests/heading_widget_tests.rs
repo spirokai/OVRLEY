@@ -15,7 +15,7 @@
 
 mod common;
 
-use ovrley_core::normalize::raw::RenderConfig;
+use ovrley_core::normalize::RenderConfig;
 use ovrley_core::normalize::{
     validate_render_config, validate_scene_config, ValidatedSceneConfig,
 };
@@ -69,7 +69,7 @@ fn default_heading() -> ValidatedHeading {
 }
 
 fn default_render_config() -> RenderConfig {
-    let scene: ovrley_core::normalize::raw::SceneConfig =
+    let scene: ovrley_core::normalize::SceneConfig =
         serde_json::from_value(common::builders::scene_json()).unwrap();
     let config = RenderConfig {
         scene,

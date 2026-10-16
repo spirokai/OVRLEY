@@ -2,6 +2,9 @@
 use serde_json::Value;
 use std::{collections::BTreeSet, env, fmt::Write, fs, path::PathBuf};
 
+#[path = "build_support/activity_schema.rs"]
+mod activity_schema;
+
 fn main() {
     let assets = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../assets");
     let metrics_path = assets.join("standard-metrics.json");
@@ -58,5 +61,6 @@ fn main() {
         "_ => panic!(\"icon asset missing from the bundled manifests: {asset_file}\"),\n}\n}\n",
     );
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    activity_schema::generate(&metrics, &widgets, &out);
     fs::write(out.join("icon_assets.rs"), generated).unwrap();
 }

@@ -23,7 +23,7 @@ use ovrley_core::encode::debug::composite::write_composite_timing_summary;
 use ovrley_core::encode::ffmpeg::composite::CompositeEncoding;
 use ovrley_core::encode::fps::Fps;
 use ovrley_core::encode::progress::RenderController;
-use ovrley_core::normalize::raw::{parse_config_json, RenderConfig};
+use ovrley_core::normalize::{parse_config_json, RenderConfig};
 use ovrley_core::normalize::{parse_template_value, validate_render_config, ValidatedRenderConfig};
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;

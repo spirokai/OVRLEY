@@ -18,6 +18,7 @@ use ovrley_widgets::interpolation::{
     collect_valid_numeric_points, interpolate_heading_points, interpolate_numeric_series_value,
     MissingSamplePolicy,
 };
+use ovrley_widgets::model::telemetry::{ActivitySeries, NumericActivity};
 
 // Validates that the requested scene window fits inside activity duration.
 fn validate_trim_window(duration: f64, start: f64, end: f64) -> CoreResult<()> {
@@ -54,6 +55,31 @@ fn split_trim_indices(elapsed: &[f64], start: f64, end: f64) -> (usize, usize) {
     let start_inner_index = elapsed.partition_point(|value| *value <= start);
     let end_inner_index = elapsed.partition_point(|value| *value < end);
     (start_inner_index, end_inner_index)
+}
+
+struct NumericTrim<'a> {
+    activity: &'a ParsedActivity,
+    requirements: &'a RenderDataRequirements,
+    start: f64,
+    end: f64,
+    interior: std::ops::Range<usize>,
+}
+
+impl NumericTrim<'_> {
+    fn series(&self, series: ActivitySeries) -> Vec<Option<f64>> {
+        if !self.requirements.enabled(series) {
+            return Vec::new();
+        }
+        trim_numeric_series(
+            &self.activity.sample_elapsed_seconds,
+            self.activity.numeric_series(series),
+            self.start,
+            self.end,
+            self.interior.start,
+            self.interior.end,
+            interpolation_strategy(series),
+        )
+    }
 }
 
 // Trims one optional numeric series and adds interpolated boundary samples.
@@ -299,588 +325,75 @@ pub fn trim_activity(
     // Each series gets interpolated boundary values at the exact start/end
     // positions so downstream interpolation has precise endpoints even when
     // the trim window cuts through a source sampling interval.
-    Ok(TrimmedActivity {
-        full_activity_metric_ranges: super::metric_ranges::calculate_metric_ranges(activity),
-        sync_time: start_time,
-        sample_elapsed_seconds: trimmed_elapsed,
-        sample_distance_progress: trimmed_distance_progress,
-        course,
-        elevation: if requirements.elevation {
-            trim_numeric_series(
-                elapsed,
-                &activity.elevation,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Elevation),
-            )
-        } else {
-            Vec::new()
-        },
-        calories: if requirements.calories {
-            trim_numeric_series(
-                elapsed,
-                &activity.calories,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Calories),
-            )
-        } else {
-            Vec::new()
-        },
-        distance_to_home: if requirements.distance_to_home {
-            trim_numeric_series(
-                elapsed,
-                &activity.distance_to_home,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::DistanceToHome),
-            )
-        } else {
-            Vec::new()
-        },
-        total_ascent: if requirements.total_ascent {
-            trim_numeric_series(
-                elapsed,
-                &activity.total_ascent,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::TotalAscent),
-            )
-        } else {
-            Vec::new()
-        },
-        full_activity_total_ascent: last_finite(&activity.total_ascent),
-        barometric_altitude: if requirements.barometric_altitude {
-            trim_numeric_series(
-                elapsed,
-                &activity.barometric_altitude,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Elevation),
-            )
-        } else {
-            Vec::new()
-        },
-        speed: if requirements.speed {
-            trim_numeric_series(
-                elapsed,
-                &activity.speed,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Speed),
-            )
-        } else {
-            Vec::new()
-        },
-        distance: if requirements.distance {
-            trim_numeric_series(
-                elapsed,
-                &activity.distance,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Distance),
-            )
-        } else {
-            Vec::new()
-        },
-        heartrate: if requirements.heartrate {
-            trim_numeric_series(
-                elapsed,
-                &activity.heartrate,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Heartrate),
-            )
-        } else {
-            Vec::new()
-        },
-        cadence: if requirements.cadence {
-            trim_numeric_series(
-                elapsed,
-                &activity.cadence,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Cadence),
-            )
-        } else {
-            Vec::new()
-        },
-        power: if requirements.power {
-            trim_numeric_series(
-                elapsed,
-                &activity.power,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Power),
-            )
-        } else {
-            Vec::new()
-        },
-        engine_power: if requirements.engine_power {
-            trim_numeric_series(
-                elapsed,
-                &activity.engine_power,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::EnginePower),
-            )
-        } else {
-            Vec::new()
-        },
-        engine_load: if requirements.engine_load {
-            trim_numeric_series(
-                elapsed,
-                &activity.engine_load,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::EngineLoad),
-            )
-        } else {
-            Vec::new()
-        },
-        temperature: if requirements.temperature {
-            trim_numeric_series(
-                elapsed,
-                &activity.temperature,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Temperature),
-            )
-        } else {
-            Vec::new()
-        },
-        pace: if requirements.pace {
-            trim_numeric_series(
-                elapsed,
-                &activity.pace,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Pace),
-            )
-        } else {
-            Vec::new()
-        },
-        g_force: if requirements.g_force {
-            trim_numeric_series(
-                elapsed,
-                &activity.g_force,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::GForce),
-            )
-        } else {
-            Vec::new()
-        },
-        g_force_x: if requirements.g_force_x {
-            trim_numeric_series(
-                elapsed,
-                &activity.g_force_x,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                InterpolationStrategy::Numeric(MissingSamplePolicy::Preserve),
-            )
-        } else {
-            Vec::new()
-        },
-        g_force_y: if requirements.g_force_y {
-            trim_numeric_series(
-                elapsed,
-                &activity.g_force_y,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                InterpolationStrategy::Numeric(MissingSamplePolicy::Preserve),
-            )
-        } else {
-            Vec::new()
-        },
-        g_force_z: if requirements.g_force_z {
-            trim_numeric_series(
-                elapsed,
-                &activity.g_force_z,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                InterpolationStrategy::Numeric(MissingSamplePolicy::Preserve),
-            )
-        } else {
-            Vec::new()
-        },
-        rpm: if requirements.rpm {
-            trim_numeric_series(
-                elapsed,
-                &activity.rpm,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Rpm),
-            )
-        } else {
-            Vec::new()
-        },
-        throttle_position: if requirements.throttle_position {
-            trim_numeric_series(
-                elapsed,
-                &activity.throttle_position,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::ThrottlePosition),
-            )
-        } else {
-            Vec::new()
-        },
-        brake_position: if requirements.brake_position {
-            trim_numeric_series(
-                elapsed,
-                &activity.brake_position,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::BrakePosition),
-            )
-        } else {
-            Vec::new()
-        },
-        lean_angle: if requirements.lean_angle {
-            trim_numeric_series(
-                elapsed,
-                &activity.lean_angle,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::LeanAngle),
-            )
-        } else {
-            Vec::new()
-        },
-        air_pressure: if requirements.air_pressure {
-            trim_numeric_series(
-                elapsed,
-                &activity.air_pressure,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::AirPressure),
-            )
-        } else {
-            Vec::new()
-        },
-        ground_contact_time: if requirements.ground_contact_time {
-            trim_numeric_series(
-                elapsed,
-                &activity.ground_contact_time,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::GroundContactTime),
-            )
-        } else {
-            Vec::new()
-        },
-        left_right_balance: if requirements.left_right_balance {
-            trim_numeric_series(
-                elapsed,
-                &activity.left_right_balance,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::LeftRightBalance),
-            )
-        } else {
-            Vec::new()
-        },
-        stride_length: if requirements.stride_length {
-            trim_numeric_series(
-                elapsed,
-                &activity.stride_length,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::StrideLength),
-            )
-        } else {
-            Vec::new()
-        },
-        stroke_rate: if requirements.stroke_rate {
-            trim_numeric_series(
-                elapsed,
-                &activity.stroke_rate,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::StrokeRate),
-            )
-        } else {
-            Vec::new()
-        },
-        torque: if requirements.torque {
-            trim_numeric_series(
-                elapsed,
-                &activity.torque,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Torque),
-            )
-        } else {
-            Vec::new()
-        },
-        vertical_speed: if requirements.vertical_speed {
-            trim_numeric_series(
-                elapsed,
-                &activity.vertical_speed,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::VerticalSpeed),
-            )
-        } else {
-            Vec::new()
-        },
-        iso: if requirements.iso {
-            trim_numeric_series(
-                elapsed,
-                &activity.iso,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Iso),
-            )
-        } else {
-            Vec::new()
-        },
-        aperture: if requirements.aperture {
-            trim_numeric_series(
-                elapsed,
-                &activity.aperture,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Aperture),
-            )
-        } else {
-            Vec::new()
-        },
-        shutter_speed: if requirements.shutter_speed {
-            trim_numeric_series(
-                elapsed,
-                &activity.shutter_speed,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::ShutterSpeed),
-            )
-        } else {
-            Vec::new()
-        },
-        focal_length: if requirements.focal_length {
-            trim_numeric_series(
-                elapsed,
-                &activity.focal_length,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::FocalLength),
-            )
-        } else {
-            Vec::new()
-        },
-        ev: if requirements.ev {
-            trim_numeric_series(
-                elapsed,
-                &activity.ev,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Ev),
-            )
-        } else {
-            Vec::new()
-        },
-        color_temperature: if requirements.color_temperature {
-            trim_numeric_series(
-                elapsed,
-                &activity.color_temperature,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::ColorTemperature),
-            )
-        } else {
-            Vec::new()
-        },
-        gear_position: if requirements.gear_position && !activity.gear_position.is_empty() {
-            let boundary_values =
-                densify_hold_series(elapsed, &activity.gear_position, &[start, end]);
-            trim_series(
-                &activity.gear_position,
-                start_inner_index,
-                end_inner_index,
-                boundary_values[0].clone(),
-                boundary_values[1].clone(),
-            )
-        } else {
-            Vec::new()
-        },
-        vertical_ratio: if requirements.vertical_ratio {
-            trim_numeric_series(
-                elapsed,
-                &activity.vertical_ratio,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::VerticalRatio),
-            )
-        } else {
-            Vec::new()
-        },
-        vertical_oscillation: if requirements.vertical_oscillation {
-            trim_numeric_series(
-                elapsed,
-                &activity.vertical_oscillation,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(
-                    ovrley_widgets::model::types::MetricKind::VerticalOscillation,
-                ),
-            )
-        } else {
-            Vec::new()
-        },
-        core_temperature: if requirements.core_temperature {
-            trim_numeric_series(
-                elapsed,
-                &activity.core_temperature,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::CoreTemperature),
-            )
-        } else {
-            Vec::new()
-        },
-        gradient: if requirements.gradient {
-            trim_numeric_series(
-                elapsed,
-                &activity.gradient,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Gradient),
-            )
-        } else {
-            Vec::new()
-        },
-        heading: if requirements.heading {
-            trim_numeric_series(
-                elapsed,
-                &activity.heading,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                interpolation_strategy(ovrley_widgets::model::types::MetricKind::Heading),
-            )
-        } else {
-            Vec::new()
-        },
-        time: if requirements.time && !activity.time.is_empty() {
-            let start_value = interpolate_time_series_value(elapsed, &activity.time, start);
-            let end_value = interpolate_time_series_value(elapsed, &activity.time, end);
-            let mut trimmed =
-                Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
-            trimmed.push(start_value);
-            trimmed.extend_from_slice(&activity.time[start_inner_index..end_inner_index]);
-            trimmed.push(end_value);
-            trimmed
-        } else {
-            Vec::new()
-        },
-        full_activity_distance: last_finite(&activity.distance),
-        lap_number: if requirements.lap_number {
-            lap_number
-        } else {
-            Vec::new()
-        },
-        lap_time_seconds: if requirements.lap_time_seconds {
-            lap_time_seconds
-        } else {
-            Vec::new()
-        },
-        lap_start_elapsed_seconds,
-        delta_to_best_lap_seconds: if requirements.delta_to_best_lap_seconds {
-            trim_numeric_series(
-                elapsed,
-                &activity.delta_to_best_lap_seconds,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                InterpolationStrategy::Numeric(MissingSamplePolicy::Preserve),
-            )
-        } else {
-            Vec::new()
-        },
-        lap_durations_seconds,
-        lap_durations_best_so_far_seconds,
-    })
+    let numeric = NumericTrim {
+        activity,
+        requirements,
+        start,
+        end,
+        interior: start_inner_index..end_inner_index,
+    };
+    Ok(
+        ovrley_widgets::numeric_activity!(TrimmedActivity, numeric, series, {
+            full_activity_metric_ranges: super::sampling::calculate_metric_ranges(activity),
+            sync_time: start_time,
+            sample_elapsed_seconds: trimmed_elapsed,
+            sample_distance_progress: trimmed_distance_progress,
+            course: course,
+            full_activity_total_ascent: last_finite(&activity.total_ascent),
+            gear_position: if requirements.gear_position && !activity.gear_position.is_empty() {
+                let boundary_values =
+                    densify_hold_series(elapsed, &activity.gear_position, &[start, end]);
+                trim_series(
+                    &activity.gear_position,
+                    start_inner_index,
+                    end_inner_index,
+                    boundary_values[0].clone(),
+                    boundary_values[1].clone(),
+                )
+            } else {
+                Vec::new()
+            },
+            time: if requirements.time && !activity.time.is_empty() {
+                let start_value = interpolate_time_series_value(elapsed, &activity.time, start);
+                let end_value = interpolate_time_series_value(elapsed, &activity.time, end);
+                let mut trimmed =
+                    Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
+                trimmed.push(start_value);
+                trimmed.extend_from_slice(&activity.time[start_inner_index..end_inner_index]);
+                trimmed.push(end_value);
+                trimmed
+            } else {
+                Vec::new()
+            },
+            full_activity_distance: last_finite(&activity.distance),
+            lap_number: if requirements.lap_number {
+                lap_number
+            } else {
+                Vec::new()
+            },
+            lap_time_seconds: if requirements.lap_time_seconds {
+                lap_time_seconds
+            } else {
+                Vec::new()
+            },
+            lap_start_elapsed_seconds: lap_start_elapsed_seconds,
+            delta_to_best_lap_seconds: if requirements.delta_to_best_lap_seconds {
+                trim_numeric_series(
+                    elapsed,
+                    &activity.delta_to_best_lap_seconds,
+                    start,
+                    end,
+                    start_inner_index,
+                    end_inner_index,
+                    InterpolationStrategy::Numeric(MissingSamplePolicy::Preserve),
+                )
+            } else {
+                Vec::new()
+            },
+            lap_durations_seconds: lap_durations_seconds,
+            lap_durations_best_so_far_seconds: lap_durations_best_so_far_seconds,
+        }),
+    )
 }
 
 #[cfg(test)]

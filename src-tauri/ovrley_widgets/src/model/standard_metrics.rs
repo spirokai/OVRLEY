@@ -32,14 +32,6 @@ pub enum StandardMetricFormatterKind {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum StandardMetricInterpolationKind {
-    Linear,
-    Hold,
-    Preserve,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
 pub enum StandardMetricUnitsMode {
     Selectable,
     Hidden,
@@ -70,15 +62,10 @@ pub struct StandardMetricIconDefinition {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StandardMetricDefinition {
-    pub kind: MetricKind,
-    pub key: String,
-    pub current: bool,
     pub default_display_unit: String,
     pub supported_display_units: Vec<StandardMetricUnitOption>,
-    pub show_units_by_default: bool,
     pub formatter: StandardMetricFormatterKind,
     pub icon: StandardMetricIconDefinition,
-    pub interpolation: StandardMetricInterpolationKind,
     pub units_mode: StandardMetricUnitsMode,
 }
 
@@ -86,13 +73,12 @@ pub struct StandardMetricDefinition {
 #[serde(rename_all = "camelCase")]
 struct RawStandardMetricDefinition {
     #[serde(rename = "type")]
-    key: String,
+    kind: MetricKind,
     current: bool,
     defaults: RawMetricDefaults,
     supported_display_units: Vec<StandardMetricUnitOption>,
     formatter: StandardMetricFormatterKind,
     icon: StandardMetricIconDefinition,
-    interpolation: StandardMetricInterpolationKind,
     units_mode: StandardMetricUnitsMode,
     #[serde(default)]
     display_types: Option<Vec<String>>,
@@ -101,22 +87,12 @@ struct RawStandardMetricDefinition {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 struct RawMetricDefaults {
     display_unit: String,
-    show_units: bool,
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-struct RawDisplayVariantDefaults {
-    width: Option<u32>,
-    height: Option<u32>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RawDisplayTypeDefinition {
-    label_key: String,
     layout_mode: DisplayTypeLayoutMode,
-    #[serde(default)]
-    variant_defaults: RawDisplayVariantDefaults,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -141,39 +117,9 @@ struct RawStandardMetricManifest {
 
 #[derive(Clone, Debug)]
 struct DisplayTypeManifest {
-    definitions: HashMap<String, DisplayTypeDefinition>,
+    definitions: HashMap<String, RawDisplayTypeDefinition>,
     defaults: Vec<String>,
     overrides: HashMap<String, Vec<String>>,
-}
-
-impl DisplayTypeManifest {
-    fn from_raw(
-        raw: RawDisplayTypeManifest,
-        defaults: Vec<String>,
-        overrides: HashMap<String, Vec<String>>,
-    ) -> Self {
-        let definitions = raw
-            .definitions
-            .into_iter()
-            .map(|(key, raw_def)| {
-                (
-                    key,
-                    DisplayTypeDefinition {
-                        label_key: raw_def.label_key,
-                        layout_mode: raw_def.layout_mode,
-                        default_frame_width: raw_def.variant_defaults.width,
-                        default_frame_height: raw_def.variant_defaults.height,
-                    },
-                )
-            })
-            .collect();
-
-        DisplayTypeManifest {
-            definitions,
-            defaults,
-            overrides,
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -188,166 +134,61 @@ fn manifest() -> &'static StandardMetricManifest {
     STANDARD_METRIC_MANIFEST.get_or_init(load_manifest)
 }
 
+#[derive(Deserialize)]
+struct RawWidgetDefaults {
+    display_type: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RawWidgetDefinition {
+    #[serde(rename = "type")]
+    key: String,
+    defaults: RawWidgetDefaults,
+}
+
+#[derive(Deserialize)]
+struct RawWidgetManifest {
+    definitions: Vec<RawWidgetDefinition>,
+}
+
 fn load_manifest() -> StandardMetricManifest {
-    let raw = serde_json::from_str::<RawStandardMetricManifest>(include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/standard-metrics.json"
-    )))
-    .expect("shared standard metrics manifest must be valid JSON");
-
-    let mut display_overrides = HashMap::new();
-    let widgets: serde_json::Value = serde_json::from_str(include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../assets/standard-widgets.json"
-    )))
-    .expect("shared widget manifest must be valid JSON");
-    for definition in widgets["definitions"]
-        .as_array()
-        .expect("widget definitions must be an array")
-    {
-        if let Some(display_type) = definition["defaults"].get("display_type") {
-            let key = definition["type"]
-                .as_str()
-                .expect("widget type must be a string");
-            let display_type = display_type
-                .as_str()
-                .expect("display_type must be a string");
-            display_overrides.insert(key.to_owned(), vec![display_type.to_owned()]);
+    let raw: RawStandardMetricManifest =
+        serde_json::from_str(include_str!("../../../../assets/standard-metrics.json"))
+            .expect("shared standard metrics manifest must be valid JSON");
+    let widgets: RawWidgetManifest =
+        serde_json::from_str(include_str!("../../../../assets/standard-widgets.json"))
+            .expect("shared widget manifest must be valid JSON");
+    let mut overrides = HashMap::new();
+    for definition in widgets.definitions {
+        if let Some(display_type) = definition.defaults.display_type {
+            overrides.insert(definition.key, vec![display_type]);
         }
     }
-    for definition in &raw.definitions {
-        if let Some(display_types) = &definition.display_types {
-            display_overrides.insert(definition.key.clone(), display_types.clone());
+    let mut definitions = HashMap::new();
+    for definition in raw.definitions {
+        if let Some(display_types) = definition.display_types {
+            overrides.insert(definition.kind.as_str().to_owned(), display_types);
         }
-    }
-
-    let definitions = raw
-        .definitions
-        .into_iter()
-        .filter(|definition| definition.current)
-        .map(|definition| {
-            let kind = metric_kind_from_key(&definition.key).unwrap_or_else(|| {
-                panic!(
-                    "shared standard metrics manifest contains unknown metric type: {}",
-                    definition.key
-                )
-            });
-
-            (
-                kind,
+        if definition.current {
+            definitions.insert(
+                definition.kind,
                 StandardMetricDefinition {
-                    kind,
-                    key: definition.key,
-                    current: definition.current,
                     default_display_unit: definition.defaults.display_unit,
                     supported_display_units: definition.supported_display_units,
-                    show_units_by_default: definition.defaults.show_units,
                     formatter: definition.formatter,
                     icon: definition.icon,
-                    interpolation: definition.interpolation,
                     units_mode: definition.units_mode,
                 },
-            )
-        })
-        .collect();
-
+            );
+        }
+    }
     StandardMetricManifest {
         definitions,
-        display_types: DisplayTypeManifest::from_raw(
-            raw.display_types,
-            raw.widget_defaults.display_types,
-            display_overrides,
-        ),
-    }
-}
-
-fn metric_kind_from_key(key: &str) -> Option<MetricKind> {
-    match key {
-        "speed" => Some(MetricKind::Speed),
-        "distance" => Some(MetricKind::Distance),
-        "heartrate" => Some(MetricKind::Heartrate),
-        "cadence" => Some(MetricKind::Cadence),
-        "power" => Some(MetricKind::Power),
-        "engine_power" => Some(MetricKind::EnginePower),
-        "temperature" => Some(MetricKind::Temperature),
-        "pace" => Some(MetricKind::Pace),
-        "g_force" => Some(MetricKind::GForce),
-        "air_pressure" => Some(MetricKind::AirPressure),
-        "ground_contact_time" => Some(MetricKind::GroundContactTime),
-        "left_right_balance" => Some(MetricKind::LeftRightBalance),
-        "stride_length" => Some(MetricKind::StrideLength),
-        "stroke_rate" => Some(MetricKind::StrokeRate),
-        "torque" => Some(MetricKind::Torque),
-        "vertical_speed" => Some(MetricKind::VerticalSpeed),
-        "gear_position" => Some(MetricKind::GearPosition),
-        "vertical_ratio" => Some(MetricKind::VerticalRatio),
-        "vertical_oscillation" => Some(MetricKind::VerticalOscillation),
-        "core_temperature" => Some(MetricKind::CoreTemperature),
-        "heading" => Some(MetricKind::Heading),
-        "altitude" => Some(MetricKind::Altitude),
-        "iso" => Some(MetricKind::Iso),
-        "aperture" => Some(MetricKind::Aperture),
-        "shutter_speed" => Some(MetricKind::ShutterSpeed),
-        "focal_length" => Some(MetricKind::FocalLength),
-        "ev" => Some(MetricKind::Ev),
-        "color_temperature" => Some(MetricKind::ColorTemperature),
-        "rpm" => Some(MetricKind::Rpm),
-        "throttle_position" => Some(MetricKind::ThrottlePosition),
-        "brake_position" => Some(MetricKind::BrakePosition),
-        "engine_load" => Some(MetricKind::EngineLoad),
-        "lean_angle" => Some(MetricKind::LeanAngle),
-        "gps_coordinates" => Some(MetricKind::GpsCoordinates),
-        "distance_to_home" => Some(MetricKind::DistanceToHome),
-        "total_ascent" => Some(MetricKind::TotalAscent),
-        "calories" => Some(MetricKind::Calories),
-        "lap_timer" => Some(MetricKind::LapTimer),
-        _ => None,
-    }
-}
-
-fn metric_kind_to_key(kind: MetricKind) -> &'static str {
-    match kind {
-        MetricKind::Speed => "speed",
-        MetricKind::Distance => "distance",
-        MetricKind::Heartrate => "heartrate",
-        MetricKind::Elevation => "elevation",
-        MetricKind::Time => "time",
-        MetricKind::Gradient => "gradient",
-        MetricKind::Cadence => "cadence",
-        MetricKind::Power => "power",
-        MetricKind::EnginePower => "engine_power",
-        MetricKind::Temperature => "temperature",
-        MetricKind::Pace => "pace",
-        MetricKind::GForce => "g_force",
-        MetricKind::AirPressure => "air_pressure",
-        MetricKind::GroundContactTime => "ground_contact_time",
-        MetricKind::LeftRightBalance => "left_right_balance",
-        MetricKind::StrideLength => "stride_length",
-        MetricKind::StrokeRate => "stroke_rate",
-        MetricKind::Torque => "torque",
-        MetricKind::VerticalSpeed => "vertical_speed",
-        MetricKind::GearPosition => "gear_position",
-        MetricKind::VerticalRatio => "vertical_ratio",
-        MetricKind::VerticalOscillation => "vertical_oscillation",
-        MetricKind::CoreTemperature => "core_temperature",
-        MetricKind::Heading => "heading",
-        MetricKind::Altitude => "altitude",
-        MetricKind::Iso => "iso",
-        MetricKind::Aperture => "aperture",
-        MetricKind::ShutterSpeed => "shutter_speed",
-        MetricKind::FocalLength => "focal_length",
-        MetricKind::Ev => "ev",
-        MetricKind::ColorTemperature => "color_temperature",
-        MetricKind::Rpm => "rpm",
-        MetricKind::ThrottlePosition => "throttle_position",
-        MetricKind::BrakePosition => "brake_position",
-        MetricKind::EngineLoad => "engine_load",
-        MetricKind::LeanAngle => "lean_angle",
-        MetricKind::GpsCoordinates => "gps_coordinates",
-        MetricKind::DistanceToHome => "distance_to_home",
-        MetricKind::TotalAscent => "total_ascent",
-        MetricKind::Calories => "calories",
-        MetricKind::LapTimer => "lap_timer",
+        display_types: DisplayTypeManifest {
+            definitions: raw.display_types.definitions,
+            defaults: raw.widget_defaults.display_types,
+            overrides,
+        },
     }
 }
 
@@ -359,24 +200,8 @@ pub fn is_standard_metric(kind: MetricKind) -> bool {
     standard_metric_definition(kind).is_some()
 }
 
-pub fn standard_metric_default_display_unit(kind: MetricKind) -> Option<&'static str> {
-    standard_metric_definition(kind).map(|definition| definition.default_display_unit.as_str())
-}
-
-pub fn standard_metric_show_units(kind: MetricKind, configured: Option<bool>) -> bool {
-    configured.unwrap_or_else(|| {
-        standard_metric_definition(kind)
-            .map(|definition| definition.show_units_by_default)
-            .unwrap_or(false)
-    })
-}
-
 pub fn standard_metric_formatter(kind: MetricKind) -> Option<StandardMetricFormatterKind> {
     standard_metric_definition(kind).map(|definition| definition.formatter)
-}
-
-pub fn standard_metric_interpolation(kind: MetricKind) -> Option<StandardMetricInterpolationKind> {
-    standard_metric_definition(kind).map(|definition| definition.interpolation)
 }
 
 pub fn standard_metric_units_mode(kind: MetricKind) -> Option<StandardMetricUnitsMode> {
@@ -417,58 +242,9 @@ pub enum DisplayTypeLayoutMode {
     Boxed,
 }
 
-/// Formal definition of a display type from the shared manifest.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DisplayTypeDefinition {
-    pub label_key: String,
-    pub layout_mode: DisplayTypeLayoutMode,
-    pub default_frame_width: Option<u32>,
-    pub default_frame_height: Option<u32>,
-}
-
-/// Look up the full definition for a `display_type` value.
-pub fn display_type_definition(display_type: &str) -> Option<&'static DisplayTypeDefinition> {
-    manifest().display_types.definitions.get(display_type)
-}
-
-/// Look up the translation key for a `display_type` value.
-pub fn display_type_label_key(display_type: &str) -> Option<&str> {
-    manifest()
-        .display_types
-        .definitions
-        .get(display_type)
-        .map(|definition| definition.label_key.as_str())
-}
-
-/// Check whether a display type uses boxed (framed) layout.
-pub fn is_boxed_display_type(display_type: &str) -> bool {
-    manifest()
-        .display_types
-        .definitions
-        .get(display_type)
-        .is_some_and(|def| def.layout_mode == DisplayTypeLayoutMode::Boxed)
-}
-
-/// Canonical layout mode for a [`DisplayType`] variant, sourced from the
-/// shared manifest. This is the single adapter that every Rust path should
-/// use when deciding boxed-vs-intrinsic behaviour.
+/// Layout mode for a validated display type. Every native display must be declared.
 pub fn display_type_layout_mode(display_type: DisplayType) -> DisplayTypeLayoutMode {
-    if is_boxed_display_type(display_type.as_str()) {
-        DisplayTypeLayoutMode::Boxed
-    } else {
-        DisplayTypeLayoutMode::Intrinsic
-    }
-}
-
-/// Return the default frame dimensions for a boxed display type, if available.
-pub fn default_frame_dimensions(display_type: &str) -> Option<(u32, u32)> {
-    let def = manifest().display_types.definitions.get(display_type)?;
-    if def.layout_mode != DisplayTypeLayoutMode::Boxed {
-        return None;
-    }
-    let w = def.default_frame_width?;
-    let h = def.default_frame_height?;
-    Some((w, h))
+    manifest().display_types.definitions[display_type.as_str()].layout_mode
 }
 
 /// Return the permitted display types for a given metric kind.
@@ -477,7 +253,7 @@ pub fn default_frame_dimensions(display_type: &str) -> Option<(u32, u32)> {
 /// otherwise the global defaults are returned.
 pub fn supported_display_types(kind: MetricKind) -> &'static [String] {
     let m = manifest();
-    let key = metric_kind_to_key(kind);
+    let key = kind.as_str();
     if let Some(override_list) = m.display_types.overrides.get(key) {
         override_list.as_slice()
     } else {

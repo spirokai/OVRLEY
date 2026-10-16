@@ -30,9 +30,8 @@ use crate::error::{CoreError, CoreResult};
 use crate::media::prepared_video::InspectedVideoSource;
 use crate::normalize::SceneConfig;
 use crate::normalize::{
-    raw::RenderConfig, validate_ffmpeg_config, validate_render_config_with_resources,
-    validate_render_presentation, ValidatedFfmpegConfig, ValidatedRenderConfig,
-    ValidatedSceneConfig,
+    validate_ffmpeg_config, validate_render_config_with_resources, validate_render_presentation,
+    RenderConfig, ValidatedFfmpegConfig, ValidatedRenderConfig, ValidatedSceneConfig,
 };
 use crate::output::{plan_batch_output_targets, RenderOutputKind};
 use crate::raster::RasterResourceResolver;

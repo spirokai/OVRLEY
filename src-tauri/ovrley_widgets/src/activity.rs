@@ -10,7 +10,10 @@ use crate::{
         interpolate_points, MissingSamplePolicy,
     },
     model::{
-        standard_metrics::{standard_metric_interpolation, StandardMetricInterpolationKind},
+        telemetry::{
+            metric_interpolation, numeric_metrics, ActivitySeries, InterpolationKind,
+            NumericActivity,
+        },
         types::MetricKind,
     },
     widgets::value::{format::MetricSample, validation::ValidatedValueWidget},
@@ -19,7 +22,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 macro_rules! activity_columns {
-    ($($field:ident: $kind:ident),* $(,)?) => {
+    (numeric { $($field:ident: $kind:ident),* } other { $($other:ident: $variant:ident),* }) => {
         /// Canonical finalized columns. Missing external telemetry is an empty series.
         #[derive(Deserialize)]
         struct PreviewActivity {
@@ -29,74 +32,36 @@ macro_rules! activity_columns {
             #[serde(default)] sync_time: Option<String>,
             #[serde(default)] metadata: serde_json::Value,
             $(#[serde(default)] $field: Vec<Option<f64>> ,)*
-            #[serde(default)] elevation: Vec<Option<f64>>,
             #[serde(default)] sample_elevations: Vec<Option<f64>>,
-            #[serde(default)] barometric_altitude: Vec<Option<f64>>,
-            #[serde(default)] gradient: Vec<Option<f64>>,
-            #[serde(default)] g_force_x: Vec<Option<f64>>,
-            #[serde(default)] g_force_y: Vec<Option<f64>>,
-            #[serde(default)] g_force_z: Vec<Option<f64>>,
             #[serde(default)] gear_position: Vec<Option<String>>,
             #[serde(default)] course: Vec<(Option<f64>, Option<f64>)>,
             #[serde(default)] sample_course_points: Vec<(Option<f64>, Option<f64>)>,
             #[serde(default)] sample_distance_progress: Vec<f64>,
             #[serde(flatten)] lap_timing: crate::widgets::lap_timer::sampling::LapTiming,
         }
-        impl PreviewActivity {
-            fn take_numeric(&mut self) -> HashMap<MetricKind, Vec<Option<f64>>> {
-                HashMap::from([$( (MetricKind::$kind, std::mem::take(&mut self.$field)), )*])
+        impl NumericActivity for PreviewActivity {
+            fn numeric_series(&self, series: ActivitySeries) -> &[Option<f64>] {
+                match series {
+                    $(ActivitySeries::$kind => &self.$field,)*
+                    _ => panic!("manifest numeric sources must be numeric activity columns"),
+                }
             }
         }
-    }
+    };
 }
-activity_columns! {
-    speed: Speed,
-    distance: Distance,
-    heartrate: Heartrate,
-    cadence: Cadence,
-    power: Power,
-    engine_power: EnginePower,
-    engine_load: EngineLoad,
-    temperature: Temperature,
-    calories: Calories,
-    pace: Pace,
-    g_force: GForce,
-    air_pressure: AirPressure,
-    ground_contact_time: GroundContactTime,
-    left_right_balance: LeftRightBalance,
-    stride_length: StrideLength,
-    stroke_rate: StrokeRate,
-    torque: Torque,
-    vertical_speed: VerticalSpeed,
-    vertical_ratio: VerticalRatio,
-    vertical_oscillation: VerticalOscillation,
-    core_temperature: CoreTemperature,
-    heading: Heading,
-    iso: Iso,
-    aperture: Aperture,
-    shutter_speed: ShutterSpeed,
-    focal_length: FocalLength,
-    ev: Ev,
-    color_temperature: ColorTemperature,
-    rpm: Rpm,
-    throttle_position: ThrottlePosition,
-    brake_position: BrakePosition,
-    lean_angle: LeanAngle,
-    distance_to_home: DistanceToHome,
-    total_ascent: TotalAscent
-}
+activity_series!(activity_columns);
 
 struct NumericColumn {
     values: Vec<Option<f64>>,
     points: Vec<(f64, f64)>,
     range: Option<(f64, f64)>,
-    policy: StandardMetricInterpolationKind,
+    policy: InterpolationKind,
 }
 impl NumericColumn {
     fn new(
         times: &[f64],
         values: Vec<Option<f64>>,
-        policy: StandardMetricInterpolationKind,
+        policy: InterpolationKind,
     ) -> WidgetResult<Self> {
         if !values.is_empty() && values.len() != times.len() {
             return Err(WidgetError::Config(
@@ -128,14 +93,15 @@ impl NumericColumn {
     }
     fn at(&self, times: &[f64], second: f64) -> Option<f64> {
         match self.policy {
-            StandardMetricInterpolationKind::Linear => interpolate_points(&self.points, second),
-            StandardMetricInterpolationKind::Preserve => interpolate_numeric_series_value(
+            InterpolationKind::Angular => interpolate_heading_points(&self.points, second),
+            InterpolationKind::Linear => interpolate_points(&self.points, second),
+            InterpolationKind::Preserve => interpolate_numeric_series_value(
                 times,
                 &self.values,
                 second,
                 MissingSamplePolicy::Preserve,
             ),
-            StandardMetricInterpolationKind::Hold => self
+            InterpolationKind::Hold => self
                 .points
                 .partition_point(|p| p.0 <= second + 1e-9)
                 .checked_sub(1)
@@ -164,7 +130,7 @@ pub struct ActivitySampler {
 }
 impl ActivitySampler {
     pub fn from_json(bytes: &[u8]) -> WidgetResult<Self> {
-        let mut activity: PreviewActivity = serde_json::from_slice(bytes)
+        let activity: PreviewActivity = serde_json::from_slice(bytes)
             .map_err(|e| WidgetError::Config(format!("preview activity: {e}")))?;
         let times = &activity.sample_elapsed_seconds;
         if !activity.trim_end_seconds.is_finite()
@@ -208,12 +174,13 @@ impl ActivitySampler {
             &activity.sample_distance_progress,
             activity.trim_end_seconds,
         );
-        let altitude = if activity.barometric_altitude.iter().any(Option::is_some) {
-            std::mem::take(&mut activity.barometric_altitude)
-        } else {
-            std::mem::take(&mut activity.elevation)
-        };
-        let mut columns = activity.take_numeric();
+        let mut columns = HashMap::new();
+        for &metric in numeric_metrics() {
+            let values = activity
+                .numeric_series_for(metric)
+                .expect("numeric metrics declare sources");
+            columns.insert(metric, values.to_vec());
+        }
         let time = crate::widgets::time::sampling::TimeSampler::new(
             activity.sync_time.as_deref(),
             &activity.sample_elapsed_seconds,
@@ -235,18 +202,11 @@ impl ActivitySampler {
                     .map_err(|e| WidgetError::Config(format!("activity timezone: {e}")))
             })
             .transpose()?;
-        columns.insert(MetricKind::Altitude, altitude);
         let times = activity.sample_elapsed_seconds;
         // Gradient bridges internal gaps; samples outside observed coverage stay missing.
-        let gradient = NumericColumn::new(
-            &times,
-            activity.gradient,
-            StandardMetricInterpolationKind::Linear,
-        )?;
-        let g_force_axes =
-            [activity.g_force_x, activity.g_force_y, activity.g_force_z].map(|values| {
-                NumericColumn::new(&times, values, StandardMetricInterpolationKind::Preserve)
-            });
+        let gradient = NumericColumn::new(&times, activity.gradient, InterpolationKind::Linear)?;
+        let g_force_axes = [activity.g_force_x, activity.g_force_y, activity.g_force_z]
+            .map(|values| NumericColumn::new(&times, values, InterpolationKind::Preserve));
         let [x, y, z] = g_force_axes;
         let g_force_axes = [x?, y?, z?];
         let g_force_magnitudes = [(0, 1), (0, 2), (1, 2)]
@@ -254,8 +214,8 @@ impl ActivitySampler {
         let numeric: HashMap<_, _> = columns
             .into_iter()
             .map(|(kind, values)| {
-                let policy = standard_metric_interpolation(kind)
-                    .expect("metric column has a manifest policy");
+                let policy = metric_interpolation(kind)
+                    .expect("numeric metrics declare an interpolation policy");
                 NumericColumn::new(&times, values, policy).map(|column| (kind, column))
             })
             .collect::<WidgetResult<_>>()?;
@@ -265,12 +225,12 @@ impl ActivitySampler {
         let latitude = NumericColumn::new(
             &times,
             activity.course.iter().map(|p| p.0).collect(),
-            StandardMetricInterpolationKind::Linear,
+            InterpolationKind::Linear,
         )?;
         let longitude = NumericColumn::new(
             &times,
             activity.course.iter().map(|p| p.1).collect(),
-            StandardMetricInterpolationKind::Linear,
+            InterpolationKind::Linear,
         )?;
         let gear = times
             .iter()
@@ -325,9 +285,10 @@ impl ActivitySampler {
         }
         let column = &self.numeric[&metric];
         MetricSample {
-            numeric: if metric == MetricKind::Heading {
-                self.heading_at(second)
-            } else if column.points.is_empty() || column.contains(second) {
+            numeric: if column.policy == InterpolationKind::Angular
+                || column.points.is_empty()
+                || column.contains(second)
+            {
                 column.at(&self.times, second)
             } else {
                 None
@@ -370,7 +331,7 @@ impl ActivitySampler {
         if second < 0.0 || second > self.end {
             return None;
         }
-        interpolate_heading_points(&self.numeric[&MetricKind::Heading].points, second)
+        self.numeric[&MetricKind::Heading].at(&self.times, second)
     }
 
     pub fn g_force_at(&self, widget: &ValidatedGForceWidget, second: f64) -> GForceSample {
@@ -420,17 +381,14 @@ impl ActivitySampler {
             kind => {
                 let column = &self.numeric[&kind];
                 // Heading and coordinates retain native bridge/edge-clamping behavior.
-                sample.available = if kind == MetricKind::Heading || column.points.is_empty() {
-                    !column.values.is_empty()
-                } else {
-                    column.contains(second)
-                };
-                if sample.available {
-                    sample.numeric = if kind == MetricKind::Heading {
-                        self.heading_at(second)
+                sample.available =
+                    if column.policy == InterpolationKind::Angular || column.points.is_empty() {
+                        !column.values.is_empty()
                     } else {
-                        column.at(&self.times, second)
+                        column.contains(second)
                     };
+                if sample.available {
+                    sample.numeric = column.at(&self.times, second);
                     if kind == MetricKind::Altitude {
                         let offset = crate::widgets::value::format::altitude_offset_m(
                             widget.starting_altitude_m,

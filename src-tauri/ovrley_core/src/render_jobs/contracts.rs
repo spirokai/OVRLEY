@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use crate::activity::schema::ParsedActivity;
 use crate::encode::quality::QualityType;
 pub use crate::media::prepared_video::{InspectedVideoSource, SourceFileStamp};
-use crate::normalize::raw::RenderConfig;
+use crate::normalize::RenderConfig;
 use ovrley_widgets::model::scene::ScenePresentationConfig;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -94,7 +94,7 @@ pub struct BatchRenderRequest {
     /// Requires automatic sync and positive activity overlap when enabled.
     /// Disabling it preserves resolved offsets and allows blank activity coverage.
     pub auto_sync: bool,
-    #[serde(deserialize_with = "crate::normalize::raw::deserialize_render_presentation")]
+    #[serde(deserialize_with = "crate::normalize::deserialize_render_presentation")]
     pub template: RenderConfig<ScenePresentationConfig>,
     pub encoding: BatchEncodingSettings,
     pub activity: BatchActivity,

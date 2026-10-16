@@ -86,7 +86,7 @@ fn full_speed_text_config(x: i32, y: i32) -> serde_json::Value {
 fn prepare_assets_distinct_caches_per_value_index() {
     use ovrley_core::activity::schema::ParsedActivity;
     use ovrley_core::debug::RenderProfiler;
-    use ovrley_core::normalize::raw::RenderConfig;
+    use ovrley_core::normalize::RenderConfig;
     use ovrley_core::normalize::validate_render_config;
     use ovrley_core::paths::AppPaths;
     use ovrley_core::render::assets::prepare_render_assets;
@@ -157,7 +157,7 @@ fn prepare_assets_distinct_caches_per_value_index() {
 #[test]
 fn render_preserves_multiple_boxed_reports() {
     use ovrley_core::activity::schema::ParsedActivity;
-    use ovrley_core::normalize::raw::RenderConfig;
+    use ovrley_core::normalize::RenderConfig;
     use ovrley_core::normalize::validate_render_config;
     use ovrley_core::paths::AppPaths;
     use ovrley_core::render::render_preview_with_report;
@@ -248,7 +248,7 @@ fn render_preserves_multiple_boxed_reports() {
 #[test]
 fn render_reports_multiple_heading_tapes_with_identity() {
     use ovrley_core::activity::schema::ParsedActivity;
-    use ovrley_core::normalize::raw::RenderConfig;
+    use ovrley_core::normalize::RenderConfig;
     use ovrley_core::normalize::validate_render_config;
     use ovrley_core::paths::AppPaths;
     use ovrley_core::render::render_preview_with_report;

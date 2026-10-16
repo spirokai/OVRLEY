@@ -1,9 +1,9 @@
 //! Strict render-submission contract for static raster widgets.
 
-use ovrley_widgets::widgets::raster::config::RasterConfig;
 use crate::error::{CoreError, CoreResult};
-use crate::raster::{ RasterResourceResolver, SelectedRaster};
-use ovrley_widgets::widgets::raster::validation::{RasterGeometry, validate_raster_geometry};
+use crate::raster::{RasterResourceResolver, SelectedRaster};
+use ovrley_widgets::widgets::raster::config::RasterConfig;
+use ovrley_widgets::widgets::raster::validation::{validate_raster_geometry, RasterGeometry};
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -35,11 +35,17 @@ fn invalid_raster(id: &str, detail: String) -> CoreError {
     ))
 }
 
-fn validate_raster_document(raw: &RasterConfig, index: usize) -> CoreResult<ValidatedRasterDocument> {
+fn validate_raster_document(
+    raw: &RasterConfig,
+    index: usize,
+) -> CoreResult<ValidatedRasterDocument> {
     let geometry = validate_raster_geometry(raw, index)?;
     let path = raw.path.as_ref().map(PathBuf::from);
     if path.as_ref().is_some_and(|path| !path.is_absolute()) {
-        return Err(CoreError::Config(format!("Raster {} requires an absolute image path [raster_error:relative_path:{}]", raw.id, raw.id)));
+        return Err(CoreError::Config(format!(
+            "Raster {} requires an absolute image path [raster_error:relative_path:{}]",
+            raw.id, raw.id
+        )));
     }
     Ok(ValidatedRasterDocument { geometry, path })
 }
@@ -150,7 +156,7 @@ mod tests {
         let mut malformed_render_config = render_config;
         malformed_render_config["rasters"][0]["width"] = json!("4");
         assert!(
-            serde_json::from_value::<super::super::raw::RenderConfig>(malformed_render_config)
+            serde_json::from_value::<super::super::config::RenderConfig>(malformed_render_config)
                 .unwrap_err()
                 .to_string()
                 .contains("raster_error:invalid_config:configuration")

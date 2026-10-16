@@ -5,7 +5,7 @@
 //! render-affecting defaults. The frontend must materialise all defaults
 //! before sending the config.
 
-use super::raw::SceneConfig;
+use super::config::SceneConfig;
 use crate::encode::ffmpeg::catalog::{CodecSelection, TransparentCodecId};
 use crate::error::{CoreError, CoreResult};
 use ovrley_widgets::model::validation::{require_finite_f64, require_positive_f64, require_u32};

@@ -88,7 +88,7 @@ fn delta_config_uses_its_canonical_mode_colors_and_data_requirement() {
     assert_eq!(widget.positive_delta_color, [0, 255, 0, 255]);
     assert_eq!(widget.negative_delta_color, [255, 0, 0, 255]);
 
-    let requirements = config.render_data_requirements().unwrap();
+    let requirements = config.render_data_requirements();
     assert!(requirements.delta_to_best_lap_seconds);
     assert!(!requirements.lap_number);
     assert!(!requirements.lap_time_seconds);
@@ -304,7 +304,7 @@ fn lap_log_config_requests_all_canonical_lap_series() {
     assert_eq!(widget.mode, LapTimerMode::LapLog);
     assert_eq!(widget.label, "Lap Times");
 
-    let requirements = config.render_data_requirements().unwrap();
+    let requirements = config.render_data_requirements();
     assert!(requirements.lap_number);
     assert!(requirements.lap_time_seconds);
     assert!(requirements.delta_to_best_lap_seconds);

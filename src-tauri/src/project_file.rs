@@ -652,7 +652,7 @@ fn validate_manual_video_sync(manual: &ProjectManualVideoSync) -> Result<(), Str
 }
 
 fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
-    ovrley_core::normalize::raw::validate_saved_label_typography(&editor.config)
+    ovrley_core::normalize::validate_saved_label_typography(&editor.config)
         .map_err(|error| error.to_string())?;
     let globals = &editor.global_defaults;
     for (label, value) in [
@@ -709,7 +709,7 @@ fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
 }
 
 fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, String> {
-    ovrley_core::normalize::raw::migrate_saved_font_input(&mut value);
+    ovrley_core::normalize::migrate_saved_font_input(&mut value);
     let mut legacy = match version {
         PROJECT_VERSION_V1 => {
             let project: ProjectDocumentV1 = serde_json::from_value(value)

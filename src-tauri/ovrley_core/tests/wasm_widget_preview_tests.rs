@@ -78,7 +78,7 @@ fn elevation_preview_matches_native_export_labels_hover_seeking_and_activity_rep
         request["scene"]["start"] = json!(0.25);
         request["scene"]["end"] = json!(3.25);
         let config = common::seam::validated_config_from_value(json!({"scene": request["scene"], "values": [], "labels": [], "plots": [request["widget"]]}));
-        let requirements = config.render_data_requirements().unwrap();
+        let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.25, 3.25, &requirements).unwrap();
         let seconds = vec![0.0, 0.75, 1.5, 2.2, 2.9];
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
@@ -312,7 +312,7 @@ fn route_preview_matches_native_export_and_keeps_marker_out_of_selection_bounds(
         request["scene"]["start"] = json!(0.25);
         request["scene"]["end"] = json!(3.25);
         let config = common::seam::validated_config_from_value(json!({"scene": request["scene"], "values": [], "labels": [], "plots": [request["widget"]]}));
-        let requirements = config.render_data_requirements().unwrap();
+        let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.25, 3.25, &requirements).unwrap();
         let seconds = vec![0.0, 0.75, 2.2, 2.9];
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
@@ -533,7 +533,7 @@ fn gauges_match_native_pixels_sampling_cache_revisions_and_activity_replacement(
         let config = common::seam::validated_config_from_value(
             json!({"scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": []}),
         );
-        let requirements = config.render_data_requirements().unwrap();
+        let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
         let assets = prepare_render_assets(
@@ -834,7 +834,7 @@ fn heading_tape_matches_native_pixels_sampling_revisions_and_activity_replacemen
         let config = common::seam::validated_config_from_value(json!({
             "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
         }));
-        let requirements = config.render_data_requirements().unwrap();
+        let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
         let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut RenderProfiler::default()).unwrap();
@@ -1061,7 +1061,7 @@ fn lap_timer_modes_match_native_pixels_sampling_and_resource_replacement() {
         let config = common::seam::validated_config_from_value(json!({
             "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
         }));
-        let requirements = config.render_data_requirements().unwrap();
+        let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.0, 5.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
         let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut RenderProfiler::default()).unwrap();
@@ -1201,7 +1201,7 @@ fn g_force_preview_matches_native_pixels_and_tracks_marker_and_percentile_change
     let config = common::seam::validated_config_from_value(json!({
         "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
     }));
-    let requirements = config.render_data_requirements().unwrap();
+    let requirements = config.render_data_requirements();
     let trimmed = trim_activity(&activity, 0.0, 5.0, &requirements).unwrap();
     let seconds = [1.0, 1.002, 3.0];
     let dense = densify_activity(&trimmed, seconds.to_vec(), &requirements);
@@ -1339,7 +1339,7 @@ fn lean_angle_preview_matches_native_export_and_tracks_signed_fill_resources_and
     let config = common::seam::validated_config_from_value(json!({
         "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
     }));
-    let requirements = config.render_data_requirements().unwrap();
+    let requirements = config.render_data_requirements();
     let trimmed = trim_activity(&parsed, 0.0, 4.0, &requirements).unwrap();
     let seconds = vec![0.0, 0.5, 1.0, 1.002, 2.0, 2.5, 3.0, 4.0];
     let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
@@ -1615,7 +1615,7 @@ fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_tri
     let config = common::seam::validated_config_from_value(json!({
         "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
     }));
-    let requirements = config.render_data_requirements().unwrap();
+    let requirements = config.render_data_requirements();
     let trimmed = trim_activity(&parsed, 0.0, 4.0, &requirements).unwrap();
     let seconds = vec![0.0, 0.5, 1.0, 1.002, 2.0, 2.5, 3.0, 4.0];
     let dense = densify_activity(&trimmed, seconds.clone(), &requirements);

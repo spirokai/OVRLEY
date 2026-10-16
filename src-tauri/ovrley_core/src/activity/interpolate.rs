@@ -12,9 +12,7 @@ use super::schema::{
 };
 use crate::normalize::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
-use ovrley_widgets::model::standard_metrics::{
-    standard_metric_interpolation, StandardMetricInterpolationKind,
-};
+use ovrley_widgets::model::telemetry::{ActivitySeries, InterpolationKind, NumericActivity};
 
 use ovrley_widgets::interpolation::{
     collect_valid_numeric_points, interpolate_heading_points, interpolate_numeric_series_value,
@@ -28,28 +26,51 @@ pub(crate) enum InterpolationStrategy {
     Numeric(MissingSamplePolicy),
 }
 
-pub(crate) fn interpolation_strategy(
-    kind: ovrley_widgets::model::types::MetricKind,
-) -> InterpolationStrategy {
-    // Heading is linear in time along the shortest angular path.
-    if kind == ovrley_widgets::model::types::MetricKind::Heading {
-        return InterpolationStrategy::Angular;
-    }
-    match standard_metric_interpolation(kind) {
-        Some(StandardMetricInterpolationKind::Hold) => InterpolationStrategy::Hold,
-        Some(StandardMetricInterpolationKind::Preserve) => {
+pub(crate) fn interpolation_strategy(series: ActivitySeries) -> InterpolationStrategy {
+    match series.interpolation() {
+        InterpolationKind::Angular => InterpolationStrategy::Angular,
+        InterpolationKind::Hold => InterpolationStrategy::Hold,
+        InterpolationKind::Preserve => {
             InterpolationStrategy::Numeric(MissingSamplePolicy::Preserve)
         }
-        Some(StandardMetricInterpolationKind::Linear) => {
-            InterpolationStrategy::Numeric(MissingSamplePolicy::Bridge)
+        InterpolationKind::Linear => InterpolationStrategy::Numeric(MissingSamplePolicy::Bridge),
+    }
+}
+
+struct NumericDensification<'a> {
+    trimmed: &'a TrimmedActivity,
+    requirements: &'a RenderDataRequirements,
+    frames: &'a [f64],
+}
+
+impl NumericDensification<'_> {
+    fn series(&self, series: ActivitySeries) -> NumericSeries {
+        let values = self.trimmed.numeric_series(series);
+        if !self.requirements.enabled(series) || values.is_empty() {
+            return Vec::new();
         }
-        None => match kind {
-            ovrley_widgets::model::types::MetricKind::Elevation
-            | ovrley_widgets::model::types::MetricKind::Gradient => {
-                InterpolationStrategy::Numeric(MissingSamplePolicy::Bridge)
+        let elapsed = &self.trimmed.sample_elapsed_seconds;
+        let mut dense = match interpolation_strategy(series) {
+            InterpolationStrategy::Angular => densify_heading_series(elapsed, values, self.frames),
+            InterpolationStrategy::Hold => densify_hold_series(elapsed, values, self.frames),
+            InterpolationStrategy::Numeric(policy) => {
+                interpolate_numeric_series(elapsed, values, self.frames, policy)
             }
-            _ => panic!("standard metric has no interpolation policy: {kind:?}"),
-        },
+        };
+        if series.limit_to_observed() {
+            if let Some((first, last)) = values
+                .iter()
+                .position(Option::is_some)
+                .zip(values.iter().rposition(Option::is_some))
+            {
+                for (second, value) in self.frames.iter().zip(&mut dense) {
+                    if *second < elapsed[first] || *second > elapsed[last] {
+                        *value = None;
+                    }
+                }
+            }
+        }
+        dense
     }
 }
 
@@ -151,7 +172,7 @@ pub fn frame_timeline_for_fps(duration: f64, fps: f64) -> crate::error::CoreResu
 // Interpolates a numeric series over all target frame times.
 fn interpolate_numeric_series(
     x_values: &[f64],
-    y_values: &NumericSeries,
+    y_values: &[Option<f64>],
     target_x_values: &[f64],
     missing_sample_policy: MissingSamplePolicy,
 ) -> Vec<Option<f64>> {
@@ -210,7 +231,7 @@ pub(super) fn densify_hold_series<T: Clone>(
 // Prepare valid heading points once; missing gaps and edges retain bridge/clamp behavior.
 fn densify_heading_series(
     x_values: &[f64],
-    y_values: &NumericSeries,
+    y_values: &[Option<f64>],
     target_x_values: &[f64],
 ) -> Vec<Option<f64>> {
     if y_values.is_empty() {
@@ -255,8 +276,12 @@ fn interpolate_time_series(
     y_values: &TimeSeries,
     target_x_values: &[f64],
 ) -> Vec<Option<String>> {
-    let sampler = ovrley_widgets::widgets::time::sampling::TimeSampler::new(sync_time, x_values, y_values);
-    target_x_values.iter().map(|second| sampler.at(*second)).collect()
+    let sampler =
+        ovrley_widgets::widgets::time::sampling::TimeSampler::new(sync_time, x_values, y_values);
+    target_x_values
+        .iter()
+        .map(|second| sampler.at(*second))
+        .collect()
 }
 
 /// Converts a trimmed activity into frame-aligned render data.
@@ -352,33 +377,10 @@ pub fn densify_activity(
     // ── Phase 3: densify each requested numeric series ───────────────────
     // Empty vectors signal to render code that the series is not needed,
     // avoiding wasted per-frame lookups and allocations.
-    // Resolve each metric's manifest strategy once per series; internal
-    // derived series use their explicit bridge default.
-    let densify = |x: &[f64],
-                   y: &NumericSeries,
-                   target: &[f64],
-                   enabled: bool,
-                   kind: ovrley_widgets::model::types::MetricKind| {
-        if !enabled || y.is_empty() {
-            return Vec::new();
-        }
-        let mut dense = match interpolation_strategy(kind) {
-            InterpolationStrategy::Angular => densify_heading_series(x, y, target),
-            InterpolationStrategy::Hold => densify_hold_series(x, y, target),
-            InterpolationStrategy::Numeric(policy) => {
-                interpolate_numeric_series(x, y, target, policy)
-            }
-        };
-        let first = y.iter().position(Option::is_some).map(|index| x[index]);
-        let last = y.iter().rposition(Option::is_some).map(|index| x[index]);
-        for (elapsed, value) in target.iter().zip(&mut dense) {
-            if first.is_some_and(|first| *elapsed < first)
-                || last.is_some_and(|last| *elapsed > last)
-            {
-                *value = None;
-            }
-        }
-        dense
+    let numeric = NumericDensification {
+        trimmed,
+        requirements,
+        frames: &frame_elapsed_seconds,
     };
 
     DenseActivityReport {
@@ -388,268 +390,7 @@ pub fn densify_activity(
         frame_distance_progress,
         full_activity_distance: trimmed.full_activity_distance,
         full_activity_total_ascent: trimmed.full_activity_total_ascent,
-        series: DenseSeriesReport {
-            speed: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.speed,
-                &frame_elapsed_seconds,
-                requirements.speed,
-                ovrley_widgets::model::types::MetricKind::Speed,
-            ),
-            distance: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.distance,
-                &frame_elapsed_seconds,
-                requirements.distance,
-                ovrley_widgets::model::types::MetricKind::Distance,
-            ),
-            elevation: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.elevation,
-                &frame_elapsed_seconds,
-                requirements.elevation,
-                ovrley_widgets::model::types::MetricKind::Elevation,
-            ),
-            calories: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.calories,
-                &frame_elapsed_seconds,
-                requirements.calories,
-                ovrley_widgets::model::types::MetricKind::Calories,
-            ),
-            distance_to_home: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.distance_to_home,
-                &frame_elapsed_seconds,
-                requirements.distance_to_home,
-                ovrley_widgets::model::types::MetricKind::DistanceToHome,
-            ),
-            total_ascent: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.total_ascent,
-                &frame_elapsed_seconds,
-                requirements.total_ascent,
-                ovrley_widgets::model::types::MetricKind::TotalAscent,
-            ),
-            barometric_altitude: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.barometric_altitude,
-                &frame_elapsed_seconds,
-                requirements.barometric_altitude,
-                ovrley_widgets::model::types::MetricKind::Elevation,
-            ),
-            gradient: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.gradient,
-                &frame_elapsed_seconds,
-                requirements.gradient,
-                ovrley_widgets::model::types::MetricKind::Gradient,
-            ),
-            heartrate: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.heartrate,
-                &frame_elapsed_seconds,
-                requirements.heartrate,
-                ovrley_widgets::model::types::MetricKind::Heartrate,
-            ),
-            cadence: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.cadence,
-                &frame_elapsed_seconds,
-                requirements.cadence,
-                ovrley_widgets::model::types::MetricKind::Cadence,
-            ),
-            power: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.power,
-                &frame_elapsed_seconds,
-                requirements.power,
-                ovrley_widgets::model::types::MetricKind::Power,
-            ),
-            engine_power: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.engine_power,
-                &frame_elapsed_seconds,
-                requirements.engine_power,
-                ovrley_widgets::model::types::MetricKind::EnginePower,
-            ),
-            engine_load: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.engine_load,
-                &frame_elapsed_seconds,
-                requirements.engine_load,
-                ovrley_widgets::model::types::MetricKind::EngineLoad,
-            ),
-            temperature: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.temperature,
-                &frame_elapsed_seconds,
-                requirements.temperature,
-                ovrley_widgets::model::types::MetricKind::Temperature,
-            ),
-            pace: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.pace,
-                &frame_elapsed_seconds,
-                requirements.pace,
-                ovrley_widgets::model::types::MetricKind::Pace,
-            ),
-            g_force: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.g_force,
-                &frame_elapsed_seconds,
-                requirements.g_force,
-                ovrley_widgets::model::types::MetricKind::GForce,
-            ),
-            g_force_x: if requirements.g_force_x {
-                interpolate_numeric_series(
-                    &trimmed.sample_elapsed_seconds,
-                    &trimmed.g_force_x,
-                    &frame_elapsed_seconds,
-                    MissingSamplePolicy::Preserve,
-                )
-            } else {
-                Vec::new()
-            },
-            g_force_y: if requirements.g_force_y {
-                interpolate_numeric_series(
-                    &trimmed.sample_elapsed_seconds,
-                    &trimmed.g_force_y,
-                    &frame_elapsed_seconds,
-                    MissingSamplePolicy::Preserve,
-                )
-            } else {
-                Vec::new()
-            },
-            g_force_z: if requirements.g_force_z {
-                interpolate_numeric_series(
-                    &trimmed.sample_elapsed_seconds,
-                    &trimmed.g_force_z,
-                    &frame_elapsed_seconds,
-                    MissingSamplePolicy::Preserve,
-                )
-            } else {
-                Vec::new()
-            },
-            rpm: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.rpm,
-                &frame_elapsed_seconds,
-                requirements.rpm,
-                ovrley_widgets::model::types::MetricKind::Rpm,
-            ),
-            throttle_position: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.throttle_position,
-                &frame_elapsed_seconds,
-                requirements.throttle_position,
-                ovrley_widgets::model::types::MetricKind::ThrottlePosition,
-            ),
-            brake_position: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.brake_position,
-                &frame_elapsed_seconds,
-                requirements.brake_position,
-                ovrley_widgets::model::types::MetricKind::BrakePosition,
-            ),
-            lean_angle: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.lean_angle,
-                &frame_elapsed_seconds,
-                requirements.lean_angle,
-                ovrley_widgets::model::types::MetricKind::LeanAngle,
-            ),
-            air_pressure: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.air_pressure,
-                &frame_elapsed_seconds,
-                requirements.air_pressure,
-                ovrley_widgets::model::types::MetricKind::AirPressure,
-            ),
-            ground_contact_time: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.ground_contact_time,
-                &frame_elapsed_seconds,
-                requirements.ground_contact_time,
-                ovrley_widgets::model::types::MetricKind::GroundContactTime,
-            ),
-            left_right_balance: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.left_right_balance,
-                &frame_elapsed_seconds,
-                requirements.left_right_balance,
-                ovrley_widgets::model::types::MetricKind::LeftRightBalance,
-            ),
-            stride_length: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.stride_length,
-                &frame_elapsed_seconds,
-                requirements.stride_length,
-                ovrley_widgets::model::types::MetricKind::StrideLength,
-            ),
-            stroke_rate: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.stroke_rate,
-                &frame_elapsed_seconds,
-                requirements.stroke_rate,
-                ovrley_widgets::model::types::MetricKind::StrokeRate,
-            ),
-            torque: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.torque,
-                &frame_elapsed_seconds,
-                requirements.torque,
-                ovrley_widgets::model::types::MetricKind::Torque,
-            ),
-            vertical_speed: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.vertical_speed,
-                &frame_elapsed_seconds,
-                requirements.vertical_speed,
-                ovrley_widgets::model::types::MetricKind::VerticalSpeed,
-            ),
-            iso: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.iso,
-                &frame_elapsed_seconds,
-                requirements.iso,
-                ovrley_widgets::model::types::MetricKind::Iso,
-            ),
-            aperture: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.aperture,
-                &frame_elapsed_seconds,
-                requirements.aperture,
-                ovrley_widgets::model::types::MetricKind::Aperture,
-            ),
-            shutter_speed: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.shutter_speed,
-                &frame_elapsed_seconds,
-                requirements.shutter_speed,
-                ovrley_widgets::model::types::MetricKind::ShutterSpeed,
-            ),
-            focal_length: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.focal_length,
-                &frame_elapsed_seconds,
-                requirements.focal_length,
-                ovrley_widgets::model::types::MetricKind::FocalLength,
-            ),
-            ev: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.ev,
-                &frame_elapsed_seconds,
-                requirements.ev,
-                ovrley_widgets::model::types::MetricKind::Ev,
-            ),
-            color_temperature: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.color_temperature,
-                &frame_elapsed_seconds,
-                requirements.color_temperature,
-                ovrley_widgets::model::types::MetricKind::ColorTemperature,
-            ),
+        series: ovrley_widgets::numeric_activity!(DenseSeriesReport, numeric, series, {
             gear_position: if requirements.gear_position {
                 densify_hold_series(
                     &trimmed.sample_elapsed_seconds,
@@ -659,39 +400,9 @@ pub fn densify_activity(
             } else {
                 Vec::new()
             },
-            vertical_ratio: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.vertical_ratio,
-                &frame_elapsed_seconds,
-                requirements.vertical_ratio,
-                ovrley_widgets::model::types::MetricKind::VerticalRatio,
-            ),
-            vertical_oscillation: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.vertical_oscillation,
-                &frame_elapsed_seconds,
-                requirements.vertical_oscillation,
-                ovrley_widgets::model::types::MetricKind::VerticalOscillation,
-            ),
-            core_temperature: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.core_temperature,
-                &frame_elapsed_seconds,
-                requirements.core_temperature,
-                ovrley_widgets::model::types::MetricKind::CoreTemperature,
-            ),
-            heading: if requirements.heading && !trimmed.heading.is_empty() {
-                densify_heading_series(
-                    &trimmed.sample_elapsed_seconds,
-                    &trimmed.heading,
-                    &frame_elapsed_seconds,
-                )
-            } else {
-                Vec::new()
-            },
-            course_lat,
-            course_lon,
-            time,
+            course_lat: course_lat,
+            course_lon: course_lon,
+            time: time,
             lap_number: if requirements.lap_number {
                 dense_lap_number
             } else {
@@ -715,6 +426,6 @@ pub fn densify_activity(
             },
             lap_durations_seconds: trimmed.lap_durations_seconds.clone(),
             lap_durations_best_so_far_seconds: trimmed.lap_durations_best_so_far_seconds.clone(),
-        },
+        }),
     }
 }

@@ -14,8 +14,8 @@ pub mod finalize;
 pub mod interpolate;
 /// Canonical lap-timing derivation, validation, and queries.
 pub(crate) mod lap_timing;
-/// Full-source metric bounds, independent of render trimming and frame rate.
-pub mod metric_ranges;
+/// Native column access, source bounds, and shared widget sampling.
+pub mod sampling;
 /// Serializable activity payloads and internal dense/trimmed report types.
 pub mod schema;
 /// Native Garmin TCX extraction into canonical raw activity samples.
@@ -24,7 +24,6 @@ pub mod tcx;
 pub mod trim;
 /// Native Racelogic VBOX extraction into canonical activity columns.
 pub mod vbo;
-mod widget_samples;
 
 use crate::activity::interpolate::{densify_activity, frame_timeline_for_fps};
 use crate::activity::schema::{DebugPayload, DenseActivityReport, ParsedActivity};
@@ -115,7 +114,7 @@ pub fn build_dense_activity_report_validated(
     activity: &ParsedActivity,
     config: &ValidatedRenderConfig,
 ) -> CoreResult<DenseActivityReport> {
-    let requirements = config.render_data_requirements()?;
+    let requirements = config.render_data_requirements();
     let trimmed = trim_activity(
         activity,
         config.scene.start,
@@ -143,7 +142,7 @@ pub(crate) fn build_dense_activity_report_for_timeline(
     config: &ValidatedRenderConfig,
     frame_elapsed_seconds: Vec<f64>,
 ) -> CoreResult<DenseActivityReport> {
-    let requirements = config.render_data_requirements()?;
+    let requirements = config.render_data_requirements();
     let trimmed = trim_activity(
         activity,
         config.scene.start,
