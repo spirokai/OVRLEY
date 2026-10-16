@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::debug::RenderProgress;
-use ovrley_core::encode::ffmpeg::assemble::OutputAssembly;
+use ovrley_core::encode::ffmpeg::assemble::{AssemblySegment, OutputAssembly};
 use ovrley_core::encode::progress::ProgressSink;
 use ovrley_core::encode::quality::QualityType;
 use ovrley_core::error::{CoreError, CoreResult};
@@ -100,6 +100,7 @@ impl Fixture {
             .map(|(index, source)| BatchRenderOutput {
                 id: format!("item-{index}"),
                 pieces: vec![common::builders::whole_source_piece(source, index == 0)],
+                transitions: Vec::new(),
             })
             .collect::<Vec<_>>();
         let destination = BatchDestination::SourceNamed {
@@ -301,7 +302,14 @@ impl BatchJobExecutor for ControlledExecutor {
         assembly: &OutputAssembly,
         session: &RendererReservation,
     ) -> CoreResult<()> {
-        assert!(assembly.parts.iter().all(|part| part.is_file()));
+        for segment in &assembly.segments {
+            match segment {
+                AssemblySegment::Part(part) => assert!(part.is_file()),
+                AssemblySegment::Transition {
+                    outgoing, incoming, ..
+                } => assert!(outgoing.is_file() && incoming.is_file()),
+            }
+        }
         self.assemblies.lock().unwrap().push(assembly.clone());
         session.check_cancelled()?;
         if assembly.target.to_str().unwrap().contains("joinfail") {
@@ -796,6 +804,7 @@ fn combined_request(fixture: &Fixture, names: &[&str], file: &str) -> BatchRende
     request.outputs = vec![BatchRenderOutput {
         id: "joined".into(),
         pieces,
+        transitions: common::builders::hard_cuts(2),
     }];
     request.destination = BatchDestination::File {
         path: fixture.directory.join(file).to_str().unwrap().into(),
@@ -814,6 +823,7 @@ fn a_separate_output_renders_its_pieces_to_parts_and_joins_them() {
     *offsets.values_mut().next().unwrap() = 10.0;
     // A deleted part between seconds 2 and 4.
     request.outputs[0].pieces = vec![piece(&request, 0, 0, 60), piece(&request, 0, 120, 240)];
+    request.outputs[0].transitions = common::builders::hard_cuts(2);
     let (service, sink, terminal) = service();
     let (executor, entered, resume) = executor(None);
     let acceptance = service
@@ -843,10 +853,10 @@ fn a_separate_output_renders_its_pieces_to_parts_and_joins_them() {
     assert_eq!(assembly.target, target);
     assert_eq!(assembly.frames, 90);
     assert_eq!(
-        assembly.parts,
+        assembly.segments,
         vec![
-            assembly.parts_directory.join("part-0000.mov"),
-            assembly.parts_directory.join("part-0001.mov")
+            AssemblySegment::Part(assembly.parts_directory.join("part-0000.mov")),
+            AssemblySegment::Part(assembly.parts_directory.join("part-0001.mov"))
         ]
     );
     assert!(assembly
@@ -1031,4 +1041,141 @@ fn a_failed_join_keeps_the_parts_and_a_cancelled_one_removes_them() {
     ));
     assert!(parts_directories(&fixture.directory).is_empty());
     assert!(!fixture.directory.join("joined.mov").exists());
+}
+
+fn composite(mut request: BatchRenderRequest) -> BatchRenderRequest {
+    request.encoding.export_mode = BatchExportMode::Composite;
+    request.encoding.export_codec = "libx264".into();
+    request.encoding.update_rate = 1;
+    request
+}
+
+fn fade(seconds: f64) -> BatchTransition {
+    BatchTransition {
+        transition_type: "fade".into(),
+        duration_seconds: seconds,
+    }
+}
+
+#[test]
+fn transitions_render_heads_and_tails_and_blend_them_between_bodies() {
+    let fixture = Fixture::new();
+    let mut request = composite(fixture.request(&["4-ride.mp4"], true));
+    let BatchActivity::ExternalActivity { offsets, .. } = &mut request.activity else {
+        unreachable!();
+    };
+    *offsets.values_mut().next().unwrap() = 10.0;
+    // A deleted part between seconds 3 and 4, bridged by a one-second fade.
+    request.outputs[0].pieces = vec![piece(&request, 0, 0, 90), piece(&request, 0, 120, 240)];
+    request.outputs[0].transitions = vec![fade(1.0)];
+    let (service, _, terminal) = service();
+    let (executor, entered, resume) = executor(None);
+    let acceptance = service
+        .submit_batch_with_executor(
+            &fixture.paths,
+            &fixture.inspection,
+            request,
+            None,
+            executor.clone(),
+        )
+        .unwrap();
+    // Every piece frame renders once; the joined output loses the 30 blended frames.
+    assert_eq!(acceptance.snapshot.items[0].planned_frames, 210);
+    for expected in [
+        "part-0000.mp4",
+        "part-0001.mp4",
+        "part-0002.mp4",
+        "part-0003.mp4",
+    ] {
+        assert_eq!(entered.recv_timeout(WAIT).unwrap(), expected);
+        resume.send(()).unwrap();
+    }
+    assert_eq!(
+        terminal.recv_timeout(WAIT).unwrap().phase,
+        BatchPhase::Completed
+    );
+    // Body 0-2 s, tail 2-3 s, head 4-5 s, body 5-8 s: each at its own activity second.
+    assert_eq!(
+        *executor.offsets.lock().unwrap(),
+        vec![10.0, 12.0, 14.0, 15.0]
+    );
+    let assembly = executor.assemblies.lock().unwrap()[0].clone();
+    let part = |index: usize| {
+        assembly
+            .parts_directory
+            .join(format!("part-{index:04}.mp4"))
+    };
+    assert_eq!(assembly.frames, 180);
+    assert_eq!(
+        assembly.segments,
+        vec![
+            AssemblySegment::Part(part(0)),
+            AssemblySegment::Transition {
+                outgoing: part(1),
+                incoming: part(2),
+                name: "fade".into(),
+                duration: 1.0,
+                output: assembly.parts_directory.join("transition-0000.mp4"),
+            },
+            AssemblySegment::Part(part(3)),
+        ]
+    );
+}
+
+#[test]
+fn transitions_must_fit_their_pieces_and_composite_output() {
+    let fixture = Fixture::new();
+    let (service, _, _) = service();
+    let (executor, entered, _) = executor(None);
+    let transparent_request = fixture.request(&["4-ride.mp4"], true);
+    let request = composite(transparent_request.clone());
+    let with = |transitions: Vec<BatchTransition>, end: u64| {
+        let mut request = request.clone();
+        request.outputs[0].pieces = vec![piece(&request, 0, 0, end), piece(&request, 0, 120, 240)];
+        request.outputs[0].transitions = transitions;
+        request
+    };
+    let rejected = |request: BatchRenderRequest, reason: &str| match service
+        .submit_batch_with_executor(
+            &fixture.paths,
+            &fixture.inspection,
+            request,
+            None,
+            executor.clone(),
+        ) {
+        Err(BatchServiceError::InvalidRequest { message }) => {
+            assert!(message.contains(reason), "{message}")
+        }
+        other => panic!("expected rejection for {reason}: {other:?}"),
+    };
+    rejected(with(Vec::new(), 90), "one transition per join");
+    rejected(
+        with(
+            vec![BatchTransition {
+                transition_type: "spin".into(),
+                duration_seconds: 1.0,
+            }],
+            90,
+        ),
+        "unknown transition spin",
+    );
+    rejected(
+        with(
+            vec![BatchTransition {
+                transition_type: "none".into(),
+                duration_seconds: 1.0,
+            }],
+            90,
+        ),
+        "hard cut has a duration of 0",
+    );
+    rejected(with(vec![fade(0.01)], 90), "shorter than one frame");
+    rejected(with(vec![fade(0.0)], 90), "must be positive");
+    // 30 frames before the fade leave no frame of the first piece untouched.
+    rejected(with(vec![fade(1.0)], 30), "leave none of its 30 frames");
+    let mut transparent = with(vec![fade(1.0)], 90);
+    transparent.encoding = transparent_request.encoding;
+    rejected(transparent, "hard cuts only");
+    assert!(!service.progress().busy);
+    assert!(entered.try_recv().is_err());
 }

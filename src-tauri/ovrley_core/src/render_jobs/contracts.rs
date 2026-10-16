@@ -67,13 +67,27 @@ pub struct BatchRenderPiece {
     pub skip_overlay: bool,
 }
 
+/// The join between two consecutive pieces of an output: a hard cut
+/// (`type: "none"`, duration 0) or an `xfade` transition over the last
+/// `durationSeconds` of the outgoing piece and the first of the incoming one.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BatchTransition {
+    #[serde(rename = "type")]
+    pub transition_type: String,
+    pub duration_seconds: f64,
+}
+
 /// One output file assembled from its pieces in order. Pieces of one output share
-/// their display resolution (and composite FPS) so they join without re-encoding.
+/// their display resolution (and composite FPS) so they join without re-encoding
+/// their bodies.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BatchRenderOutput {
     pub id: String,
     pub pieces: Vec<BatchRenderPiece>,
+    /// One per join between consecutive pieces. Transparent outputs take hard cuts only.
+    pub transitions: Vec<BatchTransition>,
 }
 
 /// Where the outputs are written.

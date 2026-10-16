@@ -283,8 +283,8 @@ describe('native batch workflow', () => {
     expect(result.current.batchQueue.find((row) => row.id === 'outside')).toMatchObject({ status: 'blocked', error: 'Outside the export range' })
     await act(async () => result.current.runBatch())
     expect(acceptedRequest.outputs).toEqual([
-      { id: reference, pieces: [{ sourceId: `inspection-1:${reference}`, startFrame: 870, endFrame: 3270, skipOverlay: false }] },
-      { id: next, pieces: [{ sourceId: `inspection-1:${next}`, startFrame: 0, endFrame: 1800, skipOverlay: false }] },
+      { id: reference, pieces: [{ sourceId: `inspection-1:${reference}`, startFrame: 870, endFrame: 3270, skipOverlay: false }], transitions: [] },
+      { id: next, pieces: [{ sourceId: `inspection-1:${next}`, startFrame: 0, endFrame: 1800, skipOverlay: false }], transitions: [] },
     ])
   })
 
@@ -318,6 +318,7 @@ describe('native batch workflow', () => {
         outputs: [reference, next, blocked].map((path) => ({
           id: path,
           pieces: [{ sourceId: `inspection-1:${path}`, startFrame: 0, endFrame: 3600, skipOverlay: false }],
+          transitions: [],
         })),
         destination: { kind: 'sourceNamed', directory: 'C:/renders' },
       },

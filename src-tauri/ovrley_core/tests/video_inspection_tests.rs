@@ -55,6 +55,7 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
     let output = |id: &str, source: &InspectedVideoSource| BatchRenderOutput {
         id: id.into(),
         pieces: vec![common::builders::whole_source_piece(source, false)],
+        transitions: Vec::new(),
     };
     let mut selection = BatchOutputSelection {
         inspection_id: session.inspection_id.clone(),
@@ -122,12 +123,14 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
     let mut later = joined.outputs[0].pieces[0].clone();
     (later.start_frame, later.end_frame) = (400, 600);
     joined.outputs[0].pieces.push(later);
+    joined.outputs[0].transitions = common::builders::hard_cuts(2);
     let BatchPlanningResponse::Planned { plans } =
         plan_batch_configuration(&service, &joined, &encoding(BatchExportMode::Composite)).unwrap()
     else {
         panic!("fresh plan")
     };
     assert_eq!(plans[0].planned_frames, 440);
+    assert_eq!(plans[0].output_frames, 440);
     // [60, 300) plus [400, 600), which ends where the 20 s source ends.
     assert!((plans[0].output_duration_seconds - 20.0 + 160.0 * 1001.0 / 30000.0).abs() < 1e-9);
     let mut empty = selection.clone();
@@ -417,6 +420,7 @@ fn accepted_sources_survive_disposal_but_closed_and_foreign_sessions_reject() {
             .map(|source| BatchRenderOutput {
                 id: source.source_id.clone(),
                 pieces: vec![common::builders::whole_source_piece(source, false)],
+                transitions: Vec::new(),
             })
             .collect(),
         destination: BatchDestination::SourceNamed {

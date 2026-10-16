@@ -583,12 +583,14 @@ export async function inspectVideoSource(inspectionId, path) {
 /**
  * Plans native batch destinations and frame totals for fresh inspected sources.
  * Coverage for embedded telemetry is finalized during owning-job preparation.
- * An output joins its pieces in order; a `sourceNamed` destination writes one
- * file per output (pieces of one source), a `file` destination one combined output.
- * @param {{inspectionId: string, outputs: Array<{id: string, pieces: Array<{sourceId: string, startFrame: number, endFrame: number, skipOverlay: boolean}>}>, destination: {kind: 'sourceNamed', directory: string}|{kind: 'file', path: string, overwrite: boolean}}} selection
+ * An output joins its pieces in order with one transition per join (a hard cut
+ * `{type: 'none', durationSeconds: 0}` or an `xfade`; transparent outputs take hard
+ * cuts only); a `sourceNamed` destination writes one file per output (pieces of one
+ * source), a `file` destination one combined output.
+ * @param {{inspectionId: string, outputs: Array<{id: string, pieces: Array<{sourceId: string, startFrame: number, endFrame: number, skipOverlay: boolean}>, transitions: Array<{type: string, durationSeconds: number}>}>, destination: {kind: 'sourceNamed', directory: string}|{kind: 'file', path: string, overwrite: boolean}}} selection
  *   Session-owned outputs to plan.
  * @param {{exportMode: string, exportCodec: string, fps: number, updateRate: number, qualityType: string, qualityValue: number, qsvFullInitArgs: string[]|null}} encoding Captured encoder settings.
- * @returns {Promise<{status: 'planned', plans: Array<{outputId: string, outputPath: string, outputDurationSeconds: number, plannedFrames: number, containerFpsNum: number, containerFpsDen: number}>}|{status: 'rejected', inspectionId: string, issues: object[]}>} Native planning result.
+ * @returns {Promise<{status: 'planned', plans: Array<{outputId: string, outputPath: string, outputDurationSeconds: number, plannedFrames: number, outputFrames: number, containerFpsNum: number, containerFpsDen: number}>}|{status: 'rejected', inspectionId: string, issues: object[]}>} Native planning result.
  */
 export async function planBatchOutputs(selection, encoding) {
   return apiCall('backend_plan_batch_outputs', { selection, encoding })

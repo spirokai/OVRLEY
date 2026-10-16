@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { placeVideosByCreationTime, resolveVideoSync, resolveVideosSync } from '@/lib/video-sync'
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
-import { captureBatchSync, createBatchRenderRequest } from '@/features/render-video/utils/renderRequest'
+import { captureBatchSync, createBatchOutputs, createBatchRenderRequest } from '@/features/render-video/utils/renderRequest'
 import { createTestVideo } from '../helpers/videoFixtures'
 
 // 5:47:13 activity ending 17:29 Sofia time (UTC+3).
@@ -130,9 +130,12 @@ describe('signed automatic synchronization and shared calibration', () => {
 
     expect(request.activity).toEqual({ mode: 'externalActivity', activity: editorSnapshot.parsedActivity, offsets: { first: -9, second: 43 } })
     expect(request.outputs).toEqual([
-      { id: 'C:/recordings/first.mp4', pieces: [{ sourceId: 'first', startFrame: 0, endFrame: 600, skipOverlay: false }] },
-      { id: 'C:/recordings/second.mp4', pieces: [{ sourceId: 'second', startFrame: 30, endFrame: 300, skipOverlay: true }] },
+      { id: 'C:/recordings/first.mp4', pieces: [{ sourceId: 'first', startFrame: 0, endFrame: 600, skipOverlay: false }], transitions: [] },
+      { id: 'C:/recordings/second.mp4', pieces: [{ sourceId: 'second', startFrame: 30, endFrame: 300, skipOverlay: true }], transitions: [] },
     ])
+    // The pieces left around a deleted part join with a hard cut.
+    const [split] = createBatchOutputs([{ ...jobs[0], pieces: [jobs[0].pieces[0], { sourceStartFrame: 700, sourceEndFrame: 900 }] }])
+    expect(split.transitions).toEqual([{ type: 'none', durationSeconds: 0 }])
     expect(Object.isFrozen(request.activity.offsets)).toBe(true)
     expect(captureBatchSync(editorSnapshot)).toEqual({ activitySummary: summary, timezoneMode: 'utc' })
 

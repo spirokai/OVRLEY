@@ -1,4 +1,5 @@
 import { getActivityDurationSeconds } from '@/lib/activity/activity-summary'
+import { HARD_CUT } from '@/lib/video-program/transition-catalog'
 import { joinVideoEdits } from '@/lib/video-program/video-collection'
 import { captureVideoSyncTimezoneMode } from '@/lib/video-sync'
 import { buildPreviewFrameWindow } from '@/lib/preview-timing'
@@ -81,7 +82,8 @@ export function captureBatchSync(editorSnapshot) {
  * Builds the native outputs of reviewed batch rows: one output per video holding
  * its program pieces (source frame ranges after the export range).
  * @param {Array<{path: string, source: {sourceId: string}, pieces: Array<object>, skipOverlay: boolean}>} jobs Reviewed rows.
- * @returns {Array<{id: string, pieces: Array<{sourceId: string, startFrame: number, endFrame: number, skipOverlay: boolean}>}>} Native outputs.
+ * @returns {Array<{id: string, pieces: Array<{sourceId: string, startFrame: number, endFrame: number, skipOverlay: boolean}>, transitions: Array<{type: string, durationSeconds: number}>}>}
+ *   Native outputs, with one transition per join between consecutive pieces.
  */
 export function createBatchOutputs(jobs) {
   // Output IDs are the source paths, which are unique in the collection.
@@ -93,6 +95,8 @@ export function createBatchOutputs(jobs) {
       endFrame: piece.sourceEndFrame,
       skipOverlay,
     })),
+    // Separate-file export joins the pieces left around deleted parts with hard cuts.
+    transitions: pieces.slice(1).map(() => ({ ...HARD_CUT })),
   }))
 }
 

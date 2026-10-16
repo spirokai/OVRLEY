@@ -228,6 +228,7 @@ fn a_combined_composite_joins_pieces_of_sources_with_and_without_audio() {
                 piece(&silent, 0, 60),
                 piece(&last, 30, 60),
             ],
+            transitions: common::builders::hard_cuts(3),
         }],
     );
     let snapshot = workspace.render(request);
@@ -272,6 +273,7 @@ fn joined_outputs_without_any_audio_have_no_audio_track() {
             id: "silent".into(),
             // A deleted part between frames 20 and 40.
             pieces: vec![piece(&silent, 0, 20), piece(&silent, 40, 60)],
+            transitions: common::builders::hard_cuts(2),
         }],
     );
     let snapshot = workspace.render(request);
@@ -299,6 +301,7 @@ fn a_separate_transparent_output_joins_its_pieces_as_mov() {
         vec![BatchRenderOutput {
             id: "ride".into(),
             pieces: vec![piece(&source, 0, 30), piece(&source, 60, 90)],
+            transitions: common::builders::hard_cuts(2),
         }],
     );
     let snapshot = workspace.render(request);
@@ -329,6 +332,7 @@ fn joined_hevc_keeps_the_apple_compatible_sample_entry() {
         vec![BatchRenderOutput {
             id: "ride".into(),
             pieces: vec![piece(&source, 0, 20), piece(&source, 40, 60)],
+            transitions: common::builders::hard_cuts(2),
         }],
     );
     request.encoding.export_codec = "libx265".into();
@@ -345,4 +349,94 @@ fn joined_hevc_keeps_the_apple_compatible_sample_entry() {
     assert_eq!(video[0]["codec_tag_string"], "hvc1");
     assert_eq!(video[0]["nb_read_packets"], "40");
     assert_eq!(stream(&streams, "audio").len(), 1);
+}
+
+fn xfade(name: &str, seconds: f64) -> BatchTransition {
+    BatchTransition {
+        transition_type: name.into(),
+        duration_seconds: seconds,
+    }
+}
+
+#[test]
+fn transitions_shorten_the_joined_video_and_audio_by_their_durations() {
+    let workspace = Workspace::new("batch-join-transitions");
+    let first = workspace.source("first.mp4", 3.0, true);
+    let silent = workspace.source("silent.mp4", 2.0, false);
+    let last = workspace.source("last.mp4", 2.0, true);
+    let target = workspace.paths.downloads_dir.join("joined.mp4");
+    // 45 + 60 + 30 frames; a 15-frame wipe, then a hard cut.
+    let request = workspace.request(
+        BatchExportMode::Composite,
+        BatchDestination::File {
+            path: target.to_str().unwrap().into(),
+            overwrite: false,
+        },
+        vec![BatchRenderOutput {
+            id: "joined".into(),
+            pieces: vec![
+                piece(&first, 15, 60),
+                piece(&silent, 0, 60),
+                piece(&last, 30, 60),
+            ],
+            transitions: vec![xfade("wipeleft", 0.5), xfade("none", 0.0)],
+        }],
+    );
+    let snapshot = workspace.render(request);
+    assert_eq!(
+        snapshot.phase,
+        BatchPhase::Completed,
+        "{:?}",
+        snapshot.items[0].outcome
+    );
+    assert_eq!(snapshot.items[0].planned_frames, 135);
+    let streams = workspace.probe_streams(&target);
+    let video = stream(&streams, "video");
+    assert_eq!(video[0]["nb_read_packets"], "120");
+    let video_seconds = 120.0 * 1001.0 / 30000.0;
+    assert!((seconds(&video[0]["duration"]) - video_seconds).abs() < 0.01);
+    let audio = stream(&streams, "audio");
+    assert!(
+        (seconds(&audio[0]["duration"]) - video_seconds).abs() < 0.03,
+        "audio {} s, video {video_seconds} s",
+        audio[0]["duration"]
+    );
+    assert!(workspace.parts_directories().is_empty());
+}
+
+#[test]
+fn hevc_transitions_at_deleted_parts_encode_with_the_output_encoder() {
+    let workspace = Workspace::new("batch-join-hevc-transitions");
+    let source = workspace.source("ride.mp4", 3.0, true);
+    let mut request = workspace.request(
+        BatchExportMode::Composite,
+        BatchDestination::SourceNamed {
+            directory: workspace.paths.downloads_dir.to_str().unwrap().into(),
+        },
+        vec![BatchRenderOutput {
+            id: "ride".into(),
+            // Two deleted parts, bridged by a 15-frame dissolve and a 9-frame fade.
+            pieces: vec![
+                piece(&source, 0, 30),
+                piece(&source, 40, 70),
+                piece(&source, 80, 90),
+            ],
+            transitions: vec![xfade("dissolve", 0.5), xfade("fade", 0.3)],
+        }],
+    );
+    request.encoding.export_codec = "libx265".into();
+    let snapshot = workspace.render(request);
+    assert_eq!(
+        snapshot.phase,
+        BatchPhase::Completed,
+        "{:?}",
+        snapshot.items[0].outcome
+    );
+    let streams = workspace.probe_streams(&workspace.paths.downloads_dir.join("ride_video.mp4"));
+    let video = stream(&streams, "video");
+    assert_eq!(video[0]["codec_name"], "hevc");
+    assert_eq!(video[0]["codec_tag_string"], "hvc1");
+    assert_eq!(video[0]["nb_read_packets"], (70 - 15 - 9).to_string());
+    let video_seconds = 46.0 * 1001.0 / 30000.0;
+    assert!((seconds(&stream(&streams, "audio")[0]["duration"]) - video_seconds).abs() < 0.03);
 }

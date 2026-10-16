@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use super::contracts::{
     BatchDestination, BatchEncodingSettings, BatchExportMode, BatchOutputSelection,
-    BatchRenderOutput, BatchRenderPiece,
+    BatchRenderOutput, BatchRenderPiece, BatchTransition,
 };
 use super::inspection::CompositeSourceMetadata;
 use super::inspection::{
@@ -19,11 +19,14 @@ use crate::activity::{
     build_dense_activity_report_for_timeline,
     schema::{DenseActivityReport, ParsedActivity},
 };
-use crate::encode::ffmpeg::assemble::{AssemblyKind, AudioPiece, OutputAssembly};
+use crate::encode::ffmpeg::assemble::{
+    AssemblyAudio, AssemblyKind, AssemblySegment, AudioPiece, OutputAssembly, TransitionEncoding,
+};
 use crate::encode::ffmpeg::catalog::{
     CodecSelection, CompositeCodecId, CompositeFilterStackKind, TransparentCodecId,
 };
 use crate::encode::ffmpeg::settings::build_ffmpeg_settings;
+use crate::encode::ffmpeg::transitions::{is_xfade_transition, NO_TRANSITION};
 use crate::encode::fps::Fps;
 use crate::encode::plan::CompositeRenderPlan;
 use crate::encode::plan::FrameProductionPlan;
@@ -218,7 +221,10 @@ pub struct BatchVideoOutputPlan {
     pub output_id: String,
     pub output_path: PathBuf,
     pub output_duration_seconds: f64,
+    /// Frames rendered for the output (its progress work).
     pub planned_frames: u64,
+    /// Frames of the finished output: the pieces minus their transitions.
+    pub output_frames: u64,
     pub container_fps_num: u32,
     pub container_fps_den: u32,
 }
@@ -259,6 +265,7 @@ pub fn plan_batch_configuration(
                 output_path: planned.target.path().to_path_buf(),
                 output_duration_seconds: planned.duration,
                 planned_frames: u64::from(planned.frames),
+                output_frames: u64::from(planned.output_frames),
                 container_fps_num,
                 container_fps_den,
             }
@@ -276,27 +283,81 @@ pub(crate) struct ValidatedBatchTemplate {
 /// One piece of a planned output: a window of one source.
 pub(crate) struct PlannedPiece {
     pub source: std::sync::Arc<InspectedVideoSource>,
+    /// Source frames `[start_frame, end_frame)`.
+    pub start_frame: u64,
+    pub end_frame: u64,
     pub window: PieceWindow,
     /// Output frames of this piece.
     pub frames: u32,
     pub skip_overlay: bool,
 }
 
+/// An `xfade` transition between two consecutive pieces of a composite output.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct PlannedTransition {
+    pub name: String,
+    /// Output frames the transition spans (on the output frame grid).
+    pub frames: u32,
+}
+
+/// Which part of its piece a rendered segment covers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SegmentRole {
+    /// The first frames of a piece, blended into the incoming transition.
+    Head,
+    /// What a piece shows on its own: the whole piece between hard cuts.
+    Body,
+    /// The last frames of a piece, blended into the outgoing transition.
+    Tail,
+}
+
+/// A separately rendered window of one piece.
+pub(crate) struct PlannedSegment {
+    pub piece: usize,
+    pub role: SegmentRole,
+    pub window: PieceWindow,
+    pub frames: u32,
+}
+
 /// Reviewed and accepted jobs share the same output contract.
 pub(crate) struct PlannedBatchOutput {
     pub target: crate::output::RenderOutputTarget,
     pub pieces: Vec<PlannedPiece>,
-    /// Output frames of all pieces.
+    /// One per join between consecutive pieces; None for a hard cut.
+    pub transitions: Vec<Option<PlannedTransition>>,
+    /// Rendered windows in order: per piece its head, body and tail.
+    pub segments: Vec<PlannedSegment>,
+    /// Frames rendered for every segment: the item's progress work.
     pub frames: u32,
-    /// Sum of the piece window durations.
+    /// Frames of the joined output: every piece minus every transition.
+    pub output_frames: u32,
+    /// Duration of the joined output.
     pub duration: f64,
     pub container_fps: Fps,
+}
+
+impl PlannedBatchOutput {
+    fn segment_index(&self, piece: usize, role: SegmentRole) -> usize {
+        self.segments
+            .iter()
+            .position(|segment| segment.piece == piece && segment.role == role)
+            .expect("planned segment")
+    }
+}
+
+fn sum_frames(frames: impl Iterator<Item = u32>) -> CoreResult<u32> {
+    frames
+        .map(u64::from)
+        .sum::<u64>()
+        .try_into()
+        .map_err(|_| CoreError::Encode("Batch output frame count exceeds u32".into()))
 }
 
 impl ValidatedBatchEncoding {
     /// Plans every requested output at its destination. The pieces of an output
     /// must join by stream copy: one display resolution, and for composite output
     /// one source FPS (and one rotation where the encoder keeps the display matrix).
+    /// Pieces next to a transition render as head, body and tail segments.
     pub(crate) fn plan_outputs(
         &self,
         outputs: &[BatchRenderOutput],
@@ -351,6 +412,8 @@ impl ValidatedBatchEncoding {
                         )?;
                         Ok(PlannedPiece {
                             source,
+                            start_frame: piece.start_frame,
+                            end_frame: piece.end_frame,
                             window,
                             frames,
                             skip_overlay: piece.skip_overlay,
@@ -365,21 +428,178 @@ impl ValidatedBatchEncoding {
                     self.layout_fps,
                     self.update_rate,
                 )?;
-                let frames = pieces
-                    .iter()
-                    .try_fold(0u32, |total, piece| total.checked_add(piece.frames))
-                    .ok_or_else(|| {
-                        CoreError::Encode("Batch output frame count exceeds u32".into())
-                    })?;
+                let transitions = self.plan_transitions(output, &pieces, container_fps)?;
+                let segments = self.plan_segments(&pieces, &transitions)?;
+                let transition_frames = sum_frames(
+                    transitions
+                        .iter()
+                        .flatten()
+                        .map(|transition| transition.frames),
+                )?;
+                let frames = sum_frames(segments.iter().map(|segment| segment.frames))?;
+                let (num, den) = container_fps.components();
                 Ok(PlannedBatchOutput {
                     target,
-                    duration: pieces.iter().map(|piece| piece.window.duration).sum(),
+                    duration: pieces
+                        .iter()
+                        .map(|piece| piece.window.duration)
+                        .sum::<f64>()
+                        - f64::from(transition_frames) * f64::from(den) / f64::from(num),
+                    output_frames: sum_frames(pieces.iter().map(|piece| piece.frames))?
+                        - transition_frames,
                     pieces,
+                    transitions,
+                    segments,
                     frames,
                     container_fps,
                 })
             })
             .collect()
+    }
+
+    /// Validates the joins of an output: one per pair of pieces, a hard cut or a
+    /// catalogue `xfade` of at least one output frame that leaves every piece at
+    /// least one frame of its own. Transparent outputs take hard cuts only.
+    fn plan_transitions(
+        &self,
+        output: &BatchRenderOutput,
+        pieces: &[PlannedPiece],
+        container_fps: Fps,
+    ) -> CoreResult<Vec<Option<PlannedTransition>>> {
+        if output.transitions.len() + 1 != pieces.len() {
+            return Err(CoreError::Config(format!(
+                "Batch output {} must hold one transition per join of its {} pieces",
+                output.id,
+                pieces.len()
+            )));
+        }
+        let invalid =
+            |reason: String| CoreError::Config(format!("Batch output {}: {reason}", output.id));
+        let transitions = output
+            .transitions
+            .iter()
+            .map(|transition| {
+                let BatchTransition {
+                    transition_type,
+                    duration_seconds,
+                } = transition;
+                if transition_type == NO_TRANSITION {
+                    return if *duration_seconds == 0.0 {
+                        Ok(None)
+                    } else {
+                        Err(invalid("a hard cut has a duration of 0 seconds".into()))
+                    };
+                }
+                if !is_xfade_transition(transition_type) {
+                    return Err(invalid(format!("unknown transition {transition_type}")));
+                }
+                if matches!(self.codec, CodecSelection::Transparent(_)) {
+                    return Err(invalid(
+                        "transparent outputs join pieces with hard cuts only".into(),
+                    ));
+                }
+                if !duration_seconds.is_finite() || *duration_seconds <= 0.0 {
+                    return Err(invalid("transition durations must be positive".into()));
+                }
+                let (num, den) = container_fps.components();
+                let frames = (duration_seconds * f64::from(num) / f64::from(den)).round();
+                if frames < 1.0 {
+                    return Err(invalid(format!(
+                        "the {transition_type} transition is shorter than one frame"
+                    )));
+                }
+                Ok(Some(PlannedTransition {
+                    name: transition_type.clone(),
+                    frames: frames as u32,
+                }))
+            })
+            .collect::<CoreResult<Vec<_>>>()?;
+        let frames_of = |transition: Option<&Option<PlannedTransition>>| {
+            transition
+                .and_then(Option::as_ref)
+                .map_or(0, |transition| transition.frames)
+        };
+        for (index, piece) in pieces.iter().enumerate() {
+            let incoming = if index == 0 {
+                0
+            } else {
+                frames_of(transitions.get(index - 1))
+            };
+            if u64::from(piece.frames)
+                < u64::from(incoming) + u64::from(frames_of(transitions.get(index))) + 1
+            {
+                return Err(invalid(format!(
+                    "the transitions around piece {} leave none of its {} frames untouched",
+                    index + 1,
+                    piece.frames
+                )));
+            }
+        }
+        Ok(transitions)
+    }
+
+    /// Splits pieces next to transitions into head, body and tail windows on
+    /// their source frame grid (transitions exist only on composite outputs,
+    /// whose output frames are source frames).
+    fn plan_segments(
+        &self,
+        pieces: &[PlannedPiece],
+        transitions: &[Option<PlannedTransition>],
+    ) -> CoreResult<Vec<PlannedSegment>> {
+        let frames_of = |index: Option<usize>| {
+            index
+                .and_then(|index| transitions.get(index))
+                .and_then(Option::as_ref)
+                .map_or(0, |transition| u64::from(transition.frames))
+        };
+        let mut segments = Vec::new();
+        for (index, piece) in pieces.iter().enumerate() {
+            let incoming = frames_of(index.checked_sub(1));
+            let outgoing = frames_of(Some(index));
+            if incoming == 0 && outgoing == 0 {
+                segments.push(PlannedSegment {
+                    piece: index,
+                    role: SegmentRole::Body,
+                    window: piece.window,
+                    frames: piece.frames,
+                });
+                continue;
+            }
+            let body_start = piece.start_frame + incoming;
+            let body_end = piece.end_frame - outgoing;
+            for (role, start_frame, end_frame) in [
+                (SegmentRole::Head, piece.start_frame, body_start),
+                (SegmentRole::Body, body_start, body_end),
+                (SegmentRole::Tail, body_end, piece.end_frame),
+            ] {
+                if start_frame == end_frame {
+                    continue;
+                }
+                let window = piece_window(
+                    &piece.source,
+                    &BatchRenderPiece {
+                        source_id: piece.source.source_id.clone(),
+                        start_frame,
+                        end_frame,
+                        skip_overlay: piece.skip_overlay,
+                    },
+                )?;
+                let (frames, _) = video_output_work(
+                    &piece.source,
+                    window,
+                    self.codec,
+                    self.layout_fps,
+                    self.update_rate,
+                )?;
+                segments.push(PlannedSegment {
+                    piece: index,
+                    role,
+                    window,
+                    frames,
+                });
+            }
+        }
+        Ok(segments)
     }
 
     fn output_kind(&self) -> RenderOutputKind {
@@ -429,16 +649,41 @@ impl ValidatedBatchTemplate {
         self.encoding.output_kind()
     }
 
-    /// How the rendered parts of a multi-piece output join into its target.
+    /// How the rendered segments of a multi-piece output join into its target:
+    /// each body in order, with an `xfade` of the outgoing tail and the incoming
+    /// head at every transition. `segment_paths` follow `output.segments`.
     pub(crate) fn plan_assembly(
         &self,
         output: &PlannedBatchOutput,
         parts_directory: PathBuf,
-        parts: Vec<PathBuf>,
+        segment_paths: Vec<PathBuf>,
     ) -> OutputAssembly {
+        let (num, den) = output.container_fps.components();
+        let seconds = |frames: u32| f64::from(frames) * f64::from(den) / f64::from(num);
+        let mut segments = Vec::new();
+        for (index, transition) in output
+            .transitions
+            .iter()
+            .map(Some)
+            .chain([None])
+            .enumerate()
+        {
+            segments.push(AssemblySegment::Part(
+                segment_paths[output.segment_index(index, SegmentRole::Body)].clone(),
+            ));
+            if let Some(Some(transition)) = transition {
+                segments.push(AssemblySegment::Transition {
+                    outgoing: segment_paths[output.segment_index(index, SegmentRole::Tail)].clone(),
+                    incoming: segment_paths[output.segment_index(index + 1, SegmentRole::Head)]
+                        .clone(),
+                    name: transition.name.clone(),
+                    duration: seconds(transition.frames),
+                    output: parts_directory.join(format!("transition-{index:04}.mp4")),
+                });
+            }
+        }
         let kind = match self.encoding.codec {
             CodecSelection::Composite(id) => {
-                let (num, den) = output.container_fps.components();
                 let has_audio = output
                     .pieces
                     .iter()
@@ -457,8 +702,13 @@ impl ValidatedBatchTemplate {
                         })
                         .flatten()
                         .filter(|degrees| *degrees != 0),
-                    audio: has_audio.then(|| {
-                        output
+                    transition_encoding: TransitionEncoding::for_codec(
+                        id,
+                        self.encoding.quality,
+                        output.container_fps,
+                    ),
+                    audio: has_audio.then(|| AssemblyAudio {
+                        pieces: output
                             .pieces
                             .iter()
                             .map(|piece| AudioPiece {
@@ -468,9 +718,18 @@ impl ValidatedBatchTemplate {
                                     .has_audio
                                     .then(|| PathBuf::from(&piece.source.metadata.path)),
                                 trim_start: piece.window.trim_start,
-                                duration: f64::from(piece.frames) * f64::from(den) / f64::from(num),
+                                duration: seconds(piece.frames),
                             })
-                            .collect()
+                            .collect(),
+                        crossfades: output
+                            .transitions
+                            .iter()
+                            .map(|transition| {
+                                transition
+                                    .as_ref()
+                                    .map_or(0.0, |transition| seconds(transition.frames))
+                            })
+                            .collect(),
                     }),
                 }
             }
@@ -479,8 +738,8 @@ impl ValidatedBatchTemplate {
         OutputAssembly {
             target: output.target.path().to_path_buf(),
             parts_directory,
-            parts,
-            frames: u64::from(output.frames),
+            segments,
+            frames: u64::from(output.output_frames),
             kind,
         }
     }

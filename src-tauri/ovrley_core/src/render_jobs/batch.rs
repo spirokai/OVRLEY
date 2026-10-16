@@ -233,8 +233,9 @@ fn run_batch(
 type PieceActivity = Option<(ParsedActivity, f64)>;
 
 /// Renders one output while the queue retains its reservation and active row.
-/// A single piece renders straight to the target; several pieces render to parts
-/// in a hidden directory next to it and are joined. The parts are removed after
+/// A single piece renders straight to the target; otherwise every planned segment
+/// (pieces, or their heads, bodies and tails next to transitions) renders to a
+/// part in a hidden directory next to it and the parts are joined. The parts are removed after
 /// a verified output or cancellation and kept after a failure.
 fn execute_batch_item(
     paths: &AppPaths,
@@ -268,17 +269,18 @@ fn execute_batch_item(
             .map(|(activity, end)| (activity, *end)),
     };
     let render = |index: usize, target: &RenderOutputTarget, joined: bool| {
-        let piece = &output.pieces[index];
+        let segment = &output.segments[index];
+        let piece = &output.pieces[segment.piece];
         check_source_freshness(&piece.source)?;
         let activity = activity_of(piece);
         let plan = plan_batch_item(
             template,
             &piece.source,
-            piece.window,
-            job.piece_offsets[index],
+            segment.window,
+            job.piece_offsets[segment.piece],
             piece.skip_overlay,
             activity.map(|(_, end)| end),
-            piece.frames,
+            segment.frames,
             output.container_fps,
         )?;
         let plan = if joined { plan.without_audio() } else { plan };
@@ -297,9 +299,9 @@ fn execute_batch_item(
     }
     let parts_directory = create_parts_directory(&output.target)?;
     let result = (|| {
-        let mut parts = Vec::with_capacity(output.pieces.len());
+        let mut parts = Vec::with_capacity(output.segments.len());
         let mut frames_before = 0;
-        for (index, piece) in output.pieces.iter().enumerate() {
+        for (index, segment) in output.segments.iter().enumerate() {
             let part = parts_directory.join(format!(
                 "part-{index:04}.{}",
                 template.output_kind().extension()
@@ -311,7 +313,7 @@ fn execute_batch_item(
             )?;
             session.controller().begin_piece(frames_before);
             render(index, &target, true)?;
-            frames_before += piece.frames;
+            frames_before += segment.frames;
             parts.push(part);
         }
         session

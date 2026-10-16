@@ -14,7 +14,8 @@ use serde::Deserialize;
 use super::diagnostics::stderr_tail;
 use super::process::PartialOutputGuard;
 use crate::encode::ffmpeg::assemble::{
-    concat_manifest, join_args, probe_output_args, remux_part_args, AssemblyKind, OutputAssembly,
+    concat_manifest, join_args, probe_output_args, remux_part_args, transition_segment_args,
+    AssemblyKind, AssemblySegment, OutputAssembly,
 };
 use crate::encode::ffmpeg::binary::{configure_ffmpeg_command, resolve_ffmpeg_binary};
 use crate::encode::progress::RenderController;
@@ -23,17 +24,31 @@ use crate::paths::AppPaths;
 
 const CANCEL_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
-/// Remuxes composite parts, joins all parts into the target and verifies its
-/// frame count and audio track.
+/// Encodes composite transitions, remuxes every composite segment, joins them
+/// into the target and verifies its frame count and audio track.
 pub(crate) fn assemble_output(
     paths: &AppPaths,
     assembly: &OutputAssembly,
     controller: &RenderController,
 ) -> CoreResult<()> {
     let ffmpeg = resolve_ffmpeg_binary(&paths.repo_root)?;
-    if let AssemblyKind::Composite { hevc, .. } = assembly.kind {
-        for (part, remux) in assembly.parts.iter().zip(assembly.joined_parts()) {
-            run_ffmpeg(&ffmpeg, &remux_part_args(part, &remux, hevc), controller)?;
+    if let AssemblyKind::Composite {
+        hevc,
+        transition_encoding,
+        ..
+    } = &assembly.kind
+    {
+        for segment in &assembly.segments {
+            if matches!(segment, AssemblySegment::Transition { .. }) {
+                run_ffmpeg(
+                    &ffmpeg,
+                    &transition_segment_args(transition_encoding, segment),
+                    controller,
+                )?;
+            }
+        }
+        for (part, remux) in assembly.remuxes() {
+            run_ffmpeg(&ffmpeg, &remux_part_args(&part, &remux, *hevc), controller)?;
         }
     }
     let manifest = assembly.manifest_path();

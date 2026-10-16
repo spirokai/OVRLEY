@@ -150,6 +150,7 @@ pub fn video_batch_request(
         outputs: vec![BatchRenderOutput {
             id: "video".into(),
             pieces: vec![whole_source_piece(source, skip_overlay)],
+            transitions: Vec::new(),
         }],
     }
 }
@@ -317,4 +318,14 @@ pub fn minimal_trimmed_activity(times: Vec<f64>) -> TrimmedActivity {
         lap_durations_seconds: vec![],
         lap_durations_best_so_far_seconds: vec![],
     }
+}
+
+/// Hard cuts between `pieces` consecutive pieces.
+pub fn hard_cuts(pieces: usize) -> Vec<ovrley_core::render_jobs::contracts::BatchTransition> {
+    (1..pieces)
+        .map(|_| ovrley_core::render_jobs::contracts::BatchTransition {
+            transition_type: "none".into(),
+            duration_seconds: 0.0,
+        })
+        .collect()
 }

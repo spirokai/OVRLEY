@@ -9,4 +9,5 @@ pub mod composite_profiles;
 pub mod detect;
 pub(crate) mod probes;
 pub mod settings;
+pub mod transitions;
 pub mod transparent_profiles;
