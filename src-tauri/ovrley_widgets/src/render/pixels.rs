@@ -2,6 +2,7 @@
 use crate::error::{WidgetError, WidgetResult};
 use skia_safe::{AlphaType, ColorType, ImageInfo, Surface};
 
+/// Reads browser RGBA with integer rounding; RGB may differ by one from Skia's float conversion.
 pub fn read_surface_rgba(surface: &mut Surface, pixels: &mut [u8]) -> WidgetResult<()> {
     let info = ImageInfo::new(
         (surface.width(), surface.height()),
@@ -25,4 +26,71 @@ pub fn read_surface_rgba(surface: &mut Surface, pixels: &mut [u8]) -> WidgetResu
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_surface_rgba;
+    use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
+
+    #[test]
+    fn readback_preserves_alpha_and_matches_skia_within_one_rgb_rounding_step() {
+        let info = ImageInfo::new((256, 256), ColorType::RGBA8888, AlphaType::Premul, None);
+        let original: Vec<u8> = (0..=255u8)
+            .flat_map(|alpha| {
+                (0..=255u8).flat_map(move |channel| {
+                    let red = channel.min(alpha);
+                    [red, alpha - red, alpha, alpha]
+                })
+            })
+            .collect();
+        let mut source = original.clone();
+        let mut surface = surfaces::wrap_pixels(&info, &mut source, 256 * 4, None).unwrap();
+        let mut expected = vec![0; original.len()];
+        assert!(surface.read_pixels(
+            &info.with_alpha_type(AlphaType::Unpremul),
+            &mut expected,
+            256 * 4,
+            (0, 0),
+        ));
+        let mut actual = vec![0; original.len()];
+        read_surface_rgba(&mut surface, &mut actual).unwrap();
+        for (index, (actual, expected)) in actual
+            .chunks_exact(4)
+            .zip(expected.chunks_exact(4))
+            .enumerate()
+        {
+            assert_eq!(actual[3], expected[3], "alpha at pixel {index}");
+            for channel in 0..3 {
+                assert!(
+                    actual[channel].abs_diff(expected[channel]) <= 1,
+                    "RGB at pixel {index}, channel {channel}: {actual:?} vs {expected:?}",
+                );
+            }
+            if expected[3] == 0 || expected[3] == 255 {
+                assert_eq!(actual, expected, "transparent/opaque pixel {index}");
+            }
+        }
+        let mut repeated = vec![0; original.len()];
+        read_surface_rgba(&mut surface, &mut repeated).unwrap();
+        assert_eq!(actual, repeated);
+        drop(surface);
+        assert_eq!(
+            source, original,
+            "readback must not unpremultiply the drawing surface",
+        );
+    }
+
+    #[test]
+    fn reused_output_replaces_previous_colors_and_alpha() {
+        let info = ImageInfo::new((2, 1), ColorType::RGBA8888, AlphaType::Premul, None);
+        let mut surface = surfaces::raster(&info, None, None).unwrap();
+        let mut pixels = vec![0; 8];
+        surface.canvas().clear(Color::from_argb(128, 255, 0, 0));
+        read_surface_rgba(&mut surface, &mut pixels).unwrap();
+        assert_eq!(pixels, [255, 0, 0, 128, 255, 0, 0, 128]);
+        surface.canvas().clear(Color::TRANSPARENT);
+        read_surface_rgba(&mut surface, &mut pixels).unwrap();
+        assert_eq!(pixels, [0; 8]);
+    }
 }

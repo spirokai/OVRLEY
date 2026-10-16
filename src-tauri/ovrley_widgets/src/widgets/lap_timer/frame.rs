@@ -6,8 +6,10 @@ use crate::{
         baseline_for_text_top_with_line_height, draw_text_blob, layout_text, text_selection_bounds,
         ResolvedTextStyle,
     },
+    widgets::value::preview::surface,
 };
-use skia_safe::{Canvas, Font, Rect, TextBlob};
+use skia_safe::{Canvas, Color, Font, Image, Rect, TextBlob};
+use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub(super) struct TextRun {
@@ -92,25 +94,58 @@ impl TextRun {
     }
 }
 
+#[derive(Clone, Debug)]
+pub(super) struct TextLayer {
+    image: Image,
+    content_bounds: Rect,
+    bounds: Rect,
+    content_width: f32,
+}
+
+impl TextLayer {
+    pub fn new(runs: Vec<TextRun>, x: f32) -> WidgetResult<Self> {
+        let frame = LapTimerFrame::new(runs, None, x)?;
+        let mut surface = surface(frame.bounds.width() as u32, frame.bounds.height() as u32)?;
+        let canvas = surface.canvas();
+        canvas.clear(Color::TRANSPARENT);
+        // Integer origins retain the glyphs' original subpixel placement.
+        canvas.translate((-frame.bounds.left, -frame.bounds.top));
+        frame.draw(canvas);
+        Ok(Self {
+            image: surface.image_snapshot(),
+            content_bounds: frame.content_bounds,
+            bounds: frame.bounds,
+            content_width: frame.content_width,
+        })
+    }
+}
+
 pub struct LapTimerFrame {
     runs: Vec<TextRun>,
+    background: Option<Arc<TextLayer>>,
     pub content_bounds: Rect,
     pub bounds: Rect,
     pub content_width: f32,
 }
 
 impl LapTimerFrame {
-    pub(super) fn new(runs: Vec<TextRun>, x: f32) -> WidgetResult<Self> {
-        let first = runs
-            .first()
-            .ok_or_else(|| WidgetError::Render("lap timer has no drawable text".into()))?;
-        let mut content_bounds = first.content;
-        let mut bounds = first.bounds;
-        let mut right = first.right;
-        for run in runs.iter().skip(1) {
+    pub(super) fn new(
+        runs: Vec<TextRun>,
+        background: Option<Arc<TextLayer>>,
+        x: f32,
+    ) -> WidgetResult<Self> {
+        let (mut content_bounds, mut bounds, mut content_width) = if let Some(layer) = &background {
+            (layer.content_bounds, layer.bounds, layer.content_width)
+        } else {
+            let first = runs
+                .first()
+                .ok_or_else(|| WidgetError::Render("lap timer has no drawable text".into()))?;
+            (first.content, first.bounds, first.right - x)
+        };
+        for run in &runs {
             content_bounds.join(run.content);
             bounds.join(run.bounds);
-            right = right.max(run.right);
+            content_width = content_width.max(run.right - x);
         }
         bounds = Rect::new(
             bounds.left.floor(),
@@ -120,13 +155,17 @@ impl LapTimerFrame {
         );
         Ok(Self {
             runs,
+            background,
             content_bounds,
             bounds,
-            content_width: right - x,
+            content_width,
         })
     }
 
     pub fn draw(&self, canvas: &Canvas) {
+        if let Some(layer) = &self.background {
+            canvas.draw_image(&layer.image, (layer.bounds.left, layer.bounds.top), None);
+        }
         for run in &self.runs {
             draw_text_blob(canvas, &run.blob, run.baseline, &run.style);
         }

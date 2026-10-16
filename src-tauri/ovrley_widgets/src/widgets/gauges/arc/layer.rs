@@ -9,11 +9,14 @@ use super::path::ArcTrackSpec;
 use super::segment::{draw_segment, inner_segment_geometry, segment_geometries};
 use super::ArcGaugeCache;
 use crate::model::{scene::ValidatedScenePresentation, types::TrackFillStyle};
-use crate::render::text::{parse_color, ResolvedTextStyle};
+use crate::render::{
+    shadow::shadow_paint,
+    text::{parse_color, ResolvedTextStyle},
+};
 use crate::widgets::gauges::{
     bar_geometry::scale_bar_geometry, validation::ValidatedArcGaugeWidget,
 };
-use skia_safe::{image_filters, paint::Style, BlendMode, Canvas, ClipOp, Paint};
+use skia_safe::{paint::Style, BlendMode, Canvas, ClipOp, Paint};
 
 /// Builds the padded, cached image containing every frame-invariant element.
 pub(super) fn draw_static_layer(
@@ -26,14 +29,11 @@ pub(super) fn draw_static_layer(
 ) {
     let track_thickness = gauge.track_thickness * scale;
     let border_thickness = gauge.track_border_thickness * scale;
-    let shadow_filter = if border_thickness > 0.0 && scene.shadow_strength > 0.0 {
-        image_filters::drop_shadow_only(
-            (scene.shadow_distance * scale, scene.shadow_distance * scale),
-            (scene.shadow_strength * scale, scene.shadow_strength * scale),
+    let shadow = if border_thickness > 0.0 {
+        shadow_paint(
+            &track_paint(parse_color(&gauge.track_border_color, text_style.opacity)),
             parse_color(&scene.shadow_color, text_style.opacity),
-            None,
-            None,
-            None,
+            scene.shadow_strength * scale,
         )
     } else {
         None
@@ -50,7 +50,9 @@ pub(super) fn draw_static_layer(
                     border_thickness,
                     scale,
                     text_style,
-                    shadow_filter.as_ref(),
+                    shadow
+                        .as_ref()
+                        .map(|paint| (paint, scene.shadow_distance * scale)),
                 );
             }
         }
@@ -62,7 +64,9 @@ pub(super) fn draw_static_layer(
             border_thickness,
             scale,
             text_style,
-            shadow_filter.as_ref(),
+            shadow
+                .as_ref()
+                .map(|paint| (paint, scene.shadow_distance * scale)),
         ),
     }
 }
@@ -75,19 +79,22 @@ fn draw_static_track(
     border_thickness: f32,
     scale: f32,
     text_style: &ResolvedTextStyle,
-    shadow_filter: Option<&skia_safe::ImageFilter>,
+    shadow: Option<(&Paint, f32)>,
 ) {
     let inner_corner_radius = gauge.track_corner_radius * scale;
     let border_color = parse_color(&gauge.track_border_color, text_style.opacity);
 
-    if let Some(shadow_filter) = shadow_filter {
+    if let Some((paint, distance)) = shadow {
+        canvas.save();
+        canvas.translate((distance, distance));
         draw_segment(
             canvas,
             geometry,
             track_thickness,
             inner_corner_radius,
-            &segment_border_paint(border_color, Some(shadow_filter.clone())),
+            paint,
         );
+        canvas.restore();
     }
     if border_thickness > 0.0 {
         draw_segment(
@@ -95,7 +102,7 @@ fn draw_static_track(
             geometry,
             track_thickness,
             inner_corner_radius,
-            &segment_border_paint(border_color, None),
+            &track_paint(border_color),
         );
         let inner_geo = inner_segment_geometry(geometry, border_thickness);
         let inner_thickness = (track_thickness - border_thickness * 2.0).max(0.0);
@@ -112,13 +119,10 @@ fn draw_static_track(
             inner_geo,
             inner_thickness,
             inner_cnr,
-            &track_paint(
-                parse_color(
-                    &gauge.track_empty_color,
-                    gauge.track_empty_opacity * text_style.opacity,
-                ),
-                None,
-            ),
+            &track_paint(parse_color(
+                &gauge.track_empty_color,
+                gauge.track_empty_opacity * text_style.opacity,
+            )),
         );
     } else {
         draw_segment(
@@ -126,13 +130,10 @@ fn draw_static_track(
             geometry,
             track_thickness,
             inner_corner_radius,
-            &track_paint(
-                parse_color(
-                    &gauge.track_empty_color,
-                    gauge.track_empty_opacity * text_style.opacity,
-                ),
-                None,
-            ),
+            &track_paint(parse_color(
+                &gauge.track_empty_color,
+                gauge.track_empty_opacity * text_style.opacity,
+            )),
         );
     }
 }
@@ -209,32 +210,17 @@ fn draw_continuous_fill(
 }
 
 fn fill_paint(cache: &ArcGaugeCache) -> Paint {
-    track_paint(
-        parse_color(
-            &cache.track_filled_color,
-            cache.track_filled_opacity * cache.text_style.opacity,
-        ),
-        None,
-    )
+    track_paint(parse_color(
+        &cache.track_filled_color,
+        cache.track_filled_opacity * cache.text_style.opacity,
+    ))
 }
 
-fn track_paint(color: skia_safe::Color, image_filter: Option<skia_safe::ImageFilter>) -> Paint {
+fn track_paint(color: skia_safe::Color) -> Paint {
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
     paint.set_style(Style::Fill);
     paint.set_color(color);
-    if let Some(image_filter) = image_filter {
-        paint.set_image_filter(image_filter);
-    }
-    paint
-}
-
-fn segment_border_paint(
-    color: skia_safe::Color,
-    image_filter: Option<skia_safe::ImageFilter>,
-) -> Paint {
-    let mut paint = track_paint(color, image_filter);
-    paint.set_style(Style::Fill);
     paint
 }
 

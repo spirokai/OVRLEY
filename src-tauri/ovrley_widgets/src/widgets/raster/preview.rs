@@ -25,6 +25,7 @@ impl PreviewImages {
         let image = Image::from_encoded(Data::new_copy(bytes))
             .ok_or_else(|| WidgetError::Render("unable to decode raster resource".into()))?;
         let (width, height) = (image.width() as u32, image.height() as u32);
+        // Decode source colors directly; a premultiplied round trip loses low-alpha precision.
         let info = image
             .image_info()
             .with_color_type(ColorType::RGBA8888)

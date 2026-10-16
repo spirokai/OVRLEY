@@ -342,7 +342,7 @@ impl PreparedRenderAssets {
                 let history = activity.lap_history();
                 let content =
                     lap_timer_content(&widget.validated, history, activity.lap_sample(index))?;
-                widget.layout.prepare_frame(history, &content)?.draw(canvas);
+                widget.layout.prepare_cached_frame(history, &content)?.draw(canvas);
                 return Ok(None);
             }
             PreparedWidget::HeadingTape(cache) => {

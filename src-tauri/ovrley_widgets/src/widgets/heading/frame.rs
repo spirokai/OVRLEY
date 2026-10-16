@@ -107,9 +107,12 @@ impl HeadingFrame {
             canvas.draw_rect(bounds, &cache.edge_fade);
         }
         if let Some(shadow) = &cache.indicator_shadow {
+            canvas.save();
+            canvas.translate((cache.shadow_distance, cache.shadow_distance));
             for (path, _) in &self.indicators {
                 canvas.draw_path(path, shadow);
             }
+            canvas.restore();
         }
         for (path, paint) in &self.indicators {
             canvas.draw_path(path, paint);

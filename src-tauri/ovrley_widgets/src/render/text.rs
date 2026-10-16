@@ -1,7 +1,7 @@
+use super::shadow::shadow_paint;
 use crate::error::WidgetResult;
 use crate::model::standard_widgets::widget_font_weight;
 use skia_safe::{
-    image_filters,
     paint::{Join, Style},
     Canvas, Color, Font, Paint, Point, Rect, TextBlob, TextBlobBuilder, Typeface,
 };
@@ -138,30 +138,17 @@ pub fn draw_text_blob(canvas: &Canvas, blob: &TextBlob, baseline: f32, style: &R
 #[derive(Clone, Debug)]
 pub struct TextPaints {
     shadow: Option<Paint>,
+    shadow_distance: f32,
     border: Option<Paint>,
     fill: Paint,
 }
 
 impl TextPaints {
     pub fn new(style: &ResolvedTextStyle) -> Self {
+        let fill = text_paint(style.color);
         let shadow = style
             .shadow_color
-            .filter(|_| style.shadow_strength > 0.0)
-            .and_then(|color| {
-                image_filters::drop_shadow_only(
-                    (style.shadow_distance, style.shadow_distance),
-                    (style.shadow_strength, style.shadow_strength),
-                    color,
-                    None,
-                    None,
-                    None,
-                )
-                .map(|filter| {
-                    let mut paint = text_paint(style.color);
-                    paint.set_image_filter(filter);
-                    paint
-                })
-            });
+            .and_then(|color| shadow_paint(&fill, color, style.shadow_strength));
         let border = style
             .border_color
             .filter(|_| style.border_thickness > 0.0)
@@ -174,13 +161,24 @@ impl TextPaints {
             });
         Self {
             shadow,
+            shadow_distance: style.shadow_distance,
             border,
-            fill: text_paint(style.color),
+            fill,
         }
     }
 
     pub fn draw(&self, canvas: &Canvas, blob: &TextBlob, position: (f32, f32)) {
-        for paint in [self.shadow.as_ref(), self.border.as_ref(), Some(&self.fill)]
+        if let Some(shadow) = &self.shadow {
+            canvas.draw_text_blob(
+                blob,
+                (
+                    position.0 + self.shadow_distance,
+                    position.1 + self.shadow_distance,
+                ),
+                shadow,
+            );
+        }
+        for paint in [self.border.as_ref(), Some(&self.fill)]
             .into_iter()
             .flatten()
         {
@@ -266,7 +264,7 @@ pub(crate) struct LaidOutText {
 
 // Keep the existing whole-string layout at zero. Nonzero tracking uses intact
 // extended grapheme clusters, with gaps only between them. One blob is reused
-// for every paint layer, including shadows where overlapping runs must blur together.
+// for every paint layer, keeping tracked glyph positions identical across fill, border and shadow.
 pub(crate) fn layout_text(text: &str, font: &Font, letter_spacing: f32) -> LaidOutText {
     if letter_spacing == 0.0 || text.is_empty() {
         return LaidOutText {

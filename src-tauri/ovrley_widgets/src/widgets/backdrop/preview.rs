@@ -2,9 +2,10 @@ use super::{config::BackdropConfig, frame::prepare_backdrop_frame, validation::v
 use crate::{
     error::{WidgetError, WidgetResult},
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
+    render::pixels::read_surface_rgba,
     widgets::value::preview::{surface, WidgetGeometry},
 };
-use skia_safe::{AlphaType, Color, ColorType, ImageInfo};
+use skia_safe::Color;
 
 /// Backdrops produce pixels at creation/update only, without fonts or activity.
 pub struct PreviewBackdrop {
@@ -27,10 +28,7 @@ impl PreviewBackdrop {
         canvas.translate((-bounds.left, -bounds.top));
         frame.draw(canvas, scene.opacity);
         let mut pixels = vec![0; width as usize * height as usize * 4];
-        let info = ImageInfo::new((width as i32, height as i32), ColorType::RGBA8888, AlphaType::Unpremul, None);
-        if !surface.read_pixels(&info, &mut pixels, width as usize * 4, (0, 0)) {
-            return Err(WidgetError::Render("unable to read backdrop RGBA pixels".into()));
-        }
+        read_surface_rgba(&mut surface, &mut pixels)?;
         let geometry = serde_json::to_vec(&WidgetGeometry {
             left: bounds.left, top: bounds.top, width, height,
             content_width: frame.content_bounds.width(), content: frame.content_bounds.into(),

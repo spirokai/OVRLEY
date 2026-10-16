@@ -9,11 +9,11 @@ use super::super::track_path::{translated_track_cap_path, translated_track_cap_r
 use super::geometry::{bordered_bar_fill_rect, segment_rect, track_cap_frame};
 use super::LinearGaugeCache;
 use crate::model::scene::ValidatedScenePresentation;
-use crate::render::text::parse_color;
+use crate::render::{shadow::shadow_paint, text::parse_color};
 use crate::widgets::gauges::validation::{
     ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
 };
-use skia_safe::{image_filters, BlendMode, Canvas, Paint, PathBuilder, PathFillType, RRect, Rect};
+use skia_safe::{BlendMode, Canvas, Paint, PathBuilder, PathFillType, RRect, Rect};
 
 /// Builds the padded, cached image containing every frame-invariant element.
 pub(super) fn draw_static_layer(
@@ -28,19 +28,14 @@ pub(super) fn draw_static_layer(
     let height_px = height as f32;
     let radius = gauge.track_corner_radius * scale;
     let border = gauge.track_border_thickness * scale;
-    let shadow_filter = if border > 0.0 {
-        (scene.shadow_strength > 0.0)
-            .then(|| {
-                image_filters::drop_shadow_only(
-                    (scene.shadow_distance * scale, scene.shadow_distance * scale),
-                    (scene.shadow_strength * scale, scene.shadow_strength * scale),
-                    parse_color(&scene.shadow_color, scene.opacity),
-                    None,
-                    None,
-                    None,
-                )
-            })
-            .flatten()
+    let mut source = Paint::default();
+    source.set_anti_alias(true);
+    let shadow = if border > 0.0 {
+        shadow_paint(
+            &source,
+            parse_color(&scene.shadow_color, scene.opacity),
+            scene.shadow_strength * scale,
+        )
     } else {
         None
     };
@@ -62,7 +57,9 @@ pub(super) fn draw_static_layer(
                 radius,
                 border,
                 scene.opacity,
-                shadow_filter.as_ref(),
+                shadow
+                    .as_ref()
+                    .map(|paint| (paint, scene.shadow_distance * scale)),
             );
         }
     } else {
@@ -73,7 +70,9 @@ pub(super) fn draw_static_layer(
             radius,
             border,
             scene.opacity,
-            shadow_filter.as_ref(),
+            shadow
+                .as_ref()
+                .map(|paint| (paint, scene.shadow_distance * scale)),
         );
     }
 }
@@ -85,7 +84,7 @@ fn draw_static_track(
     configured_radius: f32,
     border: f32,
     opacity: f32,
-    shadow_filter: Option<&skia_safe::ImageFilter>,
+    shadow: Option<(&Paint, f32)>,
 ) {
     let radius = configured_radius
         .min(rect.width() * 0.5)
@@ -100,19 +99,18 @@ fn draw_static_track(
     let inner_radius = (radius - border).max(0.0);
     let inner_rrect = RRect::new_rect_xy(inner_rect, inner_radius, inner_radius);
 
-    if let Some(filter) = shadow_filter {
-        let mut shadow_paint = Paint::default();
-        shadow_paint.set_anti_alias(true);
-        shadow_paint.set_color(skia_safe::Color::BLACK);
-        shadow_paint.set_image_filter(filter.clone());
+    if let Some((paint, distance)) = shadow {
+        canvas.save();
+        canvas.translate((distance, distance));
         if border > 0.0 {
             let mut ring_path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
             ring_path.add_rrect(outer_rrect, None, None);
             ring_path.add_rrect(inner_rrect, None, None);
-            canvas.draw_path(&ring_path.detach(), &shadow_paint);
+            canvas.draw_path(&ring_path.detach(), paint);
         } else {
-            canvas.draw_rrect(outer_rrect, &shadow_paint);
+            canvas.draw_rrect(outer_rrect, paint);
         }
+        canvas.restore();
     }
 
     if border > 0.0 {

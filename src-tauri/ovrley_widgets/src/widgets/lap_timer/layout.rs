@@ -4,7 +4,7 @@ use super::{
         best_completed_lap, delta_color, format_lap_delta, format_lap_duration, LapHistory,
         LapTimerContent,
     },
-    frame::{LapTimerFrame, TextRun},
+    frame::{LapTimerFrame, TextLayer, TextRun},
     validation::{LapTimerMode, ValidatedLapTimer},
     LINE_HEIGHT_RATIO, LOG_COLUMN_GAP_RATIO, LOG_HEADER_OPACITY, LOG_ROW_GAP_RATIO,
     TABLE_VERTICAL_METRICS_TEXT,
@@ -15,7 +15,25 @@ use crate::{
     render::text::{parse_color, resolve_font, rgba_color, FontResolver, ResolvedTextStyle},
 };
 use skia_safe::Font;
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
+};
+
+#[derive(Clone, Debug, PartialEq)]
+enum StaticContent {
+    Label,
+    Log {
+        completed: usize,
+        current_number: Option<String>,
+    },
+}
+
+#[derive(Debug)]
+struct CachedStatic {
+    content: StaticContent,
+    layer: Option<Arc<TextLayer>>,
+}
 
 #[derive(Clone, Debug)]
 pub struct LapTimerLayout {
@@ -29,6 +47,8 @@ pub struct LapTimerLayout {
     column_rights: [f32; 3],
     data_top: f32,
     row_stride: f32,
+    // Bounded to the current lap state; native workers share the immutable image.
+    static_layer: Arc<Mutex<Option<CachedStatic>>>,
 }
 
 pub fn validated_lap_timer_style(
@@ -90,6 +110,7 @@ pub fn prepare_lap_timer_layout(
         column_rights: [0.0; 3],
         data_top,
         row_stride,
+        static_layer: Arc::new(Mutex::new(None)),
     };
     if config.mode == LapTimerMode::LapLog {
         layout.column_rights = log_column_rights(&style, history, &layout.value_font, &label_font);
@@ -157,30 +178,70 @@ pub fn prepare_lap_timer_layout(
 }
 
 impl LapTimerLayout {
+    /// Direct glyph frame, also used for layout and independent cache-parity checks.
     pub fn prepare_frame(
         &self,
         history: LapHistory<'_>,
         content: &LapTimerContent,
     ) -> WidgetResult<LapTimerFrame> {
+        let mut runs = self.static_runs(history, content)?;
+        runs.extend(self.dynamic_runs(content)?);
+        LapTimerFrame::new(runs, None, self.config.x)
+    }
+
+    /// Only the current time/delta repaint while completed history and the label stay cached.
+    pub fn prepare_cached_frame(
+        &self,
+        history: LapHistory<'_>,
+        content: &LapTimerContent,
+    ) -> WidgetResult<LapTimerFrame> {
+        let key = match content {
+            LapTimerContent::Value { .. } => StaticContent::Label,
+            LapTimerContent::Log {
+                completed_lap_count,
+                current_row,
+            } => StaticContent::Log {
+                completed: *completed_lap_count,
+                current_number: current_row.as_ref().map(|(cells, _)| cells[0].clone()),
+            },
+        };
+        let background = {
+            let mut cache = self
+                .static_layer
+                .lock()
+                .expect("lap timer cache lock poisoned");
+            if cache.as_ref().map(|cache| &cache.content) != Some(&key) {
+                let runs = self.static_runs(history, content)?;
+                let layer = if runs.is_empty() {
+                    None
+                } else {
+                    Some(Arc::new(TextLayer::new(runs, self.config.x)?))
+                };
+                *cache = Some(CachedStatic {
+                    content: key,
+                    layer,
+                });
+            }
+            cache
+                .as_ref()
+                .expect("static lap state prepared")
+                .layer
+                .clone()
+        };
+        LapTimerFrame::new(self.dynamic_runs(content)?, background, self.config.x)
+    }
+
+    fn static_runs(
+        &self,
+        history: LapHistory<'_>,
+        content: &LapTimerContent,
+    ) -> WidgetResult<Vec<TextRun>> {
         let mut runs = Vec::new();
         match content {
-            LapTimerContent::Value { text, color } => {
+            LapTimerContent::Value { .. } => {
                 if let Some(label) = &self.label {
                     runs.push(label.clone());
                 }
-                runs.push(if let Some(value) = self.best_values.get(text) {
-                    value.clone()
-                } else {
-                    TextRun::new(
-                        text,
-                        TABLE_VERTICAL_METRICS_TEXT,
-                        ResolvedTextStyle {
-                            color: rgba_color(*color, 1.0),
-                            ..self.style.clone()
-                        },
-                        &self.value_font,
-                    )?
-                });
             }
             LapTimerContent::Log {
                 completed_lap_count,
@@ -213,8 +274,41 @@ impl LapTimerLayout {
                         self.data_top + y,
                     )?);
                 }
+                if let Some((cells, _)) = current_row {
+                    runs.push(TextRun::cell(
+                        &cells[0],
+                        self.column_rights[0],
+                        self.data_top,
+                        &self.style,
+                        &self.value_font,
+                    )?);
+                }
+            }
+        }
+        Ok(runs)
+    }
+
+    fn dynamic_runs(&self, content: &LapTimerContent) -> WidgetResult<Vec<TextRun>> {
+        let mut runs = Vec::new();
+        match content {
+            LapTimerContent::Value { text, color } => {
+                runs.push(if let Some(value) = self.best_values.get(text) {
+                    value.clone()
+                } else {
+                    TextRun::new(
+                        text,
+                        TABLE_VERTICAL_METRICS_TEXT,
+                        ResolvedTextStyle {
+                            color: rgba_color(*color, 1.0),
+                            ..self.style.clone()
+                        },
+                        &self.value_font,
+                    )?
+                });
+            }
+            LapTimerContent::Log { current_row, .. } => {
                 if let Some((cells, color)) = current_row {
-                    for (index, text) in cells.iter().enumerate() {
+                    for (index, text) in cells.iter().enumerate().skip(1) {
                         runs.push(TextRun::cell(
                             text,
                             self.column_rights[index],
@@ -233,7 +327,7 @@ impl LapTimerLayout {
                 }
             }
         }
-        LapTimerFrame::new(runs, self.config.x)
+        Ok(runs)
     }
 
     fn delta_cell(&self, text: &str, color: [u8; 4], top: f32) -> WidgetResult<TextRun> {

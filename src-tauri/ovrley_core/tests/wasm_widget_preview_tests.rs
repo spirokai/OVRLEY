@@ -5,7 +5,7 @@ use ovrley_core::fonts::{preview_font_resource, NativeFonts};
 use ovrley_widgets::{
     model::scene::validate_scene_presentation,
     preview::PreviewSession,
-    render::text::validated_value_style,
+    render::{pixels::read_surface_rgba, text::validated_value_style},
     widgets::value::preview::WidgetRequest,
     widgets::value::{
         format::{format_metric_parts, MetricSample},
@@ -578,12 +578,8 @@ fn gauges_match_native_pixels_sampling_cache_revisions_and_activity_replacement(
             assets.draw(canvas, &dense, index, &NativeFonts(&paths.font_dirs), false, &mut RenderProfiler::default())
             .unwrap();
             let mut pixels = vec![0; widget.pixels().len()];
-            assert!(surface.read_pixels(
-                &info.with_alpha_type(AlphaType::Unpremul),
-                &mut pixels,
-                info.width() as usize * 4,
-                (0, 0)
-            ));
+            // Compare drawing through the canonical transport; conversion has separate tests.
+            read_surface_rgba(&mut surface, &mut pixels).unwrap();
             assert!(
                 pixels == *widget.pixels(),
                 "{display}/{metric}/{placement}/{fill} pixels differ at {}",
@@ -861,7 +857,7 @@ fn heading_tape_matches_native_pixels_sampling_revisions_and_activity_replacemen
             canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
             assets.draw(canvas, &dense, index, &NativeFonts(&paths.font_dirs), false, &mut RenderProfiler::default()).unwrap();
             let mut pixels = vec![0; widget.pixels().len()];
-            assert!(surface.read_pixels(&info.with_alpha_type(AlphaType::Unpremul), &mut pixels, info.width() as usize * 4, (0,0)));
+            read_surface_rgba(&mut surface, &mut pixels).unwrap();
             assert_eq!(&pixels, widget.pixels(), "{style}/{placement} at {second}");
             assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
             let revision = widget.revision();
@@ -1086,7 +1082,7 @@ fn lap_timer_modes_match_native_pixels_sampling_and_resource_replacement() {
             let content = lap_timer_content(&native.validated, history, dense.lap_sample(index)).unwrap();
             native.layout.prepare_frame(history, &content).unwrap().draw(canvas);
             let mut pixels = vec![0; widget.pixels().len()];
-            assert!(surface.read_pixels(&info.with_alpha_type(AlphaType::Unpremul), &mut pixels, info.width() as usize * 4, (0,0)));
+            read_surface_rgba(&mut surface, &mut pixels).unwrap();
             assert_eq!(&pixels, widget.pixels(), "{mode} at {second}");
             assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
             let revision = widget.revision();
@@ -1224,9 +1220,7 @@ fn g_force_preview_matches_native_pixels_and_tracks_marker_and_percentile_change
         canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
         assets.draw(canvas, &dense, index, &NativeFonts(&font_dirs), false, &mut profiler).unwrap();
         let mut pixels = vec![0; widget.pixels().len()];
-        assert!(surface.read_pixels(
-            &info.with_alpha_type(AlphaType::Unpremul), &mut pixels, info.width() as usize * 4, (0, 0),
-        ));
+        read_surface_rgba(&mut surface, &mut pixels).unwrap();
         assert_eq!(&pixels, widget.pixels(), "G-force at {}", seconds[index]);
     }
     let revision = preview.widgets[&id].revision();
@@ -1386,12 +1380,7 @@ fn lean_angle_preview_matches_native_export_and_tracks_signed_fill_resources_and
         assets.draw(canvas, &dense, index, &NativeFonts(&paths.font_dirs), false, &mut profiler)
         .unwrap();
         let mut pixels = vec![0; widget.pixels().len()];
-        assert!(surface.read_pixels(
-            &info.with_alpha_type(AlphaType::Unpremul),
-            &mut pixels,
-            info.width() as usize * 4,
-            (0, 0)
-        ));
+        read_surface_rgba(&mut surface, &mut pixels).unwrap();
         assert_eq!(&pixels, widget.pixels(), "lean-angle at {second}");
         assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
         let revision = widget.revision();
@@ -1669,12 +1658,7 @@ fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_tri
         .draw(canvas, &fonts)
         .unwrap();
         let mut pixels = vec![0; widget.pixels().len()];
-        assert!(surface.read_pixels(
-            &info.with_alpha_type(AlphaType::Unpremul),
-            &mut pixels,
-            info.width() as usize * 4,
-            (0, 0)
-        ));
+        read_surface_rgba(&mut surface, &mut pixels).unwrap();
         assert_eq!(&pixels, widget.pixels(), "gradient at {second}");
         assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
         let revision = widget.revision();
@@ -1946,12 +1930,7 @@ fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
                 )
                 .unwrap();
                 let mut pixels = vec![0; widget.pixels().len()];
-                assert!(surface.read_pixels(
-                    &info.with_alpha_type(AlphaType::Unpremul),
-                    &mut pixels,
-                    info.width() as usize * 4,
-                    (0, 0)
-                ));
+                read_surface_rgba(&mut surface, &mut pixels).unwrap();
                 assert_eq!(
                     &pixels,
                     widget.pixels(),
@@ -2094,7 +2073,7 @@ fn label_pixels_match_native_and_only_config_changes_invalidate_the_static_revis
         &NativeFonts(&[common::test_config::repo_git_root().join("fonts")]),
     ).unwrap();
     let mut pixels = vec![0; widget.pixels().len()];
-    assert!(surface.read_pixels(&info.with_alpha_type(AlphaType::Unpremul), &mut pixels, info.width() as usize * 4, (0, 0)));
+    read_surface_rgba(&mut surface, &mut pixels).unwrap();
     assert_eq!(&pixels, widget.pixels());
     assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
     let revision = widget.revision();
@@ -2243,13 +2222,7 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
             )
             .unwrap();
             let mut pixels = vec![0; widget.pixels().len()];
-            let read_info = info.with_alpha_type(AlphaType::Unpremul);
-            assert!(surface.read_pixels(
-                &read_info,
-                &mut pixels,
-                info.width() as usize * 4,
-                (0, 0)
-            ));
+            read_surface_rgba(&mut surface, &mut pixels).unwrap();
             assert_eq!(&pixels, widget.pixels(), "{alignment}, t={second}");
             assert!(pixels.chunks_exact(4).any(|p| p[3] != 0));
             let revision = widget.revision();

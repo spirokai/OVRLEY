@@ -1,12 +1,11 @@
 //! Manifest-backed icon resources. SVG geometry is parsed once per asset.
+use super::shadow::shadow_paint;
 use super::svg::{parse_svg_icon, ParsedSvgIcon, SvgPrimitive};
 use crate::model::{
     standard_metrics::standard_metric_definition, standard_widgets::time_icon_asset_file,
     types::MetricKind,
 };
-use skia_safe::{
-    image_filters, paint::Style, Canvas, Color, Paint, PaintCap, PaintJoin, Point, Rect,
-};
+use skia_safe::{paint::Style, Canvas, Color, Paint, PaintCap, PaintJoin, Point, Rect};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 const ICON_VIEWBOX_SIZE: f32 = 24.0;
@@ -115,33 +114,15 @@ pub fn draw_metric_icon(
     canvas.translate((x, y));
     canvas.scale((icon_scale, icon_scale));
     if let Some(shadow_color) = shadow_color {
-        if shadow_strength > 0.0 {
-            let inverse_scale = if icon_scale.abs() <= f32::EPSILON {
-                1.0
-            } else {
-                1.0 / icon_scale
-            };
-            if let Some(shadow_filter) = image_filters::drop_shadow_only(
-                (
-                    shadow_distance * inverse_scale,
-                    shadow_distance * inverse_scale,
-                ),
-                (
-                    shadow_strength * inverse_scale,
-                    shadow_strength * inverse_scale,
-                ),
-                shadow_color,
-                None,
-                None,
-                None,
-            ) {
-                let mut shadow_paint = metric_icon_paint(
-                    &icon,
-                    crate::render::text::parse_color(icon_color, widget_opacity),
-                );
-                shadow_paint.set_image_filter(shadow_filter);
-                draw_metric_icon_primitives(canvas, &icon, &shadow_paint);
-            }
+        let inverse_scale = 1.0 / icon_scale;
+        if let Some(paint) = shadow_paint(&paint, shadow_color, shadow_strength * inverse_scale) {
+            canvas.save();
+            canvas.translate((
+                shadow_distance * inverse_scale,
+                shadow_distance * inverse_scale,
+            ));
+            draw_metric_icon_primitives(canvas, &icon, &paint);
+            canvas.restore();
         }
     }
     draw_metric_icon_primitives(canvas, &icon, &paint);

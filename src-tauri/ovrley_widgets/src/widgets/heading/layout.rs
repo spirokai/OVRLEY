@@ -9,12 +9,13 @@ use super::{
 use crate::{
     error::{WidgetError, WidgetResult},
     model::scene::ValidatedScenePresentation,
-    render::text::{origin_x_for_centered_text, parse_color, resolve_font, FontResolver},
+    render::{
+        shadow::shadow_paint,
+        text::{origin_x_for_centered_text, parse_color, resolve_font, FontResolver},
+    },
     widgets::value::preview::surface,
 };
-use skia_safe::{
-    gradient, image_filters, BlendMode, Color, Color4f, Image, Paint, Point, Rect, TileMode,
-};
+use skia_safe::{gradient, BlendMode, Color, Color4f, Image, Paint, Point, Rect, TileMode};
 
 /// Plain geometry keeps the native cache shareable by export worker threads.
 #[derive(Clone, Debug)]
@@ -35,6 +36,7 @@ pub struct HeadingCache {
     pub(crate) tape_ink: Vec<Rect>,
     pub(crate) indicators: Vec<(IndicatorShape, Paint)>,
     pub(crate) indicator_shadow: Option<Paint>,
+    pub(crate) shadow_distance: f32,
     pub(crate) edge_fade: Paint,
     pub(crate) edge_fade_bounds: [Rect; 2],
     pub(crate) opacity: f32,
@@ -132,29 +134,19 @@ pub fn prepare_heading_cache(
     );
     let labels = visible_labels(&ticks, heading.show_minor_labels, heading.show_major_labels);
     let mut ink = Vec::new();
-    let shadow = if scene.shadow_strength > 0.0 {
-        Some(
-            image_filters::drop_shadow_only(
-                (scene.shadow_distance * scale, scene.shadow_distance * scale),
-                (scene.shadow_strength * scale, scene.shadow_strength * scale),
-                parse_color(&scene.shadow_color, 1.0),
-                None,
-                None,
-                None,
-            )
-            .ok_or_else(|| WidgetError::Render("unable to prepare heading shadow".into()))?,
-        )
-    } else {
-        None
-    };
+    let shadow_color = parse_color(&scene.shadow_color, 1.0);
+    let shadow_distance = scene.shadow_distance * scale;
     // Shadows sit behind all ticks and labels, matching native composition.
     for shadow_pass in [true, false] {
-        if shadow_pass && shadow.is_none() {
+        if shadow_pass && scene.shadow_strength == 0.0 {
             continue;
+        }
+        canvas.save();
+        if shadow_pass {
+            canvas.translate((shadow_distance, shadow_distance));
         }
         let mut paint = Paint::default();
         paint.set_anti_alias(true);
-        paint.set_image_filter(if shadow_pass { shadow.clone() } else { None });
         for tick in &ticks {
             let thickness = if tick.is_major {
                 heading.major_tick_thickness
@@ -175,10 +167,15 @@ pub fn prepare_heading_cache(
             };
             paint.set_color(parse_color(color, 1.0));
             paint.set_stroke_width(thickness);
+            let shadow = shadow_pass.then(|| {
+                shadow_paint(&paint, shadow_color, scene.shadow_strength * scale)
+                    .expect("positive shadow sigma")
+            });
+            let draw_paint = shadow.as_ref().unwrap_or(&paint);
             // Wrap strokes as well as labels, including the half of north beyond either edge.
             for copy in [-(tape_width as f32), 0.0, tape_width as f32] {
                 let x = tick.x + copy;
-                canvas.draw_line(Point::new(x, top), Point::new(x, top + length), &paint);
+                canvas.draw_line(Point::new(x, top), Point::new(x, top + length), draw_paint);
                 if !shadow_pass {
                     // A zero-width Skia stroke is a one-pixel hairline.
                     let width = if thickness == 0.0 { 1.0 } else { thickness };
@@ -196,9 +193,19 @@ pub fn prepare_heading_cache(
                 &heading.label_color
             };
             paint.set_color(parse_color(color, 1.0));
+            let shadow = shadow_pass.then(|| {
+                shadow_paint(&paint, shadow_color, scene.shadow_strength * scale)
+                    .expect("positive shadow sigma")
+            });
+            let draw_paint = shadow.as_ref().unwrap_or(&paint);
             let x = origin_x_for_centered_text(&label.text, label.x, &font);
             for copy in [-(tape_width as f32), 0.0, tape_width as f32] {
-                canvas.draw_str(&label.text, Point::new(x + copy, label_y), &font, &paint);
+                canvas.draw_str(
+                    &label.text,
+                    Point::new(x + copy, label_y),
+                    &font,
+                    draw_paint,
+                );
                 if !shadow_pass {
                     let (_, mut bounds) = font.measure_str(&label.text, None);
                     bounds.offset((x + copy, label_y));
@@ -208,6 +215,7 @@ pub fn prepare_heading_cache(
                 }
             }
         }
+        canvas.restore();
     }
     let mut tape_bounds = Rect::default();
     for bounds in &ink {
@@ -250,11 +258,11 @@ pub fn prepare_heading_cache(
         }
     }
     let indicator_shadow = if heading.indicator_style == "chevron" {
-        shadow.map(|filter| {
-            let mut paint = indicator_paint;
-            paint.set_image_filter(filter);
-            paint
-        })
+        shadow_paint(
+            &indicator_paint,
+            shadow_color,
+            scene.shadow_strength * scale,
+        )
     } else {
         None
     };
@@ -269,6 +277,7 @@ pub fn prepare_heading_cache(
         tape_ink: ink,
         indicators,
         indicator_shadow,
+        shadow_distance,
         edge_fade,
         edge_fade_bounds,
         opacity: heading.opacity * scene.opacity,

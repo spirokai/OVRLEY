@@ -7,12 +7,13 @@ use crate::{
     error::{WidgetError, WidgetResult},
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
     preview::PreviewFonts,
+    render::pixels::read_surface_rgba,
     widgets::value::{
         config::ValueConfig,
         preview::{surface, WidgetGeometry},
     },
 };
-use skia_safe::{AlphaType, Color, ColorType, ImageInfo, Surface};
+use skia_safe::{Color, Surface};
 
 pub struct PreviewHeading {
     cache: HeadingCache,
@@ -68,17 +69,7 @@ impl PreviewHeading {
         canvas.translate((-bounds.left, -bounds.top));
         frame.draw(canvas, &self.cache);
         canvas.restore();
-        let info = ImageInfo::new(
-            (width as i32, height as i32),
-            ColorType::RGBA8888,
-            AlphaType::Unpremul,
-            None,
-        );
-        if !surface.read_pixels(&info, &mut self.pixels, width as usize * 4, (0, 0)) {
-            return Err(WidgetError::Render(
-                "unable to read heading RGBA pixels".into(),
-            ));
-        }
+        read_surface_rgba(surface, &mut self.pixels)?;
         self.geometry = serde_json::to_vec(&WidgetGeometry {
             left: bounds.left,
             top: bounds.top,

@@ -1,12 +1,13 @@
 //! Shared lean-angle track geometry and static cache.
 use super::validation::ValidatedLeanAngleWidget;
 use crate::{
-    error::WidgetResult, model::scene::ValidatedScenePresentation, render::text::parse_color,
+    error::WidgetResult,
+    model::scene::ValidatedScenePresentation,
+    render::{shadow::shadow_paint, text::parse_color},
     widgets::value::preview::surface,
 };
 use skia_safe::{
-    image_filters, paint::Style, BlendMode, ClipOp, Color, Image, Paint, Path, PathBuilder,
-    PathFillType, Point,
+    paint::Style, BlendMode, ClipOp, Color, Image, Paint, Path, PathBuilder, PathFillType, Point,
 };
 
 const START_ANGLE: f32 = 210.0;
@@ -154,21 +155,17 @@ pub fn prepare_lean_angle_cache(
     canvas.clear(Color::TRANSPARENT);
     canvas.translate((-left, -top));
     if border_thickness > 0.0 {
-        if scene.shadow_strength > 0.0 {
-            if let Some(filter) = image_filters::drop_shadow_only(
-                (scene.shadow_distance * scale, scene.shadow_distance * scale),
-                (scene.shadow_strength * scale, scene.shadow_strength * scale),
-                parse_color(&scene.shadow_color, widget.opacity),
-                None,
-                None,
-                None,
-            ) {
-                let mut paint = Paint::default();
-                paint.set_anti_alias(true);
-                paint.set_color(Color::BLACK);
-                paint.set_image_filter(filter);
-                canvas.draw_path(&border_path, &paint);
-            }
+        let mut source = Paint::default();
+        source.set_anti_alias(true);
+        if let Some(paint) = shadow_paint(
+            &source,
+            parse_color(&scene.shadow_color, widget.opacity),
+            scene.shadow_strength * scale,
+        ) {
+            canvas.save();
+            canvas.translate((scene.shadow_distance * scale, scene.shadow_distance * scale));
+            canvas.draw_path(&border_path, &paint);
+            canvas.restore();
         }
         let mut paint = Paint::default();
         paint.set_anti_alias(true);

@@ -3,12 +3,14 @@ use super::{format::GForceSample, validation::ValidatedGForceWidget};
 use crate::{
     error::WidgetResult,
     model::scene::ValidatedScenePresentation,
-    render::text::{parse_color, FontResolver},
+    render::{
+        shadow::shadow_paint,
+        text::{parse_color, FontResolver},
+    },
     widgets::value::preview::surface,
 };
 use skia_safe::{
-    image_filters, paint::Style, BlendMode, ClipOp, Color, Image, Paint, PathBuilder, PathFillType,
-    Point,
+    paint::Style, BlendMode, ClipOp, Color, Image, Paint, PathBuilder, PathFillType, Point,
 };
 
 const GUIDE_DEFAULT_THICKNESS_PX: f32 = 2.0;
@@ -88,27 +90,24 @@ pub fn prepare_g_force_cache(
     canvas.clear(Color::TRANSPARENT);
     canvas.translate((padding as f32, padding as f32));
     if border_thickness > 0.0 {
-        if scene.shadow_strength > 0.0 {
-            if let Some(filter) = image_filters::drop_shadow_only(
-                (scene.shadow_distance * scale, scene.shadow_distance * scale),
-                (scene.shadow_strength * scale, scene.shadow_strength * scale),
-                parse_color(&scene.shadow_color, widget.opacity),
+        let mut source = Paint::default();
+        source.set_anti_alias(true);
+        if let Some(paint) = shadow_paint(
+            &source,
+            parse_color(&scene.shadow_color, widget.opacity),
+            scene.shadow_strength * scale,
+        ) {
+            let mut ring_path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
+            ring_path.add_circle(Point::new(center_x, center_y), radius, None);
+            ring_path.add_circle(
+                Point::new(center_x, center_y),
+                radius - border_thickness,
                 None,
-                None,
-                None,
-            ) {
-                let mut paint = Paint::default();
-                paint.set_anti_alias(true);
-                paint.set_image_filter(filter);
-                let mut ring_path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
-                ring_path.add_circle(Point::new(center_x, center_y), radius, None);
-                ring_path.add_circle(
-                    Point::new(center_x, center_y),
-                    radius - border_thickness,
-                    None,
-                );
-                canvas.draw_path(&ring_path.detach(), &paint);
-            }
+            );
+            canvas.save();
+            canvas.translate((scene.shadow_distance * scale, scene.shadow_distance * scale));
+            canvas.draw_path(&ring_path.detach(), &paint);
+            canvas.restore();
         }
         let mut paint = Paint::default();
         paint.set_anti_alias(true);

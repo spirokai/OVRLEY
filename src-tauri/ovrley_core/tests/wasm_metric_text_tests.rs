@@ -9,7 +9,7 @@ use ovrley_widgets::{
     activity::ActivitySampler,
     model::{scene::validate_scene_presentation, standard_metrics::is_display_type_supported},
     preview::PreviewSession,
-    render::text::validated_value_style,
+    render::{pixels::read_surface_rgba, text::validated_value_style},
     widgets::value::{
         format::format_metric_parts,
         layout::{draw_metric_parts, draw_static_metric_parts_for_value},
@@ -147,12 +147,8 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
                     )
                     .unwrap();
                     let mut pixels = vec![0; widget.pixels().len()];
-                    assert!(surface.read_pixels(
-                        &info.with_alpha_type(AlphaType::Unpremul),
-                        &mut pixels,
-                        info.width() as usize * 4,
-                        (0, 0)
-                    ));
+                    // Compare drawing through the canonical transport; conversion has separate tests.
+                    read_surface_rgba(&mut surface, &mut pixels).unwrap();
                     assert_eq!(
                         &pixels, widget.pixels(),
                         "pixels: {metric}/{unit:?}/{alignment} at {second}"

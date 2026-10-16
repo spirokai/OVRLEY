@@ -3,7 +3,10 @@ use crate::{
     error::{WidgetError, WidgetResult},
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
     preview::PreviewFonts,
-    render::text::{validated_value_style, ResolvedTextStyle},
+    render::{
+        pixels::read_surface_rgba,
+        text::{validated_value_style, ResolvedTextStyle},
+    },
     widgets::value::{
         config::ValueConfig,
         format::MetricDisplayParts,
@@ -199,18 +202,7 @@ impl PreviewWidget {
         );
         canvas.restore();
         result?;
-        // Browser ImageData consumes straight alpha; Skia draws into premultiplied pixels.
-        let info = ImageInfo::new(
-            (width as i32, height as i32),
-            ColorType::RGBA8888,
-            AlphaType::Unpremul,
-            None,
-        );
-        if !surface.read_pixels(&info, &mut self.pixels, width as usize * 4, (0, 0)) {
-            return Err(WidgetError::Render(
-                "unable to read widget RGBA pixels".into(),
-            ));
-        }
+        read_surface_rgba(surface, &mut self.pixels)?;
         self.geometry = serde_json::to_vec(&WidgetGeometry {
             left: bounds.left,
             top: bounds.top,
