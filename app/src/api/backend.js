@@ -517,7 +517,8 @@ export async function readProjectFile(path) {
  * @param {string} path - Absolute `.oly` path.
  * @param {string} projectJson - Canonical project JSON.
  * @param {object} config - Current editor config containing Rust resource identities.
- * @returns {Promise<string>} Written path.
+ * @returns {Promise<{path: string, backupPath: string|null}>} Written path, and the backup kept when the
+ *   save replaced an older-format project.
  */
 export async function writeProjectFile(path, projectJson, config) {
   return invokeCommand('write_project_file', { path, projectJson, rasterResourceIds: rasterResourceIds(config) })

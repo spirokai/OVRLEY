@@ -38,6 +38,7 @@ export default function useProjectLifecycle({
   const [startupDialogOpen, setStartupDialogOpen] = useState(false)
   const [startupProjects, setStartupProjects] = useState([])
   const [startupOpeningPath, setStartupOpeningPath] = useState(null)
+  const [formatUpgradeBackupPath, setFormatUpgradeBackupPath] = useState(null)
   const operationLock = useRef(false)
   const startupLoaded = useRef(false)
   const busy = operationPhase !== null || conflictingOperation
@@ -114,8 +115,9 @@ export default function useProjectLifecycle({
           })
         }
         if (!path) return false
-        const project = await saveProject(path)
+        const { project, backupPath } = await saveProject(path)
         markSaved(path, project)
+        if (backupPath !== null) setFormatUpgradeBackupPath(backupPath)
         return true
       }),
     [loadedProjectPath, markSaved, runOperation],
@@ -210,6 +212,11 @@ export default function useProjectLifecycle({
     loadedProjectPath,
     loadingProject: operationPhase === 'loading',
     missingSourceDialog,
+    formatUpgradeDialog: {
+      open: formatUpgradeBackupPath !== null,
+      backupPath: formatUpgradeBackupPath ?? undefined,
+      onClose: () => setFormatUpgradeBackupPath(null),
+    },
     projectName,
     startupProjectDialog: {
       open: startupDialogOpen,

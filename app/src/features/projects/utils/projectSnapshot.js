@@ -2,14 +2,35 @@ import { createDurableEditorState } from '@/lib/widget/editor-state'
 import { createPathLocator } from './projectPaths'
 
 export const PROJECT_FORMAT = 'ovrley-project'
-export const PROJECT_VERSION = 3
+export const PROJECT_VERSION = 4
 export const LAST_PROJECT_DIRECTORY_KEY = 'last-project-dir'
 
-// Project format version 3 stores at most one video; version 4 stores the collection.
-function projectVideo(state) {
-  if (state.importedVideos.length > 1) throw new Error('Project format version 3 cannot store several videos')
-  const video = state.importedVideos[0]
-  return video === undefined ? null : { path: video.path, offsetSeconds: state.videoEdits[video.id].offsetSeconds }
+function cloneTransition(transition) {
+  return transition === null ? null : { type: transition.type, durationSeconds: transition.durationSeconds }
+}
+
+/**
+ * Projects the video collection in import order: identity, source locator, and user edits.
+ * A `null` transition follows the project transition defaults.
+ */
+function projectVideos(state, projectPath) {
+  return [...state.importedVideos]
+    .sort((left, right) => left.importOrder - right.importOrder)
+    .map((video) => {
+      const edits = state.videoEdits[video.id]
+      return {
+        id: video.id,
+        path: createPathLocator(video.path, projectPath),
+        offsetSeconds: edits.offsetSeconds,
+        deletedParts: edits.deletedParts.map((part) => ({
+          id: part.id,
+          fromSecond: part.fromSecond,
+          toSecond: part.toSecond,
+          transition: cloneTransition(part.transition),
+        })),
+        transitionIn: cloneTransition(edits.transitionIn),
+      }
+    })
 }
 
 /**
@@ -20,8 +41,7 @@ function projectVideo(state) {
  */
 export function createProjectContentSnapshot(state, projectPath) {
   const source = (path) => (path ? { path: createPathLocator(path, projectPath) } : null)
-  const video = projectVideo(state)
-  const { landmarks, detectedLocationSecond, speedThresholdKmh, turnThresholdDegrees } = state.manualVideoSync
+  const { videoId, landmarks, detectedLocationSecond, speedThresholdKmh, turnThresholdDegrees } = state.manualVideoSync
   const editor = createDurableEditorState({ config: state.config, globalDefaults: state.globalDefaults })
   editor.config.scene.fps = state.renderSettings.fps
   editor.config.scene.updateRate = state.renderSettings.widgetUpdateRate
@@ -30,20 +50,20 @@ export function createProjectContentSnapshot(state, projectPath) {
     editor,
     sources: {
       activity: source(state.activitySource?.path),
-      video: source(video?.path),
+      videos: projectVideos(state, projectPath),
     },
     sync: {
-      videoOffsetSeconds: video?.offsetSeconds ?? 0,
       videoTimezoneMode: state.videoSyncTimezoneMode,
-      manual: { landmarks, detectedLocationSecond, speedThresholdKmh, turnThresholdDegrees },
+      manual: { videoId, landmarks, detectedLocationSecond, speedThresholdKmh, turnThresholdDegrees },
     },
+    transitionDefaults: { ...state.transitionDefaults },
     render: {
       renderTarget: state.renderSettings.renderTarget,
       batchVideoFolder: state.batchVideoFolder,
       batchOutputFolder: state.batchOutputFolder,
       fps: state.renderSettings.fps,
       widgetUpdateRate: state.renderSettings.widgetUpdateRate,
-      exportMode: state.renderSettings.renderTarget === 'batch' || video !== null ? state.renderSettings.exportMode : 'transparent',
+      exportMode: state.renderSettings.renderTarget === 'batch' || state.importedVideos.length > 0 ? state.renderSettings.exportMode : 'transparent',
       codec: state.renderSettings.codec,
       qualityType: state.renderSettings.qualityType,
       qualityValue: state.renderSettings.qualityValue,
@@ -56,7 +76,7 @@ export function createProjectContentSnapshot(state, projectPath) {
  * Explicitly projects only project-owned durable state.
  * @param {object} state Complete application state.
  * @param {string} projectPath Absolute destination project path.
- * @returns {object} Canonical version 3 payload.
+ * @returns {object} Canonical version 4 payload.
  */
 export function createProjectSnapshot(state, projectPath) {
   return {
@@ -84,6 +104,7 @@ export function createProjectDirtyState(project) {
       editor: project.editor,
       sources: project.sources,
       sync: project.sync,
+      transitionDefaults: project.transitionDefaults,
       render: project.render,
     },
     timeline: project.timeline,

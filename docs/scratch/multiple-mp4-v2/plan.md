@@ -25,13 +25,13 @@ Rules that apply throughout:
 
 Tests: video-server integration (multiple registrations, ranges, isolated removal, unknown IDs, clear-all); project-load replacement order.
 
-Status: implemented (awaiting owner commit).
+Status: committed (`17fd29ef`).
 
 ## M2 — Canonical model, program derivation, persistence
 
 Delivered as three commits: **M2a** pure utilities (item 4), **M2b** model switch (items 1–3, 5–7, 9), **M2c** project format v4 (item 8).
 
-M2b status: implemented (awaiting owner commit). Decisions made during implementation:
+M2a status: committed (`0286c401`). M2b status: committed (`af7c48a4`). Decisions made during implementation:
 - Canonical state is split: `importedVideos` (validated source entities: metadata, preview registration, telemetry, sync warning) and `videoEdits[videoId]` (`offsetSeconds`, `deletedParts`, `transitionIn`). Timeline clips are the derived join (`joinVideoEdits`).
 - Undo tracks `videoEdits` (replacing `videoSyncOffsetSeconds`). Collection changes run through `changeVideoCollection`, which rebases history so undo never resurrects removed clips and keeps edits of remaining clips.
 - `parsedActivity`/`activitySummary` hold only the external activity. Embedded telemetry stays on each clip; without an external activity widgets use the telemetry of the clip shown at the playhead in clip-local time (`useActivityContext`). The timeline activity lane now shows only an external activity.
@@ -40,10 +40,18 @@ M2b status: implemented (awaiting owner commit). Decisions made during implement
 - Current-video render and project format v3 hold at most one clip until M6/M2c; multi-file import arrives in M3, so this limit is unreachable from the UI.
 - Exact `fpsNum/fpsDen` are required at import; the float-FPS fallback in render config is removed.
 
+M2c status: implemented (awaiting owner commit). Decisions made during implementation:
+- v4 layout: `sources.videos[]` (import order) = `{ id, path, offsetSeconds, deletedParts[{ id, fromSecond, toSecond, transition }], transitionIn }`; a transition is `null` (follows the defaults) or `{ type, durationSeconds }` (override; `none` has duration 0). Top-level `transitionDefaults`. `sync.videoOffsetSeconds` is gone; `sync.manual.videoId` names the clip that owns the landmarks (matches the M2b workspace model).
+- Clip IDs are persisted; v3 → v4 generates one UUID for the single video. Deleted-part IDs are unique across the project (join keys).
+- Rust validates structure and the transition catalogue (Rust copy, tested against the JS catalogue); the frontend checks deleted parts and landmarks against probed durations.
+- Missing videos are recovered one by one (dialog names the file); a skipped clip drops its edits, and its landmarks if it owned them.
+- Backup: Rust copies a pre-v4 target to `<name>.oly.v<old version>.bak` before the first overwrite and returns `backupPath`; the frontend shows a one-time dialog. "Save As" elsewhere leaves the original untouched.
+- v4 may still change inside the branch (owner, 2026-10-16): `render` (render target, batch folders) stays as in v3 until M3 removes the folder batch and M6 adds output mode; placement source/anchor is added with M3's placement prompt. Batch-folder import on open lands in M3.
+
 1. Replace singleton fields in `createVideoImportSlice.js` with `importedVideos[]` and ID-addressed actions (add batch, remove, set clip offset, set deleted parts, set transition). Session-level sync actions (timezone mode, shared offset, filename timestamps, reset) keep their current semantics and apply to every clip.
 2. Move embedded telemetry into the entity (remove global stash in `createMediaSlice.js`).
 3. Keep the time chain and timezone inference untouched (`media/video_probe.rs`, `media/mp4_telemetry/mod.rs`, `media/prepared_video.rs`, `lib/video-sync.js`). Only change `resolveVideoSyncState`: a non-overlapping clip keeps its signed offset with a "no activity coverage" warning instead of offset 0. Apply it per clip.
-4. Pure utilities in `app/src/lib/video-program/` — **M2a commit** (implemented, awaiting owner commit):
+4. Pure utilities in `app/src/lib/video-program/` — **M2a commit**:
    - `frame-grid.js`: `secondsToFrames`, `framesToSeconds`, `fpsEquals` (exact rationals)
    - `transition-catalog.js`: 58 `xfade` names, `DEFAULT_TRANSITION_SETTINGS` (`wipeleft`, 2 s, threshold 2 s, `dialogShown: false`), `HARD_CUT`
    - `video-collection.js`: `sortVideosByTimeline`, `getVideoEndSecond`, `getVideosTimelineBounds`, `deriveCompatibility` (largest resolution+FPS group compatible, ties → earliest import)

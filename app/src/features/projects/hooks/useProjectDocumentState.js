@@ -28,6 +28,7 @@ export default function useProjectDocumentState() {
       isProcessing: state.isProcessing,
       renderSettings: state.renderSettings,
       rendererBusy: isRendererBusy(state),
+      transitionDefaults: state.transitionDefaults,
       videoEdits: state.videoEdits,
       videoSyncTimezoneMode: state.videoSyncTimezoneMode,
       manualVideoSync: state.manualVideoSync,

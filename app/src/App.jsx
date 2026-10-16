@@ -20,7 +20,7 @@ import {
 } from '@/features/toolbar'
 import { VideoSyncDrawerContent, useVideoSyncWorkspace } from '@/features/video-sync'
 import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_SYNC_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
-import { MissingSourceDialog, StartupProjectsDialog } from '@/features/projects'
+import { MissingSourceDialog, ProjectFormatUpgradeDialog, StartupProjectsDialog } from '@/features/projects'
 import { UpdatePromptDialog } from '@/features/app-update'
 import {
   AppHeader,
@@ -165,6 +165,7 @@ function AppShell() {
         <UnsavedChangesDialog {...templateManagement.newTemplateConfirmDialog} />
         <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />
         <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
+        <ProjectFormatUpgradeDialog {...projectLifecycle.formatUpgradeDialog} />
         <KeyboardShortcutsDialog
           open={editorShell.keyboardShortcutsOpen}
           locale={i18n.resolvedLanguage}

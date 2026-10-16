@@ -8,6 +8,44 @@ import { prepareDocumentFonts } from '@/lib/font-resources'
 import { applyNewProjectState, applyPreparedProjectState } from './utils/projectHydration'
 import { createProjectSnapshot, stringifyProject } from './utils/projectSnapshot'
 
+async function removePreviewRegistrations(videos) {
+  for (const video of videos) await backend.removePreviewVideo(video.preview.importId)
+}
+
+/**
+ * Registers prepared project videos as entities that keep their saved identity.
+ * Registrations already made are removed again when a later video fails.
+ * @param {Array<object>} projectVideos Saved project videos in import order.
+ * @param {Array<object|null>} preparedVideos Prepared videos aligned with `projectVideos`; null for skipped sources.
+ * @returns {Promise<Array<object>>} Registered video entities.
+ */
+async function registerProjectVideos(projectVideos, preparedVideos) {
+  const videos = []
+  try {
+    for (const [index, preparedVideo] of preparedVideos.entries()) {
+      if (preparedVideo === null) continue
+      const registration = await backend.registerPreviewVideo(preparedVideo.path)
+      try {
+        videos.push(
+          createImportedVideo(preparedVideo.metadata, {
+            id: projectVideos[index].id,
+            importOrder: index,
+            preview: { importId: registration.importId, url: registration.previewUrl, warnings: preparedVideo.previewWarnings },
+            telemetry: preparedVideo.telemetry,
+          }),
+        )
+      } catch (error) {
+        await backend.removePreviewVideo(registration.importId)
+        throw error
+      }
+    }
+  } catch (error) {
+    await removePreviewRegistrations(videos)
+    throw error
+  }
+  return videos
+}
+
 /**
  * Loads project dependencies through their owners, then applies project-owned settings.
  * @param {object} options Project path, source resolver, and media-owner operations.
@@ -26,40 +64,26 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
 
   const sourceLoadResults = await Promise.allSettled([
     sources.activityPath ? prepareActivityPath(sources.activityPath) : Promise.resolve(null),
-    sources.videoPath ? prepareVideoPath(sources.videoPath) : Promise.resolve(null),
     prepareDocumentFonts(project.editor),
+    ...sources.videoPaths.map((videoPath) => (videoPath ? prepareVideoPath(videoPath) : Promise.resolve(null))),
   ])
   const failedSourceLoad = sourceLoadResults.find((result) => result.status === 'rejected')
   if (failedSourceLoad) throw failedSourceLoad.reason
 
   const activity = sourceLoadResults[0].value
-  const preparedVideo = sourceLoadResults[1].value
+  const preparedVideos = sourceLoadResults.slice(2).map((result) => result.value)
   const previousImportIds = useStore.getState().importedVideos.map((importedVideo) => importedVideo.preview.importId)
-  let video = null
-  if (preparedVideo) {
-    const registration = await backend.registerPreviewVideo(preparedVideo.path)
-    try {
-      video = createImportedVideo(preparedVideo.metadata, {
-        importOrder: 0,
-        preview: { importId: registration.importId, url: registration.previewUrl, warnings: preparedVideo.previewWarnings },
-        telemetry: preparedVideo.telemetry,
-      })
-    } catch (error) {
-      await backend.removePreviewVideo(registration.importId)
-      throw error
-    }
-  } else {
-    await backend.clearPreviewVideos()
-  }
+  const videos = await registerProjectVideos(project.sources.videos, preparedVideos)
+  if (videos.length === 0) await backend.clearPreviewVideos()
 
   try {
-    replaceEditorDocument(useStore, () => applyPreparedProjectState(useStore, hydratedProject, { activity, video }))
+    replaceEditorDocument(useStore, () => applyPreparedProjectState(useStore, hydratedProject, { activity, videos }))
   } catch (error) {
-    if (video) await backend.removePreviewVideo(video.preview.importId)
+    await removePreviewRegistrations(videos)
     throw error
   }
-  if (video) for (const importId of previousImportIds) await backend.removePreviewVideo(importId)
-  if (video) onSetBackgroundMode?.('video')
+  if (videos.length > 0) for (const importId of previousImportIds) await backend.removePreviewVideo(importId)
+  if (videos.length > 0) onSetBackgroundMode?.('video')
   return project
 }
 
@@ -80,15 +104,16 @@ export async function createNewProject({ clearImportedVideos }) {
 }
 
 /**
- * Writes the current canonical project snapshot and returns that snapshot.
+ * Writes the current canonical project snapshot.
  * @param {string} path Absolute project destination path.
- * @returns {Promise<object>} Written canonical project snapshot.
+ * @returns {Promise<{project: object, backupPath: string|null}>} Written snapshot, and the backup of the
+ *   older-format project it replaced, if any.
  */
 export async function saveProject(path) {
   const state = useStore.getState()
   const project = createProjectSnapshot(state, path)
   const contents = stringifyProject(project)
 
-  await backend.writeProjectFile(path, contents, state.config)
-  return project
+  const { backupPath } = await backend.writeProjectFile(path, contents, state.config)
+  return { project, backupPath }
 }
