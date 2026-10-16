@@ -17,6 +17,23 @@ function TimelineClip({ clip }) {
         {clip.highlightStyle && (
           <div aria-hidden="true" className="pointer-events-none absolute -top-3 -bottom-1 bg-success/20" style={clip.highlightStyle} />
         )}
+        {clip.cuts.map((cut) => (
+          <div
+            key={cut.key}
+            data-testid="timeline-deleted-part"
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 z-10 bg-background/75 bg-[repeating-linear-gradient(45deg,transparent_0,transparent_3px,rgb(255_255_255/0.12)_3px,rgb(255_255_255/0.12)_6px)]"
+            style={cut.style}
+          />
+        ))}
+        {clip.markStyle && (
+          <div
+            data-testid="timeline-deleted-part-mark"
+            aria-hidden="true"
+            className="pointer-events-none absolute -inset-y-1 z-10 w-0.5 -translate-x-1/2 bg-destructive"
+            style={clip.markStyle}
+          />
+        )}
         {clip.showText && (
           <div
             className={`relative grid h-full items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${clip.textClassName}`}

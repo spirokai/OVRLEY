@@ -54,6 +54,12 @@ const videoSync = {
 describe('VideoDrawerContent', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
+    useStore.setState(
+      videoStoreState([
+        createTestVideo({ id: 'video-1', path: '/videos/ride.mp4', durationSeconds: 3723 }),
+        createTestVideo({ id: 'video-2', path: '/videos/climb.mp4', durationSeconds: 65, importOrder: 1 }),
+      ]),
+    )
   })
 
   test('offers browse and drop import controls', () => {
@@ -175,5 +181,26 @@ describe('VideoDrawerContent', () => {
       'video-2': { offsetSeconds: 100 },
       'video-3': { offsetSeconds: 70.5 },
     })
+  })
+
+  test('lists deleted parts of a clip and restores them', () => {
+    useStore.getState().addDeletedPart('video-1', 60, 120)
+    render(
+      <VideoDrawerContent
+        videoSummaries={[videoSummary]}
+        onBrowseVideo={vi.fn()}
+        onDeleteVideo={vi.fn()}
+        onRemoveVideo={vi.fn()}
+        onDropVideoFiles={vi.fn()}
+        videoSync={videoSync}
+      />,
+    )
+
+    const part = screen.getByRole('listitem', { name: 'Deleted part of ride.mp4' })
+    expect(screen.getByLabelText('From')).toHaveValue('1:00.00')
+    expect(screen.getByLabelText('To')).toHaveValue('2:00.00')
+    expect(part).toHaveTextContent('1:00.00 removed')
+    fireEvent.click(screen.getByRole('button', { name: 'Restore 1:00.00–2:00.00' }))
+    expect(useStore.getState().videoEdits['video-1'].deletedParts).toEqual([])
   })
 })

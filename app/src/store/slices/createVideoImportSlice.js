@@ -229,6 +229,7 @@ export const createVideoImportSlice = (set, get) => ({
       videoEdits: Object.fromEntries(videos.map((video) => [video.id, createVideoEdits()])),
       importedBackgroundImagePath: null,
       videoDragPreview: null,
+      deletedPartMark: null,
     })
     get().computeVideoSync()
     get().selectVideoSyncVideo(videos.length > 0 ? videos[0].id : null)
@@ -241,6 +242,7 @@ export const createVideoImportSlice = (set, get) => ({
       importedBackgroundImagePath: path || null,
       videoDragPreview: null,
       videoSyncTimezoneMode: null,
+      deletedPartMark: null,
     })
     get().selectVideoSyncVideo(null)
   },
@@ -252,6 +254,7 @@ export const createVideoImportSlice = (set, get) => ({
       importedBackgroundImagePath: null,
       videoDragPreview: null,
       videoSyncTimezoneMode: null,
+      deletedPartMark: null,
     })
     get().selectVideoSyncVideo(null)
   },
@@ -349,6 +352,7 @@ export const createVideoImportSlice = (set, get) => ({
         if (edits.placementAnchor?.videoId === videoId) edits.placementAnchor = removedAnchor === null ? null : { ...removedAnchor }
       }
       draft.videoDragPreview = null
+      if (draft.deletedPartMark?.videoId === videoId) draft.deletedPartMark = null
       clampPlayheadToVideos(draft, 0)
     })
     if (get().manualVideoSync.videoId === videoId) {

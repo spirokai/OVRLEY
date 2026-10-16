@@ -322,6 +322,27 @@
           "scope": "player",
           "descriptionKey": "keyboard-shortcuts.exportGoToOut",
           "bindings": [{ "key": "o", "modifiers": ["alt"] }]
+        },
+        {
+          "id": "deletedPart.markStart",
+          "display": true,
+          "scope": "player",
+          "descriptionKey": "keyboard-shortcuts.deletedPartMarkStart",
+          "bindings": [{ "key": "i", "modifiers": ["shift"] }]
+        },
+        {
+          "id": "deletedPart.markEnd",
+          "display": true,
+          "scope": "player",
+          "descriptionKey": "keyboard-shortcuts.deletedPartMarkEnd",
+          "bindings": [{ "key": "o", "modifiers": ["shift"] }]
+        },
+        {
+          "id": "deletedPart.clearMark",
+          "display": true,
+          "scope": "player",
+          "descriptionKey": "keyboard-shortcuts.deletedPartClearMark",
+          "bindings": [{ "key": "x", "modifiers": ["shift"] }]
         }
       ]
     },

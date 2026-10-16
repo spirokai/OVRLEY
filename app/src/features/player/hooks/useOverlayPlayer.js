@@ -13,6 +13,8 @@ import { snapTimelineSecondToFrame } from '../utils/playerTiming'
 import { roundToDevicePixel, secondsToViewPx } from '../utils/timelineGeometry'
 
 import useClipDrag from './useClipDrag'
+import useDeletedPartDrag from './useDeletedPartDrag'
+import useDeletedPartMarking from './useDeletedPartMarking'
 import useExportRangeTimeline from './useExportRangeTimeline'
 import usePlaybackEngine from './usePlaybackEngine'
 import useTimelineClips from './useTimelineClips'
@@ -46,7 +48,9 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     useShallow((state) => ({
       activityFilename: state.activitySource?.path?.split(/[/\\]/).at(-1) ?? state.activitySummary?.fileName ?? null,
       activitySummary: state.activitySummary,
+      addDeletedPart: state.addDeletedPart,
       beginPreviewScrub: state.beginPreviewScrub,
+      deletedPartMark: state.deletedPartMark,
       commitPreviewScrub: state.commitPreviewScrub,
       fallbackDurationSeconds: state.fallbackDurationSeconds,
       hasVideoTelemetry: state.importedVideos.some((video) => video.telemetry.status === 'ready'),
@@ -132,6 +136,13 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     setVideoDragPreview: playerStore.setVideoDragPreview,
     setVideoOffset: playerStore.setVideoOffset,
     shiftVideoOffsets: playerStore.shiftVideoOffsets,
+  })
+  const deletedPartDrag = useDeletedPartDrag({ addDeletedPart: playerStore.addDeletedPart })
+  const deletedPartMarking = useDeletedPartMarking({
+    clips: timeline.clips,
+    program: timeline.program,
+    playheadSecond: playback.clampedPlayhead,
+    selectedClipId,
   })
   const {
     commitNudge: commitClipNudge,
@@ -275,6 +286,21 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
         event.preventDefault()
         playback.commitScrub(exportTimeline.toSecond)
         return
+      case 'deletedPart.markStart':
+        if (videoSyncMode || !deletedPartMarking.canStart) return
+        event.preventDefault()
+        deletedPartMarking.start()
+        return
+      case 'deletedPart.markEnd':
+        if (videoSyncMode || !deletedPartMarking.canEnd) return
+        event.preventDefault()
+        deletedPartMarking.end()
+        return
+      case 'deletedPart.clearMark':
+        if (deletedPartMarking.mark === null) return
+        event.preventDefault()
+        deletedPartMarking.clear()
+        return
       case 'timeline.fitAll':
         if (!playback.hasActivity && !hasVideo) return
         event.preventDefault()
@@ -320,6 +346,8 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     canSelect: canSelectClip,
     clips: displayedTimeline.clips,
     commitClipNudge,
+    deletedPartDrag,
+    deletedPartMark: playerStore.deletedPartMark,
     exportHighlightRange: videoSyncMode ? null : exportTimeline.highlightRange,
     getLaneDragProps,
     hasActivity: hasActivityData && playback.hasActivity,
@@ -431,6 +459,15 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       videoSyncMode,
     },
     toolbar: {
+      deletedPart: {
+        isVisible: hasVideo,
+        canStart: deletedPartMarking.canStart,
+        canEnd: deletedPartMarking.canEnd,
+        markLabel: deletedPartMarking.mark?.label ?? null,
+        start: deletedPartMarking.start,
+        end: deletedPartMarking.end,
+        clear: deletedPartMarking.clear,
+      },
       exportRange: {
         clear: exportTimeline.clear,
         isCustom: exportTimeline.isCustom,

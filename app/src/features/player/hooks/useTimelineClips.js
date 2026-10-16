@@ -34,6 +34,22 @@ function videoIdFromClipId(clipId) {
   return clipId.slice('video:'.length)
 }
 
+function clipRangeStyle(fromSecond, toSecond, durationSeconds) {
+  return { left: `${(fromSecond / durationSeconds) * 100}%`, width: `${((toSecond - fromSecond) / durationSeconds) * 100}%` }
+}
+
+/** Deleted parts, the drawn range and the marked start, positioned within their clip. */
+function deletedPartOverlays(clip, dragPreview, mark) {
+  const cuts = clip.deletedParts.map((part) => ({ key: part.id, style: clipRangeStyle(part.fromSecond, part.toSecond, clip.durationSeconds) }))
+  if (dragPreview?.videoId === clip.id) {
+    cuts.push({ key: 'drawing', style: clipRangeStyle(dragPreview.fromSecond, dragPreview.toSecond, clip.durationSeconds) })
+  }
+  return {
+    cuts,
+    markStyle: mark?.videoId === clip.id ? { left: `${(mark.sourceSecond / clip.durationSeconds) * 100}%` } : null,
+  }
+}
+
 function percentStyle(geometry, widthPx) {
   return {
     left: widthPx > 0 ? `${(geometry.x / widthPx) * 100}%` : '0%',
@@ -50,6 +66,8 @@ function percentStyle(geometry, widthPx) {
  * @param {boolean} options.canSelect Whether clips can be selected for keyboard nudges.
  * @param {Array<object>} options.clips Displayed timeline clips.
  * @param {function} options.commitClipNudge Callback to commit a keyboard sync adjustment.
+ * @param {object} options.deletedPartDrag Alt+drag handlers and preview from useDeletedPartDrag.
+ * @param {{videoId: string, sourceSecond: number}|null} options.deletedPartMark Marked start of a deleted part.
  * @param {{ fromSecond: number, toSecond: number }|null} options.exportHighlightRange Active export highlight range.
  * @param {function} options.getLaneDragProps Per-lane drag handler factory from useClipDrag.
  * @param {boolean} options.hasActivity Whether the external activity lane should be present.
@@ -70,6 +88,8 @@ export default function useTimelineClips({
   canSelect,
   clips,
   commitClipNudge,
+  deletedPartDrag,
+  deletedPartMark,
   exportHighlightRange,
   getLaneDragProps,
   hasActivity,
@@ -100,6 +120,7 @@ export default function useTimelineClips({
     // Video clips - each clip starts at its offset so clip geometry represents real timeline placement.
     for (const clip of sortVideosByTimeline(clips)) {
       laneInputs.push({
+        clip,
         durationSeconds: clip.durationSeconds,
         formatLabel: 'MP4',
         icon: Video,
@@ -158,6 +179,7 @@ export default function useTimelineClips({
       // Presentational lane model - TimelineLane renders these values without owning calculations.
       return {
         ...lane,
+        ...(lane.isVideo ? deletedPartOverlays(lane.clip, deletedPartDrag.preview, deletedPartMark) : { cuts: [], markStyle: null }),
         clipClassName: lane.isVideo
           ? `bg-accent/70 ${lane.warnings.length > 0 ? 'outline outline-1 -outline-offset-1 outline-destructive' : ''}`
           : 'bg-primary/80',
@@ -204,7 +226,17 @@ export default function useTimelineClips({
               event.currentTarget.focus()
               setSelectedClipId(lane.id)
             }
+            if (lane.isVideo && deletedPartDrag.onPointerDown(event, lane.clip)) return
             dragProps.onPointerDown?.(event)
+          },
+          onPointerMove: (event) => {
+            if (!deletedPartDrag.onPointerMove(event)) dragProps.onPointerMove?.(event)
+          },
+          onPointerUp: (event) => {
+            if (!deletedPartDrag.onPointerUp(event)) dragProps.onPointerUp?.(event)
+          },
+          onPointerCancel: (event) => {
+            if (!deletedPartDrag.onPointerCancel(event)) dragProps.onPointerCancel?.(event)
           },
         },
         clipStyle: percentStyle(geometry, widthPx),
@@ -270,6 +302,8 @@ export default function useTimelineClips({
     canSelect,
     clips,
     commitClipNudge,
+    deletedPartDrag,
+    deletedPartMark,
     exportHighlightRange,
     getLaneDragProps,
     hasActivity,

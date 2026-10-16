@@ -161,7 +161,7 @@ M6a status: implemented (committed). Decisions made during implementation:
 - Separate-file export renders each video's own pieces after deleted parts and the export range, without overlap trimming (`collectVideoPieces`); a video outside the export range is blocked in the queue.
 - Activity-free rendering: `prepare_render_assets`/`prepare_preview_assets`/`encode_video`/`execute_render` take `Option<&ParsedActivity>`; None is accepted only for a config without value widgets or plots and pairs with `DenseActivityReport::without_activity()`. In embedded mode a source without telemetry gets a rasters-only plan (`ActivityCoverage::without_activity`).
 
-M6b status: implemented (awaiting owner commit). Decisions made during implementation:
+M6b status: implemented (committed). Decisions made during implementation:
 - Destination is part of the contract: `destination = { kind: 'sourceNamed', directory }` (separate files: each output holds pieces of one source, named `{stem}_{video|overlay}.{mp4|mov}`, replaced if present) or `{ kind: 'file', path, overwrite }` (exactly one combined output; must not alias an input). It replaces `outputDirectory` in the request and in output planning (`BatchOutputSelection.destination`); planning reports the summed frames and window durations.
 - Outputs hold any number of pieces. One-piece outputs render straight to the target with their own audio, exactly as before. Multi-piece outputs must join by stream copy: one display resolution, and for composite one source FPS (and one rotation with QSV-full, which keeps the display matrix). Violations are rejected at submission.
 - Multi-piece outputs render each piece to `part-NNNN.{mp4|mov}` in a hidden `.ovrley-parts-{target stem}-{n}` directory next to the target. Composite parts are video-only, remuxed to MPEG-TS with `h264/hevc_mp4toannexb`, listed by relative name in an escaped concat manifest and joined with `-c:v copy` (`-tag:v hvc1` for HEVC, `-display_rotation` restored for QSV-full). Transparent parts (intra-only ProRes/QT RLE) join as MOV by stream copy, without audio.
@@ -181,6 +181,13 @@ M6b status: implemented (awaiting owner commit). Decisions made during implement
 Tests: request preparation; Rust batch lifecycle with injected executor; command builders; FFmpeg integration with tiny synthetic clips asserting durations/frame counts/audio length.
 
 ## M7 — Deleted parts
+
+M7 status: implemented (awaiting owner commit); M6c (frontend output mode/combined export dialog) is still open and follows. Decisions made during implementation:
+- Store: `createDeletedPartsSlice` owns `addDeletedPart`, `setDeletedPartRange`, `removeDeletedPart`, `setJoinTransition` (writes `transitionIn` for clip joins and the part's `transition` for deleted-part joins; `null` returns to the defaults) and the transient `deletedPartMark`. Parts stay in `videoEdits` (undoable, saved in project v4). Bounds snap to the clip's frame grid; a part must cover at least one frame inside the clip.
+- A new or moved part merges with every part it overlaps or touches; the merged part keeps the identity and transition of the earliest part it absorbs, so the project never holds overlapping or touching parts.
+- Marking: Shift+I starts a part at the playhead and Shift+O ends it (either order), Shift+X cancels; toolbar buttons do the same. The mark applies to the selected clip when it covers the playhead, else to the clip the preview shows, else to the earliest clip under the playhead; an end beyond the marked clip deletes up to its edge. Alt+drag on a clip draws a part over the dragged source range (a plain drag still moves the clip).
+- Timeline: parts are shaded inside their clip; the pending start is a line on its clip. Videos panel: "Deleted parts" per clip with From/To (`M:SS.cc`, invalid edits ignored), restore, "Go to part", and the join transition (Default with the effective default, No transition, or an `xfade` type with its own duration). A part at a clip edge creates no join, so its selector is disabled.
+- Transitions chosen at deleted parts are stored and drive the program; preview/export rendering of transitions remains M8 (export is hard cuts until then).
 
 1. UI: mark range at playhead (in/out) or by dragging on a clip; edit/remove ranges; shaded on timeline; list in videos panel.
 2. Join at each deleted part with transition selector (default rule uses deleted length as gap).

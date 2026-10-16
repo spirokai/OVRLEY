@@ -247,4 +247,55 @@ describe('useOverlayPlayer', () => {
 
     unmount()
   })
+
+  test('marks a deleted part between Shift+I and Shift+O on the clip under the playhead', () => {
+    useStore.setState({ selectedSecond: 15 })
+    const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
+    expect(result.current.toolbar.deletedPart).toMatchObject({ isVisible: true, canStart: true, canEnd: false, markLabel: null })
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'I', shiftKey: true }))
+    })
+    expect(useStore.getState().deletedPartMark).toEqual({ videoId: 'video-1', sourceSecond: 5 })
+    expect(result.current.toolbar.deletedPart.markLabel).toBe('ride.mp4 00:05')
+    expect(findLane(result, 'video:video-1').markStyle).toEqual({ left: '25%' })
+
+    act(() => useStore.getState().setSelectedSecond(22))
+    expect(result.current.toolbar.deletedPart.canEnd).toBe(true)
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'O', shiftKey: true }))
+    })
+    expect(useStore.getState().videoEdits['video-1'].deletedParts).toEqual([
+      expect.objectContaining({ fromSecond: 5, toSecond: 12, transition: null }),
+    ])
+    expect(useStore.getState().deletedPartMark).toBeNull()
+    expect(findLane(result, 'video:video-1').cuts.map((cut) => cut.style)).toEqual([{ left: '25%', width: '35%' }])
+    // Outside every clip there is nothing to mark.
+    act(() => useStore.getState().setSelectedSecond(40))
+    expect(result.current.toolbar.deletedPart.canStart).toBe(false)
+  })
+
+  test('Alt+drag on a clip deletes the dragged range instead of moving the clip', () => {
+    const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
+    const altPointer = (clientX) => ({
+      ...createPointerEvent(clientX),
+      altKey: true,
+      currentTarget: {
+        focus: vi.fn(),
+        getBoundingClientRect: () => ({ left: 100, width: 200 }),
+        releasePointerCapture: vi.fn(),
+        setPointerCapture: vi.fn(),
+      },
+    })
+    act(() => findLane(result, 'video:video-1').clipProps.onPointerDown(altPointer(250)))
+    act(() => findLane(result, 'video:video-1').clipProps.onPointerMove(altPointer(150)))
+    expect(findLane(result, 'video:video-1').cuts).toHaveLength(1)
+    act(() => findLane(result, 'video:video-1').clipProps.onPointerUp(altPointer(150)))
+
+    expect(useStore.getState().videoEdits['video-1']).toMatchObject({
+      offsetSeconds: 10,
+      deletedParts: [expect.objectContaining({ fromSecond: 5, toSecond: 15 })],
+    })
+    expect(useStore.getState().videoDragPreview).toBeNull()
+  })
 })

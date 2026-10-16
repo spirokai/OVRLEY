@@ -131,6 +131,7 @@ export function applyProjectOwnedState(store, project) {
     draft.videoSyncTimezoneMode = project.sync.videoTimezoneMode
     draft.transitionDefaults = { ...project.transitionDefaults }
     draft.videoDragPreview = null
+    draft.deletedPartMark = null
     draft.renderSettings = { ...renderSettings, range }
     draft.batchOutputFolder = batchOutputFolder
     draft.batchSkipOverlay = {}
