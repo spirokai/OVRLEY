@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { TransitionSelect } from '@/features/transitions'
 import { useTranslation } from 'react-i18next'
 
 /**
@@ -11,8 +11,9 @@ import { useTranslation } from 'react-i18next'
  */
 export function TransitionDefaultsDialog({
   open,
-  typeOptions,
   type,
+  typeLabel,
+  previewType,
   duration,
   threshold,
   durationDisabled,
@@ -45,18 +46,7 @@ export function TransitionDefaultsDialog({
           }}
         >
           <Label htmlFor="transition-default-type">{t('video-preview.transitionType', 'Transition')}</Label>
-          <Select value={type} onValueChange={onTypeChange}>
-            <SelectTrigger id="transition-default-type">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {typeOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TransitionSelect id="transition-default-type" value={type} label={typeLabel} previewType={previewType} onSelect={onTypeChange} />
           <Label htmlFor="transition-default-duration">{t('video-preview.transitionDuration', 'Duration (seconds)')}</Label>
           <Input
             id="transition-default-duration"

@@ -6,6 +6,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
+import { useJoinTransitionModels } from '@/features/transitions'
 import { useVideoTimeline, useVideoWarnings } from '@/hooks/useVideoTimeline'
 import useStore from '@/store/useStore'
 import { buildDeletedPartRows } from '../utils/deletedPartRows'
@@ -13,8 +14,8 @@ import { buildVideoDrawerViewModel, formatOffsetInput } from '../utils/videoDraw
 
 /**
  * Returns one row per clip in timeline order: details, its own timeline offset,
- * warnings, deleted parts with their join transitions, and removal. Editing a
- * row's offset moves only that clip.
+ * warnings, the transition into the clip, deleted parts with their join
+ * transitions, and removal. Editing a row's offset moves only that clip.
  *
  * @param {object} options Row inputs.
  * @param {Array<object>} options.videoSummaries Clip summaries in timeline order.
@@ -27,19 +28,18 @@ export function useVideoClipRows({ videoSummaries, timezone, videoSyncTimezoneMo
   const { t } = useTranslation()
   const warnings = useVideoWarnings()
   const { clips, program } = useVideoTimeline()
-  const { setVideoOffset, transitionDefaults, setDeletedPartRange, removeDeletedPart, setJoinTransition, commitPreviewScrub } = useStore(
+  const joinModels = useJoinTransitionModels({ clips, program })
+  const { setVideoOffset, setDeletedPartRange, removeDeletedPart, commitPreviewScrub } = useStore(
     useShallow((state) => ({
       setVideoOffset: state.setVideoOffset,
-      transitionDefaults: state.transitionDefaults,
       setDeletedPartRange: state.setDeletedPartRange,
       removeDeletedPart: state.removeDeletedPart,
-      setJoinTransition: state.setJoinTransition,
       commitPreviewScrub: state.commitPreviewScrub,
     })),
   )
 
   return useMemo(() => {
-    const commands = { setDeletedPartRange, removeDeletedPart, setJoinTransition, seek: commitPreviewScrub }
+    const commands = { setDeletedPartRange, removeDeletedPart, seek: commitPreviewScrub }
     return videoSummaries.map((summary) => ({
       id: summary.id,
       filename: summary.filename,
@@ -48,26 +48,20 @@ export function useVideoClipRows({ videoSummaries, timezone, videoSyncTimezoneMo
       warnings: (warnings.get(summary.id) ?? []).map((warning) => warning.message),
       onOffsetCommit: (text) => setVideoOffset(summary.id, Math.round(timeToSeconds(text) * 10) / 10),
       onRemove: () => onRemoveVideo(summary.id),
-      deletedParts: buildDeletedPartRows({
-        clip: clips.find((clip) => clip.id === summary.id),
-        program,
-        transitionDefaults,
-        commands,
-        t,
-      }),
+      // Only a clip that follows another piece has a join leading into it.
+      transitionIn: joinModels.get(`clip:${summary.id}`) ?? null,
+      deletedParts: buildDeletedPartRows({ clip: clips.find((clip) => clip.id === summary.id), joinModels, commands, t }),
     }))
   }, [
     clips,
     commitPreviewScrub,
+    joinModels,
     onRemoveVideo,
-    program,
     removeDeletedPart,
     setDeletedPartRange,
-    setJoinTransition,
     setVideoOffset,
     t,
     timezone,
-    transitionDefaults,
     videoSummaries,
     videoSyncTimezoneMode,
     warnings,

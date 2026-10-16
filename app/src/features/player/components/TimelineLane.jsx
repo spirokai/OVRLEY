@@ -1,4 +1,36 @@
 import { useTranslation } from 'react-i18next'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { JoinTransitionControl } from '@/features/transitions'
+
+const stopPointer = (event) => event.stopPropagation()
+
+function JoinMarker({ marker }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={marker.label}
+          title={marker.label}
+          className={`absolute top-1.5 z-30 h-3 w-3 -translate-x-1/2 rotate-45 rounded-[2px] border shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
+            marker.isInvalid
+              ? 'border-destructive bg-destructive'
+              : marker.hasTransition
+                ? 'border-foreground/70 bg-primary'
+                : 'border-foreground/60 bg-background'
+          }`}
+          style={marker.style}
+          onPointerDown={stopPointer}
+          onDoubleClick={stopPointer}
+        />
+      </PopoverTrigger>
+      <PopoverContent side="top" className="w-72 space-y-2 p-3" onPointerDown={stopPointer}>
+        <p className="text-xs font-semibold">{marker.label}</p>
+        <JoinTransitionControl id={`timeline-${marker.key}`} model={marker.control} />
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 function TimelineClip({ clip }) {
   const Icon = clip.icon
@@ -106,6 +138,18 @@ export default function TimelineLane({ lane }) {
             style={band.style}
           />
         ))}
+        {lane.joinMarkers.map((marker) =>
+          marker.bandStyle ? (
+            <div
+              key={`${marker.key}:band`}
+              data-testid="timeline-transition-window"
+              aria-hidden="true"
+              className="pointer-events-none absolute top-3 bottom-1 z-20 bg-primary/35 bg-[linear-gradient(90deg,transparent,rgb(255_255_255/0.25))]"
+              style={marker.bandStyle}
+            />
+          ) : null,
+        )}
+        {lane.joinMarkers.map((marker) => (marker.isVisible ? <JoinMarker key={marker.key} marker={marker} /> : null))}
       </div>
       {lane.clips.map((clip) => (clip.tooltip.isVisible && clip.label ? <TimelineClipTooltip key={clip.id} clip={clip} /> : null))}
     </div>

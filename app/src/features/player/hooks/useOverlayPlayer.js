@@ -7,6 +7,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { hasOpenOverlay, isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatClockDuration } from '@/lib/time-format'
 import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
+import { useJoinTransitionModels } from '@/features/transitions'
 import { useVideoTimeline, useVideoWarnings } from '@/hooks/useVideoTimeline'
 import useStore from '@/store/useStore'
 import { snapTimelineSecondToFrame } from '../utils/playerTiming'
@@ -78,6 +79,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
   const timeline = useVideoTimeline()
   const videoWarnings = useVideoWarnings()
   const displayedTimeline = timeline.displayed
+  const joinModels = useJoinTransitionModels(displayedTimeline)
   const videoIdentity = useMemo(() => timeline.clips.map((clip) => `${clip.id}:${clip.durationSeconds}`).join('|'), [timeline.clips])
 
   const [selectedClipId, setSelectedClipId] = useState(null)
@@ -351,9 +353,11 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     exportHighlightRange: videoSyncMode ? null : exportTimeline.highlightRange,
     getLaneDragProps,
     hasActivity: hasActivityData && playback.hasActivity,
+    joinModels,
     nudgeClip,
     onRemoveVideo,
     overlaps: displayedTimeline.program.overlaps,
+    program: videoSyncMode ? null : displayedTimeline.program,
     selectedClipId,
     setSelectedClipId,
     warnings: videoWarnings,

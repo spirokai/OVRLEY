@@ -1,11 +1,12 @@
-import { AlertTriangle, Film, Scissors, Trash2 } from 'lucide-react'
+import { AlertTriangle, Blend, Film, Scissors, Trash2 } from 'lucide-react'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { SectionHeading } from '@/components/ui/section-heading'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { JoinTransitionControl, TransitionSelect } from '@/features/transitions'
 import { VideoSyncControls } from '@/features/video-sync'
 import { useFileDropZone } from '../hooks/useFileDropZone'
+import { useTransitionDefaultsSection } from '../hooks/useTransitionDefaultsSection'
 import { useVideoClipRows } from '../hooks/useVideoClipRows'
 import { FileDragCursor, FileDropZone } from './FileDropZone'
 import { useTranslation } from 'react-i18next'
@@ -50,32 +51,11 @@ function DeletedPartRow({ part, filename }) {
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_4rem] items-center gap-2">
-        <Label htmlFor={`${id}-transition`} className="text-xs font-bold text-muted-foreground">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2">
+        <Label htmlFor={`${id}-transition`} className="pt-1.5 text-xs font-bold text-muted-foreground">
           {t('video-preview.transitionType', 'Transition')}
         </Label>
-        <Select value={part.transition.value} onValueChange={part.transition.onTypeChange} disabled={!part.transition.isAvailable}>
-          <SelectTrigger id={`${id}-transition`} className="h-7 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {part.transition.options.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {part.transition.durationInput !== null ? (
-          <BlurInput
-            type="text"
-            inputMode="decimal"
-            value={part.transition.durationInput}
-            onChange={(event) => part.transition.onDurationCommit(event.target.value)}
-            className="h-7 text-xs"
-            aria-label={t('video-preview.transitionDuration', 'Duration (seconds)')}
-          />
-        ) : null}
+        <JoinTransitionControl id={`${id}-transition`} model={part.transition} />
       </div>
       <div className="flex items-center justify-between text-[0.65rem] text-muted-foreground">
         <button type="button" className="underline-offset-2 hover:text-foreground hover:underline" onClick={part.onSeek}>
@@ -88,6 +68,61 @@ function DeletedPartRow({ part, filename }) {
         </span>
       </div>
     </li>
+  )
+}
+
+function TransitionDefaultsSection() {
+  const { t } = useTranslation()
+  const section = useTransitionDefaultsSection()
+  return (
+    <section className="space-y-3" aria-label={t('toolbar.transitionDefaults', 'Default transitions')}>
+      <SectionHeading icon={Blend} title={t('toolbar.transitionDefaults', 'Default transitions')} variant="drawer" />
+      <p className="px-2 text-[0.7rem] text-muted-foreground">
+        {t(
+          'toolbar.transitionDefaultsHint',
+          'Used at every join you have not set yourself. Videos and parts closer together than the continuity threshold are joined without a transition.',
+        )}
+      </p>
+      <div className="grid grid-cols-2 items-center gap-x-4 gap-y-2 px-2">
+        <Label htmlFor="transition-defaults-type" className="text-xs font-bold text-muted-foreground">
+          {t('video-preview.transitionType', 'Transition')}
+        </Label>
+        <TransitionSelect
+          id="transition-defaults-type"
+          value={section.type}
+          label={section.typeLabel}
+          previewType={section.previewType}
+          onSelect={section.onTypeChange}
+        />
+        <Label htmlFor="transition-defaults-duration" className="text-xs font-bold text-muted-foreground">
+          {t('video-preview.transitionDuration', 'Duration (seconds)')}
+        </Label>
+        <BlurInput
+          id="transition-defaults-duration"
+          type="text"
+          inputMode="decimal"
+          value={section.durationInput}
+          onChange={(event) => section.onDurationCommit(event.target.value)}
+          className="h-7 text-xs"
+        />
+        <Label htmlFor="transition-defaults-threshold" className="text-xs font-bold text-muted-foreground">
+          {t('video-preview.continuityThreshold', 'Continuity threshold (seconds)')}
+        </Label>
+        <BlurInput
+          id="transition-defaults-threshold"
+          type="text"
+          inputMode="decimal"
+          value={section.thresholdInput}
+          onChange={(event) => section.onThresholdCommit(event.target.value)}
+          className="h-7 text-xs"
+        />
+      </div>
+      {section.error !== null ? (
+        <p role="alert" className="px-2 text-xs text-destructive">
+          {section.error}
+        </p>
+      ) : null}
+    </section>
   )
 }
 
@@ -135,6 +170,14 @@ function VideoClipRow({ row }) {
           placeholder={t('toolbar.secondsOrMmss', 'Seconds or MM:SS')}
         />
       </div>
+      {row.transitionIn !== null ? (
+        <div className="grid grid-cols-2 items-start gap-4 px-2">
+          <Label htmlFor={`video-transition-${row.id}`} className="pt-1.5 text-xs font-bold text-muted-foreground">
+            {t('toolbar.transitionIn', 'Transition into this video')}
+          </Label>
+          <JoinTransitionControl id={`video-transition-${row.id}`} model={row.transitionIn} />
+        </div>
+      ) : null}
       {row.deletedParts.length > 0 ? (
         <>
           <SectionHeading icon={Scissors} title={t('toolbar.deletedParts', 'Deleted parts')} variant="drawer" />
@@ -215,6 +258,8 @@ export function VideoDrawerContent({ videoSummaries, onBrowseVideo, onDeleteVide
           {rows.map((row) => (
             <VideoClipRow key={row.id} row={row} />
           ))}
+
+          <TransitionDefaultsSection />
 
           <VideoSyncControls {...videoSync} />
         </div>

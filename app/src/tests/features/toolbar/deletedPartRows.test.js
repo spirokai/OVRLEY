@@ -10,9 +10,10 @@ function rows(deletedParts) {
   const { importedVideos, videoEdits } = videoStoreState([createTestVideo({ id: 'ride', durationSeconds: 120 })])
   videoEdits.ride.deletedParts = deletedParts
   const { clips, program } = buildTimelineProgram({ videos: importedVideos, videoEdits, dragPreview: null, transitionDefaults: defaults })
-  const commands = { setDeletedPartRange: vi.fn(), removeDeletedPart: vi.fn(), setJoinTransition: vi.fn(), seek: vi.fn() }
+  const commands = { setDeletedPartRange: vi.fn(), removeDeletedPart: vi.fn(), seek: vi.fn() }
+  const joinModels = new Map(program.joins.map((join) => [join.key, { key: join.key }]))
   clips[0].offsetSeconds = 30
-  return { commands, program, rows: buildDeletedPartRows({ clip: clips[0], program, transitionDefaults: defaults, commands, t }) }
+  return { commands, rows: buildDeletedPartRows({ clip: clips[0], joinModels, commands, t }) }
 }
 
 describe('deleted part rows', () => {
@@ -40,37 +41,14 @@ describe('deleted part rows', () => {
     expect(commands.seek).toHaveBeenCalledExactlyOnceWith(40)
   })
 
-  test('selects the transition of the join at each part', () => {
-    const fade = { type: 'wipeleft', durationSeconds: 1.5 }
+  test('uses the join control of each part; a part at a clip edge has none', () => {
     const {
-      commands,
-      program,
-      rows: [defaulted, overridden, edge],
+      rows: [inner, edge],
     } = rows([
-      { id: 'short', fromSecond: 10, toSecond: 11, transition: null },
-      { id: 'long', fromSecond: 30, toSecond: 60, transition: fade },
-      { id: 'edge', fromSecond: 100, toSecond: 120, transition: null },
+      { id: 'inner', fromSecond: 10, toSecond: 20, transition: null },
+      { id: 'edge', fromSecond: 100, toSecond: 120, transition: { type: 'fade', durationSeconds: 1 } },
     ])
-    const join = (id) => program.joins.find((candidate) => candidate.ownerId === id)
-    // One second deleted is within the continuity threshold: the default is a hard cut.
-    expect(defaulted.transition).toMatchObject({ isAvailable: true, value: 'default', durationInput: null })
-    expect(defaulted.transition.options[0].label).toBe('Default (No transition)')
-    expect(overridden.transition).toMatchObject({ isAvailable: true, value: 'wipeleft', durationInput: '1.5' })
-    expect(overridden.transition.options[0].label).toBe('Default')
-    expect(edge.transition.isAvailable).toBe(false)
-
-    defaulted.transition.onTypeChange('dissolve')
-    expect(commands.setJoinTransition).toHaveBeenLastCalledWith(join('short'), { type: 'dissolve', durationSeconds: 1 })
-    overridden.transition.onTypeChange('fade')
-    expect(commands.setJoinTransition).toHaveBeenLastCalledWith(join('long'), { type: 'fade', durationSeconds: 1.5 })
-    overridden.transition.onTypeChange('none')
-    expect(commands.setJoinTransition).toHaveBeenLastCalledWith(join('long'), { type: 'none', durationSeconds: 0 })
-    overridden.transition.onTypeChange('default')
-    expect(commands.setJoinTransition).toHaveBeenLastCalledWith(join('long'), null)
-    overridden.transition.onDurationCommit('2.5')
-    expect(commands.setJoinTransition).toHaveBeenLastCalledWith(join('long'), { type: 'wipeleft', durationSeconds: 2.5 })
-    overridden.transition.onDurationCommit('0')
-    overridden.transition.onDurationCommit('soon')
-    expect(commands.setJoinTransition).toHaveBeenCalledTimes(5)
+    expect(inner.transition).toEqual({ key: 'deletedPart:inner' })
+    expect(edge.transition).toMatchObject({ isAvailable: false, value: 'fade', label: 'No join', error: null })
   })
 })

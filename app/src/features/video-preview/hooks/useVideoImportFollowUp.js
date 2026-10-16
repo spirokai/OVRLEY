@@ -4,14 +4,12 @@
 
 import { useState } from 'react'
 import { changeVideoCollection } from '@/features/undo-redo/undoHistory'
-import { NO_TRANSITION, XFADE_TRANSITIONS } from '@/lib/video-program/transition-catalog'
+import { NO_TRANSITION } from '@/lib/video-program/transition-catalog'
 import { filenameFromSelectedPath } from '@/lib/utils'
 import useStore from '@/store/useStore'
 import i18next from 'i18next'
 import { useShallow } from 'zustand/react/shallow'
 import { createImportFollowUpSteps, dropSettledSteps, listImportOverlaps, listPlacementCandidates } from '../utils/videoImportFollowUp'
-
-const TRANSITION_TYPES = [NO_TRANSITION, ...XFADE_TRANSITIONS]
 
 function formatSecondsInput(seconds) {
   return String(seconds)
@@ -113,11 +111,9 @@ export default function useVideoImportFollowUp() {
       },
       transitionDefaults: {
         open: transitionStep !== null,
-        typeOptions: TRANSITION_TYPES.map((type) => ({
-          value: type,
-          label: type === NO_TRANSITION ? i18next.t('video-preview.noTransition', 'No transition') : type,
-        })),
         type: form.type,
+        typeLabel: form.type === NO_TRANSITION ? i18next.t('transitions.none', 'No transition') : form.type,
+        previewType: form.type === NO_TRANSITION ? null : form.type,
         duration: form.duration,
         threshold: form.threshold,
         durationDisabled: form.type === NO_TRANSITION,

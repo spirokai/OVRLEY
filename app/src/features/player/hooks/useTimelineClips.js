@@ -7,7 +7,7 @@ import { useCallback, useId, useMemo, useState } from 'react'
 import { Video } from 'lucide-react'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatClockDuration } from '@/lib/time-format'
-import { getClipGeometry, getExportRangeHighlightGeometry } from '../utils/timelineGeometry'
+import { getClipGeometry, getExportRangeHighlightGeometry, secondsToViewPx } from '../utils/timelineGeometry'
 import { getActivityAttributeLabel } from '@/lib/widget/widget-presentation'
 import { sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import i18next from 'i18next'
@@ -71,9 +71,11 @@ function percentStyle(geometry, widthPx) {
  * @param {{ fromSecond: number, toSecond: number }|null} options.exportHighlightRange Active export highlight range.
  * @param {function} options.getLaneDragProps Per-lane drag handler factory from useClipDrag.
  * @param {boolean} options.hasActivity Whether the external activity lane should be present.
+ * @param {Map<string, object>} [options.joinModels] Transition controls keyed by join key (`useJoinTransitionModels`).
  * @param {function} options.nudgeClip Callback to move a clip by a relative number of seconds.
  * @param {function} [options.onRemoveVideo] Callback to remove a video clip by video ID.
  * @param {Array<{startSecond: number, endSecond: number}>} [options.overlaps] Overlapping timeline intervals of the displayed clips.
+ * @param {{pieces: Array<object>, joins: Array<object>}} [options.program] Displayed program, for its join markers.
  * @param {string|null} options.selectedClipId Currently selected clip id.
  * @param {function} options.setSelectedClipId Callback to set selected clip id.
  * @param {number} options.viewEnd Visible viewport end second.
@@ -93,9 +95,11 @@ export default function useTimelineClips({
   exportHighlightRange,
   getLaneDragProps,
   hasActivity,
+  joinModels,
   nudgeClip,
   onRemoveVideo,
   overlaps = [],
+  program,
   selectedClipId,
   setSelectedClipId,
   viewEnd,
@@ -278,11 +282,45 @@ export default function useTimelineClips({
       .filter(({ geometry }) => geometry.isVisible)
       .map(({ key, geometry }) => ({ key, style: percentStyle(geometry, widthPx) }))
 
+    // Join markers - one per join at the end of its outgoing piece, with the
+    // transition window (the last `d` seconds of that piece) shaded.
+    const piecesById = new Map((program?.pieces ?? []).map((piece) => [piece.id, piece]))
+    const joinMarkers = (program?.joins ?? [])
+      .map((join) => {
+        const endSecond = piecesById.get(join.fromPieceId).timelineEndSecond
+        const windowSeconds = join.transition.durationSeconds
+        const band =
+          windowSeconds > 0
+            ? getClipGeometry({ startSecond: endSecond - windowSeconds, durationSeconds: windowSeconds, viewStart, viewEnd, widthPx })
+            : null
+        const control = joinModels.get(join.key)
+        return {
+          key: join.key,
+          isVisible: endSecond >= viewStart && endSecond <= viewEnd,
+          style: { left: widthPx > 0 ? `${(secondsToViewPx({ second: endSecond, viewStart, viewEnd, widthPx }) / widthPx) * 100}%` : '0%' },
+          bandStyle: band?.isVisible ? percentStyle(band, widthPx) : null,
+          isInvalid: control.error !== null,
+          hasTransition: windowSeconds > 0,
+          label: i18next.t('player.joinTransition', { defaultValue: 'Join: {{transition}}', transition: control.label }),
+          control,
+        }
+      })
+      .filter((marker) => marker.isVisible || marker.bandStyle !== null)
+
     const videoClips = clipModels.filter((clip) => clip.isVideo)
     const activityClips = clipModels.filter((clip) => !clip.isVideo)
     return [
       ...(videoClips.length > 0
-        ? [{ id: 'video', ariaLabel: i18next.t('player.videoClipLane', 'Video clip lane'), isVideo: true, clips: videoClips, conflictBands }]
+        ? [
+            {
+              id: 'video',
+              ariaLabel: i18next.t('player.videoClipLane', 'Video clip lane'),
+              isVideo: true,
+              clips: videoClips,
+              conflictBands,
+              joinMarkers,
+            },
+          ]
         : []),
       ...(activityClips.length > 0
         ? [
@@ -292,6 +330,7 @@ export default function useTimelineClips({
               isVideo: false,
               clips: activityClips,
               conflictBands: [],
+              joinMarkers: [],
             },
           ]
         : []),
@@ -308,9 +347,11 @@ export default function useTimelineClips({
     getLaneDragProps,
     hasActivity,
     hoveredLaneId,
+    joinModels,
     nudgeClip,
     onRemoveVideo,
     overlaps,
+    program,
     selectedClipId,
     setSelectedClipId,
     stopClipEvent,

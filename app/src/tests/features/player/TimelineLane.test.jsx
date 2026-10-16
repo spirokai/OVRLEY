@@ -32,7 +32,15 @@ function createClip(overrides = {}) {
 }
 
 function createLane(clipOverrides = {}, laneOverrides = {}) {
-  return { ariaLabel: 'Activity clip lane', id: 'activity', isVideo: false, clips: [createClip(clipOverrides)], conflictBands: [], ...laneOverrides }
+  return {
+    ariaLabel: 'Activity clip lane',
+    id: 'activity',
+    isVideo: false,
+    clips: [createClip(clipOverrides)],
+    conflictBands: [],
+    joinMarkers: [],
+    ...laneOverrides,
+  }
 }
 
 function renderLane(overrides = {}) {
@@ -120,5 +128,35 @@ describe('TimelineLane', () => {
     expect(screen.getByLabelText('b.mp4')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Overlapping videos' })).toHaveStyle({ left: '20%', width: '10%' })
     expect(screen.getByRole('tooltip')).toHaveTextContent('Overlaps b.mp4')
+  })
+
+  test('renders join markers with their transition window and opens the join control', () => {
+    const marker = {
+      key: 'clip:second',
+      isVisible: true,
+      style: { left: '40%' },
+      bandStyle: { left: '38%', width: '2%' },
+      isInvalid: false,
+      hasTransition: true,
+      label: 'Join: fade, 1 s',
+      control: {
+        isAvailable: true,
+        value: 'default',
+        label: 'fade, 1 s',
+        defaultLabel: 'Default (fade, 1 s)',
+        previewType: 'fade',
+        durationInput: null,
+        error: null,
+        onSelect: vi.fn(),
+        commitDuration: vi.fn(),
+      },
+    }
+    render(<TimelineLane lane={createLane({}, { joinMarkers: [marker] })} />)
+
+    expect(screen.getByTestId('timeline-transition-window')).toHaveStyle({ left: '38%', width: '2%' })
+    fireEvent.click(screen.getByRole('button', { name: 'Join: fade, 1 s' }))
+    fireEvent.click(screen.getByRole('button', { name: /fade, 1 s/, expanded: false }))
+    fireEvent.click(screen.getByRole('option', { name: 'No transition' }))
+    expect(marker.control.onSelect).toHaveBeenCalledExactlyOnceWith('none')
   })
 })

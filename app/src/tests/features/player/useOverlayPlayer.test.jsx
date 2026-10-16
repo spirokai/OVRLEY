@@ -298,4 +298,16 @@ describe('useOverlayPlayer', () => {
     })
     expect(useStore.getState().videoDragPreview).toBeNull()
   })
+
+  test('marks each join on the video lane with its transition window and control', () => {
+    createTwoClipStore()
+    const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
+    const markers = () => result.current.timeline.lanes.find((lane) => lane.id === 'video').joinMarkers
+
+    // A 20 s gap is above the continuity threshold: the default transition applies.
+    expect(markers()).toEqual([expect.objectContaining({ key: 'clip:second', hasTransition: true, isInvalid: false, label: 'Join: wipeleft, 2 s' })])
+    act(() => markers()[0].control.onSelect('none'))
+    expect(useStore.getState().videoEdits.second.transitionIn).toEqual({ type: 'none', durationSeconds: 0 })
+    expect(markers()[0]).toMatchObject({ hasTransition: false, bandStyle: null, label: 'Join: No transition' })
+  })
 })

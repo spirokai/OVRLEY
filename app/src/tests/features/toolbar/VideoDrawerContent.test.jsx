@@ -203,4 +203,54 @@ describe('VideoDrawerContent', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Restore 1:00.00–2:00.00' }))
     expect(useStore.getState().videoEdits['video-1'].deletedParts).toEqual([])
   })
+
+  test('edits the default transitions and the transition into a following video', () => {
+    useStore.setState(
+      videoStoreState(
+        [
+          createTestVideo({ id: 'video-1', path: '/videos/ride.mp4', durationSeconds: 3723 }),
+          createTestVideo({ id: 'video-2', path: '/videos/climb.mp4', durationSeconds: 65, importOrder: 1 }),
+        ],
+        { 'video-2': 4000 },
+      ),
+    )
+    const climb = { ...videoSummary, id: 'video-2', path: '/videos/climb.mp4', filename: 'climb.mp4', offsetSeconds: 4000 }
+    render(
+      <VideoDrawerContent
+        videoSummaries={[videoSummary, climb]}
+        onBrowseVideo={vi.fn()}
+        onDeleteVideo={vi.fn()}
+        onRemoveVideo={vi.fn()}
+        onDropVideoFiles={vi.fn()}
+        videoSync={videoSync}
+      />,
+    )
+
+    // Only the later video has a join leading into it; it follows the default.
+    expect(screen.getAllByLabelText('Transition into this video')).toHaveLength(1)
+    expect(screen.getByRole('region', { name: 'climb.mp4' })).toHaveTextContent('wipeleft, 2 s')
+
+    const duration = screen.getByLabelText('Duration (seconds)')
+    fireEvent.change(duration, { target: { value: '3' } })
+    fireEvent.blur(duration)
+    expect(useStore.getState().transitionDefaults).toMatchObject({ type: 'wipeleft', durationSeconds: 3, dialogShown: true })
+    expect(screen.getByRole('region', { name: 'climb.mp4' })).toHaveTextContent('wipeleft, 3 s')
+    fireEvent.change(duration, { target: { value: '0' } })
+    fireEvent.blur(duration)
+    expect(screen.getByRole('alert')).toHaveTextContent('Transition duration must be a positive number of seconds')
+    expect(useStore.getState().transitionDefaults.durationSeconds).toBe(3)
+
+    fireEvent.click(screen.getByLabelText('Transition'))
+    fireEvent.click(screen.getByRole('option', { name: 'dissolve' }))
+    expect(useStore.getState().transitionDefaults.type).toBe('dissolve')
+    expect(screen.getByRole('region', { name: 'climb.mp4' })).toHaveTextContent('dissolve, 3 s')
+
+    // An override on the join keeps its own choice when the defaults change.
+    fireEvent.click(screen.getByLabelText('Transition into this video'))
+    fireEvent.click(screen.getByRole('option', { name: 'No transition' }))
+    expect(useStore.getState().videoEdits['video-2'].transitionIn).toEqual({ type: 'none', durationSeconds: 0 })
+    fireEvent.click(screen.getByLabelText('Transition'))
+    fireEvent.click(screen.getByRole('option', { name: 'fade' }))
+    expect(screen.getByRole('region', { name: 'climb.mp4' })).toHaveTextContent('No transition')
+  })
 })
