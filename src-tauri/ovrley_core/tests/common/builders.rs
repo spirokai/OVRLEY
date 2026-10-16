@@ -74,14 +74,14 @@ pub fn batch_video_plan(
             &self,
             _: &ovrley_core::paths::AppPaths,
             _: &ovrley_core::media::prepared_video::InspectedVideoSource,
-        ) -> CoreResult<ParsedActivity> {
+        ) -> CoreResult<Option<ParsedActivity>> {
             unreachable!("external activity")
         }
         fn execute(
             &self,
             _: &ovrley_core::paths::AppPaths,
             plan: PlannedVideoRender,
-            _: &ParsedActivity,
+            _: Option<&ParsedActivity>,
             _: &RendererReservation,
             target: &ovrley_core::output::RenderOutputTarget,
         ) -> CoreResult<String> {
@@ -137,11 +137,30 @@ pub fn video_batch_request(
             offsets: [(source.source_id.clone(), offset)].into(),
         },
         output_directory: directory.to_str().unwrap().into(),
-        jobs: vec![BatchRenderJob {
+        outputs: vec![BatchRenderOutput {
             id: "video".into(),
-            source_id: source.source_id.clone(),
-            skip_overlay,
+            pieces: vec![whole_source_piece(source, skip_overlay)],
         }],
+    }
+}
+
+/// The piece covering every frame of an inspected source.
+pub fn whole_source_piece(
+    source: &ovrley_core::media::prepared_video::InspectedVideoSource,
+    skip_overlay: bool,
+) -> ovrley_core::render_jobs::contracts::BatchRenderPiece {
+    let fps = ovrley_core::encode::fps::Fps::new(
+        source.metadata.fps_num.unwrap(),
+        source.metadata.fps_den.unwrap(),
+    )
+    .unwrap();
+    ovrley_core::render_jobs::contracts::BatchRenderPiece {
+        source_id: source.source_id.clone(),
+        start_frame: 0,
+        end_frame: fps
+            .frame_count_for_duration(source.metadata.duration.unwrap())
+            .unwrap(),
+        skip_overlay,
     }
 }
 

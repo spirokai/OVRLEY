@@ -226,6 +226,7 @@
     "chooseFolder": "Choose folder...",
     "close": "Close",
     "noVideosQueued": "Import videos to render each of them to its own file.",
+    "outsideExportRange": "Outside the export range",
     "outputFolder": "Output folder",
     "rendering": "Rendering...",
     "done": "Done",

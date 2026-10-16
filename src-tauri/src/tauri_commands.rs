@@ -21,10 +21,12 @@ use ovrley_core::activity::finalize::FinalizeActivityResponse;
 use ovrley_core::commands;
 use ovrley_core::error::{CoreError, RenderPathError};
 use ovrley_core::output::RenderOutputKind;
-use ovrley_core::render_jobs::inspection::InspectionSourceSelection;
 use ovrley_core::render_jobs::{
     batch::BatchServiceError,
-    contracts::{BatchAcceptance, BatchEncodingSettings, BatchRenderRequest, BatchSnapshot},
+    contracts::{
+        BatchAcceptance, BatchEncodingSettings, BatchOutputSelection, BatchRenderRequest,
+        BatchSnapshot,
+    },
     planning::plan_batch_configuration,
 };
 use serde::Serialize;
@@ -401,7 +403,7 @@ pub(crate) async fn backend_inspect_video_source(
 #[tauri::command]
 pub(crate) async fn backend_plan_batch_outputs(
     state: tauri::State<'_, BackendState>,
-    selection: InspectionSourceSelection,
+    selection: BatchOutputSelection,
     encoding: BatchEncodingSettings,
     output_directory: String,
 ) -> Result<String, BackendRenderError> {

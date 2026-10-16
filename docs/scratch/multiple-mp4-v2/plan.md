@@ -135,12 +135,12 @@ Tests: playback engine / preview hooks with mocked media elements. Manual: nativ
 
 ## M5 — Rasters-only outside activity coverage
 
-M5 status: implemented (awaiting owner commit). Decisions made during implementation:
+M5 status: committed (`a8c3833a`). Decisions made during implementation:
 - Native: asset preparation also draws a rasters-only layer (none without rasters); frames outside the coverage copy it instead of clearing (`prepare_output_frame`). Applies to composite and transparent exports, single and batch.
 - `ActivityCoverage::for_video` accepts a video that does not overlap the activity: no covered frames, window = the whole activity (no frame samples it, dense activity gets an empty frame timeline). The single-render composite plan drops both no-overlap errors; batch jobs need no change.
 - Frontend: single-file composite export no longer rejects a clip outside the activity, and batch rows outside the activity are no longer blocked. The clip keeps its "outside the activity" warning in the panel.
 - Preview: `hasActivityCoverage` (external activity: inside it; otherwise inside the telemetry of the clip playing at the playhead; with no activity and no clip everything counts as covered) makes non-raster widgets invisible (`invisible`, so they cannot be clicked) in the editor canvas.
-- Deferred to M6: a clip without any embedded telemetry in embedded mode (no activity at all) still fails its batch job ("No embedded activity"); rendering it rasters-only needs an activity-free render path, which M6's per-piece jobs provide. Frames past the end of a clip's own telemetry are rasters-only already.
+- ~~Deferred to M6~~ (done in M6a): a clip without any embedded telemetry in embedded mode renders rasters only. Frames past the end of a clip's own telemetry are rasters-only already.
 - No FFmpeg end-to-end test of raster pixels outside coverage yet; covered by the frame-mapping unit test and planning tests. Add with M6's FFmpeg integration tests.
 
 1. Native: frames without activity coverage render rasters only instead of `pixels.fill(0)` (`ovrley_core/src/render/mod.rs` `prepare_output_frame`, `encode/video_timing.rs` coverage incl. trailing frames). Reuse the raster-only widget filtering that `skip_overlay` already does (`render_jobs/planning.rs`).
@@ -151,6 +151,15 @@ M5 status: implemented (awaiting owner commit). Decisions made during implementa
 Tests: render frame mapping tests, planning tests for zero/partial coverage, preview model tests.
 
 ## M6 — Export (hard cuts)
+
+Delivered as three commits: **M6a** native piece jobs (item 2 without concat, export range and deleted parts per piece, activity-free path), **M6b** native combined outputs (items 3, 4, 5, 6: intermediates, concat, audio pass, mux, verification, cleanup), **M6c** frontend (items 1, 7: render request from the program, output mode, dialog).
+
+M6a status: implemented (awaiting owner commit). Decisions made during implementation:
+- Batch contract: `outputs[] = { id, pieces[] }`, piece = `{ sourceId, startFrame, endFrame, skipOverlay }` on the source's exact frame grid; offsets stay per source in `activity.offsets`. Output planning takes the same outputs (`BatchOutputSelection`); plans report `outputId`. Until M6b every output must hold exactly one piece (validated loudly).
+- A piece plans like a video of its window's duration starting at activity second `offset + trimStart` (composite `trim_start`/`render_duration`, its own coverage). A piece reaching the source's last frame ends at the source duration, so a whole-file piece renders exactly as before.
+- One frame-count rule: the frontend now counts source frames like `Fps::frame_count_for_duration` (fraction ≤ 1/10,000 of a frame snaps down, otherwise rounds up) instead of rounding, so program frame indices match the renderer.
+- Separate-file export renders each video's own pieces after deleted parts and the export range, without overlap trimming (`collectVideoPieces`); a video outside the export range is blocked in the queue.
+- Activity-free rendering: `prepare_render_assets`/`prepare_preview_assets`/`encode_video`/`execute_render` take `Option<&ParsedActivity>`; None is accepted only for a config without value widgets or plots and pairs with `DenseActivityReport::without_activity()`. In embedded mode a source without telemetry gets a rasters-only plan (`ActivityCoverage::without_activity`).
 
 1. Render request from the program: shared template/encoding, optional shared external activity, output mode (`separate` | `combined`), output groups of pieces (`renderRequest.js`, `renderConfig.js`, `useRenderWorkflow.js`, `useRenderExecution.js`).
 2. Extend `render_jobs` (contracts, submission, planning, batch, batch_state, execution) from per-file jobs to per-piece jobs grouped into outputs. Remove folder-source assumptions.

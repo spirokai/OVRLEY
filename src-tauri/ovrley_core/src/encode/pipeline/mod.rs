@@ -105,7 +105,7 @@ impl VideoEncoding {
 pub(crate) fn encode_video(
     paths: &AppPaths,
     config: &ValidatedRenderConfig,
-    activity: &ParsedActivity,
+    activity: Option<&ParsedActivity>,
     dense: &DenseActivityReport,
     controller: &RenderController,
     target: &RenderOutputTarget,

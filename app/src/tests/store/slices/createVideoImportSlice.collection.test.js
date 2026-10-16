@@ -55,8 +55,9 @@ describe('createImportedVideo ingress', () => {
       preview,
     })
     expect(video.fps).toEqual({ num: 30000, den: 1001 })
-    expect(video.frameCount).toBe(300)
-    expect(video.durationSeconds).toBeCloseTo(10.01, 12)
+    // 300.09 frames: the partial last frame counts, as in the native renderer.
+    expect(video.frameCount).toBe(301)
+    expect(video.durationSeconds).toBeCloseTo((301 * 1001) / 30000, 12)
     expect(video.resolution).toEqual({ width: 1080, height: 1920 })
     expect(video).toMatchObject({ id: 'v', importOrder: 3, preview, syncWarning: null, telemetry: { status: 'pending', activity: null } })
   })
@@ -67,9 +68,18 @@ describe('createImportedVideo ingress', () => {
     ['a missing FPS numerator', { fpsNum: undefined }, 'invalid frame rate numerator'],
     ['a fractional FPS denominator', { fpsDen: 1.5 }, 'invalid frame rate denominator'],
     ['unknown audio presence', { hasAudio: undefined }, 'audio presence'],
-    ['a sub-frame duration', { duration: 0.001 }, 'at least one frame'],
   ])('rejects %s', (_label, overrides, message) => {
     expect(() => createImportedVideo(metadata(overrides), { importOrder: 0, preview })).toThrow(message)
+  })
+
+  test('counts frames like the native renderer, snapping container jitter to the frame boundary', () => {
+    const frames = (duration, fpsNum = 30, fpsDen = 1) =>
+      createImportedVideo(metadata({ duration, fpsNum, fpsDen }), { importOrder: 0, preview }).frameCount
+    expect(frames(10)).toBe(300)
+    expect(frames(10.000001)).toBe(300)
+    expect(frames(10.01)).toBe(301)
+    expect(frames(0.001)).toBe(1)
+    expect(frames(10.01, 30000, 1001)).toBe(300)
   })
 
   test('accepts settled telemetry and rejects inconsistent telemetry', () => {

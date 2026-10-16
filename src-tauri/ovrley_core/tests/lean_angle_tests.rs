@@ -32,7 +32,7 @@ fn full_lean_angle_config_validates_and_prepares_one_static_cache() {
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = common::builders::minimal_dense_activity();
     let mut profiler = RenderProfiler::default();
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&paths, &config, Some(&activity), &dense, &mut profiler).unwrap();
 
     let PreparedValue::LeanAngle(widget) = &assets.values()[0] else {
         panic!("lean-angle value index must own the static lean-angle cache");

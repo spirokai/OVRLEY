@@ -7,7 +7,10 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use super::contracts::{BatchEncodingSettings, BatchExportMode};
+use super::contracts::{
+    BatchEncodingSettings, BatchExportMode, BatchOutputSelection, BatchRenderOutput,
+    BatchRenderPiece,
+};
 use super::inspection::CompositeSourceMetadata;
 use super::inspection::{
     InspectionRejection, InspectionSourceSelection, InspectionValidation, VideoInspectionService,
@@ -96,24 +99,63 @@ pub(crate) fn validate_batch_encoding(
     })
 }
 
+/// The source window of one piece on its source's exact frame grid.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct PieceWindow {
+    pub trim_start: f64,
+    pub duration: f64,
+    frame_count: u64,
+}
+
+fn source_fps(source: &InspectedVideoSource) -> CoreResult<Fps> {
+    Fps::new(
+        source.metadata.fps_num.expect("inspected FPS numerator"),
+        source.metadata.fps_den.expect("inspected FPS denominator"),
+    )
+}
+
+/// Validates a piece against its source and derives its window. The source frame
+/// count uses the same rule as the frontend program and the renderer.
+pub(crate) fn piece_window(
+    source: &InspectedVideoSource,
+    piece: &BatchRenderPiece,
+) -> CoreResult<PieceWindow> {
+    let fps = source_fps(source)?;
+    let total =
+        fps.frame_count_for_duration(source.metadata.duration.expect("inspected source duration"))?;
+    if piece.start_frame >= piece.end_frame || piece.end_frame > total {
+        return Err(CoreError::Config(format!(
+            "Piece frames [{}, {}) must lie within the {total} frames of {}",
+            piece.start_frame, piece.end_frame, source.metadata.path
+        )));
+    }
+    let trim_start = fps.seconds_at_frame(piece.start_frame);
+    // A piece reaching the last frame ends where the source ends: that frame may be
+    // shown only partly, and a whole-source piece renders exactly like the file.
+    let end = if piece.end_frame == total {
+        source.metadata.duration.expect("inspected source duration")
+    } else {
+        fps.seconds_at_frame(piece.end_frame)
+    };
+    Ok(PieceWindow {
+        trim_start,
+        duration: end - trim_start,
+        frame_count: piece.end_frame - piece.start_frame,
+    })
+}
+
 /// Output review and job preparation use the same exact frame-count rules.
 fn video_output_work(
     source: &InspectedVideoSource,
+    window: PieceWindow,
     codec: CodecSelection,
     layout_fps: Fps,
     update_rate: NonZeroU32,
 ) -> CoreResult<(u32, Fps)> {
-    let duration = source.metadata.duration.expect("inspected source duration");
     let (frames, fps) = match codec {
-        CodecSelection::Composite(_) => {
-            let fps = Fps::new(
-                source.metadata.fps_num.expect("inspected FPS numerator"),
-                source.metadata.fps_den.expect("inspected FPS denominator"),
-            )?;
-            (fps.frame_count_for_duration(duration)?, fps)
-        }
+        CodecSelection::Composite(_) => (window.frame_count, source_fps(source)?),
         CodecSelection::Transparent(_) => {
-            let layout = layout_fps.frame_count_for_duration(duration)?;
+            let layout = layout_fps.frame_count_for_duration(window.duration)?;
             (
                 u64::from(FrameProductionPlan::decimated(layout, update_rate)?.count()),
                 layout_fps.divided_by(update_rate)?,
@@ -125,10 +167,32 @@ fn video_output_work(
     Ok((frames, fps))
 }
 
+/// Combined outputs (several pieces, concatenated) arrive with the concat step.
+pub(crate) fn single_piece(output: &BatchRenderOutput) -> CoreResult<&BatchRenderPiece> {
+    match output.pieces.as_slice() {
+        [piece] => Ok(piece),
+        _ => Err(CoreError::Config(format!(
+            "Batch output {} must contain exactly one piece",
+            output.id
+        ))),
+    }
+}
+
+/// Distinct sources referenced by the outputs, in first-use order.
+pub(crate) fn referenced_source_ids(outputs: &[BatchRenderOutput]) -> Vec<String> {
+    let mut ids: Vec<String> = Vec::new();
+    for piece in outputs.iter().flat_map(|output| &output.pieces) {
+        if !ids.contains(&piece.source_id) {
+            ids.push(piece.source_id.clone());
+        }
+    }
+    ids
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchVideoOutputPlan {
-    pub source_id: String,
+    pub output_id: String,
     pub output_path: PathBuf,
     pub output_duration_seconds: f64,
     pub planned_frames: u64,
@@ -146,29 +210,32 @@ pub enum BatchPlanningResponse {
 /// Public configuration seam: plans only fresh, session-owned descriptors.
 pub fn plan_batch_configuration(
     inspection: &VideoInspectionService,
-    selection: &InspectionSourceSelection,
+    selection: &BatchOutputSelection,
     encoding: &BatchEncodingSettings,
     output_directory: &Path,
 ) -> CoreResult<BatchPlanningResponse> {
     let encoding = validate_batch_encoding(encoding)?;
-    let sources = match inspection.validate_sources(selection) {
+    let sources = match inspection.validate_sources(&InspectionSourceSelection {
+        inspection_id: selection.inspection_id.clone(),
+        source_ids: referenced_source_ids(&selection.outputs),
+    }) {
         InspectionValidation::Valid(sources) => sources,
         InspectionValidation::Rejected(rejection) => {
             return Ok(BatchPlanningResponse::Rejected(rejection))
         }
     };
-    let outputs = encoding.plan_outputs(&sources, output_directory)?;
-    let plans = sources
-        .sources()
+    let planned = encoding.plan_outputs(&selection.outputs, &sources, output_directory)?;
+    let plans = selection
+        .outputs
         .iter()
-        .zip(outputs)
-        .map(|(source, output)| {
-            let (container_fps_num, container_fps_den) = output.container_fps.components();
+        .zip(planned)
+        .map(|(output, planned)| {
+            let (container_fps_num, container_fps_den) = planned.container_fps.components();
             BatchVideoOutputPlan {
-                source_id: source.source_id.clone(),
-                output_path: output.target.path().to_path_buf(),
-                output_duration_seconds: source.metadata.duration.expect("inspected duration"),
-                planned_frames: u64::from(output.frames),
+                output_id: output.id.clone(),
+                output_path: planned.target.path().to_path_buf(),
+                output_duration_seconds: planned.window.duration,
+                planned_frames: u64::from(planned.frames),
                 container_fps_num,
                 container_fps_den,
             }
@@ -186,18 +253,36 @@ pub(crate) struct ValidatedBatchTemplate {
 /// Reviewed and accepted jobs share the same output contract.
 pub(crate) struct PlannedBatchOutput {
     pub target: crate::output::RenderOutputTarget,
+    pub source: std::sync::Arc<InspectedVideoSource>,
+    pub window: PieceWindow,
     pub frames: u32,
     pub container_fps: Fps,
 }
 
 impl ValidatedBatchEncoding {
+    /// Plans one output per requested output, named after its source.
     pub(crate) fn plan_outputs(
         &self,
+        outputs: &[BatchRenderOutput],
         sources: &super::inspection::AcceptedInspectionSources,
         directory: &Path,
     ) -> CoreResult<Vec<PlannedBatchOutput>> {
-        let paths = sources
-            .sources()
+        let pieces = outputs
+            .iter()
+            .map(single_piece)
+            .collect::<CoreResult<Vec<_>>>()?;
+        let piece_sources = pieces
+            .iter()
+            .map(|piece| {
+                sources
+                    .sources()
+                    .iter()
+                    .find(|source| source.source_id == piece.source_id)
+                    .cloned()
+                    .expect("validated sources cover every piece")
+            })
+            .collect::<Vec<_>>();
+        let paths = piece_sources
             .iter()
             .map(|source| PathBuf::from(&source.metadata.path))
             .collect::<Vec<_>>();
@@ -209,15 +294,23 @@ impl ValidatedBatchEncoding {
             },
             &paths,
         )?;
-        sources
-            .sources()
-            .iter()
+        pieces
+            .into_iter()
+            .zip(piece_sources)
             .zip(targets)
-            .map(|(source, target)| {
-                let (frames, container_fps) =
-                    video_output_work(source, self.codec, self.layout_fps, self.update_rate)?;
+            .map(|((piece, source), target)| {
+                let window = piece_window(&source, piece)?;
+                let (frames, container_fps) = video_output_work(
+                    &source,
+                    window,
+                    self.codec,
+                    self.layout_fps,
+                    self.update_rate,
+                )?;
                 Ok(PlannedBatchOutput {
                     target,
+                    source,
+                    window,
                     frames,
                     container_fps,
                 })
@@ -339,16 +432,24 @@ pub fn plan_single_render(
 }
 
 /// Consumes timing and activity bounds validated by acceptance/job preparation.
+///
+/// The piece renders as a video of its window's duration that starts at activity
+/// second `offset + window.trim_start` (`offset` is where source frame 0 sits).
+/// Without an activity (`activity_end` is None) no frame is covered and only
+/// rasters are kept.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn plan_batch_item(
     template: &ValidatedBatchTemplate,
     source: &InspectedVideoSource,
+    window: PieceWindow,
     offset: f64,
     skip_overlay: bool,
-    activity_end: f64,
+    activity_end: Option<f64>,
     output_frame_count: u32,
     container_fps: Fps,
 ) -> CoreResult<PlannedVideoRender> {
-    let duration = source.metadata.duration.expect("inspected source duration");
+    let duration = window.duration;
+    let piece_offset = offset + window.trim_start;
     let encoding = &template.encoding;
     let update_rate = encoding.update_rate;
     let sampling_fps = match encoding.codec {
@@ -356,13 +457,16 @@ pub(crate) fn plan_batch_item(
         CodecSelection::Transparent(_) => encoding.layout_fps,
     };
     let layout_frame_count = sampling_fps.frame_count_for_duration(duration)?;
-    let coverage = ActivityCoverage::for_video(
-        duration,
-        offset,
-        activity_end,
-        sampling_fps,
-        layout_frame_count,
-    )?;
+    let coverage = match activity_end {
+        Some(activity_end) => ActivityCoverage::for_video(
+            duration,
+            piece_offset,
+            activity_end,
+            sampling_fps,
+            layout_frame_count,
+        )?,
+        None => ActivityCoverage::without_activity(duration, layout_frame_count),
+    };
     let mut presentation = template.config.scene.clone();
     presentation.width = source.display_resolution.width as u32;
     presentation.height = source.display_resolution.height as u32;
@@ -376,11 +480,11 @@ pub(crate) fn plan_batch_item(
         } else {
             update_rate
         },
-        export_start_seconds: offset,
+        export_start_seconds: piece_offset,
         custom_export_range_active: Some(true),
     };
     let mut config = template.config.clone().with_scene(scene);
-    if skip_overlay {
+    if skip_overlay || activity_end.is_none() {
         config.backdrops.clear();
         config.labels.clear();
         config.values.clear();
@@ -392,8 +496,8 @@ pub(crate) fn plan_batch_item(
             render: CompositeRenderPlan {
                 video_path: PathBuf::from(&source.metadata.path),
                 quality: encoding.quality,
-                sync_offset: offset,
-                trim_start: 0.0,
+                sync_offset: piece_offset,
+                trim_start: window.trim_start,
                 render_duration: duration,
                 update_rate,
                 source_fps: container_fps,
@@ -425,7 +529,7 @@ pub(crate) fn plan_batch_item(
         config,
         mode,
         sampling_fps,
-        activity_offset: offset,
+        activity_offset: piece_offset,
     })
 }
 

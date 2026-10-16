@@ -317,7 +317,7 @@ mod video_frame_mapping_tests {
 pub fn prepare_preview_assets(
     paths: &AppPaths,
     config: &ValidatedRenderConfig,
-    activity: &ParsedActivity,
+    activity: Option<&ParsedActivity>,
     dense_activity: &DenseActivityReport,
 ) -> CoreResult<(
     PreparedPreviewAssets,
@@ -396,7 +396,7 @@ pub fn render_preview_with_report(
     out_path: &Path,
 ) -> CoreResult<PreviewRenderReport> {
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
-        prepare_preview_assets(paths, config, activity, dense_activity)?;
+        prepare_preview_assets(paths, config, Some(activity), dense_activity)?;
     render_preview_with_prepared_assets(PreviewRenderRequest {
         paths,
         dense_activity,

@@ -80,6 +80,23 @@ function collectPieces(videos, exportRange) {
   )
 }
 
+/**
+ * Lists the pieces each video keeps after its deleted parts and the export
+ * range, without resolving overlaps between videos. Separate-file export renders
+ * these; the combined program trims overlapping pieces (see `buildProgram`).
+ * @param {object} options Piece inputs.
+ * @param {Array<object>} options.videos Imported videos joined with their edits.
+ * @param {{type: 'all'|'custom', from: number, to: number}} options.exportRange Export range in timeline seconds.
+ * @returns {Map<string, Array<object>>} Pieces of each video that keeps any, in source order.
+ */
+export function collectVideoPieces({ videos, exportRange }) {
+  const piecesByVideo = new Map()
+  for (const piece of collectPieces(videos, exportRange)) {
+    piecesByVideo.set(piece.videoId, [...(piecesByVideo.get(piece.videoId) ?? []), piece])
+  }
+  return piecesByVideo
+}
+
 function resolveOverlaps(sortedPieces, videosById) {
   const pieces = []
   const overlaps = []

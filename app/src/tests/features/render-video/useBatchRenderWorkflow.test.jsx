@@ -104,15 +104,15 @@ function snapshot(phase = 'accepted', revision = 1) {
     phase,
     rendererBusy: !terminal,
     activeItemId: null,
-    plannedFrames: acceptedRequest.jobs.length * 3600,
-    processedFrames: terminal ? acceptedRequest.jobs.length * 3600 : 0,
+    plannedFrames: acceptedRequest.outputs.length * 3600,
+    processedFrames: terminal ? acceptedRequest.outputs.length * 3600 : 0,
     renderedFrames: 0,
     encodedFrames: 0,
     currentItemProgress: null,
     elapsedSeconds: 0,
     estimatedSecondsRemaining: null,
-    items: acceptedRequest.jobs.map((job) => ({
-      id: job.id,
+    items: acceptedRequest.outputs.map((output) => ({
+      id: output.id,
       phase: terminal ? 'finished' : 'queued',
       plannedFrames: 3600,
       currentFrames: 0,
@@ -121,7 +121,7 @@ function snapshot(phase = 'accepted', revision = 1) {
       outcome: terminal ? { status: 'failed', message: 'Telemetry unavailable' } : null,
     })),
     outputs: [],
-    resultCounts: { succeeded: 0, failed: terminal ? acceptedRequest.jobs.length : 0, cancelled: 0, unstarted: 0 },
+    resultCounts: { succeeded: 0, failed: terminal ? acceptedRequest.outputs.length : 0, cancelled: 0, unstarted: 0 },
   }
 }
 function editorState() {
@@ -153,9 +153,9 @@ beforeEach(() => {
   vi.mocked(backend.createVideoInspection).mockImplementation(async () => ({ inspectionId: `inspection-${++sessionNumber}` }))
   vi.mocked(backend.inspectVideoSource).mockImplementation(async (id, path) => source(id, path))
   vi.mocked(backend.disposeVideoInspection).mockResolvedValue(undefined)
-  vi.mocked(backend.planBatchOutputs).mockImplementation(async ({ sourceIds }) => ({
+  vi.mocked(backend.planBatchOutputs).mockImplementation(async ({ outputs }) => ({
     status: 'planned',
-    plans: sourceIds.map((sourceId) => ({ sourceId, plannedFrames: 3600 })),
+    plans: outputs.map((output) => ({ outputId: output.id, plannedFrames: 3600 })),
   }))
   vi.mocked(backend.subscribeBatchRenderProgress).mockImplementation(async (handler) => {
     observe = handler
@@ -164,7 +164,7 @@ beforeEach(() => {
   vi.mocked(backend.submitBatchRender).mockImplementation(async (request) => {
     acceptedRequest = request
     latest = snapshot()
-    observe({ kind: 'snapshot', data: { ...latest, revision: 2, snapshotRevision: 2, phase: 'preparing', activeItemId: request.jobs[0].id } })
+    observe({ kind: 'snapshot', data: { ...latest, revision: 2, snapshotRevision: 2, phase: 'preparing', activeItemId: request.outputs[0].id } })
     return { batchId: latest.batchId, snapshot: latest }
   })
   vi.mocked(backend.getBatchRenderSnapshot).mockImplementation(async () => latest)
@@ -272,8 +272,20 @@ describe('native batch workflow', () => {
     ])
     expect(backend.inspectVideoSource.mock.calls.map(([, path]) => path)).toEqual([reference, next, blocked])
     await act(async () => result.current.runBatch())
-    expect(acceptedRequest.jobs.map((job) => job.id)).toEqual([reference, next, blocked])
+    expect(acceptedRequest.outputs.map((output) => output.id)).toEqual([reference, next, blocked])
     expect(acceptedRequest.activity.offsets[`inspection-1:${blocked}`]).toBe(7200)
+  })
+
+  test('renders only the part of each video inside the export range and blocks videos outside it', async () => {
+    const ranged = { ...settings, range: { type: 'custom', from: 20, to: 100 } }
+    const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings: ranged }))
+    await waitFor(() => expect(result.current.batchReady).toBe(true))
+    expect(result.current.batchQueue.find((row) => row.id === 'outside')).toMatchObject({ status: 'blocked', error: 'Outside the export range' })
+    await act(async () => result.current.runBatch())
+    expect(acceptedRequest.outputs).toEqual([
+      { id: reference, pieces: [{ sourceId: `inspection-1:${reference}`, startFrame: 870, endFrame: 3270, skipOverlay: false }] },
+      { id: next, pieces: [{ sourceId: `inspection-1:${next}`, startFrame: 0, endFrame: 1800, skipOverlay: false }] },
+    ])
   })
 
   test('an unreadable camera timestamp only hides the date of its row', async () => {
@@ -293,7 +305,7 @@ describe('native batch workflow', () => {
     expect(result.current.batchQueue.find((row) => row.id === 'next')).toMatchObject({ status: 'blocked', error: 'Video is unavailable' })
     expect(result.current.batchQueue.find((row) => row.id === 'reference').status).toBe('pending')
     await act(async () => result.current.runBatch())
-    expect(acceptedRequest.jobs.map((job) => job.id)).toEqual([reference, blocked])
+    expect(acceptedRequest.outputs.map((output) => output.id)).toEqual([reference, blocked])
   })
 
   test('submits embedded-telemetry batches without an external activity', async () => {
@@ -301,13 +313,19 @@ describe('native batch workflow', () => {
     const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
     await waitFor(() => expect(result.current.batchReady).toBe(true))
     expect(backend.planBatchOutputs).toHaveBeenLastCalledWith(
-      { inspectionId: 'inspection-1', sourceIds: [reference, next, blocked].map((path) => `inspection-1:${path}`) },
+      {
+        inspectionId: 'inspection-1',
+        outputs: [reference, next, blocked].map((path) => ({
+          id: path,
+          pieces: [{ sourceId: `inspection-1:${path}`, startFrame: 0, endFrame: 3600, skipOverlay: false }],
+        })),
+      },
       expect.any(Object),
       'C:/renders',
     )
     await act(async () => result.current.runBatch())
     expect(acceptedRequest.activity).toEqual({ mode: 'embeddedActivity' })
-    expect(acceptedRequest.jobs.map((job) => job.id)).toEqual([reference, next, blocked])
+    expect(acceptedRequest.outputs.map((output) => output.id)).toEqual([reference, next, blocked])
   })
 
   test('publishes each inspected row immediately while later sources are still probing', async () => {
@@ -350,10 +368,10 @@ describe('native batch workflow', () => {
         mode: 'externalActivity',
         offsets: { [`inspection-1:${reference}`]: -9, [`inspection-1:${next}`]: 40, [`inspection-1:${blocked}`]: 7200 },
       },
-      jobs: [
-        { id: reference, sourceId: `inspection-1:${reference}`, skipOverlay: false },
-        { id: next, sourceId: `inspection-1:${next}`, skipOverlay: true },
-        { id: blocked, sourceId: `inspection-1:${blocked}`, skipOverlay: false },
+      outputs: [
+        { id: reference, pieces: [{ sourceId: `inspection-1:${reference}`, startFrame: 0, endFrame: 3600, skipOverlay: false }] },
+        { id: next, pieces: [{ sourceId: `inspection-1:${next}`, startFrame: 0, endFrame: 3600, skipOverlay: true }] },
+        { id: blocked, pieces: [{ sourceId: `inspection-1:${blocked}`, startFrame: 0, endFrame: 3600, skipOverlay: false }] },
       ],
     })
     expect(Object.isFrozen(acceptedRequest)).toBe(true)

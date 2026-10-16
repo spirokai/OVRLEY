@@ -4,19 +4,21 @@ use super::batch::BatchServiceError;
 use super::contracts::*;
 use super::inspection::{InspectionSourceSelection, InspectionValidation, VideoInspectionService};
 use super::planning::{
-    validate_batch_encoding, validate_batch_template, PlannedBatchOutput, ValidatedBatchTemplate,
+    referenced_source_ids, single_piece, validate_batch_encoding, validate_batch_template,
+    PlannedBatchOutput, ValidatedBatchTemplate,
 };
 use crate::activity::schema::ParsedActivity;
 use crate::activity::validate_render_activity;
 use crate::error::{CoreError, CoreResult};
 use crate::raster::RasterResourceResolver;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
 
 pub(super) struct AcceptedJob {
     pub(super) id: String,
     pub(super) source: Arc<InspectedVideoSource>,
+    /// Activity second where source frame 0 sits (0 for embedded telemetry).
     pub(super) offset: f64,
     pub(super) skip_overlay: bool,
     pub(super) output: PlannedBatchOutput,
@@ -33,28 +35,26 @@ pub(super) fn accept_batch(
     request: BatchRenderRequest,
     resources: Option<&dyn RasterResourceResolver>,
 ) -> Result<AcceptedBatch, BatchServiceError> {
-    if request.jobs.is_empty() || request.jobs.len() > u32::MAX as usize {
+    if request.outputs.is_empty() || request.outputs.len() > u32::MAX as usize {
         return Err(
             CoreError::Config("Batch must contain a nonempty supported queue".into()).into(),
         );
     }
     let mut ids = HashSet::new();
-    for job in &request.jobs {
-        if job.id.trim().is_empty() || !ids.insert(&job.id) {
+    for output in &request.outputs {
+        if output.id.trim().is_empty() || !ids.insert(&output.id) {
             return Err(CoreError::Config(
-                "Batch job identities must be nonempty and distinct".into(),
+                "Batch output identities must be nonempty and distinct".into(),
             )
             .into());
         }
+        single_piece(output)?;
     }
-    let offsets = validate_batch_activity(&request.activity, &request.jobs)?;
+    let source_ids = referenced_source_ids(&request.outputs);
+    let offsets = validate_batch_activity(&request.activity, &source_ids)?;
     let owned = match inspection.validate_sources(&InspectionSourceSelection {
         inspection_id: request.inspection_id.clone(),
-        source_ids: request
-            .jobs
-            .iter()
-            .map(|job| job.source_id.clone())
-            .collect(),
+        source_ids,
     }) {
         InspectionValidation::Valid(sources) => sources,
         InspectionValidation::Rejected(rejection) => {
@@ -65,7 +65,11 @@ pub(super) fn accept_batch(
         }
     };
     let encoding = validate_batch_encoding(&request.encoding)?;
-    let outputs = encoding.plan_outputs(&owned, Path::new(&request.output_directory))?;
+    let planned = encoding.plan_outputs(
+        &request.outputs,
+        &owned,
+        Path::new(&request.output_directory),
+    )?;
     let template = validate_batch_template(request.template, encoding, resources)?;
     let external_activity = match request.activity {
         BatchActivity::EmbeddedActivity {} => None,
@@ -76,17 +80,21 @@ pub(super) fn accept_batch(
         }
     };
     let jobs = request
-        .jobs
+        .outputs
         .into_iter()
-        .zip(owned.sources())
-        .zip(outputs)
-        .zip(offsets)
-        .map(|(((job, source), output), offset)| AcceptedJob {
-            id: job.id,
-            source: source.clone(),
-            offset,
-            skip_overlay: job.skip_overlay,
-            output,
+        .zip(planned)
+        .map(|(output, planned)| {
+            let piece = &output.pieces[0];
+            AcceptedJob {
+                // Embedded telemetry is video-local: frame 0 is activity second 0.
+                offset: offsets
+                    .as_ref()
+                    .map_or(0.0, |offsets| offsets[&piece.source_id]),
+                skip_overlay: piece.skip_overlay,
+                source: planned.source.clone(),
+                id: output.id,
+                output: planned,
+            }
         })
         .collect();
     Ok(AcceptedBatch {
@@ -96,30 +104,24 @@ pub(super) fn accept_batch(
     })
 }
 
-/// Validate the committed offsets at submission: exactly one finite offset per queued source.
+/// Validate the committed offsets at submission: exactly one finite offset per
+/// referenced source with an external activity; None in embedded mode.
 fn validate_batch_activity(
     activity: &BatchActivity,
-    jobs: &[BatchRenderJob],
-) -> CoreResult<Vec<f64>> {
+    source_ids: &[String],
+) -> CoreResult<Option<HashMap<String, f64>>> {
     let BatchActivity::ExternalActivity { offsets, .. } = activity else {
-        return Ok(vec![0.0; jobs.len()]);
+        return Ok(None);
     };
-    if offsets.len() != jobs.len() {
+    if offsets.len() != source_ids.len() || source_ids.iter().any(|id| !offsets.contains_key(id)) {
         return Err(CoreError::Config(
             "Batch offsets must identify exactly the queued sources".into(),
         ));
     }
-    jobs.iter()
-        .map(|job| {
-            let offset = offsets.get(&job.source_id).ok_or_else(|| {
-                CoreError::Config(format!("Missing offset for {}", job.source_id))
-            })?;
-            if !offset.is_finite() {
-                return Err(CoreError::Config(
-                    "Batch activity offsets must be finite".into(),
-                ));
-            }
-            Ok(*offset)
-        })
-        .collect()
+    if offsets.values().any(|offset| !offset.is_finite()) {
+        return Err(CoreError::Config(
+            "Batch activity offsets must be finite".into(),
+        ));
+    }
+    Ok(Some(offsets.clone()))
 }

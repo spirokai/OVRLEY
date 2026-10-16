@@ -55,13 +55,32 @@ pub enum BatchActivity {
     },
 }
 
+/// A continuous range of one inspected source: frames `[start_frame, end_frame)`
+/// on the source's exact frame grid.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct BatchRenderJob {
-    pub id: String,
+pub struct BatchRenderPiece {
     pub source_id: String,
-    /// Suppresses all widgets except rasters, retaining the job.
+    pub start_frame: u64,
+    pub end_frame: u64,
+    /// Suppresses all widgets except rasters for this piece.
     pub skip_overlay: bool,
+}
+
+/// One output file assembled from its pieces in order.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BatchRenderOutput {
+    pub id: String,
+    pub pieces: Vec<BatchRenderPiece>,
+}
+
+/// Session-owned outputs to review before submission.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BatchOutputSelection {
+    pub inspection_id: String,
+    pub outputs: Vec<BatchRenderOutput>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -73,9 +92,8 @@ pub struct BatchRenderRequest {
     pub encoding: BatchEncodingSettings,
     pub activity: BatchActivity,
     pub output_directory: String,
-    /// Ordered, eligible jobs only. Row removal excludes a source; skipOverlay
-    /// does not. Accepted queue order and inputs are immutable.
-    pub jobs: Vec<BatchRenderJob>,
+    /// Ordered outputs; accepted order and inputs are immutable.
+    pub outputs: Vec<BatchRenderOutput>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]

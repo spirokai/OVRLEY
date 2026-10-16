@@ -4,8 +4,9 @@ import * as backend from '@/api/backend'
 import useStore from '@/store/useStore'
 import { useBatchRenderStore, useBatchSyncInputs } from '@/hooks/useAppStoreSelectors'
 import { openDirectoryPath } from '@/lib/file-dialog'
+import { collectVideoPieces } from '@/lib/video-program/program'
 import { joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
-import { captureRenderEncoding } from '../utils/renderRequest'
+import { captureRenderEncoding, createBatchOutputs } from '../utils/renderRequest'
 import { formatRenderPathError, reviewBatchQueue, reviewBatchSync } from '../utils/renderPresentation'
 
 /**
@@ -26,6 +27,9 @@ export default function useBatchInspection({ phase, settings }) {
     [inputs.importedVideos, inputs.videoEdits],
   )
   const sourcePaths = useMemo(() => clips.map((clip) => clip.path).join('\n'), [clips])
+  // Each video renders its own pieces within the export range; overlaps between videos do not trim them.
+  const exportRange = settings?.range ?? null
+  const piecesByVideo = useMemo(() => (exportRange === null ? new Map() : collectVideoPieces({ videos: clips, exportRange })), [clips, exportRange])
   const sync = useMemo(() => reviewBatchSync(inputs), [inputs])
   const [revision, setRevision] = useState(0)
   const [inspection, setInspection] = useState(null)
@@ -34,8 +38,8 @@ export default function useBatchInspection({ phase, settings }) {
   const current = inspection?.context === context ? inspection : null
   const inspectionContext = open || current !== null ? context : null
   const rows = useMemo(
-    () => reviewBatchQueue(clips, store.batchSkipOverlay, current, sync, i18n.resolvedLanguage),
-    [clips, store.batchSkipOverlay, current, sync, i18n.resolvedLanguage],
+    () => reviewBatchQueue(clips, piecesByVideo, store.batchSkipOverlay, current, sync, i18n.resolvedLanguage),
+    [clips, piecesByVideo, store.batchSkipOverlay, current, sync, i18n.resolvedLanguage],
   )
   const jobs = useMemo(() => rows.filter((row) => row.status === 'pending'), [rows])
   const review = useMemo(
@@ -85,7 +89,7 @@ export default function useBatchInspection({ phase, settings }) {
     if (!open || !current?.complete || current.error || sync.error || jobs.length === 0 || outputDirectory === null) return
     let closed = false
     void backend
-      .planBatchOutputs({ inspectionId: current.inspectionId, sourceIds: jobs.map((row) => row.source.sourceId) }, review.encoding, outputDirectory)
+      .planBatchOutputs({ inspectionId: current.inspectionId, outputs: createBatchOutputs(jobs) }, review.encoding, outputDirectory)
       .then((result) => {
         if (closed) return
         if (result.status === 'rejected') setInspection({ ...current, error: new Error('reinspectionRequired'), issues: result.issues })

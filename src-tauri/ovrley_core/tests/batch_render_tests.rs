@@ -20,11 +20,9 @@ use ovrley_core::paths::AppPaths;
 use ovrley_core::render_jobs::batch::{BatchJobExecutor, BatchServiceError};
 use ovrley_core::render_jobs::contracts::*;
 use ovrley_core::render_jobs::execution::{RenderExecutionService, RendererReservation};
-use ovrley_core::render_jobs::inspection::{
-    InspectionSourceSelection, SourceMetadataProbe, VideoInspectionService,
-};
+use ovrley_core::render_jobs::inspection::{SourceMetadataProbe, VideoInspectionService};
 use ovrley_core::render_jobs::planning::{
-    plan_batch_configuration, BatchPlanningResponse, PlannedVideoRender,
+    plan_batch_configuration, BatchPlanningResponse, PlannedVideoRender, VideoRenderModePlan,
 };
 use serde_json::json;
 
@@ -94,12 +92,17 @@ impl Fixture {
             quality_value: 20.0,
             qsv_full_init_args: None,
         };
-        let selection = InspectionSourceSelection {
+        let outputs = sources
+            .iter()
+            .enumerate()
+            .map(|(index, source)| BatchRenderOutput {
+                id: format!("item-{index}"),
+                pieces: vec![common::builders::whole_source_piece(source, index == 0)],
+            })
+            .collect::<Vec<_>>();
+        let selection = BatchOutputSelection {
             inspection_id: session.inspection_id.clone(),
-            source_ids: sources
-                .iter()
-                .map(|source| source.source_id.clone())
-                .collect(),
+            outputs: outputs.clone(),
         };
         let BatchPlanningResponse::Planned { .. } =
             plan_batch_configuration(&self.inspection, &selection, &encoding, &self.directory)
@@ -131,15 +134,7 @@ impl Fixture {
                 BatchActivity::EmbeddedActivity {}
             },
             output_directory: self.directory.to_str().unwrap().into(),
-            jobs: sources
-                .into_iter()
-                .enumerate()
-                .map(|(index, source)| BatchRenderJob {
-                    id: format!("item-{index}"),
-                    source_id: source.source_id,
-                    skip_overlay: index == 0,
-                })
-                .collect(),
+            outputs,
         }
     }
 }
@@ -196,6 +191,8 @@ struct ControlledExecutor {
     resume: Mutex<mpsc::Receiver<()>>,
     embedded: Mutex<Vec<String>>,
     offsets: Mutex<Vec<f64>>,
+    /// Per executed job: whether it received an activity and its covered frame count.
+    activities: Mutex<Vec<(bool, u64)>>,
     cleanup: Option<(mpsc::Sender<()>, Mutex<mpsc::Receiver<()>>)>,
 }
 
@@ -204,35 +201,46 @@ impl BatchJobExecutor for ControlledExecutor {
         &self,
         _: &AppPaths,
         source: &InspectedVideoSource,
-    ) -> CoreResult<ParsedActivity> {
+    ) -> CoreResult<Option<ParsedActivity>> {
         self.embedded
             .lock()
             .unwrap()
             .push(source.metadata.path.clone());
+        if source.metadata.path.contains("broken") {
+            return Err(CoreError::Activity("Unreadable embedded telemetry".into()));
+        }
         if source.metadata.path.contains("missing") {
-            return Err(CoreError::Activity("No embedded activity".into()));
+            return Ok(None);
         }
         let mut activity = activity();
         // Different owning sources must retain their own telemetry payload.
         activity.file_name = Some(source.metadata.path.clone());
-        Ok(activity)
+        Ok(Some(activity))
     }
 
     fn execute(
         &self,
         _: &AppPaths,
         plan: PlannedVideoRender,
-        activity: &ParsedActivity,
+        activity: Option<&ParsedActivity>,
         session: &RendererReservation,
         target: &RenderOutputTarget,
     ) -> CoreResult<String> {
         let filename = target.filename().to_owned();
         let frames = plan.planned_frames();
+        let covered = match plan.mode() {
+            VideoRenderModePlan::Composite { render, .. } => render.coverage.frame_count,
+            VideoRenderModePlan::Transparent(render) => render.coverage.frame_count,
+        };
+        self.activities
+            .lock()
+            .unwrap()
+            .push((activity.is_some(), covered));
         self.offsets
             .lock()
             .unwrap()
             .push(plan.config().scene.export_start_seconds);
-        if filename.starts_with('1') {
+        if filename.starts_with('1') || activity.is_none() {
             assert!(plan.config().values.is_empty());
             assert!(plan.config().labels.is_empty());
             assert!(plan.config().backdrops.is_empty());
@@ -246,7 +254,7 @@ impl BatchJobExecutor for ControlledExecutor {
         assert_eq!(plan.config().rasters.len(), 1);
         assert_eq!(plan.config().rasters[0].id, "logo");
         assert_eq!(plan.config().rasters[0].geometry.width, 4.0);
-        if let Some(path) = &activity.file_name {
+        if let Some(path) = activity.and_then(|activity| activity.file_name.as_ref()) {
             assert!(path.contains(filename.split('_').next().unwrap()));
         }
         session.controller().start_encoding()?;
@@ -297,6 +305,7 @@ fn executor(
             resume: Mutex::new(resume_rx),
             embedded: Mutex::new(Vec::new()),
             offsets: Mutex::new(Vec::new()),
+            activities: Mutex::new(Vec::new()),
             cleanup,
         }),
         entered_rx,
@@ -314,7 +323,7 @@ fn sequential_mixed_results_settle_frame_weights_and_preserve_completed_outputs(
     let changed = fixture.directory.join("3-changed.mp4");
     let first_output = fixture.directory.join("1-off_overlay.mov");
     let inspection_id = request.inspection_id.clone();
-    let first_source_id = request.jobs[0].source_id.clone();
+    let first_source_id = request.outputs[0].pieces[0].source_id.clone();
     let (service, sink, terminal) = service();
     let (executor, entered, resume) = executor(None);
     // Shared template validation belongs to submission, before any item runs.
@@ -466,7 +475,7 @@ fn embedded_failures_continue_and_all_item_failure_has_a_terminal_snapshot() {
     let fixture = Fixture::new();
     let (service, _, terminal) = service();
     let (executor, entered, resume) = executor(None);
-    let request = fixture.request(&["1-missing.mp4", "2-error.mp4"], false);
+    let request = fixture.request(&["1-broken.mp4", "2-error.mp4"], false);
     let inspection_id = request.inspection_id.clone();
     let accepted = service
         .submit_batch_with_executor(
@@ -572,8 +581,8 @@ fn batch_jobs_render_at_their_committed_offsets() {
     let BatchActivity::ExternalActivity { offsets, .. } = &mut request.activity else {
         unreachable!();
     };
-    offsets.insert(request.jobs[0].source_id.clone(), -1.0);
-    offsets.insert(request.jobs[1].source_id.clone(), 24.0);
+    offsets.insert(request.outputs[0].pieces[0].source_id.clone(), -1.0);
+    offsets.insert(request.outputs[1].pieces[0].source_id.clone(), 24.0);
     let (service, _, terminal) = service();
     let (executor, entered, resume) = executor(None);
     service
@@ -610,7 +619,10 @@ fn missing_foreign_or_non_finite_offsets_reject_before_reserving_the_renderer() 
         match case {
             0 => offsets.clear(),
             1 => {
-                offsets.insert(request.jobs[0].source_id.clone(), f64::INFINITY);
+                offsets.insert(
+                    request.outputs[0].pieces[0].source_id.clone(),
+                    f64::INFINITY,
+                );
             }
             2 => {
                 offsets.clear();
@@ -657,10 +669,71 @@ fn batch_wire_accepts_frontend_template_and_rejects_redundant_fields() {
     serde_json::from_value::<BatchRenderRequest>(wire.clone()).unwrap();
     for field in ["source", "outputPath", "timing"] {
         let mut malformed = wire.clone();
-        malformed["jobs"][0][field] = json!("legacy echo");
+        malformed["outputs"][0][field] = json!("legacy echo");
+        assert!(serde_json::from_value::<BatchRenderRequest>(malformed).is_err());
+        let mut malformed = wire.clone();
+        malformed["outputs"][0]["pieces"][0][field] = json!("legacy echo");
         assert!(serde_json::from_value::<BatchRenderRequest>(malformed).is_err());
     }
+    let mut legacy = wire.clone();
+    legacy["jobs"] = legacy["outputs"].take();
+    legacy.as_object_mut().unwrap().remove("outputs");
+    assert!(serde_json::from_value::<BatchRenderRequest>(legacy).is_err());
     let mut malformed = wire;
     malformed["activity"]["reference"] = serde_json::Value::Null;
     assert!(serde_json::from_value::<BatchRenderRequest>(malformed).is_err());
+}
+
+#[test]
+fn sources_without_embedded_telemetry_render_rasters_only() {
+    let fixture = Fixture::new();
+    let request = fixture.request(&["2-missing.mp4", "4-telemetry.mp4"], false);
+    let (service, _, terminal) = service();
+    let (executor, entered, resume) = executor(None);
+    service
+        .submit_batch_with_executor(
+            &fixture.paths,
+            &fixture.inspection,
+            request,
+            None,
+            executor.clone(),
+        )
+        .unwrap();
+    for expected in ["2-missing_overlay.mov", "4-telemetry_overlay.mov"] {
+        assert_eq!(entered.recv_timeout(WAIT).unwrap(), expected);
+        resume.send(()).unwrap();
+    }
+    assert_eq!(
+        terminal.recv_timeout(WAIT).unwrap().phase,
+        BatchPhase::Completed
+    );
+    let activities = executor.activities.lock().unwrap().clone();
+    assert_eq!(activities[0], (false, 0));
+    assert!(activities[1].0 && activities[1].1 > 0);
+}
+
+#[test]
+fn a_trimmed_piece_renders_its_window_at_the_activity_second_of_its_first_frame() {
+    let fixture = Fixture::new();
+    let mut request = fixture.request(&["4-ride.mp4"], true);
+    request.outputs[0].pieces[0].start_frame = 30;
+    request.outputs[0].pieces[0].end_frame = 150;
+    let BatchActivity::ExternalActivity { offsets, .. } = &mut request.activity else {
+        unreachable!();
+    };
+    *offsets.values_mut().next().unwrap() = 10.0;
+    let plan = common::builders::batch_video_plan(
+        &fixture.paths,
+        &fixture.inspection,
+        &request.inspection_id.clone(),
+        request,
+    )
+    .unwrap();
+    assert_eq!(plan.config().scene.export_start_seconds, 11.0);
+    let VideoRenderModePlan::Transparent(render) = plan.mode() else {
+        panic!("transparent fixture")
+    };
+    // 4 s at 30 fps decimated by 2.
+    assert_eq!(plan.planned_frames(), 60);
+    assert_eq!(render.coverage.blank_leading_frame_count, 0);
 }

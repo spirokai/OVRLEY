@@ -10,10 +10,12 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, UNIX_EPOCH};
 
 use ovrley_core::error::CoreResult;
-use ovrley_core::media::prepared_video::check_source_freshness;
+use ovrley_core::media::prepared_video::{check_source_freshness, InspectedVideoSource};
 use ovrley_core::media::SourceVideoMetadata;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::contracts::{BatchEncodingSettings, BatchExportMode};
+use ovrley_core::render_jobs::contracts::{
+    BatchEncodingSettings, BatchExportMode, BatchOutputSelection, BatchRenderOutput,
+};
 use ovrley_core::render_jobs::inspection::{
     InspectionSourceSelection, InspectionValidation, ReinspectionReason, SourceMetadataProbe,
     VideoInspectionService,
@@ -49,9 +51,13 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
     let source = service
         .inspect_source(&directory.paths(), &session.inspection_id, &path)
         .unwrap();
-    let mut selection = InspectionSourceSelection {
+    let output = |id: &str, source: &InspectedVideoSource| BatchRenderOutput {
+        id: id.into(),
+        pieces: vec![common::builders::whole_source_piece(source, false)],
+    };
+    let mut selection = BatchOutputSelection {
         inspection_id: session.inspection_id.clone(),
-        source_ids: vec![source.source_id],
+        outputs: vec![output("ride", &source)],
     };
     for (mode, filename, frames, rate) in [
         (
@@ -83,13 +89,53 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
         );
         assert_eq!(fs::read(existing).unwrap(), b"previous completed output");
     }
+    // A piece plans only its own window of the source.
+    selection.outputs[0].pieces[0].start_frame = 60;
+    selection.outputs[0].pieces[0].end_frame = 300;
+    let BatchPlanningResponse::Planned { plans } = plan_batch_configuration(
+        &service,
+        &selection,
+        &encoding(BatchExportMode::Composite),
+        &directory.0,
+    )
+    .unwrap() else {
+        panic!("fresh plan")
+    };
+    assert_eq!(plans[0].output_id, "ride");
+    assert_eq!(plans[0].planned_frames, 240);
+    assert!((plans[0].output_duration_seconds - 240.0 * 1001.0 / 30000.0).abs() < 1e-9);
+    for (start_frame, end_frame) in [(300, 300), (300, 60), (0, 601)] {
+        let mut invalid = selection.clone();
+        invalid.outputs[0].pieces[0].start_frame = start_frame;
+        invalid.outputs[0].pieces[0].end_frame = end_frame;
+        assert!(plan_batch_configuration(
+            &service,
+            &invalid,
+            &encoding(BatchExportMode::Composite),
+            &directory.0
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("must lie within the 600 frames"));
+    }
+    let mut combined = selection.clone();
+    let repeated = combined.outputs[0].pieces[0].clone();
+    combined.outputs[0].pieces.push(repeated);
+    assert!(plan_batch_configuration(
+        &service,
+        &combined,
+        &encoding(BatchExportMode::Composite),
+        &directory.0
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("exactly one piece"));
+    selection.outputs[0] = output("ride", &source);
     let duplicate = directory.source("queue/ride.朝 morning.mov");
-    selection.source_ids.push(
-        service
-            .inspect_source(&directory.paths(), &session.inspection_id, &duplicate)
-            .unwrap()
-            .source_id,
-    );
+    let duplicate = service
+        .inspect_source(&directory.paths(), &session.inspection_id, &duplicate)
+        .unwrap();
+    selection.outputs.push(output("ride-mov", &duplicate));
     let error = plan_batch_configuration(
         &service,
         &selection,
@@ -199,7 +245,8 @@ fn video_plans_sample_the_video_clock_and_show_only_rasters_in_padding() {
             assert!(suppressed.config().backdrops.is_empty());
             let dense = suppressed.prepare_activity(&activity).unwrap();
             let (assets, _, _, _) =
-                prepare_preview_assets(&paths, suppressed.config(), &activity, &dense).unwrap();
+                prepare_preview_assets(&paths, suppressed.config(), Some(&activity), &dense)
+                    .unwrap();
             let frame_size = FrameSize {
                 width: 32,
                 height: 64,
@@ -246,7 +293,7 @@ fn video_plans_sample_the_video_clock_and_show_only_rasters_in_padding() {
         let dense = outside.prepare_activity(&activity).unwrap();
         assert_eq!(dense.frame_count, 0);
         let (assets, _, _, _) =
-            prepare_preview_assets(&paths, outside.config(), &activity, &dense).unwrap();
+            prepare_preview_assets(&paths, outside.config(), Some(&activity), &dense).unwrap();
         let frame_size = FrameSize {
             width: 32,
             height: 64,
@@ -364,10 +411,20 @@ fn accepted_sources_survive_disposal_but_closed_and_foreign_sessions_reject() {
     assert_eq!(accepted.sources()[0].as_ref(), &queued);
     assert_eq!(accepted.sources()[1].as_ref(), &reference);
     check_source_freshness(&accepted.sources()[0]).unwrap();
+    let outputs = BatchOutputSelection {
+        inspection_id: selection.inspection_id.clone(),
+        outputs: [&queued, &reference]
+            .into_iter()
+            .map(|source| BatchRenderOutput {
+                id: source.source_id.clone(),
+                pieces: vec![common::builders::whole_source_piece(source, false)],
+            })
+            .collect(),
+    };
     let response = serde_json::to_value(
         plan_batch_configuration(
             &service,
-            &selection,
+            &outputs,
             &encoding(BatchExportMode::Composite),
             &directory.0,
         )

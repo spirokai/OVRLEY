@@ -64,16 +64,18 @@ impl From<CoreError> for BatchServiceError {
 /// External execution seam for deterministic service tests. Implementations
 /// return only after native work and partial-output cleanup have completed.
 pub trait BatchJobExecutor: Send + Sync {
+    /// The source's embedded telemetry, or None when it has none.
     fn embedded_activity(
         &self,
         paths: &AppPaths,
         source: &InspectedVideoSource,
-    ) -> CoreResult<ParsedActivity>;
+    ) -> CoreResult<Option<ParsedActivity>>;
+    /// Renders a plan; without an activity the plan contains rasters only.
     fn execute(
         &self,
         paths: &AppPaths,
         plan: PlannedVideoRender,
-        activity: &ParsedActivity,
+        activity: Option<&ParsedActivity>,
         session: &RendererReservation,
         target: &RenderOutputTarget,
     ) -> CoreResult<String>;
@@ -86,19 +88,18 @@ impl BatchJobExecutor for NativeBatchExecutor {
         &self,
         paths: &AppPaths,
         source: &InspectedVideoSource,
-    ) -> CoreResult<ParsedActivity> {
-        crate::media::mp4_telemetry::extract_activity(&paths.repo_root, &source.metadata.path)?
-            .map(|response| response.parsed_activity)
-            .ok_or_else(|| {
-                CoreError::Activity(format!("No embedded activity in {}", source.metadata.path))
-            })
+    ) -> CoreResult<Option<ParsedActivity>> {
+        Ok(
+            crate::media::mp4_telemetry::extract_activity(&paths.repo_root, &source.metadata.path)?
+                .map(|response| response.parsed_activity),
+        )
     }
 
     fn execute(
         &self,
         paths: &AppPaths,
         plan: PlannedVideoRender,
-        activity: &ParsedActivity,
+        activity: Option<&ParsedActivity>,
         session: &RendererReservation,
         target: &RenderOutputTarget,
     ) -> CoreResult<String> {
@@ -220,18 +221,22 @@ fn execute_batch_item(
     check_source_freshness(&job.source)?;
     session.check_cancelled()?;
     let embedded;
+    // A source without embedded telemetry renders its rasters only.
     let (activity, end) = match external_activity {
-        Some((activity, end)) => (activity, *end),
+        Some((activity, end)) => (Some(activity), Some(*end)),
         None => {
             embedded = executor.embedded_activity(paths, &job.source)?;
             session.check_cancelled()?;
-            let end = validate_render_activity(&embedded)?;
-            (&embedded, end)
+            match &embedded {
+                Some(activity) => (Some(activity), Some(validate_render_activity(activity)?)),
+                None => (None, None),
+            }
         }
     };
     let plan = plan_batch_item(
         template,
         &job.source,
+        job.output.window,
         job.offset,
         job.skip_overlay,
         end,

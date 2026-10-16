@@ -3,6 +3,7 @@ import { parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/
 import { getTimelineMinimum, getTotalPlaybackDuration } from '@/features/player/utils/playerTiming'
 import { createCachedPromise } from '@/lib/cached-promise'
 import { clamp } from '@/lib/utils'
+import { frameCountForDuration } from '@/lib/video-program/frame-grid'
 import { DEFAULT_TRANSITION_SETTINGS, NO_TRANSITION, XFADE_TRANSITIONS } from '@/lib/video-program/transition-catalog'
 import { getVideosTimelineBounds, joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import { placeVideosByCreationTime, resolveVideosSync } from '@/lib/video-sync'
@@ -89,10 +90,8 @@ export function createImportedVideo(metadata, { importOrder, preview, telemetry 
 
   const divisor = greatestCommonDivisor(metadata.fpsNum, metadata.fpsDen)
   const fps = { num: metadata.fpsNum / divisor, den: metadata.fpsDen / divisor }
-  const frameCount = Math.round((metadata.duration * fps.num) / fps.den)
-  if (frameCount < 1) {
-    throw new Error('Imported video must contain at least one frame')
-  }
+  // A positive duration always has at least one frame.
+  const frameCount = frameCountForDuration(metadata.duration, fps)
 
   return {
     id,

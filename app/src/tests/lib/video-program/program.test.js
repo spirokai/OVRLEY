@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { buildProgram, findInvalidTransitions, resolveProgramPosition } from '@/lib/video-program/program'
+import { buildProgram, collectVideoPieces, findInvalidTransitions, resolveProgramPosition } from '@/lib/video-program/program'
 import { DEFAULT_TRANSITION_SETTINGS, HARD_CUT } from '@/lib/video-program/transition-catalog'
 
 const FPS = { num: 30, den: 1 }
@@ -249,5 +249,28 @@ describe('resolveProgramPosition', () => {
 
   test('an empty program has nothing to show', () => {
     expect(resolveProgramPosition(program([]), 0)).toEqual({ kind: 'empty' })
+  })
+})
+
+describe('collectVideoPieces for separate-file export', () => {
+  test('keeps each video whole across overlaps, splits at deleted parts, and applies the export range', () => {
+    const videos = [
+      video('a', { durationSeconds: 60, deletedParts: [{ id: 'cut', fromSecond: 10, toSecond: 20, transition: null }] }),
+      video('b', { offsetSeconds: 50, durationSeconds: 30, importOrder: 1 }),
+      video('c', { offsetSeconds: 200, durationSeconds: 10, importOrder: 2 }),
+    ]
+    const spans = (pieces) => pieces.map(({ sourceStartFrame, sourceEndFrame }) => [sourceStartFrame, sourceEndFrame])
+
+    const all = collectVideoPieces({ videos, exportRange: ALL })
+    expect(spans(all.get('a'))).toEqual([
+      [0, 300],
+      [600, 1800],
+    ])
+    expect(spans(all.get('b'))).toEqual([[0, 900]])
+
+    const ranged = collectVideoPieces({ videos, exportRange: { type: 'custom', from: 15, to: 70 } })
+    expect(spans(ranged.get('a'))).toEqual([[600, 1800]])
+    expect(spans(ranged.get('b'))).toEqual([[0, 600]])
+    expect(ranged.has('c')).toBe(false)
   })
 })

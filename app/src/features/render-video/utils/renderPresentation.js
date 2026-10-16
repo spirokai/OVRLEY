@@ -137,21 +137,25 @@ function formatCreationLabels(clip, sync, locale) {
  * Reviews every imported video for separate-file export. A video renders at its
  * committed timeline offset; frames outside the activity show raster widgets only.
  * @param {object[]} clips Timeline clips in timeline order.
+ * @param {Map<string, Array<object>>} piecesByVideo Program pieces of each video after the export range.
  * @param {Object<string, boolean>} skipOverlay Video IDs that render without activity widgets.
  * @param {object|null} inspection Current native descriptors keyed by path.
  * @param {object} sync Activity summary and display timezone mode.
  * @param {string} locale Display language.
  * @returns {object[]} Reviewed rows keyed by video ID.
  */
-export function reviewBatchQueue(clips, skipOverlay, inspection, sync, locale) {
+export function reviewBatchQueue(clips, piecesByVideo, skipOverlay, inspection, sync, locale) {
   return clips.map((clip) => {
     const item = {
       id: clip.id,
       path: clip.path,
       filename: clip.path.split(/[/\\]/).at(-1),
       offsetSeconds: clip.offsetSeconds,
+      pieces: piecesByVideo.get(clip.id) ?? [],
       skipOverlay: skipOverlay[clip.id] === true,
     }
+    if (item.pieces.length === 0)
+      return { ...item, status: 'blocked', error: i18next.getFixedT(locale)('render-video.outsideExportRange', 'Outside the export range') }
     if (inspection?.error && inspection.error.message !== 'reinspectionRequired')
       return { ...item, status: 'blocked', error: formatRenderPathError(inspection.error, i18next.getFixedT(locale)) }
     const result = inspection?.sources.get(clip.path)

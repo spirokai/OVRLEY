@@ -59,6 +59,17 @@ impl ActivityCoverage {
         })
     }
 
+    /// A video rendered without any activity: no frame is covered. The window is
+    /// the video's own span; nothing samples it.
+    pub fn without_activity(duration: f64, total_frames: u64) -> Self {
+        Self {
+            start: 0.0,
+            end: duration,
+            blank_leading_frame_count: total_frames,
+            frame_count: 0,
+        }
+    }
+
     /// Scene-relative timestamps retain the fractional phase of the source
     /// clock: the first covered frame need not fall at activity time zero.
     pub fn frame_timeline(&self, fps: Fps, offset: f64) -> Vec<f64> {

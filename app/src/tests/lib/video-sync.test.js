@@ -120,15 +120,15 @@ describe('signed automatic synchronization and shared calibration', () => {
     }
     const settings = { exportMode: 'composite', codec: 'libx264', fps: 30, widgetUpdateRate: 1, qualityType: 'quality', qualityValue: 20 }
     const jobs = [
-      { path: first.metadata.path, source: first, offsetSeconds: -9, skipOverlay: false },
-      { path: second.metadata.path, source: second, offsetSeconds: 43, skipOverlay: true },
+      { path: first.metadata.path, source: first, offsetSeconds: -9, skipOverlay: false, pieces: [{ sourceStartFrame: 0, sourceEndFrame: 600 }] },
+      { path: second.metadata.path, source: second, offsetSeconds: 43, skipOverlay: true, pieces: [{ sourceStartFrame: 30, sourceEndFrame: 300 }] },
     ]
     const request = createBatchRenderRequest({ editorSnapshot, settings, inspectionId: 'inspection', outputDirectory: 'C:/output', jobs })
 
     expect(request.activity).toEqual({ mode: 'externalActivity', activity: editorSnapshot.parsedActivity, offsets: { first: -9, second: 43 } })
-    expect(request.jobs).toEqual([
-      { id: 'C:/recordings/first.mp4', sourceId: 'first', skipOverlay: false },
-      { id: 'C:/recordings/second.mp4', sourceId: 'second', skipOverlay: true },
+    expect(request.outputs).toEqual([
+      { id: 'C:/recordings/first.mp4', pieces: [{ sourceId: 'first', startFrame: 0, endFrame: 600, skipOverlay: false }] },
+      { id: 'C:/recordings/second.mp4', pieces: [{ sourceId: 'second', startFrame: 30, endFrame: 300, skipOverlay: true }] },
     ])
     expect(Object.isFrozen(request.activity.offsets)).toBe(true)
     expect(captureBatchSync(editorSnapshot)).toEqual({ activitySummary: summary, timezoneMode: 'utc' })

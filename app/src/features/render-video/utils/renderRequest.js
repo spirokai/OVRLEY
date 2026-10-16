@@ -78,6 +78,25 @@ export function captureBatchSync(editorSnapshot) {
 }
 
 /**
+ * Builds the native outputs of reviewed batch rows: one output per video holding
+ * its program pieces (source frame ranges after the export range).
+ * @param {Array<{path: string, source: {sourceId: string}, pieces: Array<object>, skipOverlay: boolean}>} jobs Reviewed rows.
+ * @returns {Array<{id: string, pieces: Array<{sourceId: string, startFrame: number, endFrame: number, skipOverlay: boolean}>}>} Native outputs.
+ */
+export function createBatchOutputs(jobs) {
+  // Output IDs are the source paths, which are unique in the collection.
+  return jobs.map(({ path, source, pieces, skipOverlay }) => ({
+    id: path,
+    pieces: pieces.map((piece) => ({
+      sourceId: source.sourceId,
+      startFrame: piece.sourceStartFrame,
+      endFrame: piece.sourceEndFrame,
+      skipOverlay,
+    })),
+  }))
+}
+
+/**
  * Builds the native separate-file export of every reviewed video. With an external
  * activity each video renders at its committed offset; without one each video
  * uses its own embedded telemetry.
@@ -100,8 +119,7 @@ export function createBatchRenderRequest({ editorSnapshot, settings, inspectionI
       encoding: captureRenderEncoding(settings, editorSnapshot.availableCodecs),
       activity,
       outputDirectory,
-      // Job IDs are the source paths, which are unique in the collection.
-      jobs: jobs.map(({ path, source, skipOverlay }) => ({ id: path, sourceId: source.sourceId, skipOverlay })),
+      outputs: createBatchOutputs(jobs),
     }),
   )
 }

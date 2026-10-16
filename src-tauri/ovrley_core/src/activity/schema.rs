@@ -604,7 +604,7 @@ pub struct DebugPayload {
 /// Every non-empty vector in this report is aligned to `frame_elapsed_seconds`.
 /// Empty vectors mean the corresponding series was not required by the active
 /// template and should be skipped by render code.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct DenseActivityReport {
     /// Numeric metric bounds from the entire source activity, before trimming.
     pub full_activity_metric_ranges: std::collections::HashMap<MetricKind, (f64, f64)>,
@@ -623,7 +623,7 @@ pub struct DenseActivityReport {
 }
 
 /// Densified telemetry series aligned with a [`DenseActivityReport`].
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct DenseSeriesReport {
     /// Speed in meters per second.
     pub speed: Vec<Option<f64>>,
@@ -724,6 +724,14 @@ pub struct DenseSeriesReport {
     /// Completed-lap metadata retained from the full activity through scene trim.
     pub lap_durations_seconds: Vec<f64>,
     pub lap_durations_best_so_far_seconds: Vec<f64>,
+}
+
+impl DenseActivityReport {
+    /// The report of a render without any activity: no frame samples activity data,
+    /// so every frame shows rasters only.
+    pub fn without_activity() -> Self {
+        Self::default()
+    }
 }
 
 impl DenseSeriesReport {

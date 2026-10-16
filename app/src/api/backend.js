@@ -583,10 +583,11 @@ export async function inspectVideoSource(inspectionId, path) {
 /**
  * Plans native batch destinations and frame totals for fresh inspected sources.
  * Coverage for embedded telemetry is finalized during owning-job preparation.
- * @param {{inspectionId: string, sourceIds: string[]}} selection Session-owned source identities.
+ * @param {{inspectionId: string, outputs: Array<{id: string, pieces: Array<{sourceId: string, startFrame: number, endFrame: number, skipOverlay: boolean}>}>}} selection
+ *   Session-owned outputs to plan.
  * @param {{exportMode: string, exportCodec: string, fps: number, updateRate: number, qualityType: string, qualityValue: number, qsvFullInitArgs: string[]|null}} encoding Captured encoder settings.
  * @param {string} outputDirectory Absolute output folder.
- * @returns {Promise<{status: 'planned', plans: Array<{sourceId: string, outputPath: string, outputDurationSeconds: number, plannedFrames: number, containerFpsNum: number, containerFpsDen: number}>}|{status: 'rejected', inspectionId: string, issues: object[]}>} Native planning result.
+ * @returns {Promise<{status: 'planned', plans: Array<{outputId: string, outputPath: string, outputDurationSeconds: number, plannedFrames: number, containerFpsNum: number, containerFpsDen: number}>}|{status: 'rejected', inspectionId: string, issues: object[]}>} Native planning result.
  */
 export async function planBatchOutputs(selection, encoding, outputDirectory) {
   return apiCall('backend_plan_batch_outputs', { selection, encoding, outputDirectory })

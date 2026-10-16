@@ -220,7 +220,7 @@ pub fn render_skia_preview(
         out_path.display()
     );
     let (prepared, label_cache_status, prepare_timings, extra_total_ms) =
-        prepare_preview_assets(paths, config, activity, dense_activity)
+        prepare_preview_assets(paths, config, Some(activity), dense_activity)
             .context("prepare_preview_assets failed")?;
     render_preview_with_prepared_assets(PreviewRenderRequest {
         paths,

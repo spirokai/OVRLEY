@@ -12,6 +12,25 @@ export function secondsToFrames(seconds, fps) {
   return Math.round((seconds * fps.num) / fps.den)
 }
 
+// Matches `Fps::frame_count_for_duration` in ovrley_core: a fractional frame within
+// 1/10,000 of a frame of the boundary is snapped down, any larger remainder adds a frame.
+const FRAME_BOUNDARY_TOLERANCE = 1 / 10_000
+
+/**
+ * Counts the frames of a source duration with the native renderer's rule, so frame
+ * indices of the program and the export agree.
+ * @param {number} durationSeconds Source duration.
+ * @param {{num: number, den: number}} fps Exact frame rate.
+ * @returns {number} Frame count.
+ */
+export function frameCountForDuration(durationSeconds, fps) {
+  const frames = (durationSeconds * fps.num) / fps.den
+  const whole = Math.floor(frames)
+  const remainder = frames - whole
+  if (remainder === 0 || (whole > 0 && remainder <= FRAME_BOUNDARY_TOLERANCE)) return whole
+  return whole + 1
+}
+
 /**
  * Converts a frame index to seconds on an exact rational frame grid.
  * @param {number} frames Frame index or frame count.
