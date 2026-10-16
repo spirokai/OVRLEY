@@ -12,6 +12,12 @@
   display: none !important;
 }
 
+/* Keep screen coordinates while sharing the shell's stacking context with dialogs. */
+.ovrley-selection-border {
+  transform: scale(calc(1 / var(--app-scale)));
+  transform-origin: top left;
+}
+
 /* control box points */
 .moveable-control {
   height: calc(10px / var(--app-scale, 1)) !important;

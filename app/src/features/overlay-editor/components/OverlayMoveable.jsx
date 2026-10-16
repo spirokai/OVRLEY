@@ -97,7 +97,7 @@ function SelectionBorder({ container, borders }) {
     <svg
       aria-hidden="true"
       className="ovrley-moveable ovrley-selection-border"
-      style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1, clipPath: border.clipPath }}
+      style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 1, clipPath: border.clipPath }}
     >
       <g fill="none" stroke="var(--theme-color-accent)" strokeWidth={border.strokeWidth}>
         {border.polygons.map((points, index) => (
@@ -105,6 +105,6 @@ function SelectionBorder({ container, borders }) {
         ))}
       </g>
     </svg>,
-    document.body,
+    container.closest('.app-shell'),
   )
 }
