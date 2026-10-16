@@ -158,6 +158,26 @@ describe('useVideoImport multi-file import', () => {
     expect(result.current.importDialogs.report.report.failures).toHaveLength(1)
   })
 
+  test('removes one clip, releases its preview registration, and clears the background after the last clip', async () => {
+    probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:00Z' })
+    probe('/clips/b.mp4', { creationTime: '2026-07-18T08:05:00Z' })
+    const { result, onSetBackgroundMode } = renderImport()
+    await importPaths(result, ['/clips/a.mp4', '/clips/b.mp4'])
+    const [first, second] = useStore.getState().importedVideos
+
+    await act(() => result.current.removeVideo(first.id))
+    expect(importedPaths()).toEqual(['/clips/b.mp4'])
+    expect(boundaries.removePreviewVideo).toHaveBeenCalledExactlyOnceWith('import:/clips/a.mp4')
+    expect(onSetBackgroundMode).not.toHaveBeenCalledWith('checker')
+
+    await act(() => result.current.removeVideo(second.id))
+    expect(importedPaths()).toEqual([])
+    expect(onSetBackgroundMode).toHaveBeenLastCalledWith('checker')
+
+    await act(() => result.current.removeVideo(second.id))
+    expect(useStore.getState().errorMessage).toBe(`Removing the video failed: Unknown imported video: ${second.id}`)
+  })
+
   test('imports several dropped native paths and rejects browser files without a path', async () => {
     probe('/clips/a.mp4')
     probe('/clips/b.mp4')

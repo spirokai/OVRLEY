@@ -7,7 +7,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { hasOpenOverlay, isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatClockDuration } from '@/lib/time-format'
 import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
-import { useVideoTimeline } from '@/hooks/useVideoTimeline'
+import { useVideoTimeline, useVideoWarnings } from '@/hooks/useVideoTimeline'
 import useStore from '@/store/useStore'
 import { snapTimelineSecondToFrame } from '../utils/playerTiming'
 import { roundToDevicePixel, secondsToViewPx } from '../utils/timelineGeometry'
@@ -37,9 +37,10 @@ function getMarkerClassName(marker) {
  * @param {{ activeKeyboardWorkspace: string, backgroundMode: string, videoSyncMode?: boolean }} options Overlay player inputs.
  * @param {string} options.activeKeyboardWorkspace Active keyboard command workspace.
  * @param {string} options.backgroundMode Active preview background mode.
+ * @param {function} [options.onRemoveVideo] Removes a video clip by video ID.
  * @returns {object} Presentational view model for the overlay player.
  */
-export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMode, videoSyncMode = false }) {
+export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMode, onRemoveVideo, videoSyncMode = false }) {
   // Store selector - gathers the entire player-facing store contract in one subscription.
   const playerStore = useStore(
     useShallow((state) => ({
@@ -71,6 +72,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     })),
   )
   const timeline = useVideoTimeline()
+  const videoWarnings = useVideoWarnings()
   const displayedTimeline = timeline.displayed
   const videoIdentity = useMemo(() => timeline.clips.map((clip) => `${clip.id}:${clip.durationSeconds}`).join('|'), [timeline.clips])
 
@@ -322,8 +324,11 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     getLaneDragProps,
     hasActivity: hasActivityData && playback.hasActivity,
     nudgeClip,
+    onRemoveVideo,
+    overlaps: displayedTimeline.program.overlaps,
     selectedClipId,
     setSelectedClipId,
+    warnings: videoWarnings,
     viewEnd: viewport.viewport.viewEnd,
     viewStart: viewport.viewport.viewStart,
     widthPx: viewport.widthPx,

@@ -333,6 +333,31 @@ export const createVideoImportSlice = (set, get) => ({
     })
   },
 
+  /**
+   * Removes one clip with its edits. Clips anchored to it inherit its anchor (or
+   * keep their position when it had none), manual sync moves to the first
+   * remaining clip when it targeted the removed one, and the playhead stays on
+   * the timeline. Compatibility, overlaps, and joins are derived and follow.
+   */
+  removeImportedVideo: (videoId) => {
+    const state = get()
+    requireVideo(state, videoId)
+    const removedAnchor = state.videoEdits[videoId].placementAnchor
+    set((draft) => {
+      draft.importedVideos = draft.importedVideos.filter((video) => video.id !== videoId)
+      delete draft.videoEdits[videoId]
+      for (const edits of Object.values(draft.videoEdits)) {
+        if (edits.placementAnchor?.videoId === videoId) edits.placementAnchor = removedAnchor === null ? null : { ...removedAnchor }
+      }
+      draft.videoDragPreview = null
+      clampPlayheadToVideos(draft, 0)
+    })
+    if (get().manualVideoSync.videoId === videoId) {
+      const [first] = sortVideosByTimeline(joinVideoEdits(get().importedVideos, get().videoEdits))
+      get().selectVideoSyncVideo(first?.id ?? null)
+    }
+  },
+
   /** Stores the project transition defaults chosen by the user and marks the defaults dialog as shown. */
   setTransitionDefaults: (defaults) => {
     requireTransitionDefaults(defaults)

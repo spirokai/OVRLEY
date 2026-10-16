@@ -9,43 +9,51 @@ function createClips(videos, offsets) {
   return joinVideoEdits(importedVideos, videoEdits)
 }
 
-function renderClips(overrides = {}) {
-  return renderHook((props) => useTimelineClips(props), {
-    initialProps: {
-      activityFilename: 'ride.fit',
-      activitySummary: {
-        availableMetrics: [
-          { attribute: 'gps_coordinates', source: 'direct' },
-          { attribute: 'barometric_altitude', source: 'direct' },
-        ],
-        durationSeconds: 100,
-        fileFormat: 'fit',
-        fileName: 'activity.fit',
-      },
-      exportHighlightRange: { fromSecond: 10, toSecond: 20 },
-      clips: createClips([createTestVideo({ path: 'C:\\clips\\ride.mp4', durationSeconds: 20 })], { 'video-1': 5 }),
-      getLaneDragProps: () => ({}),
-      hasActivity: true,
-      viewEnd: 100,
-      viewStart: 0,
-      widthPx: 500,
-      ...overrides,
+function renderClipsProps(overrides = {}) {
+  return {
+    activityFilename: 'ride.fit',
+    activitySummary: {
+      availableMetrics: [
+        { attribute: 'gps_coordinates', source: 'direct' },
+        { attribute: 'barometric_altitude', source: 'direct' },
+      ],
+      durationSeconds: 100,
+      fileFormat: 'fit',
+      fileName: 'activity.fit',
     },
-  })
+    exportHighlightRange: { fromSecond: 10, toSecond: 20 },
+    clips: createClips([createTestVideo({ path: 'C:\\clips\\ride.mp4', durationSeconds: 20 })], { 'video-1': 5 }),
+    getLaneDragProps: () => ({}),
+    hasActivity: true,
+    viewEnd: 100,
+    viewStart: 0,
+    widthPx: 500,
+    ...overrides,
+  }
+}
+
+function renderClips(overrides = {}) {
+  return renderHook((props) => useTimelineClips(props), { initialProps: renderClipsProps(overrides) })
+}
+
+function clipModel(result, clipId) {
+  return result.current.flatMap((lane) => lane.clips).find((clip) => clip.id === clipId)
 }
 
 describe('useTimelineClips', () => {
-  test('builds video and activity lane models from canonical second fields', () => {
+  test('builds the video lane and the activity lane from canonical second fields', () => {
     const { result } = renderClips()
 
-    expect(result.current.map((lane) => lane.id)).toEqual(['video:video-1', 'activity'])
-    expect(result.current[0]).toMatchObject({
+    expect(result.current.map((lane) => lane.id)).toEqual(['video', 'activity'])
+    expect(result.current.map((lane) => lane.clips.map((clip) => clip.id))).toEqual([['video:video-1'], ['activity']])
+    expect(clipModel(result, 'video:video-1')).toMatchObject({
       durationLabel: '00:20',
       durationSeconds: 20,
       label: 'ride.mp4',
       startSecond: 5,
+      warnings: [],
     })
-    expect(result.current[1]).toMatchObject({
+    expect(clipModel(result, 'activity')).toMatchObject({
       durationLabel: '01:40',
       durationSeconds: 100,
       formatLabel: 'FIT',
@@ -57,31 +65,32 @@ describe('useTimelineClips', () => {
 
   test('computes clip visibility, text visibility, and export highlight styles', () => {
     const { result } = renderClips()
+    const clip = clipModel(result, 'video:video-1')
 
-    expect(result.current[0].isVisible).toBe(true)
-    expect(result.current[0].showText).toBe(true)
-    expect(result.current[0].highlightStyle).toEqual({
+    expect(clip.isVisible).toBe(true)
+    expect(clip.showText).toBe(true)
+    expect(clip.highlightStyle).toEqual({
       left: '25%',
       width: '50%',
     })
   })
 
-  test('owns tooltip state and exposes hover handlers in the lane model', () => {
+  test('owns tooltip state and exposes hover handlers in the clip model', () => {
     const { result } = renderClips()
 
-    expect(result.current[0].tooltip.isVisible).toBe(false)
+    expect(clipModel(result, 'video:video-1').tooltip.isVisible).toBe(false)
 
     act(() => {
-      result.current[0].clipProps.onMouseEnter()
+      clipModel(result, 'video:video-1').clipProps.onMouseEnter()
     })
 
-    expect(result.current[0].tooltip.isVisible).toBe(true)
+    expect(clipModel(result, 'video:video-1').tooltip.isVisible).toBe(true)
 
     act(() => {
-      result.current[0].clipProps.onMouseLeave()
+      clipModel(result, 'video:video-1').clipProps.onMouseLeave()
     })
 
-    expect(result.current[0].tooltip.isVisible).toBe(false)
+    expect(clipModel(result, 'video:video-1').tooltip.isVisible).toBe(false)
   })
 
   test('nudges a selected clip by one second with Shift+Arrow', () => {
@@ -102,15 +111,30 @@ describe('useTimelineClips', () => {
     }
 
     act(() => {
-      result.current[0].clipProps.onKeyDown(event)
-      result.current[0].clipProps.onKeyUp(event)
+      clipModel(result, 'video:video-1').clipProps.onKeyDown(event)
+      clipModel(result, 'video:video-1').clipProps.onKeyUp(event)
     })
 
     expect(nudgeClip).toHaveBeenCalledWith('video:video-1', 1)
     expect(commitClipNudge).toHaveBeenCalledOnce()
   })
 
-  test('builds one lane per clip in timeline order before the activity lane', () => {
+  test('removes the selected video clip with Delete or Backspace but never the activity', () => {
+    const onRemoveVideo = vi.fn()
+    const keyEvent = (key) => ({ defaultPrevented: false, key, preventDefault: vi.fn(), stopPropagation: vi.fn() })
+    const { result, rerender } = renderClips({ onRemoveVideo, selectedClipId: 'video:video-1', setSelectedClipId: vi.fn() })
+
+    act(() => clipModel(result, 'video:video-1').clipProps.onKeyDown(keyEvent('Delete')))
+    act(() => clipModel(result, 'video:video-1').clipProps.onKeyDown(keyEvent('Backspace')))
+    expect(onRemoveVideo.mock.calls).toEqual([['video-1'], ['video-1']])
+    expect(clipModel(result, 'video:video-1').clipProps['aria-keyshortcuts']).toContain('Delete Backspace')
+
+    rerender(renderClipsProps({ onRemoveVideo, selectedClipId: 'activity', setSelectedClipId: vi.fn() }))
+    act(() => clipModel(result, 'activity').clipProps.onKeyDown(keyEvent('Delete')))
+    expect(onRemoveVideo).toHaveBeenCalledTimes(2)
+  })
+
+  test('puts every clip on the video lane in timeline order before the activity lane', () => {
     const getLaneDragProps = vi.fn(() => ({}))
     const clips = createClips(
       [
@@ -121,13 +145,31 @@ describe('useTimelineClips', () => {
     )
     const { result } = renderClips({ clips, getLaneDragProps })
 
-    expect(result.current.map((lane) => lane.id)).toEqual(['video:early', 'video:late', 'activity'])
-    expect(result.current[0]).toMatchObject({ isVideo: true, label: 'early.mp4', startSecond: -5, durationSeconds: 30 })
-    expect(result.current[1]).toMatchObject({ isVideo: true, label: 'late.mp4', startSecond: 40, durationSeconds: 10 })
-    expect(getLaneDragProps.mock.calls.map(([laneId]) => laneId)).toEqual(['video:early', 'video:late', 'activity'])
+    expect(result.current.map((lane) => lane.clips.map((clip) => clip.id))).toEqual([['video:early', 'video:late'], ['activity']])
+    expect(clipModel(result, 'video:early')).toMatchObject({ isVideo: true, label: 'early.mp4', startSecond: -5, durationSeconds: 30 })
+    expect(clipModel(result, 'video:late')).toMatchObject({ isVideo: true, label: 'late.mp4', startSecond: 40, durationSeconds: 10 })
+    expect(getLaneDragProps.mock.calls.map(([clipId]) => clipId)).toEqual(['video:early', 'video:late', 'activity'])
   })
 
-  test('selects the pressed clip lane by its lane id', () => {
+  test('marks overlaps with bands on the video lane and lists clip warnings', () => {
+    const clips = createClips(
+      [createTestVideo({ id: 'a', path: '/videos/a.mp4', durationSeconds: 30 }), createTestVideo({ id: 'b', path: '/videos/b.mp4', importOrder: 1 })],
+      { a: 0, b: 20 },
+    )
+    const warnings = new Map([
+      ['a', [{ kind: 'overlap', message: 'Overlaps b.mp4' }]],
+      ['b', []],
+    ])
+    const { result } = renderClips({ clips, overlaps: [{ startSecond: 20, endSecond: 30 }], warnings })
+
+    expect(result.current[0].conflictBands).toEqual([{ key: '20:30', style: { left: '20%', width: '10%' } }])
+    expect(result.current[1].conflictBands).toEqual([])
+    expect(clipModel(result, 'video:a')).toMatchObject({ warnings: ['Overlaps b.mp4'] })
+    expect(clipModel(result, 'video:a').clipClassName).toContain('outline-destructive')
+    expect(clipModel(result, 'video:b').clipClassName).not.toContain('outline-destructive')
+  })
+
+  test('selects the pressed clip by its clip id', () => {
     const setSelectedClipId = vi.fn()
     const onPointerDown = vi.fn()
     const clips = createClips(
@@ -138,7 +180,7 @@ describe('useTimelineClips', () => {
     const event = { button: 0, currentTarget: { focus: vi.fn() } }
 
     act(() => {
-      result.current[1].clipProps.onPointerDown(event)
+      clipModel(result, 'video:second').clipProps.onPointerDown(event)
     })
 
     expect(setSelectedClipId).toHaveBeenCalledWith('video:second')
@@ -148,6 +190,6 @@ describe('useTimelineClips', () => {
   test('omits the activity lane without external activity', () => {
     const { result } = renderClips({ activitySummary: null, hasActivity: false })
 
-    expect(result.current.map((lane) => lane.id)).toEqual(['video:video-1'])
+    expect(result.current.map((lane) => lane.id)).toEqual(['video'])
   })
 })

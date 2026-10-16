@@ -120,6 +120,7 @@ function AppShell() {
           videoSummaries={videoControls.videoSummaries}
           onBrowseVideo={videoControls.handleImportVideo}
           onDeleteVideo={videoControls.clearImportedVideos}
+          onRemoveVideo={videoControls.removeVideo}
           onDropVideoFiles={videoControls.handleVideoFilesDrop}
           videoSync={videoSync}
         />
@@ -233,6 +234,7 @@ function AppShell() {
                 activeKeyboardWorkspace={editorShell.activeKeyboardWorkspace}
                 backgroundMode={editorShell.editorBackgroundMode}
                 onActivateKeyboardWorkspace={() => editorShell.setActiveKeyboardWorkspace('player')}
+                onRemoveVideo={videoControls.removeVideo}
                 videoSyncMode={videoSyncWorkspace.videoSyncMode}
               />
             </>

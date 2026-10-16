@@ -7,6 +7,7 @@ import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { resolveActivityClipId, resolveActivityContext, resolveAvailableMetrics } from '@/lib/activity/activity-context'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
+import { deriveVideoWarnings } from '@/lib/video-program/video-warnings'
 
 /**
  * Returns the committed clips, their timeline program, and covered interval, plus
@@ -34,6 +35,15 @@ export function useVideoTimeline() {
     [committed, importedVideos, transitionDefaults, videoDragPreview, videoEdits],
   )
   return useMemo(() => ({ ...committed, displayed }), [committed, displayed])
+}
+
+/**
+ * Returns the warnings of every committed clip (see `deriveVideoWarnings`).
+ * @returns {Map<string, Array<{kind: string, message: string}>>} Warnings keyed by video ID.
+ */
+export function useVideoWarnings() {
+  const { clips, program } = useVideoTimeline()
+  return useMemo(() => deriveVideoWarnings(clips, program), [clips, program])
 }
 
 /**

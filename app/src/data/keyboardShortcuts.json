@@ -418,6 +418,16 @@
               "descriptionKey": "keyboard-shortcuts.timelineClipNudgeSecond"
             }
           ]
+        },
+        {
+          "id": "timelineClip.remove",
+          "display": true,
+          "scope": "timeline-clip",
+          "descriptionKey": "keyboard-shortcuts.timelineClipRemove",
+          "bindings": [
+            { "key": "delete", "modifiers": [] },
+            { "key": "backspace", "modifiers": [] }
+          ]
         }
       ]
     }

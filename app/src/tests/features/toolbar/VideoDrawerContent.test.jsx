@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 vi.mock('@/features/toolbar/hooks/useFileDropZone', () => ({
   useFileDropZone: () => ({
@@ -12,6 +12,8 @@ vi.mock('@/features/toolbar/hooks/useFileDropZone', () => ({
 }))
 
 import { VideoDrawerContent } from '@/features/toolbar'
+import useStore from '@/store/useStore'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 const videoSummary = {
   id: 'video-1',
@@ -27,6 +29,8 @@ const videoSummary = {
   bitRate: 50_000_000,
   cameraType: null,
   cameraModel: 'GoPro Hero 12',
+  offsetSeconds: 0,
+  telemetryStatus: 'ready',
 }
 
 const videoSync = {
@@ -48,6 +52,10 @@ const videoSync = {
 }
 
 describe('VideoDrawerContent', () => {
+  beforeEach(() => {
+    useStore.setState(useStore.getInitialState(), true)
+  })
+
   test('offers browse and drop import controls', () => {
     const onBrowseVideo = vi.fn()
     render(
@@ -84,9 +92,10 @@ describe('VideoDrawerContent', () => {
     expect(screen.getByText('59.94 fps')).toBeInTheDocument()
     expect(screen.getByText('1920×1080')).toBeInTheDocument()
     expect(screen.getByText('GoPro Hero 12')).toBeInTheDocument()
+    expect(screen.getByText('Available')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Sync Doctor' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete video' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove all videos' }))
     expect(onDeleteVideo).toHaveBeenCalledOnce()
   })
 
@@ -125,5 +134,46 @@ describe('VideoDrawerContent', () => {
     expect(screen.getByText('30 fps')).toBeInTheDocument()
     expect(screen.getAllByText('Details')).toHaveLength(2)
     expect(screen.getAllByRole('heading', { name: 'Sync Doctor' })).toHaveLength(1)
+  })
+
+  test('each row removes its own video, edits its own offset, and lists its warnings', () => {
+    const ride = createTestVideo({ id: 'video-1', path: '/videos/ride.mp4', durationSeconds: 60 })
+    const climb = createTestVideo({ id: 'video-2', path: '/videos/climb.mp4', durationSeconds: 60, width: 3840, height: 2160, importOrder: 1 })
+    const third = createTestVideo({ id: 'video-3', path: '/videos/third.mp4', durationSeconds: 60, importOrder: 2 })
+    useStore.setState(videoStoreState([ride, climb, third], { 'video-1': 0, 'video-2': 100, 'video-3': 50 }))
+    const onRemoveVideo = vi.fn()
+    const summaries = [
+      videoSummary,
+      { ...videoSummary, id: 'video-3', path: '/videos/third.mp4', filename: 'third.mp4', offsetSeconds: 50 },
+      { ...videoSummary, id: 'video-2', path: '/videos/climb.mp4', filename: 'climb.mp4', offsetSeconds: 100, telemetryStatus: 'pending' },
+    ]
+    render(
+      <VideoDrawerContent
+        videoSummaries={summaries}
+        onBrowseVideo={vi.fn()}
+        onDeleteVideo={vi.fn()}
+        onRemoveVideo={onRemoveVideo}
+        onDropVideoFiles={vi.fn()}
+        videoSync={videoSync}
+      />,
+    )
+
+    const climbRow = screen.getByRole('region', { name: 'climb.mp4' })
+    expect(climbRow).toHaveTextContent('Different resolution or frame rate than the other videos')
+    expect(climbRow).toHaveTextContent('Reading…')
+    expect(screen.getByRole('region', { name: 'ride.mp4' })).toHaveTextContent('Overlaps third.mp4')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove climb.mp4' }))
+    expect(onRemoveVideo).toHaveBeenCalledExactlyOnceWith('video-2')
+
+    const [, thirdOffset] = screen.getAllByLabelText('Start on timeline')
+    expect(thirdOffset).toHaveValue('50')
+    fireEvent.change(thirdOffset, { target: { value: '1:10.5' } })
+    fireEvent.blur(thirdOffset)
+    expect(useStore.getState().videoEdits).toMatchObject({
+      'video-1': { offsetSeconds: 0 },
+      'video-2': { offsetSeconds: 100 },
+      'video-3': { offsetSeconds: 70.5 },
+    })
   })
 })

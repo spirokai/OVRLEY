@@ -14,11 +14,7 @@ import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
 import { parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import useStore from '@/store/useStore'
-
-function formatOffsetInput(seconds) {
-  const rounded = Math.round(seconds * 10) / 10
-  return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1)
-}
+import { formatOffsetInput } from '../utils/videoDrawerUtils'
 
 /**
  * Provides state and callbacks for the video sync offset controls.

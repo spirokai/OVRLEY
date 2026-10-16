@@ -59,8 +59,12 @@ function createTwoClipStore() {
   })
 }
 
-function findLane(result, laneId) {
-  return result.current.timeline.lanes.find((lane) => lane.id === laneId)
+function timelineClips(result) {
+  return result.current.timeline.lanes.flatMap((lane) => lane.clips)
+}
+
+function findLane(result, clipId) {
+  return timelineClips(result).find((clip) => clip.id === clipId)
 }
 
 function dragLane(result, laneId, fromClientX, toClientX) {
@@ -85,7 +89,7 @@ describe('useOverlayPlayer', () => {
 
     expect(result.current.isVisible).toBe(true)
     expect(result.current.toolbar.fitTargets.map((target) => target.id)).toEqual(['video', 'activity'])
-    expect(result.current.timeline.lanes.map((lane) => lane.id)).toEqual(['video:video-1', 'activity'])
+    expect(timelineClips(result).map((clip) => clip.id)).toEqual(['video:video-1', 'activity'])
   })
 
   test('routes toolbar transport commands through store playback state', () => {
@@ -140,15 +144,15 @@ describe('useOverlayPlayer', () => {
     const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
 
     expect(result.current.timeline.widthPx).toBe(0)
-    expect(result.current.timeline.lanes[0].isVisible).toBe(false)
+    expect(timelineClips(result)[0].isVisible).toBe(false)
 
     act(() => {
       result.current.timeline.containerProps.ref(createTimelineElement(500))
     })
 
     expect(result.current.timeline.widthPx).toBe(500)
-    expect(result.current.timeline.lanes[0].isVisible).toBe(true)
-    expect(result.current.timeline.lanes[0].clipStyle.width).not.toBe('0%')
+    expect(timelineClips(result)[0].isVisible).toBe(true)
+    expect(timelineClips(result)[0].clipStyle.width).not.toBe('0%')
 
     act(() => {
       result.current.timeline.playhead.handleProps.onPointerDown({
@@ -182,14 +186,15 @@ describe('useOverlayPlayer', () => {
 
     expect(result.current.toolbar.exportRange.isCustom).toBe(true)
     expect(result.current.timeline.exportMarkers).toEqual([])
-    expect(result.current.timeline.lanes.every((lane) => lane.highlightStyle === null)).toBe(true)
+    expect(timelineClips(result).every((clip) => clip.highlightStyle === null)).toBe(true)
   })
 
-  test('builds one lane per clip and fits the video target to every clip', () => {
+  test('puts every clip on the video lane and fits the video target to every clip', () => {
     createTwoClipStore()
     const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
 
-    expect(result.current.timeline.lanes.map((lane) => lane.id)).toEqual(['video:first', 'video:second', 'activity'])
+    expect(result.current.timeline.lanes.map((lane) => lane.id)).toEqual(['video', 'activity'])
+    expect(timelineClips(result).map((clip) => clip.id)).toEqual(['video:first', 'video:second', 'activity'])
     expect(result.current.toolbar.fitTargets.map((target) => target.id)).toEqual(['video', 'activity'])
 
     act(() => {

@@ -79,12 +79,18 @@ M3a status: committed (`d7818199`). Decisions made during implementation:
 - Only the first import into an empty collection sizes the scene and render FPS (from the compatible group).
 - Telemetry extraction is a module-level sequential queue in timeline order; it no longer holds the import loader.
 
-M3b status: implemented (awaiting owner commit). Decisions made during implementation:
+M3b status: committed (`bb8c5b29`). Decisions made during implementation:
 - `videoEdits[id].placementAnchor` = `null | { videoId, side: 'before'|'after' }`, persisted in v4 (`sources.videos[].placementAnchor`; Rust checks references and cycles). A full sync uses the clip's detected time whenever it can be determined and falls back to the anchor only when it cannot; anchoring moves the clip next to its anchor and clips anchored to it follow. Anchors to videos skipped on project load are dropped (the clip keeps its offset).
 - Follow-up steps after an import run one dialog at a time: report → placement per undeterminable clip → transition defaults → overlaps. Each step is checked when reached. A placement prompt offers every clip except clips still waiting for their own placement; with no candidates (first undeterminable clip on an empty timeline) the clip stays at 0 and anchors the next one. Skipping leaves the clip at 0 with its warning.
 - The placement answer is committed as part of the import (`changeVideoCollection`), so undo never moves the clip back to 0.
 - Transition defaults dialog: due when the collection has more than one video and `dialogShown` is false; OK validates and stores the values, dismissing stores the current (preselected) values; both set `dialogShown`. Editing the defaults in the project settings stays with M8.
 - Overlap dialog lists only overlaps that involve clips of this import; the timeline conflict band and panel warnings come with M3c.
+
+M3c status: implemented (awaiting owner commit). Decisions made during implementation:
+- Per-clip warnings come from one utility (`lib/video-program/video-warnings.js`): incompatible format, overlaps (named on both clips), and the clip's sync warning (outside activity, unknown time). The videos panel and the timeline show the same list.
+- Videos panel: one row per clip in timeline order (name, remove, warnings, "Start on timeline" offset input that moves only that clip, details incl. telemetry state); "Remove all videos" stays; session sync controls stay below.
+- `removeImportedVideo`: drops the clip and its edits; clips anchored to it inherit its anchor (or lose it) and keep their position; manual sync moves to the first remaining clip; the playhead is clamped. The preview registration is released after the collection change; the last removal resets the background. Pausing playback of a removed playing clip stays with M4.
+- Timeline: one video lane holds every clip (clip IDs stay `video:<id>`, so drag/nudge/snapping are unchanged) plus striped overlap bands; clips with warnings get a red outline and list the warnings in their tooltip. Delete/Backspace removes the selected video clip (shortcut `timelineClip.remove`). No timeline context menu yet (keyboard and panel cover removal).
 
 1. Single import button → multi-select dialog (`lib/file-dialog`, `useVideoImport.js`). Remove the folder batch queue (`createBatchRenderSlice.js` folder state, `useBatchInspection.js` folder listing, `BatchRenderQueue*`) and source batch jobs from the collection.
 2. Blocking import: probe + register all, atomic commit, per-file failure report. Compatibility warning shown immediately in the import result (incompatible clips listed with resolution/FPS; they are still imported).

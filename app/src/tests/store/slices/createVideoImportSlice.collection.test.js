@@ -276,6 +276,46 @@ describe('placement anchors', () => {
   })
 })
 
+describe('removing a clip', () => {
+  beforeEach(resetStore)
+
+  function clip(id, options = {}) {
+    return createTestVideo({ id, path: `/videos/${id}.mp4`, durationSeconds: 20, ...options })
+  }
+
+  test('removes the clip and its edits, re-anchors dependent clips, and keeps the others in place', () => {
+    useStore.getState().addImportedVideos([clip('a'), clip('b', { importOrder: 1 }), clip('c', { importOrder: 2 })])
+    useStore.getState().anchorVideo('b', 'a', 'after')
+    useStore.getState().anchorVideo('c', 'b', 'after')
+
+    useStore.getState().removeImportedVideo('b')
+
+    const { importedVideos, videoEdits } = useStore.getState()
+    expect(importedVideos.map((video) => video.id)).toEqual(['a', 'c'])
+    expect(Object.keys(videoEdits)).toEqual(['a', 'c'])
+    expect(videoEdits.c).toMatchObject({ offsetSeconds: 40, placementAnchor: { videoId: 'a', side: 'after' } })
+
+    useStore.getState().removeImportedVideo('a')
+    expect(useStore.getState().videoEdits.c).toMatchObject({ offsetSeconds: 40, placementAnchor: null })
+    expect(() => useStore.getState().removeImportedVideo('a')).toThrow('Unknown imported video')
+  })
+
+  test('moves manual sync to the first remaining clip and keeps the playhead on the timeline', () => {
+    useStore.getState().addImportedVideos([clip('early', { creationTime: '2026-07-18T08:00:00Z', timeSource: 'ffprobe' })])
+    useStore.getState().addImportedVideos([clip('late', { creationTime: '2026-07-18T08:10:00Z', timeSource: 'ffprobe', importOrder: 1 })])
+    useStore.setState({ selectedSecond: 615 })
+    useStore.getState().selectVideoSyncVideo('late')
+
+    useStore.getState().removeImportedVideo('late')
+    expect(useStore.getState().manualVideoSync.videoId).toBe('early')
+    expect(useStore.getState().selectedSecond).toBe(20)
+
+    useStore.getState().removeImportedVideo('early')
+    expect(useStore.getState().manualVideoSync.videoId).toBeNull()
+    expect(useStore.getState().importedVideos).toEqual([])
+  })
+})
+
 describe('transition defaults', () => {
   beforeEach(resetStore)
 

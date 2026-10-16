@@ -193,6 +193,8 @@ function createVideoSummary(video) {
     bitRate: video.bitRate,
     cameraType: video.cameraType,
     cameraModel: video.cameraModel,
+    offsetSeconds: video.offsetSeconds,
+    telemetryStatus: video.telemetry.status,
   }
 }
 
@@ -302,6 +304,22 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
     }
   }
 
+  /**
+   * Removes one clip from the collection, then releases its preview registration.
+   * @param {string} videoId Clip to remove.
+   */
+  const removeVideo = async (videoId) => {
+    try {
+      const { importId } = useStore.getState().importedVideos.find((video) => video.id === videoId)?.preview ?? {}
+      changeVideoCollection(useStore, () => useStore.getState().removeImportedVideo(videoId))
+      await removePreviewVideo(importId)
+      if (useStore.getState().importedVideos.length === 0) onSetBackgroundMode?.('checker')
+    } catch (err) {
+      console.error('Failed to remove video:', err)
+      setErrorMessage(`Removing the video failed: ${err.message}`)
+    }
+  }
+
   const handleClearImportedVideos = async () => {
     try {
       if (hasVideos) {
@@ -328,5 +346,6 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
     importDialogs: followUp.dialogs,
     loadVideoPaths,
     prepareVideoPath,
+    removeVideo,
   }
 }

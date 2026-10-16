@@ -1,5 +1,6 @@
 /**
- * Builds render-ready lane models for video and activity clips.
+ * Builds render-ready lane models: one video lane holding every clip with its
+ * overlap bands, and the activity lane.
  */
 
 import { useCallback, useId, useMemo, useState } from 'react'
@@ -29,8 +30,19 @@ function getBasename(path) {
   return path.split(/[\\/]/).pop()
 }
 
+function videoIdFromClipId(clipId) {
+  return clipId.slice('video:'.length)
+}
+
+function percentStyle(geometry, widthPx) {
+  return {
+    left: widthPx > 0 ? `${(geometry.x / widthPx) * 100}%` : '0%',
+    width: widthPx > 0 ? `${(geometry.width / widthPx) * 100}%` : '0%',
+  }
+}
+
 /**
- * Owns clip lane view models, tooltip state, clip geometry, and export highlights.
+ * Owns lane and clip view models, tooltip state, clip geometry, overlap bands, and export highlights.
  *
  * @param {object} options Clip timeline inputs.
  * @param {string|null} options.activityFilename Imported activity filename.
@@ -42,12 +54,15 @@ function getBasename(path) {
  * @param {function} options.getLaneDragProps Per-lane drag handler factory from useClipDrag.
  * @param {boolean} options.hasActivity Whether the external activity lane should be present.
  * @param {function} options.nudgeClip Callback to move a clip by a relative number of seconds.
- * @param {string|null} options.selectedClipId Currently selected clip lane id.
- * @param {function} options.setSelectedClipId Callback to set selected clip lane id.
+ * @param {function} [options.onRemoveVideo] Callback to remove a video clip by video ID.
+ * @param {Array<{startSecond: number, endSecond: number}>} [options.overlaps] Overlapping timeline intervals of the displayed clips.
+ * @param {string|null} options.selectedClipId Currently selected clip id.
+ * @param {function} options.setSelectedClipId Callback to set selected clip id.
  * @param {number} options.viewEnd Visible viewport end second.
  * @param {number} options.viewStart Visible viewport start second.
+ * @param {Map<string, Array<{message: string}>>} [options.warnings] Clip warnings keyed by video ID.
  * @param {number} options.widthPx Measured timeline width.
- * @returns {Array<object>} Presentational lane view models.
+ * @returns {Array<object>} Presentational lane view models, each with its clips.
  */
 export default function useTimelineClips({
   activityFilename,
@@ -59,10 +74,13 @@ export default function useTimelineClips({
   getLaneDragProps,
   hasActivity,
   nudgeClip,
+  onRemoveVideo,
+  overlaps = [],
   selectedClipId,
   setSelectedClipId,
   viewEnd,
   viewStart,
+  warnings,
   widthPx,
 }) {
   // Tooltip identity/state - one hovered lane controls the out-of-mask tooltip renderer.
@@ -79,10 +97,9 @@ export default function useTimelineClips({
     const laneInputs = []
     const activityDurationSeconds = activitySummary?.durationSeconds ?? 0
 
-    // Video lanes - each clip starts at its offset so clip geometry represents real timeline placement.
+    // Video clips - each clip starts at its offset so clip geometry represents real timeline placement.
     for (const clip of sortVideosByTimeline(clips)) {
       laneInputs.push({
-        ariaLabel: i18next.t('player.videoClipLane', 'Video clip lane'),
         durationSeconds: clip.durationSeconds,
         formatLabel: 'MP4',
         icon: Video,
@@ -90,6 +107,7 @@ export default function useTimelineClips({
         isVideo: true,
         label: getBasename(clip.path),
         startSecond: clip.offsetSeconds,
+        warnings: (warnings?.get(clip.id) ?? []).map((warning) => warning.message),
       })
     }
 
@@ -100,7 +118,6 @@ export default function useTimelineClips({
         .sort((left, right) => left.localeCompare(right))
 
       laneInputs.push({
-        ariaLabel: i18next.t('player.activityClipLane', 'Activity clip lane'),
         availableMetrics,
         durationSeconds: activityDurationSeconds,
         formatLabel: activitySummary.fileFormat?.toUpperCase() || 'DATA',
@@ -109,10 +126,11 @@ export default function useTimelineClips({
         isVideo: false,
         label: activityFilename || activitySummary?.fileName || 'Activity',
         startSecond: 0,
+        warnings: [],
       })
     }
 
-    return laneInputs.map((lane) => {
+    const clipModels = laneInputs.map((lane) => {
       const dragProps = getLaneDragProps(lane.id)
       // Clip geometry - percent styles are derived from pixel geometry so rendering stays responsive.
       const geometry = getClipGeometry({
@@ -140,11 +158,13 @@ export default function useTimelineClips({
       // Presentational lane model - TimelineLane renders these values without owning calculations.
       return {
         ...lane,
-        clipClassName: lane.isVideo ? 'bg-accent/70' : 'bg-primary/80',
+        clipClassName: lane.isVideo
+          ? `bg-accent/70 ${lane.warnings.length > 0 ? 'outline outline-1 -outline-offset-1 outline-destructive' : ''}`
+          : 'bg-primary/80',
         clipContentClassName: CLIP_CONTENT_OFFSET_CLASS,
         clipProps: {
           ...dragProps,
-          'aria-keyshortcuts': 'ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight',
+          'aria-keyshortcuts': `ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight${lane.isVideo ? ' Delete Backspace' : ''}`,
           'aria-pressed': selectedClipId === lane.id,
           tabIndex: canSelect ? 0 : -1,
           onClick: (e) => {
@@ -158,6 +178,12 @@ export default function useTimelineClips({
           onKeyDown: (event) => {
             if (selectedClipId !== lane.id || event.defaultPrevented) return
             const match = matchKeyboardShortcut(event, 'timeline-clip')
+            if (match?.commandId === 'timelineClip.remove' && lane.isVideo && onRemoveVideo) {
+              event.preventDefault()
+              event.stopPropagation()
+              onRemoveVideo(videoIdFromClipId(lane.id))
+              return
+            }
             if (match?.commandId !== 'timelineClip.nudge') return
             event.preventDefault()
             event.stopPropagation()
@@ -181,10 +207,7 @@ export default function useTimelineClips({
             dragProps.onPointerDown?.(event)
           },
         },
-        clipStyle: {
-          left: widthPx > 0 ? `${(geometry.x / widthPx) * 100}%` : '0%',
-          width: widthPx > 0 ? `${(geometry.width / widthPx) * 100}%` : '0%',
-        },
+        clipStyle: percentStyle(geometry, widthPx),
         durationLabel: formatClockDuration(lane.durationSeconds),
         highlightStyle:
           highlight?.isVisible === true
@@ -207,6 +230,40 @@ export default function useTimelineClips({
         },
       }
     })
+
+    // Overlap bands - mark timeline intervals where clips overlap.
+    const conflictBands = overlaps
+      .map((overlap) => ({
+        key: `${overlap.startSecond}:${overlap.endSecond}`,
+        geometry: getClipGeometry({
+          startSecond: overlap.startSecond,
+          durationSeconds: overlap.endSecond - overlap.startSecond,
+          viewStart,
+          viewEnd,
+          widthPx,
+        }),
+      }))
+      .filter(({ geometry }) => geometry.isVisible)
+      .map(({ key, geometry }) => ({ key, style: percentStyle(geometry, widthPx) }))
+
+    const videoClips = clipModels.filter((clip) => clip.isVideo)
+    const activityClips = clipModels.filter((clip) => !clip.isVideo)
+    return [
+      ...(videoClips.length > 0
+        ? [{ id: 'video', ariaLabel: i18next.t('player.videoClipLane', 'Video clip lane'), isVideo: true, clips: videoClips, conflictBands }]
+        : []),
+      ...(activityClips.length > 0
+        ? [
+            {
+              id: 'activity',
+              ariaLabel: i18next.t('player.activityClipLane', 'Activity clip lane'),
+              isVideo: false,
+              clips: activityClips,
+              conflictBands: [],
+            },
+          ]
+        : []),
+    ]
   }, [
     activityFilename,
     activitySummary,
@@ -218,12 +275,15 @@ export default function useTimelineClips({
     hasActivity,
     hoveredLaneId,
     nudgeClip,
+    onRemoveVideo,
+    overlaps,
     selectedClipId,
     setSelectedClipId,
     stopClipEvent,
     tooltipBaseId,
     viewEnd,
     viewStart,
+    warnings,
     widthPx,
   ])
 }
