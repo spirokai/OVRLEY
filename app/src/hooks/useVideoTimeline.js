@@ -5,7 +5,7 @@
 import { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
-import { resolveActivityClipId, resolveActivityContext, resolveAvailableMetrics } from '@/lib/activity/activity-context'
+import { hasActivityCoverage, resolveActivityClipId, resolveActivityContext, resolveAvailableMetrics } from '@/lib/activity/activity-context'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import { deriveVideoWarnings } from '@/lib/video-program/video-warnings'
 
@@ -66,6 +66,23 @@ export function useActivityContext() {
         clip: clipId === null ? null : clips.find((clip) => clip.id === clipId),
       }),
     [activitySummary, clipId, clips, parsedActivity],
+  )
+}
+
+/**
+ * Returns whether activity data covers the playhead (see `hasActivityCoverage`).
+ * Consumers re-render only when coverage changes, not on every playhead frame.
+ * @returns {boolean} Whether non-raster widgets are shown at the playhead.
+ */
+export function usePlayheadActivityCoverage() {
+  const parsedActivity = useStore((state) => state.parsedActivity)
+  const activitySummary = useStore((state) => state.activitySummary)
+  const { clips, program } = useVideoTimeline().displayed
+  return useStore(
+    useCallback(
+      (state) => hasActivityCoverage({ parsedActivity, activitySummary, program, clips, second: state.selectedSecond }),
+      [activitySummary, clips, parsedActivity, program],
+    ),
   )
 }
 

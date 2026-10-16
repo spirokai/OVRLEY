@@ -192,6 +192,8 @@ pub struct PreparedRenderAssets {
     pub(crate) route_caches: Vec<RouteWidgetCache>,
     pub(crate) elevation_caches: Vec<ElevationWidgetCache>,
     pub(crate) base_rgba: Option<Vec<u8>>,
+    /// Rasters alone, drawn on frames without activity coverage; None without rasters.
+    pub(crate) raster_rgba: Option<Vec<u8>>,
 }
 
 impl PreparedRenderAssets {

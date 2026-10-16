@@ -10,7 +10,6 @@
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { SCENE_PRESENTATION_KEYS } from '@/lib/template/template-constants'
 import { clamp } from '@/lib/utils'
-import { videoOverlapsActivity } from '@/lib/video-timing'
 import { isMp4Codec, isQsvFullCodec } from './codecUtils'
 
 function renderValues(values) {
@@ -88,21 +87,6 @@ function applyCompositeSceneFields(scene, options) {
   scene.composite_render_duration = video.durationSeconds
   scene.composite_video_trim_start = 0
   scene.composite_widget_update_rate = scene.update_rate
-}
-
-/**
- * Validates the effective video/activity overlap after export-range translation.
- *
- * @param {object} scene - Render-effective scene config.
- * @param {number|null|undefined} timelineEnd - Activity timeline end.
- */
-function validateCompositeTiming(scene, timelineEnd) {
-  const syncOffset = scene.composite_sync_offset
-  const renderDuration = scene.composite_render_duration
-  const activityEnd = timelineEnd
-  if (!videoOverlapsActivity({ videoStart: syncOffset, videoDuration: renderDuration, activityEnd })) {
-    throw new Error('Imported video range must have positive overlap with the activity timeline.')
-  }
 }
 
 /**
@@ -224,10 +208,8 @@ export function createRenderEffectiveConfig(options) {
 
   applyTimelineSceneFields(scene, timelineStart, timelineEnd)
   applyCodecDefaults(scene, codec)
+  // A video outside the activity renders with raster widgets only (native coverage).
   applyCustomExportRange(scene, range, shouldComposite)
-  if (shouldComposite) {
-    validateCompositeTiming(scene, timelineEnd)
-  }
 
   return {
     ...nextConfig,

@@ -115,6 +115,7 @@ pub fn prepare_render_assets(
         route_caches: Vec::new(),
         elevation_caches: Vec::new(),
         base_rgba: None,
+        raster_rgba: None,
     };
 
     for validated in &config.course_plots {

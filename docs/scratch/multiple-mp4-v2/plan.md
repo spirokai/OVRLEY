@@ -120,7 +120,7 @@ M4a status: committed (`26478df2`). Decisions made during implementation:
 - Removing a clip pauses playback first; the removal clamps the playhead.
 - The hand-off reaches the clock through `useEffectEvent`, so the frame loop does not restart on every render.
 
-M4b status: implemented (awaiting owner commit); native WebView check pending. Decisions made during implementation:
+M4b status: committed (`ed70f861`); native WebView check pending. Decisions made during implementation:
 - Two persistent `<video>` elements. A pure assignment (`lib/video-program/preview-slots.js`) keeps the active element on the piece at the playhead (the upcoming piece in a gap) and parks the other one, paused and muted, on the first frame of the piece after it — also the same video after a deleted part. A cut to the parked piece swaps elements; a jump within the shown video seeks; only a jump to an unprepared video reloads an element.
 - The existing playback, scrub, drag, clock, and warning logic runs on whichever element is active (its ref switches), so a swap re-syncs the new element and the demoted element is parked again.
 - The parked element is always prepared (also while paused); it only decodes its parked frame, so two elements never play at once. Verify on WebKitGTK/WebView2 with two 4K/HEVC clips (plan risk) and fall back to preloading near the piece end if needed.
@@ -134,6 +134,14 @@ M4b status: implemented (awaiting owner commit); native WebView check pending. D
 Tests: playback engine / preview hooks with mocked media elements. Manual: native WebView (WebKitGTK, WebView2) hand-off and dual 4K/HEVC decode.
 
 ## M5 — Rasters-only outside activity coverage
+
+M5 status: implemented (awaiting owner commit). Decisions made during implementation:
+- Native: asset preparation also draws a rasters-only layer (none without rasters); frames outside the coverage copy it instead of clearing (`prepare_output_frame`). Applies to composite and transparent exports, single and batch.
+- `ActivityCoverage::for_video` accepts a video that does not overlap the activity: no covered frames, window = the whole activity (no frame samples it, dense activity gets an empty frame timeline). The single-render composite plan drops both no-overlap errors; batch jobs need no change.
+- Frontend: single-file composite export no longer rejects a clip outside the activity, and batch rows outside the activity are no longer blocked. The clip keeps its "outside the activity" warning in the panel.
+- Preview: `hasActivityCoverage` (external activity: inside it; otherwise inside the telemetry of the clip playing at the playhead; with no activity and no clip everything counts as covered) makes non-raster widgets invisible (`invisible`, so they cannot be clicked) in the editor canvas.
+- Deferred to M6: a clip without any embedded telemetry in embedded mode (no activity at all) still fails its batch job ("No embedded activity"); rendering it rasters-only needs an activity-free render path, which M6's per-piece jobs provide. Frames past the end of a clip's own telemetry are rasters-only already.
+- No FFmpeg end-to-end test of raster pixels outside coverage yet; covered by the frame-mapping unit test and planning tests. Add with M6's FFmpeg integration tests.
 
 1. Native: frames without activity coverage render rasters only instead of `pixels.fill(0)` (`ovrley_core/src/render/mod.rs` `prepare_output_frame`, `encode/video_timing.rs` coverage incl. trailing frames). Reuse the raster-only widget filtering that `skip_overlay` already does (`render_jobs/planning.rs`).
 2. Composite planning: allow clips/pieces with no activity overlap (remove the "does not overlap activity" error path in `derive_composite_render_plan` and the batch equivalent) — coverage becomes empty, overlay is rasters only.

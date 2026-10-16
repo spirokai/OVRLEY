@@ -262,23 +262,18 @@ describe('native batch workflow', () => {
     act(() => observe({ kind: 'snapshot', data: snapshot('cancelled', 7) }))
   })
 
-  test('renders every imported video in timeline order and blocks videos outside the activity at their committed offset', async () => {
+  test('renders every imported video in timeline order at its committed offset, also outside the activity', async () => {
     const { result } = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
     await waitFor(() => expect(result.current.batchReady).toBe(true))
-    expect(result.current.batchQueue.map((row) => [row.id, row.status])).toEqual([
-      ['reference', 'pending'],
-      ['next', 'pending'],
-      ['outside', 'blocked'],
+    expect(result.current.batchQueue.map((row) => [row.id, row.status, row.error])).toEqual([
+      ['reference', 'pending', null],
+      ['next', 'pending', null],
+      ['outside', 'pending', null],
     ])
-    expect(result.current.batchQueue[2].error).toBe('Video is outside the activity')
     expect(backend.inspectVideoSource.mock.calls.map(([, path]) => path)).toEqual([reference, next, blocked])
-
-    act(() => setOffset('outside', 3500))
-    await waitFor(() => expect(result.current.batchReady).toBe(true))
-    expect(result.current.batchQueue.map((row) => row.status)).toEqual(['pending', 'pending', 'pending'])
     await act(async () => result.current.runBatch())
     expect(acceptedRequest.jobs.map((job) => job.id)).toEqual([reference, next, blocked])
-    expect(acceptedRequest.activity.offsets[`inspection-1:${blocked}`]).toBe(3500)
+    expect(acceptedRequest.activity.offsets[`inspection-1:${blocked}`]).toBe(7200)
   })
 
   test('an unreadable camera timestamp only hides the date of its row', async () => {
@@ -298,7 +293,7 @@ describe('native batch workflow', () => {
     expect(result.current.batchQueue.find((row) => row.id === 'next')).toMatchObject({ status: 'blocked', error: 'Video is unavailable' })
     expect(result.current.batchQueue.find((row) => row.id === 'reference').status).toBe('pending')
     await act(async () => result.current.runBatch())
-    expect(acceptedRequest.jobs.map((job) => job.id)).toEqual([reference])
+    expect(acceptedRequest.jobs.map((job) => job.id)).toEqual([reference, blocked])
   })
 
   test('submits embedded-telemetry batches without an external activity', async () => {
@@ -341,7 +336,7 @@ describe('native batch workflow', () => {
       project: useProjectDocumentState(),
     }))
     await waitFor(() => expect(result.current.batch.batchReady).toBe(true))
-    expect(result.current.batch.batchQueue.find((row) => row.path === blocked).status).toBe('blocked')
+    expect(result.current.batch.batchQueue.find((row) => row.path === blocked).status).toBe('pending')
     act(() => result.current.batch.setBatchItemSkipOverlay('next', true))
     await waitFor(() => expect(result.current.batch.batchReady).toBe(true))
     await act(async () => result.current.batch.runBatch())
@@ -353,18 +348,19 @@ describe('native batch workflow', () => {
       encoding: { fps: 24, updateRate: 2 },
       activity: {
         mode: 'externalActivity',
-        offsets: { [`inspection-1:${reference}`]: -9, [`inspection-1:${next}`]: 40 },
+        offsets: { [`inspection-1:${reference}`]: -9, [`inspection-1:${next}`]: 40, [`inspection-1:${blocked}`]: 7200 },
       },
       jobs: [
         { id: reference, sourceId: `inspection-1:${reference}`, skipOverlay: false },
         { id: next, sourceId: `inspection-1:${next}`, skipOverlay: true },
+        { id: blocked, sourceId: `inspection-1:${blocked}`, skipOverlay: false },
       ],
     })
     expect(Object.isFrozen(acceptedRequest)).toBe(true)
     // This same wire template is accepted by the Rust batch service test.
     expect(JSON.parse(JSON.stringify(acceptedRequest.template))).toEqual(batchTemplate)
     expect(result.current.batch.batchSnapshot.phase).toBe('preparing') // Older acceptance/read must not roll back the event.
-    expect(result.current.batch.batchProgress.total).toBe(7200)
+    expect(result.current.batch.batchProgress.total).toBe(10800)
     expect(result.current.render.renderStartDisabled).toBe(true)
     expect(result.current.project.conflictingOperation).toBe(true)
     expect(editorState()).toEqual(before)
@@ -380,7 +376,7 @@ describe('native batch workflow', () => {
     expect(unlisten).toHaveBeenCalled()
     const resumed = renderHook(() => useBatchRenderWorkflow({ phase: 'confirm', settings }))
     await waitFor(() => expect(resumed.result.current.batchFinished).toBe(true))
-    expect(resumed.result.current.batchQueue.map((row) => row.status)).toEqual(['succeeded', 'failed'])
+    expect(resumed.result.current.batchQueue.map((row) => row.status)).toEqual(['succeeded', 'failed', 'failed'])
     expect(editorState()).toEqual(before)
     expect(useStore.temporal.getState().pastStates).toBe(history)
   })

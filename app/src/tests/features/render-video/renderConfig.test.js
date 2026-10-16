@@ -267,22 +267,21 @@ describe('render config preparation', () => {
     ).toThrow('Imported video is required for composite export')
   })
 
-  test('rejects composite ranges with no activity overlap', () => {
-    expect(() =>
-      createRenderEffectiveConfig({
-        config: { scene: { width: 1920, height: 1080, fps: 60 }, labels: [], values: [], plots: [] },
-        globalDefaults: {},
-        fps: 60,
-        exportMode: 'composite',
-        widgetUpdateRate: 1,
-        range: { ...DEFAULT_EXPORT_RANGE },
-        codec: 'libx264',
-        video: createTestVideo({ path: 'C:\\clip.mp4', durationSeconds: 10 }),
-        timelineStart: 0,
-        timelineEnd: 25,
-        videoOffsetSeconds: -10,
-        availableCodecs: null,
-      }),
-    ).toThrow(/positive overlap/)
+  test('keeps a composite video outside the activity, which renders rasters only', () => {
+    const config = createRenderEffectiveConfig({
+      config: { scene: { width: 1920, height: 1080, fps: 60 }, labels: [], values: [], plots: [] },
+      globalDefaults: {},
+      fps: 60,
+      exportMode: 'composite',
+      widgetUpdateRate: 1,
+      range: { ...DEFAULT_EXPORT_RANGE },
+      codec: 'libx264',
+      video: createTestVideo({ path: 'C:\\clip.mp4', durationSeconds: 10 }),
+      timelineStart: 0,
+      timelineEnd: 25,
+      videoOffsetSeconds: -10,
+      availableCodecs: null,
+    })
+    expect(config.scene).toMatchObject({ composite_sync_offset: -10, composite_render_duration: 10, composite_video_trim_start: 0 })
   })
 })

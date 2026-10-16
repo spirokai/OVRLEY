@@ -500,11 +500,6 @@ pub fn derive_composite_render_plan(
     }
 
     let sync_offset = scene.export_start_seconds;
-    if sync_offset <= -video_duration {
-        return Err(CoreError::Config(format!(
-            "scene.composite_sync_offset ({sync_offset}) must leave a positive overlap with scene.composite_video_duration ({video_duration})"
-        )));
-    }
     let trim_start = raw.composite_video_trim_start.ok_or_else(|| {
         CoreError::Config("scene.composite_video_trim_start required for composite render".into())
     })?;
@@ -543,15 +538,9 @@ pub fn derive_composite_render_plan(
                 "Composite activity end must be finite and zero or greater: {activity_end}"
             )));
         }
-        let video_end = sync_offset + render_duration;
-        if sync_offset >= activity_end || video_end <= 0.0 {
-            return Err(CoreError::Config(format!(
-                "Composite video range [{sync_offset}, {video_end}] does not overlap activity range [0, {activity_end}]"
-            )));
-        }
         let max_render_duration = activity_end - sync_offset;
         let overrun = render_duration - max_render_duration;
-        if sync_offset >= 0.0 {
+        if sync_offset >= 0.0 && max_render_duration > 0.0 {
             let ends_just_after_activity =
                 overrun > 0.0 && overrun <= COMPOSITE_ACTIVITY_DURATION_SLACK_SECONDS;
             if ends_just_after_activity {
@@ -560,9 +549,14 @@ pub fn derive_composite_render_plan(
         }
         let overlap_start = sync_offset.max(0.0);
         let overlap_end = activity_end.min(sync_offset + render_duration);
-
-        scene.start = overlap_start;
-        scene.end = overlap_end;
+        // A video outside the activity samples none of it and renders rasters only.
+        if overlap_end > overlap_start {
+            scene.start = overlap_start;
+            scene.end = overlap_end;
+        } else {
+            scene.start = 0.0;
+            scene.end = activity_end;
+        }
     } else {
         scene.start = sync_offset.max(0.0);
         scene.end = scene.start + render_duration;

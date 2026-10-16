@@ -8,7 +8,7 @@
  */
 
 import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
-import { createActivitySummary } from './activity-summary'
+import { createActivitySummary, getActivityDurationSeconds } from './activity-summary'
 
 /**
  * Returns the clip whose embedded telemetry drives widgets at a timeline second:
@@ -39,6 +39,31 @@ export function resolveActivityContext({ parsedActivity, activitySummary, clip }
     originSecond: clip.offsetSeconds,
     videoId: clip.id,
   }
+}
+
+/**
+ * Whether activity data covers a timeline second. With an external activity the
+ * second must lie inside it; without one, inside the embedded telemetry of the
+ * clip playing there. Frames without coverage show raster widgets only. Without
+ * any activity or clip (template design) everything counts as covered.
+ * @param {object} options Coverage inputs.
+ * @param {object|null} options.parsedActivity External activity.
+ * @param {object|null} options.activitySummary External activity summary.
+ * @param {object} options.program Timeline program.
+ * @param {Array<object>} options.clips Timeline clips.
+ * @param {number} options.second Timeline second.
+ * @returns {boolean} Whether non-raster widgets are shown.
+ */
+export function hasActivityCoverage({ parsedActivity, activitySummary, program, clips, second }) {
+  if (parsedActivity !== null) return second >= 0 && second <= activitySummary.durationSeconds
+  if (clips.length === 0) return true
+  const target = resolvePreviewTarget(program, second)
+  if (target === null || !target.isInside) return false
+  const clip = clips.find((candidate) => candidate.id === target.videoId)
+  const activity = clip.telemetry.activity
+  if (activity === null) return false
+  const clipSecond = second - clip.offsetSeconds
+  return clipSecond >= 0 && clipSecond <= getActivityDurationSeconds(activity)
 }
 
 /**

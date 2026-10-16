@@ -152,6 +152,7 @@ pub struct VideoFrameRenderer<'a> {
     frame_size: FrameSize,
     scale: f32,
     base_rgba: &'a [u8],
+    raster_rgba: Option<&'a [u8]>,
     blank_leading_frame_count: usize,
 }
 
@@ -179,6 +180,10 @@ impl<'a> VideoFrameRenderer<'a> {
         }
         let blank_leading_frame_count = usize::try_from(blank_leading_frame_count)
             .map_err(|_| CoreError::Render("Blank leading frame count exceeds usize".into()))?;
+        let raster_rgba = prepared_preview_assets
+            .prepared_assets
+            .raster_rgba
+            .as_deref();
 
         Ok(Self {
             paths,
@@ -187,6 +192,7 @@ impl<'a> VideoFrameRenderer<'a> {
             frame_size,
             scale: prepared_preview_assets.scene().presentation.scale,
             base_rgba,
+            raster_rgba,
             blank_leading_frame_count,
         })
     }
@@ -210,11 +216,12 @@ impl<'a> VideoFrameRenderer<'a> {
             frame_index,
             self.blank_leading_frame_count,
             self.dense_activity.frame_count,
+            self.raster_rgba,
             pixels,
         );
         let Some(activity_frame_index) = activity_frame_index else {
             frame_profiler.record_ms(
-                "blank.clear",
+                "uncovered.rasters",
                 Instant::now().duration_since(started).as_secs_f64() * 1000.0,
             );
             return Ok(());
@@ -243,15 +250,21 @@ impl<'a> VideoFrameRenderer<'a> {
     }
 }
 
+/// Maps an output frame to its activity frame. Frames outside the activity
+/// coverage show only the rasters (or nothing without rasters).
 fn prepare_output_frame(
     output_frame_index: usize,
     blank_leading_frame_count: usize,
     activity_frame_count: usize,
+    raster_rgba: Option<&[u8]>,
     pixels: &mut [u8],
 ) -> Option<usize> {
     let activity_frame_index = output_frame_index.checked_sub(blank_leading_frame_count);
     if activity_frame_index.is_none_or(|index| index >= activity_frame_count) {
-        pixels.fill(0);
+        match raster_rgba {
+            Some(rasters) => pixels.copy_from_slice(rasters),
+            None => pixels.fill(0),
+        }
         return None;
     }
     activity_frame_index
@@ -262,18 +275,37 @@ mod video_frame_mapping_tests {
     use super::prepare_output_frame;
 
     #[test]
-    fn clears_frames_outside_activity_and_maps_frames_inside_it() {
+    fn frames_outside_activity_show_rasters_only_and_frames_inside_it_map() {
         let mut pixels = [255; 4];
-        assert_eq!(prepare_output_frame(0, 2, 3, &mut pixels), None);
+        assert_eq!(prepare_output_frame(0, 2, 3, None, &mut pixels), None);
         assert_eq!(pixels, [0; 4]);
+
+        let rasters = [1, 2, 3, 4];
+        pixels.fill(255);
+        assert_eq!(
+            prepare_output_frame(1, 2, 3, Some(&rasters), &mut pixels),
+            None
+        );
+        assert_eq!(pixels, rasters);
 
         pixels.fill(255);
-        assert_eq!(prepare_output_frame(2, 2, 3, &mut pixels), Some(0));
+        assert_eq!(
+            prepare_output_frame(2, 2, 3, Some(&rasters), &mut pixels),
+            Some(0)
+        );
         assert_eq!(pixels, [255; 4]);
 
-        assert_eq!(prepare_output_frame(4, 2, 3, &mut pixels), Some(2));
-        assert_eq!(prepare_output_frame(5, 2, 3, &mut pixels), None);
-        assert_eq!(pixels, [0; 4]);
+        assert_eq!(prepare_output_frame(4, 2, 3, None, &mut pixels), Some(2));
+        assert_eq!(
+            prepare_output_frame(5, 2, 3, Some(&rasters), &mut pixels),
+            None
+        );
+        assert_eq!(pixels, rasters);
+        // A video outside the activity covers no frames.
+        assert_eq!(
+            prepare_output_frame(0, 9, 0, Some(&rasters), &mut pixels),
+            None
+        );
     }
 }
 
@@ -314,6 +346,17 @@ pub fn prepare_preview_assets(
     let labels_image = static_layer.image;
     let label_cache_status = static_layer.cache_status;
     prepared_assets.base_rgba = Some(static_layer.base_rgba);
+    if !rasters.is_empty() {
+        let raster_layer = StaticLayer {
+            backdrops: &[],
+            rasters: &rasters,
+            labels: &[],
+            values: &[],
+            scene: &prepared_assets.scene,
+        }
+        .prepare(paths, &mut prepare_profiler)?;
+        prepared_assets.raster_rgba = Some(raster_layer.base_rgba);
+    }
     let prepare_timings = annotate_timing_aliases(
         prepare_profiler.summary(),
         &[("prepare.surface.clear", "surface.clear")],

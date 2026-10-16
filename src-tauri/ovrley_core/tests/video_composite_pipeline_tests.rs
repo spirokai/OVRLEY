@@ -317,12 +317,11 @@ fn negative_sync_plan_keeps_full_video_output_and_limits_activity_overlap() {
 }
 
 #[test]
-fn composite_plan_rejects_offset_at_video_duration_boundary() {
+fn composite_plan_outside_the_activity_keeps_the_full_video_with_no_covered_frames() {
     let mut config = mutable_recent_template_config(1920, 1080);
     config.scene.composite_video_path = Some("input.mp4".to_string());
     config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
     config.scene.quality_value = Some(20.0);
-    config.scene.composite_sync_offset = Some(-30.0);
     config.scene.composite_video_fps_num = Some(30);
     config.scene.composite_video_fps_den = Some(1);
     config.scene.composite_video_duration = Some(30.0);
@@ -330,10 +329,18 @@ fn composite_plan_rejects_offset_at_video_duration_boundary() {
     config.scene.composite_video_trim_start = Some(0.0);
     config.scene.composite_widget_update_rate = Some(1);
 
-    let mut scene = validate_render_config(config.clone()).unwrap().scene;
-    let error = derive_composite_render_plan(&config.scene, &mut scene, Some(25.0)).unwrap_err();
+    // Ending exactly at the activity start, and starting after its end.
+    for offset in [-30.0, 40.0] {
+        config.scene.composite_sync_offset = Some(offset);
+        let mut scene = validate_render_config(config.clone()).unwrap().scene;
+        let plan = derive_composite_render_plan(&config.scene, &mut scene, Some(25.0)).unwrap();
 
-    assert!(error.to_string().contains("positive overlap"));
+        assert_eq!((scene.start, scene.end), (0.0, 25.0), "offset {offset}");
+        assert_eq!(plan.coverage.frame_count, 0);
+        assert_eq!(plan.coverage.blank_leading_frame_count, 900);
+        assert_eq!(plan.overlay_frame_count, 900);
+        assert_eq!(plan.output_frame_count, 900);
+    }
 }
 
 #[test]

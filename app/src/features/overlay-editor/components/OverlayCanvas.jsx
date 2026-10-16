@@ -88,6 +88,7 @@ const OverlayCanvasWidget = memo(
     sceneStyle,
     valueFont,
     exportRange,
+    isHidden,
     registerNode,
     handleWidgetMouseDown,
     setHoveredWidgetId,
@@ -113,6 +114,7 @@ const OverlayCanvasWidget = memo(
           widget.category === 'labels' && 'z-20',
           widget.category === 'plots' && 'z-3',
           widget.category === 'values' && 'z-10',
+          isHidden && 'invisible',
         )}
         style={{
           left: renderGeometry.left,
@@ -166,6 +168,7 @@ const OverlayCanvasWidget = memo(
     previousProps.sceneStyle === nextProps.sceneStyle &&
     previousProps.valueFont === nextProps.valueFont &&
     previousProps.exportRange === nextProps.exportRange &&
+    previousProps.isHidden === nextProps.isHidden &&
     previousProps.registerNode === nextProps.registerNode &&
     previousProps.handleWidgetMouseDown === nextProps.handleWidgetMouseDown &&
     previousProps.setHoveredWidgetId === nextProps.setHoveredWidgetId,
@@ -178,14 +181,15 @@ const OverlayCanvasWidget = memo(
  * @param {object} props
  * @param {object} props.sceneProps - { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize }
  * @param {object} props.displayProps - { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible }
- * @param {object} props.dataProps - { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange }
+ * @param {object} props.dataProps - { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange, hasActivityCoverage }
  * @param {object} props.callbacks - { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks }
  * @returns {JSX.Element} Rendered component output.
  */
 export default function OverlayCanvas({ sceneProps, displayProps, dataProps, callbacks }) {
   const { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize } = sceneProps
   const { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible } = displayProps
-  const { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange } = dataProps
+  const { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange, hasActivityCoverage } =
+    dataProps
   const { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
   const hasTransparentBackground = backgroundMode === 'transparent'
@@ -235,6 +239,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
               sceneStyle={sceneStyle}
               valueFont={valueFont}
               exportRange={exportRange}
+              isHidden={!hasActivityCoverage && widget.category !== 'rasters'}
               registerNode={widgetRefCallbacks[widget.id]}
               handleWidgetMouseDown={handleWidgetMouseDown}
               setHoveredWidgetId={setHoveredWidgetId}

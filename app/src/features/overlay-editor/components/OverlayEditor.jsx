@@ -384,10 +384,12 @@ function OverlayEditorContent({
       textPreviewModels,
       renderGeometryModels,
       exportRange: overlayState.previewExportRange,
+      hasActivityCoverage: overlayState.hasActivityCoverage,
     }),
     [
       activity,
       metricPreviewModels,
+      overlayState.hasActivityCoverage,
       overlayState.previewExportRange,
       overlayState.previewSecond,
       overlayState.canvasWidgets,

@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useStore from '@/store/useStore'
-import { useActivityContext, useVideoTimeline } from '@/hooks/useVideoTimeline'
+import { useActivityContext, usePlayheadActivityCoverage, useVideoTimeline } from '@/hooks/useVideoTimeline'
 import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
 import { getEffectiveWidgetData } from '@/lib/template/template-state'
@@ -33,6 +33,7 @@ export function useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onC
   const selectedSecond = useStore((state) => state.selectedSecond)
   const exportRange = useStore((state) => state.renderSettings.range)
   const activityContext = useActivityContext()
+  const hasActivityCoverage = usePlayheadActivityCoverage()
   const activity = activityContext?.activity ?? null
   const activityOriginSecond = activityContext?.originSecond ?? 0
   const activityClipVideoId = activityContext?.videoId ?? null
@@ -139,6 +140,8 @@ export function useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onC
   }
 
   return {
+    // Frames without activity coverage show raster widgets only, as in the export.
+    hasActivityCoverage,
     activeWidgetInteraction,
     beginWidgetInteraction,
     clearWidgetDraft,

@@ -1,6 +1,5 @@
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import i18next from 'i18next'
-import { videoOverlapsActivity } from '@/lib/video-timing'
 import { formatClockDuration } from '@/lib/time-format'
 import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { captureBatchSync } from './renderRequest'
@@ -136,7 +135,7 @@ function formatCreationLabels(clip, sync, locale) {
 
 /**
  * Reviews every imported video for separate-file export. A video renders at its
- * committed timeline offset; with an external activity it must overlap the activity.
+ * committed timeline offset; frames outside the activity show raster widgets only.
  * @param {object[]} clips Timeline clips in timeline order.
  * @param {Object<string, boolean>} skipOverlay Video IDs that render without activity widgets.
  * @param {object|null} inspection Current native descriptors keyed by path.
@@ -165,18 +164,7 @@ export function reviewBatchQueue(clips, skipOverlay, inspection, sync, locale) {
       durationLabel: formatClockDuration(clip.durationSeconds),
       ...formatCreationLabels(clip, sync, locale),
     }
-    const outsideActivity =
-      sync.activitySummary !== null &&
-      !videoOverlapsActivity({
-        videoStart: clip.offsetSeconds,
-        videoDuration: clip.durationSeconds,
-        activityEnd: sync.activitySummary.durationSeconds,
-      })
-    return {
-      ...inspectedItem,
-      status: outsideActivity ? 'blocked' : 'pending',
-      error: outsideActivity ? i18next.t('store.videoOutsideActivity', 'Video is outside the activity') : null,
-    }
+    return { ...inspectedItem, status: 'pending', error: null }
   })
 }
 

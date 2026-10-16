@@ -125,7 +125,7 @@ impl SourceMetadataProbe for SmallMetadataProbe {
 }
 
 #[test]
-fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
+fn video_plans_sample_the_video_clock_and_show_only_rasters_in_padding() {
     use ovrley_core::debug::RenderProfiler;
     use ovrley_core::render::{prepare_preview_assets, FrameSize, VideoFrameRenderer};
     let directory = SourcesDirectory::new();
@@ -235,7 +235,35 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
                 "reused buffers cannot leak art into padding"
             );
         }
-        assert!(prepare(120.0, true).is_err());
+        // A video starting at the activity end covers no frames and renders rasters only
+        // (transparent here: the suppressed template has no rasters).
+        let outside = prepare(120.0, false).unwrap();
+        let coverage = match outside.mode() {
+            VideoRenderModePlan::Transparent(render) => &render.coverage,
+            VideoRenderModePlan::Composite { render, .. } => &render.coverage,
+        };
+        assert_eq!(coverage.frame_count, 0);
+        let dense = outside.prepare_activity(&activity).unwrap();
+        assert_eq!(dense.frame_count, 0);
+        let (assets, _, _, _) =
+            prepare_preview_assets(&paths, outside.config(), &activity, &dense).unwrap();
+        let frame_size = FrameSize {
+            width: 32,
+            height: 64,
+        };
+        let renderer = VideoFrameRenderer::new(
+            &paths,
+            &dense,
+            &assets,
+            frame_size,
+            coverage.blank_leading_frame_count,
+        )
+        .unwrap();
+        let mut pixels = vec![255; frame_size.rgba_len().unwrap()];
+        renderer
+            .render_rgba(0, &mut pixels, &mut RenderProfiler::default())
+            .unwrap();
+        assert!(pixels.iter().all(|byte| *byte == 0));
     }
     assert_eq!(serde_json::to_value(&activity).unwrap(), original_activity);
     assert_eq!(serde_json::to_value(&template).unwrap(), original_template);
