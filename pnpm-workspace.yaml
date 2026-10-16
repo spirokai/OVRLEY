@@ -1,2 +1,6 @@
 packages:
   - 'app'
+
+onlyBuiltDependencies:
+  - esbuild
+  - igc-parser

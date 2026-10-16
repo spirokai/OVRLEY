@@ -78,7 +78,7 @@ OVRLEY supports both exporting transparent overlays as well as final footage wit
 
 Compiling and running OVRLEY requires the following system-level toolchains:
 
-- **[Node.js](https://nodejs.org/) & [pnpm](https://pnpm.io/)** (Package management and script execution)
+- **[Node.js](https://nodejs.org/) & [pnpm 10.25.0](https://pnpm.io/)** (Package management and script execution; pnpm is pinned in `package.json`)
 - **[Rust Toolchain 1.84](https://rust-lang.org/tools/install/)** (For compiling the Tauri shell and core engine)
 - **[FFmpeg 8.1+ (Full Build)](https://ffmpeg.org/download.html/)** (For video manipulation; **installed automatically**)
 
@@ -86,12 +86,16 @@ Compiling and running OVRLEY requires the following system-level toolchains:
 
 ## Dev Installation
 
-The repository setup is automated. When you install the Node dependencies, a custom `postinstall` script will automatically download and place the required FFmpeg 8.1 binaries into the correct vendor directory.
+Use pnpm for the entire repository. The root `pnpm-workspace.yaml` includes `app/`, and the root `pnpm-lock.yaml` locks dependencies for both packages. Run installation commands from the repository root; `app/` does not need a separate install or lockfile. Install hooks reject other package managers.
+
+The repository setup is automated. pnpm prepares the pinned Git dependency `igc-parser` and installs the `esbuild` binary; these dependency scripts are allowed in `pnpm-workspace.yaml`. A custom `postinstall` script will automatically download and place the required FFmpeg 8.1 binaries into the correct vendor directory.
 
 ```bash
 # Installs packages and automatically provisions the FFmpeg dependency
-pnpm install
+pnpm install --frozen-lockfile
 ```
+
+pnpm manages its package cache outside the repository using its default store location (`pnpm store path` shows it). No project `.pnpm-store/` directory or `.npmrc` override is required.
 
 ## Development
 
@@ -99,8 +103,30 @@ To launch the application locally with hot-module reloading enabled:
 
 ```bash
 # Starts the frontend server alongside the native Tauri window
-pnpm run dev
+pnpm dev
 ```
+
+`npm run dev` can launch the same script because it delegates to pnpm, but use `pnpm dev` consistently and use pnpm for all dependency changes.
+
+Other common commands, also from the repository root:
+
+```bash
+pnpm dev:frontend  # Frontend development server only
+pnpm lint          # Frontend lint checks
+pnpm test          # Frontend tests
+```
+
+To add a frontend dependency, use `pnpm --filter app add <package>`; to add a root development dependency, use `pnpm add -Dw <package>`. These commands update the shared root lockfile.
+
+Dependency checks also run from the repository root:
+
+```bash
+pnpm outdated -r  # Check available upgrades in both root and app
+pnpm audit        # Check the shared dependency tree for known vulnerabilities
+pnpm audit --fix  # Add overrides to address vulnerable dependency versions
+```
+
+`pnpm i` installs the locked dependencies across the workspace. Plain `pnpm outdated` checks the current package; use `-r` to include every workspace package. Review dependency changes and run checks after `pnpm audit --fix`.
 
 ## Available Test Suites
 

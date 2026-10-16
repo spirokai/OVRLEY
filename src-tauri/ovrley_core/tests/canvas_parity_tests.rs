@@ -10,7 +10,7 @@
 //! with intermediate temp files under:
 //!   src-tauri/target/canvas-parity/
 //!
-//! Requires: Node.js, pnpm (or npm), ffmpeg, Playwright browsers installed.
+//! Requires: Node.js, pnpm, ffmpeg, Playwright browsers installed.
 
 #[path = "common/canvas_parity.rs"]
 mod canvas_parity;

@@ -23,7 +23,7 @@ Before first run, from the repo root:
 
 ```bash
 pnpm install
-npx playwright install chromium
+pnpm exec playwright install chromium
 ```
 
 ## Fixtures
@@ -110,7 +110,7 @@ Defined in `common/canvas_parity.rs`:
 | Symptom                    | Likely cause                                                          |
 | -------------------------- | --------------------------------------------------------------------- |
 | Vite fails to start        | `pnpm install` not run; port already in use                           |
-| Playwright fails           | Playwright browsers not installed (`npx playwright install chromium`) |
+| Playwright fails           | Playwright browsers not installed (`pnpm exec playwright install chromium`) |
 | SSIM always low            | Dimensions mismatch; Skia render may need scaling                     |
 | "Canvas-only" pixels       | Widget not rendered by Skia (missing widget implementation)           |
 | "Skia-only" pixels         | Widget visible in Skia but hidden/transparent in browser              |

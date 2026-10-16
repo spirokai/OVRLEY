@@ -38,6 +38,7 @@ src-tauri/ovrley_core/   Standalone Rust crate — Skia rendering, ffmpeg encodi
 | `pnpm build`        | Production build (runs `pnpm tauri build` via wrapper)              |
 | `pnpm lint`         | ESLint on `app/` (flat config v9, Prettier-integrated)              |
 | `pnpm format`       | Prettier on `app/`                                                  |
+| `pnpm test`         | Frontend Vitest suite                                              |
 | `pnpm release`      | semantic-release (auto-tags on `skia-render-backend` branch pushes) |
 
 `pnpm tauri build` is wrapped by `scripts/tauri.mjs` — it runs Tauri with `--no-bundle`, then creates a standalone `.zip` portable archive containing the binary + `vendor/ffmpeg/` + `fonts/` + `templates/`.
@@ -78,6 +79,7 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 
 - **FFmpeg 8.1+** (full build) auto-downloaded by `postinstall` script to `vendor/ffmpeg/`. Required for video encoding. Tauri bundle resources include this path.
 - **pnpm 10.25.0** (enforced via `package.json` `packageManager` field).
+- **One pnpm workspace**: install from the repository root with `pnpm install --frozen-lockfile`. `app/` shares the root `pnpm-lock.yaml`; install hooks reject other package managers. Use pnpm's default external store; no project `.pnpm-store/` directory or `.npmrc` override is needed.
 - **Node 24** used in CI; any modern LTS should work.
 
 ## Build & release
@@ -89,9 +91,9 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 
 ## Testing
 
-- **Frontend**: Vitest + Testing Library. Run with `npx vitest run` from inside `app/` directory. Test files live in `app/src/tests/`.
+- **Frontend**: Vitest + Testing Library. Run with `pnpm test` from the repository root. Test files live in `app/src/tests/`.
 - **Rust backend**: `cargo test` from inside `src-tauri/ovrley_core/`. Integration tests in `tests/`, unit tests are `#[cfg(test)] mod tests` blocks inline or in `src/*/tests/`.
-- Run both with `npx vitest run test` && cargo test --manifest-path src-tauri/ovrley_core/Cargo.toml`.
+- Run both from the repository root with `pnpm test` and `cargo test --manifest-path src-tauri/ovrley_core/Cargo.toml`.
 
 ## Agent skills
 

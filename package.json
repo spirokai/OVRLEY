@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "tauri": "node scripts/tauri.mjs",
+    "preinstall": "node scripts/require-pnpm.mjs",
     "postinstall": "node scripts/install-ffmpeg.mjs",
     "dev": "pnpm tauri dev",
     "build": "pnpm tauri build",
@@ -17,6 +18,7 @@
     "lint": "pnpm lint:frontend",
     "format:frontend": "cd app && pnpm format",
     "format": "pnpm format:frontend",
+    "test": "pnpm --dir app test",
     "release": "semantic-release",
     "benchmark:transparent": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_transparent --",
     "benchmark:composite": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_composite --",
