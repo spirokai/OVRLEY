@@ -67,9 +67,9 @@ if (!existsSync(depsMarker)) {
 
 const staging = join(cache, 'export')
 const sysroot = join(emscripten, 'cache', 'sysroot').replaceAll('\\', '/')
-// Emscripten translates SSE2 intrinsics to WASM SIMD. This Skia revision
-// selects its vector raster pipeline via __SSE2__, not __wasm_simd128__.
-const simdCflags = ['-msimd128', '-msse2']
+// Emscripten translates SSE4.1 intrinsics to WASM SIMD. This Skia revision
+// selects its vector raster pipeline via __SSE4_1__, not __wasm_simd128__.
+const simdCflags = ['-msimd128', '-msse4.1']
 Object.assign(env, {
   CARGO_TARGET_DIR: join(cache, 'target'),
   SKIA_SOURCE_DIR: skia,

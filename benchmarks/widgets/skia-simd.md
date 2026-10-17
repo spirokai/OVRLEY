@@ -1,6 +1,8 @@
 # Skia WASM SIMD experiment — 2026-10-17
 
-The SIMD source build succeeded and is adopted in `vendor/skia-wasm`.
+The SSE2 SIMD source build succeeded and was adopted in commit `e8a854c2`.
+The subsequent [SSE4.1 experiment](skia-sse41.md) is now active; the measurements
+in this report describe SSE2 versus the original scalar module.
 Heading tape improved from 10.39 to 2.91 ms/frame (3.56x). Most other drawing-heavy
 widgets improved, but gradient, current-lap and lap delta regressed. The largest
 absolute regression is current-lap at 0.29 ms/frame. These remaining text-heavy

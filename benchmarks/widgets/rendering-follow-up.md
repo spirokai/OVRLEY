@@ -1,5 +1,10 @@
 # Widget rendering follow-up
 
+**SSE4.1 follow-up (2026-10-17):** The subsequent `-msse4.1` build reduced
+heading tape's render time another 8–9% versus SSE2, with pixel-identical output
+in 36 checked cases. Other timings are small and mixed. See
+[the SSE4.1 experiment](skia-sse41.md) for both timing passes and build details.
+
 **SIMD follow-up (2026-10-17):** Skia has now been rebuilt with `-msimd128 -msse2`.
 Heading tape improved 3.56x, with mixed results elsewhere, including three text-heavy
 regressions. See [the SIMD experiment](skia-simd.md) for timings, appearance checks,

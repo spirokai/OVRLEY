@@ -33,15 +33,17 @@ consumption of the stored archive. See
 
 ## SIMD rendering
 
-The source build enables `-msimd128 -msse2`. Emscripten translates the SSE2
-intrinsics to WebAssembly SIMD; the SSE2 macro selects this Skia revision's
+The source build enables `-msimd128 -msse4.1`. Emscripten translates the SSE4.1
+intrinsics to WebAssembly SIMD; the SSE4.1 macro selects this Skia revision's
 vector raster pipeline. The application linker also receives `-msimd128`.
 Rust's own code generation flags are unchanged, keeping the alpha-conversion
 loop outside this experiment. The generated manifest records the C++ flags.
 The source builder applies `scripts/patches/skcms-emscripten-intrinsics.patch`
 to omit skcms's extra Clang header imports on Emscripten; its `immintrin.h`
-already includes the enabled SSE2 headers. No drawing code is patched.
+already includes the enabled intrinsic headers. No drawing code is patched.
 
-The SIMD bundle is adopted following the measured gains and appearance checks
-in [the experiment report](../../benchmarks/widgets/skia-simd.md). The temporary
-scalar backups were removed; the original archive remains available in Git history.
+The initial SSE2 SIMD result is committed as `e8a854c2`; see
+[the SIMD experiment](../../benchmarks/widgets/skia-simd.md). The current
+[SSE4.1 experiment](../../benchmarks/widgets/skia-sse41.md) further improves
+heading tape with identical pixels in the checked cases. The temporary scalar
+backups were removed; the original archive remains available in Git history.
