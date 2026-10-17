@@ -2,10 +2,18 @@
 linker = "em++"
 ar = "emar"
 rustflags = [
-    "-C", "link-arg=-sINITIAL_MEMORY=134217728",
-    "-C", "link-arg=-sALLOW_MEMORY_GROWTH=1",
-    "-C", "link-arg=-sEXPORTED_RUNTIME_METHODS=HEAPU8",
-    "-C", "link-arg=-sMODULARIZE=1",
-    "-C", "link-arg=-sEXPORT_ES6=1",
-    "-C", "link-arg=-sENVIRONMENT=web",
+  "-C",
+  "target-feature=+simd128",
+  "-C",
+  "link-arg=-sINITIAL_MEMORY=134217728",
+  "-C",
+  "link-arg=-sALLOW_MEMORY_GROWTH=1",
+  "-C",
+  "link-arg=-sEXPORTED_RUNTIME_METHODS=HEAPU8",
+  "-C",
+  "link-arg=-sMODULARIZE=1",
+  "-C",
+  "link-arg=-sEXPORT_ES6=1",
+  "-C",
+  "link-arg=-sENVIRONMENT=web",
 ]

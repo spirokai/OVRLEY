@@ -2,6 +2,22 @@
 use crate::error::{WidgetError, WidgetResult};
 use skia_safe::{AlphaType, ColorType, ImageInfo, Surface};
 
+// Precompute the existing integer rounding for every channel/alpha byte pair.
+// Alpha zero is skipped by the caller. This 64 KiB table needs no runtime setup.
+static UNPREMULTIPLY: [[u8; 256]; 256] = {
+    let mut table = [[0; 256]; 256];
+    let mut alpha = 1;
+    while alpha < 256 {
+        let mut channel = 0;
+        while channel < 256 {
+            table[alpha][channel] = ((channel * 255 + alpha / 2) / alpha) as u8;
+            channel += 1;
+        }
+        alpha += 1;
+    }
+    table
+};
+
 /// Reads browser RGBA with integer rounding; RGB may differ by one from Skia's float conversion.
 pub fn read_surface_rgba(surface: &mut Surface, pixels: &mut [u8]) -> WidgetResult<()> {
     let info = ImageInfo::new(
@@ -17,12 +33,13 @@ pub fn read_surface_rgba(surface: &mut Surface, pixels: &mut [u8]) -> WidgetResu
     }
     // ImageData needs straight alpha; transparent and opaque pixels already match.
     for pixel in pixels.chunks_exact_mut(4) {
-        let alpha = u32::from(pixel[3]);
+        let alpha = usize::from(pixel[3]);
         if alpha == 0 || alpha == 255 {
             continue;
         }
+        let channels = &UNPREMULTIPLY[alpha];
         for channel in &mut pixel[..3] {
-            *channel = ((u32::from(*channel) * 255 + alpha / 2) / alpha) as u8;
+            *channel = channels[usize::from(*channel)];
         }
     }
     Ok(())
@@ -30,8 +47,21 @@ pub fn read_surface_rgba(surface: &mut Surface, pixels: &mut [u8]) -> WidgetResu
 
 #[cfg(test)]
 mod tests {
-    use super::read_surface_rgba;
+    use super::{read_surface_rgba, UNPREMULTIPLY};
     use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
+
+    #[test]
+    fn lookup_matches_integer_conversion_for_every_channel_and_nonzero_alpha() {
+        for alpha in 1..=255u32 {
+            for channel in 0..=255u32 {
+                let expected = ((channel * 255 + alpha / 2) / alpha) as u8;
+                assert_eq!(
+                    UNPREMULTIPLY[alpha as usize][channel as usize], expected,
+                    "channel {channel}, alpha {alpha}",
+                );
+            }
+        }
+    }
 
     #[test]
     fn readback_preserves_alpha_and_matches_skia_within_one_rgb_rounding_step() {

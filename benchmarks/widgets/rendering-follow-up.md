@@ -1,5 +1,16 @@
 # Widget rendering follow-up
 
+**Alpha lookup follow-up (2026-10-17):** An exact 64 KiB lookup table removes
+the readback loop's integer divisions. G-force improves about 1.6x, with gains
+for elevation, lap-log and other widgets; all 36 appearance cases remain
+pixel-identical. See [the lookup experiment](alpha-lookup.md).
+
+**Rust SIMD follow-up (2026-10-17):** Enabling Rust `+simd128` produces vector
+code but leaves the per-pixel alpha divisions scalar. Two timing passes show
+no clear overall gain, with identical pixels in 36 checks. See
+[the Rust SIMD experiment](rust-simd.md) and
+[the upstream binary-build flag audit](rust-skia-build-flags.md).
+
 **SSE4.1 follow-up (2026-10-17):** The subsequent `-msse4.1` build reduced
 heading tape's render time another 8–9% versus SSE2, with pixel-identical output
 in 36 checked cases. Other timings are small and mixed. See
