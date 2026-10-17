@@ -76,57 +76,51 @@ OVRLEY supports both exporting transparent overlays as well as final footage wit
 
 ## Dependencies
 
-Compiling and running OVRLEY requires the following system-level toolchains:
+- **Node.js 24 and pnpm 10.25.0**: one workspace and root lockfile. Frontend tooling uses **Vite+** (`vp`) for development, builds, linting, formatting, and Vitest tests.
+- **Rust via rustup**: native toolchain listed in [`.tool-versions`](.tool-versions), plus **Rust 1.98.1** with the `wasm32-unknown-emscripten` target for browser preview bindings.
+- **Tauri v2 platform prerequisites**: native compiler and webview development tools (MSVC Build Tools and WebView2 on Windows, Xcode Command Line Tools on macOS, system development packages on Linux).
+- **Emscripten 6.0.9** installed and activated through emsdk, plus **Python 3.10+** and **Git**.
+- **FFmpeg 8.1+ full build**: downloaded automatically into `vendor/ffmpeg` during installation.
 
-- **[Node.js](https://nodejs.org/) & [pnpm 10.25.0](https://pnpm.io/)** (Package management and script execution; pnpm is pinned in `package.json`)
-- **[Rust Toolchain 1.84](https://rust-lang.org/tools/install/)** (For compiling the Tauri shell and core engine)
-- **[FFmpeg 8.1+ (Full Build)](https://ffmpeg.org/download.html/)** (For video manipulation; **installed automatically**)
-
-> **Important:** The rendering engine requires an FFmpeg 8.1+ **Full Build** located within the `vendor/ffmpeg` directory to ensure compatibility with advanced hardware encoders. This is automatically handled by the installation process, but you can manually place your own build there.
+The prebuilt Skia WASM archive ships in [`vendor/skia-wasm`](vendor/skia-wasm). Ordinary bindings builds reuse it; GN, Ninja, and libclang are only needed to rebuild Skia from source. Native Skia uses upstream prebuilt binaries.
 
 ## Dev Installation
 
-Use pnpm for the entire repository. The root `pnpm-workspace.yaml` includes `app/`, and the root `pnpm-lock.yaml` locks dependencies for both packages. Run installation commands from the repository root; `app/` does not need a separate install or lockfile. Install hooks reject other package managers.
-
-The repository setup is automated. pnpm prepares the pinned Git dependency `igc-parser` and installs the `esbuild` binary; these dependency scripts are allowed in `pnpm-workspace.yaml`. A custom `postinstall` script will automatically download and place the required FFmpeg 8.1 binaries into the correct vendor directory.
+After cloning, install the dependencies above and activate Emscripten 6.0.9 in your emsdk installation. Run the following from the repository root:
 
 ```bash
-# Installs packages and automatically provisions the FFmpeg dependency
+rustup toolchain install 1.98.1 --profile minimal --target wasm32-unknown-emscripten
 pnpm install --frozen-lockfile
 ```
 
-pnpm manages its package cache outside the repository using its default store location (`pnpm store path` shows it). No project `.pnpm-store/` directory or `.npmrc` override is required.
+Copy [`.env.example`](.env.example) to `.env.local` and set `EMSDK` to your SDK directory. Set `PYTHON` if the Python on PATH is older than 3.10. Both the Tauri launcher and WASM scripts load this file; shell variables take precedence. `LIBCLANG_PATH` is only needed for rebuilding Skia.
+
+Use pnpm for all packages; no separate install in `app/` is needed.
 
 ## Development
 
-To launch the application locally with hot-module reloading enabled:
+Run commands from the repository root:
 
 ```bash
-# Starts the frontend server alongside the native Tauri window
-pnpm dev
+pnpm dev                       # Tauri app with frontend hot reload
+pnpm dev:frontend              # Frontend server only
+pnpm wasm:build                # Build JS/WASM bindings using stored Skia
 ```
 
-`npm run dev` can launch the same script because it delegates to pnpm, but use `pnpm dev` consistently and use pnpm for all dependency changes.
+The Vite plugin builds WASM bindings on first preview access and rebuilds/reloads when renderer sources change. Production frontend builds also generate and include the bindings.
 
-Other common commands, also from the repository root:
+### Rebuilding Skia from source
+
+Only needed when updating the stored Skia bundle. In addition to the tools above, install **LLVM/libclang** and set `LIBCLANG_PATH` (LLVM 23.1.0 is verified). The script fetches **GN** and pinned Skia sources/dependencies. It downloads **Ninja 1.13.1** on Windows; on other platforms install Ninja or set `NINJA` to its executable. Network access and several GB of disk space are required.
+
+Configure tool paths in the root `.env.local`: `EMSDK` for the SDK directory, `LIBCLANG_PATH` for the directory containing libclang, and optional `PYTHON` and `NINJA` executable paths. See [`.env.example`](.env.example); GN is managed by the script.
 
 ```bash
-pnpm dev:frontend  # Frontend development server only
-pnpm lint          # Frontend lint checks
-pnpm test          # Frontend tests
+pnpm wasm:skia:build  # Compile Skia and regenerate vendor/skia-wasm
+pnpm wasm:build       # Verify bindings consume the regenerated bundle
 ```
 
-To add a frontend dependency, use `pnpm --filter app add <package>`; to add a root development dependency, use `pnpm add -Dw <package>`. These commands update the shared root lockfile.
-
-Dependency checks also run from the repository root:
-
-```bash
-pnpm outdated -r  # Check available upgrades in both root and app
-pnpm audit        # Check the shared dependency tree for known vulnerabilities
-pnpm audit --fix  # Add overrides to address vulnerable dependency versions
-```
-
-`pnpm i` installs the locked dependencies across the workspace. Plain `pnpm outdated` checks the current package; use `-r` to include every workspace package. Review dependency changes and run checks after `pnpm audit --fix`.
+See the [WASM setup guide](src-tauri/wasm-bindings/README.md) for toolchain details.
 
 ## Available Test Suites
 
