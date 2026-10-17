@@ -3,11 +3,7 @@
   "rustVersion": "1.98.1",
   "emscriptenVersion": "6.0.9",
   "target": "wasm32-unknown-emscripten",
-  "features": [
-    "binary-cache",
-    "embed-icudtl",
-    "pdf",
-    "jpeg"
-  ],
-  "sha256": "c73a14119702c79e153b64a36b76e82f446dafa45dc2a72442415e30f228b891"
+  "features": ["binary-cache", "embed-icudtl", "pdf", "jpeg"],
+  "cflags": ["-fwasm-exceptions", "-msimd128", "-msse2"],
+  "sha256": "42eaa042f816449dd92b3a23edeba0e81249c5d991c497a3ff3534ad13167be3"
 }

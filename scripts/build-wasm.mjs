@@ -38,7 +38,7 @@ export function toolchainEnvironment() {
     ...process.env,
     EMSDK: emsdk,
     EM_CONFIG: join(emsdk, '.emscripten'),
-    EMCC_CFLAGS: '-fwasm-exceptions',
+    EMCC_CFLAGS: '-fwasm-exceptions -msimd128',
     CARGO_TARGET_DIR: join(root, 'src-tauri', 'target', 'wasm-bindings'),
     CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_LINKER: emxx,
     CC_wasm32_unknown_emscripten: emcc,

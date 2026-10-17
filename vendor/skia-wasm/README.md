@@ -30,3 +30,18 @@ Re-audit this list when changing the Skia revision or enabled features.
 Regenerate with `pnpm wasm:skia:build`, then run `pnpm wasm:build` to verify
 consumption of the stored archive. See
 [the migration setup guide](../../src-tauri/wasm-bindings/README.md).
+
+## SIMD rendering
+
+The source build enables `-msimd128 -msse2`. Emscripten translates the SSE2
+intrinsics to WebAssembly SIMD; the SSE2 macro selects this Skia revision's
+vector raster pipeline. The application linker also receives `-msimd128`.
+Rust's own code generation flags are unchanged, keeping the alpha-conversion
+loop outside this experiment. The generated manifest records the C++ flags.
+The source builder applies `scripts/patches/skcms-emscripten-intrinsics.patch`
+to omit skcms's extra Clang header imports on Emscripten; its `immintrin.h`
+already includes the enabled SSE2 headers. No drawing code is patched.
+
+The SIMD bundle is adopted following the measured gains and appearance checks
+in [the experiment report](../../benchmarks/widgets/skia-simd.md). The temporary
+scalar backups were removed; the original archive remains available in Git history.

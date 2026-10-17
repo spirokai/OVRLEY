@@ -1,5 +1,12 @@
 # Widget rendering follow-up
 
+**SIMD follow-up (2026-10-17):** Skia has now been rebuilt with `-msimd128 -msse2`.
+Heading tape improved 3.56x, with mixed results elsewhere, including three text-heavy
+regressions. See [the SIMD experiment](skia-simd.md) for timings, appearance checks,
+artifact hashes and build details. The SIMD result is adopted; temporary scalar
+backups were removed. The measurements below
+describe the earlier scalar module.
+
 The rebuilt readback helper improved g-force from 7.83 to 2.63 ms in WASM. The next main costs were repeated text shadows and, separately, image sampling/compositing. Lap-log cached glyph layouts but repainted the whole table on each changing timer sample. Heading-tape cached its strip correctly, but scrolling that strip still ran an expensive scalar pixel pipeline.
 
 The requested mask shadows and lap raster cache are implemented for both hosts. The production WASM module and native benchmark were rebuilt, and a full 24-case run completed. No desktop application build was run.
@@ -86,13 +93,13 @@ The current raster helper is identifiable in the rebuilt disassembly as function
 
 WebAssembly supports 128-bit SIMD operations that browsers compile into hardware vector instructions. Emscripten enables this with `-msimd128` and can translate supported existing SSE/NEON intrinsics. See [V8's SIMD explanation](https://v8.dev/features/simd) and [Emscripten's SIMD documentation](https://emscripten.org/docs/porting/simd).
 
-Our measured WASM binary contains no SIMD instructions. This is a concrete difference from native Skia's available CPU vector routines, but the fraction of the remaining slowdown caused by that difference has not been isolated. Improving a drawing algorithm benefits both hosts; explaining their speed ratio requires comparing their compiled implementations and runtime costs.
+The scalar WASM binary measured in this report contains no SIMD instructions. This is a concrete difference from native Skia's available CPU vector routines, but the fraction of the remaining slowdown caused by that difference was not isolated in these measurements. Improving a drawing algorithm benefits both hosts; explaining their speed ratio requires comparing their compiled implementations and runtime costs.
 
 A SIMD experiment must rebuild the C++ Skia library with SIMD enabled and ensure that this Skia revision selects a suitable vector implementation. The final WASM module must support those instructions too. Changing only Rust flags or relinking the existing Skia archive does not accelerate that archive. Verify SIMD use in the actual drawing hot paths, then repeat the same benchmark and appearance checks.
 
 **If Skia uses the vector routines, our widget rendering code can stay unchanged.** Calls such as `draw_text_blob`, `draw_image`, and path drawing keep the same API and rendering strategy; Skia's internal implementation performs the work differently. No switch to different widget drawing primitives is required for this experiment.
 
-The custom Rust alpha-conversion loop is outside Skia. Rebuilding Skia with SIMD does not vectorize that loop; its optimization remains separate. No SIMD-enabled Skia rebuild or performance comparison has been performed, so the expected speedup remains unmeasured.
+The custom Rust alpha-conversion loop is outside Skia. Rebuilding Skia with SIMD does not vectorize that loop; its optimization remains separate. The subsequent [SIMD rebuild and comparison](skia-simd.md) measures the result without changing that loop's Rust target-feature flags.
 
 ## Heading and other next opportunities
 

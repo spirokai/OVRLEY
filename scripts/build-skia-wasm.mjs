@@ -1,5 +1,5 @@
 // Regenerate the versioned Skia bundle. Ordinary bindings builds never run this.
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs'
 import { delimiter, join, resolve } from 'node:path'
@@ -18,6 +18,13 @@ if (!existsSync(checkout))
 run('git', ['-C', checkout, 'fetch', '--depth=1', 'origin', revision])
 run('git', ['-C', checkout, '-c', 'core.longpaths=true', 'checkout', '--detach', revision])
 run('git', ['-C', checkout, '-c', 'core.longpaths=true', 'submodule', 'update', '--init', '--depth', '1'])
+
+// skcms imports unsupported AVX/AVX-512 headers on Clang even for SSE2.
+// Emscripten's immintrin.h already supplies the enabled intrinsic headers.
+const intrinsicsPatch = join(root, 'scripts', 'patches', 'skcms-emscripten-intrinsics.patch')
+const patchApplied = spawnSync('git', ['apply', '--reverse', '--check', intrinsicsPatch], { cwd: skia, env, stdio: 'pipe' })
+if (patchApplied.error) throw patchApplied.error
+if (patchApplied.status !== 0) run('git', ['apply', intrinsicsPatch], skia)
 
 let ninja = env.NINJA
 if (!ninja) {
@@ -60,6 +67,9 @@ if (!existsSync(depsMarker)) {
 
 const staging = join(cache, 'export')
 const sysroot = join(emscripten, 'cache', 'sysroot').replaceAll('\\', '/')
+// Emscripten translates SSE2 intrinsics to WASM SIMD. This Skia revision
+// selects its vector raster pipeline via __SSE2__, not __wasm_simd128__.
+const simdCflags = ['-msimd128', '-msse2']
 Object.assign(env, {
   CARGO_TARGET_DIR: join(cache, 'target'),
   SKIA_SOURCE_DIR: skia,
@@ -68,7 +78,7 @@ Object.assign(env, {
   SKIA_NINJA_COMMAND: ninja,
   // Skia 0.153.3 expects .bat SDK launchers on Windows; SDK 6 supplies .exe.
   // Select the installed tools explicitly, including their WASM sysroot.
-  SKIA_GN_ARGS: `skia_emsdk_dir="" ar="${emar.replaceAll('\\', '/')}" cc="${emcc.replaceAll('\\', '/')}" cxx="${emxx.replaceAll('\\', '/')}" extra_cflags+=["-fwasm-exceptions","--sysroot=${sysroot}"] extra_ldflags=["--sysroot=${sysroot}"]`,
+  SKIA_GN_ARGS: `skia_emsdk_dir="" ar="${emar.replaceAll('\\', '/')}" cc="${emcc.replaceAll('\\', '/')}" cxx="${emxx.replaceAll('\\', '/')}" extra_cflags+=${JSON.stringify(['-fwasm-exceptions', `--sysroot=${sysroot}`, ...simdCflags])} extra_ldflags=["--sysroot=${sysroot}","-msimd128"]`,
   BINDGEN_EXTRA_CLANG_ARGS: `-isystem"${join(emscripten, 'system', 'include', 'compat')}"`,
   BUILD_ARTIFACTSTAGINGDIRECTORY: staging,
 })
@@ -132,6 +142,7 @@ writeFileSync(
       emscriptenVersion,
       target,
       features: ['binary-cache', 'embed-icudtl', 'pdf', 'jpeg'],
+      cflags: ['-fwasm-exceptions', ...simdCflags],
       sha256,
     },
     null,
