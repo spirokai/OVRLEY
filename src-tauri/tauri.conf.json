@@ -15,6 +15,7 @@
       {
         "title": "OVRLEY",
         "backgroundColor": "#00111b",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required --disable_direct_composition_video_overlays=1",
         "width": 1920,
         "height": 1080,
         "minWidth": 1100,
@@ -58,15 +59,7 @@
         ]
       }
     },
-    "icon": [
-      "icons/32x32.png",
-      "icons/64x64.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico",
-      "icons/icon.png"
-    ]
+    "icon": ["icons/32x32.png", "icons/64x64.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico", "icons/icon.png"]
   },
   "plugins": {
     "updater": {
