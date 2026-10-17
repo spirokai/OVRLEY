@@ -13,7 +13,8 @@ function isTimeDependentWidget(widget) {
   return WIDGET_TYPE_DEFINITIONS[widget.type].timeDependent
 }
 
-function widgetFonts(widget) {
+/** @param {object} widget Effective widget. @returns {object[]} Required native font resource requests. */
+export function widgetFonts(widget) {
   if (widget.type === 'backdrop' || widget.type === 'raster' || widget.type === 'course') return []
   if (widget.type === 'elevation') {
     return widget.data.show_elevation_metric || widget.data.show_elevation_imperial ? [{ font: widget.data.point_label.font }] : []

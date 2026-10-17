@@ -25,6 +25,9 @@
     "benchmark:transparent": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_transparent --",
     "benchmark:composite": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_composite --",
     "benchmark:widget-rate": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_widget_rate --",
+    "benchmark:widgets": "node benchmarks/widgets/run.mjs",
+    "benchmark:widgets:build": "node benchmarks/widgets/run.mjs --build",
+    "benchmark:widgets:summary": "node benchmarks/widgets/summarize.mjs",
     "prepare": "vp config"
   },
   "keywords": [],
