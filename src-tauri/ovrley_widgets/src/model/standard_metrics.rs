@@ -24,6 +24,7 @@ pub enum StandardMetricFormatterKind {
     Aperture,
     Ev,
     Gear,
+    GasMix,
     Coordinates,
     Distance,
     Elevation,

@@ -20,6 +20,7 @@ pub struct MetricSample<'a> {
     pub gear: Option<&'a str>,
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,
+    pub fraction_he: Option<f64>,
     pub full_activity_distance: Option<f64>,
     pub full_activity_total_ascent: Option<f64>,
 }
@@ -73,8 +74,13 @@ pub struct MetricCoordinateDisplay {
 }
 
 pub fn format_number(value: f64, decimals: usize) -> String {
+    let factor = 10_f64.powi(decimals as i32);
+    let scaled = value * factor;
+    // Trimming introduces another interpolation step in native export. Ignore
+    // its floating-point noise at rounding ties so both hosts show the same text.
+    let slack = (scaled.abs().max(1.0) * f64::EPSILON * 4.0).min(1e-9);
+    let rounded = (scaled + slack.copysign(scaled)).round() / factor;
     if decimals == 0 {
-        let rounded = value.round();
         return if rounded == 0.0 {
             "0".to_string()
         } else {
@@ -82,8 +88,6 @@ pub fn format_number(value: f64, decimals: usize) -> String {
         };
     }
 
-    let factor = 10_f64.powi(decimals as i32);
-    let rounded = (value * factor).round() / factor;
     let rounded = if rounded == 0.0 { 0.0 } else { rounded };
     format!("{rounded:.decimals$}")
 }
@@ -168,6 +172,10 @@ fn format_validated_standard_metric_parts(
     let unit_text = show_units.then(|| standard_metric_unit_label(kind, display_unit).to_string());
 
     let value_text = match standard_metric_formatter(kind) {
+        Some(StandardMetricFormatterKind::GasMix) => raw
+            .zip(sample.fraction_he)
+            .map(|(o2, he)| format!("{:02.0}/{:02.0}", o2 * 100.0, he * 100.0))
+            .unwrap_or_else(|| "--/--".to_string()),
         Some(StandardMetricFormatterKind::Speed) => raw
             .map(|speed_mps| {
                 format_number(
@@ -404,7 +412,7 @@ pub fn convert_standard_metric_value(
             "kmh" => value * 3.6,
             _ => unreachable!("speed unit validated at ingress"),
         },
-        MetricKind::Temperature | MetricKind::CoreTemperature => {
+        MetricKind::Temperature | MetricKind::CoreTemperature | MetricKind::WaterTemperature => {
             if display_unit == Some("fahrenheit") {
                 (value * 9.0 / 5.0) + 32.0
             } else {
@@ -444,6 +452,16 @@ pub fn convert_standard_metric_value(
             "mmhg" => value * 750.061_561_303,
             "mbar" | "hpa" => value * 1000.0,
             _ => unreachable!("pressure unit validated at ingress"),
+        },
+        MetricKind::Depth | MetricKind::FirstStopDepth => match display_unit {
+            Some("m") => value,
+            Some("ft") => value / 0.3048,
+            _ => unreachable!("depth unit validated at ingress"),
+        },
+        MetricKind::AveragePpo2 => match display_unit {
+            Some("ata") => value,
+            Some("bar") => value * 1.01325,
+            _ => unreachable!("oxygen partial pressure unit validated at ingress"),
         },
         MetricKind::Altitude => {
             if display_unit == Some("ft") {

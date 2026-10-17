@@ -514,6 +514,7 @@
       "rectangle": "Rechthoek"
     },
     "categories": {
+      "scuba_diving": "Duiken",
       "camera": "Camera",
       "cycling": "Fietsen",
       "general": "Algemeen",
@@ -538,6 +539,13 @@
       "lapLog": "Rondeoverzicht"
     },
     "types": {
+      "depth": { "name": "Diepte", "shortName": "Diepte" },
+      "first_stop_depth": { "name": "Diepte eerste decompressiestop", "shortName": "Stopdiepte" },
+      "first_stop_time": { "name": "Duur eerste decompressiestop", "shortName": "Stoptijd" },
+      "time_to_surface": { "name": "Tijd tot oppervlakte", "shortName": "TTS" },
+      "average_ppo2": { "name": "Gemiddelde ppO₂", "shortName": "ppO₂" },
+      "gas_mix": { "name": "Gasmengsel (O₂/He)", "shortName": "O₂/He" },
+      "water_temperature": { "name": "Watertemperatuur", "shortName": "Watertemp." },
       "raster": { "name": "Afbeelding", "shortName": "Afbeelding" },
       "air_pressure": { "name": "Luchtdruk", "shortName": "Druk" },
       "altitude": { "name": "Hoogte", "shortName": "Hoogte" },

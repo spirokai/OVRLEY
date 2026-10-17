@@ -514,6 +514,7 @@
       "rectangle": "Rektangel"
     },
     "categories": {
+      "scuba_diving": "Sportdykning",
       "camera": "Kamera",
       "cycling": "Cykling",
       "general": "Allmänt",
@@ -538,6 +539,13 @@
       "lapLog": "Varvlogg"
     },
     "types": {
+      "depth": { "name": "Djup", "shortName": "Djup" },
+      "first_stop_depth": { "name": "Första stoppets djup", "shortName": "Stoppdjup" },
+      "first_stop_time": { "name": "Första stoppets tid", "shortName": "Stopptid" },
+      "time_to_surface": { "name": "Tid till ytan", "shortName": "TTS" },
+      "average_ppo2": { "name": "Genomsnittligt ppO₂", "shortName": "ppO₂" },
+      "gas_mix": { "name": "Gasblandning (O₂/He)", "shortName": "O₂/He" },
+      "water_temperature": { "name": "Vattentemperatur", "shortName": "Vattentemp." },
       "raster": { "name": "Bild", "shortName": "Bild" },
       "air_pressure": { "name": "Lufttryck", "shortName": "Lufttryck" },
       "altitude": { "name": "Höjd", "shortName": "Höjd" },

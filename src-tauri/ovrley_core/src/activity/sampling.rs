@@ -122,6 +122,7 @@ impl DenseActivityReport {
                 .and_then(Option::as_deref),
             latitude: self.series.course_lat.get(index).copied().flatten(),
             longitude: self.series.course_lon.get(index).copied().flatten(),
+            fraction_he: self.series.fraction_he.get(index).copied().flatten(),
             full_activity_distance: self.full_activity_distance,
             full_activity_total_ascent: self.full_activity_total_ascent,
         }

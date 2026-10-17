@@ -8,6 +8,7 @@
     "running": "widgets.categories.running",
     "motosports": "widgets.categories.motosports",
     "camera": "widgets.categories.camera",
+    "scuba_diving": "widgets.categories.scuba_diving",
     "other": "widgets.categories.other"
   },
   "collections": {

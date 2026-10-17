@@ -514,6 +514,7 @@
       "rectangle": "Obdélník"
     },
     "categories": {
+      "scuba_diving": "Přístrojové potápění",
       "camera": "Kamera",
       "cycling": "Cyklistika",
       "general": "Obecné",
@@ -538,6 +539,13 @@
       "lapLog": "Přehled kol"
     },
     "types": {
+      "depth": { "name": "Hloubka", "shortName": "Hloubka" },
+      "first_stop_depth": { "name": "Hloubka první zastávky", "shortName": "Hloubka zast." },
+      "first_stop_time": { "name": "Doba první zastávky", "shortName": "Doba zast." },
+      "time_to_surface": { "name": "Čas do vynoření", "shortName": "TTS" },
+      "average_ppo2": { "name": "Průměrný ppO₂", "shortName": "ppO₂" },
+      "gas_mix": { "name": "Směs plynů (O₂/He)", "shortName": "O₂/He" },
+      "water_temperature": { "name": "Teplota vody", "shortName": "Teplota vody" },
       "raster": { "name": "Obrázek", "shortName": "Obrázek" },
       "air_pressure": { "name": "Tlak vzduchu", "shortName": "Tlak" },
       "altitude": { "name": "Nadmořská výška", "shortName": "Výška" },

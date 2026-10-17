@@ -514,6 +514,7 @@
       "rectangle": "長方形"
     },
     "categories": {
+      "scuba_diving": "スキューバダイビング",
       "camera": "カメラ",
       "cycling": "サイクリング",
       "general": "一般",
@@ -538,6 +539,13 @@
       "lapLog": "ラップログ"
     },
     "types": {
+      "depth": { "name": "水深", "shortName": "水深" },
+      "first_stop_depth": { "name": "最初の減圧停止深度", "shortName": "停止深度" },
+      "first_stop_time": { "name": "最初の減圧停止時間", "shortName": "停止時間" },
+      "time_to_surface": { "name": "浮上までの時間", "shortName": "TTS" },
+      "average_ppo2": { "name": "平均ppO₂", "shortName": "ppO₂" },
+      "gas_mix": { "name": "混合ガス (O₂/He)", "shortName": "O₂/He" },
+      "water_temperature": { "name": "水温", "shortName": "水温" },
       "raster": { "name": "画像", "shortName": "画像" },
       "air_pressure": { "name": "気圧", "shortName": "気圧" },
       "altitude": { "name": "高度", "shortName": "高度" },

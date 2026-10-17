@@ -6,7 +6,66 @@
 //! dimensionally invalid combinations, and converts accepted values to the
 //! canonical units used by activity finalization.
 
+use super::types::HeaderColumn;
 use super::Metric;
+use crate::error::{CoreError, CoreResult};
+use csv::StringRecord;
+
+/// File-level units for Shearwater's otherwise unqualified depth/temperature headers.
+#[derive(Default)]
+pub(super) struct ShearwaterUnits {
+    imperial_index: Option<usize>,
+    imperial: Option<bool>,
+}
+
+impl ShearwaterUnits {
+    pub(super) fn observe(&mut self, record: &StringRecord) -> CoreResult<()> {
+        if let Some(index) = self.imperial_index.take() {
+            self.imperial = Some(match record.get(index).map(str::trim) {
+                Some(value) if value.eq_ignore_ascii_case("true") => true,
+                Some(value) if value.eq_ignore_ascii_case("false") => false,
+                _ => {
+                    return Err(CoreError::Activity(
+                        "Invalid Shearwater Imperial Units flag".into(),
+                    ))
+                }
+            });
+        }
+        self.imperial_index = record
+            .iter()
+            .position(|value| value.trim() == "Imperial Units");
+        Ok(())
+    }
+
+    pub(super) fn apply(&self, columns: &mut [HeaderColumn]) {
+        let Some(imperial) = self.imperial else {
+            return;
+        };
+        for column in columns {
+            if column.declared_unit != DeclaredUnit::Absent {
+                continue;
+            }
+            let unit = match column.metric {
+                Metric::Depth | Metric::FirstStopDepth => {
+                    if imperial {
+                        Unit::Feet
+                    } else {
+                        Unit::Metres
+                    }
+                }
+                Metric::WaterTemperature => {
+                    if imperial {
+                        Unit::Fahrenheit
+                    } else {
+                        Unit::Celsius
+                    }
+                }
+                _ => continue,
+            };
+            column.declared_unit = DeclaredUnit::Supported(unit);
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 /// Units understood by the CSV activity importer.
@@ -15,6 +74,16 @@ pub(super) enum Unit {
     Seconds,
     /// Milliseconds.
     Milliseconds,
+    /// Minutes, retained in canonical dive prediction columns.
+    Minutes,
+    /// Absolute atmospheres of oxygen partial pressure.
+    AtmospheresAbsolute,
+    /// Unscaled gas fraction from zero to one.
+    Fraction,
+    /// Degrees Celsius.
+    Celsius,
+    /// Degrees Fahrenheit, converted at ingestion.
+    Fahrenheit,
     /// Decimal degrees for coordinates.
     DecimalDegrees,
     /// Metres per second.
@@ -91,6 +160,11 @@ pub(super) fn parse_declared_unit(value: &str) -> DeclaredUnit {
     let unit = match normalized.as_str() {
         "s" | "sec" | "second" | "seconds" => Unit::Seconds,
         "ms" | "millisecond" | "milliseconds" => Unit::Milliseconds,
+        "min" | "minute" | "minutes" => Unit::Minutes,
+        "ata" => Unit::AtmospheresAbsolute,
+        "fraction" => Unit::Fraction,
+        "celsius" | "°c" => Unit::Celsius,
+        "fahrenheit" | "°f" => Unit::Fahrenheit,
         "deg" | "degree" | "degrees" | "°" => Unit::Degrees,
         "m/s" | "mps" => Unit::MetresPerSecond,
         "km/h" | "kmh" | "kph" => Unit::KilometresPerHour,
@@ -193,12 +267,18 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
             Unit::MetresPerSecond | Unit::KilometresPerHour | Unit::MilesPerHour
         ),
         Metric::Elevation
+        | Metric::Depth
+        | Metric::FirstStopDepth
         | Metric::BarometricAltitude
         | Metric::Distance
         | Metric::DistanceToHome => {
             matches!(unit, Unit::Metres | Unit::Kilometres | Unit::Feet)
         }
         Metric::Heading => matches!(unit, Unit::Degrees),
+        Metric::FirstStopTime | Metric::TimeToSurface => matches!(unit, Unit::Minutes),
+        Metric::AveragePpo2 => matches!(unit, Unit::AtmospheresAbsolute),
+        Metric::FractionO2 | Metric::FractionHe => matches!(unit, Unit::Fraction),
+        Metric::WaterTemperature => matches!(unit, Unit::Celsius | Unit::Fahrenheit),
         Metric::GForce | Metric::GForceX | Metric::GForceY | Metric::GForceZ => {
             matches!(unit, Unit::G)
         }
@@ -223,6 +303,7 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
 
 pub(super) fn convert(value: f64, unit: Unit) -> f64 {
     match unit {
+        Unit::Fahrenheit => (value - 32.0) * 5.0 / 9.0,
         Unit::Milliseconds => value / 1000.0,
         Unit::KilometresPerHour => value / 3.6,
         Unit::MilesPerHour => value * 0.44704,
@@ -233,6 +314,10 @@ pub(super) fn convert(value: f64, unit: Unit) -> f64 {
         Unit::MechanicalHorsepower => value * 745.699_871_582_270_2,
         Unit::FootPounds => value * 1.355_817_948_331_400_4,
         Unit::Seconds
+        | Unit::Minutes
+        | Unit::AtmospheresAbsolute
+        | Unit::Fraction
+        | Unit::Celsius
         | Unit::DecimalDegrees
         | Unit::MetresPerSecond
         | Unit::Metres
@@ -249,6 +334,11 @@ pub(super) fn convert(value: f64, unit: Unit) -> f64 {
 /// Returns the canonical default unit for a metric with no declaration.
 fn default_unit(metric: Metric) -> Unit {
     match metric {
+        Metric::Depth | Metric::FirstStopDepth => Unit::Metres,
+        Metric::FirstStopTime | Metric::TimeToSurface => Unit::Minutes,
+        Metric::AveragePpo2 => Unit::AtmospheresAbsolute,
+        Metric::FractionO2 | Metric::FractionHe => Unit::Fraction,
+        Metric::WaterTemperature => Unit::Celsius,
         Metric::ElapsedSeconds | Metric::Timestamp => Unit::Seconds,
         Metric::Latitude | Metric::Longitude => Unit::DecimalDegrees,
         Metric::Speed => Unit::KilometresPerHour,

@@ -26,6 +26,7 @@ use csv::StringRecord;
 enum HeaderProfile {
     Generic,
     DjiAirData,
+    Shearwater,
 }
 
 /// Parses one record as a usable telemetry-header candidate.
@@ -38,12 +39,12 @@ pub(super) fn parse_header_candidate(record: &StringRecord) -> CoreResult<Option
     let gps_update_index = record
         .iter()
         .position(|value| normalize_syntax(value) == "gps update");
+    let profile = detect_header_profile(record);
     let mut columns = record
         .iter()
         .enumerate()
-        .filter_map(|(index, value)| parse_header(index, value))
+        .filter_map(|(index, value)| parse_header(index, value, profile))
         .collect::<Vec<_>>();
-    let profile = detect_header_profile(record);
     let has_timing = columns.iter().any(|column| column.metric.is_timing());
     let has_telemetry = columns.iter().any(|column| !column.metric.is_timing());
     if has_timing && has_telemetry {
@@ -82,6 +83,12 @@ pub(super) fn parse_header_candidate(record: &StringRecord) -> CoreResult<Option
 }
 
 fn detect_header_profile(record: &StringRecord) -> HeaderProfile {
+    if ["depth", "average ppo2", "fraction o2", "fraction he"]
+        .iter()
+        .all(|semantic| has_header_semantic(record, semantic))
+    {
+        return HeaderProfile::Shearwater;
+    }
     let has_distance = has_header_semantic(record, "distance");
     let has_mileage = has_header_semantic(record, "mileage");
     let has_airdata_marker = has_header_semantic(record, "compass heading")
@@ -157,7 +164,7 @@ pub(super) fn is_compatible_units_row(record: &StringRecord, columns: &[HeaderCo
 /// Unknown aliases return `None`. Header annotations supply units or control
 /// semantics, while source qualifiers resolve source-specific meanings such as
 /// absolute GPS time and otherwise adjust precedence.
-fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
+fn parse_header(index: usize, value: &str, profile: HeaderProfile) -> Option<HeaderColumn> {
     let (semantic, annotation, source) = split_header(value)?;
     let declared_unit = annotation
         .as_deref()
@@ -215,6 +222,50 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         ),
         "latitude" => (Metric::Latitude, SourcePriority::Direct, None, None, None),
         "longitude" => (Metric::Longitude, SourcePriority::Direct, None, None, None),
+        "depth" if profile == HeaderProfile::Shearwater => {
+            (Metric::Depth, SourcePriority::Direct, None, None, None)
+        }
+        "first stop depth" if profile == HeaderProfile::Shearwater => (
+            Metric::FirstStopDepth,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
+        "first stop time" if profile == HeaderProfile::Shearwater => (
+            Metric::FirstStopTime,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
+        "time to surface" if profile == HeaderProfile::Shearwater => (
+            Metric::TimeToSurface,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
+        "average ppo2" if profile == HeaderProfile::Shearwater => (
+            Metric::AveragePpo2,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
+        "fraction o2" if profile == HeaderProfile::Shearwater => {
+            (Metric::FractionO2, SourcePriority::Direct, None, None, None)
+        }
+        "fraction he" if profile == HeaderProfile::Shearwater => {
+            (Metric::FractionHe, SourcePriority::Direct, None, None, None)
+        }
+        "water temp" if profile == HeaderProfile::Shearwater => (
+            Metric::WaterTemperature,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
         "gps" => (
             Metric::GpsCoordinate,
             SourcePriority::Direct,

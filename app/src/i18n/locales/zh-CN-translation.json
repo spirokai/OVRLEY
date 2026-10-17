@@ -514,6 +514,7 @@
       "rectangle": "矩形"
     },
     "categories": {
+      "scuba_diving": "水肺潜水",
       "camera": "相机",
       "cycling": "骑行",
       "general": "常规",
@@ -538,6 +539,13 @@
       "lapLog": "圈记录"
     },
     "types": {
+      "depth": { "name": "深度", "shortName": "深度" },
+      "first_stop_depth": { "name": "首个减压停留深度", "shortName": "停留深度" },
+      "first_stop_time": { "name": "首个减压停留时间", "shortName": "停留时间" },
+      "time_to_surface": { "name": "上升至水面时间", "shortName": "TTS" },
+      "average_ppo2": { "name": "平均ppO₂", "shortName": "ppO₂" },
+      "gas_mix": { "name": "混合气体 (O₂/He)", "shortName": "O₂/He" },
+      "water_temperature": { "name": "水温", "shortName": "水温" },
       "raster": { "name": "图片", "shortName": "图片" },
       "air_pressure": { "name": "气压", "shortName": "气压" },
       "altitude": { "name": "海拔高度", "shortName": "海拔" },

@@ -490,6 +490,13 @@ pub fn generate(metrics: &Value, widgets: &Value, out: &Path) {
         .unwrap();
     }
     generated.push_str("_ => None, } }\n}\n");
+    generated.push_str("pub const ZERO_AVAILABLE_ACTIVITY_SERIES: &[&str] = &[\n");
+    for (key, definition) in &numeric {
+        if boolean(definition, "zeroIsAvailable") {
+            writeln!(generated, "{key:?},").unwrap();
+        }
+    }
+    generated.push_str("];\n");
     for (group, constant) in [
         ("core", "CORE_ACTIVITY_ATTRIBUTES"),
         ("extended", "EXTENDED_ACTIVITY_ATTRIBUTES"),

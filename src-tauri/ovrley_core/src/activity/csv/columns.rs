@@ -322,6 +322,22 @@ pub(super) fn build_activity_columns(
         &groups,
     );
     let empty = || vec![None; sample_count];
+    // Keep each gas observation atomic, including duplicate-time coalescing.
+    // Missing helium is unknown, not an air/nitrox mixture with zero helium.
+    let gas = selected_series(Metric::FractionO2, &header.columns, units_row, data)
+        .into_iter()
+        .zip(selected_series(
+            Metric::FractionHe,
+            &header.columns,
+            units_row,
+            data,
+        ))
+        .map(|(o2, he)| o2.zip(he).filter(|(o2, he)| o2 + he <= 1.0 + 1e-9))
+        .collect();
+    let (fraction_o2, fraction_he) = coalesce_series(gas, &groups)
+        .into_iter()
+        .map(|gas| (gas.map(|gas| gas.0), gas.map(|gas| gas.1)))
+        .unzip();
     let smoothing = ["g_force_x", "g_force_y", "g_force_z"]
         .into_iter()
         .map(|metric| {
@@ -389,6 +405,14 @@ pub(super) fn build_activity_columns(
         engine_power,
         engine_load,
         temperature: empty(),
+        depth: series(Metric::Depth).0,
+        first_stop_depth: series(Metric::FirstStopDepth).0,
+        first_stop_time: series(Metric::FirstStopTime).0,
+        time_to_surface: series(Metric::TimeToSurface).0,
+        average_ppo2: series(Metric::AveragePpo2).0,
+        fraction_o2,
+        fraction_he,
+        water_temperature: series(Metric::WaterTemperature).0,
         calories: empty(),
         gradient: empty(),
         pace: empty(),

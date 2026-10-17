@@ -10,6 +10,33 @@ import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 import i18next from '@/i18n'
 
 describe('manifest-backed widgets', () => {
+  test('offers seven scuba text metrics with diving units and conventional names', () => {
+    const group = GROUPED_QUICKMENU_ITEMS.find((group) => group.items.some((item) => item.type === 'depth'))
+    const types = ['depth', 'first_stop_depth', 'first_stop_time', 'time_to_surface', 'average_ppo2', 'gas_mix', 'water_temperature']
+    expect(group.items.map((item) => item.type).sort()).toEqual([...types].sort())
+    for (const type of types) {
+      expect(WIDGET_TYPE_DEFINITIONS[type].category).toBe('scuba_diving')
+      expect(getWidgetDisplayTypeOptions(type, i18next.t)).toEqual([{ value: 'text', label: 'Text' }])
+    }
+    expect(i18next.t('widgets.types.depth.shortName')).toBe('Depth')
+    expect(i18next.t('widgets.types.first_stop_depth.shortName')).toBe('Stop Depth')
+    expect(i18next.t('widgets.types.first_stop_time.shortName')).toBe('Stop Time')
+    expect(WIDGET_TYPE_DEFINITIONS.depth.supportedDisplayUnits.map((unit) => unit.value)).toEqual(['m', 'ft'])
+    expect(WIDGET_TYPE_DEFINITIONS.water_temperature.supportedDisplayUnits.map((unit) => unit.value)).toEqual(['celsius', 'fahrenheit'])
+    expect(createWidgetDefaults({ type: 'average_ppo2' }, DEFAULT_GLOBAL_DEFAULTS)).toMatchObject({ display_unit: 'ata', decimals: 2 })
+    expect(WIDGET_TYPE_DEFINITIONS.average_ppo2.supportedDisplayUnits[0]).toEqual({ value: 'ata', label: 'atm', renderLabel: 'ATM' })
+    for (const [type, decimals] of [
+      ['depth', 1],
+      ['first_stop_depth', 1],
+      ['first_stop_time', 0],
+      ['time_to_surface', 0],
+    ]) {
+      expect(WIDGET_TYPE_DEFINITIONS[type].hasDecimalControl).toBe(true)
+      expect(createWidgetDefaults({ type }, DEFAULT_GLOBAL_DEFAULTS).decimals).toBe(decimals)
+    }
+    expect(WIDGET_TYPE_DEFINITIONS.gas_mix.unitsMode).toBe('hidden')
+  })
+
   test('uses the same display choices in the inspector and widget drawer', () => {
     expect(getWidgetDisplayTypeOptions('heading', i18next.t)).toEqual([
       { value: 'text', label: 'Text' },

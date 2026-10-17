@@ -7,9 +7,20 @@
       "rawSample": true,
       "limitToObserved": true,
       "finalize": true,
-      "smoothing": null
+      "smoothing": null,
+      "zeroIsAvailable": false
     },
     "auxiliary": {
+      "fraction_o2": {
+        "zeroIsAvailable": true,
+        "interpolation": "hold",
+        "unit": "fraction"
+      },
+      "fraction_he": {
+        "zeroIsAvailable": true,
+        "interpolation": "hold",
+        "unit": "fraction"
+      },
       "barometric_altitude": {
         "interpolation": "linear",
         "unit": "m"
@@ -86,6 +97,13 @@
         "temperature"
       ],
       "extended": [
+        "depth",
+        "first_stop_depth",
+        "first_stop_time",
+        "time_to_surface",
+        "average_ppo2",
+        "gas_mix",
+        "water_temperature",
         "air_pressure",
         "barometric_altitude",
         "calories",
@@ -434,6 +452,152 @@
     }
   },
   "definitions": [
+    {
+      "type": "depth",
+      "activity": {
+        "column": { "unit": "m", "zeroIsAvailable": true },
+        "sources": ["depth"],
+        "requires": []
+      },
+      "current": true,
+      "nameKey": "widgets.types.depth.name",
+      "shortNameKey": "widgets.types.depth.shortName",
+      "supportedDisplayUnits": [
+        { "value": "m", "label": "m", "renderLabel": "M" },
+        { "value": "ft", "label": "ft", "renderLabel": "FT" }
+      ],
+      "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": { "source": "custom", "assetFile": "widget-depth.svg" },
+      "category": "scuba_diving",
+      "defaults": { "display_type": "text", "display_unit": "m", "show_units": true, "decimals": 1 },
+      "displayTypes": ["text"]
+    },
+    {
+      "type": "first_stop_depth",
+      "activity": {
+        "column": { "unit": "m", "zeroIsAvailable": true },
+        "sources": ["first_stop_depth"],
+        "requires": []
+      },
+      "current": true,
+      "nameKey": "widgets.types.first_stop_depth.name",
+      "shortNameKey": "widgets.types.first_stop_depth.shortName",
+      "supportedDisplayUnits": [
+        { "value": "m", "label": "m", "renderLabel": "M" },
+        { "value": "ft", "label": "ft", "renderLabel": "FT" }
+      ],
+      "formatter": "decimal",
+      "interpolation": "hold",
+      "unitsMode": "selectable",
+      "icon": { "source": "custom", "assetFile": "widget-first-stop-depth.svg" },
+      "category": "scuba_diving",
+      "defaults": { "display_type": "text", "display_unit": "m", "show_units": true, "decimals": 1 },
+      "displayTypes": ["text"]
+    },
+    {
+      "type": "first_stop_time",
+      "activity": {
+        "column": { "unit": "min", "zeroIsAvailable": true },
+        "sources": ["first_stop_time"],
+        "requires": []
+      },
+      "current": true,
+      "nameKey": "widgets.types.first_stop_time.name",
+      "shortNameKey": "widgets.types.first_stop_time.shortName",
+      "supportedDisplayUnits": [{ "value": "min", "label": "min", "renderLabel": "MIN" }],
+      "formatter": "decimal",
+      "interpolation": "hold",
+      "unitsMode": "selectable",
+      "icon": { "source": "custom", "assetFile": "widget-first-stop-time.svg" },
+      "category": "scuba_diving",
+      "defaults": { "display_type": "text", "display_unit": "min", "show_units": true, "decimals": 0 },
+      "displayTypes": ["text"]
+    },
+    {
+      "type": "time_to_surface",
+      "activity": {
+        "column": { "unit": "min", "zeroIsAvailable": true },
+        "sources": ["time_to_surface"],
+        "requires": []
+      },
+      "current": true,
+      "nameKey": "widgets.types.time_to_surface.name",
+      "shortNameKey": "widgets.types.time_to_surface.shortName",
+      "supportedDisplayUnits": [{ "value": "min", "label": "min", "renderLabel": "MIN" }],
+      "formatter": "decimal",
+      "interpolation": "hold",
+      "unitsMode": "selectable",
+      "icon": { "source": "custom", "assetFile": "widget-time-to-surface.svg" },
+      "category": "scuba_diving",
+      "defaults": { "display_type": "text", "display_unit": "min", "show_units": true, "decimals": 0 },
+      "displayTypes": ["text"]
+    },
+    {
+      "type": "average_ppo2",
+      "activity": {
+        "column": { "unit": "ata", "zeroIsAvailable": true },
+        "sources": ["average_ppo2"],
+        "requires": []
+      },
+      "current": true,
+      "nameKey": "widgets.types.average_ppo2.name",
+      "shortNameKey": "widgets.types.average_ppo2.shortName",
+      "supportedDisplayUnits": [
+        { "value": "ata", "label": "atm", "renderLabel": "ATM" },
+        { "value": "bar", "label": "bar", "renderLabel": "BAR" }
+      ],
+      "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "maxDecimals": 2,
+      "icon": { "source": "custom", "assetFile": "widget-average-ppo2.svg" },
+      "category": "scuba_diving",
+      "defaults": { "display_type": "text", "display_unit": "ata", "show_units": true, "decimals": 2 },
+      "displayTypes": ["text"]
+    },
+    {
+      "type": "gas_mix",
+      "activity": {
+        "sources": ["fraction_o2"],
+        "requires": ["fraction_he"],
+        "coverageSource": "fraction_o2"
+      },
+      "current": true,
+      "nameKey": "widgets.types.gas_mix.name",
+      "shortNameKey": "widgets.types.gas_mix.shortName",
+      "supportedDisplayUnits": [{ "value": "none", "label": "" }],
+      "formatter": "gasmix",
+      "interpolation": "hold",
+      "unitsMode": "hidden",
+      "icon": { "source": "custom", "assetFile": "widget-gas-mix.svg" },
+      "category": "scuba_diving",
+      "defaults": { "display_type": "text", "display_unit": "none", "show_units": false },
+      "displayTypes": ["text"]
+    },
+    {
+      "type": "water_temperature",
+      "activity": {
+        "column": { "unit": "celsius", "zeroIsAvailable": true },
+        "sources": ["water_temperature"],
+        "requires": []
+      },
+      "current": true,
+      "nameKey": "widgets.types.water_temperature.name",
+      "shortNameKey": "widgets.types.water_temperature.shortName",
+      "supportedDisplayUnits": [
+        { "value": "celsius", "label": "°C" },
+        { "value": "fahrenheit", "label": "°F" }
+      ],
+      "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": { "source": "custom", "assetFile": "widget-water-temperature.svg" },
+      "category": "scuba_diving",
+      "defaults": { "display_type": "text", "display_unit": "celsius", "show_units": true },
+      "displayTypes": ["text"]
+    },
     {
       "type": "speed",
       "activity": {

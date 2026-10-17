@@ -514,6 +514,7 @@
       "rectangle": "Retângulo"
     },
     "categories": {
+      "scuba_diving": "Mergulho autônomo",
       "camera": "Câmera",
       "cycling": "Ciclismo",
       "general": "Geral",
@@ -538,6 +539,13 @@
       "lapLog": "Registro de voltas"
     },
     "types": {
+      "depth": { "name": "Profundidade", "shortName": "Profundidade" },
+      "first_stop_depth": { "name": "Profundidade da primeira parada", "shortName": "Prof. parada" },
+      "first_stop_time": { "name": "Tempo da primeira parada", "shortName": "Tempo parada" },
+      "time_to_surface": { "name": "Tempo até a superfície", "shortName": "TTS" },
+      "average_ppo2": { "name": "ppO₂ médio", "shortName": "ppO₂" },
+      "gas_mix": { "name": "Mistura de gases (O₂/He)", "shortName": "O₂/He" },
+      "water_temperature": { "name": "Temperatura da água", "shortName": "Temp. água" },
       "raster": { "name": "Imagem", "shortName": "Imagem" },
       "air_pressure": { "name": "Pressão do ar", "shortName": "Pressão" },
       "altitude": { "name": "Altitude", "shortName": "Altitude" },

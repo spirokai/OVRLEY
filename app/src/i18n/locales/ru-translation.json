@@ -514,6 +514,7 @@
       "rectangle": "Прямоугольник"
     },
     "categories": {
+      "scuba_diving": "Дайвинг",
       "camera": "Камера",
       "cycling": "Велоспорт",
       "general": "Общие",
@@ -538,6 +539,13 @@
       "lapLog": "Журнал кругов"
     },
     "types": {
+      "depth": { "name": "Глубина", "shortName": "Глубина" },
+      "first_stop_depth": { "name": "Глубина первой остановки", "shortName": "Глубина ост." },
+      "first_stop_time": { "name": "Время первой остановки", "shortName": "Время ост." },
+      "time_to_surface": { "name": "Время до поверхности", "shortName": "TTS" },
+      "average_ppo2": { "name": "Среднее ppO₂", "shortName": "ppO₂" },
+      "gas_mix": { "name": "Газовая смесь (O₂/He)", "shortName": "O₂/He" },
+      "water_temperature": { "name": "Температура воды", "shortName": "Темп. воды" },
       "raster": { "name": "Изображение", "shortName": "Изображение" },
       "air_pressure": { "name": "Атмосферное давление", "shortName": "Давление" },
       "altitude": { "name": "Высота над уровнем моря", "shortName": "Высота" },

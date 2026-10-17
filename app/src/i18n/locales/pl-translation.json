@@ -514,6 +514,7 @@
       "rectangle": "Prostokąt"
     },
     "categories": {
+      "scuba_diving": "Nurkowanie",
       "camera": "Kamera",
       "cycling": "Kolarstwo",
       "general": "Ogólne",
@@ -538,6 +539,13 @@
       "lapLog": "Rejestr okrążeń"
     },
     "types": {
+      "depth": { "name": "Głębokość", "shortName": "Głębokość" },
+      "first_stop_depth": { "name": "Głębokość pierwszego przystanku", "shortName": "Głęb. przyst." },
+      "first_stop_time": { "name": "Czas pierwszego przystanku", "shortName": "Czas przyst." },
+      "time_to_surface": { "name": "Czas do wynurzenia", "shortName": "TTS" },
+      "average_ppo2": { "name": "Średnie ppO₂", "shortName": "ppO₂" },
+      "gas_mix": { "name": "Mieszanka gazowa (O₂/He)", "shortName": "O₂/He" },
+      "water_temperature": { "name": "Temperatura wody", "shortName": "Temp. wody" },
       "raster": { "name": "Obraz", "shortName": "Obraz" },
       "air_pressure": { "name": "Ciśnienie powietrza", "shortName": "Ciśn." },
       "altitude": { "name": "Wysokość", "shortName": "Wysokość" },

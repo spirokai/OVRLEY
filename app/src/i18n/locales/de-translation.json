@@ -514,6 +514,7 @@
       "rectangle": "Rechteck"
     },
     "categories": {
+      "scuba_diving": "Gerätetauchen",
       "camera": "Kamera",
       "cycling": "Radfahren",
       "general": "Allgemein",
@@ -538,6 +539,13 @@
       "lapLog": "Rundenprotokoll"
     },
     "types": {
+      "depth": { "name": "Tiefe", "shortName": "Tiefe" },
+      "first_stop_depth": { "name": "Tiefe des ersten Dekostopps", "shortName": "Stopptiefe" },
+      "first_stop_time": { "name": "Dauer des ersten Dekostopps", "shortName": "Stoppdauer" },
+      "time_to_surface": { "name": "Zeit bis zur Oberfläche", "shortName": "TTS" },
+      "average_ppo2": { "name": "Mittlerer ppO₂", "shortName": "ppO₂" },
+      "gas_mix": { "name": "Gasgemisch (O₂/He)", "shortName": "O₂/He" },
+      "water_temperature": { "name": "Wassertemperatur", "shortName": "Wassertemp." },
       "raster": { "name": "Bild", "shortName": "Bild" },
       "air_pressure": { "name": "Luftdruck", "shortName": "Luftdr." },
       "altitude": { "name": "Höhenlage", "shortName": "Höhe" },

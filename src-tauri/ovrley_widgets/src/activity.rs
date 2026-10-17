@@ -121,6 +121,7 @@ pub struct ActivitySampler {
     gear: Vec<(f64, String)>,
     latitude: NumericColumn,
     longitude: NumericColumn,
+    fraction_he: NumericColumn,
     gradient: NumericColumn,
     g_force_axes: [NumericColumn; 3],
     g_force_magnitudes: [Vec<f64>; 3],
@@ -203,6 +204,11 @@ impl ActivitySampler {
             })
             .transpose()?;
         let times = activity.sample_elapsed_seconds;
+        let fraction_he = NumericColumn::new(
+            &times,
+            activity.fraction_he,
+            ActivitySeries::FractionHe.interpolation(),
+        )?;
         // Gradient bridges internal gaps; samples outside observed coverage stay missing.
         let gradient = NumericColumn::new(&times, activity.gradient, InterpolationKind::Linear)?;
         let g_force_axes = [activity.g_force_x, activity.g_force_y, activity.g_force_z]
@@ -255,6 +261,7 @@ impl ActivitySampler {
             gear,
             latitude,
             longitude,
+            fraction_he,
             gradient,
             g_force_axes,
             g_force_magnitudes,
@@ -367,6 +374,14 @@ impl ActivitySampler {
             ..MetricSample::default()
         };
         match widget.metric {
+            MetricKind::GasMix => {
+                let column = &self.numeric[&MetricKind::GasMix];
+                sample.available = column.contains(second) && self.fraction_he.contains(second);
+                if sample.available {
+                    sample.numeric = column.at(&self.times, second);
+                    sample.fraction_he = self.fraction_he.at(&self.times, second);
+                }
+            }
             MetricKind::GearPosition => {
                 sample.gear = self
                     .gear

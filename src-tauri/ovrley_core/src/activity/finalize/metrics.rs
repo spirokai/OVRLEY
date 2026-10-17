@@ -11,6 +11,7 @@
 
 use crate::activity::schema::{ActivityColumns, GearSeries, NumericSeries};
 use crate::media::telemetry_math::{bearing_degrees, finite_f64, haversine_distance, round_f64};
+use ovrley_widgets::model::telemetry::ZERO_AVAILABLE_ACTIVITY_SERIES;
 use ovrley_widgets::widgets::elevation::sampling::preferred_elevation_series;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -84,7 +85,7 @@ impl MetricCoverage {
         }
     }
 
-    fn from_descriptor(descriptor: &MetricDescriptor) -> Self {
+    fn from_descriptor(descriptor: &MetricDescriptor, zero_is_available: bool) -> Self {
         match &descriptor.series {
             MetricSeries::Numeric(series) => {
                 let available_count = series.iter().filter(|v| v.is_some()).count();
@@ -97,7 +98,11 @@ impl MetricCoverage {
                     available_count,
                     nonzero_count,
                     total_samples: series.len(),
-                    has_usable_values: nonzero_count > 0,
+                    has_usable_values: if zero_is_available {
+                        available_count > 0
+                    } else {
+                        nonzero_count > 0
+                    },
                 }
             }
             MetricSeries::Gear(series) => Self::from_series(series, descriptor.source),
@@ -119,7 +124,13 @@ pub fn build_metric_coverage(
 ) -> BTreeMap<String, MetricCoverage> {
     let mut coverage = BTreeMap::new();
     for (metric, descriptor) in metric_series_map {
-        coverage.insert(metric.clone(), MetricCoverage::from_descriptor(descriptor));
+        coverage.insert(
+            metric.clone(),
+            MetricCoverage::from_descriptor(
+                descriptor,
+                ZERO_AVAILABLE_ACTIVITY_SERIES.contains(&metric.as_str()),
+            ),
+        );
     }
     coverage
 }

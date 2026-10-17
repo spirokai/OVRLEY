@@ -514,6 +514,7 @@
       "rectangle": "Rectangle"
     },
     "categories": {
+      "scuba_diving": "Plongée sous-marine",
       "camera": "Caméra",
       "cycling": "Cyclisme",
       "general": "Général",
@@ -538,6 +539,13 @@
       "lapLog": "Journal des tours"
     },
     "types": {
+      "depth": { "name": "Profondeur", "shortName": "Profondeur" },
+      "first_stop_depth": { "name": "Profondeur du premier palier", "shortName": "Prof. palier" },
+      "first_stop_time": { "name": "Durée du premier palier", "shortName": "Durée palier" },
+      "time_to_surface": { "name": "Temps de remontée", "shortName": "TTS" },
+      "average_ppo2": { "name": "ppO₂ moyenne", "shortName": "ppO₂" },
+      "gas_mix": { "name": "Mélange gazeux (O₂/He)", "shortName": "O₂/He" },
+      "water_temperature": { "name": "Température de l’eau", "shortName": "Temp. eau" },
       "raster": { "name": "Image", "shortName": "Image" },
       "air_pressure": { "name": "Pression atmosphérique", "shortName": "Press. atmos." },
       "altitude": { "name": "Altitude", "shortName": "Altitude" },

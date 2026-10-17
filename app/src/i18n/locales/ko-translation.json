@@ -514,6 +514,7 @@
       "rectangle": "직사각형"
     },
     "categories": {
+      "scuba_diving": "스쿠버 다이빙",
       "camera": "카메라",
       "cycling": "자전거",
       "general": "일반",
@@ -538,6 +539,13 @@
       "lapLog": "랩 기록"
     },
     "types": {
+      "depth": { "name": "수심", "shortName": "수심" },
+      "first_stop_depth": { "name": "첫 감압 정지 수심", "shortName": "정지 수심" },
+      "first_stop_time": { "name": "첫 감압 정지 시간", "shortName": "정지 시간" },
+      "time_to_surface": { "name": "수면 도달 시간", "shortName": "TTS" },
+      "average_ppo2": { "name": "평균 ppO₂", "shortName": "ppO₂" },
+      "gas_mix": { "name": "혼합 기체 (O₂/He)", "shortName": "O₂/He" },
+      "water_temperature": { "name": "수온", "shortName": "수온" },
       "raster": { "name": "이미지", "shortName": "이미지" },
       "air_pressure": { "name": "기압", "shortName": "기압" },
       "altitude": { "name": "고도", "shortName": "고도" },

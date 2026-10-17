@@ -514,6 +514,7 @@
       "rectangle": "Dikdörtgen"
     },
     "categories": {
+      "scuba_diving": "Tüplü dalış",
       "camera": "Kamera",
       "cycling": "Bisiklet",
       "general": "Genel",
@@ -538,6 +539,13 @@
       "lapLog": "Tur günlüğü"
     },
     "types": {
+      "depth": { "name": "Derinlik", "shortName": "Derinlik" },
+      "first_stop_depth": { "name": "İlk durak derinliği", "shortName": "Durak derinliği" },
+      "first_stop_time": { "name": "İlk durak süresi", "shortName": "Durak süresi" },
+      "time_to_surface": { "name": "Yüzeye çıkış süresi", "shortName": "TTS" },
+      "average_ppo2": { "name": "Ortalama ppO₂", "shortName": "ppO₂" },
+      "gas_mix": { "name": "Gaz karışımı (O₂/He)", "shortName": "O₂/He" },
+      "water_temperature": { "name": "Su sıcaklığı", "shortName": "Su sıc." },
       "raster": { "name": "Görüntü", "shortName": "Görüntü" },
       "air_pressure": { "name": "Hava basıncı", "shortName": "Hava bas." },
       "altitude": { "name": "Rakım", "shortName": "Rakım" },
