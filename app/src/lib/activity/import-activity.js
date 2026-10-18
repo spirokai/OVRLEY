@@ -134,6 +134,8 @@ export async function parseActivityPath(path) {
   if (lowerPath.endsWith('.csv')) parsedActivity = (await backend.parseCsvActivity(path)).parsed_activity
   else if (lowerPath.endsWith('.vbo')) parsedActivity = (await backend.parseVboActivity(path)).parsed_activity
   else if (lowerPath.endsWith('.tcx')) parsedActivity = (await backend.parseTcxActivity(path)).parsed_activity
+  else if (lowerPath.endsWith('.uddf')) parsedActivity = (await backend.parseUddfActivity(path)).parsed_activity
+  else if (lowerPath.endsWith('.ssrf') || lowerPath.endsWith('.xml')) parsedActivity = (await backend.parseSubsurfaceActivity(path)).parsed_activity
   else {
     const file = await (await import('@/lib/file-dialog')).fileFromSelectedPath(path, 'activity')
     parsedActivity = await parseActivityFile(file)

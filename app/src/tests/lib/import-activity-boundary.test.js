@@ -7,12 +7,16 @@ const finalizeActivity = vi.hoisted(() => vi.fn())
 const parseCsvActivity = vi.hoisted(() => vi.fn())
 const parseVboActivity = vi.hoisted(() => vi.fn())
 const parseTcxActivity = vi.hoisted(() => vi.fn())
+const parseUddfActivity = vi.hoisted(() => vi.fn())
+const parseSubsurfaceActivity = vi.hoisted(() => vi.fn())
 
 vi.mock('@/api/backend', () => ({
   finalizeActivity,
   parseCsvActivity,
   parseVboActivity,
   parseTcxActivity,
+  parseUddfActivity,
+  parseSubsurfaceActivity,
   writeParseDebugFile: vi.fn().mockResolvedValue('debug-path.json'),
   openVideo: vi.fn(),
 }))
@@ -40,6 +44,8 @@ describe('import-activity store boundary', () => {
     parseCsvActivity.mockReset()
     parseVboActivity.mockReset()
     parseTcxActivity.mockReset()
+    parseUddfActivity.mockReset()
+    parseSubsurfaceActivity.mockReset()
     finalizeActivity.mockResolvedValue({
       parsed_activity: {
         metadata: {
@@ -133,6 +139,25 @@ describe('import-activity store boundary', () => {
     expect(finalizeActivity).not.toHaveBeenCalled()
     expect(store.activateActivityFile).toHaveBeenCalledWith(parsedActivity)
     expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\ride.TCX' })
+  })
+
+  test.each([
+    ['dive.UDDF', parseUddfActivity],
+    ['dive.SSRF', parseSubsurfaceActivity],
+    ['dive.XML', parseSubsurfaceActivity],
+  ])('imports %s through its native Rust parser', async (filename, parser) => {
+    const { importActivityPath } = await import('@/lib/activity/import-activity')
+    const store = storeActions()
+    const parsedActivity = { metadata: { duration_seconds: 60 } }
+    parser.mockResolvedValue({ parsed_activity: parsedActivity })
+    const path = `C:\\activities\\${filename}`
+
+    await importActivityPath(path, store)
+
+    expect(parser).toHaveBeenCalledWith(path)
+    expect(finalizeActivity).not.toHaveBeenCalled()
+    expect(store.activateActivityFile).toHaveBeenCalledWith(parsedActivity)
+    expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path })
   })
 
   test('imports a native VBO path without creating a browser File or finalizing RawActivity', async () => {

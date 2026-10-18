@@ -1,0 +1,18 @@
+<!-- First dive from kTwoDives in Unabara's tests/subsurface_parser_test.cpp (GPL-2.0), Arnaud Dupuis.
+     https://github.com/arnauddupuis/unabara/blob/8590eaabcbaa9f77e669a902a28ebd476b504c3c/tests/subsurface_parser_test.cpp -->
+<divelog program='subsurface' version='3'>
+<dives>
+<dive number='7' date='2026-03-01' time='10:00:00'>
+  <location>Test Reef</location>
+  <cylinder size='12.0 l' workpressure='232.0 bar' description='D12' o2='32.0%' start='200.0 bar' end='150.0 bar' />
+  <cylinder size='11.1 l' description='AL80' o2='50.0%' start='180.0 bar' end='160.0 bar' />
+  <divecomputer model='Test DC'>
+    <sample time='0:00 min' depth='0.0 m' temp='24.0 C' pressure0='200.0 bar' pressure1='180.0 bar' ndl='99:00 min' />
+    <sample time='1:00 min' depth='18.0 m' cns='5%' />
+    <event time='2:00 min' name='gaschange' cylinder='1' />
+    <sample time='3:00 min' depth='20.0 m' temp='22.0 C' pressure0='170.0 bar' in_deco='1' tts='4:30 min' stopdepth='3.0 m' stoptime='2:00 min' />
+    <sample time='4:00 min' depth='19.0 m' />
+  </divecomputer>
+</dive>
+</dives>
+</divelog>

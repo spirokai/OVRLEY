@@ -1,0 +1,41 @@
+<!-- Based on kUddfDive in Unabara's tests/uddf_parser_test.cpp (GPL-2.0), Arnaud Dupuis.
+     https://github.com/arnauddupuis/unabara/blob/8590eaabcbaa9f77e669a902a28ebd476b504c3c/tests/uddf_parser_test.cpp -->
+<uddf version='3.2'>
+<gasdefinitions>
+  <mix id='mix1'><name>EAN32</name><o2>0.32</o2><he>0.0</he></mix>
+  <mix id='mix2'><name>TX18/45</name><o2>0,18</o2><he>0,45</he></mix>
+</gasdefinitions>
+<profiledata><repetitiongroup><dive id='d1'>
+  <informationbeforedive>
+    <divenumber>3</divenumber>
+    <datetime>2026-04-23T09:30:00</datetime>
+  </informationbeforedive>
+  <tankdata>
+    <link ref='mix1'/>
+    <tankvolume>0.012</tankvolume>
+    <tankpressurebegin>20000000</tankpressurebegin>
+    <tankpressureend>15000000</tankpressureend>
+  </tankdata>
+  <samples>
+    <waypoint>
+      <divetime>0.0</divetime>
+      <depth>0.0</depth>
+      <temperature>297.15</temperature>
+      <tankpressure ref='mix1'>20000000</tankpressure>
+    </waypoint>
+    <waypoint>
+      <divetime>60.0</divetime>
+      <depth>18.0</depth>
+      <cns>12.5</cns>
+      <nodecotime>1200</nodecotime>
+    </waypoint>
+    <waypoint>
+      <divetime>120.0</divetime>
+      <depth>20,5</depth>
+      <decostop kind='mandatory' decodepth='3.0' duration='120'/>
+      <decostop kind='mandatory' decodepth='6.0' duration='180'/>
+    </waypoint>
+  </samples>
+  <informationafterdive><averagedepth>12.3</averagedepth></informationafterdive>
+</dive></repetitiongroup></profiledata>
+</uddf>

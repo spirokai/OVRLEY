@@ -256,6 +256,32 @@ pub(crate) async fn backend_parse_tcx_activity(
     )
 }
 
+/// Parses a native UDDF dive through the shared activity finalizer.
+#[tauri::command]
+pub(crate) async fn backend_parse_uddf_activity(
+    app: AppHandle,
+    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    path: String,
+) -> Result<FinalizeActivityResponse, String> {
+    previews.retain(
+        commands::backend_parse_uddf_activity(&runtime_paths::app_paths(&app)?, &path)
+            .map_err(|error| error.to_string())?,
+    )
+}
+
+/// Parses a native Subsurface XML/SSRF dive through the shared finalizer.
+#[tauri::command]
+pub(crate) async fn backend_parse_subsurface_activity(
+    app: AppHandle,
+    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    path: String,
+) -> Result<FinalizeActivityResponse, String> {
+    previews.retain(
+        commands::backend_parse_subsurface_activity(&runtime_paths::app_paths(&app)?, &path)
+            .map_err(|error| error.to_string())?,
+    )
+}
+
 /// Renders one transparent preview PNG for the requested second.
 #[tauri::command]
 pub(crate) async fn backend_render_preview_frame(

@@ -96,6 +96,30 @@ pub fn backend_parse_tcx_activity(
     Ok(response)
 }
 
+/// Parses and finalizes a native UDDF dive.
+pub fn backend_parse_uddf_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response =
+        crate::activity::uddf::parse_uddf_activity_path(Path::new(path), Some(&paths.repo_root))?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
+/// Parses and finalizes a native Subsurface XML/SSRF dive.
+pub fn backend_parse_subsurface_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response = crate::activity::subsurface::parse_subsurface_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
 /// Lists canonical bundled capabilities and lazy system font identities.
 pub fn backend_list_system_fonts(paths: &AppPaths) -> CoreResult<Value> {
     Ok(serde_json::to_value(crate::fonts::font_catalog(

@@ -223,6 +223,24 @@ export async function parseTcxActivity(path) {
 }
 
 /**
+ * Parses and finalizes a native UDDF dive using the Rust parser.
+ * @param {string} path Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseUddfActivity(path) {
+  return invokeCommand('backend_parse_uddf_activity', { path })
+}
+
+/**
+ * Parses and finalizes a native Subsurface XML/SSRF dive using the Rust parser.
+ * @param {string} path Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseSubsurfaceActivity(path) {
+  return invokeCommand('backend_parse_subsurface_activity', { path })
+}
+
+/**
  * Renders a transparent PNG for a single preview second.
  *
  * @param {*} config - Overlay template configuration data.
