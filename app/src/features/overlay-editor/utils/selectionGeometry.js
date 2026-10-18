@@ -62,29 +62,38 @@ export function getIntersectedWidgetIds({ orderedWidgetIds, sceneElement, widget
 }
 
 /** @param {object} context Visible selection, hovered ID, viewport scale, and mounted WASM wrappers. @returns {object[]} Badge positions above content bounds. */
-export function buildWidgetBadges({ displayScale, hoveredWidgetId, orderedWidgetIds, sceneElement, selectedWidgetIds, widgetMap, widgetNodes }) {
+export function buildWidgetBadges({
+  displayScale,
+  getGeometry,
+  hoveredWidgetId,
+  orderedWidgetIds,
+  sceneElement,
+  selectedWidgetIds,
+  widgetMap,
+  widgetNodes,
+}) {
   if (sceneElement === null) return []
   const visibleIds = new Set(selectedWidgetIds)
   if (hoveredWidgetId !== null) visibleIds.add(hoveredWidgetId)
-  const sceneBounds = sceneElement.getBoundingClientRect()
-  const scale = getElementScale(sceneElement, sceneBounds)
   const badges = []
   for (const id of orderedWidgetIds) {
     const node = widgetNodes[id]
     if (!visibleIds.has(id) || !node || node.style.visibility === 'hidden') continue
-    const bounds = node.getBoundingClientRect()
-    const matrix = new DOMMatrixReadOnly(node.style.transform)
-    const width = Number.parseFloat(node.style.width)
-    const height = Number.parseFloat(node.style.height)
-    // Recover the rotated top-left corner; the DOM bounds already account for the widget's transform-origin.
-    const left = bounds.left - Math.min(0, matrix.a * width, matrix.c * height, matrix.a * width + matrix.c * height) * scale.x
-    const top = bounds.top - Math.min(0, matrix.b * width, matrix.d * height, matrix.b * width + matrix.d * height) * scale.y
+    const geometry = getGeometry(node)
+    const angle = ((geometry.rotation ?? 0) * Math.PI) / 180
+    const cos = Math.cos(angle)
+    const sin = Math.sin(angle)
+    const [originX, originY] = geometry.rotation_origin ?? [0, 0]
+    // Use the same content rectangle and pivot as preview placement, including
+    // fractional coordinates. Shadows do not participate in badge placement.
+    const left = geometry.content.left + originX - originX * cos + originY * sin
+    const top = geometry.content.top + originY - originX * sin - originY * cos
     badges.push({
       id,
       type: widgetMap[id].type,
-      left: ((left - sceneBounds.left) / scale.x) * displayScale + 2 * matrix.a - 20 * matrix.c,
-      top: Math.max(((top - sceneBounds.top) / scale.y) * displayScale + 2 * matrix.b - 20 * matrix.d, 0),
-      rotation: (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI,
+      left: left * displayScale + 2 * cos + 20 * sin,
+      top: Math.max(top * displayScale + 2 * sin - 20 * cos, 0),
+      rotation: (Math.atan2(sin, cos) * 180) / Math.PI,
     })
   }
   return badges

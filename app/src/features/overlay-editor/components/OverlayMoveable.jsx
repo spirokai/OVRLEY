@@ -85,13 +85,15 @@ const SELECTION_BORDER_ABLES = [
         const { left, top, pos1, pos2, pos3, pos4 } = manager.getState()
         return [pos1, pos2, pos4, pos3].map(([x, y]) => ({ x: left + x, y: top + y }))
       })
-      return [React.createElement(SelectionBorder, { key: 'selection-border', container: moveable.getContainer(), borders })]
+      return [
+        React.createElement(SelectionBorder, { key: 'selection-border', container: moveable.getContainer(), borders, zoom: moveable.props.zoom }),
+      ]
     },
   },
 ]
 
-function SelectionBorder({ container, borders }) {
-  const border = useSelectionBorder(container, borders)
+function SelectionBorder({ container, borders, zoom }) {
+  const border = useSelectionBorder(container, borders, zoom)
   if (border === null) return null // Measured in the layout effect before the first paint.
   return createPortal(
     <svg

@@ -1,37 +1,43 @@
-import { useLayoutEffect, useState } from 'react'
+import { useLayoutEffect, useMemo, useState } from 'react'
+import { getPixelAlignedBorders } from '../utils/selectionBorderGeometry'
 
-/** @param {HTMLElement} container Scene container. @param {object[][]} borders Scene vertices per border. @returns {object|null} Screen borders. */
-export function useSelectionBorder(container, borders) {
-  const [border, setBorder] = useState(null)
+/** @param {HTMLElement} container Scene container. @param {object[][]} borders Scene vertices per border. @param {number} zoom Moveable's inverse viewport scale. @returns {object|null} Screen borders. */
+export function useSelectionBorder(container, borders, zoom) {
+  const [viewportGeometry, setViewportGeometry] = useState(null)
+  // Moving vertices only need projection. Measuring and setting state for each
+  // new borders array would add layout reads and another React commit per render.
   useLayoutEffect(() => {
     const viewport = container.closest('[data-overlay-viewport]')
-    function updateBorder() {
+    function updateViewportGeometry() {
       const bounds = container.getBoundingClientRect()
       const clip = viewport.getBoundingClientRect()
-      setBorder({
-        ...getPixelAlignedBorders(borders, bounds, { width: container.offsetWidth, height: container.offsetHeight }, window.devicePixelRatio),
+      setViewportGeometry({
+        bounds,
+        sceneSize: { width: container.offsetWidth, height: container.offsetHeight },
+        pixelRatio: window.devicePixelRatio,
         clipPath: `inset(${clip.top}px calc(100% - ${clip.right}px) calc(100% - ${clip.bottom}px) ${clip.left}px)`,
       })
     }
-    updateBorder()
-    window.addEventListener('scroll', updateBorder, true)
-    window.addEventListener('resize', updateBorder)
+    updateViewportGeometry()
+    const observer = new ResizeObserver(updateViewportGeometry)
+    observer.observe(container)
+    observer.observe(viewport)
+    window.addEventListener('scroll', updateViewportGeometry, true)
+    window.addEventListener('resize', updateViewportGeometry)
     return () => {
-      window.removeEventListener('scroll', updateBorder, true)
-      window.removeEventListener('resize', updateBorder)
+      observer.disconnect()
+      window.removeEventListener('scroll', updateViewportGeometry, true)
+      window.removeEventListener('resize', updateViewportGeometry)
     }
-  }, [container, borders])
-  return border
-}
-
-function getPixelAlignedBorders(borders, bounds, sceneSize, pixelRatio) {
-  const strokePixels = Math.max(1, Math.round(pixelRatio))
-  const centerOffset = (strokePixels % 2) / 2
-  const snap = (value) => (Math.round(value * pixelRatio - centerOffset) + centerOffset) / pixelRatio
-  const polygons = borders.map((vertices) =>
-    vertices
-      .map(({ x, y }) => `${snap(bounds.left + (x * bounds.width) / sceneSize.width)},${snap(bounds.top + (y * bounds.height) / sceneSize.height)}`)
-      .join(' '),
+  }, [container, zoom])
+  return useMemo(
+    () =>
+      viewportGeometry === null
+        ? null
+        : {
+            ...getPixelAlignedBorders(borders, viewportGeometry.bounds, viewportGeometry.sceneSize, viewportGeometry.pixelRatio),
+            clipPath: viewportGeometry.clipPath,
+          },
+    [borders, viewportGeometry],
   )
-  return { polygons, strokeWidth: strokePixels / pixelRatio }
 }

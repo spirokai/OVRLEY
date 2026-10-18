@@ -1,7 +1,7 @@
 /** Browser-only instrumentation. Production modules and their scheduling stay unchanged. */
 
-/** @returns {object} Timers, counters, and reversible browser/WASM wrappers. */
-export function createInteractionProfiler() {
+/** @param {object} options Optional diagnostic stack capture. @returns {object} Timers, counters, and reversible browser/WASM wrappers. */
+export function createInteractionProfiler({ rectStacks = false } = {}) {
   let capture = null
   const restore = []
   const moveables = new WeakSet()
@@ -50,6 +50,19 @@ export function createInteractionProfiler() {
       wrap(CanvasRenderingContext2D.prototype, 'putImageData', 'canvas.upload', (args) => args[0].data.byteLength)
       wrap(Uint8ClampedArray.prototype, 'set', 'pixels.copy', (args) => args[0].byteLength)
       wrap(Element.prototype, 'getBoundingClientRect', 'dom.measure')
+      if (rectStacks) {
+        const measured = Element.prototype.getBoundingClientRect
+        Element.prototype.getBoundingClientRect = function (...args) {
+          if (capture !== null) {
+            const stack = new Error().stack.split('\n').slice(2).join('\n')
+            const element = this.dataset.widgetId ? '[data-widget-id]' : `${this.tagName.toLowerCase()}.${[...this.classList].join('.')}`
+            capture.rect_stacks[stack] = (capture.rect_stacks[stack] ?? 0) + 1
+            capture.rect_elements[element] = (capture.rect_elements[element] ?? 0) + 1
+          }
+          return measured.apply(this, args)
+        }
+        restore.push(() => (Element.prototype.getBoundingClientRect = measured))
+      }
       window.requestAnimationFrame = (callback) => nativeFrame((time) => measure(`raf.${callback.name || 'anonymous'}`, () => callback(time)))
       restore.push(() => (window.requestAnimationFrame = nativeFrame))
     },
@@ -61,6 +74,7 @@ export function createInteractionProfiler() {
     start() {
       if (capture !== null) throw new Error('An interaction profile is already running')
       capture = { stages: {}, counters: { 'geometry.presentations': 0, 'canvas.upload.bytes': 0 } }
+      if (rectStacks) Object.assign(capture, { rect_stacks: {}, rect_elements: {} })
     },
     stop() {
       if (capture === null) throw new Error('No interaction profile is running')

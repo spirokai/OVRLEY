@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
+import { getWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 import { getPrimarySelectionId, normalizeSelectionIds } from '@/lib/widget/widget-config'
 import {
   areWidgetBadgesEqual,
@@ -161,6 +162,7 @@ export default function useWidgetSelection({ displayScale, orderedWidgetIds, wid
   const refreshBadges = useEffectEvent(() => {
     const next = buildWidgetBadges({
       displayScale,
+      getGeometry: (node) => getWidgetInteraction(node).geometry(),
       hoveredWidgetId,
       orderedWidgetIds,
       sceneElement,

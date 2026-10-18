@@ -13,7 +13,7 @@ import { createInteractionProfiler } from './profile'
 import '@/i18n'
 import '@/styles/moveable.css'
 
-const profiler = createInteractionProfiler()
+const profiler = createInteractionProfiler({ rectStacks: new URLSearchParams(location.search).has('rect-stacks') })
 const gestures = { drag: 0, resize: 0, commits: 0 }
 let currentEditor
 

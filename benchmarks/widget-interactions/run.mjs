@@ -25,6 +25,7 @@ const { values } = parseArgs({
     operation: { type: 'string', default: 'all' },
     label: { type: 'string', default: 'baseline' },
     compare: { type: 'string' },
+    'rect-stacks': { type: 'boolean', default: false },
   },
 })
 const protocol = {}
@@ -39,6 +40,8 @@ if (!Number.isSafeInteger(protocol.frames * protocol.burst) || !Number.isSafeInt
 if (!['all', 'text', 'mixed'].includes(values.workload) || !['all', 'drag', 'resize'].includes(values.operation))
   throw new Error('Choose workload all/text/mixed and operation all/drag/resize')
 if (!/^[a-zA-Z0-9_-]+$/.test(values.label)) throw new Error('label must contain only letters, numbers, underscores, or hyphens')
+if (values['rect-stacks'] && values.compare !== undefined)
+  throw new Error('Rectangle stack capture adds diagnostic overhead; run it without --compare')
 protocol.workloads = values.workload === 'all' ? ['text', 'mixed'] : [values.workload]
 protocol.operations = values.operation === 'all' ? ['drag', 'resize'] : [values.operation]
 
@@ -64,6 +67,9 @@ function summary(results, baseline) {
     '',
     `${protocol.widgets} selected widgets; ${protocol.frames} measured input frames; ${protocol.warmup} warm-up frames; ${protocol.burst} mouse moves per frame. Playhead paused at 60 seconds.`,
     '',
+    ...(values['rect-stacks']
+      ? ['Rectangle stack capture is enabled. Timings include diagnostic overhead and are not comparable to normal runs.', '']
+      : []),
     '| Case | First input → group geometry ms | Frame interval avg ms | p95 ms | Max ms | Intervals >25 ms | Config updates | Canvas uploads | Mouseup CPU ms |',
     '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
   ]
@@ -268,6 +274,7 @@ async function main() {
         viewport: [1600, 1000],
         commit: commit.trim(),
         working_tree: dirty.trim(),
+        rect_stacks: values['rect-stacks'],
         wasm: { path: wasmPath, sha256: createHash('sha256').update(wasmBytes).digest('hex'), modified_at: wasmStat.mtime.toISOString() },
       },
       results: [],
@@ -275,7 +282,7 @@ async function main() {
     for (const fixture of fixtures) {
       for (const operation of protocol.operations) {
         console.info(`[interactions] ${fixture.workload}-${operation}: ${protocol.widgets} widgets`)
-        await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`)
+        await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/${values['rect-stacks'] ? '?rect-stacks' : ''}`)
         await page.waitForFunction(() => window.runInteractionBenchmark !== undefined, undefined, { timeout: 60000 })
         const row = await page.evaluate((input) => window.runInteractionBenchmark(input), {
           fixture,

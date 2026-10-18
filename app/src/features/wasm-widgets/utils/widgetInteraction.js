@@ -108,6 +108,10 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
   return {
     forWidget(id) {
       return {
+        // Selection UI reads presented geometry without measuring DOM or flushing the frame scheduler.
+        geometry() {
+          return getGeometry(id)
+        },
         rotate(rotation) {
           flush()
           const widget = getSnapshot().widgets.find((item) => item.id === id)
