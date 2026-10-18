@@ -28,6 +28,7 @@
     "benchmark:widgets": "node benchmarks/widgets/run.mjs",
     "benchmark:widgets:build": "node benchmarks/widgets/run.mjs --build",
     "benchmark:widgets:summary": "node benchmarks/widgets/summarize.mjs",
+    "benchmark:interactions": "node benchmarks/widget-interactions/run.mjs",
     "prepare": "vp config"
   },
   "keywords": [],
