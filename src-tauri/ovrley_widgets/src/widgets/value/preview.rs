@@ -21,13 +21,15 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use skia_safe::{surfaces, AlphaType, Color, ColorType, Image, ImageInfo, Surface};
 
-#[derive(Deserialize)]
+#[derive(Clone, PartialEq, Deserialize)]
 pub struct WidgetRequest {
     pub widget: ValueConfig,
     pub scene: ScenePresentationConfig,
+    #[serde(default)]
+    pub transient: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct WidgetGeometry {
     pub left: f32,
     pub top: f32,
@@ -38,7 +40,7 @@ pub struct WidgetGeometry {
 }
 
 /// Interaction rectangle in scene pixels, independent of raster allocation.
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct ContentBounds {
     pub left: f32,
     pub top: f32,

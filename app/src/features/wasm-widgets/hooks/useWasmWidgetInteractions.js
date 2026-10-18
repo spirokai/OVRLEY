@@ -21,7 +21,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
   }
   const cancel = useEffectEvent(() => {
     if (!gesture.current) return
-    gesture.current.controller?.cancel()
+    gesture.current.controller.cancel()
     clear()
     state.moveableRef.current?.stopDrag()
   })
@@ -79,6 +79,17 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     try {
       const patch = current.controller.finish()
       if (patch) state.commitWidgetUpdate(current.ids[0], patch)
+    } finally {
+      current.controller.cancel()
+      clear()
+    }
+  }
+  const finishGroup = () => {
+    const current = gesture.current
+    if (!current) return
+    try {
+      const patches = current.controller.finish()
+      if (patches) state.commitWidgetUpdates(patches)
     } finally {
       current.controller.cancel()
       clear()
@@ -160,17 +171,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       )
       current.controller.update(intents)
     },
-    onResizeGroupEnd: () => {
-      const current = gesture.current
-      if (!current) return
-      try {
-        const patches = current.controller.finish()
-        if (patches) state.commitWidgetUpdates(patches)
-      } finally {
-        current.controller.cancel()
-        clear()
-      }
-    },
+    onResizeGroupEnd: finishGroup,
     onRotateStart: ({ target, set }) => {
       const current = begin(target)
       set(current.origin.data.rotation)
@@ -183,7 +184,9 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     onRotateEnd: finish,
     onDragGroupStart: ({ events }) => {
       const ids = selectedWidgets.map((widget) => widget.id)
-      gesture.current = { ids, widgets: selectedWidgets, axis: null, updates: null }
+      const controller = getWidgetInteraction(events[0].target).group(ids)
+      controller.begin(state.setLiveWidgetDrafts)
+      gesture.current = { ids, controller, axis: null }
       setIsGroupDragActive(true)
       setGroupDragSelectionIds(ids)
       events.forEach((event) => event.set([0, 0]))
@@ -191,15 +194,9 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     onDragGroup: ({ events, inputEvent }) => {
       const current = gesture.current
       if (!current) return
-      const [x, y] = dragTranslation(current, events[0].beforeTranslate, inputEvent.ctrlKey)
-      current.updates = Object.fromEntries(current.widgets.map((widget) => [widget.id, { x: widget.data.x + x, y: widget.data.y + y }]))
-      state.setLiveWidgetDrafts(current.updates)
+      const translate = dragTranslation(current, events[0].beforeTranslate, inputEvent.ctrlKey)
+      current.controller.update(Object.fromEntries(current.ids.map((id) => [id, { type: 'drag', translate }])))
     },
-    onDragGroupEnd: () => {
-      const current = gesture.current
-      if (!current) return
-      if (current.updates) state.commitWidgetUpdates(current.updates)
-      clear()
-    },
+    onDragGroupEnd: finishGroup,
   }
 }

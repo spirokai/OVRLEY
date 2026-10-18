@@ -3,6 +3,7 @@ use crate::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
     render::text::FontResolver,
+    preview_instance::PreviewInstance,
     preview_widget::{PreviewWidget, WidgetRequest, ResizeRequest, ResizeUpdate},
 };
 use skia_safe::{FontMgr, Typeface};
@@ -51,7 +52,7 @@ pub struct PreviewSession {
     pub fonts: PreviewFonts,
     pub images: crate::widgets::raster::preview::PreviewImages,
     activity: Option<ActivitySampler>,
-    pub widgets: BTreeMap<u32, PreviewWidget>,
+    pub widgets: BTreeMap<u32, PreviewInstance>,
     next_id: u32,
 }
 
@@ -78,11 +79,11 @@ impl PreviewSession {
                 origin.widget, origin.scene, label_offset,
             )?));
         }
-        if let WidgetRequest::Backdrop {widget, scene} = request.origin {
+        if let WidgetRequest::Backdrop {widget, scene, ..} = request.origin {
             let size = request.size.ok_or_else(|| WidgetError::Config("backdrop resize size is required".into()))?;
             return Ok(ResizeUpdate::Backdrop(crate::widgets::backdrop::interaction::resize_backdrop(widget, scene, size, request.fixed, request.point)?));
         }
-        if let WidgetRequest::Raster {widget, scene} = request.origin {
+        if let WidgetRequest::Raster {widget, scene, ..} = request.origin {
             let size = request.size.ok_or_else(|| WidgetError::Config("raster resize size is required".into()))?;
             return Ok(ResizeUpdate::Raster(crate::widgets::raster::interaction::resize_raster(widget, scene, size, request.fixed, request.point)?));
         }
@@ -98,7 +99,7 @@ impl PreviewSession {
         if let WidgetRequest::Elevation {widget, scene, ..} = request.origin {
             let size = request.size.ok_or_else(|| WidgetError::Config("elevation resize size is required".into()))?;
             let handle = request.handle.ok_or_else(|| WidgetError::Config("elevation resize requires its preview handle".into()))?;
-            let Some(PreviewWidget::Elevation(elevation)) = self.widgets.get_mut(&handle) else {
+            let Some(PreviewInstance { widget: PreviewWidget::Elevation(elevation), .. }) = self.widgets.get_mut(&handle) else {
                 return Err(WidgetError::Config("elevation resize requires an elevation handle".into()));
             };
             return Ok(ResizeUpdate::Elevation(elevation.resize(widget, scene, size, request.fixed, request.point, request.second, request.commit, self.activity.as_ref())?));
@@ -106,7 +107,7 @@ impl PreviewSession {
         if let WidgetRequest::DivingProfile {widget, scene, ..} = request.origin {
             let size = request.size.ok_or_else(|| WidgetError::Config("diving profile resize size is required".into()))?;
             let handle = request.handle.ok_or_else(|| WidgetError::Config("diving profile resize requires its preview handle".into()))?;
-            let Some(PreviewWidget::DivingProfile(profile)) = self.widgets.get_mut(&handle) else {
+            let Some(PreviewInstance { widget: PreviewWidget::DivingProfile(profile), .. }) = self.widgets.get_mut(&handle) else {
                 return Err(WidgetError::Config("diving profile resize requires a diving profile handle".into()));
             };
             return Ok(ResizeUpdate::DivingProfile(profile.resize(widget, scene, size, request.fixed, request.point, request.second, request.commit, self.activity.as_ref())?));
@@ -115,13 +116,13 @@ impl PreviewSession {
         match request.origin {
             WidgetRequest::Route {widget, scene, ..} => {
                 let handle = request.handle.ok_or_else(|| WidgetError::Config("route resize requires its preview handle".into()))?;
-                let Some(PreviewWidget::Route(route)) = self.widgets.get_mut(&handle) else {
+                let Some(PreviewInstance { widget: PreviewWidget::Route(route), .. }) = self.widgets.get_mut(&handle) else {
                     return Err(WidgetError::Config("route resize requires a route handle".into()));
                 };
                 Ok(ResizeUpdate::Route(route.resize(widget, scene, factor, request.fixed, request.point, request.second, request.commit, self.activity.as_ref())?))
             },
             WidgetRequest::DivingProfile { .. } | WidgetRequest::Elevation { .. } | WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } | WidgetRequest::HeadingTape(_) | WidgetRequest::Gauge(_) => unreachable!(),
-            WidgetRequest::Label {widget, scene} => Ok(ResizeUpdate::Label(crate::widgets::label::interaction::resize_label(widget, scene, factor, request.fixed, request.point, &self.fonts)?)),
+            WidgetRequest::Label {widget, scene, ..} => Ok(ResizeUpdate::Label(crate::widgets::label::interaction::resize_label(widget, scene, factor, request.fixed, request.point, &self.fonts)?)),
             WidgetRequest::Gradient(origin) => Ok(ResizeUpdate::Gradient(crate::widgets::gradient::interaction::resize_gradient(
                 origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
             )?)),
@@ -146,6 +147,7 @@ impl PreviewSession {
             Some(ActivitySampler::from_json(bytes)?)
         };
         for widget in self.widgets.values_mut() {
+            let widget = &mut widget.widget;
             if let PreviewWidget::DivingProfile(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::Elevation(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::Route(widget) = widget { widget.invalidate_activity(); }
@@ -155,7 +157,7 @@ impl PreviewSession {
         Ok(())
     }
     pub fn create_widget(&mut self, request: WidgetRequest) -> WidgetResult<u32> {
-        let widget = PreviewWidget::new(request, &self.fonts, &self.images)?;
+        let widget = PreviewInstance::new(request, &self.fonts, &self.images)?;
         self.next_id = self
             .next_id
             .checked_add(1)
@@ -164,54 +166,11 @@ impl PreviewSession {
         Ok(self.next_id)
     }
     pub fn update_widget(&mut self, id: u32, request: WidgetRequest) -> WidgetResult<()> {
-        if let WidgetRequest::DivingProfile {widget, scene, transient} = request {
-            let previous = self.widgets.get_mut(&id).ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?;
-            if let PreviewWidget::DivingProfile(profile) = previous {
-                return profile.update(widget, scene, transient);
-            }
-            let mut replacement = PreviewWidget::DivingProfile(crate::widgets::diving_profile::preview::PreviewDivingProfile::new(widget, scene)?);
-            replacement.inherit_revision(previous.revision());
-            self.widgets.insert(id, replacement);
-            return Ok(());
-        }
-        if let WidgetRequest::Elevation {widget, scene, transient} = request {
-            let previous = self.widgets.get_mut(&id).ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?;
-            if let PreviewWidget::Elevation(elevation) = previous {
-                return elevation.update(widget, scene, transient);
-            }
-            let mut replacement = PreviewWidget::Elevation(crate::widgets::elevation::preview::PreviewElevation::new(widget, scene)?);
-            replacement.inherit_revision(previous.revision());
-            self.widgets.insert(id, replacement);
-            return Ok(());
-        }
-        if let WidgetRequest::Route {widget, scene, transient} = request {
-            let previous = self.widgets.get_mut(&id).ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?;
-            if let PreviewWidget::Route(route) = previous {
-                return route.update(widget, scene, transient);
-            }
-            let mut replacement = PreviewWidget::Route(crate::widgets::route::preview::PreviewRoute::new(widget, scene)?);
-            replacement.inherit_revision(previous.revision());
-            self.widgets.insert(id, replacement);
-            return Ok(());
-        }
-        if let WidgetRequest::Raster {widget, scene} = request {
-            let previous = self.widgets.get_mut(&id).ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?;
-            if let PreviewWidget::Raster(raster) = previous {
-                return raster.update(widget, scene, &self.images);
-            }
-            let mut replacement = PreviewWidget::Raster(crate::widgets::raster::preview::PreviewRaster::new(widget, scene, &self.images)?);
-            replacement.inherit_revision(previous.revision());
-            self.widgets.insert(id, replacement);
-            return Ok(());
-        }
-        let mut replacement = PreviewWidget::new(request, &self.fonts, &self.images)?;
-        let previous = self
+        self
             .widgets
-            .get(&id)
-            .ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?;
-        replacement.inherit_revision(previous.revision());
-        self.widgets.insert(id, replacement);
-        Ok(())
+            .get_mut(&id)
+            .ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?
+            .update(request, &self.fonts, &self.images)
     }
     pub fn render(&mut self, second: f64) -> WidgetResult<()> {
         if !second.is_finite() {
@@ -219,7 +178,7 @@ impl PreviewSession {
         }
         for widget in self.widgets.values_mut() {
             // Static families are fully rendered on creation/update and never visit the playhead path.
-            match widget {
+            match &mut widget.widget {
                 PreviewWidget::DivingProfile(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::Elevation(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::Route(widget) => widget.render(self.activity.as_ref(), second)?,
@@ -232,6 +191,7 @@ impl PreviewSession {
                 PreviewWidget::HeadingTape(widget) => widget.render(self.activity.as_ref(), second)?,
                 _ => {},
             }
+            widget.sync()?;
         }
         Ok(())
     }

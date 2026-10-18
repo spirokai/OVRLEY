@@ -59,7 +59,7 @@ pub struct PreviewRaster {
     pub geometry: Vec<u8>,
     pub revision: u32,
     source_id: Option<String>,
-    pixels_revision: u32,
+    pub pixels_revision: u32,
 }
 
 impl PreviewRaster {
@@ -128,7 +128,6 @@ impl PreviewRaster {
             rotation: f32,
             rotation_origin: [f32; 2],
             opacity: f32,
-            pixels_revision: u32,
         }
         let geometry = serde_json::to_vec(&Geometry {
             widget: WidgetGeometry {
@@ -142,7 +141,6 @@ impl PreviewRaster {
             rotation: frame.rotation,
             rotation_origin: content.rotation_origin(),
             opacity: frame.paint_opacity(source_id.is_some(), scene.opacity),
-            pixels_revision,
         })
         .map_err(|e| WidgetError::Render(e.to_string()))?;
         Ok(Self {

@@ -63,14 +63,15 @@ test('raster loads once, creates without waiting for fonts, and ignores playhead
   expect(module._ovrley_preview_destroy).toHaveBeenCalledOnce()
 })
 
-test('elevation playback reuses its raster allocation and skips placement work when only pixels change', async () => {
+test('elevation playback uploads changed pixels while translation only presents geometry', async () => {
   previewFont.mockResolvedValue([1, 2, 3])
   const { module, session, snapshot, error } = setup()
-  const geometry = new TextEncoder().encode(
+  let geometry = new TextEncoder().encode(
     JSON.stringify({ left: 0, top: 0, width: 2, height: 2, content_width: 2, content: { left: 0, top: 0, width: 2, height: 2 } }),
   )
   module.HEAPU8.set(geometry, 512)
   module._ovrley_preview_revision = vi.fn(() => module._ovrley_preview_render.mock.calls.length)
+  module._ovrley_preview_pixels_revision = vi.fn(() => module._ovrley_preview_render.mock.calls.length)
   module._ovrley_preview_geometry_ptr = vi.fn(() => 512)
   module._ovrley_preview_geometry_len = vi.fn(() => geometry.length)
   module._ovrley_preview_pixels = vi.fn(() => 256)
@@ -90,7 +91,7 @@ test('elevation playback reuses its raster allocation and skips placement work w
   const canvas = document.createElement('canvas')
   target.append(canvas)
   const putImageData = vi.fn()
-  canvas.getContext = vi.fn(() => ({ putImageData }))
+  canvas.getContext = vi.fn(() => ({ putImageData, clearRect: vi.fn() }))
   const placement = vi.fn()
   target.addEventListener('wasm-widget-render', placement)
   const next = {
@@ -114,6 +115,23 @@ test('elevation playback reuses its raster allocation and skips placement work w
   expect(module._ovrley_preview_widget_create).toHaveBeenCalledOnce()
   expect(module._ovrley_preview_widget_update).not.toHaveBeenCalled()
   expect(previewFont).toHaveBeenCalledTimes(2)
+  module._ovrley_preview_pixels_revision.mockReturnValue(4)
+  geometry = new TextEncoder().encode(
+    JSON.stringify({ left: 10.25, top: -4.5, width: 2, height: 2, content_width: 2, content: { left: 10.25, top: -4.5, width: 2, height: 2 } }),
+  )
+  module.HEAPU8.set(geometry, 512)
+  const moved = { ...next, widgets: [{ ...next.widgets[0], data: { ...next.widgets[0].data, x: 10.25, y: -4.5 } }] }
+  session.setSnapshot(moved)
+  vi.advanceTimersToNextFrame()
+  expect(placement).toHaveBeenCalledTimes(2)
+  expect(putImageData).toHaveBeenCalledTimes(4)
+  expect(module._ovrley_preview_pixels).toHaveBeenCalledTimes(4)
+  previewActivity.mockResolvedValue([1, 2, 3])
+  session.setSnapshot({ ...moved, activityId: 'replacement' })
+  await Promise.resolve()
+  vi.advanceTimersToNextFrame()
+  expect(error).toHaveBeenLastCalledWith(null)
+  expect(putImageData).toHaveBeenCalledTimes(5) // Restore a cleared canvas even if replacement activity produces identical pixels.
   session.dispose()
 })
 

@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { expect, test, vi } from 'vite-plus/test'
 import { useWasmWidgetInteractions } from '@/features/wasm-widgets/hooks/useWasmWidgetInteractions'
-import { registerWidgetInteraction, unregisterWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
+import { createWidgetInteraction, registerWidgetInteraction, unregisterWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 import useWidgetDraftState, { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
 
 test.each([
@@ -89,7 +89,28 @@ test('group translation shares canonical data patches and commits once before a 
     const config = {}
     const sceneElement = document.createElement('div')
     const moveableRef = { current: { stopDrag: vi.fn(), updateRect: vi.fn() } }
-    const { result } = renderHook(() => {
+    const target = document.createElement('div')
+    let frame = null
+    const transient = vi.fn()
+    const render = () => {
+      frame = null
+      interaction.resolve({ widgets: selectedWidgets, scene: {}, second: 0 })
+      transient(selectedWidgets.map(({ id }) => interaction.isDragging(id)))
+    }
+    const interaction = createWidgetInteraction({
+      schedule() {
+        if (frame === null) frame = requestAnimationFrame(render)
+      },
+      flush() {
+        if (frame !== null) cancelAnimationFrame(frame)
+        render()
+      },
+      getSnapshot: () => ({ widgets: selectedWidgets, scene: {}, second: 0 }),
+      getGeometry: () => ({ content: { left: 100, top: 50, width: 50, height: 20 } }),
+      resize: vi.fn(),
+    })
+    registerWidgetInteraction(target, interaction.forWidget('speed'))
+    const { result, unmount } = renderHook(() => {
       const controller = useWidgetDraftState()
       const liveEdits = useWidgetDraftView(controller)
       const state = { ...liveEdits, config, sceneElement, moveableRef, commitWidgetUpdates }
@@ -103,23 +124,31 @@ test('group translation shares canonical data patches and commits once before a 
       return { controller, liveEdits, handlers }
     })
     const events = [
-      { set: vi.fn(), beforeTranslate: [12.125, 8.25] },
+      { target, set: vi.fn(), beforeTranslate: [12.125, 8.25] },
       { set: vi.fn(), beforeTranslate: [12.125, 8.25] },
     ]
     act(() => {
       result.current.handlers.onDragGroupStart({ events })
       result.current.handlers.onDragGroup({ events, inputEvent: { ctrlKey: false } })
     })
+    act(() => vi.advanceTimersToNextFrame())
+    expect(transient).toHaveBeenLastCalledWith([true, true])
     expect(result.current.controller.getWidgetDraft('speed')).toEqual({ x: 112.125, y: 58.25 })
     expect(result.current.controller.getWidgetDraft('label')).toEqual({ x: 212.125, y: 83.25 })
     expect(commitWidgetUpdates).not.toHaveBeenCalled()
-    act(() => result.current.handlers.onDragGroupEnd())
+    act(() => {
+      result.current.handlers.onDragGroup({ events: [{ beforeTranslate: [20.25, 10.5] }], inputEvent: { ctrlKey: false } })
+      result.current.handlers.onDragGroupEnd()
+    })
+    expect(transient).toHaveBeenLastCalledWith([false, false])
     expect(commitWidgetUpdates).toHaveBeenCalledExactlyOnceWith({
-      speed: { x: 112.125, y: 58.25 },
-      label: { x: 212.125, y: 83.25 },
+      speed: { x: 120.25, y: 60.5 },
+      label: { x: 220.25, y: 85.5 },
     })
     expect(result.current.liveEdits.liveWidgetDrafts).toEqual({})
     expect(vi.getTimerCount()).toBe(0)
+    unmount()
+    unregisterWidgetInteraction(target)
   } finally {
     vi.useRealTimers()
   }

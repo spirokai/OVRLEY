@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, thiserror::Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize, thiserror::Error)]
 #[serde(rename_all = "snake_case")]
 pub enum RasterError {
     #[error("Select an absolute image path.")]

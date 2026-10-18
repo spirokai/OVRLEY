@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 /// One typography contract for render requests and saved-document ingress.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct LabelTypography {
     #[serde(deserialize_with = "deserialize_font_weight")]
     pub font_weight: f32,
@@ -47,7 +47,7 @@ fn deserialize_letter_spacing<'de, D: serde::Deserializer<'de>>(
 }
 
 /// Static text label drawn onto the cached base layer.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct LabelConfig {
     #[serde(default)]
     pub text: String,

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Complete template render configuration.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RasterConfig {
     pub id: String,

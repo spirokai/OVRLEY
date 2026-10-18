@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use crate::{error::{WidgetError, WidgetResult}, model::types::BackdropType};
 
 /// Static geometric backdrop drawn below other widgets.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct BackdropConfig {
     #[serde(default)]
     pub id: Option<String>,

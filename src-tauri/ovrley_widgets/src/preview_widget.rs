@@ -14,13 +14,14 @@ use crate::widgets::route::{config::CoursePlotConfig, preview::PreviewRoute};
 use crate::widgets::elevation::{config::ElevationPlotConfig, preview::PreviewElevation};
 use crate::widgets::diving_profile::{config::DivingProfileConfig, preview::PreviewDivingProfile};
 
+#[derive(Clone, PartialEq)]
 pub enum WidgetRequest {
     DivingProfile { widget: DivingProfileConfig, scene: ScenePresentationConfig, transient: bool },
     Elevation { widget: ElevationPlotConfig, scene: ScenePresentationConfig, transient: bool },
     Route { widget: CoursePlotConfig, scene: ScenePresentationConfig, transient: bool },
-    Raster { widget: RasterConfig, scene: ScenePresentationConfig },
-    Backdrop { widget: BackdropConfig, scene: ScenePresentationConfig },
-    Label { widget: LabelConfig, scene: ScenePresentationConfig },
+    Raster { widget: RasterConfig, scene: ScenePresentationConfig, transient: bool },
+    Backdrop { widget: BackdropConfig, scene: ScenePresentationConfig, transient: bool },
+    Label { widget: LabelConfig, scene: ScenePresentationConfig, transient: bool },
     Gradient(ValueRequest),
     LeanAngle(ValueRequest),
     GForce(ValueRequest),
@@ -37,7 +38,7 @@ impl<'de> Deserialize<'de> for WidgetRequest {
             r#type: String,
             widget: serde_json::Value,
             scene: ScenePresentationConfig,
-            /// Preview-only resize draft: reuse committed vectors until mouseup.
+            /// Preview-only drag/resize draft: retain cached pixels/vectors until mouseup.
             #[serde(default)]
             transient: bool,
         }
@@ -49,18 +50,18 @@ impl<'de> Deserialize<'de> for WidgetRequest {
         } else if input.r#type == "elevation" {
             Ok(Self::Elevation { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene, transient: input.transient })
         } else if input.r#type == "label" {
-            Ok(Self::Label { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene })
+            Ok(Self::Label { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene, transient: input.transient })
         } else if input.r#type == "backdrop" {
-            Ok(Self::Backdrop { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene })
+            Ok(Self::Backdrop { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene, transient: input.transient })
         } else if input.r#type == "raster" {
-            Ok(Self::Raster { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene })
+            Ok(Self::Raster { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene, transient: input.transient })
         } else {
             let metric: MetricKind = serde_json::from_value(input.r#type.into()).map_err(serde::de::Error::custom)?;
             let widget: ValueConfig = serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?;
             if widget.value != metric {
                 return Err(serde::de::Error::custom("widget type must match its value metric"));
             }
-            let request = ValueRequest { widget, scene: input.scene };
+            let request = ValueRequest { widget, scene: input.scene, transient: input.transient };
             Ok(if metric == MetricKind::Gradient { Self::Gradient(request) }
                 else if metric == MetricKind::LapTimer { Self::LapTimer(request) }
                 else if metric == MetricKind::LeanAngle && request.widget.display_type == crate::model::types::DisplayType::LeanAngle { Self::LeanAngle(request) }
@@ -94,9 +95,9 @@ impl PreviewWidget {
             WidgetRequest::DivingProfile {widget, scene, ..} => Ok(Self::DivingProfile(PreviewDivingProfile::new(widget, scene)?)),
             WidgetRequest::Elevation {widget, scene, ..} => Ok(Self::Elevation(PreviewElevation::new(widget, scene)?)),
             WidgetRequest::Route {widget, scene, ..} => Ok(Self::Route(PreviewRoute::new(widget, scene)?)),
-            WidgetRequest::Raster {widget, scene} => Ok(Self::Raster(PreviewRaster::new(widget, scene, images)?)),
-            WidgetRequest::Backdrop {widget, scene} => Ok(Self::Backdrop(PreviewBackdrop::new(widget, scene)?)),
-            WidgetRequest::Label {widget, scene} => Ok(Self::Label(PreviewLabel::new(widget, scene, fonts)?)),
+            WidgetRequest::Raster {widget, scene, ..} => Ok(Self::Raster(PreviewRaster::new(widget, scene, images)?)),
+            WidgetRequest::Backdrop {widget, scene, ..} => Ok(Self::Backdrop(PreviewBackdrop::new(widget, scene)?)),
+            WidgetRequest::Label {widget, scene, ..} => Ok(Self::Label(PreviewLabel::new(widget, scene, fonts)?)),
             WidgetRequest::Gradient(request) => Ok(Self::Gradient(PreviewGradient::new(request.widget, request.scene)?)),
             WidgetRequest::LeanAngle(request) => Ok(Self::LeanAngle(PreviewLeanAngle::new(request.widget, request.scene)?)),
             WidgetRequest::GForce(request) => Ok(Self::GForce(PreviewGForce::new(request.widget, request.scene)?)),
@@ -114,23 +115,6 @@ impl PreviewWidget {
     }
     pub fn revision(&self) -> u32 {
         match self { Self::DivingProfile(widget) => widget.revision, Self::Elevation(widget) => widget.revision, Self::Route(widget) => widget.revision, Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::GForce(widget) => widget.revision, Self::LapTimer(widget) => widget.revision, Self::HeadingTape(widget) => widget.revision, Self::Gauge(widget) => widget.revision, Self::Value(widget) => widget.revision }
-    }
-    pub fn inherit_revision(&mut self, previous: u32) {
-        match self {
-            Self::DivingProfile(widget) => widget.revision = previous,
-            Self::Elevation(widget) => widget.revision = previous,
-            Self::Route(widget) => widget.revision = previous,
-            Self::Raster(widget) => widget.revision = previous.wrapping_add(1),
-            Self::Backdrop(widget) => widget.revision = previous.wrapping_add(1),
-            Self::Label(widget) => widget.revision = previous.wrapping_add(1),
-            Self::Gradient(widget) => widget.revision = previous,
-            Self::LeanAngle(widget) => widget.revision = previous,
-            Self::GForce(widget) => widget.revision = previous,
-            Self::LapTimer(widget) => widget.revision = previous,
-            Self::HeadingTape(widget) => widget.revision = previous,
-            Self::Gauge(widget) => widget.revision = previous,
-            Self::Value(widget) => widget.revision = previous,
-        }
     }
 }
 

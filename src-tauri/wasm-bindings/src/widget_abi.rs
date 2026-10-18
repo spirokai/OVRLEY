@@ -171,6 +171,11 @@ pub unsafe extern "C" fn ovrley_preview_revision(session: *const Session, id: u3
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_pixels_revision(session: *const Session, id: u32) -> u32 {
+    (&(*session).preview.widgets)[&id].pixels_revision()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn ovrley_preview_resize(
     session: *mut Session,
     ptr: *const u8,

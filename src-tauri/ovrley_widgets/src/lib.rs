@@ -7,6 +7,7 @@ pub mod rdp;
 pub mod model;
 pub mod activity;
 pub mod preview;
+mod preview_instance;
 pub mod preview_widget;
 pub mod render;
 pub mod widgets;

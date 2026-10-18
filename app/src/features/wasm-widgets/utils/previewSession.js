@@ -153,7 +153,8 @@ export function createPreviewSession(module, onError) {
       }
       for (const widget of interaction.resolve(snapshot)) {
         let instance = widgets.get(widget.id)
-        const transient = ['course', 'elevation', 'diving_profile'].includes(widget.type) && interaction.isResizing(widget.id)
+        const transient =
+          interaction.isDragging(widget.id) || (['course', 'elevation', 'diving_profile'].includes(widget.type) && interaction.isResizing(widget.id))
         if (instance?.data === widget.data && instance.scene === snapshot.scene && instance.transient === transient) continue
         const resource = widget.type === 'raster' && images.get(widget.data.resourceId)
         if (resource?.error) throw resource.error
@@ -177,7 +178,7 @@ export function createPreviewSession(module, onError) {
           type: widget.type,
           widget: widget.data,
           scene: snapshot.scene,
-          ...(['course', 'elevation', 'diving_profile'].includes(widget.type) ? { transient } : {}),
+          transient,
         })
         if (!instance) {
           const widgetHandle = upload(encoder.encode(config), (ptr, len) => module._ovrley_preview_widget_create(handle, ptr, len))
@@ -209,8 +210,8 @@ export function createPreviewSession(module, onError) {
         )
         const geometryChanged = widget.geometryJson !== geometryJson
         const geometry = geometryChanged ? JSON.parse(geometryJson) : widget.geometry
-        const pixelsRevision = widget.type === 'raster' ? geometry.pixels_revision : revision
-        if (widget.type !== 'raster' || !widget.image || widget.pixelsRevision !== pixelsRevision) {
+        const pixelsRevision = module._ovrley_preview_pixels_revision(handle, widget.handle)
+        if (!widget.image || widget.pixelsRevision !== pixelsRevision) {
           if (!widget.image || widget.image.width !== geometry.width || widget.image.height !== geometry.height) {
             canvas.width = geometry.width
             canvas.height = geometry.height
@@ -282,6 +283,7 @@ export function createPreviewSession(module, onError) {
           const canvas = canvases.get(id)
           if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
           widget.revision = -1
+          widget.pixelsRevision = -1
         }
         if (nextId === null) activityReady = true
         else

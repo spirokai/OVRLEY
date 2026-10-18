@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 /// Effective profile config. Presentation defaults are materialized by the host.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ElevationPlotConfig {
     pub value: String,
     pub x: f32,
@@ -44,7 +44,7 @@ pub struct ElevationPlotConfig {
     pub extra: BTreeMap<String, Value>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct PointLabelConfig {
     /// Omitted font inherits the scene's optional native font selection.
     pub font: Option<String>,

@@ -120,8 +120,90 @@ fn elevation_preview(request: &Value, activity: &[u8]) -> (PreviewSession, u32) 
 }
 
 fn prepared_elevation(preview: &PreviewSession, id: u32) -> std::sync::Arc<ovrley_widgets::widgets::elevation::geometry::ElevationGeometry> {
-    let ovrley_widgets::preview_widget::PreviewWidget::Elevation(widget) = &preview.widgets[&id] else { panic!("expected elevation handle"); };
+    let ovrley_widgets::preview_widget::PreviewWidget::Elevation(widget) = &preview.widgets[&id].widget else { panic!("expected elevation handle"); };
     widget.prepared_geometry.as_ref().unwrap().clone()
+}
+
+#[test]
+fn every_preview_family_reuses_drag_pixels_and_restores_fractional_commit() {
+    let defaults: Value = serde_json::from_str(include_str!("../../../assets/standard-widgets.json")).unwrap();
+    let mut cases = vec![
+        label_preview(), gradient_preview(), lean_angle_preview(), g_force_preview(),
+        lap_timer_preview(), heading_preview(),
+        gauge_preview("linear", "speed", "horizontal", "fill"),
+        gauge_preview("arc", "speed", "horizontal", "fill"),
+        gauge_preview("corner", "speed", "bottom-left", "fill"),
+    ];
+    for kind in ["course", "elevation", "diving_profile", "backdrop", "raster", "speed", "time"] {
+        let (preview, mut request) = lean_angle_preview();
+        request["type"] = json!(kind);
+        request["widget"] = if matches!(kind, "speed" | "time") {
+            let mut widget = common::builders::speed_value_json();
+            widget["value"] = json!(kind);
+            if kind == "time" {
+                widget.as_object_mut().unwrap().extend(json!({
+                    "format": "time-24", "hours_offset": 0, "time_mode": "elapsed",
+                    "elapsed_origin": "activity", "show_hundredths": false,
+                }).as_object().unwrap().clone());
+            }
+            widget
+        } else {
+            defaults["definitions"].as_array().unwrap().iter()
+                .find(|definition| definition["type"] == kind).unwrap()["defaults"].clone()
+        };
+        request["widget"]["x"] = json!(150.25);
+        request["widget"]["y"] = json!(90.5);
+        request["scene"]["preview_duration_seconds"] = json!(4.0);
+        request["scene"]["export_start_seconds"] = json!(0.0);
+        if matches!(kind, "speed" | "time") { request["widget"]["font"] = json!("Inter.ttf"); }
+        if matches!(kind, "elevation" | "diving_profile") { request["widget"]["point_label"]["font"] = json!("Inter.ttf"); }
+        if kind == "raster" { request["widget"]["id"] = json!("raster"); }
+        if kind == "backdrop" {
+            request["widget"].as_object_mut().unwrap().extend(json!({
+                "id": "backdrop", "width": 120, "height": 80, "corner_radius": 4,
+                "round_top_left": true, "round_top_right": true, "round_bottom_left": true, "round_bottom_right": true,
+            }).as_object().unwrap().clone());
+        }
+        cases.push((preview, request));
+    }
+    for (mut preview, mut request) in cases {
+        let kind = request["type"].as_str().unwrap().to_owned();
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        preview.render(1.5).unwrap();
+        let pixels = preview.widgets[&id].pixels().clone();
+        let storage = preview.widgets[&id].pixels().as_ptr();
+        let pixels_revision = preview.widgets[&id].pixels_revision();
+        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let (x, y) = (request["widget"]["x"].as_f64().unwrap(), request["widget"]["y"].as_f64().unwrap());
+        request["transient"] = json!(true);
+        for (dx, dy) in [(12.0, -8.0), (12.125, -8.375), (-5.5, 7.25)] {
+            request["widget"]["x"] = json!(x + dx);
+            request["widget"]["y"] = json!(y + dy);
+            let revision = preview.widgets[&id].revision();
+            preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+            preview.render(1.5).unwrap();
+            let widget = &preview.widgets[&id];
+            assert_ne!(widget.revision(), revision, "{kind} must present movement");
+            assert_eq!(widget.pixels_revision(), pixels_revision, "{kind} must retain its pixels revision");
+            assert_eq!(widget.pixels().as_ptr(), storage, "{kind} must retain its surface storage");
+            assert_eq!(widget.pixels(), &pixels, "{kind} must not redraw during dragging");
+            let moved: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            for (field, delta) in [("left", dx), ("top", dy)] {
+                assert!((moved["content"][field].as_f64().unwrap() - geometry["content"][field].as_f64().unwrap() - delta).abs() < 0.001, "{kind} content placement");
+                assert!((moved[field].as_f64().unwrap() - geometry[field].as_f64().unwrap() - delta).abs() < 0.001, "{kind} shadow placement");
+            }
+        }
+        request["transient"] = json!(false);
+        preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+        preview.render(1.5).unwrap();
+        if kind != "raster" { assert_ne!(preview.widgets[&id].pixels_revision(), pixels_revision, "{kind} must settle its fractional pixels"); }
+        let fresh = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        preview.render(1.5).unwrap();
+        assert_eq!(preview.widgets[&id].pixels(), preview.widgets[&fresh].pixels(), "{kind} settled pixels must match a fresh render");
+        let settled: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let fresh_geometry: Value = serde_json::from_slice(preview.widgets[&fresh].geometry()).unwrap();
+        assert_eq!(settled, fresh_geometry, "{kind} settled geometry must match a fresh render");
+    }
 }
 
 #[test]
@@ -349,7 +431,7 @@ fn route_activity() -> ovrley_core::activity::schema::ParsedActivity {
 }
 
 fn prepared_route(preview: &PreviewSession, id: u32) -> std::sync::Arc<ovrley_widgets::widgets::route::geometry::RouteGeometry> {
-    let ovrley_widgets::preview_widget::PreviewWidget::Route(route) = &preview.widgets[&id] else { panic!("expected route handle"); };
+    let ovrley_widgets::preview_widget::PreviewWidget::Route(route) = &preview.widgets[&id].widget else { panic!("expected route handle"); };
     route.prepared_geometry.as_ref().unwrap().clone()
 }
 

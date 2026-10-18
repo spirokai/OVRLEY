@@ -7,7 +7,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 /// Shared presentation ingress, independent of an activity or export window.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ScenePresentationConfig {
     #[serde(default)]
     pub width: Option<u32>,
