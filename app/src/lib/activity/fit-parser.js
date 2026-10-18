@@ -39,6 +39,32 @@ function getOptionalRecordNumberFromKeys(record, keys) {
   return null
 }
 
+function getRecordElapsedSeconds(record, elapsedOffsetSeconds) {
+  const elapsedSeconds = safeNumber(record.elapsed_time)
+  return elapsedSeconds === null ? null : elapsedSeconds + elapsedOffsetSeconds
+}
+
+/** Missing timestamps leave lap timing unavailable rather than merging separate laps. */
+function extractLapTiming(laps, firstRecordTimestamp) {
+  if (!laps.length || firstRecordTimestamp == null || laps.some((lap) => lap.start_time == null)) return null
+
+  const startTimes = laps.map((lap) => lap.start_time.getTime())
+  if (startTimes.some((start, index) => !Number.isFinite(start) || (index > 0 && start <= startTimes[index - 1]))) {
+    throw new Error('FIT lap start_time values must be valid timestamps in strictly increasing order.')
+  }
+
+  const firstRecordTime = firstRecordTimestamp.getTime()
+  if (!Number.isFinite(firstRecordTime)) throw new Error('FIT lap timing requires a valid first record timestamp.')
+
+  // A device can start a lap before writing its first record. Keep both on the same timeline.
+  const origin = Math.min(firstRecordTime, startTimes[0])
+  return {
+    sync_time: new Date(origin).toISOString(),
+    lap_markers: { BeaconMarkers: startTimes.map((start) => (start - origin) / 1000) },
+    elapsedOffsetSeconds: (firstRecordTime - origin) / 1000,
+  }
+}
+
 /**
  * Parses fit activity file.
  *
@@ -65,6 +91,8 @@ export default async function parseFitActivityFile(file) {
 
   const firstSession = Array.isArray(parsedFit?.sessions) ? parsedFit.sessions[0] || null : null
   const fileId = parsedFit?.file_id || null
+  const lapTiming = extractLapTiming(parsedFit.laps ?? [], records[0].timestamp)
+  const elapsedOffsetSeconds = lapTiming?.elapsedOffsetSeconds ?? 0
 
   const raw_samples = records.map((record) => ({
     air_pressure: safeNumber(record.absolute_pressure),
@@ -73,7 +101,7 @@ export default async function parseFitActivityFile(file) {
     cadence: safeNumber(record.cadence),
     core_temperature: safeNumber(record.core_temperature),
     distance: safeNumber(record.distance),
-    elapsed_seconds: safeNumber(getOptionalRecordValue(record, ['elapsed_time'])),
+    elapsed_seconds: getRecordElapsedSeconds(record, elapsedOffsetSeconds),
     elevation: safeNumber(record.enhanced_altitude ?? record.altitude),
     g_force: safeNumber(getOptionalRecordValue(record, ['g_force', 'gforce'])),
     gear_position: safeGearValue(getOptionalRecordValue(record, ['gear_ratio', 'gear', 'front_gear'])),
@@ -102,6 +130,8 @@ export default async function parseFitActivityFile(file) {
   return {
     file_name: file.name,
     file_format: 'fit',
+    sync_time: lapTiming?.sync_time ?? null,
+    lap_markers: lapTiming?.lap_markers ?? 'None',
     metadata: {
       creator: fileId?.product_name || null,
       file_created_at: fileId?.time_created || null,
