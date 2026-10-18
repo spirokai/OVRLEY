@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { describe, expect, test } from 'vite-plus/test'
+import { afterEach, describe, expect, test, vi } from 'vite-plus/test'
+import FitParser from 'fit-file-parser'
 import { FitBaseType, FitEncoder } from 'fit-file-parser/encoder'
 import parseFitActivityFile from '@/lib/activity/fit-parser'
 
@@ -50,5 +51,42 @@ describe('FIT parsing', () => {
     expect(samples.map((sample) => sample.left_right_balance)).toEqual([null, null, 0, 50])
     expect(samples.map((sample) => sample.cadence)).toEqual([0, 80, 0, 80])
     expect(options.skip_idle_gap_fill).toBe(false)
+  })
+})
+
+const origin = Date.parse('2026-01-01T00:00:00Z')
+const timestampAt = (seconds) => new Date(origin + seconds * 1000)
+
+describe('parseFitActivityFile lap timing', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  test('preserves exact lap boundaries when the first lap starts before the first record', async () => {
+    vi.spyOn(FitParser.prototype, 'parseAsync').mockResolvedValue({
+      laps: [{ start_time: timestampAt(1) }, { start_time: timestampAt(5.5) }],
+      records: [2, 3, 7].map((seconds) => ({ timestamp: timestampAt(seconds), elapsed_time: seconds - 2 })),
+    })
+
+    const activity = await parseFitActivityFile({ name: 'laps.fit', arrayBuffer: async () => new ArrayBuffer(0) })
+
+    expect(activity.sync_time).toBe('2026-01-01T00:00:01.000Z')
+    expect(activity.lap_markers).toEqual({ BeaconMarkers: [0, 4.5] })
+    expect(activity.raw_samples.map((sample) => sample.elapsed_seconds)).toEqual([1, 2, 6])
+  })
+
+  test('keeps dive gas switches on the same timeline as lap-adjusted records', async () => {
+    vi.spyOn(FitParser.prototype, 'parseAsync').mockResolvedValue({
+      laps: [{ start_time: timestampAt(1) }],
+      records: [2, 3, 7].map((seconds) => ({ timestamp: timestampAt(seconds), elapsed_time: seconds - 2, depth: 10 })),
+      dive_gases: [
+        { oxygen_content: 21, helium_content: 0 },
+        { oxygen_content: 50, helium_content: 0 },
+      ],
+      events: [{ event: 'dive_gas_switched', timestamp: timestampAt(4), data: 1 }],
+    })
+
+    const activity = await parseFitActivityFile({ name: 'dive-laps.fit', arrayBuffer: async () => new ArrayBuffer(0) })
+
+    expect(activity.raw_samples.map((sample) => sample.elapsed_seconds)).toEqual([1, 2, 3, 6])
+    expect(activity.raw_samples[2]).toMatchObject({ timestamp: timestampAt(4), fraction_o2: 0.5, fraction_he: 0 })
   })
 })

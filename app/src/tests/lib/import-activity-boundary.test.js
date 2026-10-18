@@ -110,6 +110,19 @@ describe('import-activity store boundary', () => {
     expect(parseCsvActivity).not.toHaveBeenCalled()
   })
 
+  test('passes FIT lap boundaries to the shared finalizer', async () => {
+    const { parseActivityFile } = await import('@/lib/activity/import-activity')
+    const bytes = await readFile(path.join(fixtureDir, 'test-ride.fit'))
+
+    await parseActivityFile(new File([bytes], 'laps.fit'))
+
+    expect(finalizeActivity).toHaveBeenCalledTimes(1)
+    const rawActivity = finalizeActivity.mock.calls[0][0]
+    expect(rawActivity.sync_time).toBe('2026-05-02T17:00:18.000Z')
+    expect(rawActivity.lap_markers.BeaconMarkers).toHaveLength(15)
+    expect(rawActivity.lap_markers.BeaconMarkers.slice(0, 3)).toEqual([0, 1248, 1298])
+  })
+
   test('imports a native CSV path without creating a browser File or finalizing RawActivity', async () => {
     const { importCsvActivityPath } = await import('@/lib/activity/import-activity')
     const store = storeActions()
