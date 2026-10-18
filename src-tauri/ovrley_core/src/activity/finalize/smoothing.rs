@@ -1,6 +1,7 @@
-//! Optional smoothing primitives for finalized activity metric series.
+//! Smoothing primitives for finalized activity metric series.
 //!
-//! The shared finalizer applies these only when extraction opts in per metric.
+//! Distance-derived speed uses a one-second default; extraction can also opt in
+//! per metric with explicit settings.
 //! MP4 telemetry pre-treatment also reuses the zero-phase moving average
 //! helpers through its existing smoothing module re-exports.
 

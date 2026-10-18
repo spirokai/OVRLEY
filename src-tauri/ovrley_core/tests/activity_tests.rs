@@ -179,7 +179,7 @@ fn finalizes_raw_activity_axis_g_force_and_lean_angle_samples() {
 }
 
 #[test]
-fn finalizes_raw_activity_without_smoothing_when_map_is_empty() {
+fn finalizes_raw_activity_with_default_derived_speed_smoothing_when_map_is_empty() {
     let raw_activity = serde_json::json!({
         "file_name": "raw-no-smoothing.srt",
         "file_format": "srt",
@@ -200,10 +200,8 @@ fn finalizes_raw_activity_without_smoothing_when_map_is_empty() {
         .unwrap()
         .parsed_activity;
 
-    assert_eq!(
-        activity.speed,
-        vec![None, Some(0.0), Some(40.0), Some(0.0), Some(40.0)]
-    );
+    assert_eq!(activity.speed[0], None);
+    assert!(activity.speed.iter().flatten().all(|speed| *speed > 0.0 && *speed < 40.0));
     assert_eq!(
         activity.vertical_speed,
         vec![None, Some(0.0), Some(16.0), Some(0.0), Some(16.0)]

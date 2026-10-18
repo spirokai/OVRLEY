@@ -9,6 +9,7 @@
 //! Phase 0 intentionally uses the standard gradient derivation for every format;
 //! the legacy GPX path is not ported.
 
+use super::smoothing::{smoothing_window_for_seconds, zero_phase_smooth};
 use crate::activity::schema::{ActivityColumns, GearSeries, NumericSeries};
 use crate::media::telemetry_math::{bearing_degrees, finite_f64, haversine_distance, round_f64};
 use ovrley_widgets::model::telemetry::ZERO_AVAILABLE_ACTIVITY_SERIES;
@@ -649,6 +650,16 @@ pub fn derive_activity_metric_series(
     let preferred_altitude =
         preferred_elevation_series(&direct["barometric_altitude"], &direct["elevation"]).to_vec();
     let derived_speed = derive_numeric_rate_series(distance_series, elapsed_series);
+    // Explicit extraction settings are applied once by the finalizer. Otherwise,
+    // smooth distance-derived speed over one second before mixing in recorded
+    // values. At 1 Hz or slower the window is one sample, preserving those rates.
+    let derived_speed = if columns.options.smoothing.contains_key("speed") {
+        derived_speed
+    } else {
+        let timestamps_ms: Vec<_> = elapsed_series.iter().map(|second| second * 1000.0).collect();
+        let window = smoothing_window_for_seconds(&timestamps_ms, 1.0);
+        zero_phase_smooth(&derived_speed, window)
+    };
     let derived_heading = derive_heading_series(course_series, distance_series, 2.0);
     let derived_distance_to_home = derive_distance_to_home_series(course_series);
     let derived_total_ascent =
