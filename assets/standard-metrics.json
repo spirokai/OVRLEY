@@ -97,6 +97,7 @@
         "temperature"
       ],
       "extended": [
+        "diving_profile",
         "depth",
         "first_stop_depth",
         "first_stop_time",

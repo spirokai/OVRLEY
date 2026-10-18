@@ -539,6 +539,10 @@
       "lapLog": "Registro de vueltas"
     },
     "types": {
+      "diving_profile": {
+        "name": "Perfil de buceo",
+        "shortName": "Perfil de buceo"
+      },
       "depth": { "name": "Profundidad", "shortName": "Profundidad" },
       "first_stop_depth": { "name": "Profundidad de la primera parada", "shortName": "Prof. parada" },
       "first_stop_time": { "name": "Tiempo de la primera parada", "shortName": "Tiempo parada" },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "Techo de descompresión",
+    "ceilingLineColor": "Color de la línea",
+    "ceilingAreaColor": "Color del área",
+    "ceilingLineOpacity": "Opacidad de la línea",
+    "ceilingAreaOpacity": "Opacidad del área",
     "alignment": "Alineación",
     "alignmentBelow": "Superior",
     "alignmentCentered": "Centrado",

@@ -117,7 +117,7 @@ test('course slider and handle rotation share the same patch and preserve positi
   expect(restored.y).toBeCloseTo(original.data.y, 10)
 })
 
-test.each(['course', 'elevation'])(
+test.each(['course', 'elevation', 'diving_profile'])(
   '%s resize defers geometry preparation to the final flush and preserves fractional committed dimensions',
   (type) => {
     const { interaction, resize, setSnapshot, presentations } = editor(type)
@@ -136,10 +136,10 @@ test.each(['course', 'elevation'])(
     }))
     const origin = interaction.begin(vi.fn())
     const anchor = resizeAnchor(origin.bounds, [-1, -1])
-    interaction.update({ type: 'resize', geometry: { ...(type === 'elevation' ? { size: [300.1875, 157.875] } : { factor: 0.75 }), ...anchor } })
+    interaction.update({ type: 'resize', geometry: { ...(type !== 'course' ? { size: [300.1875, 157.875] } : { factor: 0.75 }), ...anchor } })
     vi.advanceTimersToNextFrame()
     expect(resize.mock.lastCall[0]).toMatchObject({ widget: original.data, second: 0.75, commit: false })
-    interaction.update({ type: 'resize', geometry: { ...(type === 'elevation' ? { size: [550.34375, 289.4375] } : { factor: 1.375 }), ...anchor } })
+    interaction.update({ type: 'resize', geometry: { ...(type !== 'course' ? { size: [550.34375, 289.4375] } : { factor: 1.375 }), ...anchor } })
     const patch = interaction.finish() // Mouseup before RAF still resolves the final size as a commit.
     expect(resize).toHaveBeenCalledTimes(2)
     expect(resize.mock.lastCall[0]).toMatchObject({ widget: original.data, second: 0.75, commit: true })

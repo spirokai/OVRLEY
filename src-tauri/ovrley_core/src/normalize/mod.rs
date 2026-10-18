@@ -12,6 +12,7 @@ use ovrley_widgets::model::scene::{
 use ovrley_widgets::model::telemetry::{mode_activity, widget_telemetry, ActivitySeries};
 use ovrley_widgets::widgets::{
     backdrop::validation::ValidatedBackdrop, elevation::validation::ValidatedElevationPlot,
+    diving_profile::validation::ValidatedDivingProfile,
     g_force::validation::GForceAxis, label::validation::ValidatedLabel,
     route::validation::ValidatedRoutePlot, value::validation::ValidatedValue,
 };
@@ -108,6 +109,9 @@ impl ValidatedRenderConfig {
         if !self.elevation_plots.is_empty() {
             requirements.include_widget("elevation");
         }
+        if !self.diving_profiles.is_empty() {
+            requirements.include_widget("diving_profile");
+        }
         requirements
     }
 }
@@ -122,6 +126,7 @@ pub struct ValidatedRenderConfig<S = ValidatedSceneConfig> {
     pub values: Vec<ValidatedValue>,
     pub course_plots: Vec<ValidatedRoutePlot>,
     pub elevation_plots: Vec<ValidatedElevationPlot>,
+    pub diving_profiles: Vec<ValidatedDivingProfile>,
 }
 
 /// Validates every value widget and label in the config. Returns the first
@@ -161,6 +166,7 @@ impl<S> ValidatedRenderConfig<S> {
             values: self.values,
             course_plots: self.course_plots,
             elevation_plots: self.elevation_plots,
+            diving_profiles: self.diving_profiles,
         }
     }
 }

@@ -539,6 +539,10 @@
       "lapLog": "Tur günlüğü"
     },
     "types": {
+      "diving_profile": {
+        "name": "Dalış Profili",
+        "shortName": "Dalış Profili"
+      },
       "depth": { "name": "Derinlik", "shortName": "Derinlik" },
       "first_stop_depth": { "name": "İlk durak derinliği", "shortName": "Durak derinliği" },
       "first_stop_time": { "name": "İlk durak süresi", "shortName": "Durak süresi" },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "Dekompresyon Tavanı",
+    "ceilingLineColor": "Çizgi Rengi",
+    "ceilingAreaColor": "Alan Rengi",
+    "ceilingLineOpacity": "Çizgi Opaklığı",
+    "ceilingAreaOpacity": "Alan Opaklığı",
     "alignment": "Hizalama",
     "alignmentBelow": "Üst",
     "alignmentCentered": "Ortalanmış",

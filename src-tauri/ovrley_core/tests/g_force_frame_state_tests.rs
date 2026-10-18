@@ -280,6 +280,7 @@ fn prepare_g_force_cache(
         ],
         course_plots: vec![],
         elevation_plots: vec![],
+        diving_profiles: vec![],
     };
     let paths = ovrley_core::paths::AppPaths::from_repo_root(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),

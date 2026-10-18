@@ -539,6 +539,10 @@
       "lapLog": "Varvlogg"
     },
     "types": {
+      "diving_profile": {
+        "name": "Dykprofil",
+        "shortName": "Dykprofil"
+      },
       "depth": { "name": "Djup", "shortName": "Djup" },
       "first_stop_depth": { "name": "Första stoppets djup", "shortName": "Stoppdjup" },
       "first_stop_time": { "name": "Första stoppets tid", "shortName": "Stopptid" },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "Dekompressionstak",
+    "ceilingLineColor": "Linjefärg",
+    "ceilingAreaColor": "Fyllningsfärg",
+    "ceilingLineOpacity": "Linjeopacitet",
+    "ceilingAreaOpacity": "Fyllningsopacitet",
     "alignment": "Justering",
     "alignmentBelow": "Topp",
     "alignmentCentered": "Centrerad",

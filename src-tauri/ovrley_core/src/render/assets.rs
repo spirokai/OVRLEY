@@ -9,6 +9,10 @@ use ovrley_widgets::{
     model::types::{DisplayType, MetricKind},
     render::text::FontResolver,
     widgets::{
+        diving_profile::{
+            geometry::{DivingFrameState, DivingGeometry},
+            layout::DivingProfileLayout,
+        },
         elevation::{
             geometry::{ElevationFrameState, ElevationGeometry},
             layout::ElevationLayout,
@@ -98,12 +102,19 @@ pub(crate) struct ElevationWidgetCache {
 }
 
 #[derive(Clone, Debug)]
+pub(crate) struct DivingProfileCache {
+    pub layout: DivingProfileLayout,
+    pub frame_states: Vec<DivingFrameState>,
+}
+
+#[derive(Clone, Debug)]
 pub struct PreparedRenderAssets {
     pub(crate) scene: ValidatedSceneConfig,
     pub(crate) timezone: Option<chrono_tz::Tz>,
     pub values: Vec<PreparedValue>,
     pub(crate) route_caches: Vec<RouteWidgetCache>,
     pub(crate) elevation_caches: Vec<ElevationWidgetCache>,
+    pub(crate) diving_caches: Vec<DivingProfileCache>,
     pub(crate) label_count: usize,
 }
 
@@ -171,6 +182,38 @@ pub fn prepare_render_assets(
                             geometry,
                             elevation.altitude_offset(widget.starting_altitude_m),
                             elevation.elevation_range(),
+                            fonts,
+                        )?,
+                        frame_states,
+                    })
+                },
+            )?);
+        }
+    }
+    let mut diving_caches = Vec::new();
+    if !config.diving_profiles.is_empty() {
+        let diving = activity.diving_activity();
+        for widget in &config.diving_profiles {
+            diving_caches.push(profiler.measure(
+                "build_diving_profile_cache",
+                || -> CoreResult<_> {
+                    let window = scene.plot_window(widget.show_full_activity);
+                    let geometry = Arc::new(DivingGeometry::new(
+                        widget,
+                        scene.presentation.scale,
+                        &diving.samples(window, widget.width * scene.presentation.scale),
+                    ));
+                    let frame_states = dense
+                        .frame_elapsed_seconds
+                        .iter()
+                        .map(|elapsed| diving.frame_state(&geometry, scene.start + elapsed, window))
+                        .collect();
+                    Ok(DivingProfileCache {
+                        layout: DivingProfileLayout::new(
+                            widget.clone(),
+                            scene.presentation.clone(),
+                            geometry,
+                            diving.depth_range(),
                             fonts,
                         )?,
                         frame_states,
@@ -273,6 +316,7 @@ pub fn prepare_render_assets(
         values,
         route_caches,
         elevation_caches,
+        diving_caches,
         label_count: config.labels.len(),
     })
 }

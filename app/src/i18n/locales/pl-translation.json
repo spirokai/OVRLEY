@@ -539,6 +539,10 @@
       "lapLog": "Rejestr okrążeń"
     },
     "types": {
+      "diving_profile": {
+        "name": "Profil nurkowania",
+        "shortName": "Profil nurkowania"
+      },
       "depth": { "name": "Głębokość", "shortName": "Głębokość" },
       "first_stop_depth": { "name": "Głębokość pierwszego przystanku", "shortName": "Głęb. przyst." },
       "first_stop_time": { "name": "Czas pierwszego przystanku", "shortName": "Czas przyst." },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "Sufit dekompresyjny",
+    "ceilingLineColor": "Kolor linii",
+    "ceilingAreaColor": "Kolor obszaru",
+    "ceilingLineOpacity": "Krycie linii",
+    "ceilingAreaOpacity": "Krycie obszaru",
     "alignment": "Wyrównanie",
     "alignmentBelow": "Góra",
     "alignmentCentered": "Wyśrodkowane",

@@ -286,6 +286,70 @@
       "initializers": ["pointLabelFontSize"]
     },
     {
+      "type": "diving_profile",
+      "activity": {
+        "sources": ["depth"],
+        "requires": ["first_stop_depth"],
+        "coverageSource": "depth"
+      },
+      "nameKey": "widgets.types.diving_profile.name",
+      "shortNameKey": "widgets.types.diving_profile.shortName",
+      "category": "scuba_diving",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-diving-profile.svg"
+      },
+      "collection": "plots",
+      "layoutMode": "boxed",
+      "timeDependent": true,
+      "globalBindings": {
+        "opacity": "opacity",
+        "point_label.font": "font_values",
+        "point_label.color": "color_values"
+      },
+      "initializers": ["pointLabelFontSize"],
+      "defaults": {
+        "value": "diving_profile",
+        "x": 100,
+        "y": 100,
+        "width": 971.5,
+        "height": 164.5,
+        "rotation": 0,
+        "opacity": 1,
+        "y_scale": 1,
+        "simplify_tolerance_px": 1.5,
+        "target_density": 0.5,
+        "completed_line_width": 4,
+        "completed_line_color": "#ff7c2b",
+        "completed_line_opacity": 80,
+        "remaining_line_width": 4,
+        "remaining_line_color": "#ff7c2b",
+        "remaining_line_opacity": 34,
+        "ceiling_line_width": 3,
+        "ceiling_line_color": "#e65b50",
+        "ceiling_line_opacity": 100,
+        "ceiling_area_color": "#e65b50",
+        "ceiling_area_opacity": 35,
+        "marker_variant": "halo",
+        "marker_variant_diameter": 32,
+        "marker_size": 8.633734,
+        "marker_color": "#30c4d1",
+        "marker_opacity": 100,
+        "show_full_activity": true,
+        "show_depth_metric": true,
+        "show_depth_imperial": false,
+        "metric_label_offset_x": 20,
+        "metric_label_offset_y": -30,
+        "imperial_label_offset_x": 8,
+        "imperial_label_offset_y": 2,
+        "point_label": {
+          "font": "JetBrains Mono.ttf",
+          "font_size": 21,
+          "color": "#30c4d1"
+        }
+      }
+    },
+    {
       "type": "course",
       "activity": {
         "column": {

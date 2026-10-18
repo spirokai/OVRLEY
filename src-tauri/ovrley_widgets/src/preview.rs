@@ -103,6 +103,14 @@ impl PreviewSession {
             };
             return Ok(ResizeUpdate::Elevation(elevation.resize(widget, scene, size, request.fixed, request.point, request.second, request.commit, self.activity.as_ref())?));
         }
+        if let WidgetRequest::DivingProfile {widget, scene, ..} = request.origin {
+            let size = request.size.ok_or_else(|| WidgetError::Config("diving profile resize size is required".into()))?;
+            let handle = request.handle.ok_or_else(|| WidgetError::Config("diving profile resize requires its preview handle".into()))?;
+            let Some(PreviewWidget::DivingProfile(profile)) = self.widgets.get_mut(&handle) else {
+                return Err(WidgetError::Config("diving profile resize requires a diving profile handle".into()));
+            };
+            return Ok(ResizeUpdate::DivingProfile(profile.resize(widget, scene, size, request.fixed, request.point, request.second, request.commit, self.activity.as_ref())?));
+        }
         let factor = crate::model::validation::require_positive_f32(request.factor, "resize factor")?;
         match request.origin {
             WidgetRequest::Route {widget, scene, ..} => {
@@ -112,7 +120,7 @@ impl PreviewSession {
                 };
                 Ok(ResizeUpdate::Route(route.resize(widget, scene, factor, request.fixed, request.point, request.second, request.commit, self.activity.as_ref())?))
             },
-            WidgetRequest::Elevation { .. } | WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } | WidgetRequest::HeadingTape(_) | WidgetRequest::Gauge(_) => unreachable!(),
+            WidgetRequest::DivingProfile { .. } | WidgetRequest::Elevation { .. } | WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } | WidgetRequest::HeadingTape(_) | WidgetRequest::Gauge(_) => unreachable!(),
             WidgetRequest::Label {widget, scene} => Ok(ResizeUpdate::Label(crate::widgets::label::interaction::resize_label(widget, scene, factor, request.fixed, request.point, &self.fonts)?)),
             WidgetRequest::Gradient(origin) => Ok(ResizeUpdate::Gradient(crate::widgets::gradient::interaction::resize_gradient(
                 origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
@@ -138,6 +146,7 @@ impl PreviewSession {
             Some(ActivitySampler::from_json(bytes)?)
         };
         for widget in self.widgets.values_mut() {
+            if let PreviewWidget::DivingProfile(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::Elevation(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::Route(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::LapTimer(widget) = widget { widget.invalidate_activity(); }
@@ -155,6 +164,16 @@ impl PreviewSession {
         Ok(self.next_id)
     }
     pub fn update_widget(&mut self, id: u32, request: WidgetRequest) -> WidgetResult<()> {
+        if let WidgetRequest::DivingProfile {widget, scene, transient} = request {
+            let previous = self.widgets.get_mut(&id).ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?;
+            if let PreviewWidget::DivingProfile(profile) = previous {
+                return profile.update(widget, scene, transient);
+            }
+            let mut replacement = PreviewWidget::DivingProfile(crate::widgets::diving_profile::preview::PreviewDivingProfile::new(widget, scene)?);
+            replacement.inherit_revision(previous.revision());
+            self.widgets.insert(id, replacement);
+            return Ok(());
+        }
         if let WidgetRequest::Elevation {widget, scene, transient} = request {
             let previous = self.widgets.get_mut(&id).ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?;
             if let PreviewWidget::Elevation(elevation) = previous {
@@ -201,6 +220,7 @@ impl PreviewSession {
         for widget in self.widgets.values_mut() {
             // Static families are fully rendered on creation/update and never visit the playhead path.
             match widget {
+                PreviewWidget::DivingProfile(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::Elevation(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::Route(widget) => widget.render(self.activity.as_ref(), second)?,
                 PreviewWidget::Value(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,

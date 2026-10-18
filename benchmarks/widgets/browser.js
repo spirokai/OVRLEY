@@ -9,6 +9,7 @@ export const fixtures = {
   ride: ['afternoon-ride-parse-debug.json', 60],
   racechrono: ['sample RaceChrono-parse-debug.json', 60],
   racebox: ['sample Racebox-parse-debug.json', 400],
+  dive: ['Shearwater-Cloud-Dive-01-parse-debug.json', 1560],
 }
 
 /** @param {object} input Activity payloads, HUD template, image path, and frame counts. @returns {object[]} Fixed cases; no rendering occurs. */
@@ -16,6 +17,7 @@ export function createCases({ activities, template, image, frames, warmup, fps }
   const specs = [
     ['course', 'course', 'ride', {}, { width: 560, height: 258, show_full_activity: true }],
     ['elevation', 'elevation', 'ride', {}, { width: 618, height: 163, show_full_activity: true }],
+    ['diving_profile', 'diving_profile', 'dive', {}, { width: 618, height: 163, show_full_activity: true }],
     ['gradient', 'gradient', 'ride', {}, { font_size: 45, triangle_width: 36 }],
     ['time-daytime', 'time', 'ride', {}, { font_size: 45, time_mode: 'daytime' }],
     ['time-elapsed', 'time', 'ride', {}, { font_size: 45, time_mode: 'elapsed', elapsed_origin: 'activity' }],
@@ -86,6 +88,7 @@ export function createCases({ activities, template, image, frames, warmup, fps }
       g_force: ['g_force_x', 'g_force_y'],
       course: ['sample_course_points'],
       elevation: ['sample_elevations'],
+      diving_profile: ['depth', 'first_stop_depth'],
       gradient: ['gradient'],
       lap_timer: ['lap_time_seconds', 'delta_to_best_lap_seconds'],
     }

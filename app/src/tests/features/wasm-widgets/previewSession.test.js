@@ -117,7 +117,7 @@ test('elevation playback reuses its raster allocation and skips placement work w
   session.dispose()
 })
 
-test.each(['g_force', 'heading', 'elevation'])(
+test.each(['g_force', 'heading', 'elevation', 'diving_profile'])(
   '%s prepares its label font independently and reuses its handle through playback before disposal',
   async (type) => {
     previewFont.mockImplementation(({ font }) => (font === 'Label.ttf' ? Promise.resolve([1, 2, 3]) : new Promise(() => {})))
@@ -131,6 +131,7 @@ test.each(['g_force', 'heading', 'elevation'])(
         font: 'Unused.ttf',
         label_font: 'Label.ttf',
         ...(type === 'elevation' ? { point_label: { font: 'Label.ttf' }, show_elevation_metric: true, show_elevation_imperial: false } : {}),
+        ...(type === 'diving_profile' ? { point_label: { font: 'Label.ttf' }, show_depth_metric: true, show_depth_imperial: false } : {}),
       },
     }
     const next = { ...snapshot, widgets: [widget] }

@@ -260,6 +260,33 @@ impl PreparedRenderAssets {
                 (state.marker_x, state.marker_y),
             ));
         }
+        for cache in &self.diving_caches {
+            let layout = &cache.layout;
+            let state = cache.frame_states[index];
+            let frame = layout.frame(state)?;
+            profiler.measure("composite.diving_profile", || layout.draw(canvas, &frame));
+            let config = &layout.config;
+            let scale = layout.scene.scale;
+            if let Some(marker) = state.marker {
+                report.diving_profiles.push(plot_report(
+                    WidgetGeometryReport {
+                        point_count: layout.geometry.segments.iter().map(|s| s.points.len()).sum(),
+                        source_point_count: layout.geometry.source_point_count,
+                        simplification: format!(
+                            "sg11_density_{:.2}_rdp_px_{:.2}",
+                            config.target_density, config.simplify_tolerance_px,
+                        ),
+                        bbox: [0.0, 0.0, config.width * scale, config.height * scale],
+                        widget_width: (config.width * scale).round() as u32,
+                        widget_height: (config.height * scale).round() as u32,
+                        rotation_deg: config.rotation,
+                    },
+                    (config.x, config.y),
+                    state.progress01,
+                    marker,
+                ));
+            }
+        }
         profiler.record_ms("frame.draw", started.elapsed().as_secs_f64() * 1000.0);
         Ok(report)
     }

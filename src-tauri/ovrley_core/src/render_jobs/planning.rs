@@ -400,6 +400,7 @@ pub(crate) fn plan_batch_item(
         config.values.clear();
         config.course_plots.clear();
         config.elevation_plots.clear();
+        config.diving_profiles.clear();
     }
     let mode = match encoding.codec {
         CodecSelection::Composite(requested_codec_id) => VideoRenderModePlan::Composite {

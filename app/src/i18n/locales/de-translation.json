@@ -539,6 +539,10 @@
       "lapLog": "Rundenprotokoll"
     },
     "types": {
+      "diving_profile": {
+        "name": "Tauchprofil",
+        "shortName": "Tauchprofil"
+      },
       "depth": { "name": "Tiefe", "shortName": "Tiefe" },
       "first_stop_depth": { "name": "Tiefe des ersten Dekostopps", "shortName": "Stopptiefe" },
       "first_stop_time": { "name": "Dauer des ersten Dekostopps", "shortName": "Stoppdauer" },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "Dekompressionsgrenze",
+    "ceilingLineColor": "Linienfarbe",
+    "ceilingAreaColor": "Flächenfarbe",
+    "ceilingLineOpacity": "Liniendeckkraft",
+    "ceilingAreaOpacity": "Flächendeckkraft",
     "alignment": "Ausrichtung",
     "alignmentBelow": "Oben",
     "alignmentCentered": "Zentriert",

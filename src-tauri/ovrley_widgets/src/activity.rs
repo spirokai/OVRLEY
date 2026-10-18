@@ -114,6 +114,7 @@ impl NumericColumn {
 }
 
 pub struct ActivitySampler {
+    pub(crate) diving: crate::widgets::diving_profile::sampling::DivingActivity,
     pub(crate) elevation: crate::widgets::elevation::sampling::ElevationActivity,
     pub(crate) route: crate::widgets::route::sampling::RouteActivity,
     pub(crate) time: crate::widgets::time::sampling::TimeSampler,
@@ -212,6 +213,9 @@ impl ActivitySampler {
                     .map_err(|e| WidgetError::Config(format!("activity timezone: {e}")))
             })
             .transpose()?;
+        let diving = crate::widgets::diving_profile::sampling::DivingActivity::new(
+            times, &activity.depth, &activity.first_stop_depth, activity.trim_end_seconds,
+        );
         let times = activity.sample_elapsed_seconds;
         let fraction_he = NumericColumn::new(
             &times,
@@ -260,6 +264,7 @@ impl ActivitySampler {
             activity.trim_end_seconds,
         );
         Ok(Self {
+            diving,
             elevation,
             route,
             time,

@@ -539,6 +539,10 @@
       "lapLog": "圈记录"
     },
     "types": {
+      "diving_profile": {
+        "name": "潜水剖面",
+        "shortName": "潜水剖面"
+      },
       "depth": { "name": "深度", "shortName": "深度" },
       "first_stop_depth": { "name": "首个减压停留深度", "shortName": "停留深度" },
       "first_stop_time": { "name": "首个减压停留时间", "shortName": "停留时间" },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "减压上限",
+    "ceilingLineColor": "曲线颜色",
+    "ceilingAreaColor": "区域颜色",
+    "ceilingLineOpacity": "曲线不透明度",
+    "ceilingAreaOpacity": "区域不透明度",
     "alignment": "对齐",
     "alignmentBelow": "顶部",
     "alignmentCentered": "居中",

@@ -101,7 +101,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       current.anchor = resizeAnchor(
         bounds,
         direction,
-        ['course', 'elevation', 'raster'].includes(selectedWidget.type) ? current.origin.data.rotation : 0,
+        ['course', 'elevation', 'diving_profile', 'raster'].includes(selectedWidget.type) ? current.origin.data.rotation : 0,
         current.origin.rotationOrigin,
       )
       set([bounds.width, bounds.height])
@@ -142,7 +142,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
           const anchor = resizeAnchor(
             origin.bounds,
             [1, 1],
-            ['course', 'elevation', 'raster'].includes(widget.type) ? origin.data.rotation : 0,
+            ['course', 'elevation', 'diving_profile', 'raster'].includes(widget.type) ? origin.data.rotation : 0,
             origin.rotationOrigin,
           )
           return [

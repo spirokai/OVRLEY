@@ -12,8 +12,10 @@ use crate::widgets::heading::preview::PreviewHeading;
 use crate::widgets::gauges::preview::PreviewGauge;
 use crate::widgets::route::{config::CoursePlotConfig, preview::PreviewRoute};
 use crate::widgets::elevation::{config::ElevationPlotConfig, preview::PreviewElevation};
+use crate::widgets::diving_profile::{config::DivingProfileConfig, preview::PreviewDivingProfile};
 
 pub enum WidgetRequest {
+    DivingProfile { widget: DivingProfileConfig, scene: ScenePresentationConfig, transient: bool },
     Elevation { widget: ElevationPlotConfig, scene: ScenePresentationConfig, transient: bool },
     Route { widget: CoursePlotConfig, scene: ScenePresentationConfig, transient: bool },
     Raster { widget: RasterConfig, scene: ScenePresentationConfig },
@@ -40,7 +42,9 @@ impl<'de> Deserialize<'de> for WidgetRequest {
             transient: bool,
         }
         let input = Input::deserialize(deserializer)?;
-        if input.r#type == "course" {
+        if input.r#type == "diving_profile" {
+            Ok(Self::DivingProfile { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene, transient: input.transient })
+        } else if input.r#type == "course" {
             Ok(Self::Route { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene, transient: input.transient })
         } else if input.r#type == "elevation" {
             Ok(Self::Elevation { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene, transient: input.transient })
@@ -69,6 +73,7 @@ impl<'de> Deserialize<'de> for WidgetRequest {
 }
 
 pub enum PreviewWidget {
+    DivingProfile(PreviewDivingProfile),
     Elevation(PreviewElevation),
     Route(PreviewRoute),
     Raster(PreviewRaster),
@@ -86,6 +91,7 @@ pub enum PreviewWidget {
 impl PreviewWidget {
     pub fn new(request: WidgetRequest, fonts: &PreviewFonts, images: &PreviewImages) -> WidgetResult<Self> {
         match request {
+            WidgetRequest::DivingProfile {widget, scene, ..} => Ok(Self::DivingProfile(PreviewDivingProfile::new(widget, scene)?)),
             WidgetRequest::Elevation {widget, scene, ..} => Ok(Self::Elevation(PreviewElevation::new(widget, scene)?)),
             WidgetRequest::Route {widget, scene, ..} => Ok(Self::Route(PreviewRoute::new(widget, scene)?)),
             WidgetRequest::Raster {widget, scene} => Ok(Self::Raster(PreviewRaster::new(widget, scene, images)?)),
@@ -101,16 +107,17 @@ impl PreviewWidget {
         }
     }
     pub fn pixels(&self) -> &Vec<u8> {
-        match self { Self::Elevation(widget) => &widget.pixels, Self::Route(widget) => &widget.pixels, Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::LeanAngle(widget) => &widget.pixels, Self::GForce(widget) => &widget.pixels, Self::LapTimer(widget) => &widget.pixels, Self::HeadingTape(widget) => &widget.pixels, Self::Gauge(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
+        match self { Self::DivingProfile(widget) => &widget.pixels, Self::Elevation(widget) => &widget.pixels, Self::Route(widget) => &widget.pixels, Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::LeanAngle(widget) => &widget.pixels, Self::GForce(widget) => &widget.pixels, Self::LapTimer(widget) => &widget.pixels, Self::HeadingTape(widget) => &widget.pixels, Self::Gauge(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
     }
     pub fn geometry(&self) -> &Vec<u8> {
-        match self { Self::Elevation(widget) => &widget.geometry, Self::Route(widget) => &widget.geometry, Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::LeanAngle(widget) => &widget.geometry, Self::GForce(widget) => &widget.geometry, Self::LapTimer(widget) => &widget.geometry, Self::HeadingTape(widget) => &widget.geometry, Self::Gauge(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
+        match self { Self::DivingProfile(widget) => &widget.geometry, Self::Elevation(widget) => &widget.geometry, Self::Route(widget) => &widget.geometry, Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::LeanAngle(widget) => &widget.geometry, Self::GForce(widget) => &widget.geometry, Self::LapTimer(widget) => &widget.geometry, Self::HeadingTape(widget) => &widget.geometry, Self::Gauge(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
     }
     pub fn revision(&self) -> u32 {
-        match self { Self::Elevation(widget) => widget.revision, Self::Route(widget) => widget.revision, Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::GForce(widget) => widget.revision, Self::LapTimer(widget) => widget.revision, Self::HeadingTape(widget) => widget.revision, Self::Gauge(widget) => widget.revision, Self::Value(widget) => widget.revision }
+        match self { Self::DivingProfile(widget) => widget.revision, Self::Elevation(widget) => widget.revision, Self::Route(widget) => widget.revision, Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::GForce(widget) => widget.revision, Self::LapTimer(widget) => widget.revision, Self::HeadingTape(widget) => widget.revision, Self::Gauge(widget) => widget.revision, Self::Value(widget) => widget.revision }
     }
     pub fn inherit_revision(&mut self, previous: u32) {
         match self {
+            Self::DivingProfile(widget) => widget.revision = previous,
             Self::Elevation(widget) => widget.revision = previous,
             Self::Route(widget) => widget.revision = previous,
             Self::Raster(widget) => widget.revision = previous.wrapping_add(1),
@@ -148,6 +155,7 @@ pub struct ResizeRequest {
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum ResizeUpdate {
+    DivingProfile(crate::widgets::diving_profile::interaction::ResizeUpdate),
     Elevation(crate::widgets::elevation::interaction::ResizeUpdate),
     Route(crate::widgets::route::interaction::ResizeUpdate),
     Raster(crate::widgets::raster::interaction::ResizeUpdate),

@@ -539,6 +539,10 @@
       "lapLog": "Journal des tours"
     },
     "types": {
+      "diving_profile": {
+        "name": "Profil de plongée",
+        "shortName": "Profil de plongée"
+      },
       "depth": { "name": "Profondeur", "shortName": "Profondeur" },
       "first_stop_depth": { "name": "Profondeur du premier palier", "shortName": "Prof. palier" },
       "first_stop_time": { "name": "Durée du premier palier", "shortName": "Durée palier" },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "Plafond de décompression",
+    "ceilingLineColor": "Couleur de la ligne",
+    "ceilingAreaColor": "Couleur de la zone",
+    "ceilingLineOpacity": "Opacité de la ligne",
+    "ceilingAreaOpacity": "Opacité de la zone",
     "alignment": "Alignement",
     "alignmentBelow": "Haut",
     "alignmentCentered": "Centré",

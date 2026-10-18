@@ -13,7 +13,7 @@ describe('manifest-backed widgets', () => {
   test('offers seven scuba text metrics with diving units and conventional names', () => {
     const group = GROUPED_QUICKMENU_ITEMS.find((group) => group.items.some((item) => item.type === 'depth'))
     const types = ['depth', 'first_stop_depth', 'first_stop_time', 'time_to_surface', 'average_ppo2', 'gas_mix', 'water_temperature']
-    expect(group.items.map((item) => item.type).sort()).toEqual([...types].sort())
+    expect(group.items.map((item) => item.type).sort()).toEqual([...types, 'diving_profile'].sort())
     for (const type of types) {
       expect(WIDGET_TYPE_DEFINITIONS[type].category).toBe('scuba_diving')
       expect(getWidgetDisplayTypeOptions(type, i18next.t)).toEqual([{ value: 'text', label: 'Text' }])

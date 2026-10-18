@@ -8,6 +8,10 @@ use ovrley_widgets::model::types::{DisplayType, MetricKind};
 use ovrley_widgets::widgets::value::config::ValueConfig;
 use ovrley_widgets::widgets::{
     backdrop::validation::validate_backdrop,
+    diving_profile::{
+        config::DivingProfileConfig,
+        validation::{validate_diving_profile, ValidatedDivingProfile},
+    },
     elevation::{
         config::ElevationPlotConfig,
         validation::{validate_elevation_plot, ValidatedElevationPlot},
@@ -52,6 +56,7 @@ pub(super) fn validate_render_contents(
     Ok(ValidatedRenderConfig {
         course_plots: validate_route_plots(&raw.plots)?,
         elevation_plots: validate_elevation_plots(&raw.plots, &scene)?,
+        diving_profiles: validate_diving_profiles(&raw.plots, &scene)?,
         scene,
         backdrops,
         rasters,
@@ -137,4 +142,18 @@ pub fn validate_elevation_plots(
 
 fn elevation_config_error(error: serde_json::Error) -> CoreError {
     CoreError::Config(format!("elevation plot config: {error}"))
+}
+
+fn validate_diving_profiles(
+    plots: &serde_json::Value,
+    scene: &ValidatedScenePresentation,
+) -> CoreResult<Vec<ValidatedDivingProfile>> {
+    config::find_plot_values(plots, "diving_profile")
+        .into_iter()
+        .map(|(index, value)| {
+            let plot: DivingProfileConfig = serde_json::from_value(value.clone())
+                .map_err(|error| CoreError::Config(format!("diving profile config: {error}")))?;
+            Ok(validate_diving_profile(&plot, index, scene)?)
+        })
+        .collect()
 }

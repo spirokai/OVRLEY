@@ -539,6 +539,10 @@
       "lapLog": "Registro de voltas"
     },
     "types": {
+      "diving_profile": {
+        "name": "Perfil de mergulho",
+        "shortName": "Perfil de mergulho"
+      },
       "depth": { "name": "Profundidade", "shortName": "Profundidade" },
       "first_stop_depth": { "name": "Profundidade da primeira parada", "shortName": "Prof. parada" },
       "first_stop_time": { "name": "Tempo da primeira parada", "shortName": "Tempo parada" },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "Teto de descompressão",
+    "ceilingLineColor": "Cor da linha",
+    "ceilingAreaColor": "Cor da área",
+    "ceilingLineOpacity": "Opacidade da linha",
+    "ceilingAreaOpacity": "Opacidade da área",
     "alignment": "Alinhamento",
     "alignmentBelow": "Topo",
     "alignmentCentered": "Centralizado",

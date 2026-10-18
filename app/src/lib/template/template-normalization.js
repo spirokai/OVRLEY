@@ -227,7 +227,7 @@ function normalizePlot(plot = {}, config, globalDefaults) {
   const type = plot.value
   if (WIDGET_TYPE_DEFINITIONS[type]?.collection !== 'plots') throw new Error(`Unknown plot widget type: ${type}`)
   const withDefaults = { ...WIDGET_TYPE_DEFINITIONS[type].defaults, ...plot }
-  if (type === 'elevation') {
+  if (type === 'elevation' || type === 'diving_profile') {
     withDefaults.point_label = normalizePointLabel(plot.point_label, config, globalDefaults)
   }
   const pickedPlot = pickDefined(withDefaults, WIDGET_TYPE_DEFINITIONS[type].configKeys)

@@ -2,7 +2,7 @@ import { useWasmCanvas } from '../hooks/useWasmCanvas'
 
 /** @param {object} props Standalone widget canvas registration. @returns {JSX.Element} Rust-positioned canvas. */
 export function WasmWidgetCanvas({ widget, attach, registerNode, handleWidgetMouseDown }) {
-  const separateRaster = widget.type === 'course' || widget.type === 'elevation'
+  const separateRaster = widget.type === 'course' || widget.type === 'elevation' || widget.type === 'diving_profile'
   const { wrapperRef, canvasRef } = useWasmCanvas({ id: widget.id, attach, registerNode, separateRaster })
   const canvas = (
     <canvas

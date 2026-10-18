@@ -5,6 +5,7 @@ use ovrley_widgets::model::telemetry::{numeric_metrics, ActivitySeries, NumericA
 use ovrley_widgets::{
     model::types::MetricKind,
     widgets::{
+        diving_profile::sampling::DivingActivity,
         elevation::sampling::{
             elevation_profile_series, preferred_elevation_series, ElevationActivity,
         },
@@ -65,6 +66,15 @@ pub fn calculate_metric_ranges(activity: &ParsedActivity) -> HashMap<MetricKind,
 }
 
 impl ParsedActivity {
+    pub fn diving_activity(&self) -> DivingActivity {
+        DivingActivity::new(
+            &self.sample_elapsed_seconds,
+            &self.depth,
+            &self.first_stop_depth,
+            self.trim_end_seconds,
+        )
+    }
+
     pub fn route_activity(&self) -> RouteActivity {
         RouteActivity::new(
             &self.sample_elapsed_seconds,

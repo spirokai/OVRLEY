@@ -16,6 +16,9 @@ function isTimeDependentWidget(widget) {
 /** @param {object} widget Effective widget. @returns {object[]} Required native font resource requests. */
 export function widgetFonts(widget) {
   if (widget.type === 'backdrop' || widget.type === 'raster' || widget.type === 'course') return []
+  if (widget.type === 'diving_profile') {
+    return widget.data.show_depth_metric || widget.data.show_depth_imperial ? [{ font: widget.data.point_label.font }] : []
+  }
   if (widget.type === 'elevation') {
     return widget.data.show_elevation_metric || widget.data.show_elevation_imperial ? [{ font: widget.data.point_label.font }] : []
   }
@@ -69,7 +72,7 @@ export function createPreviewSession(module, onError) {
     getSnapshot: () => snapshot,
     getGeometry: (id) => widgets.get(id).geometry,
     resize(request, id) {
-      const input = ['course', 'elevation'].includes(request.type) ? { ...request, handle: widgets.get(id).handle } : request
+      const input = ['course', 'elevation', 'diving_profile'].includes(request.type) ? { ...request, handle: widgets.get(id).handle } : request
       upload(encoder.encode(JSON.stringify(input)), (ptr, len) => check(module._ovrley_preview_resize(handle, ptr, len)))
       return JSON.parse(read(module._ovrley_preview_resize_ptr(handle), module._ovrley_preview_resize_len(handle)))
     },
@@ -150,7 +153,7 @@ export function createPreviewSession(module, onError) {
       }
       for (const widget of interaction.resolve(snapshot)) {
         let instance = widgets.get(widget.id)
-        const transient = ['course', 'elevation'].includes(widget.type) && interaction.isResizing(widget.id)
+        const transient = ['course', 'elevation', 'diving_profile'].includes(widget.type) && interaction.isResizing(widget.id)
         if (instance?.data === widget.data && instance.scene === snapshot.scene && instance.transient === transient) continue
         const resource = widget.type === 'raster' && images.get(widget.data.resourceId)
         if (resource?.error) throw resource.error
@@ -174,7 +177,7 @@ export function createPreviewSession(module, onError) {
           type: widget.type,
           widget: widget.data,
           scene: snapshot.scene,
-          ...(['course', 'elevation'].includes(widget.type) ? { transient } : {}),
+          ...(['course', 'elevation', 'diving_profile'].includes(widget.type) ? { transient } : {}),
         })
         if (!instance) {
           const widgetHandle = upload(encoder.encode(config), (ptr, len) => module._ovrley_preview_widget_create(handle, ptr, len))
@@ -213,7 +216,8 @@ export function createPreviewSession(module, onError) {
             canvas.height = geometry.height
             widget.image = new ImageData(geometry.width, geometry.height)
           }
-          const measurePixels = measure && (widget.type === 'course' || widget.type === 'elevation' || widget.type === 'raster')
+          const measurePixels =
+            measure && (widget.type === 'course' || widget.type === 'elevation' || widget.type === 'diving_profile' || widget.type === 'raster')
           const widgetLabel = measurePixels ? `${widget.type}:${id}` : null
           const copyStarted = measurePixels ? performance.now() : 0
           const ptr = module._ovrley_preview_pixels(handle, widget.handle)

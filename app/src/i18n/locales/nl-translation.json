@@ -539,6 +539,10 @@
       "lapLog": "Rondeoverzicht"
     },
     "types": {
+      "diving_profile": {
+        "name": "Duikprofiel",
+        "shortName": "Duikprofiel"
+      },
       "depth": { "name": "Diepte", "shortName": "Diepte" },
       "first_stop_depth": { "name": "Diepte eerste decompressiestop", "shortName": "Stopdiepte" },
       "first_stop_time": { "name": "Duur eerste decompressiestop", "shortName": "Stoptijd" },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "Decompressieplafond",
+    "ceilingLineColor": "Lijnkleur",
+    "ceilingAreaColor": "Vulkleur",
+    "ceilingLineOpacity": "Lijndekking",
+    "ceilingAreaOpacity": "Vuldekking",
     "alignment": "Uitlijning",
     "alignmentBelow": "Boven",
     "alignmentCentered": "Gecentreerd",

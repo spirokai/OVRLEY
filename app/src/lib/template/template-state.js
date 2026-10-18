@@ -73,7 +73,7 @@ function buildEffectivePlotData(widgetData = {}, globals) {
   const nextData = { ...widgetData }
   if (!nextData.color) nextData.color = globals?.color_values || getThemeColor('ice')
   if (nextData.opacity === undefined) nextData.opacity = globals?.opacity
-  if (nextData.value === 'elevation' && globals?.font_values) {
+  if ((nextData.value === 'elevation' || nextData.value === 'diving_profile') && globals?.font_values) {
     nextData.point_label = {
       ...(nextData.point_label || {}),
       ...(!nextData.point_label?.font ? createFontSelection(globals.font_values) : {}),
@@ -172,7 +172,7 @@ export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null, 
   }
   if (nextConfig.plots) {
     for (const plot of nextConfig.plots) {
-      if (plot.value === 'elevation' && shouldApply('font_values')) {
+      if ((plot.value === 'elevation' || plot.value === 'diving_profile') && shouldApply('font_values')) {
         plot.point_label = { ...(plot.point_label || {}), ...createFontSelection(globals.font_values) }
       }
       if (shouldApply('color_values') && Object.hasOwn(plot, 'color')) plot.color = globals.color_values

@@ -383,6 +383,6 @@ export function SizeSlider({ onChange, onCommit, ...props }) {
  * @param {*} props.className - Additional class names to merge into the element.
  * @returns {JSX.Element} Rendered component output.
  */
-export function ToggleField({ checked, onCheckedChange, className }) {
-  return <Switch size="xs" checked={checked} onCheckedChange={onCheckedChange} className={className} />
+export function ToggleField({ checked, onCheckedChange, className, label }) {
+  return <Switch size="xs" aria-label={label} checked={checked} onCheckedChange={onCheckedChange} className={className} />
 }

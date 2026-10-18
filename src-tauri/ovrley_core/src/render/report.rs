@@ -32,6 +32,7 @@ pub struct PreviewRenderReport {
     pub label_cache_status: LabelCacheStatus,
     pub route_widgets: Vec<WidgetRenderReport>,
     pub elevation_widgets: Vec<WidgetRenderReport>,
+    pub diving_profiles: Vec<WidgetRenderReport>,
     pub metric_presentations: Vec<MetricPresentationReport>,
     pub prepare_timings: BTreeMap<String, TimingBucket>,
     pub frame_timings: BTreeMap<String, TimingBucket>,
@@ -81,6 +82,7 @@ pub struct MetricPresentationReport {
 pub struct FrameRenderReport {
     pub route_widgets: Vec<WidgetRenderReport>,
     pub elevation_widgets: Vec<WidgetRenderReport>,
+    pub diving_profiles: Vec<WidgetRenderReport>,
     pub metric_presentations: Vec<MetricPresentationReport>,
 }
 

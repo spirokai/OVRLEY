@@ -539,6 +539,10 @@
       "lapLog": "랩 기록"
     },
     "types": {
+      "diving_profile": {
+        "name": "다이빙 프로필",
+        "shortName": "잠수 프로필"
+      },
       "depth": { "name": "수심", "shortName": "수심" },
       "first_stop_depth": { "name": "첫 감압 정지 수심", "shortName": "정지 수심" },
       "first_stop_time": { "name": "첫 감압 정지 시간", "shortName": "정지 시간" },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "감압 천장",
+    "ceilingLineColor": "선 색상",
+    "ceilingAreaColor": "영역 색상",
+    "ceilingLineOpacity": "선 불투명도",
+    "ceilingAreaOpacity": "영역 불투명도",
     "alignment": "정렬",
     "alignmentBelow": "위쪽",
     "alignmentCentered": "가운데",

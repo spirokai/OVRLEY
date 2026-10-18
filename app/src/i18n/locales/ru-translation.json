@@ -539,6 +539,10 @@
       "lapLog": "Журнал кругов"
     },
     "types": {
+      "diving_profile": {
+        "name": "Профиль погружения",
+        "shortName": "Профиль погружения"
+      },
       "depth": { "name": "Глубина", "shortName": "Глубина" },
       "first_stop_depth": { "name": "Глубина первой остановки", "shortName": "Глубина ост." },
       "first_stop_time": { "name": "Время первой остановки", "shortName": "Время ост." },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "Декомпрессионный потолок",
+    "ceilingLineColor": "Цвет линии",
+    "ceilingAreaColor": "Цвет области",
+    "ceilingLineOpacity": "Непрозрачность линии",
+    "ceilingAreaOpacity": "Непрозрачность области",
     "alignment": "Выравнивание",
     "alignmentBelow": "Сверху",
     "alignmentCentered": "По центру",

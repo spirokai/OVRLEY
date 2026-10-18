@@ -539,6 +539,10 @@
       "lapLog": "ラップログ"
     },
     "types": {
+      "diving_profile": {
+        "name": "ダイビングプロファイル",
+        "shortName": "潜水プロファイル"
+      },
       "depth": { "name": "水深", "shortName": "水深" },
       "first_stop_depth": { "name": "最初の減圧停止深度", "shortName": "停止深度" },
       "first_stop_time": { "name": "最初の減圧停止時間", "shortName": "停止時間" },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "減圧シーリング",
+    "ceilingLineColor": "線の色",
+    "ceilingAreaColor": "領域の色",
+    "ceilingLineOpacity": "線の不透明度",
+    "ceilingAreaOpacity": "領域の不透明度",
     "alignment": "配置",
     "alignmentBelow": "上",
     "alignmentCentered": "中央",

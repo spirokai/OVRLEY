@@ -539,6 +539,10 @@
       "lapLog": "Registro giri"
     },
     "types": {
+      "diving_profile": {
+        "name": "Profilo di immersione",
+        "shortName": "Profilo immersione"
+      },
       "depth": { "name": "Profondità", "shortName": "Profondità" },
       "first_stop_depth": { "name": "Profondità della prima sosta", "shortName": "Prof. sosta" },
       "first_stop_time": { "name": "Durata della prima sosta", "shortName": "Durata sosta" },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "Tetto di decompressione",
+    "ceilingLineColor": "Colore linea",
+    "ceilingAreaColor": "Colore area",
+    "ceilingLineOpacity": "Opacità linea",
+    "ceilingAreaOpacity": "Opacità area",
     "alignment": "Allineamento",
     "alignmentBelow": "In alto",
     "alignmentCentered": "Centrato",

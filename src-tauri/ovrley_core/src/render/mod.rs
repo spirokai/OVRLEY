@@ -254,6 +254,7 @@ pub fn render_preview_with_prepared_assets(
         label_cache_status: request.label_cache_status,
         route_widgets: frame_report.route_widgets,
         elevation_widgets: frame_report.elevation_widgets,
+        diving_profiles: frame_report.diving_profiles,
         metric_presentations: frame_report.metric_presentations,
         prepare_timings: request.prepare_timings,
         frame_timings,

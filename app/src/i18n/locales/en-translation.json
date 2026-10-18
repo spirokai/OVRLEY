@@ -539,6 +539,10 @@
       "lapLog": "Lap Log"
     },
     "types": {
+      "diving_profile": {
+        "name": "Diving Profile",
+        "shortName": "Dive Profile"
+      },
       "depth": { "name": "Depth", "shortName": "Depth" },
       "first_stop_depth": { "name": "First Stop Depth", "shortName": "Stop Depth" },
       "first_stop_time": { "name": "First Stop Time", "shortName": "Stop Time" },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "Decompression Ceiling",
+    "ceilingLineColor": "Line Color",
+    "ceilingAreaColor": "Area Color",
+    "ceilingLineOpacity": "Line Opacity",
+    "ceilingAreaOpacity": "Area Opacity",
     "alignment": "Alignment",
     "alignmentBelow": "Top",
     "alignmentCentered": "Centered",

@@ -37,6 +37,67 @@ fn elevation_request() -> Value {
     request
 }
 
+#[test]
+fn diving_profile_preview_matches_export_during_playback_and_seeking() {
+    use ovrley_core::{activity::{interpolate::densify_activity, trim::trim_activity}, debug::RenderProfiler, paths::AppPaths, render::{prepare_preview_assets, FrameSize, VideoFrameRenderer}};
+    let manifest: Value = serde_json::from_str(include_str!("../../../assets/standard-widgets.json")).unwrap();
+    let mut request = route_request();
+    request["type"] = json!("diving_profile");
+    request["widget"] = manifest["definitions"].as_array().unwrap().iter().find(|w| w["type"] == "diving_profile").unwrap()["defaults"].clone();
+    request["widget"].as_object_mut().unwrap().extend(json!({
+        "x": 150.25, "y": 90.5, "width": 280.125, "height": 145.25, "rotation": 0,
+        "opacity": 0.8, "marker_variant": "ring", "show_depth_imperial": true, "show_full_activity": false,
+        "simplify_tolerance_px": 2.5, "target_density": 1.25,
+        "point_label": {"font": "Inter.ttf", "font_size": 19.5, "color": "#abcdef"}
+    }).as_object().unwrap().clone());
+    request["scene"]["custom_export_range_active"] = json!(true);
+    request["scene"]["start"] = json!(0.25);
+    request["scene"]["end"] = json!(3.75);
+    let activity = ovrley_core::activity::parse_activity_json(&json!({
+        "sample_elapsed_seconds": [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4], "trim_end_seconds": 4,
+        "sample_distance_progress": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "depth": [0, 30, 30, 18, 12, 6, 3, 3, 0], "first_stop_depth": [0, 0, 9, 9, 6, 6, 3, 0, 0]
+    }).to_string()).unwrap();
+    let config = common::seam::validated_config_from_value(json!({"scene": request["scene"], "values": [], "labels": [], "plots": [request["widget"]]}));
+    let requirements = config.render_data_requirements();
+    assert!(requirements.depth && requirements.first_stop_depth);
+    let trimmed = trim_activity(&activity, 0.25, 3.75, &requirements).unwrap();
+    let dense = densify_activity(&trimmed, vec![0.0, 1.5, 3.25], &requirements);
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
+    let (assets, _, _, _) = prepare_preview_assets(&paths, &config, &activity, &dense).unwrap();
+    let renderer = VideoFrameRenderer::new(&paths.font_dirs, &dense, &assets, FrameSize { width: 700, height: 500 }, 0).unwrap();
+    let (mut preview, id) = elevation_preview(&request, &serde_json::to_vec(&activity).unwrap());
+    let mut placement = None;
+    for index in [0, 1, 2, 0] {
+        preview.render(0.25 + dense.frame_elapsed_seconds[index]).unwrap();
+        let widget = &preview.widgets[&id];
+        if let Some(previous) = &placement { assert_eq!(widget.geometry(), previous); }
+        else { placement = Some(widget.geometry().clone()); }
+        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let (w, h, left, top) = (geometry["width"].as_u64().unwrap() as usize, geometry["height"].as_u64().unwrap() as usize,
+            geometry["left"].as_f64().unwrap() as usize, geometry["top"].as_f64().unwrap() as usize);
+        let mut native = vec![0; 700 * 500 * 4];
+        renderer.render_rgba(index, &mut native, &mut RenderProfiler::default()).unwrap();
+        let mut difference = 0;
+        for y in 0..h {
+            let native = &native[((top + y) * 700 + left) * 4..((top + y) * 700 + left + w) * 4];
+            for (a, b) in native.chunks_exact(4).zip(widget.pixels()[y * w * 4..(y + 1) * w * 4].chunks_exact(4)) {
+                difference = difference.max(a[3].abs_diff(b[3]) as u16);
+                for c in 0..3 { difference = difference.max((a[c] as u16 * a[3] as u16).abs_diff(b[c] as u16 * b[3] as u16) / 255); }
+            }
+        }
+        assert!(difference <= 8, "diving profile preview/export pixel difference: {difference}");
+        let revision = widget.revision();
+        preview.render(0.25 + dense.frame_elapsed_seconds[index]).unwrap();
+        assert_eq!(preview.widgets[&id].revision(), revision);
+    }
+    // Playback changes the completed line and marker while reusing static presentation.
+    let pixels = preview.widgets[&id].pixels().clone();
+    preview.render(2.0).unwrap();
+    assert_ne!(preview.widgets[&id].pixels(), &pixels);
+}
+
 fn elevation_activity() -> ovrley_core::activity::schema::ParsedActivity {
     ovrley_core::activity::parse_activity_json(&json!({
         "sample_elapsed_seconds": [0.0, 0.5, 1.5, 2.5, 3.0, 4.0], "trim_end_seconds": 4.0,

@@ -13,6 +13,7 @@ import { PositionSection } from './widgetEditorSections'
 import BackdropWidgetEditor from './BackdropWidgetEditor'
 import RasterWidgetEditor from './RasterWidgetEditor'
 import ElevationWidgetEditor from './ElevationWidgetEditor'
+import DivingProfileWidgetEditor from './DivingProfileWidgetEditor'
 import GradientWidgetEditor from './GradientWidgetEditor'
 import MetricWidgetEditor from './metricWidget/MetricWidgetEditor'
 import RouteMapWidgetEditor from './RouteMapWidgetEditor'
@@ -38,6 +39,7 @@ const WIDGET_EDITOR_MAP = {
   gradient: GradientWidgetEditor,
   course: RouteMapWidgetEditor,
   elevation: ElevationWidgetEditor,
+  diving_profile: DivingProfileWidgetEditor,
 }
 
 /**

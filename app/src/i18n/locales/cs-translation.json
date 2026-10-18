@@ -539,6 +539,10 @@
       "lapLog": "Přehled kol"
     },
     "types": {
+      "diving_profile": {
+        "name": "Profil ponoru",
+        "shortName": "Profil ponoru"
+      },
       "depth": { "name": "Hloubka", "shortName": "Hloubka" },
       "first_stop_depth": { "name": "Hloubka první zastávky", "shortName": "Hloubka zast." },
       "first_stop_time": { "name": "Doba první zastávky", "shortName": "Doba zast." },
@@ -594,6 +598,11 @@
     }
   },
   "widget-editor": {
+    "decompressionCeiling": "Dekompresní strop",
+    "ceilingLineColor": "Barva čáry",
+    "ceilingAreaColor": "Barva oblasti",
+    "ceilingLineOpacity": "Krytí čáry",
+    "ceilingAreaOpacity": "Krytí oblasti",
     "alignment": "Zarovnání",
     "alignmentBelow": "Navrch",
     "alignmentCentered": "Vycentrováno",
