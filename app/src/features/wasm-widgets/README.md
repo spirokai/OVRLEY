@@ -26,6 +26,9 @@ the canvas unmounts. Activity replacement and clearing still replace the WASM da
 - `useWasmWidgetInteractions` translates Moveable gestures into scene-space intent.
 - `widgetInteraction` captures the original configuration and gesture anchor. It
   replaces pending intent instead of accumulating deltas from previous drafts.
+  Its per-widget `geometry()` returns the session's last presented geometry without
+  flushing or scheduling work. Selection badges reuse it to avoid DOM rectangle
+  reads and a second geometry cache; callers must treat it as read-only.
 - `previewSession` owns the animation-frame scheduler. It resolves the latest
   intent, updates WASM and presents pixels/geometry in that frame. Inspector draft
   publication is downstream; it does not gate gesture rendering.
@@ -38,13 +41,29 @@ the canvas unmounts. Activity replacement and clearing still replace the WASM da
   raster bounds. `widgetPresentation` installs both and notifies the editor to
   refresh Moveable, including during an active gesture.
 
+Every widget family uses the existing `pixels_revision` contract. The overall
+revision can advance for placement alone; `previewSession` copies WASM pixels and
+uploads the canvas only when the pixel revision changes. At a fixed playhead,
+translation preserves the Rust instance, layout, surface, and rendered values.
+Content and raster bounds move together, preserving shadow offsets. Geometry-only
+frames still update placement; pixel-only playback frames skip DOM placement and
+Moveable refreshes.
+
+Active drags set `transient` so fractional movement can reuse cached pixels. On
+mouseup, clearing that flag and flushing restores native/export pixel alignment,
+with one rerasterization when the final fractional position requires it. Raster
+images retain their existing placement behavior. The paused 15-widget drag
+benchmark measured zero steady-state pixel copies and canvas uploads after this
+change; per-widget config and geometry updates still occur. See the
+[overlay editor notes](../overlay-editor/README.md) for selection measurement costs.
+
 Mouseup flushes pending intent before committing one configuration patch. The
 commit preserves the preview's fractional coordinates and sizes. Escape, window
 blur, selection changes, document replacement and unmount cancel the gesture.
 
 Single widgets support dragging and resizing, with rotation for routes and raster
-images. Groups support translation through shared data drafts; group scaling is
-disabled until a shared multi-widget resize policy is implemented.
+images. Groups share the same interaction controller and frame scheduler for
+translation and proportional resizing; Rust applies each widget's resize policy.
 
 The overlay editor keeps one data-patch draft model for the canvas and inspector,
 and one node registry with stable callbacks across appearance and display edits.
