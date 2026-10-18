@@ -165,10 +165,51 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
 }
 
 #[test]
+fn balance_missing_samples_are_neutral_in_preview_and_trimmed_export() {
+    let activity: ParsedActivity = serde_json::from_value(json!({
+        "sample_elapsed_seconds": [0, 1, 2, 3, 4, 5], "trim_end_seconds": 5,
+        "left_right_balance": [52, null, null, 0, 0, 48],
+    }))
+    .unwrap();
+    let sampler = ActivitySampler::from_json(&serde_json::to_vec(&activity).unwrap()).unwrap();
+    let mut input = request("left_right_balance", "percent");
+    input["widget"]["decimals"] = json!(0);
+    input["widget"]["balance_format"] = json!("plain");
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": input["scene"], "values": [input["widget"]], "labels": [], "plots": [],
+    }));
+    let widget = validate_value_widget(serde_json::from_value(input["widget"].clone()).unwrap(), 0)
+        .unwrap();
+    let requirements = config.render_data_requirements();
+    let trimmed = trim_activity(&activity, 0.5, 4.5, &requirements).unwrap();
+    let seconds = vec![0.0, 0.5, 1.0, 1.5, 2.5, 3.0, 4.0];
+    let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
+    for ((index, second), expected) in seconds
+        .into_iter()
+        .enumerate()
+        .zip(["51/49", "50/50", "50/50", "50/50", "0/100", "0/100", "24/76"])
+    {
+        for sample in [
+            sampler.sample(&widget, second + 0.5),
+            dense.metric_sample(widget.metric, index, 0.0),
+        ] {
+            assert_eq!(
+                format_metric_parts(&widget, &sample).standard_text().0,
+                format!("[{expected}]"),
+                "balance at {} seconds",
+                second + 0.5,
+            );
+        }
+    }
+    assert_eq!(activity.left_right_balance[1], None);
+}
+
+#[test]
 fn sample_policies_altitude_totals_and_activity_removal_preserve_display_semantics() {
     let bytes = br#"{"sample_elapsed_seconds":[0,1,2,3,4],"trim_end_seconds":4,
         "power":[null,100,null,300,null],"speed":[null,10,null,30,null],
         "iso":[null,100,null,400,null],"gear_position":[null,"0",null,"3",null],
+        "left_right_balance":[null,52,null,0,null],
         "barometric_altitude":[null,100,null,120,null],"elevation":[900,910,920,930,940],
         "distance":[0,10,20,30,40],"total_ascent":[0,1,2,3,4]}"#;
     let sampler = ActivitySampler::from_json(bytes).unwrap();
@@ -177,6 +218,9 @@ fn sample_policies_altitude_totals_and_activity_removal_preserve_display_semanti
         ("power", "w", 2.0, "0"),
         ("power", "w", 1.5, "50"),
         ("power", "w", 4.0, "--"),
+        ("left_right_balance", "percent", 1.0, "52%/48%"),
+        ("left_right_balance", "percent", 2.0, "50%/50%"),
+        ("left_right_balance", "percent", 3.0, "0%/100%"),
         ("speed", "mps", 2.0, "20"),
         ("iso", "iso", 2.0, "100"),
         ("gear_position", "gear", 0.0, "--"),

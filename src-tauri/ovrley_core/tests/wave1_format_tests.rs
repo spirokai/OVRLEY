@@ -500,14 +500,14 @@ fn balance_formats_l_suffix() {
 }
 
 #[test]
-fn balance_preserves_gap_as_zero_when_series_is_available() {
+fn balance_displays_gap_as_neutral_when_series_is_available() {
     let (value, _) = format_parts(
         "left_right_balance",
         "left_right_balance",
         None,
         &[("display_unit", r#""percent""#)],
     );
-    assert_eq!(value, "0/100");
+    assert_eq!(value, "50/50");
 }
 
 // ── New camera metric formatting ──────────────────────────────────────────

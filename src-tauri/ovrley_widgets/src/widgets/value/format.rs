@@ -102,7 +102,11 @@ pub fn resolve_metric_display_value(
     }
 
     if metric_interpolation(kind) == Some(InterpolationKind::Preserve) && available {
-        Some(0.0)
+        Some(if kind == MetricKind::LeftRightBalance {
+            50.0
+        } else {
+            0.0
+        })
     } else {
         None
     }
@@ -565,6 +569,7 @@ mod tests {
 
     #[test]
     fn balance_variants_omit_spaces_around_slash() {
+        assert_eq!(format_balance_value(0.0, 0, Some("plain")), "0/100");
         assert_eq!(format_balance_value(60.0, 0, Some("plain")), "60/40");
         assert_eq!(format_balance_value(48.0, 0, Some("l_prefix")), "L48/R52");
         assert_eq!(format_balance_value(70.0, 0, Some("l_suffix")), "70L/30R");

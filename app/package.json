@@ -34,7 +34,7 @@
     "@tauri-apps/plugin-updater": "=2.9.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "fit-file-parser": "^2.3.3",
+    "fit-file-parser": "^6.2.2",
     "i18next": "^26.4.1",
     "igc-parser": "git+https://github.com/Turbo87/igc-parser.git#29672f82c87b93cc2c44b567421a97c05383ea4c",
     "immer": "^11.1.4",

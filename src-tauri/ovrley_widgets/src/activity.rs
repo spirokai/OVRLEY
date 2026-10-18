@@ -16,7 +16,10 @@ use crate::{
         },
         types::MetricKind,
     },
-    widgets::value::{format::MetricSample, validation::ValidatedValueWidget},
+    widgets::value::{
+        format::{resolve_metric_display_value, MetricSample},
+        validation::ValidatedValueWidget,
+    },
 };
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -177,10 +180,16 @@ impl ActivitySampler {
         );
         let mut columns = HashMap::new();
         for &metric in numeric_metrics() {
-            let values = activity
+            let mut values = activity
                 .numeric_series_for(metric)
-                .expect("numeric metrics declare sources");
-            columns.insert(metric, values.to_vec());
+                .expect("numeric metrics declare sources")
+                .to_vec();
+            if metric == MetricKind::LeftRightBalance {
+                for value in &mut values {
+                    *value = resolve_metric_display_value(metric, *value, true);
+                }
+            }
+            columns.insert(metric, values);
         }
         let time = crate::widgets::time::sampling::TimeSampler::new(
             activity.sync_time.as_deref(),

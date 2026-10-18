@@ -19,6 +19,8 @@ use ovrley_widgets::interpolation::{
     MissingSamplePolicy,
 };
 use ovrley_widgets::model::telemetry::{ActivitySeries, NumericActivity};
+use ovrley_widgets::model::types::MetricKind;
+use ovrley_widgets::widgets::value::format::resolve_metric_display_value;
 
 // Validates that the requested scene window fits inside activity duration.
 fn validate_trim_window(duration: f64, start: f64, end: f64) -> CoreResult<()> {
@@ -70,9 +72,22 @@ impl NumericTrim<'_> {
         if !self.requirements.enabled(series) {
             return Vec::new();
         }
+        let data = self.activity.numeric_series(series);
+        let neutral_balance;
+        let data = if series == ActivitySeries::LeftRightBalance {
+            neutral_balance = data
+                .iter()
+                .map(|value| {
+                    resolve_metric_display_value(MetricKind::LeftRightBalance, *value, true)
+                })
+                .collect::<Vec<_>>();
+            neutral_balance.as_slice()
+        } else {
+            data
+        };
         trim_numeric_series(
             &self.activity.sample_elapsed_seconds,
-            self.activity.numeric_series(series),
+            data,
             self.start,
             self.end,
             self.interior.start,

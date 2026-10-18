@@ -156,8 +156,8 @@ importers:
         specifier: ^2.1.1
         version: 2.1.1
       fit-file-parser:
-        specifier: ^2.3.3
-        version: 2.3.3
+        specifier: ^6.2.2
+        version: 6.2.2
       i18next:
         specifier: ^26.4.1
         version: 26.4.1
@@ -2964,8 +2964,8 @@ packages:
     resolution: {integrity: sha512-2kCCtc+JvcZ86IGAz3Z2Y0A1baIz9fL31pH/0S1IqZr9Iwnjq8izfPtrCyQKO6TLMPELLsQMre7VDqeIKCsHkA==}
     engines: {node: '>=18'}
 
-  fit-file-parser@2.3.3:
-    resolution: {integrity: sha512-TZPFfjkEev5TTd9RnZ4xn4k5ZSx2VZiKNjoZsHIkmQDK0S0XA7ebfdMLj76BK7kStsHh5WbK8Fmn/w85jgd0dA==}
+  fit-file-parser@6.2.2:
+    resolution: {integrity: sha512-L+IWg/coQ9X2BNxdXALwPCDlwkoIiCc1RaPyL95fO7hDAteN6sz5tKhkUMaRscQ0PV9wZcFTdZMSmrV4LQ51ww==}
 
   flat-cache@4.0.1:
     resolution: {integrity: sha512-f7ccFPK3SXFHpx15UIGyRJ/FJQctuKZ0zVuN3frBo4HnK3cay9VEW0R6yPYFHC0AgqhukPzKjq22t5DmAyqGyw==}
@@ -7571,7 +7571,7 @@ snapshots:
       semver-regex: 4.0.5
       super-regex: 1.1.0
 
-  fit-file-parser@2.3.3:
+  fit-file-parser@6.2.2:
     dependencies:
       buffer: 6.0.3
 
