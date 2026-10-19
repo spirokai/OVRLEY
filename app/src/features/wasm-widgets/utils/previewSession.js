@@ -1,6 +1,6 @@
 import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { previewActivity, previewFont, rasterPreviewPng } from '@/api/backend'
-import { isPreviewPerfEnabled, recordPreviewPerfDuration, setPreviewPerfValue } from '@/lib/previewPerf'
+import { isPreviewPerfEnabled, recordPreviewPerfDuration, setPreviewPerfValue } from '@/lib/preview-perf'
 import { createWidgetInteraction, registerWidgetInteraction, unregisterWidgetInteraction } from './widgetInteraction'
 import { presentWidgetGeometry } from './widgetPresentation'
 

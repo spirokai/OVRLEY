@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { FontSection, UnitsControlRow } from './widgetEditorSections'
 import { TrendingUp } from 'lucide-react'
-import { getThemeColor } from '@/lib/theme'
+import { getThemeColor } from '@/lib/color-utils'
 import { useTranslation } from 'react-i18next'
 
 /**

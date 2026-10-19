@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { formatExportRangeTime } from '@/lib/export-range'
+import { formatExportRangeTime } from '@/lib/time-format'
 import useStore from '@/store/useStore'
 import { clamp } from '@/lib/utils'
 import { clampExportRangeMarkerSecond } from '../utils/timelineGeometry'

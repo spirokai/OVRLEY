@@ -1,5 +1,5 @@
 /**
- * Preview performance diagnostics for local development.
+ * Shared preview performance diagnostics for local development.
  *
  * Counters stay disabled unless the current browser session explicitly opts in
  * through `window.__OVRLEY_PREVIEW_PERF_ENABLED__ = true`. Snapshots are

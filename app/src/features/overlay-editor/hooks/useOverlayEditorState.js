@@ -24,7 +24,7 @@ import { useOverlayPreviewStore } from '@/hooks/useAppStoreSelectors'
 import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
 import { applyWidgetDrafts } from '@/lib/widget/widget-resolver'
-import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
+import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/preview-perf'
 import { useWidgetDraftView } from './useWidgetDraftState'
 
 function getWidgetRefCallbacks(widgetLiveEdits, orderedWidgetIds) {

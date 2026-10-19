@@ -1,4 +1,4 @@
-import { directoryFromSelectedPath } from '@/lib/utils'
+import { directoryFromSelectedPath } from '@/lib/file-dialog'
 
 function splitPath(path) {
   return String(path).replace(/\\/g, '/').split('/').filter(Boolean)

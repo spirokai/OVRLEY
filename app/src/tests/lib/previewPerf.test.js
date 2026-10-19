@@ -15,11 +15,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/tes
  * The module owns timer and counter state, so each spec needs a clean module
  * instance instead of reusing state from a previous test.
  *
- * @returns {Promise<typeof import('@/lib/previewPerf')>} Fresh preview perf module.
+ * @returns {Promise<typeof import('@/lib/preview-perf')>} Fresh preview perf module.
  */
 async function loadPreviewPerfModule() {
   vi.resetModules()
-  return import('@/lib/previewPerf')
+  return import('@/lib/preview-perf')
 }
 
 describe('previewPerf', () => {

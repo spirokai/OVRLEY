@@ -23,7 +23,10 @@ vi.mock('@/api/backend', () => ({
   listDirectoryVideoFiles: vi.fn(),
   listAvailableFonts: vi.fn().mockResolvedValue({ recommendedFonts: [], systemFonts: [] }),
 }))
-vi.mock('@/lib/file-dialog', () => ({ openDirectoryPath: vi.fn() }))
+vi.mock('@/lib/file-dialog', async (importOriginal) => ({
+  ...(await importOriginal()),
+  openDirectoryPath: vi.fn(),
+}))
 
 const folder = 'C:/videos'
 const reference = `${folder}/reference.mp4`

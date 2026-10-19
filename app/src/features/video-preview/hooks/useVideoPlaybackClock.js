@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import useStore from '@/store/useStore'
 import { getContainerFps } from '@/lib/update-rate'
-import { incrementPreviewPerfCounter, previewPerfCounterName, setPreviewPerfValue } from '@/lib/previewPerf'
+import { incrementPreviewPerfCounter, previewPerfCounterName, setPreviewPerfValue } from '@/lib/preview-perf'
 
 const PREVIEW_CLOCK_MODE_FLAG = '__OVRLEY_PREVIEW_CLOCK_MODE__'
 

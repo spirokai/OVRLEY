@@ -1,5 +1,5 @@
 /**
- * Provides shared compose refs utilities for the app.
+ * React ref hooks shared by the color picker controls.
  */
 
 /* oxlint-disable react/exhaustive-deps */

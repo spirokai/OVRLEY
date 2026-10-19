@@ -1,6 +1,31 @@
 /**
- * Provides shared color utils utilities for the app.
+ * Color normalization and CSS theme color lookup.
  */
+
+const THEME_COLOR_VARS = {
+  background: '--theme-color-background',
+  accent: '--theme-color-accent',
+  aqua: '--theme-color-aqua',
+  ice: '--theme-color-ice',
+  success: '--theme-color-success',
+  teal: '--theme-color-teal',
+}
+
+/**
+ * Reads a named theme color or CSS custom property.
+ *
+ * @param {string} name Theme color name or CSS custom property.
+ * @returns {string} Resolved color, or empty text without a browser document.
+ */
+export function getThemeColor(name) {
+  const variableName = THEME_COLOR_VARS[name] || name
+
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return ''
+  }
+
+  return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim()
+}
 
 /**
  * Normalizes hex color.

@@ -28,7 +28,7 @@ vi.mock('@/store/useStore', () => ({
   ),
 }))
 
-vi.mock('@/lib/previewPerf', () => ({
+vi.mock('@/lib/preview-perf', () => ({
   incrementPreviewPerfCounter: vi.fn(),
   previewPerfCounterName: vi.fn((label) => `${label}/s`),
   setPreviewPerfValue: setPreviewPerfValueSpy,

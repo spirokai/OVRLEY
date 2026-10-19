@@ -1,6 +1,55 @@
 import i18next from 'i18next'
 
 /**
+ * Converts a time string (HH:MM:SS, MM:SS, or plain seconds) to seconds.
+ * Empty/null input returns 0.
+ *
+ * @param {string|null|undefined} timeStr Time string in HH:MM:SS or MM:SS format.
+ * @returns {number} Total seconds.
+ */
+export function timeToSeconds(timeStr) {
+  if (timeStr === null || timeStr === undefined || timeStr === '') {
+    return 0
+  }
+
+  const str = String(timeStr).trim()
+  if (str === '') return 0
+
+  const isNegative = str.startsWith('-')
+  const absStr = isNegative ? str.substring(1) : str
+
+  if (absStr.includes(':')) {
+    const parts = absStr.split(':')
+    let seconds = 0
+    if (parts.length === 3) {
+      seconds = parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseFloat(parts[2])
+    } else if (parts.length === 2) {
+      seconds = parseInt(parts[0], 10) * 60 + parseFloat(parts[1])
+    }
+    return isNegative ? -seconds : seconds
+  }
+
+  const parsed = parseFloat(str)
+  return isNaN(parsed) ? 0 : parsed
+}
+
+/**
+ * Converts a numeric second value to HH:MM:SS.
+ *
+ * @param {number} seconds Whole or fractional second value.
+ * @returns {string} Zero-padded HH:MM:SS string.
+ */
+export function formatExportRangeTime(seconds) {
+  const sign = seconds < 0 ? '-' : ''
+  const wholeSeconds = Math.trunc(Math.abs(seconds))
+  const hours = Math.floor(wholeSeconds / 3600)
+  const minutes = Math.floor((wholeSeconds % 3600) / 60)
+  const remainingSeconds = wholeSeconds % 60
+
+  return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`
+}
+
+/**
  * Formats seconds as a clock duration in mm:ss or h:mm:ss form.
  *
  * @param {number} seconds - Duration in seconds.

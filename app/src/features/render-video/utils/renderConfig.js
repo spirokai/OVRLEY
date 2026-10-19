@@ -10,7 +10,7 @@
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { SCENE_PRESENTATION_KEYS } from '@/lib/template/template-constants'
 import { clamp } from '@/lib/utils'
-import { videoOverlapsActivity } from '@/lib/video-timing'
+import { videoOverlapsActivity } from '@/lib/video-sync'
 import { isMp4Codec, isQsvFullCodec } from './codecUtils'
 
 function reduceFps(num, den) {

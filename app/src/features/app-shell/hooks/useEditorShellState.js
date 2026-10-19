@@ -15,7 +15,9 @@
 
 import { clamp } from '@/lib/utils'
 import { useEffect, useState } from 'react'
-import { DEBUG_MODE_ENABLED } from '@/lib/dev-config'
+
+// Enable debug controls during local development.
+const DEBUG_MODE_ENABLED = true
 
 /**
  * Derives the UI scale factor from the viewport width.
@@ -76,7 +78,6 @@ export default function useEditorShellState() {
   const [uiScale, setUiScale] = useState(() => (typeof window === 'undefined' ? 1 : getUiScale(window.innerWidth)))
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false)
   const [activeKeyboardWorkspace, setActiveKeyboardWorkspace] = useState('editor')
-  // Debug-only controls are surfaced from the app-level development flag.
   const debugModeEnabled = import.meta.env.DEV && DEBUG_MODE_ENABLED
 
   // Resize subscription for responsive chrome scaling. In non-browser

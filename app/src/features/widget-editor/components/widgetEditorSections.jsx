@@ -9,7 +9,7 @@ import { SectionHeading } from '@/components/ui/section-heading'
 import { ColorField, ContentAlignmentControl, NumberField, SelectField, SizeSlider, SliderField, TextField, ToggleField } from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
 import { useAvailableFonts, useLabelTypography } from '@/hooks/useFonts'
-import { getThemeColor } from '@/lib/theme'
+import { getThemeColor } from '@/lib/color-utils'
 import { useTranslation } from 'react-i18next'
 
 /**

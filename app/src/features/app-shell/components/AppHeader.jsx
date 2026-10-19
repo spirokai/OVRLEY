@@ -7,7 +7,7 @@ import ActivitySection from './ActivitySection'
 import ActionButtons from './ActionButtons'
 import TemplateSection from './TemplateSection'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { isInteractiveElement } from '@/lib/utils'
+import { isInteractiveElement } from '@/lib/keyboard-shortcuts'
 
 /**
  * Renders the app header component.

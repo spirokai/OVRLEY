@@ -1,6 +1,18 @@
 import i18next from 'i18next'
 import { getZonedDateTimeParts } from '@/lib/time-format'
-import { videoOverlapsActivity } from '@/lib/video-timing'
+
+/**
+ * Reports whether a video interval overlaps the activity interval.
+ *
+ * @param {object} options Timing inputs.
+ * @param {number} options.videoStart Timeline second where the video interval starts.
+ * @param {number} options.videoDuration Video interval duration in seconds.
+ * @param {number} [options.activityEnd=Infinity] Activity interval end in seconds.
+ * @returns {boolean} Whether the half-open intervals overlap.
+ */
+export function videoOverlapsActivity({ videoStart, videoDuration, activityEnd = Number.POSITIVE_INFINITY }) {
+  return videoStart < activityEnd && videoStart + videoDuration > 0
+}
 
 class VideoSyncError extends Error {
   constructor(key, message) {
@@ -55,7 +67,7 @@ export function captureVideoSyncTimezoneMode(mode) {
  * @param {'utc'|'local'} timezoneMode Captured Apply Timezone interpretation.
  * @returns {{automaticOffsetSeconds: number, activityDurationSeconds: number}} Raw timing.
  */
-export function calculateAutomaticVideoOffset(video, activitySummary, timezoneMode) {
+function calculateAutomaticVideoOffset(video, activitySummary, timezoneMode) {
   if (!video.creationTime) {
     throw new VideoSyncError('store.couldNotDetermineVideoCreationTime', 'Could not determine video creation time')
   }

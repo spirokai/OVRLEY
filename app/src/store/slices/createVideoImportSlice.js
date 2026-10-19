@@ -1,8 +1,7 @@
 import { detectCodecs } from '@/api/backend'
 import { parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
-import { resolveVideoSyncState } from '@/lib/video-sync'
+import { resolveVideoSyncState, videoOverlapsActivity } from '@/lib/video-sync'
 import { createCachedPromise } from '@/lib/cached-promise'
-import { videoOverlapsActivity } from '@/lib/video-timing'
 import { clamp } from '@/lib/utils'
 import { getTimelineMinimum, getTotalPlaybackDuration } from '@/features/player/utils/playerTiming'
 

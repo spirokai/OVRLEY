@@ -3,7 +3,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { videoOverlapsActivity } from '@/lib/video-timing'
+import { videoOverlapsActivity } from '@/lib/video-sync'
 import { getTimelineMinimum } from '../utils/playerTiming'
 import { snapClipOffset, viewPxToSeconds } from '../utils/timelineGeometry'
 

@@ -1,6 +1,6 @@
 import { captureVideoSyncTimezoneMode, createBatchCalibration } from '@/lib/video-sync'
-import { buildPreviewFrameWindow } from '@/lib/preview-timing'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
+import { clamp } from '@/lib/utils'
 import { validateRenderSettings } from '@/store/slices/createRenderSettingsSlice'
 import { isQsvFullCodec } from './codecUtils'
 import { createBatchRenderTemplate, createRenderEffectiveConfig } from './renderConfig'
@@ -147,6 +147,24 @@ export function createRenderRequest({ editorSnapshot, settings, batchReview, ove
     if (payload.config.scene.start >= payload.config.scene.end) throw new Error('Start time must be before end time')
   }
   return { target, payload, settings: acceptedSettings }
+}
+
+// PNG requests need a one-frame scene window. At the end of the activity,
+// shift it backward so the renderer still receives a positive duration.
+function buildPreviewFrameWindow({ activityDuration, previewSecond, sceneFps }) {
+  const duration = Math.max(activityDuration, 0)
+  const second = clamp(previewSecond, 0, duration)
+  const frameDuration = 1 / Math.max(Math.trunc(sceneFps), 1)
+
+  if (duration <= 0) {
+    return { start: 0, end: frameDuration }
+  }
+
+  const maxWindowStart = Math.max(duration - frameDuration, 0)
+  const start = clamp(second, 0, maxWindowStart)
+  const end = Math.min(duration, Math.max(start + frameDuration, second + Number.EPSILON))
+
+  return { start, end }
 }
 
 /** @param {object} state Captured editor snapshot. @returns {object} Native preview frame inputs. */

@@ -3,55 +3,19 @@
  */
 
 import { clamp } from '@/lib/utils'
-import { resolveActivityDuration } from '@/lib/preview-timing'
+import { timeToSeconds } from '@/lib/time-format'
 
 /**
- * Converts a time string (HH:MM:SS, MM:SS, or plain seconds) to seconds.
- * Empty/null input returns 0.
+ * Resolves the duration of optional external activity data for range controls.
+ * Trimmed duration takes precedence over source metadata; absent or unusable
+ * external durations leave an empty activity range.
  *
- * @param {string|null|undefined} timeStr - Time string in HH:MM:SS or MM:SS format.
- * @returns {number} Total seconds.
+ * @param {object|null} activity Parsed activity data, or null without an activity.
+ * @returns {number} Non-negative activity duration in seconds.
  */
-export function timeToSeconds(timeStr) {
-  if (timeStr === null || timeStr === undefined || timeStr === '') {
-    return 0
-  }
-
-  const str = String(timeStr).trim()
-  if (str === '') return 0
-
-  const isNegative = str.startsWith('-')
-  const absStr = isNegative ? str.substring(1) : str
-
-  if (absStr.includes(':')) {
-    const parts = absStr.split(':')
-    let seconds = 0
-    if (parts.length === 3) {
-      seconds = parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseFloat(parts[2])
-    } else if (parts.length === 2) {
-      seconds = parseInt(parts[0], 10) * 60 + parseFloat(parts[1])
-    }
-    return isNegative ? -seconds : seconds
-  }
-
-  const parsed = parseFloat(str)
-  return isNaN(parsed) ? 0 : parsed
-}
-
-/**
- * Converts a numeric second value to HH:MM:SS.
- *
- * @param {number} seconds - Whole or fractional second value.
- * @returns {string} Zero-padded HH:MM:SS string.
- */
-export function formatExportRangeTime(seconds) {
-  const sign = seconds < 0 ? '-' : ''
-  const safeSeconds = Math.trunc(Math.abs(seconds))
-  const hours = Math.floor(safeSeconds / 3600)
-  const minutes = Math.floor((safeSeconds % 3600) / 60)
-  const remainingSeconds = safeSeconds % 60
-
-  return `${sign}${[hours, minutes, remainingSeconds].map((part) => String(part).padStart(2, '0')).join(':')}`
+export function resolveActivityDuration(activity) {
+  const duration = Number(activity?.trim_end_seconds ?? activity?.metadata?.duration_seconds ?? 0)
+  return Math.max(Number.isFinite(duration) ? duration : 0, 0)
 }
 
 /**
@@ -103,7 +67,7 @@ export function getCustomExportRangeDefault(exportRange, activityEndSecond) {
  * @returns {{ active: boolean, start: number, end: number }}
  */
 export function resolveExportRangeWindow(activity, exportRange) {
-  const duration = resolveActivityDuration({ sourceActivity: activity })
+  const duration = resolveActivityDuration(activity)
 
   if (exportRange.type !== 'custom') {
     return {

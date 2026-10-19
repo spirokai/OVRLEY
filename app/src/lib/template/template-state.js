@@ -21,7 +21,7 @@
  */
 
 import { createFontSelection, createLabelFontSelection, getFontFamilyName } from '@/lib/fonts'
-import { getThemeColor } from '@/lib/theme'
+import { getThemeColor } from '@/lib/color-utils'
 import { resolveActiveWidgetData } from '../widget/widget-resolver'
 import { DEFAULT_GLOBAL_DEFAULTS } from './template-constants'
 import { mergeSceneGlobalDefaults, normalizeGlobalDefaults, normalizeTemplateConfig } from './template-normalization'
