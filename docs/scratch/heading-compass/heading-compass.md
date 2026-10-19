@@ -40,8 +40,8 @@ display_type configuration are standard. One line each:
 - indicator is triangle with cutout (like a compass needle)
 - corner radius must be limited by size of the indicator; in relative manner
 - global shadow affects the indicator, the cardinal labels, unit, value, and the track
-- track width should increase outwards to prevent squishing the labels and indicator; track arc is
-  fixed and non-configurable
+- track width should increase outwards to prevent squishing the labels and indicator; track arc angle is
+  read from the manifest but configuration not exposed in the editor
 - track does not rotate with the heading value, it is fixed in place
 - two rotational modes exist:
   - either the indicator rotates with the heading value,
@@ -60,4 +60,4 @@ display_type configuration are standard. One line each:
 ## CACHING
 
 - track should be cached in static layer
-- either cardinal labels or indicator should be cached in static layer depending on the rotation mode
+- either cardinal labels or indicator should be cached in static layer depending on the rotation mode. Can the cardinals be cached and the image just rotated? How does that affect the quality?

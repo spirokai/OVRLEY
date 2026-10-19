@@ -8,7 +8,7 @@ import { dragTranslation, groupResizeOrigin, resizeAnchor, widgetResizeGeometry 
  * @param {object} options Selection, draft lifecycle, commits and Moveable reference.
  * @returns {object} Widget and group gesture handlers.
  */
-export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, state, setIsGroupDragActive, setGroupDragSelectionIds }) {
+export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, state, setGroupGestureType, setGroupDragSelectionIds }) {
   const gesture = useRef(null)
 
   const clear = () => {
@@ -16,7 +16,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     gesture.current = null
     if (!current) return
     state.clearWidgetDrafts(current.ids)
-    setIsGroupDragActive(false)
+    setGroupGestureType(null)
     setGroupDragSelectionIds([])
   }
   const cancel = useEffectEvent(() => {
@@ -135,6 +135,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       const controller = getWidgetInteraction(events[0].target).group(ids)
       const origins = controller.begin(state.setLiveWidgetDrafts)
       gesture.current = { controller, origins, ids, widgets: selectedWidgets, groupOrigin: groupResizeOrigin(moveable.getRect(), direction) }
+      setGroupGestureType('resize')
       events.forEach(({ target, set, dragStart }) => {
         const { bounds } = origins[target.dataset.widgetId]
         set([bounds.width, bounds.height])
@@ -187,7 +188,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       const controller = getWidgetInteraction(events[0].target).group(ids)
       controller.begin(state.setLiveWidgetDrafts)
       gesture.current = { ids, controller, axis: null }
-      setIsGroupDragActive(true)
+      setGroupGestureType('drag')
       setGroupDragSelectionIds(ids)
       events.forEach((event) => event.set([0, 0]))
     },

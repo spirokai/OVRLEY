@@ -41,7 +41,7 @@ test.each([
       selectedWidget: widget,
       selectedWidgets: [widget],
       state,
-      setIsGroupDragActive: vi.fn(),
+      setGroupGestureType: vi.fn(),
       setGroupDragSelectionIds: vi.fn(),
     }),
   )
@@ -118,7 +118,7 @@ test('group translation shares canonical data patches and commits once before a 
         selectedWidget: selectedWidgets[0],
         selectedWidgets,
         state,
-        setIsGroupDragActive: vi.fn(),
+        setGroupGestureType: vi.fn(),
         setGroupDragSelectionIds: vi.fn(),
       })
       return { controller, liveEdits, handlers }

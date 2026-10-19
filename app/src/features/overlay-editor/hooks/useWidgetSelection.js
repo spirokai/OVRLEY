@@ -23,7 +23,7 @@ function setHoveredWidgetFromEvent(setHoveredWidgetId, event) {
 }
 
 function handleWidgetMouseDown(context, event, widgetId) {
-  const { commitSelection, moveableRef, selectedWidgetId, selectedWidgetIds, setGroupDragSelectionIds, setIsGroupDragActive } = context
+  const { commitSelection, moveableRef, selectedWidgetId, selectedWidgetIds, setGroupDragSelectionIds, setGroupGestureType } = context
   event.stopPropagation()
   if (event.button !== 0) return
 
@@ -31,7 +31,7 @@ function handleWidgetMouseDown(context, event, widgetId) {
   const isCtrlAxisLockDrag = event.ctrlKey && isSelected && !event.metaKey && !event.shiftKey
   if (isSelected && selectedWidgetIds.length > 1 && (isCtrlAxisLockDrag || !hasSelectionModifier(event))) {
     event.preventDefault()
-    setIsGroupDragActive(true)
+    setGroupGestureType('drag')
     setGroupDragSelectionIds([...selectedWidgetIds])
     moveableRef.current?.dragStart(event.nativeEvent, event.currentTarget)
     return
@@ -144,22 +144,25 @@ function getElementGuidelines(widgetNodes, orderedWidgetIds, selectedWidgetIds) 
 export default function useWidgetSelection({ displayScale, orderedWidgetIds, widgetMap, widgetNodes, moveableRef, sceneElement, sceneSize }) {
   const [hoveredWidgetId, setHoveredWidgetId] = useState(null)
   const [widgetBadges, setWidgetBadges] = useState([])
-  const [isGroupDragActive, setIsGroupDragActive] = useState(false)
+  const [groupGestureType, setGroupGestureType] = useState(null)
   const [groupDragSelectionIds, setGroupDragSelectionIds] = useState([])
   const [stageElement, setStageElement] = useState(null)
   const [selectionRect, setSelectionRect] = useState(null)
   const marqueeRef = useRef(null)
   useEffect(() => setupMarqueeCleanup(marqueeRef), [])
   const { selectedWidgetId, selectedWidgetIds, setWidgetSelection } = useStore(useShallow(selectWidgetSelection))
+  const isGroupDragActive = groupGestureType === 'drag'
   // Store selection can advance before controlled config props after paste or deletion.
   const effectiveIds = useMemo(
     () => normalizeSelectionIds(isGroupDragActive ? groupDragSelectionIds : selectedWidgetIds, orderedWidgetIds),
     [groupDragSelectionIds, isGroupDragActive, orderedWidgetIds, selectedWidgetIds],
   )
+  const areWidgetBadgesHidden = groupGestureType !== null
   const shouldRefreshBadges = useEffectEvent(
-    (event) => event.target.dataset.widgetId === hoveredWidgetId || effectiveIds.includes(event.target.dataset.widgetId),
+    (event) => !areWidgetBadgesHidden && (event.target.dataset.widgetId === hoveredWidgetId || effectiveIds.includes(event.target.dataset.widgetId)),
   )
   const refreshBadges = useEffectEvent(() => {
+    if (areWidgetBadgesHidden) return
     const next = buildWidgetBadges({
       displayScale,
       getGeometry: (node) => getWidgetInteraction(node).geometry(),
@@ -172,7 +175,7 @@ export default function useWidgetSelection({ displayScale, orderedWidgetIds, wid
     })
     setWidgetBadges((current) => (areWidgetBadgesEqual(current, next) ? current : next))
   })
-  useLayoutEffect(() => refreshBadges(), [displayScale, effectiveIds, hoveredWidgetId, sceneElement, widgetNodes])
+  useLayoutEffect(() => refreshBadges(), [areWidgetBadgesHidden, displayScale, effectiveIds, hoveredWidgetId, sceneElement, widgetNodes])
   useEffect(() => {
     if (sceneElement === null) return
     let pending = false
@@ -220,7 +223,7 @@ export default function useWidgetSelection({ displayScale, orderedWidgetIds, wid
       selectedWidgetId,
       selectedWidgetIds,
       setGroupDragSelectionIds,
-      setIsGroupDragActive,
+      setGroupGestureType,
       setSelectionRect,
       widgetNodes,
     }),
@@ -231,13 +234,13 @@ export default function useWidgetSelection({ displayScale, orderedWidgetIds, wid
   return {
     handleCanvasMouseOver: canvasMouseOver,
     handleCanvasMouseLeave: canvasMouseLeave,
-    widgetBadges,
+    widgetBadges: areWidgetBadgesHidden ? [] : widgetBadges,
     handleSceneMouseDown: sceneMouseDown,
     handleWidgetMouseDown: widgetMouseDown,
     isGroupDragActive,
     selectionRect,
     setGroupDragSelectionIds,
-    setIsGroupDragActive,
+    setGroupGestureType,
     setStageElement,
     elementGuidelines,
     isGroupSelection,

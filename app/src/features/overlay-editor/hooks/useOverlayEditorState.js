@@ -129,7 +129,7 @@ export default function useOverlayEditorState({
     selectedWidget: selection.selectedWidget,
     selectedWidgets: selection.selectedWidgets,
     state,
-    setIsGroupDragActive: selection.setIsGroupDragActive,
+    setGroupGestureType: selection.setGroupGestureType,
     setGroupDragSelectionIds: selection.setGroupDragSelectionIds,
   })
   const previewRasterScale = Math.min(1, viewport.displayScale * window.devicePixelRatio)
