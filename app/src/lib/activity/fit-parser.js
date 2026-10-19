@@ -10,7 +10,7 @@ import { safeGearValue, safeNumber } from './raw-sample-utils.js'
 const DIVE_SUB_SPORTS = new Set(['single_gas_diving', 'multi_gas_diving', 'gauge_diving', 'apnea_diving', 'apnea_hunting', 'ccr_diving'])
 const BAR_PER_ATMOSPHERE = 1.01325
 
-function extractDiveSamples(parsedFit, records, subSport, elapsedOffsetSeconds) {
+function extractDiveSamples(parsedFit, records, subSport) {
   const gases = new Map()
   for (const [index, gas] of (parsedFit.dive_gases ?? []).entries()) {
     if (gas.status === 'disabled') continue
@@ -56,7 +56,7 @@ function extractDiveSamples(parsedFit, records, subSport, elapsedOffsetSeconds) 
       if (event.timestamp > records[0].timestamp && event.timestamp < record.timestamp && currentGas) {
         gasSwitchSamples.push({
           timestamp: event.timestamp,
-          elapsed_seconds: (event.timestamp - records[0].timestamp) / 1000 + elapsedOffsetSeconds,
+          elapsed_seconds: (event.timestamp - records[0].timestamp) / 1000,
           fraction_o2: currentGas.fraction_o2,
           fraction_he: currentGas.fraction_he,
         })
@@ -111,11 +111,6 @@ function getOptionalRecordNumberFromKeys(record, keys) {
   return null
 }
 
-function getRecordElapsedSeconds(record, elapsedOffsetSeconds) {
-  const elapsedSeconds = safeNumber(record.elapsed_time)
-  return elapsedSeconds === null ? null : elapsedSeconds + elapsedOffsetSeconds
-}
-
 /** Missing timestamps leave lap timing unavailable rather than merging separate laps. */
 function extractLapTiming(laps, firstRecordTimestamp) {
   if (!laps.length || firstRecordTimestamp == null || laps.some((lap) => lap.start_time == null)) return null
@@ -128,12 +123,15 @@ function extractLapTiming(laps, firstRecordTimestamp) {
   const firstRecordTime = firstRecordTimestamp.getTime()
   if (!Number.isFinite(firstRecordTime)) throw new Error('FIT lap timing requires a valid first record timestamp.')
 
-  // A device can start a lap before writing its first record. Keep both on the same timeline.
-  const origin = Math.min(firstRecordTime, startTimes[0])
+  // Keep the recording at t=0 and shorten the lap in progress at the first record.
+  // Earlier laps have no recorded samples and do not extend the activity.
+  const firstObservedLapIndex = Math.max(
+    0,
+    startTimes.findLastIndex((start) => start <= firstRecordTime),
+  )
   return {
-    sync_time: new Date(origin).toISOString(),
-    lap_markers: { BeaconMarkers: startTimes.map((start) => (start - origin) / 1000) },
-    elapsedOffsetSeconds: (firstRecordTime - origin) / 1000,
+    sync_time: firstRecordTimestamp.toISOString(),
+    lap_markers: { BeaconMarkers: startTimes.slice(firstObservedLapIndex).map((start) => Math.max(0, (start - firstRecordTime) / 1000)) },
   }
 }
 
@@ -164,10 +162,9 @@ export default async function parseFitActivityFile(file) {
   const firstSession = Array.isArray(parsedFit?.sessions) ? parsedFit.sessions[0] || null : null
   const fileId = parsedFit?.file_id || null
   const lapTiming = extractLapTiming(parsedFit.laps ?? [], records[0].timestamp)
-  const elapsedOffsetSeconds = lapTiming?.elapsedOffsetSeconds ?? 0
   const subSport = firstSession?.sub_sport ?? parsedFit.sports?.[0]?.sub_sport
   const isDive = DIVE_SUB_SPORTS.has(subSport) || records.some((record) => record.depth !== undefined)
-  const diveSamples = isDive ? extractDiveSamples(parsedFit, records, subSport, elapsedOffsetSeconds) : null
+  const diveSamples = isDive ? extractDiveSamples(parsedFit, records, subSport) : null
 
   const raw_samples = records.map((record, index) => ({
     air_pressure: safeNumber(record.absolute_pressure),
@@ -176,7 +173,7 @@ export default async function parseFitActivityFile(file) {
     cadence: safeNumber(record.cadence),
     core_temperature: safeNumber(record.core_temperature),
     distance: safeNumber(record.distance),
-    elapsed_seconds: getRecordElapsedSeconds(record, elapsedOffsetSeconds),
+    elapsed_seconds: safeNumber(record.elapsed_time),
     elevation: safeNumber(record.enhanced_altitude ?? record.altitude),
     g_force: safeNumber(getOptionalRecordValue(record, ['g_force', 'gforce'])),
     gear_position: safeGearValue(getOptionalRecordValue(record, ['gear_ratio', 'gear', 'front_gear'])),

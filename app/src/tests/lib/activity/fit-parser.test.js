@@ -60,7 +60,7 @@ const timestampAt = (seconds) => new Date(origin + seconds * 1000)
 describe('parseFitActivityFile lap timing', () => {
   afterEach(() => vi.restoreAllMocks())
 
-  test('preserves exact lap boundaries when the first lap starts before the first record', async () => {
+  test('shortens the first lap without shifting records when it starts before the first record', async () => {
     vi.spyOn(FitParser.prototype, 'parseAsync').mockResolvedValue({
       laps: [{ start_time: timestampAt(1) }, { start_time: timestampAt(5.5) }],
       records: [2, 3, 7].map((seconds) => ({ timestamp: timestampAt(seconds), elapsed_time: seconds - 2 })),
@@ -68,12 +68,12 @@ describe('parseFitActivityFile lap timing', () => {
 
     const activity = await parseFitActivityFile({ name: 'laps.fit', arrayBuffer: async () => new ArrayBuffer(0) })
 
-    expect(activity.sync_time).toBe('2026-01-01T00:00:01.000Z')
-    expect(activity.lap_markers).toEqual({ BeaconMarkers: [0, 4.5] })
-    expect(activity.raw_samples.map((sample) => sample.elapsed_seconds)).toEqual([1, 2, 6])
+    expect(activity.sync_time).toBe('2026-01-01T00:00:02.000Z')
+    expect(activity.lap_markers).toEqual({ BeaconMarkers: [0, 3.5] })
+    expect(activity.raw_samples.map((sample) => sample.elapsed_seconds)).toEqual([0, 1, 5])
   })
 
-  test('keeps dive gas switches on the same timeline as lap-adjusted records', async () => {
+  test('keeps dive gas switches on the record timeline when a lap starts earlier', async () => {
     vi.spyOn(FitParser.prototype, 'parseAsync').mockResolvedValue({
       laps: [{ start_time: timestampAt(1) }],
       records: [2, 3, 7].map((seconds) => ({ timestamp: timestampAt(seconds), elapsed_time: seconds - 2, depth: 10 })),
@@ -86,7 +86,7 @@ describe('parseFitActivityFile lap timing', () => {
 
     const activity = await parseFitActivityFile({ name: 'dive-laps.fit', arrayBuffer: async () => new ArrayBuffer(0) })
 
-    expect(activity.raw_samples.map((sample) => sample.elapsed_seconds)).toEqual([1, 2, 3, 6])
+    expect(activity.raw_samples.map((sample) => sample.elapsed_seconds)).toEqual([0, 1, 2, 5])
     expect(activity.raw_samples[2]).toMatchObject({ timestamp: timestampAt(4), fraction_o2: 0.5, fraction_he: 0 })
   })
 })
