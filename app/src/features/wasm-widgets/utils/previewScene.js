@@ -1,7 +1,7 @@
 import { resolveExportRangeWindow } from '@/lib/export-range'
 
-/** @param {object} options Canonical defaults, dimensions, activity, and export timing. @returns {object} Rust preview scene. */
-export function buildWasmScene({ globalDefaults, sceneSize, exportRange, activity, fallbackDurationSeconds }) {
+/** @param {object} options Scene inputs; omitted previewRasterScale keeps native raster resolution. @returns {object} Rust preview scene. */
+export function buildWasmScene({ globalDefaults, sceneSize, exportRange, activity, fallbackDurationSeconds, previewRasterScale = 1 }) {
   const window = resolveExportRangeWindow(activity, exportRange)
   return {
     ...sceneSize,
@@ -17,5 +17,6 @@ export function buildWasmScene({ globalDefaults, sceneSize, exportRange, activit
     end: window.end,
     custom_export_range_active: window.active,
     preview_duration_seconds: fallbackDurationSeconds,
+    preview_raster_scale: previewRasterScale,
   }
 }

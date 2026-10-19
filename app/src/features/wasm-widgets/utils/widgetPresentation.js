@@ -18,9 +18,10 @@ export function presentWidgetGeometry(canvas, geometry, target = canvas.parentEl
   const nested = canvas.parentElement === target
   canvas.style.left = `${geometry.left - (nested ? content.left : 0)}px`
   canvas.style.top = `${geometry.top - (nested ? content.top : 0)}px`
-  // Static images retain source pixels and let the browser transform them.
-  canvas.style.width = sourceRaster ? `${content.width}px` : ''
-  canvas.style.height = sourceRaster ? `${content.height}px` : ''
+  // Families without a preview raster scale retain their native canvas size.
+  const rasterScale = geometry.preview_raster_scale
+  canvas.style.width = sourceRaster ? `${content.width}px` : rasterScale === undefined ? '' : `${geometry.width / rasterScale}px`
+  canvas.style.height = sourceRaster ? `${content.height}px` : rasterScale === undefined ? '' : `${geometry.height / rasterScale}px`
   canvas.style.opacity = sourceRaster ? `${geometry.opacity}` : ''
   // Other rotated families already have their rotation baked into the pixels.
   const rotation = geometry.rotation ?? 0

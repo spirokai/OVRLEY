@@ -132,9 +132,18 @@ export default function useOverlayEditorState({
     setIsGroupDragActive: selection.setIsGroupDragActive,
     setGroupDragSelectionIds: selection.setGroupDragSelectionIds,
   })
+  const previewRasterScale = Math.min(1, viewport.displayScale * window.devicePixelRatio)
   const scene = useMemo(
-    () => buildWasmScene({ globalDefaults, sceneSize, exportRange: previewExportRange, activity: parsedActivity, fallbackDurationSeconds }),
-    [globalDefaults, sceneSize, previewExportRange, parsedActivity, fallbackDurationSeconds],
+    () =>
+      buildWasmScene({
+        globalDefaults,
+        sceneSize,
+        exportRange: previewExportRange,
+        activity: parsedActivity,
+        fallbackDurationSeconds,
+        previewRasterScale,
+      }),
+    [globalDefaults, sceneSize, previewExportRange, parsedActivity, fallbackDurationSeconds, previewRasterScale],
   )
   const markControls = resolveVideoSyncMarkControls(videoSyncMarkControls, selectedSecond, videoSyncMode)
   if (videoSyncMode && markControls === null) throw new Error('Video sync editor requires mark controls')
