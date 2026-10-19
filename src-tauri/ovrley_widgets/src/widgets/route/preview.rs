@@ -13,7 +13,7 @@ use crate::{
     model::scene::{
         validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
     },
-    render::pixels::read_surface_rgba,
+    render::{pixels::read_surface_rgba, preview::PreviewRasterScale},
     widgets::value::preview::{surface, WidgetGeometry},
 };
 use skia_safe::{Color, Surface};
@@ -24,6 +24,7 @@ pub struct PreviewRoute {
     scene: ValidatedScenePresentation,
     window: Option<RouteWindow>,
     preview_duration: f64,
+    preview_raster_scale: PreviewRasterScale,
     samples: Option<Arc<Vec<RouteSample>>>,
     pub prepared_geometry: Option<Arc<RouteGeometry>>,
     placeholder_geometry: Option<Arc<RouteGeometry>>,
@@ -54,11 +55,13 @@ impl PreviewRoute {
         let config = validate_route_plot(&widget, 0)?;
         let window = RouteWindow::from_scene(&scene, config.show_full_activity)?;
         let preview_duration = Self::preview_duration(&scene)?;
+        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
         Ok(Self {
             config,
             scene: validate_scene_presentation(scene)?,
             window,
             preview_duration,
+            preview_raster_scale,
             samples: None,
             prepared_geometry: None,
             placeholder_geometry: None,
@@ -81,6 +84,7 @@ impl PreviewRoute {
         let config = validate_route_plot(&widget, 0)?;
         let window = RouteWindow::from_scene(&scene, config.show_full_activity)?;
         let preview_duration = Self::preview_duration(&scene)?;
+        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
         let scene = validate_scene_presentation(scene)?;
         if window != self.window {
             self.invalidate_activity();
@@ -112,6 +116,7 @@ impl PreviewRoute {
         self.scene = scene;
         self.window = window;
         self.preview_duration = preview_duration;
+        self.preview_raster_scale = preview_raster_scale;
         self.last_progress = None;
         Ok(())
     }
@@ -236,7 +241,7 @@ impl PreviewRoute {
         }
         let layout = self.layout.as_ref().expect("route layout prepared");
         let frame = layout.frame(progress);
-        let (width, height) = (frame.bounds.width() as u32, frame.bounds.height() as u32);
+        let (width, height) = self.preview_raster_scale.dimensions(frame.bounds);
         if self
             .surface
             .as_ref()
@@ -250,6 +255,7 @@ impl PreviewRoute {
         let canvas = surface.canvas();
         canvas.clear(Color::TRANSPARENT);
         canvas.save();
+        self.preview_raster_scale.apply(canvas);
         canvas.translate((-frame.bounds.left, -frame.bounds.top));
         layout.draw(canvas, &frame);
         canvas.restore();
@@ -269,6 +275,7 @@ impl PreviewRoute {
                     top: frame.bounds.top,
                     width,
                     height,
+                    preview_raster_scale: self.preview_raster_scale.value(),
                     content_width: frame.content_bounds.width,
                     content: frame.content_bounds,
                 },

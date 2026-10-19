@@ -7,7 +7,7 @@ use crate::{
     error::{WidgetError, WidgetResult},
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
     preview::PreviewFonts,
-    render::pixels::read_surface_rgba,
+    render::{pixels::read_surface_rgba, preview::PreviewRasterScale},
     widgets::value::{
         config::ValueConfig,
         preview::{surface, WidgetGeometry},
@@ -17,6 +17,7 @@ use skia_safe::{Color, Surface};
 
 pub struct PreviewHeading {
     cache: HeadingCache,
+    preview_raster_scale: PreviewRasterScale,
     surface: Option<Surface>,
     last_heading: Option<f32>,
     pub pixels: Vec<u8>,
@@ -31,9 +32,11 @@ impl PreviewHeading {
         fonts: &PreviewFonts,
     ) -> WidgetResult<Self> {
         let widget = validate_heading(widget, 0)?;
+        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
         let scene = validate_scene_presentation(scene)?;
         Ok(Self {
             cache: prepare_heading_cache(&widget, &scene, fonts)?,
+            preview_raster_scale,
             surface: None,
             last_heading: None,
             pixels: Vec::new(),
@@ -51,8 +54,7 @@ impl PreviewHeading {
         }
         let frame = self.cache.prepare_frame(raw);
         let bounds = frame.bounds;
-        let width = bounds.width() as u32;
-        let height = bounds.height() as u32;
+        let (width, height) = self.preview_raster_scale.dimensions(bounds);
         if self
             .surface
             .as_ref()
@@ -66,6 +68,7 @@ impl PreviewHeading {
         let canvas = surface.canvas();
         canvas.clear(Color::TRANSPARENT);
         canvas.save();
+        self.preview_raster_scale.apply(canvas);
         canvas.translate((-bounds.left, -bounds.top));
         frame.draw(canvas, &self.cache);
         canvas.restore();
@@ -75,6 +78,7 @@ impl PreviewHeading {
             top: bounds.top,
             width,
             height,
+            preview_raster_scale: self.preview_raster_scale.value(),
             content_width: frame.content_width,
             content: frame.content_bounds.into(),
         })

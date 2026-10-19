@@ -9,11 +9,10 @@ use super::{
 use crate::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
-    model::{
-        scene::{validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation},
-        validation::require_positive_f32,
+    model::scene::{
+        validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
     },
-    render::{pixels::read_surface_rgba, text::FontResolver},
+    render::{pixels::read_surface_rgba, preview::PreviewRasterScale, text::FontResolver},
     widgets::{
         route::sampling::RouteWindow,
         value::preview::{surface, WidgetGeometry},
@@ -27,7 +26,7 @@ pub struct PreviewElevation {
     scene: ValidatedScenePresentation,
     window: Option<RouteWindow>,
     preview_duration: f64,
-    preview_raster_scale: f32,
+    preview_raster_scale: PreviewRasterScale,
     samples: Option<Arc<Vec<(f32, f64, f32)>>>,
     pub prepared_geometry: Option<Arc<ElevationGeometry>>,
     placeholder_geometry: Option<Arc<ElevationGeometry>>,
@@ -40,17 +39,6 @@ pub struct PreviewElevation {
 }
 
 impl PreviewElevation {
-    /// Hosts without a viewport density keep native resolution; scene coordinates stay unchanged.
-    fn preview_raster_scale(scene: &ScenePresentationConfig) -> WidgetResult<f32> {
-        match scene.extra.get("preview_raster_scale") {
-            None => Ok(1.0),
-            Some(value) => require_positive_f32(
-                value.as_f64().map(|value| value as f32),
-                "scene.preview_raster_scale",
-            ),
-        }
-    }
-
     fn timing(
         widget: &ElevationPlotConfig,
         scene: &ScenePresentationConfig,
@@ -71,7 +59,7 @@ impl PreviewElevation {
 
     pub fn new(widget: ElevationPlotConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
         let (window, preview_duration) = Self::timing(&widget, &scene)?;
-        let preview_raster_scale = Self::preview_raster_scale(&scene)?;
+        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
         let scene = validate_scene_presentation(scene)?;
         let config = validate_elevation_plot(&widget, 0, &scene)?;
         Ok(Self {
@@ -99,7 +87,7 @@ impl PreviewElevation {
         transient: bool,
     ) -> WidgetResult<()> {
         let (window, preview_duration) = Self::timing(&widget, &scene)?;
-        let preview_raster_scale = Self::preview_raster_scale(&scene)?;
+        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
         let scene = validate_scene_presentation(scene)?;
         let config = validate_elevation_plot(&widget, 0, &scene)?;
         if window != self.window {
@@ -266,10 +254,7 @@ impl PreviewElevation {
         }
         let layout = self.layout.as_ref().expect("elevation layout prepared");
         let frame = layout.frame(state)?;
-        let (width, height) = (
-            (frame.bounds.width() * self.preview_raster_scale).ceil() as u32,
-            (frame.bounds.height() * self.preview_raster_scale).ceil() as u32,
-        );
+        let (width, height) = self.preview_raster_scale.dimensions(frame.bounds);
         if self.surface.as_ref().map(|s| (s.width(), s.height()))
             != Some((width as i32, height as i32))
         {
@@ -280,7 +265,7 @@ impl PreviewElevation {
         let canvas = surface.canvas();
         canvas.clear(Color::TRANSPARENT);
         canvas.save();
-        canvas.scale((self.preview_raster_scale, self.preview_raster_scale));
+        self.preview_raster_scale.apply(canvas);
         canvas.translate((-frame.bounds.left, -frame.bounds.top));
         layout.draw(canvas, &frame);
         canvas.restore();
@@ -292,7 +277,6 @@ impl PreviewElevation {
                 widget: WidgetGeometry,
                 rotation: f32,
                 rotation_origin: [f32; 2],
-                preview_raster_scale: f32,
             }
             self.geometry = serde_json::to_vec(&Geometry {
                 widget: WidgetGeometry {
@@ -300,12 +284,12 @@ impl PreviewElevation {
                     top: frame.bounds.top,
                     width,
                     height,
+                    preview_raster_scale: self.preview_raster_scale.value(),
                     content_width: frame.content_bounds.width,
                     content: frame.content_bounds,
                 },
                 rotation: self.config.rotation,
                 rotation_origin: frame.content_bounds.rotation_origin(),
-                preview_raster_scale: self.preview_raster_scale,
             })
             .map_err(|e| WidgetError::Render(e.to_string()))?;
         }

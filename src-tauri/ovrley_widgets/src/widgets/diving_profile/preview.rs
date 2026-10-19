@@ -12,7 +12,7 @@ use crate::{
     model::scene::{
         validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
     },
-    render::{pixels::read_surface_rgba, text::FontResolver},
+    render::{pixels::read_surface_rgba, preview::PreviewRasterScale, text::FontResolver},
     widgets::{
         route::sampling::RouteWindow,
         value::preview::{surface, WidgetGeometry},
@@ -26,6 +26,7 @@ pub struct PreviewDivingProfile {
     scene: ValidatedScenePresentation,
     window: Option<RouteWindow>,
     preview_duration: f64,
+    preview_raster_scale: PreviewRasterScale,
     pub prepared_geometry: Option<Arc<DivingGeometry>>,
     layout: Option<DivingProfileLayout>,
     last_state: Option<DivingFrameState>,
@@ -56,6 +57,7 @@ impl PreviewDivingProfile {
 
     pub fn new(widget: DivingProfileConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
         let (window, preview_duration) = Self::timing(&widget, &scene)?;
+        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
         let scene = validate_scene_presentation(scene)?;
         let config = validate_diving_profile(&widget, 0, &scene)?;
         Ok(Self {
@@ -63,6 +65,7 @@ impl PreviewDivingProfile {
             scene,
             window,
             preview_duration,
+            preview_raster_scale,
             prepared_geometry: None,
             layout: None,
             last_state: None,
@@ -80,6 +83,7 @@ impl PreviewDivingProfile {
         transient: bool,
     ) -> WidgetResult<()> {
         let (window, preview_duration) = Self::timing(&widget, &scene)?;
+        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
         let scene = validate_scene_presentation(scene)?;
         let config = validate_diving_profile(&widget, 0, &scene)?;
         if window != self.window
@@ -95,6 +99,7 @@ impl PreviewDivingProfile {
             && self.scene == scene
             && self.window == window
             && self.preview_duration == preview_duration
+            && self.preview_raster_scale == preview_raster_scale
         {
             return Ok(());
         }
@@ -108,6 +113,7 @@ impl PreviewDivingProfile {
         self.scene = scene;
         self.window = window;
         self.preview_duration = preview_duration;
+        self.preview_raster_scale = preview_raster_scale;
         self.last_state = None;
         Ok(())
     }
@@ -198,7 +204,7 @@ impl PreviewDivingProfile {
             .as_ref()
             .expect("diving profile layout prepared");
         let frame = layout.frame(state)?;
-        let (width, height) = (frame.bounds.width() as u32, frame.bounds.height() as u32);
+        let (width, height) = self.preview_raster_scale.dimensions(frame.bounds);
         if self.surface.as_ref().map(|s| (s.width(), s.height()))
             != Some((width as i32, height as i32))
         {
@@ -212,6 +218,7 @@ impl PreviewDivingProfile {
         let canvas = surface.canvas();
         canvas.clear(Color::TRANSPARENT);
         canvas.save();
+        self.preview_raster_scale.apply(canvas);
         canvas.translate((-frame.bounds.left, -frame.bounds.top));
         layout.draw(canvas, &frame);
         canvas.restore();
@@ -230,6 +237,7 @@ impl PreviewDivingProfile {
                     top: frame.bounds.top,
                     width,
                     height,
+                    preview_raster_scale: self.preview_raster_scale.value(),
                     content_width: frame.content_bounds.width,
                     content: frame.content_bounds,
                 },

@@ -7,7 +7,7 @@ use crate::{
     error::{WidgetError, WidgetResult},
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
     preview::PreviewFonts,
-    render::pixels::read_surface_rgba,
+    render::{pixels::read_surface_rgba, preview::PreviewRasterScale},
     widgets::value::{
         config::ValueConfig,
         preview::{surface, WidgetGeometry},
@@ -17,6 +17,7 @@ use skia_safe::{Color, Surface};
 
 pub struct PreviewLeanAngle {
     cache: LeanAngleCache,
+    preview_raster_scale: PreviewRasterScale,
     surface: Option<Surface>,
     last_sample: Option<Option<f64>>,
     pub pixels: Vec<u8>,
@@ -27,10 +28,12 @@ pub struct PreviewLeanAngle {
 impl PreviewLeanAngle {
     pub fn new(widget: ValueConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
         let config = validate_lean_angle(widget, 0)?;
+        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
         let scene = validate_scene_presentation(scene)?;
         let cache = prepare_lean_angle_cache(&config, &scene)?;
         Ok(Self {
             cache,
+            preview_raster_scale,
             surface: None,
             last_sample: None,
             pixels: Vec::new(),
@@ -52,8 +55,7 @@ impl PreviewLeanAngle {
         }
         let frame = self.cache.prepare_frame(raw, fonts)?;
         let bounds = frame.bounds;
-        let width = bounds.width() as u32;
-        let height = bounds.height() as u32;
+        let (width, height) = self.preview_raster_scale.dimensions(bounds);
         if self
             .surface
             .as_ref()
@@ -67,6 +69,7 @@ impl PreviewLeanAngle {
         let canvas = surface.canvas();
         canvas.clear(Color::TRANSPARENT);
         canvas.save();
+        self.preview_raster_scale.apply(canvas);
         canvas.translate((-bounds.left, -bounds.top));
         frame.draw(canvas, &self.cache);
         canvas.restore();
@@ -76,6 +79,7 @@ impl PreviewLeanAngle {
             top: bounds.top,
             width,
             height,
+            preview_raster_scale: self.preview_raster_scale.value(),
             content_width: frame.content_width,
             content: frame.content_bounds.into(),
         })

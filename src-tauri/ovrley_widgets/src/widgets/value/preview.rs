@@ -5,6 +5,7 @@ use crate::{
     preview::PreviewFonts,
     render::{
         pixels::read_surface_rgba,
+        preview::PreviewRasterScale,
         text::{validated_value_style, ResolvedTextStyle},
     },
     widgets::value::{
@@ -35,6 +36,7 @@ pub struct WidgetGeometry {
     pub top: f32,
     pub width: u32,
     pub height: u32,
+    pub preview_raster_scale: f32,
     pub content_width: f32,
     pub content: ContentBounds,
 }
@@ -90,6 +92,7 @@ pub struct PreviewWidget {
     config: ValuePresentation,
     style: ResolvedTextStyle,
     scale: f32,
+    preview_raster_scale: PreviewRasterScale,
     static_parts: StaticMetricParts,
     static_image: Option<StaticImage>,
     surface: Option<Surface>,
@@ -123,6 +126,7 @@ pub(crate) fn surface(width: u32, height: u32) -> WidgetResult<Surface> {
 impl PreviewWidget {
     pub fn new(request: WidgetRequest, fonts: &PreviewFonts) -> WidgetResult<Self> {
         let config = ValuePresentation::new(request.widget, &request.scene)?;
+        let preview_raster_scale = PreviewRasterScale::from_scene(&request.scene)?;
         let scene = validate_scene_presentation(request.scene)?;
         let style = validated_value_style(config.base(), &scene, scene.scale);
         let static_parts = static_metric_parts_for_value(config.base());
@@ -147,6 +151,7 @@ impl PreviewWidget {
             config,
             style,
             scale: scene.scale,
+            preview_raster_scale,
             static_parts,
             static_image,
             surface: None,
@@ -177,8 +182,7 @@ impl PreviewWidget {
                 cache.image.height() as f32,
             ));
         }
-        let width = bounds.width() as u32;
-        let height = bounds.height() as u32;
+        let (width, height) = self.preview_raster_scale.dimensions(bounds);
         if self.surface.as_ref().map(|s| (s.width(), s.height()))
             != Some((width as i32, height as i32))
         {
@@ -189,6 +193,7 @@ impl PreviewWidget {
         let canvas = surface.canvas();
         canvas.clear(Color::TRANSPARENT);
         canvas.save();
+        self.preview_raster_scale.apply(canvas);
         canvas.translate((-bounds.left, -bounds.top));
         if let Some(cache) = &self.static_image {
             canvas.draw_image(&cache.image, (cache.left, cache.top), None);
@@ -210,6 +215,7 @@ impl PreviewWidget {
             top: bounds.top,
             width,
             height,
+            preview_raster_scale: self.preview_raster_scale.value(),
             content_width: frame.content_width,
             content: frame.content_bounds.into(),
         })

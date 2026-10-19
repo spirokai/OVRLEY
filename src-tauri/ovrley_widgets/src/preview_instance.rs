@@ -127,8 +127,6 @@ struct PlacementGeometry {
     rotation_origin: Option<[f32; 2]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     opacity: Option<f32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    preview_raster_scale: Option<f32>,
 }
 
 pub struct PreviewInstance {

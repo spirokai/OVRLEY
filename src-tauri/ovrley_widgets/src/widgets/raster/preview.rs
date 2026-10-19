@@ -135,6 +135,7 @@ impl PreviewRaster {
                 top: content.top,
                 width,
                 height,
+                preview_raster_scale: 1.0,
                 content_width: content.width,
                 content,
             },

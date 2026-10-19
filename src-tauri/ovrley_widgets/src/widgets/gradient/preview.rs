@@ -7,7 +7,7 @@ use crate::{
     error::{WidgetError, WidgetResult},
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
     preview::PreviewFonts,
-    render::{pixels::read_surface_rgba, text::ResolvedTextStyle},
+    render::{pixels::read_surface_rgba, preview::PreviewRasterScale, text::ResolvedTextStyle},
     widgets::value::{
         config::ValueConfig,
         preview::{surface, WidgetGeometry},
@@ -19,6 +19,7 @@ pub struct PreviewGradient {
     config: ValidatedGradientWidget,
     style: ResolvedTextStyle,
     scale: f32,
+    preview_raster_scale: PreviewRasterScale,
     scene_opacity: f32,
     surface: Option<Surface>,
     last_sample: Option<Option<f64>>,
@@ -30,12 +31,14 @@ pub struct PreviewGradient {
 impl PreviewGradient {
     pub fn new(widget: ValueConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
         let config = validate_gradient_widget(widget, 0)?;
+        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
         let scene = validate_scene_presentation(scene)?;
         let style = validated_gradient_style(&config, &scene, scene.scale);
         Ok(Self {
             config,
             style,
             scale: scene.scale,
+            preview_raster_scale,
             scene_opacity: scene.opacity,
             surface: None,
             last_sample: None,
@@ -60,8 +63,7 @@ impl PreviewGradient {
             &self.config, &self.style, raw, self.scale, self.scene_opacity, fonts,
         )?;
         let bounds = frame.bounds;
-        let width = bounds.width() as u32;
-        let height = bounds.height() as u32;
+        let (width, height) = self.preview_raster_scale.dimensions(bounds);
         if self.surface.as_ref().map(|s| (s.width(), s.height()))
             != Some((width as i32, height as i32))
         {
@@ -72,6 +74,7 @@ impl PreviewGradient {
         let canvas = surface.canvas();
         canvas.clear(Color::TRANSPARENT);
         canvas.save();
+        self.preview_raster_scale.apply(canvas);
         canvas.translate((-bounds.left, -bounds.top));
         let result = frame.draw(canvas, fonts);
         canvas.restore();
@@ -82,6 +85,7 @@ impl PreviewGradient {
             top: bounds.top,
             width,
             height,
+            preview_raster_scale: self.preview_raster_scale.value(),
             content_width: frame.content_width,
             content: frame.content_bounds.into(),
         })
