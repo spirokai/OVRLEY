@@ -2829,6 +2829,8 @@ dependencies = [
  "csv",
  "image",
  "log",
+ "objc2",
+ "objc2-foundation",
  "open",
  "ovrley_widgets",
  "roxmltree",

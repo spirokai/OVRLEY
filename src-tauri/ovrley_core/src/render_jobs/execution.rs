@@ -9,6 +9,7 @@ use std::thread::{self, JoinHandle};
 
 use serde::Serialize;
 
+use super::activity::RenderActivity;
 use super::batch_state::BatchState;
 use super::inspection::verify_composite_source_resolution;
 use super::planning::{plan_single_render, PlannedVideoRender, VideoRenderModePlan};
@@ -197,6 +198,9 @@ where
     let session = &reservation;
     let outcome = catch_unwind(AssertUnwindSafe(move || {
         session.check_cancelled()?;
+        // Prevent App Nap for the whole operation, including every batch item
+        // and native cleanup. Released on success, error, cancellation or panic.
+        let _activity = RenderActivity::begin("Rendering video");
         operation(session)
     }))
     .unwrap_or_else(|_| Err(CoreError::Encode("Render operation worker panicked".into())));

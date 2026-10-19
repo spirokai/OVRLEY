@@ -30,6 +30,10 @@ tzf-rs = { version = "1.3.7", default-features = false, features = ["bundled"] }
 # to this checkout automatically at build time (no fork needed).
 telemetry-parser = { git = "https://github.com/AdrianEddy/telemetry-parser.git", rev = "fd9a73e" }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.3"
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSProcessInfo", "NSString"] }
+
 [features]
 canvas-parity = []
 
