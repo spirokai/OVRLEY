@@ -57,20 +57,3 @@ export function resolveVideoPreviewSource({
 
   return ''
 }
-
-/**
- * Reports whether the current timeline playhead sits outside the imported video window.
- *
- * @param {object} options - Window inputs.
- * @param {number} options.selectedSecond - Current preview second.
- * @param {number} options.videoDuration - Imported video duration in seconds.
- * @param {number} options.videoSyncOffsetSeconds - Timeline second where the video starts.
- * @returns {boolean} Whether the playhead is outside the imported video range.
- */
-export function isVideoPreviewOutOfRange({ selectedSecond, videoDuration, videoSyncOffsetSeconds }) {
-  const safeSelectedSecond = Number(selectedSecond) || 0
-  const safeOffset = Number(videoSyncOffsetSeconds) || 0
-  const safeDuration = Number(videoDuration) || 0
-
-  return safeSelectedSecond < safeOffset || safeSelectedSecond >= safeOffset + safeDuration
-}

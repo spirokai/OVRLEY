@@ -17,7 +17,7 @@ export function VideoSyncControls({
   activitySummary,
   canResetCreationTime,
   filenameCreationTimeAvailable,
-  importedVideoTimeSource,
+  timezoneDisabled,
   offsetInput,
   timezone,
   videoSyncTimezoneMode,
@@ -25,9 +25,9 @@ export function VideoSyncControls({
   openManualVideoSync,
   computeVideoSync,
   incrementOffset,
-  resetVideoCreationTime,
+  resetVideoCreationTimes,
   setOffsetInput,
-  setVideoCreationTimeFromFilename,
+  setVideoCreationTimesFromFilenames,
   setVideoSyncTimezoneMode,
   submitOffsetInput,
 }) {
@@ -44,7 +44,7 @@ export function VideoSyncControls({
           size="icon"
           className="ml-2 h-6 w-6 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
           disabled={!canResetCreationTime}
-          onClick={resetVideoCreationTime}
+          onClick={resetVideoCreationTimes}
           aria-label={t('toolbar.restoreDetectedVideoCreationTime', 'Restore detected video creation time')}
         >
           <RotateCcw className="h-3 w-3" />
@@ -91,7 +91,7 @@ export function VideoSyncControls({
             size="sm"
             className="h-9 border-border/80 bg-surface-elevated px-3 text-xs font-semibold text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
             disabled={!activitySummary}
-            onClick={() => computeVideoSync(activitySummary)}
+            onClick={() => computeVideoSync()}
             aria-keyshortcuts="Mod+Shift+A"
           >
             {t('toolbar.autosync', 'Auto-sync')}
@@ -101,7 +101,7 @@ export function VideoSyncControls({
           <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('toolbar.creationTime', 'Creation Time')}</Label>
           <Tabs
             value={canResetCreationTime ? 'filename' : 'detected'}
-            onValueChange={(value) => (value === 'filename' ? setVideoCreationTimeFromFilename() : resetVideoCreationTime())}
+            onValueChange={(value) => (value === 'filename' ? setVideoCreationTimesFromFilenames() : resetVideoCreationTimes())}
           >
             <TabsList variant="toolbar" className="grid h-8 w-full grid-cols-2 p-0.5">
               <TabsTrigger variant="toolbar" value="detected" className="h-full px-2 text-[0.7rem]">
@@ -121,7 +121,7 @@ export function VideoSyncControls({
                 <Switch
                   id="video-sync-timezone-toggle"
                   checked={videoSyncTimezoneMode === 'utc'}
-                  disabled={importedVideoTimeSource === 'filename'}
+                  disabled={timezoneDisabled}
                   onCheckedChange={(checked) => setVideoSyncTimezoneMode(checked ? 'utc' : 'local')}
                   aria-label={t('toolbar.applyTimezone', 'Apply Timezone')}
                 />

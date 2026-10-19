@@ -12,7 +12,7 @@ use serde::Serialize;
 use super::batch_state::BatchState;
 use super::inspection::verify_composite_source_resolution;
 use super::planning::{plan_single_render, PlannedVideoRender, VideoRenderModePlan};
-use crate::activity::schema::ParsedActivity;
+use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::{parse_activity_json, validate_render_activity};
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::composite::CompositeEncoding;
@@ -80,7 +80,7 @@ impl RenderExecutionService {
     ) -> CoreResult<String> {
         run_operation(self.reserve()?, |session| {
             session.begin_item(plan.planned_frames(), "Preparing video assets...")?;
-            execute_render(paths, plan, activity, session, target)
+            execute_render(paths, plan, Some(activity), session, target)
         })
     }
 
@@ -147,7 +147,7 @@ impl RenderExecutionService {
             reservation,
             move |session| {
                 session.begin_item(plan.planned_frames(), "Preparing video assets...")?;
-                execute_render(&paths, plan, &activity, session, &target)
+                execute_render(&paths, plan, Some(&activity), session, &target)
             },
             |_| {},
         )?;
@@ -270,15 +270,20 @@ impl Drop for RendererReservation {
 
 /// Executes a finalized single or batch plan. The caller owns item start and
 /// the reservation; pipelines return only after native cleanup.
+/// Renders one planned video. Without an activity (a video without telemetry)
+/// no frame samples activity data and the plan must contain static widgets only.
 pub(crate) fn execute_render(
     paths: &AppPaths,
     plan: PlannedVideoRender,
-    activity: &ParsedActivity,
+    activity: Option<&ParsedActivity>,
     session: &RendererReservation,
     target: &RenderOutputTarget,
 ) -> CoreResult<String> {
     session.check_cancelled()?;
-    let dense = plan.prepare_activity(activity)?;
+    let dense = match activity {
+        Some(activity) => plan.prepare_activity(activity)?,
+        None => DenseActivityReport::without_activity(),
+    };
     session.check_cancelled()?;
     let encoding = match plan.mode {
         VideoRenderModePlan::Composite {

@@ -175,7 +175,7 @@ fn main() -> Result<(), String> {
 
     let paths = AppPaths::from_repo_root(repo_root()?);
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
-        prepare_preview_assets(&paths, &config, &activity, &dense_activity)
+        prepare_preview_assets(&paths, &config, Some(&activity), &dense_activity)
             .map_err(|e| e.to_string())?;
     let mut reports = Vec::with_capacity(seconds.len());
     // -- Phase 3: render one preview frame per requested second --

@@ -118,7 +118,7 @@ fn corner_gauge_prepares_a_shared_arc_cache_and_renders_a_frame() {
     let dense = dense_speed_activity(vec![Some(0.0), Some(50.0), Some(100.0)]);
     let mut profiler = RenderProfiler::default();
 
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&paths, &config, Some(&activity), &dense, &mut profiler).unwrap();
     let PreparedValue::ArcGauge(widget) = &assets.values()[0] else {
         panic!("corner gauge should use the shared arc cache");
     };

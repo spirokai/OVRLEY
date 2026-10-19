@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next'
  * @param {string} props.backgroundMode - Current background mode ('checker' | 'black' | 'white' | 'video' | 'image').
  * @param {function} props.onSetBackgroundMode - Sets the background mode.
  * @param {string|null} props.importedBackgroundImageFilename - Imported image filename; if set shows image background toggle.
- * @param {string|null} props.importedVideoFilename - Video filename; if set shows video background toggle.
+ * @param {string|null} props.importedVideoLabel - Imported video filename or count; if set shows video background toggle.
  * @param {number} props.zoomLevel - Current zoom level (0–1 range).
  * @param {function} props.onZoomIn - Increases zoom level.
  * @param {function} props.onZoomOut - Decreases zoom level.
@@ -32,7 +32,7 @@ export default function EditorToolbar({
   backgroundMode,
   onSetBackgroundMode,
   importedBackgroundImageFilename,
-  importedVideoFilename,
+  importedVideoLabel,
   zoomLevel,
   onZoomIn,
   onZoomOut,
@@ -88,7 +88,7 @@ export default function EditorToolbar({
           </Button>
         </SimpleTooltip>
 
-        {(importedBackgroundImageFilename || importedVideoFilename) && (
+        {(importedBackgroundImageFilename || importedVideoLabel) && (
           <>
             <div className="mx-1 h-5 w-px bg-border/70" />
             {importedBackgroundImageFilename ? (

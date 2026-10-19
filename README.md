@@ -33,6 +33,9 @@
 - **Real-Time Preview**: Preview at up to 4K/30 fps directly inside the app before you export.
 - **Flexible Video Sync**: Automatically sync telemetry using camera timestamps, GPS timestamps or supported timestamps in video filenames. You can also adjust the sync by multiple approaches. Negative offsets are supported when the video starts before the telemetry.
 - **Video-Editing Timeline**: See video and telemetry as separate tracks, move through them frame by frame, zoom and pan, and choose exactly which part to export.
+- **Multiple Videos**: Load many clips at once, for example camera files split at a size limit or separate recordings. OVRLEY places every clip by its recording time, also before or after the activity, warns about overlaps and clips that differ in resolution or frame rate, and previews them continuously.
+- **Deleted Parts and Transitions**: Cut unwanted parts out of any clip and choose a transition for every join between clips or around a deleted part from 58 animated `xfade` transitions. Clips recorded back to back join seamlessly by default.
+- **One Video or Separate Files**: Export all clips together as one video with their transitions, or each clip to its own file, as final footage or transparent overlays.
 - **Keyboard Shortcuts**: Use shortcuts for playback, editing, timeline navigation, and other common actions. The help button in the top toolbar shows the full list.
 - **Automatic Updates**: Installer builds can check for new versions at startup and update with your permission.
 - **100% Free & Offline**: No subscriptions. All data processing, rendering, and encoding happen locally on your machine. Your data never leaves your computer.

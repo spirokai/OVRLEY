@@ -22,7 +22,6 @@ vi.mock('@/store/useStore', () => ({
           fps: 30,
         },
       },
-      importedVideoFps: undefined,
       renderSettings: { fps: 30, widgetUpdateRate: 1 },
     }),
   ),
@@ -63,7 +62,8 @@ describe('useVideoPlaybackClock', () => {
         isActive: false,
         onPlaybackEnded: vi.fn(),
         onPreviewSecond: vi.fn(),
-        videoSyncOffsetSeconds: 0,
+        videoFps: null,
+        videoOffsetSeconds: 0,
       }),
     )
 
@@ -80,10 +80,60 @@ describe('useVideoPlaybackClock', () => {
         isActive: false,
         onPlaybackEnded: vi.fn(),
         onPreviewSecond: vi.fn(),
-        videoSyncOffsetSeconds: 0,
+        videoFps: null,
+        videoOffsetSeconds: 0,
       }),
     )
 
     expect(setPreviewPerfValueSpy).toHaveBeenCalledWith('preview clock mode', 'raf')
+  })
+
+  test('hands playback on once when the presented frame leaves the playing piece', () => {
+    const listeners = {}
+    let frameCallback = null
+    const video = {
+      currentTime: 4,
+      paused: false,
+      ended: false,
+      currentSrc: 'http://preview/video',
+      requestVideoFrameCallback: vi.fn((callback) => {
+        frameCallback = callback
+        return 1
+      }),
+      cancelVideoFrameCallback: vi.fn(() => {
+        frameCallback = null
+      }),
+      addEventListener: vi.fn((name, listener) => {
+        listeners[name] = listener
+      }),
+      removeEventListener: vi.fn(),
+    }
+    const onPreviewSecond = vi.fn()
+    const onPlaybackEnded = vi.fn()
+
+    renderHook(() =>
+      useVideoPlaybackClock({
+        videoRef: { current: video },
+        isActive: true,
+        videoFps: { num: 30, den: 1 },
+        videoOffsetSeconds: 10,
+        pieceEndSourceSecond: 5,
+        onPreviewSecond,
+        onPlaybackEnded,
+      }),
+    )
+
+    onPreviewSecond.mockClear()
+    frameCallback(0, { mediaTime: 4.95 })
+    expect(onPreviewSecond).toHaveBeenLastCalledWith(14.95)
+    expect(onPlaybackEnded).not.toHaveBeenCalled()
+
+    frameCallback(0, { mediaTime: 5 })
+    expect(onPreviewSecond).toHaveBeenCalledTimes(1)
+    expect(onPlaybackEnded).toHaveBeenCalledOnce()
+    expect(frameCallback).toBeNull()
+
+    listeners.ended()
+    expect(onPlaybackEnded).toHaveBeenCalledOnce()
   })
 })

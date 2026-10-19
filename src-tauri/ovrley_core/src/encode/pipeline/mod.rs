@@ -1,5 +1,6 @@
 //! Shared video preparation and encoding, with one supervised native pipeline.
 
+pub(crate) mod assemble;
 mod buffers;
 #[doc(hidden)]
 pub mod diagnostics;
@@ -105,7 +106,7 @@ impl VideoEncoding {
 pub(crate) fn encode_video(
     paths: &AppPaths,
     config: &ValidatedRenderConfig,
-    activity: &ParsedActivity,
+    activity: Option<&ParsedActivity>,
     dense: &DenseActivityReport,
     controller: &RenderController,
     target: &RenderOutputTarget,

@@ -93,6 +93,8 @@ pub fn run() {
             tauri_commands::backend_list_templates,
             tauri_commands::backend_get_template,
             tauri_commands::backend_open_output_directory,
+            tauri_commands::backend_render_transition_proxy,
+            tauri_commands::backend_release_transition_proxy,
             tauri_commands::backend_open_templates,
             tauri_commands::backend_open_video,
             tauri_commands::backend_probe_video,
@@ -104,8 +106,9 @@ pub fn run() {
             tauri_commands::backend_register_preview_video,
             tauri_commands::backend_import_preview_video,
             tauri_commands::backend_extract_video_telemetry,
-            tauri_commands::backend_clear_preview_video,
-            tauri_commands::backend_get_video_state,
+            tauri_commands::backend_remove_preview_video,
+            tauri_commands::backend_clear_preview_videos,
+            tauri_commands::backend_get_preview_videos,
             tauri_commands::backend_get_map_style_url_template,
             tauri_commands::backend_detect_codecs,
             tauri_commands::backend_build_elevation_geometry,
@@ -126,6 +129,10 @@ pub fn run() {
         .setup(|app| {
             app.manage(distribution::detect()?);
             app.manage(raster_resources::RasterResources::default());
+            // Transition proxies of earlier sessions are no longer registered anywhere.
+            ovrley_core::encode::ffmpeg::transition_proxy::clear_transition_proxies(
+                &runtime_paths::app_paths(app.handle())?,
+            )?;
 
             #[cfg(debug_assertions)]
             {

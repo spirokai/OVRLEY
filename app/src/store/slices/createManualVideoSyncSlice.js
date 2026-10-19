@@ -93,6 +93,22 @@ function requireCalculationResult(result) {
   }
 }
 
+/**
+ * Returns the timeline clip whose landmarks the manual sync workspace matches.
+ * @param {object} state Application state.
+ * @returns {object|null} Target clip (video entity joined with its edits), or null without imported videos.
+ */
+export function findVideoSyncTarget(state) {
+  const video = state.importedVideos.find((candidate) => candidate.id === state.manualVideoSync.videoId)
+  return video ? { ...video, ...state.videoEdits[video.id] } : null
+}
+
+function requireTargetVideo(state) {
+  const video = findVideoSyncTarget(state)
+  if (!video) throw new Error('A video must be loaded before adding a manual video sync landmark')
+  return video
+}
+
 function requireCalculationError(message) {
   if (typeof message !== 'string' || message.trim() === '') {
     throw new Error('Manual video sync calculation error must be a non-empty string')
@@ -113,16 +129,14 @@ export function createManualVideoSyncSlice(set, get) {
 
     addVideoSyncLandmark: (type, videoSecond) => {
       const state = get()
-      if (state.importedVideoDuration === null) {
-        throw new Error('A video must be loaded before adding a manual video sync landmark')
-      }
+      const video = requireTargetVideo(state)
       const id = createLandmarkId()
       if (state.manualVideoSync.landmarks.some((landmark) => landmark.id === id)) {
         throw new Error(`Manual video sync landmark id is duplicated: ${id}`)
       }
       const landmark = { id, type, videoSecond }
       if (type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) landmark.activitySecond = null
-      validateLandmark(landmark, state.importedVideoDuration)
+      validateLandmark(landmark, video.durationSeconds)
       if (state.manualVideoSync.landmarks.length >= VIDEO_SYNC_MAX_LANDMARKS) {
         throw new Error(`Manual video sync supports at most ${VIDEO_SYNC_MAX_LANDMARKS} landmarks`)
       }
@@ -146,7 +160,7 @@ export function createManualVideoSyncSlice(set, get) {
       const state = get()
       const landmark = state.manualVideoSync.landmarks.find((item) => item.id === id)
       if (!landmark) throw new Error(`Manual video sync landmark was not found: ${id}`)
-      validateVideoSecond(videoSecond, state.importedVideoDuration)
+      validateVideoSecond(videoSecond, requireTargetVideo(state).durationSeconds)
 
       set((draft) => {
         const target = draft.manualVideoSync.landmarks.find((item) => item.id === id)
@@ -185,7 +199,7 @@ export function createManualVideoSyncSlice(set, get) {
       const nextLandmark = { ...landmark, type }
       if (type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) nextLandmark.activitySecond = null
       else delete nextLandmark.activitySecond
-      validateLandmark(nextLandmark, state.importedVideoDuration)
+      validateLandmark(nextLandmark, requireTargetVideo(state).durationSeconds)
 
       if (
         type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION &&
@@ -261,7 +275,8 @@ export function createManualVideoSyncSlice(set, get) {
         throw new Error('Manual video sync candidate is not part of the current result')
       }
 
-      state.setVideoSyncOffset(candidate.offset, { compensatePlayhead: true })
+      // Candidates place the target clip; every clip moves by the same amount.
+      state.shiftVideoOffsets(candidate.offset - requireTargetVideo(state).offsetSeconds, { compensatePlayhead: true })
     },
 
     beginVideoSyncCalculation: (scope) => {
@@ -328,11 +343,18 @@ export function createManualVideoSyncSlice(set, get) {
       return true
     },
 
-    clearVideoSyncForVideo: () =>
+    /** Chooses the video whose landmarks are matched; landmarks belong to one video and are cleared on change. */
+    selectVideoSyncVideo: (videoId) => {
+      if (get().manualVideoSync.videoId === videoId) return
+      if (videoId !== null && !get().importedVideos.some((video) => video.id === videoId)) {
+        throw new Error(`Unknown manual video sync video: ${videoId}`)
+      }
       set((draft) => {
+        draft.manualVideoSync.videoId = videoId
         draft.manualVideoSync.landmarks = []
         draft.manualVideoSyncResults = createCandidateResults(draft.manualVideoSyncResults)
-      }),
+      })
+    },
 
     clearVideoSyncForActivity: () =>
       set((draft) => {

@@ -10,36 +10,7 @@
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { SCENE_PRESENTATION_KEYS } from '@/lib/template/template-constants'
 import { clamp } from '@/lib/utils'
-import { videoOverlapsActivity } from '@/lib/video-timing'
 import { isMp4Codec, isQsvFullCodec } from './codecUtils'
-
-function reduceFps(num, den) {
-  let a = Math.abs(num)
-  let b = Math.abs(den)
-  while (b !== 0) {
-    const next = a % b
-    a = b
-    b = next
-  }
-  const gcd = Math.max(a, 1)
-  return { num: num / gcd, den: den / gcd }
-}
-
-// ffprobe metadata is external data: prefer its exact rational, then known
-// broadcast rates, then a reduced millisecond approximation.
-function resolveCompositeFps(fpsNum, fpsDen, fps) {
-  const num = Number(fpsNum)
-  const den = Number(fpsDen)
-  if (Number.isInteger(num) && num > 0 && Number.isInteger(den) && den > 0) return reduceFps(num, den)
-  const value = Number(fps)
-  if (!Number.isFinite(value) || value <= 0) return null
-  const match = [
-    [23.976, 24000, 1001],
-    [29.97, 30000, 1001],
-    [59.94, 60000, 1001],
-  ].find(([approx]) => Math.abs(value - approx) <= 0.001)
-  return match ? { num: match[1], den: match[2] } : reduceFps(Math.round(value * 1000), 1000)
-}
 
 function renderValues(values) {
   return values.map(({ display_variants: _displayVariants, ...value }) => {
@@ -102,62 +73,20 @@ function applyCodecDefaults(scene, resolvedExportCodec) {
  * @param {object} options - Render preparation options.
  */
 function applyCompositeSceneFields(scene, options) {
-  const {
-    importedVideoDuration,
-    importedVideoFps,
-    importedVideoFpsNum,
-    importedVideoFpsDen,
-    importedVideoPath,
-    importedVideoResolution,
-    qualityType,
-    qualityValue,
-    videoSyncOffsetSeconds,
-  } = options
-  const sourceFps = resolveCompositeFps(importedVideoFpsNum, importedVideoFpsDen, importedVideoFps)
-  const renderDuration = importedVideoDuration
-  const displayWidth = importedVideoResolution?.width
-  const displayHeight = importedVideoResolution?.height
+  const { video, videoOffsetSeconds, qualityType, qualityValue } = options
 
-  if (!sourceFps) {
-    throw new Error('Imported video FPS is required for MP4 compositing.')
-  }
-  if (!Number.isFinite(renderDuration) || renderDuration <= 0) {
-    throw new Error('Imported video duration is required for MP4 compositing.')
-  }
-  if (!Number.isFinite(displayWidth) || displayWidth <= 0 || !Number.isFinite(displayHeight) || displayHeight <= 0) {
-    throw new Error('Imported video resolution is required for MP4 compositing.')
-  }
-  if (!Number.isFinite(videoSyncOffsetSeconds)) {
-    throw new Error('Imported video sync offset must be a finite number.')
-  }
-
-  scene.width = displayWidth
-  scene.height = displayHeight
-  scene.composite_video_path = importedVideoPath
+  scene.width = video.resolution.width
+  scene.height = video.resolution.height
+  scene.composite_video_path = video.path
   scene.qualityType = qualityType
   scene.qualityValue = qualityValue
-  scene.composite_sync_offset = videoSyncOffsetSeconds
-  scene.composite_video_fps_num = sourceFps.num
-  scene.composite_video_fps_den = sourceFps.den
-  scene.composite_video_duration = renderDuration
-  scene.composite_render_duration = renderDuration
+  scene.composite_sync_offset = videoOffsetSeconds
+  scene.composite_video_fps_num = video.fps.num
+  scene.composite_video_fps_den = video.fps.den
+  scene.composite_video_duration = video.durationSeconds
+  scene.composite_render_duration = video.durationSeconds
   scene.composite_video_trim_start = 0
   scene.composite_widget_update_rate = scene.update_rate
-}
-
-/**
- * Validates the effective video/activity overlap after export-range translation.
- *
- * @param {object} scene - Render-effective scene config.
- * @param {number|null|undefined} timelineEnd - Activity timeline end.
- */
-function validateCompositeTiming(scene, timelineEnd) {
-  const syncOffset = scene.composite_sync_offset
-  const renderDuration = scene.composite_render_duration
-  const activityEnd = timelineEnd
-  if (!videoOverlapsActivity({ videoStart: syncOffset, videoDuration: renderDuration, activityEnd })) {
-    throw new Error('Imported video range must have positive overlap with the activity timeline.')
-  }
 }
 
 /**
@@ -168,10 +97,10 @@ function validateCompositeTiming(scene, timelineEnd) {
  *
  * @param {object} scene - Render-effective scene config.
  * @param {object|null|undefined} exportRange - Requested export-range settings.
- * @param {string|null|undefined} importedVideoPath - Active composite-video path, if any.
+ * @param {boolean} isComposite - Whether an imported video is composited.
  */
-function applyCustomExportRange(scene, exportRange, importedVideoPath) {
-  scene.custom_export_range_active = importedVideoPath !== null
+function applyCustomExportRange(scene, exportRange, isComposite) {
+  scene.custom_export_range_active = isComposite
 
   if (exportRange.type !== 'custom') {
     return
@@ -184,7 +113,7 @@ function applyCustomExportRange(scene, exportRange, importedVideoPath) {
     throw new Error('Custom export range end must be after its start.')
   }
 
-  if (!importedVideoPath) {
+  if (!isComposite) {
     scene.start = start
     scene.end = end
     scene.custom_export_range_active = true
@@ -236,7 +165,8 @@ function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
  * @param {'transparent'|'composite'} options.exportMode - Active export pipeline selection.
  * @param {object} options.range - Validated export range settings.
  * @param {object|null|undefined} options.globalDefaults - Template global defaults.
- * @param {string|null} options.importedVideoPath - Imported-video path, if any.
+ * @param {{path: string, durationSeconds: number, fps: {num: number, den: number}, resolution: {width: number, height: number}}|null} options.video - Composited video, if any.
+ * @param {number} options.videoOffsetSeconds - Activity second where the composited video starts.
  * @param {number} options.timelineStart - Active editor timeline start second.
  * @param {number} options.timelineEnd - Active editor timeline end second.
  * @param {number} options.fps - Validated overlay FPS.
@@ -244,8 +174,7 @@ function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
  * @returns {object} Render-effective config.
  */
 export function createRenderEffectiveConfig(options) {
-  const { availableCodecs, config, codec, exportMode, range, globalDefaults, importedVideoPath, timelineStart, timelineEnd, widgetUpdateRate, fps } =
-    options
+  const { availableCodecs, config, codec, exportMode, range, globalDefaults, video, timelineStart, timelineEnd, widgetUpdateRate, fps } = options
 
   if (!config?.scene) {
     throw new Error('No valid config available')
@@ -256,7 +185,7 @@ export function createRenderEffectiveConfig(options) {
     ...nextConfig.scene,
   }
   const shouldComposite = exportMode === 'composite'
-  if (shouldComposite && importedVideoPath === null) throw new Error('Imported video is required for composite export')
+  if (shouldComposite && video === null) throw new Error('Imported video is required for composite export')
   if (isMp4Codec(codec) !== shouldComposite) throw new Error('Render codec must match the export mode')
 
   scene.fps = fps
@@ -279,10 +208,8 @@ export function createRenderEffectiveConfig(options) {
 
   applyTimelineSceneFields(scene, timelineStart, timelineEnd)
   applyCodecDefaults(scene, codec)
-  applyCustomExportRange(scene, range, shouldComposite ? importedVideoPath : null)
-  if (shouldComposite) {
-    validateCompositeTiming(scene, timelineEnd)
-  }
+  // A video outside the activity renders with raster widgets only (native coverage).
+  applyCustomExportRange(scene, range, shouldComposite)
 
   return {
     ...nextConfig,

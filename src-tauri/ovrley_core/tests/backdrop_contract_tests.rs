@@ -500,11 +500,11 @@ fn static_cache_key_includes_backdrops() {
     .unwrap();
 
     let (_, first_status, _, _) =
-        prepare_preview_assets(&paths, &first_config, &activity, &dense).unwrap();
+        prepare_preview_assets(&paths, &first_config, Some(&activity), &dense).unwrap();
     let (_, second_status, _, _) =
-        prepare_preview_assets(&paths, &first_config, &activity, &dense).unwrap();
+        prepare_preview_assets(&paths, &first_config, Some(&activity), &dense).unwrap();
     let (_, changed_status, _, _) =
-        prepare_preview_assets(&paths, &second_config, &activity, &dense).unwrap();
+        prepare_preview_assets(&paths, &second_config, Some(&activity), &dense).unwrap();
 
     assert!(matches!(first_status, LabelCacheStatus::Miss));
     assert!(matches!(second_status, LabelCacheStatus::Hit));

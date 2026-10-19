@@ -237,7 +237,9 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
             0.0,
             false,
         );
-        request.output_directory = paths.downloads_dir.to_str().unwrap().into();
+        request.destination = BatchDestination::SourceNamed {
+            directory: paths.downloads_dir.to_str().unwrap().into(),
+        };
         let service = RenderExecutionService::with_sink(observed.clone());
         let started = Instant::now();
         service

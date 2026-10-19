@@ -17,16 +17,18 @@ const PROJECT_FILTER = [{ name: 'OVRLEY Project', extensions: ['oly'] }]
  * Coordinates project commands with project UI state.
  * @param {object} options Project media-owner operations.
  * @param {function} options.prepareActivityPath Parses one activity source without committing it.
- * @param {function} options.clearImportedVideo Clears the active video source.
+ * @param {function} options.clearImportedVideos Clears every imported video source.
  * @param {function} options.prepareVideoPath Probes one video source without committing it.
+ * @param {function} options.importLegacyBatchFolder Imports the video folder of an opened version 3 batch project.
  * @param {function} [options.onSetBackgroundMode] Shell setter for the editor background mode.
  * @param {boolean} [options.startupReady] Whether application startup completed successfully.
  * @returns {object} Project lifecycle state and command handlers.
  */
 export default function useProjectLifecycle({
   prepareActivityPath,
-  clearImportedVideo,
+  clearImportedVideos,
   prepareVideoPath,
+  importLegacyBatchFolder,
   onSetBackgroundMode,
   startupReady = false,
 }) {
@@ -38,6 +40,7 @@ export default function useProjectLifecycle({
   const [startupDialogOpen, setStartupDialogOpen] = useState(false)
   const [startupProjects, setStartupProjects] = useState([])
   const [startupOpeningPath, setStartupOpeningPath] = useState(null)
+  const [formatUpgradeBackupPath, setFormatUpgradeBackupPath] = useState(null)
   const operationLock = useRef(false)
   const startupLoaded = useRef(false)
   const busy = operationPhase !== null || conflictingOperation
@@ -85,12 +88,13 @@ export default function useProjectLifecycle({
   const loadProjectPath = useCallback(
     async (path) => {
       setOperationPhase('loading')
-      const project = await loadProject({ path, resolveProjectSources, prepareActivityPath, prepareVideoPath, onSetBackgroundMode })
-      if (!project) return false
-      markSaved(path, project)
+      const loaded = await loadProject({ path, resolveProjectSources, prepareActivityPath, prepareVideoPath, onSetBackgroundMode })
+      if (!loaded) return false
+      markSaved(path, loaded.project)
+      if (loaded.legacyBatchVideoFolder !== null) await importLegacyBatchFolder(loaded.legacyBatchVideoFolder)
       return true
     },
-    [markSaved, onSetBackgroundMode, prepareActivityPath, prepareVideoPath, resolveProjectSources],
+    [importLegacyBatchFolder, markSaved, onSetBackgroundMode, prepareActivityPath, prepareVideoPath, resolveProjectSources],
   )
 
   const handleOpenProject = useCallback(
@@ -114,8 +118,9 @@ export default function useProjectLifecycle({
           })
         }
         if (!path) return false
-        const project = await saveProject(path)
+        const { project, backupPath } = await saveProject(path)
         markSaved(path, project)
+        if (backupPath !== null) setFormatUpgradeBackupPath(backupPath)
         return true
       }),
     [loadedProjectPath, markSaved, runOperation],
@@ -132,11 +137,11 @@ export default function useProjectLifecycle({
   const createProject = useCallback(
     () =>
       runOperation(i18next.t('projects.createProject', 'create project'), async () => {
-        await createNewProject({ clearImportedVideo })
+        await createNewProject({ clearImportedVideos })
         markNew()
         return true
       }),
-    [clearImportedVideo, markNew, runOperation],
+    [clearImportedVideos, markNew, runOperation],
   )
 
   const handleStartupNewProject = useCallback(async () => {
@@ -210,6 +215,11 @@ export default function useProjectLifecycle({
     loadedProjectPath,
     loadingProject: operationPhase === 'loading',
     missingSourceDialog,
+    formatUpgradeDialog: {
+      open: formatUpgradeBackupPath !== null,
+      backupPath: formatUpgradeBackupPath ?? undefined,
+      onClose: () => setFormatUpgradeBackupPath(null),
+    },
     projectName,
     startupProjectDialog: {
       open: startupDialogOpen,

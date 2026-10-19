@@ -726,6 +726,14 @@ pub struct DenseSeriesReport {
     pub lap_durations_best_so_far_seconds: Vec<f64>,
 }
 
+impl DenseActivityReport {
+    /// The report of a render without any activity: no frame samples activity data,
+    /// so every frame shows rasters only.
+    pub fn without_activity() -> Self {
+        Self::default()
+    }
+}
+
 impl DenseSeriesReport {
     /// Returns the canonical numeric dense series for a metric.
     ///

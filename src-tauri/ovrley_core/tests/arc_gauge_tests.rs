@@ -103,7 +103,7 @@ fn prepare_assets_builds_arc_cache_with_static_unit_and_frame_values() {
     let dense = dense_speed_activity(vec![Some(10.0), Some(30.0), Some(50.0)]);
     let mut profiler = RenderProfiler::default();
 
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&paths, &config, Some(&activity), &dense, &mut profiler).unwrap();
 
     let PreparedValue::ArcGauge(widget) = &assets.values()[0] else {
         panic!("arc gauge should prepare a gauge cache at value index 0");
@@ -133,7 +133,7 @@ fn bars_style_resolves_configured_arc_geometry_into_the_cache() {
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
     let mut profiler = RenderProfiler::default();
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&paths, &config, Some(&activity), &dense, &mut profiler).unwrap();
 
     let PreparedValue::ArcGauge(widget) = &assets.values()[0] else {
         panic!("arc bars should use the arc gauge cache");

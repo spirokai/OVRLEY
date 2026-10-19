@@ -50,10 +50,11 @@ export default function useAppShellComposition() {
   const renderWorkflow = useRenderWorkflow({ backendStatus: backendState.backendStatus })
   const videoControls = useVideoImport({ debugModeEnabled: editorShell.debugModeEnabled, onSetBackgroundMode: editorShell.setEditorBackgroundMode })
   const projectLifecycle = useProjectLifecycle({
-    clearImportedVideo: videoControls.clearImportedVideo,
+    clearImportedVideos: videoControls.clearImportedVideos,
     onSetBackgroundMode: editorShell.setEditorBackgroundMode,
     prepareActivityPath: activityImport.prepareActivityPath,
     prepareVideoPath: videoControls.prepareVideoPath,
+    importLegacyBatchFolder: videoControls.importLegacyBatchFolder,
     startupReady: backendState.backendReady && templateRestoreComplete,
   })
   useWindowCloseGuard(projectLifecycle.handleCloseRequest)

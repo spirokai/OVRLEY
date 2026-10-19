@@ -115,7 +115,7 @@ export default function ActivitySection({
           <Separator className="my-1.5" />
 
           <div className="flex flex-col gap-0.5">
-            <MenuItem icon={Film} label={t('app-shell.importVideo', 'Import Video')} onClick={() => run(onImportVideo)} />
+            <MenuItem icon={Film} label={t('app-shell.importVideo', 'Import Videos')} onClick={() => run(onImportVideo)} />
           </div>
         </PopoverContent>
       </Popover>

@@ -36,28 +36,9 @@ pub struct BatchEncodingSettings {
     pub qsv_full_init_args: Option<Vec<String>>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum VideoSyncTimezoneMode {
-    Local,
-    Utc,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct BatchCalibrationReference {
-    pub source_id: String,
-    /// Effective editor timestamp, including an override when selected.
-    pub creation_time: String,
-    /// Null when the external probe did not identify timestamp provenance.
-    pub time_source: Option<String>,
-    pub committed_offset_seconds: f64,
-    pub automatic_offset_seconds: f64,
-}
-
-/// Embedded mode has no shared activity calibration. With external activity,
-/// absent reference means exactly zero correction; a present reference must
-/// have a resolved signed baseline. Drag preview offsets never enter this DTO.
+/// Embedded mode uses each source's own telemetry. With external activity, every
+/// queued source carries its committed editor offset (activity second where the
+/// video starts). Drag preview offsets never enter this DTO.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(
     tag = "mode",
@@ -69,38 +50,82 @@ pub enum BatchActivity {
     EmbeddedActivity {},
     ExternalActivity {
         activity: ParsedActivity,
-        timezone_mode: VideoSyncTimezoneMode,
-        reference: Option<BatchCalibrationReference>,
-        /// Automatic baselines keyed by the queued source identities. The backend
-        /// applies the reference correction once; jobs carry no timing mode.
-        automatic_offsets: HashMap<String, f64>,
+        /// Committed offsets keyed by the queued source identities.
+        offsets: HashMap<String, f64>,
     },
 }
 
+/// A continuous range of one inspected source: frames `[start_frame, end_frame)`
+/// on the source's exact frame grid.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct BatchRenderJob {
-    pub id: String,
+pub struct BatchRenderPiece {
     pub source_id: String,
-    /// Suppresses all widgets except rasters, retaining the job.
+    pub start_frame: u64,
+    pub end_frame: u64,
+    /// Suppresses all widgets except rasters for this piece.
     pub skip_overlay: bool,
+}
+
+/// The join between two consecutive pieces of an output: a hard cut
+/// (`type: "none"`, duration 0) or an `xfade` transition over the last
+/// `durationSeconds` of the outgoing piece and the first of the incoming one.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BatchTransition {
+    #[serde(rename = "type")]
+    pub transition_type: String,
+    pub duration_seconds: f64,
+}
+
+/// One output file assembled from its pieces in order. Pieces of one output share
+/// their display resolution (and composite FPS) so they join without re-encoding
+/// their bodies.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BatchRenderOutput {
+    pub id: String,
+    pub pieces: Vec<BatchRenderPiece>,
+    /// One per join between consecutive pieces. Transparent outputs take hard cuts only.
+    pub transitions: Vec<BatchTransition>,
+}
+
+/// Where the outputs are written.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub enum BatchDestination {
+    /// Separate files: every output holds pieces of one source and is written to
+    /// `{directory}/{source stem}_{video|overlay}.{mp4|mov}`, replacing existing files.
+    SourceNamed { directory: String },
+    /// One combined output at an exact path.
+    File { path: String, overwrite: bool },
+}
+
+/// Session-owned outputs to review before submission.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BatchOutputSelection {
+    pub inspection_id: String,
+    pub outputs: Vec<BatchRenderOutput>,
+    pub destination: BatchDestination,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BatchRenderRequest {
     pub inspection_id: String,
-    /// Requires automatic sync and positive activity overlap when enabled.
-    /// Disabling it preserves resolved offsets and allows blank activity coverage.
-    pub auto_sync: bool,
     #[serde(deserialize_with = "crate::normalize::raw::deserialize_render_presentation")]
     pub template: RenderConfig<ScenePresentationConfig>,
     pub encoding: BatchEncodingSettings,
     pub activity: BatchActivity,
-    pub output_directory: String,
-    /// Ordered, eligible jobs only. Row removal excludes a source; skipOverlay
-    /// does not. Accepted queue order and inputs are immutable.
-    pub jobs: Vec<BatchRenderJob>,
+    pub destination: BatchDestination,
+    /// Ordered outputs; accepted order and inputs are immutable.
+    pub outputs: Vec<BatchRenderOutput>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]

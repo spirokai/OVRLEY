@@ -1,59 +1,26 @@
-/** User queue choices and retained native execution snapshots. Inspection stays transient. */
+/**
+ * Separate-file export of every imported video: the output folder, per-video
+ * overlay choices, and retained native execution snapshots. Inspection stays transient.
+ */
 function requireFolder(path) {
   if (path !== null && (typeof path !== 'string' || path.trim() === '')) throw new Error('Batch folder must be a nonempty path or null')
 }
 
-function requireItem(state, id) {
-  const item = state.batchQueue.find((candidate) => candidate.id === id)
-  if (!item) throw new Error(`Unknown batch queue item: ${id}`)
-  return item
-}
-
 export function createBatchRenderSlice(set) {
   return {
-    // Session preference; excluded from project, template, and undo snapshots.
-    batchAutoSync: true,
-    batchVideoFolder: null,
     batchOutputFolder: null,
-    batchQueue: [],
+    batchSkipOverlay: {}, // video ID → true when that video renders without activity widgets
     batchSnapshot: null,
 
-    setBatchAutoSync: (autoSync) => {
-      if (typeof autoSync !== 'boolean') throw new Error('Automatic batch synchronization must be boolean')
-      set({ batchAutoSync: autoSync })
-    },
-    setBatchVideoFolder: (path) => {
-      requireFolder(path)
-      set({ batchVideoFolder: path })
-    },
     setBatchOutputFolder: (path) => {
       requireFolder(path)
       set({ batchOutputFolder: path })
     },
-    setBatchQueueFromPaths: (paths) => {
-      if (!Array.isArray(paths) || paths.some((path) => typeof path !== 'string' || path.trim() === '') || new Set(paths).size !== paths.length) {
-        throw new Error('Batch queue requires distinct nonempty source paths')
-      }
-      set((state) => {
-        const previous = new Map(state.batchQueue.map((item) => [item.path, item]))
-        state.batchQueue = paths.map((path) => ({
-          id: path,
-          path,
-          filename: path.split(/[/\\]/).at(-1),
-          skipOverlay: previous.get(path)?.skipOverlay ?? false,
-        }))
-      })
-    },
-    removeBatchQueueItem: (id) =>
-      set((state) => {
-        requireItem(state, id)
-        state.batchQueue = state.batchQueue.filter((item) => item.id !== id)
-      }),
-    clearBatchQueue: () => set({ batchQueue: [], batchVideoFolder: null }),
-    setBatchItemSkipOverlay: (id, skipOverlay) => {
+    setBatchItemSkipOverlay: (videoId, skipOverlay) => {
       if (typeof skipOverlay !== 'boolean') throw new Error('Activity overlay suppression must be boolean')
       set((state) => {
-        requireItem(state, id).skipOverlay = skipOverlay
+        if (skipOverlay) state.batchSkipOverlay[videoId] = true
+        else delete state.batchSkipOverlay[videoId]
       })
     },
     acceptBatchSnapshot: (snapshot) => set({ batchSnapshot: snapshot }),

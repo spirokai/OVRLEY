@@ -54,6 +54,7 @@ describe('useOverlayEditorState module contract', () => {
     expect(result.current.previewSecond).toBe(9)
     expect(result.current.renderedWidgets).toHaveLength(1)
     expect(result.current.widgetRefCallbacks['speed-widget']).toEqual(expect.any(Function))
+    expect(result.current.hasActivityCoverage).toBe(true)
 
     act(() => {
       useStore.setState({
@@ -61,6 +62,7 @@ describe('useOverlayEditorState module contract', () => {
           trim_end_seconds: 3,
           metadata: { duration_seconds: 3 },
         },
+        activitySummary: { durationSeconds: 3 },
       })
     })
 
@@ -71,6 +73,8 @@ describe('useOverlayEditorState module contract', () => {
     })
     expect(result.current.renderedWidgets).toHaveLength(1)
     expect(result.current.widgetRefCallbacks['speed-widget']).toEqual(expect.any(Function))
+    // Past the activity end only raster widgets are shown.
+    expect(result.current.hasActivityCoverage).toBe(false)
   })
 })
 
