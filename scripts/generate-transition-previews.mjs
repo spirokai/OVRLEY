@@ -1,6 +1,6 @@
 // Generates the animated previews of the transition picker with the bundled FFmpeg:
 // one small looping WebP per `xfade` transition, from two neutral generated frames
-// (a blue grid fading into an orange box). Run after changing the catalogue:
+// (matching teal and orange boxes). Run after changing the catalogue:
 //   node scripts/generate-transition-previews.mjs
 import { mkdir, readdir, rm } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
@@ -18,10 +18,15 @@ const FPS = 15;
 const CLIP_SECONDS = 1.6;
 const OFFSET_SECONDS = 0.6;
 const DURATION_SECONDS = 1;
-const FRAME_A = `color=c=0x2563eb:s=${SIZE}:r=${FPS}:d=${CLIP_SECONDS},drawgrid=w=15:h=17:t=1:c=white@0.45`;
-const FRAME_B =
-  `color=c=0xf97316:s=${SIZE}:r=${FPS}:d=${CLIP_SECONDS},` +
-  "drawbox=x=30:y=14:w=60:h=40:t=fill:c=0xfff7ed@0.85,drawbox=x=45:y=24:w=30:h=20:t=fill:c=0xc2410c";
+function createFrame(backgroundColor, detailColor) {
+  return (
+    `color=c=${backgroundColor}:s=${SIZE}:r=${FPS}:d=${CLIP_SECONDS},format=rgb24,` +
+    "drawbox=x=30:y=14:w=60:h=40:t=fill:c=0xfff7ed@0.85," +
+    `drawbox=x=45:y=24:w=30:h=20:t=fill:c=${detailColor}`
+  );
+}
+const FRAME_A = createFrame("0x005b5b", "0x003d3d");
+const FRAME_B = createFrame("0xf97316", "0xc2410c");
 
 await mkdir(outputDir, { recursive: true });
 for (const file of await readdir(outputDir)) {
@@ -47,8 +52,13 @@ for (const transition of XFADE_TRANSITIONS) {
       `[0][1]xfade=transition=${transition}:duration=${DURATION_SECONDS}:offset=${OFFSET_SECONDS}`,
       "-c:v",
       "libwebp_anim",
+      "-pix_fmt",
+      "bgra",
+      "-lossless",
+      "1",
+      // In lossless mode, quality controls compression effort rather than fidelity.
       "-quality",
-      "60",
+      "80",
       "-loop",
       "0",
       join(outputDir, `${transition}.webp`),
