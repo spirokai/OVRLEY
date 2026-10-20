@@ -129,7 +129,7 @@ fn every_preview_family_reuses_drag_pixels_and_restores_fractional_commit() {
     let defaults: Value = serde_json::from_str(include_str!("../../../assets/standard-widgets.json")).unwrap();
     let mut cases = vec![
         label_preview(), gradient_preview(), lean_angle_preview(), g_force_preview(),
-        lap_timer_preview(), heading_preview(),
+        lap_timer_preview(), heading_preview(), heading_compass_preview("indicator"), heading_compass_preview("compass"),
         gauge_preview("linear", "speed", "horizontal", "fill"),
         gauge_preview("arc", "speed", "horizontal", "fill"),
         gauge_preview("corner", "speed", "bottom-left", "fill"),
@@ -2530,5 +2530,137 @@ fn live_resize_keeps_the_opposite_content_corner_fixed_and_commits_the_same_geom
                 );
             }
         }
+    }
+}
+
+fn heading_compass_preview(rotation_mode: &str) -> (PreviewSession, Value) {
+    let (preview, mut request) = lean_angle_preview();
+    request["type"] = json!("heading");
+    request["scene"]["opacity"] = json!(0.7);
+    request["widget"] = json!({
+        "value": "heading", "display_type": "heading_compass", "x": 120.25, "y": 60.5,
+        "diameter": 200, "rotation_mode": rotation_mode, "arc_angle": 270, "opacity": 0.8,
+        "track_thickness": 10, "track_corner_radius": 5, "track_fill": "#ffffffcc",
+        "indicator_size": 70, "indicator_corner_radius": 25, "indicator_color": "#ff1f3d",
+        "show_cardinal_labels": true, "cardinal_font_size": 22, "cardinal_label_color": "#eeeeee",
+        "font": "Inter.ttf", "show_value": true, "font_size": 48, "color": "#abcdef",
+        "unit_color": "#aaaaaa", "show_units": true, "value_offset_x": 6.5, "value_offset_y": -4.25,
+    });
+    (preview, request)
+}
+
+#[test]
+fn heading_compass_matches_native_pixels_rotates_continuously_and_validates_at_ingress() {
+    use ovrley_core::{
+        activity::{interpolate::densify_activity, trim::trim_activity},
+        debug::RenderProfiler, paths::AppPaths,
+        render::assets::prepare_render_assets,
+    };
+    let activity = ovrley_core::activity::parse_activity_json(r#"{
+        "sample_elapsed_seconds": [0,0.5,1.5,2.5,4], "trim_end_seconds": 4,
+        "heading": [null,350,null,100,null]
+    }"#).unwrap();
+    let bytes = serde_json::to_vec(&activity).unwrap();
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
+    let seconds = vec![0.0, 0.5, 0.501, 1.5, 2.0, 2.5, 3.75];
+    let mut mode_pixels = Vec::new();
+    for mode in ["indicator", "compass"] {
+        let (mut preview, request) = heading_compass_preview(mode);
+        preview.replace_activity(&bytes).unwrap();
+        let config = common::seam::validated_config_from_value(json!({
+            "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
+        }));
+        let requirements = config.render_data_requirements();
+        let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
+        let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
+        let mut profiler = RenderProfiler::default();
+        let assets = prepare_render_assets(&NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        for (index, second) in seconds.iter().enumerate() {
+            preview.render(*second).unwrap();
+            let widget = &preview.widgets[&id];
+            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let info = ImageInfo::new(
+                (geometry["width"].as_i64().unwrap() as i32, geometry["height"].as_i64().unwrap() as i32),
+                ColorType::RGBA8888, AlphaType::Premul, None,
+            );
+            let mut surface = surfaces::raster(&info, None, None).unwrap();
+            let canvas = surface.canvas();
+            canvas.clear(Color::TRANSPARENT);
+            canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
+            assets.draw(canvas, &dense, index, &NativeFonts(&paths.font_dirs), false, &mut profiler).unwrap();
+            let mut pixels = vec![0; widget.pixels().len()];
+            read_surface_rgba(&mut surface, &mut pixels).unwrap();
+            assert_eq!(&pixels, widget.pixels(), "{mode} heading compass at {second}");
+            let revision = widget.revision();
+            preview.render(*second).unwrap();
+            assert_eq!(preview.widgets[&id].revision(), revision, "{mode} unchanged sample re-rendered");
+        }
+        // Sub-degree changes keep the readout but still turn the dial.
+        preview.render(0.5).unwrap();
+        let previous = preview.widgets[&id].pixels().clone();
+        preview.render(0.501).unwrap();
+        assert_ne!(preview.widgets[&id].pixels(), &previous, "{mode} dial turns between whole degrees");
+        preview.render(2.0).unwrap();
+        mode_pixels.push(preview.widgets[&id].pixels().clone());
+        for (field, malformed) in [
+            ("diameter", Value::Null),
+            ("width", json!(200)),
+            ("rotation_mode", json!("spin")),
+            ("arc_angle", json!(400)),
+            ("track_thickness", json!(0)),
+            ("track_corner_radius", json!(-1)),
+            ("track_fill", json!("white")),
+            ("indicator_corner_radius", json!(150)),
+            ("indicator_size", Value::Null),
+            ("show_cardinal_labels", Value::Null),
+            ("cardinal_font_size", json!(0)),
+            ("show_value", Value::Null),
+            ("value_offset_y", Value::Null),
+            ("opacity", json!(2)),
+        ] {
+            let mut invalid = request.clone();
+            invalid["widget"][field] = malformed;
+            assert!(preview.create_widget(serde_json::from_value(invalid).unwrap()).is_err(), "{mode} {field}");
+        }
+    }
+    assert_ne!(mode_pixels[0], mode_pixels[1], "rotation modes turn different dial parts");
+}
+
+#[test]
+fn heading_compass_resize_preserves_the_fixed_corner_and_scales_pixel_fields() {
+    let (mut preview, origin) = heading_compass_preview("compass");
+    preview.replace_activity(br#"{"sample_elapsed_seconds":[0,3],"heading":[20,200],"trim_end_seconds":3}"#).unwrap();
+    let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
+    preview.render(1.0).unwrap();
+    let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let bounds = &geometry["content"];
+    let fixed = [1.0, 1.0];
+    let point = [
+        bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap(),
+        bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap(),
+    ];
+    let mut gesture = origin.clone();
+    gesture["factor"] = json!(1.5);
+    gesture["fixed"] = json!(fixed);
+    gesture["point"] = json!(point);
+    gesture["second"] = json!(1.0);
+    let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(gesture).unwrap()).unwrap()).unwrap();
+    let variant = &patch["display_variants"]["heading_compass"];
+    assert_eq!(variant["diameter"], json!(300.0));
+    assert_eq!(variant["track_thickness"], json!(15.0));
+    assert_eq!(variant["indicator_size"], json!(105.0));
+    assert_eq!(variant["cardinal_font_size"], json!(33.0));
+    assert_eq!(patch["font_size"], json!(72.0));
+    let mut committed = origin;
+    committed["widget"].as_object_mut().unwrap().extend(variant.as_object().unwrap().clone());
+    committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+    preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
+    preview.render(1.0).unwrap();
+    let actual: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    for (axis, position, size) in [(0, "left", "width"), (1, "top", "height")] {
+        let corner = actual["content"][position].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
+        assert!((corner - point[axis]).abs() < 0.002, "heading compass corner moved on axis {axis}");
     }
 }

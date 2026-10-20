@@ -192,6 +192,7 @@ impl PreparedRenderAssets {
                 }
                 let timing = match &value.widget {
                     PreparedWidget::HeadingTape(_) => "heading.draw",
+                    PreparedWidget::HeadingCompass(_) => "heading_compass.draw",
                     PreparedWidget::LeanAngle(_) => "lean_angle.draw",
                     PreparedWidget::Gauge(_) => "gauge.draw",
                     PreparedWidget::GForce(_) => "g_force.draw",
@@ -387,6 +388,21 @@ impl PreparedRenderAssets {
                         bounds.width() * 0.5,
                         cache.tape_body_y + cache.tape_body_height * 0.5,
                     ),
+                )
+            }
+            PreparedWidget::HeadingCompass(cache) => {
+                let raw = activity.series.heading.get(index).copied().flatten();
+                let frame = cache.prepare_frame(raw, fonts)?;
+                frame.draw(canvas, cache);
+                let size = cache.layout.size();
+                boxed_report(
+                    [cache.x, cache.y, size, size],
+                    (size.ceil() as u32, size.ceil() as u32),
+                    0.0,
+                    "heading_compass",
+                    0,
+                    raw.unwrap_or(0.0).rem_euclid(360.0) as f32 / 360.0,
+                    (frame.marker.x - cache.x, frame.marker.y - cache.y),
                 )
             }
             PreparedWidget::LeanAngle(cache) => {

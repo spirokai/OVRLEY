@@ -268,6 +268,37 @@
           "height": 100
         }
       },
+      "heading_compass": {
+        "labelKey": "widgets.displayTypes.headingCompass",
+        "icon": {
+          "source": "shared",
+          "assetFile": "display-type-heading-compass.svg"
+        },
+        "layoutMode": "boxed",
+        "defaults": {
+          "font_size": 40
+        },
+        "forbiddenFrameFields": ["width", "height"],
+        "requiredPositiveFields": ["diameter"],
+        "variantDefaults": {
+          "diameter": 170,
+          "rotation_mode": "indicator",
+          "arc_angle": 290,
+          "track_thickness": 8,
+          "track_corner_radius": 4,
+          "track_fill": "#ffffff",
+          "indicator_size": 55,
+          "indicator_corner_radius": 70,
+          "indicator_color": "#ff1f3d",
+          "show_cardinal_labels": true,
+          "cardinal_font_size": 20,
+          "cardinal_label_color": "#ffffff",
+          "show_value": true,
+          "value_offset_x": 0,
+          "value_offset_y": 0
+        },
+        "geometryFields": ["x", "y"]
+      },
       "lean_angle": {
         "labelKey": "widgets.displayTypes.leanAngle",
         "icon": {
@@ -1683,7 +1714,7 @@
         "show_units": true,
         "display_unit": "degrees"
       },
-      "displayTypes": ["text", "heading_tape"]
+      "displayTypes": ["text", "heading_tape", "heading_compass"]
     },
     {
       "type": "altitude",

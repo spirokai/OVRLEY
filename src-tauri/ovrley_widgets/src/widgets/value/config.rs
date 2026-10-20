@@ -249,6 +249,18 @@ pub struct ValueConfig {
     pub indicator_color: Option<String>,
     #[serde(default)]
     pub indicator_size: Option<f32>,
+    #[serde(default)]
+    pub indicator_corner_radius: Option<f32>,
+    #[serde(default)]
+    pub rotation_mode: Option<String>,
+    #[serde(default)]
+    pub track_fill: Option<String>,
+    #[serde(default)]
+    pub show_cardinal_labels: Option<bool>,
+    #[serde(default)]
+    pub cardinal_font_size: Option<f32>,
+    #[serde(default)]
+    pub show_value: Option<bool>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

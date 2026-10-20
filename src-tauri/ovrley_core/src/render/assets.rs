@@ -28,6 +28,7 @@ use ovrley_widgets::{
         },
         gradient::validation::ValidatedGradientWidget,
         heading::layout::{prepare_heading_cache, HeadingCache},
+        heading_compass::layout::{prepare_heading_compass_cache, HeadingCompassCache},
         lap_timer::{
             layout::{prepare_lap_timer_layout, LapTimerLayout},
             validation::ValidatedLapTimer,
@@ -75,6 +76,7 @@ pub enum PreparedWidget {
     TimeText(ValidatedTimeValue),
     Gradient(ValidatedGradientWidget),
     HeadingTape(HeadingCache),
+    HeadingCompass(HeadingCompassCache),
     LeanAngle(LeanAngleCache),
     Gauge(GaugeCache),
     GForce(GForceWidgetCache),
@@ -243,6 +245,11 @@ pub fn prepare_render_assets(
             ValidatedValue::HeadingTape(widget) => {
                 PreparedWidget::HeadingTape(profiler.measure("heading_cache.total", || {
                     prepare_heading_cache(widget, &scene.presentation, fonts)
+                })?)
+            }
+            ValidatedValue::HeadingCompass(widget) => {
+                PreparedWidget::HeadingCompass(profiler.measure("heading_compass.prepare", || {
+                    prepare_heading_compass_cache(widget, &scene.presentation, fonts)
                 })?)
             }
             ValidatedValue::LeanAngle(widget) => {

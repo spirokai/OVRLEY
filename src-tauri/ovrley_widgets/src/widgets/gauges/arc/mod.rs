@@ -31,8 +31,9 @@ use inner_widget::{
 };
 #[cfg(test)]
 pub(crate) use path::{ArcTrackSpec, RevealClip};
+pub(crate) use segment::rounded_segment_path;
 #[cfg(test)]
-pub(crate) use segment::{rounded_segment_geometry, rounded_segment_path, segment_geometries};
+pub(crate) use segment::{rounded_segment_geometry, segment_geometries};
 use skia_safe::{Canvas, Color, Font, Image, Rect};
 
 #[derive(Clone, Debug)]

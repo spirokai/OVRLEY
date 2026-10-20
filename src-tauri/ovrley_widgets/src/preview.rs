@@ -126,6 +126,9 @@ impl PreviewSession {
             WidgetRequest::Gradient(origin) => Ok(ResizeUpdate::Gradient(crate::widgets::gradient::interaction::resize_gradient(
                 origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
             )?)),
+            WidgetRequest::HeadingCompass(origin) => Ok(ResizeUpdate::HeadingCompass(crate::widgets::heading_compass::interaction::resize_heading_compass(
+                origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
+            )?)),
             WidgetRequest::LeanAngle(origin) => Ok(ResizeUpdate::LeanAngle(crate::widgets::lean_angle::interaction::resize_lean_angle(
                 origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
             )?)),
@@ -189,6 +192,7 @@ impl PreviewSession {
                 PreviewWidget::LapTimer(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::Gauge(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::HeadingTape(widget) => widget.render(self.activity.as_ref(), second)?,
+                PreviewWidget::HeadingCompass(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 _ => {},
             }
             widget.sync()?;

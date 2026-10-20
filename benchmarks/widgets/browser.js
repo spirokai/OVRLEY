@@ -27,6 +27,13 @@ export function createCases({ activities, template, image, frames, warmup, fps }
     ['raster', 'raster', 'ride', {}, { path: image, width: 256, height: 256 }],
     ['speed-text', 'speed', 'ride', { displayType: 'text' }, { font_size: 45, show_units: true, display_unit: 'kmh' }],
     ['heading-tape', 'heading', 'ride', { displayType: 'heading_tape' }, { display_variants: { heading_tape: { width: 600, height: 100 } } }],
+    ...['indicator', 'compass'].map((rotation_mode) => [
+      `heading-compass-${rotation_mode}`,
+      'heading',
+      'ride',
+      { displayType: 'heading_compass' },
+      { display_variants: { heading_compass: { diameter: 200, rotation_mode } } },
+    ]),
     [
       'lean-angle',
       'lean_angle',

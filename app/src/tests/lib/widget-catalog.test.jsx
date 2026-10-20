@@ -41,6 +41,7 @@ describe('manifest-backed widgets', () => {
     expect(getWidgetDisplayTypeOptions('heading', i18next.t)).toEqual([
       { value: 'text', label: 'Text' },
       { value: 'heading_tape', label: 'Heading Tape' },
+      { value: 'heading_compass', label: 'Heading Compass' },
     ])
     expect(getWidgetDisplayTypeOptions('backdrop', i18next.t)).toEqual([
       { value: 'circle', label: 'Circle' },
@@ -50,6 +51,7 @@ describe('manifest-backed widgets', () => {
     expect(items.find((item) => item.type === 'heading').options.map((option) => option.selection)).toEqual([
       { displayType: 'text' },
       { displayType: 'heading_tape' },
+      { displayType: 'heading_compass' },
     ])
     expect(items.find((item) => item.type === 'lap_timer').options.map((option) => option.selection)).toEqual([
       { lapTimerMode: 'current_lap' },

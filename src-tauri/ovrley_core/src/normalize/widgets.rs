@@ -20,6 +20,7 @@ use ovrley_widgets::widgets::{
     gauges::validation::{validate_arc_gauge, validate_corner_gauge, validate_gt_gauge, validate_linear_gauge},
     gradient::validation::validate_gradient_widget,
     heading::validation::validate_heading,
+    heading_compass::validation::validate_heading_compass,
     label::validation::validate_label,
     lap_timer::validation::validate_lap_timer,
     lean_angle::validation::validate_lean_angle,
@@ -86,6 +87,9 @@ fn validate_render_value(
                 .map(ValidatedValue::HeadingTape)
                 .map_err(Into::into)
         }
+        (MetricKind::Heading, DisplayType::HeadingCompass) => validate_heading_compass(value, index)
+            .map(ValidatedValue::HeadingCompass)
+            .map_err(Into::into),
         (MetricKind::LeanAngle, DisplayType::LeanAngle) => validate_lean_angle(value, index)
             .map(ValidatedValue::LeanAngle)
             .map_err(Into::into),

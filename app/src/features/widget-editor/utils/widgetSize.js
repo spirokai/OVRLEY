@@ -16,6 +16,12 @@ const LEAN_SIZE_FIELDS = [
   ['value_offset_x', -10_000, 10_000],
   ['value_offset_y', -10_000, 10_000],
 ]
+const COMPASS_SIZE_FIELDS = [
+  ['cardinal_font_size', 4, 400],
+  ['indicator_size', 1, 10_000],
+  ['value_offset_x', -10_000, 10_000],
+  ['value_offset_y', -10_000, 10_000],
+]
 const G_FORCE_SIZE_FIELDS = [
   ['label_font_size', 8, 400],
   ['label_offset_x', -10_000, 10_000],
@@ -53,6 +59,15 @@ function buildLeanSize(data, factor) {
   }
 }
 
+function buildCompassSize(data, factor) {
+  return {
+    ...scaleFields(data, factor, COMPASS_SIZE_FIELDS),
+    diameter: scaleNumber(data.diameter, factor, 8, 10_000),
+    track_thickness: scaleNumber(data.track_thickness, factor, 1, 10_000),
+    track_corner_radius: scaleNumber(data.track_corner_radius, factor, 0, 10_000),
+  }
+}
+
 function buildGForceSize(data, factor) {
   const diameter = scaleNumber(data.diameter, factor, 8, 10_000)
   return {
@@ -63,18 +78,21 @@ function buildGForceSize(data, factor) {
   }
 }
 
-/** @param {object} widget Resolved gauge, lean-angle, or G-force widget. @param {number} size Inspector size in widget pixels. @returns {object} Canonical data patch. */
+/** @param {object} widget Resolved gauge, lean-angle, heading-compass, or G-force widget. @param {number} size Inspector size in widget pixels. @returns {object} Canonical data patch. */
 export function buildUniformResizeUpdate(widget, size) {
   const displayType = widget.data.display_type
   const data = resolveActiveWidgetData(widget.data)
   const variant = widget.data.display_variants[displayType]
-  if (displayType === 'lean_angle') {
+  if (displayType === 'lean_angle' || displayType === 'heading_compass') {
     const factor = size / data.diameter
     return {
       x: widget.data.x,
       y: widget.data.y,
-      font_size: scaleNumber(data.font_size, factor, 8, 400),
-      display_variants: { ...widget.data.display_variants, [displayType]: { ...variant, ...buildLeanSize(data, factor) } },
+      font_size: scaleNumber(data.font_size, factor, displayType === 'lean_angle' ? 8 : 6, 400),
+      display_variants: {
+        ...widget.data.display_variants,
+        [displayType]: { ...variant, ...(displayType === 'lean_angle' ? buildLeanSize(data, factor) : buildCompassSize(data, factor)) },
+      },
     }
   }
   const width = Math.round(size)

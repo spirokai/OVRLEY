@@ -50,6 +50,8 @@ pub enum DisplayType {
     GtGauge,
     #[serde(rename = "heading_tape")]
     Tape,
+    #[serde(rename = "heading_compass")]
+    HeadingCompass,
     #[serde(rename = "lean_angle")]
     LeanAngle,
     #[serde(rename = "g_force")]
@@ -68,6 +70,7 @@ impl DisplayType {
             DisplayType::Corner => "corner",
             DisplayType::GtGauge => "gt_gauge",
             DisplayType::Tape => "heading_tape",
+            DisplayType::HeadingCompass => "heading_compass",
             DisplayType::LeanAngle => "lean_angle",
             DisplayType::GForce => "g_force",
             DisplayType::LapTimer => "lap_timer",
@@ -112,6 +115,7 @@ impl<'de> Deserialize<'de> for DisplayType {
                 "corner" => Ok(DisplayType::Corner),
                 "gt_gauge" => Ok(DisplayType::GtGauge),
                 "heading_tape" => Ok(DisplayType::Tape),
+                "heading_compass" => Ok(DisplayType::HeadingCompass),
                 "lean_angle" => Ok(DisplayType::LeanAngle),
                 "g_force" => Ok(DisplayType::GForce),
                 "lap_timer" => Ok(DisplayType::LapTimer),

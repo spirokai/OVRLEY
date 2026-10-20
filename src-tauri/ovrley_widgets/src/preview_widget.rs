@@ -9,6 +9,7 @@ use crate::widgets::lean_angle::preview::PreviewLeanAngle;
 use crate::widgets::g_force::preview::PreviewGForce;
 use crate::widgets::lap_timer::preview::PreviewLapTimer;
 use crate::widgets::heading::preview::PreviewHeading;
+use crate::widgets::heading_compass::preview::PreviewHeadingCompass;
 use crate::widgets::gauges::preview::PreviewGauge;
 use crate::widgets::route::{config::CoursePlotConfig, preview::PreviewRoute};
 use crate::widgets::elevation::{config::ElevationPlotConfig, preview::PreviewElevation};
@@ -27,6 +28,7 @@ pub enum WidgetRequest {
     GForce(ValueRequest),
     LapTimer(ValueRequest),
     HeadingTape(ValueRequest),
+    HeadingCompass(ValueRequest),
     Gauge(ValueRequest),
     Value(ValueRequest),
 }
@@ -67,6 +69,7 @@ impl<'de> Deserialize<'de> for WidgetRequest {
                 else if metric == MetricKind::LeanAngle && request.widget.display_type == crate::model::types::DisplayType::LeanAngle { Self::LeanAngle(request) }
                 else if metric == MetricKind::GForce && request.widget.display_type == crate::model::types::DisplayType::GForce { Self::GForce(request) }
                 else if metric == MetricKind::Heading && request.widget.display_type == crate::model::types::DisplayType::Tape { Self::HeadingTape(request) }
+                else if metric == MetricKind::Heading && request.widget.display_type == crate::model::types::DisplayType::HeadingCompass { Self::HeadingCompass(request) }
                 else if matches!(request.widget.display_type, crate::model::types::DisplayType::Linear | crate::model::types::DisplayType::Arc | crate::model::types::DisplayType::Corner | crate::model::types::DisplayType::GtGauge) { Self::Gauge(request) }
                 else { Self::Value(request) })
         }
@@ -85,6 +88,7 @@ pub enum PreviewWidget {
     GForce(PreviewGForce),
     LapTimer(PreviewLapTimer),
     HeadingTape(PreviewHeading),
+    HeadingCompass(PreviewHeadingCompass),
     Gauge(PreviewGauge),
     Value(ValuePreview),
 }
@@ -103,18 +107,19 @@ impl PreviewWidget {
             WidgetRequest::GForce(request) => Ok(Self::GForce(PreviewGForce::new(request.widget, request.scene)?)),
             WidgetRequest::LapTimer(request) => Ok(Self::LapTimer(PreviewLapTimer::new(request.widget, request.scene)?)),
             WidgetRequest::HeadingTape(request) => Ok(Self::HeadingTape(PreviewHeading::new(request.widget, request.scene, fonts)?)),
+            WidgetRequest::HeadingCompass(request) => Ok(Self::HeadingCompass(PreviewHeadingCompass::new(request.widget, request.scene, fonts)?)),
             WidgetRequest::Gauge(request) => Ok(Self::Gauge(PreviewGauge::new(request.widget, request.scene)?)),
             WidgetRequest::Value(request) => Ok(Self::Value(ValuePreview::new(request, fonts)?)),
         }
     }
     pub fn pixels(&self) -> &Vec<u8> {
-        match self { Self::DivingProfile(widget) => &widget.pixels, Self::Elevation(widget) => &widget.pixels, Self::Route(widget) => &widget.pixels, Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::LeanAngle(widget) => &widget.pixels, Self::GForce(widget) => &widget.pixels, Self::LapTimer(widget) => &widget.pixels, Self::HeadingTape(widget) => &widget.pixels, Self::Gauge(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
+        match self { Self::DivingProfile(widget) => &widget.pixels, Self::Elevation(widget) => &widget.pixels, Self::Route(widget) => &widget.pixels, Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::LeanAngle(widget) => &widget.pixels, Self::GForce(widget) => &widget.pixels, Self::LapTimer(widget) => &widget.pixels, Self::HeadingTape(widget) => &widget.pixels, Self::HeadingCompass(widget) => &widget.pixels, Self::Gauge(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
     }
     pub fn geometry(&self) -> &Vec<u8> {
-        match self { Self::DivingProfile(widget) => &widget.geometry, Self::Elevation(widget) => &widget.geometry, Self::Route(widget) => &widget.geometry, Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::LeanAngle(widget) => &widget.geometry, Self::GForce(widget) => &widget.geometry, Self::LapTimer(widget) => &widget.geometry, Self::HeadingTape(widget) => &widget.geometry, Self::Gauge(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
+        match self { Self::DivingProfile(widget) => &widget.geometry, Self::Elevation(widget) => &widget.geometry, Self::Route(widget) => &widget.geometry, Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::LeanAngle(widget) => &widget.geometry, Self::GForce(widget) => &widget.geometry, Self::LapTimer(widget) => &widget.geometry, Self::HeadingTape(widget) => &widget.geometry, Self::HeadingCompass(widget) => &widget.geometry, Self::Gauge(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
     }
     pub fn revision(&self) -> u32 {
-        match self { Self::DivingProfile(widget) => widget.revision, Self::Elevation(widget) => widget.revision, Self::Route(widget) => widget.revision, Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::GForce(widget) => widget.revision, Self::LapTimer(widget) => widget.revision, Self::HeadingTape(widget) => widget.revision, Self::Gauge(widget) => widget.revision, Self::Value(widget) => widget.revision }
+        match self { Self::DivingProfile(widget) => widget.revision, Self::Elevation(widget) => widget.revision, Self::Route(widget) => widget.revision, Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::GForce(widget) => widget.revision, Self::LapTimer(widget) => widget.revision, Self::HeadingTape(widget) => widget.revision, Self::HeadingCompass(widget) => widget.revision, Self::Gauge(widget) => widget.revision, Self::Value(widget) => widget.revision }
     }
 }
 
@@ -150,6 +155,7 @@ pub enum ResizeUpdate {
     GForce(crate::widgets::g_force::interaction::ResizeUpdate),
     LapTimer(crate::widgets::lap_timer::interaction::ResizeUpdate),
     HeadingTape(crate::widgets::heading::interaction::ResizeUpdate),
+    HeadingCompass(crate::widgets::heading_compass::interaction::ResizeUpdate),
     Gauge(crate::widgets::gauges::interaction::ResizeUpdate),
     Value(crate::widgets::value::interaction::ResizeUpdate),
 }
