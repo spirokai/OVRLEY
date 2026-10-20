@@ -1,5 +1,6 @@
 import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import GradientPicker from '@/components/ui/gradient-picker'
 import { SlidersHorizontal, Tags } from 'lucide-react'
 import { buildUniformResizeUpdate } from '../../utils/widgetSize'
 import FontSelectField from '@/components/ui/font-select-field'
@@ -58,6 +59,10 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
   const cornerRadiusMax = getArcCornerRadiusMax(arcData, displayType)
   const size = widget.data.width ?? arcData.width
   const barGapMax = arcData.track_fill_style === 'bars' ? getArcGapMax(arcData, displayType) : 0
+  const [trialGradientStops, setTrialGradientStops] = useState([
+    { offset: 0, color: '#40e0d0' },
+    { offset: 1, color: '#c65102' },
+  ])
 
   const updateBoundedNumber = (updateVariant, key, rawValue, min, max) => {
     const value = Number(rawValue)
@@ -214,6 +219,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             onSliderChange={(track_filled_opacity) => updateArc({ track_filled_opacity })}
           />
         </div>
+        {/* TEMP: gradient picker trial, not wired to widget data */}
+        <GradientPicker label="Gradient" stops={trialGradientStops} onChange={setTrialGradientStops} />
       </div>
 
       <FontSection

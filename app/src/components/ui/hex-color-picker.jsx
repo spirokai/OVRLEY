@@ -34,6 +34,8 @@ const AREA_COMMIT_DEBOUNCE_MS = 0
  * @param {*} props.presetColors - Value for preset colors.
  * @param {*} props.showValue - Boolean flag for show value.
  * @param {*} props.disabled - Value for disabled.
+ * @param {JSX.Element} [props.trigger] - Custom trigger element replacing the default swatch button.
+ * @param {*} [props.children] - Extra content rendered below the presets.
  * @returns {JSX.Element} Rendered component output.
  */
 export default function HexColorPicker({
@@ -46,6 +48,8 @@ export default function HexColorPicker({
   presetColors = DEFAULT_PRESET_COLORS,
   showValue = true,
   disabled = false,
+  trigger,
+  children,
 }) {
   const { t } = useTranslation()
   const normalizedValue = normalizeHexColor(value)
@@ -119,20 +123,22 @@ export default function HexColorPicker({
     >
       <div className={cn('flex items-center gap-2', className)}>
         <ColorPickerTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              'flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border border-border/70 bg-transparent px-2 text-left shadow-xs transition-colors hover:border-accent-border hover:bg-surface-highlight-soft',
-              triggerClassName,
-            )}
-          >
-            <ColorPickerSwatch className={cn('size-5 shrink-0 rounded-xs border border-border/70 shadow-sm', swatchClassName)} />
-            {showValue ? (
-              <span className={cn('truncate font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground', valueClassName)}>
-                {displayValue}
-              </span>
-            ) : null}
-          </button>
+          {trigger ?? (
+            <button
+              type="button"
+              className={cn(
+                'flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border border-border/70 bg-transparent px-2 text-left shadow-xs transition-colors hover:border-accent-border hover:bg-surface-highlight-soft',
+                triggerClassName,
+              )}
+            >
+              <ColorPickerSwatch className={cn('size-5 shrink-0 rounded-xs border border-border/70 shadow-sm', swatchClassName)} />
+              {showValue ? (
+                <span className={cn('truncate font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground', valueClassName)}>
+                  {displayValue}
+                </span>
+              ) : null}
+            </button>
+          )}
         </ColorPickerTrigger>
 
         <ColorPickerContent align="start" sideOffset={8} className=" rounded-sm border-border/80 bg-card/95 p-3 shadow-2xl shadow-background/40">
@@ -180,6 +186,8 @@ export default function HexColorPicker({
                 ))}
               </div>
             </div>
+
+            {children}
           </div>
         </ColorPickerContent>
       </div>
