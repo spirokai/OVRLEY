@@ -17,7 +17,7 @@ use ovrley_widgets::widgets::{
         validation::{validate_elevation_plot, ValidatedElevationPlot},
     },
     g_force::validation::validate_g_force,
-    gauges::validation::{validate_arc_gauge, validate_corner_gauge, validate_linear_gauge},
+    gauges::validation::{validate_arc_gauge, validate_corner_gauge, validate_gt_gauge, validate_linear_gauge},
     gradient::validation::validate_gradient_widget,
     heading::validation::validate_heading,
     label::validation::validate_label,
@@ -105,6 +105,9 @@ fn validate_render_value(
             .map(ValidatedValue::ArcGauge)
             .map_err(Into::into),
         (_, DisplayType::Corner) => validate_corner_gauge(value, index)
+            .map(ValidatedValue::ArcGauge)
+            .map_err(Into::into),
+        (_, DisplayType::GtGauge) => validate_gt_gauge(value, index)
             .map(ValidatedValue::ArcGauge)
             .map_err(Into::into),
         _ => validate_value_widget(value, index)

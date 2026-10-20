@@ -17,12 +17,24 @@ use crate::widgets::value::validation::ValidatedValueWidget;
 pub const MIN_ARC_ANGLE_DEGREES: f32 = 30.0;
 pub const MAX_ARC_ANGLE_DEGREES: f32 = 360.0;
 pub const CORNER_GAUGE_ANGLE_DEGREES: f32 = 90.0;
+pub const MIN_GT_GAUGE_TICK_COUNT: u32 = 2;
 
 /// The supported bottom-corner placements for a fixed 90° gauge.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ValidatedCornerGaugeOrientation {
     BottomLeft,
     BottomRight,
+}
+
+/// GT gauge decoration drawn around the shared arc track.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ValidatedGtGaugeStyle {
+    /// Evenly spaced value-less ticks, including both track ends.
+    pub tick_count: u32,
+    pub tick_length: f32,
+    pub tick_color: String,
+    /// Fill glow intensity in 0..=1; zero disables the glow.
+    pub glow: f32,
 }
 
 /// Fully validated arc gauge configuration.
@@ -37,6 +49,7 @@ pub struct ValidatedArcGaugeWidget {
     pub display_type: DisplayType,
     pub arc_angle: f32,
     pub corner_orientation: Option<ValidatedCornerGaugeOrientation>,
+    pub gt_style: Option<ValidatedGtGaugeStyle>,
     pub inner_widget_offset_x: f32,
     pub inner_widget_offset_y: f32,
     pub track_thickness: f32,
@@ -74,17 +87,75 @@ pub fn validate_arc_gauge(
         )));
     }
 
-    let arc_angle = require_f32(value.arc_angle, &p("arc_angle"))?;
-    if !(MIN_ARC_ANGLE_DEGREES..=MAX_ARC_ANGLE_DEGREES).contains(&arc_angle) {
+    let arc_angle = validate_arc_angle(value.arc_angle, &p("arc_angle"))?;
+    validate_arc_shaped_gauge(value, index, DisplayType::Arc, arc_angle, None, None)
+}
+
+/// Validates a raw value config as a GT gauge: a rotated arc with ticks and fill glow.
+pub fn validate_gt_gauge(
+    value: ValueConfig,
+    index: usize,
+) -> WidgetResult<ValidatedArcGaugeWidget> {
+    let p = |field: &str| format!("values[{index}].{field}");
+
+    if value.display_type != DisplayType::GtGauge {
         return Err(WidgetError::Config(format!(
-            "{}: must be {}..={}, got {arc_angle}",
-            p("arc_angle"),
-            MIN_ARC_ANGLE_DEGREES as u32,
-            MAX_ARC_ANGLE_DEGREES as u32,
+            "{}: expected gt_gauge display_type, got '{}'",
+            p("display_type"),
+            value.display_type.as_str()
         )));
     }
 
-    validate_arc_shaped_gauge(value, index, DisplayType::Arc, arc_angle, None)
+    let arc_angle = validate_arc_angle(value.arc_angle, &p("arc_angle"))?;
+    let tick_count = value
+        .tick_count
+        .ok_or_else(|| WidgetError::Config(format!("{}: required", p("tick_count"))))?;
+    if tick_count < MIN_GT_GAUGE_TICK_COUNT {
+        return Err(WidgetError::Config(format!(
+            "{}: must be >= {MIN_GT_GAUGE_TICK_COUNT}, got {tick_count}",
+            p("tick_count")
+        )));
+    }
+    let tick_length = require_f32(value.tick_length, &p("tick_length"))?;
+    if tick_length < 0.0 {
+        return Err(WidgetError::Config(format!(
+            "{}: must be >= 0, got {tick_length}",
+            p("tick_length")
+        )));
+    }
+    let glow = require_f32(value.glow, &p("glow"))?;
+    if !(0.0..=1.0).contains(&glow) {
+        return Err(WidgetError::Config(format!(
+            "{}: must be 0.0..1.0, got {glow}",
+            p("glow")
+        )));
+    }
+    let gt_style = ValidatedGtGaugeStyle {
+        tick_count,
+        tick_length,
+        tick_color: require_hex_color(value.tick_color.as_deref(), &p("tick_color"))?,
+        glow,
+    };
+
+    validate_arc_shaped_gauge(
+        value,
+        index,
+        DisplayType::GtGauge,
+        arc_angle,
+        None,
+        Some(gt_style),
+    )
+}
+
+fn validate_arc_angle(arc_angle: Option<f32>, field: &str) -> WidgetResult<f32> {
+    let arc_angle = require_f32(arc_angle, field)?;
+    if !(MIN_ARC_ANGLE_DEGREES..=MAX_ARC_ANGLE_DEGREES).contains(&arc_angle) {
+        return Err(WidgetError::Config(format!(
+            "{field}: must be {}..={}, got {arc_angle}",
+            MIN_ARC_ANGLE_DEGREES as u32, MAX_ARC_ANGLE_DEGREES as u32,
+        )));
+    }
+    Ok(arc_angle)
 }
 
 /// Validates a raw value config as a fixed 90° bottom-corner gauge.
@@ -124,6 +195,7 @@ pub fn validate_corner_gauge(
         DisplayType::Corner,
         CORNER_GAUGE_ANGLE_DEGREES,
         Some(corner_orientation),
+        None,
     )
 }
 
@@ -133,6 +205,7 @@ fn validate_arc_shaped_gauge(
     display_type: DisplayType,
     arc_angle: f32,
     corner_orientation: Option<ValidatedCornerGaugeOrientation>,
+    gt_style: Option<ValidatedGtGaugeStyle>,
 ) -> WidgetResult<ValidatedArcGaugeWidget> {
     let p = |field: &str| format!("values[{index}].{field}");
 
@@ -242,6 +315,7 @@ fn validate_arc_shaped_gauge(
         display_type,
         arc_angle,
         corner_orientation,
+        gt_style,
         inner_widget_offset_x,
         inner_widget_offset_y,
         track_thickness,

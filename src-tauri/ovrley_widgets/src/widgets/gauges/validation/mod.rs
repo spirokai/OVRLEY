@@ -3,9 +3,9 @@ mod arc;
 mod linear;
 
 pub use arc::{
-    validate_arc_gauge, validate_corner_gauge, ValidatedArcGaugeWidget,
-    ValidatedCornerGaugeOrientation, CORNER_GAUGE_ANGLE_DEGREES, MAX_ARC_ANGLE_DEGREES,
-    MIN_ARC_ANGLE_DEGREES,
+    validate_arc_gauge, validate_corner_gauge, validate_gt_gauge, ValidatedArcGaugeWidget,
+    ValidatedCornerGaugeOrientation, ValidatedGtGaugeStyle, CORNER_GAUGE_ANGLE_DEGREES,
+    MAX_ARC_ANGLE_DEGREES, MIN_ARC_ANGLE_DEGREES, MIN_GT_GAUGE_TICK_COUNT,
 };
 pub use linear::{
     validate_linear_gauge, ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation,
@@ -33,6 +33,7 @@ impl ValidatedGauge {
             DisplayType::Linear => Ok(Self::Linear(validate_linear_gauge(widget, 0)?)),
             DisplayType::Arc => Ok(Self::Arc(validate_arc_gauge(widget, 0)?)),
             DisplayType::Corner => Ok(Self::Arc(validate_corner_gauge(widget, 0)?)),
+            DisplayType::GtGauge => Ok(Self::Arc(validate_gt_gauge(widget, 0)?)),
             _ => Err(WidgetError::Config("unsupported gauge display type".into())),
         }
     }

@@ -39,6 +39,18 @@ pub fn arc_start_end_angles(arc_angle: f32) -> (f32, f32) {
     (270.0 - angle * 0.5, 270.0 + angle * 0.5)
 }
 
+/// GT gauges open their gap on the right instead of the bottom.
+pub const GT_GAUGE_TRACK_ROTATION_DEGREES: f32 = -90.0;
+
+/// Centers a validated GT sweep around the left of its frame.
+pub fn gt_start_end_angles(arc_angle: f32) -> (f32, f32) {
+    let (start, end) = arc_start_end_angles(arc_angle);
+    (
+        start + GT_GAUGE_TRACK_ROTATION_DEGREES,
+        end + GT_GAUGE_TRACK_ROTATION_DEGREES,
+    )
+}
+
 /// Returns the directed quarter-circle sweep for a corner gauge.
 pub fn corner_start_end_angles(orientation: ValidatedCornerGaugeOrientation) -> (f32, f32) {
     match orientation {
@@ -80,6 +92,21 @@ pub fn arc_gauge_geometry(
         radius: arc_radius(width, height, track_thickness, border_thickness),
         start_angle,
         sweep_angle: end_angle - start_angle,
+    }
+}
+
+/// Resolves arc geometry rotated into the GT gauge's fixed track orientation.
+pub fn gt_gauge_geometry(
+    width: f32,
+    height: f32,
+    arc_angle: f32,
+    track_thickness: f32,
+    border_thickness: f32,
+) -> ArcGaugeGeometry {
+    let (start_angle, _) = gt_start_end_angles(arc_angle);
+    ArcGaugeGeometry {
+        start_angle,
+        ..arc_gauge_geometry(width, height, arc_angle, track_thickness, border_thickness)
     }
 }
 

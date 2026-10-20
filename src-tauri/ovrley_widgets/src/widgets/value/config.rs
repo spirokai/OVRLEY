@@ -120,6 +120,12 @@ pub struct ValueConfig {
     #[serde(default)]
     pub corner_orientation: Option<String>,
     #[serde(default)]
+    pub tick_count: Option<u32>,
+    #[serde(default)]
+    pub tick_length: Option<f32>,
+    #[serde(default)]
+    pub glow: Option<f32>,
+    #[serde(default)]
     pub inner_widget_offset_x: Option<f32>,
     #[serde(default)]
     pub inner_widget_offset_y: Option<f32>,

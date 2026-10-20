@@ -28,7 +28,7 @@ function buildBarGeometryUpdate(data, update, getCornerRadiusMax) {
   }
 }
 
-export function BarFillStyleField({ data, suggestBarGeometry, updateVariant }) {
+export function BarFillStyleField({ data, suggestBarGeometry, updateVariant, disabled = false }) {
   const { t } = useTranslation()
   return (
     <SelectField
@@ -36,6 +36,7 @@ export function BarFillStyleField({ data, suggestBarGeometry, updateVariant }) {
       value={data.track_fill_style ?? 'fill'}
       onValueChange={(track_fill_style) => updateVariant(buildFillStyleUpdate(data, track_fill_style, suggestBarGeometry))}
       options={translateOptions(FILL_STYLE_OPTIONS, t)}
+      disabled={disabled}
       contentProps={{ position: 'popper', side: 'bottom', align: 'start' }}
     />
   )

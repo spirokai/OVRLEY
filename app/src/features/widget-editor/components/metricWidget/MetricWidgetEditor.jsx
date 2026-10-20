@@ -29,6 +29,7 @@ const DISPLAY_SECTION = {
   linear: LinearDisplaySection,
   arc: ArcDisplaySection,
   corner: ArcDisplaySection,
+  gt_gauge: ArcDisplaySection,
   lean_angle: LeanAngleDisplaySection,
   g_force: GForceWidgetEditor,
   lap_timer: LapTimerDisplaySection,

@@ -449,6 +449,47 @@
           "width": 162,
           "height": 162
         }
+      },
+      "gt_gauge": {
+        "labelKey": "widgets.displayTypes.gtGauge",
+        "icon": {
+          "source": "shared",
+          "assetFile": "display-type-gt-gauge.svg"
+        },
+        "layoutMode": "boxed",
+        "conditionalKeys": ["bar_count", "bar_gap"],
+        "defaults": {
+          "font_size": 64
+        },
+        "inheritedFields": {
+          "min_max_label_font": "font"
+        },
+        "variantDefaults": {
+          "arc_angle": 270,
+          "tick_count": 9,
+          "tick_length": 9,
+          "tick_color": "#8c8c8c",
+          "glow": 0.6,
+          "track_fill_style": "fill",
+          "inner_widget_offset_x": 0,
+          "inner_widget_offset_y": 0,
+          "track_thickness": 10,
+          "track_corner_radius": 5,
+          "track_border_thickness": 0,
+          "track_border_color": "#ffffff",
+          "track_empty_color": "#ffffff",
+          "track_empty_opacity": 0.2,
+          "track_filled_color": "#ff0a3c",
+          "track_filled_opacity": 1,
+          "track_fill_flat": false,
+          "show_min_max_labels": false,
+          "min_max_label_font": null,
+          "min_max_label_font_size": 12,
+          "min_max_label_color": "#ffffff",
+          "rotation": 0,
+          "width": 240,
+          "height": 240
+        }
       }
     }
   },
@@ -472,7 +513,12 @@
       "unitsMode": "selectable",
       "icon": { "source": "custom", "assetFile": "widget-depth.svg" },
       "category": "scuba_diving",
-      "defaults": { "display_type": "text", "display_unit": "m", "show_units": true, "decimals": 1 },
+      "defaults": {
+        "display_type": "text",
+        "display_unit": "m",
+        "show_units": true,
+        "decimals": 1
+      },
       "displayTypes": ["text"]
     },
     {
@@ -492,9 +538,17 @@
       "formatter": "decimal",
       "interpolation": "hold",
       "unitsMode": "selectable",
-      "icon": { "source": "custom", "assetFile": "widget-first-stop-depth.svg" },
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-first-stop-depth.svg"
+      },
       "category": "scuba_diving",
-      "defaults": { "display_type": "text", "display_unit": "m", "show_units": true, "decimals": 1 },
+      "defaults": {
+        "display_type": "text",
+        "display_unit": "m",
+        "show_units": true,
+        "decimals": 1
+      },
       "displayTypes": ["text"]
     },
     {
@@ -513,7 +567,12 @@
       "unitsMode": "selectable",
       "icon": { "source": "custom", "assetFile": "widget-first-stop-time.svg" },
       "category": "scuba_diving",
-      "defaults": { "display_type": "text", "display_unit": "min", "show_units": true, "decimals": 0 },
+      "defaults": {
+        "display_type": "text",
+        "display_unit": "min",
+        "show_units": true,
+        "decimals": 0
+      },
       "displayTypes": ["text"]
     },
     {
@@ -532,7 +591,12 @@
       "unitsMode": "selectable",
       "icon": { "source": "custom", "assetFile": "widget-time-to-surface.svg" },
       "category": "scuba_diving",
-      "defaults": { "display_type": "text", "display_unit": "min", "show_units": true, "decimals": 0 },
+      "defaults": {
+        "display_type": "text",
+        "display_unit": "min",
+        "show_units": true,
+        "decimals": 0
+      },
       "displayTypes": ["text"]
     },
     {
@@ -555,7 +619,12 @@
       "maxDecimals": 2,
       "icon": { "source": "custom", "assetFile": "widget-average-ppo2.svg" },
       "category": "scuba_diving",
-      "defaults": { "display_type": "text", "display_unit": "ata", "show_units": true, "decimals": 2 },
+      "defaults": {
+        "display_type": "text",
+        "display_unit": "ata",
+        "show_units": true,
+        "decimals": 2
+      },
       "displayTypes": ["text"]
     },
     {
@@ -574,7 +643,11 @@
       "unitsMode": "hidden",
       "icon": { "source": "custom", "assetFile": "widget-gas-mix.svg" },
       "category": "scuba_diving",
-      "defaults": { "display_type": "text", "display_unit": "none", "show_units": false },
+      "defaults": {
+        "display_type": "text",
+        "display_unit": "none",
+        "show_units": false
+      },
       "displayTypes": ["text"]
     },
     {
@@ -594,9 +667,16 @@
       "formatter": "decimal",
       "interpolation": "linear",
       "unitsMode": "selectable",
-      "icon": { "source": "custom", "assetFile": "widget-water-temperature.svg" },
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-water-temperature.svg"
+      },
       "category": "scuba_diving",
-      "defaults": { "display_type": "text", "display_unit": "celsius", "show_units": true },
+      "defaults": {
+        "display_type": "text",
+        "display_unit": "celsius",
+        "show_units": true
+      },
       "displayTypes": ["text"]
     },
     {
@@ -2020,7 +2100,7 @@
     "timeDependent": true,
     "collection": "values",
     "defaultsPreset": "value",
-    "displayTypes": ["text", "linear", "arc", "corner"],
+    "displayTypes": ["text", "linear", "arc", "corner", "gt_gauge"],
     "optionalFields": ["display_variants"]
   },
   "displayDefaults": {

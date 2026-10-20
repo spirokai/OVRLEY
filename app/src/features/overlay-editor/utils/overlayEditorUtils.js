@@ -43,7 +43,7 @@ export function getWidgetResizeOptions(widget, isGroupSelection) {
     canRotateSelected: widget.type === 'course' || widget.type === 'raster',
     showEdgeResizeHandles: widget.type === 'raster' || widget.type === 'elevation' || widget.type === 'diving_profile',
     maintainAspectRatio:
-      ['arc', 'corner', 'lean_angle', 'g_force'].includes(widget.data.display_type) ||
+      ['arc', 'corner', 'gt_gauge', 'lean_angle', 'g_force'].includes(widget.data.display_type) ||
       (widget.type === 'backdrop' && widget.data.display_type === 'circle') ||
       widget.type === 'course' ||
       !isFramedWidget(widget),

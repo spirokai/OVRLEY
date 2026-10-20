@@ -15,7 +15,7 @@ The build uses the existing Rust/Skia/Emscripten setup. Execution uses prebuilt 
 
 Each case gets one persistent widget, 200 warm-up frames, and **one 1,000-frame pass** through a consecutive 30 FPS timeline. `--frames` and `--warmup` override the counts. No repetitions, config edits, resize gestures, or scrubbing. All renderers run serially and use the same activity, resolved config, and frame times. Setup and warm-up are excluded from playback timings. The default `both` backend runs native export, native preview, and WASM; `native`, `native-preview`, and `wasm` select one workflow.
 
-There are 24 widget cases plus an empty-scene baseline: all standard families, including diving profile; speed as text, linear, arc, and corner (including fill/bars); heading tape; lean angle; G-force; and four lap-timer modes. Time and backdrop each cover their two basic variants.
+There are 25 widget cases plus an empty-scene baseline: all standard families, including diving profile; speed as text, linear, arc, and corner (including fill/bars), GT gauge (fill only); heading tape; lean angle; G-force; and four lap-timer modes. Time and backdrop each cover their two basic variants.
 
 Sizes come from the HUD's 4K scene and scale of 2. Route is 1120 x 516, elevation and diving profile are 1236 x 326, heading tape 1200 x 200, circular gauges about 464 px across, and linear gauges 464 x 80. The recorded raster dimensions include the renderer's effects/ink bounds. The raster case uses the bundled app icon.
 

@@ -42,8 +42,8 @@ export function createCases({ activities, template, image, frames, warmup, fps }
       { display_variants: { g_force: { diameter: 232, width: 256, height: 256, marker_size: 12, label_font_size: 35 } } },
     ],
   ]
-  for (const display of ['linear', 'arc', 'corner'])
-    for (const style of ['fill', 'bars']) {
+  for (const display of ['linear', 'arc', 'corner', 'gt_gauge'])
+    for (const style of display === 'gt_gauge' ? ['fill'] : ['fill', 'bars']) {
       specs.push([
         `speed-${display}-${style}`,
         'speed',

@@ -67,7 +67,7 @@ impl<'de> Deserialize<'de> for WidgetRequest {
                 else if metric == MetricKind::LeanAngle && request.widget.display_type == crate::model::types::DisplayType::LeanAngle { Self::LeanAngle(request) }
                 else if metric == MetricKind::GForce && request.widget.display_type == crate::model::types::DisplayType::GForce { Self::GForce(request) }
                 else if metric == MetricKind::Heading && request.widget.display_type == crate::model::types::DisplayType::Tape { Self::HeadingTape(request) }
-                else if matches!(request.widget.display_type, crate::model::types::DisplayType::Linear | crate::model::types::DisplayType::Arc | crate::model::types::DisplayType::Corner) { Self::Gauge(request) }
+                else if matches!(request.widget.display_type, crate::model::types::DisplayType::Linear | crate::model::types::DisplayType::Arc | crate::model::types::DisplayType::Corner | crate::model::types::DisplayType::GtGauge) { Self::Gauge(request) }
                 else { Self::Value(request) })
         }
     }

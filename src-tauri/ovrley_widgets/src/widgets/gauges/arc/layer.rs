@@ -4,7 +4,7 @@
 //! Dynamic rendering uses the same canonical track geometry for continuous
 //! reveals and rounded segmented wedges, so fill cannot change the silhouette.
 
-use super::geometry::ArcGaugeGeometry;
+use super::geometry::{arc_point, ArcGaugeGeometry};
 use super::path::ArcTrackSpec;
 use super::segment::{draw_segment, inner_segment_geometry, segment_geometries};
 use super::ArcGaugeCache;
@@ -14,9 +14,24 @@ use crate::render::{
     text::{parse_color, ResolvedTextStyle},
 };
 use crate::widgets::gauges::{
-    bar_geometry::scale_bar_geometry, validation::ValidatedArcGaugeWidget,
+    bar_geometry::ResolvedBarGeometry, validation::ValidatedArcGaugeWidget,
 };
-use skia_safe::{paint::Style, BlendMode, Canvas, ClipOp, Paint};
+use skia_safe::{
+    paint::{Cap, Style},
+    BlendMode, Canvas, ClipOp, Paint,
+};
+
+/// GT ticks start this many track thicknesses inside the track's inner edge.
+const GT_TICK_GAP_RATIO: f32 = 1.0;
+/// GT tick stroke width relative to the track thickness.
+const GT_TICK_WIDTH_RATIO: f32 = 0.2;
+/// GT glow blur radius relative to the track thickness.
+const GT_GLOW_SIGMA_RATIO: f32 = 0.6;
+
+/// Blur sigma of the GT fill glow; also sizes the glow's raster padding.
+pub(super) fn glow_sigma(track_thickness: f32) -> f32 {
+    track_thickness * GT_GLOW_SIGMA_RATIO
+}
 
 /// Builds the padded, cached image containing every frame-invariant element.
 pub(super) fn draw_static_layer(
@@ -24,6 +39,7 @@ pub(super) fn draw_static_layer(
     gauge: &ValidatedArcGaugeWidget,
     scene: &ValidatedScenePresentation,
     geometry: ArcGaugeGeometry,
+    bars: Option<ResolvedBarGeometry>,
     scale: f32,
     text_style: &ResolvedTextStyle,
 ) {
@@ -39,7 +55,7 @@ pub(super) fn draw_static_layer(
         None
     };
 
-    match scale_bar_geometry(gauge.bar_geometry, scale) {
+    match bars {
         Some(bar_geometry) => {
             for segment in segment_geometries(geometry, bar_geometry) {
                 draw_static_track(
@@ -68,6 +84,47 @@ pub(super) fn draw_static_layer(
                 .as_ref()
                 .map(|paint| (paint, scene.shadow_distance * scale)),
         ),
+    }
+    draw_gt_ticks(canvas, gauge, geometry, scale, text_style);
+}
+
+/// Value-less ticks evenly spaced along the sweep, inside the track.
+fn draw_gt_ticks(
+    canvas: &Canvas,
+    gauge: &ValidatedArcGaugeWidget,
+    geometry: ArcGaugeGeometry,
+    scale: f32,
+    text_style: &ResolvedTextStyle,
+) {
+    let Some(style) = &gauge.gt_style else {
+        return;
+    };
+    let length = style.tick_length * scale;
+    if length <= 0.0 {
+        return;
+    }
+    let thickness = gauge.track_thickness * scale;
+    let outer = geometry.radius
+        - thickness * (0.5 + GT_TICK_GAP_RATIO)
+        - gauge.track_border_thickness * scale;
+    let inner = (outer - length).max(0.0);
+    if outer <= inner {
+        return;
+    }
+    let mut paint = Paint::default();
+    paint.set_anti_alias(true);
+    paint.set_style(Style::Stroke);
+    paint.set_stroke_cap(Cap::Round);
+    paint.set_stroke_width((thickness * GT_TICK_WIDTH_RATIO).max(scale));
+    paint.set_color(parse_color(&style.tick_color, text_style.opacity));
+    let steps = (style.tick_count - 1) as f32;
+    for index in 0..style.tick_count {
+        let angle = geometry.start_angle + geometry.sweep_angle * index as f32 / steps;
+        canvas.draw_line(
+            arc_point(geometry.center_x, geometry.center_y, outer, angle),
+            arc_point(geometry.center_x, geometry.center_y, inner, angle),
+            &paint,
+        );
     }
 }
 
@@ -196,6 +253,15 @@ fn draw_continuous_fill(
     let Some(reveal_path) = reveal.path(&reveal_spec) else {
         return;
     };
+    let paint = fill_paint(cache);
+    if let Some(glow) = glow_paint(cache, &paint) {
+        // The blur hides the tip's exact cap shape, so the glow needs no reveal clip.
+        let glow_geometry = ArcGaugeGeometry {
+            sweep_angle: inner_geometry.sweep_angle * fill01,
+            ..inner_geometry
+        };
+        draw_segment(canvas, glow_geometry, inner_thickness, end_corner, &glow);
+    }
 
     canvas.save();
     canvas.clip_path(&reveal_path, ClipOp::Intersect, true);
@@ -204,7 +270,7 @@ fn draw_continuous_fill(
         inner_geometry,
         inner_thickness,
         inner_corner,
-        &fill_paint(cache),
+        &paint,
     );
     canvas.restore();
 }
@@ -214,6 +280,15 @@ fn fill_paint(cache: &ArcGaugeCache) -> Paint {
         &cache.track_filled_color,
         cache.track_filled_opacity * cache.text_style.opacity,
     ))
+}
+
+/// Subtle blurred halo in the fill color, drawn beneath the fill.
+fn glow_paint(cache: &ArcGaugeCache, fill: &Paint) -> Option<Paint> {
+    if cache.glow <= 0.0 {
+        return None;
+    }
+    let color = fill.color().with_a((cache.glow * 255.0).round() as u8);
+    shadow_paint(fill, color, glow_sigma(cache.track_thickness))
 }
 
 fn track_paint(color: skia_safe::Color) -> Paint {

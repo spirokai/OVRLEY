@@ -48,6 +48,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
   const { t } = useTranslation()
   const displayType = widget.data.display_type
   const isCornerGauge = displayType === 'corner'
+  const isGtGauge = displayType === 'gt_gauge'
   const arcData = useMemo(() => widget.data.display_variants?.[displayType] ?? {}, [displayType, widget.data.display_variants])
   const updateArc = useDisplayVariantUpdater(widget, displayType, updateWidgetData)
   const updateArcSize = useDisplayVariantUpdater(widget, displayType, updateWidgetSize)
@@ -103,6 +104,20 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
               onValueChange={(corner_orientation) => updateArc({ corner_orientation })}
               options={translateOptions(CORNER_ORIENTATION_OPTIONS, t)}
             />
+          ) : isGtGauge ? (
+            <SliderField
+              editable
+              label={t('widget-editor.tickLength', 'Tick Length')}
+              value={arcData.tick_length}
+              min={0}
+              max={100}
+              step={1}
+              integerDisplay
+              valueDisplay={`${arcData.tick_length}`}
+              suffix="px"
+              onSliderChange={(tick_length) => updateArcSize({ tick_length })}
+              onSliderCommit={() => commitWidgetSize(widget.id)}
+            />
           ) : (
             <SliderField
               editable
@@ -137,7 +152,12 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <BarFillStyleField data={arcData} suggestBarGeometry={(data) => suggestArcBarGeometry(data, displayType)} updateVariant={updateArc} />
+          <BarFillStyleField
+            data={arcData}
+            suggestBarGeometry={(data) => suggestArcBarGeometry(data, displayType)}
+            updateVariant={updateArc}
+            disabled={isGtGauge}
+          />
           <SliderField
             editable
             label={t('widget-editor.cornerRadius', 'Corner Radius')}
@@ -219,6 +239,22 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             onSliderChange={(track_filled_opacity) => updateArc({ track_filled_opacity })}
           />
         </div>
+        {isGtGauge ? (
+          <div className="grid grid-cols-2 gap-4">
+            <SliderField
+              editable
+              label={t('widget-editor.glow', 'Glow')}
+              value={arcData.glow}
+              min={0}
+              max={1}
+              step={0.05}
+              valueScale={100}
+              valueDisplay={`${Math.round(arcData.glow * 100)}`}
+              suffix="%"
+              onSliderChange={(glow) => updateArc({ glow })}
+            />
+          </div>
+        ) : null}
         {/* TEMP: gradient picker trial, not wired to widget data */}
         <GradientPicker label="Gradient" stops={trialGradientStops} onChange={setTrialGradientStops} />
       </div>

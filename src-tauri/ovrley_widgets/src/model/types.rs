@@ -27,7 +27,7 @@ include!(concat!(env!("OUT_DIR"), "/metric_kinds.rs"));
 ///
 /// Controls how a metric value widget is rendered. The default is `Text` which
 /// matches the original icon + value + unit layout. Future slices introduce
-/// rendering paths for the gauge variants (linear, arc, corner, and
+/// rendering paths for the gauge variants (linear, arc, corner, GT, and
 /// heading tape) and use this field to dispatch.
 ///
 /// ## Backward compatibility
@@ -46,6 +46,8 @@ pub enum DisplayType {
     Arc,
     #[serde(rename = "corner")]
     Corner,
+    #[serde(rename = "gt_gauge")]
+    GtGauge,
     #[serde(rename = "heading_tape")]
     Tape,
     #[serde(rename = "lean_angle")]
@@ -64,6 +66,7 @@ impl DisplayType {
             DisplayType::Linear => "linear",
             DisplayType::Arc => "arc",
             DisplayType::Corner => "corner",
+            DisplayType::GtGauge => "gt_gauge",
             DisplayType::Tape => "heading_tape",
             DisplayType::LeanAngle => "lean_angle",
             DisplayType::GForce => "g_force",
@@ -107,6 +110,7 @@ impl<'de> Deserialize<'de> for DisplayType {
                 "linear" => Ok(DisplayType::Linear),
                 "arc" => Ok(DisplayType::Arc),
                 "corner" => Ok(DisplayType::Corner),
+                "gt_gauge" => Ok(DisplayType::GtGauge),
                 "heading_tape" => Ok(DisplayType::Tape),
                 "lean_angle" => Ok(DisplayType::LeanAngle),
                 "g_force" => Ok(DisplayType::GForce),

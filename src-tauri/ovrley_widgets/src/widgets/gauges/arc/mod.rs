@@ -22,10 +22,11 @@ use crate::{
 };
 pub use geometry::{
     arc_gauge_geometry, arc_point, arc_radius, arc_start_end_angles, corner_gauge_geometry,
-    corner_start_end_angles, ArcGaugeGeometry,
+    corner_start_end_angles, gt_gauge_geometry, gt_start_end_angles, ArcGaugeGeometry,
+    GT_GAUGE_TRACK_ROTATION_DEGREES,
 };
 use inner_widget::{
-    inner_widget_layout, unit_font_size, unit_style, ArcInnerWidgetLayout, DEFAULT_GAP_PX,
+    inner_widget_layout, unit_font_size, unit_style, value_unit_gap, ArcInnerWidgetLayout,
     LINE_HEIGHT,
 };
 #[cfg(test)]
@@ -58,6 +59,8 @@ pub struct ArcGaugeCache {
     pub value_font: Font,
     pub has_unit: bool,
     pub unit_font_size: f32,
+    /// GT fill glow intensity; zero for arc and corner gauges.
+    pub glow: f32,
     pub inner_widget_gap: f32,
     pub inner_widget_offset_x: f32,
     pub inner_widget_offset_y: f32,
@@ -77,15 +80,25 @@ pub fn prepare_arc_gauge_cache(
     let thickness = gauge.track_thickness * scale;
     let border = gauge.track_border_thickness * scale;
     let corner = gauge.track_corner_radius * scale;
-    let mut geometry = match gauge.corner_orientation {
-        Some(orientation) => {
+    // GT rotation is resolved into the cached angles once, never applied per frame.
+    let mut geometry = match (gauge.corner_orientation, &gauge.gt_style) {
+        (Some(orientation), _) => {
             corner_gauge_geometry(width, height, orientation, thickness, corner, border)
         }
-        None => arc_gauge_geometry(width, height, gauge.arc_angle, thickness, border),
+        (None, Some(_)) => gt_gauge_geometry(width, height, gauge.arc_angle, thickness, border),
+        (None, None) => arc_gauge_geometry(width, height, gauge.arc_angle, thickness, border),
     };
     let text_style = validated_value_style(&gauge.inner_value, scene, scale);
     let value_font = resolve_font(fonts, text_style.font_name.as_deref(), text_style.font_size)?;
-    let bars = scale_bar_geometry(gauge.bar_geometry, scale);
+    // GT gauges always render a continuous fill, whatever track style is configured.
+    let (track_fill_style, bars) = if gauge.gt_style.is_some() {
+        (TrackFillStyle::Fill, None)
+    } else {
+        (
+            gauge.track_fill_style,
+            scale_bar_geometry(gauge.bar_geometry, scale),
+        )
+    };
     let segments = bars
         .map(|bars| segment::segment_geometries(geometry, bars))
         .unwrap_or_else(|| vec![geometry]);
@@ -104,6 +117,13 @@ pub fn prepare_arc_gauge_cache(
         ));
         shadow.offset((scene.shadow_distance * scale, scene.shadow_distance * scale));
         bounds.join(shadow);
+    }
+    let glow = gauge.gt_style.as_ref().map_or(0.0, |style| style.glow);
+    if glow > 0.0 {
+        let mut halo = content;
+        let extent = layer::glow_sigma(thickness) * 3.0;
+        halo.outset((extent, extent));
+        bounds.join(halo);
     }
     let mut texts = Vec::new();
     if gauge.show_min_max_labels {
@@ -128,11 +148,12 @@ pub fn prepare_arc_gauge_cache(
         bounds.join(text.bounds);
     }
     let bounds = raster_bounds(bounds);
+    let inner_widget_gap = value_unit_gap(gauge, text_style.font_size, scale);
     let mut surface = surface(bounds.width() as u32, bounds.height() as u32, SHAPE_COLOR_TYPE)?;
     let canvas = surface.canvas();
     canvas.clear(Color::TRANSPARENT);
     canvas.translate((-bounds.left, -bounds.top));
-    layer::draw_static_layer(canvas, gauge, scene, geometry, scale, &text_style);
+    layer::draw_static_layer(canvas, gauge, scene, geometry, bars, scale, &text_style);
     for text in texts {
         text.draw(canvas);
     }
@@ -158,13 +179,14 @@ pub fn prepare_arc_gauge_cache(
         track_filled_color: gauge.track_filled_color.clone(),
         track_filled_opacity: gauge.track_filled_opacity,
         track_fill_flat: gauge.track_fill_flat,
-        track_fill_style: gauge.track_fill_style,
+        track_fill_style,
         bar_geometry: bars,
         text_style,
         value_font,
         has_unit: unit_text.is_some(),
         unit_font_size: unit_size,
-        inner_widget_gap: DEFAULT_GAP_PX * scale,
+        glow,
+        inner_widget_gap,
         inner_widget_offset_x: gauge.inner_widget_offset_x * scale,
         inner_widget_offset_y: gauge.inner_widget_offset_y * scale,
     })

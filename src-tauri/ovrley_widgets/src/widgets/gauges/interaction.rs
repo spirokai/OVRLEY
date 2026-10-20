@@ -47,6 +47,8 @@ pub struct ResizeVariant {
     pub min_max_label_font_size: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bar_gap: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tick_length: Option<f32>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -126,6 +128,7 @@ pub fn resize_gauge(
                         inner_widget_offset_y: None,
                         min_max_label_font_size: None,
                         bar_gap: config.bar_geometry.map(|bars| bars.gap),
+                        tick_length: None,
                     },
                 )
             }
@@ -151,6 +154,9 @@ pub fn resize_gauge(
                     (config.inner_widget_offset_y * factor).clamp(-10_000.0, 10_000.0);
                 config.min_max_label_font_size =
                     (config.min_max_label_font_size * factor).clamp(6.0, 50.0);
+                if let Some(style) = config.gt_style.as_mut() {
+                    style.tick_length = (style.tick_length * factor).clamp(0.0, 100.0);
+                }
                 let bars = config.bar_geometry;
                 (config.track_corner_radius, config.bar_geometry) = resolve_arc_track_geometry(
                     config.width.min(config.height),
@@ -179,6 +185,7 @@ pub fn resize_gauge(
                         inner_widget_offset_y: Some(config.inner_widget_offset_y),
                         min_max_label_font_size: Some(config.min_max_label_font_size),
                         bar_gap: config.bar_geometry.map(|bars| bars.gap),
+                        tick_length: config.gt_style.as_ref().map(|style| style.tick_length),
                     },
                 )
             }

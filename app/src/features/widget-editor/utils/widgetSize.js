@@ -32,10 +32,11 @@ function scaleFields(data, factor, fields) {
   return patch
 }
 
-function buildGaugeSize(data, factor) {
+function buildGaugeSize(data, factor, displayType) {
   const thickness = scaleNumber(data.track_thickness, factor, 1, 100)
   return {
     ...scaleFields(data, factor, GAUGE_SIZE_FIELDS),
+    ...(displayType === 'gt_gauge' ? { tick_length: scaleNumber(data.tick_length, factor, 0, 100) } : {}),
     track_thickness: thickness,
     track_corner_radius: scaleNumber(data.track_corner_radius, factor, 0, thickness * 0.5),
   }
@@ -81,7 +82,7 @@ export function buildUniformResizeUpdate(widget, size) {
   const factor = (width / data.width + height / data.height) * 0.5
   let content
   if (displayType === 'g_force') content = buildGForceSize(data, factor)
-  else if (displayType === 'arc' || displayType === 'corner') content = buildGaugeSize(data, factor)
+  else if (['arc', 'corner', 'gt_gauge'].includes(displayType)) content = buildGaugeSize(data, factor, displayType)
   else throw new Error(`Unsupported inspector size policy: ${displayType}`)
   return {
     width,

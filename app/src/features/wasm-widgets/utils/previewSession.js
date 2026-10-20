@@ -22,7 +22,7 @@ export function widgetFonts(widget) {
   if (widget.type === 'elevation') {
     return widget.data.show_elevation_metric || widget.data.show_elevation_imperial ? [{ font: widget.data.point_label.font }] : []
   }
-  if (['linear', 'arc', 'corner'].includes(widget.data.display_type)) {
+  if (['linear', 'arc', 'corner', 'gt_gauge'].includes(widget.data.display_type)) {
     const fonts = widget.data.display_type === 'linear' ? [] : [{ font: widget.data.font }]
     if (widget.data.show_min_max_labels) fonts.push({ font: widget.data.min_max_label_font })
     return fonts

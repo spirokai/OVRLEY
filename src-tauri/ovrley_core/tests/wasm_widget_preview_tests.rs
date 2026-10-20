@@ -133,6 +133,7 @@ fn every_preview_family_reuses_drag_pixels_and_restores_fractional_commit() {
         gauge_preview("linear", "speed", "horizontal", "fill"),
         gauge_preview("arc", "speed", "horizontal", "fill"),
         gauge_preview("corner", "speed", "bottom-left", "fill"),
+        gauge_preview("gt_gauge", "speed", "bottom-left", "fill"),
     ];
     for kind in ["course", "elevation", "diving_profile", "backdrop", "raster", "speed", "time"] {
         let (preview, mut request) = lean_angle_preview();
@@ -674,6 +675,12 @@ fn gauge_preview(
         "show_units": true, "unit_color": "#aaaaaa", "display_unit": match metric { "speed" => "kmh", "altitude" => "ft", _ => "w" },
         "prefix": "", "suffix": "", "decimals": 0,
     });
+    request["widget"].as_object_mut().unwrap().extend(
+        json!({"tick_count": 11, "tick_length": 14, "tick_color": "#8c8c8c", "glow": 0.6})
+            .as_object()
+            .unwrap()
+            .clone(),
+    );
     if metric == "altitude" {
         request["widget"]["starting_altitude"] = json!(4000);
     }
@@ -707,6 +714,8 @@ fn gauges_match_native_pixels_sampling_cache_revisions_and_activity_replacement(
         ("arc", "power", "bottom-left", "bars"),
         ("corner", "altitude", "bottom-left", "fill"),
         ("corner", "altitude", "bottom-right", "bars"),
+        ("gt_gauge", "speed", "bottom-left", "fill"),
+        ("gt_gauge", "power", "bottom-left", "bars"),
     ] {
         let (mut preview, mut request) = gauge_preview(display, metric, placement, fill);
         request["scene"]["opacity"] = json!(0.5);
@@ -846,6 +855,7 @@ fn gauge_resize_preserves_opposite_corners_and_commits_fractional_geometry_durin
         ("arc", "bottom-left", "bars"),
         ("corner", "bottom-left", "fill"),
         ("corner", "bottom-right", "bars"),
+        ("gt_gauge", "bottom-left", "fill"),
     ] {
         let (mut preview, mut origin) = gauge_preview(display, "speed", placement, fill);
         origin["widget"]["track_corner_radius"] = json!(9);
@@ -891,6 +901,11 @@ fn gauge_resize_preserves_opposite_corners_and_commits_fractional_geometry_durin
                         assert!(
                             (patch["font_size"].as_f64().unwrap() - 60.0 * factor).abs() < 0.001
                         );
+                    }
+                    if display == "gt_gauge" {
+                        assert!((variant["tick_length"].as_f64().unwrap() - 14.0 * factor).abs() < 0.001);
+                    } else {
+                        assert!(variant.get("tick_length").is_none());
                     }
                     let mut live = origin.clone();
                     for (key, value) in patch.as_object().unwrap() {
