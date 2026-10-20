@@ -2,11 +2,12 @@ import { describe, expect, test } from 'vite-plus/test'
 import {
   buildFitTargets,
   clampToView,
-  computeTimelineTicks,
+  computeTimelineTickStrip,
   fitRangeToViewport,
   fitToFull,
   followPlayhead,
   getMatchingFitTargetId,
+  getTimelineTickStep,
   panViewport,
   rangesMatch,
   zoomRange,
@@ -81,12 +82,16 @@ describe('timelineViewport utilities', () => {
     expect(rangesMatch({ viewStart: 0, viewEnd: 100 }, { viewStart: 0, viewEnd: 100.0005 })).toBe(true)
   })
 
-  test('computes major and minor timeline ticks', () => {
-    const ticks = computeTimelineTicks({ viewStart: 0, viewEnd: 100, widthPx: 900 })
-    const majorStep = ticks.major[1].second - ticks.major[0].second
+  test('computes a major and minor tick strip from its anchor', () => {
+    const step = getTimelineTickStep(9)
+    const ticks = computeTimelineTickStrip({ anchorSecond: 20, step, pxPerSecond: 9, widthPx: 900 })
 
-    expect(majorStep * (900 / 100)).toBeGreaterThanOrEqual(90)
+    expect(step * 9).toBeGreaterThanOrEqual(90)
+    expect(ticks.major[0]).toMatchObject({ second: 20, x: 0 })
+    expect(ticks.major[1].x).toBe(step * 9)
+    expect(ticks.major.at(-1).x).toBeGreaterThanOrEqual(900 + step * 9)
     expect(ticks.major[0].label).toBeTruthy()
+    expect(ticks.minor).toHaveLength((ticks.major.length - 1) * 4)
     expect(ticks.minor[0].label).toBeUndefined()
   })
 })

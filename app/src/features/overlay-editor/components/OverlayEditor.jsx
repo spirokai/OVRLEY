@@ -101,7 +101,9 @@ function OverlayEditorContent(props) {
                 setSceneElement={setSceneElement}
               />
             ) : (
-              <div className="absolute left-0 top-0" style={{ ...sceneSize, transform: `scale(${displayScale})`, transformOrigin: 'top left' }}>
+              // CSS zoom, unlike a scale transform, does not force an offscreen render surface around the composited widget canvases.
+              // Zoom also creates no stacking context, so isolate keeps Moveable's z-index 3000 controls below app modals.
+              <div className="absolute left-0 top-0 isolate" style={{ ...sceneSize, zoom: displayScale }}>
                 <OverlayCanvas
                   state={editor}
                   backgroundMode={backgroundMode}

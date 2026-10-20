@@ -11,21 +11,20 @@ import { getTimelineMinimum } from '../utils/playerTiming'
 import {
   buildFitTargets,
   clampToView,
-  computeTimelineTicks,
+  computeTimelineTickStrip,
   fitToFull,
   followPlayhead,
   getMatchingFitTargetId,
+  getTimelineTickStep,
   panViewport,
   zoomRange,
 } from '../utils/timelineViewport'
 
+const PX_PER_SECOND_PRECISION = 1e6
+
 function getDevicePixelRatio() {
   if (typeof window === 'undefined') return 1
   return window.devicePixelRatio || 1
-}
-
-function getLeftPercent(x, widthPx) {
-  return widthPx > 0 ? `${(x / widthPx) * 100}%` : '0%'
 }
 
 /**
@@ -296,9 +295,16 @@ export default function useTimelineViewport({
     [containerElement, panBy, viewport, zoomBy],
   )
 
-  // Tick model - presentational components receive rounded pixel positions and percent label positions.
-  const ticks = useMemo(() => {
-    const rawTicks = computeTimelineTicks({ viewStart: viewport.viewStart, viewEnd: viewport.viewEnd, widthPx })
+  // Tick model - the strip is rebuilt only when zoom, width, or the major step under the viewport start changes.
+  // Playback follow pans every frame, which then only moves the strip instead of restyling every tick.
+  // Panning keeps the span but recomputes viewEnd - viewStart with float error; quantize so the strip memo stays hit.
+  const span = viewport.viewEnd - viewport.viewStart
+  const pxPerSecond = span > 0 && widthPx > 0 ? Math.round((widthPx / span) * PX_PER_SECOND_PRECISION) / PX_PER_SECOND_PRECISION : 0
+  const tickStep = pxPerSecond > 0 ? getTimelineTickStep(pxPerSecond) : 0
+  const tickAnchorSecond = tickStep > 0 ? Math.floor(viewport.viewStart / tickStep) * tickStep : 0
+  const tickStrip = useMemo(() => {
+    if (tickStep === 0) return { major: [], minor: [] } // Nothing to draw until the axis is measured.
+    const rawTicks = computeTimelineTickStrip({ anchorSecond: tickAnchorSecond, step: tickStep, pxPerSecond, widthPx })
     const pixelRatio = getDevicePixelRatio()
 
     return {
@@ -306,14 +312,18 @@ export default function useTimelineViewport({
         id: `major-${index}`,
         label: tick.label,
         lineStyle: { left: roundToDevicePixel(tick.x, pixelRatio) },
-        labelStyle: { left: getLeftPercent(tick.x, widthPx) },
+        labelStyle: { left: tick.x },
       })),
       minor: rawTicks.minor.map((tick, index) => ({
         id: `minor-${index}`,
         lineStyle: { left: roundToDevicePixel(tick.x, pixelRatio) },
       })),
     }
-  }, [viewport.viewEnd, viewport.viewStart, widthPx])
+  }, [pxPerSecond, tickAnchorSecond, tickStep, widthPx])
+  const ticks = useMemo(() => {
+    const offset = roundToDevicePixel((tickAnchorSecond - viewport.viewStart) * pxPerSecond, getDevicePixelRatio())
+    return { ...tickStrip, stripStyle: { transform: `translateX(${offset}px)` } }
+  }, [pxPerSecond, tickAnchorSecond, tickStrip, viewport.viewStart])
 
   // Viewport API - returns render-ready geometry plus commands for toolbar and gesture hooks.
   return {

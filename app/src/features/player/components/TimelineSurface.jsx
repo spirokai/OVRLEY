@@ -20,17 +20,21 @@ export default function TimelineSurface({ timeline }) {
         role="group"
         {...timeline.axisProps}
       >
-        {timeline.ticks.minor.map((tick) => (
-          <div key={tick.id} className="absolute top-0 h-1.5 w-px bg-border/70" style={tick.lineStyle} />
-        ))}
-        {timeline.ticks.major.map((tick) => (
-          <div key={tick.id}>
-            <div className="absolute top-0 h-2.5 w-px bg-border" style={tick.lineStyle} />
-            <span className="absolute top-3 -translate-x-1/2 text-[0.6rem] tabular-nums text-muted-foreground" style={tick.labelStyle}>
-              {tick.label}
-            </span>
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute inset-0 will-change-transform" style={timeline.ticks.stripStyle}>
+            {timeline.ticks.minor.map((tick) => (
+              <div key={tick.id} className="absolute top-0 h-1.5 w-px bg-border/70" style={tick.lineStyle} />
+            ))}
+            {timeline.ticks.major.map((tick) => (
+              <div key={tick.id}>
+                <div className="absolute top-0 h-2.5 w-px bg-border" style={tick.lineStyle} />
+                <span className="absolute top-3 -translate-x-1/2 text-[0.6rem] tabular-nums text-muted-foreground" style={tick.labelStyle}>
+                  {tick.label}
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
 
       {timeline.videoSyncMode && timeline.graph ? <VideoSyncTimelineGraph graph={timeline.graph} /> : null}
