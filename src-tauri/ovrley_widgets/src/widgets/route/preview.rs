@@ -14,7 +14,7 @@ use crate::{
         validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
     },
     render::{pixels::read_surface_rgba, preview::PreviewRasterScale},
-    widgets::value::preview::{surface, WidgetGeometry},
+    widgets::value::preview::{surface, SHAPE_COLOR_TYPE, WidgetGeometry},
 };
 use skia_safe::{Color, Surface};
 use std::sync::Arc;
@@ -248,7 +248,7 @@ impl PreviewRoute {
             .map(|surface| (surface.width(), surface.height()))
             != Some((width as i32, height as i32))
         {
-            self.surface = Some(surface(width, height)?);
+            self.surface = Some(surface(width, height, SHAPE_COLOR_TYPE)?);
             self.pixels.resize(width as usize * height as usize * 4, 0);
         }
         let surface = self.surface.as_mut().expect("route surface allocated");

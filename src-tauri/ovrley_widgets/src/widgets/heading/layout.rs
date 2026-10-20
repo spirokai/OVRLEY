@@ -13,7 +13,7 @@ use crate::{
         shadow::shadow_paint,
         text::{origin_x_for_centered_text, parse_color, resolve_font, FontResolver},
     },
-    widgets::value::preview::surface,
+    widgets::value::preview::{surface, SHAPE_COLOR_TYPE},
 };
 use skia_safe::{gradient, BlendMode, Color, Color4f, Image, Paint, Point, Rect, TileMode};
 
@@ -105,7 +105,7 @@ pub fn prepare_heading_cache(
     let image_width = tape_width
         .checked_add(2)
         .ok_or_else(|| WidgetError::Render("heading strip image width overflow".into()))?;
-    let mut tape = surface(image_width, layout.body_height.ceil() as u32)?;
+    let mut tape = surface(image_width, layout.body_height.ceil() as u32, SHAPE_COLOR_TYPE)?;
     let canvas = tape.canvas();
     canvas.clear(skia_safe::Color::TRANSPARENT);
     // Wrapped strokes/labels also fill these gutters, so bilinear sampling sees across north.

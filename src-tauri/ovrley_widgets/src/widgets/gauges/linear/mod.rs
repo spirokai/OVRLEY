@@ -16,7 +16,7 @@ use crate::{
         types::TrackFillStyle,
     },
     render::text::{parse_color, resolve_font, FontResolver, ResolvedTextStyle},
-    widgets::value::preview::surface,
+    widgets::value::preview::{surface, SHAPE_COLOR_TYPE},
 };
 pub use geometry::{bar_fill_rect, bordered_bar_fill_rect};
 use skia_safe::{Canvas, Color, Image, Rect};
@@ -107,7 +107,7 @@ pub fn prepare_linear_gauge_cache(
         }
     }
     let bounds = raster_bounds(bounds);
-    let mut surface = surface(bounds.width() as u32, bounds.height() as u32)?;
+    let mut surface = surface(bounds.width() as u32, bounds.height() as u32, SHAPE_COLOR_TYPE)?;
     let canvas = surface.canvas();
     canvas.clear(Color::TRANSPARENT);
     canvas.translate((-bounds.left, -bounds.top));

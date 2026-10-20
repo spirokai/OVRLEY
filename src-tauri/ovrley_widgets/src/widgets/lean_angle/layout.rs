@@ -4,7 +4,7 @@ use crate::{
     error::WidgetResult,
     model::scene::ValidatedScenePresentation,
     render::{shadow::shadow_paint, text::parse_color},
-    widgets::value::preview::surface,
+    widgets::value::preview::{surface, SHAPE_COLOR_TYPE},
 };
 use skia_safe::{
     paint::Style, BlendMode, ClipOp, Color, Image, Paint, Path, PathBuilder, PathFillType, Point,
@@ -150,7 +150,7 @@ pub fn prepare_lean_angle_cache(
     let top = track_bounds.top.floor() - padding;
     let width = (track_bounds.right.ceil() + padding - left) as u32;
     let height = (track_bounds.bottom.ceil() + padding - top) as u32;
-    let mut surface = surface(width, height)?;
+    let mut surface = surface(width, height, SHAPE_COLOR_TYPE)?;
     let canvas = surface.canvas();
     canvas.clear(Color::TRANSPARENT);
     canvas.translate((-left, -top));

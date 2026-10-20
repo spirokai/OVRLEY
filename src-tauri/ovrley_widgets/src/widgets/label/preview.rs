@@ -4,7 +4,7 @@ use crate::{
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
     preview::PreviewFonts,
     render::{pixels::read_surface_rgba, preview::PreviewRasterScale},
-    widgets::value::preview::{surface, WidgetGeometry},
+    widgets::value::preview::{surface, SHAPE_COLOR_TYPE, WidgetGeometry},
 };
 use skia_safe::Color;
 
@@ -23,7 +23,7 @@ impl PreviewLabel {
         let frame = prepare_label_frame(&label, &scene, fonts)?;
         let bounds = frame.bounds;
         let (width, height) = preview_raster_scale.dimensions(bounds);
-        let mut surface = surface(width, height)?;
+        let mut surface = surface(width, height, SHAPE_COLOR_TYPE)?;
         let canvas = surface.canvas();
         canvas.clear(Color::TRANSPARENT);
         preview_raster_scale.apply(canvas);

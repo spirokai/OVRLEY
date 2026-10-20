@@ -7,7 +7,7 @@ use crate::{
     error::WidgetResult,
     model::scene::ValidatedScenePresentation,
     render::text::parse_color,
-    widgets::value::preview::{surface, ContentBounds},
+    widgets::value::preview::{surface, SHAPE_COLOR_TYPE, ContentBounds},
 };
 use skia_safe::{
     BlurStyle, Canvas, Color, Image, MaskFilter, Paint, PaintCap, PaintJoin, Path, Rect,
@@ -122,6 +122,7 @@ impl RouteLayout {
         let mut layer = surface(
             remaining_image_bounds.width() as u32,
             remaining_image_bounds.height() as u32,
+            SHAPE_COLOR_TYPE,
         )?;
         let canvas = layer.canvas();
         let path = geometry.path.lock().expect("route path lock");

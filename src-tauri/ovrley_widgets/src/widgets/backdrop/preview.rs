@@ -3,7 +3,7 @@ use crate::{
     error::{WidgetError, WidgetResult},
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
     render::{pixels::read_surface_rgba, preview::PreviewRasterScale},
-    widgets::value::preview::{surface, WidgetGeometry},
+    widgets::value::preview::{surface, SHAPE_COLOR_TYPE, WidgetGeometry},
 };
 use skia_safe::Color;
 
@@ -22,7 +22,7 @@ impl PreviewBackdrop {
         let frame = prepare_backdrop_frame(&backdrop, scene.scale);
         let bounds = frame.bounds;
         let (width, height) = preview_raster_scale.dimensions(bounds);
-        let mut surface = surface(width, height)?;
+        let mut surface = surface(width, height, SHAPE_COLOR_TYPE)?;
         let canvas = surface.canvas();
         canvas.clear(Color::TRANSPARENT);
         preview_raster_scale.apply(canvas);

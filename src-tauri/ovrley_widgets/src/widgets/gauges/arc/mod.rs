@@ -18,7 +18,7 @@ use crate::{
         origin_x_for_centered_text, parse_color, resolve_font, validated_value_style, FontResolver,
         ResolvedTextStyle,
     },
-    widgets::value::preview::surface,
+    widgets::value::preview::{surface, SHAPE_COLOR_TYPE},
 };
 pub use geometry::{
     arc_gauge_geometry, arc_point, arc_radius, arc_start_end_angles, corner_gauge_geometry,
@@ -128,7 +128,7 @@ pub fn prepare_arc_gauge_cache(
         bounds.join(text.bounds);
     }
     let bounds = raster_bounds(bounds);
-    let mut surface = surface(bounds.width() as u32, bounds.height() as u32)?;
+    let mut surface = surface(bounds.width() as u32, bounds.height() as u32, SHAPE_COLOR_TYPE)?;
     let canvas = surface.canvas();
     canvas.clear(Color::TRANSPARENT);
     canvas.translate((-bounds.left, -bounds.top));

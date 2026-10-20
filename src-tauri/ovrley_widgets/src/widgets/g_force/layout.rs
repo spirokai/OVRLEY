@@ -7,7 +7,7 @@ use crate::{
         shadow::shadow_paint,
         text::{parse_color, FontResolver},
     },
-    widgets::value::preview::surface,
+    widgets::value::preview::{surface, SHAPE_COLOR_TYPE},
 };
 use skia_safe::{
     paint::Style, BlendMode, ClipOp, Color, Image, Paint, PathBuilder, PathFillType, Point,
@@ -85,6 +85,7 @@ pub fn prepare_g_force_cache(
     let mut surface = surface(
         (layout.width.ceil() as u32).saturating_add(padding.saturating_mul(2)),
         (layout.height.ceil() as u32).saturating_add(padding.saturating_mul(2)),
+        SHAPE_COLOR_TYPE,
     )?;
     let canvas = surface.canvas();
     canvas.clear(Color::TRANSPARENT);

@@ -6,7 +6,7 @@ use crate::{
         baseline_for_text_top_with_line_height, draw_text_blob, layout_text,
         measure_text_with_font, text_selection_bounds, ResolvedTextStyle,
     },
-    widgets::value::preview::surface,
+    widgets::value::preview::{surface, TEXT_COLOR_TYPE},
 };
 use skia_safe::{Canvas, Color, Font, Image, Rect, TextBlob};
 use std::sync::Arc;
@@ -105,7 +105,11 @@ pub(super) struct TextLayer {
 impl TextLayer {
     pub fn new(runs: Vec<TextRun>, x: f32) -> WidgetResult<Self> {
         let frame = LapTimerFrame::new(runs, None, x)?;
-        let mut surface = surface(frame.bounds.width() as u32, frame.bounds.height() as u32)?;
+        let mut surface = surface(
+            frame.bounds.width() as u32,
+            frame.bounds.height() as u32,
+            TEXT_COLOR_TYPE,
+        )?;
         let canvas = surface.canvas();
         canvas.clear(Color::TRANSPARENT);
         // Integer origins retain the glyphs' original subpixel placement.

@@ -10,7 +10,7 @@ use crate::{
     widgets::{
         elevation::label::{ElevationLabel, LabelRun},
         route::layout::{outward, rotated_rect, scaled_rect, stroke_paint},
-        value::preview::{surface, ContentBounds},
+        value::preview::{surface, SHAPE_COLOR_TYPE, ContentBounds},
     },
 };
 use skia_safe::{BlurStyle, Canvas, Color, Image, MaskFilter, Matrix, Paint, Rect};
@@ -94,6 +94,7 @@ impl DivingProfileLayout {
         let mut layer = surface(
             remaining_bounds.width() as u32,
             remaining_bounds.height() as u32,
+            SHAPE_COLOR_TYPE,
         )?;
         let canvas = layer.canvas();
         canvas.clear(Color::TRANSPARENT);
