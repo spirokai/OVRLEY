@@ -185,6 +185,38 @@ impl Workspace {
             .unwrap()
             .clone()
     }
+
+    /// The distinct pixel formats of every decoded video frame, in order of appearance.
+    fn frame_pixel_formats(&self, path: &Path) -> Vec<String> {
+        let probed = Command::new(self.ffmpeg.with_file_name(if cfg!(windows) {
+            "ffprobe.exe"
+        } else {
+            "ffprobe"
+        }))
+        .args([
+            "-v",
+            "error",
+            "-select_streams",
+            "v",
+            "-show_entries",
+            "frame=pix_fmt",
+            "-of",
+            "csv=p=0",
+        ])
+        .arg(path)
+        .output()
+        .unwrap();
+        assert!(probed.status.success());
+        let mut formats: Vec<String> = Vec::new();
+        for line in String::from_utf8(probed.stdout).unwrap().lines() {
+            // Frames with side data end in an empty column.
+            let format = line.trim_end_matches(',');
+            if !formats.iter().any(|seen| seen == format) {
+                formats.push(format.to_string());
+            }
+        }
+        formats
+    }
 }
 
 fn piece(source: &InspectedVideoSource, start_frame: u64, end_frame: u64) -> BatchRenderPiece {
@@ -393,6 +425,9 @@ fn transitions_shorten_the_joined_video_and_audio_by_their_durations() {
     let streams = workspace.probe_streams(&target);
     let video = stream(&streams, "video");
     assert_eq!(video[0]["nb_read_packets"], "120");
+    // The stream-copied transition keeps the parts' format; players decode the
+    // whole track with the first parameter sets.
+    assert_eq!(workspace.frame_pixel_formats(&target), ["yuv420p"]);
     let video_seconds = 120.0 * 1001.0 / 30000.0;
     assert!((seconds(&video[0]["duration"]) - video_seconds).abs() < 0.01);
     let audio = stream(&streams, "audio");
@@ -432,8 +467,10 @@ fn hevc_transitions_at_deleted_parts_encode_with_the_output_encoder() {
         "{:?}",
         snapshot.items[0].outcome
     );
-    let streams = workspace.probe_streams(&workspace.paths.downloads_dir.join("ride_video.mp4"));
+    let target = workspace.paths.downloads_dir.join("ride_video.mp4");
+    let streams = workspace.probe_streams(&target);
     let video = stream(&streams, "video");
+    assert_eq!(workspace.frame_pixel_formats(&target), ["yuv420p10le"]);
     assert_eq!(video[0]["codec_name"], "hevc");
     assert_eq!(video[0]["codec_tag_string"], "hvc1");
     assert_eq!(video[0]["nb_read_packets"], (70 - 15 - 9).to_string());

@@ -89,26 +89,38 @@ pub struct AudioPiece {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TransitionEncoding {
     pub device_args: Vec<String>,
-    /// Appended to the `xfade` filter, e.g. `format=nv12,hwupload`.
-    pub upload_filter: Option<String>,
+    /// Appended to the `xfade` filter: the parts' pixel format, plus the upload
+    /// for hardware-frame encoders. `xfade` otherwise negotiates 4:4:4 with
+    /// encoders that accept it, and a 4:4:4 stretch stream-copied between 4:2:0
+    /// parts does not decode in players that keep the first parameter sets.
+    pub output_filter: String,
     pub encoder_args: Vec<String>,
 }
 
 impl TransitionEncoding {
     pub fn for_codec(codec_id: CompositeCodecId, quality: EncodingQuality, fps: Fps) -> Self {
         let profile = composite_profile(codec_id);
-        let (device_args, upload_filter): (Vec<&str>, _) =
+        // Parts are 4:2:0: 8-bit unless the profile pins its own pixel format.
+        let part_format = profile
+            .output_args
+            .iter()
+            .position(|arg| *arg == "-pix_fmt")
+            .map_or("yuv420p", |index| profile.output_args[index + 1]);
+        let (device_args, output_filter): (Vec<&str>, _) =
             match codec_id.metadata().filter_stack_kind {
                 CompositeFilterStackKind::VaapiOverlay => (
                     vec!["-init_hw_device", "vaapi=va", "-filter_hw_device", "va"],
-                    Some("format=nv12,hwupload"),
+                    "format=nv12,hwupload".to_string(),
                 ),
-                CompositeFilterStackKind::AmfD3d11Overlay => {
-                    (profile.input_args.to_vec(), Some("format=nv12,hwupload"))
-                }
+                CompositeFilterStackKind::AmfD3d11Overlay => (
+                    profile.input_args.to_vec(),
+                    "format=nv12,hwupload".to_string(),
+                ),
                 CompositeFilterStackKind::SoftwareOverlay
                 | CompositeFilterStackKind::CudaOverlay
-                | CompositeFilterStackKind::QsvFullOverlay => (Vec::new(), None),
+                | CompositeFilterStackKind::QsvFullOverlay => {
+                    (Vec::new(), format!("format={part_format}"))
+                }
             };
         let mut encoder_args = vec![
             "-r".to_string(),
@@ -126,7 +138,7 @@ impl TransitionEncoding {
         encoder_args.extend(rate_control_args(profile, quality));
         Self {
             device_args: device_args.into_iter().map(String::from).collect(),
-            upload_filter: upload_filter.map(String::from),
+            output_filter,
             encoder_args,
         }
     }
@@ -195,15 +207,12 @@ pub fn transition_segment_args(
             input.to_string_lossy().into_owned(),
         ]);
     }
-    let upload = encoding
-        .upload_filter
-        .as_ref()
-        .map_or(String::new(), |filter| format!(",{filter}"));
     args.extend([
         "-filter_complex".into(),
         format!(
-            "[0:v][1:v]xfade=transition={name}:duration={}:offset=0{upload}[out]",
-            format_seconds_arg(*duration)
+            "[0:v][1:v]xfade=transition={name}:duration={}:offset=0,{}[out]",
+            format_seconds_arg(*duration),
+            encoding.output_filter
         ),
         "-map".into(),
         "[out]".into(),
@@ -478,14 +487,16 @@ mod tests {
         assert_eq!(
             transition_segment_args(&software(false), &transition()).join(" "),
             "-loglevel error -nostdin -noautorotate -i /out/.parts/part-0001.mp4 -noautorotate -i /out/.parts/part-0002.mp4 \
-             -filter_complex [0:v][1:v]xfade=transition=wipeleft:duration=1.001:offset=0[out] -map [out] \
+             -filter_complex [0:v][1:v]xfade=transition=wipeleft:duration=1.001:offset=0,format=yuv420p[out] -map [out] \
              -r 30000/1001 -c:v libx264 -preset veryfast -crf 20 -an -movflags faststart -y /out/.parts/transition-0000.mp4"
         );
-        let hevc = software(true).encoder_args.join(" ");
+        let hevc = software(true);
         assert_eq!(
-            hevc,
+            hevc.encoder_args.join(" "),
             "-r 30000/1001 -c:v libx265 -pix_fmt yuv420p10le -profile:v main10 -preset veryfast -tag:v hvc1 -crf 20"
         );
+        // The blend keeps the parts' pixel format, the profile's own when it pins one.
+        assert_eq!(hevc.output_filter, "format=yuv420p10le");
         // Hardware-frame encoders get their device and an upload; the others take system frames.
         let fps = Fps::new(30, 1).unwrap();
         let vaapi = TransitionEncoding::for_codec(
@@ -497,7 +508,7 @@ mod tests {
             vaapi.device_args,
             ["-init_hw_device", "vaapi=va", "-filter_hw_device", "va"]
         );
-        assert_eq!(vaapi.upload_filter.as_deref(), Some("format=nv12,hwupload"));
+        assert_eq!(vaapi.output_filter, "format=nv12,hwupload");
         let amf = TransitionEncoding::for_codec(
             CompositeCodecId::AmfH264,
             EncodingQuality::Quality(20),
@@ -514,7 +525,7 @@ mod tests {
         ] {
             let encoding = TransitionEncoding::for_codec(codec, EncodingQuality::Quality(20), fps);
             assert!(
-                encoding.device_args.is_empty() && encoding.upload_filter.is_none(),
+                encoding.device_args.is_empty() && encoding.output_filter == "format=yuv420p",
                 "{codec:?}"
             );
         }
