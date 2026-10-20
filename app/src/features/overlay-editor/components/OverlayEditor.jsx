@@ -52,12 +52,12 @@ function OverlayEditorContent(props) {
         {showProjectStatus ? (
           <Badge
             variant={projectStatus === 'Modified' ? 'secondary' : 'outline'}
-            className={`h-6 rounded-xs text-[10px] shadow-lg backdrop-blur-sm ${projectStatus === 'Modified' ? 'border-accent-border bg-surface-accent-soft/20 text-primary' : 'bg-card/85'}`}
+            className={`h-6 rounded-xs text-[10px] shadow-lg ${projectStatus === 'Modified' ? 'border-accent-border bg-surface-accent-soft/20 text-primary' : 'bg-card/85'}`}
           >
             {t(statusTranslation.key, statusTranslation.defaultLabel)}
           </Badge>
         ) : null}
-        <div className="rounded-xs border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">
+        <div className="rounded-xs border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg">
           {sceneSize.width} &times; {sceneSize.height}
         </div>
       </div>
@@ -160,7 +160,7 @@ function OverlayEditor(props) {
   if (props.config !== null) return <OverlayEditorContent {...props} />
   return (
     <div className="flex h-full items-center justify-center p-8">
-      <div className="max-w-sm rounded-sm border border-dashed border-border/70 bg-card/60 px-8 py-10 text-center shadow-[0_30px_80px_rgba(0,0,0,0.25)] backdrop-blur-sm">
+      <div className="max-w-sm rounded-sm border border-dashed border-border/70 bg-card/60 px-8 py-10 text-center shadow-[0_30px_80px_rgba(0,0,0,0.25)]">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center bg-surface-elevated text-primary">
           <LayoutGrid className="h-6 w-6" />
         </div>

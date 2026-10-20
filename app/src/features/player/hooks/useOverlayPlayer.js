@@ -9,7 +9,8 @@ import { formatClockDuration } from '@/lib/time-format'
 import { videoOverlapsActivity } from '@/lib/video-sync'
 import useStore from '@/store/useStore'
 import { snapTimelineSecondToFrame } from '../utils/playerTiming'
-import { moveClipOffset, roundToDevicePixel, secondsToViewPx } from '../utils/timelineGeometry'
+import { PLAYHEAD_CENTER_X } from '../data/playheadGeometry'
+import { moveClipOffset, roundToDevicePixel, secondsToViewPx, snapToScreenPixel } from '../utils/timelineGeometry'
 
 import useClipDrag from './useClipDrag'
 import useExportRangeTimeline from './useExportRangeTimeline'
@@ -18,11 +19,6 @@ import useTimelineClips from './useTimelineClips'
 import useTimelineGestures from './useTimelineGestures'
 import useTimelineViewport from './useTimelineViewport'
 import useVideoSyncTimeline from '@/features/video-sync/hooks/useVideoSyncTimeline'
-
-function getDevicePixelRatio() {
-  if (typeof window === 'undefined') return 1
-  return window.devicePixelRatio || 1
-}
 
 function getMarkerClassName(marker) {
   return `mt-1 h-4 w-2.5 bg-success/10 ${
@@ -344,16 +340,17 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     widthPx: viewport.widthPx,
   })
 
-  // Playhead geometry - converts the displayed playhead second into a stable pixel position for the surface.
-  const pixelRatio = getDevicePixelRatio()
-  const playheadLeft = roundToDevicePixel(
+  // Playhead geometry - places the playhead SVG so its line center sits on the displayed second, with the SVG origin
+  // snapped to a screen pixel so every position renders with the same sub-pixel phase.
+  const pixelRatio = viewport.pixelGrid.ratio
+  const playheadOffset = snapToScreenPixel(
     secondsToViewPx({
       second: playback.clampedPlayhead,
       viewStart: viewport.viewport.viewStart,
       viewEnd: viewport.viewport.viewEnd,
       widthPx: viewport.widthPx,
-    }),
-    pixelRatio,
+    }) - PLAYHEAD_CENTER_X,
+    viewport.pixelGrid,
   )
   const snapGuidelineLeft =
     snapGuidelineSecond === null
@@ -431,8 +428,9 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       panSurfaceProps: gestures.panSurfaceProps,
       playhead: {
         handleProps: gestures.playheadProps,
-        lineStyle: { left: playheadLeft },
-        style: { left: playheadLeft },
+        // Positioned by transform because layout snaps `left` to whole CSS pixels before the app shell's scale,
+        // which lands on a different sub-pixel phase at each step.
+        style: { transform: `translateX(${playheadOffset}px)` },
       },
       snapGuidelineStyle: snapGuidelineLeft === null ? null : { left: snapGuidelineLeft },
       ticks: viewport.ticks,

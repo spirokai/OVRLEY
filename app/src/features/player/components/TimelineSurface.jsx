@@ -4,6 +4,9 @@ import VideoSyncTimelineLandmarks from '@/features/video-sync/components/VideoSy
 import { GripVertical } from 'lucide-react'
 import TimelineLane from './TimelineLane'
 import { useTranslation } from 'react-i18next'
+import { PLAYHEAD_HEAD_HEIGHT, PLAYHEAD_HEAD_SHOULDER, PLAYHEAD_HIT_PADDING, PLAYHEAD_LINE_X, PLAYHEAD_WIDTH } from '../data/playheadGeometry'
+
+const PLAYHEAD_HEAD_POINTS = `0,0 ${PLAYHEAD_WIDTH},0 ${PLAYHEAD_WIDTH},${PLAYHEAD_HEAD_SHOULDER} ${PLAYHEAD_WIDTH / 2},${PLAYHEAD_HEAD_HEIGHT} 0,${PLAYHEAD_HEAD_SHOULDER}`
 
 /**
  * Presentational timeline surface containing the axis, lanes, playhead, and export markers.
@@ -59,16 +62,26 @@ export default function TimelineSurface({ timeline }) {
 
       <div className="pointer-events-none absolute inset-0">
         {timeline.videoSyncMode ? <VideoSyncTimelineLandmarks landmarks={timeline.landmarks} /> : null}
-        <div className="pointer-events-none absolute bottom-0 top-0 z-30 w-px -translate-x-1/2 bg-primary" style={timeline.playhead.lineStyle} />
-        <div
-          className="pointer-events-auto absolute -top-1 z-40 -translate-x-1/2 cursor-grab p-1 active:cursor-grabbing"
+        {/* One SVG for head and line, so the line can never drift against the head. */}
+        <svg
+          data-testid="timeline-playhead"
+          width={PLAYHEAD_WIDTH}
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-0 left-0 top-0 z-40 h-full overflow-visible fill-primary"
           style={timeline.playhead.style}
-          {...timeline.playhead.handleProps}
         >
-          <svg width="14" height="13" viewBox="0 0 14 13" className="fill-primary" aria-hidden="true">
-            <polygon points="1,0 13,0 13,5 7,13 1,5" />
-          </svg>
-        </div>
+          <rect x={PLAYHEAD_LINE_X} y="0" width="1" height="100%" />
+          <polygon points={PLAYHEAD_HEAD_POINTS} />
+          <rect
+            x={-PLAYHEAD_HIT_PADDING}
+            y={-PLAYHEAD_HIT_PADDING}
+            width={PLAYHEAD_WIDTH + 2 * PLAYHEAD_HIT_PADDING}
+            height={PLAYHEAD_HEAD_HEIGHT + 2 * PLAYHEAD_HIT_PADDING}
+            fill="transparent"
+            className="pointer-events-auto cursor-grab active:cursor-grabbing"
+            {...timeline.playhead.handleProps}
+          />
+        </svg>
 
         {timeline.exportMarkers.map((marker) => (
           <div key={marker.marker}>

@@ -20,7 +20,7 @@ export default function OverlayPlayer({ activeKeyboardWorkspace, backgroundMode,
 
   return (
     <div
-      className="shrink-0 border-border/70 bg-black/30 px-8 py-2 backdrop-blur-sm"
+      className="shrink-0 border-border/70 bg-black/30 px-8 py-2"
       onFocusCapture={onActivateKeyboardWorkspace}
       onPointerDownCapture={onActivateKeyboardWorkspace}
     >

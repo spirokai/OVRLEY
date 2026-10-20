@@ -135,11 +135,7 @@ export default function HexColorPicker({
           </button>
         </ColorPickerTrigger>
 
-        <ColorPickerContent
-          align="start"
-          sideOffset={8}
-          className=" rounded-sm border-border/80 bg-card/95 p-3 shadow-2xl shadow-background/40 backdrop-blur-sm"
-        >
+        <ColorPickerContent align="start" sideOffset={8} className=" rounded-sm border-border/80 bg-card/95 p-3 shadow-2xl shadow-background/40">
           <div className="space-y-4">
             <ColorPickerArea
               className="h-40 w-full overflow-hidden rounded-sm border border-border/60"
