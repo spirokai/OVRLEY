@@ -180,7 +180,20 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
           </div>
         </div>
         <div className="space-y-4">
-          <SectionHeading icon={Palette} title={t('widget-editor.areaStyling', 'Area Styling')} />
+          <SectionHeading
+            icon={Palette}
+            title={t('widget-editor.areaStyling', 'Area Styling')}
+            trailing={
+              <div className="flex items-center gap-2 px-1">
+                <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.areaGradient', 'Gradient')}</Label>
+                <ToggleField
+                  label={t('widget-editor.areaGradient', 'Gradient')}
+                  checked={widget.data.area_gradient}
+                  onCheckedChange={(checked) => updateWidgetData(widget.id, { area_gradient: checked })}
+                />
+              </div>
+            }
+          />
           <div className="grid grid-cols-2 gap-4">
             <ColorField
               label={t('widget-editor.finishedColor', 'Finished Color')}

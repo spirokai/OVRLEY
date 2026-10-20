@@ -39,6 +39,7 @@ fn minimal_plot() -> ValidatedElevationPlot {
         area_remaining_opacity: 0.3,
         area_completed_color: "#00ff00".into(),
         area_completed_opacity: 0.5,
+        area_gradient: false,
         marker_variant: "single".into(),
         marker_variant_diameter: 0.0,
         marker_size: 8.0,

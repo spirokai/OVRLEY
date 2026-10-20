@@ -233,6 +233,7 @@
         "remaining_line_opacity": 35,
         "area_completed_opacity": 24,
         "area_remaining_opacity": 12,
+        "area_gradient": false,
         "marker_variant": "single",
         "marker_variant_diameter": 40,
         "marker_size": 10,

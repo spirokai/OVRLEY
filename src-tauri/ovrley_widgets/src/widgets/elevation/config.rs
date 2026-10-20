@@ -24,6 +24,7 @@ pub struct ElevationPlotConfig {
     pub area_remaining_opacity: f32,
     pub area_completed_color: String,
     pub area_completed_opacity: f32,
+    pub area_gradient: bool,
     pub marker_variant: String,
     pub marker_variant_diameter: f32,
     pub marker_size: f32,

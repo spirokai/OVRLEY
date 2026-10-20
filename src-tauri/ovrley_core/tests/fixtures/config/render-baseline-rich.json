@@ -219,6 +219,7 @@
       "remaining_line_opacity": 100,
       "area_completed_opacity": 46,
       "area_remaining_opacity": 38,
+      "area_gradient": false,
       "marker_variant": "single",
       "marker_variant_diameter": 40,
       "marker_size": 5,

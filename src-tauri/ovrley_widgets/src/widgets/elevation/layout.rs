@@ -14,8 +14,8 @@ use crate::{
     },
 };
 use skia_safe::{
-    path_utils, BlurStyle, Canvas, ClipOp, Color, Image, MaskFilter, Matrix, Paint, Path,
-    PathBuilder, Rect,
+    gradient, path_utils, BlurStyle, Canvas, ClipOp, Color, Color4f, Image, MaskFilter, Matrix,
+    Paint, Path, PathBuilder, Rect, TileMode,
 };
 use std::sync::{Arc, Mutex};
 
@@ -54,6 +54,27 @@ fn fill_paint(color: &str, opacity: f32) -> Paint {
     paint.set_anti_alias(true);
     paint.set_color(parse_color(color, opacity));
     paint
+}
+
+/// Area fill; the optional gradient fades from full fill opacity at the plot top to
+/// transparent at the plot bottom, in rotated local plot coordinates.
+fn area_paint(color: &str, opacity: f32, gradient_height: Option<f32>) -> WidgetResult<Paint> {
+    let mut paint = fill_paint(color, opacity);
+    if let Some(height) = gradient_height {
+        let top = parse_color(color, 1.0);
+        let colors = [Color4f::from(top), Color4f::from(top.with_a(0))];
+        let gradient = gradient::Gradient::new(
+            gradient::Colors::new(&colors, None, TileMode::Clamp, None),
+            gradient::Interpolation::default(),
+        );
+        let shader =
+            gradient::shaders::linear_gradient(((0.0, 0.0), (0.0, height)), &gradient, None)
+                .ok_or_else(|| {
+                    WidgetError::Render("unable to prepare elevation area gradient".into())
+                })?;
+        paint.set_shader(shader);
+    }
+    Ok(paint)
 }
 
 fn stroke_outline(path: &Path, paint: &Paint) -> WidgetResult<Path> {
@@ -128,6 +149,7 @@ impl ElevationLayout {
             config.completed_line_opacity * scene.opacity,
         );
         let completed_area_clip = Arc::new(Mutex::new(stroke_outline(&path, &completed_line)?));
+        let area_gradient_height = config.area_gradient.then_some(config.height * scene.scale);
         canvas.save();
         canvas.clip_path(
             &stroke_outline(&path, &remaining_line)?,
@@ -136,10 +158,11 @@ impl ElevationLayout {
         );
         canvas.draw_path(
             &area,
-            &fill_paint(
+            &area_paint(
                 &config.area_remaining_color,
                 config.area_remaining_opacity * scene.opacity,
-            ),
+                area_gradient_height,
+            )?,
         );
         canvas.restore();
         if blur > 0.0 {
@@ -253,10 +276,11 @@ impl ElevationLayout {
         );
         let content_bounds =
             ContentBounds::rotated_frame(content, config.rotation, config.x, config.y);
-        let completed_area = fill_paint(
+        let completed_area = area_paint(
             &config.area_completed_color,
             config.area_completed_opacity * scene.opacity,
-        );
+            area_gradient_height,
+        )?;
         let marker = fill_paint(&config.marker_color, config.marker_opacity * scene.opacity);
         let mut variant = marker.clone();
         match config.marker_variant.as_str() {

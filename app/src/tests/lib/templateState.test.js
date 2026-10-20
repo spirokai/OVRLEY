@@ -215,6 +215,20 @@ describe('normalizeTemplateConfig', () => {
     expect(result.plots[0].point_label.font).toBe('ElevFont.ttf')
   })
 
+  test('materializes area_gradient off for elevation plots saved before the field existed and keeps explicit values', () => {
+    const config = {
+      rasters: [],
+      plots: [
+        { id: 'plot-1', value: 'elevation', x: 30, y: 40, point_label: {} },
+        { id: 'plot-2', value: 'elevation', x: 30, y: 40, point_label: {}, area_gradient: true },
+      ],
+    }
+    const result = normalizeTemplateConfig(config, {})
+
+    expect(result.plots[0].area_gradient).toBe(false)
+    expect(result.plots[1].area_gradient).toBe(true)
+  })
+
   test('normalizes heading value widget with display_variants', () => {
     const config = {
       rasters: [],

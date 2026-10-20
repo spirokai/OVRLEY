@@ -27,6 +27,8 @@ pub struct ValidatedElevationPlot {
     pub area_remaining_opacity: f32,
     pub area_completed_color: String,
     pub area_completed_opacity: f32,
+    /// Fades both area fills from their opacity at the plot top to transparent at its bottom.
+    pub area_gradient: bool,
     pub marker_variant: String,
     pub marker_variant_diameter: f32,
     pub marker_size: f32,
@@ -132,6 +134,7 @@ pub fn validate_elevation_plot(
         area_remaining_opacity: opacity(plot.area_remaining_opacity, "area_remaining_opacity")?,
         area_completed_color: color(&plot.area_completed_color, "area_completed_color")?,
         area_completed_opacity: opacity(plot.area_completed_opacity, "area_completed_opacity")?,
+        area_gradient: plot.area_gradient,
         marker_variant: plot.marker_variant.clone(),
         marker_variant_diameter: positive(plot.marker_variant_diameter, "marker_variant_diameter")?,
         marker_size: positive(plot.marker_size, "marker_size")?,

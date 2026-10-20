@@ -329,6 +329,44 @@ fn elevation_areas_stop_at_the_inner_stroke_edge() {
 }
 
 #[test]
+fn elevation_area_gradient_fades_both_areas_from_plot_top_to_transparent_bottom() {
+    let mut activity = elevation_activity();
+    activity.sample_elevations.fill(Some(100.0));
+    activity.barometric_altitude.fill(Some(100.0));
+    let bytes = serde_json::to_vec(&activity).unwrap();
+    for (gradient, completed, second) in [(false, false, 0.0), (true, false, 0.0), (false, true, 4.0), (true, true, 4.0)] {
+        let mut request = elevation_request();
+        request["widget"].as_object_mut().unwrap().extend(json!({
+            "x": 40, "y": 40, "width": 240, "height": 160, "rotation": 0, "y_scale": 0.5,
+            "show_elevation_metric": false, "show_elevation_imperial": false,
+            "remaining_line_width": 1, "completed_line_width": 1,
+            "remaining_line_opacity": 0, "completed_line_opacity": 0, "marker_opacity": 0,
+            "area_remaining_opacity": if completed { 0 } else { 100 },
+            "area_completed_opacity": if completed { 100 } else { 0 },
+            "area_gradient": gradient
+        }).as_object().unwrap().clone());
+        request["scene"].as_object_mut().unwrap().extend(json!({
+            "scale": 1, "opacity": 1, "shadow_strength": 0, "shadow_distance": 0, "border_thickness": 0
+        }).as_object().unwrap().clone());
+        let (mut preview, id) = elevation_preview(&request, &bytes);
+        preview.render(second).unwrap();
+        let widget = &preview.widgets[&id];
+        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let left = geometry["left"].as_f64().unwrap() as usize;
+        let top = geometry["top"].as_f64().unwrap() as usize;
+        let raster_width = geometry["width"].as_u64().unwrap() as usize;
+        let alpha = |y: usize| widget.pixels()[((y - top) * raster_width + 160 - left) * 4 + 3] as i32;
+        if gradient {
+            // Plot spans y 40..200: alpha follows 255 * (200 - y) / 160 regardless of the area's own top.
+            assert!((alpha(170) - 48).abs() <= 3, "gradient alpha near area top, got {}", alpha(170));
+            assert!((alpha(195) - 8).abs() <= 3, "gradient alpha near plot bottom, got {}", alpha(195));
+        } else {
+            assert_eq!((alpha(170), alpha(195)), (255, 255), "solid area keeps uniform opacity");
+        }
+    }
+}
+
+#[test]
 fn elevation_resize_updates_size_reuses_geometry_until_commit_and_preserves_fixed_corners() {
     use std::sync::Arc;
     let opposite = |geometry: &Value, fixed: [f64; 2]| {
