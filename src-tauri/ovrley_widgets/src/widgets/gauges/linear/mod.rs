@@ -11,7 +11,8 @@ use super::{
 use crate::{
     error::WidgetResult,
     model::{
-        scene::ValidatedScenePresentation, standard_widgets::widget_font_weight,
+        scene::{Numerals, ValidatedScenePresentation},
+        standard_widgets::widget_font_weight,
         types::TrackFillStyle,
     },
     render::text::{parse_color, resolve_font, FontResolver, ResolvedTextStyle},
@@ -97,6 +98,7 @@ pub fn prepare_linear_gauge_cache(
                 shadow_distance: 0.0,
                 border_color: None,
                 border_thickness: 0.0,
+                numerals: Numerals::Default,
             };
             let run = prepare_text(text, text, style, fonts)?;
             content.join(run.content_bounds);

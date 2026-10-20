@@ -57,7 +57,7 @@ impl ElevationLabel {
             || format!("-- {}", self.unit),
             |value| format!("{value} {}", self.unit),
         );
-        let run = layout_text(&text, &self.font, 0.0);
+        let run = layout_text(&text, &self.font, 0.0, self.style.numerals);
         let m = run.measurement;
         let baseline =
             (self.style.line_height - (m.bounds_bottom - m.bounds_top)) * 0.5 - m.bounds_top;
@@ -98,7 +98,7 @@ impl ElevationLabel {
         let mut top = 0.0_f32;
         let mut bottom = 0.0_f32;
         for c in "0123456789- MFT".chars() {
-            let m = measure_text_with_font(&c.to_string(), &self.font);
+            let m = measure_text_with_font(&c.to_string(), &self.font, self.style.numerals);
             if c.is_ascii_digit() {
                 advance = advance.max(m.width);
             }
@@ -107,8 +107,9 @@ impl ElevationLabel {
             top = top.min(m.bounds_top);
             bottom = bottom.max(m.bounds_bottom);
         }
-        let suffix = measure_text_with_font(&format!("- {}", self.unit), &self.font).width;
-        let placeholder = measure_text_with_font(&format!("-- {}", self.unit), &self.font).width;
+        let measure = |text: String| measure_text_with_font(&text, &self.font, self.style.numerals);
+        let suffix = measure(format!("- {}", self.unit)).width;
+        let placeholder = measure(format!("-- {}", self.unit)).width;
         let width = (digits as f32 * advance + suffix).max(placeholder) + overhang;
         let half_border = self.style.border_thickness * 0.5;
         let height = bottom - top;

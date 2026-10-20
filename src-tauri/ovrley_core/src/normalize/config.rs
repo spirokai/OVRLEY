@@ -366,6 +366,7 @@ fn materialize_template_scene_defaults(config: &mut Value, template: &Value) {
     copy_scene_default_if_missing(scene, globals, "shadow_distance", "shadow_distance");
     copy_scene_default_if_missing(scene, globals, "border_color", "border_color");
     copy_scene_default_if_missing(scene, globals, "border_thickness", "border_thickness");
+    copy_scene_default_if_missing(scene, globals, "fixed_width_digits", "fixed_width_digits");
 }
 
 fn copy_scene_default_if_missing(

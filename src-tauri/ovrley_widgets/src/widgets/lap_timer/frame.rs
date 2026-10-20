@@ -3,8 +3,8 @@ use super::{LINE_HEIGHT_RATIO, TABLE_VERTICAL_METRICS_TEXT};
 use crate::{
     error::{WidgetError, WidgetResult},
     render::text::{
-        baseline_for_text_top_with_line_height, draw_text_blob, layout_text, text_selection_bounds,
-        ResolvedTextStyle,
+        baseline_for_text_top_with_line_height, draw_text_blob, layout_text,
+        measure_text_with_font, text_selection_bounds, ResolvedTextStyle,
     },
     widgets::value::preview::surface,
 };
@@ -28,7 +28,7 @@ impl TextRun {
         style: ResolvedTextStyle,
         font: &Font,
     ) -> WidgetResult<Self> {
-        let layout = layout_text(text, font, 0.0);
+        let layout = layout_text(text, font, 0.0, style.numerals);
         let measurement = layout.measurement;
         let baseline =
             baseline_for_text_top_with_line_height(metrics_text, style.y, font, style.line_height);
@@ -71,7 +71,7 @@ impl TextRun {
         style: &ResolvedTextStyle,
         font: &Font,
     ) -> WidgetResult<Self> {
-        let (width, _) = font.measure_str(text, None);
+        let width = measure_text_with_font(text, font, style.numerals).width;
         Self::new(
             text,
             TABLE_VERTICAL_METRICS_TEXT,

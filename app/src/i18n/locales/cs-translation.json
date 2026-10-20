@@ -344,6 +344,7 @@
     "borderThickness": "Tloušťka okrajů",
     "custom": "Vlastní",
     "customFps": "Vlastní FPS",
+    "fixedWidthDigits": "Číslice pevné šířky",
     "fontLabels": "Písmo – popisky",
     "fontValues": "Písmo – hodnoty",
     "framerate": "Snímková frekvence",

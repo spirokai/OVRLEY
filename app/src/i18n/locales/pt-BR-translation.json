@@ -344,6 +344,7 @@
     "borderThickness": "Espessura da borda",
     "custom": "Personalizado",
     "customFps": "FPS personalizado",
+    "fixedWidthDigits": "Dígitos de largura fixa",
     "fontLabels": "Fonte - rótulos",
     "fontValues": "Fonte - valores",
     "framerate": "Taxa de quadros",

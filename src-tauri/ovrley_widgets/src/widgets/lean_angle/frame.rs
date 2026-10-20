@@ -10,7 +10,8 @@ use super::{
 use crate::{
     error::{WidgetError, WidgetResult},
     model::{
-        scene::ValidatedScenePresentation, standard_metrics::standard_metric_unit_label,
+        scene::{Numerals, ValidatedScenePresentation},
+        standard_metrics::standard_metric_unit_label,
         standard_widgets::widget_font_weight, types::MetricKind,
     },
     render::text::{
@@ -123,6 +124,7 @@ pub fn prepare_lean_angle_frame(
         shadow_distance: scene.shadow_distance * scale,
         border_color: Some(parse_color(&scene.border_color, widget.opacity)),
         border_thickness: scene.border_thickness * scale,
+        numerals: scene.numerals,
     };
     let value_text = format_lean_angle_value(raw);
     let value_font = resolve_styled_font(
@@ -132,9 +134,12 @@ pub fn prepare_lean_angle_frame(
         widget_font_weight(),
         false,
     )?;
-    let value = layout_text(&value_text, &value_font, 0.0);
-    let value_vertical =
-        measure_text_with_font(metric_vertical_metrics_text(&value_text), &value_font);
+    let value = layout_text(&value_text, &value_font, 0.0, value_style.numerals);
+    let value_vertical = measure_text_with_font(
+        metric_vertical_metrics_text(&value_text),
+        &value_font,
+        Numerals::Default,
+    );
     let unit = if raw.is_some() && widget.show_units {
         let unit_text = standard_metric_unit_label(MetricKind::LeanAngle, None);
         let unit_size = (font_size * METRIC_WIDGET_UNIT_RATIO).max(MIN_UNITS_FONT_SIZE * scale);
@@ -145,9 +150,13 @@ pub fn prepare_lean_angle_frame(
             widget_font_weight(),
             false,
         )?;
-        let text = layout_text(unit_text, &font, 0.0);
+        let text = layout_text(unit_text, &font, 0.0, Numerals::Default);
         // The degree glyph shares the existing degree/C baseline reference.
-        let vertical = measure_text_with_font(metric_vertical_metrics_text("\u{00b0}C"), &font);
+        let vertical = measure_text_with_font(
+            metric_vertical_metrics_text("\u{00b0}C"),
+            &font,
+            Numerals::Default,
+        );
         let style = ResolvedTextStyle {
             font_size: unit_size,
             line_height: unit_size * METRIC_WIDGET_LINE_HEIGHT,

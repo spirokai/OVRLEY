@@ -225,6 +225,7 @@ impl ElevationLayout {
             shadow_distance: scene.shadow_distance * scene.scale,
             border_color: Some(parse_color(&scene.border_color, scene.opacity)),
             border_thickness: scene.border_thickness * scene.scale,
+            numerals: scene.numerals,
         };
         let labels = [
             (

@@ -344,6 +344,7 @@
     "borderThickness": "테두리 두께",
     "custom": "사용자 지정",
     "customFps": "사용자 지정 FPS",
+    "fixedWidthDigits": "고정 폭 숫자",
     "fontLabels": "폰트 - 레이블",
     "fontValues": "폰트 - 값",
     "framerate": "프레임 속도",

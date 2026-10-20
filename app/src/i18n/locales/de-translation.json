@@ -344,6 +344,7 @@
     "borderThickness": "Randdicke",
     "custom": "Benutzerdefiniert",
     "customFps": "Benutzerdefinierte FPS",
+    "fixedWidthDigits": "Ziffern mit fester Breite",
     "fontLabels": "Schrift – Text",
     "fontValues": "Schrift – Werte",
     "framerate": "Bildrate",

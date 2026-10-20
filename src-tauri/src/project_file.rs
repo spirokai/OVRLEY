@@ -29,9 +29,10 @@ use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 const PROJECT_FORMAT: &str = "ovrley-project";
-const PROJECT_VERSION: u32 = 3;
+const PROJECT_VERSION: u32 = 4;
 const PROJECT_VERSION_V1: u32 = 1;
 const PROJECT_VERSION_V2: u32 = 2;
+const PROJECT_VERSION_V3: u32 = 3;
 const MAX_MANUAL_LANDMARKS: usize = 5;
 const MAX_MANUAL_LOCATION_LANDMARKS: usize = 1;
 const DEFAULT_MANUAL_SPEED_THRESHOLD_KMH: f64 = 5.0;
@@ -191,6 +192,7 @@ struct GlobalDefaults {
     font_size: f64,
     opacity: f64,
     scale: f64,
+    fixed_width_digits: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -710,6 +712,12 @@ fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
 
 fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, String> {
     ovrley_core::normalize::migrate_saved_font_input(&mut value);
+    if matches!(
+        version,
+        PROJECT_VERSION_V1 | PROJECT_VERSION_V2 | PROJECT_VERSION_V3
+    ) {
+        insert_fixed_width_digits(&mut value)?;
+    }
     let mut legacy = match version {
         PROJECT_VERSION_V1 => {
             let project: ProjectDocumentV1 = serde_json::from_value(value)
@@ -736,9 +744,17 @@ fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, St
         }
         PROJECT_VERSION_V2 => serde_json::from_value(value)
             .map_err(|error| format!("Invalid version 2 project: {error}"))?,
+        PROJECT_VERSION_V3 => {
+            let project: ProjectDocument = serde_json::from_value(value)
+                .map_err(|error| format!("Invalid version 3 project: {error}"))?;
+            return Ok(ProjectDocument {
+                version: PROJECT_VERSION,
+                ..project
+            });
+        }
         PROJECT_VERSION => {
             return serde_json::from_value(value)
-                .map_err(|error| format!("Invalid version 3 project: {error}"));
+                .map_err(|error| format!("Invalid version 4 project: {error}"));
         }
         other => return Err(format!("Unsupported project version: {other}")),
     };
@@ -762,6 +778,21 @@ fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, St
         timeline: legacy.timeline,
         raster_assets: BTreeMap::new(),
     })
+}
+
+// Version 4 adds the fixed-width digits switch; earlier projects take its default, on.
+fn insert_fixed_width_digits(value: &mut Value) -> Result<(), String> {
+    let globals = value
+        .pointer_mut("/editor/globalDefaults")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| "editor.globalDefaults must be an object".to_string())?;
+    if globals
+        .insert("fixed_width_digits".into(), Value::Bool(true))
+        .is_some()
+    {
+        return Err("Legacy project cannot contain fixed_width_digits".into());
+    }
+    Ok(())
 }
 
 fn migrate_legacy_render(render: LegacyProjectRender) -> Result<ProjectRender, String> {
@@ -1311,13 +1342,15 @@ mod tests {
         let fixture: Value = serde_json::from_str(config).unwrap();
         let mut config = fixture["config"].clone();
         config["rasters"] = serde_json::json!([]);
+        let mut global_defaults = fixture["settings"]["globalDefaults"].clone();
+        global_defaults["fixed_width_digits"] = Value::Bool(true);
         serde_json::json!({
             "format": PROJECT_FORMAT,
             "version": PROJECT_VERSION,
             "savedAt": "2026-08-27T12:00:00.000Z",
             "editor": {
                 "config": config,
-                "globalDefaults": fixture["settings"]["globalDefaults"]
+                "globalDefaults": global_defaults
             },
             "sources": {
                 "activity": { "path": { "kind": "project-relative", "value": "media/session.fit" } },
@@ -1353,6 +1386,10 @@ mod tests {
     fn valid_v2_project_json() -> String {
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
         project["version"] = Value::from(PROJECT_VERSION_V2);
+        project["editor"]["globalDefaults"]
+            .as_object_mut()
+            .unwrap()
+            .remove("fixed_width_digits");
         project["editor"]["config"]
             .as_object_mut()
             .unwrap()
@@ -1407,7 +1444,7 @@ mod tests {
                     let loaded = read_project_file_sync(&resources, path_string(path.clone()))
                         .unwrap()
                         .project;
-                    assert_eq!(loaded.version, 3);
+                    assert_eq!(loaded.version, PROJECT_VERSION);
                     assert_eq!(
                         loaded.editor.config["labels"][0]["letter_spacing"],
                         spacing.unwrap_or(0.0)
@@ -1609,7 +1646,7 @@ mod tests {
             .unwrap();
 
             let loaded = read_project_file_sync(&resources, path_string(path.clone())).unwrap();
-            assert_eq!(loaded.project.version, 3);
+            assert_eq!(loaded.project.version, PROJECT_VERSION);
             assert_eq!(loaded.project.render.quality_type, quality_type);
             assert_eq!(loaded.project.render.quality_value, quality_value);
             assert_eq!(
@@ -1629,7 +1666,7 @@ mod tests {
             let mut archive = ZipArchive::new(File::open(&path).unwrap()).unwrap();
             let stored: Value =
                 serde_json::from_reader(archive.by_name(PROJECT_JSON_ENTRY).unwrap()).unwrap();
-            assert_eq!(stored["version"], 3);
+            assert_eq!(stored["version"], PROJECT_VERSION);
             assert_eq!(
                 stored["render"]["qualityType"],
                 project["render"]["qualityType"]
@@ -1728,7 +1765,7 @@ mod tests {
 
         let parsed = parse_project(&project.to_string()).unwrap().document;
         let serialized = serde_json::to_value(parsed).unwrap();
-        assert_eq!(serialized["version"], 3);
+        assert_eq!(serialized["version"], PROJECT_VERSION);
         assert_eq!(serialized["sync"]["manual"], project["sync"]["manual"]);
         assert_eq!(serialized["render"]["qualityType"], "quality");
         assert_eq!(
@@ -1823,7 +1860,7 @@ mod tests {
         for invalid in [
             "not json".to_string(),
             valid_project_json().replace(PROJECT_FORMAT, "wrong-project"),
-            valid_project_json().replace("\"version\":3", "\"version\":99"),
+            valid_project_json().replace("\"version\":4", "\"version\":99"),
             valid_project_json().replace("\"fps\":30.0", "\"fps\":0.0"),
             valid_project_json().replace("\"qualityValue\":18", "\"qualityValue\":52"),
             valid_project_json()
@@ -1879,6 +1916,33 @@ mod tests {
     }
 
     #[test]
+    fn legacy_projects_migrate_to_fixed_width_digits() {
+        let mut v3: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        v3["version"] = Value::from(PROJECT_VERSION_V3);
+        v3["editor"]["globalDefaults"]
+            .as_object_mut()
+            .unwrap()
+            .remove("fixed_width_digits");
+        for legacy in [
+            valid_v1_project_json(),
+            valid_v2_project_json(),
+            v3.to_string(),
+        ] {
+            let parsed = parse_project(&legacy).unwrap().document;
+            assert_eq!(parsed.version, PROJECT_VERSION);
+            assert!(parsed.editor.global_defaults.fixed_width_digits);
+        }
+        v3["editor"]["globalDefaults"]["fixed_width_digits"] = Value::Bool(false);
+        assert!(parse_project(&v3.to_string()).is_err());
+        let mut current: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        current["editor"]["globalDefaults"]
+            .as_object_mut()
+            .unwrap()
+            .remove("fixed_width_digits");
+        assert!(parse_project(&current.to_string()).is_err());
+    }
+
+    #[test]
     fn migrates_v1_and_v2_to_canonical_v3_without_embedded_rasters() {
         let parsed = parse_project(&valid_v1_project_json()).unwrap().document;
         assert_eq!(parsed.version, PROJECT_VERSION);
@@ -1922,7 +1986,7 @@ mod tests {
             let loaded =
                 read_project_file_sync(&RasterResources::default(), path_string(path.clone()))
                     .unwrap();
-            assert_eq!(loaded.project.version, 3);
+            assert_eq!(loaded.project.version, PROJECT_VERSION);
             assert!(loaded.raster_load_results.is_empty());
             assert_eq!(fs::read(&path).unwrap(), previous);
 
@@ -1936,7 +2000,7 @@ mod tests {
             let mut archive = ZipArchive::new(File::open(&path).unwrap()).unwrap();
             let stored: Value =
                 serde_json::from_reader(archive.by_name(PROJECT_JSON_ENTRY).unwrap()).unwrap();
-            assert_eq!(stored["version"], 3);
+            assert_eq!(stored["version"], PROJECT_VERSION);
             assert_eq!(stored["editor"]["config"]["rasters"], serde_json::json!([]));
             assert_eq!(stored["rasterAssets"], serde_json::json!({}));
             assert_eq!(stored["render"]["qualityType"], "quality");

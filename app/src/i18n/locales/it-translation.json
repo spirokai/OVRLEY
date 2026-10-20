@@ -344,6 +344,7 @@
     "borderThickness": "Spessore bordi",
     "custom": "Personalizzato",
     "customFps": "FPS personalizzato",
+    "fixedWidthDigits": "Cifre a larghezza fissa",
     "fontLabels": "Carattere - etichette",
     "fontValues": "Carattere - valori",
     "framerate": "Frequenza fotogrammi",

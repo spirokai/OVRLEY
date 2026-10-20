@@ -5,9 +5,10 @@ use super::{
 };
 use crate::{
     error::{WidgetError, WidgetResult},
+    model::scene::Numerals,
     render::text::{
-        baseline_for_top_with_line_height, draw_text_blob, layout_text, FontResolver,
-        ResolvedTextStyle,
+        baseline_for_top_with_line_height, draw_text_blob, layout_text, measure_text_with_font,
+        FontResolver, ResolvedTextStyle,
     },
     widgets::value::layout::metric_vertical_metrics_text,
 };
@@ -41,15 +42,37 @@ impl TextRun {
     }
 }
 
+/// Static gauge text such as units and min/max labels.
 pub(crate) fn prepare_text(
     text: &str,
     metrics_text: &str,
     style: ResolvedTextStyle,
     fonts: &dyn FontResolver,
 ) -> WidgetResult<TextRun> {
+    prepare_run(text, metrics_text, style, fonts, Numerals::Default)
+}
+
+/// The changing gauge readout, laid out in the style's numerals.
+fn prepare_value_text(
+    text: &str,
+    metrics_text: &str,
+    style: ResolvedTextStyle,
+    fonts: &dyn FontResolver,
+) -> WidgetResult<TextRun> {
+    let numerals = style.numerals;
+    prepare_run(text, metrics_text, style, fonts, numerals)
+}
+
+fn prepare_run(
+    text: &str,
+    metrics_text: &str,
+    style: ResolvedTextStyle,
+    fonts: &dyn FontResolver,
+    numerals: Numerals,
+) -> WidgetResult<TextRun> {
     let font =
         crate::render::text::resolve_font(fonts, style.font_name.as_deref(), style.font_size)?;
-    let text = layout_text(text, &font, 0.0);
+    let text = layout_text(text, &font, 0.0, numerals);
     let (_, vertical) = font.measure_str(metrics_text, None);
     let baseline = if vertical.height() <= f32::EPSILON {
         baseline_for_top_with_line_height(style.y, &font, style.line_height)
@@ -133,11 +156,12 @@ impl GaugeLayout {
         let value = if let Self::Arc(cache) = self {
             let layout = cache.inner_layout();
             let mut style = cache.text_style.clone();
-            let (advance, _) = cache.value_font.measure_str(&state.value_text, None);
+            let advance =
+                measure_text_with_font(&state.value_text, &cache.value_font, style.numerals).width;
             // Advance-centering preserves the native monospaced readout's anchor.
             style.x = layout.center_x - advance * 0.5;
             style.y = layout.value_top;
-            let run = prepare_text(
+            let run = prepare_value_text(
                 &state.value_text,
                 metric_vertical_metrics_text(&state.value_text),
                 style,

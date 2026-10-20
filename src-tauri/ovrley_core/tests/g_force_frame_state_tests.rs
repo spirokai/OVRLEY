@@ -90,6 +90,7 @@ fn scene() -> ValidatedSceneConfig {
             shadow_distance: 0.0,
             border_color: String::new(),
             border_thickness: 0.0,
+            numerals: ovrley_widgets::model::scene::Numerals::Default,
             overlay_filename: None,
         },
         fps: 1.0,

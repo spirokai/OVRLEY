@@ -344,6 +344,7 @@
     "borderThickness": "Épaisseur du bord",
     "custom": "Personnalisé",
     "customFps": "FPS personnalisé",
+    "fixedWidthDigits": "Chiffres à largeur fixe",
     "fontLabels": "Police - libellés",
     "fontValues": "Police - valeurs",
     "framerate": "Fréquence d’images",

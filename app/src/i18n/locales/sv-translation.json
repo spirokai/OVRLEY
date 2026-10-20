@@ -344,6 +344,7 @@
     "borderThickness": "Kanttjocklek",
     "custom": "Anpassad",
     "customFps": "Anpassad FPS",
+    "fixedWidthDigits": "Siffror med fast bredd",
     "fontLabels": "Teckensnitt - etiketter",
     "fontValues": "Teckensnitt - värden",
     "framerate": "Bildfrekvens",

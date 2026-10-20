@@ -10,6 +10,7 @@ export function buildWasmScene({ globalDefaults, sceneSize, exportRange, activit
     shadow_color: globalDefaults.shadow_color,
     shadow_strength: globalDefaults.shadow_strength,
     shadow_distance: globalDefaults.shadow_distance,
+    fixed_width_digits: globalDefaults.fixed_width_digits,
     scale: globalDefaults.scale,
     opacity: globalDefaults.opacity,
     export_start_seconds: exportRange.from,

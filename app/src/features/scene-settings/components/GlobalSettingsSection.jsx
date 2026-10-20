@@ -1,6 +1,6 @@
 /**
- * Renders global default settings — font selection, color pickers, opacity,
- * scale, border thickness, and shadow controls.
+ * Renders global default settings — font selection, fixed-width digits, color
+ * pickers, opacity, scale, border thickness, and shadow controls.
  * Pure presentational — all data comes from props.
  *
  * @param {object} props
@@ -17,6 +17,7 @@ import { SliderField } from '@/features/widget-editor/components/widgetFormContr
 import { Separator } from '@/components/ui/separator'
 import { Palette, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import FontSelectField from '@/components/ui/font-select-field'
 import HexColorPicker from '@/components/ui/hex-color-picker'
 import { useTranslation } from 'react-i18next'
@@ -57,6 +58,17 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
           onValueChange={(v) => onGlobalDefaultChange('font_text', v)}
           recommendedFonts={availableFonts.recommendedFonts}
           systemFonts={availableFonts.systemFonts}
+        />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Label htmlFor="fixed-width-digits" className="text-[10px] text-muted-foreground uppercase font-bold">
+          {t('scene-settings.fixedWidthDigits', 'Fixed-Width Digits')}
+        </Label>
+        <Switch
+          id="fixed-width-digits"
+          checked={globalDefaults.fixed_width_digits}
+          onCheckedChange={(checked) => onGlobalDefaultChange('fixed_width_digits', checked)}
         />
       </div>
 

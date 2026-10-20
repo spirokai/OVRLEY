@@ -41,8 +41,19 @@ pub struct ScenePresentationConfig {
     pub border_strength: Option<f32>,
     #[serde(default)]
     pub border_distance: Option<f32>,
+    /// Optional; absent scenes predate the switch and use its default, fixed-width digits.
+    #[serde(default)]
+    pub fixed_width_digits: Option<bool>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+/// Digit placement for changing widget values; static text keeps the face's advances.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Numerals {
+    Default,
+    /// Each digit's ink centered in a cell as wide as the face's widest digit.
+    FixedWidth,
 }
 
 /// Shared presentation validated once before per-job timing is available.
@@ -61,6 +72,7 @@ pub struct ValidatedScenePresentation {
     pub shadow_distance: f32,
     pub border_color: String,
     pub border_thickness: f32,
+    pub numerals: Numerals,
     pub overlay_filename: Option<String>,
 }
 
@@ -106,6 +118,11 @@ pub fn validate_scene_presentation(
         shadow_distance,
         border_color,
         border_thickness,
+        numerals: if raw.fixed_width_digits == Some(false) {
+            Numerals::Default
+        } else {
+            Numerals::FixedWidth
+        },
         overlay_filename: raw.overlay_filename,
     })
 }

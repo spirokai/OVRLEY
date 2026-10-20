@@ -344,6 +344,7 @@
     "borderThickness": "Kenarlık kalınlığı",
     "custom": "Özel",
     "customFps": "Özel FPS",
+    "fixedWidthDigits": "Sabit genişlikte rakamlar",
     "fontLabels": "Yazı tipi - etiketler",
     "fontValues": "Yazı tipi - değerler",
     "framerate": "Kare hızı",

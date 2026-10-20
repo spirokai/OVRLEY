@@ -344,6 +344,7 @@
     "borderThickness": "境界線の太さ",
     "custom": "カスタム",
     "customFps": "カスタムFPS",
+    "fixedWidthDigits": "等幅数字",
     "fontLabels": "フォント - ラベル",
     "fontValues": "フォント - 値",
     "framerate": "フレームレート",

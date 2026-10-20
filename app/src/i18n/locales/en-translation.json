@@ -344,6 +344,7 @@
     "borderThickness": "Border Thickness",
     "custom": "Custom",
     "customFps": "Custom FPS",
+    "fixedWidthDigits": "Fixed-Width Digits",
     "fontLabels": "Font - Labels",
     "fontValues": "Font - Values",
     "framerate": "Framerate",

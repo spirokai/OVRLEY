@@ -1,6 +1,9 @@
-use super::shadow::shadow_paint;
+use super::{
+    digit_cells::{place_digits, PlacedGlyphs},
+    shadow::shadow_paint,
+};
 use crate::error::WidgetResult;
-use crate::model::standard_widgets::widget_font_weight;
+use crate::model::{scene::Numerals, standard_widgets::widget_font_weight};
 use skia_safe::{
     paint::{Join, Style},
     Canvas, Color, Font, Paint, Point, Rect, TextBlob, TextBlobBuilder, Typeface,
@@ -49,6 +52,8 @@ pub struct ResolvedTextStyle {
     /// Optional text stroke color.
     pub border_color: Option<Color>,
     pub border_thickness: f32,
+    /// Digit placement; static text layouts ignore it.
+    pub numerals: Numerals,
 }
 
 /// Text measurement details used for manual widget layout.
@@ -74,7 +79,7 @@ pub(crate) fn text_selection_bounds(measurement: &MeasuredText, x: f32, baseline
     )
 }
 
-/// Draws text with optional drop shadow and stroke.
+/// Draws a metric readout with optional drop shadow and stroke in the style's numerals.
 pub fn draw_text(
     canvas: &Canvas,
     text: &str,
@@ -84,8 +89,8 @@ pub fn draw_text(
     draw_text_with_vertical_metrics_text(canvas, text, text, style, fonts)
 }
 
-/// Draws text while allowing baseline alignment to be measured from a stable
-/// reference string instead of the rendered glyphs.
+/// Draws a metric readout while allowing baseline alignment to be measured from
+/// a stable reference string instead of the rendered glyphs, in the style's numerals.
 pub fn draw_text_with_vertical_metrics_text(
     canvas: &Canvas,
     text: &str,
@@ -109,14 +114,14 @@ pub fn draw_text_with_vertical_metrics_text(
     } else {
         vertical_metrics_text
     };
-    let layout = layout_text(text, &font, style.letter_spacing);
+    let layout = layout_text(text, &font, style.letter_spacing, style.numerals);
     let blob = layout
         .blob
         .ok_or_else(|| crate::error::WidgetError::Render("Failed to lay out label text".into()))?;
     let vertical_measurement = if metrics_text == text {
         layout.measurement
     } else {
-        measure_text_with_font(metrics_text, &font)
+        measure_text_with_font(metrics_text, &font, style.numerals)
     };
     let glyph_height = vertical_measurement.bounds_bottom - vertical_measurement.bounds_top;
     let baseline = if glyph_height <= f32::EPSILON {
@@ -237,7 +242,7 @@ pub fn baseline_for_text_top_with_line_height(
     top_y + linebox_offset - bounds.top
 }
 
-/// Measures text using a resolved style.
+/// Measures a metric readout using a resolved style and its numerals.
 pub fn measure_text(
     text: &str,
     style: &ResolvedTextStyle,
@@ -251,9 +256,9 @@ pub fn measure_text(
         style.italic,
     )?;
     Ok(if style.letter_spacing == 0.0 {
-        measure_text_with_font(text, &font)
+        measure_text_with_font(text, &font, style.numerals)
     } else {
-        layout_text(text, &font, style.letter_spacing).measurement
+        layout_text(text, &font, style.letter_spacing, style.numerals).measurement
     })
 }
 
@@ -265,11 +270,26 @@ pub(crate) struct LaidOutText {
 // Keep the existing whole-string layout at zero. Nonzero tracking uses intact
 // extended grapheme clusters, with gaps only between them. One blob is reused
 // for every paint layer, keeping tracked glyph positions identical across fill, border and shadow.
-pub(crate) fn layout_text(text: &str, font: &Font, letter_spacing: f32) -> LaidOutText {
+pub(crate) fn layout_text(
+    text: &str,
+    font: &Font,
+    letter_spacing: f32,
+    numerals: Numerals,
+) -> LaidOutText {
+    if let Some(placed) = fixed_width_digits(text, font, letter_spacing, numerals) {
+        let mut builder = TextBlobBuilder::new();
+        let (glyphs, xs) = builder.alloc_run_pos_h(font, placed.glyphs.len(), 0.0, None);
+        glyphs.copy_from_slice(&placed.glyphs);
+        xs.copy_from_slice(&placed.xs);
+        return LaidOutText {
+            blob: builder.make(),
+            measurement: measurement(font, (placed.width, placed.ink)),
+        };
+    }
     if letter_spacing == 0.0 || text.is_empty() {
         return LaidOutText {
             blob: TextBlob::from_str(text, font),
-            measurement: measure_text_with_font(text, font),
+            measurement: measurement(font, font.measure_str(text, None)),
         };
     }
     let mut builder = TextBlobBuilder::new();
@@ -319,9 +339,28 @@ pub(crate) fn layout_text(text: &str, font: &Font, letter_spacing: f32) -> LaidO
     }
 }
 
-/// Measures text using an already-resolved Skia font.
-pub fn measure_text_with_font(text: &str, font: &Font) -> MeasuredText {
-    let (width, bounds) = font.measure_str(text, None);
+/// Measures text using an already-resolved Skia font, as `layout_text` places it.
+pub fn measure_text_with_font(text: &str, font: &Font, numerals: Numerals) -> MeasuredText {
+    match fixed_width_digits(text, font, 0.0, numerals) {
+        Some(placed) => measurement(font, (placed.width, placed.ink)),
+        None => measurement(font, font.measure_str(text, None)),
+    }
+}
+
+/// Digit-cell placement when the numerals ask for it and any digit would move.
+fn fixed_width_digits(
+    text: &str,
+    font: &Font,
+    letter_spacing: f32,
+    numerals: Numerals,
+) -> Option<PlacedGlyphs> {
+    match numerals {
+        Numerals::Default => None,
+        Numerals::FixedWidth => place_digits(text, font, letter_spacing),
+    }
+}
+
+fn measurement(font: &Font, (width, bounds): (f32, Rect)) -> MeasuredText {
     let (_, metrics) = font.metrics();
     MeasuredText {
         width,
@@ -407,5 +446,6 @@ pub fn validated_value_style(
         border_color: (!scene.border_color.is_empty())
             .then(|| parse_color(&scene.border_color, opacity)),
         border_thickness: scene.border_thickness * scale,
+        numerals: scene.numerals,
     }
 }

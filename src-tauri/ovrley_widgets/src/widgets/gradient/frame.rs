@@ -38,6 +38,7 @@ pub fn validated_gradient_style(
         border_color: (!scene.border_color.is_empty())
             .then(|| parse_color(&scene.border_color, opacity)),
         border_thickness: scene.border_thickness * scale,
+        numerals: scene.numerals,
     }
 }
 

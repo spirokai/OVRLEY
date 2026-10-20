@@ -1,4 +1,5 @@
 //! Drawing resources shared across widget families.
+mod digit_cells;
 pub mod icons;
 pub mod pixels;
 pub(crate) mod preview;

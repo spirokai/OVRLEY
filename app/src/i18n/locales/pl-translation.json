@@ -344,6 +344,7 @@
     "borderThickness": "Grubość obramowania",
     "custom": "Niestandardowe",
     "customFps": "Niestandardowe FPS",
+    "fixedWidthDigits": "Cyfry o stałej szerokości",
     "fontLabels": "Czcionka - etykiety",
     "fontValues": "Czcionka - wartości",
     "framerate": "Liczba klatek",

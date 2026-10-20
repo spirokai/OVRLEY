@@ -344,6 +344,7 @@
     "borderThickness": "Grosor del borde",
     "custom": "Personalizado",
     "customFps": "FPS personalizado",
+    "fixedWidthDigits": "Dígitos de ancho fijo",
     "fontLabels": "Fuente - etiquetas",
     "fontValues": "Fuente - valores",
     "framerate": "FPS",

@@ -344,6 +344,7 @@
     "borderThickness": "边框粗细",
     "custom": "自定义",
     "customFps": "自定义 FPS",
+    "fixedWidthDigits": "等宽数字",
     "fontLabels": "字体 - 标签",
     "fontValues": "字体 - 数值",
     "framerate": "帧率",

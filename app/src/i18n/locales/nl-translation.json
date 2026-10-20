@@ -344,6 +344,7 @@
     "borderThickness": "Randdikte",
     "custom": "Aangepast",
     "customFps": "Aangepaste FPS",
+    "fixedWidthDigits": "Cijfers met vaste breedte",
     "fontLabels": "Lettertype - labels",
     "fontValues": "Lettertype - waarden",
     "framerate": "Framesnelheid",

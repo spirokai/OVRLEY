@@ -1,6 +1,6 @@
 //! A single prepared run owns static label paint and interaction geometry.
 use super::{style::validated_label_style, validation::ValidatedLabel};
-use crate::{error::WidgetResult, model::scene::ValidatedScenePresentation, render::text::{
+use crate::{error::WidgetResult, model::scene::{Numerals, ValidatedScenePresentation}, render::text::{
     baseline_for_top_with_line_height, draw_text_blob, layout_text, resolve_styled_font,
     text_selection_bounds, FontResolver, ResolvedTextStyle,
 }};
@@ -28,7 +28,7 @@ impl LabelFrame {
 pub fn prepare_label_frame(label: &ValidatedLabel, scene: &ValidatedScenePresentation, fonts: &dyn FontResolver) -> WidgetResult<LabelFrame> {
     let style = validated_label_style(label, scene, scene.scale);
     let font = resolve_styled_font(fonts, Some(&label.font_name), style.font_size, style.font_weight, style.italic)?;
-    let layout = layout_text(&label.text, &font, style.letter_spacing);
+    let layout = layout_text(&label.text, &font, style.letter_spacing, Numerals::Default);
     let ink = layout.measurement;
     let height = ink.bounds_bottom - ink.bounds_top;
     let baseline = if height <= f32::EPSILON {

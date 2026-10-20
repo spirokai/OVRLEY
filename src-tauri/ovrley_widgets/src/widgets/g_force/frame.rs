@@ -94,6 +94,7 @@ pub fn prepare_g_force_frame(
         shadow_distance: scene.shadow_distance * scale,
         border_color: None,
         border_thickness: 0.0,
+        numerals: scene.numerals,
     };
     let font = resolve_font(fonts, Some(&widget.label_font), font_size)?;
     let mut content_bounds = Rect::from_xywh(
@@ -111,7 +112,7 @@ pub fn prepare_g_force_frame(
     ));
     let mut bounds = content_bounds;
     let mut prepare_text = |text: &str, style: ResolvedTextStyle| -> WidgetResult<(TextRun, f32)> {
-        let text = layout_text(text, &font, 0.0);
+        let text = layout_text(text, &font, 0.0, style.numerals);
         let ink = &text.measurement;
         let baseline =
             style.y + (line_height - (ink.bounds_bottom - ink.bounds_top)) * 0.5 - ink.bounds_top;

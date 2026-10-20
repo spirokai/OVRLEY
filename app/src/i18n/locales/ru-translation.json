@@ -344,6 +344,7 @@
     "borderThickness": "Толщина границы",
     "custom": "Пользовательский",
     "customFps": "Пользовательский FPS",
+    "fixedWidthDigits": "Цифры фиксированной ширины",
     "fontLabels": "Шрифт — метки",
     "fontValues": "Шрифт — значения",
     "framerate": "Частота кадров",

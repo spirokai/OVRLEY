@@ -12,7 +12,10 @@ use super::{
 use crate::{
     error::{WidgetError, WidgetResult},
     model::{scene::ValidatedScenePresentation, standard_widgets::widget_font_weight},
-    render::text::{parse_color, resolve_font, rgba_color, FontResolver, ResolvedTextStyle},
+    render::text::{
+        measure_text_with_font, parse_color, resolve_font, rgba_color, FontResolver,
+        ResolvedTextStyle,
+    },
 };
 use skia_safe::Font;
 use std::{
@@ -74,6 +77,7 @@ pub fn validated_lap_timer_style(
         border_color: (!scene.border_color.is_empty())
             .then(|| parse_color(&scene.border_color, opacity)),
         border_thickness: scene.border_thickness * scene.scale,
+        numerals: scene.numerals,
     }
 }
 
@@ -366,7 +370,7 @@ fn log_column_rights(
     row_font: &Font,
     header_font: &Font,
 ) -> [f32; 3] {
-    let width = |text: &str, font: &Font| font.measure_str(text, None).0;
+    let width = |text: &str, font: &Font| measure_text_with_font(text, font, style.numerals).width;
     let character_width = |character: char| {
         let mut buffer = [0; 4];
         width(character.encode_utf8(&mut buffer), row_font)
