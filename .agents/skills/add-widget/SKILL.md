@@ -38,6 +38,9 @@ Copy the closest current entry; inherit shared defaults:
 - **Display** (`heading_tape`, `lean_angle`): `displayTypes.definitions.<type>` with label/icon,
   `layoutMode`, shared `defaults`, boxed `variantDefaults`, geometry bindings/constraints,
   and modes as needed. Opt affected metrics into it through their `displayTypes` lists.
+  Style constants the template keeps out of the editor (palettes, gaps, label weights) also
+  live in `variantDefaults`, so the renderer and the preview's font requests read one source.
+  A variant key is promoted only when the root has no key of that name; avoid root-key clashes.
 - **Independent** (`course`, `backdrop`): `assets/standard-widgets.json` → `definitions` with
   identity, labels, icon, category, collection, layout, defaults, and optional fields.
   Declare global bindings and `timeDependent: true` where needed. New collections also need
@@ -69,29 +72,56 @@ new derivation formulas/source precedence in `ovrley_core/src/activity/finalize/
 Cargo generates `MetricKind`, `ActivitySeries`, numeric fields, and input operations from
 the manifests. Generic finalization, ranges, trimming, interpolation, requirements, and preview
 sampling consume them. Extend these declarations rather than handwritten registration tables.
-Specialized nonnumeric columns require explicit Rust storage/preparation/sampling.
+Specialized nonnumeric columns require explicit Rust storage/preparation/sampling. A new display
+of an existing metric samples through an `ActivitySampler` accessor in
+`ovrley_widgets/src/activity.rs` (e.g. `heartrate_at`); add one, with range and coverage checks,
+when the metric has none.
 
 **Complete when:** requested direct/derived values reach sampling with correct units and gap
 behavior. A scalar metric using existing formatting/rendering proceeds directly to step 6.
 
 ## 4. Implement rendering and dispatch (new displays/families)
 
-Create/extend `ovrley_widgets/src/widgets/<family>/`; register in `widgets/mod.rs`. Follow the
-closest family's config, validation, layout/frame, preview cache, and interaction structure.
-Share native/WASM drawing; prepare static work once. Validate required config at ingress.
+One `ovrley_widgets` family serves both hosts. The editor preview renders it into a tile;
+native export (`ovrley_core/src/render/engine.rs` + `atlas.rs`) builds the same family through
+`PreviewWidget::from_validated` and draws it onto the frame. There is no separate export drawing
+path. Mirror the newest comparable family (`heading_compass`, `heart_zones`).
 
-- **Metric display:** extend `value/config.rs` and `value/validation.rs` (`ValidatedValue`,
-  `metric_kind()`). Update handwritten `DisplayType` in `model/types.rs`: variant, serde name,
-  `as_str`, deserializer. New formatters need shared formatting/validation and editor controls.
-- **Preview:** `preview_widget.rs` — request dispatch, `PreviewWidget` construction, pixels,
-  geometry, revision, `ResizeUpdate`; `preview.rs` — render/resize and cache invalidation.
-  Reuse the existing WASM ABI.
-- **Export:** core `normalize/widgets.rs` validation, `render/assets.rs` preparation,
-  `render/frame.rs` drawing. Extend config collections/`ValidatedRenderConfig` for new families
-  where needed. Consume family/mode dependencies in `normalize/mod.rs` and preview sampling.
+Create `ovrley_widgets/src/widgets/<family>/`, registered in `widgets/mod.rs`:
 
-**Complete when:** both hosts use shared drawing with complete validation, sampling, resource,
-cache, geometry, and resize dispatch for every requested display.
+- `validation.rs` — `validate_<family>(ValueConfig, index)` checks metric/display, requires every
+  field, parses enums, and resolves derived inputs once (e.g. zones from thresholds).
+- `layout.rs` — `prepare_<family>_cache(validated, scene, fonts)` applies `scene.scale`, rasterizes
+  static parts once (per-state images, shadow sprites), and fixes stable `bounds` and
+  `content_bounds`. Keep pure geometry in testable functions. Paths are not shared across export
+  workers; store shape parameters and rebuild trivial paths per frame.
+- `frame.rs` — `prepare_frame(sample)` → frame state; `draw(canvas, cache)` in scene coordinates.
+- `preview.rs` — `Preview<Family>` with `new`, `from_validated`, `frame_key` (equal keys draw
+  identical pixels), `layout_bounds`, `draw`, and `render` (skip unchanged samples, `render_tile`,
+  serialize `WidgetGeometry`, bump `revision`). Copy the struct from a neighbour.
+- `interaction.rs` — `resize_<family>` returning `ResizeUpdate { x, y, display_variants: { <type> } }`.
+  Framed displays take a scene-pixel `size` (divide by `scene.scale`); uniform ones a `factor`.
+  Keep the gesture's `fixed` corner on `point`.
+- `tests.rs` — unit tests for formulas and geometry.
+
+Dispatch for a metric display:
+
+- `model/types.rs` — `DisplayType` variant, serde name, `as_str`, deserializer arm.
+- `value/config.rs` — new `ValueConfig` fields; `value/validation.rs` — `ValidatedValue` variant,
+  `metric_kind()`, `display_type()`.
+- `preview_widget.rs` — `WidgetRequest` variant and deserializer routing by metric + display;
+  `PreviewWidget` variant; arms in `new`, `from_validated`, `frame_key` (`FrameKey`), `pixels`,
+  `geometry`, `layout_bounds`, `draw`, `bounds`, `revision`; `ResizeUpdate` variant.
+- `preview.rs` — `resize_widget` routing (size-based families return before the `factor` match
+  and join its `unreachable!` arm) and the playhead `render` loop.
+- `preview_instance.rs` — the placement and `pixel_config` arms.
+- `ovrley_core/src/normalize/widgets.rs` — the `validate_render_value` arm. Export needs nothing else.
+
+Independent families also extend config collections/`ValidatedRenderConfig`, the
+`ValidatedWidget` enum, and the layer list in `render/engine.rs`. Reuse the existing WASM ABI.
+
+**Complete when:** both hosts build the family from one validated config, with complete
+validation, sampling, caching, geometry, and resize dispatch for every requested display.
 
 ## 5. Wire the editor (new displays/families)
 
@@ -100,9 +130,19 @@ Register display sections in `DISPLAY_SECTION` in `MetricWidgetEditor.jsx` under
 in `components/SidebarWidgetsTab.jsx`. Keep components presentational. Persist boxed settings
 in `display_variants.<type>` and use `lib/widget/widget-resolver.js` for edits/projection.
 
-Check behavior-specific seams: `previewSession.js` (`widgetFonts`), `overlayEditorUtils.js`
-(handles/aspect/rotation), `useWasmWidgetInteractions.js`/`widgetInteraction.js` (gestures),
-and `WasmWidgetCanvas.jsx`/`widgetPresentation.js` (layering/pixel placement).
+Check behavior-specific seams:
+
+- `features/wasm-widgets/utils/previewSession.js` `widgetFonts` — request exactly the fonts and
+  weights the family resolves (none when its text is hidden); a missing request fails the preview.
+- `features/wasm-widgets/utils/widgetGestureGeometry.js` `widgetResizeGeometry` — list framed
+  displays that resize by `size`; the rest send a uniform `factor`.
+- `features/overlay-editor/utils/overlayEditorUtils.js` — `maintainAspectRatio` (boxed displays
+  are unlocked unless listed), rotation, and edge handles.
+- `features/widget-editor/utils/widgetSize.js` — inspector size sliders for uniform displays.
+- `useWasmWidgetInteractions.js`/`widgetInteraction.js` (gestures) and
+  `WasmWidgetCanvas.jsx`/`widgetPresentation.js` (layering/pixel placement).
+
+Put editor-side transformations (e.g. clamped list edits) in `features/widget-editor/utils/`.
 
 **Complete when:** all controls and specified gestures update the canonical config, survive
 display switching/save/reload, and present the correct resources and geometry.
@@ -111,7 +151,19 @@ display switching/save/reload, and present the correct resources and geometry.
 
 Test derivations with known inputs/outputs, including gaps and boundaries. Extend relevant
 parser, family, and editor tests. `manifest_activity_tests.rs` covers generated numeric columns;
-`widget-catalog.test.jsx` covers manifest creation, icons, and persistence. Run from repo root:
+`widget-catalog.test.jsx` covers manifest creation, icons, and persistence. For a new
+display or family also extend:
+
+- `ovrley_core/tests/display_type_tests.rs` — serde round trip and layout mode.
+- `ovrley_core/tests/wasm_widget_preview_tests.rs` — a `<family>_preview()` fixture (its scene
+  scale is 1.7, so content is scaled); a preview-vs-`render_full_frames` pixel test across samples
+  with unchanged-sample revision skips and malformed-field ingress errors; a resize test that
+  checks the fixed corner. Add the fixture to `every_family_preview()`, give
+  `every_family_parsed_activity()` the metric's column, and raise the atlas test's value count
+  and layer range.
+- `benchmarks/widgets/browser.js` — one case per visual variant.
+
+Run from repo root:
 
 ```sh
 pnpm check
@@ -122,7 +174,13 @@ cargo test --manifest-path src-tauri/ovrley_core/Cargo.toml
 Follow repository build authorization rules for `pnpm wasm:build` and `pnpm dev`; bindings
 reuse `vendor/skia-wasm`. Verify playback, editing, gestures, save/reload, and native export.
 Compare actual output with the blueprint at matching size/state, correct visible differences,
-and check preview/export agreement.
+and check preview/export agreement. Without the app, a throwaway test can write
+`widget.pixels()` (premultiplied RGBA) and `geometry()` to the scratchpad for inspection;
+delete it afterwards.
+
+With approval, `pnpm benchmark:widgets:build` then `pnpm benchmark:widgets --run --case <case>`
+(one case per run) measures preview, WASM, and export cost; results land in
+`debug/benchmarks/widgets/`.
 
 **Complete when:** behavior and derivations satisfy the template, available visual comparisons
 support close fidelity, and remaining differences/unverified requirements are explicitly reported.
