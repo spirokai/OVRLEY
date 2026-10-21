@@ -16,6 +16,13 @@
 //! The full frame is the plan with one slot covering the frame. The plan is
 //! immutable for an export and is the single source for frame production and
 //! the FFmpeg graph.
+//!
+//! Possible optimization: static layers are drawn once into the atlas bases but
+//! still piped, converted and uploaded with every frame. Planning them as a
+//! separate atlas, sent once as a still FFmpeg input overlaid with
+//! `eof_action=repeat` beneath the dynamic slots, would leave only their blend
+//! per frame. It needs one still per base (covered and uncovered), switched by
+//! timeline `enable`, and keeps transparent exports on copied slots.
 
 use super::FrameSize;
 use crate::error::{CoreError, CoreResult};
