@@ -3,7 +3,8 @@
 //! Prepared render assets are built before this module is entered and remain
 //! immutable for the lifetime of the workers. Every worker creates its own
 //! Skia surface around an exclusively owned RGBA buffer; surfaces and canvases
-//! are never shared between threads.
+//! are never shared between threads. When FFmpeg reads `yuva420p`, each worker
+//! draws into its own RGBA scratch buffer and converts into the pooled buffer.
 //!
 //! The buffer-before-task invariant is intentional: a worker must acquire its
 //! render buffer before claiming a frame index. Reversing that order can
@@ -13,11 +14,12 @@
 use super::diagnostics::EncoderMonitor;
 use super::process::{PipelineKind, PipelineShutdown};
 use crate::debug::{RenderProfiler, TimingBucket};
+use crate::encode::overlay_format::{convert_rgba_to_yuva420p, OverlayPixelFormat};
 use crate::encode::pipeline::buffers::{merge_timing_maps, queue_frame, FrameBuffer};
 use crate::encode::plan::CompositeRenderPlan;
 use crate::encode::progress::{ProgressEstimator, RenderController};
 use crate::error::{CoreError, CoreResult};
-use crate::render::VideoFrameRenderer;
+use crate::render::{FrameSize, VideoFrameRenderer};
 use std::collections::BTreeMap;
 use std::num::{NonZeroU32, NonZeroUsize};
 use std::process::Child;
@@ -31,6 +33,62 @@ use crate::encode::plan::FrameProductionPlan;
 pub(crate) enum ParallelFrameProgress<'a> {
     Transparent(&'a EncoderMonitor),
     Composite(&'a CompositeRenderPlan),
+}
+
+/// Size and pixel format of the frames written to FFmpeg.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct PipedFrameFormat {
+    pub(crate) size: FrameSize,
+    pub(crate) pixel_format: OverlayPixelFormat,
+}
+
+/// Renders frames into pooled buffers in the piped format; owned by one thread.
+struct FrameProducer<'a> {
+    renderer: VideoFrameRenderer<'a>,
+    format: PipedFrameFormat,
+    /// RGBA drawing target for formats the renderer does not draw directly.
+    scratch: Vec<u8>,
+}
+
+impl<'a> FrameProducer<'a> {
+    fn new(renderer: VideoFrameRenderer<'a>, format: PipedFrameFormat) -> CoreResult<Self> {
+        let scratch = match format.pixel_format {
+            OverlayPixelFormat::Rgba => Vec::new(),
+            OverlayPixelFormat::Yuva420p(_) => vec![0; format.size.rgba_len()?],
+        };
+        Ok(Self {
+            renderer,
+            format,
+            scratch,
+        })
+    }
+
+    fn render(
+        &mut self,
+        dense_frame_index: usize,
+        buffer: &mut FrameBuffer,
+        profiler: &mut RenderProfiler,
+    ) -> CoreResult<()> {
+        match self.format.pixel_format {
+            OverlayPixelFormat::Rgba => {
+                self.renderer
+                    .render_rgba(dense_frame_index, &mut buffer.pixels, profiler)
+            }
+            OverlayPixelFormat::Yuva420p(color) => {
+                self.renderer
+                    .render_rgba(dense_frame_index, &mut self.scratch, profiler)?;
+                profiler.measure("frame.yuva420p_convert", || {
+                    convert_rgba_to_yuva420p(
+                        &self.scratch,
+                        self.format.size,
+                        color,
+                        &mut buffer.pixels,
+                    )
+                });
+                Ok(())
+            }
+        }
+    }
 }
 
 pub(crate) struct ParallelFrameRenderResult {
@@ -122,6 +180,7 @@ struct FrameOutput<'a> {
 pub(crate) fn render_frames_parallel(
     renderer: VideoFrameRenderer<'_>,
     plan: FrameProductionPlan,
+    format: PipedFrameFormat,
     workers: NonZeroUsize,
     progress: ParallelFrameProgress<'_>,
     pipeline: PipelineKind,
@@ -134,7 +193,12 @@ pub(crate) fn render_frames_parallel(
     render_started: Instant,
 ) -> CoreResult<ParallelFrameRenderResult> {
     let mut profiler = RenderProfiler::default();
-    let prewarmed = prewarm_first_frame(renderer, buffers, shutdown, &mut profiler)?;
+    let prewarmed = prewarm_first_frame(
+        &mut FrameProducer::new(renderer, format)?,
+        buffers,
+        shutdown,
+        &mut profiler,
+    )?;
     let tasks = FrameTasks::new(plan);
     let (sender, receiver) = std::sync::mpsc::channel();
 
@@ -146,7 +210,7 @@ pub(crate) fn render_frames_parallel(
             match thread::Builder::new()
                 .name(format!("frame-render-{index}"))
                 .spawn_scoped(scope, move || {
-                    frame_worker(renderer, tasks, buffers, shutdown, sender)
+                    frame_worker(renderer, format, tasks, buffers, shutdown, sender)
                 }) {
                 Ok(worker) => workers_started.push(worker),
                 Err(error) => {
@@ -200,6 +264,7 @@ pub(crate) fn render_frames_parallel(
 
 fn frame_worker(
     renderer: VideoFrameRenderer<'_>,
+    format: PipedFrameFormat,
     tasks: &FrameTasks,
     buffers: &super::buffers::FrameBufferPool,
     shutdown: &PipelineShutdown,
@@ -207,6 +272,7 @@ fn frame_worker(
 ) -> BTreeMap<String, TimingBucket> {
     let mut profiler = RenderProfiler::default();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> CoreResult<()> {
+        let mut producer = FrameProducer::new(renderer, format)?;
         while !shutdown.is_stopped() {
             let started = Instant::now();
             let Some(mut buffer) = buffers.acquire(shutdown, &mut profiler) else {
@@ -216,7 +282,7 @@ fn frame_worker(
                 buffers.release(buffer);
                 break;
             };
-            renderer.render_rgba(dense_frame_index, &mut buffer.pixels, &mut profiler)?;
+            producer.render(dense_frame_index, &mut buffer, &mut profiler)?;
             let elapsed = started.elapsed().as_secs_f64() * 1000.0;
             profiler.record_ms("parallel.worker_frame", elapsed);
             profiler.record_ms("frame.total", elapsed);
@@ -384,7 +450,7 @@ impl<'a> FrameProgressReporter<'a> {
 }
 
 fn prewarm_first_frame(
-    renderer: VideoFrameRenderer<'_>,
+    producer: &mut FrameProducer<'_>,
     buffers: &super::buffers::FrameBufferPool,
     shutdown: &PipelineShutdown,
     profiler: &mut RenderProfiler,
@@ -394,7 +460,7 @@ fn prewarm_first_frame(
         .acquire(shutdown, profiler)
         .ok_or(CoreError::Cancelled)?;
     let started = Instant::now();
-    renderer.render_rgba(0, &mut buffer.pixels, profiler)?;
+    producer.render(0, &mut buffer, profiler)?;
     let elapsed = started.elapsed().as_secs_f64() * 1000.0;
     profiler.record_ms("parallel.worker_frame", elapsed);
     profiler.record_ms("parallel.prewarm_frame", elapsed);
@@ -493,11 +559,13 @@ mod tests {
 
     #[test]
     fn sizes_parallel_pool_from_resolution_and_worker_count() {
+        let uhd = crate::render::FrameSize {
+            width: 3840,
+            height: 2160,
+        };
         let plan = ParallelFramePoolPlan::for_resources(
-            crate::render::FrameSize {
-                width: 3840,
-                height: 2160,
-            },
+            uhd,
+            OverlayPixelFormat::Rgba,
             NonZeroUsize::new(3).unwrap(),
             8,
         )
@@ -505,12 +573,20 @@ mod tests {
         assert_eq!(plan.frame_byte_len, 3840 * 2160 * 4);
         assert_eq!(plan.buffer_count, 5);
         assert_eq!(plan.queue_capacity, 4);
+        let yuva = OverlayPixelFormat::Yuva420p(
+            crate::encode::overlay_format::YuvColor::from_probe(None, None).unwrap(),
+        );
+        let plan =
+            ParallelFramePoolPlan::for_resources(uhd, yuva, NonZeroUsize::new(3).unwrap(), 8)
+                .unwrap();
+        assert_eq!(plan.frame_byte_len, 3840 * 2160 * 5 / 2);
 
         let error = ParallelFramePoolPlan::for_resources(
             crate::render::FrameSize {
                 width: 11520,
                 height: 6480,
             },
+            OverlayPixelFormat::Rgba,
             NonZeroUsize::new(2).unwrap(),
             8,
         )
@@ -522,6 +598,7 @@ mod tests {
                 width: 1920,
                 height: 1080,
             },
+            OverlayPixelFormat::Rgba,
             NonZeroUsize::new(4).unwrap(),
             4,
         )

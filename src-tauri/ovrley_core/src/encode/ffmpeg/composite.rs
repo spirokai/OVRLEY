@@ -8,7 +8,7 @@ use crate::output::RenderOutputTarget;
 use std::path::{Path, PathBuf};
 
 use crate::encode::ffmpeg::catalog::{CompositeCodecId, CompositeFilterStackKind};
-use crate::encode::overlay_format::YuvColor;
+use crate::encode::overlay_format::{OverlayPixelFormat, YuvColor};
 use crate::encode::plan::CompositeRenderPlan;
 use crate::encode::quality::rate_control_args;
 use crate::error::{CoreError, CoreResult};
@@ -65,11 +65,12 @@ impl CompositeEncoding {
 ///
 /// Composite mode currently uses three inputs:
 /// - input 0: coarsely seeked source video for frame-accurate filter-side video trim
-/// - input 1: raw RGBA overlay frames from stdin (`pipe:0`)
+/// - input 1: raw overlay frames from stdin (`pipe:0`) in `overlay_pixel_format`
 /// - input 2: coarsely seeked source media for filtered audio encoding
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompositeFfmpegSettings {
     pub codec_id: CompositeCodecId,
+    pub overlay_pixel_format: OverlayPixelFormat,
     pub input_0_args: Vec<String>,
     pub input_1_args: Vec<String>,
     pub input_2_args: Vec<String>,
@@ -115,13 +116,16 @@ impl CompositeFfmpegSettings {
 /// Builds FFmpeg argument groups from the canonical composite render plan.
 ///
 /// Input 0 uses a coarse input seek followed by frame-accurate filter-side
-/// video trimming. Input 1 is the raw RGBA overlay stream on `pipe:0`, and
+/// video trimming. Input 1 is the raw overlay stream on `pipe:0`, and
 /// input 2 uses the same derived source window for filtered audio encoding.
 /// Audio encoding targets the source bitrate, or 192 kbps when unreported.
 ///
-/// An untagged HD source (`source_color`) is treated as BT.709 and its main
-/// video tagged `bt709`, so FFmpeg converts the overlay, and labels the
-/// output, the way players display it.
+/// The overlay is piped as `yuva420p` in the source's colour (`source_color`)
+/// for every graph that blends in YUV. The QSV full-overlay graph uploads RGBA
+/// surfaces, and a source colour space without a supported matrix
+/// (`source_color` None) keeps RGBA for FFmpeg to convert. An untagged HD
+/// source is treated as BT.709 and its main video tagged `bt709`, so the
+/// overlay blends, and the output is labelled, as players display it.
 ///
 /// The function consumes the validated render plan, selects and configures an encoder profile,
 /// then assembles four argument groups that callers concatenate in order: HW
@@ -218,19 +222,26 @@ pub fn build_composite_ffmpeg_settings(
         video_path.clone(),
     ]);
 
-    // ── PHASE 4: BUILD INPUT 1 ARGS (raw RGBA overlay via stdin pipe) ──
-    let input_1_args = vec![
-        "-f".to_string(),
-        "rawvideo".to_string(),
-        "-pix_fmt".to_string(),
-        "rgba".to_string(),
+    // ── PHASE 4: BUILD INPUT 1 ARGS (raw overlay via stdin pipe) ──
+    // Players display an untagged HD source as BT.709: tag the main video so
+    // the overlay blends, and the output is labelled, in that colour space.
+    let retagged_color = source_color.and_then(|color| color.untagged_hd_as_bt709(frame_size));
+    let main_colorspace_tag = retagged_color.map(|_| "bt709");
+    let source_color = retagged_color.or(source_color);
+    let overlay_pixel_format = match source_color {
+        Some(color) if !qsv_full_overlay => OverlayPixelFormat::Yuva420p(color),
+        _ => OverlayPixelFormat::Rgba,
+    };
+    let mut input_1_args = vec!["-f".to_string(), "rawvideo".to_string()];
+    input_1_args.extend(overlay_pixel_format.ffmpeg_input_args());
+    input_1_args.extend([
         "-s".to_string(),
         format!("{width}x{height}", width = width, height = height),
         "-r".to_string(),
         render.overlay_pipe_fps.ffmpeg_arg(),
         "-i".to_string(),
         "pipe:0".to_string(),
-    ];
+    ]);
 
     // ── PHASE 5: BUILD INPUT 2 ARGS (coarse seek plus filter-side audio trim) ──
     let mut input_2_args = Vec::new();
@@ -245,11 +256,6 @@ pub fn build_composite_ffmpeg_settings(
     }
 
     // ── PHASE 6: BUILD FILTER COMPLEX (video trim + scale + overlay + format) ──
-    // Players display an untagged HD source as BT.709: tag the main video so
-    // FFmpeg converts the overlay, and labels the output, in that colour space.
-    let main_colorspace_tag = source_color
-        .and_then(|color| color.untagged_hd_as_bt709(frame_size))
-        .map(|_| "bt709");
     let mut filter_complex = composite_filter_complex(
         width,
         height,
@@ -315,6 +321,7 @@ pub fn build_composite_ffmpeg_settings(
 
     Ok(CompositeFfmpegSettings {
         codec_id: selected_profile.codec_id,
+        overlay_pixel_format,
         input_0_args,
         input_1_args,
         input_2_args,
@@ -386,6 +393,49 @@ mod tests {
         assert!(!filter_complex(untagged, 720, 576).contains("setparams"));
         let bt709 = YuvColor::from_probe(Some("bt709"), Some("tv"));
         assert!(!filter_complex(bt709, 1920, 1080).contains("setparams"));
+    }
+
+    #[test]
+    fn overlays_pipe_yuva420p_in_the_source_colour_except_for_qsv_full_overlay() {
+        let size = FrameSize {
+            width: 1920,
+            height: 1080,
+        };
+        let bt709 = YuvColor::from_probe(Some("bt709"), Some("tv"));
+        let settings = |codec_id, init_args, color| {
+            build_composite_ffmpeg_settings(
+                &render_plan(codec_id, init_args),
+                size,
+                false,
+                None,
+                None,
+                color,
+            )
+            .unwrap()
+        };
+
+        let software = settings(CompositeCodecId::SoftwareHevc, Vec::new(), bt709);
+        assert_eq!(
+            software.overlay_pixel_format,
+            OverlayPixelFormat::Yuva420p(bt709.unwrap())
+        );
+        assert_argument_pair(&software.input_1_args, "-pix_fmt", "yuva420p");
+        assert_argument_pair(&software.input_1_args, "-colorspace", "bt709");
+        assert_argument_pair(&software.input_1_args, "-color_range", "tv");
+
+        // An untagged HD source's overlay is converted and tagged as BT.709.
+        let untagged = YuvColor::from_probe(None, Some("pc"));
+        let gopro = settings(CompositeCodecId::SoftwareHevc, Vec::new(), untagged);
+        assert_argument_pair(&gopro.input_1_args, "-colorspace", "bt709");
+        assert_argument_pair(&gopro.input_1_args, "-color_range", "pc");
+
+        let unsupported = settings(CompositeCodecId::SoftwareHevc, Vec::new(), None);
+        assert_eq!(unsupported.overlay_pixel_format, OverlayPixelFormat::Rgba);
+
+        let qsv_init = ["-init_hw_device", "qsv=qs"].map(String::from).to_vec();
+        let qsv_full = settings(CompositeCodecId::QsvFullHevc, qsv_init, bt709);
+        assert_eq!(qsv_full.overlay_pixel_format, OverlayPixelFormat::Rgba);
+        assert_argument_pair(&qsv_full.input_1_args, "-pix_fmt", "rgba");
     }
 
     #[test]

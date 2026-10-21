@@ -19,7 +19,7 @@ use self::buffers::{
 use self::diagnostics::{
     format_pipe_write_failure, is_pipe_write_error, stderr_tail, EncoderMonitor,
 };
-use self::frames::{render_frames_parallel, ParallelFrameProgress};
+use self::frames::{render_frames_parallel, ParallelFrameProgress, PipedFrameFormat};
 use self::process::{PipelineKind, PipelineProcesses, PipelineShutdown};
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::debug::TimingBucket;
@@ -32,6 +32,7 @@ use crate::encode::ffmpeg::binary::resolve_ffmpeg_binary;
 use crate::encode::ffmpeg::composite::CompositeEncoding;
 use crate::encode::ffmpeg::composite_profiles::composite_profile;
 use crate::encode::ffmpeg::transparent_profiles::transparent_profile;
+use crate::encode::overlay_format::OverlayPixelFormat;
 use crate::encode::plan::{FrameProductionPlan, TransparentRenderPlan};
 use crate::encode::progress::RenderController;
 use crate::error::{CoreError, CoreResult};
@@ -53,6 +54,7 @@ impl VideoEncoding {
                 kind: PipelineKind::Composite,
                 frames: plan.render.frames,
                 frame_size: size,
+                pixel_format: plan.ffmpeg_settings.overlay_pixel_format,
                 output_frame_count: plan.render.output_frame_count,
                 cpu_cores_per_frame_worker: composite_profile(plan.ffmpeg_settings.codec_id)
                     .cpu_cores_per_frame_worker,
@@ -62,6 +64,7 @@ impl VideoEncoding {
                 kind: PipelineKind::Transparent,
                 frames: plan.frames,
                 frame_size: size,
+                pixel_format: OverlayPixelFormat::Rgba,
                 output_frame_count: plan.output_frame_count,
                 cpu_cores_per_frame_worker: transparent_profile(plan.ffmpeg.codec_id)
                     .cpu_cores_per_frame_worker,
@@ -225,6 +228,8 @@ pub(crate) struct FramePipelinePlan {
     pub kind: PipelineKind,
     pub frames: FrameProductionPlan,
     pub frame_size: FrameSize,
+    /// Format of the frames written to FFmpeg; the renderer always draws RGBA.
+    pub pixel_format: OverlayPixelFormat,
     pub output_frame_count: u32,
     pub cpu_cores_per_frame_worker: usize,
     pub ffmpeg_args: Vec<String>,
@@ -258,7 +263,8 @@ pub(crate) fn run_frame_pipeline(
         frame_sender,
         frame_receiver,
         buffers,
-    } = ParallelFramePoolPlan::for_frame_size(plan.frame_size, workers)?.create_channels();
+    } = ParallelFramePoolPlan::for_frame_size(plan.frame_size, plan.pixel_format, workers)?
+        .create_channels();
     let shutdown = PipelineShutdown::shared(controller.cancel_flag());
     controller.set_frame_progress(0, plan.output_frame_count, 0, 0, None, None);
     controller.start_encoding()?;
@@ -275,6 +281,10 @@ pub(crate) fn run_frame_pipeline(
     let producer = render_frames_parallel(
         renderer,
         plan.frames,
+        PipedFrameFormat {
+            size: plan.frame_size,
+            pixel_format: plan.pixel_format,
+        },
         workers,
         encoding.progress(&monitor),
         plan.kind,
