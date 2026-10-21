@@ -1,10 +1,8 @@
 mod common;
 
-use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
-use ovrley_core::debug::RenderProfiler;
+use ovrley_core::activity::schema::DenseActivityReport;
 use ovrley_core::fonts::NativeFonts;
 use ovrley_core::normalize::{validate_render_config, RenderConfig};
-use ovrley_core::render::assets::{prepare_render_assets, PreparedWidget};
 use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
 use ovrley_widgets::widgets::gauges::arc::{arc_point, gt_gauge_geometry, gt_start_end_angles};
 use ovrley_widgets::widgets::gauges::frame::GaugeLayout;
@@ -154,24 +152,9 @@ fn rendered_layout(
 ) {
     let config = validate_single(value).unwrap();
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
-    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
-    let assets = prepare_render_assets(
-        &NativeFonts(&font_dirs),
-        &config,
-        &activity,
-        &dense,
-        &mut RenderProfiler::default(),
-    )
-    .unwrap();
-    let PreparedWidget::Gauge(cache) = &assets.values[0].widget else {
-        panic!("gt gauge should prepare the shared gauge cache");
-    };
-    (
-        cache.layout.clone(),
-        cache.frame_states[1].clone(),
-        font_dirs,
-    )
+    let (layout, mut frame_states) = common::gauge::gauge_layout(&config, &dense, &NativeFonts(&font_dirs));
+    (layout, frame_states.remove(1), font_dirs)
 }
 
 fn validate_single(

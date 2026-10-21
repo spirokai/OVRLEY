@@ -1,7 +1,6 @@
 mod common;
 
-use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
-use ovrley_core::debug::RenderProfiler;
+use ovrley_core::activity::schema::DenseActivityReport;
 use ovrley_core::normalize::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
 use ovrley_widgets::widgets::gauges::validation::ValidatedCornerGaugeOrientation;
@@ -9,8 +8,6 @@ use ovrley_core::paths::AppPaths;
 use ovrley_widgets::widgets::gauges::arc::{
     arc_point, corner_gauge_geometry, corner_start_end_angles,
 };
-use ovrley_core::render::assets::PreparedWidget;
-use ovrley_core::render::{render_preview_with_report, assets::prepare_render_assets};
 use ovrley_widgets::model::types::{DisplayType, TrackFillStyle};
 use ovrley_widgets::widgets::value::config::ValueConfig;
 use std::collections::BTreeMap;
@@ -113,32 +110,17 @@ fn corner_orientation_is_required_and_restricted_to_bottom_corners() {
 }
 
 #[test]
-fn corner_gauge_prepares_a_shared_arc_cache_and_renders_a_frame() {
+fn corner_gauge_lays_out_the_shared_arc_gauge() {
     let config = validate_single_corner(full_corner_gauge_config("bottom-right")).unwrap();
     let paths = test_paths();
-    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = dense_speed_activity(vec![Some(0.0), Some(50.0), Some(100.0)]);
-    let mut profiler = RenderProfiler::default();
 
-    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
-    let PreparedWidget::Gauge(widget) = &assets.values[0].widget else {
-        panic!("corner gauge should use the shared arc cache");
-    };
-    let cache = widget;
-    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(layout) = &cache.layout else { panic!("corner layout"); };
+    let (layout, frame_states) = common::gauge::gauge_layout(&config, &dense, &ovrley_core::fonts::NativeFonts(&paths.font_dirs));
+    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(layout) = &layout else { panic!("corner layout"); };
     assert_eq!(layout.geometry.start_angle, 180.0);
     assert_eq!(layout.geometry.sweep_angle, 90.0);
-    assert_eq!(cache.frame_states[1].fill01, 0.5);
+    assert_eq!(frame_states[1].fill01, 0.5);
 
-    let out_path = std::env::temp_dir().join("corner_gauge_preview_report.png");
-    let report =
-        render_preview_with_report(&paths, &config, &activity, &dense, 1.0, &out_path).unwrap();
-    assert_eq!(
-        report.metric_presentations[0].display_type,
-        DisplayType::Corner
-    );
-    assert_eq!(report.metric_presentations[0].widget.frame.progress01, 1.0);
-    let _ = std::fs::remove_file(out_path);
 }
 
 #[test]

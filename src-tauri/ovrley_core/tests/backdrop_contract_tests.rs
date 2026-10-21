@@ -1,11 +1,7 @@
 mod common;
 
-use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::commands::validate_config_value;
-use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::parse_config_value;
-use ovrley_core::paths::AppPaths;
-use ovrley_core::render::{prepare_preview_assets, LabelCacheStatus, StaticLayer};
 use ovrley_widgets::model::types::BackdropType;
 use serde_json::json;
 
@@ -266,7 +262,7 @@ fn rectangle_corner_radius_adjusts_to_border_only_when_a_corner_is_rounded() {
 }
 
 #[test]
-fn static_base_rgba_renders_rectangle_backdrop() {
+fn export_frame_renders_rectangle_backdrop() {
     let validated = validate_config_value(&json!({
         "scene": small_scene_json(32, 24),
         "backdrops": [rectangle_backdrop_json("static-base-rect", "#ff0000")],
@@ -275,24 +271,14 @@ fn static_base_rgba_renders_rectangle_backdrop() {
         "plots": []
     }))
     .unwrap();
-    let mut profiler = RenderProfiler::default();
-    let pixels = StaticLayer {
-        backdrops: &validated.backdrops,
-        rasters: &[],
-        labels: &validated.labels,
-        values: &validated.values,
-        scene: &validated.scene,
-    }
-    .prepare(&test_paths(), &mut profiler)
-    .unwrap()
-    .base_rgba;
+    let pixels = common::export::scene_frame(&validated);
 
     assert_eq!(rgba_at(&pixels, 32, 8, 8), [255, 0, 0, 255]);
     assert_eq!(rgba_at(&pixels, 32, 24, 20), [0, 0, 0, 0]);
 }
 
 #[test]
-fn static_base_rgba_renders_rectangle_fill_inside_border() {
+fn export_frame_renders_rectangle_fill_inside_border() {
     let mut backdrop = rectangle_backdrop_json("bordered-static-rect", "#ff0000");
     backdrop["border_thickness"] = json!(2);
     backdrop["border_color"] = json!("#0000ff");
@@ -304,24 +290,14 @@ fn static_base_rgba_renders_rectangle_fill_inside_border() {
         "plots": []
     }))
     .unwrap();
-    let mut profiler = RenderProfiler::default();
-    let pixels = StaticLayer {
-        backdrops: &validated.backdrops,
-        rasters: &[],
-        labels: &validated.labels,
-        values: &validated.values,
-        scene: &validated.scene,
-    }
-    .prepare(&test_paths(), &mut profiler)
-    .unwrap()
-    .base_rgba;
+    let pixels = common::export::scene_frame(&validated);
 
     assert_eq!(rgba_at(&pixels, 32, 5, 8), [0, 0, 255, 255]);
     assert_eq!(rgba_at(&pixels, 32, 6, 8), [255, 0, 0, 255]);
 }
 
 #[test]
-fn static_base_rgba_applies_rectangle_fill_alpha_multipliers() {
+fn export_frame_applies_rectangle_fill_alpha_multipliers() {
     let mut backdrop = rectangle_backdrop_json("alpha-static-rect", "#ff000080");
     backdrop["opacity"] = json!(0.5);
     backdrop["fill_opacity"] = json!(0.5);
@@ -333,23 +309,13 @@ fn static_base_rgba_applies_rectangle_fill_alpha_multipliers() {
         "plots": []
     }))
     .unwrap();
-    let mut profiler = RenderProfiler::default();
-    let pixels = StaticLayer {
-        backdrops: &validated.backdrops,
-        rasters: &[],
-        labels: &validated.labels,
-        values: &validated.values,
-        scene: &validated.scene,
-    }
-    .prepare(&test_paths(), &mut profiler)
-    .unwrap()
-    .base_rgba;
+    let pixels = common::export::scene_frame(&validated);
 
     assert_eq!(rgba_at(&pixels, 32, 8, 8), [255, 0, 0, 32]);
 }
 
 #[test]
-fn static_base_rgba_renders_circle_fill_inside_total_diameter_border() {
+fn export_frame_renders_circle_fill_inside_total_diameter_border() {
     let mut backdrop = circle_backdrop_json("bordered-static-circle", "#ff0000");
     backdrop["border_thickness"] = json!(2);
     backdrop["border_color"] = json!("#0000ff");
@@ -361,17 +327,7 @@ fn static_base_rgba_renders_circle_fill_inside_total_diameter_border() {
         "plots": []
     }))
     .unwrap();
-    let mut profiler = RenderProfiler::default();
-    let pixels = StaticLayer {
-        backdrops: &validated.backdrops,
-        rasters: &[],
-        labels: &validated.labels,
-        values: &validated.values,
-        scene: &validated.scene,
-    }
-    .prepare(&test_paths(), &mut profiler)
-    .unwrap()
-    .base_rgba;
+    let pixels = common::export::scene_frame(&validated);
 
     assert_eq!(rgba_at(&pixels, 32, 10, 6), [0, 0, 255, 255]);
     assert_eq!(rgba_at(&pixels, 32, 10, 11), [255, 0, 0, 255]);
@@ -379,7 +335,7 @@ fn static_base_rgba_renders_circle_fill_inside_total_diameter_border() {
 }
 
 #[test]
-fn static_base_rgba_applies_circle_fill_alpha_multipliers() {
+fn export_frame_applies_circle_fill_alpha_multipliers() {
     let mut backdrop = circle_backdrop_json("alpha-static-circle", "#ff000080");
     backdrop["opacity"] = json!(0.5);
     backdrop["fill_opacity"] = json!(0.5);
@@ -391,57 +347,13 @@ fn static_base_rgba_applies_circle_fill_alpha_multipliers() {
         "plots": []
     }))
     .unwrap();
-    let mut profiler = RenderProfiler::default();
-    let pixels = StaticLayer {
-        backdrops: &validated.backdrops,
-        rasters: &[],
-        labels: &validated.labels,
-        values: &validated.values,
-        scene: &validated.scene,
-    }
-    .prepare(&test_paths(), &mut profiler)
-    .unwrap()
-    .base_rgba;
+    let pixels = common::export::scene_frame(&validated);
 
     assert_eq!(rgba_at(&pixels, 32, 10, 11), [255, 0, 0, 32]);
 }
 
 #[test]
-fn static_cache_key_includes_backdrops() {
-    let paths = test_paths();
-    let activity: ParsedActivity = serde_json::from_value(json!({})).unwrap();
-    let dense = common::builders::minimal_dense_activity();
-    let first_config = validate_config_value(&json!({
-        "scene": small_scene_json(53, 47),
-        "backdrops": [rectangle_backdrop_json("cache-rect", "#ff0000")],
-        "labels": [],
-        "values": [],
-        "plots": []
-    }))
-    .unwrap();
-    let second_config = validate_config_value(&json!({
-        "scene": small_scene_json(53, 47),
-        "backdrops": [rectangle_backdrop_json("cache-rect", "#0000ff")],
-        "labels": [],
-        "values": [],
-        "plots": []
-    }))
-    .unwrap();
-
-    let (_, first_status, _, _) =
-        prepare_preview_assets(&paths, &first_config, &activity, &dense).unwrap();
-    let (_, second_status, _, _) =
-        prepare_preview_assets(&paths, &first_config, &activity, &dense).unwrap();
-    let (_, changed_status, _, _) =
-        prepare_preview_assets(&paths, &second_config, &activity, &dense).unwrap();
-
-    assert!(matches!(first_status, LabelCacheStatus::Miss));
-    assert!(matches!(second_status, LabelCacheStatus::Hit));
-    assert!(matches!(changed_status, LabelCacheStatus::Miss));
-}
-
-#[test]
-fn wasm_backdrops_match_native_opacity_and_ignore_playhead_and_activity() {
+fn wasm_backdrops_match_export_opacity_and_ignore_playhead_and_activity() {
     use ovrley_widgets::preview::PreviewSession;
     for mut backdrop in [rectangle_backdrop_json("wasm-rect", "#abcdef80"), circle_backdrop_json("wasm-circle", "#abcdef80")] {
         backdrop["x"] = json!(20.25);
@@ -465,14 +377,14 @@ fn wasm_backdrops_match_native_opacity_and_ignore_playhead_and_activity() {
         let revision = widget.revision();
         let pixel_storage = widget.pixels().as_ptr();
         let mut config = validate_config_value(&json!({"scene": scene, "backdrops": [backdrop], "labels": [], "values": [], "plots": []})).unwrap();
-        let native = StaticLayer {
-            backdrops: &config.backdrops, rasters: &[], labels: &[], values: &[], scene: &config.scene,
-        }.prepare(&test_paths(), &mut RenderProfiler::default()).unwrap().base_rgba;
+        let native = common::export::scene_frame(&config);
         let width = geometry["width"].as_u64().unwrap() as usize;
         let height = geometry["height"].as_u64().unwrap() as usize;
         let left = geometry["left"].as_f64().unwrap() as usize;
         let top = geometry["top"].as_f64().unwrap() as usize;
-        assert_eq!(rgba_at(&pixels, width, width / 2, height / 2), rgba_at(&native, 96, left + width / 2, top + height / 2));
+        // Tiles unpremultiply with integer rounding; export frames are drawn straight.
+        let (tile, frame) = (rgba_at(&pixels, width, width / 2, height / 2), rgba_at(&native, 96, left + width / 2, top + height / 2));
+        assert!(tile.iter().zip(frame).all(|(a, b)| a.abs_diff(b) <= 1), "tile {tile:?}, export {frame:?}");
         assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
         preview.replace_activity(br#"{"sample_elapsed_seconds":[0,1],"speed":[0,20],"trim_end_seconds":1}"#).unwrap();
         for second in [0.0, 1.0, 0.25, 100.0] {
@@ -487,8 +399,7 @@ fn wasm_backdrops_match_native_opacity_and_ignore_playhead_and_activity() {
         request["scene"]["opacity"] = json!(0.5);
         preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
         config.scene.presentation.opacity = 0.5;
-        let native = StaticLayer { backdrops: &config.backdrops, rasters: &[], labels: &[], values: &[], scene: &config.scene }
-            .prepare(&test_paths(), &mut RenderProfiler::default()).unwrap().base_rgba;
+        let native = common::export::scene_frame(&config);
         assert_eq!(rgba_at(preview.widgets[&id].pixels(), width, width / 2, height / 2)[3], 48);
         assert_eq!(rgba_at(&native, 96, left + width / 2, top + height / 2)[3], 48);
         request["widget"]["fill_color"] = json!("#ff0000");
@@ -620,17 +531,4 @@ fn rgba_at(pixels: &[u8], width: usize, x: usize, y: usize) -> [u8; 4] {
         pixels[offset + 2],
         pixels[offset + 3],
     ]
-}
-
-fn test_paths() -> AppPaths {
-    let workspace_root = common::test_config::repo_git_root();
-    AppPaths {
-        repo_root: workspace_root.clone(),
-        font_dirs: vec![workspace_root.join("fonts")],
-        debug_render_dir: std::env::temp_dir(),
-        temp_dir: std::env::temp_dir(),
-        bundled_templates_dirs: vec![],
-        user_templates_dir: std::env::temp_dir(),
-        downloads_dir: std::env::temp_dir(),
-    }
 }

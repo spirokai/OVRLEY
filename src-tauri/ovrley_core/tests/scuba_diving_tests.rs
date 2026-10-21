@@ -283,12 +283,12 @@ fn dive_times_allow_decimals_but_show_whole_minutes_by_default() {
 }
 
 #[test]
-fn scuba_widgets_render_in_the_preview_cache_and_native_export_with_matching_pixels() {
+fn scuba_widgets_render_in_the_preview_cache_and_export_frame_with_matching_pixels() {
     use ovrley_core::{
         debug::RenderProfiler,
         fonts::preview_font_resource,
         paths::AppPaths,
-        render::{prepare_preview_assets, FrameSize, VideoFrameRenderer},
+        render::render_full_frames,
     };
     use ovrley_widgets::preview::{FontRequest, PreviewSession};
 
@@ -309,16 +309,13 @@ fn scuba_widgets_render_in_the_preview_cache_and_native_export_with_matching_pix
         let trimmed = trim_activity(&activity, 0.0, 3780.0, &requirements).unwrap();
         let seconds = vec![0.0, 400.5, 1800.0, 3500.0, 3780.0];
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let (assets, _, _, _) = prepare_preview_assets(&paths, &config, &activity, &dense).unwrap();
-        let renderer = VideoFrameRenderer::new(
+        let frames = render_full_frames(
             &paths.font_dirs,
+            &config,
+            &activity,
             &dense,
-            &assets,
-            FrameSize {
-                width: 700,
-                height: 500,
-            },
-            0,
+            &[0, 1, 2, 3, 4],
+            &mut RenderProfiler::default(),
         )
         .unwrap();
         let mut preview = PreviewSession::default();
@@ -343,10 +340,7 @@ fn scuba_widgets_render_in_the_preview_cache_and_native_export_with_matching_pix
                 geometry["left"].as_f64().unwrap() as usize,
                 geometry["top"].as_f64().unwrap() as usize,
             );
-            let mut native = vec![0_u8; 700 * 500 * 4];
-            renderer
-                .render_rgba(index, &mut native, &mut RenderProfiler::default())
-                .unwrap();
+            let native = &frames[index];
             let mut difference = 0;
             for (y, row) in rendered
                 .pixels()

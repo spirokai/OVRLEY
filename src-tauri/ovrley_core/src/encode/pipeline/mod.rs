@@ -42,7 +42,7 @@ use crate::normalize::ValidatedRenderConfig;
 use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
 use crate::debug::RenderProfiler;
-use crate::render::{ExportWidgets, FrameSize, LabelCacheStatus, PreparedAtlas};
+use crate::render::{ExportWidgets, FrameSize, PreparedAtlas};
 use crate::render_jobs::inspection::CompositeSourceMetadata;
 
 /// Encoding inputs fixed by job planning. Source probing and activity timing
@@ -164,20 +164,9 @@ pub(crate) fn encode_video(
         &mut prepare_profiler,
     )?;
     let (encoding, atlas) = match request {
-        // CPU overlay graphs overlay the planned atlas slot by slot. The CUDA, VAAPI and
-        // QSV full overlay graphs still take the full frame; so does a rotated CUDA
-        // request that falls back to a CPU overlay graph.
+        // Every composite graph overlays the planned atlas slot by slot.
         VideoEncodingRequest::Composite { render, source } => {
-            let atlas = if render
-                .requested_codec_id
-                .metadata()
-                .filter_stack_kind
-                .overlays_atlas_slots()
-            {
-                export.plan_atlas(&render.frames.dense_frame_indices(), &mut prepare_profiler)?
-            } else {
-                export.full_frame_atlas()
-            };
+            let atlas = export.plan_atlas(&render.frames.dense_frame_indices(), &mut prepare_profiler)?;
             let encoding = CompositeEncoding::new(
                 size,
                 render,
@@ -205,12 +194,10 @@ pub(crate) fn encode_video(
     };
     let prepare_timings = prepare_profiler.summary();
     if let Some(directory) = &debug_dir {
-        // Widgets draw their own tiles; there is no shared static label layer to cache.
         write_prepare_summary(
             directory,
             prepare_started.elapsed().as_secs_f64() * 1000.0,
             prepare_timings.clone(),
-            LabelCacheStatus::None,
         )?;
     }
     let observe = |index: u64, dense_index: usize, buffer: &FrameBuffer| {

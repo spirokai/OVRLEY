@@ -8,7 +8,7 @@ use crate::debug::TimingBucket;
 use crate::encode::debug::round3;
 use crate::error::{CoreError, CoreResult};
 use crate::paths::AppPaths;
-use crate::render::{FrameSize, LabelCacheStatus};
+use crate::render::FrameSize;
 use chrono::Local;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -45,7 +45,6 @@ struct TimingSummary {
 struct PrepareTimingSummary {
     total_ms: f64,
     timings: BTreeMap<String, TimingBucket>,
-    label_cache_status: LabelCacheStatus,
 }
 
 /// Writes preparation timing data for one render.
@@ -53,13 +52,8 @@ pub(crate) fn write_prepare_summary(
     debug_dir: &Path,
     total_ms: f64,
     timings: BTreeMap<String, TimingBucket>,
-    label_cache_status: LabelCacheStatus,
 ) -> CoreResult<()> {
-    let summary = PrepareTimingSummary {
-        total_ms,
-        timings,
-        label_cache_status,
-    };
+    let summary = PrepareTimingSummary { total_ms, timings };
     write_json(
         debug_dir.join("prepare_render_assets_timing.json"),
         &summary,

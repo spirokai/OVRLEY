@@ -69,10 +69,11 @@ fn config(activity_end: f64) -> RenderConfig {
     scene.ffmpeg = serde_json::json!({"codec": "libx264"});
     scene.start = sync_offset;
     scene.end = sync_offset + RENDER_SECONDS;
-    scene.fps = 30000.0 / 1001.0;
+    scene.fps = 30.0;
     scene.composite_video_path = Some(fixtures().join("video").join("test-1080p.mp4").to_string_lossy().into_owned());
-    scene.quality_type = Some(crate::encode::quality::QualityType::Bitrate);
-    scene.quality_value = Some(20.0);
+    // Near-lossless, so frames compare overlay pixels rather than rate-control decisions.
+    scene.quality_type = Some(crate::encode::quality::QualityType::Quality);
+    scene.quality_value = Some(1.0);
     scene.composite_sync_offset = Some(sync_offset);
     scene.composite_video_fps_num = Some(30000);
     scene.composite_video_fps_den = Some(1001);

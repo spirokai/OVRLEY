@@ -47,10 +47,7 @@ use ovrley_core::normalize::{
     migrate_saved_font_input, parse_template_value, validate_render_config, ValidatedRenderConfig,
 };
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::{
-    prepare_preview_assets, render_preview_with_prepared_assets, PreparedPreviewAssets,
-    PreviewRenderRequest,
-};
+use ovrley_core::render::render_preview_frame;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::fs;
@@ -217,27 +214,15 @@ pub fn render_skia_preview(
     dense_activity: &DenseActivityReport,
     second: u32,
     out_path: &Path,
-) -> Result<PreparedPreviewAssets> {
+) -> Result<()> {
     println!(
         "  rendering Skia frame at second {second} → {}",
         out_path.display()
     );
-    let (prepared, label_cache_status, prepare_timings, extra_total_ms) =
-        prepare_preview_assets(paths, config, activity, dense_activity)
-            .context("prepare_preview_assets failed")?;
-    render_preview_with_prepared_assets(PreviewRenderRequest {
-        paths,
-        dense_activity,
-        prepared_preview_assets: &prepared,
-        second: f64::from(second),
-        prepare_timings,
-        label_cache_status,
-        extra_total_ms,
-        out_path,
-    })
-    .context("render_preview_with_prepared_assets failed")?;
+    render_preview_frame(paths, config, activity, dense_activity, f64::from(second), out_path)
+        .context("render_preview_frame failed")?;
     println!("  Skia render complete: {} kB", file_size_kb(out_path));
-    Ok(prepared)
+    Ok(())
 }
 
 /// Returns file size in KB.

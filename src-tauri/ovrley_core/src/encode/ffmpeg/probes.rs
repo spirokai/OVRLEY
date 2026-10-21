@@ -8,6 +8,7 @@ use crate::encode::ffmpeg::composite_filters::composite_filter_complex;
 use crate::encode::ffmpeg::composite_profiles::composite_profile;
 use crate::encode::ffmpeg::transparent_profiles::transparent_profile;
 use crate::render::{AtlasPlan, FrameSize};
+use skia_safe::IRect;
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -83,10 +84,11 @@ fn qsv_full_probe_candidates() -> Vec<QsvProbeCandidate> {
 /// Probes whether a QSV device can run the performance QSV filter path.
 ///
 /// Prepares synthetic NV12 hardware frames, then exercises the live render
-/// graph and direct hardware-frame encoding for 30 frames without video decode.
+/// graph over a two-slot atlas and direct hardware-frame encoding for 30
+/// frames without video decode.
 /// Main-frame preparation belongs to each candidate: the preferred path uploads
 /// NV12 directly, while DXVA2 uses a fixed BGRA upload and GPU conversion.
-/// The live render graph owns the overlay upload's 16-frame pool on both paths.
+/// The live render graph owns each slot upload's 16-frame pool on both paths.
 fn probe_qsv_overlay_path(ffmpeg_path: &Path, candidate: &QsvProbeCandidate) -> bool {
     probe_codec(
         "qsv_overlay",
@@ -96,16 +98,22 @@ fn probe_qsv_overlay_path(ffmpeg_path: &Path, candidate: &QsvProbeCandidate) -> 
 }
 
 fn qsv_overlay_probe_args(candidate: &QsvProbeCandidate) -> Vec<String> {
+    // Two slots exercise the chained, offset overlays of the export graph.
+    let atlas = AtlasPlan::from_layer_bounds(
+        FrameSize {
+            width: 128,
+            height: 128,
+        },
+        &[
+            Some(IRect::new(8, 8, 40, 40)),
+            Some(IRect::new(72, 80, 120, 120)),
+        ],
+    )
+    .expect("fixed QSV probe layer bounds fit the probe frame");
     let render_graph = composite_filter_complex(
         128,
         128,
-        &AtlasPlan::full_frame(
-            FrameSize {
-                width: 128,
-                height: 128,
-            },
-            0,
-        ),
+        &atlas,
         0.0,
         1.0,
         composite_profile(CompositeCodecId::QsvFullH264),
@@ -113,8 +121,11 @@ fn qsv_overlay_probe_args(candidate: &QsvProbeCandidate) -> Vec<String> {
         None,
         None,
         None,
-    )
-    .expect("fixed QSV probe dimensions and timing produce a valid render graph");
+    );
+    let FrameSize {
+        width: atlas_width,
+        height: atlas_height,
+    } = atlas.size();
     let filter_complex = format!(
         "[0:v]{}[probe_main];{}",
         candidate.main_preparation,
@@ -134,7 +145,7 @@ fn qsv_overlay_probe_args(candidate: &QsvProbeCandidate) -> Vec<String> {
         "-f".to_string(),
         "lavfi".to_string(),
         "-i".to_string(),
-        "color=c=red@0.35:s=128x128:r=30:d=1,format=rgba".to_string(),
+        format!("color=c=red@0.35:s={atlas_width}x{atlas_height}:r=30:d=1,format=rgba"),
         "-filter_complex".to_string(),
         filter_complex,
         "-map".to_string(),
@@ -170,11 +181,10 @@ mod tests {
                 .position(|arg| arg == "-filter_complex")
                 .unwrap()
                 + 1];
-            assert!(graph.contains("[probe_main]trim=start=0:end=1,setpts=PTS-STARTPTS,scale_qsv=w=128:h=128:format=nv12[main_hw]"));
-            assert!(
-                graph.contains("[1:v]setpts=PTS-STARTPTS,hwupload=extra_hw_frames=16[overlay_hw]")
-            );
-            assert!(graph.contains("[main_hw][overlay_hw]overlay_qsv=x=0:y=0[out]"));
+            assert!(graph.contains("[probe_main]trim=start=0:end=1,setpts=PTS-STARTPTS,scale_qsv=w=128:h=128:format=nv12[base]"));
+            assert!(graph.contains("[1:v]setpts=PTS-STARTPTS,split=2[atlas0][atlas1];"));
+            assert_eq!(graph.matches(",hwupload=extra_hw_frames=16[slot").count(), 2);
+            assert!(graph.contains("[base][slot0]overlay_qsv=x=8:y=8[main1];[main1][slot1]overlay_qsv=x=72:y=80[out]"));
             assert!(!graph.contains("hwdownload"));
             if index == 0 {
                 assert!(graph.starts_with("[0:v]format=nv12,hwupload[probe_main];"));

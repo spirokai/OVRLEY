@@ -39,7 +39,7 @@ fn elevation_request() -> Value {
 
 #[test]
 fn diving_profile_preview_matches_export_during_playback_and_seeking() {
-    use ovrley_core::{activity::{interpolate::densify_activity, trim::trim_activity}, debug::RenderProfiler, paths::AppPaths, render::{prepare_preview_assets, FrameSize, VideoFrameRenderer}};
+    use ovrley_core::{activity::{interpolate::densify_activity, trim::trim_activity}, debug::RenderProfiler, paths::AppPaths, render::render_full_frames};
     let manifest: Value = serde_json::from_str(include_str!("../../../assets/standard-widgets.json")).unwrap();
     let mut request = route_request();
     request["type"] = json!("diving_profile");
@@ -65,8 +65,7 @@ fn diving_profile_preview_matches_export_during_playback_and_seeking() {
     let dense = densify_activity(&trimmed, vec![0.0, 1.5, 3.25], &requirements);
     let root = common::test_config::repo_git_root();
     let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
-    let (assets, _, _, _) = prepare_preview_assets(&paths, &config, &activity, &dense).unwrap();
-    let renderer = VideoFrameRenderer::new(&paths.font_dirs, &dense, &assets, FrameSize { width: 700, height: 500 }, 0).unwrap();
+    let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
     let (mut preview, id) = elevation_preview(&request, &serde_json::to_vec(&activity).unwrap());
     let mut placement = None;
     for index in [0, 1, 2, 0] {
@@ -77,8 +76,7 @@ fn diving_profile_preview_matches_export_during_playback_and_seeking() {
         let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
         let (w, h, left, top) = (geometry["width"].as_u64().unwrap() as usize, geometry["height"].as_u64().unwrap() as usize,
             geometry["left"].as_f64().unwrap() as usize, geometry["top"].as_f64().unwrap() as usize);
-        let mut native = vec![0; 700 * 500 * 4];
-        renderer.render_rgba(index, &mut native, &mut RenderProfiler::default()).unwrap();
+        let native = &frames[index];
         let mut difference = 0;
         for y in 0..h {
             let native = &native[((top + y) * 700 + left) * 4..((top + y) * 700 + left + w) * 4];
@@ -383,31 +381,10 @@ fn every_family_reports_layout_only_bounds_that_contain_its_drawing() {
     }
 }
 
-/// Largest premultiplied channel difference between two straight-alpha RGBA frames, where it
-/// is, and how many pixels and which rectangle exceed `tolerance`.
-#[allow(clippy::type_complexity)]
-fn premultiplied_difference(width: usize, expected: &[u8], actual: &[u8], tolerance: u16) -> (u16, (usize, usize), [u8; 4], [u8; 4], usize, [usize; 4]) {
-    let mut largest = (0, (0, 0), [0; 4], [0; 4], 0, [usize::MAX, usize::MAX, 0, 0]);
-    for (index, (a, b)) in expected.chunks_exact(4).zip(actual.chunks_exact(4)).enumerate() {
-        let mut difference = a[3].abs_diff(b[3]) as u16;
-        for c in 0..3 {
-            difference = difference.max((a[c] as u16 * a[3] as u16).abs_diff(b[c] as u16 * b[3] as u16) / 255);
-        }
-        let (x, y) = (index % width, index / width);
-        if difference > tolerance {
-            largest.4 += 1;
-            largest.5 = [largest.5[0].min(x), largest.5[1].min(y), largest.5[2].max(x), largest.5[3].max(y)];
-        }
-        if difference > largest.0 {
-            (largest.0, largest.1, largest.2, largest.3) = (difference, (x, y), a.try_into().unwrap(), b.try_into().unwrap());
-        }
-    }
-    largest
-}
-
-/// Golden reference until the export renderer is removed: frames composited from engine tiles
-/// equal the export renderer's frames, before, inside and after the activity coverage.
-fn assert_engine_frames_match_export_renderer(
+/// Golden reference: the planned atlas reassembles into the single-slot full-frame plan's frames,
+/// before, inside and after the activity coverage. Workers claim frames out of order and revisit
+/// equal samples, so a worker rendering frames out of order must match one rendering them in order.
+fn assert_atlas_frames_match_the_full_frame(
     name: &str,
     config: &ovrley_core::normalize::ValidatedRenderConfig,
     activity: &ovrley_core::activity::schema::ParsedActivity,
@@ -416,47 +393,36 @@ fn assert_engine_frames_match_export_renderer(
         activity::build_dense_activity_report_validated,
         debug::RenderProfiler,
         paths::AppPaths,
-        render::{prepare_preview_assets, ExportWidgets, FrameSize, VideoFrameRenderer},
+        render::{ExportWidgets, FrameSize},
     };
     const BLANK_LEADING_FRAMES: usize = 2;
-    const TOLERANCE: u16 = 8;
-    // Blending a premultiplied tile into the frame rounds soft anti-aliased and shadow pixels
-    // differently from drawing each primitive into the frame; a few may differ more.
-    const SOFT_PIXEL_TOLERANCE: u16 = 64;
-    const SOFT_PIXELS: usize = 64;
     let root = common::test_config::repo_git_root();
     let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
     let dense = build_dense_activity_report_validated(activity, config).unwrap();
     let size = FrameSize { width: config.scene.presentation.width, height: config.scene.presentation.height };
-    let (assets, _, _, _) = prepare_preview_assets(&paths, config, activity, &dense).unwrap();
-    let renderer = VideoFrameRenderer::new(&paths.font_dirs, &dense, &assets, size, BLANK_LEADING_FRAMES as u64).unwrap();
     let mut profiler = RenderProfiler::default();
     let export = ExportWidgets::prepare(&paths.font_dirs, config, activity, &dense, size, BLANK_LEADING_FRAMES as u64, &mut profiler).unwrap();
-    let mut worker = export.worker().unwrap();
     let full_frame = export.prepare_atlas(export.full_frame_atlas(), &mut profiler).unwrap();
     let frame_count = BLANK_LEADING_FRAMES + dense.frame_count + 2;
-    // Workers claim frames out of order and revisit equal samples; widget caches must follow.
-    let order: Vec<usize> = (0..frame_count).chain((0..frame_count).rev().step_by(3)).collect();
-    let (mut expected, mut actual) = (vec![0; size.rgba_len().unwrap()], vec![0; size.rgba_len().unwrap()]);
-    let mut covered_pixels = false;
-    for frame in order {
-        renderer.render_rgba(frame, &mut expected, &mut RenderProfiler::default()).unwrap();
-        worker.render_atlas(frame, &full_frame, &mut actual, &mut profiler).unwrap();
-        let covered = (BLANK_LEADING_FRAMES..BLANK_LEADING_FRAMES + dense.frame_count).contains(&frame);
-        covered_pixels |= covered && expected.chunks_exact(4).any(|pixel| pixel[3] > 0);
-        let (difference, at, a, b, count, area) = premultiplied_difference(size.width as usize, &expected, &actual, TOLERANCE);
-        if difference > TOLERANCE && std::env::var_os("OVRLEY_DUMP_ENGINE_FRAMES").is_some() {
-            for (label, pixels) in [("export", &expected), ("engine", &actual)] {
-                image::RgbaImage::from_raw(size.width, size.height, pixels.clone()).unwrap()
-                    .save(std::env::temp_dir().join(format!("{}-{frame}-{label}.png", name.replace(' ', "-")))).unwrap();
-            }
-        }
-        assert!(
-            difference <= SOFT_PIXEL_TOLERANCE && count <= SOFT_PIXELS,
-            "{name} frame {frame} (covered: {covered}): premultiplied difference {difference} at {at:?}: export {a:?}, engine {b:?}; {count} pixels in {area:?}"
-        );
+    let mut in_order = export.worker().unwrap();
+    let expected: Vec<Vec<u8>> = (0..frame_count)
+        .map(|frame| {
+            let mut pixels = vec![0; size.rgba_len().unwrap()];
+            in_order.render_atlas(frame, &full_frame, &mut pixels, &mut profiler).unwrap();
+            pixels
+        })
+        .collect();
+    let covered = BLANK_LEADING_FRAMES..BLANK_LEADING_FRAMES + dense.frame_count;
+    assert!(
+        covered.clone().any(|frame| expected[frame].chunks_exact(4).any(|pixel| pixel[3] > 0)),
+        "{name}: covered frames must draw widgets"
+    );
+    let mut out_of_order = export.worker().unwrap();
+    let mut actual = vec![0; size.rgba_len().unwrap()];
+    for frame in (0..frame_count).rev().step_by(3).chain(0..frame_count) {
+        out_of_order.render_atlas(frame, &full_frame, &mut actual, &mut profiler).unwrap();
+        assert!(actual == expected[frame], "{name} frame {frame} (covered: {}): out-of-order rendering differs", covered.contains(&frame));
     }
-    assert!(covered_pixels, "{name}: covered frames must draw widgets");
     assert_atlas_reassembles_the_full_frame(name, &export, &(0..frame_count).collect::<Vec<_>>())
 }
 
@@ -585,7 +551,7 @@ fn overlapping_widgets_are_planned(atlas: &ovrley_core::render::AtlasPlan) -> bo
 }
 
 #[test]
-fn engine_tiles_composite_into_the_export_frames_of_the_fixture_templates() {
+fn atlas_frames_reassemble_the_full_frames_of_the_fixture_templates() {
     use ovrley_core::activity::parse_activity_json;
     let fixtures = common::test_config::fixtures();
     let activity = parse_activity_json(&std::fs::read_to_string(fixtures.join("activity/gpx-parse-debug.json")).unwrap()).unwrap();
@@ -601,7 +567,7 @@ fn engine_tiles_composite_into_the_export_frames_of_the_fixture_templates() {
         config["scene"]["end"] = json!(600.4);
         config["scene"]["custom_export_range_active"] = json!(true);
         let config = common::seam::validated_config_from_value(config);
-        let atlas = assert_engine_frames_match_export_renderer(template, &config, &activity);
+        let atlas = assert_atlas_frames_match_the_full_frame(template, &config, &activity);
         let frame = config.scene.presentation.width as u64 * config.scene.presentation.height as u64;
         assert!(atlas.slots().len() > 2, "{template}: planned {atlas:?}");
         assert!(overlapping_widgets_are_planned(&atlas), "{template}: overlapping widgets must share or overlap slots");
@@ -640,7 +606,7 @@ fn atlas_planning_of_a_ten_minute_export_runs_layout_only_within_seconds() {
 }
 
 #[test]
-fn engine_tiles_composite_overlapping_rotated_widgets_of_every_family_into_the_export_frame() {
+fn atlas_frames_reassemble_overlapping_rotated_widgets_of_every_family_into_the_full_frame() {
     use ovrley_core::{
         normalize::{parse_config_value, validate_render_config_with_resources},
         raster::{load_embedded_raster, RasterResourceResolver, SelectedRaster},
@@ -696,9 +662,7 @@ fn engine_tiles_composite_overlapping_rotated_widgets_of_every_family_into_the_e
                 widget["rotation"] = json!(match kind.as_str() { "course" => 27.0, "elevation" => 230.0, _ => 37.0 });
                 "plots"
             }
-            // The export renderer drew text units and icons in its full-frame static layer, below
-            // every value; the engine draws each value whole, like the preview. They agree unless
-            // a text value overlaps another value, so these overlap only the raster and the route.
+            // Text values overlap only the raster and the route.
             "speed" | "time" => {
                 widget["x"] = json!(if kind == "speed" { 180.25 } else { 560.25 });
                 widget["y"] = json!(if kind == "speed" { 400.5 } else { 520.5 });
@@ -711,7 +675,7 @@ fn engine_tiles_composite_overlapping_rotated_widgets_of_every_family_into_the_e
     let config = validate_render_config_with_resources(parse_config_value(&config).unwrap(), Some(&resources)).unwrap();
     assert_eq!(config.values.len(), 13, "every value family is exported");
 
-    let atlas = assert_engine_frames_match_export_renderer("every family", &config, &every_family_parsed_activity());
+    let atlas = assert_atlas_frames_match_the_full_frame("every family", &config, &every_family_parsed_activity());
     // Every layer is visible; neighbouring widgets either share a slot or overlay in layer order.
     let mut layers: Vec<_> = atlas.slots().iter().flat_map(|slot| slot.layers.clone()).collect();
     layers.sort_unstable();
@@ -758,8 +722,8 @@ fn widgets_accept_the_native_font_and_raster_resolvers_used_by_export() {
 }
 
 #[test]
-fn elevation_preview_matches_native_export_labels_hover_seeking_and_activity_replacement() {
-    use ovrley_core::{activity::{interpolate::densify_activity, trim::trim_activity}, debug::RenderProfiler, paths::AppPaths, render::{prepare_preview_assets, FrameSize, VideoFrameRenderer}};
+fn elevation_preview_matches_export_labels_hover_seeking_and_activity_replacement() {
+    use ovrley_core::{activity::{interpolate::densify_activity, trim::trim_activity}, debug::RenderProfiler, paths::AppPaths, render::render_full_frames};
     let activity = elevation_activity();
     let bytes = serde_json::to_vec(&activity).unwrap();
     let root = common::test_config::repo_git_root();
@@ -776,8 +740,7 @@ fn elevation_preview_matches_native_export_labels_hover_seeking_and_activity_rep
         let trimmed = trim_activity(&activity, 0.25, 3.25, &requirements).unwrap();
         let seconds = vec![0.0, 0.75, 1.5, 2.2, 2.9];
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let (assets, _, _, _) = prepare_preview_assets(&paths, &config, &activity, &dense).unwrap();
-        let renderer = VideoFrameRenderer::new(&paths.font_dirs, &dense, &assets, FrameSize {width: 700, height: 500}, 0).unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
         let (mut preview, id) = elevation_preview(&request, &bytes);
         let raw = serde_json::from_value(request["widget"].clone()).unwrap();
         let scene = validate_scene_presentation(serde_json::from_value(request["scene"].clone()).unwrap()).unwrap();
@@ -786,15 +749,12 @@ fn elevation_preview_matches_native_export_labels_hover_seeking_and_activity_rep
         for index in [0, 1, 2, 3, 4, 2, 0] {
             let second = 0.25 + seconds[index];
             preview.render(second).unwrap();
-            let prepared = prepared_elevation(&preview, id);
-            assert_eq!(assets.prepared_assets.elevation_geometry_json().unwrap()["points"], serde_json::to_value(&prepared.points).unwrap());
             let widget = &preview.widgets[&id];
             let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
             if let Some(placement) = &placement { assert_eq!(widget.geometry(), placement, "playback must retain raster and selection bounds"); }
             else { placement = Some(widget.geometry().clone()); }
             let (w, h, left, top) = (geometry["width"].as_u64().unwrap() as usize, geometry["height"].as_u64().unwrap() as usize, geometry["left"].as_f64().unwrap() as usize, geometry["top"].as_f64().unwrap() as usize);
-            let mut native = vec![0; 700 * 500 * 4];
-            renderer.render_rgba(index, &mut native, &mut RenderProfiler::default()).unwrap();
+            let native = &frames[index];
             let mut difference = 0;
             let mut largest = (0, 0, [0; 4], [0; 4]);
             for y in 0..h {
@@ -807,7 +767,7 @@ fn elevation_preview_matches_native_export_labels_hover_seeking_and_activity_rep
                     if difference > previous { largest = (x + left, y + top, <[u8; 4]>::try_from(a).unwrap(), <[u8; 4]>::try_from(b).unwrap()); }
                 }
             }
-            assert!(difference <= 8, "{variant}/{full} native elevation differs at {second}: {difference}; {largest:?}");
+            assert!(difference <= 8, "{variant}/{full} export elevation differs at {second}: {difference}; {largest:?}");
             assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] > 0));
             let revision = widget.revision();
             preview.render(second).unwrap();
@@ -1025,10 +985,10 @@ fn prepared_route(preview: &PreviewSession, id: u32) -> std::sync::Arc<ovrley_wi
 }
 
 #[test]
-fn route_preview_matches_native_export_and_keeps_marker_out_of_selection_bounds() {
+fn route_preview_matches_export_and_keeps_marker_out_of_selection_bounds() {
     use ovrley_core::{
         activity::{interpolate::densify_activity, trim::trim_activity}, debug::RenderProfiler, paths::AppPaths,
-        render::{prepare_preview_assets, FrameSize, VideoFrameRenderer},
+        render::render_full_frames,
     };
     let activity = route_activity();
     let bytes = serde_json::to_vec(&activity).unwrap();
@@ -1048,8 +1008,7 @@ fn route_preview_matches_native_export_and_keeps_marker_out_of_selection_bounds(
         let trimmed = trim_activity(&activity, 0.25, 3.25, &requirements).unwrap();
         let seconds = vec![0.0, 0.75, 2.2, 2.9];
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let (assets, _, _, _) = prepare_preview_assets(&paths, &config, &activity, &dense).unwrap();
-        let renderer = VideoFrameRenderer::new(&paths.font_dirs, &dense, &assets, FrameSize {width: 700, height: 500}, 0).unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
         let mut preview = PreviewSession::default();
         preview.replace_activity(&bytes).unwrap();
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
@@ -1065,8 +1024,7 @@ fn route_preview_matches_native_export_and_keeps_marker_out_of_selection_bounds(
             let height = geometry["height"].as_u64().unwrap() as usize;
             let left = geometry["left"].as_f64().unwrap() as usize;
             let top = geometry["top"].as_f64().unwrap() as usize;
-            let mut native = vec![0; 700 * 500 * 4];
-            renderer.render_rgba(index, &mut native, &mut RenderProfiler::default()).unwrap();
+            let native = &frames[index];
             let mut max_difference = 0;
             for y in 0..height {
                 let native_row = &native[((top + y) * 700 + left) * 4..((top + y) * 700 + left + width) * 4];
@@ -1082,7 +1040,7 @@ fn route_preview_matches_native_export_and_keeps_marker_out_of_selection_bounds(
                 }
             }
             // Allow edge quantization between native straight-alpha and preview premultiplied surfaces.
-            assert!(max_difference <= 8, "{variant}/{full} native route differs at {second}: {max_difference}");
+            assert!(max_difference <= 8, "{variant}/{full} export route differs at {second}: {max_difference}");
             assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] > 0));
             let revision = widget.revision();
             preview.render(second).unwrap();
@@ -1195,6 +1153,33 @@ fn route_gestures_reuse_geometry_until_resize_commit_and_keep_every_opposite_cor
     }
 }
 
+/// Preview tiles are drawn premultiplied and unpremultiplied with integer rounding, export frames
+/// are drawn straight; soft shadow and anti-aliased edges round apart by a few levels.
+const EXPORT_TILE_TOLERANCE: u16 = 12;
+
+/// Largest premultiplied channel difference between a straight-alpha preview tile and the same
+/// scene rectangle of a straight-alpha export frame `frame_width` pixels wide.
+fn export_tile_difference(frame: &[u8], frame_width: usize, geometry: &Value, tile: &[u8]) -> u16 {
+    let width = geometry["width"].as_u64().unwrap() as usize;
+    let (left, top) = (geometry["left"].as_f64().unwrap() as i64, geometry["top"].as_f64().unwrap() as i64);
+    let frame_height = frame.len() / 4 / frame_width;
+    let mut difference = 0;
+    for (index, b) in tile.chunks_exact(4).enumerate() {
+        let (x, y) = (left + (index % width) as i64, top + (index / width) as i64);
+        let a = if x < 0 || y < 0 || x as usize >= frame_width || y as usize >= frame_height {
+            &[0; 4][..]
+        } else {
+            let at = (y as usize * frame_width + x as usize) * 4;
+            &frame[at..at + 4]
+        };
+        difference = difference.max(a[3].abs_diff(b[3]) as u16);
+        for c in 0..3 {
+            difference = difference.max((a[c] as u16 * a[3] as u16).abs_diff(b[c] as u16 * b[3] as u16) / 255);
+        }
+    }
+    difference
+}
+
 fn gauge_preview(
     display: &str,
     metric: &str,
@@ -1238,12 +1223,12 @@ fn gauge_preview(
 }
 
 #[test]
-fn gauges_match_native_pixels_sampling_cache_revisions_and_activity_replacement() {
+fn gauges_match_export_pixels_sampling_cache_revisions_and_activity_replacement() {
     use ovrley_core::{
         activity::{interpolate::densify_activity, trim::trim_activity},
         debug::RenderProfiler,
         paths::AppPaths,
-        render::assets::prepare_render_assets,
+        render::render_full_frames,
     };
     let activity = ovrley_core::activity::parse_activity_json(
         r#"{
@@ -1276,14 +1261,8 @@ fn gauges_match_native_pixels_sampling_cache_revisions_and_activity_replacement(
         let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let assets = prepare_render_assets(
-            &ovrley_core::fonts::NativeFonts(&paths.font_dirs),
-            &config,
-            &activity,
-            &dense,
-            &mut RenderProfiler::default(),
-        )
-        .unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let frame_width = config.scene.presentation.width as usize;
         let id = preview
             .create_widget(serde_json::from_value(request.clone()).unwrap())
             .unwrap();
@@ -1299,33 +1278,13 @@ fn gauges_match_native_pixels_sampling_cache_revisions_and_activity_replacement(
                 );
             }
             let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
-            let info = ImageInfo::new(
-                (
-                    geometry["width"].as_i64().unwrap() as i32,
-                    geometry["height"].as_i64().unwrap() as i32,
-                ),
-                ColorType::RGBA8888,
-                AlphaType::Premul,
-                None,
-            );
-            let mut surface = surfaces::raster(&info, None, None).unwrap();
-            let canvas = surface.canvas();
-            canvas.clear(Color::TRANSPARENT);
-            canvas.translate((
-                -geometry["left"].as_f64().unwrap() as f32,
-                -geometry["top"].as_f64().unwrap() as f32,
-            ));
-            assets.draw(canvas, &dense, index, &NativeFonts(&paths.font_dirs), false, &mut RenderProfiler::default())
-            .unwrap();
-            let mut pixels = vec![0; widget.pixels().len()];
-            // Compare drawing through the canonical transport; conversion has separate tests.
-            read_surface_rgba(&mut surface, &mut pixels).unwrap();
+            let difference = export_tile_difference(&frames[index], frame_width, &geometry, widget.pixels());
             assert!(
-                pixels == *widget.pixels(),
-                "{display}/{metric}/{placement}/{fill} pixels differ at {}",
+                difference <= EXPORT_TILE_TOLERANCE,
+                "{display}/{metric}/{placement}/{fill} differs from export by {difference} at {}",
                 seconds[index]
             );
-            assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+            assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] != 0));
             let revision = widget.revision();
             preview.render(seconds[index]).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision);
@@ -1548,11 +1507,11 @@ fn heading_preview() -> (PreviewSession, Value) {
 }
 
 #[test]
-fn heading_tape_matches_native_pixels_sampling_revisions_and_activity_replacement() {
+fn heading_tape_matches_export_pixels_sampling_revisions_and_activity_replacement() {
     use ovrley_core::{
         activity::{interpolate::densify_activity, trim::trim_activity},
         debug::RenderProfiler, paths::AppPaths,
-        render::assets::prepare_render_assets,
+        render::render_full_frames,
     };
     use ovrley_widgets::activity::ActivitySampler;
     let (mut preview, mut request) = heading_preview();
@@ -1579,7 +1538,8 @@ fn heading_tape_matches_native_pixels_sampling_revisions_and_activity_replacemen
         let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut RenderProfiler::default()).unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let scene_width = config.scene.presentation.width as usize;
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         for index in [0,1,2,3,4,5,6,7,4,0] {
             let second = seconds[index];
@@ -1596,16 +1556,9 @@ fn heading_tape_matches_native_pixels_sampling_revisions_and_activity_replacemen
             assert_eq!(geometry["content"]["left"], request["widget"]["x"], "tape frame does not travel horizontally");
             let frame_width = request["widget"]["width"].as_f64().unwrap() * request["scene"]["scale"].as_f64().unwrap();
             assert!((geometry["content"]["width"].as_f64().unwrap() - frame_width).abs() < 0.001, "tape width stays fixed as ticks and gaps cross its edges");
-            let info = ImageInfo::new((geometry["width"].as_i64().unwrap() as i32, geometry["height"].as_i64().unwrap() as i32), ColorType::RGBA8888, AlphaType::Premul, None);
-            let mut surface = surfaces::raster(&info, None, None).unwrap();
-            let canvas = surface.canvas();
-            canvas.clear(Color::TRANSPARENT);
-            canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
-            assets.draw(canvas, &dense, index, &NativeFonts(&paths.font_dirs), false, &mut RenderProfiler::default()).unwrap();
-            let mut pixels = vec![0; widget.pixels().len()];
-            read_surface_rgba(&mut surface, &mut pixels).unwrap();
-            assert_eq!(&pixels, widget.pixels(), "{style}/{placement} at {second}");
-            assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+            let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
+            assert!(difference <= EXPORT_TILE_TOLERANCE, "{style}/{placement} differs from export by {difference} at {second}");
+            assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] != 0));
             let revision = widget.revision();
             preview.render(second).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision);
@@ -1782,18 +1735,16 @@ fn lap_timer_preview() -> (PreviewSession, Value) {
 }
 
 #[test]
-fn lap_timer_modes_match_native_pixels_sampling_and_resource_replacement() {
+fn lap_timer_modes_match_export_pixels_sampling_and_resource_replacement() {
     use ovrley_core::{
         activity::{interpolate::densify_activity, trim::trim_activity},
         debug::RenderProfiler,
         paths::AppPaths,
-        render::assets::{prepare_render_assets, PreparedWidget},
+        render::render_full_frames,
     };
-    use ovrley_widgets::{activity::ActivitySampler, widgets::lap_timer::format::lap_timer_content};
     let (mut preview, mut request) = lap_timer_preview();
     let mut activity = lap_timer_activity();
     let bytes = serde_json::to_vec(&activity).unwrap();
-    let sampler = ActivitySampler::from_json(&bytes).unwrap();
     preview.replace_activity(&bytes).unwrap();
     let root = common::test_config::repo_git_root();
     let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
@@ -1806,31 +1757,17 @@ fn lap_timer_modes_match_native_pixels_sampling_and_resource_replacement() {
         let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.0, 5.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut RenderProfiler::default()).unwrap();
-        let PreparedWidget::LapTimer(native) = &assets.values[0].widget else { panic!("lap timer dispatch"); };
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let scene_width = config.scene.presentation.width as usize;
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         for index in [0,1,2,3,4,5,6,7,8,9,10,11,6,3,0] {
             let second = seconds[index];
-            assert_eq!(
-                lap_timer_content(&native.validated, sampler.lap_history(), sampler.lap_timer_at(second)).unwrap(),
-                lap_timer_content(&native.validated, dense.lap_history(), dense.lap_sample(index)).unwrap(),
-                "{mode} sampling at {second}",
-            );
             preview.render(second).unwrap();
             let widget = &preview.widgets[&id];
             let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
-            let info = ImageInfo::new((geometry["width"].as_i64().unwrap() as i32, geometry["height"].as_i64().unwrap() as i32), ovrley_widgets::widgets::value::preview::TEXT_COLOR_TYPE, AlphaType::Premul, None);
-            let mut surface = surfaces::raster(&info, None, None).unwrap();
-            let canvas = surface.canvas();
-            canvas.clear(Color::TRANSPARENT);
-            canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
-            let history = dense.lap_history();
-            let content = lap_timer_content(&native.validated, history, dense.lap_sample(index)).unwrap();
-            native.layout.prepare_frame(history, &content).unwrap().draw(canvas);
-            let mut pixels = vec![0; widget.pixels().len()];
-            read_surface_rgba(&mut surface, &mut pixels).unwrap();
-            assert_eq!(&pixels, widget.pixels(), "{mode} at {second}");
-            assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+            let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
+            assert!(difference <= EXPORT_TILE_TOLERANCE, "{mode} differs from export by {difference} at {second}");
+            assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] != 0));
             let revision = widget.revision();
             preview.render(second).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision);
@@ -1930,11 +1867,11 @@ fn g_force_preview() -> (PreviewSession, Value) {
 }
 
 #[test]
-fn g_force_preview_matches_native_pixels_and_tracks_marker_and_percentile_changes() {
+fn g_force_preview_matches_export_pixels_and_tracks_marker_and_percentile_changes() {
     use ovrley_core::{
         activity::{interpolate::densify_activity, schema::ParsedActivity, trim::trim_activity},
         debug::RenderProfiler,
-        render::assets::prepare_render_assets,
+        render::render_full_frames,
     };
     let fixture: Value = serde_json::from_str(include_str!("fixtures/g-force-frame-state.json")).unwrap();
     let mut activity: ParsedActivity = serde_json::from_value(fixture["activity"].clone()).unwrap();
@@ -1947,27 +1884,16 @@ fn g_force_preview_matches_native_pixels_and_tracks_marker_and_percentile_change
     let trimmed = trim_activity(&activity, 0.0, 5.0, &requirements).unwrap();
     let seconds = [1.0, 1.002, 3.0];
     let dense = densify_activity(&trimmed, seconds.to_vec(), &requirements);
-    let mut profiler = RenderProfiler::default();
-    let paths = ovrley_core::paths::AppPaths::from_repo_root(common::test_config::repo_git_root());
-    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
+    let frames = render_full_frames(&font_dirs, &config, &activity, &dense, &[0, 1, 2], &mut RenderProfiler::default()).unwrap();
+    let scene_width = config.scene.presentation.width as usize;
     let id = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
     for index in [0, 1, 2, 0] {
         preview.render(seconds[index]).unwrap();
         let widget = &preview.widgets[&id];
         let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
-        let info = ImageInfo::new(
-            (geometry["width"].as_i64().unwrap() as i32, geometry["height"].as_i64().unwrap() as i32),
-            ColorType::RGBA8888, AlphaType::Premul, None,
-        );
-        let mut surface = surfaces::raster(&info, None, None).unwrap();
-        let canvas = surface.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
-        assets.draw(canvas, &dense, index, &NativeFonts(&font_dirs), false, &mut profiler).unwrap();
-        let mut pixels = vec![0; widget.pixels().len()];
-        read_surface_rgba(&mut surface, &mut pixels).unwrap();
-        assert_eq!(&pixels, widget.pixels(), "G-force at {}", seconds[index]);
+        let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
+        assert!(difference <= EXPORT_TILE_TOLERANCE, "G-force differs from export by {difference} at {}", seconds[index]);
     }
     let revision = preview.widgets[&id].revision();
     preview.render(1.0).unwrap();
@@ -2059,12 +1985,12 @@ fn lean_angle_preview() -> (PreviewSession, Value) {
 }
 
 #[test]
-fn lean_angle_preview_matches_native_export_and_tracks_signed_fill_resources_and_validation() {
+fn lean_angle_preview_matches_export_and_tracks_signed_fill_resources_and_validation() {
     use ovrley_core::{
         activity::{interpolate::densify_activity, schema::ParsedActivity, trim::trim_activity},
         debug::RenderProfiler,
         paths::AppPaths,
-        render::assets::prepare_render_assets,
+        render::render_full_frames,
     };
     use ovrley_widgets::activity::ActivitySampler;
     let (mut preview, request) = lean_angle_preview();
@@ -2093,8 +2019,8 @@ fn lean_angle_preview_matches_native_export_and_tracks_signed_fill_resources_and
         user_templates_dir: std::env::temp_dir(),
         downloads_dir: std::env::temp_dir(),
     };
-    let mut profiler = RenderProfiler::default();
-    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &parsed, &dense, &mut profiler).unwrap();
+    let frames = render_full_frames(&paths.font_dirs, &config, &parsed, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+    let scene_width = config.scene.presentation.width as usize;
     let id = preview
         .create_widget(serde_json::from_value(request.clone()).unwrap())
         .unwrap();
@@ -2107,28 +2033,9 @@ fn lean_angle_preview_matches_native_export_and_tracks_signed_fill_resources_and
         preview.render(second).unwrap();
         let widget = &preview.widgets[&id];
         let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
-        let info = ImageInfo::new(
-            (
-                geometry["width"].as_i64().unwrap() as i32,
-                geometry["height"].as_i64().unwrap() as i32,
-            ),
-            ColorType::RGBA8888,
-            AlphaType::Premul,
-            None,
-        );
-        let mut surface = surfaces::raster(&info, None, None).unwrap();
-        let canvas = surface.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        canvas.translate((
-            -geometry["left"].as_f64().unwrap() as f32,
-            -geometry["top"].as_f64().unwrap() as f32,
-        ));
-        assets.draw(canvas, &dense, index, &NativeFonts(&paths.font_dirs), false, &mut profiler)
-        .unwrap();
-        let mut pixels = vec![0; widget.pixels().len()];
-        read_surface_rgba(&mut surface, &mut pixels).unwrap();
-        assert_eq!(&pixels, widget.pixels(), "lean-angle at {second}");
-        assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+        let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
+        assert!(difference <= EXPORT_TILE_TOLERANCE, "lean-angle differs from export by {difference} at {second}");
+        assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] != 0));
         let revision = widget.revision();
         preview.render(second).unwrap();
         assert_eq!(preview.widgets[&id].revision(), revision);
@@ -3100,11 +3007,11 @@ fn heading_compass_preview(rotation_mode: &str) -> (PreviewSession, Value) {
 }
 
 #[test]
-fn heading_compass_matches_native_pixels_rotates_continuously_and_validates_at_ingress() {
+fn heading_compass_matches_export_pixels_rotates_continuously_and_validates_at_ingress() {
     use ovrley_core::{
         activity::{interpolate::densify_activity, trim::trim_activity},
         debug::RenderProfiler, paths::AppPaths,
-        render::assets::prepare_render_assets,
+        render::render_full_frames,
     };
     let activity = ovrley_core::activity::parse_activity_json(r#"{
         "sample_elapsed_seconds": [0,0.5,1.5,2.5,4], "trim_end_seconds": 4,
@@ -3124,25 +3031,15 @@ fn heading_compass_matches_native_pixels_rotates_continuously_and_validates_at_i
         let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let mut profiler = RenderProfiler::default();
-        let assets = prepare_render_assets(&NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let scene_width = config.scene.presentation.width as usize;
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         for (index, second) in seconds.iter().enumerate() {
             preview.render(*second).unwrap();
             let widget = &preview.widgets[&id];
             let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
-            let info = ImageInfo::new(
-                (geometry["width"].as_i64().unwrap() as i32, geometry["height"].as_i64().unwrap() as i32),
-                ColorType::RGBA8888, AlphaType::Premul, None,
-            );
-            let mut surface = surfaces::raster(&info, None, None).unwrap();
-            let canvas = surface.canvas();
-            canvas.clear(Color::TRANSPARENT);
-            canvas.translate((-geometry["left"].as_f64().unwrap() as f32, -geometry["top"].as_f64().unwrap() as f32));
-            assets.draw(canvas, &dense, index, &NativeFonts(&paths.font_dirs), false, &mut profiler).unwrap();
-            let mut pixels = vec![0; widget.pixels().len()];
-            read_surface_rgba(&mut surface, &mut pixels).unwrap();
-            assert_eq!(&pixels, widget.pixels(), "{mode} heading compass at {second}");
+            let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
+            assert!(difference <= EXPORT_TILE_TOLERANCE, "{mode} heading compass differs from export by {difference} at {second}");
             let revision = widget.revision();
             preview.render(*second).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision, "{mode} unchanged sample re-rendered");

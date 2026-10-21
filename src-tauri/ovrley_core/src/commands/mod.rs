@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::paths::AppPaths;
-use crate::render::render_preview_with_report;
+use crate::render::render_preview_frame;
 
 /// Health-check response sent to the frontend.
 #[derive(Debug, Serialize)]
@@ -167,7 +167,7 @@ pub fn backend_render_preview_frame(
     let second_label = format!("{second:.3}").replace('.', "_");
     let filename = format!("preview_frame_{timestamp}_t{second_label}.png");
     let output_path = paths.downloads_dir.join(&filename);
-    render_preview_with_report(
+    render_preview_frame(
         paths,
         &validated,
         &parsed_activity,

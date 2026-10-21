@@ -1,50 +1,25 @@
-//! Native overlay jobs: prepare shared widgets, compose frames, and write preview output.
-pub mod assets;
+//! Native overlay rendering: every widget draws through the export host of the shared
+//! widget engine, for video frames and for preview PNGs alike.
 mod atlas;
 mod engine;
-mod frame;
-pub mod report;
-mod static_layer;
 pub mod surface;
 
 use crate::{
     activity::schema::{DenseActivityReport, ParsedActivity},
     debug::{RenderProfiler, TimingBucket},
     error::{CoreError, CoreResult},
-    fonts::NativeFonts,
     normalize::{ValidatedRenderConfig, ValidatedSceneConfig},
     paths::AppPaths,
 };
-use assets::{prepare_render_assets, PreparedRenderAssets};
-use skia_safe::Image;
-use static_layer::prepare_rasters;
-use std::{collections::BTreeMap, path::Path, time::Instant};
-use surface::{create_surface, write_surface_png};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+    time::Instant,
+};
+use surface::{wrap_native_surface, write_surface_png};
 
 pub use atlas::{AtlasPlan, AtlasSlot};
 pub use engine::{ExportWidgets, PreparedAtlas, WorkerWidgets};
-pub use frame::VideoFrameRenderer;
-pub use report::{LabelCacheStatus, PreviewRenderReport};
-pub use static_layer::{PreparedStaticLayer, StaticLayer};
-
-/// Assets prepared once and reused by preview/video frame rendering.
-#[derive(Clone)]
-pub struct PreparedPreviewAssets {
-    /// Cached static label/metric-part layer for preview surfaces.
-    pub(crate) labels_image: Option<Image>,
-    /// Shared widget layouts paired with native frame samples.
-    pub prepared_assets: PreparedRenderAssets,
-    /// Images remain visible on video frames without activity coverage.
-    pub(crate) raster_rgba: Vec<u8>,
-    /// Required static pixels for video composition.
-    pub(crate) base_rgba: Vec<u8>,
-}
-
-impl PreparedPreviewAssets {
-    pub fn scene(&self) -> &ValidatedSceneConfig {
-        &self.prepared_assets.scene
-    }
-}
 
 /// Canonical dimensions for a rendered video frame.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -77,195 +52,103 @@ impl FrameSize {
     }
 }
 
-/// Prepares all reusable assets needed to render preview or video frames.
-///
-/// The result includes static labels/icons, widget caches, timing buckets, and
-/// total preparation time. Video rendering uses the embedded base RGBA buffer to
-/// avoid redrawing static content every frame.
-pub fn prepare_preview_assets(
-    paths: &AppPaths,
+/// Renders the full scene frames of dense activity frames `dense_indices` as straight-alpha RGBA,
+/// through the full-frame atlas plan export uses for transparent video.
+pub fn render_full_frames(
+    font_dirs: &[PathBuf],
     config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
-    dense_activity: &DenseActivityReport,
-) -> CoreResult<(
-    PreparedPreviewAssets,
-    LabelCacheStatus,
-    BTreeMap<String, TimingBucket>,
-    f64,
-)> {
-    let mut prepare_profiler = RenderProfiler::default();
-    let prepare_started = Instant::now();
-    let prepared_assets = prepare_render_assets(
-        &NativeFonts(&paths.font_dirs),
-        config,
-        activity,
-        dense_activity,
-        &mut prepare_profiler,
-    )?;
-    let rasters = prepare_rasters(&config.rasters, prepared_assets.scene.presentation.scale)?;
-    let raster_rgba = StaticLayer {
-        backdrops: &[],
-        rasters: &rasters,
-        labels: &[],
-        values: &[],
-        scene: &prepared_assets.scene,
-    }
-    .prepare(paths, &mut prepare_profiler)?
-    .base_rgba;
-    let static_layer = StaticLayer {
-        backdrops: &config.backdrops,
-        rasters: &rasters,
-        labels: &config.labels,
-        values: &config.values,
-        scene: &prepared_assets.scene,
-    }
-    .prepare(paths, &mut prepare_profiler)?;
-    let labels_image = static_layer.image;
-    let label_cache_status = static_layer.cache_status;
-    let prepare_timings = prepare_profiler.summary();
-
-    Ok((
-        PreparedPreviewAssets {
-            labels_image,
-            prepared_assets,
-            raster_rgba,
-            base_rgba: static_layer.base_rgba,
-        },
-        label_cache_status,
-        prepare_timings,
-        prepare_started.elapsed().as_secs_f64() * 1000.0,
-    ))
+    dense: &DenseActivityReport,
+    dense_indices: &[usize],
+    profiler: &mut RenderProfiler,
+) -> CoreResult<Vec<Vec<u8>>> {
+    let size = FrameSize {
+        width: config.scene.presentation.width,
+        height: config.scene.presentation.height,
+    };
+    let export = ExportWidgets::prepare(font_dirs, config, activity, dense, size, 0, profiler)?;
+    let atlas = export.prepare_atlas(export.full_frame_atlas(), profiler)?;
+    let mut worker = export.worker()?;
+    dense_indices
+        .iter()
+        .map(|index| {
+            let mut pixels = vec![0; size.rgba_len()?];
+            worker.render_atlas(*index, &atlas, &mut pixels, profiler)?;
+            Ok(pixels)
+        })
+        .collect()
 }
 
-/// Renders a preview PNG and returns a performance report.
-pub fn render_preview_with_report(
+/// One preview PNG: the activity second it shows and where it is written.
+pub struct PreviewFrame {
+    pub second: f64,
+    pub out_path: PathBuf,
+}
+
+/// Serializable timing report for a batch of preview PNGs.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct PreviewRenderReport {
+    pub seconds: Vec<f64>,
+    pub frame_indices: Vec<usize>,
+    pub width: u32,
+    pub height: u32,
+    pub total_ms: f64,
+    pub timings: BTreeMap<String, TimingBucket>,
+}
+
+/// Renders preview PNGs of full scene frames and returns their timing report.
+pub fn render_preview_frames(
     paths: &AppPaths,
     config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
-    dense_activity: &DenseActivityReport,
-    second: f64,
-    out_path: &Path,
+    dense: &DenseActivityReport,
+    frames: &[PreviewFrame],
 ) -> CoreResult<PreviewRenderReport> {
-    let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
-        prepare_preview_assets(paths, config, activity, dense_activity)?;
-    render_preview_with_prepared_assets(PreviewRenderRequest {
-        paths,
-        dense_activity,
-        prepared_preview_assets: &prepared_preview_assets,
-        second,
-        prepare_timings,
-        label_cache_status,
-        extra_total_ms: prepare_total_ms,
-        out_path,
+    let started = Instant::now();
+    let mut profiler = RenderProfiler::default();
+    let scene = &config.scene;
+    let frame_indices: Vec<usize> = frames
+        .iter()
+        .map(|frame| frame_index_for_second(scene, dense, frame.second))
+        .collect();
+    let pixels = render_full_frames(&paths.font_dirs, config, activity, dense, &frame_indices, &mut profiler)?;
+    let (width, height) = (scene.presentation.width, scene.presentation.height);
+    for (frame, mut pixels) in frames.iter().zip(pixels) {
+        profiler.measure("preview.png_write", || -> CoreResult<()> {
+            let mut surface = wrap_native_surface(width, height, &mut pixels)?;
+            write_surface_png(&mut surface, &frame.out_path)
+                .map_err(|error| CoreError::Render(format!("Failed to render preview frame: {error}")))
+        })?;
+    }
+    Ok(PreviewRenderReport {
+        seconds: frames.iter().map(|frame| frame.second).collect(),
+        frame_indices,
+        width,
+        height,
+        total_ms: started.elapsed().as_secs_f64() * 1000.0,
+        timings: profiler.summary(),
     })
 }
 
-/// Bundled parameters for a preview frame render.
-pub struct PreviewRenderRequest<'a> {
-    pub paths: &'a AppPaths,
-    pub dense_activity: &'a DenseActivityReport,
-    pub prepared_preview_assets: &'a PreparedPreviewAssets,
-    pub second: f64,
-    pub prepare_timings: BTreeMap<String, TimingBucket>,
-    pub label_cache_status: LabelCacheStatus,
-    pub extra_total_ms: f64,
-    pub out_path: &'a Path,
-}
-
-/// Renders a preview using already-prepared assets.
-///
-/// # Phases
-///
-/// 1. **Setup** — resolve dimensions, frame index, and initialize profilers.
-/// 2. **Surface render** — draw all overlay layers into a Skia surface.
-/// 3. **PNG export** — encode the surface snapshot to disk.
-/// 4. **Report** — collect timing data and build the preview report.
-///
-/// This is useful for repeated preview generation where static labels and widget
-/// geometry should be prepared once and reused.
-pub fn render_preview_with_prepared_assets(
-    request: PreviewRenderRequest<'_>,
+/// Renders one preview PNG for activity `second`.
+pub fn render_preview_frame(
+    paths: &AppPaths,
+    config: &ValidatedRenderConfig,
+    activity: &ParsedActivity,
+    dense: &DenseActivityReport,
+    second: f64,
+    out_path: &Path,
 ) -> CoreResult<PreviewRenderReport> {
-    // Phase 1: resolve dimensions, frame index, and create profilers.
-    let width = request.prepared_preview_assets.scene().presentation.width;
-    let height = request.prepared_preview_assets.scene().presentation.height;
-    let frame_index = frame_index_for_second(
-        request.prepared_preview_assets.scene(),
-        request.dense_activity,
-        request.second,
-    );
-    let mut frame_profiler = RenderProfiler::default();
-    let mut preview_profiler = RenderProfiler::default();
-    let total_started = Instant::now();
-
-    // Phase 2: draw all overlay layers into a Skia surface.
-    let mut surface = create_surface(width, height)?;
-    preview_profiler.measure("preview.surface.create_clear", || {
-        surface.canvas().clear(skia_safe::Color::TRANSPARENT);
-    });
-    if let Some(image) = &request.prepared_preview_assets.labels_image {
-        frame_profiler.measure("base.restore", || {
-            surface.canvas().draw_image(image, (0, 0), None);
-        });
-    }
-    let frame_report = request.prepared_preview_assets.prepared_assets.draw(
-        surface.canvas(),
-        request.dense_activity,
-        frame_index,
-        &NativeFonts(&request.paths.font_dirs),
-        true,
-        &mut frame_profiler,
-    )?;
-
-    // Phase 3: encode the surface snapshot as PNG to disk.
-    preview_profiler.measure("preview.png_write", || {
-        write_surface_png(&mut surface, request.out_path)
-            .map_err(|error| CoreError::Render(format!("Failed to render preview frame: {error}")))
-    })?;
-
-    // Phase 4: collect timing data and build the preview report.
-    let frame_timings = frame_profiler.summary();
-    let preview_only_timings = preview_profiler.summary();
-    let surface_ms = preview_only_timings
-        .get("preview.surface.create_clear")
-        .map(|bucket| bucket.total_ms)
-        .unwrap_or(0.0);
-    let label_layer_ms = frame_timings
-        .get("base.restore")
-        .map(|bucket| bucket.total_ms)
-        .unwrap_or(0.0);
-    let value_draw_ms = frame_timings
-        .get("text.dynamic")
-        .map(|bucket| bucket.total_ms)
-        .unwrap_or(0.0);
-    let png_write_ms = preview_only_timings
-        .get("preview.png_write")
-        .map(|bucket| bucket.total_ms)
-        .unwrap_or(0.0);
-
-    let report = PreviewRenderReport {
-        second: request.second,
-        frame_index,
-        width,
-        height,
-        total_ms: total_started.elapsed().as_secs_f64() * 1000.0 + request.extra_total_ms,
-        surface_ms,
-        label_layer_ms,
-        value_draw_ms,
-        png_write_ms,
-        value_count: request.prepared_preview_assets.prepared_assets.values.len(),
-        label_count: request.prepared_preview_assets.prepared_assets.label_count,
-        label_cache_status: request.label_cache_status,
-        route_widgets: frame_report.route_widgets,
-        elevation_widgets: frame_report.elevation_widgets,
-        diving_profiles: frame_report.diving_profiles,
-        metric_presentations: frame_report.metric_presentations,
-        prepare_timings: request.prepare_timings,
-        frame_timings,
-        preview_only_timings,
-    };
-
-    Ok(report)
+    render_preview_frames(
+        paths,
+        config,
+        activity,
+        dense,
+        &[PreviewFrame {
+            second,
+            out_path: out_path.to_path_buf(),
+        }],
+    )
 }
 
 fn frame_index_for_second(

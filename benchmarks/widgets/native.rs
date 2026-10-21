@@ -7,7 +7,7 @@ use ovrley_core::{
     debug::RenderProfiler,
     fonts::preview_font_resource,
     paths::AppPaths,
-    render::{prepare_preview_assets, FrameSize, VideoFrameRenderer},
+    render::{ExportWidgets, FrameSize},
 };
 use ovrley_widgets::preview::FontRequest;
 use serde::Deserialize;
@@ -119,29 +119,40 @@ fn main() -> Result<(), String> {
                 return Err("Native frame timeline differs from browser timeline".into());
             }
         }
-        let (assets, _, prepare_stages, _) =
-            prepare_preview_assets(&paths, &config, &activity, &dense)
-                .map_err(|e| e.to_string())?;
         let size = FrameSize {
             width: config.scene.presentation.width,
             height: config.scene.presentation.height,
         };
-        let renderer = VideoFrameRenderer::new(&paths.font_dirs, &dense, &assets, size, 0)
+        let mut prepare_profiler = RenderProfiler::default();
+        let export = ExportWidgets::prepare(
+            &paths.font_dirs,
+            &config,
+            &activity,
+            &dense,
+            size,
+            0,
+            &mut prepare_profiler,
+        )
+        .map_err(|e| e.to_string())?;
+        let atlas = export
+            .prepare_atlas(export.full_frame_atlas(), &mut prepare_profiler)
             .map_err(|e| e.to_string())?;
+        let mut worker = export.worker().map_err(|e| e.to_string())?;
+        let prepare_stages = prepare_profiler.summary();
         let mut pixels = vec![0; size.rgba_len().map_err(|e| e.to_string())?];
         let setup_ms = setup.elapsed().as_secs_f64() * 1000.0;
         let mut profiler = RenderProfiler::default();
         for index in 0..plan.warmup {
-            renderer
-                .render_rgba(index, &mut pixels, &mut profiler)
+            worker
+                .render_atlas(index, &atlas, &mut pixels, &mut profiler)
                 .map_err(|e| e.to_string())?;
         }
         let mut profiler = RenderProfiler::default();
         let mut ms = vec![0.0; plan.frames];
         for (offset, duration) in ms.iter_mut().enumerate() {
             let started = Instant::now();
-            renderer
-                .render_rgba(plan.warmup + offset, &mut pixels, &mut profiler)
+            worker
+                .render_atlas(plan.warmup + offset, &atlas, &mut pixels, &mut profiler)
                 .map_err(|e| e.to_string())?;
             *duration = started.elapsed().as_secs_f64() * 1000.0;
         }

@@ -123,8 +123,8 @@ impl CompositeFfmpegSettings {
 /// Audio encoding targets the source bitrate, or 192 kbps when unreported.
 ///
 /// The overlay is piped as frames of `atlas`, which the filter graph crops and
-/// overlays slot by slot for CPU overlay stacks; the other stacks take the
-/// full-frame plan.
+/// overlays slot by slot. The QSV full overlay stack places each slot on the
+/// coded main video, turned to its coded orientation.
 ///
 /// The overlay is piped as `yuva420p` in the source's colour (`source_color`)
 /// for every graph that blends in YUV. The QSV full-overlay graph uploads RGBA
@@ -275,7 +275,7 @@ pub fn build_composite_ffmpeg_settings(
         source_rotation_filter,
         qsv_overlay_cpu_rotation_filter,
         main_colorspace_tag,
-    )?;
+    );
     if include_audio {
         filter_complex.push_str(&format!(
             ";[2:a]atrim=start={}:duration={},asetpts=N/SR/TB[aout]",
@@ -580,14 +580,188 @@ mod tests {
     }
 
     #[test]
-    fn full_frame_overlay_graphs_reject_a_packed_atlas() {
+    fn hardware_overlay_graphs_upload_and_overlay_every_atlas_slot_at_its_scene_position() {
         let atlas = planned_atlas();
-        for codec_id in [CompositeCodecId::NnvgpuH264, CompositeCodecId::VaapiHevc] {
-            let error = atlas_settings(codec_id, &atlas).unwrap_err().to_string();
-            assert!(error.contains("overlays the full 3840x2160 frame"), "{error}");
-            let full = atlas_settings(codec_id, &AtlasPlan::full_frame(UHD, 3)).unwrap();
-            assert!(!full.filter_complex.contains("crop="));
-            assert_argument_pair(&full.input_1_args, "-s", "3840x2160");
+        assert_eq!(atlas.slots().len(), 2);
+        for (codec_id, base, overlay_filter) in [
+            (CompositeCodecId::NnvgpuH264, "scale_cuda=w=3840:h=2160:format=yuv420p[base]", "overlay_cuda"),
+            (CompositeCodecId::NnvgpuHevc, "scale_cuda=w=3840:h=2160:format=yuv420p[base]", "overlay_cuda"),
+            (CompositeCodecId::VaapiH264, "scale_vaapi=w=3840:h=2160:format=nv12[base]", "overlay_vaapi"),
+            (CompositeCodecId::VaapiHevc, "scale_vaapi=w=3840:h=2160:format=nv12[base]", "overlay_vaapi"),
+        ] {
+            let settings = atlas_settings(codec_id, &atlas).unwrap();
+            let graph = &settings.filter_complex;
+            let name = codec_id.metadata().profile_name;
+            assert_argument_pair(
+                &settings.input_1_args,
+                "-s",
+                &format!("{}x{}", atlas.size().width, atlas.size().height),
+            );
+            assert!(graph.contains(base), "{name}: {graph}");
+            assert!(
+                graph.contains("[1:v]setpts=PTS-STARTPTS,format=yuva420p,split=2[atlas0][atlas1];"),
+                "{name}: {graph}"
+            );
+            assert_eq!(graph.matches("crop=").count(), 2, "{name}: {graph}");
+            assert_eq!(graph.matches("hwupload").count(), 2, "{name}: {graph}");
+            assert_eq!(graph.matches(&format!("{overlay_filter}=")).count(), 2, "{name}: {graph}");
+            for (index, slot) in atlas.slots().iter().enumerate() {
+                let rect = AtlasPlan::atlas_rect(slot);
+                let crop = format!(
+                    "[atlas{index}]crop={}:{}:{}:{},hwupload[slot{index}]",
+                    rect.width(),
+                    rect.height(),
+                    rect.left,
+                    rect.top
+                );
+                assert!(graph.contains(&crop), "{name}: {graph}");
+                let (x, y) = (slot.scene.left, slot.scene.top);
+                let coordinates = if overlay_filter == "overlay_vaapi" { format!("x={x}:y={y}") } else { format!("{x}:{y}") };
+                let overlay = format!("[slot{index}]{overlay_filter}={coordinates}:eof_action=repeat:shortest=1");
+                assert!(graph.contains(&overlay), "{name}: {graph}");
+            }
+            assert!(graph.contains(&format!("[base][slot0]{overlay_filter}=")), "{name}: {graph}");
+            assert!(graph.contains(&format!("[main1];[main1][slot1]{overlay_filter}=")), "{name}: {graph}");
+            assert!(graph.contains("shortest=1[out];[2:a]atrim="), "{name}: {graph}");
         }
+    }
+
+    #[test]
+    fn hardware_overlay_graphs_upload_the_empty_atlas_whole() {
+        let empty = AtlasPlan::from_layer_bounds(UHD, &[None]).unwrap();
+        let cuda = atlas_settings(CompositeCodecId::NnvgpuHevc, &empty).unwrap();
+        assert!(cuda.filter_complex.contains(
+            "[1:v]setpts=PTS-STARTPTS,format=yuva420p,null,hwupload[slot0];[base][slot0]overlay_cuda=0:0:eof_action=repeat:shortest=1[out]"
+        ));
+        let vaapi = atlas_settings(CompositeCodecId::VaapiH264, &empty).unwrap();
+        assert!(vaapi.filter_complex.contains(
+            "[1:v]setpts=PTS-STARTPTS,format=yuva420p,null,hwupload[slot0];[base][slot0]overlay_vaapi=x=0:y=0:eof_action=repeat:shortest=1[out]"
+        ));
+    }
+
+    #[test]
+    fn rotated_hardware_overlay_graphs_keep_gpu_rotation_and_overlay_atlas_slots() {
+        let portrait = FrameSize {
+            width: 1080,
+            height: 1920,
+        };
+        let atlas = AtlasPlan::from_layer_bounds(
+            portrait,
+            &[
+                Some(skia_safe::IRect::new(40, 60, 400, 200)),
+                Some(skia_safe::IRect::new(600, 1500, 1000, 1800)),
+            ],
+        )
+        .unwrap();
+        assert_eq!(atlas.slots().len(), 2);
+        for (codec_id, rotation, overlay_filter) in [
+            (CompositeCodecId::NnvgpuH264, "transpose_cuda=1,", "overlay_cuda="),
+            (CompositeCodecId::VaapiHevc, "transpose_vaapi=1,", "overlay_vaapi="),
+        ] {
+            let settings = build_composite_ffmpeg_settings(
+                &render_plan(codec_id, Vec::new()),
+                portrait,
+                &atlas,
+                false,
+                None,
+                Some(270),
+                None,
+            )
+            .unwrap();
+            let graph = &settings.filter_complex;
+            assert_eq!(settings.codec_id, codec_id);
+            assert!(graph.contains(&format!("{rotation}sidedata=mode=delete:type=DISPLAYMATRIX,scale_")), "{graph}");
+            assert_eq!(graph.matches(overlay_filter).count(), 2, "{graph}");
+            assert_argument_pair(&settings.input_0_args, "-noautorotate", "-i");
+        }
+    }
+
+    fn qsv_full_settings(frame: FrameSize, atlas: &AtlasPlan, rotation: Option<i32>) -> CompositeFfmpegSettings {
+        let qsv_init = ["-init_hw_device", "qsv=qs"].map(String::from).to_vec();
+        build_composite_ffmpeg_settings(
+            &render_plan(CompositeCodecId::QsvFullHevc, qsv_init),
+            frame,
+            atlas,
+            true,
+            None,
+            rotation,
+            YuvColor::from_probe(Some("bt709"), Some("tv")),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn qsv_full_overlay_places_every_atlas_slot_at_its_coded_position_for_every_rotation() {
+        let atlas = planned_atlas();
+        let scenes: Vec<_> = atlas.slots().iter().map(|slot| slot.scene).collect();
+        assert_eq!(
+            scenes,
+            [
+                skia_safe::IRect::new(100, 200, 500, 302),
+                skia_safe::IRect::new(3000, 1800, 3600, 2100)
+            ]
+        );
+        for (rotation, main_scale, tile_rotation, positions) in [
+            (None, "scale_qsv=w=3840:h=2160", "", [(100, 200), (3000, 1800)]),
+            (Some(90), "scale_qsv=w=2160:h=3840", "transpose=1,", [(1858, 100), (60, 3000)]),
+            (Some(180), "scale_qsv=w=3840:h=2160", "hflip,vflip,", [(3340, 1858), (240, 60)]),
+            (Some(270), "scale_qsv=w=2160:h=3840", "transpose=2,", [(200, 3340), (1800, 240)]),
+        ] {
+            let settings = qsv_full_settings(UHD, &atlas, rotation);
+            let graph = &settings.filter_complex;
+            assert_argument_pair(
+                &settings.input_1_args,
+                "-s",
+                &format!("{}x{}", atlas.size().width, atlas.size().height),
+            );
+            assert_argument_pair(&settings.input_1_args, "-pix_fmt", "rgba");
+            assert!(graph.contains(&format!("{main_scale}:format=nv12[base]")), "{rotation:?}: {graph}");
+            assert!(graph.contains("[1:v]setpts=PTS-STARTPTS,split=2[atlas0][atlas1];"), "{rotation:?}: {graph}");
+            assert!(!graph.contains("sidedata=mode=delete"), "{rotation:?}: {graph}");
+            for (index, slot) in atlas.slots().iter().enumerate() {
+                let rect = AtlasPlan::atlas_rect(slot);
+                let crop = format!(
+                    "[atlas{index}]crop={}:{}:{}:{},{tile_rotation}hwupload=extra_hw_frames=16[slot{index}]",
+                    rect.width(),
+                    rect.height(),
+                    rect.left,
+                    rect.top
+                );
+                assert!(graph.contains(&crop), "{rotation:?}: {graph}");
+            }
+            let [(x0, y0), (x1, y1)] = positions;
+            assert!(
+                graph.contains(&format!(
+                    "[base][slot0]overlay_qsv=x={x0}:y={y0}[main1];[main1][slot1]overlay_qsv=x={x1}:y={y1}[out]"
+                )),
+                "{rotation:?}: {graph}"
+            );
+        }
+    }
+
+    #[test]
+    fn qsv_full_overlay_clips_slots_to_an_odd_frame_before_mapping_them() {
+        let frame = FrameSize {
+            width: 1919,
+            height: 1079,
+        };
+        let atlas = AtlasPlan::from_layer_bounds(frame, &[Some(skia_safe::IRect::new(1900, 1000, 1919, 1079))]).unwrap();
+        let slot = &atlas.slots()[0];
+        assert_eq!(slot.scene, skia_safe::IRect::new(1900, 1000, 1920, 1080));
+        let (left, top) = (slot.atlas_origin.x, slot.atlas_origin.y);
+        for (rotation, position) in [(None, "x=1900:y=1000"), (Some(90), "x=0:y=1900"), (Some(180), "x=0:y=0"), (Some(270), "x=1000:y=0")] {
+            let graph = qsv_full_settings(frame, &atlas, rotation).filter_complex;
+            assert!(graph.contains(&format!("crop=19:79:{left}:{top},")), "{rotation:?}: {graph}");
+            assert!(graph.contains(&format!("[base][slot0]overlay_qsv={position}[out]")), "{rotation:?}: {graph}");
+        }
+    }
+
+    #[test]
+    fn qsv_full_overlay_uploads_the_empty_atlas_whole() {
+        let empty = AtlasPlan::from_layer_bounds(UHD, &[None]).unwrap();
+        let graph = qsv_full_settings(UHD, &empty, Some(90)).filter_complex;
+        assert!(graph.contains(
+            "[1:v]setpts=PTS-STARTPTS,null,transpose=1,hwupload=extra_hw_frames=16[slot0];[base][slot0]overlay_qsv=x=0:y=0[out]"
+        ));
     }
 }

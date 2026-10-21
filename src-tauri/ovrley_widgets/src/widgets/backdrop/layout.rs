@@ -1,6 +1,6 @@
 //! Static backdrop widget drawing.
 
-use super::{frame::prepare_backdrop_frame, validation::ValidatedBackdrop};
+use super::validation::ValidatedBackdrop;
 use crate::model::types::BackdropType;
 use crate::render::text::parse_color;
 use skia_safe::{paint::Style, Canvas, Paint, Path, PathBuilder, Point};
@@ -11,17 +11,6 @@ struct RectangleCorners {
     top_right: bool,
     bottom_right: bool,
     bottom_left: bool,
-}
-
-pub fn draw_backdrops_static_layer(
-    canvas: &Canvas,
-    backdrops: &[ValidatedBackdrop],
-    scale: f32,
-    scene_opacity: f32,
-) {
-    for backdrop in backdrops {
-        prepare_backdrop_frame(backdrop, scale).draw(canvas, scene_opacity);
-    }
 }
 
 pub(crate) fn draw_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f32, opacity: f32) {

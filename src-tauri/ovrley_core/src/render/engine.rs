@@ -19,13 +19,14 @@
 //! Widget instances hold Skia surfaces and caches, so each frame worker builds
 //! its own set from the shared, immutable [`ExportWidgets`].
 
-use super::{atlas::AtlasPlan, static_layer::prepare_raster_image, surface::wrap_native_surface, FrameSize};
+use super::{atlas::AtlasPlan, surface::wrap_native_surface, FrameSize};
 use crate::{
     activity::schema::{DenseActivityReport, ParsedActivity},
     debug::RenderProfiler,
     error::{CoreError, CoreResult},
     fonts::NativeFonts,
-    normalize::ValidatedRenderConfig,
+    normalize::{RasterSource, ValidatedRaster, ValidatedRenderConfig},
+    raster::load_selected_raster,
 };
 use ovrley_widgets::{
     activity::ActivitySampler,
@@ -33,9 +34,9 @@ use ovrley_widgets::{
     model::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode},
     preview_widget::{FrameKey, PreviewWidget, ValidatedWidget},
     render::{image::RasterImage, text::FontResolver},
-    widgets::value::preview::TileBounds,
+    widgets::{raster::image::downsample_raster, value::preview::TileBounds},
 };
-use skia_safe::{AlphaType, ColorType, IRect, Image};
+use skia_safe::{AlphaType, ColorType, Data, IRect, Image};
 use std::{num::NonZeroUsize, path::PathBuf, sync::Arc, thread, time::Instant};
 
 /// Immutable export inputs shared by every frame worker.
@@ -108,10 +109,7 @@ impl<'a> ExportWidgets<'a> {
             config
                 .rasters
                 .iter()
-                .map(|raster| {
-                    let (image, _) = prepare_raster_image(raster, scene.presentation.scale)?;
-                    straight_rgba(&image, &raster.id)
-                })
+                .map(|raster| export_raster(raster, scene.presentation.scale))
                 .collect::<CoreResult<Vec<_>>>()
         })?;
         Ok(Self {
@@ -406,7 +404,16 @@ impl ExportWidget {
     }
 }
 
-fn straight_rgba(image: &Image, id: &str) -> CoreResult<RasterImage> {
+/// Loads the oriented source and resamples it once to its export size, as straight-alpha RGBA.
+fn export_raster(config: &ValidatedRaster, global_scale: f32) -> CoreResult<RasterImage> {
+    let id = &config.id;
+    let selected = match &config.source {
+        RasterSource::Image(image) => Arc::clone(image),
+        RasterSource::File(path) => Arc::new(load_selected_raster(path).map_err(|error| error.for_widget(id))?),
+    };
+    let image = Image::from_encoded(Data::new_copy(selected.preview_png()))
+        .ok_or_else(|| CoreError::Render(format!("Raster {id} could not be decoded [raster_error:decode:{id}]")))?;
+    let image = downsample_raster(image, &config.geometry, id, global_scale)?;
     let (width, height) = (image.width() as u32, image.height() as u32);
     let info = image
         .image_info()

@@ -168,14 +168,6 @@ pub enum CompositeFilterStackKind {
     QsvFullOverlay,
 }
 
-impl CompositeFilterStackKind {
-    /// Whether the graph crops each atlas slot and overlays it on the CPU. The
-    /// CUDA, VAAPI and QSV full overlay graphs still overlay the full frame.
-    pub fn overlays_atlas_slots(self) -> bool {
-        matches!(self, Self::SoftwareOverlay | Self::AmfD3d11Overlay)
-    }
-}
-
 /// Availability rules for composite encoder profiles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CompositeAvailabilityRule {

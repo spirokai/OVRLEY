@@ -3,10 +3,10 @@
 use ovrley_core::activity::interpolate::densify_activity;
 use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
 use ovrley_core::activity::trim::trim_activity;
-use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::{RenderDataRequirements, ValidatedSceneConfig};
 use ovrley_widgets::widgets::g_force::{
-    format::{derive_max_g, g_force_frame_state},
+    format::{derive_max_g, g_force_frame_state, GForceSample},
+    layout::{prepare_g_force_cache as prepare_g_force_cache_layout, GForceCache},
     validation::{GForceAxis, ValidatedGForceWidget},
 };
 use serde::Deserialize;
@@ -132,9 +132,7 @@ fn fixture_max_g_matches_nearest_rank_percentile_exactly() {
         &scene(),
         &fixture.activity,
         &dense,
-        &mut RenderProfiler::default(),
-    )
-    .unwrap();
+    );
     assert_eq!(cache.samples[0].max_g, fixture.expected_max_g);
 }
 
@@ -148,9 +146,7 @@ fn known_clamped_missing_and_zero_frames_match_contract() {
         &scene(),
         &fixture.activity,
         &dense,
-        &mut RenderProfiler::default(),
-    )
-    .unwrap();
+    );
 
     let state = |index: usize| {
         g_force_frame_state(
@@ -193,9 +189,7 @@ fn invert_and_axis_remap_select_the_canonical_dense_series() {
         &scene(),
         &fixture.activity,
         &dense,
-        &mut RenderProfiler::default(),
-    )
-    .unwrap();
+    );
     let inverted_state = g_force_frame_state(
         inverted.samples[1].horizontal,
         inverted.samples[1].vertical,
@@ -218,9 +212,7 @@ fn invert_and_axis_remap_select_the_canonical_dense_series() {
         &scene(),
         &fixture.activity,
         &dense,
-        &mut RenderProfiler::default(),
-    )
-    .unwrap();
+    );
     assert_eq!(remapped.samples[1].horizontal, Some(4.0));
     assert_eq!(remapped.samples[1].vertical, Some(2.0));
 }
@@ -240,9 +232,7 @@ fn absent_selected_series_is_missing() {
         &scene(),
         &activity,
         &dense,
-        &mut RenderProfiler::default(),
-    )
-    .unwrap();
+    );
     assert!(cache
         .samples
         .iter()
@@ -264,34 +254,36 @@ fn trim_boundary_preserves_an_explicit_null_axis_sample() {
     assert_eq!(dense.series.g_force_y, [Some(1.0), Some(6.0)]);
 }
 
+/// The widget crate's g-force layout and its sample at every dense frame.
+struct GForceFrames {
+    layout: GForceCache,
+    samples: Vec<GForceSample>,
+}
+
 fn prepare_g_force_cache(
     widget: &ValidatedGForceWidget,
     scene: &ValidatedSceneConfig,
     activity: &ParsedActivity,
     dense: &DenseActivityReport,
-    profiler: &mut RenderProfiler,
-) -> ovrley_core::CoreResult<ovrley_core::render::assets::GForceWidgetCache> {
-    let config = ovrley_core::normalize::ValidatedRenderConfig {
-        scene: scene.clone(),
-        backdrops: vec![],
-        rasters: vec![],
-        labels: vec![],
-        values: vec![
-            ovrley_widgets::widgets::value::validation::ValidatedValue::GForce(widget.clone()),
-        ],
-        course_plots: vec![],
-        elevation_plots: vec![],
-        diving_profiles: vec![],
-    };
-    let paths = ovrley_core::paths::AppPaths::from_repo_root(
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
+) -> GForceFrames {
+    let max_g = derive_max_g(
+        activity.g_force_axis(widget.axis_horizontal),
+        activity.g_force_axis(widget.axis_vertical),
+        widget.clip_percentile,
     );
-    let mut assets = ovrley_core::render::assets::prepare_render_assets(
-        &ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, activity, dense, profiler,
-    )?;
-    let ovrley_core::render::assets::PreparedWidget::GForce(cache) = assets.values.remove(0).widget
-    else {
-        unreachable!()
-    };
-    Ok(cache)
+    let horizontal = dense.g_force_axis(widget.axis_horizontal);
+    let vertical = dense.g_force_axis(widget.axis_vertical);
+    GForceFrames {
+        layout: prepare_g_force_cache_layout(widget, &scene.presentation).unwrap(),
+        samples: (0..dense.frame_count)
+            .map(|index| {
+                GForceSample::new(
+                    widget,
+                    horizontal.get(index).copied().flatten(),
+                    vertical.get(index).copied().flatten(),
+                    max_g,
+                )
+            })
+            .collect(),
+    }
 }

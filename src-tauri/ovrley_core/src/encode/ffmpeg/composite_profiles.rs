@@ -31,10 +31,13 @@ const SOFTWARE_HEVC_FILTER: &str = "[0:v]{base_video_filters}null[base];\
 [1:v]setpts=PTS-STARTPTS,{atlas_slot_crops};\
 {atlas_slot_overlays}[out]";
 
+// Hardware overlay graphs crop every atlas slot on the CPU, upload each crop
+// and chain one hardware overlay per slot onto `[base]` the same way. QSV full
+// overlay places each slot on its coded main video.
 const VAAPI_FILTER: &str =
-    "[0:v]{base_video_filters}scale_vaapi=w={width}:h={height}:format=nv12[main_hw];\
-[1:v]setpts=PTS-STARTPTS,format=yuva420p,hwupload[overlay_hw];\
-[main_hw][overlay_hw]overlay_vaapi=x=0:y=0:eof_action=repeat:shortest=1[out]";
+    "[0:v]{base_video_filters}scale_vaapi=w={width}:h={height}:format=nv12[base];\
+[1:v]setpts=PTS-STARTPTS,format=yuva420p,{atlas_slot_crops};\
+{atlas_slot_overlays}[out]";
 
 const AMF_D3D11_INPUT_ARGS: &[&str] = &["-init_hw_device", "d3d11va=dx", "-filter_hw_device", "dx"];
 
@@ -44,18 +47,18 @@ const AMF_D3D11_FILTER: &str = "[0:v]{base_video_filters}null[base];\
 
 const CUDA_H264_FILTER: &str =
     "[0:v]{base_video_filters}scale_cuda=w={width}:h={height}:format=yuv420p[base];\
-[1:v]setpts=PTS-STARTPTS,format=yuva420p,hwupload[ovr];\
-[base][ovr]overlay_cuda=0:0:eof_action=repeat:shortest=1[out]";
+[1:v]setpts=PTS-STARTPTS,format=yuva420p,{atlas_slot_crops};\
+{atlas_slot_overlays}[out]";
 
 const CUDA_HEVC_FILTER: &str =
     "[0:v]{base_video_filters}scale_cuda=w={width}:h={height}:format=yuv420p[base];\
-[1:v]setpts=PTS-STARTPTS,format=yuva420p,hwupload[ovr];\
-[base][ovr]overlay_cuda=0:0:eof_action=repeat:shortest=1[out]";
+[1:v]setpts=PTS-STARTPTS,format=yuva420p,{atlas_slot_crops};\
+{atlas_slot_overlays}[out]";
 
 const QSV_FULL_FILTER: &str =
-    "[0:v]{base_video_filters}scale_qsv=w={main_width}:h={main_height}:format=nv12[main_hw];\
-[1:v]setpts=PTS-STARTPTS,{qsv_overlay_cpu_rotation_filter}hwupload=extra_hw_frames=16[overlay_hw];\
-[main_hw][overlay_hw]overlay_qsv=x=0:y=0[out]";
+    "[0:v]{base_video_filters}scale_qsv=w={main_width}:h={main_height}:format=nv12[base];\
+[1:v]setpts=PTS-STARTPTS,{atlas_slot_crops};\
+{atlas_slot_overlays}[out]";
 
 const BUILTIN_PROFILES: &[CompositeProfile] = &[
     CompositeProfile {

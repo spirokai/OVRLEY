@@ -11,5 +11,7 @@
 
 pub mod builders;
 pub mod composite;
+pub mod export;
+pub mod gauge;
 pub mod seam;
 pub mod test_config;

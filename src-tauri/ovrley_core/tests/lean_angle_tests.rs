@@ -1,12 +1,8 @@
 mod common;
 
-use ovrley_core::activity::schema::ParsedActivity;
-use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
-use ovrley_core::paths::AppPaths;
-use ovrley_core::render::assets::prepare_render_assets;
-use ovrley_core::render::assets::PreparedWidget;
+use ovrley_widgets::widgets::lean_angle::layout::prepare_lean_angle_cache;
 use std::collections::BTreeMap;
 
 #[test]
@@ -28,16 +24,7 @@ fn full_lean_angle_config_validates_and_prepares_one_static_cache() {
     assert_eq!(widget.diameter, 180.0);
     assert_eq!(widget.track_thickness, 24.0);
 
-    let paths = test_paths();
-    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
-    let dense = common::builders::minimal_dense_activity();
-    let mut profiler = RenderProfiler::default();
-    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
-
-    let PreparedWidget::LeanAngle(widget) = &assets.values[0].widget else {
-        panic!("lean-angle value index must own the static lean-angle cache");
-    };
-    let cache = widget;
+    let cache = prepare_lean_angle_cache(widget, &config.scene.presentation).unwrap();
     assert!((cache.layout.center_x - 77.94229).abs() < 0.0001);
     assert_eq!(cache.layout.center_y, 90.0);
     assert_eq!(
@@ -141,17 +128,4 @@ fn full_lean_angle_config() -> serde_json::Value {
         "value_offset_x": 0,
         "value_offset_y": 0
     })
-}
-
-fn test_paths() -> AppPaths {
-    let workspace_root = common::test_config::repo_git_root();
-    AppPaths {
-        repo_root: workspace_root.clone(),
-        font_dirs: vec![workspace_root.join("fonts")],
-        debug_render_dir: std::env::temp_dir(),
-        temp_dir: std::env::temp_dir(),
-        bundled_templates_dirs: vec![],
-        user_templates_dir: std::env::temp_dir(),
-        downloads_dir: std::env::temp_dir(),
-    }
 }

@@ -128,7 +128,7 @@ impl SourceMetadataProbe for SmallMetadataProbe {
 #[test]
 fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
     use ovrley_core::debug::RenderProfiler;
-    use ovrley_core::render::{prepare_preview_assets, FrameSize, VideoFrameRenderer};
+    use ovrley_core::render::{ExportWidgets, FrameSize};
     let directory = SourcesDirectory::new();
     let service = VideoInspectionService::with_probe(Arc::new(SmallMetadataProbe));
     let session = service.create_session();
@@ -199,25 +199,27 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
             assert!(suppressed.config().labels.is_empty());
             assert!(suppressed.config().backdrops.is_empty());
             let dense = suppressed.prepare_activity(&activity).unwrap();
-            let (assets, _, _, _) =
-                prepare_preview_assets(&paths, suppressed.config(), &activity, &dense).unwrap();
             let frame_size = FrameSize {
                 width: 32,
                 height: 64,
             };
-            let renderer = VideoFrameRenderer::new(
+            let mut profiler = RenderProfiler::default();
+            let export = ExportWidgets::prepare(
                 &paths.font_dirs,
+                suppressed.config(),
+                &activity,
                 &dense,
-                &assets,
                 frame_size,
                 coverage.blank_leading_frame_count,
+                &mut profiler,
             )
             .unwrap();
+            let atlas = export.prepare_atlas(export.full_frame_atlas(), &mut profiler).unwrap();
+            let mut worker = export.worker().unwrap();
             let mut pixels = vec![255; frame_size.rgba_len().unwrap()];
-            let mut profiler = RenderProfiler::default();
             let covered_frame = leading.div_ceil(stride) * stride;
-            renderer
-                .render_rgba(covered_frame, &mut pixels, &mut profiler)
+            worker
+                .render_atlas(covered_frame, &atlas, &mut pixels, &mut profiler)
                 .unwrap();
             assert!(
                 pixels.chunks_exact(4).all(|pixel| pixel[3] == 0),
@@ -228,8 +230,8 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
             } else {
                 (leading + dense.frame_count).div_ceil(stride) * stride
             };
-            renderer
-                .render_rgba(blank_frame, &mut pixels, &mut profiler)
+            worker
+                .render_atlas(blank_frame, &atlas, &mut pixels, &mut profiler)
                 .unwrap();
             assert!(
                 pixels.iter().all(|byte| *byte == 0),

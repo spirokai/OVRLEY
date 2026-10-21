@@ -1,15 +1,12 @@
 mod common;
 
-use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
-use ovrley_core::debug::RenderProfiler;
+use ovrley_core::activity::schema::DenseActivityReport;
 use ovrley_core::normalize::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
 use ovrley_widgets::widgets::gauges::validation::ValidatedLinearGaugeOrientation;
 use ovrley_core::paths::AppPaths;
 use ovrley_widgets::widgets::gauges::linear::{bar_fill_rect, bordered_bar_fill_rect};
-use ovrley_core::render::assets::PreparedWidget;
-use ovrley_core::render::{render_preview_with_report, assets::prepare_render_assets};
-use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
+use ovrley_widgets::model::types::TrackFillStyle;
 use ovrley_widgets::widgets::value::config::ValueConfig;
 use std::collections::BTreeMap;
 
@@ -134,7 +131,7 @@ fn linear_fill_rect_stays_inside_track_border() {
 }
 
 #[test]
-fn prepare_assets_builds_linear_gauge_cache_with_activity_range() {
+fn linear_gauge_samples_fill_across_the_activity_range() {
     let config = validate_render_config(RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
         backdrops: vec![],
@@ -146,17 +143,10 @@ fn prepare_assets_builds_linear_gauge_cache_with_activity_range() {
     })
     .unwrap();
     let paths = test_paths();
-    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = dense_speed_activity(vec![Some(10.0), Some(30.0), Some(50.0)]);
-    let mut profiler = RenderProfiler::default();
 
-    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
-
-    let PreparedWidget::Gauge(widget) = &assets.values[0].widget else {
-        panic!("linear gauge should prepare a gauge cache at value index 0");
-    };
-    let cache = widget;
-    assert_eq!(cache.frame_states[1].fill01, 0.5);
+    let (_, frame_states) = common::gauge::gauge_layout(&config, &dense, &ovrley_core::fonts::NativeFonts(&paths.font_dirs));
+    assert_eq!(frame_states[1].fill01, 0.5);
 }
 
 #[test]
@@ -176,58 +166,11 @@ fn bars_style_resolves_configured_linear_geometry_into_the_cache() {
     })
     .unwrap();
     let paths = test_paths();
-    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
-    let mut profiler = RenderProfiler::default();
-    let assets = prepare_render_assets(&ovrley_core::fonts::NativeFonts(&paths.font_dirs), &config, &activity, &dense, &mut profiler).unwrap();
-
-    let PreparedWidget::Gauge(widget) = &assets.values[0].widget else {
-        panic!("linear bars should use the linear gauge cache");
-    };
-    let cache = widget;
-    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Linear(layout) = &cache.layout else { panic!("gauge layout"); };
+    let (layout, _) = common::gauge::gauge_layout(&config, &dense, &ovrley_core::fonts::NativeFonts(&paths.font_dirs));
+    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Linear(layout) = &layout else { panic!("gauge layout"); };
     assert_eq!(layout.track_fill_style, TrackFillStyle::Bars);
     assert_eq!(layout.bar_geometry.unwrap().count, 8);
-}
-
-#[test]
-fn preview_render_reports_linear_gauge_without_text_fallback() {
-    let mut scene = common::builders::scene_json();
-    scene["width"] = serde_json::json!(320);
-    scene["height"] = serde_json::json!(120);
-    let config = validate_render_config(RenderConfig {
-        scene: serde_json::from_value(scene).unwrap(),
-        backdrops: vec![],
-        rasters: vec![],
-        labels: vec![],
-        values: vec![serde_json::from_value(full_linear_gauge_config(20, 30)).unwrap()],
-        plots: serde_json::Value::Object(serde_json::Map::new()),
-        extra: BTreeMap::new(),
-    })
-    .unwrap();
-    let paths = test_paths();
-    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
-    let dense = dense_speed_activity(vec![Some(0.0), Some(50.0), Some(100.0)]);
-    let out_path = std::env::temp_dir().join("linear_gauge_preview_report.png");
-
-    let report =
-        render_preview_with_report(&paths, &config, &activity, &dense, 0.0, &out_path).unwrap();
-
-    assert_eq!(report.metric_presentations.len(), 1);
-    assert_eq!(
-        report.metric_presentations[0].metric_kind,
-        MetricKind::Speed
-    );
-    assert_eq!(
-        report.metric_presentations[0].display_type,
-        DisplayType::Linear
-    );
-    assert_eq!(
-        report.metric_presentations[0].widget.geometry.widget_width,
-        200
-    );
-    assert_eq!(report.metric_presentations[0].widget.frame.progress01, 0.0);
-    let _ = std::fs::remove_file(out_path);
 }
 
 fn full_linear_gauge_config(x: i32, y: i32) -> serde_json::Value {

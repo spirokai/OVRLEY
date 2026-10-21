@@ -637,11 +637,10 @@ fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
     assert_argument_pair(&built.input_0_args, "-hwaccel_output_format", "qsv");
     assert!(built
         .filter_complex
-        .contains("scale_qsv=w=3840:h=2160:format=nv12[main_hw]"));
-    assert!(built
-        .filter_complex
-        .contains("[1:v]setpts=PTS-STARTPTS,hwupload=extra_hw_frames=16[overlay_hw]"));
-    assert!(built.filter_complex.contains("overlay_qsv"));
+        .contains("scale_qsv=w=3840:h=2160:format=nv12[base]"));
+    assert!(built.filter_complex.contains(
+        "[1:v]setpts=PTS-STARTPTS,crop=3840:2160:0:0,hwupload=extra_hw_frames=16[slot0];[base][slot0]overlay_qsv=x=0:y=0[out]"
+    ));
     assert!(!built.filter_complex.contains("hwdownload"));
     assert_argument_pair(&built.input_0_args, "-noautorotate", "-i");
     assert!(!has_argument_pair(
@@ -657,17 +656,17 @@ fn qsv_full_rotated_sources_rotate_only_the_rgba_overlay() {
     let cases = [
         (
             90,
-            "scale_qsv=w=2160:h=3840:format=nv12[main_hw]",
+            "scale_qsv=w=2160:h=3840:format=nv12[base]",
             "transpose=1,",
         ),
         (
             180,
-            "scale_qsv=w=3840:h=2160:format=nv12[main_hw]",
+            "scale_qsv=w=3840:h=2160:format=nv12[base]",
             "hflip,vflip,",
         ),
         (
             270,
-            "scale_qsv=w=2160:h=3840:format=nv12[main_hw]",
+            "scale_qsv=w=2160:h=3840:format=nv12[base]",
             "transpose=2,",
         ),
     ];
@@ -685,7 +684,7 @@ fn qsv_full_rotated_sources_rotate_only_the_rgba_overlay() {
         assert_argument_pair(&built.input_0_args, "-noautorotate", "-i");
         assert!(built.filter_complex.contains(main_scale));
         assert!(built.filter_complex.contains(&format!(
-            "[1:v]setpts=PTS-STARTPTS,{overlay_rotation}hwupload=extra_hw_frames=16[overlay_hw]"
+            "[1:v]setpts=PTS-STARTPTS,crop=3840:2160:0:0,{overlay_rotation}hwupload=extra_hw_frames=16[slot0];[base][slot0]overlay_qsv=x=0:y=0[out]"
         )));
         assert!(!built.filter_complex.contains("vpp_qsv"));
         assert!(!built
