@@ -160,11 +160,7 @@
       "outputDirectoryMissing": "出力ディレクトリが存在しません",
       "outputPermissionDenied": "出力ファイルへの書き込み権限がありません",
       "outputPathInvalid": "出力ファイル名またはパスが無効です",
-      "outputWriteFailed": "出力ファイルを作成または書き込みできませんでした：{{detail}}",
-      "videoDirectoryInvalid": "動画ディレクトリの完全なパスを選択してください",
-      "videoDirectoryMissing": "動画ディレクトリが存在しません",
-      "videoDirectoryPermissionDenied": "動画ディレクトリの読み取り権限がありません",
-      "videoDirectoryReadFailed": "動画ディレクトリを読み取れませんでした：{{detail}}"
+      "outputWriteFailed": "出力ファイルを作成または書き込みできませんでした：{{detail}}"
     },
     "reinspectionRequired": "ファイルが変更されたか、検査の有効期限が切れました。開始前に再検査してください。",
     "inspectAgain": "再検査",

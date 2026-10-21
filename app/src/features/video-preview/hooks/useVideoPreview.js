@@ -314,7 +314,7 @@ export function useVideoPreview(slotRefs, isActive = true) {
   const videoPreviewHelpAvailable = Boolean(hevcPlaybackWarning) && platformOs === 'windows'
   const videoPreviewMessages = [
     hevcPlaybackWarning,
-    ...(activeClip?.preview.warnings ?? []),
+    ...(activeClip?.previewWarnings ?? []),
     metadataStatusMessage,
     seekWarning,
     nativeVideoError,

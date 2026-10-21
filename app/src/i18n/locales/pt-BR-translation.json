@@ -160,11 +160,7 @@
       "outputDirectoryMissing": "O diretório de saída não existe",
       "outputPermissionDenied": "Você não tem permissão para gravar o arquivo de saída",
       "outputPathInvalid": "O nome ou caminho do arquivo de saída é inválido",
-      "outputWriteFailed": "Não foi possível criar ou gravar o arquivo de saída: {{detail}}",
-      "videoDirectoryInvalid": "Escolha um caminho completo para o diretório de vídeos",
-      "videoDirectoryMissing": "O diretório de vídeos não existe",
-      "videoDirectoryPermissionDenied": "Você não tem permissão para ler o diretório de vídeos",
-      "videoDirectoryReadFailed": "Não foi possível ler o diretório de vídeos: {{detail}}"
+      "outputWriteFailed": "Não foi possível criar ou gravar o arquivo de saída: {{detail}}"
     },
     "reinspectionRequired": "Os arquivos mudaram ou a inspeção expirou. Inspecione novamente antes de iniciar.",
     "inspectAgain": "Inspecionar novamente",

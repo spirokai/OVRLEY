@@ -251,12 +251,21 @@ struct ProjectVideo {
     id: String,
     path: PathLocator,
     offset_seconds: f64,
+    /// Whether the start was set by hand; detecting times again keeps a manual start.
+    offset_source: OffsetSource,
     deleted_parts: Vec<ProjectDeletedPart>,
     #[serde(deserialize_with = "deserialize_required_option")]
     transition_in: Option<ProjectTransition>,
     /// Places a video whose time cannot be determined next to another video.
     #[serde(deserialize_with = "deserialize_required_option")]
     placement_anchor: Option<ProjectPlacementAnchor>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum OffsetSource {
+    Auto,
+    Manual,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -513,7 +522,7 @@ pub(crate) struct ReadProjectResult {
     project: ProjectDocument,
     resolved_sources: ResolvedSources,
     raster_load_results: HashMap<String, RasterLoadResult>,
-    /// Video folder of a version 3 batch project, whose videos the frontend imports on open.
+    /// Video folder of a version 3 batch project; the frontend tells the user it is no longer imported.
     legacy_batch_video_folder: Option<String>,
 }
 
@@ -1086,6 +1095,7 @@ fn migrate_v3_project(project: ProjectDocumentV3) -> Result<MigratedProject, Str
         id: Uuid::new_v4().to_string(),
         path: source.path,
         offset_seconds: project.sync.video_offset_seconds,
+        offset_source: OffsetSource::Auto,
         deleted_parts: Vec::new(),
         transition_in: None,
         placement_anchor: None,
@@ -1972,6 +1982,7 @@ mod tests {
             "id": id,
             "path": { "kind": "project-relative", "value": path },
             "offsetSeconds": offset_seconds,
+            "offsetSource": "auto",
             "deletedParts": [],
             "transitionIn": null,
             "placementAnchor": null
@@ -2726,7 +2737,7 @@ mod tests {
 
     #[test]
     fn rejects_malformed_v4_video_collection_contracts() {
-        let cases: [(&str, fn(&mut Value)); 25] = [
+        let cases: [(&str, fn(&mut Value)); 27] = [
             ("missing placementAnchor", |project| {
                 project["sources"]["videos"][0]
                     .as_object_mut()
@@ -2756,6 +2767,15 @@ mod tests {
             }),
             ("non-finite offset", |project| {
                 project["sources"]["videos"][0]["offsetSeconds"] = Value::from("1")
+            }),
+            ("unknown offset source", |project| {
+                project["sources"]["videos"][0]["offsetSource"] = Value::from("dragged")
+            }),
+            ("missing offset source", |project| {
+                project["sources"]["videos"][0]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("offsetSource");
             }),
             ("missing transitionIn", |project| {
                 project["sources"]["videos"][0]

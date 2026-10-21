@@ -160,11 +160,7 @@
       "outputDirectoryMissing": "Выходной каталог не существует",
       "outputPermissionDenied": "У вас нет разрешения на запись выходного файла",
       "outputPathInvalid": "Имя или путь выходного файла недопустимы",
-      "outputWriteFailed": "Не удалось создать или записать выходной файл: {{detail}}",
-      "videoDirectoryInvalid": "Укажите полный путь к каталогу видео",
-      "videoDirectoryMissing": "Каталог видео не существует",
-      "videoDirectoryPermissionDenied": "У вас нет разрешения на чтение каталога видео",
-      "videoDirectoryReadFailed": "Не удалось прочитать каталог видео: {{detail}}"
+      "outputWriteFailed": "Не удалось создать или записать выходной файл: {{detail}}"
     },
     "reinspectionRequired": "Исходные файлы изменились или срок проверки истёк. Повторите проверку перед запуском.",
     "inspectAgain": "Проверить снова",

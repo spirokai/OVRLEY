@@ -366,7 +366,7 @@ pub(crate) async fn backend_cancel(
 /// Probes a video file with ffprobe and returns serialized metadata.
 ///
 /// This command is retained for diagnostics; the normal import path uses the
-/// same core probe through `backend_import_preview_video`.
+/// same core probe through `backend_prepare_preview_video`.
 #[tauri::command]
 pub(crate) async fn backend_probe_video(
     app: AppHandle,
@@ -431,15 +431,6 @@ pub(crate) fn backend_dispose_video_inspection(
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ImportPreviewVideoResponse {
-    import_id: String,
-    preview_url: String,
-    metadata: serde_json::Value,
-    warnings: Vec<String>,
-}
-
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
 struct PreparePreviewVideoResponse {
     metadata: serde_json::Value,
     warnings: Vec<String>,
@@ -490,28 +481,6 @@ pub(crate) async fn backend_register_preview_video(
     path: String,
 ) -> Result<String, String> {
     serialize_command_result(&register_preview_video(&state, path)?)
-}
-
-/// Imports a local video into the HTTP preview server and returns preview state.
-///
-/// The original filesystem path remains the source of truth for export. The
-/// returned `preview_url` is only for native `<video>` preview playback.
-#[tauri::command]
-pub(crate) async fn backend_import_preview_video(
-    app: AppHandle,
-    state: tauri::State<'_, VideoServerHandle>,
-    path: String,
-) -> Result<String, String> {
-    let prepared = prepare_preview_video(&app, &path)?;
-    let registration = register_preview_video(&state, path)?;
-    let response = ImportPreviewVideoResponse {
-        import_id: registration.import_id,
-        preview_url: registration.preview_url,
-        warnings: prepared.warnings,
-        metadata: prepared.metadata,
-    };
-
-    serialize_command_result(&response)
 }
 
 /// Extracts embedded telemetry from an imported video source.

@@ -160,11 +160,7 @@
       "outputDirectoryMissing": "Le dossier de sortie n’existe pas",
       "outputPermissionDenied": "Vous n’avez pas l’autorisation d’écrire le fichier de sortie",
       "outputPathInvalid": "Le nom ou le chemin du fichier de sortie est invalide",
-      "outputWriteFailed": "Impossible de créer ou d’écrire le fichier de sortie : {{detail}}",
-      "videoDirectoryInvalid": "Choisissez un chemin complet vers le dossier vidéo",
-      "videoDirectoryMissing": "Le dossier vidéo n’existe pas",
-      "videoDirectoryPermissionDenied": "Vous n’avez pas l’autorisation de lire le dossier vidéo",
-      "videoDirectoryReadFailed": "Impossible de lire le dossier vidéo : {{detail}}"
+      "outputWriteFailed": "Impossible de créer ou d’écrire le fichier de sortie : {{detail}}"
     },
     "reinspectionRequired": "Les fichiers ont changé ou la vérification a expiré. Vérifiez à nouveau avant de démarrer.",
     "inspectAgain": "Vérifier à nouveau",

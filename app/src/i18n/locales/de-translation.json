@@ -160,11 +160,7 @@
       "outputDirectoryMissing": "Das Ausgabeverzeichnis existiert nicht",
       "outputPermissionDenied": "Sie haben keine Berechtigung, die Ausgabedatei zu schreiben",
       "outputPathInvalid": "Der Name oder Pfad der Ausgabedatei ist ungültig",
-      "outputWriteFailed": "Die Ausgabedatei konnte nicht erstellt oder geschrieben werden: {{detail}}",
-      "videoDirectoryInvalid": "Wählen Sie einen vollständigen Pfad zum Videoverzeichnis",
-      "videoDirectoryMissing": "Das Videoverzeichnis existiert nicht",
-      "videoDirectoryPermissionDenied": "Sie haben keine Berechtigung, das Videoverzeichnis zu lesen",
-      "videoDirectoryReadFailed": "Das Videoverzeichnis konnte nicht gelesen werden: {{detail}}"
+      "outputWriteFailed": "Die Ausgabedatei konnte nicht erstellt oder geschrieben werden: {{detail}}"
     },
     "reinspectionRequired": "Quelldateien wurden geändert oder die Prüfung ist abgelaufen. Vor dem Start erneut prüfen.",
     "inspectAgain": "Erneut prüfen",

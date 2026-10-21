@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { hasActivityCoverage } from '@/lib/activity/activity-context'
+import { hasActivityCoverage, resolveActivityContext, resolveAvailableMetrics } from '@/lib/activity/activity-context'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
@@ -41,5 +41,46 @@ describe('hasActivityCoverage', () => {
 
   test('counts everything as covered without any activity or clip', () => {
     expect(hasActivityCoverage({ parsedActivity: null, activitySummary: null, program: { pieces: [], joins: [] }, clips: [], second: 5 })).toBe(true)
+  })
+})
+
+function clipTelemetry(attributes = ['speed']) {
+  return {
+    coverage: Object.fromEntries(attributes.map((attribute) => [attribute, { source: 'direct' }])),
+    extended_attributes: [],
+    metadata: { duration_seconds: 120, sample_count: 240 },
+    file_format: 'mp4-telemetry',
+    valid_attributes: attributes,
+  }
+}
+
+describe('resolveActivityContext', () => {
+  test('an external activity drives every timeline second from zero', () => {
+    const activityFile = { metadata: { duration_seconds: 120 } }
+    const context = resolveActivityContext({ parsedActivity: activityFile, activitySummary: { durationSeconds: 120 }, clip: null })
+    expect(context).toEqual({ activity: activityFile, summary: { durationSeconds: 120 }, originSecond: 0, videoId: null })
+  })
+
+  test('without an external activity the clip supplies its own telemetry from its start', () => {
+    const activity = clipTelemetry()
+    const clip = { ...createTestVideo({ telemetry: { status: 'ready', activity } }), offsetSeconds: 300 }
+    const context = resolveActivityContext({ parsedActivity: null, activitySummary: null, clip })
+    expect(context).toMatchObject({ activity, originSecond: 300, videoId: clip.id })
+    expect(context.summary.availableMetrics).toEqual([{ attribute: 'speed', source: 'direct' }])
+
+    const pending = { ...createTestVideo(), offsetSeconds: 0 }
+    expect(resolveActivityContext({ parsedActivity: null, activitySummary: null, clip: pending })).toMatchObject({ activity: null, summary: null })
+    expect(resolveActivityContext({ parsedActivity: null, activitySummary: null, clip: null })).toBeNull()
+  })
+
+  test('available metrics come from the external activity or from every clip telemetry', () => {
+    const videos = [
+      createTestVideo({ id: 'a', telemetry: { status: 'ready', activity: clipTelemetry(['speed']) } }),
+      createTestVideo({ id: 'b', telemetry: { status: 'ready', activity: clipTelemetry(['speed', 'cadence']) } }),
+      createTestVideo({ id: 'c' }),
+    ]
+    expect(resolveAvailableMetrics(null, videos).map(({ attribute }) => attribute)).toEqual(['speed', 'cadence'])
+    const externalSummary = { availableMetrics: [{ attribute: 'heartrate', source: 'direct' }] }
+    expect(resolveAvailableMetrics(externalSummary, videos)).toBe(externalSummary.availableMetrics)
   })
 })

@@ -463,15 +463,6 @@ export async function rasterPreviewPng(resourceId) {
   return invokeCommand('raster_preview_png', { resourceId })
 }
 
-/**
- * Lists supported video files (mp4/mov/mkv) directly inside a directory.
- * @param {string} directory - Absolute directory path.
- * @returns {Promise<string[]>} Absolute video paths sorted by name.
- */
-export async function listDirectoryVideoFiles(directory) {
-  return invokeCommand('list_directory_video_files', { directory })
-}
-
 /** @returns {Promise<string>} Absolute Documents/OVRLEY/projects directory. */
 export async function getDefaultProjectDirectory() {
   return invokeCommand('default_project_directory')
@@ -522,16 +513,6 @@ export async function readProjectFile(path) {
  */
 export async function writeProjectFile(path, projectJson, config) {
   return invokeCommand('write_project_file', { path, projectJson, rasterResourceIds: rasterResourceIds(config) })
-}
-
-/**
- * Imports a video into the local HTTP preview server.
- *
- * @param {string} path - Absolute path to the source video file.
- * @returns {Promise<object>} Promise resolving to preview URL, import ID, metadata, and warnings.
- */
-export async function importPreviewVideo(path) {
-  return apiCall('backend_import_preview_video', { path })
 }
 
 /**

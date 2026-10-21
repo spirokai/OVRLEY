@@ -20,8 +20,8 @@ import {
 } from '@/features/toolbar'
 import { VideoSyncDrawerContent, useVideoSyncWorkspace } from '@/features/video-sync'
 import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_SYNC_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
-import { MissingSourceDialog, ProjectFormatUpgradeDialog, StartupProjectsDialog } from '@/features/projects'
-import { VideoImportReportDialog, VideoOverlapDialog, VideoPlacementDialog } from '@/features/video-preview'
+import { MissingSourceDialog, ProjectNoticeDialog, StartupProjectsDialog } from '@/features/projects'
+import { VideoImportDialog } from '@/features/video-preview'
 import { UpdatePromptDialog } from '@/features/app-update'
 import {
   AppHeader,
@@ -167,10 +167,8 @@ function AppShell() {
         <UnsavedChangesDialog {...templateManagement.newTemplateConfirmDialog} />
         <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />
         <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
-        <ProjectFormatUpgradeDialog {...projectLifecycle.formatUpgradeDialog} />
-        <VideoImportReportDialog {...videoControls.importDialogs.report} />
-        <VideoPlacementDialog {...videoControls.importDialogs.placement} />
-        <VideoOverlapDialog {...videoControls.importDialogs.overlaps} />
+        <ProjectNoticeDialog {...projectLifecycle.noticeDialog} />
+        <VideoImportDialog {...videoControls.importDialog} />
         <KeyboardShortcutsDialog
           open={editorShell.keyboardShortcutsOpen}
           locale={i18n.resolvedLanguage}

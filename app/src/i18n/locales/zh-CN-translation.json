@@ -160,11 +160,7 @@
       "outputDirectoryMissing": "输出目录不存在",
       "outputPermissionDenied": "您没有写入输出文件的权限",
       "outputPathInvalid": "输出文件名或路径无效",
-      "outputWriteFailed": "无法创建或写入输出文件：{{detail}}",
-      "videoDirectoryInvalid": "请选择完整的视频目录路径",
-      "videoDirectoryMissing": "视频目录不存在",
-      "videoDirectoryPermissionDenied": "您没有读取视频目录的权限",
-      "videoDirectoryReadFailed": "无法读取视频目录：{{detail}}"
+      "outputWriteFailed": "无法创建或写入输出文件：{{detail}}"
     },
     "reinspectionRequired": "源文件已更改或检查已过期。开始前请重新检查。",
     "inspectAgain": "重新检查",

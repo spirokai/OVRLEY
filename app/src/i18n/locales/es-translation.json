@@ -160,11 +160,7 @@
       "outputDirectoryMissing": "El directorio de salida no existe",
       "outputPermissionDenied": "No tienes permiso para escribir el archivo de salida",
       "outputPathInvalid": "El nombre o la ruta del archivo de salida no es válido",
-      "outputWriteFailed": "No se pudo crear ni escribir el archivo de salida: {{detail}}",
-      "videoDirectoryInvalid": "Selecciona una ruta completa al directorio de vídeos",
-      "videoDirectoryMissing": "El directorio de vídeos no existe",
-      "videoDirectoryPermissionDenied": "No tienes permiso para leer el directorio de vídeos",
-      "videoDirectoryReadFailed": "No se pudo leer el directorio de vídeos: {{detail}}"
+      "outputWriteFailed": "No se pudo crear ni escribir el archivo de salida: {{detail}}"
     },
     "reinspectionRequired": "Los archivos cambiaron o la inspección caducó. Inspecciona de nuevo antes de iniciar.",
     "inspectAgain": "Inspeccionar de nuevo",

@@ -160,11 +160,7 @@
       "outputDirectoryMissing": "Výstupní adresář neexistuje",
       "outputPermissionDenied": "Nemáte oprávnění zapisovat do výstupního souboru",
       "outputPathInvalid": "Název nebo cesta výstupního souboru je neplatná",
-      "outputWriteFailed": "Nelze vytvořit nebo zapsat výstupní soubor: {{detail}}",
-      "videoDirectoryInvalid": "Vyberte úplnou cestu k adresáři videí",
-      "videoDirectoryMissing": "Adresář videí neexistuje",
-      "videoDirectoryPermissionDenied": "Nemáte oprávnění číst adresář videí",
-      "videoDirectoryReadFailed": "Nelze číst adresář videí: {{detail}}"
+      "outputWriteFailed": "Nelze vytvořit nebo zapsat výstupní soubor: {{detail}}"
     },
     "reinspectionRequired": "Zdroje se změnily nebo kontrola vypršela. Před spuštěním je znovu zkontrolujte.",
     "inspectAgain": "Znovu zkontrolovat",

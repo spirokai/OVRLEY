@@ -22,6 +22,7 @@ function projectVideos(state, projectPath) {
         id: video.id,
         path: createPathLocator(video.path, projectPath),
         offsetSeconds: edits.offsetSeconds,
+        offsetSource: edits.offsetSource,
         deletedParts: edits.deletedParts.map((part) => ({
           id: part.id,
           fromSecond: part.fromSecond,

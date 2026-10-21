@@ -8,13 +8,13 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 /**
- * Renders the shared automatic video-sync controls.
+ * Renders the shared automatic video-sync controls. The warning offers manual
+ * sync only where it is available (`openManualVideoSync`, after import).
  *
  * @param {object} props Video sync state and actions.
- * @returns {JSX.Element|null} Rendered controls, or null without activity data.
+ * @returns {JSX.Element} Rendered controls.
  */
 export function VideoSyncControls({
-  activitySummary,
   canResetCreationTime,
   filenameCreationTimeAvailable,
   timezoneDisabled,
@@ -31,7 +31,6 @@ export function VideoSyncControls({
   setVideoSyncTimezoneMode,
 }) {
   const { t } = useTranslation()
-  if (!activitySummary) return null
 
   return (
     <section className="space-y-4">
@@ -67,7 +66,6 @@ export function VideoSyncControls({
             variant="outline"
             size="sm"
             className="h-9 border-border/80 bg-surface-elevated px-3 text-xs font-semibold text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
-            disabled={!activitySummary}
             onClick={() => computeVideoSync()}
             aria-keyshortcuts="Mod+Shift+A"
           >
@@ -112,15 +110,17 @@ export function VideoSyncControls({
           <Bell className="h-3 w-3 shrink-0" />
           <div className="min-w-0 flex-1 space-y-3 pl-2">
             <p className="text-[0.65rem] font-semibold leading-tight pl-1 pt-2">{videoSyncWarning}</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 px-2 w-full text-[0.75rem] border-amber-400/30 bg-amber-400/10 text-amber-400 hover:bg-amber-500/20 hover:text-amber-200"
-              onClick={openManualVideoSync}
-            >
-              {t('videoSync.openManualSync', 'Open Manual Sync')}
-            </Button>
+            {openManualVideoSync ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 px-2 w-full text-[0.75rem] border-amber-400/30 bg-amber-400/10 text-amber-400 hover:bg-amber-500/20 hover:text-amber-200"
+                onClick={openManualVideoSync}
+              >
+                {t('videoSync.openManualSync', 'Open Manual Sync')}
+              </Button>
+            ) : null}
           </div>
         </div>
       ) : null}

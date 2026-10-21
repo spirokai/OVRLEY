@@ -10,9 +10,9 @@
 
 import i18next from 'i18next'
 import { filenameFromSelectedPath } from '@/lib/utils'
+import { findCombinedExportIssues } from '@/lib/video-program/combined-export'
 import { buildProgram, buildVideoPieceTransitions, collectVideoPieces, findInvalidTransitions } from '@/lib/video-program/program'
 import { HARD_CUT } from '@/lib/video-program/transition-catalog'
-import { deriveCompatibility } from '@/lib/video-program/video-collection'
 import { reviewBatchQueue } from './renderPresentation'
 
 function nativePiece(piece, sourceId, skipOverlay) {
@@ -33,29 +33,32 @@ function groupPiecesByVideo(pieces) {
   return piecesByVideo
 }
 
+/**
+ * Describes one reason the videos cannot be exported as one file (see `findCombinedExportIssues`).
+ * @param {{kind: 'overlap'|'incompatible', videoIds: Array<string>}} issue Issue.
+ * @param {Array<object>} clips Clips the issue refers to.
+ * @param {import('i18next').TFunction} t Translation function.
+ * @returns {string} Message naming the videos.
+ */
+export function formatCombinedExportIssue(issue, clips, t) {
+  const names = clips.filter((clip) => issue.videoIds.includes(clip.id)).map((clip) => filenameFromSelectedPath(clip.path))
+  return issue.kind === 'overlap'
+    ? t('render-video.combinedOverlap', {
+        defaultValue: 'Videos overlap ({{names}}). Move a video or delete the overlapping part.',
+        names: names.join(', '),
+      })
+    : t('render-video.combinedIncompatible', {
+        defaultValue: 'Videos differ in resolution or frame rate ({{names}}). Remove them or export separate files.',
+        names: names.join(', '),
+      })
+}
+
 function combinedBlockers({ program, clips, rows, exportMode, t }) {
   const names = (ids) => clips.filter((clip) => ids.has(clip.id)).map((clip) => filenameFromSelectedPath(clip.path))
   const included = clips.filter((clip) => program.pieces.some((piece) => piece.videoId === clip.id))
   const blockers = []
   if (program.pieces.length === 0) blockers.push(t('render-video.nothingInExportRange', 'No video lies inside the export range.'))
-  if (program.overlaps.length > 0) {
-    const overlapping = new Set(program.overlaps.flatMap((overlap) => [overlap.earlierVideoId, overlap.laterVideoId]))
-    blockers.push(
-      t('render-video.combinedOverlap', {
-        defaultValue: 'Videos overlap ({{names}}). Move a video or delete the overlapping part.',
-        names: names(overlapping).join(', '),
-      }),
-    )
-  }
-  const { incompatibleIds } = deriveCompatibility(included)
-  if (incompatibleIds.size > 0) {
-    blockers.push(
-      t('render-video.combinedIncompatible', {
-        defaultValue: 'Videos differ in resolution or frame rate ({{names}}). Remove them or export separate files.',
-        names: names(incompatibleIds).join(', '),
-      }),
-    )
-  }
+  for (const issue of findCombinedExportIssues(program, included)) blockers.push(formatCombinedExportIssue(issue, clips, t))
   if (exportMode === 'composite' && findInvalidTransitions(program).length > 0) {
     blockers.push(t('render-video.combinedInvalidTransitions', 'Some transitions are longer than the video pieces they join.'))
   }

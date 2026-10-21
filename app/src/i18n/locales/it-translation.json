@@ -160,11 +160,7 @@
       "outputDirectoryMissing": "La cartella di output non esiste",
       "outputPermissionDenied": "Non hai il permesso di scrivere il file di output",
       "outputPathInvalid": "Il nome o il percorso del file di output non è valido",
-      "outputWriteFailed": "Impossibile creare o scrivere il file di output: {{detail}}",
-      "videoDirectoryInvalid": "Scegli un percorso completo per la cartella dei video",
-      "videoDirectoryMissing": "La cartella dei video non esiste",
-      "videoDirectoryPermissionDenied": "Non hai il permesso di leggere la cartella dei video",
-      "videoDirectoryReadFailed": "Impossibile leggere la cartella dei video: {{detail}}"
+      "outputWriteFailed": "Impossibile creare o scrivere il file di output: {{detail}}"
     },
     "reinspectionRequired": "I file sono cambiati o la verifica è scaduta. Verifica di nuovo prima di iniziare.",
     "inspectAgain": "Verifica di nuovo",

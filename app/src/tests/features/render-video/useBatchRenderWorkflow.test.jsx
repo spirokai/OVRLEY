@@ -10,6 +10,7 @@ import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 import batchTemplate from '../../../../../src-tauri/ovrley_core/tests/fixtures/config/batch-template.json'
+import { createVideoEdits } from '@/lib/video-program/imported-video'
 
 vi.mock('@/api/backend', () => ({
   createVideoInspection: vi.fn(),
@@ -434,7 +435,14 @@ describe('native batch workflow', () => {
     await act(async () => finishPlan({ status: 'planned', plans: [] }))
     await waitFor(() => expect(result.current.batchReady).toBe(true))
     const added = createTestVideo({ id: 'added', path: `${folder}/added.mp4`, durationSeconds: 60, importOrder: 3 })
-    act(() => useStore.getState().addImportedVideos([added]))
+    act(() => {
+      const { importedVideos, videoEdits, videoSyncTimezoneMode } = useStore.getState()
+      useStore.getState().commitVideoCollection({
+        importedVideos: [...importedVideos, added],
+        videoEdits: { ...videoEdits, added: createVideoEdits() },
+        videoSyncTimezoneMode,
+      })
+    })
     await waitFor(() => expect(result.current.batchReady).toBe(true))
     expect(backend.disposeVideoInspection).toHaveBeenCalledWith('inspection-1')
     expect(result.current.batchQueue.map((row) => row.id)).toContain('added')

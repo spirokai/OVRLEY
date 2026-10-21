@@ -1,4 +1,4 @@
-import { AlertTriangle, Blend, Film, Scissors, Trash2 } from 'lucide-react'
+import { AlertTriangle, Blend, Film, RotateCcw, Scissors, Trash2 } from 'lucide-react'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -156,7 +156,31 @@ function VideoClipRow({ row }) {
         <Label htmlFor={offsetInputId} className="text-xs font-bold text-muted-foreground">
           {t('toolbar.videoStart', 'Start on timeline')}
         </Label>
-        <SecondsInput id={offsetInputId} value={row.offsetSeconds} fps={row.offsetFps} signed onCommit={row.onOffsetCommit} className="h-8 text-xs" />
+        <div className="flex items-start gap-1">
+          <div className="min-w-0 flex-1">
+            <SecondsInput
+              id={offsetInputId}
+              value={row.offsetSeconds}
+              fps={row.offsetFps}
+              signed
+              onCommit={row.onOffsetCommit}
+              className="h-8 text-xs"
+            />
+          </div>
+          {row.offsetIsManual ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-surface-accent-soft hover:text-primary"
+              onClick={row.onOffsetReset}
+              aria-label={t('toolbar.resetVideoStart', { defaultValue: 'Place {{name}} automatically again', name: row.filename })}
+              title={t('toolbar.resetVideoStartHint', 'Set by hand. Click to place it by its recording time again.')}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
+        </div>
       </div>
       {row.transitionIn !== null ? (
         <div className="grid grid-cols-2 items-start gap-4 px-2">
@@ -243,13 +267,13 @@ export function VideoDrawerContent({ videoSummaries, onBrowseVideo, onDeleteVide
               {t('toolbar.deleteVideo', 'Remove all videos')}
             </Button>
           </div>
+          {videoSync.activitySummary ? <VideoSyncControls {...videoSync} /> : null}
+
           {rows.map((row) => (
             <VideoClipRow key={row.id} row={row} />
           ))}
 
           <TransitionDefaultsSection />
-
-          <VideoSyncControls {...videoSync} />
         </div>
       ) : null}
     </div>

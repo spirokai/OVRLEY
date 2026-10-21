@@ -12,10 +12,14 @@ function cloneTransition(transition) {
 
 /**
  * Restores the saved edits of every loaded video. The native boundary validated
- * their shape; bounds that need the probed duration are checked here. An anchor
- * to a video skipped as a missing source is dropped; the clip keeps its offset.
+ * their shape; bounds that need the probed duration are checked here, before the
+ * project replaces the session. An anchor to a video skipped as a missing source
+ * is dropped; the clip keeps its offset.
+ * @param {Array<object>} videos Probed video entities with their saved IDs.
+ * @param {Array<object>} projectVideos Saved project videos.
+ * @returns {object} Video edits keyed by video ID.
  */
-function createProjectVideoEdits(videos, projectVideos) {
+export function createProjectVideoEdits(videos, projectVideos) {
   const loadedIds = new Set(videos.map((video) => video.id))
   const projectVideosById = new Map(projectVideos.map((projectVideo) => [projectVideo.id, projectVideo]))
   return Object.fromEntries(
@@ -29,6 +33,7 @@ function createProjectVideoEdits(videos, projectVideos) {
         video.id,
         {
           offsetSeconds: projectVideo.offsetSeconds,
+          offsetSource: projectVideo.offsetSource,
           deletedParts: projectVideo.deletedParts.map((part) => ({ ...part, transition: cloneTransition(part.transition) })),
           transitionIn: cloneTransition(projectVideo.transitionIn),
           placementAnchor:
@@ -42,8 +47,12 @@ function createProjectVideoEdits(videos, projectVideos) {
 /**
  * Restores the manual sync workspace. When its video was skipped as a missing
  * source, its landmarks go with it and the first loaded video is selected.
+ * Landmarks are checked against the probed video before the project replaces the session.
+ * @param {Array<object>} videos Probed video entities with their saved IDs.
+ * @param {object} manual Saved manual sync workspace.
+ * @returns {object} Manual sync workspace.
  */
-function createProjectManualVideoSync(videos, manual) {
+export function createProjectManualVideoSync(videos, manual) {
   const video = videos.find((candidate) => candidate.id === manual.videoId)
   if (!video) return { ...manual, videoId: videos[0]?.id ?? null, landmarks: [] }
   if (manual.landmarks.some((landmark) => landmark.videoSecond > video.durationSeconds)) {
@@ -94,16 +103,16 @@ export function applyNewProjectState(store, { templateSource, templateState }) {
 
 /**
  * Restores the project-owned editor widget document and settings after the
- * activity and video loaders have populated their own Zustand domains.
+ * activity and the video collection have been committed.
  *
  * @param {object} store Zustand application store.
  * @param {object} project Validated project payload.
+ * @param {object} manualVideoSync Manual sync workspace checked against the loaded videos.
  */
-export function applyProjectOwnedState(store, project) {
+export function applyProjectOwnedState(store, project, manualVideoSync) {
   const state = store.getState()
-  const videoEdits = createProjectVideoEdits(state.importedVideos, project.sources.videos)
-  state.hydrateVideoSyncState(createProjectManualVideoSync(state.importedVideos, project.sync.manual))
-  const videoBounds = getVideosTimelineBounds(joinVideoEdits(state.importedVideos, videoEdits))
+  state.hydrateVideoSyncState(manualVideoSync)
+  const videoBounds = getVideosTimelineBounds(joinVideoEdits(state.importedVideos, state.videoEdits))
   const timelineMinimum = getTimelineMinimum({ videoBounds })
   const activityDuration = state.activitySummary?.durationSeconds ?? 0
   const videoEnd = videoBounds?.endSecond ?? 0
@@ -126,9 +135,6 @@ export function applyProjectOwnedState(store, project) {
     draft.globalDefaults = project.editor.globalDefaults
     draft.loadedTemplateSource = null
     draft.lastSavedTemplateState = null
-    draft.videoEdits = videoEdits
-    for (const video of draft.importedVideos) video.syncWarning = null
-    draft.videoSyncTimezoneMode = project.sync.videoTimezoneMode
     draft.transitionDefaults = { ...project.transitionDefaults }
     draft.videoDragPreview = null
     draft.deletedPartMark = null
@@ -145,12 +151,15 @@ export function applyProjectOwnedState(store, project) {
 }
 
 /**
- * Commits staged media through one synchronous project transition.
+ * Commits staged media through one synchronous project transition. The activity
+ * is activated before the videos join, so detecting video times on activation
+ * never moves the saved placements.
  * @param {object} store Zustand application store.
  * @param {object} project Validated project payload.
- * @param {{activity: object|null, videos: Array<object>}} prepared Prepared activity and registered video entities.
+ * @param {{activity: object|null, collection: {importedVideos: Array<object>, videoEdits: object, videoSyncTimezoneMode: 'utc'|'local'|null}, manualVideoSync: object}} prepared
+ *   Prepared activity, registered video collection with its validated edits, and the manual sync workspace.
  */
-export function applyPreparedProjectState(store, project, prepared) {
+export function applyPreparedProjectState(store, project, { activity, collection, manualVideoSync }) {
   store.setState((draft) => {
     draft.activitySource = null
     draft.parsedActivity = null
@@ -159,8 +168,8 @@ export function applyPreparedProjectState(store, project, prepared) {
 
   const state = store.getState()
   state.clearImportedVideos()
-  if (prepared.videos.length > 0) state.setImportedVideos(prepared.videos)
-  if (prepared.activity) activateParsedActivity(prepared.activity, store.getState())
+  if (activity) activateParsedActivity(activity, store.getState())
+  store.getState().commitVideoCollection(collection)
 
-  applyProjectOwnedState(store, project)
+  applyProjectOwnedState(store, project, manualVideoSync)
 }

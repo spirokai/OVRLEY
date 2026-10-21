@@ -160,11 +160,7 @@
       "outputDirectoryMissing": "출력 디렉터리가 존재하지 않습니다",
       "outputPermissionDenied": "출력 파일에 쓸 권한이 없습니다",
       "outputPathInvalid": "출력 파일 이름 또는 경로가 유효하지 않습니다",
-      "outputWriteFailed": "출력 파일을 만들거나 쓸 수 없습니다: {{detail}}",
-      "videoDirectoryInvalid": "동영상 디렉터리의 전체 경로를 선택하세요",
-      "videoDirectoryMissing": "동영상 디렉터리가 존재하지 않습니다",
-      "videoDirectoryPermissionDenied": "동영상 디렉터리를 읽을 권한이 없습니다",
-      "videoDirectoryReadFailed": "동영상 디렉터리를 읽을 수 없습니다: {{detail}}"
+      "outputWriteFailed": "출력 파일을 만들거나 쓸 수 없습니다: {{detail}}"
     },
     "reinspectionRequired": "파일이 변경되었거나 검사 유효 기간이 만료되었습니다. 시작 전에 다시 검사하세요.",
     "inspectAgain": "다시 검사",

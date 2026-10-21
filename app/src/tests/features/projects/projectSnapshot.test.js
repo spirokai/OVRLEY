@@ -43,6 +43,7 @@ describe('project snapshot contract', () => {
           id: 'runtime-video',
           path: { kind: 'absolute', value: 'D:\\video\\lap.mp4' },
           offsetSeconds: 7.5,
+          offsetSource: 'auto',
           deletedParts: [],
           transitionIn: null,
           placementAnchor: null,

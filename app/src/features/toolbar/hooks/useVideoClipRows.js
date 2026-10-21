@@ -28,9 +28,10 @@ export function useVideoClipRows({ videoSummaries, timezone, videoSyncTimezoneMo
   const warnings = useVideoWarnings()
   const { clips, program } = useVideoTimeline()
   const joinModels = useJoinTransitionModels({ clips, program })
-  const { setVideoOffset, setDeletedPartRange, removeDeletedPart, commitPreviewScrub } = useStore(
+  const { setVideoOffset, resetVideoOffset, setDeletedPartRange, removeDeletedPart, commitPreviewScrub } = useStore(
     useShallow((state) => ({
       setVideoOffset: state.setVideoOffset,
+      resetVideoOffset: state.resetVideoOffset,
       setDeletedPartRange: state.setDeletedPartRange,
       removeDeletedPart: state.removeDeletedPart,
       commitPreviewScrub: state.commitPreviewScrub,
@@ -48,8 +49,10 @@ export function useVideoClipRows({ videoSummaries, timezone, videoSyncTimezoneMo
         // The start snaps to the clip's own frames.
         offsetSeconds: clip.offsetSeconds,
         offsetFps: clip.fps,
+        offsetIsManual: clip.offsetSource === 'manual',
         warnings: (warnings.get(summary.id) ?? []).map((warning) => warning.message),
         onOffsetCommit: (seconds) => setVideoOffset(summary.id, seconds),
+        onOffsetReset: () => resetVideoOffset(summary.id),
         onRemove: () => onRemoveVideo(summary.id),
         // Only a clip that follows another piece has a join leading into it.
         transitionIn: joinModels.get(`clip:${summary.id}`) ?? null,
@@ -62,6 +65,7 @@ export function useVideoClipRows({ videoSummaries, timezone, videoSyncTimezoneMo
     joinModels,
     onRemoveVideo,
     removeDeletedPart,
+    resetVideoOffset,
     setDeletedPartRange,
     setVideoOffset,
     t,

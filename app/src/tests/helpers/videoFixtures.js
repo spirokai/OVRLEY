@@ -2,10 +2,11 @@
  * Canonical imported-video fixtures for tests.
  */
 
-import { createImportedVideo, createVideoEdits } from '@/store/slices/createVideoImportSlice'
+import { requireTelemetry, createImportedVideo, createVideoEdits, withPreviewRegistration } from '@/lib/video-program/imported-video'
 
 /**
- * Creates a validated imported-video entity through the production ingress.
+ * Creates a validated imported-video entity through the production ingress,
+ * registered for preview unless `registered` is false.
  * @param {object} [options] Fixture overrides.
  * @returns {object} Imported video entity.
  */
@@ -23,9 +24,11 @@ export function createTestVideo({
   codecName = 'h264',
   importOrder = 0,
   previewWarnings = [],
-  telemetry,
+  telemetry = { status: 'pending', activity: null },
+  registered = true,
 } = {}) {
-  return createImportedVideo(
+  requireTelemetry(telemetry)
+  const video = createImportedVideo(
     {
       path,
       duration: durationSeconds,
@@ -38,13 +41,12 @@ export function createTestVideo({
       timeSource,
       codecName,
     },
-    {
-      id,
-      importOrder,
-      preview: { importId: `import-${id}`, url: `http://127.0.0.1:4321/video/import-${id}`, warnings: previewWarnings },
-      telemetry,
-    },
+    { id, importOrder, previewWarnings },
   )
+  const withTelemetry = { ...video, telemetry }
+  return registered
+    ? withPreviewRegistration(withTelemetry, { importId: `import-${id}`, previewUrl: `http://127.0.0.1:4321/video/import-${id}` })
+    : withTelemetry
 }
 
 /**
