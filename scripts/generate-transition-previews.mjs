@@ -1,18 +1,21 @@
 // Generates the animated previews of the transition picker with the bundled FFmpeg:
-// one small looping WebP per `xfade` transition, from two neutral generated frames
-// (a blue grid fading into an orange box). Run after changing the catalogue:
+// one looping WebP sprite sheet holding a cell per `xfade` transition in catalogue
+// order (`assets/transitions.json`, row by row), each blending two neutral generated
+// frames (a blue grid fading into an orange box). Run after changing the catalogue:
 //   node scripts/generate-transition-previews.mjs
-import { mkdir, readdir, rm } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { XFADE_TRANSITIONS } from "../app/src/lib/video-program/transition-catalog.js";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const outputDir = join(rootDir, "assets", "transition-previews");
+const catalogue = JSON.parse(await readFile(join(rootDir, "assets", "transitions.json"), "utf8"));
+const output = join(rootDir, "assets", "transition-previews.webp");
 const ffmpeg = join(rootDir, "vendor", "ffmpeg", "bin", process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg");
 
-const SIZE = "120x68";
+const { columns, width, height } = catalogue.preview;
+const transitions = catalogue.xfade;
+const SIZE = `${width}x${height}`;
 const FPS = 15;
 // Each preview holds 0.6 s of A, a 1 s transition and 0.6 s of B, then loops.
 const CLIP_SECONDS = 1.6;
@@ -23,40 +26,24 @@ const FRAME_B =
   `color=c=0xf97316:s=${SIZE}:r=${FPS}:d=${CLIP_SECONDS},` +
   "drawbox=x=30:y=14:w=60:h=40:t=fill:c=0xfff7ed@0.85,drawbox=x=45:y=24:w=30:h=20:t=fill:c=0xc2410c";
 
-await mkdir(outputDir, { recursive: true });
-for (const file of await readdir(outputDir)) {
-  if (file.endsWith(".webp")) await rm(join(outputDir, file));
+const labels = (prefix) => transitions.map((_, index) => `[${prefix}${index}]`).join("");
+const cells = transitions.map((_, index) => `${(index % columns) * width}_${Math.floor(index / columns) * height}`);
+const graph = [
+  `${FRAME_A},split=${transitions.length}${labels("a")}`,
+  `${FRAME_B},split=${transitions.length}${labels("b")}`,
+  ...transitions.map(
+    (transition, index) =>
+      `[a${index}][b${index}]xfade=transition=${transition}:duration=${DURATION_SECONDS}:offset=${OFFSET_SECONDS}[x${index}]`,
+  ),
+  `${labels("x")}xstack=inputs=${transitions.length}:layout=${cells.join("|")}:fill=black`,
+].join(";");
+
+const result = spawnSync(
+  ffmpeg,
+  ["-hide_banner", "-loglevel", "error", "-y", "-filter_complex", graph, "-c:v", "libwebp_anim", "-quality", "60", "-loop", "0", output],
+  { encoding: "utf8" },
+);
+if (result.status !== 0) {
+  throw new Error(`FFmpeg could not render the transition previews: ${result.stderr || result.error}`);
 }
-for (const transition of XFADE_TRANSITIONS) {
-  const result = spawnSync(
-    ffmpeg,
-    [
-      "-hide_banner",
-      "-loglevel",
-      "error",
-      "-y",
-      "-f",
-      "lavfi",
-      "-i",
-      FRAME_A,
-      "-f",
-      "lavfi",
-      "-i",
-      FRAME_B,
-      "-filter_complex",
-      `[0][1]xfade=transition=${transition}:duration=${DURATION_SECONDS}:offset=${OFFSET_SECONDS}`,
-      "-c:v",
-      "libwebp_anim",
-      "-quality",
-      "60",
-      "-loop",
-      "0",
-      join(outputDir, `${transition}.webp`),
-    ],
-    { encoding: "utf8" },
-  );
-  if (result.status !== 0) {
-    throw new Error(`FFmpeg could not render the ${transition} preview: ${result.stderr || result.error}`);
-  }
-}
-console.log(`Wrote ${XFADE_TRANSITIONS.length} transition previews to ${outputDir}`);
+console.log(`Wrote ${transitions.length} transition previews to ${output}`);

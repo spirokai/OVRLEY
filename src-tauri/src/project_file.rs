@@ -8,7 +8,9 @@ use crate::raster_resources::RasterResources;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use chrono::DateTime;
 use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, EncoderId};
-use ovrley_core::encode::ffmpeg::transitions::{NO_TRANSITION, XFADE_TRANSITIONS};
+use ovrley_core::encode::ffmpeg::transitions::{
+    is_xfade_transition, transition_defaults, NO_TRANSITION,
+};
 use ovrley_core::encode::quality::{validate_quality, QualityType};
 use ovrley_core::normalize::{raw::RasterConfig, validate_template_rasters};
 use ovrley_core::raster::{
@@ -40,10 +42,6 @@ const MAX_MANUAL_SPEED_THRESHOLD_KMH: f64 = 10.0;
 const DEFAULT_MANUAL_TURN_THRESHOLD_DEGREES: f64 = 80.0;
 const MIN_MANUAL_TURN_THRESHOLD_DEGREES: f64 = 70.0;
 const MAX_MANUAL_TURN_THRESHOLD_DEGREES: f64 = 160.0;
-// Hard transition defaults for new and migrated projects.
-const DEFAULT_TRANSITION_TYPE: &str = "wipeleft";
-const DEFAULT_TRANSITION_DURATION_SECONDS: f64 = 2.0;
-const DEFAULT_SPLIT_GAP_THRESHOLD_SECONDS: f64 = 2.0;
 const PROJECT_JSON_ENTRY: &str = "project.json";
 const THUMBNAIL_ENTRY: &str = "thumbnail.png";
 const RASTER_ASSET_NAMESPACE: &str = "rasters/";
@@ -306,10 +304,11 @@ struct ProjectTransitionDefaults {
 
 impl Default for ProjectTransitionDefaults {
     fn default() -> Self {
+        let defaults = transition_defaults();
         Self {
-            transition_type: DEFAULT_TRANSITION_TYPE.into(),
-            duration_seconds: DEFAULT_TRANSITION_DURATION_SECONDS,
-            split_gap_threshold_seconds: DEFAULT_SPLIT_GAP_THRESHOLD_SECONDS,
+            transition_type: defaults.transition_type.clone(),
+            duration_seconds: defaults.duration_seconds,
+            split_gap_threshold_seconds: defaults.split_gap_threshold_seconds,
             dialog_shown: false,
         }
     }
@@ -709,7 +708,7 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
 }
 
 fn validate_transition_type(transition_type: &str) -> Result<(), String> {
-    if transition_type != NO_TRANSITION && !XFADE_TRANSITIONS.contains(&transition_type) {
+    if transition_type != NO_TRANSITION && !is_xfade_transition(transition_type) {
         return Err(format!("unknown transition type: {transition_type}"));
     }
     Ok(())
@@ -2845,11 +2844,5 @@ mod tests {
         let mut project = multi_video_project_json();
         project["sources"]["video"] = Value::Null;
         assert!(parse_project(&project.to_string()).is_err());
-    }
-
-    #[test]
-    fn default_transition_is_in_the_frontend_defaults() {
-        let frontend = include_str!("../../app/src/lib/video-program/transition-catalog.js");
-        assert!(frontend.contains(&format!("type: '{DEFAULT_TRANSITION_TYPE}'")));
     }
 }

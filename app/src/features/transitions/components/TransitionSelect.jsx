@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils'
 import { NO_TRANSITION, XFADE_TRANSITIONS } from '@/lib/video-program/transition-catalog'
 import { DEFAULT_TRANSITION_OPTION } from '../utils/joinTransitionModel'
-import { transitionPreviewUrl } from '../utils/transitionPreviews'
+import { transitionPreviewStyle } from '../utils/transitionPreviews'
 
 function PickerTile({ isSelected, label, onSelect, children }) {
   return (
@@ -62,7 +62,9 @@ export function TransitionSelect({ value, label, previewType, defaultLabel = nul
           className="h-7 w-full min-w-0 justify-between gap-2 px-2 text-xs font-normal"
         >
           <span className="flex min-w-0 items-center gap-2">
-            {previewType !== null ? <img src={transitionPreviewUrl(previewType)} alt="" className="h-4 w-7 shrink-0 rounded-[2px]" /> : null}
+            {previewType !== null ? (
+              <span aria-hidden="true" style={transitionPreviewStyle(previewType)} className="h-4 w-7 shrink-0 rounded-[2px]" />
+            ) : null}
             <span className="truncate">{label}</span>
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
@@ -91,7 +93,7 @@ export function TransitionSelect({ value, label, previewType, defaultLabel = nul
           </PickerTile>
           {types.map((type) => (
             <PickerTile key={type} isSelected={value === type} label={type} onSelect={() => choose(type)}>
-              <img src={transitionPreviewUrl(type)} alt="" loading="lazy" className="h-full w-full object-cover" />
+              <span aria-hidden="true" style={transitionPreviewStyle(type)} className="h-full w-full" />
             </PickerTile>
           ))}
         </div>

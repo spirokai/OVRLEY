@@ -10,7 +10,7 @@ describe('TransitionSelect', () => {
     fireEvent.click(screen.getByRole('button', { name: /fade, 1 s/ }))
     const picker = screen.getByRole('listbox', { name: 'Transitions' })
     expect(screen.getByRole('option', { name: 'Default (fade, 1 s)' })).toHaveAttribute('aria-selected', 'true')
-    expect(picker.querySelectorAll('img')).toHaveLength(58)
+    expect(picker.querySelectorAll('[style*="transition-previews"]')).toHaveLength(58)
 
     fireEvent.change(screen.getByLabelText('Filter transitions'), { target: { value: 'circle' } })
     expect(screen.getAllByRole('option').map((option) => option.getAttribute('aria-label'))).toEqual([

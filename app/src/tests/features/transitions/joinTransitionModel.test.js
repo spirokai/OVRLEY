@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { buildJoinTransitionModel, joinOverride, transitionLabel } from '@/features/transitions'
-import { missingTransitionPreviews, transitionPreviewUrl } from '@/features/transitions/utils/transitionPreviews'
+import { transitionPreviewStyle } from '@/features/transitions/utils/transitionPreviews'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
@@ -27,10 +27,13 @@ function model(join, clips, setJoinTransition = vi.fn(), isInvalid = false) {
 }
 
 describe('join transition model', () => {
-  test('every catalogue transition has an animated preview', () => {
-    expect(missingTransitionPreviews()).toEqual([])
-    expect(transitionPreviewUrl('wipeleft')).toMatch(/wipeleft\.webp/)
-    expect(() => transitionPreviewUrl('spin')).toThrow(/no preview/)
+  test('shows each catalogue transition from its cell of the preview sprite', () => {
+    expect(transitionPreviewStyle('fade')).toMatchObject({
+      backgroundImage: expect.stringMatching(/transition-previews\.webp/),
+      backgroundPosition: '0% 0%',
+    })
+    expect(transitionPreviewStyle('revealdown')).toMatchObject({ backgroundSize: '800% 800%', backgroundPosition: '14.285714285714285% 100%' })
+    expect(() => transitionPreviewStyle('spin')).toThrow(/no preview/)
   })
 
   test('shows the effective transition and the default each join follows', () => {
