@@ -1,111 +1,53 @@
 /**
- * Container hook for video sync controls.
+ * Container hook for the session-level video sync controls.
  *
- * Manages the local offset input state and exposes handlers that coerce,
- * validate, and commit sync values to the global store.
+ * Exposes the sync state of the imported videos and the handlers that commit
+ * sync values to the global store. Session controls apply to every imported video.
  *
  * @module useVideoSyncControls
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
-import { parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import useStore from '@/store/useStore'
-
-function formatOffsetInput(seconds) {
-  const rounded = Math.round(seconds * 10) / 10
-  return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1)
-}
+import { deriveVideoSyncControls } from '../utils/videoSyncControls'
 
 /**
- * Provides state and callbacks for the video sync offset controls.
- *
+ * Provides state and callbacks for the video sync controls of the drawer.
  * @returns {object} Sync state and handlers for the video drawer.
  */
 export function useVideoSyncControls() {
-  const {
-    activitySummary,
-    computeVideoSync,
-    importedVideoPath,
-    importedVideoTimeSource,
-    openManualVideoSync,
-    resetVideoCreationTime,
-    setVideoCreationTimeFromFilename,
-    setVideoSyncOffset,
-    setVideoSyncTimezoneMode,
-    setVideoSyncWarning,
-    videoSyncOffsetSeconds,
-    videoSyncTimezoneMode,
-    videoSyncWarning,
-  } = useStore(
+  const collection = useStore(
     useShallow((state) => ({
-      activitySummary: state.activitySummary,
-      computeVideoSync: state.computeVideoSync,
-      importedVideoPath: state.importedVideoPath,
-      importedVideoTimeSource: state.importedVideoTimeSource,
-      openManualVideoSync: state.openManualVideoSync,
-      resetVideoCreationTime: state.resetVideoCreationTime,
-      setVideoCreationTimeFromFilename: state.setVideoCreationTimeFromFilename,
-      setVideoSyncOffset: state.setVideoSyncOffset,
-      setVideoSyncTimezoneMode: state.setVideoSyncTimezoneMode,
-      setVideoSyncWarning: state.setVideoSyncWarning,
-      videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+      importedVideos: state.importedVideos,
+      videoEdits: state.videoEdits,
       videoSyncTimezoneMode: state.videoSyncTimezoneMode,
-      videoSyncWarning: state.videoSyncWarning,
+      parsedActivity: state.parsedActivity,
+      activitySummary: state.activitySummary,
     })),
   )
+  const commands = useStore(
+    useShallow((state) => ({
+      computeVideoSync: state.computeVideoSync,
+      openManualVideoSync: state.openManualVideoSync,
+      resetVideoCreationTimes: state.resetVideoCreationTimes,
+      setVideoCreationTimesFromFilenames: state.setVideoCreationTimesFromFilenames,
+      setVideoSyncTimezoneMode: state.setVideoSyncTimezoneMode,
+      shiftVideoOffsets: state.shiftVideoOffsets,
+    })),
+  )
+  const controls = useMemo(() => deriveVideoSyncControls(collection), [collection])
+  const { shiftVideoOffsets, ...actions } = commands
 
-  const timezone = useStore((state) => state.parsedActivity?.metadata?.timezone ?? null)
-
-  const [offsetInput, setOffsetInput] = useState(formatOffsetInput(videoSyncOffsetSeconds ?? 0))
-
-  useEffect(() => {
-    setOffsetInput(formatOffsetInput(videoSyncOffsetSeconds ?? 0))
-  }, [videoSyncOffsetSeconds])
-
-  const filenameCreationTimeAvailable = useMemo(() => parseVideoFilenameCreationTime(importedVideoPath) !== null, [importedVideoPath])
-
-  const submitOffsetInput = (val) => {
-    const parsed = timeToSeconds(val)
-    const rounded = Math.round(parsed * 10) / 10
+  /** Shifts every video so the earliest starts at `seconds`; returns the reason when that is rejected. */
+  const commitSharedOffset = (seconds) => {
     try {
-      setVideoSyncOffset(rounded)
+      shiftVideoOffsets(seconds - controls.sharedOffsetSeconds)
     } catch (error) {
-      setVideoSyncWarning(error.message)
-      setOffsetInput(formatOffsetInput(videoSyncOffsetSeconds ?? 0))
-      return
+      return error.message
     }
-    setOffsetInput(Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1))
+    return null
   }
 
-  const incrementOffset = (amount) => {
-    const current = timeToSeconds(offsetInput)
-    const newOffset = Math.round((current + amount) * 10) / 10
-    try {
-      setVideoSyncOffset(newOffset)
-    } catch (error) {
-      setVideoSyncWarning(error.message)
-      return
-    }
-    setOffsetInput(Number.isInteger(newOffset) ? newOffset.toString() : newOffset.toFixed(1))
-  }
-
-  return {
-    activitySummary,
-    canResetCreationTime: importedVideoTimeSource === 'filename',
-    filenameCreationTimeAvailable,
-    offsetInput,
-    timezone,
-    videoSyncTimezoneMode,
-    videoSyncWarning,
-    computeVideoSync,
-    incrementOffset,
-    openManualVideoSync,
-    resetVideoCreationTime,
-    setOffsetInput,
-    setVideoCreationTimeFromFilename,
-    setVideoSyncTimezoneMode,
-    submitOffsetInput,
-  }
+  return { ...controls, ...actions, commitSharedOffset }
 }

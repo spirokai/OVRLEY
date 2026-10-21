@@ -74,14 +74,14 @@ pub fn batch_video_plan(
             &self,
             _: &ovrley_core::paths::AppPaths,
             _: &ovrley_core::media::prepared_video::InspectedVideoSource,
-        ) -> CoreResult<ParsedActivity> {
+        ) -> CoreResult<Option<ParsedActivity>> {
             unreachable!("external activity")
         }
         fn execute(
             &self,
             _: &ovrley_core::paths::AppPaths,
             plan: PlannedVideoRender,
-            _: &ParsedActivity,
+            _: Option<&ParsedActivity>,
             _: &RendererReservation,
             target: &ovrley_core::output::RenderOutputTarget,
         ) -> CoreResult<String> {
@@ -93,6 +93,14 @@ pub fn batch_video_plan(
                 .to_str()
                 .unwrap()
                 .to_owned())
+        }
+        fn assemble(
+            &self,
+            _: &ovrley_core::paths::AppPaths,
+            _: &ovrley_core::encode::ffmpeg::assemble::OutputAssembly,
+            _: &RendererReservation,
+        ) -> CoreResult<()> {
+            unreachable!("single-piece output")
         }
     }
     assert_eq!(request.inspection_id, inspection_id);
@@ -134,16 +142,36 @@ pub fn video_batch_request(
         encoding,
         activity: BatchActivity::ExternalActivity {
             activity,
-            timezone_mode: VideoSyncTimezoneMode::Utc,
-            reference: None,
-            automatic_offsets: [(source.source_id.clone(), offset)].into(),
+            offsets: [(source.source_id.clone(), offset)].into(),
         },
-        output_directory: directory.to_str().unwrap().into(),
-        jobs: vec![BatchRenderJob {
+        destination: BatchDestination::SourceNamed {
+            directory: directory.to_str().unwrap().into(),
+        },
+        outputs: vec![BatchRenderOutput {
             id: "video".into(),
-            source_id: source.source_id.clone(),
-            skip_overlay,
+            pieces: vec![whole_source_piece(source, skip_overlay)],
+            transitions: Vec::new(),
         }],
+    }
+}
+
+/// The piece covering every frame of an inspected source.
+pub fn whole_source_piece(
+    source: &ovrley_core::media::prepared_video::InspectedVideoSource,
+    skip_overlay: bool,
+) -> ovrley_core::render_jobs::contracts::BatchRenderPiece {
+    let fps = ovrley_core::encode::fps::Fps::new(
+        source.metadata.fps_num.unwrap(),
+        source.metadata.fps_den.unwrap(),
+    )
+    .unwrap();
+    ovrley_core::render_jobs::contracts::BatchRenderPiece {
+        source_id: source.source_id.clone(),
+        start_frame: 0,
+        end_frame: fps
+            .frame_count_for_duration(source.metadata.duration.unwrap())
+            .unwrap(),
+        skip_overlay,
     }
 }
 
@@ -290,4 +318,14 @@ pub fn minimal_trimmed_activity(times: Vec<f64>) -> TrimmedActivity {
         lap_durations_seconds: vec![],
         lap_durations_best_so_far_seconds: vec![],
     }
+}
+
+/// Hard cuts between `pieces` consecutive pieces.
+pub fn hard_cuts(pieces: usize) -> Vec<ovrley_core::render_jobs::contracts::BatchTransition> {
+    (1..pieces)
+        .map(|_| ovrley_core::render_jobs::contracts::BatchTransition {
+            transition_type: "none".into(),
+            duration_seconds: 0.0,
+        })
+        .collect()
 }

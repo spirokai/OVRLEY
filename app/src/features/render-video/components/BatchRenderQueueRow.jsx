@@ -1,22 +1,13 @@
 import { memo } from 'react'
-import { CalendarDays, Clock, Loader2, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { CalendarDays, Clock, Loader2 } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
 import { formatFps, formatTime } from '../utils/codecUtils'
 import { formatProgressPercent } from '../utils/renderPresentation'
 import { useTranslation } from 'react-i18next'
 
-/** @param {object} props Queue item, active progress, display mode, and queue actions. @returns {JSX.Element} One presentational queue row. */
-function BatchRenderQueueRow({
-  item,
-  isActive,
-  batchRunning,
-  showBatchProgress,
-  currentItemProgress,
-  setBatchItemSkipOverlay,
-  removeBatchQueueItem,
-}) {
+/** @param {object} props Queue item, active progress, display mode, and the overlay toggle. @returns {JSX.Element} One presentational queue row. */
+function BatchRenderQueueRow({ item, isActive, batchRunning, showBatchProgress, currentItemProgress, setBatchItemSkipOverlay }) {
   const { t } = useTranslation()
   const isBlocked = item.status === 'blocked'
   const isDone = item.status === 'succeeded'
@@ -27,7 +18,7 @@ function BatchRenderQueueRow({
   return (
     <div
       key={item.id}
-      className={`grid ${showBatchProgress ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_4.5rem_1.75rem]'} items-center gap-3 rounded-sm px-2 py-2 ${isBlocked ? (showBatchProgress ? 'opacity-50' : '[&>*:not(:last-child)]:opacity-50') : 'hover:bg-surface-elevated'}`}
+      className={`grid ${showBatchProgress ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_4.5rem]'} items-center gap-3 rounded-sm px-2 py-2 ${isBlocked ? (showBatchProgress ? 'opacity-50' : '[&>*:not(:last-child)]:opacity-50') : 'hover:bg-surface-elevated'}`}
     >
       <div className="min-w-0">
         <div className="flex items-center justify-between gap-3">
@@ -116,16 +107,6 @@ function BatchRenderQueueRow({
               />
             )}
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground enabled:hover:text-primary disabled:hover:bg-transparent"
-            onClick={() => removeBatchQueueItem(item.id)}
-            disabled={batchRunning}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
         </>
       )}
     </div>

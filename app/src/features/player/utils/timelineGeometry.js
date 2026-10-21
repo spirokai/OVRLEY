@@ -93,60 +93,53 @@ export function clampExportRangeMarkerSecond({ marker, second, fromSecond, toSec
 }
 
 /**
+ * Snaps a proposed clip shift so that one moving clip edge lands on a fixed edge.
+ *
+ * The threshold is expressed in pixels, matching react-moveable's default
+ * snapThreshold, and converted to timeline seconds for the current viewport.
+ *
+ * @param {{ proposedDelta: number, movingEdges: number[], fixedEdges: number[], viewStart: number, viewEnd: number, widthPx: number, thresholdPx?: number }} options Snap inputs.
+ * @returns {{ delta: number, guidelineSecond: number|null }} Snapped shift and active guideline.
+ */
+export function snapClipDelta({ proposedDelta, movingEdges, fixedEdges, viewStart, viewEnd, widthPx, thresholdPx = SNAP_THRESHOLD_PX }) {
+  const span = viewEnd - viewStart
+  const thresholdSeconds = span > 0 && widthPx > 0 ? (thresholdPx / widthPx) * span : 0
+
+  let bestDistance = Infinity
+  let delta = proposedDelta
+  let guidelineSecond = null
+
+  for (const movingEdge of movingEdges) {
+    for (const fixedEdge of fixedEdges) {
+      const candidate = fixedEdge - movingEdge
+      const distance = Math.abs(proposedDelta - candidate)
+      if (distance <= thresholdSeconds && distance < bestDistance) {
+        bestDistance = distance
+        delta = candidate
+        guidelineSecond = fixedEdge
+      }
+    }
+  }
+
+  return { delta, guidelineSecond }
+}
+
+/**
+ * Returns the imported video addressed by a timeline lane, or null for the activity lane.
+ *
+ * @param {string} laneId Timeline lane id: `activity` or `video:<videoId>`.
+ * @returns {string|null} Video id.
+ */
+export function videoIdFromLaneId(laneId) {
+  return laneId === 'activity' ? null : laneId.slice('video:'.length)
+}
+
+/**
  * Computes the clip-local overlay used to highlight the active export range.
  *
  * @param {{ startSecond: number, durationSeconds: number, exportFromSecond: number, exportToSecond: number }} options
  * @returns {{ isVisible: boolean, leftPercent: number, widthPercent: number }}
  */
-/**
- * Snaps a proposed sync offset to alignment points between two clips.
- *
- * Candidates: video‑start → activity‑start (0), video‑start → activity‑end,
- * video‑end → activity‑start, video‑end → activity‑end.
- *
- * The threshold is expressed in pixels, matching react-moveable's default
- * snapThreshold, and converted to timeline seconds for the current viewport.
- *
- * @param {{ proposedOffset: number, activityDuration: number, videoDuration: number, viewStart: number, viewEnd: number, widthPx: number, thresholdPx?: number }} options Snap inputs.
- * @returns {{ offset: number, guidelineSecond: number|null }} Snapped offset and active guideline.
- */
-export function snapClipOffset({ proposedOffset, activityDuration, videoDuration, viewStart, viewEnd, widthPx, thresholdPx = SNAP_THRESHOLD_PX }) {
-  const candidates = [
-    { guidelineSecond: 0, value: 0 },
-    { guidelineSecond: activityDuration, value: activityDuration },
-    { guidelineSecond: 0, value: -videoDuration },
-    { guidelineSecond: activityDuration, value: activityDuration - videoDuration },
-  ]
-  const span = viewEnd - viewStart
-  const thresholdSeconds = span > 0 && widthPx > 0 ? (thresholdPx / widthPx) * span : 0
-
-  let bestDelta = Infinity
-  let bestValue = proposedOffset
-  let guidelineSecond = null
-
-  for (const candidate of candidates) {
-    const delta = Math.abs(proposedOffset - candidate.value)
-    if (delta <= thresholdSeconds && delta < bestDelta) {
-      bestDelta = delta
-      bestValue = candidate.value
-      guidelineSecond = candidate.guidelineSecond
-    }
-  }
-
-  return { guidelineSecond, offset: bestValue }
-}
-
-/**
- * Converts horizontal clip movement into the canonical video sync offset.
- *
- * @param {{ currentOffset: number, deltaSeconds: number, laneId: string }} options Movement inputs.
- * @returns {number} Video sync offset after applying lane-relative movement.
- */
-export function moveClipOffset({ currentOffset, deltaSeconds, laneId }) {
-  const direction = laneId === 'activity' ? -1 : 1
-  return currentOffset + direction * deltaSeconds
-}
-
 export function getExportRangeHighlightGeometry({ startSecond, durationSeconds, exportFromSecond, exportToSecond }) {
   if (durationSeconds <= 0) return { isVisible: false, leftPercent: 0, widthPercent: 0 }
 

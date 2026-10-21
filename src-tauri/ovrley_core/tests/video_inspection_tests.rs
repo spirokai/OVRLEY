@@ -10,10 +10,13 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, UNIX_EPOCH};
 
 use ovrley_core::error::CoreResult;
-use ovrley_core::media::prepared_video::check_source_freshness;
+use ovrley_core::media::prepared_video::{check_source_freshness, InspectedVideoSource};
 use ovrley_core::media::SourceVideoMetadata;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::contracts::{BatchEncodingSettings, BatchExportMode};
+use ovrley_core::render_jobs::contracts::{
+    BatchDestination, BatchEncodingSettings, BatchExportMode, BatchOutputSelection,
+    BatchRenderOutput,
+};
 use ovrley_core::render_jobs::inspection::{
     InspectionSourceSelection, InspectionValidation, ReinspectionReason, SourceMetadataProbe,
     VideoInspectionService,
@@ -49,10 +52,17 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
     let source = service
         .inspect_source(&directory.paths(), &session.inspection_id, &path)
         .unwrap();
-    let mut selection = InspectionSourceSelection {
+    let output = |id: &str, source: &InspectedVideoSource| BatchRenderOutput {
+        id: id.into(),
+        pieces: vec![common::builders::whole_source_piece(source, false)],
+        transitions: Vec::new(),
+    };
+    let mut selection = BatchOutputSelection {
         inspection_id: session.inspection_id.clone(),
-        source_ids: vec![source.source_id],
-        calibration_source_id: None,
+        outputs: vec![output("ride", &source)],
+        destination: BatchDestination::SourceNamed {
+            directory: directory.0.to_str().unwrap().into(),
+        },
     };
     for (mode, filename, frames, rate) in [
         (
@@ -70,8 +80,7 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
     ] {
         let existing = directory.0.join(filename);
         fs::write(&existing, b"previous completed output").unwrap();
-        let response =
-            plan_batch_configuration(&service, &selection, &encoding(mode), &directory.0).unwrap();
+        let response = plan_batch_configuration(&service, &selection, &encoding(mode)).unwrap();
         let BatchPlanningResponse::Planned { plans } = response else {
             panic!("fresh plan")
         };
@@ -84,30 +93,68 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
         );
         assert_eq!(fs::read(existing).unwrap(), b"previous completed output");
     }
-    let duplicate = directory.source("queue/ride.朝 morning.mov");
-    selection.source_ids.push(
-        service
-            .inspect_source(&directory.paths(), &session.inspection_id, &duplicate)
+    // A piece plans only its own window of the source.
+    selection.outputs[0].pieces[0].start_frame = 60;
+    selection.outputs[0].pieces[0].end_frame = 300;
+    let BatchPlanningResponse::Planned { plans } =
+        plan_batch_configuration(&service, &selection, &encoding(BatchExportMode::Composite))
             .unwrap()
-            .source_id,
+    else {
+        panic!("fresh plan")
+    };
+    assert_eq!(plans[0].output_id, "ride");
+    assert_eq!(plans[0].planned_frames, 240);
+    assert!((plans[0].output_duration_seconds - 240.0 * 1001.0 / 30000.0).abs() < 1e-9);
+    for (start_frame, end_frame) in [(300, 300), (300, 60), (0, 601)] {
+        let mut invalid = selection.clone();
+        invalid.outputs[0].pieces[0].start_frame = start_frame;
+        invalid.outputs[0].pieces[0].end_frame = end_frame;
+        assert!(plan_batch_configuration(
+            &service,
+            &invalid,
+            &encoding(BatchExportMode::Composite),
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("must lie within the 600 frames"));
+    }
+    // An output joins its pieces: frames and durations add up.
+    let mut joined = selection.clone();
+    let mut later = joined.outputs[0].pieces[0].clone();
+    (later.start_frame, later.end_frame) = (400, 600);
+    joined.outputs[0].pieces.push(later);
+    joined.outputs[0].transitions = common::builders::hard_cuts(2);
+    let BatchPlanningResponse::Planned { plans } =
+        plan_batch_configuration(&service, &joined, &encoding(BatchExportMode::Composite)).unwrap()
+    else {
+        panic!("fresh plan")
+    };
+    assert_eq!(plans[0].planned_frames, 440);
+    assert_eq!(plans[0].output_frames, 440);
+    // [60, 300) plus [400, 600), which ends where the 20 s source ends.
+    assert!((plans[0].output_duration_seconds - 20.0 + 160.0 * 1001.0 / 30000.0).abs() < 1e-9);
+    let mut empty = selection.clone();
+    empty.outputs[0].pieces.clear();
+    assert!(
+        plan_batch_configuration(&service, &empty, &encoding(BatchExportMode::Composite))
+            .unwrap_err()
+            .to_string()
+            .contains("at least one piece")
     );
-    let error = plan_batch_configuration(
-        &service,
-        &selection,
-        &encoding(BatchExportMode::Composite),
-        &directory.0,
-    )
-    .unwrap_err();
+    selection.outputs[0] = output("ride", &source);
+    let duplicate = directory.source("queue/ride.朝 morning.mov");
+    let duplicate = service
+        .inspect_source(&directory.paths(), &session.inspection_id, &duplicate)
+        .unwrap();
+    selection.outputs.push(output("ride-mov", &duplicate));
+    let error =
+        plan_batch_configuration(&service, &selection, &encoding(BatchExportMode::Composite))
+            .unwrap_err();
     assert!(error.to_string().contains("conflicting destinations"));
     service.dispose_session(&session.inspection_id);
     assert!(matches!(
-        plan_batch_configuration(
-            &service,
-            &selection,
-            &encoding(BatchExportMode::Composite),
-            &directory.0
-        )
-        .unwrap(),
+        plan_batch_configuration(&service, &selection, &encoding(BatchExportMode::Composite),)
+            .unwrap(),
         BatchPlanningResponse::Rejected(_)
     ));
 }
@@ -126,7 +173,7 @@ impl SourceMetadataProbe for SmallMetadataProbe {
 }
 
 #[test]
-fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
+fn video_plans_sample_the_video_clock_and_show_only_rasters_in_padding() {
     use ovrley_core::debug::RenderProfiler;
     use ovrley_core::render::{prepare_preview_assets, FrameSize, VideoFrameRenderer};
     let directory = SourcesDirectory::new();
@@ -200,7 +247,8 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
             assert!(suppressed.config().backdrops.is_empty());
             let dense = suppressed.prepare_activity(&activity).unwrap();
             let (assets, _, _, _) =
-                prepare_preview_assets(&paths, suppressed.config(), &activity, &dense).unwrap();
+                prepare_preview_assets(&paths, suppressed.config(), Some(&activity), &dense)
+                    .unwrap();
             let frame_size = FrameSize {
                 width: 32,
                 height: 64,
@@ -236,7 +284,35 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
                 "reused buffers cannot leak art into padding"
             );
         }
-        assert!(prepare(120.0, true).is_err());
+        // A video starting at the activity end covers no frames and renders rasters only
+        // (transparent here: the suppressed template has no rasters).
+        let outside = prepare(120.0, false).unwrap();
+        let coverage = match outside.mode() {
+            VideoRenderModePlan::Transparent(render) => &render.coverage,
+            VideoRenderModePlan::Composite { render, .. } => &render.coverage,
+        };
+        assert_eq!(coverage.frame_count, 0);
+        let dense = outside.prepare_activity(&activity).unwrap();
+        assert_eq!(dense.frame_count, 0);
+        let (assets, _, _, _) =
+            prepare_preview_assets(&paths, outside.config(), Some(&activity), &dense).unwrap();
+        let frame_size = FrameSize {
+            width: 32,
+            height: 64,
+        };
+        let renderer = VideoFrameRenderer::new(
+            &paths,
+            &dense,
+            &assets,
+            frame_size,
+            coverage.blank_leading_frame_count,
+        )
+        .unwrap();
+        let mut pixels = vec![255; frame_size.rgba_len().unwrap()];
+        renderer
+            .render_rgba(0, &mut pixels, &mut RenderProfiler::default())
+            .unwrap();
+        assert!(pixels.iter().all(|byte| *byte == 0));
     }
     assert_eq!(serde_json::to_value(&activity).unwrap(), original_activity);
     assert_eq!(serde_json::to_value(&template).unwrap(), original_template);
@@ -327,8 +403,7 @@ fn accepted_sources_survive_disposal_but_closed_and_foreign_sessions_reject() {
     assert_eq!(queued.metadata.fps, Some(30000.0 / 1001.0));
     let mut selection = InspectionSourceSelection {
         inspection_id: session.inspection_id.clone(),
-        source_ids: vec![queued.source_id.clone()],
-        calibration_source_id: Some(reference.source_id.clone()),
+        source_ids: vec![queued.source_id.clone(), reference.source_id.clone()],
     };
     let accepted = match service.validate_sources(&selection) {
         InspectionValidation::Valid(accepted) => accepted,
@@ -336,16 +411,25 @@ fn accepted_sources_survive_disposal_but_closed_and_foreign_sessions_reject() {
     };
     service.dispose_session(&session.inspection_id);
     assert_eq!(accepted.sources()[0].as_ref(), &queued);
-    assert_eq!(accepted.calibration_source(), Some(&reference));
+    assert_eq!(accepted.sources()[1].as_ref(), &reference);
     check_source_freshness(&accepted.sources()[0]).unwrap();
+    let outputs = BatchOutputSelection {
+        inspection_id: selection.inspection_id.clone(),
+        outputs: [&queued, &reference]
+            .into_iter()
+            .map(|source| BatchRenderOutput {
+                id: source.source_id.clone(),
+                pieces: vec![common::builders::whole_source_piece(source, false)],
+                transitions: Vec::new(),
+            })
+            .collect(),
+        destination: BatchDestination::SourceNamed {
+            directory: directory.0.to_str().unwrap().into(),
+        },
+    };
     let response = serde_json::to_value(
-        plan_batch_configuration(
-            &service,
-            &selection,
-            &encoding(BatchExportMode::Composite),
-            &directory.0,
-        )
-        .unwrap(),
+        plan_batch_configuration(&service, &outputs, &encoding(BatchExportMode::Composite))
+            .unwrap(),
     )
     .unwrap();
     assert_eq!(response["status"], "rejected");
@@ -365,7 +449,7 @@ fn accepted_sources_survive_disposal_but_closed_and_foreign_sessions_reject() {
 }
 
 #[test]
-fn submission_requires_reinspection_of_changed_queue_and_calibration_files() {
+fn submission_requires_reinspection_of_every_changed_queued_file() {
     let directory = SourcesDirectory::new();
     let queue_path = directory.source("queue/clip.mp4");
     let reference_path = directory.source("outside/reference.mp4");
@@ -378,15 +462,13 @@ fn submission_requires_reinspection_of_changed_queue_and_calibration_files() {
                 .inspect_source(&directory.paths(), &session.inspection_id, &queue_path)
                 .unwrap()
                 .source_id,
-        ],
-        calibration_source_id: Some(
             service
                 .inspect_source(&directory.paths(), &session.inspection_id, &reference_path)
                 .unwrap()
                 .source_id,
-        ),
+        ],
     };
-    // Same-size edits must be caught by mtime; reference edits must also block.
+    // Same-size edits must be caught by mtime; content edits of another file must also block.
     fs::File::options()
         .write(true)
         .open(&queue_path)
@@ -402,23 +484,18 @@ fn submission_requires_reinspection_of_changed_queue_and_calibration_files() {
                 .iter()
                 .all(|issue| issue.reason == ReinspectionReason::SourceChanged));
             assert_eq!(rejection.issues[0].source_id, selection.source_ids[0]);
-            assert_eq!(
-                rejection.issues[1].source_id,
-                selection.calibration_source_id.as_ref().unwrap().as_str()
-            );
+            assert_eq!(rejection.issues[1].source_id, selection.source_ids[1]);
         }
-        _ => panic!("stale queue or calibration must prevent acceptance"),
+        _ => panic!("stale queued files must prevent acceptance"),
     }
     selection.source_ids[0] = service
         .inspect_source(&directory.paths(), &session.inspection_id, &queue_path)
         .unwrap()
         .source_id;
-    selection.calibration_source_id = Some(
-        service
-            .inspect_source(&directory.paths(), &session.inspection_id, &reference_path)
-            .unwrap()
-            .source_id,
-    );
+    selection.source_ids[1] = service
+        .inspect_source(&directory.paths(), &session.inspection_id, &reference_path)
+        .unwrap()
+        .source_id;
     assert!(matches!(
         service.validate_sources(&selection),
         InspectionValidation::Valid(_)

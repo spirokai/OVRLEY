@@ -1,24 +1,12 @@
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import i18next from 'i18next'
-import { resolveBatchVideoTiming } from '@/lib/video-sync'
 import { formatClockDuration } from '@/lib/time-format'
 import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { captureBatchSync } from './renderRequest'
 
-/** @param {number} durationSeconds Imported video duration. @param {number} offsetSeconds Committed activity offset. @returns {object} Activity-timeline export range. */
-export function getImportedVideoExportRange(durationSeconds, offsetSeconds) {
-  return { type: 'custom', from: offsetSeconds, to: offsetSeconds + durationSeconds }
-}
-
-/** @param {string} value Editable range time. @returns {string} Whole-second input preserving its optional negative sign. */
-export function sanitizeRangeTimeInput(value) {
-  const input = value.trim()
-  const sign = input.startsWith('-') ? '-' : ''
-  const sanitized = input
-    .split(':')
-    .map((part) => part.split(/[.,]/)[0].replace(/\D/g, ''))
-    .join(':')
-  return `${sign}${sanitized}`
+/** @param {{startSecond: number, endSecond: number}} videoBounds Committed interval covered by videos. @returns {object} Activity-timeline export range. */
+export function getImportedVideoExportRange(videoBounds) {
+  return { type: 'custom', from: videoBounds.startSecond, to: videoBounds.endSecond }
 }
 
 /** @param {'transparent'|'composite'} exportMode Render mode. @returns {string} Native container extension. */
@@ -117,37 +105,59 @@ export function reviewBatchSync(inputs) {
   }
 }
 
-/** @param {object[]} choices User queue. @param {object|null} inspection Current descriptors. @param {object} sync Automatic synchronization context. @param {string} locale Display language. @returns {object[]} Reviewed rows. */
-export function reviewBatchQueue(choices, inspection, sync, locale) {
-  return choices.map((item) => {
+// Camera timestamps are external data; an unreadable one only hides the date.
+function formatCreationLabels(clip, sync, locale) {
+  try {
+    const [creationDateLabel, creationTimeLabel] = formatVideoCreationTime(
+      clip.creationTime,
+      clip.timeSource,
+      sync.activitySummary?.timezone ?? null,
+      sync.timezoneMode,
+      locale,
+    ).split(/(?=\d{2}:\d{2}:\d{2}$)/)
+    return { creationDateLabel: creationDateLabel.trimEnd(), creationTimeLabel }
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error
+    return { creationDateLabel: null, creationTimeLabel: null }
+  }
+}
+
+/**
+ * Reviews every imported video for separate-file export. A video renders at its
+ * committed timeline offset; frames outside the activity show raster widgets only.
+ * @param {object[]} clips Timeline clips in timeline order.
+ * @param {Map<string, Array<object>>} piecesByVideo Program pieces of each video after the export range.
+ * @param {Object<string, boolean>} skipOverlay Video IDs that render without activity widgets.
+ * @param {object|null} inspection Current native descriptors keyed by path.
+ * @param {object} sync Activity summary and display timezone mode.
+ * @param {string} locale Display language.
+ * @returns {object[]} Reviewed rows keyed by video ID.
+ */
+export function reviewBatchQueue(clips, piecesByVideo, skipOverlay, inspection, sync, locale) {
+  return clips.map((clip) => {
+    const item = {
+      id: clip.id,
+      path: clip.path,
+      filename: clip.path.split(/[/\\]/).at(-1),
+      offsetSeconds: clip.offsetSeconds,
+      pieces: piecesByVideo.get(clip.id) ?? [],
+      skipOverlay: skipOverlay[clip.id] === true,
+    }
+    if (item.pieces.length === 0)
+      return { ...item, status: 'blocked', error: i18next.getFixedT(locale)('render-video.outsideExportRange', 'Outside the export range') }
     if (inspection?.error && inspection.error.message !== 'reinspectionRequired')
       return { ...item, status: 'blocked', error: formatRenderPathError(inspection.error, i18next.getFixedT(locale)) }
-    const result = inspection?.sources.get(item.path)
+    const result = inspection?.sources.get(clip.path)
     if (!result) return { ...item, status: 'checking', error: null }
     if (result.error || sync.error)
       return { ...item, status: 'blocked', error: formatRenderPathError(result.error ?? sync.error, i18next.getFixedT(locale)) }
-    const { metadata } = result.source
-    const inspectedItem = { ...item, source: result.source, durationLabel: formatClockDuration(metadata.duration) }
-    try {
-      const [creationDateLabel, creationTimeLabel] = formatVideoCreationTime(
-        metadata.creationTime,
-        metadata.timeSource,
-        sync.activitySummary?.timezone ?? null,
-        sync.timezoneMode,
-        locale,
-      ).split(/(?=\d{2}:\d{2}:\d{2}$)/)
-      inspectedItem.creationDateLabel = creationDateLabel.trimEnd()
-      inspectedItem.creationTimeLabel = creationTimeLabel
-      const { timing, hasPositiveOverlap } = resolveBatchVideoTiming(metadata, sync.activitySummary, sync.timezoneMode)
-      return {
-        ...inspectedItem,
-        timing,
-        status: hasPositiveOverlap === false ? 'blocked' : 'pending',
-        error: hasPositiveOverlap === false ? i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity') : null,
-      }
-    } catch (error) {
-      return { ...inspectedItem, status: 'blocked', error: error.message }
+    const inspectedItem = {
+      ...item,
+      source: result.source,
+      durationLabel: formatClockDuration(clip.durationSeconds),
+      ...formatCreationLabels(clip, sync, locale),
     }
+    return { ...inspectedItem, status: 'pending', error: null }
   })
 }
 
@@ -184,7 +194,9 @@ export function getRenderSummaryItems(ctx, t) {
     (option) => option.value === ctx.selectedAccelerationValue && option.available && option.value !== 'cpu',
   )?.label
   const durationSeconds = isCompositeExport
-    ? ctx.importedVideoDuration
+    ? ctx.videoBounds === null
+      ? null
+      : ctx.videoBounds.endSecond - ctx.videoBounds.startSecond
     : ctx.settings.range?.type === 'custom'
       ? ctx.settings.range.to - ctx.settings.range.from
       : ctx.config?.scene?.start !== undefined && ctx.config?.scene?.end !== undefined

@@ -4,6 +4,7 @@ import { createPathLocator } from '@/features/projects/utils/projectPaths'
 import { VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
 import { createRenderEffectiveConfig } from '@/features/render-video/utils/renderConfig'
 import useStore from '@/store/useStore'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 describe('project snapshot contract', () => {
   test('projects only sources and project-owned settings', () => {
@@ -11,15 +12,12 @@ describe('project snapshot contract', () => {
     useStore.setState((state) => ({
       loadedTemplateSource: { kind: 'file', path: 'C:\\Events\\templates\\race.json' },
       activitySource: { kind: 'file', path: 'C:\\Events\\media\\ride.fit' },
-      importedVideoPath: 'D:\\video\\lap.mp4',
+      ...videoStoreState([createTestVideo({ id: 'runtime-video', path: 'D:\\video\\lap.mp4', durationSeconds: 100 })], { 'runtime-video': 7.5 }),
       parsedActivity: { samples: [1, 2, 3] },
       activitySummary: { durationSeconds: 100 },
-      importedVideoImportId: 'runtime-id',
-      importedVideoPreviewUrl: 'http://127.0.0.1/runtime-id',
-      importedVideoDuration: 100,
       renderSettings: {
         ...state.renderSettings,
-        renderTarget: 'batch',
+        outputMode: 'separate',
         fps: 60,
         codec: 'h264_nvenc',
         qualityType: 'bitrate',
@@ -28,9 +26,8 @@ describe('project snapshot contract', () => {
       selectedSecond: 12.5,
       timelineViewport: { viewStart: 10, viewEnd: 30 },
     }))
-    useStore.getState().setBatchVideoFolder('C:\\Events\\batch-videos')
     useStore.getState().setBatchOutputFolder('C:\\Events\\batch-renders')
-    useStore.getState().setBatchQueueFromPaths(['C:\\Events\\batch-videos\\blocked.mp4'])
+    useStore.getState().setBatchItemSkipOverlay('runtime-video', true)
 
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
 
@@ -41,12 +38,23 @@ describe('project snapshot contract', () => {
     expect(project.editor.globalDefaults).toEqual(useStore.getState().globalDefaults)
     expect(project.sources).toEqual({
       activity: { path: { kind: 'project-relative', value: 'media/ride.fit' } },
-      video: { path: { kind: 'absolute', value: 'D:\\video\\lap.mp4' } },
+      videos: [
+        {
+          id: 'runtime-video',
+          path: { kind: 'absolute', value: 'D:\\video\\lap.mp4' },
+          offsetSeconds: 7.5,
+          offsetSource: 'auto',
+          deletedParts: [],
+          transitionIn: null,
+          placementAnchor: null,
+        },
+      ],
     })
+    expect(project.sync).not.toHaveProperty('videoOffsetSeconds')
+    expect(project.transitionDefaults).toEqual({ type: 'none', durationSeconds: 2, splitGapThresholdSeconds: 2 })
     expect(project.render.fps).toBe(60)
     expect(project.render).toMatchObject({
-      renderTarget: 'batch',
-      batchVideoFolder: 'C:\\Events\\batch-videos',
+      outputMode: 'separate',
       batchOutputFolder: 'C:\\Events\\batch-renders',
     })
     expect(project.render).toMatchObject({ qualityType: 'bitrate', qualityValue: 35 })
@@ -57,12 +65,16 @@ describe('project snapshot contract', () => {
     for (const forbidden of [
       'parsedActivity',
       'activitySummary',
-      'importedVideoImportId',
-      'importedVideoPreviewUrl',
-      'importedVideoDuration',
+      'importedVideos',
+      'videoEdits',
+      'http://127.0.0.1',
+      'frameCount',
+      'importOrder',
       'isVideoMuted',
       'selectedWidgetIds',
       'batchQueue',
+      'batchSkipOverlay',
+      'batchVideoFolder',
       'batchActiveItemId',
       'batchRunning',
       'skipOverlay',
@@ -75,6 +87,7 @@ describe('project snapshot contract', () => {
     const dirtyState = createProjectDirtyState(project)
     expect(dirtyState).not.toHaveProperty('savedAt')
     expect(dirtyState.content.editor).toEqual(project.editor)
+    expect(dirtyState.content.transitionDefaults).toEqual(project.transitionDefaults)
     expect(dirtyState.timeline).toEqual(project.timeline)
   })
 
@@ -96,12 +109,12 @@ describe('project snapshot contract', () => {
     const resourceId = 'session-image-resource'
     useStore.setState((state) => ({
       config: { ...state.config, rasters: [{ ...raster, resourceId }] },
-      importedVideoPath: 'C:\\Events\\video.mp4',
+      ...videoStoreState([createTestVideo({ path: 'C:\\Events\\video.mp4', durationSeconds: 30 })]),
       renderSettings: { ...state.renderSettings, codec: 'libx265', qualityType, qualityValue },
     }))
     const state = useStore.getState()
     const project = createProjectSnapshot(state, 'C:\\Events\\Race.oly')
-    expect(project.version).toBe(3)
+    expect(project.version).toBe(4)
     expect(project.editor.config.rasters).toEqual([raster])
     expect(project.rasterAssets).toEqual({})
     expect(project.render).toMatchObject({ qualityType, qualityValue })
@@ -119,12 +132,8 @@ describe('project snapshot contract', () => {
       codec: state.renderSettings.codec,
       qualityType,
       qualityValue,
-      importedVideoPath: state.importedVideoPath,
-      importedVideoDuration: 30,
-      importedVideoFpsNum: 30,
-      importedVideoFpsDen: 1,
-      importedVideoResolution: { width: 1920, height: 1080 },
-      videoSyncOffsetSeconds: 0,
+      video: state.importedVideos[0],
+      videoOffsetSeconds: state.videoEdits[state.importedVideos[0].id].offsetSeconds,
       timelineStart: 0,
       timelineEnd: 30,
     })
@@ -159,11 +168,11 @@ describe('project snapshot contract', () => {
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
 
     expect(useStore.getState().renderSettings.exportMode).toBe('composite')
-    expect(project.sources.video).toBeNull()
+    expect(project.sources.videos).toEqual([])
     expect(project.render.exportMode).toBe('transparent')
-    useStore.getState().setRenderTarget('batch')
+    useStore.getState().setOutputMode('separate')
     const batchProject = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
-    expect(batchProject.render.renderTarget).toBe('batch')
+    expect(batchProject.render.outputMode).toBe('separate')
     expect(batchProject.render.exportMode).toBe('composite')
   })
 
@@ -171,9 +180,10 @@ describe('project snapshot contract', () => {
     useStore.setState(useStore.getInitialState(), true)
     useStore.setState({
       activitySource: { kind: 'file', path: 'C:\\Events\\ride.fit' },
-      importedVideoPath: 'C:\\Events\\video.mp4',
+      ...videoStoreState([createTestVideo({ path: 'C:\\Events\\video.mp4', durationSeconds: 30 })]),
     })
     useStore.getState().hydrateVideoSyncState({
+      videoId: 'video-1',
       landmarks: [
         { id: 'stop-1', type: 'stop', videoSecond: 4 },
         { id: 'left-1', type: 'leftTurn', videoSecond: 8 },
@@ -188,8 +198,9 @@ describe('project snapshot contract', () => {
 
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
 
-    expect(project.version).toBe(3)
+    expect(project.version).toBe(4)
     expect(project.sync.manual).toEqual({
+      videoId: 'video-1',
       landmarks: [
         { id: 'stop-1', type: 'stop', videoSecond: 4 },
         { id: 'left-1', type: 'leftTurn', videoSecond: 8 },
@@ -200,5 +211,49 @@ describe('project snapshot contract', () => {
       turnThresholdDegrees: 120,
     })
     expect(JSON.stringify(project)).not.toContain('manualVideoSyncResults')
+  })
+
+  test('saves every video in import order with its edits and the transition defaults', () => {
+    useStore.setState(useStore.getInitialState(), true)
+    const later = createTestVideo({ id: 'video-2', path: 'C:\\Events\\clips\\b.mp4', importOrder: 1 })
+    const earlier = createTestVideo({ id: 'video-1', path: 'D:\\a.mp4' })
+    const deletedPart = { id: 'cut-1', fromSecond: 5, toSecond: 10, transition: { type: 'dissolve', durationSeconds: 1.5 } }
+    useStore.setState({
+      importedVideos: [later, earlier],
+      videoEdits: {
+        'video-1': { offsetSeconds: -12.5, deletedParts: [], transitionIn: null, placementAnchor: null },
+        'video-2': {
+          offsetSeconds: 70,
+          deletedParts: [deletedPart],
+          transitionIn: { type: 'none', durationSeconds: 0 },
+          placementAnchor: { videoId: 'video-1', side: 'after' },
+        },
+      },
+      transitionDefaults: { type: 'none', durationSeconds: 3, splitGapThresholdSeconds: 0.5 },
+    })
+
+    const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
+
+    expect(project.sources.videos).toEqual([
+      {
+        id: 'video-1',
+        path: { kind: 'absolute', value: 'D:\\a.mp4' },
+        offsetSeconds: -12.5,
+        deletedParts: [],
+        transitionIn: null,
+        placementAnchor: null,
+      },
+      {
+        id: 'video-2',
+        path: { kind: 'project-relative', value: 'clips/b.mp4' },
+        offsetSeconds: 70,
+        deletedParts: [deletedPart],
+        transitionIn: { type: 'none', durationSeconds: 0 },
+        placementAnchor: { videoId: 'video-1', side: 'after' },
+      },
+    ])
+    expect(project.sources.videos[1].deletedParts[0]).not.toBe(deletedPart)
+    expect(project.transitionDefaults).toEqual({ type: 'none', durationSeconds: 3, splitGapThresholdSeconds: 0.5 })
+    expect(project.render.exportMode).toBe('composite')
   })
 })

@@ -8,6 +8,25 @@
  * store actions do not depend on hidden module state or timer windows.
  */
 
+import { getCourseWidgetDimensions } from '@/features/widget-editor/utils/widgetUtils'
+
+/**
+ * Fits course plots to the aspect ratio of an activity route.
+ * @param {*} state - Current store draft state.
+ * @param {Array<[number, number]>|undefined} coursePoints - Activity route points, when the activity has a route.
+ */
+export function applyCoursePlotDimensions(state, coursePoints) {
+  if (!coursePoints || !state.config?.plots) return
+  const dimensions = getCourseWidgetDimensions(coursePoints)
+  if (!dimensions) return
+  for (const plot of state.config.plots) {
+    if (plot.value === 'course') {
+      plot.width = dimensions.width
+      plot.height = dimensions.height
+    }
+  }
+}
+
 export const DEFAULT_CONFIG = {
   scene: {
     width: 1920,

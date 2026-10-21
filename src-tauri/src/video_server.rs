@@ -11,12 +11,16 @@
 //! Forbidden dependencies: `ovrley_core` (the core crate is not a dependency of
 //!       the Tauri shell — the Tauri shell wraps core, not vice versa).
 //!
+//! ## Video Registry
+//! Every imported preview video is registered under its own opaque import ID.
+//! Registering or removing one video never invalidates another video's URL.
+//!
 //! ## Thread Safety
 //! The preview server runs on four request-worker threads. Shared state
-//! (`VideoServerHandle.inner: Arc<Mutex<VideoServerInner>>`) is locked only on
-//! video-path changes and shutdown — the hot request-serving path locks neither
-//! a mutex nor the server handle. Each worker exits when the shared shutdown
-//! state is set.
+//! (`VideoServerHandle.inner: Arc<Mutex<VideoServerInner>>`) is locked briefly
+//! on registry changes, per video request to look up its registration, and on
+//! shutdown. File reads happen outside the lock. Each worker exits when the
+//! shared shutdown state is set.
 //!
 //! ## Request Handling
 //! Supports HTTP range requests (`bytes=start-end`, `bytes=start-`,
@@ -25,6 +29,7 @@
 //! out-of-bounds ranges, and 200 OK for full-file requests.
 
 use serde::Serialize;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
@@ -51,29 +56,35 @@ pub struct VideoServerHandle {
 
 struct VideoServerInner {
     port: Option<u16>,
-    current: Option<CurrentVideo>,
+    videos: HashMap<String, RegisteredVideo>,
     shutdown: bool,
     started: bool,
 }
 
 #[derive(Clone)]
-struct CurrentVideo {
-    import_id: String,
+struct RegisteredVideo {
     path: PathBuf,
     file_size: u64,
     content_type: String,
 }
 
-/// Serializable preview-video state returned to the frontend.
+/// Identity of one preview-video registration.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewVideoRegistration {
+    pub import_id: String,
+    pub preview_url: String,
+}
+
+/// Serializable diagnostic state of one registered preview video.
 ///
-/// The frontend polls this after importing a video to discover the local
-/// preview URL and confirm the file is accessible. `preview_url` uses a random
-/// loopback port assigned at server start.
+/// `preview_url` uses the random loopback port assigned at server start.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewVideoState {
     pub import_id: String,
     pub preview_url: String,
+    pub path: String,
     pub path_exists: bool,
     pub file_size: u64,
     pub content_type: String,
@@ -107,7 +118,7 @@ impl VideoServerHandle {
         Self {
             inner: Arc::new(Mutex::new(VideoServerInner {
                 port: None,
-                current: None,
+                videos: HashMap::new(),
                 shutdown: false,
                 started: false,
             })),
@@ -193,12 +204,16 @@ impl VideoServerHandle {
         self.inner.lock().ok()?.port
     }
 
-    /// Registers a video file as the only file the preview server may serve.
+    /// Registers a video file under a fresh opaque import ID.
     ///
-    /// This validates the path, records file size and content type, generates a
-    /// fresh opaque import ID, and returns the corresponding loopback preview
-    /// URL. Registering a new file immediately invalidates the previous URL.
-    pub fn set_video(&self, path: PathBuf, content_type: String) -> Result<String, String> {
+    /// This validates the path, records file size and content type, and returns
+    /// the import ID with its loopback preview URL. Existing registrations stay
+    /// valid; registering the same path twice yields two independent IDs.
+    pub fn register_video(
+        &self,
+        path: PathBuf,
+        content_type: String,
+    ) -> Result<PreviewVideoRegistration, String> {
         let metadata = std::fs::metadata(&path)
             .map_err(|error| format!("Failed to read video metadata: {error}"))?;
         if !metadata.is_file() {
@@ -206,50 +221,74 @@ impl VideoServerHandle {
         }
 
         let import_id = Uuid::new_v4().to_string();
-        let file_size = metadata.len();
-        let current = CurrentVideo {
-            import_id: import_id.clone(),
-            path,
-            file_size,
-            content_type,
-        };
+        let mut guard = self.inner.lock().map_err(|error| error.to_string())?;
+        let preview_url = video_url(guard.port, &import_id)?;
+        guard.videos.insert(
+            import_id.clone(),
+            RegisteredVideo {
+                path,
+                file_size: metadata.len(),
+                content_type,
+            },
+        );
 
-        {
-            let mut guard = self.inner.lock().map_err(|error| error.to_string())?;
-            guard.current = Some(current);
-        }
-
-        self.url_for_import(&import_id)
+        Ok(PreviewVideoRegistration {
+            import_id,
+            preview_url,
+        })
     }
 
-    /// Removes the current video registration.
+    /// Removes one video registration and returns the path it served.
     ///
-    /// After this succeeds, all `/video/<import_id>` requests return `404` until
-    /// another video is registered.
-    pub fn clear_video(&self) -> Result<(), String> {
+    /// Afterwards `/video/<import_id>` returns `404`; other registrations are
+    /// unaffected. Unknown IDs are an error so callers cannot silently lose track
+    /// of registrations they own.
+    pub fn remove_video(&self, import_id: &str) -> Result<PathBuf, String> {
         let mut guard = self.inner.lock().map_err(|error| error.to_string())?;
-        guard.current = None;
+        guard
+            .videos
+            .remove(import_id)
+            .map(|video| video.path)
+            .ok_or_else(|| format!("Unknown preview video import ID: {import_id}"))
+    }
+
+    /// Removes every video registration.
+    pub fn clear_videos(&self) -> Result<(), String> {
+        let mut guard = self.inner.lock().map_err(|error| error.to_string())?;
+        guard.videos.clear();
         Ok(())
     }
 
-    /// Returns diagnostic state for the current video registration.
+    /// Returns diagnostic state for every video registration, ordered by path
+    /// and then import ID.
     ///
-    /// The state includes a fresh URL reconstruction, source-file existence, and
-    /// static file metadata. It returns `None` when no video is registered or the
-    /// server port is not available.
-    pub fn current_state(&self) -> Option<PreviewVideoState> {
-        let current = {
-            let guard = self.inner.lock().ok()?;
-            guard.current.clone()?
+    /// Each entry includes a fresh URL reconstruction, source-file existence, and
+    /// static file metadata.
+    pub fn video_states(&self) -> Result<Vec<PreviewVideoState>, String> {
+        let (port, videos) = {
+            let guard = self.inner.lock().map_err(|error| error.to_string())?;
+            (guard.port, guard.videos.clone())
         };
 
-        Some(PreviewVideoState {
-            preview_url: self.url_for_import(&current.import_id).ok()?,
-            path_exists: current.path.is_file(),
-            import_id: current.import_id,
-            file_size: current.file_size,
-            content_type: current.content_type,
-        })
+        let mut states = videos
+            .into_iter()
+            .map(|(import_id, video)| {
+                Ok(PreviewVideoState {
+                    preview_url: video_url(port, &import_id)?,
+                    path_exists: video.path.is_file(),
+                    path: video.path.display().to_string(),
+                    import_id,
+                    file_size: video.file_size,
+                    content_type: video.content_type,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        states.sort_by(|left, right| {
+            left.path
+                .cmp(&right.path)
+                .then_with(|| left.import_id.cmp(&right.import_id))
+        });
+        Ok(states)
     }
 
     /// Builds the MapLibre URL template for cached OpenFreeMap styles.
@@ -275,17 +314,12 @@ impl VideoServerHandle {
             "http://127.0.0.1:{port}/tiles/{{z}}/{{x}}/{{y}}.pbf"
         ))
     }
+}
 
-    /// Builds the HTTP preview URL for an import ID using the bound server port.
-    fn url_for_import(&self, import_id: &str) -> Result<String, String> {
-        let port = self
-            .inner
-            .lock()
-            .map_err(|error| error.to_string())?
-            .port
-            .ok_or_else(|| "Video preview server is not running".to_string())?;
-        Ok(format!("http://127.0.0.1:{port}/video/{import_id}"))
-    }
+/// Builds the HTTP preview URL for an import ID using the bound server port.
+fn video_url(port: Option<u16>, import_id: &str) -> Result<String, String> {
+    let port = port.ok_or_else(|| "Video preview server is not running".to_string())?;
+    Ok(format!("http://127.0.0.1:{port}/video/{import_id}"))
 }
 
 /// Handles one tiny_http request and logs any response construction failure.
@@ -305,8 +339,8 @@ fn handle_request(
 /// Routes and validates an incoming HTTP request.
 ///
 /// Supports `/health`, `/styles/<style>`, `/tiles/<z>/<x>/<y>.pbf`, and `/video/<import_id>`.
-/// Video requests must match the current import ID and source file; stale IDs,
-/// missing files, and absent registrations all return `404`.
+/// Video requests must match a registered import ID whose source file still
+/// exists; unknown or removed IDs and missing files return `404`.
 fn respond_to_request(
     inner: &Arc<Mutex<VideoServerInner>>,
     map_tile_service: Option<&MapTileService>,
@@ -375,16 +409,16 @@ fn respond_to_request(
         return respond_empty(request, StatusCode(404), common_headers(None, None));
     };
 
-    let current = {
+    let video = {
         let guard = inner.lock().map_err(|error| error.to_string())?;
-        guard.current.clone()
+        guard.videos.get(import_id).cloned()
     };
 
-    let Some(current) = current else {
+    let Some(video) = video else {
         return respond_empty(request, StatusCode(404), common_headers(None, None));
     };
 
-    if current.import_id != import_id || !current.path.is_file() {
+    if !video.path.is_file() {
         return respond_empty(request, StatusCode(404), common_headers(None, None));
     }
 
@@ -395,13 +429,13 @@ fn respond_to_request(
         .map(|header| header.value.as_str().to_string());
     let is_head = method == Method::Head;
 
-    match parse_range(range_header.as_deref(), current.file_size) {
-        ParsedRange::Valid(range) => respond_video_range(request, current, range, is_head),
+    match parse_range(range_header.as_deref(), video.file_size) {
+        ParsedRange::Valid(range) => respond_video_range(request, video, range, is_head),
         ParsedRange::Unsatisfiable => {
-            let headers = common_headers(None, Some(format!("bytes */{}", current.file_size)));
+            let headers = common_headers(None, Some(format!("bytes */{}", video.file_size)));
             respond_empty(request, StatusCode(416), headers)
         }
-        ParsedRange::Ignore => respond_video_full(request, current, is_head),
+        ParsedRange::Ignore => respond_video_full(request, video, is_head),
     }
 }
 
@@ -438,28 +472,28 @@ fn respond_map_resource(
 /// after the shared state has already been cloned out of the mutex.
 fn respond_video_full(
     request: Request,
-    current: CurrentVideo,
+    video: RegisteredVideo,
     is_head: bool,
 ) -> Result<(), String> {
-    let mut headers = common_headers(Some(current.content_type), None);
-    headers.push(header("Content-Length", current.file_size.to_string())?);
+    let mut headers = common_headers(Some(video.content_type), None);
+    headers.push(header("Content-Length", video.file_size.to_string())?);
 
     if is_head {
         return respond_empty(request, StatusCode(200), headers);
     }
 
-    let file = File::open(&current.path).map_err(|error| {
+    let file = File::open(&video.path).map_err(|error| {
         format!(
             "Failed to open video file {}: {error}",
-            current.path.display()
+            video.path.display()
         )
     })?;
-    let reader = ChunkedRead::new(file.take(current.file_size));
+    let reader = ChunkedRead::new(file.take(video.file_size));
     let response = Response::new(
         StatusCode(200),
         headers,
         reader,
-        Some(current.file_size as usize),
+        Some(video.file_size as usize),
         None,
     )
     .with_chunked_threshold(usize::MAX);
@@ -473,16 +507,16 @@ fn respond_video_full(
 /// headers.
 fn respond_video_range(
     request: Request,
-    current: CurrentVideo,
+    video: RegisteredVideo,
     range: ByteRange,
     is_head: bool,
 ) -> Result<(), String> {
     let range_len = range.end - range.start + 1;
     let mut headers = common_headers(
-        Some(current.content_type),
+        Some(video.content_type),
         Some(format!(
             "bytes {}-{}/{}",
-            range.start, range.end, current.file_size
+            range.start, range.end, video.file_size
         )),
     );
     headers.push(header("Content-Length", range_len.to_string())?);
@@ -491,10 +525,10 @@ fn respond_video_range(
         return respond_empty(request, StatusCode(206), headers);
     }
 
-    let mut file = File::open(&current.path).map_err(|error| {
+    let mut file = File::open(&video.path).map_err(|error| {
         format!(
             "Failed to open video file {}: {error}",
-            current.path.display()
+            video.path.display()
         )
     })?;
     file.seek(SeekFrom::Start(range.start))

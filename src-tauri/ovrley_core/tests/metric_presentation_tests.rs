@@ -257,7 +257,7 @@ fn prepare_assets_distinct_caches_per_value_index() {
     };
     let mut profiler = RenderProfiler::default();
 
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&paths, &config, Some(&activity), &dense, &mut profiler).unwrap();
 
     let PreparedValue::HeadingTape(widget_0) = &assets.values()[0] else {
         panic!("index 0 must remain a heading tape")

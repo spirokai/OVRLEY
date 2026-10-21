@@ -15,20 +15,25 @@
 use crate::distribution::DistributionKind;
 use crate::preview_import::{content_type_for_path, preview_warnings_for_metadata};
 use crate::runtime_paths;
-use crate::video_server::VideoServerHandle;
+use crate::video_server::{PreviewVideoRegistration, VideoServerHandle};
 use crate::BackendState;
 use ovrley_core::activity::finalize::FinalizeActivityResponse;
 use ovrley_core::commands;
+use ovrley_core::encode::ffmpeg::transition_proxy::{
+    remove_transition_proxy, render_transition_proxy, TransitionProxyRequest,
+};
 use ovrley_core::error::{CoreError, RenderPathError};
 use ovrley_core::output::RenderOutputKind;
-use ovrley_core::render_jobs::inspection::InspectionSourceSelection;
 use ovrley_core::render_jobs::{
     batch::BatchServiceError,
-    contracts::{BatchAcceptance, BatchEncodingSettings, BatchRenderRequest, BatchSnapshot},
+    contracts::{
+        BatchAcceptance, BatchEncodingSettings, BatchOutputSelection, BatchRenderRequest,
+        BatchSnapshot,
+    },
     planning::plan_batch_configuration,
 };
 use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tauri::AppHandle;
 
 const WINDOWS_HEVC_EXTENSION_URL: &str = "https://apps.microsoft.com/detail/9nmzlz57r3t7";
@@ -361,7 +366,7 @@ pub(crate) async fn backend_cancel(
 /// Probes a video file with ffprobe and returns serialized metadata.
 ///
 /// This command is retained for diagnostics; the normal import path uses the
-/// same core probe through `backend_import_preview_video`.
+/// same core probe through `backend_prepare_preview_video`.
 #[tauri::command]
 pub(crate) async fn backend_probe_video(
     app: AppHandle,
@@ -401,18 +406,12 @@ pub(crate) async fn backend_inspect_video_source(
 #[tauri::command]
 pub(crate) async fn backend_plan_batch_outputs(
     state: tauri::State<'_, BackendState>,
-    selection: InspectionSourceSelection,
+    selection: BatchOutputSelection,
     encoding: BatchEncodingSettings,
-    output_directory: String,
 ) -> Result<String, BackendRenderError> {
     let service = state.video_inspection.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        plan_batch_configuration(
-            &service,
-            &selection,
-            &encoding,
-            Path::new(&output_directory),
-        )
+        plan_batch_configuration(&service, &selection, &encoding)
     })
     .await
     .map_err(|error| BackendRenderError::RenderError {
@@ -428,22 +427,6 @@ pub(crate) fn backend_dispose_video_inspection(
     inspection_id: String,
 ) {
     state.video_inspection.dispose_session(&inspection_id);
-}
-
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ImportPreviewVideoResponse {
-    import_id: String,
-    preview_url: String,
-    metadata: serde_json::Value,
-    warnings: Vec<String>,
-}
-
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct RegisterPreviewVideoResponse {
-    import_id: String,
-    preview_url: String,
 }
 
 #[derive(serde::Serialize)]
@@ -482,51 +465,22 @@ pub(crate) async fn backend_prepare_preview_video(
 fn register_preview_video(
     state: &VideoServerHandle,
     path: String,
-) -> Result<RegisterPreviewVideoResponse, String> {
-    let preview_url = state.set_video(PathBuf::from(&path), content_type_for_path(&path))?;
-    let import_id = preview_url
-        .rsplit('/')
-        .next()
-        .ok_or_else(|| "Failed to read import ID from preview URL".to_string())?
-        .to_string();
-    Ok(RegisterPreviewVideoResponse {
-        import_id,
-        preview_url,
-    })
+) -> Result<PreviewVideoRegistration, String> {
+    let content_type = content_type_for_path(&path);
+    state.register_video(PathBuf::from(path), content_type)
 }
 
 /// Registers an already-probed video with the preview server.
 ///
 /// Project loading probes sources in parallel before entering its commit
 /// phase. This command performs only the fast, fallible preview registration.
+/// Existing registrations stay valid.
 #[tauri::command]
 pub(crate) async fn backend_register_preview_video(
     state: tauri::State<'_, VideoServerHandle>,
     path: String,
 ) -> Result<String, String> {
     serialize_command_result(&register_preview_video(&state, path)?)
-}
-
-/// Imports a local video into the HTTP preview server and returns preview state.
-///
-/// The original filesystem path remains the source of truth for export. The
-/// returned `preview_url` is only for native `<video>` preview playback.
-#[tauri::command]
-pub(crate) async fn backend_import_preview_video(
-    app: AppHandle,
-    state: tauri::State<'_, VideoServerHandle>,
-    path: String,
-) -> Result<String, String> {
-    let prepared = prepare_preview_video(&app, &path)?;
-    let registration = register_preview_video(&state, path)?;
-    let response = ImportPreviewVideoResponse {
-        import_id: registration.import_id,
-        preview_url: registration.preview_url,
-        warnings: prepared.warnings,
-        metadata: prepared.metadata,
-    };
-
-    serialize_command_result(&response)
 }
 
 /// Extracts embedded telemetry from an imported video source.
@@ -543,27 +497,64 @@ pub(crate) async fn backend_extract_video_telemetry(
         .map_err(|error| error.to_string())
 }
 
-/// Clears the currently registered local HTTP preview video.
+/// Removes one local HTTP preview video registration.
 ///
-/// Any previously issued `/video/<import_id>` URL becomes invalid after this
-/// command because the server only serves the current import.
+/// Only `/video/<import_id>` becomes invalid; other registrations keep serving.
 #[tauri::command]
-pub(crate) async fn backend_clear_preview_video(
+pub(crate) async fn backend_remove_preview_video(
     state: tauri::State<'_, VideoServerHandle>,
+    import_id: String,
 ) -> Result<String, String> {
-    state.clear_video()?;
+    state.remove_video(&import_id)?;
     Ok("null".to_string())
 }
 
-/// Returns diagnostic state for the currently registered preview video.
+/// Renders the preview proxy of one transition and serves it like an imported
+/// video. The proxy file lives until it is released (or the app restarts).
+#[tauri::command]
+pub(crate) async fn backend_render_transition_proxy(
+    app: AppHandle,
+    state: tauri::State<'_, VideoServerHandle>,
+    request: TransitionProxyRequest,
+) -> Result<String, String> {
+    let paths = runtime_paths::app_paths(&app)?;
+    let path = tauri::async_runtime::spawn_blocking(move || {
+        render_transition_proxy(&paths, &request).map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    serialize_command_result(&state.register_video(path, "video/mp4".into())?)
+}
+
+/// Stops serving a transition proxy and deletes its file.
+#[tauri::command]
+pub(crate) async fn backend_release_transition_proxy(
+    state: tauri::State<'_, VideoServerHandle>,
+    import_id: String,
+) -> Result<String, String> {
+    let path = state.remove_video(&import_id)?;
+    remove_transition_proxy(&path).map_err(|error| error.to_string())?;
+    Ok("null".to_string())
+}
+
+/// Removes every local HTTP preview video registration.
+#[tauri::command]
+pub(crate) async fn backend_clear_preview_videos(
+    state: tauri::State<'_, VideoServerHandle>,
+) -> Result<String, String> {
+    state.clear_videos()?;
+    Ok("null".to_string())
+}
+
+/// Returns diagnostic state for every registered preview video.
 ///
 /// This is not needed for normal playback, but is useful for DevTools/manual
 /// verification of server state and source-file availability.
 #[tauri::command]
-pub(crate) async fn backend_get_video_state(
+pub(crate) async fn backend_get_preview_videos(
     state: tauri::State<'_, VideoServerHandle>,
 ) -> Result<String, String> {
-    serialize_command_result(&state.current_state())
+    serialize_command_result(&state.video_states()?)
 }
 
 /// Returns the loopback URL template used by MapLibre to request cached map styles.

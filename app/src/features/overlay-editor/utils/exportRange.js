@@ -56,15 +56,14 @@ export function formatExportRangeTime(seconds) {
 }
 
 /**
- * Applies a whole-second sidebar time string without allowing an inverted range.
+ * Applies one boundary of the export range without allowing an inverted range.
  *
  * @param {{ type: string, from: number, to: number }} exportRange Current canonical range.
  * @param {'from'|'to'} boundary Boundary being edited.
- * @param {string} value Whole-second time string from the sidebar.
+ * @param {number} second New boundary in timeline seconds.
  * @returns {{ type: string, from: number, to: number }} Updated canonical range.
  */
-export function setExportRangeBoundaryFromTimeInput(exportRange, boundary, value) {
-  const second = timeToSeconds(value)
+export function setExportRangeBoundary(exportRange, boundary, second) {
   if (boundary === 'from') {
     return { ...exportRange, from: second, to: Math.max(exportRange.to, second) }
   }
@@ -299,4 +298,24 @@ export function buildExportWindowRouteSamples(activity, window) {
   }
 
   return scopedSamples
+}
+
+/**
+ * The export range in the activity time widgets read: the custom range shifted by
+ * the activity origin; without one, the telemetry clip's own duration, or the
+ * interval covered by the videos.
+ * @param {object} options Range inputs.
+ * @param {{type: 'all'|'custom', from: number, to: number}} options.exportRange Timeline export range.
+ * @param {number} options.activityOriginSecond Timeline second of activity second 0.
+ * @param {number|null} options.activityClipDurationSeconds Duration of the clip supplying embedded telemetry, or null with an external activity.
+ * @param {{startSecond: number, endSecond: number}|null} options.videoBounds Interval covered by the videos.
+ * @returns {{type: 'all'|'custom', from: number, to: number}} Preview export range.
+ */
+export function resolvePreviewExportRange({ exportRange, activityOriginSecond, activityClipDurationSeconds, videoBounds }) {
+  if (exportRange.type === 'custom') {
+    return { ...exportRange, from: exportRange.from - activityOriginSecond, to: exportRange.to - activityOriginSecond }
+  }
+  if (activityClipDurationSeconds !== null) return { type: 'custom', from: 0, to: activityClipDurationSeconds }
+  if (videoBounds === null) return exportRange
+  return { type: 'custom', from: videoBounds.startSecond, to: videoBounds.endSecond }
 }

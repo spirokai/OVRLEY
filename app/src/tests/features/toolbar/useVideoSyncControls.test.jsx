@@ -6,65 +6,40 @@ import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { useVideoSyncControls } from '@/features/toolbar'
 import useStore from '@/store/useStore'
-import { DEFAULT_CONFIG } from '@/store/store-utils'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 describe('useVideoSyncControls', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
   })
 
-  test('parses and rounds a simple time string on blur', () => {
+  test('shows the earliest clip offset on its frames and shifts every clip by the same amount, keeping their relative placement', () => {
     act(() => {
-      useStore.setState({
-        aspectRatio: '16:9',
-        updateRate: 1,
-        config: { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } },
-      })
+      useStore.setState(
+        videoStoreState(
+          [
+            createTestVideo({ id: 'video-1', path: '/videos/late.mp4', importOrder: 0 }),
+            createTestVideo({ id: 'video-2', path: '/videos/early.mp4', importOrder: 1, fps: { num: 25, den: 1 } }),
+          ],
+          { 'video-1': 15, 'video-2': 10 },
+        ),
+      )
     })
 
     const { result } = renderHook(() => useVideoSyncControls())
+    expect(result.current).toMatchObject({ sharedOffsetSeconds: 10, sharedOffsetFps: { num: 25, den: 1 } })
 
     act(() => {
-      result.current.submitOffsetInput('1:30')
+      expect(result.current.commitSharedOffset(18.5)).toBeNull()
     })
 
-    expect(useStore.getState().videoSyncOffsetSeconds).toBe(90)
-    expect(result.current.offsetInput).toBe('90')
+    expect(useStore.getState().videoEdits['video-1'].offsetSeconds).toBe(23.5)
+    expect(useStore.getState().videoEdits['video-2'].offsetSeconds).toBe(18.5)
+    expect(result.current.sharedOffsetSeconds).toBe(18.5)
   })
 
-  test('parses colon-delimited time (H:MM:SS)', () => {
-    act(() => {
-      useStore.setState({
-        aspectRatio: '16:9',
-        updateRate: 1,
-        config: { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } },
-      })
-    })
-
+  test('returns the reason a shift is rejected to the field', () => {
     const { result } = renderHook(() => useVideoSyncControls())
-
-    act(() => {
-      result.current.submitOffsetInput('1:00:30')
-    })
-
-    expect(useStore.getState().videoSyncOffsetSeconds).toBe(3630)
-  })
-
-  test('parses decimal seconds and rounds to 1 decimal', () => {
-    act(() => {
-      useStore.setState({
-        aspectRatio: '16:9',
-        updateRate: 1,
-        config: { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } },
-      })
-    })
-
-    const { result } = renderHook(() => useVideoSyncControls())
-
-    act(() => {
-      result.current.submitOffsetInput('5.55')
-    })
-
-    expect(useStore.getState().videoSyncOffsetSeconds).toBe(5.6)
+    expect(result.current.commitSharedOffset(5)).toBe('A video must be loaded before shifting video offsets')
   })
 })

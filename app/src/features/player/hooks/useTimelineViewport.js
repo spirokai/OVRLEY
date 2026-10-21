@@ -33,10 +33,9 @@ function getLeftPercent(x, widthPx) {
  *
  * @param {object} options Timeline viewport inputs.
  * @param {number} options.totalDuration Total playable duration.
- * @param {boolean} [options.hasVideo=false] Whether a video lane is present.
- * @param {number} [options.videoSyncOffsetSeconds=0] Committed timeline second where the video starts.
- * @param {number} [options.videoSyncOffsetPreviewSeconds] Transient timeline second used during drag preview.
- * @param {number} [options.importedVideoDuration=0] Imported video duration in seconds.
+ * @param {{startSecond: number, endSecond: number}|null} [options.videoBounds=null] Committed interval covered by videos.
+ * @param {{startSecond: number, endSecond: number}|null} [options.displayedVideoBounds] Interval covered by videos during a drag preview.
+ * @param {string} [options.videoIdentity=''] Identity of the imported videos; changes reset the viewport.
  * @param {boolean} [options.hasActivityData=false] Whether activity metadata is loaded.
  * @param {number} [options.activityDurationSeconds=0] Activity duration in seconds.
  * @param {number} [options.fallbackDurationSeconds=0] Fallback duration for template-only timelines.
@@ -47,10 +46,9 @@ function getLeftPercent(x, widthPx) {
  */
 export default function useTimelineViewport({
   totalDuration,
-  hasVideo = false,
-  videoSyncOffsetSeconds = 0,
-  videoSyncOffsetPreviewSeconds = videoSyncOffsetSeconds,
-  importedVideoDuration = 0,
+  videoBounds = null,
+  displayedVideoBounds = videoBounds,
+  videoIdentity = '',
   hasActivityData = false,
   activityDurationSeconds = 0,
   fallbackDurationSeconds = 0,
@@ -58,7 +56,7 @@ export default function useTimelineViewport({
   playheadSecond = 0,
   isDragging = false,
 }) {
-  const timelineMinimum = getTimelineMinimum({ hasVideo, videoSyncOffsetSeconds: videoSyncOffsetPreviewSeconds })
+  const timelineMinimum = getTimelineMinimum({ videoBounds: displayedVideoBounds })
   // Duration ref - viewport actions use the latest duration without recreating every callback.
   const totalDurationRef = useRef(totalDuration)
   const timelineMinimumRef = useRef(timelineMinimum)
@@ -86,7 +84,7 @@ export default function useTimelineViewport({
   }, [])
 
   // Media identity - structural media changes reset stale zoom/pan state, while sync timing changes preserve it.
-  const mediaIdentity = [hasVideo, importedVideoDuration, hasActivityData, activityDurationSeconds, fallbackDurationSeconds].join('|')
+  const mediaIdentity = [videoIdentity, hasActivityData, activityDurationSeconds, fallbackDurationSeconds].join('|')
 
   useEffect(() => {
     totalDurationRef.current = totalDuration
@@ -167,23 +165,12 @@ export default function useTimelineViewport({
       buildFitTargets({
         totalDuration,
         widthPx,
-        hasVideo,
-        videoSyncOffsetSeconds,
-        importedVideoDuration,
+        videoBounds,
         hasActivityData,
         activityDurationSeconds,
         fallbackDurationSeconds,
       }),
-    [
-      activityDurationSeconds,
-      fallbackDurationSeconds,
-      hasActivityData,
-      hasVideo,
-      importedVideoDuration,
-      totalDuration,
-      videoSyncOffsetSeconds,
-      widthPx,
-    ],
+    [activityDurationSeconds, fallbackDurationSeconds, hasActivityData, totalDuration, videoBounds, widthPx],
   )
 
   const displayedFitTargetId = useMemo(() => getMatchingFitTargetId({ viewport, targets: fitTargets }), [fitTargets, viewport])

@@ -48,8 +48,7 @@ export function captureVideoSyncTimezoneMode(mode) {
 /**
  * Calculates a signed baseline independently of clip overlap. GPS and other
  * trusted sources keep absolute-time handling; camera/filename timestamps use
- * the selected interpretation. Interactive auto-sync resolves that selection
- * before batch calibration captures it.
+ * the selected interpretation.
  * @param {object} video Source metadata with creationTime and timeSource.
  * @param {object} activitySummary Activity syncTime, endTime and timezone.
  * @param {'utc'|'local'} timezoneMode Captured Apply Timezone interpretation.
@@ -76,35 +75,37 @@ export function calculateAutomaticVideoOffset(video, activitySummary, timezoneMo
   }
 }
 
+function isAmbiguousTimeSource(timeSource) {
+  return timeSource === 'ffprobe' || timeSource === 'filename'
+}
+
 /**
- * Resolves interactive sync state using the same baseline as batch calibration.
+ * Resolves the automatic sync state of one clip.
  * Ambiguous camera timestamps try both interpretations until a mode is selected;
  * prefer local when both overlap and retain an explicit selection.
  * A sole local match remains automatic for subsequent activity changes.
- * Unresolvable external timestamps or clips without positive activity overlap
- * use the warning/zero UI state; overlapping clips retain their signed offset.
- * @param {object} videoState Imported video state.
- * @param {object|null} activitySummary Activity summary.
- * @returns {object} Store sync fields ready to commit.
+ * Unresolvable external timestamps use the warning/zero UI state.
+ * A clip outside the activity keeps its signed offset and reports that it has no activity coverage.
+ * @param {object} video Imported video entity.
+ * @param {object} activitySummary External activity summary.
+ * @param {'utc'|'local'|null} sessionMode Explicit Apply Timezone selection, or null to infer.
+ * @returns {{offsetSeconds: number, determined: boolean, syncWarning: string|null, timezoneMode: 'utc'|'local'|null}} Clip sync
+ *   result; `determined` is false when the clip's time could not be resolved against the activity.
  */
-export function resolveVideoSyncState(videoState, activitySummary) {
-  const mode = captureVideoSyncTimezoneMode(videoState.videoSyncTimezoneMode)
-  const ambiguous = videoState.importedVideoTimeSource === 'ffprobe' || videoState.importedVideoTimeSource === 'filename'
-  const inferMode = ambiguous && (videoState.videoSyncTimezoneMode === null || videoState.videoSyncTimezoneMode === undefined)
+export function resolveVideoSync(video, activitySummary, sessionMode) {
+  const mode = captureVideoSyncTimezoneMode(sessionMode)
+  const ambiguous = isAmbiguousTimeSource(video.timeSource)
+  const inferMode = ambiguous && sessionMode === null
   const modes = inferMode ? ['local', 'utc'] : [mode]
   try {
     const candidates = modes.map((timezoneMode) => {
-      const { automaticOffsetSeconds, activityDurationSeconds } = calculateAutomaticVideoOffset(
-        { creationTime: videoState.importedVideoCreationTime, timeSource: videoState.importedVideoTimeSource },
-        activitySummary,
-        timezoneMode,
-      )
+      const { automaticOffsetSeconds, activityDurationSeconds } = calculateAutomaticVideoOffset(video, activitySummary, timezoneMode)
       return {
         timezoneMode,
         automaticOffsetSeconds,
         overlaps: videoOverlapsActivity({
           videoStart: automaticOffsetSeconds,
-          videoDuration: videoState.importedVideoDuration,
+          videoDuration: video.durationSeconds,
           activityEnd: activityDurationSeconds,
         }),
       }
@@ -113,75 +114,72 @@ export function resolveVideoSyncState(videoState, activitySummary) {
     const selected = matches[0] ?? candidates[0]
     const inferredLocalOnly = inferMode && matches.length === 1 && selected.timezoneMode === 'local'
     return {
-      videoSyncOffsetSeconds: selected.overlaps ? selected.automaticOffsetSeconds : 0,
-      videoSyncWarning: selected.overlaps ? null : i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity'),
-      videoSyncTimezoneMode: ambiguous && !inferredLocalOnly ? selected.timezoneMode : null,
+      offsetSeconds: selected.automaticOffsetSeconds,
+      determined: true,
+      syncWarning: selected.overlaps ? null : i18next.t('store.videoOutsideActivity', 'Video is outside the activity'),
+      timezoneMode: ambiguous && !inferredLocalOnly ? selected.timezoneMode : null,
     }
   } catch (error) {
     if (!(error instanceof VideoSyncError)) throw error
     return {
-      videoSyncOffsetSeconds: 0,
-      videoSyncWarning: i18next.t(error.translationKey, error.message),
-      videoSyncTimezoneMode: null,
+      offsetSeconds: 0,
+      determined: false,
+      syncWarning: i18next.t(error.translationKey, error.message),
+      timezoneMode: null,
     }
   }
 }
 
 /**
- * Captures the shared correction from the committed reference offset. A null
- * activity selects per-video embedded telemetry; a null reference explicitly
- * means zero correction. A present reference must have a resolvable baseline.
- * @param {object} options Calibration inputs from one synchronous snapshot.
- * @param {object|null} options.activitySummary Shared external activity summary, or null.
- * @param {object|null} options.referenceVideo Effective path, creationTime, timeSource and committedOffsetSeconds, or null.
- * @param {'utc'|'local'|null|undefined} options.timezoneMode Apply Timezone selection.
- * @returns {object} Serializable calibration, matching the Rust BatchCalibration contract.
+ * Resolves automatic synchronization for every clip against one external activity.
+ * An explicit session mode applies to all clips. Without one, each ambiguous clip
+ * infers its own interpretation; the session adopts one only when every ambiguous
+ * clip settled on the same explicit interpretation (a sole local match stays automatic).
+ * @param {Array<object>} videos Imported video entities.
+ * @param {object} activitySummary External activity summary.
+ * @param {'utc'|'local'|null} sessionMode Explicit Apply Timezone selection, or null to infer.
+ * @returns {{placements: Array<{offsetSeconds: number, determined: boolean, syncWarning: string|null}>, timezoneMode: 'utc'|'local'|null}}
+ *   Placements in input order and the resulting session mode.
  */
-export function createBatchCalibration({ activitySummary, referenceVideo, timezoneMode }) {
-  const mode = captureVideoSyncTimezoneMode(timezoneMode)
-  if (activitySummary === null) return { mode: 'embeddedActivity' }
-  if (referenceVideo === null) return { mode: 'externalActivity', timezoneMode: mode, correctionSeconds: 0, reference: null }
-  if (!Number.isFinite(referenceVideo.committedOffsetSeconds)) throw new Error('Committed video sync offset must be a finite number')
-  let baseline
-  try {
-    baseline = calculateAutomaticVideoOffset(referenceVideo, activitySummary, mode)
-  } catch (error) {
-    throw new Error(`Could not calibrate reference video: ${error.message}`)
-  }
-  const { automaticOffsetSeconds } = baseline
+export function resolveVideosSync(videos, activitySummary, sessionMode) {
+  const results = videos.map((video) => resolveVideoSync(video, activitySummary, sessionMode))
+  const ambiguousModes = results.filter((_, index) => isAmbiguousTimeSource(videos[index].timeSource)).map(({ timezoneMode }) => timezoneMode)
+  let timezoneMode = null
+  if (sessionMode !== null) timezoneMode = ambiguousModes.length > 0 ? sessionMode : null
+  else if (ambiguousModes.length > 0 && ambiguousModes.every((mode) => mode !== null && mode === ambiguousModes[0])) timezoneMode = ambiguousModes[0]
   return {
-    mode: 'externalActivity',
-    timezoneMode: mode,
-    correctionSeconds: referenceVideo.committedOffsetSeconds - automaticOffsetSeconds,
-    reference: {
-      path: referenceVideo.path,
-      creationTime: referenceVideo.creationTime,
-      timeSource: referenceVideo.timeSource,
-      committedOffsetSeconds: referenceVideo.committedOffsetSeconds,
-      automaticOffsetSeconds,
-    },
+    placements: results.map(({ offsetSeconds, determined, syncWarning }) => ({ offsetSeconds, determined, syncWarning })),
+    timezoneMode,
   }
 }
 
-/**
- * Evaluates automatic overlap using only the inspected video's timestamp.
- * Reference overrides and shared calibration belong to render submission.
- * Embedded telemetry is prepared later by its owning job; null overlap
- * explicitly means coverage has not yet been inspected.
- * @param {object} video Inspected source metadata with creationTime, timeSource and duration.
- * @param {object|null} activitySummary Shared external activity summary, or null.
- * @param {'utc'|'local'} timezoneMode Captured Apply Timezone interpretation.
- * @returns {{timing: object, hasPositiveOverlap: boolean|null}} Job timing and eligibility.
- */
-export function resolveBatchVideoTiming(video, activitySummary, timezoneMode) {
-  if (activitySummary === null) return { timing: { mode: 'embeddedActivity' }, hasPositiveOverlap: null }
-  const { automaticOffsetSeconds, activityDurationSeconds } = calculateAutomaticVideoOffset(video, activitySummary, timezoneMode)
-  return {
-    timing: { mode: 'externalActivity', automaticOffsetSeconds },
-    hasPositiveOverlap: videoOverlapsActivity({
-      videoStart: automaticOffsetSeconds,
-      videoDuration: video.duration,
-      activityEnd: activityDurationSeconds,
-    }),
+function parseCreationTimeMs(video) {
+  if (typeof video.creationTime !== 'string' || video.creationTime.trim() === '') return null
+  if (video.timeSource === 'gps' || video.timeSource === 'file_mtime') {
+    const parsed = Date.parse(video.creationTime)
+    return Number.isFinite(parsed) ? parsed : null
   }
+  return parseSyncTimestamp(video.creationTime, video.timeSource, null)
+}
+
+/**
+ * Places clips without an external activity at their detected real time relative
+ * to the earliest clip, keeping the gaps between recordings. Ambiguous camera
+ * clock text is compared as wall-clock time.
+ * @param {Array<object>} videos Imported video entities.
+ * @returns {Array<{offsetSeconds: number, determined: boolean, syncWarning: string|null}>} Placements in input order.
+ */
+export function placeVideosByCreationTime(videos) {
+  const startsMs = videos.map(parseCreationTimeMs)
+  const knownStartsMs = startsMs.filter((startMs) => startMs !== null)
+  const originMs = knownStartsMs.length > 0 ? Math.min(...knownStartsMs) : null
+  return startsMs.map((startMs) =>
+    startMs === null
+      ? {
+          offsetSeconds: 0,
+          determined: false,
+          syncWarning: i18next.t('store.couldNotDetermineVideoCreationTime', 'Could not determine video creation time'),
+        }
+      : { offsetSeconds: (startMs - originMs) / 1000, determined: true, syncWarning: null },
+  )
 }

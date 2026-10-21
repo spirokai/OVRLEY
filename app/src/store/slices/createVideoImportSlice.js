@@ -1,268 +1,197 @@
 import { detectCodecs } from '@/api/backend'
-import { parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
-import { resolveVideoSyncState } from '@/lib/video-sync'
-import { createCachedPromise } from '@/lib/cached-promise'
-import { videoOverlapsActivity } from '@/lib/video-timing'
-import { clamp } from '@/lib/utils'
 import { getTimelineMinimum, getTotalPlaybackDuration } from '@/features/player/utils/playerTiming'
+import { createCachedPromise } from '@/lib/cached-promise'
+import { clamp } from '@/lib/utils'
+import {
+  placeAutomaticVideos,
+  removeVideo,
+  resetCreationTimes,
+  resetVideoOffset,
+  setVideoOffset,
+  setVideoSyncTimezoneMode,
+  shiftVideoOffsets,
+  applyFilenameCreationTimes,
+} from '@/lib/video-program/collection-edits'
+import { requireTelemetry } from '@/lib/video-program/imported-video'
+import { DEFAULT_TRANSITION_SETTINGS, NO_TRANSITION, XFADE_TRANSITIONS } from '@/lib/video-program/transition-catalog'
+import { getVideosTimelineBounds, joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
+import { applyCoursePlotDimensions } from '../store-utils'
 
 let fetchCodecsOnce = null
 
-function displayResolutionForImportedVideo(metadata) {
-  const resolution = metadata?.resolution
-  if (!resolution) {
-    throw new Error('Imported video metadata must include a resolution')
-  }
-
-  const width = Number(resolution.width)
-  const height = Number(resolution.height)
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    throw new Error('Imported video metadata contains an invalid resolution')
-  }
-
-  const rotation = metadata.rotationDegrees === null || metadata.rotationDegrees === undefined ? 0 : Number(metadata.rotationDegrees)
-  if (!Number.isFinite(rotation)) {
-    throw new Error('Imported video metadata contains an invalid rotation')
-  }
-
-  const normalizedRotation = ((rotation % 360) + 360) % 360
-  if (![0, 90, 180, 270].includes(normalizedRotation)) {
-    throw new Error('Imported video metadata contains an unsupported rotation')
-  }
-
-  if (normalizedRotation === 90 || normalizedRotation === 270) {
-    return { width: height, height: width }
-  }
-
-  return { width, height }
-}
-
-function validateImportedVideoTiming(metadata) {
-  if (typeof metadata.path !== 'string' || metadata.path.length === 0) {
-    throw new Error('Imported video metadata must include a path')
-  }
-  if (!Number.isFinite(metadata.duration) || metadata.duration <= 0) {
-    throw new Error('Imported video metadata contains an invalid duration')
-  }
-  if (!Number.isFinite(metadata.fps) || metadata.fps <= 0) {
-    throw new Error('Imported video metadata contains an invalid frame rate')
+function requireTransitionDefaults({ type, durationSeconds, splitGapThresholdSeconds }) {
+  if (type !== NO_TRANSITION && !XFADE_TRANSITIONS.includes(type)) throw new Error(`Unknown transition type: ${type}`)
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) throw new Error('Transition duration must be a positive number of seconds')
+  if (!Number.isFinite(splitGapThresholdSeconds) || splitGapThresholdSeconds < 0) {
+    throw new Error('Continuity threshold must be zero or a positive number of seconds')
   }
 }
 
-export function createImportedVideoState(metadata) {
-  validateImportedVideoTiming(metadata)
-  return {
-    importedVideoPath: metadata.path,
-    importedVideoDuration: metadata.duration,
-    importedVideoFps: metadata.fps,
-    importedVideoFpsNum: metadata.fpsNum,
-    importedVideoFpsDen: metadata.fpsDen,
-    importedVideoResolution: displayResolutionForImportedVideo(metadata),
-    importedVideoCreationTime: metadata.creationTime,
-    importedVideoTimeSource: metadata.timeSource ?? null,
-    detectedVideoCreationTime: metadata.creationTime,
-    detectedVideoTimeSource: metadata.timeSource ?? null,
-    importedVideoImportId: metadata.importId ?? null,
-    importedVideoPreviewUrl: metadata.previewUrl ?? null,
-    importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
-    importedBackgroundImagePath: null,
-    videoSyncOffsetPreviewSeconds: null,
-    videoSyncTimezoneMode: null,
-    importedVideoCodecName: metadata.codecName ?? null,
-    importedVideoCodecLongName: metadata.codecLongName ?? null,
-    importedVideoBitRate: metadata.bitRate ?? null,
-    importedVideoCameraType: metadata.cameraType ?? null,
-    importedVideoCameraModel: metadata.cameraModel ?? null,
-  }
-}
-
-function validateVideoSyncOffset(seconds, videoDuration, label = 'Video sync offset') {
-  if (!Number.isFinite(seconds)) {
-    throw new Error(`${label} must be a finite number`)
-  }
-  if (videoDuration === null) return
-  if (!videoOverlapsActivity({ videoStart: seconds, videoDuration })) {
-    throw new Error(`${label} must leave a positive overlap with the imported video`)
-  }
+function clampPlayheadToVideos(draft, deltaSeconds) {
+  const bounds = getVideosTimelineBounds(joinVideoEdits(draft.importedVideos, draft.videoEdits))
+  const timelineMinimum = getTimelineMinimum({ videoBounds: bounds })
+  const totalDuration = getTotalPlaybackDuration({
+    activityDurationSeconds: draft.activitySummary?.durationSeconds,
+    fallbackDurationSeconds: draft.fallbackDurationSeconds,
+    videoBounds: bounds,
+  })
+  draft.selectedSecond = clamp(draft.selectedSecond + deltaSeconds, timelineMinimum, totalDuration)
 }
 
 export const createVideoImportSlice = (set, get) => ({
-  importedVideoPath: null, // absolute path from Tauri file dialog
-  importedVideoDuration: null, // seconds (float), read via ffprobe
-  importedVideoFps: null, // fps (float)
-  importedVideoFpsNum: null, // exact ffprobe FPS numerator
-  importedVideoFpsDen: null, // exact ffprobe FPS denominator
-  importedVideoResolution: null, // display-oriented { width, height }
-  importedVideoCreationTime: null, // ISO-8601 string or null
-  importedVideoTimeSource: null, // "gps" | "ffprobe" | "file_mtime" | "filename" | null
-  detectedVideoCreationTime: null, // original creation time from imported metadata
-  detectedVideoTimeSource: null, // original creation-time source from imported metadata
-  importedVideoImportId: null, // opaque local preview server import ID
-  importedVideoPreviewUrl: null, // local HTTP preview URL for the video element
-  importedVideoPreviewWarnings: [],
+  importedVideos: [], // canonical imported-video entities (see createImportedVideo)
+  videoEdits: {}, // undoable user edits keyed by video ID (see createVideoEdits)
   importedBackgroundImagePath: null, // absolute path from Tauri file dialog
-  videoSyncOffsetSeconds: 0, // user-adjustable sync offset
-  videoSyncOffsetPreviewSeconds: null, // transient drag preview; committed on release
-  videoSyncWarning: null, // string warning or null
-  videoSyncTimezoneMode: null, // "local" or "utc" for camera timestamps; null requests automatic inference
+  videoDragPreview: null, // { videoId: string|null, deltaSeconds } while one clip (or, with null, every clip) is dragged
+  videoSyncTimezoneMode: null, // session "Apply Timezone" selection: "local" | "utc"; null requests automatic inference
+  transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
   availableCodecs: null,
-  importedVideoCodecName: null,
-  importedVideoCodecLongName: null,
-  importedVideoBitRate: null,
-  importedVideoCameraType: null,
-  importedVideoCameraModel: null,
 
-  setImportedVideo: (metadata) => {
-    const importedVideoState = createImportedVideoState(metadata)
-    get().clearVideoSyncForVideo()
-    set(importedVideoState)
-
-    get().syncVideoMetadata()
-
-    return importedVideoState.importedVideoResolution
+  /**
+   * Replaces the collection with registered video entities and their edits (a reviewed
+   * import or a loaded project). A manual-sync selection of a video no longer in the
+   * collection moves to the first clip; the playhead stays on the timeline.
+   * @param {{importedVideos: Array<object>, videoEdits: object, videoSyncTimezoneMode: 'utc'|'local'|null}} collection Collection to commit.
+   */
+  commitVideoCollection: ({ importedVideos, videoEdits, videoSyncTimezoneMode }) => {
+    if (importedVideos.some((video) => video.preview === null)) throw new Error('Committed videos must be registered for preview')
+    set((draft) => {
+      draft.importedVideos = importedVideos
+      draft.videoEdits = videoEdits
+      draft.videoSyncTimezoneMode = videoSyncTimezoneMode
+      draft.importedBackgroundImagePath = null
+      draft.videoDragPreview = null
+      if (!importedVideos.some((video) => video.id === draft.deletedPartMark?.videoId)) draft.deletedPartMark = null
+      clampPlayheadToVideos(draft, 0)
+    })
+    const { manualVideoSync } = get()
+    if (!importedVideos.some((video) => video.id === manualVideoSync.videoId)) {
+      const [first] = sortVideosByTimeline(joinVideoEdits(importedVideos, videoEdits))
+      get().selectVideoSyncVideo(first?.id ?? null)
+    }
   },
 
   setImportedBackgroundImage: (path) => {
-    get().clearVideoSyncForVideo()
-    get().clearVideoTelemetry()
     set({
-      importedVideoPath: null,
-      importedVideoDuration: null,
-      importedVideoFps: null,
-      importedVideoFpsNum: null,
-      importedVideoFpsDen: null,
-      importedVideoResolution: null,
-      importedVideoCreationTime: null,
-      importedVideoTimeSource: null,
-      detectedVideoCreationTime: null,
-      detectedVideoTimeSource: null,
-      importedVideoImportId: null,
-      importedVideoPreviewUrl: null,
-      importedVideoPreviewWarnings: [],
+      importedVideos: [],
+      videoEdits: {},
       importedBackgroundImagePath: path || null,
-      videoSyncOffsetSeconds: 0,
-      videoSyncOffsetPreviewSeconds: null,
-      videoSyncWarning: null,
+      videoDragPreview: null,
       videoSyncTimezoneMode: null,
-      importedVideoCodecName: null,
-      importedVideoCodecLongName: null,
-      importedVideoBitRate: null,
-      importedVideoCameraType: null,
-      importedVideoCameraModel: null,
+      deletedPartMark: null,
     })
+    get().selectVideoSyncVideo(null)
   },
 
-  clearImportedVideo: () => {
-    get().clearVideoSyncForVideo()
-    get().clearVideoTelemetry()
+  clearImportedVideos: () => {
     set({
-      importedVideoPath: null,
-      importedVideoDuration: null,
-      importedVideoFps: null,
-      importedVideoFpsNum: null,
-      importedVideoFpsDen: null,
-      importedVideoResolution: null,
-      importedVideoCreationTime: null,
-      importedVideoTimeSource: null,
-      detectedVideoCreationTime: null,
-      detectedVideoTimeSource: null,
-      importedVideoImportId: null,
-      importedVideoPreviewUrl: null,
-      importedVideoPreviewWarnings: [],
+      importedVideos: [],
+      videoEdits: {},
       importedBackgroundImagePath: null,
-      videoSyncOffsetSeconds: 0,
-      videoSyncOffsetPreviewSeconds: null,
-      videoSyncWarning: null,
+      videoDragPreview: null,
       videoSyncTimezoneMode: null,
-      importedVideoCodecName: null,
-      importedVideoCodecLongName: null,
-      importedVideoBitRate: null,
-      importedVideoCameraType: null,
-      importedVideoCameraModel: null,
+      deletedPartMark: null,
     })
+    get().selectVideoSyncVideo(null)
   },
 
-  setVideoSyncOffset: (seconds, { compensatePlayhead = false } = {}) => {
-    validateVideoSyncOffset(seconds, get().importedVideoDuration)
-    if (!compensatePlayhead) {
-      set({
-        videoSyncOffsetSeconds: seconds,
-        videoSyncWarning: null,
-      })
-      return
-    }
-
-    const state = get()
-    const offsetDelta = seconds - state.videoSyncOffsetSeconds
-    const timelineMinimum = getTimelineMinimum({
-      hasVideo: state.importedVideoPath !== null,
-      videoSyncOffsetSeconds: seconds,
-    })
-    const totalDuration = getTotalPlaybackDuration({
-      activityDurationSeconds: state.activitySummary?.durationSeconds,
-      fallbackDurationSeconds: state.fallbackDurationSeconds,
-      importedVideoDuration: state.importedVideoDuration,
-      importedVideoPath: state.importedVideoPath,
-      videoSyncOffsetSeconds: seconds,
-    })
-
+  /**
+   * Removes one clip with its edits (see `removeVideo`). Manual sync moves to the
+   * first remaining clip when it targeted the removed one, and the playhead stays
+   * on the timeline. Compatibility, overlaps, and joins are derived and follow.
+   */
+  removeImportedVideo: (videoId) => {
     set((draft) => {
-      draft.videoSyncOffsetSeconds = seconds
-      draft.videoSyncWarning = null
-      draft.selectedSecond = clamp(state.selectedSecond + offsetDelta, timelineMinimum, totalDuration)
-      draft.videoSyncOffsetPreviewSeconds = null
+      removeVideo(draft, videoId)
+      draft.videoDragPreview = null
+      if (draft.deletedPartMark?.videoId === videoId) draft.deletedPartMark = null
+      clampPlayheadToVideos(draft, 0)
+    })
+    if (get().manualVideoSync.videoId === videoId) {
+      const [first] = sortVideosByTimeline(joinVideoEdits(get().importedVideos, get().videoEdits))
+      get().selectVideoSyncVideo(first?.id ?? null)
+    }
+  },
+
+  /** Stores the project transition defaults chosen by the user. */
+  setTransitionDefaults: (defaults) => {
+    requireTransitionDefaults(defaults)
+    const { type, durationSeconds, splitGapThresholdSeconds } = defaults
+    set({ transitionDefaults: { type, durationSeconds, splitGapThresholdSeconds } })
+  },
+
+  /** Places every automatic clip by detected time (see `placeAutomaticVideos`). */
+  computeVideoSync: () => {
+    set((draft) => placeAutomaticVideos(draft))
+  },
+
+  /** Sets one clip's start by hand (see `setVideoOffset`). */
+  setVideoOffset: (videoId, seconds, { compensatePlayhead = false } = {}) => {
+    set((draft) => {
+      const deltaSeconds = seconds - (draft.videoEdits[videoId]?.offsetSeconds ?? 0)
+      setVideoOffset(draft, videoId, seconds)
+      draft.videoDragPreview = null
+      if (compensatePlayhead) clampPlayheadToVideos(draft, deltaSeconds)
     })
   },
 
-  setVideoSyncOffsetPreview: (seconds) => {
-    if (seconds !== null) validateVideoSyncOffset(seconds, get().importedVideoDuration, 'Video sync offset preview')
-    set({
-      videoSyncOffsetPreviewSeconds: seconds,
+  /** Returns a clip set by hand to automatic placement (see `resetVideoOffset`). */
+  resetVideoOffset: (videoId) => {
+    set((draft) => {
+      resetVideoOffset(draft, videoId)
+      draft.videoDragPreview = null
+      clampPlayheadToVideos(draft, 0)
     })
   },
 
-  setVideoSyncWarning: (msg) =>
-    set({
-      videoSyncWarning: msg,
-    }),
+  /** Shifts every clip by the same amount, keeping their relative placement. */
+  shiftVideoOffsets: (deltaSeconds, { compensatePlayhead = false } = {}) => {
+    set((draft) => {
+      shiftVideoOffsets(draft, deltaSeconds)
+      draft.videoDragPreview = null
+      if (compensatePlayhead) clampPlayheadToVideos(draft, deltaSeconds)
+    })
+  },
+
+  /** Sets or clears the transient shift of the dragged clip, or of every clip when `videoId` is null. */
+  setVideoDragPreview: (dragPreview) => {
+    if (dragPreview !== null) {
+      if (dragPreview.videoId !== null && !get().importedVideos.some((video) => video.id === dragPreview.videoId)) {
+        throw new Error(`Unknown imported video: ${dragPreview.videoId}`)
+      }
+      if (!Number.isFinite(dragPreview.deltaSeconds)) throw new Error('Video drag shift must be a finite number')
+    }
+    set({ videoDragPreview: dragPreview })
+  },
 
   setVideoSyncTimezoneMode: (mode) => {
-    if (mode !== 'local' && mode !== 'utc') {
-      throw new Error('Video sync timezone mode must be local or utc')
-    }
-
-    set({ videoSyncTimezoneMode: mode })
-    get().computeVideoSync(get().activitySummary)
+    set((draft) => setVideoSyncTimezoneMode(draft, mode))
   },
 
-  setVideoCreationTimeFromFilename: () => {
-    const creationTime = parseVideoFilenameCreationTime(get().importedVideoPath)
-    if (creationTime === null) {
-      throw new Error('Video filename does not contain a valid YYYYMMDD_HHMMSS timestamp')
-    }
+  /** Uses the `YYYYMMDD_HHMMSS` filename timestamp of every clip that has one. */
+  setVideoCreationTimesFromFilenames: () => {
+    set((draft) => applyFilenameCreationTimes(draft))
+  },
 
-    set({
-      importedVideoCreationTime: creationTime,
-      importedVideoTimeSource: 'filename',
-      videoSyncTimezoneMode: 'local',
+  resetVideoCreationTimes: () => {
+    set((draft) => resetCreationTimes(draft))
+  },
+
+  /**
+   * Stores the settled embedded-telemetry result of one clip. Results for clips
+   * removed in the meantime are discarded.
+   * @returns {boolean} Whether the result was stored.
+   */
+  setVideoTelemetry: (videoId, { status, activity }) => {
+    if (status === 'pending') throw new Error('Video telemetry results must be settled')
+    requireTelemetry({ status, activity })
+    if (!get().importedVideos.some((video) => video.id === videoId)) return false
+    set((draft) => {
+      draft.importedVideos.find((video) => video.id === videoId).telemetry = { status, activity }
+      if (status === 'ready' && draft.parsedActivity === null) applyCoursePlotDimensions(draft, activity.sample_course_points)
     })
-    get().computeVideoSync(get().activitySummary)
+    return true
   },
-
-  resetVideoCreationTime: () => {
-    const state = get()
-    set({
-      importedVideoCreationTime: state.detectedVideoCreationTime,
-      importedVideoTimeSource: state.detectedVideoTimeSource,
-      videoSyncTimezoneMode: null,
-    })
-    get().computeVideoSync(get().activitySummary)
-  },
-
-  setImportedVideoPreviewWarnings: (warnings) =>
-    set({
-      importedVideoPreviewWarnings: Array.isArray(warnings) ? warnings : [],
-    }),
 
   fetchAvailableCodecs: async () => {
     const cachedCodecs = get().availableCodecs
@@ -284,6 +213,4 @@ export const createVideoImportSlice = (set, get) => ({
       return null
     }
   },
-
-  computeVideoSync: (activitySummary) => set((state) => resolveVideoSyncState(state, activitySummary)),
 })

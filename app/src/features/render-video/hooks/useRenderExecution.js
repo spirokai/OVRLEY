@@ -15,7 +15,7 @@ function applyRenderProgress(snapshot) {
 // The transports are the native boundary. Submission, buffering, recovery and
 // listener lifetime are shared; native IDs and terminal contracts stay native.
 const transports = {
-  current: {
+  single: {
     subscribe: (observe) => backend.subscribeRenderProgress(observe),
     submit: ({ config, parsedActivity, outputPath, overwrite }) => backend.renderVideo(config, parsedActivity, { outputPath, overwrite }),
     read: () => backend.getRenderProgress(),
@@ -166,7 +166,7 @@ function createObserver(target, activeId = null) {
     if (id === null) {
       const eventId = transport.eventId(event)
       const previous = buffered.get(eventId)
-      if (target === 'current') buffered.set(eventId, [event])
+      if (target === 'single') buffered.set(eventId, [event])
       else {
         // Retain the newest full queue plus its newest tick until acceptance.
         // A tick alone cannot reconstruct outcomes from earlier queue items.
@@ -197,7 +197,7 @@ export default function useRenderExecution({ reviewTarget = null } = {}) {
   useEffect(() => {
     const prepared = []
     for (const [target, id] of [
-      ['current', store.activeRenderId],
+      ['single', store.activeRenderId],
       ['batch', store.activeBatchId],
     ]) {
       if ((id === null && target !== reviewTarget) || observers.get(target)?.id() === id) continue
@@ -224,8 +224,8 @@ export default function useRenderExecution({ reviewTarget = null } = {}) {
   const submit = useCallback(async ({ settings, batchReview, overwrite = false, onAccepted }) => {
     const state = useStore.getState()
     if (isRendererBusy(state)) return false
-    if (settings.renderTarget === 'batch' && Object.entries(batchReview.reviewedInputs).some(([key, value]) => state[key] !== value)) return false
     const request = createRenderRequest({ editorSnapshot: state, settings, batchReview, overwrite })
+    if (request.target === 'batch' && Object.entries(batchReview.reviewedInputs).some(([key, value]) => state[key] !== value)) return false
     state.setRenderSubmissionTarget(request.target)
     const observer = observers.get(request.target) ?? createObserver(request.target)
     observer.beginSubmission()
@@ -253,7 +253,7 @@ export default function useRenderExecution({ reviewTarget = null } = {}) {
     const state = useStore.getState()
     const transport = transports[target]
     const id = transport.activeId(state)
-    if (id === null || (!state.renderingVideo && target === 'current') || (target === 'batch' && !state.batchSnapshot.rendererBusy)) return
+    if (id === null || (!state.renderingVideo && target === 'single') || (target === 'batch' && !state.batchSnapshot.rendererBusy)) return
     if (state.renderCancellationTarget !== null) return
     state.setRenderCancellationTarget(target)
     try {

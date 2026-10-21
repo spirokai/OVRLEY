@@ -1,6 +1,13 @@
 import { formatClockDuration } from '@/lib/time-format'
 import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 
+const TELEMETRY_STATUS_LABELS = {
+  pending: ['toolbar.telemetryPending', 'Reading…'],
+  ready: ['toolbar.telemetryReady', 'Available'],
+  absent: ['toolbar.telemetryAbsent', 'None'],
+  failed: ['toolbar.telemetryFailed', 'Could not be read'],
+}
+
 const TIME_SOURCE_KEYS = {
   gps: 'toolbar.timeSourceGps',
   ffprobe: 'toolbar.timeSourceMetadata',
@@ -63,6 +70,10 @@ export function buildVideoDrawerViewModel(videoSummary, timezone, timezoneMode, 
     {
       label: t('toolbar.camera', 'Camera'),
       value: videoSummary.cameraModel || videoSummary.cameraType || unknownValue,
+    },
+    {
+      label: t('toolbar.telemetry', 'Telemetry'),
+      value: t(...TELEMETRY_STATUS_LABELS[videoSummary.telemetryStatus]),
     },
   ]
 

@@ -2,7 +2,7 @@
 
 ## 1. Project Overview
 
-**OVRLEY** (`0.1.0`, GPL-3.0) is a cross-platform desktop application that turns `.fit` / `.gpx` GPS activity data and `.srt` telemetry subtitles into **customizable video overlays**. Users load an activity file, arrange widgets (speed, heart rate, elevation, route map, time, gradient, etc.) on a scene canvas, optionally import a source video for compositing, and render the result as ProRes, QTRLE, or H.264/H.265 MP4.
+**OVRLEY** (`0.1.0`, GPL-3.0) is a cross-platform desktop application that turns `.fit` / `.gpx` GPS activity data and `.srt` telemetry subtitles into **customizable video overlays**. Users load an activity file, arrange widgets (speed, heart rate, elevation, route map, time, gradient, etc.) on a scene canvas, optionally import one or many source videos for compositing, and render the result as ProRes, QTRLE, or H.264/H.265 MP4.
 
 **Key capabilities:**
 
@@ -10,7 +10,8 @@
 - Widget editing: drag, resize, rotate, grid snap via `react-moveable`
 - Activity extraction: FIT (via `fit-file-parser` JS library), GPX (via DOMParser), and SRT (text parser), with shared Rust finalization
 - Transparent overlay export (ProRes/QTRLE) for external compositing
-- Direct MP4 compositing: overlay rendered over imported source video
+- Direct MP4 compositing: overlay rendered over the imported source videos
+- Multi-video timeline: many clips placed by recording time (also before or after the activity), deleted parts, `xfade` transitions per join, continuous preview across clips, export as one combined video or one file per video
 - 100% offline, no cloud dependencies
 
 ---
@@ -310,7 +311,7 @@ OVRLEY follows a **two-process desktop architecture** via Tauri v2:
 
 ### 5.1 State Management (Zustand)
 
-The Zustand store is composed of 5 slices, merged via `create()` with `immer` + `subscribeWithSelector` middleware:
+The Zustand store is composed of feature slices, merged via `create()` with `immer` and undo history (`zundo`, see `features/undo-redo/undoHistory.js`):
 
 ```
 useStore
@@ -319,11 +320,24 @@ useStore
 ├── createLayoutSlice
 │   # Widget drawer open/close toggle
 ├── createMediaSlice
-│   # Activity summary, render progress, errors, parsedActivity, videoFilename, activityFilename
+│   # Activity summary, render progress, errors, parsedActivity, activityFilename
 ├── createTemplateSlice
-│   # Templates, export settings, global defaults, aspectRatio, updateRate, config hydration
-└── createVideoImportSlice
-    # Imported video metadata, sync offset, codec availability, platformOs
+│   # Templates, global defaults, aspectRatio, config hydration
+├── createVideoImportSlice
+│   # importedVideos (validated entities), videoEdits (undoable per-video edits:
+│   # offset and whether it was set by hand, deleted parts, transitionIn, placement
+│   # anchor), transition defaults, timezone mode, codec availability. Collection
+│   # edits are the shared recipes of lib/video-program/collection-edits.js
+├── createDeletedPartsSlice
+│   # Deleted-part and join-transition edits, the transient deleted-part mark
+├── createTransitionProxySlice
+│   # Preview proxies of transitions (session state, keyed by content)
+├── createManualVideoSyncSlice
+│   # Manual sync landmarks of the selected video
+├── createRenderSettingsSlice
+│   # Render settings (output mode, FPS, codec, quality, export range)
+└── createBatchRenderSlice
+    # Native batch snapshot, output folder, per-video overlay switches
 ```
 
 Store access from components goes through selector hooks in `hooks/useAppStoreSelectors.js`, which use `useShallow` to prevent unnecessary re-renders. Non-React utility functions must NOT call `useStore.getState()` — they receive state via parameters from their hook callers. React hooks may use `useStore.getState()` for imperative state reads (e.g. inside callbacks and effects).
@@ -360,17 +374,19 @@ App.jsx
 
 ### 5.3 Feature Modules
 
-10 feature modules each with their own `data/`, `utils/`, `hooks/`, and/or `components/` subdirectories:
+Feature modules each have their own `data/`, `utils/`, `hooks/`, and/or `components/` subdirectories. The main ones:
 
 | Feature | Purpose |
 |---|---|
 | **`app-shell/`** | App header, title bar, control panel, loading overlay, error alert, backend health polling, activity import, app bootstrap, editor shell state (zoom/grid/background) |
 | **`overlay-editor/`** | Main editor canvas, moveable (drag/resize/rotate), widget selection, editor keyboard shortcuts, viewport management, drag/rotate/scale/resize handlers |
 | **`player/`** | Overlay player component, playback engine (timeline + video-backed RAF loops), keyboard shortcuts (Space/Arrow keys), timeline scrubbing |
-| **`render-video/`** | Render dialog: codec selection (ProRes, QTRLE, H.264, H.265), hardware acceleration (NVENC, QSV, VAAPI, VideoToolbox, Vulkan), bitrate slider, FPS mode, export range, progress polling, render workflow orchestration |
-| **`scene-settings/`** | Sidebar settings tab: aspect ratio, resolution, FPS, widget update rate, video sync offset, global font/color/opacity defaults |
+| **`render-video/`** | Render dialog: codec selection (ProRes, QTRLE, H.264, H.265), hardware acceleration (NVENC, QSV, VAAPI, VideoToolbox, Vulkan), bitrate slider, FPS mode, export range, output mode (one combined file or separate files), export review of the videos (`reviewExport`), progress, render workflow orchestration |
+| **`scene-settings/`** | Sidebar settings tab: aspect ratio, resolution, FPS, widget update rate, global font/color/opacity defaults |
+| **`toolbar/`** | Drawers: activity, videos panel (per-video offset, details, deleted parts, transition into the video, default transitions, sync) |
+| **`transitions/`** | Transition picker with animated previews (sprite `assets/transition-previews.webp`, generated by `scripts/generate-transition-previews.mjs` from the catalogue in `assets/transitions.json`), join transition controls |
 | **`template-manager/`** | Template CRUD, community template loading, template save status tracking, new-template dialog |
-| **`video-preview/`** | Video file import, local HTTP preview server, video playback clock, scrub scheduling, sync with activity timeline |
+| **`video-preview/`** | Video import pipeline (`videoImportOperations.js`, shared with project load) and the import dialog that reviews every video before it joins, two-element preview playback across pieces, transition proxies, video playback clock, scrub scheduling |
 | **`widget-drawer/`** | Widget quick-add sidebar panel (button grid) |
 | **`widget-editor/`** | Per-widget property editors: metric value, text, time, gradient, elevation, route map, heading. Sidebar widgets tab composition. |
 | **`widget-preview/`** | SVG widget preview renderers: metric, text, route, elevation, heading. Geometry computation, text measurement, shadow rendering. |
@@ -449,37 +465,37 @@ Zustand (activitySummary, parsedActivity)
 
 The frontend owns browser-visible FIT/GPX/SRT extraction into `RawActivity`. MP4 telemetry is extracted in Rust by `media/mp4_telemetry/`, smoothed at native cadence where required, aligned into `ActivityColumns`, and sent directly into the same shared finalizer core. Rust owns canonical finalization from optional idle-gap fill through derived metrics, opt-in smoothing, `sync_time` metadata, debug payload generation, and final `ParsedActivity` assembly. The `importActivityFile()` function accepts `storeActions` as a required parameter (no implicit `useStore.getState()` fallback).
 
-### 5.6 Video Preview System
+### 5.6 Video Model and Preview
 
-Imported source videos are served by a custom local HTTP server (`video_server.rs`) for native `<video>` element playback:
+**Video model.** `importedVideos[]` holds one validated entity per imported file (frame-exact duration, exact rational FPS, display resolution, rotation, audio, creation time, preview registration, embedded telemetry state). User edits live in `videoEdits[videoId]` (`offsetSeconds`, `offsetSource` (`auto` or `manual`, a start set by hand that detecting times again keeps), `deletedParts`, `transitionIn`, `placementAnchor`) and are undoable. `joinVideoEdits` joins them into timeline clips, and `buildProgram` (`lib/video-program/program.js`) derives the output program: ordered **pieces** (continuous source ranges after deleted parts and the export range; overlaps resolved by trimming the later piece) and **joins** between consecutive pieces (a clip join or a deleted-part join, each with a transition: an override or the project default by the continuity-threshold rule). Timeline, preview, warnings, export review and transition proxies all consume this one derivation.
+
+**Preview registry.** Every imported video is served by the local HTTP server (`video_server.rs`) under its own opaque import ID (`/video/<import_id>`); registering or removing one never invalidates another. Transition proxies are registered the same way.
 
 ```
-User selects video
-    │
+useVideoImport.js → import dialog: probe each file (backend.preparePreviewVideo), review
     ▼
-useVideoImport.js → backend.importPreviewVideo(path)
-    │                          (features/video-preview/hooks/)
-    ▼
-lib.rs: backend_import_preview_video
-    ├── Assigns UUIDv4 import_id
-    ├── Registers file in VideoServerHandle
-    └── Returns preview_url (http://127.0.0.1:PORT/video/<uuid>)
-    │
+createImportedVideo (ingress validation) → register previews → commitVideoCollection
     ▼
 useVideoPreview.js
-    ├── Sets <video> src to preview_url
-    ├── Handles play/pause/scrub via useVideoPlaybackClock
-    ├── Syncs with activity timeline via videoSyncOffsetSeconds
-    └── Debounces seek requests for performance
+    ├── resolvePreviewTarget(program, playhead) → clip and source second shown
+    ├── two <video> elements: the active one plays the piece at the playhead, the parked one
+    │   waits at the next piece's continuation, so cuts swap elements
+    ├── useVideoPlaybackClock publishes the playhead from the active element; at a piece end
+    │   playback continues at the next piece (skipping gaps, deleted parts and the start a
+    │   transition already showed)
+    └── inside a transition window a ready proxy plays over the outgoing piece; the overlay
+        blends into the incoming clip's widgets (`useTransitionOverlay`)
 ```
+
+**Transition proxies.** `listTransitionProxyJobs` describes one proxy per `xfade` join (its content key is the whole request); `useTransitionProxyQueue` renders them one at a time nearest the playhead first (`backend_render_transition_proxy`) and releases those no join needs. Proxy files live in `<runtime>/tmp/transition-proxies` and are cleared at startup.
 
 ---
 
 ## 6. Backend Architecture
 
-### 6.1 Tauri IPC Commands (21 total)
+### 6.1 Tauri IPC Commands
 
-All defined in `lib.rs` and implemented in `ovrley_core/src/commands/mod.rs`:
+Registered in `lib.rs` (`tauri_commands.rs`, `project_file.rs`, `file_ops.rs`) and implemented in `ovrley_core`. A selection:
 
 | Command                        | Purpose                                       |
 | ------------------------------ | --------------------------------------------- |
@@ -487,7 +503,11 @@ All defined in `lib.rs` and implemented in `ovrley_core/src/commands/mod.rs`:
 | `backend_current_os`           | OS string ("windows", "macos")                |
 | `backend_list_system_fonts`    | Skia FontMgr font listing                     |
 | `backend_finalize_activity`    | Finalize RawActivity into ParsedActivity      |
-| `backend_render`               | Start video render (transparent or composite) |
+| `backend_render`               | Start a single render (the activity overlay without videos) |
+| `backend_create_video_inspection` / `backend_inspect_video_source` / `backend_dispose_video_inspection` | Session-owned source inspection for exports |
+| `backend_plan_batch_outputs`   | Plan export outputs at their destination (frames, durations, paths) |
+| `backend_submit_batch` / `backend_batch_snapshot` / `backend_cancel_batch` | Export videos: outputs of pieces joined by transitions; progress snapshots and events |
+| `backend_render_transition_proxy` / `backend_release_transition_proxy` | Preview proxy of one transition, served like a preview video |
 | `backend_render_preview_frame` | Render one transparent preview PNG (debug)    |
 | `backend_progress`             | Poll render progress                          |
 | `backend_cancel`               | Cancel active render                          |
@@ -496,9 +516,11 @@ All defined in `lib.rs` and implemented in `ovrley_core/src/commands/mod.rs`:
 | `backend_list_templates`       | List bundled + user templates                 |
 | `backend_get_template`         | Read template JSON                            |
 | `backend_probe_video`          | ffprobe metadata extraction                   |
-| `backend_import_preview_video` | Register video for preview                    |
-| `backend_clear_preview_video`  | Clear preview registration                    |
-| `backend_get_video_state`      | Diagnostic server state                       |
+| `backend_prepare_preview_video` | Probe a video without registering it       |
+| `backend_register_preview_video` | Register probed video for preview (adds)    |
+| `backend_remove_preview_video` | Remove one preview registration by import ID  |
+| `backend_clear_preview_videos` | Remove all preview registrations              |
+| `backend_get_preview_videos`   | Diagnostic state of all registrations         |
 | `backend_detect_codecs`        | Probe encoder availability                    |
 | `backend_build_elevation_geometry` | Build elevation widget geometry via IPC   |
 | `backend_build_route_geometry` | Build route widget geometry via IPC           |
@@ -770,54 +792,57 @@ OverlayEditor renders all widgets from config
 ### 7.4 Video Render Export
 
 ```
-[User clicks "Render"]
+[User clicks "Render"] → RenderVideoDialog (codec, quality, FPS, output mode, destination)
     │
-    ▼
-RenderVideoDialog opens → user selects codec, bitrate, FPS, etc.
+    ├── without videos: single render of the activity overlay
+    │       createRenderRequest → backend_render → RenderProgressPanel
     │
-    ▼
-[User clicks "Start Render"]
-    │
-    ▼
-render-video.js → build final config
-    ├── Apply global defaults
-    ├── Override with export settings (FPS, update rate, codec)
-    ├── Set composite_video_path if MP4 mode
-    └── Invoke backend.renderVideo(config, activity)
-    │
-    ▼
-Rust: backend_render command
-    ├── derive_composite_render_plan() (if composite)
-    ├── trim + densify activity at output FPS
-    ├── Render loop → pipe frames to FFmpeg
-    └── Monitor progress
-    │
-    ▼
-Frontend polls backend_progress every 500ms
-    │
-    ▼
-RenderProgressPanel shows progress bar + ETA
-    │
-    ▼
-On completion: backend_open_video → OS file manager opens output
+    └── with videos: batch service
+            useBatchInspection: inspect every video natively (fresh descriptors)
+            reviewExport (render-video/utils/exportOutputs.js):
+              combined → one output = the program's pieces joined by its transitions
+              separate → one output per video = its pieces joined at its deleted parts
+              (transparent outputs join with hard cuts; reasons a combined file cannot
+               render: overlaps, different resolution/FPS, transitions too long, unreadable videos)
+            backend_plan_batch_outputs → backend_submit_batch (destination: file | sourceNamed)
+                ▼
+            Rust render_jobs: per output, a single piece renders straight to the target;
+            otherwise each piece (or its head/body/tail next to a transition) renders to a part,
+            transitions are xfade(tail, head) encoded with the output's encoder, parts are
+            remuxed to MPEG-TS and joined by the concat demuxer, the audio is encoded once from
+            the sources (acrossfade at transitions), the result is verified with ffprobe
+                ▼
+            Batch snapshots/events → queue rows and progress; existing combined files ask first
 ```
 
 ### 7.5 Video Import + Sync
 
 ```
-[User imports video]
+[User imports one or many videos]
     │
     ▼
-VideoServerHandle.set_video(path)
-    ├── Starts HTTP server on random port (if not running)
-    └── Returns preview URL
+probe each file (no preview registration, no store change) → createImportedVideo
+    ▼
+import dialog: a draft of the whole collection (existing and new videos), edited with
+the same recipes as the store (lib/video-program/collection-edits.js)
+    ├── placement: against the external activity, or by recording time relative to the
+    │   earliest clip (shared correction of the automatic clips); undeterminable clips go
+    │   after the previous clip and are moved with arrows (placementAnchor)
+    ├── sync per video in seconds (set by hand = manual, kept when times are detected
+    │   again) and the automatic sync controls; landmark sync stays in the sidebar
+    ├── window: a video joins when it starts within an hour of the activity (or of the
+    │   videos already imported); a fresh import without an activity takes its videos
+    │   when they start within 12 hours of each other
+    ├── overlaps, single-file blockers, transition defaults
+    └── Import: register previews of the joining videos → commitVideoCollection (one
+        change) → embedded telemetry read per clip in the background
+Project load uses the same pipeline: probe, validate the saved edits against the probed
+videos, register, commit, telemetry — nothing changes before validation succeeds.
     │
     ▼
-useVideoPreview sets <video src>
-├── useVideoPlaybackClock drives timeline
-└── Video sync: compares video sync_time vs activity timestamps
-    ├── computeVideoSync() → auto-sets videoSyncOffsetSeconds
-    └── During render: composite_video_path + sync_offset applied
+Timeline lane: clips at their offsets, overlap bands, deleted parts, join markers
+Without an external activity each clip's own telemetry drives widgets in clip-local time;
+frames without activity coverage show raster widgets only.
 ```
 
 ---

@@ -151,11 +151,13 @@ export function validateLandmark(landmark, videoDurationSeconds = null) {
 }
 
 /**
- * Creates the documented durable defaults for a new project.
- * @returns {{landmarks: object[], detectedLocationSecond: number|null, speedThresholdKmh: number, turnThresholdDegrees: number}} Default state.
+ * Creates the documented durable defaults for a new project. `videoId` names the
+ * imported video whose landmarks are being matched.
+ * @returns {{videoId: string|null, landmarks: object[], detectedLocationSecond: number|null, speedThresholdKmh: number, turnThresholdDegrees: number}} Default state.
  */
 export function createDefaultManualState() {
   return {
+    videoId: null,
     landmarks: [],
     detectedLocationSecond: null,
     speedThresholdKmh: VIDEO_SYNC_DEFAULT_SPEED_THRESHOLD_KMH,

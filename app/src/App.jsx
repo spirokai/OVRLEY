@@ -20,7 +20,8 @@ import {
 } from '@/features/toolbar'
 import { VideoSyncDrawerContent, useVideoSyncWorkspace } from '@/features/video-sync'
 import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_SYNC_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
-import { MissingSourceDialog, StartupProjectsDialog } from '@/features/projects'
+import { MissingSourceDialog, ProjectNoticeDialog, StartupProjectsDialog } from '@/features/projects'
+import { VideoImportDialog } from '@/features/video-preview'
 import { UpdatePromptDialog } from '@/features/app-update'
 import {
   AppHeader,
@@ -82,11 +83,7 @@ function AppShell() {
   } = useAppShellComposition()
   const toolbarDrawer = useToolbarDrawer(layout)
   const videoSync = useVideoSyncControls()
-  const videoSyncWorkspace = useVideoSyncWorkspace({
-    toolbarDrawer,
-    videoSummary: videoControls.videoSummary,
-    videoSync,
-  })
+  const videoSyncWorkspace = useVideoSyncWorkspace({ toolbarDrawer, videoSync })
   const { config, globalDefaults, importingVideo, isProcessing, setConfig } = appShell
   let drawerContent = null
 
@@ -98,8 +95,7 @@ function AppShell() {
           projectPath={projectLifecycle.loadedProjectPath}
           activityFilename={activityImport.activityFilename}
           activityPath={activityImport.activityPath}
-          videoFilename={videoControls.videoSummary.filename}
-          videoPath={videoControls.videoSummary.path}
+          videoSources={videoControls.videoSummaries}
           status={projectLifecycle.status}
           busy={projectLifecycle.busy}
           onNew={projectLifecycle.handleNewProject}
@@ -121,9 +117,10 @@ function AppShell() {
     } else if (toolbarDrawer.activeTool === VIDEO_TOOL) {
       drawerContent = (
         <VideoDrawerContent
-          videoSummary={videoControls.videoSummary}
+          videoSummaries={videoControls.videoSummaries}
           onBrowseVideo={videoControls.handleImportVideo}
-          onDeleteVideo={videoControls.clearImportedVideo}
+          onDeleteVideo={videoControls.clearImportedVideos}
+          onRemoveVideo={videoControls.removeVideo}
           onDropVideoFiles={videoControls.handleVideoFilesDrop}
           videoSync={videoSync}
         />
@@ -170,6 +167,8 @@ function AppShell() {
         <UnsavedChangesDialog {...templateManagement.newTemplateConfirmDialog} />
         <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />
         <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
+        <ProjectNoticeDialog {...projectLifecycle.noticeDialog} />
+        <VideoImportDialog {...videoControls.importDialog} />
         <KeyboardShortcutsDialog
           open={editorShell.keyboardShortcutsOpen}
           locale={i18n.resolvedLanguage}
@@ -218,7 +217,7 @@ function AppShell() {
                   gridVisible={editorShell.editorGridVisible}
                   snapToGrid={editorShell.editorSnapToGrid}
                   importedBackgroundImageFilename={videoControls.importedBackgroundImageFilename}
-                  importedVideoFilename={videoControls.importedVideoFilename}
+                  importedVideoLabel={videoControls.importedVideoLabel}
                   editorShell={editorShell}
                   undoRedoControls={undoRedoControls}
                   showProjectStatus={projectLifecycle.status !== 'Saved'}
@@ -232,6 +231,7 @@ function AppShell() {
                 activeKeyboardWorkspace={editorShell.activeKeyboardWorkspace}
                 backgroundMode={editorShell.editorBackgroundMode}
                 onActivateKeyboardWorkspace={() => editorShell.setActiveKeyboardWorkspace('player')}
+                onRemoveVideo={videoControls.removeVideo}
                 videoSyncMode={videoSyncWorkspace.videoSyncMode}
               />
             </>

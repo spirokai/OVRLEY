@@ -11,6 +11,8 @@ import { createLayoutSlice } from './slices/createLayoutSlice'
 import { createRenderSettingsSlice } from './slices/createRenderSettingsSlice'
 import { createBatchRenderSlice } from './slices/createBatchRenderSlice'
 import { createManualVideoSyncSlice } from './slices/createManualVideoSyncSlice'
+import { createDeletedPartsSlice } from './slices/createDeletedPartsSlice'
+import { createTransitionProxySlice } from './slices/createTransitionProxySlice'
 import { withEditorHistory } from '@/features/undo-redo/undoHistory'
 
 function createStoreState(set, get) {
@@ -19,6 +21,8 @@ function createStoreState(set, get) {
     ...createEditorSlice(set, get),
     ...createMediaSlice(set, get),
     ...createVideoImportSlice(set, get),
+    ...createDeletedPartsSlice(set, get),
+    ...createTransitionProxySlice(set),
     ...createRenderSettingsSlice(set, get),
     ...createBatchRenderSlice(set),
     ...createManualVideoSyncSlice(set, get),

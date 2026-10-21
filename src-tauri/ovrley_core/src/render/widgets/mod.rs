@@ -41,7 +41,7 @@ pub mod value;
 use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::debug::RenderProfiler;
-use crate::error::CoreResult;
+use crate::error::{CoreError, CoreResult};
 use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
 use crate::render::format::altitude_offset_m;
@@ -91,11 +91,13 @@ mod tests;
 /// Prepares all widget-specific caches needed by the active template.
 ///
 /// All config validation has already happened at the seam. This function
-/// clones validated data into widget caches without re-validating.
+/// clones validated data into widget caches without re-validating. Without an
+/// activity only static widgets can be prepared (a video without telemetry
+/// renders its rasters only).
 pub fn prepare_render_assets(
     paths: &AppPaths,
     config: &ValidatedRenderConfig,
-    activity: &ParsedActivity,
+    activity: Option<&ParsedActivity>,
     dense_activity: &DenseActivityReport,
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<PreparedRenderAssets> {
@@ -108,13 +110,26 @@ pub fn prepare_render_assets(
     let mut assets = PreparedRenderAssets {
         scene,
         export_start_seconds,
-        timezone: activity.timezone.clone(),
+        timezone: activity.and_then(|activity| activity.timezone.clone()),
         backdrops,
         labels,
         values,
         route_caches: Vec::new(),
         elevation_caches: Vec::new(),
         base_rgba: None,
+        raster_rgba: None,
+    };
+
+    let Some(activity) = activity else {
+        if !config.values.is_empty()
+            || !config.course_plots.is_empty()
+            || !config.elevation_plots.is_empty()
+        {
+            return Err(CoreError::Config(
+                "Value widgets and plots require activity data".into(),
+            ));
+        }
+        return Ok(assets);
     };
 
     for validated in &config.course_plots {

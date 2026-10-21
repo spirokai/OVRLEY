@@ -15,6 +15,7 @@ import OverlayMoveable from './OverlayMoveable'
 import { WIDGET_ICONS } from '../data/overlayEditorConfig'
 import { useOverlayEditorStateWithLiveEdits } from '../hooks/useOverlayEditorState'
 import useOverlayPreviewModels from '../hooks/useOverlayPreviewModels'
+import { useTransitionOverlay } from '../hooks/useTransitionOverlay'
 import useWidgetSelection from '../hooks/useWidgetSelection'
 import { useEditorViewport } from '../hooks/useEditorViewport'
 import { useEditorKeyboard } from '../hooks/useEditorKeyboard'
@@ -35,6 +36,9 @@ const PROJECT_STATUS_TRANSLATIONS = {
   Saved: { key: 'overlay-editor.statusSaved', defaultLabel: 'Saved' },
   Modified: { key: 'overlay-editor.statusModified', defaultLabel: 'Modified' },
 }
+
+// Without a transition no incoming widget models are built.
+const NO_WIDGETS = []
 
 function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels, selectedWidgetIds, widgets }) {
   const { t } = useTranslation()
@@ -92,14 +96,14 @@ function CanvasStatusBadges({ height, showProjectStatus, status, width }) {
   )
 }
 
-function CanvasToolbar({ editorShell, importedBackgroundImageFilename, importedVideoFilename, undoRedoControls }) {
+function CanvasToolbar({ editorShell, importedBackgroundImageFilename, importedVideoLabel, undoRedoControls }) {
   return (
     <div data-testid="canvas-editor-toolbar" className="pointer-events-auto absolute left-1/2 top-4 z-50 -translate-x-1/2">
       <EditorToolbar
         backgroundMode={editorShell.editorBackgroundMode}
         onSetBackgroundMode={editorShell.setEditorBackgroundMode}
         importedBackgroundImageFilename={importedBackgroundImageFilename}
-        importedVideoFilename={importedVideoFilename}
+        importedVideoLabel={importedVideoLabel}
         zoomLevel={editorShell.editorZoomLevel}
         onZoomIn={editorShell.increaseZoom}
         onZoomOut={editorShell.decreaseZoom}
@@ -142,7 +146,7 @@ function OverlayEditorContent({
   gridVisible,
   snapToGrid,
   importedBackgroundImageFilename,
-  importedVideoFilename,
+  importedVideoLabel,
   showProjectStatus,
   projectStatus,
   videoSyncMode = false,
@@ -170,6 +174,26 @@ function OverlayEditorContent({
     exportStartSecond: overlayState.previewExportStartSecond,
     renderedWidgets: overlayState.canvasWidgets,
   })
+  // Inside a shown transition the overlay blends into the incoming piece's widgets.
+  const transitionOverlay = useTransitionOverlay()
+  const incomingPreviewModels = useOverlayPreviewModels({
+    activity: transitionOverlay?.activity ?? null,
+    globalScale: overlayState.globalScale,
+    previewSecond: transitionOverlay?.previewSecond ?? 0,
+    exportStartSecond: transitionOverlay?.exportRange.from ?? 0,
+    renderedWidgets: transitionOverlay === null ? NO_WIDGETS : overlayState.canvasWidgets,
+  })
+  const incomingOverlay = useMemo(
+    () =>
+      transitionOverlay === null || videoSyncMode
+        ? null
+        : {
+            ...transitionOverlay,
+            metricPreviewModels: incomingPreviewModels.metricPreviewModels,
+            textPreviewModels: incomingPreviewModels.textPreviewModels,
+          },
+    [incomingPreviewModels, transitionOverlay, videoSyncMode],
+  )
 
   const renderGeometryModels = useMemo(
     () =>
@@ -384,10 +408,14 @@ function OverlayEditorContent({
       textPreviewModels,
       renderGeometryModels,
       exportRange: overlayState.previewExportRange,
+      hasActivityCoverage: overlayState.hasActivityCoverage,
+      incomingOverlay,
     }),
     [
       activity,
+      incomingOverlay,
       metricPreviewModels,
+      overlayState.hasActivityCoverage,
       overlayState.previewExportRange,
       overlayState.previewSecond,
       overlayState.canvasWidgets,
@@ -422,7 +450,7 @@ function OverlayEditorContent({
       <CanvasToolbar
         editorShell={editorShell}
         importedBackgroundImageFilename={importedBackgroundImageFilename}
-        importedVideoFilename={importedVideoFilename}
+        importedVideoLabel={importedVideoLabel}
         undoRedoControls={undoRedoControls}
       />
       <div ref={scrollViewportRef} className="absolute left-0 right-0 top-12 bottom-0 overflow-auto" onWheel={handleWheel}>

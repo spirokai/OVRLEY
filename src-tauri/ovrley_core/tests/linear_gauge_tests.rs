@@ -149,7 +149,7 @@ fn prepare_assets_builds_linear_gauge_cache_with_activity_range() {
     let dense = dense_speed_activity(vec![Some(10.0), Some(30.0), Some(50.0)]);
     let mut profiler = RenderProfiler::default();
 
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&paths, &config, Some(&activity), &dense, &mut profiler).unwrap();
 
     let PreparedValue::LinearGauge(widget) = &assets.values()[0] else {
         panic!("linear gauge should prepare a gauge cache at value index 0");
@@ -181,7 +181,7 @@ fn bars_style_resolves_configured_linear_geometry_into_the_cache() {
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
     let mut profiler = RenderProfiler::default();
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+    let assets = prepare_render_assets(&paths, &config, Some(&activity), &dense, &mut profiler).unwrap();
 
     let PreparedValue::LinearGauge(widget) = &assets.values()[0] else {
         panic!("linear bars should use the linear gauge cache");

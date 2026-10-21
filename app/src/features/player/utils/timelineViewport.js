@@ -178,27 +178,17 @@ export function followPlayhead({ playheadSecond, viewStart, viewEnd, totalDurati
 /**
  * Builds canonical fit targets for the current media shape.
  *
- * @param {{ totalDuration: number, widthPx?: number, hasVideo: boolean, videoSyncOffsetSeconds: number, importedVideoDuration: number, hasActivityData: boolean, activityDurationSeconds: number, fallbackDurationSeconds: number }} options
+ * @param {{ totalDuration: number, widthPx?: number, videoBounds: {startSecond: number, endSecond: number}|null, hasActivityData: boolean, activityDurationSeconds: number, fallbackDurationSeconds: number }} options
  * @returns {Array<{ id: 'all'|'video'|'activity', label: string, viewport: { viewStart: number, viewEnd: number } }>}
  */
-export function buildFitTargets({
-  totalDuration,
-  widthPx = 0,
-  hasVideo,
-  videoSyncOffsetSeconds,
-  importedVideoDuration,
-  hasActivityData,
-  activityDurationSeconds,
-  fallbackDurationSeconds,
-}) {
+export function buildFitTargets({ totalDuration, widthPx = 0, videoBounds, hasActivityData, activityDurationSeconds, fallbackDurationSeconds }) {
   const targets = []
-  const timelineMinimum = getTimelineMinimum({ hasVideo, videoSyncOffsetSeconds })
+  const timelineMinimum = getTimelineMinimum({ videoBounds })
   const componentRanges = []
 
-  if (hasVideo) {
-    const start = videoSyncOffsetSeconds
-    const duration = importedVideoDuration
-    const end = start + duration
+  if (videoBounds !== null) {
+    const start = videoBounds.startSecond
+    const end = videoBounds.endSecond
     componentRanges.push({ start, end })
     targets.push({
       id: 'video',
