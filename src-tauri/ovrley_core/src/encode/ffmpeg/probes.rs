@@ -7,7 +7,7 @@ use crate::encode::ffmpeg::catalog::{
 use crate::encode::ffmpeg::composite_filters::composite_filter_complex;
 use crate::encode::ffmpeg::composite_profiles::composite_profile;
 use crate::encode::ffmpeg::transparent_profiles::transparent_profile;
-use crate::render::{AtlasPlan, FrameSize};
+use crate::render::{AtlasPlan, FrameSize, SlotPlacement};
 use skia_safe::IRect;
 use std::fs;
 use std::path::Path;
@@ -108,6 +108,7 @@ fn qsv_overlay_probe_args(candidate: &QsvProbeCandidate) -> Vec<String> {
             Some(IRect::new(8, 8, 40, 40)),
             Some(IRect::new(72, 80, 120, 120)),
         ],
+        SlotPlacement::Overlay,
     )
     .expect("fixed QSV probe layer bounds fit the probe frame");
     let render_graph = composite_filter_complex(

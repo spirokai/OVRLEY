@@ -18,7 +18,7 @@ use std::{
 };
 use surface::{wrap_native_surface, write_surface_png};
 
-pub use atlas::{AtlasPlan, AtlasSlot};
+pub use atlas::{AtlasPlan, AtlasSlot, SlotPlacement};
 pub use engine::{ExportWidgets, PreparedAtlas, WorkerWidgets};
 
 /// Canonical dimensions for a rendered video frame.

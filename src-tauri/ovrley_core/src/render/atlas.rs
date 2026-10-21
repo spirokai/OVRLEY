@@ -6,10 +6,12 @@
 //! Overlapping slots are merged when their union costs no more than the two
 //! slots apart, or when their layers interleave; widgets inside one slot
 //! composite in layer order. Slots left overlapping are overlaid in layer
-//! order, since compositing over is associative. The slots are then
+//! order, since compositing over is associative. A plan whose slots are copied
+//! onto a transparent frame instead merges every overlap. The slots are then
 //! shelf-packed into one atlas frame. Each slot
 //! keeps its scene position modulo [`PIXEL_PHASE`], so widgets drawn straight
-//! into the atlas produce exactly the pixels they produce in the full frame.
+//! into the atlas produce the pixels they produce in the full frame, up to one
+//! level where Skia's float anti-aliasing rounds a shifted path differently.
 //!
 //! The full frame is the plan with one slot covering the frame. The plan is
 //! immutable for an export and is the single source for frame production and
@@ -26,6 +28,15 @@ pub const PIXEL_PHASE: i32 = 8;
 /// Smallest position at or after `at` with the same phase as `scene`; even inputs stay even.
 fn in_phase(at: i32, scene: i32) -> i32 {
     at + (scene - at).rem_euclid(PIXEL_PHASE)
+}
+
+/// How FFmpeg places the atlas slots back on the frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SlotPlacement {
+    /// Slots are overlaid in order onto the main video, so they may overlap.
+    Overlay,
+    /// Slots are copied onto a transparent frame, so they never overlap.
+    Copy,
 }
 
 /// One region of the scene copied into the atlas.
@@ -64,8 +75,9 @@ impl AtlasPlan {
 
     /// Plans slots from each layer's union of frame-clipped bounds over every
     /// planned frame; layers without bounds are never visible and get no slot.
+    /// `placement` decides which overlapping slots merge.
     /// A packed atlas at least as large as the frame degrades to the full frame.
-    pub fn from_layer_bounds(frame: FrameSize, layer_bounds: &[Option<IRect>]) -> CoreResult<Self> {
+    pub fn from_layer_bounds(frame: FrameSize, layer_bounds: &[Option<IRect>], placement: SlotPlacement) -> CoreResult<Self> {
         let limit = frame_rect(frame);
         let mut slots: Vec<(IRect, Vec<usize>)> = Vec::new();
         for (layer, bounds) in layer_bounds.iter().enumerate() {
@@ -78,7 +90,7 @@ impl AtlasPlan {
             }
             slots.push((even_outward(bounds), vec![layer]));
         }
-        merge_overlapping(&mut slots);
+        merge_overlapping(&mut slots, placement);
         let plan = pack(slots);
         let area = |size: FrameSize| u64::from(size.width) * u64::from(size.height);
         Ok(if area(plan.size) >= area(frame) {
@@ -95,6 +107,36 @@ impl AtlasPlan {
 
     pub fn slots(&self) -> &[AtlasSlot] {
         &self.slots
+    }
+
+    /// Scene rectangle of `slot` clipped to `frame`, and the atlas rectangle
+    /// holding it. A planned slot can extend one column or row past an odd frame edge.
+    pub fn frame_placement(slot: &AtlasSlot, frame: FrameSize) -> (IRect, IRect) {
+        let scene = IRect::new(
+            slot.scene.left,
+            slot.scene.top,
+            slot.scene.right.min(frame.width as i32),
+            slot.scene.bottom.min(frame.height as i32),
+        );
+        let atlas = IRect::from_xywh(slot.atlas_origin.x, slot.atlas_origin.y, scene.width(), scene.height());
+        (scene, atlas)
+    }
+
+    /// Copies the slots of an RGBA atlas frame onto a transparent RGBA frame;
+    /// slots of a [`SlotPlacement::Copy`] plan never overlap.
+    pub fn unpack_rgba(&self, atlas: &[u8], frame: FrameSize) -> CoreResult<Vec<u8>> {
+        let mut pixels = vec![0; frame.rgba_len()?];
+        let (frame_stride, atlas_stride) = (frame.width as usize * 4, self.size.width as usize * 4);
+        for slot in &self.slots {
+            let (scene, rect) = Self::frame_placement(slot, frame);
+            let row_bytes = scene.width() as usize * 4;
+            for row in 0..scene.height() as usize {
+                let from = (rect.top as usize + row) * atlas_stride + rect.left as usize * 4;
+                let to = (scene.top as usize + row) * frame_stride + scene.left as usize * 4;
+                pixels[to..to + row_bytes].copy_from_slice(&atlas[from..from + row_bytes]);
+            }
+        }
+        Ok(pixels)
     }
 
     /// Atlas rectangle of `slot`.
@@ -155,14 +197,18 @@ fn interleave(a: &[usize], b: &[usize]) -> bool {
 /// has layers that do not interleave. Apart, the overlap is blended twice;
 /// merged, the union's empty area is piped and blended instead, so the union is
 /// taken when it is no larger than the two slots together. Interleaved layers
-/// have no overlay order and always merge. A merged slot keeps its layers in
-/// layer order.
-fn merge_overlapping(slots: &mut Vec<(IRect, Vec<usize>)>) {
+/// have no overlay order and always merge. Copied slots have no blending and
+/// always merge. A merged slot keeps its layers in layer order.
+fn merge_overlapping(slots: &mut Vec<(IRect, Vec<usize>)>, placement: SlotPlacement) {
     'merge: loop {
         for first in 0..slots.len() {
             for second in first + 1..slots.len() {
                 let ((a, a_layers), (b, b_layers)) = (&slots[first], &slots[second]);
-                if overlaps(a, b) && (area(&union(a, b)) <= area(a) + area(b) || interleave(a_layers, b_layers)) {
+                if overlaps(a, b)
+                    && (placement == SlotPlacement::Copy
+                        || area(&union(a, b)) <= area(a) + area(b)
+                        || interleave(a_layers, b_layers))
+                {
                     let (rect, layers) = slots.swap_remove(second);
                     slots[first].0 = union(&slots[first].0, &rect);
                     slots[first].1.extend(layers);
@@ -294,7 +340,7 @@ mod tests {
             None,
             Some(IRect::new(3001, 2001, 3839, 2159)),
         ];
-        let plan = AtlasPlan::from_layer_bounds(UHD, &bounds).unwrap();
+        let plan = AtlasPlan::from_layer_bounds(UHD, &bounds, SlotPlacement::Overlay).unwrap();
         assert_packed(&plan);
         let scenes: Vec<_> = plan.slots().iter().map(|slot| (slot.scene, slot.layers.clone())).collect();
         assert_eq!(
@@ -309,7 +355,7 @@ mod tests {
     #[test]
     fn odd_frame_edges_extend_the_even_slot_past_the_frame() {
         let frame = FrameSize { width: 1281, height: 721 };
-        let plan = AtlasPlan::from_layer_bounds(frame, &[Some(IRect::new(1201, 701, 1281, 721))]).unwrap();
+        let plan = AtlasPlan::from_layer_bounds(frame, &[Some(IRect::new(1201, 701, 1281, 721))], SlotPlacement::Overlay).unwrap();
         assert_packed(&plan);
         assert_eq!(plan.slots()[0].scene, IRect::new(1200, 700, 1282, 722));
     }
@@ -322,7 +368,7 @@ mod tests {
             Some(IRect::new(110, 0, 150, 40)),
             Some(IRect::new(10, 10, 110, 110)),
         ];
-        let plan = AtlasPlan::from_layer_bounds(UHD, &bounds).unwrap();
+        let plan = AtlasPlan::from_layer_bounds(UHD, &bounds, SlotPlacement::Overlay).unwrap();
         assert_packed(&plan);
         let scenes: Vec<_> = plan.slots().iter().map(|slot| (slot.scene, slot.layers.clone())).collect();
         assert_eq!(
@@ -338,11 +384,20 @@ mod tests {
     fn costly_overlaps_stay_apart_in_layer_order() {
         // A wide strip crossed by a tall strip: their union is mostly empty.
         let bounds = [Some(IRect::new(0, 900, 3000, 1000)), Some(IRect::new(1400, 0, 1600, 2000))];
-        let plan = AtlasPlan::from_layer_bounds(UHD, &bounds).unwrap();
+        let plan = AtlasPlan::from_layer_bounds(UHD, &bounds, SlotPlacement::Overlay).unwrap();
         assert_packed(&plan);
         let scenes: Vec<_> = plan.slots().iter().map(|slot| (slot.scene, slot.layers.clone())).collect();
         assert_eq!(scenes, [(bounds[0].unwrap(), vec![0]), (bounds[1].unwrap(), vec![1])]);
         assert!(overlaps(&plan.slots()[0].scene, &plan.slots()[1].scene));
+    }
+
+    #[test]
+    fn copied_slots_merge_every_overlap() {
+        let bounds = [Some(IRect::new(0, 900, 3000, 1000)), Some(IRect::new(1400, 0, 1600, 2000))];
+        let plan = AtlasPlan::from_layer_bounds(UHD, &bounds, SlotPlacement::Copy).unwrap();
+        assert_packed(&plan);
+        let scenes: Vec<_> = plan.slots().iter().map(|slot| (slot.scene, slot.layers.clone())).collect();
+        assert_eq!(scenes, [(IRect::new(0, 0, 3000, 2000), vec![0, 1])]);
     }
 
     #[test]
@@ -353,7 +408,7 @@ mod tests {
             Some(IRect::new(100, 0, 2000, 40)),
             Some(IRect::new(10, 10, 110, 110)),
         ];
-        let plan = AtlasPlan::from_layer_bounds(UHD, &bounds).unwrap();
+        let plan = AtlasPlan::from_layer_bounds(UHD, &bounds, SlotPlacement::Overlay).unwrap();
         assert_packed(&plan);
         let scenes: Vec<_> = plan.slots().iter().map(|slot| (slot.scene, slot.layers.clone())).collect();
         assert_eq!(scenes, [(IRect::new(0, 0, 2000, 110), vec![0, 1, 2])]);
@@ -368,7 +423,7 @@ mod tests {
                 Some(IRect::from_xywh(left, top, 37 + index * 11 % 300, 23 + index * 7 % 200))
             })
             .collect();
-        let plan = AtlasPlan::from_layer_bounds(UHD, &bounds).unwrap();
+        let plan = AtlasPlan::from_layer_bounds(UHD, &bounds, SlotPlacement::Overlay).unwrap();
         assert_packed(&plan);
         assert_eq!(plan.slots().len(), 40);
         let mut layers: Vec<_> = plan.slots().iter().flat_map(|slot| slot.layers.clone()).collect();
@@ -382,20 +437,48 @@ mod tests {
     fn layouts_covering_the_frame_degrade_to_the_full_frame_plan() {
         let frame = FrameSize { width: 1920, height: 1080 };
         let bounds = [Some(IRect::new(0, 0, 1920, 1080)), Some(IRect::new(10, 10, 20, 20)), None];
-        assert_eq!(AtlasPlan::from_layer_bounds(frame, &bounds).unwrap(), AtlasPlan::full_frame(frame, 3));
+        assert_eq!(AtlasPlan::from_layer_bounds(frame, &bounds, SlotPlacement::Overlay).unwrap(), AtlasPlan::full_frame(frame, 3));
     }
 
     #[test]
     fn without_visible_layers_the_atlas_is_one_transparent_chroma_block() {
-        let plan = AtlasPlan::from_layer_bounds(UHD, &[None, None]).unwrap();
+        let plan = AtlasPlan::from_layer_bounds(UHD, &[None, None], SlotPlacement::Overlay).unwrap();
         assert_eq!(plan.size(), FrameSize { width: 2, height: 2 });
         assert!(plan.slots().is_empty());
     }
 
     #[test]
+    fn unpacking_copies_each_slot_to_its_scene_position_clipped_to_the_frame() {
+        let frame = FrameSize { width: 63, height: 31 };
+        let plan = AtlasPlan::from_layer_bounds(
+            frame,
+            &[Some(IRect::new(0, 0, 2, 2)), Some(IRect::new(50, 20, 63, 31))],
+            SlotPlacement::Copy,
+        )
+        .unwrap();
+        assert_eq!(plan.slots().len(), 2, "{plan:?}");
+        let atlas_size = plan.size();
+        let atlas: Vec<u8> = (0..atlas_size.rgba_len().unwrap()).map(|byte| (byte / 4 + 1) as u8).collect();
+        let pixels = plan.unpack_rgba(&atlas, frame).unwrap();
+        let pixel = |x: usize, y: usize| pixels[(y * 63 + x) * 4];
+        let atlas_pixel = |x: i32, y: i32| atlas[(y as usize * atlas_size.width as usize + x as usize) * 4];
+        for slot in plan.slots() {
+            let (scene, rect) = AtlasPlan::frame_placement(slot, frame);
+            for (dy, dx) in (0..scene.height()).flat_map(|dy| (0..scene.width()).map(move |dx| (dy, dx))) {
+                assert_eq!(
+                    pixel((scene.left + dx) as usize, (scene.top + dy) as usize),
+                    atlas_pixel(rect.left + dx, rect.top + dy)
+                );
+            }
+        }
+        assert_eq!(pixel(30, 10), 0, "pixels outside the slots stay transparent");
+        assert_eq!(pixels.len(), frame.rgba_len().unwrap());
+    }
+
+    #[test]
     fn bounds_outside_the_frame_are_rejected() {
         for bounds in [IRect::new(-1, 0, 10, 10), IRect::new(0, 0, 3841, 10), IRect::new(5, 5, 5, 10)] {
-            assert!(AtlasPlan::from_layer_bounds(UHD, &[Some(bounds)]).is_err(), "{bounds:?}");
+            assert!(AtlasPlan::from_layer_bounds(UHD, &[Some(bounds)], SlotPlacement::Overlay).is_err(), "{bounds:?}");
         }
     }
 }

@@ -42,7 +42,7 @@ use crate::normalize::ValidatedRenderConfig;
 use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
 use crate::debug::RenderProfiler;
-use crate::render::{ExportWidgets, FrameSize, PreparedAtlas};
+use crate::render::{ExportWidgets, FrameSize, PreparedAtlas, SlotPlacement};
 use crate::render_jobs::inspection::CompositeSourceMetadata;
 
 /// Encoding inputs fixed by job planning. Source probing and activity timing
@@ -83,17 +83,18 @@ impl VideoEncoding {
             Self::Transparent(plan) => FramePipelinePlan {
                 kind: PipelineKind::Transparent,
                 frames: plan.frames,
+                ffmpeg_args: plan.ffmpeg.command_args(
+                    output,
+                    atlas.plan(),
+                    size,
+                    &plan.container_fps,
+                    input_format,
+                ),
                 atlas,
                 pixel_format: OverlayPixelFormat::Rgba,
                 output_frame_count: plan.output_frame_count,
                 cpu_cores_per_frame_worker: transparent_profile(plan.ffmpeg.codec_id)
                     .cpu_cores_per_frame_worker,
-                ffmpeg_args: plan.ffmpeg.command_args(
-                    output,
-                    size,
-                    &plan.container_fps,
-                    input_format,
-                ),
             },
         }
     }
@@ -166,7 +167,11 @@ pub(crate) fn encode_video(
     let (encoding, atlas) = match request {
         // Every composite graph overlays the planned atlas slot by slot.
         VideoEncodingRequest::Composite { render, source } => {
-            let atlas = export.plan_atlas(&render.frames.dense_frame_indices(), &mut prepare_profiler)?;
+            let atlas = export.plan_atlas(
+                &render.frames.dense_frame_indices(),
+                SlotPlacement::Overlay,
+                &mut prepare_profiler,
+            )?;
             let encoding = CompositeEncoding::new(
                 size,
                 render,
@@ -179,9 +184,14 @@ pub(crate) fn encode_video(
             )?;
             (VideoEncoding::Composite(encoding), atlas)
         }
-        // Transparent export outputs the full frame.
+        // FFmpeg copies the planned atlas slots back onto the transparent full frame.
         VideoEncodingRequest::Transparent(plan) => {
-            (VideoEncoding::Transparent(plan), export.full_frame_atlas())
+            let atlas = export.plan_atlas(
+                &plan.frames.dense_frame_indices(),
+                SlotPlacement::Copy,
+                &mut prepare_profiler,
+            )?;
+            (VideoEncoding::Transparent(plan), atlas)
         }
     };
     let atlas = export.prepare_atlas(atlas, &mut prepare_profiler)?;
@@ -200,6 +210,7 @@ pub(crate) fn encode_video(
             prepare_timings.clone(),
         )?;
     }
+    let sample_atlas = frame_plan.atlas.plan().clone();
     let observe = |index: u64, dense_index: usize, buffer: &FrameBuffer| {
         if samples.binary_search(&(index as usize)).is_ok() {
             write_sample_frame(
@@ -207,7 +218,7 @@ pub(crate) fn encode_video(
                     .as_ref()
                     .expect("samples require a debug directory"),
                 size,
-                &buffer.pixels,
+                &sample_atlas.unpack_rgba(&buffer.pixels, size)?,
                 dense_index,
             )?;
         }

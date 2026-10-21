@@ -1,6 +1,6 @@
-//! End to end: a real FFmpeg composite export through the planned atlas decodes
-//! to the same frames as the export through the full-frame plan, including the
-//! frames after the activity ends, where only rasters show.
+//! End to end: a real FFmpeg composite or transparent export through the planned
+//! atlas decodes to the same frames as the export through the full-frame plan,
+//! including the composite frames after the activity ends, where only rasters show.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -18,7 +18,7 @@ use crate::encode::progress::RenderController;
 use crate::normalize::{parse_template_value, RenderConfig};
 use crate::output::{RenderOutputKind, RenderOutputTarget};
 use crate::paths::AppPaths;
-use crate::render::{AtlasPlan, ExportWidgets, FrameSize};
+use crate::render::{AtlasPlan, ExportWidgets, FrameSize, SlotPlacement};
 use crate::render_jobs::inspection::verify_composite_source_resolution;
 use crate::render_jobs::planning::{plan_single_render, PlannedVideoRender, VideoRenderModePlan};
 
@@ -84,6 +84,72 @@ fn config(activity_end: f64) -> RenderConfig {
     config
 }
 
+/// The 1080p test template as a lossless transparent export of the activity's
+/// last seconds; transparent exports cannot outlast the activity.
+fn transparent_config(activity_end: f64) -> RenderConfig {
+    let template = fs::read_to_string(fixtures().join("config").join("test-template-4k.json")).unwrap();
+    let mut config = parse_template_value(&serde_json::from_str(&template).unwrap()).unwrap();
+    let scene = &mut config.scene;
+    scene.presentation.width = Some(1920);
+    scene.presentation.height = Some(1080);
+    scene.ffmpeg = serde_json::json!({"codec": "qtrle"});
+    scene.start = activity_end - 2.0 * RENDER_SECONDS;
+    scene.end = scene.start + RENDER_SECONDS;
+    scene.fps = 30.0;
+    config
+}
+
+/// Exports the transparent overlay through the planned atlas or the full-frame
+/// plan and returns that plan with the output path.
+fn export_transparent(paths: &AppPaths, planned: bool) -> (AtlasPlan, PathBuf) {
+    let activity = activity();
+    let activity_end = validate_render_activity(&activity).unwrap();
+    let plan = plan_single_render(transparent_config(activity_end), activity_end, None).unwrap();
+    let dense = plan.prepare_activity(&activity).unwrap();
+    let PlannedVideoRender { config, mode, .. } = plan;
+    let VideoRenderModePlan::Transparent(render) = mode else {
+        panic!("a render without a composite video plans a transparent render");
+    };
+    let size = FrameSize {
+        width: config.scene.presentation.width,
+        height: config.scene.presentation.height,
+    };
+    let mut profiler = RenderProfiler::default();
+    let export = ExportWidgets::prepare(
+        &paths.font_dirs,
+        &config,
+        &activity,
+        &dense,
+        size,
+        render.coverage.blank_leading_frame_count,
+        &mut profiler,
+    )
+    .unwrap();
+    let atlas = if planned {
+        export.plan_atlas(&render.frames.dense_frame_indices(), SlotPlacement::Copy, &mut profiler).unwrap()
+    } else {
+        export.full_frame_atlas()
+    };
+    let label = if planned { "planned" } else { "full-frame" };
+    let output = paths.downloads_dir.join(format!("atlas-transparent-{label}.mov"));
+    let target = RenderOutputTarget::validate(output.to_str().unwrap(), RenderOutputKind::Transparent, true).unwrap();
+    let encoding = VideoEncoding::Transparent(render);
+    let prepared = export.prepare_atlas(atlas.clone(), &mut profiler).unwrap();
+    let frame_plan = encoding.frame_plan(prepared, size, target.path(), "rgba");
+    run_frame_pipeline(
+        &resolve_ffmpeg_binary(&paths.repo_root).unwrap(),
+        &export,
+        frame_plan,
+        &RenderController::default(),
+        &target,
+        &encoding,
+        Arc::new(EncoderMonitor::default()),
+        None,
+    )
+    .unwrap();
+    (atlas, output)
+}
+
 /// Exports the composite through the planned atlas or the full-frame plan and
 /// returns that plan with the output path.
 fn export(paths: &AppPaths, planned: bool) -> (AtlasPlan, PathBuf) {
@@ -114,7 +180,7 @@ fn export(paths: &AppPaths, planned: bool) -> (AtlasPlan, PathBuf) {
     )
     .unwrap();
     let atlas = if planned {
-        export.plan_atlas(&render.frames.dense_frame_indices(), &mut profiler).unwrap()
+        export.plan_atlas(&render.frames.dense_frame_indices(), SlotPlacement::Overlay, &mut profiler).unwrap()
     } else {
         export.full_frame_atlas()
     };
@@ -142,10 +208,15 @@ fn export(paths: &AppPaths, planned: bool) -> (AtlasPlan, PathBuf) {
 
 /// Decodes every video frame of `video` as 8-bit yuv420p.
 fn decode(paths: &AppPaths, video: &Path) -> Vec<u8> {
+    decode_as(paths, video, "yuv420p")
+}
+
+/// Decodes every video frame of `video` in `pixel_format`.
+fn decode_as(paths: &AppPaths, video: &Path, pixel_format: &str) -> Vec<u8> {
     let output = Command::new(resolve_ffmpeg_binary(&paths.repo_root).unwrap())
         .args(["-v", "error", "-i"])
         .arg(video)
-        .args(["-map", "0:v:0", "-f", "rawvideo", "-pix_fmt", "yuv420p", "-"])
+        .args(["-map", "0:v:0", "-f", "rawvideo", "-pix_fmt", pixel_format, "-"])
         .output()
         .unwrap();
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
@@ -178,5 +249,37 @@ fn atlas_export_decodes_to_the_full_frame_export() {
         let total: u64 = planned.iter().zip(reference).map(|(a, b)| u64::from(a.abs_diff(*b))).sum();
         let mean = total as f64 / frame_bytes as f64;
         assert!(mean <= 0.25, "frame {index}: mean sample difference {mean:.3} between the atlas and full-frame exports");
+    }
+}
+
+#[test]
+fn transparent_atlas_export_decodes_to_the_same_pixels_as_the_full_frame_export() {
+    let paths = test_paths();
+    let (atlas, planned) = export_transparent(&paths, true);
+    let frame = FrameSize {
+        width: 1920,
+        height: 1080,
+    };
+    assert!(atlas.slots().len() > 1, "the template must plan several slots: {atlas:?}");
+    assert!(atlas.size() != frame, "the planned atlas must not be the full frame");
+    let (_, reference) = export_transparent(&paths, false);
+
+    // qtrle is lossless and the rebuild copies slots, so frames differ only where
+    // Skia's anti-aliasing rounds a shifted path one coverage level apart.
+    let planned = decode_as(&paths, &planned, "rgba");
+    let reference = decode_as(&paths, &reference, "rgba");
+    let frame_bytes = frame.rgba_len().unwrap();
+    assert!(!planned.is_empty() && planned.len() % frame_bytes == 0);
+    assert_eq!(planned.len(), reference.len());
+    let premultiplied = |rgba: &[u8], channel: usize| f32::from(rgba[channel]) * f32::from(rgba[3]) / 255.0;
+    for (index, (planned, reference)) in planned.chunks(frame_bytes).zip(reference.chunks(frame_bytes)).enumerate() {
+        let differing = planned
+            .chunks_exact(4)
+            .zip(reference.chunks_exact(4))
+            .filter(|(a, b)| {
+                a[3].abs_diff(b[3]) > 1 || (0..3).any(|channel| (premultiplied(a, channel) - premultiplied(b, channel)).abs() > 2.0)
+            })
+            .count();
+        assert_eq!(differing, 0, "frame {index}: {differing} pixels differ between the atlas and full-frame exports");
     }
 }

@@ -19,7 +19,7 @@
 //! Widget instances hold Skia surfaces and caches, so each frame worker builds
 //! its own set from the shared, immutable [`ExportWidgets`].
 
-use super::{atlas::AtlasPlan, surface::wrap_native_surface, FrameSize};
+use super::{atlas::{AtlasPlan, SlotPlacement}, surface::wrap_native_surface, FrameSize};
 use crate::{
     activity::schema::{DenseActivityReport, ParsedActivity},
     debug::RenderProfiler,
@@ -174,8 +174,14 @@ impl<'a> ExportWidgets<'a> {
     }
 
     /// Plans the atlas from layout alone over `frame_indices`, the output frames export
-    /// renders. Contiguous chunks run in parallel so unchanged samples skip layout.
-    pub fn plan_atlas(&self, frame_indices: &[usize], profiler: &mut RenderProfiler) -> CoreResult<AtlasPlan> {
+    /// renders, for slots placed back on the frame by `placement`. Contiguous chunks
+    /// run in parallel so unchanged samples skip layout.
+    pub fn plan_atlas(
+        &self,
+        frame_indices: &[usize],
+        placement: SlotPlacement,
+        profiler: &mut RenderProfiler,
+    ) -> CoreResult<AtlasPlan> {
         let started = Instant::now();
         let threads = thread::available_parallelism().map_or(1, NonZeroUsize::get);
         let chunk = frame_indices.len().div_ceil(threads).max(1);
@@ -211,7 +217,7 @@ impl<'a> ExportWidgets<'a> {
             }
         }
         profiler.record_ms("atlas.plan.layout", started.elapsed().as_secs_f64() * 1000.0);
-        let plan = profiler.measure("atlas.plan.pack", || AtlasPlan::from_layer_bounds(self.frame_size, &union))?;
+        let plan = profiler.measure("atlas.plan.pack", || AtlasPlan::from_layer_bounds(self.frame_size, &union, placement))?;
         profiler.record_ms("atlas.plan", started.elapsed().as_secs_f64() * 1000.0);
         Ok(plan)
     }

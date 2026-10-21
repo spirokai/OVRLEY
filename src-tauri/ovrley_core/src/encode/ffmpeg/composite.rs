@@ -343,6 +343,7 @@ pub fn build_composite_ffmpeg_settings(
 mod tests {
     use super::*;
     use crate::encode::fps::Fps;
+    use crate::render::SlotPlacement;
 
     fn assert_argument_pair(args: &[String], flag: &str, value: &str) {
         assert!(
@@ -498,6 +499,7 @@ mod tests {
                 None,
                 Some(skia_safe::IRect::new(3000, 1800, 3600, 2100)),
             ],
+            SlotPlacement::Overlay,
         )
         .unwrap()
     }
@@ -571,7 +573,7 @@ mod tests {
         ));
         assert_argument_pair(&full.input_1_args, "-s", "3840x2160");
 
-        let empty = AtlasPlan::from_layer_bounds(UHD, &[None]).unwrap();
+        let empty = AtlasPlan::from_layer_bounds(UHD, &[None], SlotPlacement::Overlay).unwrap();
         let empty = atlas_settings(CompositeCodecId::AmfHevc, &empty).unwrap();
         assert!(empty.filter_complex.contains(
             "[1:v]setpts=PTS-STARTPTS,null[slot0];[base][slot0]overlay=0:0:eof_action=repeat:shortest=1,format=nv12,hwupload[out]"
@@ -628,7 +630,7 @@ mod tests {
 
     #[test]
     fn hardware_overlay_graphs_upload_the_empty_atlas_whole() {
-        let empty = AtlasPlan::from_layer_bounds(UHD, &[None]).unwrap();
+        let empty = AtlasPlan::from_layer_bounds(UHD, &[None], SlotPlacement::Overlay).unwrap();
         let cuda = atlas_settings(CompositeCodecId::NnvgpuHevc, &empty).unwrap();
         assert!(cuda.filter_complex.contains(
             "[1:v]setpts=PTS-STARTPTS,format=yuva420p,null,hwupload[slot0];[base][slot0]overlay_cuda=0:0:eof_action=repeat:shortest=1[out]"
@@ -651,6 +653,7 @@ mod tests {
                 Some(skia_safe::IRect::new(40, 60, 400, 200)),
                 Some(skia_safe::IRect::new(600, 1500, 1000, 1800)),
             ],
+            SlotPlacement::Overlay,
         )
         .unwrap();
         assert_eq!(atlas.slots().len(), 2);
@@ -745,7 +748,7 @@ mod tests {
             width: 1919,
             height: 1079,
         };
-        let atlas = AtlasPlan::from_layer_bounds(frame, &[Some(skia_safe::IRect::new(1900, 1000, 1919, 1079))]).unwrap();
+        let atlas = AtlasPlan::from_layer_bounds(frame, &[Some(skia_safe::IRect::new(1900, 1000, 1919, 1079))], SlotPlacement::Overlay).unwrap();
         let slot = &atlas.slots()[0];
         assert_eq!(slot.scene, skia_safe::IRect::new(1900, 1000, 1920, 1080));
         let (left, top) = (slot.atlas_origin.x, slot.atlas_origin.y);
@@ -758,7 +761,7 @@ mod tests {
 
     #[test]
     fn qsv_full_overlay_uploads_the_empty_atlas_whole() {
-        let empty = AtlasPlan::from_layer_bounds(UHD, &[None]).unwrap();
+        let empty = AtlasPlan::from_layer_bounds(UHD, &[None], SlotPlacement::Overlay).unwrap();
         let graph = qsv_full_settings(UHD, &empty, Some(90)).filter_complex;
         assert!(graph.contains(
             "[1:v]setpts=PTS-STARTPTS,null,transpose=1,hwupload=extra_hw_frames=16[slot0];[base][slot0]overlay_qsv=x=0:y=0[out]"

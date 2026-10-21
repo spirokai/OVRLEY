@@ -428,7 +428,8 @@ fn assert_atlas_frames_match_the_full_frame(
 
 /// The planned atlas holds every widget's bounds of every planned frame, and compositing its
 /// slots in order over a transparent frame at their scene positions gives the full-frame plan's
-/// frame: exactly where one slot covers a pixel, within 8-bit rounding where slots overlap.
+/// frame: within one level of anti-aliasing rounding where one slot covers a pixel, within
+/// 8-bit blending rounding where slots overlap.
 fn assert_atlas_reassembles_the_full_frame(
     name: &str,
     export: &ovrley_core::render::ExportWidgets,
@@ -436,7 +437,7 @@ fn assert_atlas_reassembles_the_full_frame(
 ) -> ovrley_core::render::AtlasPlan {
     use ovrley_core::{debug::RenderProfiler, render::AtlasPlan};
     let size = export.frame_size();
-    let atlas = export.plan_atlas(frames, &mut RenderProfiler::default()).unwrap();
+    let atlas = export.plan_atlas(frames, ovrley_core::render::SlotPlacement::Overlay, &mut RenderProfiler::default()).unwrap();
     let full_frame = export.prepare_atlas(export.full_frame_atlas(), &mut RenderProfiler::default()).unwrap();
     let prepared = export.prepare_atlas(atlas.clone(), &mut RenderProfiler::default()).unwrap();
     let mut planned = vec![false; full_frame.plan().slots()[0].layers.len()];
@@ -503,12 +504,13 @@ fn assert_atlas_reassembles_the_full_frame(
         drew |= expected.iter().skip(3).step_by(4).any(|alpha| *alpha > 0);
         let matches = |pixel: usize| {
             let (expected, actual) = (&expected[pixel * 4..pixel * 4 + 4], &reassembled[pixel * 4..pixel * 4 + 4]);
-            if covers[pixel] <= 1 {
-                return expected == actual;
-            }
+            // Skia rasterizes a path at its shifted atlas position in float, so anti-aliased
+            // coverage can round one level apart; overlapping slots add blending rounding.
+            let alpha_tolerance = if covers[pixel] <= 1 { 1 } else { 2 };
             // Compare premultiplied: straight colour is unstable where alpha is near zero.
             let premultiplied = |rgba: &[u8], channel: usize| f32::from(rgba[channel]) * f32::from(rgba[3]) / 255.0;
-            (expected[3].abs_diff(actual[3]) <= 2) && (0..3).all(|channel| (premultiplied(expected, channel) - premultiplied(actual, channel)).abs() <= 2.0)
+            (expected[3].abs_diff(actual[3]) <= alpha_tolerance)
+                && (0..3).all(|channel| (premultiplied(expected, channel) - premultiplied(actual, channel)).abs() <= 2.0)
         };
         if let Some(pixel) = (0..width * height).find(|pixel| !matches(*pixel)) {
             panic!(
@@ -596,7 +598,7 @@ fn atlas_planning_of_a_ten_minute_export_runs_layout_only_within_seconds() {
     let mut profiler = RenderProfiler::default();
     let export = ExportWidgets::prepare(&paths.font_dirs, &config, &activity, &dense, size, 0, &mut profiler).unwrap();
     let frames: Vec<usize> = (0..dense.frame_count).collect();
-    let atlas = export.plan_atlas(&frames, &mut profiler).unwrap();
+    let atlas = export.plan_atlas(&frames, ovrley_core::render::SlotPlacement::Overlay, &mut profiler).unwrap();
     let planning = &profiler.summary()["atlas.plan"];
     eprintln!("planned {} frames into {:?} in {:.0} ms", frames.len(), atlas.size(), planning.total_ms);
     // Unoptimized test builds are several times slower than the shipped export.
