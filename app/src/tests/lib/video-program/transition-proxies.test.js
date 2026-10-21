@@ -1,14 +1,15 @@
 import { describe, expect, test } from 'vitest'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import {
+  listShownTransitionJoinKeys,
   listTransitionProxyJobs,
   pickNextTransitionProxyJob,
-  resolveContinuationSecond,
+  resolveContinuation,
   resolveTransitionWindow,
 } from '@/lib/video-program/transition-proxies'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
-const fade = { type: 'fade', durationSeconds: 2, splitGapThresholdSeconds: 2, dialogShown: true }
+const fade = { type: 'fade', durationSeconds: 2, splitGapThresholdSeconds: 2 }
 
 function timeline(edit = () => {}) {
   const { importedVideos, videoEdits } = videoStoreState(
@@ -33,9 +34,20 @@ describe('transition windows', () => {
       elapsedSeconds: expect.closeTo(1, 5),
       incomingSecond: expect.closeTo(101, 5),
     })
-    // Playback continues after the incoming start the transition showed.
-    expect(resolveContinuationSecond(program, ride.id)).toBe(102)
-    expect(resolveContinuationSecond(program, program.pieces[1].id)).toBeNull()
+    // Playback continues after the incoming start the shown transition played.
+    expect(resolveContinuation(program, ride.id, new Set(['clip:climb']))).toEqual({ piece: program.pieces[1], second: 102 })
+    expect(resolveContinuation(program, program.pieces[1].id, new Set(['clip:climb']))).toBeNull()
+    expect(() => resolveContinuation(program, 'missing', new Set())).toThrow('Unknown program piece')
+  })
+
+  test('without a shown proxy the preview cuts hard and the incoming piece starts from its first frame', () => {
+    const { clips, program } = timeline()
+    const jobs = listTransitionProxyJobs(program, clips)
+    for (const proxies of [{}, { [jobs[0].key]: { status: 'rendering' } }, { [jobs[0].key]: { status: 'failed' } }]) {
+      const shown = listShownTransitionJoinKeys(jobs, proxies)
+      expect(resolveContinuation(program, program.pieces[0].id, shown)).toEqual({ piece: program.pieces[1], second: 100 })
+    }
+    expect(listShownTransitionJoinKeys(jobs, { [jobs[0].key]: { status: 'ready' } })).toEqual(new Set(['clip:climb']))
   })
 
   test('hard cuts continue at the next piece and have no window', () => {
@@ -43,7 +55,7 @@ describe('transition windows', () => {
       edits.climb.transitionIn = { type: 'none', durationSeconds: 0 }
     })
     expect(resolveTransitionWindow(program, 59.5)).toBeNull()
-    expect(resolveContinuationSecond(program, program.pieces[0].id)).toBe(100)
+    expect(resolveContinuation(program, program.pieces[0].id, new Set()).second).toBe(100)
   })
 })
 

@@ -301,6 +301,7 @@ describe('useOverlayPlayer', () => {
 
   test('marks each join on the video lane with its transition window and control', () => {
     createTwoClipStore()
+    useStore.setState({ transitionDefaults: { type: 'wipeleft', durationSeconds: 2, splitGapThresholdSeconds: 2 } })
     const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
     const markers = () => result.current.timeline.lanes.find((lane) => lane.id === 'video').joinMarkers
 

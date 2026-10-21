@@ -5,7 +5,9 @@ import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 const t = (key, options) => (typeof options === 'string' ? options : options.defaultValue.replace(/{{(\w+)}}/g, (_, name) => options[name]))
-const defaults = { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 2, dialogShown: true }
+const defaults = { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 2 }
+// Frame rate of the fixture videos.
+const fps = { num: 30, den: 1 }
 
 function timeline() {
   const { importedVideos, videoEdits } = videoStoreState(
@@ -23,7 +25,7 @@ function timeline() {
 }
 
 function model(join, clips, setJoinTransition = vi.fn(), isInvalid = false) {
-  return buildJoinTransitionModel({ join, override: joinOverride(join, clips), transitionDefaults: defaults, isInvalid, setJoinTransition, t })
+  return buildJoinTransitionModel({ join, fps, override: joinOverride(join, clips), transitionDefaults: defaults, isInvalid, setJoinTransition, t })
 }
 
 describe('join transition model', () => {
@@ -75,6 +77,27 @@ describe('join transition model', () => {
     expect(atLong.commitDuration('0')).toBe('Enter a duration above 0 seconds')
     expect(atLong.commitDuration('soon')).toBe('Enter a duration above 0 seconds')
     expect(setJoinTransition).toHaveBeenCalledTimes(5)
+  })
+
+  test('stores typed durations snapped to the frames of the joined pieces, at least one frame', () => {
+    const { clips, program } = timeline()
+    const setJoinTransition = vi.fn()
+    const atLong = model(program.joins[1], clips, setJoinTransition)
+    expect(atLong.commitDuration('1.01')).toBeNull()
+    expect(setJoinTransition).toHaveBeenLastCalledWith(program.joins[1], { type: 'wipeleft', durationSeconds: 1 })
+    expect(atLong.commitDuration('0.01')).toBeNull()
+    expect(setJoinTransition).toHaveBeenLastCalledWith(program.joins[1], { type: 'wipeleft', durationSeconds: 1 / 30 })
+    // A new override starts from the default snapped the same way.
+    buildJoinTransitionModel({
+      join: program.joins[0],
+      fps: { num: 25, den: 1 },
+      override: null,
+      transitionDefaults: { ...defaults, durationSeconds: 1.01 },
+      isInvalid: false,
+      setJoinTransition,
+      t,
+    }).onSelect('fade')
+    expect(setJoinTransition).toHaveBeenLastCalledWith(program.joins[0], { type: 'fade', durationSeconds: 1 })
   })
 
   test('flags a transition that does not fit the pieces it joins', () => {

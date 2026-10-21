@@ -269,19 +269,6 @@ describe('useVideoImport follow-up dialogs', () => {
     expect(offsetOf('/clips/unknown.mp4')).toBe(-30)
     expect(useStore.temporal.getState().pastStates).toEqual([])
 
-    expect(openDialog(result)).toEqual(['transitionDefaults'])
-    expect(result.current.importDialogs.transitionDefaults).toMatchObject({
-      type: 'wipeleft',
-      duration: '2',
-      threshold: '2',
-      durationDisabled: false,
-    })
-    act(() => result.current.importDialogs.transitionDefaults.onTypeChange('none'))
-    expect(result.current.importDialogs.transitionDefaults.durationDisabled).toBe(true)
-    act(() => result.current.importDialogs.transitionDefaults.onThresholdChange('5'))
-    act(() => result.current.importDialogs.transitionDefaults.onConfirm())
-    expect(useStore.getState().transitionDefaults).toEqual({ type: 'none', durationSeconds: 2, splitGapThresholdSeconds: 5, dialogShown: true })
-
     expect(openDialog(result)).toEqual(['overlaps'])
     expect(result.current.importDialogs.overlaps.overlaps).toEqual([
       expect.objectContaining({ earlierName: 'a.mp4', laterName: 'b.mp4', seconds: 10 }),
@@ -290,45 +277,9 @@ describe('useVideoImport follow-up dialogs', () => {
     expect(openDialog(result)).toEqual([])
   })
 
-  test('asks for transition defaults once, when a project first holds several videos', async () => {
-    probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:00Z' })
-    probe('/clips/b.mp4', { creationTime: '2026-07-18T08:05:00Z' })
-    probe('/clips/c.mp4', { creationTime: '2026-07-18T08:10:00Z' })
-    const { result } = renderImport()
-
-    await importPaths(result, ['/clips/a.mp4'])
-    expect(openDialog(result)).toEqual([])
-
-    await importPaths(result, ['/clips/b.mp4'])
-    expect(openDialog(result)).toEqual(['transitionDefaults'])
-    act(() => result.current.importDialogs.transitionDefaults.onDismiss())
-    expect(useStore.getState().transitionDefaults).toEqual({ type: 'wipeleft', durationSeconds: 2, splitGapThresholdSeconds: 2, dialogShown: true })
-
-    await importPaths(result, ['/clips/c.mp4'])
-    expect(openDialog(result)).toEqual([])
-  })
-
-  test('keeps the transition dialog open with an error for an invalid duration', async () => {
-    probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:00Z' })
-    probe('/clips/b.mp4', { creationTime: '2026-07-18T08:05:00Z' })
-    const { result } = renderImport()
-    await importPaths(result, ['/clips/a.mp4', '/clips/b.mp4'])
-
-    act(() => result.current.importDialogs.transitionDefaults.onDurationChange('0'))
-    act(() => result.current.importDialogs.transitionDefaults.onConfirm())
-
-    expect(result.current.importDialogs.transitionDefaults.error).toBe('Transition duration must be a positive number of seconds')
-    expect(useStore.getState().transitionDefaults.dialogShown).toBe(false)
-    act(() => result.current.importDialogs.transitionDefaults.onDurationChange('1.5'))
-    expect(result.current.importDialogs.transitionDefaults.error).toBeNull()
-    act(() => result.current.importDialogs.transitionDefaults.onConfirm())
-    expect(useStore.getState().transitionDefaults).toMatchObject({ durationSeconds: 1.5, dialogShown: true })
-  })
-
   test('the first undeterminable clip of an empty timeline stays at the start and anchors the next one', async () => {
     probe('/clips/first.mp4')
     probe('/clips/second.mp4')
-    useStore.setState((state) => ({ transitionDefaults: { ...state.transitionDefaults, dialogShown: true } }))
     const { result } = renderImport()
 
     await importPaths(result, ['/clips/first.mp4', '/clips/second.mp4'])
@@ -344,7 +295,6 @@ describe('useVideoImport follow-up dialogs', () => {
   test('skipping the placement leaves the clip at the start with its warning', async () => {
     probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:00Z' })
     probe('/clips/unknown.mp4')
-    useStore.setState((state) => ({ transitionDefaults: { ...state.transitionDefaults, dialogShown: true } }))
     const { result } = renderImport()
 
     await importPaths(result, ['/clips/a.mp4', '/clips/unknown.mp4'])

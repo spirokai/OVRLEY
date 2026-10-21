@@ -53,18 +53,6 @@ export function resolvePreviewTarget(program, second) {
 }
 
 /**
- * Returns the piece that plays after a piece ends, or null after the last piece.
- * @param {{pieces: Array<object>}} program Built program.
- * @param {string} pieceId Ending piece.
- * @returns {object|null} Next piece.
- */
-export function findNextPiece(program, pieceId) {
-  const index = program.pieces.findIndex((piece) => piece.id === pieceId)
-  if (index === -1) throw new Error(`Unknown program piece: ${pieceId}`)
-  return program.pieces[index + 1] ?? null
-}
-
-/**
  * Resolves where playback starts and which clock drives it. Inside a piece the
  * video plays; inside a gap or deleted part playback skips to the next piece.
  * Before the first and after the last piece the timeline clock plays the activity.

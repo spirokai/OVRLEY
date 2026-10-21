@@ -60,7 +60,7 @@
     "revealdown"
   ],
   "defaults": {
-    "type": "wipeleft",
+    "type": "none",
     "durationSeconds": 2,
     "splitGapThresholdSeconds": 2
   },

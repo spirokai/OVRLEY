@@ -3,6 +3,7 @@
  * default), the choices, the override's duration, and validation.
  */
 
+import { snapDurationToFrames } from '@/lib/video-program/frame-grid'
 import { HARD_CUT, NO_TRANSITION } from '@/lib/video-program/transition-catalog'
 
 export const DEFAULT_TRANSITION_OPTION = 'default'
@@ -47,9 +48,11 @@ export function joinOverride(join, clips) {
 
 /**
  * Builds the transition control of a join. Without a join (a deleted part at a
- * clip edge) the control is unavailable.
+ * clip edge) the control is unavailable. Durations are stored snapped to the
+ * frames of the joined pieces, as the export counts them.
  * @param {object} options Model inputs.
  * @param {object|undefined} options.join Program join.
+ * @param {{num: number, den: number}|null} options.fps Frame rate of the joined pieces; null without a join.
  * @param {{type: string, durationSeconds: number}|null} options.override Stored override.
  * @param {{durationSeconds: number}} options.transitionDefaults Project transition defaults.
  * @param {boolean} options.isInvalid Whether the transition does not fit the pieces it joins.
@@ -57,7 +60,7 @@ export function joinOverride(join, clips) {
  * @param {function} options.t Translation function.
  * @returns {object} Presentational control model.
  */
-export function buildJoinTransitionModel({ join, override, transitionDefaults, isInvalid, setJoinTransition, t }) {
+export function buildJoinTransitionModel({ join, fps, override, transitionDefaults, isInvalid, setJoinTransition, t }) {
   const isXfade = override !== null && override.type !== NO_TRANSITION
   const effective = join?.transition ?? null
   return {
@@ -74,13 +77,18 @@ export function buildJoinTransitionModel({ join, override, transitionDefaults, i
     onSelect: (value) => {
       if (value === DEFAULT_TRANSITION_OPTION) setJoinTransition(join, null)
       else if (value === NO_TRANSITION) setJoinTransition(join, HARD_CUT)
-      else setJoinTransition(join, { type: value, durationSeconds: isXfade ? override.durationSeconds : transitionDefaults.durationSeconds })
+      else {
+        setJoinTransition(join, {
+          type: value,
+          durationSeconds: isXfade ? override.durationSeconds : snapDurationToFrames(transitionDefaults.durationSeconds, fps),
+        })
+      }
     },
     /** Commits a typed duration; returns the validation message, or null when committed. */
     commitDuration: (text) => {
       const durationSeconds = parseSecondsInput(text)
       if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return t('transitions.durationInvalid', 'Enter a duration above 0 seconds')
-      setJoinTransition(join, { type: override.type, durationSeconds })
+      setJoinTransition(join, { type: override.type, durationSeconds: snapDurationToFrames(durationSeconds, fps) })
       return null
     },
   }

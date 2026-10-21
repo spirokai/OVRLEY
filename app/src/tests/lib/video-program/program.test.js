@@ -6,13 +6,14 @@ import { DEFAULT_TRANSITION_SETTINGS, HARD_CUT } from '@/lib/video-program/trans
 const FPS = { num: 30, den: 1 }
 const ALL = { type: 'all', from: 0, to: 0 }
 const WIPE = { type: 'wipeleft', durationSeconds: 2 }
+const WIPE_DEFAULTS = { ...DEFAULT_TRANSITION_SETTINGS, ...WIPE }
 
 function video(id, { offsetSeconds = 0, durationSeconds = 60, importOrder = 0, deletedParts = [], transitionIn = null, fps = FPS } = {}) {
   const frameCount = Math.round((durationSeconds * fps.num) / fps.den)
   return { id, offsetSeconds, durationSeconds: (frameCount * fps.den) / fps.num, frameCount, fps, importOrder, deletedParts, transitionIn }
 }
 
-function program(videos, { exportRange = ALL, transitionDefaults = DEFAULT_TRANSITION_SETTINGS } = {}) {
+function program(videos, { exportRange = ALL, transitionDefaults = WIPE_DEFAULTS } = {}) {
   return buildProgram({ videos, exportRange, transitionDefaults })
 }
 
@@ -47,16 +48,16 @@ describe('buildProgram joins and default transitions', () => {
       duration: 118,
     },
     {
-      name: '"No transition" defaults keep hard cuts',
+      name: '"No transition", the hard default, keeps hard cuts',
       videos: [video('a'), video('b', { offsetSeconds: 70, importOrder: 1 })],
-      defaults: { ...DEFAULT_TRANSITION_SETTINGS, type: 'none' },
+      defaults: DEFAULT_TRANSITION_SETTINGS,
       transition: HARD_CUT,
       duration: 120,
     },
     {
       name: 'a larger threshold treats the gap as continuous',
       videos: [video('a'), video('b', { offsetSeconds: 70, importOrder: 1 })],
-      defaults: { ...DEFAULT_TRANSITION_SETTINGS, splitGapThresholdSeconds: 15 },
+      defaults: { ...WIPE_DEFAULTS, splitGapThresholdSeconds: 15 },
       transition: HARD_CUT,
       duration: 120,
     },
@@ -86,11 +87,18 @@ describe('buildProgram joins and default transitions', () => {
       video('b', { offsetSeconds: 70, importOrder: 1, transitionIn: { type: 'fade', durationSeconds: 1 } }),
       video('c', { offsetSeconds: 140, importOrder: 2 }),
     ]
-    const result = program(videos, { transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS, type: 'dissolve', durationSeconds: 3 } })
+    const result = program(videos, { transitionDefaults: { ...WIPE_DEFAULTS, type: 'dissolve', durationSeconds: 3 } })
     expect(result.joins.map(({ transition }) => transition)).toEqual([
       { type: 'fade', durationSeconds: 1 },
       { type: 'dissolve', durationSeconds: 3 },
     ])
+  })
+
+  test('default durations snap to the frames of the pieces they join, as the export counts them', () => {
+    const ntsc = { num: 30000, den: 1001 }
+    const videos = [video('a', { fps: ntsc }), video('b', { offsetSeconds: 70, importOrder: 1, fps: ntsc })]
+    const result = program(videos, { transitionDefaults: { ...WIPE_DEFAULTS, durationSeconds: 1.01 } })
+    expect(result.joins[0].transition).toEqual({ type: 'wipeleft', durationSeconds: (30 * 1001) / 30000 })
   })
 })
 

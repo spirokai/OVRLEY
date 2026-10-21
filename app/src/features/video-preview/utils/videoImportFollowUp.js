@@ -1,7 +1,7 @@
 /**
  * Steps that follow a video import, in the order the user sees them: the import
- * report, a placement prompt per clip whose time could not be determined, the
- * one-time transition defaults dialog, and the overlap warning.
+ * report, a placement prompt per clip whose time could not be determined, and the
+ * overlap warning.
  *
  * Whether a step is due is decided when it is reached, so earlier answers (for
  * example a placement that removes an overlap) are taken into account.
@@ -20,7 +20,6 @@ export function createImportFollowUpSteps({ report, undeterminedIds, videoIds })
   return [
     ...(report === null ? [] : [{ kind: 'report', report }]),
     ...undeterminedIds.map((videoId) => ({ kind: 'placement', videoId })),
-    { kind: 'transitionDefaults' },
     { kind: 'overlaps', videoIds },
   ]
 }
@@ -76,8 +75,6 @@ function isStepDue(step, remainingSteps, state) {
         state.videoEdits[step.videoId].placementAnchor === null &&
         listPlacementCandidates(state, step.videoId, remainingSteps).length > 0
       )
-    case 'transitionDefaults':
-      return state.importedVideos.length > 1 && !state.transitionDefaults.dialogShown
     case 'overlaps':
       return listImportOverlaps(state, step.videoIds).length > 0
     default:

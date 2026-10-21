@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { findNextPiece, resolvePlaybackStart, resolvePreviewTarget } from '@/lib/video-program/playback-target'
+import { resolvePlaybackStart, resolvePreviewTarget } from '@/lib/video-program/playback-target'
 import { buildProgram } from '@/lib/video-program/program'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
@@ -55,7 +55,6 @@ describe('resolvePreviewTarget', () => {
     })
     expect(resolvePreviewTarget(cut, 8)).toEqual({ videoId: 'first', piece: cut.pieces[0], sourceSecond: 3, isInside: false, isDeleted: true })
     expect(resolvePlaybackStart(cut, 8)).toEqual({ source: 'video', second: 9 })
-    expect(findNextPiece(cut, cut.pieces[0].id)).toBe(cut.pieces[1])
   })
 
   test('is null without clips', () => {
@@ -67,8 +66,5 @@ describe('resolvePreviewTarget', () => {
     expect(resolvePlaybackStart(program, 7.5)).toEqual({ source: 'video', second: 7.5 })
     expect(resolvePlaybackStart(program, 20)).toEqual({ source: 'video', second: 30 })
     expect(resolvePlaybackStart(program, 50)).toEqual({ source: 'timeline', second: 50 })
-    expect(findNextPiece(program, firstPiece.id)).toBe(secondPiece)
-    expect(findNextPiece(program, secondPiece.id)).toBeNull()
-    expect(() => findNextPiece(program, 'missing')).toThrow('Unknown program piece')
   })
 })

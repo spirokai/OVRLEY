@@ -4,7 +4,7 @@ import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 const t = (key, options) => (typeof options === 'string' ? options : options.defaultValue.replace(/{{(\w+)}}/g, (_, name) => options[name]))
-const defaults = { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 2, dialogShown: true }
+const defaults = { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 2 }
 
 function rows(deletedParts) {
   const { importedVideos, videoEdits } = videoStoreState([createTestVideo({ id: 'ride', durationSeconds: 120 })])

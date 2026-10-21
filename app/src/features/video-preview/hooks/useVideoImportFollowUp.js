@@ -4,30 +4,10 @@
 
 import { useState } from 'react'
 import { changeVideoCollection } from '@/features/undo-redo/undoHistory'
-import { NO_TRANSITION } from '@/lib/video-program/transition-catalog'
 import { filenameFromSelectedPath } from '@/lib/utils'
 import useStore from '@/store/useStore'
-import i18next from 'i18next'
 import { useShallow } from 'zustand/react/shallow'
 import { createImportFollowUpSteps, dropSettledSteps, listImportOverlaps, listPlacementCandidates } from '../utils/videoImportFollowUp'
-
-function formatSecondsInput(seconds) {
-  return String(seconds)
-}
-
-function parseSecondsInput(value) {
-  const trimmed = value.trim()
-  return trimmed === '' ? Number.NaN : Number(trimmed)
-}
-
-function createTransitionForm(defaults) {
-  return {
-    type: defaults.type,
-    duration: formatSecondsInput(defaults.durationSeconds),
-    threshold: formatSecondsInput(defaults.splitGapThresholdSeconds),
-    error: null,
-  }
-}
 
 /**
  * Owns the follow-up step queue and the small forms of its dialogs.
@@ -37,7 +17,6 @@ export default function useVideoImportFollowUp() {
   const [steps, setSteps] = useState([])
   // Form state is tagged with the step it belongs to, so a new step starts from fresh defaults.
   const [placementChoice, setPlacementChoice] = useState(null)
-  const [transitionForm, setTransitionForm] = useState(null)
   const collection = useStore(
     useShallow((state) => ({ importedVideos: state.importedVideos, videoEdits: state.videoEdits, transitionDefaults: state.transitionDefaults })),
   )
@@ -56,32 +35,6 @@ export default function useVideoImportFollowUp() {
       ? placementChoice
       : { step: placementStep, anchorVideoId: candidates.at(-1)?.id ?? null, side: 'after' }
   const placedVideo = placementStep ? collection.importedVideos.find((video) => video.id === placementStep.videoId) : null
-
-  // Transition defaults form.
-  const transitionStep = current?.kind === 'transitionDefaults' ? current : null
-  const form =
-    transitionStep && transitionForm?.step === transitionStep
-      ? transitionForm
-      : { step: transitionStep, ...createTransitionForm(collection.transitionDefaults) }
-  const updateForm = (changes) => setTransitionForm({ ...form, ...changes, error: null })
-
-  const confirmTransitionDefaults = () => {
-    const durationSeconds = parseSecondsInput(form.duration)
-    const splitGapThresholdSeconds = parseSecondsInput(form.threshold)
-    try {
-      useStore.getState().setTransitionDefaults({ type: form.type, durationSeconds, splitGapThresholdSeconds })
-    } catch (error) {
-      setTransitionForm({ ...form, error: error.message })
-      return
-    }
-    advance()
-  }
-
-  const dismissTransitionDefaults = () => {
-    const { type, durationSeconds, splitGapThresholdSeconds } = useStore.getState().transitionDefaults
-    useStore.getState().setTransitionDefaults({ type, durationSeconds, splitGapThresholdSeconds })
-    advance()
-  }
 
   // Overlap warning.
   const overlapStep = current?.kind === 'overlaps' ? current : null
@@ -108,21 +61,6 @@ export default function useVideoImportFollowUp() {
           advance()
         },
         onSkip: advance,
-      },
-      transitionDefaults: {
-        open: transitionStep !== null,
-        type: form.type,
-        typeLabel: form.type === NO_TRANSITION ? i18next.t('transitions.none', 'No transition') : form.type,
-        previewType: form.type === NO_TRANSITION ? null : form.type,
-        duration: form.duration,
-        threshold: form.threshold,
-        durationDisabled: form.type === NO_TRANSITION,
-        error: form.error,
-        onTypeChange: (type) => updateForm({ type }),
-        onDurationChange: (duration) => updateForm({ duration }),
-        onThresholdChange: (threshold) => updateForm({ threshold }),
-        onConfirm: confirmTransitionDefaults,
-        onDismiss: dismissTransitionDefaults,
       },
       overlaps: {
         open: overlapStep !== null,

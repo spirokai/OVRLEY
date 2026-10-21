@@ -205,15 +205,16 @@ describe('VideoDrawerContent', () => {
   })
 
   test('edits the default transitions and the transition into a following video', () => {
-    useStore.setState(
-      videoStoreState(
+    useStore.setState({
+      ...videoStoreState(
         [
           createTestVideo({ id: 'video-1', path: '/videos/ride.mp4', durationSeconds: 3723 }),
           createTestVideo({ id: 'video-2', path: '/videos/climb.mp4', durationSeconds: 65, importOrder: 1 }),
         ],
         { 'video-2': 4000 },
       ),
-    )
+      transitionDefaults: { type: 'wipeleft', durationSeconds: 2, splitGapThresholdSeconds: 2 },
+    })
     const climb = { ...videoSummary, id: 'video-2', path: '/videos/climb.mp4', filename: 'climb.mp4', offsetSeconds: 4000 }
     render(
       <VideoDrawerContent
@@ -233,7 +234,7 @@ describe('VideoDrawerContent', () => {
     const duration = screen.getByLabelText('Duration (seconds)')
     fireEvent.change(duration, { target: { value: '3' } })
     fireEvent.blur(duration)
-    expect(useStore.getState().transitionDefaults).toMatchObject({ type: 'wipeleft', durationSeconds: 3, dialogShown: true })
+    expect(useStore.getState().transitionDefaults).toMatchObject({ type: 'wipeleft', durationSeconds: 3 })
     expect(screen.getByRole('region', { name: 'climb.mp4' })).toHaveTextContent('wipeleft, 3 s')
     fireEvent.change(duration, { target: { value: '0' } })
     fireEvent.blur(duration)

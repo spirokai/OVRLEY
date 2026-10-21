@@ -37,7 +37,7 @@ describe('useTransitionOverlay', () => {
         ],
         { a: 0, b: 40 },
       ),
-      transitionDefaults: { type: 'fade', durationSeconds: 2, splitGapThresholdSeconds: 2, dialogShown: true },
+      transitionDefaults: { type: 'fade', durationSeconds: 2, splitGapThresholdSeconds: 2 },
       selectedSecond: 29,
     })
   })

@@ -50,7 +50,7 @@ describe('project snapshot contract', () => {
       ],
     })
     expect(project.sync).not.toHaveProperty('videoOffsetSeconds')
-    expect(project.transitionDefaults).toEqual({ type: 'wipeleft', durationSeconds: 2, splitGapThresholdSeconds: 2, dialogShown: false })
+    expect(project.transitionDefaults).toEqual({ type: 'none', durationSeconds: 2, splitGapThresholdSeconds: 2 })
     expect(project.render.fps).toBe(60)
     expect(project.render).toMatchObject({
       outputMode: 'separate',
@@ -228,7 +228,7 @@ describe('project snapshot contract', () => {
           placementAnchor: { videoId: 'video-1', side: 'after' },
         },
       },
-      transitionDefaults: { type: 'none', durationSeconds: 3, splitGapThresholdSeconds: 0.5, dialogShown: true },
+      transitionDefaults: { type: 'none', durationSeconds: 3, splitGapThresholdSeconds: 0.5 },
     })
 
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
@@ -252,7 +252,7 @@ describe('project snapshot contract', () => {
       },
     ])
     expect(project.sources.videos[1].deletedParts[0]).not.toBe(deletedPart)
-    expect(project.transitionDefaults).toEqual({ type: 'none', durationSeconds: 3, splitGapThresholdSeconds: 0.5, dialogShown: true })
+    expect(project.transitionDefaults).toEqual({ type: 'none', durationSeconds: 3, splitGapThresholdSeconds: 0.5 })
     expect(project.render.exportMode).toBe('composite')
   })
 })

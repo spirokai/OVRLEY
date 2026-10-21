@@ -12,10 +12,11 @@
  * piece is the first piece of its video (transition stored on
  * `video.transitionIn`) and a `deletedPart` join otherwise (transition stored on
  * the deleted part that precedes the incoming piece). A stored transition of
- * `null` means the join follows the project transition defaults.
+ * `null` means the join follows the project transition defaults, snapped to the
+ * frames of the pieces it joins.
  */
 
-import { framesToSeconds, secondsToFrames } from './frame-grid'
+import { framesToSeconds, secondsToFrames, snapDurationToFrames } from './frame-grid'
 import { HARD_CUT, NO_TRANSITION } from './transition-catalog'
 import { sortVideosByTimeline } from './video-collection'
 
@@ -132,7 +133,7 @@ function resolveOverlaps(sortedPieces, videosById) {
 function defaultTransition(previous, next, gapSeconds, transitionDefaults) {
   if (gapSeconds <= transitionDefaults.splitGapThresholdSeconds + TIME_EPSILON_SECONDS) return HARD_CUT
   if (transitionDefaults.type === NO_TRANSITION) return HARD_CUT
-  const { durationSeconds } = transitionDefaults
+  const durationSeconds = snapDurationToFrames(transitionDefaults.durationSeconds, previous.fps)
   const fits = (piece) => 2 * durationSeconds + framesToSeconds(1, piece.fps) <= piece.durationSeconds + TIME_EPSILON_SECONDS
   if (!fits(previous) || !fits(next)) return HARD_CUT
   return { type: transitionDefaults.type, durationSeconds }

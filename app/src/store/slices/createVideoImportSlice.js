@@ -361,11 +361,11 @@ export const createVideoImportSlice = (set, get) => ({
     }
   },
 
-  /** Stores the project transition defaults chosen by the user and marks the defaults dialog as shown. */
+  /** Stores the project transition defaults chosen by the user. */
   setTransitionDefaults: (defaults) => {
     requireTransitionDefaults(defaults)
     const { type, durationSeconds, splitGapThresholdSeconds } = defaults
-    set({ transitionDefaults: { type, durationSeconds, splitGapThresholdSeconds, dialogShown: true } })
+    set({ transitionDefaults: { type, durationSeconds, splitGapThresholdSeconds } })
   },
 
   /** Places every clip by detected time (see `detectVideoPlacements`). */

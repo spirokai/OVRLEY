@@ -9,9 +9,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { openHevcSupport } from '@/api/backend'
 import { useTransitionProxyJobs, useVideoTimeline } from '@/hooks/useVideoTimeline'
 import { framesToSeconds } from '@/lib/video-program/frame-grid'
-import { findNextPiece, resolvePreviewTarget } from '@/lib/video-program/playback-target'
+import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
 import { assignPreviewSlots, EMPTY_PREVIEW_SLOTS } from '@/lib/video-program/preview-slots'
-import { resolveContinuationSecond, resolveTransitionWindow } from '@/lib/video-program/transition-proxies'
+import { listShownTransitionJoinKeys, resolveContinuation, resolveTransitionWindow } from '@/lib/video-program/transition-proxies'
 import useStore from '@/store/useStore'
 import { useVideoPlaybackClock } from './useVideoPlaybackClock'
 import { useVideoPreviewWarnings } from './useVideoPreviewWarnings'
@@ -60,7 +60,9 @@ export function useVideoPreview(slotRefs, isActive = true) {
   const videoSrc = activePath === null ? '' : resolveVideoPreviewSource({ importedVideoPath: activePath, importedVideoPreviewUrl: activePreviewUrl })
 
   // Element slots - the active element shows the target piece; the parked one waits on the piece after it.
-  const preloadPiece = target === null ? null : findNextPiece(program, target.piece.id)
+  const shownJoinKeys = listShownTransitionJoinKeys(transitionProxyJobs, transitionProxies)
+  const continuation = target === null ? null : resolveContinuation(program, target.piece.id, shownJoinKeys)
+  const preloadPiece = continuation?.piece ?? null
   const preloadClip = preloadPiece === null ? null : clips.find((clip) => clip.id === preloadPiece.videoId)
   const [previousSlots, setPreviousSlots] = useState(EMPTY_PREVIEW_SLOTS)
   const slotState = assignPreviewSlots(previousSlots, {
@@ -74,7 +76,7 @@ export function useVideoPreview(slotRefs, isActive = true) {
   // The next piece continues after the start its incoming transition already showed.
   const parkedSecond =
     parkedSlot !== null && parkedSlot.pieceId === preloadPiece?.id
-      ? preloadPiece.sourceStartSecond + resolveContinuationSecond(program, target.piece.id) - preloadPiece.timelineStartSecond
+      ? preloadPiece.sourceStartSecond + continuation.second - preloadPiece.timelineStartSecond
       : null
 
   // Warning lifecycle - tracks metadata, native-player, and slow-seek messages separately from playback sync.
@@ -91,14 +93,14 @@ export function useVideoPreview(slotRefs, isActive = true) {
     })
   }, [])
 
-  // Piece end - continue with the next piece (skipping gaps, deleted parts, and the start the
-  // transition already showed) or hand the rest of the activity to the timeline clock, holding the
+  // Piece end - continue with the next piece (skipping gaps, deleted parts, and the start a shown
+  // transition already played) or hand the rest of the activity to the timeline clock, holding the
   // last frame of the piece.
   const handlePieceEnded = () => {
     const playingPiece = program.pieces.find((piece) => piece.id === playingPieceId)
-    const continuationSecond = resolveContinuationSecond(program, playingPieceId)
-    if (continuationSecond !== null) {
-      startPreviewPlayback({ source: 'video', second: continuationSecond })
+    const next = resolveContinuation(program, playingPieceId, shownJoinKeys)
+    if (next !== null) {
+      startPreviewPlayback({ source: 'video', second: next.second })
       return
     }
     const video = videoRef.current

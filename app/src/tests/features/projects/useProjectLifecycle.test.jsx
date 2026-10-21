@@ -368,7 +368,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       parsedActivity: { samples: [] },
       activitySummary: { durationSeconds: 120 },
       ...videoStoreState([createTestVideo({ path: 'C:\\Media\\ride.mp4', durationSeconds: 120 })], { 'video-1': 12 }),
-      transitionDefaults: { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 5, dialogShown: true },
+      transitionDefaults: { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 5 },
       selectedSecond: 45,
       timelineViewport: { viewStart: 30, viewEnd: 60 },
       batchOutputFolder: 'C:\\batch-renders',
@@ -718,7 +718,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: null,
         manual: { videoId: 'clip-c', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
-      transitionDefaults: { type: 'none', durationSeconds: 2, splitGapThresholdSeconds: 3, dialogShown: true },
+      transitionDefaults: { type: 'none', durationSeconds: 2, splitGapThresholdSeconds: 3 },
       render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: -5, viewEnd: 140 },
     }

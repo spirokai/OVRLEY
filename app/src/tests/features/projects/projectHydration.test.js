@@ -25,7 +25,7 @@ test('project restoration changes only project-owned settings', () => {
       videoTimezoneMode: 'utc',
       manual: { videoId: 'canonical-video', landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
     },
-    transitionDefaults: { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 4, dialogShown: true },
+    transitionDefaults: { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 4 },
     render: {
       outputMode: 'separate',
       batchOutputFolder: 'C:\\renders',
@@ -52,7 +52,7 @@ test('project restoration changes only project-owned settings', () => {
   expect(state.videoEdits['canonical-video'].offsetSeconds).toBe(20)
   expect(state.manualVideoSync.videoId).toBe('canonical-video')
   expect(state.videoSyncTimezoneMode).toBe('utc')
-  expect(state.transitionDefaults).toEqual({ type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 4, dialogShown: true })
+  expect(state.transitionDefaults).toEqual({ type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 4 })
   expect(state.manualVideoSync.detectedLocationSecond).toBe(30)
   expect(state.manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 30 })
   expect(state.renderSettings).toMatchObject({ fps: 60, codec: 'libx264', qualityType: 'bitrate', qualityValue: 20 })
@@ -96,7 +96,7 @@ function createProject({ videos, manual = {}, timeline = { playheadSecond: 0, vi
         ...manual,
       },
     },
-    transitionDefaults: { type: 'wipeleft', durationSeconds: 2, splitGapThresholdSeconds: 2, dialogShown: false },
+    transitionDefaults: { type: 'wipeleft', durationSeconds: 2, splitGapThresholdSeconds: 2 },
     render: {
       outputMode: 'combined',
       batchOutputFolder: null,

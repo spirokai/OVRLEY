@@ -574,8 +574,6 @@
     "placementSkipHint": "If you skip, the video starts at the beginning of the timeline.",
     "placementTitle": "Place video",
     "theVideoPreviewCouldNotBeLoaded": "The video preview could not be loaded.",
-    "transitionDefaultsDescription": "Choose how videos are joined. Videos closer together than the continuity threshold are treated as one recording and joined without a transition. You can change every join later.",
-    "transitionDefaultsTitle": "Transitions between videos",
     "transitionDuration": "Duration (seconds)",
     "transitionType": "Transition",
     "unsupportedVideoFile": "Not a supported video file (MP4, MOV, MKV).",

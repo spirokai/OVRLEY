@@ -299,7 +299,6 @@ struct ProjectTransitionDefaults {
     transition_type: String,
     duration_seconds: f64,
     split_gap_threshold_seconds: f64,
-    dialog_shown: bool,
 }
 
 impl Default for ProjectTransitionDefaults {
@@ -309,7 +308,6 @@ impl Default for ProjectTransitionDefaults {
             transition_type: defaults.transition_type.clone(),
             duration_seconds: defaults.duration_seconds,
             split_gap_threshold_seconds: defaults.split_gap_threshold_seconds,
-            dialog_shown: false,
         }
     }
 }
@@ -1768,7 +1766,7 @@ mod tests {
                 }
             },
             "transitionDefaults": {
-                "type": "wipeleft", "durationSeconds": 2.0, "splitGapThresholdSeconds": 2.0, "dialogShown": false
+                "type": "wipeleft", "durationSeconds": 2.0, "splitGapThresholdSeconds": 2.0
             },
             "render": {
                 "outputMode": "combined", "batchOutputFolder": null,
@@ -1997,7 +1995,7 @@ mod tests {
             { "id": "stop-1", "type": "stop", "videoSecond": 4.0 }
         ]);
         project["transitionDefaults"] = serde_json::json!({
-            "type": "none", "durationSeconds": 3.0, "splitGapThresholdSeconds": 0.5, "dialogShown": true
+            "type": "none", "durationSeconds": 3.0, "splitGapThresholdSeconds": 0.5
         });
         project
     }
@@ -2680,7 +2678,7 @@ mod tests {
         assert_eq!(
             serialized["transitionDefaults"],
             serde_json::json!({
-                "type": "wipeleft", "durationSeconds": 2.0, "splitGapThresholdSeconds": 2.0, "dialogShown": false
+                "type": "none", "durationSeconds": 2.0, "splitGapThresholdSeconds": 2.0
             })
         );
         assert!(serialized["sync"].get("videoOffsetSeconds").is_none());

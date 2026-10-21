@@ -3,9 +3,9 @@
  *
  * A join with a transition of duration `d` blends the last `d` seconds of the
  * outgoing piece into the first `d` seconds of the incoming one. On the editor
- * timeline the window is the end of the outgoing piece; afterwards playback
- * continues `d` seconds into the incoming piece. A proxy is a short native
- * render of that blend, keyed by everything that affects it.
+ * timeline the window is the end of the outgoing piece; when its proxy showed
+ * the blend, playback continues `d` seconds into the incoming piece. A proxy is
+ * a short native render of that blend, keyed by everything that affects it.
  */
 
 import { NO_TRANSITION } from './transition-catalog'
@@ -45,18 +45,32 @@ export function resolveTransitionWindow(program, second) {
 }
 
 /**
- * Timeline second where playback continues after a piece: the incoming piece's
- * start, plus the transition that already showed its first seconds.
+ * Resolves the piece that plays after a piece and the timeline second where it
+ * continues: its start, plus the transition when the transition's proxy already
+ * showed its first seconds. Without a shown proxy the preview cuts hard, so the
+ * incoming piece starts from its first frame.
  * @param {{pieces: Array<object>, joins: Array<object>}} program Built program.
  * @param {string} pieceId Ending piece.
- * @returns {number|null} Timeline second, or null after the last piece.
+ * @param {Set<string>} shownJoinKeys Joins whose transition proxy is shown (`listShownTransitionJoinKeys`).
+ * @returns {{piece: object, second: number}|null} Next piece and its continuation second, or null after the last piece.
  */
-export function resolveContinuationSecond(program, pieceId) {
+export function resolveContinuation(program, pieceId, shownJoinKeys) {
   const index = program.pieces.findIndex((piece) => piece.id === pieceId)
   if (index === -1) throw new Error(`Unknown program piece: ${pieceId}`)
-  const next = program.pieces[index + 1]
-  if (next === undefined) return null
-  return next.timelineStartSecond + program.joins[index].transition.durationSeconds
+  const piece = program.pieces[index + 1]
+  if (piece === undefined) return null
+  const join = program.joins[index]
+  return { piece, second: piece.timelineStartSecond + (shownJoinKeys.has(join.key) ? join.transition.durationSeconds : 0) }
+}
+
+/**
+ * Lists the joins whose transition the preview shows: those with a rendered proxy.
+ * @param {Array<object>} jobs Proxy jobs (`listTransitionProxyJobs`).
+ * @param {Object<string, object>} proxies Known proxies keyed by content key.
+ * @returns {Set<string>} Join keys.
+ */
+export function listShownTransitionJoinKeys(jobs, proxies) {
+  return new Set(jobs.filter((job) => proxies[job.key]?.status === 'ready').map((job) => job.joinKey))
 }
 
 /**

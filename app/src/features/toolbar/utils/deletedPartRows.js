@@ -49,6 +49,7 @@ export function buildDeletedPartRows({ clip, joinModels, commands, t }) {
           joinModels.get(`deletedPart:${part.id}`) ??
           buildJoinTransitionModel({
             join: undefined,
+            fps: null,
             override: part.transition,
             transitionDefaults: null,
             isInvalid: false,

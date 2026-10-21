@@ -42,6 +42,17 @@ export function framesToSeconds(frames, fps) {
 }
 
 /**
+ * Snaps a positive duration to the nearest whole number of frames, at least one,
+ * the way exported transitions are counted.
+ * @param {number} seconds Positive duration in seconds.
+ * @param {{num: number, den: number}} fps Exact frame rate.
+ * @returns {number} Frame-exact duration in seconds.
+ */
+export function snapDurationToFrames(seconds, fps) {
+  return framesToSeconds(Math.max(1, secondsToFrames(seconds, fps)), fps)
+}
+
+/**
  * Reports whether two exact frame rates describe the same rate.
  * @param {{num: number, den: number}} left Exact frame rate.
  * @param {{num: number, den: number}} right Exact frame rate.

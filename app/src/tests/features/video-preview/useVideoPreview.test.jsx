@@ -217,7 +217,7 @@ describe('useVideoPreview', () => {
     expect(element.pause).toHaveBeenCalled()
   })
 
-  test('shows the proxy over a transition window and continues after the start it showed', () => {
+  function fadeBetweenTwoVideos() {
     useStore.setState({
       ...videoStoreState(
         [
@@ -229,12 +229,14 @@ describe('useVideoPreview', () => {
       transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS, type: 'fade', durationSeconds: 2 },
     })
     playingAt(8.5)
-    const playing = createVideoStub({ duration: 10, paused: false, currentTime: 8.5 })
     const parked = createVideoStub({ duration: 10 })
-    const slotRefs = [{ current: playing }, { current: parked }]
+    const slotRefs = [{ current: createVideoStub({ duration: 10, paused: false, currentTime: 8.5 }) }, { current: parked }]
     const { result } = renderHook(() => useVideoPreview(slotRefs, true))
-    // The second video waits where playback continues: after the two seconds the fade showed.
-    expect(parked.currentTime).toBe(2)
+    return { parked, result }
+  }
+
+  test('shows the proxy over a transition window and continues after the start it showed', () => {
+    const { parked, result } = fadeBetweenTwoVideos()
     expect(result.current.transition).toEqual({ proxyStatus: 'queued', proxyUrl: null, elapsedSeconds: 0.5, isPlaying: true })
 
     const { importedVideos, videoEdits, transitionDefaults } = useStore.getState()
@@ -242,10 +244,21 @@ describe('useVideoPreview', () => {
     const [job] = listTransitionProxyJobs(program, clips)
     act(() => useStore.getState().setTransitionProxy(job.key, { status: 'ready', importId: 'proxy', url: 'http://127.0.0.1:4321/video/proxy' }))
     expect(result.current.transition).toMatchObject({ proxyStatus: 'ready', proxyUrl: 'http://127.0.0.1:4321/video/proxy' })
+    // The second video waits where playback continues: after the two seconds the fade showed.
+    expect(parked.currentTime).toBe(2)
 
     act(() => lastClock().onPlaybackEnded())
     expect(useStore.getState().selectedSecond).toBe(22)
     expect(result.current.transition).toBeNull()
+  })
+
+  test('without a rendered proxy cuts hard and continues from the first frame of the next video', () => {
+    const { parked, result } = fadeBetweenTwoVideos()
+    expect(result.current.transition).toMatchObject({ proxyStatus: 'queued', proxyUrl: null })
+    expect(parked.currentTime).toBe(0)
+
+    act(() => lastClock().onPlaybackEnded())
+    expect(useStore.getState().selectedSecond).toBe(20)
   })
 
   test('after the last piece hands the activity to the timeline clock and holds the last frame', () => {

@@ -329,9 +329,9 @@ describe('removing a clip', () => {
 describe('transition defaults', () => {
   beforeEach(resetStore)
 
-  test('stores chosen defaults, marks the dialog as shown, and rejects malformed values', () => {
+  test('stores chosen defaults and rejects malformed values', () => {
     useStore.getState().setTransitionDefaults({ type: 'none', durationSeconds: 3, splitGapThresholdSeconds: 0 })
-    expect(useStore.getState().transitionDefaults).toEqual({ type: 'none', durationSeconds: 3, splitGapThresholdSeconds: 0, dialogShown: true })
+    expect(useStore.getState().transitionDefaults).toEqual({ type: 'none', durationSeconds: 3, splitGapThresholdSeconds: 0 })
 
     for (const [defaults, message] of [
       [{ type: 'swirl', durationSeconds: 2, splitGapThresholdSeconds: 2 }, 'Unknown transition type'],

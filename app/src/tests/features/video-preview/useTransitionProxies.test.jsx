@@ -10,7 +10,7 @@ vi.mock('@/api/backend', () => ({
   releaseTransitionProxy: vi.fn().mockResolvedValue(null),
 }))
 
-const fade = { type: 'fade', durationSeconds: 2, splitGapThresholdSeconds: 2, dialogShown: true }
+const fade = { type: 'fade', durationSeconds: 2, splitGapThresholdSeconds: 2 }
 
 function deferred() {
   let resolve

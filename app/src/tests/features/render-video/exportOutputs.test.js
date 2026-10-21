@@ -3,7 +3,7 @@ import { reviewExport } from '@/features/render-video/utils/exportOutputs'
 import { joinVideoEdits } from '@/lib/video-program/video-collection'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
-const defaults = { type: 'wipeleft', durationSeconds: 1, splitGapThresholdSeconds: 2, dialogShown: true }
+const defaults = { type: 'wipeleft', durationSeconds: 1, splitGapThresholdSeconds: 2 }
 const all = { type: 'all', from: 0, to: 0 }
 const sync = { activitySummary: null, timezoneMode: 'utc', error: null }
 
