@@ -76,6 +76,7 @@ fn settings_for_codec_with_rotation(
         true,
         None,
         rotation_degrees,
+        None,
     )
     .unwrap()
 }
@@ -83,7 +84,8 @@ fn settings_for_codec_with_rotation(
 fn cuda_settings_for_dimensions(codec: &str, width: u32, height: u32) -> CompositeFfmpegSettings {
     let fps = Fps::new(30000, 1001).unwrap();
     let render = render_plan(codec, "60M", fps, fps, 0.0);
-    build_composite_ffmpeg_settings(&render, FrameSize { width, height }, true, None, None).unwrap()
+    build_composite_ffmpeg_settings(&render, FrameSize { width, height }, true, None, None, None)
+        .unwrap()
 }
 
 fn render_plan(
@@ -251,6 +253,7 @@ fn test_2_7_filtered_audio_map_and_encoding_are_present() {
             true,
             audio_bit_rate,
             None,
+            None,
         )
         .unwrap();
 
@@ -279,6 +282,7 @@ fn test_2_7b_source_without_audio_omits_audio_input_and_filter_graph() {
             height: 2160,
         },
         false,
+        None,
         None,
         None,
     )
@@ -681,6 +685,7 @@ fn qsv_full_rotated_sources_rotate_only_the_rgba_overlay() {
         true,
         None,
         Some(45),
+        None,
     )
     .unwrap_err();
     assert!(error
@@ -742,6 +747,7 @@ fn quality_mode_selects_encoder_specific_args() {
                 height: 1080,
             },
             true,
+            None,
             None,
             None,
         )

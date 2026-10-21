@@ -502,6 +502,7 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
         true,
         None,
         None,
+        None,
         &output_target,
     )
     .unwrap();

@@ -27,6 +27,10 @@ pub struct SourceVideoMetadata {
     pub codec_long_name: Option<String>,
     pub codec_profile: Option<String>,
     pub pix_fmt: Option<String>,
+    /// ffprobe `color_range` of the video stream (`tv`, `pc`); None when untagged.
+    pub color_range: Option<String>,
+    /// ffprobe `color_space` (matrix) of the video stream, e.g. `bt709`; None when untagged.
+    pub color_space: Option<String>,
     pub bits_per_raw_sample: Option<u32>,
     pub bit_rate: Option<String>,
     /// First audio stream's bitrate in bits per second, when reported by ffprobe.

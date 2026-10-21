@@ -8,6 +8,7 @@ use crate::output::RenderOutputTarget;
 use std::path::{Path, PathBuf};
 
 use crate::encode::ffmpeg::catalog::{CompositeCodecId, CompositeFilterStackKind};
+use crate::encode::overlay_format::YuvColor;
 use crate::encode::plan::CompositeRenderPlan;
 use crate::encode::quality::rate_control_args;
 use crate::error::{CoreError, CoreResult};
@@ -35,6 +36,7 @@ impl CompositeEncoding {
         include_audio: bool,
         audio_bit_rate: Option<u64>,
         source_rotation_degrees: Option<i32>,
+        source_color: Option<YuvColor>,
         output_target: &RenderOutputTarget,
     ) -> CoreResult<Self> {
         let ffmpeg_settings = build_composite_ffmpeg_settings(
@@ -43,6 +45,7 @@ impl CompositeEncoding {
             include_audio,
             audio_bit_rate,
             source_rotation_degrees,
+            source_color,
         )?;
         let output_path = output_target.path().to_path_buf();
 
@@ -116,6 +119,10 @@ impl CompositeFfmpegSettings {
 /// input 2 uses the same derived source window for filtered audio encoding.
 /// Audio encoding targets the source bitrate, or 192 kbps when unreported.
 ///
+/// An untagged HD source (`source_color`) is treated as BT.709 and its main
+/// video tagged `bt709`, so FFmpeg converts the overlay, and labels the
+/// output, the way players display it.
+///
 /// The function consumes the validated render plan, selects and configures an encoder profile,
 /// then assembles four argument groups that callers concatenate in order: HW
 /// init args, input 0 (seeked and filter-trimmed video), input 1 (overlay pipe),
@@ -127,6 +134,7 @@ pub fn build_composite_ffmpeg_settings(
     include_audio: bool,
     audio_bit_rate: Option<u64>,
     source_rotation_degrees: Option<i32>,
+    source_color: Option<YuvColor>,
 ) -> CoreResult<CompositeFfmpegSettings> {
     let FrameSize { width, height } = frame_size;
     // Establish one canonical rotation value before profile selection and reuse
@@ -237,6 +245,11 @@ pub fn build_composite_ffmpeg_settings(
     }
 
     // ── PHASE 6: BUILD FILTER COMPLEX (video trim + scale + overlay + format) ──
+    // Players display an untagged HD source as BT.709: tag the main video so
+    // FFmpeg converts the overlay, and labels the output, in that colour space.
+    let main_colorspace_tag = source_color
+        .and_then(|color| color.untagged_hd_as_bt709(frame_size))
+        .map(|_| "bt709");
     let mut filter_complex = composite_filter_complex(
         width,
         height,
@@ -246,6 +259,7 @@ pub fn build_composite_ffmpeg_settings(
         source_rotation_degrees,
         source_rotation_filter,
         qsv_overlay_cpu_rotation_filter,
+        main_colorspace_tag,
     )?;
     if include_audio {
         filter_complex.push_str(&format!(
@@ -322,6 +336,58 @@ mod tests {
         );
     }
 
+    fn render_plan(
+        codec_id: CompositeCodecId,
+        qsv_full_init_args: Vec<String>,
+    ) -> CompositeRenderPlan {
+        CompositeRenderPlan {
+            frames: crate::encode::plan::FrameProductionPlan::new(30, std::num::NonZeroU32::MIN)
+                .unwrap(),
+            video_path: "rotated-landscape.mp4".into(),
+            quality: crate::encode::quality::EncodingQuality::Bitrate(60.0),
+            sync_offset: 0.0,
+            trim_start: 0.0,
+            render_duration: 1.0,
+            update_rate: std::num::NonZeroU32::MIN,
+            source_fps: Fps::new(30, 1).unwrap(),
+            overlay_pipe_fps: Fps::new(30, 1).unwrap(),
+            overlay_frame_count: 30,
+            output_frame_count: 30,
+            coverage: crate::encode::video_timing::ActivityCoverage::for_video(
+                1.0,
+                0.0,
+                1.0,
+                Fps::new(30, 1).unwrap(),
+                30,
+            )
+            .unwrap(),
+            requested_codec_id: codec_id,
+            qsv_full_init_args,
+        }
+    }
+
+    #[test]
+    fn untagged_hd_sources_tag_the_main_video_bt709() {
+        let filter_complex = |color, width, height| {
+            build_composite_ffmpeg_settings(
+                &render_plan(CompositeCodecId::SoftwareHevc, Vec::new()),
+                FrameSize { width, height },
+                false,
+                None,
+                None,
+                color,
+            )
+            .unwrap()
+            .filter_complex
+        };
+        let untagged = YuvColor::from_probe(None, Some("pc"));
+        assert!(filter_complex(untagged, 3840, 2160)
+            .starts_with("[0:v]setparams=colorspace=bt709,trim="));
+        assert!(!filter_complex(untagged, 720, 576).contains("setparams"));
+        let bt709 = YuvColor::from_probe(Some("bt709"), Some("tv"));
+        assert!(!filter_complex(bt709, 1920, 1080).contains("setparams"));
+    }
+
     #[test]
     fn rotated_cuda_profiles_use_post_orientation_dimensions_for_metadata() {
         for (codec_id, expected_metadata) in [
@@ -334,33 +400,7 @@ mod tests {
                 "hevc_metadata=width=1080:height=1920",
             ),
         ] {
-            let render = CompositeRenderPlan {
-                frames: crate::encode::plan::FrameProductionPlan::new(
-                    30,
-                    std::num::NonZeroU32::MIN,
-                )
-                .unwrap(),
-                video_path: "rotated-landscape.mp4".into(),
-                quality: crate::encode::quality::EncodingQuality::Bitrate(60.0),
-                sync_offset: 0.0,
-                trim_start: 0.0,
-                render_duration: 1.0,
-                update_rate: std::num::NonZeroU32::MIN,
-                source_fps: Fps::new(30, 1).unwrap(),
-                overlay_pipe_fps: Fps::new(30, 1).unwrap(),
-                overlay_frame_count: 30,
-                output_frame_count: 30,
-                coverage: crate::encode::video_timing::ActivityCoverage::for_video(
-                    1.0,
-                    0.0,
-                    1.0,
-                    Fps::new(30, 1).unwrap(),
-                    30,
-                )
-                .unwrap(),
-                requested_codec_id: codec_id,
-                qsv_full_init_args: Vec::new(),
-            };
+            let render = render_plan(codec_id, Vec::new());
             let settings = build_composite_ffmpeg_settings(
                 &render,
                 FrameSize {
@@ -370,6 +410,7 @@ mod tests {
                 true,
                 None,
                 Some(90),
+                None,
             )
             .unwrap();
 

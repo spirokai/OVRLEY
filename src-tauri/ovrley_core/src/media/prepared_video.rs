@@ -221,6 +221,12 @@ fn merge_ffprobe_metadata(
     if metadata.pix_fmt.is_none() {
         metadata.pix_fmt = ffprobe_metadata.pix_fmt;
     }
+    if metadata.color_range.is_none() {
+        metadata.color_range = ffprobe_metadata.color_range;
+    }
+    if metadata.color_space.is_none() {
+        metadata.color_space = ffprobe_metadata.color_space;
+    }
     if metadata.bits_per_raw_sample.is_none() {
         metadata.bits_per_raw_sample = ffprobe_metadata.bits_per_raw_sample;
     }

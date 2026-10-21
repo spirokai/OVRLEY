@@ -60,7 +60,10 @@ fn cuda_frame_overhang(dimension: u32) -> u32 {
 /// display dimensions except for a 90°/270° QSV source, where coded video has
 /// the inverse width/height pair. The base-video filter chain owns exact video
 /// trimming so the decoded frame boundary matches the render plan more closely
-/// than input-side seek alone.
+/// than input-side seek alone. `main_colorspace_tag` labels an untagged main
+/// video (metadata only), so the overlay blends in, and the output carries,
+/// the colour space players assume for it.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn composite_filter_complex(
     width: u32,
     height: u32,
@@ -70,16 +73,20 @@ pub(super) fn composite_filter_complex(
     source_rotation_degrees: Option<i32>,
     source_rotation_filter: Option<&'static str>,
     qsv_overlay_cpu_rotation_filter: Option<&'static str>,
+    main_colorspace_tag: Option<&'static str>,
 ) -> CoreResult<String> {
     let template = profile
         .filter_complex
         .as_deref()
         .expect("composite profile catalog defines a filter graph");
-    let mut base_video_filters = format!(
+    let mut base_video_filters = main_colorspace_tag
+        .map(|tag| format!("setparams=colorspace={tag},"))
+        .unwrap_or_default();
+    base_video_filters.push_str(&format!(
         "trim=start={}:end={},setpts=PTS-STARTPTS,",
         format_seconds_arg(video_trim_start),
         format_seconds_arg(video_trim_start + render_duration),
-    );
+    ));
     if let Some(rotation_filter) = source_rotation_filter {
         base_video_filters.push_str(rotation_filter);
         base_video_filters.push_str("sidedata=mode=delete:type=DISPLAYMATRIX,");

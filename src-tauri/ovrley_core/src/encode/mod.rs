@@ -21,6 +21,8 @@ pub mod debug;
 pub mod ffmpeg;
 /// Rational frame-rate helpers shared by composite encoding modules.
 pub mod fps;
+/// Colour of the composite source video, as the raw overlay frames must match it.
+pub mod overlay_format;
 /// Encoding runtime pipelines and their shared frame/process infrastructure.
 pub mod pipeline;
 /// Canonical composite-render data contract.

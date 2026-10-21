@@ -104,6 +104,7 @@ fn qsv_overlay_probe_args(candidate: &QsvProbeCandidate) -> Vec<String> {
         None,
         None,
         None,
+        None,
     )
     .expect("fixed QSV probe dimensions and timing produce a valid render graph");
     let filter_complex = format!(

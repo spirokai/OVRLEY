@@ -420,11 +420,7 @@ pub(crate) fn plan_batch_item(
                 requested_codec_id,
                 qsv_full_init_args: encoding.qsv_full_init_args.clone(),
             },
-            source_metadata: Some(CompositeSourceMetadata {
-                has_audio: source.metadata.has_audio,
-                audio_bit_rate: source.metadata.audio_bit_rate,
-                rotation_degrees: source.metadata.rotation_degrees,
-            }),
+            source_metadata: Some(CompositeSourceMetadata::from_source(&source.metadata)),
         },
         CodecSelection::Transparent(_) => plan_transparent_render(
             &config.scene,

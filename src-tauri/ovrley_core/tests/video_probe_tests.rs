@@ -69,6 +69,8 @@ fn source_video_metadata_serializes_sync_and_legacy_creation_fields() {
         codec_long_name: None,
         codec_profile: None,
         pix_fmt: Some("yuv420p".to_string()),
+        color_range: Some("tv".to_string()),
+        color_space: Some("bt709".to_string()),
         bits_per_raw_sample: Some(8),
         bit_rate: None,
         audio_bit_rate: Some(128_000),

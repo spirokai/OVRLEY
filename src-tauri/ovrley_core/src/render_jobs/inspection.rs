@@ -284,6 +284,23 @@ pub struct CompositeSourceMetadata {
     pub has_audio: bool,
     pub audio_bit_rate: Option<u64>,
     pub rotation_degrees: Option<i32>,
+    /// Colour the overlay is converted to; None when the source's colour space
+    /// has no supported matrix (the overlay is then piped as RGBA).
+    pub color: Option<crate::encode::overlay_format::YuvColor>,
+}
+
+impl CompositeSourceMetadata {
+    pub(crate) fn from_source(metadata: &crate::media::SourceVideoMetadata) -> Self {
+        Self {
+            has_audio: metadata.has_audio,
+            audio_bit_rate: metadata.audio_bit_rate,
+            rotation_degrees: metadata.rotation_degrees,
+            color: crate::encode::overlay_format::YuvColor::from_probe(
+                metadata.color_space.as_deref(),
+                metadata.color_range.as_deref(),
+            ),
+        }
+    }
 }
 
 pub(crate) fn verify_composite_source_resolution(
@@ -306,7 +323,7 @@ pub(crate) fn verify_composite_source_resolution(
         ))
     })?;
     let metadata = crate::media::video_probe::probe_video(&paths.repo_root, video_path)?;
-    let resolution = metadata.resolution.ok_or_else(|| {
+    let resolution = metadata.resolution.clone().ok_or_else(|| {
         CoreError::Config(format!(
             "Could not read composite video resolution for {}",
             composite_video_path.display()
@@ -334,9 +351,5 @@ pub(crate) fn verify_composite_source_resolution(
         )));
     }
 
-    Ok(CompositeSourceMetadata {
-        has_audio: metadata.has_audio,
-        audio_bit_rate: metadata.audio_bit_rate,
-        rotation_degrees: metadata.rotation_degrees,
-    })
+    Ok(CompositeSourceMetadata::from_source(&metadata))
 }
