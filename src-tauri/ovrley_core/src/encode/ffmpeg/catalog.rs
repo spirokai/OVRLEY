@@ -10,6 +10,8 @@
 //! transparent codec or composite profile used throughout normalization,
 //! capability detection, and FFmpeg command construction.
 
+use crate::render::SlotPlacement;
+
 /// Canonical identifiers for unique FFmpeg encoders.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum EncoderId {
@@ -166,6 +168,17 @@ pub enum CompositeFilterStackKind {
     AmfD3d11Overlay,
     CudaOverlay,
     QsvFullOverlay,
+}
+
+impl CompositeFilterStackKind {
+    /// How the stack's graph places atlas slots on the main video. Every
+    /// `overlay_qsv` composites a whole new main surface, so QSV overlays one slot.
+    pub fn slot_placement(self) -> SlotPlacement {
+        match self {
+            Self::SoftwareOverlay | Self::VaapiOverlay | Self::AmfD3d11Overlay | Self::CudaOverlay => SlotPlacement::Overlay,
+            Self::QsvFullOverlay => SlotPlacement::SingleOverlay,
+        }
+    }
 }
 
 /// Availability rules for composite encoder profiles.

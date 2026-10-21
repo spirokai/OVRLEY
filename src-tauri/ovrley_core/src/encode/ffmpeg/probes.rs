@@ -2,12 +2,12 @@
 
 use crate::encode::ffmpeg::binary::configure_ffmpeg_command;
 use crate::encode::ffmpeg::catalog::{
-    CompositeCodecId, EncoderMetadata, ProbeKind, TransparentCodecId,
+    CompositeCodecId, CompositeFilterStackKind, EncoderMetadata, ProbeKind, TransparentCodecId,
 };
 use crate::encode::ffmpeg::composite_filters::composite_filter_complex;
 use crate::encode::ffmpeg::composite_profiles::composite_profile;
 use crate::encode::ffmpeg::transparent_profiles::transparent_profile;
-use crate::render::{AtlasPlan, FrameSize, SlotPlacement};
+use crate::render::{AtlasPlan, FrameSize};
 use skia_safe::IRect;
 use std::fs;
 use std::path::Path;
@@ -84,11 +84,11 @@ fn qsv_full_probe_candidates() -> Vec<QsvProbeCandidate> {
 /// Probes whether a QSV device can run the performance QSV filter path.
 ///
 /// Prepares synthetic NV12 hardware frames, then exercises the live render
-/// graph over a two-slot atlas and direct hardware-frame encoding for 30
+/// graph over the export's single-slot atlas and direct hardware-frame encoding for 30
 /// frames without video decode.
 /// Main-frame preparation belongs to each candidate: the preferred path uploads
 /// NV12 directly, while DXVA2 uses a fixed BGRA upload and GPU conversion.
-/// The live render graph owns each slot upload's 16-frame pool on both paths.
+/// The live render graph owns the slot upload's 16-frame pool on both paths.
 fn probe_qsv_overlay_path(ffmpeg_path: &Path, candidate: &QsvProbeCandidate) -> bool {
     probe_codec(
         "qsv_overlay",
@@ -98,7 +98,7 @@ fn probe_qsv_overlay_path(ffmpeg_path: &Path, candidate: &QsvProbeCandidate) -> 
 }
 
 fn qsv_overlay_probe_args(candidate: &QsvProbeCandidate) -> Vec<String> {
-    // Two slots exercise the chained, offset overlays of the export graph.
+    // Two layers merge into the one offset slot the export graph overlays.
     let atlas = AtlasPlan::from_layer_bounds(
         FrameSize {
             width: 128,
@@ -108,7 +108,7 @@ fn qsv_overlay_probe_args(candidate: &QsvProbeCandidate) -> Vec<String> {
             Some(IRect::new(8, 8, 40, 40)),
             Some(IRect::new(72, 80, 120, 120)),
         ],
-        SlotPlacement::Overlay,
+        CompositeFilterStackKind::QsvFullOverlay.slot_placement(),
     )
     .expect("fixed QSV probe layer bounds fit the probe frame");
     let render_graph = composite_filter_complex(
@@ -183,9 +183,9 @@ mod tests {
                 .unwrap()
                 + 1];
             assert!(graph.contains("[probe_main]trim=start=0:end=1,setpts=PTS-STARTPTS,scale_qsv=w=128:h=128:format=nv12[base]"));
-            assert!(graph.contains("[1:v]setpts=PTS-STARTPTS,split=2[atlas0][atlas1];"));
-            assert_eq!(graph.matches(",hwupload=extra_hw_frames=16[slot").count(), 2);
-            assert!(graph.contains("[base][slot0]overlay_qsv=x=8:y=8[main1];[main1][slot1]overlay_qsv=x=72:y=80[out]"));
+            assert!(graph.contains("[1:v]setpts=PTS-STARTPTS,crop=112:112:0:0,hwupload=extra_hw_frames=16[slot0];"));
+            assert_eq!(graph.matches(",hwupload=extra_hw_frames=16[slot").count(), 1);
+            assert!(graph.contains("[base][slot0]overlay_qsv=x=8:y=8[out]"));
             assert!(!graph.contains("hwdownload"));
             if index == 0 {
                 assert!(graph.starts_with("[0:v]format=nv12,hwupload[probe_main];"));

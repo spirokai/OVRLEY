@@ -165,11 +165,12 @@ pub(crate) fn encode_video(
         &mut prepare_profiler,
     )?;
     let (encoding, atlas) = match request {
-        // Every composite graph overlays the planned atlas slot by slot.
+        // Every composite graph overlays the planned atlas slot by slot, in the
+        // placement its filter stack plans.
         VideoEncodingRequest::Composite { render, source } => {
             let atlas = export.plan_atlas(
                 &render.frames.dense_frame_indices(),
-                SlotPlacement::Overlay,
+                render.requested_codec_id.metadata().filter_stack_kind.slot_placement(),
                 &mut prepare_profiler,
             )?;
             let encoding = CompositeEncoding::new(

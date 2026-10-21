@@ -7,7 +7,8 @@
 //! slots apart, or when their layers interleave; widgets inside one slot
 //! composite in layer order. Slots left overlapping are overlaid in layer
 //! order, since compositing over is associative. A plan whose slots are copied
-//! onto a transparent frame instead merges every overlap. The slots are then
+//! onto a transparent frame instead merges every overlap, and a plan overlaid
+//! as one slot merges every slot. The slots are then
 //! shelf-packed into one atlas frame. Each slot
 //! keeps its scene position modulo [`PIXEL_PHASE`], so widgets drawn straight
 //! into the atlas produce the pixels they produce in the full frame, up to one
@@ -44,6 +45,9 @@ pub enum SlotPlacement {
     Overlay,
     /// Slots are copied onto a transparent frame, so they never overlap.
     Copy,
+    /// One slot holding every layer is overlaid onto the main video, for overlay
+    /// filters whose cost grows with every chained instance.
+    SingleOverlay,
 }
 
 /// One region of the scene copied into the atlas.
@@ -205,16 +209,18 @@ fn interleave(a: &[usize], b: &[usize]) -> bool {
 /// merged, the union's empty area is piped and blended instead, so the union is
 /// taken when it is no larger than the two slots together. Interleaved layers
 /// have no overlay order and always merge. Copied slots have no blending and
-/// always merge. A merged slot keeps its layers in layer order.
+/// always merge. A single overlay merges every slot, overlapping or not. A
+/// merged slot keeps its layers in layer order.
 fn merge_overlapping(slots: &mut Vec<(IRect, Vec<usize>)>, placement: SlotPlacement) {
     'merge: loop {
         for first in 0..slots.len() {
             for second in first + 1..slots.len() {
                 let ((a, a_layers), (b, b_layers)) = (&slots[first], &slots[second]);
-                if overlaps(a, b)
-                    && (placement == SlotPlacement::Copy
-                        || area(&union(a, b)) <= area(a) + area(b)
-                        || interleave(a_layers, b_layers))
+                if placement == SlotPlacement::SingleOverlay
+                    || overlaps(a, b)
+                        && (placement == SlotPlacement::Copy
+                            || area(&union(a, b)) <= area(a) + area(b)
+                            || interleave(a_layers, b_layers))
                 {
                     let (rect, layers) = slots.swap_remove(second);
                     slots[first].0 = union(&slots[first].0, &rect);
@@ -405,6 +411,21 @@ mod tests {
         assert_packed(&plan);
         let scenes: Vec<_> = plan.slots().iter().map(|slot| (slot.scene, slot.layers.clone())).collect();
         assert_eq!(scenes, [(IRect::new(0, 0, 3000, 2000), vec![0, 1])]);
+    }
+
+    #[test]
+    fn a_single_overlay_merges_every_slot_into_their_union() {
+        let bounds = [
+            Some(IRect::new(100, 100, 300, 200)),
+            None,
+            Some(IRect::new(1000, 600, 1200, 700)),
+            Some(IRect::new(150, 150, 250, 250)),
+        ];
+        let plan = AtlasPlan::from_layer_bounds(UHD, &bounds, SlotPlacement::SingleOverlay).unwrap();
+        assert_packed(&plan);
+        let scenes: Vec<_> = plan.slots().iter().map(|slot| (slot.scene, slot.layers.clone())).collect();
+        assert_eq!(scenes, [(IRect::new(100, 100, 1200, 700), vec![0, 2, 3])]);
+        assert_eq!(plan.size(), FrameSize { width: 1104, height: 604 }, "the slot keeps its pixel phase");
     }
 
     #[test]
