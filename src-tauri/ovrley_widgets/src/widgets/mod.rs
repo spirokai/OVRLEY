@@ -6,6 +6,7 @@ pub mod g_force;
 pub mod lap_timer;
 pub mod heading;
 pub mod heading_compass;
+pub mod heart_zones;
 pub mod gauges;
 pub mod time;
 pub mod label;

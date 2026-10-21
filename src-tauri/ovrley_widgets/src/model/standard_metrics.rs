@@ -7,6 +7,7 @@
 
 use crate::model::types::DisplayType;
 use crate::model::types::MetricKind;
+use crate::widgets::heart_zones::zones::HeartZoneModel;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -94,6 +95,9 @@ struct RawMetricDefaults {
 #[serde(rename_all = "camelCase")]
 struct RawDisplayTypeDefinition {
     layout_mode: DisplayTypeLayoutMode,
+    /// Declared only by `heart_zones`.
+    #[serde(default)]
+    zone_model: Option<HeartZoneModel>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -246,6 +250,14 @@ pub enum DisplayTypeLayoutMode {
 /// Layout mode for a validated display type. Every native display must be declared.
 pub fn display_type_layout_mode(display_type: DisplayType) -> DisplayTypeLayoutMode {
     manifest().display_types.definitions[display_type.as_str()].layout_mode
+}
+
+/// Coggan zone shares of the heart-zones display.
+pub fn heart_zone_model() -> &'static HeartZoneModel {
+    manifest().display_types.definitions[DisplayType::HeartZones.as_str()]
+        .zone_model
+        .as_ref()
+        .expect("heart_zones display must declare zoneModel")
 }
 
 /// Return the permitted display types for a given metric kind.

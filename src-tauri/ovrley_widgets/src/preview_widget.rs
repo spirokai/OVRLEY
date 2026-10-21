@@ -12,6 +12,7 @@ use crate::widgets::g_force::preview::PreviewGForce;
 use crate::widgets::lap_timer::preview::PreviewLapTimer;
 use crate::widgets::heading::preview::PreviewHeading;
 use crate::widgets::heading_compass::preview::PreviewHeadingCompass;
+use crate::widgets::heart_zones::preview::PreviewHeartZones;
 use crate::widgets::gauges::preview::PreviewGauge;
 use crate::widgets::route::{config::CoursePlotConfig, preview::PreviewRoute};
 use crate::widgets::elevation::{config::ElevationPlotConfig, preview::PreviewElevation};
@@ -59,6 +60,7 @@ pub enum WidgetRequest {
     LapTimer(ValueRequest),
     HeadingTape(ValueRequest),
     HeadingCompass(ValueRequest),
+    HeartZones(ValueRequest),
     Gauge(ValueRequest),
     Value(ValueRequest),
 }
@@ -100,6 +102,7 @@ impl<'de> Deserialize<'de> for WidgetRequest {
                 else if metric == MetricKind::GForce && request.widget.display_type == crate::model::types::DisplayType::GForce { Self::GForce(request) }
                 else if metric == MetricKind::Heading && request.widget.display_type == crate::model::types::DisplayType::Tape { Self::HeadingTape(request) }
                 else if metric == MetricKind::Heading && request.widget.display_type == crate::model::types::DisplayType::HeadingCompass { Self::HeadingCompass(request) }
+                else if metric == MetricKind::Heartrate && request.widget.display_type == crate::model::types::DisplayType::HeartZones { Self::HeartZones(request) }
                 else if matches!(request.widget.display_type, crate::model::types::DisplayType::Linear | crate::model::types::DisplayType::Arc | crate::model::types::DisplayType::Corner | crate::model::types::DisplayType::GtGauge) { Self::Gauge(request) }
                 else { Self::Value(request) })
         }
@@ -119,6 +122,7 @@ pub enum PreviewWidget {
     LapTimer(PreviewLapTimer),
     HeadingTape(PreviewHeading),
     HeadingCompass(PreviewHeadingCompass),
+    HeartZones(PreviewHeartZones),
     Gauge(PreviewGauge),
     Value(ValuePreview),
 }
@@ -138,6 +142,7 @@ impl PreviewWidget {
             WidgetRequest::LapTimer(request) => Ok(Self::LapTimer(PreviewLapTimer::new(request.widget, request.scene)?)),
             WidgetRequest::HeadingTape(request) => Ok(Self::HeadingTape(PreviewHeading::new(request.widget, request.scene, fonts)?)),
             WidgetRequest::HeadingCompass(request) => Ok(Self::HeadingCompass(PreviewHeadingCompass::new(request.widget, request.scene, fonts)?)),
+            WidgetRequest::HeartZones(request) => Ok(Self::HeartZones(PreviewHeartZones::new(request.widget, request.scene, fonts)?)),
             WidgetRequest::Gauge(request) => Ok(Self::Gauge(PreviewGauge::new(request.widget, request.scene)?)),
             WidgetRequest::Value(request) => Ok(Self::Value(ValuePreview::new(request, fonts)?)),
         }
@@ -157,6 +162,7 @@ impl PreviewWidget {
                 ValidatedValue::Gradient(widget) => Self::Gradient(PreviewGradient::from_validated(widget.clone(), scene, host)),
                 ValidatedValue::HeadingTape(widget) => Self::HeadingTape(PreviewHeading::from_validated(widget, scene, host, fonts)?),
                 ValidatedValue::HeadingCompass(widget) => Self::HeadingCompass(PreviewHeadingCompass::from_validated(widget, scene, host, fonts)?),
+                ValidatedValue::HeartZones(widget) => Self::HeartZones(PreviewHeartZones::from_validated(widget, scene, host, fonts)?),
                 ValidatedValue::LeanAngle(widget) => Self::LeanAngle(PreviewLeanAngle::from_validated(widget, scene, host)?),
                 ValidatedValue::LinearGauge(widget) => Self::Gauge(PreviewGauge::from_validated(ValidatedGauge::Linear(widget.clone()), scene.clone(), host)),
                 ValidatedValue::ArcGauge(widget) => Self::Gauge(PreviewGauge::from_validated(ValidatedGauge::Arc(widget.clone()), scene.clone(), host)),
@@ -179,15 +185,16 @@ impl PreviewWidget {
             Self::LapTimer(widget) => FrameKey::LapTimer(widget.frame_key(activity, second)?),
             Self::HeadingTape(widget) => FrameKey::Sample(widget.frame_key(activity, second)),
             Self::HeadingCompass(widget) => FrameKey::Sample(widget.frame_key(activity, second)),
+            Self::HeartZones(widget) => FrameKey::Sample(widget.frame_key(activity, second)),
             Self::Gauge(widget) => FrameKey::Gauge(widget.frame_key(activity, second)),
             Self::Value(widget) => FrameKey::Parts(widget.frame_key(activity, second)),
         })
     }
     pub fn pixels(&self) -> &Vec<u8> {
-        match self { Self::DivingProfile(widget) => &widget.pixels, Self::Elevation(widget) => &widget.pixels, Self::Route(widget) => &widget.pixels, Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::LeanAngle(widget) => &widget.pixels, Self::GForce(widget) => &widget.pixels, Self::LapTimer(widget) => &widget.pixels, Self::HeadingTape(widget) => &widget.pixels, Self::HeadingCompass(widget) => &widget.pixels, Self::Gauge(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
+        match self { Self::DivingProfile(widget) => &widget.pixels, Self::Elevation(widget) => &widget.pixels, Self::Route(widget) => &widget.pixels, Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::LeanAngle(widget) => &widget.pixels, Self::GForce(widget) => &widget.pixels, Self::LapTimer(widget) => &widget.pixels, Self::HeadingTape(widget) => &widget.pixels, Self::HeadingCompass(widget) => &widget.pixels, Self::HeartZones(widget) => &widget.pixels, Self::Gauge(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
     }
     pub fn geometry(&self) -> &Vec<u8> {
-        match self { Self::DivingProfile(widget) => &widget.geometry, Self::Elevation(widget) => &widget.geometry, Self::Route(widget) => &widget.geometry, Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::LeanAngle(widget) => &widget.geometry, Self::GForce(widget) => &widget.geometry, Self::LapTimer(widget) => &widget.geometry, Self::HeadingTape(widget) => &widget.geometry, Self::HeadingCompass(widget) => &widget.geometry, Self::Gauge(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
+        match self { Self::DivingProfile(widget) => &widget.geometry, Self::Elevation(widget) => &widget.geometry, Self::Route(widget) => &widget.geometry, Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::LeanAngle(widget) => &widget.geometry, Self::GForce(widget) => &widget.geometry, Self::LapTimer(widget) => &widget.geometry, Self::HeadingTape(widget) => &widget.geometry, Self::HeadingCompass(widget) => &widget.geometry, Self::HeartZones(widget) => &widget.geometry, Self::Gauge(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
     }
     /// Scene rectangle a render at `second` would draw into, from layout alone: no surface
     /// is allocated and nothing is drawn. Rasters report their rotated scene extent.
@@ -205,6 +212,7 @@ impl PreviewWidget {
             Self::LapTimer(widget) => widget.layout_bounds(activity, second, fonts),
             Self::HeadingTape(widget) => Ok(widget.layout_bounds(activity, second)),
             Self::HeadingCompass(widget) => widget.layout_bounds(activity, second, fonts),
+            Self::HeartZones(widget) => Ok(widget.layout_bounds()),
             Self::Gauge(widget) => widget.layout_bounds(activity, second, fonts),
             Self::Value(widget) => widget.layout_bounds(activity, second, fonts),
         }
@@ -225,6 +233,7 @@ impl PreviewWidget {
             Self::LapTimer(widget) => widget.draw(canvas, activity, second, fonts),
             Self::HeadingTape(widget) => Ok(widget.draw(canvas, activity, second)),
             Self::HeadingCompass(widget) => widget.draw(canvas, activity, second, fonts),
+            Self::HeartZones(widget) => Ok(widget.draw(canvas, activity, second)),
             Self::Gauge(widget) => widget.draw(canvas, activity, second, fonts),
             Self::Value(widget) => widget.draw(canvas, activity, second, fonts),
         }
@@ -232,10 +241,10 @@ impl PreviewWidget {
     /// Scene bounds of the rendered tile, which the serialized geometry is derived from.
     /// Playhead families have none before their first render.
     pub fn bounds(&self) -> Option<TileBounds> {
-        match self { Self::DivingProfile(widget) => widget.bounds, Self::Elevation(widget) => widget.bounds, Self::Route(widget) => widget.bounds, Self::Raster(widget) => Some(widget.bounds), Self::Backdrop(widget) => Some(widget.bounds), Self::Label(widget) => Some(widget.bounds), Self::Gradient(widget) => widget.bounds, Self::LeanAngle(widget) => widget.bounds, Self::GForce(widget) => widget.bounds, Self::LapTimer(widget) => widget.bounds, Self::HeadingTape(widget) => widget.bounds, Self::HeadingCompass(widget) => widget.bounds, Self::Gauge(widget) => widget.bounds, Self::Value(widget) => widget.bounds }
+        match self { Self::DivingProfile(widget) => widget.bounds, Self::Elevation(widget) => widget.bounds, Self::Route(widget) => widget.bounds, Self::Raster(widget) => Some(widget.bounds), Self::Backdrop(widget) => Some(widget.bounds), Self::Label(widget) => Some(widget.bounds), Self::Gradient(widget) => widget.bounds, Self::LeanAngle(widget) => widget.bounds, Self::GForce(widget) => widget.bounds, Self::LapTimer(widget) => widget.bounds, Self::HeadingTape(widget) => widget.bounds, Self::HeadingCompass(widget) => widget.bounds, Self::HeartZones(widget) => widget.bounds, Self::Gauge(widget) => widget.bounds, Self::Value(widget) => widget.bounds }
     }
     pub fn revision(&self) -> u32 {
-        match self { Self::DivingProfile(widget) => widget.revision, Self::Elevation(widget) => widget.revision, Self::Route(widget) => widget.revision, Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::GForce(widget) => widget.revision, Self::LapTimer(widget) => widget.revision, Self::HeadingTape(widget) => widget.revision, Self::HeadingCompass(widget) => widget.revision, Self::Gauge(widget) => widget.revision, Self::Value(widget) => widget.revision }
+        match self { Self::DivingProfile(widget) => widget.revision, Self::Elevation(widget) => widget.revision, Self::Route(widget) => widget.revision, Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::GForce(widget) => widget.revision, Self::LapTimer(widget) => widget.revision, Self::HeadingTape(widget) => widget.revision, Self::HeadingCompass(widget) => widget.revision, Self::HeartZones(widget) => widget.revision, Self::Gauge(widget) => widget.revision, Self::Value(widget) => widget.revision }
     }
 }
 
@@ -272,6 +281,7 @@ pub enum ResizeUpdate {
     LapTimer(crate::widgets::lap_timer::interaction::ResizeUpdate),
     HeadingTape(crate::widgets::heading::interaction::ResizeUpdate),
     HeadingCompass(crate::widgets::heading_compass::interaction::ResizeUpdate),
+    HeartZones(crate::widgets::heart_zones::interaction::ResizeUpdate),
     Gauge(crate::widgets::gauges::interaction::ResizeUpdate),
     Value(crate::widgets::value::interaction::ResizeUpdate),
 }

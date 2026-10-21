@@ -15,6 +15,7 @@ import LinearDisplaySection from './LinearDisplaySection'
 import ArcDisplaySection from './ArcDisplaySection'
 import HeadingTapeDisplaySection from './HeadingTapeDisplaySection'
 import HeadingCompassDisplaySection from './HeadingCompassDisplaySection'
+import HeartZonesDisplaySection from './HeartZonesDisplaySection'
 import LeanAngleDisplaySection from './LeanAngleDisplaySection'
 import GForceWidgetEditor from '../GForceWidgetEditor'
 import LapTimerDisplaySection from './LapTimerDisplaySection'
@@ -28,6 +29,7 @@ import { useTranslation } from 'react-i18next'
 const DISPLAY_SECTION = {
   heading_tape: HeadingTapeDisplaySection,
   heading_compass: HeadingCompassDisplaySection,
+  heart_zones: HeartZonesDisplaySection,
   linear: LinearDisplaySection,
   arc: ArcDisplaySection,
   corner: ArcDisplaySection,

@@ -43,6 +43,7 @@ describe('manifest-backed widgets', () => {
       { value: 'heading_tape', label: 'Heading Tape' },
       { value: 'heading_compass', label: 'Heading Compass' },
     ])
+    expect(getWidgetDisplayTypeOptions('heartrate', i18next.t).at(-1)).toEqual({ value: 'heart_zones', label: 'Heart Zones' })
     expect(getWidgetDisplayTypeOptions('backdrop', i18next.t)).toEqual([
       { value: 'circle', label: 'Circle' },
       { value: 'rectangle', label: 'Rectangle' },

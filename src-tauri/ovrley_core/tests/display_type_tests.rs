@@ -21,6 +21,7 @@ fn recognized_display_type_strings_parse_to_expected_variants() {
         (r#""gt_gauge""#, DisplayType::GtGauge),
         (r#""heading_tape""#, DisplayType::Tape),
         (r#""heading_compass""#, DisplayType::HeadingCompass),
+        (r#""heart_zones""#, DisplayType::HeartZones),
         (r#""lean_angle""#, DisplayType::LeanAngle),
         (r#""g_force""#, DisplayType::GForce),
     ];
@@ -61,6 +62,7 @@ fn display_type_round_trips_each_variant() {
         (DisplayType::GtGauge, r#""gt_gauge""#),
         (DisplayType::Tape, r#""heading_tape""#),
         (DisplayType::HeadingCompass, r#""heading_compass""#),
+        (DisplayType::HeartZones, r#""heart_zones""#),
         (DisplayType::LeanAngle, r#""lean_angle""#),
         (DisplayType::GForce, r#""g_force""#),
     ];
@@ -260,6 +262,10 @@ fn display_type_is_intrinsic_only_for_text() {
     );
     assert_eq!(
         display_type_layout_mode(DisplayType::HeadingCompass),
+        DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::HeartZones),
         DisplayTypeLayoutMode::Boxed
     );
     assert_eq!(

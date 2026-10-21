@@ -27,6 +27,9 @@ export function widgetFonts(widget) {
     if (widget.data.show_min_max_labels) fonts.push({ font: widget.data.min_max_label_font })
     return fonts
   }
+  if (widget.data.display_type === 'heart_zones') {
+    return widget.data.show_label ? [{ font: widget.data.font, font_weight: widget.data.label_font_weight }] : []
+  }
   const valueFont = {
     font: widget.type === 'g_force' || widget.data.display_type === 'heading_tape' ? widget.data.label_font : widget.data.font,
     ...(widget.type === 'label' ? { font_weight: widget.data.font_weight, italic: widget.data.italic } : {}),

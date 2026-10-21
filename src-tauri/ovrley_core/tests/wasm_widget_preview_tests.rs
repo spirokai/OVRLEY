@@ -128,6 +128,7 @@ fn every_family_preview() -> Vec<(PreviewSession, Value)> {
     let mut cases = vec![
         label_preview(), gradient_preview(), lean_angle_preview(), g_force_preview(),
         lap_timer_preview(), heading_preview(), heading_compass_preview("indicator"), heading_compass_preview("compass"),
+        heart_zones_preview("line"), heart_zones_preview("arrow"),
         gauge_preview("linear", "speed", "horizontal", "fill"),
         gauge_preview("arc", "speed", "horizontal", "fill"),
         gauge_preview("corner", "speed", "bottom-left", "fill"),
@@ -259,6 +260,7 @@ fn every_family_parsed_activity() -> ovrley_core::activity::schema::ParsedActivi
         "elevation": [10.0, 15.0, 20.0, 30.0, 35.0, 25.0, 5.0, 7.0, 9.0],
         "speed": [0.0, 9.0, 10.0, 99.4, 100.0, 140.0, 5.0, null, 12.0],
         "heading": [350.0, 10.0, 90.0, 180.0, 270.0, 359.0, 0.5, 45.0, 120.0],
+        "heartrate": [80.0, 110.0, 130.0, 150.0, null, 170.0, 185.0, 190.0, 100.0],
         "gradient": [-12.5, -1.0, 0.0, 3.0, 9.9, 10.0, 25.0, -25.0, 1.0],
         "depth": [0.0, 4.0, 9.5, 18.0, 24.0, 21.0, 12.0, 5.0, 0.0],
         "lean_angle": [-55.0, -10.0, 0.0, 12.0, 48.0, 61.0, -61.0, 5.0, 0.0],
@@ -675,13 +677,13 @@ fn atlas_frames_reassemble_overlapping_rotated_widgets_of_every_family_into_the_
         config[collection].as_array_mut().unwrap().push(widget);
     }
     let config = validate_render_config_with_resources(parse_config_value(&config).unwrap(), Some(&resources)).unwrap();
-    assert_eq!(config.values.len(), 13, "every value family is exported");
+    assert_eq!(config.values.len(), 15, "every value family is exported");
 
     let atlas = assert_atlas_frames_match_the_full_frame("every family", &config, &every_family_parsed_activity());
     // Every layer is visible; neighbouring widgets either share a slot or overlay in layer order.
     let mut layers: Vec<_> = atlas.slots().iter().flat_map(|slot| slot.layers.clone()).collect();
     layers.sort_unstable();
-    assert_eq!(layers, (0..19).collect::<Vec<_>>());
+    assert_eq!(layers, (0..21).collect::<Vec<_>>());
     assert!(overlapping_widgets_are_planned(&atlas), "every family: {atlas:?}");
 }
 
@@ -3111,5 +3113,132 @@ fn heading_compass_resize_preserves_the_fixed_corner_and_scales_pixel_fields() {
     for (axis, position, size) in [(0, "left", "width"), (1, "top", "height")] {
         let corner = actual["content"][position].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
         assert!((corner - point[axis]).abs() < 0.002, "heading compass corner moved on axis {axis}");
+    }
+}
+
+fn heart_zones_preview(indicator_style: &str) -> (PreviewSession, Value) {
+    let (preview, mut request) = lean_angle_preview();
+    request["type"] = json!("heartrate");
+    request["scene"]["opacity"] = json!(0.9);
+    request["widget"] = json!({
+        "value": "heartrate", "display_type": "heart_zones", "x": 80.25, "y": 70.5,
+        "width": 400, "height": 36, "opacity": 0.8, "zone_calculation": "lthr", "lthr": 160,
+        "zone_colors": ["#2c4964", "#285b4f", "#596d2b", "#705227", "#9d2842"], "zone_gap": 4,
+        "track_corner_radius": 8, "indicator_style": indicator_style, "indicator_size": 14,
+        "indicator_color": "#ffffff", "show_label": true, "font": "Inter.ttf",
+        "label_font_weight": 800, "label_color": "#bdbdbd",
+    });
+    (preview, request)
+}
+
+#[test]
+fn heart_zones_matches_export_pixels_moves_continuously_and_validates_at_ingress() {
+    use ovrley_core::{
+        activity::{interpolate::densify_activity, trim::trim_activity},
+        debug::RenderProfiler, paths::AppPaths,
+        render::render_full_frames,
+    };
+    let activity = ovrley_core::activity::parse_activity_json(r#"{
+        "sample_elapsed_seconds": [0,1,2,3,4], "trim_end_seconds": 4,
+        "heartrate": [90,120,150,null,185]
+    }"#).unwrap();
+    let bytes = serde_json::to_vec(&activity).unwrap();
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
+    let seconds = vec![0.0, 1.0, 1.001, 2.0, 3.0, 4.0];
+    for style in ["line", "arrow"] {
+        let (mut preview, request) = heart_zones_preview(style);
+        preview.replace_activity(&bytes).unwrap();
+        let config = common::seam::validated_config_from_value(json!({
+            "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
+        }));
+        let requirements = config.render_data_requirements();
+        let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
+        let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let scene_width = config.scene.presentation.width as usize;
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        for (index, second) in seconds.iter().enumerate() {
+            preview.render(*second).unwrap();
+            let widget = &preview.widgets[&id];
+            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
+            assert!(difference <= EXPORT_TILE_TOLERANCE, "{style} heart zones differs from export by {difference} at {second}");
+            let revision = widget.revision();
+            preview.render(*second).unwrap();
+            assert_eq!(preview.widgets[&id].revision(), revision, "{style} unchanged sample re-rendered");
+        }
+        // Sub-bpm changes still move the indicator.
+        preview.render(1.0).unwrap();
+        let previous = preview.widgets[&id].pixels().clone();
+        preview.render(1.001).unwrap();
+        assert_ne!(preview.widgets[&id].pixels(), &previous, "{style} indicator moves between whole bpm");
+        let mut manual = request.clone();
+        manual["widget"]["zone_calculation"] = json!("manual");
+        manual["widget"]["manual_zones"] = json!([
+            {"from": 80, "to": 110}, {"from": 110, "to": 130}, {"from": 131, "to": 150},
+            {"from": 150, "to": 170}, {"from": 170, "to": 190},
+        ]);
+        assert!(preview.create_widget(serde_json::from_value(manual.clone()).unwrap()).is_ok(), "{style} manual zones");
+        manual["widget"]["manual_zones"][2]["from"] = json!(120);
+        assert!(preview.create_widget(serde_json::from_value(manual).unwrap()).is_err(), "{style} overlapping manual zones");
+        for (field, malformed) in [
+            ("width", Value::Null),
+            ("height", json!(0)),
+            ("zone_calculation", json!("karvonen")),
+            ("lthr", Value::Null),
+            ("zone_colors", json!(["#ffffff"])),
+            ("zone_gap", json!(200)),
+            ("track_corner_radius", json!(-1)),
+            ("indicator_style", json!("needle")),
+            ("indicator_size", json!(0)),
+            ("indicator_color", json!("white")),
+            ("label_color", Value::Null),
+            ("show_label", Value::Null),
+            ("label_font_weight", json!(0)),
+            ("font", json!("")),
+            ("opacity", json!(2)),
+        ] {
+            let mut invalid = request.clone();
+            invalid["widget"][field] = malformed;
+            assert!(preview.create_widget(serde_json::from_value(invalid).unwrap()).is_err(), "{style} {field}");
+        }
+    }
+}
+
+#[test]
+fn heart_zones_resize_reflows_the_track_and_preserves_the_fixed_corner() {
+    let (mut preview, origin) = heart_zones_preview("arrow");
+    preview.replace_activity(br#"{"sample_elapsed_seconds":[0,3],"heartrate":[100,180],"trim_end_seconds":3}"#).unwrap();
+    let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
+    preview.render(1.0).unwrap();
+    let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let bounds = &geometry["content"];
+    // The fixture scene renders at scale 1.7; the content rectangle is the scaled track.
+    assert!((bounds["width"].as_f64().unwrap() - 680.0).abs() < 0.01);
+    assert!((bounds["height"].as_f64().unwrap() - 61.2).abs() < 0.01);
+    let fixed = [0.0, 1.0];
+    let point = [
+        bounds["left"].as_f64().unwrap(),
+        bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap(),
+    ];
+    let mut gesture = origin.clone();
+    gesture["size"] = json!([520.5 * 1.7, 30.25 * 1.7]);
+    gesture["fixed"] = json!(fixed);
+    gesture["point"] = json!(point);
+    gesture["second"] = json!(1.0);
+    let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(gesture).unwrap()).unwrap()).unwrap();
+    let variant = &patch["display_variants"]["heart_zones"];
+    assert!((variant["width"].as_f64().unwrap() - 520.5).abs() < 0.001);
+    assert!((variant["height"].as_f64().unwrap() - 30.25).abs() < 0.001);
+    let mut committed = origin;
+    committed["widget"].as_object_mut().unwrap().extend(variant.as_object().unwrap().clone());
+    committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+    preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
+    preview.render(1.0).unwrap();
+    let actual: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    for (axis, position, size) in [(0, "left", "width"), (1, "top", "height")] {
+        let corner = actual["content"][position].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
+        assert!((corner - point[axis]).abs() < 0.002, "heart zones corner moved on axis {axis}");
     }
 }

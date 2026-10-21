@@ -299,6 +299,42 @@
         },
         "geometryFields": ["x", "y"]
       },
+      "heart_zones": {
+        "labelKey": "widgets.displayTypes.heartZones",
+        "icon": {
+          "source": "shared",
+          "assetFile": "display-type-heart-zones.svg"
+        },
+        "layoutMode": "boxed",
+        "zoneModel": {
+          "lthrBoundaries": [0.4, 0.69, 0.84, 0.95, 1.06, 1.15],
+          "lthrShareOfMaxHeartrate": 0.9
+        },
+        "defaults": {},
+        "variantDefaults": {
+          "width": 420,
+          "height": 36,
+          "zone_calculation": "lthr",
+          "lthr": 165,
+          "max_heartrate": 185,
+          "manual_zones": [
+            { "from": 66, "to": 114 },
+            { "from": 114, "to": 139 },
+            { "from": 139, "to": 157 },
+            { "from": 157, "to": 175 },
+            { "from": 175, "to": 190 }
+          ],
+          "zone_colors": ["#2c4964", "#285b4f", "#596d2b", "#705227", "#9d2842"],
+          "zone_gap": 4,
+          "track_corner_radius": 8,
+          "indicator_style": "line",
+          "indicator_size": 14,
+          "indicator_color": "#ffffff",
+          "show_label": true,
+          "label_font_weight": 800,
+          "label_color": "#bdbdbd"
+        }
+      },
       "lean_angle": {
         "labelKey": "widgets.displayTypes.leanAngle",
         "icon": {
@@ -1007,7 +1043,8 @@
       "defaults": {
         "show_units": true,
         "display_unit": "bpm"
-      }
+      },
+      "displayTypes": ["text", "linear", "arc", "corner", "gt_gauge", "heart_zones"]
     },
     {
       "type": "cadence",

@@ -23,7 +23,7 @@ export function widgetResizeGeometry(widget, bounds, width, height) {
     widget.type === 'raster' ||
     widget.type === 'elevation' ||
     widget.type === 'diving_profile' ||
-    ['heading_tape', 'linear'].includes(widget.data.display_type)
+    ['heading_tape', 'heart_zones', 'linear'].includes(widget.data.display_type)
     ? { size: [Math.max(width, 0.01), Math.max(height, 0.01)] }
     : { factor: Math.max(width / bounds.width, 0.01) }
 }

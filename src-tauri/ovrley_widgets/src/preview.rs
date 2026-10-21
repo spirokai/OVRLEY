@@ -93,6 +93,12 @@ impl PreviewSession {
                 origin.widget, origin.scene, size, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
             )?));
         }
+        if let WidgetRequest::HeartZones(origin) = request.origin {
+            let size = request.size.ok_or_else(|| WidgetError::Config("heart zones resize size is required".into()))?;
+            return Ok(ResizeUpdate::HeartZones(crate::widgets::heart_zones::interaction::resize_heart_zones(
+                origin.widget, origin.scene, size, request.fixed, request.point,
+            )?));
+        }
         if let WidgetRequest::Gauge(origin) = request.origin {
             return Ok(ResizeUpdate::Gauge(crate::widgets::gauges::interaction::resize_gauge(origin.widget, origin.scene, request.factor, request.size, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts)?));
         }
@@ -121,7 +127,7 @@ impl PreviewSession {
                 };
                 Ok(ResizeUpdate::Route(route.resize(widget, scene, factor, request.fixed, request.point, request.second, request.commit, self.activity.as_ref())?))
             },
-            WidgetRequest::DivingProfile { .. } | WidgetRequest::Elevation { .. } | WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } | WidgetRequest::HeadingTape(_) | WidgetRequest::Gauge(_) => unreachable!(),
+            WidgetRequest::DivingProfile { .. } | WidgetRequest::Elevation { .. } | WidgetRequest::Backdrop { .. } | WidgetRequest::Raster { .. } | WidgetRequest::HeadingTape(_) | WidgetRequest::HeartZones(_) | WidgetRequest::Gauge(_) => unreachable!(),
             WidgetRequest::Label {widget, scene, ..} => Ok(ResizeUpdate::Label(crate::widgets::label::interaction::resize_label(widget, scene, factor, request.fixed, request.point, &self.fonts)?)),
             WidgetRequest::Gradient(origin) => Ok(ResizeUpdate::Gradient(crate::widgets::gradient::interaction::resize_gradient(
                 origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
@@ -196,6 +202,7 @@ impl PreviewSession {
                 PreviewWidget::Gauge(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::HeadingTape(widget) => widget.render(self.activity.as_ref(), second)?,
                 PreviewWidget::HeadingCompass(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
+                PreviewWidget::HeartZones(widget) => widget.render(self.activity.as_ref(), second)?,
                 _ => {},
             }
             widget.sync()?;

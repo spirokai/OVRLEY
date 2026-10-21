@@ -1,4 +1,5 @@
 use crate::model::types::{DisplayType, MetricKind, TrackFillStyle};
+use crate::widgets::heart_zones::zones::HeartZoneRange;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -261,6 +262,20 @@ pub struct ValueConfig {
     pub cardinal_font_size: Option<f32>,
     #[serde(default)]
     pub show_value: Option<bool>,
+    #[serde(default)]
+    pub zone_calculation: Option<String>,
+    #[serde(default)]
+    pub lthr: Option<f32>,
+    #[serde(default)]
+    pub max_heartrate: Option<f32>,
+    #[serde(default)]
+    pub manual_zones: Option<Vec<HeartZoneRange>>,
+    #[serde(default)]
+    pub zone_colors: Option<Vec<String>>,
+    #[serde(default)]
+    pub zone_gap: Option<f32>,
+    #[serde(default)]
+    pub label_font_weight: Option<f32>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

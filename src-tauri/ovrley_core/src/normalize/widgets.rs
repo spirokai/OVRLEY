@@ -21,6 +21,7 @@ use ovrley_widgets::widgets::{
     gradient::validation::validate_gradient_widget,
     heading::validation::validate_heading,
     heading_compass::validation::validate_heading_compass,
+    heart_zones::validation::validate_heart_zones,
     label::validation::validate_label,
     lap_timer::validation::validate_lap_timer,
     lean_angle::validation::validate_lean_angle,
@@ -89,6 +90,9 @@ fn validate_render_value(
         }
         (MetricKind::Heading, DisplayType::HeadingCompass) => validate_heading_compass(value, index)
             .map(ValidatedValue::HeadingCompass)
+            .map_err(Into::into),
+        (MetricKind::Heartrate, DisplayType::HeartZones) => validate_heart_zones(value, index)
+            .map(ValidatedValue::HeartZones)
             .map_err(Into::into),
         (MetricKind::LeanAngle, DisplayType::LeanAngle) => validate_lean_angle(value, index)
             .map(ValidatedValue::LeanAngle)

@@ -347,6 +347,14 @@ impl ActivitySampler {
         column.at(&self.times, second)
     }
 
+    pub fn heartrate_at(&self, second: f64) -> Option<f64> {
+        let column = &self.numeric[&MetricKind::Heartrate];
+        if second < 0.0 || second > self.end || !column.contains(second) {
+            return None;
+        }
+        column.at(&self.times, second)
+    }
+
     /// Heading uses the shortest arc while retaining gap bridging and edge clamping.
     pub fn heading_at(&self, second: f64) -> Option<f64> {
         if second < 0.0 || second > self.end {

@@ -34,6 +34,13 @@ export function createCases({ activities, template, image, frames, warmup, fps }
       { displayType: 'heading_compass' },
       { display_variants: { heading_compass: { diameter: 200, rotation_mode } } },
     ]),
+    ...['line', 'arrow'].map((indicator_style) => [
+      `heart-zones-${indicator_style}`,
+      'heartrate',
+      'ride',
+      { displayType: 'heart_zones' },
+      { display_variants: { heart_zones: { width: 420, height: 36, indicator_style } } },
+    ]),
     [
       'lean-angle',
       'lean_angle',
