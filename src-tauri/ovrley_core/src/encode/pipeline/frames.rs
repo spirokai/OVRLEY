@@ -1,10 +1,11 @@
 //! Ordered parallel CPU frame production for a single FFmpeg process.
 //!
-//! Prepared render assets are built before this module is entered and remain
-//! immutable for the lifetime of the workers. Every worker creates its own
-//! Skia surface around an exclusively owned RGBA buffer; surfaces and canvases
-//! are never shared between threads. When FFmpeg reads `yuva420p`, each worker
-//! draws into its own RGBA scratch buffer and converts into the pooled buffer.
+//! Prepared export widgets and the prepared atlas are built before this module is
+//! entered and remain immutable for the lifetime of the workers. Every worker
+//! builds its own widget instances and wraps a Skia surface around an
+//! exclusively owned RGBA atlas buffer; surfaces and canvases are never shared
+//! between threads. When FFmpeg reads `yuva420p`, each worker draws into its
+//! own RGBA scratch atlas and converts only the atlas into the pooled buffer.
 //!
 //! The buffer-before-task invariant is intentional: a worker must acquire its
 //! render buffer before claiming a frame index. Reversing that order can
@@ -19,7 +20,7 @@ use crate::encode::pipeline::buffers::{merge_timing_maps, queue_frame, FrameBuff
 use crate::encode::plan::CompositeRenderPlan;
 use crate::encode::progress::{ProgressEstimator, RenderController};
 use crate::error::{CoreError, CoreResult};
-use crate::render::{FrameSize, VideoFrameRenderer};
+use crate::render::{ExportWidgets, PreparedAtlas, WorkerWidgets};
 use std::collections::BTreeMap;
 use std::num::{NonZeroU32, NonZeroUsize};
 use std::process::Child;
@@ -35,29 +36,29 @@ pub(crate) enum ParallelFrameProgress<'a> {
     Composite(&'a CompositeRenderPlan),
 }
 
-/// Size and pixel format of the frames written to FFmpeg.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct PipedFrameFormat {
-    pub(crate) size: FrameSize,
+/// Atlas and pixel format of the frames written to FFmpeg.
+#[derive(Clone, Copy)]
+pub(crate) struct PipedFrameFormat<'a> {
+    pub(crate) atlas: &'a PreparedAtlas,
     pub(crate) pixel_format: OverlayPixelFormat,
 }
 
-/// Renders frames into pooled buffers in the piped format; owned by one thread.
+/// Renders atlas frames into pooled buffers in the piped format; owned by one thread.
 struct FrameProducer<'a> {
-    renderer: VideoFrameRenderer<'a>,
-    format: PipedFrameFormat,
+    widgets: WorkerWidgets<'a>,
+    format: PipedFrameFormat<'a>,
     /// RGBA drawing target for formats the renderer does not draw directly.
     scratch: Vec<u8>,
 }
 
 impl<'a> FrameProducer<'a> {
-    fn new(renderer: VideoFrameRenderer<'a>, format: PipedFrameFormat) -> CoreResult<Self> {
+    fn new(export: &'a ExportWidgets<'a>, format: PipedFrameFormat<'a>) -> CoreResult<Self> {
         let scratch = match format.pixel_format {
             OverlayPixelFormat::Rgba => Vec::new(),
-            OverlayPixelFormat::Yuva420p(_) => vec![0; format.size.rgba_len()?],
+            OverlayPixelFormat::Yuva420p(_) => vec![0; format.atlas.plan().size().rgba_len()?],
         };
         Ok(Self {
-            renderer,
+            widgets: export.worker()?,
             format,
             scratch,
         })
@@ -70,17 +71,23 @@ impl<'a> FrameProducer<'a> {
         profiler: &mut RenderProfiler,
     ) -> CoreResult<()> {
         match self.format.pixel_format {
-            OverlayPixelFormat::Rgba => {
-                self.renderer
-                    .render_rgba(dense_frame_index, &mut buffer.pixels, profiler)
-            }
+            OverlayPixelFormat::Rgba => self.widgets.render_atlas(
+                dense_frame_index,
+                self.format.atlas,
+                &mut buffer.pixels,
+                profiler,
+            ),
             OverlayPixelFormat::Yuva420p(color) => {
-                self.renderer
-                    .render_rgba(dense_frame_index, &mut self.scratch, profiler)?;
-                profiler.measure("frame.yuva420p_convert", || {
+                self.widgets.render_atlas(
+                    dense_frame_index,
+                    self.format.atlas,
+                    &mut self.scratch,
+                    profiler,
+                )?;
+                profiler.measure("atlas.yuva420p_convert", || {
                     convert_rgba_to_yuva420p(
                         &self.scratch,
-                        self.format.size,
+                        self.format.atlas.plan().size(),
                         color,
                         &mut buffer.pixels,
                     )
@@ -178,9 +185,9 @@ struct FrameOutput<'a> {
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn render_frames_parallel(
-    renderer: VideoFrameRenderer<'_>,
+    export: &ExportWidgets<'_>,
     plan: FrameProductionPlan,
-    format: PipedFrameFormat,
+    format: PipedFrameFormat<'_>,
     workers: NonZeroUsize,
     progress: ParallelFrameProgress<'_>,
     pipeline: PipelineKind,
@@ -194,7 +201,7 @@ pub(crate) fn render_frames_parallel(
 ) -> CoreResult<ParallelFrameRenderResult> {
     let mut profiler = RenderProfiler::default();
     let prewarmed = prewarm_first_frame(
-        &mut FrameProducer::new(renderer, format)?,
+        &mut FrameProducer::new(export, format)?,
         buffers,
         shutdown,
         &mut profiler,
@@ -210,7 +217,7 @@ pub(crate) fn render_frames_parallel(
             match thread::Builder::new()
                 .name(format!("frame-render-{index}"))
                 .spawn_scoped(scope, move || {
-                    frame_worker(renderer, format, tasks, buffers, shutdown, sender)
+                    frame_worker(export, format, tasks, buffers, shutdown, sender)
                 }) {
                 Ok(worker) => workers_started.push(worker),
                 Err(error) => {
@@ -263,8 +270,8 @@ pub(crate) fn render_frames_parallel(
 }
 
 fn frame_worker(
-    renderer: VideoFrameRenderer<'_>,
-    format: PipedFrameFormat,
+    export: &ExportWidgets<'_>,
+    format: PipedFrameFormat<'_>,
     tasks: &FrameTasks,
     buffers: &super::buffers::FrameBufferPool,
     shutdown: &PipelineShutdown,
@@ -272,7 +279,7 @@ fn frame_worker(
 ) -> BTreeMap<String, TimingBucket> {
     let mut profiler = RenderProfiler::default();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> CoreResult<()> {
-        let mut producer = FrameProducer::new(renderer, format)?;
+        let mut producer = FrameProducer::new(export, format)?;
         while !shutdown.is_stopped() {
             let started = Instant::now();
             let Some(mut buffer) = buffers.acquire(shutdown, &mut profiler) else {

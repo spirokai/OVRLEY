@@ -16,8 +16,7 @@ use super::planning::{plan_single_render, PlannedVideoRender, VideoRenderModePla
 use crate::activity::schema::ParsedActivity;
 use crate::activity::{parse_activity_json, validate_render_activity};
 use crate::debug::RenderProgress;
-use crate::encode::ffmpeg::composite::CompositeEncoding;
-use crate::encode::pipeline::{encode_video, VideoEncoding};
+use crate::encode::pipeline::{encode_video, VideoEncodingRequest};
 use crate::encode::progress::{ProgressSink, RenderController};
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::parse_config_json;
@@ -284,7 +283,7 @@ pub(crate) fn execute_render(
     session.check_cancelled()?;
     let dense = plan.prepare_activity(activity)?;
     session.check_cancelled()?;
-    let encoding = match plan.mode {
+    let request = match plan.mode {
         VideoRenderModePlan::Composite {
             render,
             source_metadata,
@@ -299,20 +298,9 @@ pub(crate) fn execute_render(
                 )?,
             };
             session.check_cancelled()?;
-            VideoEncoding::Composite(CompositeEncoding::new(
-                crate::render::FrameSize {
-                    width: plan.config.scene.presentation.width,
-                    height: plan.config.scene.presentation.height,
-                },
-                render,
-                source.has_audio,
-                source.audio_bit_rate,
-                source.rotation_degrees,
-                source.color,
-                target,
-            )?)
+            VideoEncodingRequest::Composite { render, source }
         }
-        VideoRenderModePlan::Transparent(render) => VideoEncoding::Transparent(render),
+        VideoRenderModePlan::Transparent(render) => VideoEncodingRequest::Transparent(render),
     };
     encode_video(
         paths,
@@ -321,6 +309,6 @@ pub(crate) fn execute_render(
         &dense,
         session.controller(),
         target,
-        encoding,
+        request,
     )
 }

@@ -4,7 +4,7 @@ use crate::{
     activity::ActivitySampler,
     error::WidgetResult,
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
-    preview::PreviewFonts,
+    render::text::FontResolver,
     widgets::value::config::ValueConfig,
 };
 use serde::Serialize;
@@ -40,7 +40,7 @@ pub fn resize_lean_angle(
     point: [f32; 2],
     activity: Option<&ActivitySampler>,
     second: f64,
-    fonts: &PreviewFonts,
+    fonts: &dyn FontResolver,
 ) -> WidgetResult<ResizeUpdate> {
     let mut config = validate_lean_angle(widget, 0)?;
     let scene = validate_scene_presentation(scene)?;

@@ -493,12 +493,14 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
         "plan",
         ovrley_core::output::RenderOutputKind::Composite,
     );
+    let size = ovrley_core::render::FrameSize {
+        width: scene.presentation.width,
+        height: scene.presentation.height,
+    };
     let plan = CompositeEncoding::new(
-        ovrley_core::render::FrameSize {
-            width: scene.presentation.width,
-            height: scene.presentation.height,
-        },
+        size,
         render,
+        &ovrley_core::render::AtlasPlan::full_frame(size, 0),
         true,
         None,
         None,

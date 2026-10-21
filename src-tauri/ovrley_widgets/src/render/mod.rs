@@ -1,5 +1,6 @@
 //! Drawing resources shared across widget families.
 pub mod icons;
+pub mod image;
 pub mod pixels;
 pub(crate) mod preview;
 pub mod shadow;

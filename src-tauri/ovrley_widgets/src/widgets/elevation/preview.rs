@@ -9,16 +9,20 @@ use super::{
 use crate::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
+    host::WidgetHost,
     model::scene::{
         validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
     },
-    render::{pixels::read_surface_rgba, preview::PreviewRasterScale, text::FontResolver},
+    render::{
+        preview::{render_tile, PreviewRasterScale},
+        text::FontResolver,
+    },
     widgets::{
         route::sampling::RouteWindow,
-        value::preview::{surface, WidgetGeometry},
+        value::preview::{TileBounds, WidgetGeometry},
     },
 };
-use skia_safe::{Color, Surface};
+use skia_safe::{Canvas, Surface};
 use std::sync::Arc;
 
 pub struct PreviewElevation {
@@ -35,39 +39,38 @@ pub struct PreviewElevation {
     surface: Option<Surface>,
     pub pixels: Vec<u8>,
     pub geometry: Vec<u8>,
+    /// Scene bounds of the last rendered tile; absent until the first render.
+    pub bounds: Option<TileBounds>,
     pub revision: u32,
 }
 
 impl PreviewElevation {
     fn timing(
-        widget: &ElevationPlotConfig,
-        scene: &ScenePresentationConfig,
+        show_full_activity: bool,
+        host: &WidgetHost,
     ) -> WidgetResult<(Option<RouteWindow>, f64)> {
-        let window = RouteWindow::from_scene(scene, widget.show_full_activity)?;
-        let duration = scene
-            .extra
-            .get("preview_duration_seconds")
-            .and_then(serde_json::Value::as_f64)
-            .filter(|v| v.is_finite() && *v >= 0.0)
-            .ok_or_else(|| {
-                WidgetError::Config(
-                    "preview_duration_seconds: required non-negative finite second".into(),
-                )
-            })?;
-        Ok((window, duration))
+        Ok((host.plot_window(show_full_activity), host.placeholder_duration()?))
     }
 
     pub fn new(widget: ElevationPlotConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
-        let (window, preview_duration) = Self::timing(&widget, &scene)?;
-        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene)?;
         let scene = validate_scene_presentation(scene)?;
         let config = validate_elevation_plot(&widget, 0, &scene)?;
+        Self::from_validated(config, scene, &host)
+    }
+
+    pub fn from_validated(
+        config: ValidatedElevationPlot,
+        scene: ValidatedScenePresentation,
+        host: &WidgetHost,
+    ) -> WidgetResult<Self> {
+        let (window, preview_duration) = Self::timing(config.show_full_activity, host)?;
         Ok(Self {
             config,
             scene,
             window,
             preview_duration,
-            preview_raster_scale,
+            preview_raster_scale: host.raster_scale,
             samples: None,
             prepared_geometry: None,
             placeholder_geometry: None,
@@ -76,6 +79,7 @@ impl PreviewElevation {
             surface: None,
             pixels: Vec::new(),
             geometry: Vec::new(),
+            bounds: None,
             revision: 0,
         })
     }
@@ -86,8 +90,9 @@ impl PreviewElevation {
         scene: ScenePresentationConfig,
         transient: bool,
     ) -> WidgetResult<()> {
-        let (window, preview_duration) = Self::timing(&widget, &scene)?;
-        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene)?;
+        let (window, preview_duration) = Self::timing(widget.show_full_activity, &host)?;
+        let preview_raster_scale = host.raster_scale;
         let scene = validate_scene_presentation(scene)?;
         let config = validate_elevation_plot(&widget, 0, &scene)?;
         if window != self.window {
@@ -214,62 +219,131 @@ impl PreviewElevation {
         Ok(anchored_update(&config, &scene, fixed, point))
     }
 
+    /// Altitude correction and label range for the activity, shared by layout and its bounds.
+    fn label_range(&self, activity: Option<&ActivitySampler>) -> (f64, Option<(f64, f64)>) {
+        (
+            activity.map_or(0.0, |a| {
+                a.elevation.altitude_offset(self.config.starting_altitude_m)
+            }),
+            activity.and_then(|a| a.elevation.elevation_range()),
+        )
+    }
+
+    fn state(
+        &self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+        geometry: &ElevationGeometry,
+    ) -> ElevationFrameState {
+        if geometry.source_point_count == 0 {
+            let progress = (second / self.preview_duration.max(1e-9)).clamp(0.0, 1.0) as f32;
+            geometry.state(progress, None, progress)
+        } else {
+            let activity = &activity.expect("elevation activity prepared").elevation;
+            activity.frame_state(
+                geometry,
+                second,
+                self.window,
+                activity.elevation_at(second),
+            )
+        }
+    }
+
+    /// Scene rectangle a render at `second` draws into, without drawing the remaining profile.
+    pub fn layout_bounds(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<TileBounds> {
+        let geometry = self.geometry_at(activity, second)?;
+        let (offset, range) = self.label_range(activity);
+        Ok(
+            ElevationLayout::measure_bounds(&self.config, &self.scene, &geometry, offset, range, fonts)?
+                .into(),
+        )
+    }
+
+    /// Prepares the layout for the geometry at `second`; reports whether it was rebuilt.
+    fn layout(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<bool> {
+        let geometry = self.geometry_at(activity, second)?;
+        let changed = self
+            .layout
+            .as_ref()
+            .is_none_or(|layout| !Arc::ptr_eq(&layout.geometry, &geometry));
+        if changed {
+            let (offset, range) = self.label_range(activity);
+            self.layout = Some(ElevationLayout::new(
+                self.config.clone(),
+                self.scene.clone(),
+                geometry,
+                offset,
+                range,
+                fonts,
+            )?);
+        }
+        Ok(changed)
+    }
+
+    /// Draws the frame at `second` onto a host canvas in scene coordinates.
+    pub fn draw(
+        &mut self,
+        canvas: &Canvas,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<TileBounds> {
+        self.layout(activity, second, fonts)?;
+        let layout = self.layout.as_ref().expect("elevation layout prepared");
+        let frame = layout.frame(self.state(activity, second, &layout.geometry))?;
+        layout.draw(canvas, &frame);
+        Ok(frame.bounds.into())
+    }
+
+    /// What the frame at `second` depends on: the drawn geometry, which the widget retains, and
+    /// its state. Equal keys draw identical pixels.
+    pub fn frame_key(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<(usize, ElevationFrameState)> {
+        self.layout(activity, second, fonts)?;
+        let layout = self.layout.as_ref().expect("elevation layout prepared");
+        Ok((
+            Arc::as_ptr(&layout.geometry) as usize,
+            self.state(activity, second, &layout.geometry),
+        ))
+    }
+
     pub fn render(
         &mut self,
         activity: Option<&ActivitySampler>,
         second: f64,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<()> {
-        let geometry = self.geometry_at(activity, second)?;
-        let state = if geometry.source_point_count == 0 {
-            let progress = (second / self.preview_duration.max(1e-9)).clamp(0.0, 1.0) as f32;
-            geometry.state(progress, None, progress)
-        } else {
-            let activity = &activity.expect("elevation activity prepared").elevation;
-            activity.frame_state(
-                &geometry,
-                second,
-                self.window,
-                activity.elevation_at(second),
-            )
-        };
-        let changed = self
-            .layout
-            .as_ref()
-            .is_none_or(|layout| !Arc::ptr_eq(&layout.geometry, &geometry));
-        if changed {
-            let offset = activity.map_or(0.0, |a| {
-                a.elevation.altitude_offset(self.config.starting_altitude_m)
-            });
-            self.layout = Some(ElevationLayout::new(
-                self.config.clone(),
-                self.scene.clone(),
-                geometry,
-                offset,
-                activity.and_then(|a| a.elevation.elevation_range()),
-                fonts,
-            )?);
-        } else if self.last_state == Some(state) {
+        let changed = self.layout(activity, second, fonts)?;
+        let layout = self.layout.as_ref().expect("elevation layout prepared");
+        let state = self.state(activity, second, &layout.geometry);
+        if !changed && self.last_state == Some(state) {
             return Ok(());
         }
-        let layout = self.layout.as_ref().expect("elevation layout prepared");
         let frame = layout.frame(state)?;
-        let (width, height) = self.preview_raster_scale.dimensions(frame.bounds);
-        if self.surface.as_ref().map(|s| (s.width(), s.height()))
-            != Some((width as i32, height as i32))
-        {
-            self.surface = Some(surface(width, height)?);
-            self.pixels.resize(width as usize * height as usize * 4, 0);
-        }
-        let surface = self.surface.as_mut().expect("elevation surface allocated");
-        let canvas = surface.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        canvas.save();
-        self.preview_raster_scale.apply(canvas);
-        canvas.translate((-frame.bounds.left, -frame.bounds.top));
-        layout.draw(canvas, &frame);
-        canvas.restore();
-        read_surface_rgba(surface, &mut self.pixels)?;
+        let (width, height) = render_tile(
+            &mut self.surface,
+            &mut self.pixels,
+            self.preview_raster_scale,
+            frame.bounds,
+            |canvas| {
+                layout.draw(canvas, &frame);
+                Ok(())
+            },
+        )?;
         if changed || self.last_state.is_none() {
             #[derive(serde::Serialize)]
             struct Geometry {
@@ -278,20 +352,20 @@ impl PreviewElevation {
                 rotation: f32,
                 rotation_origin: [f32; 2],
             }
+            let tile = TileBounds::from(frame.bounds);
             self.geometry = serde_json::to_vec(&Geometry {
-                widget: WidgetGeometry {
-                    left: frame.bounds.left,
-                    top: frame.bounds.top,
-                    width,
-                    height,
-                    preview_raster_scale: self.preview_raster_scale.value(),
-                    content_width: frame.content_bounds.width,
-                    content: frame.content_bounds,
-                },
+                widget: WidgetGeometry::new(
+                    tile,
+                    (width, height),
+                    self.preview_raster_scale.value(),
+                    frame.content_bounds.width,
+                    frame.content_bounds,
+                ),
                 rotation: self.config.rotation,
                 rotation_origin: frame.content_bounds.rotation_origin(),
             })
             .map_err(|e| WidgetError::Render(e.to_string()))?;
+            self.bounds = Some(tile);
         }
         self.revision = self.revision.wrapping_add(1);
         self.last_state = Some(state);

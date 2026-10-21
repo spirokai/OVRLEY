@@ -29,7 +29,7 @@ use ovrley_core::encode::ffmpeg::composite::{
 use ovrley_core::encode::fps::Fps;
 use ovrley_core::encode::plan::CompositeRenderPlan;
 use ovrley_core::normalize::{validate_scene_config, SceneConfig};
-use ovrley_core::render::FrameSize;
+use ovrley_core::render::{AtlasPlan, FrameSize};
 use ovrley_core::render_jobs::planning::derive_composite_render_plan;
 use serde_json::json;
 
@@ -73,6 +73,13 @@ fn settings_for_codec_with_rotation(
             width: 3840,
             height: 2160,
         },
+        &AtlasPlan::full_frame(
+            FrameSize {
+                width: 3840,
+                height: 2160,
+            },
+            0,
+        ),
         true,
         None,
         rotation_degrees,
@@ -84,7 +91,15 @@ fn settings_for_codec_with_rotation(
 fn cuda_settings_for_dimensions(codec: &str, width: u32, height: u32) -> CompositeFfmpegSettings {
     let fps = Fps::new(30000, 1001).unwrap();
     let render = render_plan(codec, "60M", fps, fps, 0.0);
-    build_composite_ffmpeg_settings(&render, FrameSize { width, height }, true, None, None, None)
+    build_composite_ffmpeg_settings(
+        &render,
+        FrameSize { width, height },
+        &AtlasPlan::full_frame(FrameSize { width, height }, 0),
+        true,
+        None,
+        None,
+        None,
+    )
         .unwrap()
 }
 
@@ -250,6 +265,13 @@ fn test_2_7_filtered_audio_map_and_encoding_are_present() {
                 width: 3840,
                 height: 2160,
             },
+            &AtlasPlan::full_frame(
+                FrameSize {
+                    width: 3840,
+                    height: 2160,
+                },
+                0,
+            ),
             true,
             audio_bit_rate,
             None,
@@ -281,6 +303,13 @@ fn test_2_7b_source_without_audio_omits_audio_input_and_filter_graph() {
             width: 3840,
             height: 2160,
         },
+        &AtlasPlan::full_frame(
+            FrameSize {
+                width: 3840,
+                height: 2160,
+            },
+            0,
+        ),
         false,
         None,
         None,
@@ -682,6 +711,13 @@ fn qsv_full_rotated_sources_rotate_only_the_rgba_overlay() {
             width: 3840,
             height: 2160,
         },
+        &AtlasPlan::full_frame(
+            FrameSize {
+                width: 3840,
+                height: 2160,
+            },
+            0,
+        ),
         true,
         None,
         Some(45),
@@ -746,6 +782,13 @@ fn quality_mode_selects_encoder_specific_args() {
                 width: 1920,
                 height: 1080,
             },
+            &AtlasPlan::full_frame(
+                FrameSize {
+                    width: 1920,
+                    height: 1080,
+                },
+                0,
+            ),
             true,
             None,
             None,

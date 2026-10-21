@@ -7,7 +7,7 @@ mod segment;
 
 use super::{
     bar_geometry::{scale_bar_geometry, ResolvedBarGeometry},
-    frame::{prepare_text, raster_bounds, TextRun},
+    frame::{prepare_text, raster_bounds, ArcValueLayout, GaugeFrameLayout, TextRun},
     metric::format_gauge_label,
     validation::{ValidatedArcGaugeWidget, MAX_ARC_ANGLE_DEGREES},
 };
@@ -63,21 +63,46 @@ pub struct ArcGaugeCache {
     pub inner_widget_offset_y: f32,
 }
 
-pub fn prepare_arc_gauge_cache(
+/// Arc gauge layout before its static raster is drawn; frame bounds need nothing more.
+pub(crate) struct ArcGaugeMeasure {
+    /// Track geometry relative to the gauge origin, as the static raster draws it.
+    local_geometry: ArcGaugeGeometry,
+    texts: Vec<TextRun>,
+    /// Static raster rectangle relative to the gauge origin.
+    local_bounds: Rect,
+    content_bounds: Rect,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    track_thickness: f32,
+    track_corner_radius: f32,
+    track_border_thickness: f32,
+    bar_geometry: Option<ResolvedBarGeometry>,
+    text_style: ResolvedTextStyle,
+    value_font: Font,
+    has_unit: bool,
+    unit_font_size: f32,
+    inner_widget_gap: f32,
+    inner_widget_offset_x: f32,
+    inner_widget_offset_y: f32,
+}
+
+pub(crate) fn measure_arc_gauge(
     gauge: &ValidatedArcGaugeWidget,
     scene: &ValidatedScenePresentation,
     range: (f64, f64),
     altitude_offset_m: f64,
     unit_text: Option<&str>,
     fonts: &dyn FontResolver,
-) -> WidgetResult<ArcGaugeCache> {
+) -> WidgetResult<ArcGaugeMeasure> {
     let scale = scene.scale;
     let width = gauge.width * scale;
     let height = gauge.height * scale;
     let thickness = gauge.track_thickness * scale;
     let border = gauge.track_border_thickness * scale;
     let corner = gauge.track_corner_radius * scale;
-    let mut geometry = match gauge.corner_orientation {
+    let geometry = match gauge.corner_orientation {
         Some(orientation) => {
             corner_gauge_geometry(width, height, orientation, thickness, corner, border)
         }
@@ -127,38 +152,19 @@ pub fn prepare_arc_gauge_cache(
         content.join(text.content_bounds);
         bounds.join(text.bounds);
     }
-    let bounds = raster_bounds(bounds);
-    let mut surface = surface(bounds.width() as u32, bounds.height() as u32)?;
-    let canvas = surface.canvas();
-    canvas.clear(Color::TRANSPARENT);
-    canvas.translate((-bounds.left, -bounds.top));
-    layer::draw_static_layer(canvas, gauge, scene, geometry, scale, &text_style);
-    for text in texts {
-        text.draw(canvas);
-    }
     content.offset((gauge.x, gauge.y));
-    geometry.center_x += gauge.x;
-    geometry.center_y += gauge.y;
-    geometry.inner_widget_center_x += gauge.x;
-    geometry.inner_widget_center_y += gauge.y;
-    Ok(ArcGaugeCache {
-        static_image: surface.image_snapshot(),
-        static_image_x: gauge.x + bounds.left,
-        static_image_y: gauge.y + bounds.top,
+    Ok(ArcGaugeMeasure {
+        local_geometry: geometry,
+        texts,
+        local_bounds: raster_bounds(bounds),
         content_bounds: content,
         x: gauge.x,
         y: gauge.y,
         width,
         height,
-        rotation: gauge.rotation,
-        geometry,
         track_thickness: thickness,
         track_corner_radius: corner,
         track_border_thickness: border,
-        track_filled_color: gauge.track_filled_color.clone(),
-        track_filled_opacity: gauge.track_filled_opacity,
-        track_fill_flat: gauge.track_fill_flat,
-        track_fill_style: gauge.track_fill_style,
         bar_geometry: bars,
         text_style,
         value_font,
@@ -170,6 +176,99 @@ pub fn prepare_arc_gauge_cache(
     })
 }
 
+/// Scene geometry of the track; the static raster keeps the local copy.
+fn placed_geometry(mut geometry: ArcGaugeGeometry, x: f32, y: f32) -> ArcGaugeGeometry {
+    geometry.center_x += x;
+    geometry.center_y += y;
+    geometry.inner_widget_center_x += x;
+    geometry.inner_widget_center_y += y;
+    geometry
+}
+
+impl ArcGaugeMeasure {
+    pub(crate) fn frame_layout(&self) -> GaugeFrameLayout<'_> {
+        GaugeFrameLayout {
+            content_bounds: self.content_bounds,
+            raster_bounds: self.local_bounds.with_offset((self.x, self.y)),
+            content_width: self.width,
+            value: Some(ArcValueLayout {
+                inner: inner_widget_layout(
+                    placed_geometry(self.local_geometry, self.x, self.y),
+                    self.inner_widget_offset_x,
+                    self.inner_widget_offset_y,
+                    &self.text_style,
+                    self.has_unit.then_some(self.unit_font_size),
+                    self.inner_widget_gap,
+                ),
+                style: &self.text_style,
+                font: &self.value_font,
+            }),
+        }
+    }
+
+    pub(crate) fn into_cache(
+        self,
+        gauge: &ValidatedArcGaugeWidget,
+        scene: &ValidatedScenePresentation,
+    ) -> WidgetResult<ArcGaugeCache> {
+        let bounds = self.local_bounds;
+        let mut surface = surface(bounds.width() as u32, bounds.height() as u32)?;
+        let canvas = surface.canvas();
+        canvas.clear(Color::TRANSPARENT);
+        canvas.translate((-bounds.left, -bounds.top));
+        layer::draw_static_layer(
+            canvas,
+            gauge,
+            scene,
+            self.local_geometry,
+            scene.scale,
+            &self.text_style,
+        );
+        for text in self.texts {
+            text.draw(canvas);
+        }
+        Ok(ArcGaugeCache {
+            static_image: surface.image_snapshot(),
+            static_image_x: self.x + bounds.left,
+            static_image_y: self.y + bounds.top,
+            content_bounds: self.content_bounds,
+            x: self.x,
+            y: self.y,
+            width: self.width,
+            height: self.height,
+            rotation: gauge.rotation,
+            geometry: placed_geometry(self.local_geometry, self.x, self.y),
+            track_thickness: self.track_thickness,
+            track_corner_radius: self.track_corner_radius,
+            track_border_thickness: self.track_border_thickness,
+            track_filled_color: gauge.track_filled_color.clone(),
+            track_filled_opacity: gauge.track_filled_opacity,
+            track_fill_flat: gauge.track_fill_flat,
+            track_fill_style: gauge.track_fill_style,
+            bar_geometry: self.bar_geometry,
+            text_style: self.text_style,
+            value_font: self.value_font,
+            has_unit: self.has_unit,
+            unit_font_size: self.unit_font_size,
+            inner_widget_gap: self.inner_widget_gap,
+            inner_widget_offset_x: self.inner_widget_offset_x,
+            inner_widget_offset_y: self.inner_widget_offset_y,
+        })
+    }
+}
+
+pub fn prepare_arc_gauge_cache(
+    gauge: &ValidatedArcGaugeWidget,
+    scene: &ValidatedScenePresentation,
+    range: (f64, f64),
+    altitude_offset_m: f64,
+    unit_text: Option<&str>,
+    fonts: &dyn FontResolver,
+) -> WidgetResult<ArcGaugeCache> {
+    measure_arc_gauge(gauge, scene, range, altitude_offset_m, unit_text, fonts)?
+        .into_cache(gauge, scene)
+}
+
 impl ArcGaugeCache {
     pub fn raster_bounds(&self) -> Rect {
         Rect::from_xywh(
@@ -178,6 +277,18 @@ impl ArcGaugeCache {
             self.static_image.width() as f32,
             self.static_image.height() as f32,
         )
+    }
+    pub(crate) fn frame_layout(&self) -> GaugeFrameLayout<'_> {
+        GaugeFrameLayout {
+            content_bounds: self.content_bounds,
+            raster_bounds: self.raster_bounds(),
+            content_width: self.width,
+            value: Some(ArcValueLayout {
+                inner: self.inner_layout(),
+                style: &self.text_style,
+                font: &self.value_font,
+            }),
+        }
     }
     pub(crate) fn inner_layout(&self) -> ArcInnerWidgetLayout {
         inner_widget_layout(

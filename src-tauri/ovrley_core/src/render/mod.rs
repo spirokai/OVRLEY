@@ -1,5 +1,7 @@
 //! Native overlay jobs: prepare shared widgets, compose frames, and write preview output.
 pub mod assets;
+mod atlas;
+mod engine;
 mod frame;
 pub mod report;
 mod static_layer;
@@ -19,6 +21,8 @@ use static_layer::prepare_rasters;
 use std::{collections::BTreeMap, path::Path, time::Instant};
 use surface::{create_surface, write_surface_png};
 
+pub use atlas::{AtlasPlan, AtlasSlot};
+pub use engine::{ExportWidgets, PreparedAtlas, WorkerWidgets};
 pub use frame::VideoFrameRenderer;
 pub use report::{LabelCacheStatus, PreviewRenderReport};
 pub use static_layer::{PreparedStaticLayer, StaticLayer};

@@ -6,6 +6,7 @@ pub mod rdp;
 #[macro_use]
 pub mod model;
 pub mod activity;
+pub mod host;
 pub mod preview;
 mod preview_instance;
 pub mod preview_widget;

@@ -12,7 +12,7 @@ use crate::encode::overlay_format::{OverlayPixelFormat, YuvColor};
 use crate::encode::plan::CompositeRenderPlan;
 use crate::encode::quality::rate_control_args;
 use crate::error::{CoreError, CoreResult};
-use crate::render::FrameSize;
+use crate::render::{AtlasPlan, FrameSize};
 
 use super::composite_filters::{
     composite_filter_complex, cuda_display_metadata_filter, format_seconds_arg,
@@ -33,6 +33,7 @@ impl CompositeEncoding {
     pub fn new(
         frame_size: FrameSize,
         render: CompositeRenderPlan,
+        atlas: &AtlasPlan,
         include_audio: bool,
         audio_bit_rate: Option<u64>,
         source_rotation_degrees: Option<i32>,
@@ -42,6 +43,7 @@ impl CompositeEncoding {
         let ffmpeg_settings = build_composite_ffmpeg_settings(
             &render,
             frame_size,
+            atlas,
             include_audio,
             audio_bit_rate,
             source_rotation_degrees,
@@ -65,7 +67,7 @@ impl CompositeEncoding {
 ///
 /// Composite mode currently uses three inputs:
 /// - input 0: coarsely seeked source video for frame-accurate filter-side video trim
-/// - input 1: raw overlay frames from stdin (`pipe:0`) in `overlay_pixel_format`
+/// - input 1: raw atlas frames from stdin (`pipe:0`) in `overlay_pixel_format`
 /// - input 2: coarsely seeked source media for filtered audio encoding
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompositeFfmpegSettings {
@@ -120,6 +122,10 @@ impl CompositeFfmpegSettings {
 /// input 2 uses the same derived source window for filtered audio encoding.
 /// Audio encoding targets the source bitrate, or 192 kbps when unreported.
 ///
+/// The overlay is piped as frames of `atlas`, which the filter graph crops and
+/// overlays slot by slot for CPU overlay stacks; the other stacks take the
+/// full-frame plan.
+///
 /// The overlay is piped as `yuva420p` in the source's colour (`source_color`)
 /// for every graph that blends in YUV. The QSV full-overlay graph uploads RGBA
 /// surfaces, and a source colour space without a supported matrix
@@ -135,6 +141,7 @@ impl CompositeFfmpegSettings {
 pub fn build_composite_ffmpeg_settings(
     render: &CompositeRenderPlan,
     frame_size: FrameSize,
+    atlas: &AtlasPlan,
     include_audio: bool,
     audio_bit_rate: Option<u64>,
     source_rotation_degrees: Option<i32>,
@@ -222,7 +229,7 @@ pub fn build_composite_ffmpeg_settings(
         video_path.clone(),
     ]);
 
-    // ── PHASE 4: BUILD INPUT 1 ARGS (raw overlay via stdin pipe) ──
+    // ── PHASE 4: BUILD INPUT 1 ARGS (raw atlas frames via stdin pipe) ──
     // Players display an untagged HD source as BT.709: tag the main video so
     // the overlay blends, and the output is labelled, in that colour space.
     let retagged_color = source_color.and_then(|color| color.untagged_hd_as_bt709(frame_size));
@@ -234,9 +241,10 @@ pub fn build_composite_ffmpeg_settings(
     };
     let mut input_1_args = vec!["-f".to_string(), "rawvideo".to_string()];
     input_1_args.extend(overlay_pixel_format.ffmpeg_input_args());
+    let atlas_size = atlas.size();
     input_1_args.extend([
         "-s".to_string(),
-        format!("{width}x{height}", width = width, height = height),
+        format!("{}x{}", atlas_size.width, atlas_size.height),
         "-r".to_string(),
         render.overlay_pipe_fps.ffmpeg_arg(),
         "-i".to_string(),
@@ -259,6 +267,7 @@ pub fn build_composite_ffmpeg_settings(
     let mut filter_complex = composite_filter_complex(
         width,
         height,
+        atlas,
         input_window.filter_start,
         render.render_duration,
         selected_profile,
@@ -376,9 +385,11 @@ mod tests {
     #[test]
     fn untagged_hd_sources_tag_the_main_video_bt709() {
         let filter_complex = |color, width, height| {
+            let size = FrameSize { width, height };
             build_composite_ffmpeg_settings(
                 &render_plan(CompositeCodecId::SoftwareHevc, Vec::new()),
-                FrameSize { width, height },
+                size,
+                &AtlasPlan::full_frame(size, 0),
                 false,
                 None,
                 None,
@@ -406,6 +417,7 @@ mod tests {
             build_composite_ffmpeg_settings(
                 &render_plan(codec_id, init_args),
                 size,
+                &AtlasPlan::full_frame(size, 0),
                 false,
                 None,
                 None,
@@ -451,12 +463,14 @@ mod tests {
             ),
         ] {
             let render = render_plan(codec_id, Vec::new());
+            let size = FrameSize {
+                width: 1080,
+                height: 1920,
+            };
             let settings = build_composite_ffmpeg_settings(
                 &render,
-                FrameSize {
-                    width: 1080,
-                    height: 1920,
-                },
+                size,
+                &AtlasPlan::full_frame(size, 0),
                 true,
                 None,
                 Some(90),
@@ -468,6 +482,112 @@ mod tests {
                 .filter_complex
                 .contains("transpose_cuda=2,sidedata=mode=delete:type=DISPLAYMATRIX,scale_cuda"));
             assert_argument_pair(&settings.output_args, "-bsf:v", expected_metadata);
+        }
+    }
+
+    const UHD: FrameSize = FrameSize {
+        width: 3840,
+        height: 2160,
+    };
+
+    fn planned_atlas() -> AtlasPlan {
+        AtlasPlan::from_layer_bounds(
+            UHD,
+            &[
+                Some(skia_safe::IRect::new(101, 200, 500, 301)),
+                None,
+                Some(skia_safe::IRect::new(3000, 1800, 3600, 2100)),
+            ],
+        )
+        .unwrap()
+    }
+
+    fn atlas_settings(codec_id: CompositeCodecId, atlas: &AtlasPlan) -> CoreResult<CompositeFfmpegSettings> {
+        build_composite_ffmpeg_settings(
+            &render_plan(codec_id, Vec::new()),
+            UHD,
+            atlas,
+            true,
+            None,
+            None,
+            YuvColor::from_probe(Some("bt709"), Some("tv")),
+        )
+    }
+
+    #[test]
+    fn cpu_overlay_graphs_crop_and_overlay_every_atlas_slot_at_its_scene_position() {
+        let atlas = planned_atlas();
+        assert_eq!(atlas.slots().len(), 2);
+        for codec_id in [
+            CompositeCodecId::SoftwareH264,
+            CompositeCodecId::SoftwareHevc,
+            CompositeCodecId::NvgpuH264,
+            CompositeCodecId::NvgpuHevc,
+            CompositeCodecId::QsvH264,
+            CompositeCodecId::QsvHevc,
+            CompositeCodecId::AmfH264,
+            CompositeCodecId::AmfHevc,
+            CompositeCodecId::MacH264,
+            CompositeCodecId::MacHevc,
+        ] {
+            let settings = atlas_settings(codec_id, &atlas).unwrap();
+            let graph = &settings.filter_complex;
+            let name = codec_id.metadata().profile_name;
+            assert_argument_pair(
+                &settings.input_1_args,
+                "-s",
+                &format!("{}x{}", atlas.size().width, atlas.size().height),
+            );
+            assert!(graph.contains("[1:v]setpts=PTS-STARTPTS,split=2[atlas0][atlas1];"), "{name}: {graph}");
+            assert_eq!(graph.matches("crop=").count(), 2, "{name}: {graph}");
+            assert_eq!(graph.matches("overlay=").count(), 2, "{name}: {graph}");
+            for (index, slot) in atlas.slots().iter().enumerate() {
+                let rect = AtlasPlan::atlas_rect(slot);
+                let crop = format!(
+                    "[atlas{index}]crop={}:{}:{}:{}[slot{index}]",
+                    rect.width(),
+                    rect.height(),
+                    rect.left,
+                    rect.top
+                );
+                assert!(graph.contains(&crop), "{name}: {graph}");
+                let overlay = format!(
+                    "[slot{index}]overlay={}:{}:eof_action=repeat:shortest=1",
+                    slot.scene.left, slot.scene.top
+                );
+                assert!(graph.contains(&overlay), "{name}: {graph}");
+            }
+            assert!(graph.contains("[base][slot0]overlay="), "{name}: {graph}");
+            assert!(graph.contains("[main1];[main1][slot1]overlay="), "{name}: {graph}");
+            assert!(graph.ends_with("[2:a]atrim=start=0:duration=1,asetpts=N/SR/TB[aout]"), "{name}: {graph}");
+        }
+    }
+
+    #[test]
+    fn single_slot_and_empty_atlases_keep_one_overlay() {
+        let full = atlas_settings(CompositeCodecId::SoftwareH264, &AtlasPlan::full_frame(UHD, 2)).unwrap();
+        assert!(full.filter_complex.contains(
+            "[1:v]setpts=PTS-STARTPTS,crop=3840:2160:0:0[slot0];[base][slot0]overlay=0:0:eof_action=repeat:shortest=1,format=yuv420p[out]"
+        ));
+        assert_argument_pair(&full.input_1_args, "-s", "3840x2160");
+
+        let empty = AtlasPlan::from_layer_bounds(UHD, &[None]).unwrap();
+        let empty = atlas_settings(CompositeCodecId::AmfHevc, &empty).unwrap();
+        assert!(empty.filter_complex.contains(
+            "[1:v]setpts=PTS-STARTPTS,null[slot0];[base][slot0]overlay=0:0:eof_action=repeat:shortest=1,format=nv12,hwupload[out]"
+        ));
+        assert_argument_pair(&empty.input_1_args, "-s", "2x2");
+    }
+
+    #[test]
+    fn full_frame_overlay_graphs_reject_a_packed_atlas() {
+        let atlas = planned_atlas();
+        for codec_id in [CompositeCodecId::NnvgpuH264, CompositeCodecId::VaapiHevc] {
+            let error = atlas_settings(codec_id, &atlas).unwrap_err().to_string();
+            assert!(error.contains("overlays the full 3840x2160 frame"), "{error}");
+            let full = atlas_settings(codec_id, &AtlasPlan::full_frame(UHD, 3)).unwrap();
+            assert!(!full.filter_complex.contains("crop="));
+            assert_argument_pair(&full.input_1_args, "-s", "3840x2160");
         }
     }
 }

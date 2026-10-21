@@ -140,6 +140,9 @@ impl PreviewSession {
             )?)),
         }
     }
+    pub fn activity(&self) -> Option<&ActivitySampler> {
+        self.activity.as_ref()
+    }
     pub fn replace_activity(&mut self, bytes: &[u8]) -> WidgetResult<()> {
         self.activity = if bytes.is_empty() {
             None

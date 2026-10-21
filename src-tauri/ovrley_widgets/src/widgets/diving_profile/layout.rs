@@ -35,6 +35,20 @@ pub struct DivingProfileLayout {
     variant: Paint,
 }
 
+struct DivingProfileMeasure {
+    scale: [f32; 2],
+    stroke: f32,
+    offset: (f32, f32),
+    blur: f32,
+    opacity: f32,
+    rotation: (f32, f32),
+    remaining_bounds: Rect,
+    raster: Rect,
+    labels: [Option<ElevationLabel>; 2],
+    bounds: Rect,
+    content_bounds: ContentBounds,
+}
+
 pub struct DivingProfileFrame {
     pub state: DivingFrameState,
     pub bounds: Rect,
@@ -51,13 +65,14 @@ fn fill_paint(color: &str, opacity: f32) -> Paint {
 }
 
 impl DivingProfileLayout {
-    pub fn new(
-        config: ValidatedDivingProfile,
-        scene: ValidatedScenePresentation,
-        geometry: Arc<DivingGeometry>,
+    /// Every rectangle the layout needs, before its remaining raster is drawn.
+    fn measure(
+        config: &ValidatedDivingProfile,
+        scene: &ValidatedScenePresentation,
+        geometry: &DivingGeometry,
         depth_range: Option<(f64, f64)>,
         fonts: &dyn FontResolver,
-    ) -> WidgetResult<Self> {
+    ) -> WidgetResult<DivingProfileMeasure> {
         let opacity = scene.opacity * config.opacity;
         let scale = [
             config.width * scene.scale / geometry.key.width,
@@ -91,62 +106,7 @@ impl DivingProfileLayout {
             0.0,
             0.0,
         ));
-        let mut layer = surface(
-            remaining_bounds.width() as u32,
-            remaining_bounds.height() as u32,
-        )?;
-        let canvas = layer.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        canvas.translate((-remaining_bounds.left, -remaining_bounds.top));
-        canvas.rotate(config.rotation, None);
-
-        let matrix = Matrix::scale((scale[0], scale[1]));
-        let paths = geometry.paths.lock().expect("diving profile paths lock");
-        let path = paths.remaining.with_transform(&matrix);
-        let area = paths.ceiling_area.with_transform(&matrix);
-        let ceiling = paths.ceiling_line.with_transform(&matrix);
-        drop(paths);
-        let remaining_line = stroke_paint(
-            &config.remaining_line_color,
-            stroke,
-            config.remaining_line_opacity * opacity,
-        );
-        let completed_line = stroke_paint(
-            &config.completed_line_color,
-            (config.completed_line_width * scene.scale).max(1.0),
-            config.completed_line_opacity * opacity,
-        );
-        canvas.draw_path(
-            &area,
-            &fill_paint(
-                &config.ceiling_area_color,
-                config.ceiling_area_opacity * opacity,
-            ),
-        );
-        if config.ceiling_line_width > 0.0 {
-            canvas.draw_path(
-                &ceiling,
-                &stroke_paint(
-                    &config.ceiling_line_color,
-                    config.ceiling_line_width * scene.scale,
-                    config.ceiling_line_opacity * opacity,
-                ),
-            );
-        }
-        if blur > 0.0 {
-            canvas.save();
-            canvas.translate(offset);
-            let mut shadow = stroke_paint(
-                &scene.shadow_color,
-                stroke,
-                config.remaining_line_opacity * opacity,
-            );
-            shadow.set_mask_filter(MaskFilter::blur(BlurStyle::Normal, blur, true));
-            canvas.draw_path(&path, &shadow);
-            canvas.restore();
-        }
-        canvas.draw_path(&path, &remaining_line);
-        let content = Self::measure_content(&config, &scene);
+        let content = Self::measure_content(config, scene);
         let radius =
             (config.marker_size * scene.scale)
                 .max(2.0)
@@ -243,6 +203,107 @@ impl DivingProfileLayout {
         );
         let content_bounds =
             ContentBounds::rotated_frame(content, config.rotation, config.x, config.y);
+        Ok(DivingProfileMeasure {
+            scale,
+            stroke,
+            offset,
+            blur,
+            opacity,
+            remaining_bounds,
+            raster,
+            labels,
+            bounds,
+            content_bounds,
+            rotation: (sin, cos),
+        })
+    }
+
+    /// Frame bounds from layout alone; the cached remaining raster is not drawn.
+    pub fn measure_bounds(
+        config: &ValidatedDivingProfile,
+        scene: &ValidatedScenePresentation,
+        geometry: &DivingGeometry,
+        depth_range: Option<(f64, f64)>,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<Rect> {
+        Ok(Self::measure(config, scene, geometry, depth_range, fonts)?.bounds)
+    }
+
+    pub fn new(
+        config: ValidatedDivingProfile,
+        scene: ValidatedScenePresentation,
+        geometry: Arc<DivingGeometry>,
+        depth_range: Option<(f64, f64)>,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<Self> {
+        let DivingProfileMeasure {
+            scale,
+            stroke,
+            offset,
+            blur,
+            opacity,
+            remaining_bounds,
+            raster,
+            labels,
+            bounds,
+            content_bounds,
+            rotation: (sin, cos),
+        } = Self::measure(&config, &scene, &geometry, depth_range, fonts)?;
+        let mut layer = surface(
+            remaining_bounds.width() as u32,
+            remaining_bounds.height() as u32,
+        )?;
+        let canvas = layer.canvas();
+        canvas.clear(Color::TRANSPARENT);
+        canvas.translate((-remaining_bounds.left, -remaining_bounds.top));
+        canvas.rotate(config.rotation, None);
+
+        let matrix = Matrix::scale((scale[0], scale[1]));
+        let paths = geometry.paths.lock().expect("diving profile paths lock");
+        let path = paths.remaining.with_transform(&matrix);
+        let area = paths.ceiling_area.with_transform(&matrix);
+        let ceiling = paths.ceiling_line.with_transform(&matrix);
+        drop(paths);
+        let remaining_line = stroke_paint(
+            &config.remaining_line_color,
+            stroke,
+            config.remaining_line_opacity * opacity,
+        );
+        let completed_line = stroke_paint(
+            &config.completed_line_color,
+            (config.completed_line_width * scene.scale).max(1.0),
+            config.completed_line_opacity * opacity,
+        );
+        canvas.draw_path(
+            &area,
+            &fill_paint(
+                &config.ceiling_area_color,
+                config.ceiling_area_opacity * opacity,
+            ),
+        );
+        if config.ceiling_line_width > 0.0 {
+            canvas.draw_path(
+                &ceiling,
+                &stroke_paint(
+                    &config.ceiling_line_color,
+                    config.ceiling_line_width * scene.scale,
+                    config.ceiling_line_opacity * opacity,
+                ),
+            );
+        }
+        if blur > 0.0 {
+            canvas.save();
+            canvas.translate(offset);
+            let mut shadow = stroke_paint(
+                &scene.shadow_color,
+                stroke,
+                config.remaining_line_opacity * opacity,
+            );
+            shadow.set_mask_filter(MaskFilter::blur(BlurStyle::Normal, blur, true));
+            canvas.draw_path(&path, &shadow);
+            canvas.restore();
+        }
+        canvas.draw_path(&path, &remaining_line);
         let marker = fill_paint(&config.marker_color, config.marker_opacity * opacity);
         let mut variant = marker.clone();
         match config.marker_variant.as_str() {

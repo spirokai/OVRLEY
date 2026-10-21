@@ -14,7 +14,7 @@ use crate::{
         scene::{validate_scene_presentation, ScenePresentationConfig},
         validation::require_positive_f32,
     },
-    preview::PreviewFonts,
+    render::text::FontResolver,
     widgets::value::config::ValueConfig,
 };
 use serde::Serialize;
@@ -59,7 +59,7 @@ pub fn resize_gauge(
     point: [f32; 2],
     activity: Option<&ActivitySampler>,
     second: f64,
-    fonts: &PreviewFonts,
+    fonts: &dyn FontResolver,
 ) -> WidgetResult<ResizeUpdate> {
     let mut widget = ValidatedGauge::new(widget)?;
     let scene = validate_scene_presentation(scene)?;
