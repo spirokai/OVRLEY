@@ -2,7 +2,7 @@
 use crate::{
     error::WidgetResult,
     model::scene::validate_scene_presentation,
-    preview::PreviewFonts,
+    render::text::FontResolver,
     render::text::validated_value_style,
     widgets::value::{
         frame::prepare_metric_frame, presentation::ValuePresentation, preview::WidgetRequest,
@@ -35,9 +35,12 @@ pub struct ResizeUpdate {
 pub fn resize_value(
     request: ResizeRequest,
     activity: Option<&crate::activity::ActivitySampler>,
-    fonts: &PreviewFonts,
+    fonts: &dyn FontResolver,
 ) -> WidgetResult<ResizeUpdate> {
-    let mut presentation = ValuePresentation::new(request.origin.widget, &request.origin.scene)?;
+    let mut presentation = ValuePresentation::new(
+        request.origin.widget,
+        &crate::host::WidgetHost::from_scene(&request.origin.scene)?,
+    )?;
     let config = presentation.base_mut();
     let scene = validate_scene_presentation(request.origin.scene)?;
     // Match the editor's existing intrinsic size limits without rounding on release.

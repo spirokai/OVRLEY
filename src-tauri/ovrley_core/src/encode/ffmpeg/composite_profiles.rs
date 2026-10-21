@@ -20,13 +20,16 @@ pub struct CompositeProfile {
     pub bitrate_args: &'static [&'static str],
 }
 
+// CPU overlay graphs crop every atlas slot (`{atlas_slot_crops}` labels the
+// crops) and chain one overlay per slot onto `[base]` at the slot's scene
+// position (`{atlas_slot_overlays}` leaves the last overlay unlabelled).
 const SOFTWARE_H264_FILTER: &str = "[0:v]{base_video_filters}null[base];\
-[1:v]setpts=PTS-STARTPTS[ovr];\
-[base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=yuv420p[out]";
+[1:v]setpts=PTS-STARTPTS,{atlas_slot_crops};\
+{atlas_slot_overlays},format=yuv420p[out]";
 
 const SOFTWARE_HEVC_FILTER: &str = "[0:v]{base_video_filters}null[base];\
-[1:v]setpts=PTS-STARTPTS[ovr];\
-[base][ovr]overlay=0:0:eof_action=repeat:shortest=1[out]";
+[1:v]setpts=PTS-STARTPTS,{atlas_slot_crops};\
+{atlas_slot_overlays}[out]";
 
 const VAAPI_FILTER: &str =
     "[0:v]{base_video_filters}scale_vaapi=w={width}:h={height}:format=nv12[main_hw];\
@@ -36,8 +39,8 @@ const VAAPI_FILTER: &str =
 const AMF_D3D11_INPUT_ARGS: &[&str] = &["-init_hw_device", "d3d11va=dx", "-filter_hw_device", "dx"];
 
 const AMF_D3D11_FILTER: &str = "[0:v]{base_video_filters}null[base];\
-[1:v]setpts=PTS-STARTPTS[ovr];\
-[base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=nv12,hwupload[out]";
+[1:v]setpts=PTS-STARTPTS,{atlas_slot_crops};\
+{atlas_slot_overlays},format=nv12,hwupload[out]";
 
 const CUDA_H264_FILTER: &str =
     "[0:v]{base_video_filters}scale_cuda=w={width}:h={height}:format=yuv420p[base];\

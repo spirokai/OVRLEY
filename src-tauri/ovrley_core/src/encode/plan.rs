@@ -43,6 +43,13 @@ impl FrameProductionPlan {
     pub(crate) fn stride(self) -> NonZeroU32 {
         self.stride
     }
+
+    /// Dense frame index of every produced frame, in output order.
+    pub(crate) fn dense_frame_indices(self) -> Vec<usize> {
+        (0..self.count as usize)
+            .map(|index| index * self.stride.get() as usize)
+            .collect()
+    }
 }
 
 /// Fixed input to the transparent pipeline; timing is supplied by the job owner.

@@ -9,16 +9,20 @@ use super::{
 use crate::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
+    host::WidgetHost,
     model::scene::{
         validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
     },
-    render::{pixels::read_surface_rgba, preview::PreviewRasterScale, text::FontResolver},
+    render::{
+        preview::{render_tile, PreviewRasterScale},
+        text::FontResolver,
+    },
     widgets::{
         route::sampling::RouteWindow,
-        value::preview::{surface, SHAPE_COLOR_TYPE, WidgetGeometry},
+        value::preview::{SHAPE_COLOR_TYPE, TileBounds, WidgetGeometry},
     },
 };
-use skia_safe::{Color, Surface};
+use skia_safe::{Canvas, Surface};
 use std::sync::Arc;
 
 pub struct PreviewDivingProfile {
@@ -33,45 +37,45 @@ pub struct PreviewDivingProfile {
     surface: Option<Surface>,
     pub pixels: Vec<u8>,
     pub geometry: Vec<u8>,
+    /// Scene bounds of the last rendered tile; absent until the first render.
+    pub bounds: Option<TileBounds>,
     pub revision: u32,
 }
 
 impl PreviewDivingProfile {
     fn timing(
-        widget: &DivingProfileConfig,
-        scene: &ScenePresentationConfig,
+        show_full_activity: bool,
+        host: &WidgetHost,
     ) -> WidgetResult<(Option<RouteWindow>, f64)> {
-        let window = RouteWindow::from_scene(scene, widget.show_full_activity)?;
-        let duration = scene
-            .extra
-            .get("preview_duration_seconds")
-            .and_then(serde_json::Value::as_f64)
-            .filter(|v| v.is_finite() && *v >= 0.0)
-            .ok_or_else(|| {
-                WidgetError::Config(
-                    "preview_duration_seconds: required non-negative finite second".into(),
-                )
-            })?;
-        Ok((window, duration))
+        Ok((host.plot_window(show_full_activity), host.placeholder_duration()?))
     }
 
     pub fn new(widget: DivingProfileConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
-        let (window, preview_duration) = Self::timing(&widget, &scene)?;
-        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene)?;
         let scene = validate_scene_presentation(scene)?;
         let config = validate_diving_profile(&widget, 0, &scene)?;
+        Self::from_validated(config, scene, &host)
+    }
+
+    pub fn from_validated(
+        config: ValidatedDivingProfile,
+        scene: ValidatedScenePresentation,
+        host: &WidgetHost,
+    ) -> WidgetResult<Self> {
+        let (window, preview_duration) = Self::timing(config.show_full_activity, host)?;
         Ok(Self {
             config,
             scene,
             window,
             preview_duration,
-            preview_raster_scale,
+            preview_raster_scale: host.raster_scale,
             prepared_geometry: None,
             layout: None,
             last_state: None,
             surface: None,
             pixels: Vec::new(),
             geometry: Vec::new(),
+            bounds: None,
             revision: 0,
         })
     }
@@ -82,8 +86,9 @@ impl PreviewDivingProfile {
         scene: ScenePresentationConfig,
         transient: bool,
     ) -> WidgetResult<()> {
-        let (window, preview_duration) = Self::timing(&widget, &scene)?;
-        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene)?;
+        let (window, preview_duration) = Self::timing(widget.show_full_activity, &host)?;
+        let preview_raster_scale = host.raster_scale;
         let scene = validate_scene_presentation(scene)?;
         let config = validate_diving_profile(&widget, 0, &scene)?;
         if window != self.window
@@ -170,20 +175,39 @@ impl PreviewDivingProfile {
         Ok(anchored_update(&config, &scene, fixed, point))
     }
 
-    pub fn render(
-        &mut self,
+    fn state(
+        &self,
         activity: Option<&ActivitySampler>,
         second: f64,
-        fonts: &dyn FontResolver,
-    ) -> WidgetResult<()> {
-        let geometry = self.geometry_at(activity);
-        let state = match activity {
-            Some(a) => a.diving.frame_state(&geometry, second, self.window),
+        geometry: &DivingGeometry,
+    ) -> DivingFrameState {
+        match activity {
+            Some(a) => a.diving.frame_state(geometry, second, self.window),
             None => geometry.state(
                 (second / self.preview_duration.max(1e-9)).clamp(0.0, 1.0) as f32,
                 None,
             ),
-        };
+        }
+    }
+
+    /// Scene rectangle a render at `second` draws into, without drawing the remaining profile.
+    pub fn layout_bounds(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<TileBounds> {
+        let geometry = self.geometry_at(activity);
+        let range = activity.and_then(|a| a.diving.depth_range());
+        Ok(DivingProfileLayout::measure_bounds(&self.config, &self.scene, &geometry, range, fonts)?.into())
+    }
+
+    /// Prepares the layout for the activity's geometry; reports whether it was rebuilt.
+    fn layout(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<bool> {
+        let geometry = self.geometry_at(activity);
         let changed = self
             .layout
             .as_ref()
@@ -196,33 +220,70 @@ impl PreviewDivingProfile {
                 activity.and_then(|a| a.diving.depth_range()),
                 fonts,
             )?);
-        } else if self.last_state == Some(state) {
-            return Ok(());
         }
+        Ok(changed)
+    }
+
+    /// Draws the frame at `second` onto a host canvas in scene coordinates.
+    pub fn draw(
+        &mut self,
+        canvas: &Canvas,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<TileBounds> {
+        self.layout(activity, fonts)?;
         let layout = self
             .layout
             .as_ref()
             .expect("diving profile layout prepared");
-        let frame = layout.frame(state)?;
-        let (width, height) = self.preview_raster_scale.dimensions(frame.bounds);
-        if self.surface.as_ref().map(|s| (s.width(), s.height()))
-            != Some((width as i32, height as i32))
-        {
-            self.surface = Some(surface(width, height, SHAPE_COLOR_TYPE)?);
-            self.pixels.resize(width as usize * height as usize * 4, 0);
-        }
-        let surface = self
-            .surface
-            .as_mut()
-            .expect("diving profile surface allocated");
-        let canvas = surface.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        canvas.save();
-        self.preview_raster_scale.apply(canvas);
-        canvas.translate((-frame.bounds.left, -frame.bounds.top));
+        let frame = layout.frame(self.state(activity, second, &layout.geometry))?;
         layout.draw(canvas, &frame);
-        canvas.restore();
-        read_surface_rgba(surface, &mut self.pixels)?;
+        Ok(frame.bounds.into())
+    }
+
+    /// What the frame at `second` depends on; equal keys draw identical pixels.
+    pub fn frame_key(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<DivingFrameState> {
+        self.layout(activity, fonts)?;
+        let layout = self
+            .layout
+            .as_ref()
+            .expect("diving profile layout prepared");
+        Ok(self.state(activity, second, &layout.geometry))
+    }
+
+    pub fn render(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<()> {
+        let changed = self.layout(activity, fonts)?;
+        let layout = self
+            .layout
+            .as_ref()
+            .expect("diving profile layout prepared");
+        let state = self.state(activity, second, &layout.geometry);
+        if !changed && self.last_state == Some(state) {
+            return Ok(());
+        }
+        let frame = layout.frame(state)?;
+        let (width, height) = render_tile(
+            &mut self.surface,
+            &mut self.pixels,
+            SHAPE_COLOR_TYPE,
+            self.preview_raster_scale,
+            frame.bounds,
+            |canvas| {
+                layout.draw(canvas, &frame);
+                Ok(())
+            },
+        )?;
         if changed || self.last_state.is_none() {
             #[derive(serde::Serialize)]
             struct Geometry {
@@ -231,20 +292,20 @@ impl PreviewDivingProfile {
                 rotation: f32,
                 rotation_origin: [f32; 2],
             }
+            let tile = TileBounds::from(frame.bounds);
             self.geometry = serde_json::to_vec(&Geometry {
-                widget: WidgetGeometry {
-                    left: frame.bounds.left,
-                    top: frame.bounds.top,
-                    width,
-                    height,
-                    preview_raster_scale: self.preview_raster_scale.value(),
-                    content_width: frame.content_bounds.width,
-                    content: frame.content_bounds,
-                },
+                widget: WidgetGeometry::new(
+                    tile,
+                    (width, height),
+                    self.preview_raster_scale.value(),
+                    frame.content_bounds.width,
+                    frame.content_bounds,
+                ),
                 rotation: self.config.rotation,
                 rotation_origin: frame.content_bounds.rotation_origin(),
             })
             .map_err(|e| WidgetError::Render(e.to_string()))?;
+            self.bounds = Some(tile);
         }
         self.revision = self.revision.wrapping_add(1);
         self.last_state = Some(state);

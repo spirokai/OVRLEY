@@ -124,8 +124,8 @@ fn prepared_elevation(preview: &PreviewSession, id: u32) -> std::sync::Arc<ovrle
     widget.prepared_geometry.as_ref().unwrap().clone()
 }
 
-#[test]
-fn every_preview_family_reuses_drag_pixels_and_restores_fractional_commit() {
+/// One placed request per preview family, each in its own font-loaded session.
+fn every_family_preview() -> Vec<(PreviewSession, Value)> {
     let defaults: Value = serde_json::from_str(include_str!("../../../assets/standard-widgets.json")).unwrap();
     let mut cases = vec![
         label_preview(), gradient_preview(), lean_angle_preview(), g_force_preview(),
@@ -167,7 +167,12 @@ fn every_preview_family_reuses_drag_pixels_and_restores_fractional_commit() {
         }
         cases.push((preview, request));
     }
-    for (mut preview, mut request) in cases {
+    cases
+}
+
+#[test]
+fn every_preview_family_reuses_drag_pixels_and_restores_fractional_commit() {
+    for (mut preview, mut request) in every_family_preview() {
         let kind = request["type"].as_str().unwrap().to_owned();
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         preview.render(1.5).unwrap();
@@ -205,6 +210,551 @@ fn every_preview_family_reuses_drag_pixels_and_restores_fractional_commit() {
         let fresh_geometry: Value = serde_json::from_slice(preview.widgets[&fresh].geometry()).unwrap();
         assert_eq!(settled, fresh_geometry, "{kind} settled geometry must match a fresh render");
     }
+}
+
+#[test]
+fn every_preview_family_derives_serialized_geometry_from_typed_tile_bounds() {
+    for (mut preview, mut request) in every_family_preview() {
+        let kind = request["type"].as_str().unwrap().to_owned();
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        preview.render(1.5).unwrap();
+        let assert_derived = |preview: &PreviewSession, stage: &str| {
+            let widget = &preview.widgets[&id];
+            let bounds = widget.bounds().unwrap_or_else(|| panic!("{kind} {stage}: rendered tile must report bounds"));
+            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let field = |name: &str| geometry[name].as_f64().unwrap() as f32;
+            assert_eq!((field("left"), field("top")), (bounds.left, bounds.top), "{kind} {stage}: tile origin");
+            let size = (geometry["width"].as_u64().unwrap() as u32, geometry["height"].as_u64().unwrap() as u32);
+            if kind == "raster" {
+                // Source pixels stretch over the unrotated content frame.
+                let content = (geometry["content"]["width"].as_f64().unwrap() as f32, geometry["content"]["height"].as_f64().unwrap() as f32);
+                assert_eq!(content, (bounds.width, bounds.height), "{kind} {stage}: tile extent");
+            } else {
+                let scale = field("preview_raster_scale");
+                assert_eq!(size, ((bounds.width * scale).ceil() as u32, (bounds.height * scale).ceil() as u32), "{kind} {stage}: tile extent");
+            }
+        };
+        assert_derived(&preview, "rendered");
+        let (x, y) = (request["widget"]["x"].as_f64().unwrap(), request["widget"]["y"].as_f64().unwrap());
+        request["transient"] = json!(true);
+        request["widget"]["x"] = json!(x + 12.125);
+        request["widget"]["y"] = json!(y - 8.375);
+        preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+        preview.render(1.5).unwrap();
+        assert_derived(&preview, "dragged");
+    }
+}
+
+/// Every family reads its metric from this activity; speed crosses digit-count changes.
+fn every_family_activity() -> Vec<u8> {
+    serde_json::to_vec(&every_family_parsed_activity()).unwrap()
+}
+
+fn every_family_parsed_activity() -> ovrley_core::activity::schema::ParsedActivity {
+    let points = json!([[48.0, 12.0], [48.004, 12.002], [48.01, 12.005], [null, null], [48.013, 12.02], [48.016, 12.018], [48.02, 12.013], [48.018, 12.006], [48.015, 12.0]]);
+    ovrley_core::activity::parse_activity_json(&json!({
+        "sample_elapsed_seconds": [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0], "trim_end_seconds": 4.0,
+        "sample_distance_progress": [0.0, 0.1, 0.2, 0.3, 0.45, 0.6, 0.75, 0.9, 1.0],
+        "sample_course_points": points, "course": points,
+        "sample_elevations": [100.0, 115.0, null, 165.0, 180.0, 125.0, 90.0, 95.0, 99.0],
+        "barometric_altitude": [100.0, 115.0, null, 165.0, 180.0, 125.0, 90.0, 95.0, 99.0],
+        "elevation": [10.0, 15.0, 20.0, 30.0, 35.0, 25.0, 5.0, 7.0, 9.0],
+        "speed": [0.0, 9.0, 10.0, 99.4, 100.0, 140.0, 5.0, null, 12.0],
+        "heading": [350.0, 10.0, 90.0, 180.0, 270.0, 359.0, 0.5, 45.0, 120.0],
+        "gradient": [-12.5, -1.0, 0.0, 3.0, 9.9, 10.0, 25.0, -25.0, 1.0],
+        "depth": [0.0, 4.0, 9.5, 18.0, 24.0, 21.0, 12.0, 5.0, 0.0],
+        "lean_angle": [-55.0, -10.0, 0.0, 12.0, 48.0, 61.0, -61.0, 5.0, 0.0],
+        "g_force_x": [0.0, 0.4, -1.2, 2.5, -0.1, 0.0, 1.0, -2.0, 0.2],
+        "g_force_y": [0.0, -0.3, 0.8, -2.2, 1.5, 0.0, -1.0, 2.0, 0.1],
+        "g_force_z": [1.0, 1.0, 1.1, 0.9, 1.0, 1.0, 1.0, 1.0, 1.0],
+        "lap_number": [-1, 0, 0, 0, 0, 1, 1, 2, 2],
+        "lap_time_seconds": [null, 0.0, 0.5, 1.0, 1.5, 0.0, 0.5, 0.0, 0.5],
+        "lap_start_elapsed_seconds": [0.5, 2.5, 3.5],
+        "lap_durations_seconds": [2.0, 1.0], "lap_durations_best_so_far_seconds": [2.0, 1.0],
+        "delta_to_best_lap_seconds": [null, null, null, null, null, 0.0, -0.5, null, 0.25],
+    }).to_string()).unwrap()
+}
+
+/// Request variants covering every alignment, rotation, shadows and strokes for each family.
+fn bounds_variants(request: &Value) -> Vec<(String, Value)> {
+    let kind = request["type"].as_str().unwrap();
+    let mut variants = vec![("as configured".to_owned(), request.clone())];
+    let mut styled = request.clone();
+    styled["scene"].as_object_mut().unwrap().extend(json!({
+        "shadow_color": "#102030", "shadow_strength": 5, "shadow_distance": 6,
+        "border_color": "#ff00ff", "border_thickness": 3,
+    }).as_object().unwrap().clone());
+    variants.push(("shadow and stroke".to_owned(), styled));
+    let mut plain = request.clone();
+    plain["scene"].as_object_mut().unwrap().extend(json!({
+        "shadow_strength": 0, "shadow_distance": 0, "border_thickness": 0,
+    }).as_object().unwrap().clone());
+    variants.push(("no shadow or stroke".to_owned(), plain));
+    if request["widget"].get("content_alignment").is_some() || matches!(kind, "speed" | "time") {
+        for alignment in ["left", "center", "right"] {
+            let mut aligned = request.clone();
+            aligned["widget"]["content_alignment"] = json!(alignment);
+            variants.push((format!("{alignment} aligned"), aligned));
+        }
+    }
+    if matches!(kind, "speed" | "time") {
+        // Fixed-width digits are the scene default; proportional digits change the value's width.
+        let mut proportional = request.clone();
+        proportional["scene"]["fixed_width_digits"] = json!(false);
+        variants.push(("proportional digits".to_owned(), proportional));
+    }
+    if matches!(kind, "course" | "elevation" | "diving_profile" | "raster") {
+        for rotation in [37.0, 90.0, 230.0] {
+            let mut rotated = request.clone();
+            rotated["widget"]["rotation"] = json!(rotation);
+            variants.push((format!("rotated {rotation}"), rotated));
+        }
+    }
+    variants
+}
+
+#[test]
+fn every_family_reports_layout_only_bounds_that_contain_its_drawing() {
+    use ovrley_widgets::{
+        activity::ActivitySampler,
+        preview_widget::PreviewWidget,
+        widgets::value::preview::{allocated_surfaces, TileBounds},
+    };
+    const MARGIN: i32 = 48;
+    let activity = every_family_activity();
+    let sampler = ActivitySampler::from_json(&activity).unwrap();
+    // Before, inside and after the activity; samples between the timestamps change value widths.
+    let seconds = [-0.5, 0.0, 0.25, 0.75, 1.0, 1.25, 2.0, 2.25, 2.75, 3.1, 3.6, 4.0, 6.0];
+    for (mut preview, base) in every_family_preview() {
+        preview.replace_activity(&activity).unwrap();
+        for (variant, request) in bounds_variants(&base) {
+            let kind = format!("{} ({variant})", request["type"].as_str().unwrap());
+            let raster = request["type"] == "raster";
+            let mut widget = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), &preview.fonts, &preview.images)
+                .unwrap_or_else(|error| panic!("{kind}: {error}"));
+            let allocated = allocated_surfaces();
+            let bounds: Vec<TileBounds> = seconds
+                .iter()
+                .map(|second| widget.layout_bounds(Some(&sampler), *second, &preview.fonts).unwrap())
+                .collect();
+            assert_eq!(allocated_surfaces(), allocated, "{kind}: layout-only bounds must not allocate a surface");
+            let text_speed = request["type"] == "speed" && request["widget"]["display_type"] == "text" && variant == "proportional digits";
+            if text_speed {
+                let mut widths: Vec<_> = bounds.iter().map(|bounds| bounds.width.to_bits()).collect();
+                widths.sort_unstable();
+                widths.dedup();
+                assert!(widths.len() > 3, "{kind}: proportional digits must change the value's width");
+            }
+            let mut drew = false;
+            let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+            for (second, bounds) in seconds.iter().zip(bounds) {
+                preview.render(*second).unwrap();
+                if !raster {
+                    // Rasters transport source pixels; their scene extent is checked by drawing below.
+                    assert_eq!(preview.widgets[&id].bounds(), Some(bounds), "{kind} at {second}s: rendered tile bounds");
+                }
+                let (left, top) = (bounds.left.floor() as i32 - MARGIN, bounds.top.floor() as i32 - MARGIN);
+                let (width, height) = (bounds.width.ceil() as i32 + 2 * MARGIN + 2, bounds.height.ceil() as i32 + 2 * MARGIN + 2);
+                let info = ImageInfo::new((width, height), ColorType::RGBA8888, AlphaType::Premul, None);
+                let mut surface = surfaces::raster(&info, None, None).unwrap();
+                surface.canvas().clear(Color::TRANSPARENT);
+                surface.canvas().translate((-left as f32, -top as f32));
+                let drawn = widget.draw(surface.canvas(), Some(&sampler), *second, &preview.fonts).unwrap();
+                assert_eq!(drawn, bounds, "{kind} at {second}s: drawn rectangle");
+                let mut pixels = vec![0; width as usize * height as usize * 4];
+                read_surface_rgba(&mut surface, &mut pixels).unwrap();
+                let (right, bottom) = (bounds.left + bounds.width, bounds.top + bounds.height);
+                for (index, pixel) in pixels.chunks_exact(4).enumerate() {
+                    if pixel[3] == 0 {
+                        continue;
+                    }
+                    drew = true;
+                    let x = (index as i32 % width + left) as f32;
+                    let y = (index as i32 / width + top) as f32;
+                    assert!(
+                        x + 1.0 > bounds.left && x < right && y + 1.0 > bounds.top && y < bottom,
+                        "{kind} at {second}s: pixel ({x}, {y}) alpha {} lies outside {bounds:?}",
+                        pixel[3],
+                    );
+                }
+            }
+            assert!(drew, "{kind}: some sample must draw pixels");
+        }
+    }
+}
+
+/// Largest premultiplied channel difference between two straight-alpha RGBA frames, where it
+/// is, and how many pixels and which rectangle exceed `tolerance`.
+#[allow(clippy::type_complexity)]
+fn premultiplied_difference(width: usize, expected: &[u8], actual: &[u8], tolerance: u16) -> (u16, (usize, usize), [u8; 4], [u8; 4], usize, [usize; 4]) {
+    let mut largest = (0, (0, 0), [0; 4], [0; 4], 0, [usize::MAX, usize::MAX, 0, 0]);
+    for (index, (a, b)) in expected.chunks_exact(4).zip(actual.chunks_exact(4)).enumerate() {
+        let mut difference = a[3].abs_diff(b[3]) as u16;
+        for c in 0..3 {
+            difference = difference.max((a[c] as u16 * a[3] as u16).abs_diff(b[c] as u16 * b[3] as u16) / 255);
+        }
+        let (x, y) = (index % width, index / width);
+        if difference > tolerance {
+            largest.4 += 1;
+            largest.5 = [largest.5[0].min(x), largest.5[1].min(y), largest.5[2].max(x), largest.5[3].max(y)];
+        }
+        if difference > largest.0 {
+            (largest.0, largest.1, largest.2, largest.3) = (difference, (x, y), a.try_into().unwrap(), b.try_into().unwrap());
+        }
+    }
+    largest
+}
+
+/// Golden reference until the export renderer is removed: frames composited from engine tiles
+/// equal the export renderer's frames, before, inside and after the activity coverage.
+fn assert_engine_frames_match_export_renderer(
+    name: &str,
+    config: &ovrley_core::normalize::ValidatedRenderConfig,
+    activity: &ovrley_core::activity::schema::ParsedActivity,
+) -> ovrley_core::render::AtlasPlan {
+    use ovrley_core::{
+        activity::build_dense_activity_report_validated,
+        debug::RenderProfiler,
+        paths::AppPaths,
+        render::{prepare_preview_assets, ExportWidgets, FrameSize, VideoFrameRenderer},
+    };
+    const BLANK_LEADING_FRAMES: usize = 2;
+    const TOLERANCE: u16 = 8;
+    // Blending a premultiplied tile into the frame rounds soft anti-aliased and shadow pixels
+    // differently from drawing each primitive into the frame; a few may differ more.
+    const SOFT_PIXEL_TOLERANCE: u16 = 64;
+    const SOFT_PIXELS: usize = 64;
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
+    let dense = build_dense_activity_report_validated(activity, config).unwrap();
+    let size = FrameSize { width: config.scene.presentation.width, height: config.scene.presentation.height };
+    let (assets, _, _, _) = prepare_preview_assets(&paths, config, activity, &dense).unwrap();
+    let renderer = VideoFrameRenderer::new(&paths.font_dirs, &dense, &assets, size, BLANK_LEADING_FRAMES as u64).unwrap();
+    let mut profiler = RenderProfiler::default();
+    let export = ExportWidgets::prepare(&paths.font_dirs, config, activity, &dense, size, BLANK_LEADING_FRAMES as u64, &mut profiler).unwrap();
+    let mut worker = export.worker().unwrap();
+    let full_frame = export.prepare_atlas(export.full_frame_atlas(), &mut profiler).unwrap();
+    let frame_count = BLANK_LEADING_FRAMES + dense.frame_count + 2;
+    // Workers claim frames out of order and revisit equal samples; widget caches must follow.
+    let order: Vec<usize> = (0..frame_count).chain((0..frame_count).rev().step_by(3)).collect();
+    let (mut expected, mut actual) = (vec![0; size.rgba_len().unwrap()], vec![0; size.rgba_len().unwrap()]);
+    let mut covered_pixels = false;
+    for frame in order {
+        renderer.render_rgba(frame, &mut expected, &mut RenderProfiler::default()).unwrap();
+        worker.render_atlas(frame, &full_frame, &mut actual, &mut profiler).unwrap();
+        let covered = (BLANK_LEADING_FRAMES..BLANK_LEADING_FRAMES + dense.frame_count).contains(&frame);
+        covered_pixels |= covered && expected.chunks_exact(4).any(|pixel| pixel[3] > 0);
+        let (difference, at, a, b, count, area) = premultiplied_difference(size.width as usize, &expected, &actual, TOLERANCE);
+        if difference > TOLERANCE && std::env::var_os("OVRLEY_DUMP_ENGINE_FRAMES").is_some() {
+            for (label, pixels) in [("export", &expected), ("engine", &actual)] {
+                image::RgbaImage::from_raw(size.width, size.height, pixels.clone()).unwrap()
+                    .save(std::env::temp_dir().join(format!("{}-{frame}-{label}.png", name.replace(' ', "-")))).unwrap();
+            }
+        }
+        assert!(
+            difference <= SOFT_PIXEL_TOLERANCE && count <= SOFT_PIXELS,
+            "{name} frame {frame} (covered: {covered}): premultiplied difference {difference} at {at:?}: export {a:?}, engine {b:?}; {count} pixels in {area:?}"
+        );
+    }
+    assert!(covered_pixels, "{name}: covered frames must draw widgets");
+    assert_atlas_reassembles_the_full_frame(name, &export, &(0..frame_count).collect::<Vec<_>>())
+}
+
+/// The planned atlas holds every widget's bounds of every planned frame, and compositing its
+/// slots in order over a transparent frame at their scene positions gives the full-frame plan's
+/// frame: exactly where one slot covers a pixel, within 8-bit rounding where slots overlap.
+fn assert_atlas_reassembles_the_full_frame(
+    name: &str,
+    export: &ovrley_core::render::ExportWidgets,
+    frames: &[usize],
+) -> ovrley_core::render::AtlasPlan {
+    use ovrley_core::{debug::RenderProfiler, render::AtlasPlan};
+    let size = export.frame_size();
+    let atlas = export.plan_atlas(frames, &mut RenderProfiler::default()).unwrap();
+    let full_frame = export.prepare_atlas(export.full_frame_atlas(), &mut RenderProfiler::default()).unwrap();
+    let prepared = export.prepare_atlas(atlas.clone(), &mut RenderProfiler::default()).unwrap();
+    let mut planned = vec![false; full_frame.plan().slots()[0].layers.len()];
+    for (index, slot) in atlas.slots().iter().enumerate() {
+        let scene = slot.scene;
+        for value in [scene.left, scene.top, scene.width(), scene.height(), slot.atlas_origin.x, slot.atlas_origin.y] {
+            assert_eq!(value % 2, 0, "{name}: slot {slot:?} must be even");
+        }
+        assert!(slot.layers.windows(2).all(|pair| pair[0] < pair[1]), "{name}: slot {slot:?} layers in layer order");
+        for layer in &slot.layers {
+            assert!(!std::mem::replace(&mut planned[*layer], true), "{name}: layer {layer} planned twice");
+        }
+        for other in &atlas.slots()[index + 1..] {
+            let disjoint = |a: skia_safe::IRect, b: skia_safe::IRect| a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+            assert!(
+                disjoint(scene, other.scene) || slot.layers[slot.layers.len() - 1] < other.layers[0],
+                "{name}: overlapping slots {slot:?} and {other:?} must overlay in layer order"
+            );
+            assert!(disjoint(AtlasPlan::atlas_rect(slot), AtlasPlan::atlas_rect(other)), "{name}: slots {slot:?} and {other:?} overlap in the atlas");
+        }
+        let rect = AtlasPlan::atlas_rect(slot);
+        assert!(rect.left >= 0 && rect.top >= 0 && rect.right <= atlas.size().width as i32 && rect.bottom <= atlas.size().height as i32);
+    }
+    let mut worker = export.worker().unwrap();
+    for frame in frames {
+        for (layer, bounds) in worker.frame_bounds(*frame).unwrap().into_iter().enumerate() {
+            let Some(bounds) = bounds else { continue };
+            let slot = atlas.slots().iter().find(|slot| slot.layers.contains(&layer));
+            let slot = slot.unwrap_or_else(|| panic!("{name} frame {frame}: visible layer {layer} has no slot"));
+            let scene = slot.scene;
+            assert!(
+                scene.left <= bounds.left && scene.top <= bounds.top && bounds.right <= scene.right && bounds.bottom <= scene.bottom,
+                "{name} frame {frame}: layer {layer} bounds {bounds:?} lie outside its slot {scene:?}"
+            );
+        }
+    }
+    let (width, height) = (size.width as usize, size.height as usize);
+    let mut atlas_pixels = vec![0; atlas.size().rgba_len().unwrap()];
+    let mut expected = vec![0; size.rgba_len().unwrap()];
+    let mut profiler = RenderProfiler::default();
+    let mut drew = false;
+    for frame in frames {
+        worker.render_atlas(*frame, &full_frame, &mut expected, &mut profiler).unwrap();
+        worker.render_atlas(*frame, &prepared, &mut atlas_pixels, &mut profiler).unwrap();
+        let mut reassembled = vec![0u8; expected.len()];
+        let mut covers = vec![0u8; width * height];
+        for slot in atlas.slots() {
+            for row in 0..slot.scene.height() as usize {
+                let y = slot.scene.top as usize + row;
+                let left = slot.scene.left as usize;
+                let columns = (slot.scene.width() as usize).min(width - left);
+                if y >= height {
+                    break;
+                }
+                let source = ((slot.atlas_origin.y as usize + row) * atlas.size().width as usize + slot.atlas_origin.x as usize) * 4;
+                for column in 0..columns {
+                    let pixel = y * width + left + column;
+                    let (source, target) = (source + column * 4, pixel * 4);
+                    covers[pixel] += 1;
+                    source_over(&mut reassembled[target..target + 4], &atlas_pixels[source..source + 4]);
+                }
+            }
+        }
+        drew |= expected.iter().skip(3).step_by(4).any(|alpha| *alpha > 0);
+        let matches = |pixel: usize| {
+            let (expected, actual) = (&expected[pixel * 4..pixel * 4 + 4], &reassembled[pixel * 4..pixel * 4 + 4]);
+            if covers[pixel] <= 1 {
+                return expected == actual;
+            }
+            // Compare premultiplied: straight colour is unstable where alpha is near zero.
+            let premultiplied = |rgba: &[u8], channel: usize| f32::from(rgba[channel]) * f32::from(rgba[3]) / 255.0;
+            (expected[3].abs_diff(actual[3]) <= 2) && (0..3).all(|channel| (premultiplied(expected, channel) - premultiplied(actual, channel)).abs() <= 2.0)
+        };
+        if let Some(pixel) = (0..width * height).find(|pixel| !matches(*pixel)) {
+            panic!(
+                "{name} frame {frame}: reassembled atlas differs at ({}, {}): full frame {:?}, atlas {:?}",
+                pixel % width,
+                pixel / width,
+                &expected[pixel * 4..pixel * 4 + 4],
+                &reassembled[pixel * 4..pixel * 4 + 4]
+            );
+        }
+    }
+    assert!(drew, "{name}: the reassembled frames must show widgets");
+    atlas
+}
+
+/// Straight-alpha RGBA `source` over `target`, as FFmpeg overlays one slot over the frame.
+fn source_over(target: &mut [u8], source: &[u8]) {
+    if target[3] == 0 {
+        target.copy_from_slice(source);
+        return;
+    }
+    let (source_alpha, target_alpha) = (f32::from(source[3]) / 255.0, f32::from(target[3]) / 255.0);
+    let alpha = source_alpha + target_alpha * (1.0 - source_alpha);
+    for channel in 0..3 {
+        let color = f32::from(source[channel]) * source_alpha + f32::from(target[channel]) * target_alpha * (1.0 - source_alpha);
+        target[channel] = (color / alpha).round() as u8;
+    }
+    target[3] = (alpha * 255.0).round() as u8;
+}
+
+/// Whether two slots cover a common scene pixel or one slot holds several layers.
+fn overlapping_widgets_are_planned(atlas: &ovrley_core::render::AtlasPlan) -> bool {
+    let slots = atlas.slots();
+    slots.iter().any(|slot| slot.layers.len() > 1)
+        || slots.iter().enumerate().any(|(index, slot)| {
+            slots[index + 1..]
+                .iter()
+                .any(|other| slot.scene.left < other.scene.right && other.scene.left < slot.scene.right && slot.scene.top < other.scene.bottom && other.scene.top < slot.scene.bottom)
+        })
+}
+
+#[test]
+fn engine_tiles_composite_into_the_export_frames_of_the_fixture_templates() {
+    use ovrley_core::activity::parse_activity_json;
+    let fixtures = common::test_config::fixtures();
+    let activity = parse_activity_json(&std::fs::read_to_string(fixtures.join("activity/gpx-parse-debug.json")).unwrap()).unwrap();
+    for template in ["test-template-4k.json", "render-baseline-rich.json"] {
+        let file: Value = serde_json::from_str(&std::fs::read_to_string(fixtures.join("config").join(template)).unwrap()).unwrap();
+        let mut config = file.get("config").cloned().unwrap_or_else(|| file.clone());
+        if let Some(globals) = file.pointer("/settings/globalDefaults").and_then(Value::as_object) {
+            config["scene"].as_object_mut().unwrap().extend(globals.clone());
+        }
+        config["scene"].as_object_mut().unwrap().entry("opacity").or_insert(json!(1.0));
+        // A short window keeps 4K frames cheap; a custom range exercises the plot window.
+        config["scene"]["start"] = json!(600.0);
+        config["scene"]["end"] = json!(600.4);
+        config["scene"]["custom_export_range_active"] = json!(true);
+        let config = common::seam::validated_config_from_value(config);
+        let atlas = assert_engine_frames_match_export_renderer(template, &config, &activity);
+        let frame = config.scene.presentation.width as u64 * config.scene.presentation.height as u64;
+        assert!(atlas.slots().len() > 2, "{template}: planned {atlas:?}");
+        assert!(overlapping_widgets_are_planned(&atlas), "{template}: overlapping widgets must share or overlap slots");
+        assert!(atlas.size().width as u64 * atlas.size().height as u64 * 4 < frame * 3, "{template}: atlas {:?}", atlas.size());
+    }
+}
+
+#[test]
+fn atlas_planning_of_a_ten_minute_export_runs_layout_only_within_seconds() {
+    use ovrley_core::{activity::{build_dense_activity_report_validated, parse_activity_json}, debug::RenderProfiler, paths::AppPaths, render::{ExportWidgets, FrameSize}};
+    let fixtures = common::test_config::fixtures();
+    let activity = parse_activity_json(&std::fs::read_to_string(fixtures.join("activity/gpx-parse-debug.json")).unwrap()).unwrap();
+    let file: Value = serde_json::from_str(&std::fs::read_to_string(fixtures.join("config/render-baseline-rich.json")).unwrap()).unwrap();
+    let mut config = file.get("config").cloned().unwrap_or_else(|| file.clone());
+    config["scene"].as_object_mut().unwrap().entry("opacity").or_insert(json!(1.0));
+    config["scene"]["fps"] = json!(60.0);
+    config["scene"]["start"] = json!(60.0);
+    config["scene"]["end"] = json!(660.0);
+    config["scene"]["custom_export_range_active"] = json!(true);
+    let config = common::seam::validated_config_from_value(config);
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
+    let dense = build_dense_activity_report_validated(&activity, &config).unwrap();
+    assert!(dense.frame_count >= 36_000, "a 10-minute export at 60 fps, got {} frames", dense.frame_count);
+    let size = FrameSize { width: config.scene.presentation.width, height: config.scene.presentation.height };
+    let mut profiler = RenderProfiler::default();
+    let export = ExportWidgets::prepare(&paths.font_dirs, &config, &activity, &dense, size, 0, &mut profiler).unwrap();
+    let frames: Vec<usize> = (0..dense.frame_count).collect();
+    let atlas = export.plan_atlas(&frames, &mut profiler).unwrap();
+    let planning = &profiler.summary()["atlas.plan"];
+    eprintln!("planned {} frames into {:?} in {:.0} ms", frames.len(), atlas.size(), planning.total_ms);
+    // Unoptimized test builds are several times slower than the shipped export.
+    let budget_ms = if cfg!(debug_assertions) { 30_000.0 } else { 3_000.0 };
+    assert!(planning.total_ms < budget_ms, "planning took {:.0} ms", planning.total_ms);
+    assert!(profiler.summary().contains_key("atlas.plan.pack"));
+}
+
+#[test]
+fn engine_tiles_composite_overlapping_rotated_widgets_of_every_family_into_the_export_frame() {
+    use ovrley_core::{
+        normalize::{parse_config_value, validate_render_config_with_resources},
+        raster::{load_embedded_raster, RasterResourceResolver, SelectedRaster},
+    };
+    use std::sync::Arc;
+    struct Resources(Arc<SelectedRaster>);
+    impl RasterResourceResolver for Resources {
+        fn resolve(&self, resource_id: &str) -> Option<Arc<SelectedRaster>> {
+            (resource_id == "selected").then(|| Arc::clone(&self.0))
+        }
+    }
+    // Larger than its frame, so export resamples it; alpha varies across the image.
+    let mut encoded = Vec::new();
+    image::DynamicImage::ImageRgba8(image::RgbaImage::from_fn(400, 250, |x, y| {
+        image::Rgba([(x % 256) as u8, (y % 256) as u8, 90, (40 + (x + y) % 216) as u8])
+    }))
+    .write_to(&mut std::io::Cursor::new(&mut encoded), image::ImageFormat::Png)
+    .unwrap();
+    let resources = Resources(Arc::new(load_embedded_raster("png", encoded).unwrap()));
+
+    let (_, base) = lean_angle_preview();
+    let mut scene = base["scene"].clone();
+    scene["fps"] = json!(8.0);
+    scene["start"] = json!(0.25);
+    scene["end"] = json!(3.75);
+    scene["custom_export_range_active"] = json!(true);
+    let mut config = json!({ "scene": scene, "backdrops": [], "rasters": [], "labels": [], "values": [], "plots": [] });
+    // A 130 px grid at scene scale 1.7 makes neighbouring widgets overlap.
+    for (index, (_, request)) in every_family_preview().into_iter().enumerate() {
+        let kind = request["type"].as_str().unwrap().to_owned();
+        let mut widget = request["widget"].clone();
+        widget["x"] = json!(30.25 + (index % 4) as f64 * 130.0);
+        widget["y"] = json!(20.5 + (index / 4) as f64 * 110.0);
+        let collection = match kind.as_str() {
+            "label" => "labels",
+            "backdrop" => {
+                // The backdrop sits under every other layer.
+                widget["x"] = json!(10.5);
+                widget["y"] = json!(10.5);
+                widget["width"] = json!(420);
+                widget["height"] = json!(260);
+                "backdrops"
+            }
+            "raster" => {
+                widget.as_object_mut().unwrap().extend(json!({
+                    "width": 160.0, "height": 100.0, "rotation": 15.0, "opacity": 0.8, "resourceId": "selected",
+                    "path": std::env::temp_dir().join("selected.png"),
+                }).as_object().unwrap().clone());
+                "rasters"
+            }
+            "course" | "elevation" | "diving_profile" => {
+                widget["value"] = json!(kind);
+                widget["rotation"] = json!(match kind.as_str() { "course" => 27.0, "elevation" => 230.0, _ => 37.0 });
+                "plots"
+            }
+            // The export renderer drew text units and icons in its full-frame static layer, below
+            // every value; the engine draws each value whole, like the preview. They agree unless
+            // a text value overlaps another value, so these overlap only the raster and the route.
+            "speed" | "time" => {
+                widget["x"] = json!(if kind == "speed" { 180.25 } else { 560.25 });
+                widget["y"] = json!(if kind == "speed" { 400.5 } else { 520.5 });
+                "values"
+            }
+            _ => "values",
+        };
+        config[collection].as_array_mut().unwrap().push(widget);
+    }
+    let config = validate_render_config_with_resources(parse_config_value(&config).unwrap(), Some(&resources)).unwrap();
+    assert_eq!(config.values.len(), 13, "every value family is exported");
+
+    let atlas = assert_engine_frames_match_export_renderer("every family", &config, &every_family_parsed_activity());
+    // Every layer is visible; neighbouring widgets either share a slot or overlay in layer order.
+    let mut layers: Vec<_> = atlas.slots().iter().flat_map(|slot| slot.layers.clone()).collect();
+    layers.sort_unstable();
+    assert_eq!(layers, (0..19).collect::<Vec<_>>());
+    assert!(overlapping_widgets_are_planned(&atlas), "every family: {atlas:?}");
+}
+
+#[test]
+fn widgets_accept_the_native_font_and_raster_resolvers_used_by_export() {
+    use ovrley_core::raster::{load_embedded_raster, RasterResourceResolver, SelectedRaster};
+    use ovrley_widgets::preview_widget::PreviewWidget;
+    use std::sync::Arc;
+    struct Resources(Arc<SelectedRaster>);
+    impl RasterResourceResolver for Resources {
+        fn resolve(&self, resource_id: &str) -> Option<Arc<SelectedRaster>> {
+            (resource_id == "selected").then(|| Arc::clone(&self.0))
+        }
+    }
+    let mut encoded = Vec::new();
+    image::DynamicImage::ImageRgba8(image::RgbaImage::from_fn(6, 4, |x, y| image::Rgba([x as u8 * 40, y as u8 * 60, 90, 200])))
+        .write_to(&mut std::io::Cursor::new(&mut encoded), image::ImageFormat::Png)
+        .unwrap();
+    let selected = Arc::new(load_embedded_raster("png", encoded).unwrap());
+    let resources: &dyn RasterResourceResolver = &Resources(Arc::clone(&selected));
+    let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
+    let fonts = NativeFonts(&font_dirs);
+
+    let (mut raster_preview, mut raster) = lean_angle_preview();
+    raster_preview.images.register("selected".into(), selected.preview_png()).unwrap();
+    raster["type"] = json!("raster");
+    raster["widget"] = json!({ "id":"raster", "x":20.5, "y":10.0, "width":30.0, "height":20.0, "rotation":15.0, "opacity":0.8, "path":"/image.png", "resourceId":"selected" });
+    let request_scene = raster["scene"].clone();
+    for (mut preview, request) in [(raster_preview, raster), label_preview()] {
+        let kind = request["type"].as_str().unwrap().to_owned();
+        let native = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), &fonts, resources).unwrap();
+        let id = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
+        let session = &preview.widgets[&id];
+        assert_eq!(native.pixels(), session.pixels(), "{kind} pixels must not depend on the host");
+        assert_eq!(native.geometry(), session.geometry(), "{kind} geometry must not depend on the host");
+        assert_eq!(native.bounds(), session.bounds(), "{kind} bounds must not depend on the host");
+    }
+    let missing = json!({ "type":"raster", "widget": { "id":"raster", "x":0, "y":0, "width":1, "height":1, "rotation":0, "opacity":1, "path":"/image.png", "resourceId":"missing" }, "scene": request_scene });
+    assert!(PreviewWidget::new(serde_json::from_value(missing).unwrap(), &fonts, resources).is_err(), "unresolved native rasters must fail loudly");
 }
 
 #[test]
@@ -1269,7 +1819,7 @@ fn lap_timer_modes_match_native_pixels_sampling_and_resource_replacement() {
             preview.render(second).unwrap();
             let widget = &preview.widgets[&id];
             let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
-            let info = ImageInfo::new((geometry["width"].as_i64().unwrap() as i32, geometry["height"].as_i64().unwrap() as i32), ColorType::RGBA8888, AlphaType::Premul, None);
+            let info = ImageInfo::new((geometry["width"].as_i64().unwrap() as i32, geometry["height"].as_i64().unwrap() as i32), ovrley_widgets::widgets::value::preview::TEXT_COLOR_TYPE, AlphaType::Premul, None);
             let mut surface = surfaces::raster(&info, None, None).unwrap();
             let canvas = surface.canvas();
             canvas.clear(Color::TRANSPARENT);
@@ -1831,7 +2381,7 @@ fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_tri
                 geometry["width"].as_i64().unwrap() as i32,
                 geometry["height"].as_i64().unwrap() as i32,
             ),
-            ColorType::RGBA8888,
+            ovrley_widgets::widgets::value::preview::TEXT_COLOR_TYPE,
             AlphaType::Premul,
             None,
         );
@@ -2095,7 +2645,7 @@ fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
                         geometry["width"].as_i64().unwrap() as i32,
                         geometry["height"].as_i64().unwrap() as i32,
                     ),
-                    ColorType::RGBA8888,
+                    ovrley_widgets::widgets::value::preview::TEXT_COLOR_TYPE,
                     AlphaType::Premul,
                     None,
                 );
@@ -2386,7 +2936,7 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
                     geometry["width"].as_i64().unwrap() as i32,
                     geometry["height"].as_i64().unwrap() as i32,
                 ),
-                ColorType::RGBA8888,
+                ovrley_widgets::widgets::value::preview::TEXT_COLOR_TYPE,
                 AlphaType::Premul,
                 None,
             );

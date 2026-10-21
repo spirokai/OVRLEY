@@ -7,6 +7,7 @@ use crate::encode::ffmpeg::catalog::{
 use crate::encode::ffmpeg::composite_filters::composite_filter_complex;
 use crate::encode::ffmpeg::composite_profiles::composite_profile;
 use crate::encode::ffmpeg::transparent_profiles::transparent_profile;
+use crate::render::{AtlasPlan, FrameSize};
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -98,9 +99,17 @@ fn qsv_overlay_probe_args(candidate: &QsvProbeCandidate) -> Vec<String> {
     let render_graph = composite_filter_complex(
         128,
         128,
+        &AtlasPlan::full_frame(
+            FrameSize {
+                width: 128,
+                height: 128,
+            },
+            0,
+        ),
         0.0,
         1.0,
         composite_profile(CompositeCodecId::QsvFullH264),
+        None,
         None,
         None,
         None,

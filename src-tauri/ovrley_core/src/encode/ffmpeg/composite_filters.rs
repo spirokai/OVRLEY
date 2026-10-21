@@ -2,6 +2,7 @@
 
 use crate::encode::ffmpeg::catalog::{CompositeCodecId, CompositeFilterStackKind};
 use crate::error::{CoreError, CoreResult};
+use crate::render::{AtlasPlan, FrameSize};
 
 use super::composite_profiles::CompositeProfile;
 
@@ -55,31 +56,55 @@ fn cuda_frame_overhang(dimension: u32) -> u32 {
 /// Builds the selected profile's composite filter graph.
 ///
 /// Profile templates use `{base_video_filters}`, `{width}`, `{height}`,
-/// `{main_width}`, `{main_height}`, and `{qsv_overlay_cpu_rotation_filter}`
-/// placeholders. The QSV main dimensions are derived here: they match the
-/// display dimensions except for a 90°/270° QSV source, where coded video has
+/// `{main_width}`, `{main_height}`, `{qsv_overlay_cpu_rotation_filter}`,
+/// `{atlas_slot_crops}` and `{atlas_slot_overlays}` placeholders. The overlay
+/// input is the `atlas` frame: CPU overlay graphs crop each of its slots and
+/// overlay it at the slot's scene position; the other graphs overlay the
+/// atlas whole and require the full-frame plan. The QSV main dimensions are
+/// derived here: they match the display dimensions except for a 90°/270° QSV source, where coded video has
 /// the inverse width/height pair. The base-video filter chain owns exact video
 /// trimming so the decoded frame boundary matches the render plan more closely
-/// than input-side seek alone.
+/// than input-side seek alone. `main_colorspace_tag` labels an untagged main
+/// video (metadata only), so the overlay blends in, and the output carries,
+/// the colour space players assume for it.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn composite_filter_complex(
     width: u32,
     height: u32,
+    atlas: &AtlasPlan,
     video_trim_start: f64,
     render_duration: f64,
     profile: &CompositeProfile,
     source_rotation_degrees: Option<i32>,
     source_rotation_filter: Option<&'static str>,
     qsv_overlay_cpu_rotation_filter: Option<&'static str>,
+    main_colorspace_tag: Option<&'static str>,
 ) -> CoreResult<String> {
     let template = profile
         .filter_complex
         .as_deref()
         .expect("composite profile catalog defines a filter graph");
-    let mut base_video_filters = format!(
+    let (atlas_slot_crops, atlas_slot_overlays) =
+        if profile.codec_id.metadata().filter_stack_kind.overlays_atlas_slots() {
+            atlas_slot_filters(atlas)
+        } else if atlas.size() == (FrameSize { width, height }) {
+            (String::new(), String::new())
+        } else {
+            return Err(CoreError::Encode(format!(
+                "Composite profile {} overlays the full {width}x{height} frame, not a {}x{} atlas",
+                profile.codec_id.metadata().profile_name,
+                atlas.size().width,
+                atlas.size().height
+            )));
+        };
+    let mut base_video_filters = main_colorspace_tag
+        .map(|tag| format!("setparams=colorspace={tag},"))
+        .unwrap_or_default();
+    base_video_filters.push_str(&format!(
         "trim=start={}:end={},setpts=PTS-STARTPTS,",
         format_seconds_arg(video_trim_start),
         format_seconds_arg(video_trim_start + render_duration),
-    );
+    ));
     if let Some(rotation_filter) = source_rotation_filter {
         base_video_filters.push_str(rotation_filter);
         base_video_filters.push_str("sidedata=mode=delete:type=DISPLAYMATRIX,");
@@ -104,7 +129,56 @@ pub(super) fn composite_filter_complex(
         .replace(
             "{qsv_overlay_cpu_rotation_filter}",
             qsv_overlay_cpu_rotation_filter.unwrap_or_default(),
-        ))
+        )
+        .replace("{atlas_slot_crops}", &atlas_slot_crops)
+        .replace("{atlas_slot_overlays}", &atlas_slot_overlays))
+}
+
+/// Splits the atlas into one crop per slot, labelled `[slotN]`, and chains one
+/// overlay per slot at its scene position onto `[base]`. The last overlay is
+/// left unlabelled for the profile's output filters. A plan without slots
+/// overlays its transparent atlas whole, so the atlas stream still ends the
+/// graph as it does with slots.
+fn atlas_slot_filters(atlas: &AtlasPlan) -> (String, String) {
+    const OVERLAY_OPTIONS: &str = "eof_action=repeat:shortest=1";
+    let slots = atlas.slots();
+    if slots.is_empty() {
+        return (
+            "null[slot0]".to_string(),
+            format!("[base][slot0]overlay=0:0:{OVERLAY_OPTIONS}"),
+        );
+    }
+    let mut crops = String::new();
+    if slots.len() > 1 {
+        crops.push_str(&format!("split={}", slots.len()));
+        for index in 0..slots.len() {
+            crops.push_str(&format!("[atlas{index}]"));
+        }
+    }
+    let mut overlays = String::new();
+    for (index, slot) in slots.iter().enumerate() {
+        let rect = AtlasPlan::atlas_rect(slot);
+        if slots.len() > 1 {
+            crops.push_str(&format!(";[atlas{index}]"));
+        }
+        crops.push_str(&format!(
+            "crop={}:{}:{}:{}[slot{index}]",
+            rect.width(),
+            rect.height(),
+            rect.left,
+            rect.top
+        ));
+        if index > 0 {
+            overlays.push_str(&format!("[main{index}];[main{index}]"));
+        } else {
+            overlays.push_str("[base]");
+        }
+        overlays.push_str(&format!(
+            "[slot{index}]overlay={}:{}:{OVERLAY_OPTIONS}",
+            slot.scene.left, slot.scene.top
+        ));
+    }
+    (crops, overlays)
 }
 
 pub(super) fn source_rotation_filter(

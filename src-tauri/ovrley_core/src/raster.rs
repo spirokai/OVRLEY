@@ -1,5 +1,9 @@
 //! Validates a selected bitmap once and prepares its oriented editor preview.
-use ovrley_widgets::widgets::raster::error::RasterError;
+use ovrley_widgets::{
+    error::{WidgetError, WidgetResult},
+    render::image::{ImageSource, RasterImage},
+    widgets::raster::error::RasterError,
+};
 
 use image::{metadata::Orientation, ImageDecoder, ImageFormat, ImageReader};
 use std::fs::File;
@@ -58,6 +62,16 @@ impl std::fmt::Debug for SelectedRaster {
 /// The shell owns session resources; the core only borrows their lookup seam.
 pub trait RasterResourceResolver {
     fn resolve(&self, resource_id: &str) -> Option<Arc<SelectedRaster>>;
+}
+
+/// Widgets borrow the session resolver directly and decode the oriented preview once per widget.
+impl ImageSource for dyn RasterResourceResolver + '_ {
+    fn resolve_image(&self, resource_id: &str) -> WidgetResult<RasterImage> {
+        let raster = self.resolve(resource_id).ok_or_else(|| {
+            WidgetError::Render(format!("raster resource not registered: {resource_id}"))
+        })?;
+        RasterImage::decode(raster.preview_png())
+    }
 }
 
 /// Archive names use canonical extensions, while file selection also accepts jpg.

@@ -95,6 +95,8 @@ pub fn probe_video_metadata(repo_root: &Path, file_path: &str) -> CoreResult<Sou
         codec_long_name: None,
         codec_profile: None,
         pix_fmt: None,
+        color_range: None,
+        color_space: None,
         bits_per_raw_sample: None,
         bit_rate: None,
         audio_bit_rate: None,

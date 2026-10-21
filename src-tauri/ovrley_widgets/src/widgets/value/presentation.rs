@@ -10,8 +10,9 @@ use crate::widgets::time::{
 };
 use crate::{
     activity::ActivitySampler,
-    error::{WidgetError, WidgetResult},
-    model::{scene::ScenePresentationConfig, types::MetricKind},
+    error::WidgetResult,
+    host::WidgetHost,
+    model::types::MetricKind,
 };
 
 pub enum ValuePresentation {
@@ -23,23 +24,20 @@ pub enum ValuePresentation {
 }
 
 impl ValuePresentation {
-    pub fn new(widget: ValueConfig, scene: &ScenePresentationConfig) -> WidgetResult<Self> {
+    pub fn new(widget: ValueConfig, host: &WidgetHost) -> WidgetResult<Self> {
         if widget.value == MetricKind::Time {
-            let export_start_seconds = scene
-                .extra
-                .get("export_start_seconds")
-                .and_then(|v| v.as_f64())
-                .filter(|v| v.is_finite())
-                .ok_or_else(|| {
-                    WidgetError::Config("scene.export_start_seconds must be a finite number".into())
-                })?;
-            Ok(Self::Time {
-                widget: validate_time_value(widget, 0)?,
-                export_start_seconds,
-            })
+            Self::time(validate_time_value(widget, 0)?, host)
         } else {
             Ok(Self::Metric(validate_value_widget(widget, 0)?))
         }
+    }
+
+    /// Elapsed export time counts from the host's clock origin.
+    pub fn time(widget: ValidatedTimeValue, host: &WidgetHost) -> WidgetResult<Self> {
+        Ok(Self::Time {
+            widget,
+            export_start_seconds: host.export_start_seconds()?,
+        })
     }
 
     pub fn base(&self) -> &ValidatedValueWidget {

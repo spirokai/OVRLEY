@@ -1,9 +1,9 @@
 //! Shared placement and pixel revisions for every preview family.
 use crate::{
     error::{WidgetError, WidgetResult},
-    preview::PreviewFonts,
     preview_widget::{PreviewWidget, WidgetRequest},
-    widgets::{raster::preview::PreviewImages, value::preview::WidgetGeometry},
+    render::{image::ImageSource, text::FontResolver},
+    widgets::value::preview::{TileBounds, WidgetGeometry},
 };
 use serde::{Deserialize, Serialize};
 
@@ -146,8 +146,8 @@ pub struct PreviewInstance {
 impl PreviewInstance {
     pub fn new(
         request: WidgetRequest,
-        fonts: &PreviewFonts,
-        images: &PreviewImages,
+        fonts: &dyn FontResolver,
+        images: &(impl ImageSource + ?Sized),
     ) -> WidgetResult<Self> {
         let (position, _) = request.placement()?;
         let mut config = request.clone();
@@ -170,8 +170,8 @@ impl PreviewInstance {
     pub fn update(
         &mut self,
         request: WidgetRequest,
-        fonts: &PreviewFonts,
-        images: &PreviewImages,
+        fonts: &dyn FontResolver,
+        images: &(impl ImageSource + ?Sized),
     ) -> WidgetResult<()> {
         let (position, transient) = request.placement()?;
         let mut config = request.clone();
@@ -289,6 +289,14 @@ impl PreviewInstance {
         self.placed_geometry
             .as_ref()
             .unwrap_or_else(|| self.widget.geometry())
+    }
+    /// Typed tile bounds at the instance's current placement, matching `geometry()`.
+    pub fn bounds(&self) -> Option<TileBounds> {
+        let [dx, dy] = [
+            self.position[0] - self.origin[0],
+            self.position[1] - self.origin[1],
+        ];
+        self.widget.bounds().map(|bounds| bounds.translated(dx, dy))
     }
     pub fn revision(&self) -> u32 {
         self.revision

@@ -18,7 +18,7 @@ use ovrley_widgets::{
     },
 };
 use serde_json::{json, Value};
-use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
+use skia_safe::{surfaces, AlphaType, Color, ImageInfo};
 
 fn manifest() -> Value {
     serde_json::from_str(include_str!("../../../assets/standard-metrics.json")).unwrap()
@@ -116,7 +116,7 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
                             geometry["width"].as_i64().unwrap() as i32,
                             geometry["height"].as_i64().unwrap() as i32,
                         ),
-                        ColorType::RGBA8888,
+                        ovrley_widgets::widgets::value::preview::TEXT_COLOR_TYPE,
                         AlphaType::Premul,
                         None,
                     );

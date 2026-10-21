@@ -10,13 +10,14 @@ use super::{
 use crate::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
+    host::WidgetHost,
     model::scene::{
         validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
     },
-    render::{pixels::read_surface_rgba, preview::PreviewRasterScale},
-    widgets::value::preview::{surface, SHAPE_COLOR_TYPE, WidgetGeometry},
+    render::preview::{render_tile, PreviewRasterScale},
+    widgets::value::preview::{SHAPE_COLOR_TYPE, TileBounds, WidgetGeometry},
 };
-use skia_safe::{Color, Surface};
+use skia_safe::{Canvas, Surface};
 use std::sync::Arc;
 
 pub struct PreviewRoute {
@@ -34,34 +35,29 @@ pub struct PreviewRoute {
     surface: Option<Surface>,
     pub pixels: Vec<u8>,
     pub geometry: Vec<u8>,
+    /// Scene bounds of the last rendered tile; absent until the first render.
+    pub bounds: Option<TileBounds>,
     pub revision: u32,
 }
 
 impl PreviewRoute {
-    fn preview_duration(scene: &ScenePresentationConfig) -> WidgetResult<f64> {
-        scene
-            .extra
-            .get("preview_duration_seconds")
-            .and_then(serde_json::Value::as_f64)
-            .filter(|value| value.is_finite() && *value >= 0.0)
-            .ok_or_else(|| {
-                WidgetError::Config(
-                    "preview_duration_seconds: required non-negative finite second".into(),
-                )
-            })
-    }
-
     pub fn new(widget: CoursePlotConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
         let config = validate_route_plot(&widget, 0)?;
-        let window = RouteWindow::from_scene(&scene, config.show_full_activity)?;
-        let preview_duration = Self::preview_duration(&scene)?;
-        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene)?;
+        Self::from_validated(config, validate_scene_presentation(scene)?, &host)
+    }
+
+    pub fn from_validated(
+        config: ValidatedRoutePlot,
+        scene: ValidatedScenePresentation,
+        host: &WidgetHost,
+    ) -> WidgetResult<Self> {
         Ok(Self {
+            window: host.plot_window(config.show_full_activity),
+            preview_duration: host.placeholder_duration()?,
+            preview_raster_scale: host.raster_scale,
             config,
-            scene: validate_scene_presentation(scene)?,
-            window,
-            preview_duration,
-            preview_raster_scale,
+            scene,
             samples: None,
             prepared_geometry: None,
             placeholder_geometry: None,
@@ -71,6 +67,7 @@ impl PreviewRoute {
             surface: None,
             pixels: Vec::new(),
             geometry: Vec::new(),
+            bounds: None,
             revision: 0,
         })
     }
@@ -82,9 +79,10 @@ impl PreviewRoute {
         transient: bool,
     ) -> WidgetResult<()> {
         let config = validate_route_plot(&widget, 0)?;
-        let window = RouteWindow::from_scene(&scene, config.show_full_activity)?;
-        let preview_duration = Self::preview_duration(&scene)?;
-        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene)?;
+        let window = host.plot_window(config.show_full_activity);
+        let preview_duration = host.placeholder_duration()?;
+        let preview_raster_scale = host.raster_scale;
         let scene = validate_scene_presentation(scene)?;
         if window != self.window {
             self.invalidate_activity();
@@ -223,43 +221,85 @@ impl PreviewRoute {
         Ok(resize_route(&config, &scene, &geometry, fixed, point))
     }
 
-    pub fn render(&mut self, activity: Option<&ActivitySampler>, second: f64) -> WidgetResult<()> {
+    /// Scene rectangle a render at `second` draws into; marker overflow is reserved for the whole path.
+    pub fn layout_bounds(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+    ) -> WidgetResult<TileBounds> {
         let geometry = self.geometry_at(activity, second)?;
-        let progress = self.progress(activity, second, geometry.source_point_count == 0);
-        let layout_changed = self
+        Ok(RouteLayout::measure(&self.config, &self.scene, &geometry).into())
+    }
+
+    /// Prepares the layout for the geometry at `second`; reports whether it was rebuilt.
+    fn layout(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+    ) -> WidgetResult<bool> {
+        let geometry = self.geometry_at(activity, second)?;
+        let changed = self
             .layout
             .as_ref()
             .is_none_or(|layout| !Arc::ptr_eq(&layout.geometry, &geometry));
-        if layout_changed {
+        if changed {
             self.layout = Some(RouteLayout::new(
                 self.config.clone(),
                 self.scene.clone(),
                 geometry,
             )?);
-        } else if self.last_progress == Some(progress) {
+        }
+        Ok(changed)
+    }
+
+    /// Draws the frame at `second` onto a host canvas in scene coordinates.
+    pub fn draw(
+        &mut self,
+        canvas: &Canvas,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+    ) -> WidgetResult<TileBounds> {
+        self.layout(activity, second)?;
+        let layout = self.layout.as_ref().expect("route layout prepared");
+        let progress = self.progress(activity, second, layout.geometry.source_point_count == 0);
+        let frame = layout.frame(progress);
+        layout.draw(canvas, &frame);
+        Ok(frame.bounds.into())
+    }
+
+    /// What the frame at `second` depends on: the drawn geometry, which the widget retains, and
+    /// the marker progress. Equal keys draw identical pixels.
+    pub fn frame_key(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+    ) -> WidgetResult<(usize, f32)> {
+        self.layout(activity, second)?;
+        let geometry = &self.layout.as_ref().expect("route layout prepared").geometry;
+        let progress = self.progress(activity, second, geometry.source_point_count == 0);
+        Ok((Arc::as_ptr(geometry) as usize, progress))
+    }
+
+    pub fn render(&mut self, activity: Option<&ActivitySampler>, second: f64) -> WidgetResult<()> {
+        let layout_changed = self.layout(activity, second)?;
+        let geometry = &self.layout.as_ref().expect("route layout prepared").geometry;
+        let progress = self.progress(activity, second, geometry.source_point_count == 0);
+        if !layout_changed && self.last_progress == Some(progress) {
             return Ok(());
         }
         let layout = self.layout.as_ref().expect("route layout prepared");
         let frame = layout.frame(progress);
-        let (width, height) = self.preview_raster_scale.dimensions(frame.bounds);
-        if self
-            .surface
-            .as_ref()
-            .map(|surface| (surface.width(), surface.height()))
-            != Some((width as i32, height as i32))
-        {
-            self.surface = Some(surface(width, height, SHAPE_COLOR_TYPE)?);
-            self.pixels.resize(width as usize * height as usize * 4, 0);
-        }
-        let surface = self.surface.as_mut().expect("route surface allocated");
-        let canvas = surface.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        canvas.save();
-        self.preview_raster_scale.apply(canvas);
-        canvas.translate((-frame.bounds.left, -frame.bounds.top));
-        layout.draw(canvas, &frame);
-        canvas.restore();
-        read_surface_rgba(surface, &mut self.pixels)?;
+        let (width, height) = render_tile(
+            &mut self.surface,
+            &mut self.pixels,
+            SHAPE_COLOR_TYPE,
+            self.preview_raster_scale,
+            frame.bounds,
+            |canvas| {
+                layout.draw(canvas, &frame);
+                Ok(())
+            },
+        )?;
         if layout_changed || self.last_progress.is_none() {
             #[derive(serde::Serialize)]
             struct Geometry {
@@ -269,20 +309,20 @@ impl PreviewRoute {
                 rotation_origin: [f32; 2],
             }
             let rotation_origin = frame.content_bounds.rotation_origin();
+            let tile = TileBounds::from(frame.bounds);
             self.geometry = serde_json::to_vec(&Geometry {
-                widget: WidgetGeometry {
-                    left: frame.bounds.left,
-                    top: frame.bounds.top,
-                    width,
-                    height,
-                    preview_raster_scale: self.preview_raster_scale.value(),
-                    content_width: frame.content_bounds.width,
-                    content: frame.content_bounds,
-                },
+                widget: WidgetGeometry::new(
+                    tile,
+                    (width, height),
+                    self.preview_raster_scale.value(),
+                    frame.content_bounds.width,
+                    frame.content_bounds,
+                ),
                 rotation: self.config.rotation,
                 rotation_origin,
             })
             .map_err(|e| WidgetError::Render(e.to_string()))?;
+            self.bounds = Some(tile);
         }
         self.revision = self.revision.wrapping_add(1);
         self.last_progress = Some(progress);

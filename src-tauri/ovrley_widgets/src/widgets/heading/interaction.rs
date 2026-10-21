@@ -11,7 +11,7 @@ use crate::{
         scene::{validate_scene_presentation, ScenePresentationConfig},
         validation::require_non_negative_f32,
     },
-    preview::PreviewFonts,
+    render::text::FontResolver,
     widgets::value::config::ValueConfig,
 };
 use serde::Serialize;
@@ -73,7 +73,7 @@ pub fn resize_heading(
     point: [f32; 2],
     activity: Option<&ActivitySampler>,
     second: f64,
-    fonts: &PreviewFonts,
+    fonts: &dyn FontResolver,
 ) -> WidgetResult<ResizeUpdate> {
     if size.iter().any(|value| !value.is_finite() || *value <= 0.0) {
         return Err(WidgetError::Config("invalid heading resize size".into()));

@@ -1,19 +1,20 @@
 use super::{
     layout::{prepare_lean_angle_cache, LeanAngleCache},
-    validation::validate_lean_angle,
+    validation::{validate_lean_angle, ValidatedLeanAngleWidget},
 };
 use crate::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
-    model::scene::{validate_scene_presentation, ScenePresentationConfig},
-    preview::PreviewFonts,
-    render::{pixels::read_surface_rgba, preview::PreviewRasterScale},
+    host::WidgetHost,
+    model::scene::{validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation},
+    render::text::FontResolver,
+    render::preview::{render_tile, PreviewRasterScale},
     widgets::value::{
         config::ValueConfig,
-        preview::{surface, SHAPE_COLOR_TYPE, WidgetGeometry},
+        preview::{SHAPE_COLOR_TYPE, TileBounds, WidgetGeometry},
     },
 };
-use skia_safe::{Color, Surface};
+use skia_safe::{Canvas, Surface};
 
 pub struct PreviewLeanAngle {
     cache: LeanAngleCache,
@@ -22,31 +23,70 @@ pub struct PreviewLeanAngle {
     last_sample: Option<Option<f64>>,
     pub pixels: Vec<u8>,
     pub geometry: Vec<u8>,
+    /// Scene bounds of the last rendered tile; absent until the first render.
+    pub bounds: Option<TileBounds>,
     pub revision: u32,
 }
 
 impl PreviewLeanAngle {
     pub fn new(widget: ValueConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
         let config = validate_lean_angle(widget, 0)?;
-        let preview_raster_scale = PreviewRasterScale::from_scene(&scene)?;
-        let scene = validate_scene_presentation(scene)?;
-        let cache = prepare_lean_angle_cache(&config, &scene)?;
+        let host = WidgetHost::from_scene(&scene)?;
+        Self::from_validated(&config, &validate_scene_presentation(scene)?, &host)
+    }
+
+    pub fn from_validated(
+        config: &ValidatedLeanAngleWidget,
+        scene: &ValidatedScenePresentation,
+        host: &WidgetHost,
+    ) -> WidgetResult<Self> {
         Ok(Self {
-            cache,
-            preview_raster_scale,
+            cache: prepare_lean_angle_cache(config, scene)?,
+            preview_raster_scale: host.raster_scale,
             surface: None,
             last_sample: None,
             pixels: Vec::new(),
             geometry: Vec::new(),
+            bounds: None,
             revision: 0,
         })
+    }
+
+    /// The sample the frame at `second` draws; equal samples draw identical pixels.
+    pub fn frame_key(&self, activity: Option<&ActivitySampler>, second: f64) -> Option<f64> {
+        activity.and_then(|activity| activity.lean_angle_at(second))
+    }
+
+    /// Scene rectangle a render at `second` draws into, from layout alone.
+    pub fn layout_bounds(
+        &self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<TileBounds> {
+        let raw = activity.and_then(|activity| activity.lean_angle_at(second));
+        Ok(self.cache.prepare_frame(raw, fonts)?.bounds.into())
+    }
+
+    /// Draws the frame at `second` onto a host canvas in scene coordinates.
+    pub fn draw(
+        &self,
+        canvas: &Canvas,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<TileBounds> {
+        let raw = activity.and_then(|activity| activity.lean_angle_at(second));
+        let frame = self.cache.prepare_frame(raw, fonts)?;
+        frame.draw(canvas, &self.cache);
+        Ok(frame.bounds.into())
     }
 
     pub fn render(
         &mut self,
         activity: Option<&ActivitySampler>,
         second: f64,
-        fonts: &PreviewFonts,
+        fonts: &dyn FontResolver,
     ) -> WidgetResult<()> {
         let raw = activity.and_then(|activity| activity.lean_angle_at(second));
         // Signed fill changes continuously, even when the magnitude label stays the same.
@@ -55,35 +95,27 @@ impl PreviewLeanAngle {
         }
         let frame = self.cache.prepare_frame(raw, fonts)?;
         let bounds = frame.bounds;
-        let (width, height) = self.preview_raster_scale.dimensions(bounds);
-        if self
-            .surface
-            .as_ref()
-            .map(|surface| (surface.width(), surface.height()))
-            != Some((width as i32, height as i32))
-        {
-            self.surface = Some(surface(width, height, SHAPE_COLOR_TYPE)?);
-            self.pixels.resize(width as usize * height as usize * 4, 0);
-        }
-        let surface = self.surface.as_mut().expect("surface allocated");
-        let canvas = surface.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        canvas.save();
-        self.preview_raster_scale.apply(canvas);
-        canvas.translate((-bounds.left, -bounds.top));
-        frame.draw(canvas, &self.cache);
-        canvas.restore();
-        read_surface_rgba(surface, &mut self.pixels)?;
-        self.geometry = serde_json::to_vec(&WidgetGeometry {
-            left: bounds.left,
-            top: bounds.top,
-            width,
-            height,
-            preview_raster_scale: self.preview_raster_scale.value(),
-            content_width: frame.content_width,
-            content: frame.content_bounds.into(),
-        })
+        let (width, height) = render_tile(
+            &mut self.surface,
+            &mut self.pixels,
+            SHAPE_COLOR_TYPE,
+            self.preview_raster_scale,
+            bounds,
+            |canvas| {
+                frame.draw(canvas, &self.cache);
+                Ok(())
+            },
+        )?;
+        let tile = TileBounds::from(bounds);
+        self.geometry = serde_json::to_vec(&WidgetGeometry::new(
+            tile,
+            (width, height),
+            self.preview_raster_scale.value(),
+            frame.content_width,
+            frame.content_bounds.into(),
+        ))
         .map_err(|error| WidgetError::Render(error.to_string()))?;
+        self.bounds = Some(tile);
         self.revision = self.revision.wrapping_add(1);
         self.last_sample = Some(raw);
         Ok(())

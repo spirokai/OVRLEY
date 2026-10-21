@@ -5,5 +5,5 @@ pub mod frame;
 pub mod interaction;
 pub mod layout;
 pub mod preview;
-mod presentation;
+pub(crate) mod presentation;
 pub mod validation;

@@ -468,6 +468,7 @@ mod tests {
                     width: 2,
                     height: 2,
                 },
+                crate::encode::overlay_format::OverlayPixelFormat::Rgba,
                 std::num::NonZeroUsize::new(1).unwrap(),
                 2,
             )

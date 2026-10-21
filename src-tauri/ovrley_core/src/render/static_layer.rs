@@ -190,27 +190,36 @@ pub(super) fn prepare_rasters(
     rasters
         .iter()
         .map(|config| {
-            let selected = match &config.source {
-                RasterSource::Image(image) => Arc::clone(image),
-                RasterSource::File(path) => Arc::new(
-                    load_selected_raster(path).map_err(|error| error.for_widget(&config.id))?,
-                ),
-            };
-            let preview = selected.preview_png();
-            let image = Image::from_encoded(Data::new_copy(preview)).ok_or_else(|| {
-                CoreError::Render(format!(
-                    "Raster {} could not be decoded [raster_error:decode:{}]",
-                    config.id, config.id
-                ))
-            })?;
-            let image = downsample_raster(image, &config.geometry, &config.id, global_scale)?;
+            let (image, content_hash) = prepare_raster_image(config, global_scale)?;
             Ok(PreparedRaster {
                 geometry: config.geometry.clone(),
-                content_hash: selected.content_hash(),
+                content_hash,
                 image,
             })
         })
         .collect()
+}
+
+/// Loads the oriented source and resamples it once to the frame's export size.
+pub(super) fn prepare_raster_image(
+    config: &ValidatedRaster,
+    global_scale: f32,
+) -> CoreResult<(Image, u64)> {
+    let selected = match &config.source {
+        RasterSource::Image(image) => Arc::clone(image),
+        RasterSource::File(path) => Arc::new(
+            load_selected_raster(path).map_err(|error| error.for_widget(&config.id))?,
+        ),
+    };
+    let preview = selected.preview_png();
+    let image = Image::from_encoded(Data::new_copy(preview)).ok_or_else(|| {
+        CoreError::Render(format!(
+            "Raster {} could not be decoded [raster_error:decode:{}]",
+            config.id, config.id
+        ))
+    })?;
+    let image = downsample_raster(image, &config.geometry, &config.id, global_scale)?;
+    Ok((image, selected.content_hash()))
 }
 
 pub(super) fn draw_rasters(

@@ -1,6 +1,8 @@
 //! Prepared geometry is the source for both painting and editor bounds.
 use super::{
-    arc::ArcGaugeCache, linear::LinearGaugeCache, metric::GaugeFrameState,
+    arc::{inner_widget::ArcInnerWidgetLayout, measure_arc_gauge, ArcGaugeCache, ArcGaugeMeasure},
+    linear::{measure_linear_gauge, LinearGaugeCache, LinearGaugeMeasure},
+    metric::GaugeFrameState,
     validation::ValidatedGauge,
 };
 use crate::{
@@ -12,12 +14,106 @@ use crate::{
     },
     widgets::value::layout::metric_vertical_metrics_text,
 };
-use skia_safe::{Canvas, Rect, TextBlob};
+use skia_safe::{Canvas, Font, Rect, TextBlob};
 
 #[derive(Clone, Debug)]
 pub enum GaugeLayout {
     Linear(LinearGaugeCache),
     Arc(ArcGaugeCache),
+}
+
+/// Layout-only gauge measurement: frame bounds without the cached static raster.
+pub(crate) enum GaugeMeasure {
+    Linear(LinearGaugeMeasure),
+    Arc(ArcGaugeMeasure),
+}
+
+/// Inputs of a gauge frame's bounds, from a cache or a layout-only measure.
+pub(crate) struct GaugeFrameLayout<'a> {
+    pub(crate) content_bounds: Rect,
+    pub(crate) raster_bounds: Rect,
+    pub(crate) content_width: f32,
+    /// The arc readout is laid out per frame; linear gauges have no value text.
+    pub(crate) value: Option<ArcValueLayout<'a>>,
+}
+
+pub(crate) struct ArcValueLayout<'a> {
+    pub(crate) inner: ArcInnerWidgetLayout,
+    pub(crate) style: &'a ResolvedTextStyle,
+    pub(crate) font: &'a Font,
+}
+
+impl GaugeFrameLayout<'_> {
+    /// One bounds formula for cached and layout-only frames.
+    fn frame(self, state: GaugeFrameState, fonts: &dyn FontResolver) -> WidgetResult<GaugeFrame> {
+        let (mut content_bounds, mut bounds) = (self.content_bounds, self.raster_bounds);
+        let value = if let Some(value) = self.value {
+            let mut style = value.style.clone();
+            let advance =
+                measure_text_with_font(&state.value_text, value.font, style.numerals).width;
+            // Advance-centering preserves the native monospaced readout's anchor.
+            style.x = value.inner.center_x - advance * 0.5;
+            style.y = value.inner.value_top;
+            let run = prepare_value_text(
+                &state.value_text,
+                metric_vertical_metrics_text(&state.value_text),
+                style,
+                fonts,
+            )?;
+            content_bounds.join(run.content_bounds);
+            bounds.join(run.bounds);
+            Some(run)
+        } else {
+            None
+        };
+        Ok(GaugeFrame {
+            bounds: raster_bounds(bounds),
+            content_bounds,
+            content_width: self.content_width,
+            state,
+            value,
+        })
+    }
+}
+
+impl GaugeMeasure {
+    pub(crate) fn new(
+        widget: &ValidatedGauge,
+        scene: &crate::model::scene::ValidatedScenePresentation,
+        range: (f64, f64),
+        altitude_offset_m: f64,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<Self> {
+        match widget {
+            ValidatedGauge::Linear(gauge) => Ok(Self::Linear(measure_linear_gauge(
+                gauge,
+                scene,
+                range,
+                altitude_offset_m,
+                fonts,
+            )?)),
+            ValidatedGauge::Arc(gauge) => Ok(Self::Arc(measure_arc_gauge(
+                gauge,
+                scene,
+                range,
+                altitude_offset_m,
+                widget.unit_text().as_deref(),
+                fonts,
+            )?)),
+        }
+    }
+
+    pub(crate) fn frame_bounds(
+        &self,
+        state: GaugeFrameState,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<Rect> {
+        let layout = match self {
+            Self::Linear(measure) => measure.frame_layout(),
+            Self::Arc(measure) => measure.frame_layout(),
+        };
+        Ok(layout.frame(state, fonts)?.bounds)
+    }
 }
 
 pub struct GaugeFrame {
@@ -149,37 +245,11 @@ impl GaugeLayout {
         state: GaugeFrameState,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<GaugeFrame> {
-        let (mut content_bounds, mut bounds, content_width) = match self {
-            Self::Linear(cache) => (cache.content_bounds, cache.raster_bounds(), cache.width),
-            Self::Arc(cache) => (cache.content_bounds, cache.raster_bounds(), cache.width),
-        };
-        let value = if let Self::Arc(cache) = self {
-            let layout = cache.inner_layout();
-            let mut style = cache.text_style.clone();
-            let advance =
-                measure_text_with_font(&state.value_text, &cache.value_font, style.numerals).width;
-            // Advance-centering preserves the native monospaced readout's anchor.
-            style.x = layout.center_x - advance * 0.5;
-            style.y = layout.value_top;
-            let run = prepare_value_text(
-                &state.value_text,
-                metric_vertical_metrics_text(&state.value_text),
-                style,
-                fonts,
-            )?;
-            content_bounds.join(run.content_bounds);
-            bounds.join(run.bounds);
-            Some(run)
-        } else {
-            None
-        };
-        Ok(GaugeFrame {
-            bounds: raster_bounds(bounds),
-            content_bounds,
-            content_width,
-            state,
-            value,
-        })
+        match self {
+            Self::Linear(cache) => cache.frame_layout(),
+            Self::Arc(cache) => cache.frame_layout(),
+        }
+        .frame(state, fonts)
     }
 }
 

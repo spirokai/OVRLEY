@@ -324,7 +324,11 @@ export function createPreviewSession(module, onError) {
       disposed = true
       if (frame !== null) cancelAnimationFrame(frame)
       interaction.dispose()
-      for (const target of targets.values()) unregisterWidgetInteraction(target)
+      // Wrappers stay hidden until a session presents them again, so nothing reads their geometry.
+      for (const target of targets.values()) {
+        unregisterWidgetInteraction(target)
+        target.style.visibility = 'hidden'
+      }
       module._ovrley_preview_destroy(handle)
       widgets.clear()
       canvases.clear()

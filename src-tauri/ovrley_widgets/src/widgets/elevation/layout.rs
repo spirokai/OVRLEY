@@ -41,6 +41,19 @@ pub struct ElevationLayout {
     variant: Paint,
 }
 
+struct ElevationMeasure {
+    scale: [f32; 2],
+    stroke: f32,
+    offset: (f32, f32),
+    blur: f32,
+    rotation: (f32, f32),
+    remaining_bounds: Rect,
+    raster: Rect,
+    labels: [Option<ElevationLabel>; 2],
+    bounds: Rect,
+    content_bounds: ContentBounds,
+}
+
 pub struct ElevationFrame {
     pub state: ElevationFrameState,
     pub bounds: Rect,
@@ -88,14 +101,15 @@ fn stroke_outline(path: &Path, paint: &Paint) -> WidgetResult<Path> {
 }
 
 impl ElevationLayout {
-    pub fn new(
-        config: ValidatedElevationPlot,
-        scene: ValidatedScenePresentation,
-        geometry: Arc<ElevationGeometry>,
+    /// Every rectangle the layout needs, before its remaining raster is drawn.
+    fn measure(
+        config: &ValidatedElevationPlot,
+        scene: &ValidatedScenePresentation,
+        geometry: &ElevationGeometry,
         altitude_offset_m: f64,
         elevation_range: Option<(f64, f64)>,
         fonts: &dyn FontResolver,
-    ) -> WidgetResult<Self> {
+    ) -> WidgetResult<ElevationMeasure> {
         let scale = [
             config.width * scene.scale / geometry.key.width,
             config.height * scene.scale / geometry.key.height,
@@ -126,61 +140,7 @@ impl ElevationLayout {
             0.0,
             0.0,
         ));
-        let mut layer = surface(
-            remaining_bounds.width() as u32,
-            remaining_bounds.height() as u32,
-            SHAPE_COLOR_TYPE,
-        )?;
-        let canvas = layer.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        canvas.translate((-remaining_bounds.left, -remaining_bounds.top));
-        canvas.rotate(config.rotation, None);
-        let paths = geometry.paths.lock().expect("elevation paths lock");
-        let matrix = Matrix::scale((scale[0], scale[1]));
-        let path = paths.0.with_transform(&matrix);
-        let area = paths.1.with_transform(&matrix);
-        let remaining_line = stroke_paint(
-            &config.remaining_line_color,
-            stroke,
-            config.remaining_line_opacity * scene.opacity,
-        );
-        let completed_line = stroke_paint(
-            &config.completed_line_color,
-            (config.completed_line_width * scene.scale).max(1.0),
-            config.completed_line_opacity * scene.opacity,
-        );
-        let completed_area_clip = Arc::new(Mutex::new(stroke_outline(&path, &completed_line)?));
-        let area_gradient_height = config.area_gradient.then_some(config.height * scene.scale);
-        canvas.save();
-        canvas.clip_path(
-            &stroke_outline(&path, &remaining_line)?,
-            ClipOp::Difference,
-            true,
-        );
-        canvas.draw_path(
-            &area,
-            &area_paint(
-                &config.area_remaining_color,
-                config.area_remaining_opacity * scene.opacity,
-                area_gradient_height,
-            )?,
-        );
-        canvas.restore();
-        if blur > 0.0 {
-            canvas.save();
-            canvas.translate(offset);
-            let mut shadow = stroke_paint(
-                &scene.shadow_color,
-                stroke,
-                config.remaining_line_opacity * scene.opacity,
-            );
-            shadow.set_mask_filter(MaskFilter::blur(BlurStyle::Normal, blur, true));
-            canvas.draw_path(&path, &shadow);
-            canvas.restore();
-        }
-        canvas.draw_path(&path, &remaining_line);
-        drop(paths);
-        let content = Self::measure_content(&config, &scene);
+        let content = Self::measure_content(config, scene);
         let radius =
             (config.marker_size * scene.scale)
                 .max(2.0)
@@ -278,6 +238,106 @@ impl ElevationLayout {
         );
         let content_bounds =
             ContentBounds::rotated_frame(content, config.rotation, config.x, config.y);
+        Ok(ElevationMeasure {
+            scale,
+            stroke,
+            offset,
+            blur,
+            remaining_bounds,
+            raster,
+            labels,
+            bounds,
+            content_bounds,
+            rotation: (sin, cos),
+        })
+    }
+
+    /// Frame bounds from layout alone; the cached remaining raster is not drawn.
+    pub fn measure_bounds(
+        config: &ValidatedElevationPlot,
+        scene: &ValidatedScenePresentation,
+        geometry: &ElevationGeometry,
+        altitude_offset_m: f64,
+        elevation_range: Option<(f64, f64)>,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<Rect> {
+        Ok(Self::measure(config, scene, geometry, altitude_offset_m, elevation_range, fonts)?.bounds)
+    }
+
+    pub fn new(
+        config: ValidatedElevationPlot,
+        scene: ValidatedScenePresentation,
+        geometry: Arc<ElevationGeometry>,
+        altitude_offset_m: f64,
+        elevation_range: Option<(f64, f64)>,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<Self> {
+        let ElevationMeasure {
+            scale,
+            stroke,
+            offset,
+            blur,
+            remaining_bounds,
+            raster,
+            labels,
+            bounds,
+            content_bounds,
+            rotation: (sin, cos),
+        } = Self::measure(&config, &scene, &geometry, altitude_offset_m, elevation_range, fonts)?;
+        let mut layer = surface(
+            remaining_bounds.width() as u32,
+            remaining_bounds.height() as u32,
+            SHAPE_COLOR_TYPE,
+        )?;
+        let canvas = layer.canvas();
+        canvas.clear(Color::TRANSPARENT);
+        canvas.translate((-remaining_bounds.left, -remaining_bounds.top));
+        canvas.rotate(config.rotation, None);
+        let paths = geometry.paths.lock().expect("elevation paths lock");
+        let matrix = Matrix::scale((scale[0], scale[1]));
+        let path = paths.0.with_transform(&matrix);
+        let area = paths.1.with_transform(&matrix);
+        let remaining_line = stroke_paint(
+            &config.remaining_line_color,
+            stroke,
+            config.remaining_line_opacity * scene.opacity,
+        );
+        let completed_line = stroke_paint(
+            &config.completed_line_color,
+            (config.completed_line_width * scene.scale).max(1.0),
+            config.completed_line_opacity * scene.opacity,
+        );
+        let completed_area_clip = Arc::new(Mutex::new(stroke_outline(&path, &completed_line)?));
+        let area_gradient_height = config.area_gradient.then_some(config.height * scene.scale);
+        canvas.save();
+        canvas.clip_path(
+            &stroke_outline(&path, &remaining_line)?,
+            ClipOp::Difference,
+            true,
+        );
+        canvas.draw_path(
+            &area,
+            &area_paint(
+                &config.area_remaining_color,
+                config.area_remaining_opacity * scene.opacity,
+                area_gradient_height,
+            )?,
+        );
+        canvas.restore();
+        if blur > 0.0 {
+            canvas.save();
+            canvas.translate(offset);
+            let mut shadow = stroke_paint(
+                &scene.shadow_color,
+                stroke,
+                config.remaining_line_opacity * scene.opacity,
+            );
+            shadow.set_mask_filter(MaskFilter::blur(BlurStyle::Normal, blur, true));
+            canvas.draw_path(&path, &shadow);
+            canvas.restore();
+        }
+        canvas.draw_path(&path, &remaining_line);
+        drop(paths);
         let completed_area = area_paint(
             &config.area_completed_color,
             config.area_completed_opacity * scene.opacity,

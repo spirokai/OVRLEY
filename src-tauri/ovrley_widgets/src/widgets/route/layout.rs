@@ -30,6 +30,14 @@ pub struct RouteLayout {
     variant_paint: Paint,
 }
 
+struct RemainingStroke {
+    scale: [f32; 2],
+    width: f32,
+    offset: [f32; 2],
+    blur: f32,
+    bounds: Rect,
+}
+
 pub struct RouteFrame {
     pub state: RouteFrameState,
     pub bounds: Rect,
@@ -93,30 +101,61 @@ pub(crate) fn stroke_paint(color: &str, width: f32, opacity: f32) -> Paint {
 }
 
 impl RouteLayout {
-    pub fn new(
-        config: ValidatedRoutePlot,
-        scene: ValidatedScenePresentation,
-        geometry: Arc<RouteGeometry>,
-    ) -> WidgetResult<Self> {
-        let scale = geometry.scale_to(&config).map(|value| value * scene.scale);
+    /// Remaining-path stroke and its unrotated raster rectangle, before any drawing.
+    fn remaining_stroke(
+        config: &ValidatedRoutePlot,
+        scene: &ValidatedScenePresentation,
+        geometry: &RouteGeometry,
+    ) -> RemainingStroke {
+        let scale = geometry.scale_to(config).map(|value| value * scene.scale);
         let width = (config.remaining_line_width * scene.scale).max(1.0);
         let line_bounds =
             scaled_rect(geometry.point_bounds, scale).with_outset((width * 0.5, width * 0.5));
-        let mut remaining_bounds = line_bounds;
+        let mut bounds = line_bounds;
         let (sin, cos) = config.rotation.to_radians().sin_cos();
         let distance = scene.shadow_distance * scene.scale;
         let offset = [(cos + sin) * distance, (cos - sin) * distance];
         let blur = scene.shadow_strength * scene.scale;
         if blur > 0.0 {
-            remaining_bounds.join(
+            bounds.join(
                 line_bounds
                     .with_outset((blur * 3.0, blur * 3.0))
                     .with_offset((offset[0], offset[1])),
             );
         }
+        RemainingStroke {
+            scale,
+            width,
+            offset,
+            blur,
+            bounds: outward(bounds.with_outset((1.0, 1.0))),
+        }
+    }
+
+    /// Frame bounds from layout alone; the cached remaining raster is not drawn.
+    pub fn measure(
+        config: &ValidatedRoutePlot,
+        scene: &ValidatedScenePresentation,
+        geometry: &RouteGeometry,
+    ) -> Rect {
+        let remaining = Self::remaining_stroke(config, scene, geometry);
+        Self::measure_bounds(config, scene, geometry, remaining.bounds).0
+    }
+
+    pub fn new(
+        config: ValidatedRoutePlot,
+        scene: ValidatedScenePresentation,
+        geometry: Arc<RouteGeometry>,
+    ) -> WidgetResult<Self> {
+        let RemainingStroke {
+            scale,
+            width,
+            offset,
+            blur,
+            bounds: remaining_bounds,
+        } = Self::remaining_stroke(&config, &scene, &geometry);
         // Cache at the final angle so playback can blit without resampling a rotated
         // bitmap every frame. Positions stay relative to the widget for cheap dragging.
-        remaining_bounds = outward(remaining_bounds.with_outset((1.0, 1.0)));
         let remaining_image_bounds =
             outward(rotated_rect(remaining_bounds, config.rotation, 0.0, 0.0));
         let mut layer = surface(
