@@ -37,15 +37,14 @@ const videoSync = {
   activitySummary: { timezone: 'Europe/Zurich', syncTime: '2026-07-18T07:20:03.000Z' },
   canResetCreationTime: false,
   filenameCreationTimeAvailable: true,
-  offsetInput: '0',
+  sharedOffsetSeconds: 0,
+  sharedOffsetFps: { num: 30, den: 1 },
   timezone: 'Europe/Zurich',
   timezoneDisabled: false,
   videoSyncTimezoneMode: 'local',
   videoSyncWarning: null,
   computeVideoSync: vi.fn(),
-  incrementOffset: vi.fn(),
-  submitOffsetInput: vi.fn(),
-  setOffsetInput: vi.fn(),
+  commitSharedOffset: vi.fn(() => null),
   resetVideoCreationTimes: vi.fn(),
   setVideoCreationTimesFromFilenames: vi.fn(),
   setVideoSyncTimezoneMode: vi.fn(),
@@ -174,13 +173,17 @@ describe('VideoDrawerContent', () => {
 
     const [, thirdOffset] = screen.getAllByLabelText('Start on timeline')
     expect(thirdOffset).toHaveValue('50')
-    fireEvent.change(thirdOffset, { target: { value: '1:10.5' } })
+    // Only seconds can be typed; the start snaps to the clip's frames (30 fps).
+    fireEvent.change(thirdOffset, { target: { value: '1:10' } })
+    expect(thirdOffset).toHaveValue('50')
+    fireEvent.change(thirdOffset, { target: { value: '70.52' } })
     fireEvent.blur(thirdOffset)
     expect(useStore.getState().videoEdits).toMatchObject({
       'video-1': { offsetSeconds: 0 },
       'video-2': { offsetSeconds: 100 },
-      'video-3': { offsetSeconds: 70.5 },
+      'video-3': { offsetSeconds: 2116 / 30 },
     })
+    expect(thirdOffset).toHaveValue('70.533')
   })
 
   test('lists deleted parts of a clip and restores them', () => {
@@ -238,7 +241,7 @@ describe('VideoDrawerContent', () => {
     expect(screen.getByRole('region', { name: 'climb.mp4' })).toHaveTextContent('wipeleft, 3 s')
     fireEvent.change(duration, { target: { value: '0' } })
     fireEvent.blur(duration)
-    expect(screen.getByRole('alert')).toHaveTextContent('Transition duration must be a positive number of seconds')
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a duration above 0 seconds')
     expect(useStore.getState().transitionDefaults.durationSeconds).toBe(3)
 
     fireEvent.click(screen.getByLabelText('Transition'))

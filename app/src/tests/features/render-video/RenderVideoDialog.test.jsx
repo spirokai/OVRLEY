@@ -86,8 +86,9 @@ describe('RenderVideoDialog', () => {
     expect(screen.getByText('Export Settings')).toBeInTheDocument()
     expect(screen.getByText('Custom Export Range')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /use video range/i })).toBeInTheDocument()
-    expect(screen.getByDisplayValue('00:00:05')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('00:00:17')).toBeInTheDocument()
+    expect(screen.getByLabelText('From')).toHaveValue('5')
+    expect(screen.getByLabelText('To')).toHaveValue('17')
+    expect(screen.getByText('00:17')).toBeInTheDocument()
   })
 
   test('preserves export markers when switching an imported-video dialog to transparent export', async () => {
@@ -118,10 +119,8 @@ describe('RenderVideoDialog', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Transparent' }))
 
-    expect(screen.getByDisplayValue('00:00:02')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('00:00:08')).toBeInTheDocument()
-    expect(screen.queryByDisplayValue('00:00:05')).not.toBeInTheDocument()
-    expect(screen.queryByDisplayValue('00:00:17')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('From')).toHaveValue('2')
+    expect(screen.getByLabelText('To')).toHaveValue('8')
   })
 
   test('commits the edited output path instead of the previous draft value', async () => {

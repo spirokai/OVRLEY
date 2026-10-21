@@ -9,17 +9,6 @@ export function getImportedVideoExportRange(videoBounds) {
   return { type: 'custom', from: videoBounds.startSecond, to: videoBounds.endSecond }
 }
 
-/** @param {string} value Editable range time. @returns {string} Whole-second input preserving its optional negative sign. */
-export function sanitizeRangeTimeInput(value) {
-  const input = value.trim()
-  const sign = input.startsWith('-') ? '-' : ''
-  const sanitized = input
-    .split(':')
-    .map((part) => part.split(/[.,]/)[0].replace(/\D/g, ''))
-    .join(':')
-  return `${sign}${sanitized}`
-}
-
 /** @param {'transparent'|'composite'} exportMode Render mode. @returns {string} Native container extension. */
 export function getRenderOutputExtension(exportMode) {
   return exportMode === 'composite' ? 'mp4' : 'mov'

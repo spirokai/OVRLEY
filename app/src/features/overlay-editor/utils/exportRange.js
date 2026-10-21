@@ -56,15 +56,14 @@ export function formatExportRangeTime(seconds) {
 }
 
 /**
- * Applies a whole-second sidebar time string without allowing an inverted range.
+ * Applies one boundary of the export range without allowing an inverted range.
  *
  * @param {{ type: string, from: number, to: number }} exportRange Current canonical range.
  * @param {'from'|'to'} boundary Boundary being edited.
- * @param {string} value Whole-second time string from the sidebar.
+ * @param {number} second New boundary in timeline seconds.
  * @returns {{ type: string, from: number, to: number }} Updated canonical range.
  */
-export function setExportRangeBoundaryFromTimeInput(exportRange, boundary, value) {
-  const second = timeToSeconds(value)
+export function setExportRangeBoundary(exportRange, boundary, second) {
   if (boundary === 'from') {
     return { ...exportRange, from: second, to: Math.max(exportRange.to, second) }
   }

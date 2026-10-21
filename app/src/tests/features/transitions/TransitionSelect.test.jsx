@@ -34,15 +34,16 @@ describe('TransitionSelect', () => {
 })
 
 describe('JoinTransitionControl', () => {
-  test('shows invalid durations and placements as alerts', () => {
-    const commitDuration = vi.fn((text) => (text === '0' ? 'Enter a duration above 0 seconds' : null))
+  test('commits durations snapped to the join frames and shows invalid ones and placements as alerts', () => {
+    const commitDuration = vi.fn()
     const model = {
       isAvailable: true,
       value: 'fade',
       label: 'fade, 1 s',
       defaultLabel: 'Default',
       previewType: 'fade',
-      durationInput: '1',
+      durationSeconds: 1,
+      durationFps: { num: 25, den: 1 },
       error: null,
       onSelect: vi.fn(),
       commitDuration,
@@ -51,10 +52,14 @@ describe('JoinTransitionControl', () => {
     const duration = screen.getByLabelText('Transition duration (seconds)')
     fireEvent.change(duration, { target: { value: '0' } })
     fireEvent.blur(duration)
-    expect(commitDuration).toHaveBeenCalledWith('0')
+    expect(commitDuration).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent('Enter a duration above 0 seconds')
+    // 25.75 frames at 25 fps round to 26 frames.
+    fireEvent.change(duration, { target: { value: '1.03' } })
+    fireEvent.blur(duration)
+    expect(commitDuration).toHaveBeenCalledExactlyOnceWith(1.04)
 
-    rerender(<JoinTransitionControl id="join" model={{ ...model, durationInput: null, error: 'Too long for the video pieces it joins' }} />)
+    rerender(<JoinTransitionControl id="join" model={{ ...model, durationSeconds: null, error: 'Too long for the video pieces it joins' }} />)
     fireEvent.click(screen.getByRole('button', { name: /fade, 1 s/ }))
     fireEvent.click(screen.getByRole('option', { name: 'Default' }))
     expect(model.onSelect).toHaveBeenCalledWith('default')

@@ -174,6 +174,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       hasTimelineMedia,
       aspectRatio,
       exportRange: renderSettings.range,
+      renderFps: renderSettings.fps,
       fpsMode,
       importedVideoFps,
       importedVideoResolution,

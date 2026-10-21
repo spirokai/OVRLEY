@@ -21,16 +21,6 @@ export function transitionLabel(transition, t) {
 }
 
 /**
- * Parses a transition duration typed by the user.
- * @param {string} text Input text.
- * @returns {number} Seconds, or NaN when the text is not a number.
- */
-export function parseSecondsInput(text) {
-  const trimmed = text.trim()
-  return trimmed === '' ? Number.NaN : Number(trimmed)
-}
-
-/**
  * Returns the stored override of a join: `transitionIn` of the clip it leads
  * into, or the transition of the deleted part it bridges.
  * @param {{kind: 'clip'|'deletedPart', ownerId: string}} join Program join.
@@ -72,7 +62,8 @@ export function buildJoinTransitionModel({ join, fps, override, transitionDefaul
         ? t('transitions.defaultIs', { defaultValue: 'Default ({{transition}})', transition: transitionLabel(join.transition, t) })
         : t('transitions.default', 'Default'),
     previewType: effective !== null && effective.type !== NO_TRANSITION ? effective.type : null,
-    durationInput: isXfade ? String(override.durationSeconds) : null,
+    durationSeconds: isXfade ? override.durationSeconds : null,
+    durationFps: fps,
     error: isInvalid ? t('transitions.tooLong', 'Too long for the video pieces it joins') : null,
     onSelect: (value) => {
       if (value === DEFAULT_TRANSITION_OPTION) setJoinTransition(join, null)
@@ -84,12 +75,7 @@ export function buildJoinTransitionModel({ join, fps, override, transitionDefaul
         })
       }
     },
-    /** Commits a typed duration; returns the validation message, or null when committed. */
-    commitDuration: (text) => {
-      const durationSeconds = parseSecondsInput(text)
-      if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return t('transitions.durationInvalid', 'Enter a duration above 0 seconds')
-      setJoinTransition(join, { type: override.type, durationSeconds: snapDurationToFrames(durationSeconds, fps) })
-      return null
-    },
+    /** Stores a duration typed into the override (already snapped to `durationFps`). */
+    commitDuration: (durationSeconds) => setJoinTransition(join, { type: override.type, durationSeconds }),
   }
 }

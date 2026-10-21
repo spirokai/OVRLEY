@@ -145,7 +145,7 @@ describe('TimelineLane', () => {
         label: 'fade, 1 s',
         defaultLabel: 'Default (fade, 1 s)',
         previewType: 'fade',
-        durationInput: null,
+        durationSeconds: null,
         error: null,
         onSelect: vi.fn(),
         commitDuration: vi.fn(),

@@ -8,16 +8,6 @@ const TELEMETRY_STATUS_LABELS = {
   failed: ['toolbar.telemetryFailed', 'Could not be read'],
 }
 
-/**
- * Formats a timeline offset for the offset inputs, rounded to a tenth of a second.
- * @param {number} seconds Offset in seconds.
- * @returns {string} Input text.
- */
-export function formatOffsetInput(seconds) {
-  const rounded = Math.round(seconds * 10) / 10
-  return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1)
-}
-
 const TIME_SOURCE_KEYS = {
   gps: 'toolbar.timeSourceGps',
   ffprobe: 'toolbar.timeSourceMetadata',

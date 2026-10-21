@@ -248,6 +248,7 @@ export default function RenderExportSettings(ctx) {
         {ctx.showExportRangeSettings && (
           <ExportRangeSettings
             range={ctx.settings.range}
+            fps={ctx.settings.fps}
             onExportRangeChange={(range) => ctx.onSettingsChange({ range })}
             showUseVideoRangeAction={ctx.hasImportedVideo}
             onUseVideoRange={ctx.handleApplyImportedVideoRange}

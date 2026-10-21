@@ -5,12 +5,11 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
-import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
 import { useJoinTransitionModels } from '@/features/transitions'
 import { useVideoTimeline, useVideoWarnings } from '@/hooks/useVideoTimeline'
 import useStore from '@/store/useStore'
 import { buildDeletedPartRows } from '../utils/deletedPartRows'
-import { buildVideoDrawerViewModel, formatOffsetInput } from '../utils/videoDrawerUtils'
+import { buildVideoDrawerViewModel } from '../utils/videoDrawerUtils'
 
 /**
  * Returns one row per clip in timeline order: details, its own timeline offset,
@@ -40,18 +39,23 @@ export function useVideoClipRows({ videoSummaries, timezone, videoSyncTimezoneMo
 
   return useMemo(() => {
     const commands = { setDeletedPartRange, removeDeletedPart, seek: commitPreviewScrub }
-    return videoSummaries.map((summary) => ({
-      id: summary.id,
-      filename: summary.filename,
-      metadataRows: buildVideoDrawerViewModel(summary, timezone, videoSyncTimezoneMode, t).metadataRows,
-      offsetInput: formatOffsetInput(summary.offsetSeconds),
-      warnings: (warnings.get(summary.id) ?? []).map((warning) => warning.message),
-      onOffsetCommit: (text) => setVideoOffset(summary.id, Math.round(timeToSeconds(text) * 10) / 10),
-      onRemove: () => onRemoveVideo(summary.id),
-      // Only a clip that follows another piece has a join leading into it.
-      transitionIn: joinModels.get(`clip:${summary.id}`) ?? null,
-      deletedParts: buildDeletedPartRows({ clip: clips.find((clip) => clip.id === summary.id), joinModels, commands, t }),
-    }))
+    return videoSummaries.map((summary) => {
+      const clip = clips.find((candidate) => candidate.id === summary.id)
+      return {
+        id: summary.id,
+        filename: summary.filename,
+        metadataRows: buildVideoDrawerViewModel(summary, timezone, videoSyncTimezoneMode, t).metadataRows,
+        // The start snaps to the clip's own frames.
+        offsetSeconds: clip.offsetSeconds,
+        offsetFps: clip.fps,
+        warnings: (warnings.get(summary.id) ?? []).map((warning) => warning.message),
+        onOffsetCommit: (seconds) => setVideoOffset(summary.id, seconds),
+        onRemove: () => onRemoveVideo(summary.id),
+        // Only a clip that follows another piece has a join leading into it.
+        transitionIn: joinModels.get(`clip:${summary.id}`) ?? null,
+        deletedParts: buildDeletedPartRows({ clip, joinModels, commands, t }),
+      }
+    })
   }, [
     clips,
     commitPreviewScrub,

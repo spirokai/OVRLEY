@@ -40,6 +40,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           onUpdateRateChange={handlers.handleUpdateRateChange}
           hasTimelineMedia={overlaySettings.hasTimelineMedia}
           exportRange={overlaySettings.exportRange}
+          renderFps={overlaySettings.renderFps}
           onExportRangeChange={state.setExportRange}
           videoResolutionMismatch={overlaySettings.videoResolutionMismatch}
         />

@@ -1,6 +1,5 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BlurInput } from '@/components/ui/blur-input'
+import { SecondsInput } from '@/components/ui/seconds-input'
 import { TransitionSelect } from './TransitionSelect'
 
 /**
@@ -10,11 +9,9 @@ import { TransitionSelect } from './TransitionSelect'
  */
 export function JoinTransitionControl({ model, id }) {
   const { t } = useTranslation()
-  const [durationError, setDurationError] = useState(null)
-  const error = durationError ?? model.error
   return (
     <div className="space-y-1">
-      <div className="grid grid-cols-[minmax(0,1fr)_4rem] items-center gap-2">
+      <div className="grid grid-cols-[minmax(0,1fr)_6rem] items-start gap-2">
         <TransitionSelect
           id={id}
           value={model.value}
@@ -22,26 +19,22 @@ export function JoinTransitionControl({ model, id }) {
           previewType={model.previewType}
           defaultLabel={model.defaultLabel}
           disabled={!model.isAvailable}
-          onSelect={(value) => {
-            setDurationError(null)
-            model.onSelect(value)
-          }}
+          onSelect={model.onSelect}
         />
-        {model.durationInput !== null ? (
-          <BlurInput
-            type="text"
-            inputMode="decimal"
-            value={model.durationInput}
-            onChange={(event) => setDurationError(model.commitDuration(event.target.value))}
+        {model.durationSeconds !== null ? (
+          <SecondsInput
+            value={model.durationSeconds}
+            fps={model.durationFps}
+            mode="duration"
+            onCommit={model.commitDuration}
             className="h-7 text-xs"
             aria-label={t('transitions.duration', 'Transition duration (seconds)')}
-            aria-invalid={durationError !== null}
           />
         ) : null}
       </div>
-      {error !== null ? (
+      {model.error !== null ? (
         <p role="alert" className="text-[0.65rem] text-destructive">
-          {error}
+          {model.error}
         </p>
       ) : null}
     </div>

@@ -54,13 +54,14 @@ describe('join transition model', () => {
       label: 'wipeleft, 1.5 s',
       defaultLabel: 'Default',
       previewType: 'wipeleft',
-      durationInput: '1.5',
+      durationSeconds: 1.5,
+      durationFps: fps,
     })
-    expect(intoLater).toMatchObject({ value: 'default', label: 'fade, 1 s', defaultLabel: 'Default (fade, 1 s)', durationInput: null })
+    expect(intoLater).toMatchObject({ value: 'default', label: 'fade, 1 s', defaultLabel: 'Default (fade, 1 s)', durationSeconds: null })
     expect(transitionLabel({ type: 'none', durationSeconds: 0 }, t)).toBe('No transition')
   })
 
-  test('selects overrides, keeps an override duration and validates typed durations', () => {
+  test('selects overrides, keeps an override duration and stores typed durations', () => {
     const { clips, program } = timeline()
     const setJoinTransition = vi.fn()
     const [atShort, atLong] = program.joins.map((join) => model(join, clips, setJoinTransition))
@@ -72,22 +73,14 @@ describe('join transition model', () => {
     expect(setJoinTransition).toHaveBeenLastCalledWith(program.joins[1], { type: 'none', durationSeconds: 0 })
     atLong.onSelect('default')
     expect(setJoinTransition).toHaveBeenLastCalledWith(program.joins[1], null)
-    expect(atLong.commitDuration('2.5')).toBeNull()
+    atLong.commitDuration(2.5)
     expect(setJoinTransition).toHaveBeenLastCalledWith(program.joins[1], { type: 'wipeleft', durationSeconds: 2.5 })
-    expect(atLong.commitDuration('0')).toBe('Enter a duration above 0 seconds')
-    expect(atLong.commitDuration('soon')).toBe('Enter a duration above 0 seconds')
     expect(setJoinTransition).toHaveBeenCalledTimes(5)
   })
 
-  test('stores typed durations snapped to the frames of the joined pieces, at least one frame', () => {
-    const { clips, program } = timeline()
+  test('a new override starts from the default snapped to the frames of the joined pieces', () => {
+    const { program } = timeline()
     const setJoinTransition = vi.fn()
-    const atLong = model(program.joins[1], clips, setJoinTransition)
-    expect(atLong.commitDuration('1.01')).toBeNull()
-    expect(setJoinTransition).toHaveBeenLastCalledWith(program.joins[1], { type: 'wipeleft', durationSeconds: 1 })
-    expect(atLong.commitDuration('0.01')).toBeNull()
-    expect(setJoinTransition).toHaveBeenLastCalledWith(program.joins[1], { type: 'wipeleft', durationSeconds: 1 / 30 })
-    // A new override starts from the default snapped the same way.
     buildJoinTransitionModel({
       join: program.joins[0],
       fps: { num: 25, den: 1 },

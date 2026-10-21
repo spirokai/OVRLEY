@@ -1,8 +1,8 @@
-import { Bell, ChevronDown, ChevronUp, Clock3, RotateCcw } from 'lucide-react'
+import { Bell, Clock3, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { BlurInput } from '@/components/ui/blur-input'
 import { Label } from '@/components/ui/label'
+import { SecondsInput } from '@/components/ui/seconds-input'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -18,18 +18,17 @@ export function VideoSyncControls({
   canResetCreationTime,
   filenameCreationTimeAvailable,
   timezoneDisabled,
-  offsetInput,
+  sharedOffsetSeconds,
+  sharedOffsetFps,
   timezone,
   videoSyncTimezoneMode,
   videoSyncWarning,
   openManualVideoSync,
   computeVideoSync,
-  incrementOffset,
+  commitSharedOffset,
   resetVideoCreationTimes,
-  setOffsetInput,
   setVideoCreationTimesFromFilenames,
   setVideoSyncTimezoneMode,
-  submitOffsetInput,
 }) {
   const { t } = useTranslation()
   if (!activitySummary) return null
@@ -54,37 +53,15 @@ export function VideoSyncControls({
       <div className="space-y-3">
         <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('toolbar.syncOffset', 'Sync Offset')}</Label>
         <div className="grid grid-cols-2 items-center gap-4">
-          <div className="relative flex-1">
-            <BlurInput
-              type="text"
-              value={offsetInput}
-              onChange={(event) => setOffsetInput(event.target.value)}
-              onBlur={(event) => submitOffsetInput(event.target.value)}
-              className="h-9 text-xs pr-11 w-full border border-border/70"
-              placeholder={t('toolbar.secondsOrMmss', 'Seconds or MM:SS')}
-            />
-            <div className="absolute inset-y-1 right-1 flex w-5 flex-col overflow-hidden rounded border border-none bg-surface-strong">
-              <button
-                type="button"
-                aria-label={t('toolbar.increaseSyncOffset', 'Increase sync offset')}
-                className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => incrementOffset(0.1)}
-              >
-                <ChevronUp className="h-3 w-3" />
-              </button>
-              <div className="h-px bg-border/60" />
-              <button
-                type="button"
-                aria-label={t('toolbar.decreaseSyncOffset', 'Decrease sync offset')}
-                className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => incrementOffset(-0.1)}
-              >
-                <ChevronDown className="h-3 w-3" />
-              </button>
-            </div>
-          </div>
+          <SecondsInput
+            value={sharedOffsetSeconds}
+            fps={sharedOffsetFps}
+            signed
+            step={0.1}
+            onCommit={commitSharedOffset}
+            className="h-9 w-full text-xs"
+            aria-label={t('toolbar.syncOffset', 'Sync Offset')}
+          />
           <Button
             type="button"
             variant="outline"

@@ -21,28 +21,24 @@ import {
 import { getContainerFps, getUpdateRateOptions } from '@/lib/update-rate'
 import { getDefaultBitrate } from '../data/bitrateDefaults'
 import { useRenderDialogInputs, useRenderRangeActivity } from '@/hooks/useAppStoreSelectors'
-import {
-  formatExportRangeTime,
-  getActivityDurationSeconds,
-  getCustomExportRangeDefault,
-  setExportRangeBoundaryFromTimeInput,
-} from '@/features/overlay-editor/utils/exportRange'
-import { createBatchItemProgress, createBatchProgress, isBatchFinished, sanitizeRangeTimeInput } from '../utils/renderPresentation'
+import { getActivityDurationSeconds, getCustomExportRangeDefault, setExportRangeBoundary } from '@/features/overlay-editor/utils/exportRange'
+import { createBatchItemProgress, createBatchProgress, isBatchFinished } from '../utils/renderPresentation'
 
-/** @param {object} options Editable range and commit callback. @returns {object} Shared range control presentation and input handlers. */
-export function useExportRangeSettings({ range, onExportRangeChange }) {
+/**
+ * @param {object} options Editable range, render frame rate and commit callback; the boundaries snap to the render frames.
+ * @returns {object} Shared range control presentation and input handlers.
+ */
+export function useExportRangeSettings({ range, fps, onExportRangeChange }) {
   const activity = useRenderRangeActivity()
   return {
     isCustom: range.type === 'custom',
-    fromTime: formatExportRangeTime(range.from),
-    toTime: formatExportRangeTime(range.to),
+    fromSecond: range.from,
+    toSecond: range.to,
+    rangeFps: { num: fps, den: 1 },
     handleCustomChange: (checked) =>
       onExportRangeChange(checked ? getCustomExportRangeDefault(range, getActivityDurationSeconds(activity)) : { ...range, type: 'all' }),
-    handleFromChange: (event) => onExportRangeChange(setExportRangeBoundaryFromTimeInput(range, 'from', sanitizeRangeTimeInput(event.target.value))),
-    handleToChange: (event) => onExportRangeChange(setExportRangeBoundaryFromTimeInput(range, 'to', sanitizeRangeTimeInput(event.target.value))),
-    preventDecimalInput: (event) => {
-      if (event.key === '.' || event.key === ',') event.preventDefault()
-    },
+    handleFromCommit: (second) => onExportRangeChange(setExportRangeBoundary(range, 'from', second)),
+    handleToCommit: (second) => onExportRangeChange(setExportRangeBoundary(range, 'to', second)),
   }
 }
 

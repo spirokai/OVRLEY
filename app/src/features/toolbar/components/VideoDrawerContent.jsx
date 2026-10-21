@@ -2,6 +2,7 @@ import { AlertTriangle, Blend, Film, Scissors, Trash2 } from 'lucide-react'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { SecondsInput } from '@/components/ui/seconds-input'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { JoinTransitionControl, TransitionSelect } from '@/features/transitions'
 import { VideoSyncControls } from '@/features/video-sync'
@@ -97,31 +98,25 @@ function TransitionDefaultsSection() {
         <Label htmlFor="transition-defaults-duration" className="text-xs font-bold text-muted-foreground">
           {t('video-preview.transitionDuration', 'Duration (seconds)')}
         </Label>
-        <BlurInput
+        <SecondsInput
           id="transition-defaults-duration"
-          type="text"
-          inputMode="decimal"
-          value={section.durationInput}
-          onChange={(event) => section.onDurationCommit(event.target.value)}
+          value={section.durationSeconds}
+          fps={section.durationFps}
+          mode="duration"
+          onCommit={section.onDurationCommit}
           className="h-7 text-xs"
         />
         <Label htmlFor="transition-defaults-threshold" className="text-xs font-bold text-muted-foreground">
           {t('video-preview.continuityThreshold', 'Continuity threshold (seconds)')}
         </Label>
-        <BlurInput
+        <SecondsInput
           id="transition-defaults-threshold"
-          type="text"
-          inputMode="decimal"
-          value={section.thresholdInput}
-          onChange={(event) => section.onThresholdCommit(event.target.value)}
+          value={section.thresholdSeconds}
+          fps={null}
+          onCommit={section.onThresholdCommit}
           className="h-7 text-xs"
         />
       </div>
-      {section.error !== null ? (
-        <p role="alert" className="px-2 text-xs text-destructive">
-          {section.error}
-        </p>
-      ) : null}
     </section>
   )
 }
@@ -161,14 +156,7 @@ function VideoClipRow({ row }) {
         <Label htmlFor={offsetInputId} className="text-xs font-bold text-muted-foreground">
           {t('toolbar.videoStart', 'Start on timeline')}
         </Label>
-        <BlurInput
-          id={offsetInputId}
-          type="text"
-          value={row.offsetInput}
-          onChange={(event) => row.onOffsetCommit(event.target.value)}
-          className="h-8 text-xs"
-          placeholder={t('toolbar.secondsOrMmss', 'Seconds or MM:SS')}
-        />
+        <SecondsInput id={offsetInputId} value={row.offsetSeconds} fps={row.offsetFps} signed onCommit={row.onOffsetCommit} className="h-8 text-xs" />
       </div>
       {row.transitionIn !== null ? (
         <div className="grid grid-cols-2 items-start gap-4 px-2">
