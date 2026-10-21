@@ -6,7 +6,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { clamp } from '@/lib/utils'
 import { getEditorGridSize, getGridGuidelines } from '../utils/overlayEditorUtils'
-import { MOVEABLE_ZOOM, VIEWPORT_PADDING, ZOOM_MAX, ZOOM_MIN } from '../data/overlayEditorConstants'
+import {
+  MOVEABLE_FULL_SIZE_VIEWPORT_WIDTH,
+  MOVEABLE_MIN_HANDLE_SCALE,
+  MOVEABLE_ZOOM,
+  VIEWPORT_PADDING,
+  ZOOM_MAX,
+  ZOOM_MIN,
+} from '../data/overlayEditorConstants'
 
 const WHEEL_LINE_PIXELS = 16
 
@@ -45,6 +52,11 @@ function getFitScale(viewportSize, contentSize) {
   const width = Math.max(viewportSize.width - VIEWPORT_PADDING, 1)
   const height = Math.max(viewportSize.height - VIEWPORT_PADDING, 1)
   return Math.min(width / contentSize.width, height / contentSize.height, 1)
+}
+
+// Moveable's zoom cancels the scene scale; this factor shrinks handles with a smaller editor viewport instead.
+function getHandleScale(viewportSize) {
+  return clamp(viewportSize.width / MOVEABLE_FULL_SIZE_VIEWPORT_WIDTH, MOVEABLE_MIN_HANDLE_SCALE, 1)
 }
 
 function handleWheel({ onZoomLevelChange, sceneElement, zoomAnchorRef, zoomLevel }, event) {
@@ -95,6 +107,6 @@ export function useEditorViewport({ contentSize, onZoomLevelChange, sceneElement
     viewportRef,
     horizontalGuidelines,
     verticalGuidelines,
-    moveableZoom: MOVEABLE_ZOOM / displayScale / 2,
+    moveableZoom: (MOVEABLE_ZOOM / displayScale / 2) * getHandleScale(viewportSize),
   }
 }

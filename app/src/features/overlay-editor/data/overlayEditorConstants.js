@@ -8,6 +8,9 @@ export const EDITOR_GRID_DIVISIONS = 72
 export const CORNER_RESIZE_DIRECTIONS = ['nw', 'ne', 'se', 'sw']
 export const EDGE_RESIZE_DIRECTIONS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 export const MOVEABLE_ZOOM = 1.5
+// Handles keep full size from this editor viewport width and shrink with it below, down to the minimum scale.
+export const MOVEABLE_FULL_SIZE_VIEWPORT_WIDTH = 1600
+export const MOVEABLE_MIN_HANDLE_SCALE = 0.5
 
 export const CANVAS_BACKGROUND_COLORS = {
   black: '#000000',

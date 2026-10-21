@@ -18,18 +18,41 @@
   transform-origin: top left;
 }
 
-/* control box points */
+/* control box points — sized inside the zoomed app shell, so they scale with the UI */
 .moveable-control {
-  height: calc(10px / var(--app-scale, 1)) !important;
-  width: calc(10px / var(--app-scale, 1)) !important;
-  margin-top: calc(-5px / var(--app-scale, 1)) !important;
-  margin-left: calc(-5px / var(--app-scale, 1)) !important;
+  height: 10px !important;
+  width: 10px !important;
+  margin-top: -5px !important;
+  margin-left: -5px !important;
   border-radius: 0 !important;
 }
 
 .moveable-direction,
 .moveable-rotation-control {
   border-color: var(--theme-color-accent) !important;
+}
+
+/* Moveable draws the rotation line 1px wide and scales it by its zoom. Under the scene's CSS zoom that 1px
+   first snaps up to a whole device pixel, so a small scene (large zoom) thickens the line and shifts it off
+   centre. Size the line in zoomed pixels instead of scaling it. */
+.ovrley-moveable .moveable-rotation {
+  width: var(--zoompx) !important;
+}
+
+.ovrley-moveable .moveable-rotation-line {
+  transform: none !important;
+}
+
+/* Margins are half the size, so the circle stays centred on its anchor; Moveable shifts the control 0.5px
+   right for its 1px line, so the left margin centres it on the zoomed line instead. */
+.moveable-control.moveable-rotation-control {
+  height: 14px !important;
+  width: 14px !important;
+  margin-top: -7px !important;
+  margin-left: calc(var(--zoompx) / 2 - 7.5px) !important;
+  background-color: #fff !important;
+  border: 2px solid var(--theme-color-accent) !important;
+  border-radius: 50% !important;
 }
 
 /* dashed guides */
