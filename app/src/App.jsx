@@ -242,7 +242,7 @@ function App() {
           controlPanel={
             videoSyncWorkspace.videoSyncMode ? null : (
               <div
-                className="w-106 min-w-106 max-w-106 shrink-0 overflow-y-auto border-l border-border bg-card/60"
+                className="w-106 min-w-106 max-w-106 shrink-0 overflow-y-auto bg-card/60"
                 onFocusCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
                 onPointerDownCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
               >

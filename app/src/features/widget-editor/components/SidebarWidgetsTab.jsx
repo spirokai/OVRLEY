@@ -130,7 +130,7 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
           <Accordion
             type="single"
             collapsible
-            className="border-b border-border/70"
+            className="border-t border-r border-border/70"
             value={openWidgetId || undefined}
             onValueChange={(value) => setSelectedWidgetId(value || null)}
           >
@@ -145,10 +145,10 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
                       else accordionItemsRef.current.delete(widget.id)
                     }}
                     value={widget.id}
-                    className="overflow-hidden border border-transparent border-b-none transition-all data-[state=open]:border-accent-border"
+                    className="relative border-b border-border/70 data-[state=open]:after:pointer-events-none data-[state=open]:after:absolute data-[state=open]:after:left-0 data-[state=open]:after:-right-px data-[state=open]:after:-top-px data-[state=open]:after:-bottom-px data-[state=open]:after:z-30 data-[state=open]:after:border data-[state=open]:after:border-accent-border data-[state=open]:after:content-['']"
                   >
                     <div className="relative group/widget-row">
-                      <AccordionTrigger className="group/trigger w-full px-3 py-3 pr-10 border-t border-border/70 data-[state=open]:border-r-transparent hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary ">
+                      <AccordionTrigger className="group/trigger w-full px-3 py-3 pr-10 hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary">
                         <div className="flex items-center gap-2.5 flex-1 min-w-0 text-muted-foreground transition-colors group-hover/widget-row:text-primary group-data-[state=open]/trigger:text-primary">
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded">
                             <Icon className="h-3.5 w-3.5" />

@@ -13,7 +13,7 @@
  * @module useSceneSettingsState
  */
 
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import useStore from '@/store/useStore'
@@ -130,8 +130,6 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
     updateRate: renderSettings.widgetUpdateRate,
   })
 
-  const handleCustomFpsChangeEvent = useCallback((e) => handleCustomFpsChange(e.target.value), [handleCustomFpsChange])
-
   const updateRateOptions = useMemo(() => getUpdateRateOptions(scene?.fps), [scene?.fps])
 
   const videoResolutionMismatch =
@@ -170,7 +168,7 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
 
   const handlers = {
     handleAspectRatioChange,
-    handleCustomFpsChange: handleCustomFpsChangeEvent,
+    handleCustomFpsChange,
     handleFpsModeChange,
     handleResolutionChange,
     handleUpdateRateChange,

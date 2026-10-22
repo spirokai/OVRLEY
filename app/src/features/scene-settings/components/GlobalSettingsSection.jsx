@@ -13,13 +13,11 @@
  */
 
 import { Label } from '@/components/ui/label'
-import { SliderField } from '@/features/widget-editor/components/widgetFormControls'
+import { ColorField, CONTROL_CLASS, FIELD_LABEL_CLASS, SliderField, ToggleField } from '@/features/widget-editor/components/widgetFormControls'
 import { Separator } from '@/components/ui/separator'
 import { Palette, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
 import FontSelectField from '@/components/ui/font-select-field'
-import HexColorPicker from '@/components/ui/hex-color-picker'
 import { useTranslation } from 'react-i18next'
 
 export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultChange, onResetDefaults, sceneStyleValue, availableFonts }) {
@@ -51,6 +49,8 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
           onValueChange={(v) => onGlobalDefaultChange('font_values', v)}
           recommendedFonts={availableFonts.recommendedFonts}
           systemFonts={availableFonts.systemFonts}
+          triggerClassName={CONTROL_CLASS}
+          labelClassName={FIELD_LABEL_CLASS}
         />
         <FontSelectField
           label={t('scene-settings.fontLabels', 'Font - Labels')}
@@ -58,75 +58,57 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
           onValueChange={(v) => onGlobalDefaultChange('font_text', v)}
           recommendedFonts={availableFonts.recommendedFonts}
           systemFonts={availableFonts.systemFonts}
+          triggerClassName={CONTROL_CLASS}
+          labelClassName={FIELD_LABEL_CLASS}
         />
       </div>
 
       <div className="flex items-center justify-between">
-        <Label htmlFor="fixed-width-digits" className="text-[10px] text-muted-foreground uppercase font-bold">
-          {t('scene-settings.fixedWidthDigits', 'Fixed-Width Digits')}
-        </Label>
-        <Switch
-          id="fixed-width-digits"
+        <Label className={FIELD_LABEL_CLASS}>{t('scene-settings.fixedWidthDigits', 'Fixed-Width Digits')}</Label>
+        <ToggleField
+          label={t('scene-settings.fixedWidthDigits', 'Fixed-Width Digits')}
           checked={globalDefaults.fixed_width_digits}
           onCheckedChange={(checked) => onGlobalDefaultChange('fixed_width_digits', checked)}
         />
       </div>
 
+      <div className="grid grid-cols-3 gap-3 pt-4">
+        <ColorField
+          label={t('scene-settings.values', 'Values')}
+          value={globalDefaults.color_values}
+          onChange={(value) => onGlobalDefaultChange('color_values', value)}
+        />
+        <ColorField
+          label={t('scene-settings.labels', 'Labels')}
+          value={globalDefaults.color_text}
+          onChange={(value) => onGlobalDefaultChange('color_text', value)}
+        />
+        <ColorField
+          label={t('scene-settings.icons', 'Icons')}
+          value={globalDefaults.color_icons}
+          onChange={(value) => onGlobalDefaultChange('color_icons', value)}
+        />
+      </div>
+
       <div className="grid grid-cols-3 gap-3">
-        <div className="space-y-2">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.values', 'Values')}</Label>
-          <HexColorPicker
-            value={globalDefaults.color_values}
-            onChange={(value) => onGlobalDefaultChange('color_values', value)}
-            valueClassName="text-[10px] tracking-[0.16em]"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.labels', 'Labels')}</Label>
-          <HexColorPicker
-            value={globalDefaults.color_text}
-            onChange={(value) => onGlobalDefaultChange('color_text', value)}
-            valueClassName="text-[10px] tracking-[0.16em]"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.icons', 'Icons')}</Label>
-          <HexColorPicker
-            value={globalDefaults.color_icons}
-            onChange={(value) => onGlobalDefaultChange('color_icons', value)}
-            valueClassName="text-[10px] tracking-[0.16em]"
-          />
-        </div>
+        <ColorField
+          label={t('scene-settings.borders', 'Borders')}
+          value={sceneStyleValue('border_color', '#000000')}
+          onChange={(value) => onGlobalDefaultChange('border_color', value)}
+        />
+        <ColorField
+          label={t('scene-settings.shadows', 'Shadows')}
+          value={sceneStyleValue('shadow_color', '#000000')}
+          onChange={(value) => onGlobalDefaultChange('shadow_color', value)}
+        />
+        <ColorField
+          label={t('scene-settings.units', 'Units')}
+          value={globalDefaults.color_units}
+          onChange={(value) => onGlobalDefaultChange('color_units', value)}
+        />
       </div>
 
-      <div className="grid grid-cols-3 gap-4 pt-2">
-        <div className="space-y-2">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.borders', 'Borders')}</Label>
-          <HexColorPicker
-            value={sceneStyleValue('border_color', '#000000')}
-            onChange={(value) => onGlobalDefaultChange('border_color', value)}
-            valueClassName="text-[10px] tracking-[0.16em]"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.shadows', 'Shadows')}</Label>
-          <HexColorPicker
-            value={sceneStyleValue('shadow_color', '#000000')}
-            onChange={(value) => onGlobalDefaultChange('shadow_color', value)}
-            valueClassName="text-[10px] tracking-[0.16em]"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.units', 'Units')}</Label>
-          <HexColorPicker
-            value={globalDefaults.color_units}
-            onChange={(value) => onGlobalDefaultChange('color_units', value)}
-            valueClassName="text-[10px] tracking-[0.16em]"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-6 pt-2">
+      <div className="space-y-6 pt-6">
         <SliderField
           editable
           label={t('scene-settings.transparency', 'Transparency')}

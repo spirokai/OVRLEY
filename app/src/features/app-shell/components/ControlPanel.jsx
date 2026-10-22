@@ -20,7 +20,8 @@ import { useTranslation } from 'react-i18next'
 export default function ControlPanel({ config, onConfigChange, widgetLiveEdits }) {
   const { t } = useTranslation()
   return (
-    <div className="flex flex-col h-full bg-card">
+    // The divider is an overlay so an open widget's accent border can cover it instead of doubling it.
+    <div className="relative flex flex-col h-full bg-card after:pointer-events-none after:absolute after:inset-y-0 after:left-0 after:z-20 after:w-px after:bg-border after:content-['']">
       <Tabs defaultValue="settings" className="flex-1 flex flex-col min-h-0">
         <div className="shrink-0 ">
           <TabsList variant="main" className="grid w-full grid-cols-2 ">
@@ -40,7 +41,7 @@ export default function ControlPanel({ config, onConfigChange, widgetLiveEdits }
             <SidebarSettingsTab config={config} onConfigChange={onConfigChange} widgetLiveEdits={widgetLiveEdits} />
           </TabsContent>
 
-          <TabsContent value="widgets" className="outline-none">
+          <TabsContent value="widgets" className="mt-0 outline-none">
             <SidebarWidgetsTab widgetLiveEdits={widgetLiveEdits} />
           </TabsContent>
         </div>

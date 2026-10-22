@@ -60,7 +60,7 @@ const CONTENT_ALIGNMENT_OPTIONS = [
 ]
 
 export const CONTROL_CLASS = 'h-9 border-border/70 bg-surface text-xs'
-const FIELD_LABEL_CLASS = 'h-3 text-[9px] text-muted-foreground uppercase font-bold'
+export const FIELD_LABEL_CLASS = 'h-3 text-[9px] text-muted-foreground uppercase font-bold'
 
 /**
  * Renders the alignment selector for intrinsic value widgets.
