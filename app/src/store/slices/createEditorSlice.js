@@ -90,6 +90,7 @@ export function createEditorSlice(set, get) {
     editorDocumentRevision: 0,
     selectedWidgetId: null,
     selectedWidgetIds: [],
+    isMarqueeSelecting: false,
     previewInterpolationEnabled: true,
     hasUnrenderedChanges: false,
     lastRenderedConfig: null,
@@ -269,6 +270,11 @@ export function createEditorSlice(set, get) {
     setWidgetSelection: (widgetIds, preferredWidgetId = null) =>
       set((state) => {
         setWidgetSelectionState(state, widgetIds, preferredWidgetId)
+      }),
+
+    setMarqueeSelecting: (isMarqueeSelecting) =>
+      set((state) => {
+        state.isMarqueeSelecting = isMarqueeSelecting
       }),
 
     setSelectedWidgetId: (widgetId) =>

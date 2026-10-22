@@ -56,6 +56,7 @@ function stopMarquee(marqueeRef) {
   window.removeEventListener('mousemove', gesture.mouseMove)
   window.removeEventListener('mouseup', gesture.mouseUp)
   marqueeRef.current = null
+  useStore.getState().setMarqueeSelecting(false)
 }
 
 function handleWindowMouseMove(context, event) {
@@ -99,6 +100,7 @@ function handleSceneMouseDown(context, event) {
     mouseUp: handleWindowMouseUp.bind(null, context),
   }
   marqueeRef.current = gesture
+  useStore.getState().setMarqueeSelecting(true)
   setSelectionRect({ ...startStagePoint, width: 0, height: 0 })
   window.addEventListener('mousemove', gesture.mouseMove)
   window.addEventListener('mouseup', gesture.mouseUp)

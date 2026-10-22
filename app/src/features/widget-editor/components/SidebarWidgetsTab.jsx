@@ -22,6 +22,7 @@ import TimeWidgetEditor from './TimeWidgetEditor'
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAccordionAutoscroll } from '../hooks/useAccordionAutoscroll'
+import useHeldValue from '../hooks/useHeldValue'
 
 /**
  * Widget type → editor component dispatch map.
@@ -94,6 +95,7 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
     config,
     widgets,
     selectedWidgetId,
+    isMarqueeSelecting,
     updateWidgetData,
     updateWidgetSize,
     commitWidgetSize,
@@ -102,6 +104,8 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
     resetWidget,
     setSelectedWidgetId,
   } = useWidgetManager({ widgetLiveEdits })
+  // The open item and its autoscroll wait for the marquee to finish.
+  const openWidgetId = useHeldValue(selectedWidgetId, isMarqueeSelecting)
 
   const handleAccordionAnimation = (widgetId, phase, event) => {
     if (event.target !== event.currentTarget) return
@@ -127,7 +131,7 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
             type="single"
             collapsible
             className="border-b border-border/70"
-            value={selectedWidgetId || undefined}
+            value={openWidgetId || undefined}
             onValueChange={(value) => setSelectedWidgetId(value || null)}
           >
             {widgets.map((widget) => {

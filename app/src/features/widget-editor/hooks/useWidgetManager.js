@@ -31,6 +31,7 @@ const CONTENT_ALIGNMENT_FACTORS = {
  *   config: object,
  *   widgets: Array<object>,
  *   selectedWidgetId: string|null,
+ *   isMarqueeSelecting: boolean,
  *   updateWidgetData: Function,
  *   updateWidgetSize: Function,
  *   commitWidgetSize: Function,
@@ -44,10 +45,11 @@ const CONTENT_ALIGNMENT_FACTORS = {
 export function useWidgetManager({ widgetLiveEdits }) {
   const { t } = useTranslation()
   // Store selectors — shallow-pick zustand state needed for widget management
-  const { config, globalDefaults, parsedActivity, selectedWidgetId, setConfig, setSelectedWidgetId } = useStore(
+  const { config, globalDefaults, isMarqueeSelecting, parsedActivity, selectedWidgetId, setConfig, setSelectedWidgetId } = useStore(
     useShallow((state) => ({
       config: state.config,
       globalDefaults: state.globalDefaults,
+      isMarqueeSelecting: state.isMarqueeSelecting,
       parsedActivity: state.parsedActivity,
       selectedWidgetId: state.selectedWidgetId,
       setConfig: state.setConfig,
@@ -154,6 +156,7 @@ export function useWidgetManager({ widgetLiveEdits }) {
     config,
     widgets,
     selectedWidgetId,
+    isMarqueeSelecting,
     updateWidgetData,
     updateWidgetSize,
     commitWidgetSize,

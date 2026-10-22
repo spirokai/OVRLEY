@@ -157,7 +157,7 @@ export default function HeartZonesDisplaySection({ widget, updateWidgetData, upd
             className="w-full"
             value={zones.indicator_style}
             onValueChange={(indicator_style) => {
-              if (indicator_style) updateZonesSize({ indicator_style })
+              if (indicator_style) updateZones({ indicator_style })
             }}
           >
             {INDICATOR_STYLE_OPTIONS.map((option) => (
