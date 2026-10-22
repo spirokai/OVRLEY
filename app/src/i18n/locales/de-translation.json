@@ -646,6 +646,7 @@
     "emptyOpacity": "Leerdeckkraft",
     "fillColor": "Füllfarbe",
     "filledColor": "Füllbereichfarbe",
+    "fillGradient": "Verlauf",
     "filledOpacity": "Füllteil-Deckkraft",
     "fillOpacity": "Füllungsdeckkraft",
     "finishedColor": "Abschlussfarbe",

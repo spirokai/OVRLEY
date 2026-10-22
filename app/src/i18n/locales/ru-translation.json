@@ -646,6 +646,7 @@
     "emptyOpacity": "Альфа пустой части",
     "fillColor": "Цвет заливки",
     "filledColor": "Цвет заполнения",
+    "fillGradient": "Градиент",
     "filledOpacity": "Альфа заполнения",
     "fillOpacity": "Альфа заливки",
     "finishedColor": "Цвет завершённого",

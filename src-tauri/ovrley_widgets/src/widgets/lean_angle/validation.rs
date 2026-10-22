@@ -5,6 +5,7 @@ use crate::model::types::{DisplayType, MetricKind};
 use crate::model::validation::{
     require_bool, require_f32, require_str, require_string, rgba_from_hex,
 };
+use crate::render::track_fill::{validate_track_fill_color, TrackFillColor};
 use crate::widgets::value::config::ValueConfig;
 
 #[derive(Clone, Debug)]
@@ -17,7 +18,7 @@ pub struct ValidatedLeanAngleWidget {
     pub show_icon: bool,
     pub track_empty_color: String,
     pub track_empty_opacity: f32,
-    pub track_filled_color: String,
+    pub track_filled_color: TrackFillColor,
     pub track_filled_opacity: f32,
     pub track_border_thickness: f32,
     pub track_border_color: String,
@@ -120,13 +121,17 @@ pub fn validate_lean_angle(
     }
 
     let track_empty_color = require_string(value.track_empty_color, &p("track_empty_color"))?;
-    let track_filled_color = require_string(value.track_filled_color, &p("track_filled_color"))?;
+    let track_filled_color = validate_track_fill_color(
+        value.track_filled_color.as_deref(),
+        value.track_filled_gradient,
+        value.track_filled_gradient_stops,
+        p,
+    )?;
     let track_border_color = require_string(value.track_border_color, &p("track_border_color"))?;
     let color = require_string(value.color, &p("color"))?;
     let unit_color = require_string(value.unit_color, &p("unit_color"))?;
     for (field, hex) in [
         ("track_empty_color", track_empty_color.as_str()),
-        ("track_filled_color", track_filled_color.as_str()),
         ("track_border_color", track_border_color.as_str()),
         ("color", color.as_str()),
         ("unit_color", unit_color.as_str()),

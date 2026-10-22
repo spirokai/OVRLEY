@@ -173,6 +173,8 @@ fn full_corner_gauge_config(corner_orientation: &str) -> serde_json::Value {
         "track_empty_opacity": 0.5,
         "track_filled_color": "#40e0d0",
         "track_filled_opacity": 1,
+        "track_filled_gradient": false,
+        "track_filled_gradient_stops": [{ "offset": 0, "color": "#40e0d0" }, { "offset": 1, "color": "#c65102" }],
         "track_fill_flat": false,
         "show_min_max_labels": true,
         "min_max_label_font": "Arial.ttf",

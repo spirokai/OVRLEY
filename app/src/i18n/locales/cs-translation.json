@@ -646,6 +646,7 @@
     "emptyOpacity": "Krytí zbývající",
     "fillColor": "Barva výplně",
     "filledColor": "Barva plné části",
+    "fillGradient": "Přechod",
     "filledOpacity": "Krytí dokončeno",
     "fillOpacity": "Průhlednost výplně",
     "finishedColor": "Barva projeté části",

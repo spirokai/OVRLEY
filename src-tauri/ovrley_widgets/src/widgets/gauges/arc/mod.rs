@@ -14,6 +14,7 @@ use super::{
 use crate::{
     error::WidgetResult,
     model::{scene::ValidatedScenePresentation, types::TrackFillStyle},
+    render::track_fill::TrackFill,
     render::text::{
         origin_x_for_centered_text, parse_color, resolve_font, validated_value_style, FontResolver,
         ResolvedTextStyle,
@@ -34,7 +35,7 @@ pub(crate) use path::{ArcTrackSpec, RevealClip};
 pub(crate) use segment::rounded_segment_path;
 #[cfg(test)]
 pub(crate) use segment::{rounded_segment_geometry, segment_geometries};
-use skia_safe::{Canvas, Color, Font, Image, Rect};
+use skia_safe::{Canvas, Color, Font, Image, Point, Rect};
 
 #[derive(Clone, Debug)]
 pub struct ArcGaugeCache {
@@ -51,8 +52,7 @@ pub struct ArcGaugeCache {
     pub track_thickness: f32,
     pub track_corner_radius: f32,
     pub track_border_thickness: f32,
-    pub track_filled_color: String,
-    pub track_filled_opacity: f32,
+    pub fill: TrackFill,
     pub track_fill_flat: bool,
     pub track_fill_style: TrackFillStyle,
     pub bar_geometry: Option<ResolvedBarGeometry>,
@@ -254,7 +254,15 @@ impl ArcGaugeMeasure {
         for text in self.texts {
             text.draw(canvas);
         }
-        Ok(ArcGaugeCache {
+        // The fill raster shares the static raster's frame, so the sweep is gauge-local.
+        let local = self.local_geometry;
+        let fill_paint = gauge.track_filled_color.sweep_paint(
+            gauge.track_filled_opacity * self.text_style.opacity,
+            Point::new(local.center_x, local.center_y),
+            local.start_angle,
+            local.sweep_angle,
+        )?;
+        let mut cache = ArcGaugeCache {
             static_image: surface.image_snapshot(),
             static_image_x: self.x + bounds.left,
             static_image_y: self.y + bounds.top,
@@ -264,12 +272,12 @@ impl ArcGaugeMeasure {
             width: self.width,
             height: self.height,
             rotation: gauge.rotation,
-            geometry: placed_geometry(self.local_geometry, self.x, self.y),
+            geometry: placed_geometry(local, self.x, self.y),
             track_thickness: self.track_thickness,
             track_corner_radius: self.track_corner_radius,
             track_border_thickness: self.track_border_thickness,
-            track_filled_color: gauge.track_filled_color.clone(),
-            track_filled_opacity: gauge.track_filled_opacity,
+            // Replaced below once the full fill can be drawn from this geometry.
+            fill: TrackFill::Paint(fill_paint.clone()),
             track_fill_flat: gauge.track_fill_flat,
             track_fill_style: self.track_fill_style,
             bar_geometry: self.bar_geometry,
@@ -281,7 +289,15 @@ impl ArcGaugeMeasure {
             inner_widget_gap: self.inner_widget_gap,
             inner_widget_offset_x: self.inner_widget_offset_x,
             inner_widget_offset_y: self.inner_widget_offset_y,
-        })
+        };
+        cache.fill = TrackFill::prepare(
+            &gauge.track_filled_color,
+            fill_paint,
+            bounds,
+            (self.x, self.y),
+            |canvas, paint| layer::draw_full_fill_layer(canvas, &cache, local, paint),
+        )?;
+        Ok(cache)
     }
 }
 

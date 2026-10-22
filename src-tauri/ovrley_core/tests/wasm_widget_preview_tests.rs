@@ -1206,7 +1206,8 @@ fn gauge_preview(
         "inner_widget_offset_x": 11.25, "inner_widget_offset_y": -17.5,
         "track_thickness": 18, "track_corner_radius": 6, "track_border_thickness": 2,
         "track_border_color": "#ffffff", "track_empty_color": "#222222", "track_empty_opacity": 0.5,
-        "track_filled_color": "#40e0d0", "track_filled_opacity": 0.7, "track_fill_flat": false,
+        "track_filled_color": "#40e0d0", "track_filled_opacity": 0.7,
+        "track_filled_gradient": false, "track_filled_gradient_stops": [{ "offset": 0, "color": "#40e0d0" }, { "offset": 1, "color": "#c65102" }], "track_fill_flat": false,
         "track_fill_style": fill, "bar_count": 8, "bar_gap": 3,
         "show_min_max_labels": true, "min_max_label_font": "Teko.ttf", "min_max_label_font_size": 16,
         "min_max_label_position": if placement == "vertical" { "left" } else { "bottom" }, "min_max_label_color": "#cdefab",
@@ -1246,17 +1247,25 @@ fn gauges_match_export_pixels_sampling_cache_revisions_and_activity_replacement(
     let root = common::test_config::repo_git_root();
     let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
     let seconds = vec![0.0, 0.5, 0.501, 0.75, 1.5, 2.25, 2.5, 3.75];
-    for (display, metric, placement, fill) in [
-        ("linear", "speed", "horizontal", "fill"),
-        ("linear", "power", "vertical", "bars"),
-        ("arc", "speed", "bottom-left", "fill"),
-        ("arc", "power", "bottom-left", "bars"),
-        ("corner", "altitude", "bottom-left", "fill"),
-        ("corner", "altitude", "bottom-right", "bars"),
-        ("gt_gauge", "speed", "bottom-left", "fill"),
-        ("gt_gauge", "power", "bottom-left", "bars"),
+    for (display, metric, placement, fill, gradient) in [
+        ("linear", "speed", "horizontal", "fill", false),
+        ("linear", "speed", "horizontal", "fill", true),
+        ("linear", "power", "vertical", "bars", true),
+        ("arc", "speed", "bottom-left", "fill", false),
+        ("arc", "speed", "bottom-left", "fill", true),
+        ("arc", "power", "bottom-left", "bars", true),
+        ("corner", "altitude", "bottom-left", "fill", true),
+        ("corner", "altitude", "bottom-right", "bars", false),
+        ("gt_gauge", "speed", "bottom-left", "fill", false),
+        ("gt_gauge", "power", "bottom-left", "bars", false),
     ] {
         let (mut preview, mut request) = gauge_preview(display, metric, placement, fill);
+        request["widget"]["track_filled_gradient"] = json!(gradient);
+        request["widget"]["track_filled_gradient_stops"] = json!([
+            { "offset": 0.8, "color": "#ff0000" },
+            { "offset": 0, "color": "#00ff00" },
+            { "offset": 0.4, "color": "#0000ff" },
+        ]);
         request["scene"]["opacity"] = json!(0.5);
         preview.replace_activity(&bytes).unwrap();
         let config = common::seam::validated_config_from_value(
@@ -1980,6 +1989,7 @@ fn lean_angle_preview() -> (PreviewSession, Value) {
                 "diameter": 180, "rotation": 0, "opacity": 0.8, "show_icon": false,
                 "track_empty_color": "#222222", "track_empty_opacity": 0.5,
                 "track_filled_color": "#40e0d0", "track_filled_opacity": 0.7,
+        "track_filled_gradient": false, "track_filled_gradient_stops": [{ "offset": 0, "color": "#40e0d0" }, { "offset": 1, "color": "#c65102" }],
                 "track_border_thickness": 2, "track_border_color": "#ffffff", "track_thickness": 24,
                 "font": "Inter.ttf", "font_size": 60, "color": "#abcdef", "unit_color": "#aaaaaa",
                 "show_units": true, "value_offset_x": 11.25, "value_offset_y": -17.5,

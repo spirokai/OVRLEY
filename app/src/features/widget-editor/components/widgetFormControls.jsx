@@ -232,17 +232,28 @@ export function NumberField({ label, value, onChange, min, max, disabled = false
  * @param {string} [props.defaultLabel='Color'] - Default translation used when label is absent.
  * @param {*} props.value - Input value processed by the helper.
  * @param {*} props.onChange - Callback invoked to change.
+ * @param {React.ReactNode} [props.trailing] - Optional control aligned to the end of the label row.
  * @returns {JSX.Element} Rendered component output.
  */
-export function ColorField({ label, labelKey = 'widget-editor.color', defaultLabel = 'Color', value, onChange, disabled = false }) {
+export function ColorField({ label, labelKey = 'widget-editor.color', defaultLabel = 'Color', value, onChange, disabled = false, trailing = null }) {
   const { t } = useTranslation()
   const resolvedLabel = label ?? t(labelKey, defaultLabel)
+  const fieldLabel = (
+    <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
+      {resolvedLabel}
+    </Label>
+  )
 
   return (
     <div className="space-y-1">
-      <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
-        {resolvedLabel}
-      </Label>
+      {trailing ? (
+        <div className="flex h-3 items-center justify-between gap-2">
+          {fieldLabel}
+          {trailing}
+        </div>
+      ) : (
+        fieldLabel
+      )}
       <HexColorPicker value={value} onChange={onChange} disabled={disabled} triggerClassName="justify-start" />
     </div>
   )

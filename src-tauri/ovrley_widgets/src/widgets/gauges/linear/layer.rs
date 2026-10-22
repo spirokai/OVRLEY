@@ -9,11 +9,13 @@ use super::super::track_path::{translated_track_cap_path, translated_track_cap_r
 use super::geometry::{bordered_bar_fill_rect, segment_rect, track_cap_frame};
 use super::LinearGaugeCache;
 use crate::model::scene::ValidatedScenePresentation;
-use crate::render::{shadow::shadow_paint, text::parse_color};
+use crate::render::{shadow::shadow_paint, text::parse_color, track_fill::FillShape};
 use crate::widgets::gauges::validation::{
     ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
 };
-use skia_safe::{BlendMode, Canvas, Paint, PathBuilder, PathFillType, RRect, Rect};
+use crate::model::types::TrackFillStyle;
+use crate::widgets::gauges::bar_geometry::ResolvedBarGeometry;
+use skia_safe::{BlendMode, Canvas, ClipOp, Paint, PathBuilder, PathFillType, RRect, Rect};
 
 /// Builds the padded, cached image containing every frame-invariant element.
 pub(super) fn draw_static_layer(
@@ -134,36 +136,92 @@ fn draw_static_track(
     canvas.draw_rrect(inner_rrect, &empty_paint);
 }
 
+/// Inner rounded rect of one bar, inset by the border, relative to `origin`.
+fn bar_fill_rrect(
+    index: u32,
+    bars: ResolvedBarGeometry,
+    cache: &LinearGaugeCache,
+    origin: (f32, f32),
+) -> RRect {
+    let outer = segment_rect(
+        index,
+        bars.extent,
+        bars.gap,
+        cache.width as f32,
+        cache.height as f32,
+        cache.orientation,
+    );
+    let border = cache.track_border_thickness;
+    let inner = Rect::from_xywh(
+        origin.0 + outer.left + border,
+        origin.1 + outer.top + border,
+        (outer.width() - border * 2.0).max(0.0),
+        (outer.height() - border * 2.0).max(0.0),
+    );
+    let radius = (cache.track_corner_radius - border)
+        .max(0.0)
+        .min(inner.width() * 0.5)
+        .min(inner.height() * 0.5);
+    RRect::new_rect_xy(inner, radius, radius)
+}
+
+/// The border-inset continuous track relative to `origin`.
+fn inner_track_rrect(cache: &LinearGaugeCache, origin: (f32, f32)) -> RRect {
+    let inset = cache.track_border_thickness;
+    let inner_rect = Rect::from_xywh(
+        origin.0 + inset,
+        origin.1 + inset,
+        (cache.width as f32 - inset * 2.0).max(0.0),
+        (cache.height as f32 - inset * 2.0).max(0.0),
+    );
+    let radius = (cache.track_corner_radius - inset).max(0.0);
+    RRect::new_rect_xy(inner_rect, radius, radius)
+}
+
+/// Paints the completely filled track relative to the gauge origin; per-frame clips
+/// reveal this cached gradient raster instead of shading the gradient every frame.
+pub(super) fn draw_full_fill_layer(canvas: &Canvas, cache: &LinearGaugeCache, paint: &Paint) {
+    match (cache.track_fill_style, cache.bar_geometry) {
+        (TrackFillStyle::Bars, Some(bars)) => {
+            for index in 0..bars.count {
+                canvas.draw_rrect(bar_fill_rrect(index, bars, cache, (0.0, 0.0)), paint);
+            }
+        }
+        _ => {
+            canvas.draw_rrect(inner_track_rrect(cache, (0.0, 0.0)), paint);
+        }
+    }
+}
+
 /// Draws only complete bars whose discrete buckets are active at `fill01`.
 pub(super) fn draw_segmented_fill(canvas: &Canvas, cache: &LinearGaugeCache, fill01: f32) {
-    let bar_geometry = cache
+    let bars = cache
         .bar_geometry
         .expect("bars fill style must carry resolved bar geometry");
-    let filled_count = bar_fill_count(fill01, bar_geometry.count);
-    let paint = fill_paint(cache);
-
-    for index in 0..filled_count as u32 {
-        let outer = segment_rect(
+    let filled_count = bar_fill_count(fill01, bars.count) as u32;
+    if filled_count == 0 {
+        return;
+    }
+    // Gaps are empty in the full-fill raster, so one rect ending mid-gap reveals whole bars.
+    let segment = |index| {
+        segment_rect(
             index,
-            bar_geometry.extent,
-            bar_geometry.gap,
+            bars.extent,
+            bars.gap,
             cache.width as f32,
             cache.height as f32,
             cache.orientation,
-        );
-        let border = cache.track_border_thickness;
-        let inner = Rect::from_xywh(
-            cache.x + outer.left + border,
-            cache.y + outer.top + border,
-            (outer.width() - border * 2.0).max(0.0),
-            (outer.height() - border * 2.0).max(0.0),
-        );
-        let radius = (cache.track_corner_radius - border)
-            .max(0.0)
-            .min(inner.width() * 0.5)
-            .min(inner.height() * 0.5);
-        canvas.draw_rrect(RRect::new_rect_xy(inner, radius, radius), &paint);
-    }
+        )
+    };
+    let mut reveal = segment(0);
+    reveal.join(segment(filled_count - 1));
+    reveal.outset((bars.gap * 0.5, bars.gap * 0.5));
+    reveal.offset((cache.x, cache.y));
+    cache.fill.draw(canvas, &FillShape::Rect(reveal), |paint| {
+        for index in 0..filled_count {
+            canvas.draw_rrect(bar_fill_rrect(index, bars, cache, (cache.x, cache.y)), paint);
+        }
+    });
 }
 
 /// Reveals the continuous source track while preserving its configured caps.
@@ -181,49 +239,39 @@ pub(super) fn draw_continuous_fill(canvas: &Canvas, cache: &LinearGaugeCache, fi
         return;
     }
 
-    let fill_paint = fill_paint(cache);
     let fill_rect = Rect::from_xywh(x, y, width, height);
     let radius = (cache.track_corner_radius - cache.track_border_thickness).max(0.0);
+    let inner_rrect = inner_track_rrect(cache, (cache.x, cache.y));
     if radius == 0.0 {
-        canvas.draw_rrect(RRect::new_rect_xy(fill_rect, radius, radius), &fill_paint);
+        let reveal = FillShape::Rect(fill_rect);
+        cache.fill.draw(canvas, &reveal, |paint| reveal.draw(canvas, paint));
         return;
     }
-
-    let inset = cache.track_border_thickness;
-    let inner_rect = Rect::from_xywh(
-        cache.x + inset,
-        cache.y + inset,
-        (cache.width as f32 - inset * 2.0).max(0.0),
-        (cache.height as f32 - inset * 2.0).max(0.0),
-    );
-    let inner_rrect = RRect::new_rect_xy(inner_rect, radius, radius);
-    canvas.save();
     if cache.track_fill_flat {
-        canvas.clip_rect(fill_rect, skia_safe::ClipOp::Intersect, true);
-        canvas.draw_rrect(inner_rrect, &fill_paint);
-    } else {
-        canvas.clip_rrect(inner_rrect, skia_safe::ClipOp::Intersect, true);
-        let revealed_length = match cache.orientation {
-            ValidatedLinearGaugeOrientation::Horizontal => width,
-            ValidatedLinearGaugeOrientation::Vertical => height,
-        };
-        if let Some(cap) = translated_track_cap_reveal(revealed_length, radius) {
-            let (frame, track_thickness) = track_cap_frame(inner_rect, radius, cache.orientation);
-            let cap_path = translated_track_cap_path(frame, track_thickness, cap);
-            canvas.draw_path(&cap_path, &fill_paint);
-        } else {
-            canvas.draw_rrect(RRect::new_rect_xy(fill_rect, radius, radius), &fill_paint);
-        }
+        cache.fill.draw(canvas, &FillShape::Rect(fill_rect), |paint| {
+            canvas.save();
+            canvas.clip_rect(fill_rect, ClipOp::Intersect, true);
+            canvas.draw_rrect(inner_rrect, paint);
+            canvas.restore();
+        });
+        return;
     }
-    canvas.restore();
-}
-
-fn fill_paint(cache: &LinearGaugeCache) -> Paint {
-    let mut paint = Paint::default();
-    paint.set_anti_alias(true);
-    paint.set_color(parse_color(
-        &cache.track_filled_color,
-        cache.track_filled_opacity,
-    ));
-    paint
+    let revealed_length = match cache.orientation {
+        ValidatedLinearGaugeOrientation::Horizontal => width,
+        ValidatedLinearGaugeOrientation::Vertical => height,
+    };
+    let reveal = match translated_track_cap_reveal(revealed_length, radius) {
+        Some(cap) => {
+            let (frame, track_thickness) =
+                track_cap_frame(*inner_rrect.rect(), radius, cache.orientation);
+            FillShape::Path(translated_track_cap_path(frame, track_thickness, cap))
+        }
+        None => FillShape::RRect(RRect::new_rect_xy(fill_rect, radius, radius)),
+    };
+    cache.fill.draw(canvas, &reveal, |paint| {
+        canvas.save();
+        canvas.clip_rrect(inner_rrect, ClipOp::Intersect, true);
+        reveal.draw(canvas, paint);
+        canvas.restore();
+    });
 }

@@ -356,6 +356,11 @@
           "track_empty_opacity": 0.5,
           "track_filled_color": "#dce2e8",
           "track_filled_opacity": 1,
+          "track_filled_gradient": false,
+          "track_filled_gradient_stops": [
+            { "offset": 0, "color": "#40e0d0" },
+            { "offset": 1, "color": "#c65102" }
+          ],
           "track_border_thickness": 0,
           "track_border_color": "#ffffff",
           "track_thickness": 150,
@@ -431,6 +436,11 @@
           "track_empty_opacity": 0.5,
           "track_filled_color": "#dce2e8",
           "track_filled_opacity": 1,
+          "track_filled_gradient": false,
+          "track_filled_gradient_stops": [
+            { "offset": 0, "color": "#40e0d0" },
+            { "offset": 1, "color": "#c65102" }
+          ],
           "track_fill_flat": false,
           "show_min_max_labels": false,
           "min_max_label_font": null,
@@ -469,6 +479,11 @@
           "track_empty_opacity": 0.5,
           "track_filled_color": "#dce2e8",
           "track_filled_opacity": 1,
+          "track_filled_gradient": false,
+          "track_filled_gradient_stops": [
+            { "offset": 0, "color": "#40e0d0" },
+            { "offset": 1, "color": "#c65102" }
+          ],
           "track_fill_flat": false,
           "show_min_max_labels": false,
           "min_max_label_font": null,
@@ -507,6 +522,11 @@
           "track_empty_opacity": 0.5,
           "track_filled_color": "#dce2e8",
           "track_filled_opacity": 1,
+          "track_filled_gradient": false,
+          "track_filled_gradient_stops": [
+            { "offset": 0, "color": "#40e0d0" },
+            { "offset": 1, "color": "#c65102" }
+          ],
           "track_fill_flat": false,
           "show_min_max_labels": false,
           "min_max_label_font": null,

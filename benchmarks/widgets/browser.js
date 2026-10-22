@@ -5,6 +5,15 @@ import { WIDGET_COLLECTIONS, requireWidgetTypeDefinition } from '@/lib/widget/wi
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 import { widgetFonts } from '@/features/wasm-widgets/utils/previewSession'
 
+const FILL_GRADIENT = {
+  track_filled_gradient: true,
+  track_filled_gradient_stops: [
+    { offset: 0, color: '#40e0d0' },
+    { offset: 0.5, color: '#f5d742' },
+    { offset: 1, color: '#c65102' },
+  ],
+}
+
 export const fixtures = {
   ride: ['afternoon-ride-parse-debug.json', 60],
   racechrono: ['sample RaceChrono-parse-debug.json', 60],
@@ -49,6 +58,13 @@ export function createCases({ activities, template, image, frames, warmup, fps }
       { font_size: 45, display_variants: { lean_angle: { diameter: 232, track_thickness: 65 } } },
     ],
     [
+      'lean-angle-gradient',
+      'lean_angle',
+      'racechrono',
+      { displayType: 'lean_angle' },
+      { font_size: 45, display_variants: { lean_angle: { diameter: 232, track_thickness: 65, ...FILL_GRADIENT } } },
+    ],
+    [
       'g-force',
       'g_force',
       'racebox',
@@ -56,10 +72,17 @@ export function createCases({ activities, template, image, frames, warmup, fps }
       { display_variants: { g_force: { diameter: 232, width: 256, height: 256, marker_size: 12, label_font_size: 35 } } },
     ],
   ]
-  for (const display of ['linear', 'arc', 'corner', 'gt_gauge'])
+  for (const [display, gradient] of [
+    ['linear', false],
+    ['linear', true],
+    ['arc', false],
+    ['arc', true],
+    ['corner', false],
+    ['gt_gauge', false],
+  ])
     for (const style of display === 'gt_gauge' ? ['fill'] : ['fill', 'bars']) {
       specs.push([
-        `speed-${display}-${style}`,
+        `speed-${display}-${style}${gradient ? '-gradient' : ''}`,
         'speed',
         'ride',
         { displayType: display },
@@ -72,11 +95,23 @@ export function createCases({ activities, template, image, frames, warmup, fps }
               height: display === 'linear' ? 40 : 232,
               track_fill_style: style,
               ...(style === 'bars' ? { bar_count: 20, bar_gap: 3 } : {}),
+              ...(gradient ? FILL_GRADIENT : {}),
             },
           },
         },
       ])
     }
+  specs.push([
+    'speed-linear-fill-gradient-flat',
+    'speed',
+    'ride',
+    { displayType: 'linear' },
+    {
+      show_units: true,
+      display_unit: 'kmh',
+      display_variants: { linear: { width: 232, height: 40, track_fill_style: 'fill', track_fill_flat: true, ...FILL_GRADIENT } },
+    },
+  ])
   for (const mode of ['current_lap', 'best_lap', 'delta', 'lap_log'])
     specs.push([`lap-${mode}`, 'lap_timer', 'racebox', { displayType: 'lap_timer', lapTimerMode: mode }, {}])
   const globals = { ...DEFAULT_GLOBAL_DEFAULTS, ...template.settings.globalDefaults }

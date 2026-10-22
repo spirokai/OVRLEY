@@ -646,6 +646,7 @@
     "emptyOpacity": "Opacidade vazia",
     "fillColor": "Cor preenchimento",
     "filledColor": "Cor preenchida",
+    "fillGradient": "Degradê",
     "filledOpacity": "Opacidade cheia",
     "fillOpacity": "Opacidade da área",
     "finishedColor": "Cor concluída",

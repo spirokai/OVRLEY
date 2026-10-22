@@ -646,6 +646,7 @@
     "emptyOpacity": "空の部分の不透明度",
     "fillColor": "塗りつぶしの色",
     "filledColor": "塗りつぶし済みの色",
+    "fillGradient": "グラデーション",
     "filledOpacity": "塗りつぶし済みの不透明度",
     "fillOpacity": "塗りつぶしの不透明度",
     "finishedColor": "完了部分の色",

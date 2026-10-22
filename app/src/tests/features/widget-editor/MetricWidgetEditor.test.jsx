@@ -266,7 +266,7 @@ describe('MetricWidgetEditor linear gauge controls', () => {
     expect(screen.getByText('Orientation')).toBeInTheDocument()
     expect(screen.getByText('Min/Max Labels')).toBeInTheDocument()
 
-    await user.click(screen.getAllByRole('switch')[1])
+    await user.click(screen.getAllByRole('switch').at(-1))
     expect(updateWidgetData).toHaveBeenCalledWith(
       'value-0',
       expect.objectContaining({
@@ -275,6 +275,60 @@ describe('MetricWidgetEditor linear gauge controls', () => {
         }),
       }),
     )
+
+    await user.click(screen.getByRole('switch', { name: 'Gradient' }))
+    expect(updateWidgetData).toHaveBeenCalledWith(
+      'value-0',
+      expect.objectContaining({
+        display_variants: expect.objectContaining({
+          linear: expect.objectContaining({ track_filled_gradient: true }),
+        }),
+      }),
+    )
+    expect(screen.queryByRole('group', { name: 'Gradient stops' })).not.toBeInTheDocument()
+  })
+
+  test('swaps the filled color for the gradient picker when the fill gradient is on', () => {
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('speed', {
+          display_type: 'linear',
+          display_unit: 'kmh',
+          display_variants: {
+            linear: {
+              width: 200,
+              height: 60,
+              rotation: 0,
+              orientation: 'horizontal',
+              track_corner_radius: 6,
+              track_border_thickness: 2,
+              track_border_color: '#ffffff',
+              track_empty_color: '#222222',
+              track_empty_opacity: 0.5,
+              track_filled_color: '#40e0d0',
+              track_filled_opacity: 1,
+              track_filled_gradient: true,
+              track_filled_gradient_stops: [
+                { offset: 0, color: '#40e0d0' },
+                { offset: 0.5, color: '#ffffff' },
+                { offset: 1, color: '#c65102' },
+              ],
+              track_fill_flat: false,
+              show_min_max_labels: false,
+              min_max_label_font: 'Arial.ttf',
+              min_max_label_font_size: 12,
+              min_max_label_color: '#ffffff',
+            },
+          },
+        })}
+        updateWidgetData={vi.fn()}
+        setNumericField={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('switch', { name: 'Gradient' })).toBeChecked()
+    expect(screen.getByRole('group', { name: 'Gradient stops' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Color stop at/ })).toHaveLength(3)
   })
 
   test('shows explicit bar count and gap controls without auto controls', () => {

@@ -646,6 +646,7 @@
     "emptyOpacity": "빈 부분 불투명도",
     "fillColor": "채우기 색상",
     "filledColor": "채워진 부분 색상",
+    "fillGradient": "그라데이션",
     "filledOpacity": "채워진 부분 불투명도",
     "fillOpacity": "채우기 불투명도",
     "finishedColor": "완료 부분 색상",

@@ -16,6 +16,7 @@ use crate::{
         types::TrackFillStyle,
     },
     render::text::{parse_color, resolve_font, FontResolver, ResolvedTextStyle},
+    render::track_fill::TrackFill,
     widgets::value::preview::{surface, SHAPE_COLOR_TYPE},
 };
 pub use geometry::{bar_fill_rect, bordered_bar_fill_rect};
@@ -35,8 +36,7 @@ pub struct LinearGaugeCache {
     pub orientation: ValidatedLinearGaugeOrientation,
     pub track_corner_radius: f32,
     pub track_border_thickness: f32,
-    pub track_filled_color: String,
-    pub track_filled_opacity: f32,
+    pub fill: TrackFill,
     pub track_fill_flat: bool,
     pub track_fill_style: TrackFillStyle,
     pub bar_geometry: Option<ResolvedBarGeometry>,
@@ -155,7 +155,20 @@ impl LinearGaugeMeasure {
         for text in self.texts {
             text.draw(canvas);
         }
-        Ok(LinearGaugeCache {
+        let track_border_thickness = gauge.track_border_thickness * scale;
+        // The fill raster shares the static raster's frame, so the axis is gauge-local.
+        let (start, end) = geometry::fill_axis(
+            self.width,
+            self.height,
+            gauge.orientation,
+            track_border_thickness,
+        );
+        let fill_paint = gauge.track_filled_color.linear_paint(
+            gauge.track_filled_opacity * scene.opacity,
+            start,
+            end,
+        )?;
+        let mut cache = LinearGaugeCache {
             static_image: surface.image_snapshot(),
             static_image_x: self.x + bounds.left,
             static_image_y: self.y + bounds.top,
@@ -167,13 +180,21 @@ impl LinearGaugeMeasure {
             rotation: gauge.rotation,
             orientation: gauge.orientation,
             track_corner_radius: gauge.track_corner_radius * scale,
-            track_border_thickness: gauge.track_border_thickness * scale,
-            track_filled_color: gauge.track_filled_color.clone(),
-            track_filled_opacity: gauge.track_filled_opacity * scene.opacity,
+            track_border_thickness,
+            // Replaced below once the full fill can be drawn from this geometry.
+            fill: TrackFill::Paint(fill_paint.clone()),
             track_fill_flat: gauge.track_fill_flat,
             track_fill_style: gauge.track_fill_style,
             bar_geometry: scale_bar_geometry(gauge.bar_geometry, scale),
-        })
+        };
+        cache.fill = TrackFill::prepare(
+            &gauge.track_filled_color,
+            fill_paint,
+            bounds,
+            (self.x, self.y),
+            |canvas, paint| layer::draw_full_fill_layer(canvas, &cache, paint),
+        )?;
+        Ok(cache)
     }
 }
 

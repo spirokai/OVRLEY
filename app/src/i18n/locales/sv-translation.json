@@ -646,6 +646,7 @@
     "emptyOpacity": "Tom opacitet",
     "fillColor": "Fyllningsfärg",
     "filledColor": "Fylld färg",
+    "fillGradient": "Toning",
     "filledOpacity": "Fylld opacitet",
     "fillOpacity": "Fyllnadsopacitet",
     "finishedColor": "Färdig färg",

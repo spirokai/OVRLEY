@@ -13,6 +13,8 @@ use skia_safe::{
 const START_ANGLE: f32 = 210.0;
 const SWEEP_ANGLE: f32 = 120.0;
 pub const LEAN_ANGLE_MAX_FILL_SWEEP: f32 = SWEEP_ANGLE * 0.5;
+/// Upright: the sector's top, where the fill starts in either lean direction.
+pub const LEAN_ANGLE_CENTER_ANGLE: f32 = START_ANGLE + LEAN_ANGLE_MAX_FILL_SWEEP;
 const LABEL_LINE_HEIGHT_RATIO: f32 = 0.92;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -185,7 +187,7 @@ pub fn prepare_lean_angle_cache(
     canvas.draw_path(&inner_path, &paint);
     paint.set_style(Style::Stroke);
     paint.set_stroke_width(widget.diameter / 200.0 * scale);
-    paint.set_color(parse_color(&widget.track_filled_color, 1.0));
+    paint.set_color(parse_color(widget.track_filled_color.leading_color(), 1.0));
     canvas.save();
     canvas.clip_path(&inner_path, ClipOp::Intersect, true);
     canvas.save_layer_alpha_f(None, 0.4 * widget.opacity);

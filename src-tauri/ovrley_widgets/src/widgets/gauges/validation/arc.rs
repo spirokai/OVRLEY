@@ -10,6 +10,7 @@ use crate::model::validation::{
     require_bool, require_f32, require_hex_color, require_positive_f32, require_string,
 };
 use crate::widgets::gauges::bar_geometry::{resolve_arc_track_geometry, ResolvedBarGeometry};
+use crate::render::track_fill::{validate_track_fill_color, TrackFillColor};
 use crate::widgets::value::config::ValueConfig;
 use crate::widgets::value::validation::validate_arc_inner_value_widget;
 use crate::widgets::value::validation::ValidatedValueWidget;
@@ -58,7 +59,7 @@ pub struct ValidatedArcGaugeWidget {
     pub track_border_color: String,
     pub track_empty_color: String,
     pub track_empty_opacity: f32,
-    pub track_filled_color: String,
+    pub track_filled_color: TrackFillColor,
     pub track_filled_opacity: f32,
     pub track_fill_flat: bool,
     pub track_fill_style: TrackFillStyle,
@@ -277,10 +278,20 @@ fn validate_arc_shaped_gauge(
     )?;
     let track_empty_color =
         require_hex_color(value.track_empty_color.as_deref(), &p("track_empty_color"))?;
-    let track_filled_color = require_hex_color(
-        value.track_filled_color.as_deref(),
-        &p("track_filled_color"),
-    )?;
+    // GT gauges keep a solid fill; their glow is tinted with that single color.
+    let track_filled_color = if gt_style.is_some() {
+        TrackFillColor::Solid(require_hex_color(
+            value.track_filled_color.as_deref(),
+            &p("track_filled_color"),
+        )?)
+    } else {
+        validate_track_fill_color(
+            value.track_filled_color.as_deref(),
+            value.track_filled_gradient,
+            value.track_filled_gradient_stops.clone(),
+            p,
+        )?
+    };
     let track_fill_flat = require_bool(value.track_fill_flat, &p("track_fill_flat"))?;
     let track_fill_style = value.track_fill_style.unwrap_or_default();
     let (track_corner_radius, bar_geometry) = resolve_arc_track_geometry(

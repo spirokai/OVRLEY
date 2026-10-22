@@ -126,6 +126,36 @@ fn bars_style_resolves_configured_arc_geometry_into_the_cache() {
     assert_eq!(layout.bar_geometry.unwrap().count, 8);
 }
 
+#[test]
+fn gradient_fill_follows_the_arc_from_its_start_to_its_end() {
+    let mut raw_config = full_arc_gauge_config(20, 30);
+    raw_config["track_filled_gradient"] = serde_json::json!(true);
+    raw_config["track_filled_gradient_stops"] = serde_json::json!([
+        { "offset": 1, "color": "#0000ff" },
+        { "offset": 0, "color": "#ff0000" },
+    ]);
+    let config = validate_single_arc(raw_config).unwrap();
+    let paths = test_paths();
+    let fonts = ovrley_core::fonts::NativeFonts(&paths.font_dirs);
+    let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
+    let (layout, states) = common::gauge::gauge_layout(&config, &dense, &fonts);
+    let frame = layout.prepare_frame(states[1].clone(), &fonts).unwrap();
+    let mut surface = skia_safe::surfaces::raster_n32_premul((300, 300)).unwrap();
+    surface.canvas().clear(skia_safe::Color::TRANSPARENT);
+    frame.draw(surface.canvas(), &layout);
+    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(arc) = &layout else { panic!("arc layout"); };
+    let geometry = arc.geometry;
+    let mut color_at = |fraction: f32| {
+        let angle = geometry.start_angle + geometry.sweep_angle * fraction;
+        let point = arc_point(geometry.center_x, geometry.center_y, geometry.radius, angle);
+        surface.peek_pixels().unwrap().get_color((point.x as i32, point.y as i32))
+    };
+    let (start, middle, end) = (color_at(0.02), color_at(0.5), color_at(0.98));
+    assert!(start.r() > 230 && start.b() < 25, "{start:?}");
+    assert!(middle.r().abs_diff(middle.b()) < 30 && middle.r() > 90, "{middle:?}");
+    assert!(end.b() > 230 && end.r() < 25, "{end:?}");
+}
+
 fn validate_single_arc(
     value: serde_json::Value,
 ) -> Result<ovrley_core::normalize::ValidatedRenderConfig, ovrley_core::CoreError> {
@@ -160,6 +190,8 @@ fn full_arc_gauge_config(x: i32, y: i32) -> serde_json::Value {
         "track_empty_opacity": 0.5,
         "track_filled_color": "#40e0d0",
         "track_filled_opacity": 1,
+        "track_filled_gradient": false,
+        "track_filled_gradient_stops": [{ "offset": 0, "color": "#40e0d0" }, { "offset": 1, "color": "#c65102" }],
         "track_fill_flat": false,
         "show_min_max_labels": true,
         "min_max_label_font": "Arial.ttf",

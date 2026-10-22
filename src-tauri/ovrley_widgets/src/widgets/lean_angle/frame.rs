@@ -3,7 +3,8 @@ use super::{
     format::{format_lean_angle_value, lean_angle_fill_sweep},
     layout::{
         annular_sector_inset_path, annular_sector_path, geometry_from_layout, inset_geometry,
-        lean_angle_layout, polar_point, LeanAngleCache, LeanAngleGeometry,
+        lean_angle_layout, polar_point, LeanAngleCache, LeanAngleGeometry, LEAN_ANGLE_CENTER_ANGLE,
+        LEAN_ANGLE_MAX_FILL_SWEEP,
     },
     validation::ValidatedLeanAngleWidget,
 };
@@ -23,7 +24,7 @@ use crate::{
         METRIC_WIDGET_UNIT_RATIO, MIN_UNITS_FONT_SIZE,
     },
 };
-use skia_safe::{paint::Style, Canvas, ClipOp, Paint, Path, Point, Rect, TextBlob};
+use skia_safe::{Canvas, ClipOp, Paint, Path, Point, Rect, TextBlob};
 
 struct TextRun {
     blob: TextBlob,
@@ -88,16 +89,15 @@ pub fn prepare_lean_angle_frame(
     let border = widget.track_border_thickness * scale;
     let fill_sweep = lean_angle_fill_sweep(raw);
     let fill = if fill_sweep != 0.0 {
-        let mut paint = Paint::default();
-        paint.set_anti_alias(true);
-        paint.set_style(Style::Fill);
-        paint.set_color(parse_color(
-            &widget.track_filled_color,
+        let paint = widget.track_filled_color.mirrored_sweep_paint(
             widget.track_filled_opacity * widget.opacity,
-        ));
+            Point::new(geometry.center_x, geometry.center_y),
+            LEAN_ANGLE_CENTER_ANGLE,
+            LEAN_ANGLE_MAX_FILL_SWEEP,
+        )?;
         Some((
             annular_sector_path(LeanAngleGeometry {
-                start_angle: 270.0,
+                start_angle: LEAN_ANGLE_CENTER_ANGLE,
                 sweep_angle: fill_sweep,
                 ..inset_geometry(geometry, border)
             }),
@@ -253,7 +253,7 @@ pub fn prepare_lean_angle_frame(
             geometry.center_x,
             geometry.center_y,
             geometry.outer_radius,
-            270.0 + fill_sweep,
+            LEAN_ANGLE_CENTER_ANGLE + fill_sweep,
         ),
     })
 }

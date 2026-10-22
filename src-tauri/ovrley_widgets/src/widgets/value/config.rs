@@ -1,5 +1,6 @@
 use crate::model::types::{DisplayType, MetricKind, TrackFillStyle};
 use crate::widgets::heart_zones::zones::HeartZoneRange;
+use crate::render::track_fill::GradientStop;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -150,6 +151,10 @@ pub struct ValueConfig {
     pub track_filled_color: Option<String>,
     #[serde(default)]
     pub track_filled_opacity: Option<f32>,
+    #[serde(default)]
+    pub track_filled_gradient: Option<bool>,
+    #[serde(default)]
+    pub track_filled_gradient_stops: Option<Vec<GradientStop>>,
     #[serde(default)]
     pub track_fill_flat: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_track_fill_style")]

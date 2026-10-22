@@ -646,6 +646,7 @@
     "emptyOpacity": "Opacité vide",
     "fillColor": "Couleur du plein",
     "filledColor": "Couleur remplie",
+    "fillGradient": "Dégradé",
     "filledOpacity": "Opacité remplie",
     "fillOpacity": "Opacité pleine",
     "finishedColor": "Couleur terminée",

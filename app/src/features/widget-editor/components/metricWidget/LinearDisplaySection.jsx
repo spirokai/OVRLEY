@@ -6,6 +6,7 @@ import { SlidersHorizontal, Tags } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import { useAvailableFonts } from '@/hooks/useFonts'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
+import TrackFilledColorFields from './TrackFilledColorFields'
 import { getLinearBarGapMax, getLinearTrackCornerRadiusMax, getSuggestedLinearBarGeometry } from '../../utils/gaugeGeometry'
 import { useTranslation } from 'react-i18next'
 import { translateOptions } from '@/i18n'
@@ -192,25 +193,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             onSliderChange={(value) => updateLinear({ track_empty_opacity: value })}
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            label={t('widget-editor.filledColor', 'Filled Color')}
-            value={linearData.track_filled_color}
-            onChange={(value) => updateLinear({ track_filled_color: value })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.filledOpacity', 'Filled Opacity')}
-            value={linearData.track_filled_opacity}
-            min={0}
-            max={1}
-            step={0.05}
-            valueScale={100}
-            valueDisplay={`${Math.round(linearData.track_filled_opacity * 100)}`}
-            suffix="%"
-            onSliderChange={(value) => updateLinear({ track_filled_opacity: value })}
-          />
-        </div>
+        <TrackFilledColorFields data={linearData} updateVariant={updateLinear} />
       </div>
 
       <div className="space-y-4">

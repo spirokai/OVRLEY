@@ -646,6 +646,7 @@
     "emptyOpacity": "空白不透明度",
     "fillColor": "填充颜色",
     "filledColor": "已填充颜色",
+    "fillGradient": "渐变",
     "filledOpacity": "已填充不透明度",
     "fillOpacity": "填充不透明度",
     "finishedColor": "已完成颜色",

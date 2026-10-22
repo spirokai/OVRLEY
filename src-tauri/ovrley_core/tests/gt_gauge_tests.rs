@@ -80,6 +80,9 @@ fn gt_gauge_separates_unit_further_than_arc() {
     let gt = rendered_layout(full_gt_gauge_config());
     let mut arc_config = full_gt_gauge_config();
     arc_config["display_type"] = serde_json::json!("arc");
+    arc_config["track_filled_gradient"] = serde_json::json!(false);
+    arc_config["track_filled_gradient_stops"] =
+        serde_json::json!([{ "offset": 0, "color": "#40e0d0" }, { "offset": 1, "color": "#c65102" }]);
     let arc = rendered_layout(arc_config);
     let (GaugeLayout::Arc(gt), GaugeLayout::Arc(arc)) = (&gt.0, &arc.0) else {
         panic!("arc-shaped layouts");

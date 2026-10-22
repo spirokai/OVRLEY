@@ -4,6 +4,7 @@ import { SectionHeading } from '@/components/ui/section-heading'
 import { buildUniformResizeUpdate } from '../../utils/widgetSize'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { ColorField, SizeSlider, SliderField } from '../widgetFormControls'
+import TrackFilledColorFields from './TrackFilledColorFields'
 import FontSelectField from '@/components/ui/font-select-field'
 import { useAvailableFonts } from '@/hooks/useFonts'
 import { useTranslation } from 'react-i18next'
@@ -81,25 +82,7 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             onSliderChange={(track_empty_opacity) => updateLean({ track_empty_opacity })}
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            label={t('widget-editor.filledColor', 'Filled Color')}
-            value={leanVariant.track_filled_color}
-            onChange={(track_filled_color) => updateLean({ track_filled_color })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.filledOpacity', 'Filled Opacity')}
-            value={leanVariant.track_filled_opacity}
-            min={0}
-            max={1}
-            step={0.05}
-            valueScale={100}
-            valueDisplay={`${Math.round(leanVariant.track_filled_opacity * 100)}`}
-            suffix="%"
-            onSliderChange={(track_filled_opacity) => updateLean({ track_filled_opacity })}
-          />
-        </div>
+        <TrackFilledColorFields data={leanVariant} updateVariant={updateLean} />
         <div className="grid grid-cols-2 gap-4">
           <ColorField
             label={t('widget-editor.borderColor', 'Border Color')}

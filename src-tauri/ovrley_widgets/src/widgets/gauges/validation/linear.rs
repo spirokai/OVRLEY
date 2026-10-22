@@ -13,6 +13,7 @@ use crate::model::validation::{
 use crate::widgets::gauges::bar_geometry::{
     resolve_bar_style_geometry, track_corner_radius_max, ResolvedBarGeometry,
 };
+use crate::render::track_fill::{validate_track_fill_color, TrackFillColor};
 use crate::widgets::value::config::ValueConfig;
 use crate::widgets::value::validation::normalize_starting_altitude_m;
 
@@ -48,7 +49,7 @@ pub struct ValidatedLinearGaugeWidget {
     pub track_border_color: String,
     pub track_empty_color: String,
     pub track_empty_opacity: f32,
-    pub track_filled_color: String,
+    pub track_filled_color: TrackFillColor,
     pub track_filled_opacity: f32,
     pub track_fill_flat: bool,
     pub track_fill_style: TrackFillStyle,
@@ -227,9 +228,11 @@ pub fn validate_linear_gauge(
             &p("track_empty_color"),
         )?,
         track_empty_opacity,
-        track_filled_color: require_hex_color(
+        track_filled_color: validate_track_fill_color(
             value.track_filled_color.as_deref(),
-            &p("track_filled_color"),
+            value.track_filled_gradient,
+            value.track_filled_gradient_stops,
+            p,
         )?,
         track_filled_opacity,
         track_fill_flat: require_bool(value.track_fill_flat, &p("track_fill_flat"))?,

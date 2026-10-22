@@ -1,6 +1,5 @@
 import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
-import { useMemo, useState } from 'react'
-import GradientPicker from '@/components/ui/gradient-picker'
+import { useMemo } from 'react'
 import { SlidersHorizontal, Tags } from 'lucide-react'
 import { buildUniformResizeUpdate } from '../../utils/widgetSize'
 import FontSelectField from '@/components/ui/font-select-field'
@@ -10,6 +9,7 @@ import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { FontSection, UnitsControlRow } from '../widgetEditorSections'
 import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from '../widgetFormControls'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
+import TrackFilledColorFields from './TrackFilledColorFields'
 import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry, getArcTrackDimensions } from '../../utils/gaugeGeometry'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
 import { useTranslation } from 'react-i18next'
@@ -60,10 +60,6 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
   const cornerRadiusMax = getArcCornerRadiusMax(arcData, displayType)
   const size = widget.data.width ?? arcData.width
   const barGapMax = arcData.track_fill_style === 'bars' ? getArcGapMax(arcData, displayType) : 0
-  const [trialGradientStops, setTrialGradientStops] = useState([
-    { offset: 0, color: '#40e0d0' },
-    { offset: 1, color: '#c65102' },
-  ])
 
   const updateBoundedNumber = (updateVariant, key, rawValue, min, max) => {
     const value = Number(rawValue)
@@ -220,25 +216,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             onSliderChange={(track_empty_opacity) => updateArc({ track_empty_opacity })}
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            label={t('widget-editor.filledColor', 'Filled Color')}
-            value={arcData.track_filled_color}
-            onChange={(track_filled_color) => updateArc({ track_filled_color })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.filledOpacity', 'Filled Opacity')}
-            value={arcData.track_filled_opacity}
-            min={0}
-            max={1}
-            step={0.05}
-            valueScale={100}
-            valueDisplay={`${Math.round((arcData.track_filled_opacity ?? 0) * 100)}`}
-            suffix="%"
-            onSliderChange={(track_filled_opacity) => updateArc({ track_filled_opacity })}
-          />
-        </div>
+        <TrackFilledColorFields data={arcData} updateVariant={updateArc} supportsGradient={!isGtGauge} />
         {isGtGauge ? (
           <div className="grid grid-cols-2 gap-4">
             <SliderField
@@ -255,8 +233,6 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             />
           </div>
         ) : null}
-        {/* TEMP: gradient picker trial, not wired to widget data */}
-        <GradientPicker label="Gradient" stops={trialGradientStops} onChange={setTrialGradientStops} />
       </div>
 
       <FontSection

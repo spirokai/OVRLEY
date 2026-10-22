@@ -646,6 +646,7 @@
     "emptyOpacity": "Lege dekking",
     "fillColor": "Vulkleur",
     "filledColor": "Gevulde kleur",
+    "fillGradient": "Verloop",
     "filledOpacity": "Gevulde dekking",
     "fillOpacity": "Dekking vulling",
     "finishedColor": "Voltooide kleur",

@@ -49,6 +49,27 @@ pub fn bordered_bar_fill_rect(
     )
 }
 
+/// The gauge-local bordered track's fill direction, from empty to full.
+pub(super) fn fill_axis(
+    width: f32,
+    height: f32,
+    orientation: ValidatedLinearGaugeOrientation,
+    border_thickness: f32,
+) -> (Point, Point) {
+    let (x, y, width, height) =
+        bordered_bar_fill_rect(0.0, 0.0, width, height, 1.0, orientation, border_thickness);
+    match orientation {
+        ValidatedLinearGaugeOrientation::Horizontal => (
+            Point::new(x, y + height * 0.5),
+            Point::new(x + width, y + height * 0.5),
+        ),
+        ValidatedLinearGaugeOrientation::Vertical => (
+            Point::new(x + width * 0.5, y + height),
+            Point::new(x + width * 0.5, y),
+        ),
+    }
+}
+
 pub(super) fn segment_rect(
     index: u32,
     extent: f32,
