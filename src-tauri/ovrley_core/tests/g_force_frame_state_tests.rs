@@ -275,7 +275,7 @@ fn prepare_g_force_cache(
     let horizontal = dense.g_force_axis(widget.axis_horizontal);
     let vertical = dense.g_force_axis(widget.axis_vertical);
     GForceFrames {
-        layout: prepare_g_force_cache_layout(widget, &scene.presentation).unwrap(),
+        layout: prepare_g_force_cache_layout(widget, &scene.presentation, 1.0).unwrap(),
         samples: (0..dense.frame_count)
             .map(|index| {
                 GForceSample::new(

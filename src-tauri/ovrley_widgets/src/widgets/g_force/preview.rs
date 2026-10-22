@@ -42,7 +42,7 @@ impl PreviewGForce {
         scene: &ValidatedScenePresentation,
         host: &WidgetHost,
     ) -> WidgetResult<Self> {
-        let cache = prepare_g_force_cache(&config, scene)?;
+        let cache = prepare_g_force_cache(&config, scene, host.raster_scale.value())?;
         Ok(Self {
             config,
             cache,

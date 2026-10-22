@@ -5,19 +5,24 @@ use super::{
     validation::ValidatedGForceWidget,
 };
 use crate::{
-    error::{WidgetError, WidgetResult},
+    error::WidgetResult,
     model::{scene::ValidatedScenePresentation, standard_widgets::widget_font_weight},
     render::text::{
-        draw_text_blob, layout_text, parse_color, resolve_font, text_selection_bounds, FontResolver,
-        ResolvedTextStyle,
+        layout_text_path, parse_color, resolve_font, FontResolver, ResolvedTextStyle, TextPaints,
     },
 };
-use skia_safe::{Canvas, Paint, Point, Rect, TextBlob};
+use skia_safe::{Canvas, Paint, Path, Point, Rect};
 
+/// Labels are placed outlines so they track the dial continuously while it resizes.
 struct TextRun {
-    blob: TextBlob,
-    baseline: f32,
-    style: ResolvedTextStyle,
+    path: Path,
+    paints: TextPaints,
+}
+
+impl TextRun {
+    fn draw(&self, canvas: &Canvas) {
+        self.paints.draw_path(canvas, &self.path);
+    }
 }
 
 pub struct GForceFrame {
@@ -33,24 +38,20 @@ pub struct GForceFrame {
 
 impl GForceFrame {
     pub fn draw(&self, canvas: &Canvas, cache: &GForceCache) {
-        canvas.draw_image(
+        canvas.draw_image_rect(
             &cache.parent_circle_image,
-            (cache.parent_circle_image_x, cache.parent_circle_image_y),
             None,
+            cache.parent_circle_rect,
+            &Paint::default(),
         );
         canvas.draw_circle(
             Point::new(cache.x + self.state.marker_x, cache.y + self.state.marker_y),
             self.marker_radius,
             &self.marker_paint,
         );
-        draw_text_blob(
-            canvas,
-            &self.value.blob,
-            self.value.baseline,
-            &self.value.style,
-        );
+        self.value.draw(canvas);
         if let Some(unit) = &self.unit {
-            draw_text_blob(canvas, &unit.blob, unit.baseline, &unit.style);
+            unit.draw(canvas);
         }
     }
 }
@@ -111,28 +112,23 @@ pub fn prepare_g_force_frame(
         marker_radius * 2.0,
     ));
     let mut bounds = content_bounds;
-    let mut prepare_text = |text: &str, style: ResolvedTextStyle| -> WidgetResult<(TextRun, f32)> {
-        let text = layout_text(text, &font, 0.0, style.numerals);
-        let ink = &text.measurement;
-        let baseline =
-            style.y + (line_height - (ink.bounds_bottom - ink.bounds_top)) * 0.5 - ink.bounds_top;
-        bounds.join(Rect::new(
-            style.x + ink.bounds_left,
-            baseline + ink.bounds_top,
-            style.x + ink.bounds_right,
-            baseline + ink.bounds_bottom,
+    let mut prepare_text = |text: &str, style: ResolvedTextStyle| -> (TextRun, f32) {
+        let (path, width) = layout_text_path(text, &font, style.numerals);
+        // Outline bounds scale continuously; glyph-mask bounds step in whole pixels.
+        let ink = path.compute_tight_bounds();
+        let baseline = style.y + (line_height - ink.height()) * 0.5 - ink.top;
+        bounds.join(ink.with_offset((style.x, baseline)));
+        content_bounds.join(Rect::new(
+            style.x,
+            baseline + ink.top,
+            style.x + width,
+            baseline + ink.bottom,
         ));
-        content_bounds.join(text_selection_bounds(ink, style.x, baseline));
-        Ok((
-            TextRun {
-                blob: text
-                    .blob
-                    .ok_or_else(|| WidgetError::Render("unable to lay out G-force label".into()))?,
-                baseline,
-                style,
-            },
-            ink.width,
-        ))
+        let run = TextRun {
+            path: path.with_offset((style.x, baseline)),
+            paints: TextPaints::new(&style),
+        };
+        (run, width)
     };
     let value_text = if state.magnitude.is_some() {
         state
@@ -142,22 +138,18 @@ pub fn prepare_g_force_frame(
     } else {
         &state.label
     };
-    let (value, value_width) = prepare_text(value_text, style.clone())?;
-    let unit = if state.magnitude.is_some() {
-        Some(
-            prepare_text(
-                &widget.label_unit,
-                ResolvedTextStyle {
-                    x: style.x + value_width + 3.0,
-                    color: parse_color(&widget.label_unit_color, widget.opacity),
-                    ..style
-                },
-            )?
-            .0,
+    let (value, value_width) = prepare_text(value_text, style.clone());
+    let unit = state.magnitude.is_some().then(|| {
+        prepare_text(
+            &widget.label_unit,
+            ResolvedTextStyle {
+                x: style.x + value_width + 3.0,
+                color: parse_color(&widget.label_unit_color, widget.opacity),
+                ..style
+            },
         )
-    } else {
-        None
-    };
+        .0
+    });
     let shadow_padding = if scene.shadow_strength > 0.0 {
         (scene.shadow_strength * 3.0 + scene.shadow_distance) * scale
     } else {

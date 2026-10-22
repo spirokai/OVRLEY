@@ -10,7 +10,7 @@ use crate::{
     widgets::value::preview::{surface, SHAPE_COLOR_TYPE},
 };
 use skia_safe::{
-    paint::Style, BlendMode, ClipOp, Color, Image, Paint, PathBuilder, PathFillType, Point,
+    paint::Style, BlendMode, ClipOp, Color, Image, Paint, PathBuilder, PathFillType, Point, Rect,
 };
 
 const GUIDE_DEFAULT_THICKNESS_PX: f32 = 2.0;
@@ -43,9 +43,9 @@ pub fn g_force_layout(widget: &ValidatedGForceWidget, scale: f32) -> GForceLayou
 pub struct GForceCache {
     config: ValidatedGForceWidget,
     scene: ValidatedScenePresentation,
+    /// Rasterized at the host's density, so stamping it into its scene rectangle is 1:1.
     pub parent_circle_image: Image,
-    pub parent_circle_image_x: f32,
-    pub parent_circle_image_y: f32,
+    pub parent_circle_rect: Rect,
     pub layout: GForceLayout,
     pub x: f32,
     pub y: f32,
@@ -61,9 +61,14 @@ impl GForceCache {
     }
 }
 
+/// Rasterizes the static dial at `density` raster pixels per scene pixel.
+///
+/// Matching the host's density keeps thin guides intact; resampling a scene-density
+/// dial onto a reduced preview raster drops whole pixel rows and columns.
 pub fn prepare_g_force_cache(
     widget: &ValidatedGForceWidget,
     scene: &ValidatedScenePresentation,
+    density: f32,
 ) -> WidgetResult<GForceCache> {
     let scale = scene.scale;
     let layout = g_force_layout(widget, scale);
@@ -82,13 +87,18 @@ pub fn prepare_g_force_cache(
         0.0
     };
     let padding = (border_thickness.max(1.0) * 0.5 + shadow_extent).ceil() as u32;
+    let extent = |length: f32| {
+        ((length.ceil() as u32).saturating_add(padding.saturating_mul(2)) as f32 * density).ceil()
+            as u32
+    };
     let mut surface = surface(
-        (layout.width.ceil() as u32).saturating_add(padding.saturating_mul(2)),
-        (layout.height.ceil() as u32).saturating_add(padding.saturating_mul(2)),
+        extent(layout.width),
+        extent(layout.height),
         SHAPE_COLOR_TYPE,
     )?;
     let canvas = surface.canvas();
     canvas.clear(Color::TRANSPARENT);
+    canvas.scale((density, density));
     canvas.translate((padding as f32, padding as f32));
     if border_thickness > 0.0 {
         let mut source = Paint::default();
@@ -164,8 +174,12 @@ pub fn prepare_g_force_cache(
         layout,
         x: widget.x,
         y: widget.y,
+        parent_circle_rect: Rect::from_xywh(
+            widget.x - padding as f32,
+            widget.y - padding as f32,
+            surface.width() as f32 / density,
+            surface.height() as f32 / density,
+        ),
         parent_circle_image: surface.image_snapshot(),
-        parent_circle_image_x: widget.x - padding as f32,
-        parent_circle_image_y: widget.y - padding as f32,
     })
 }

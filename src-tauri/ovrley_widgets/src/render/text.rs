@@ -6,7 +6,8 @@ use crate::error::WidgetResult;
 use crate::model::{scene::Numerals, standard_widgets::widget_font_weight};
 use skia_safe::{
     paint::{Join, Style},
-    Canvas, Color, Font, Paint, Point, Rect, TextBlob, TextBlobBuilder, Typeface,
+    Canvas, Color, Font, Paint, Path, PathBuilder, Point, Rect, TextBlob, TextBlobBuilder,
+    Typeface,
 };
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -190,6 +191,20 @@ impl TextPaints {
             canvas.draw_text_blob(blob, Point::from(position), paint);
         }
     }
+
+    /// Paints placed glyph outlines, which keep fractional positions the glyph cache would round.
+    pub fn draw_path(&self, canvas: &Canvas, path: &Path) {
+        if let Some(shadow) = &self.shadow {
+            let offset = (self.shadow_distance, self.shadow_distance);
+            canvas.draw_path(&path.with_offset(offset), shadow);
+        }
+        for paint in [self.border.as_ref(), Some(&self.fill)]
+            .into_iter()
+            .flatten()
+        {
+            canvas.draw_path(path, paint);
+        }
+    }
 }
 
 /// Resolves a font from configured font directories or system fonts.
@@ -265,6 +280,26 @@ pub fn measure_text(
 pub(crate) struct LaidOutText {
     pub blob: Option<TextBlob>,
     pub measurement: MeasuredText,
+}
+
+/// Glyph outlines placed as `layout_text` places untracked text, origin on the baseline, and their advance width.
+pub(crate) fn layout_text_path(text: &str, font: &Font, numerals: Numerals) -> (Path, f32) {
+    let (glyphs, xs, width) = match fixed_width_digits(text, font, 0.0, numerals) {
+        Some(placed) => (placed.glyphs, placed.xs, placed.width),
+        None => {
+            let glyphs = font.str_to_glyphs_vec(text);
+            let mut xs = vec![0.0; glyphs.len()];
+            font.get_x_pos(&glyphs, &mut xs, None);
+            (glyphs, xs, font.measure_str(text, None).0)
+        }
+    };
+    let mut builder = PathBuilder::new();
+    for (glyph, x) in glyphs.into_iter().zip(xs) {
+        if let Some(outline) = font.get_path(glyph) {
+            builder.add_path_with_offset(&outline, (x, 0.0), None);
+        }
+    }
+    (builder.detach(), width)
 }
 
 // Keep the existing whole-string layout at zero. Nonzero tracking uses intact

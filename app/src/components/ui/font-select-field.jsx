@@ -34,7 +34,7 @@ export default function FontSelectField({
   const { recommendedOptions, filteredSystemFonts } = getFontSelectOptions(value, recommendedFonts, systemFonts)
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-0.5">
       <Label className={labelClassName} disabled={disabled}>
         {label}
       </Label>
