@@ -1,9 +1,5 @@
 [workspace]
-members = [
-    ".",
-    "ovrley_core",
-    "ovrley_widgets",
-]
+members = [".", "ovrley_core", "ovrley_widgets"]
 
 [package]
 name = "app"
@@ -46,3 +42,7 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 reqwest = { version = "0.12.28", default-features = false, features = ["blocking", "rustls-tls"] }
 http = "1.4"
 http-cache-semantics = "=2.1.0"
+
+# Per-pixel overlay conversion runs in ovrley_core; unoptimized it makes dev exports unusably slow.
+[profile.dev.package.ovrley_core]
+opt-level = 3
