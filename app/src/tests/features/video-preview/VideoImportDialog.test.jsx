@@ -80,8 +80,8 @@ describe('VideoImportDialog', () => {
     const ride = screen.getByRole('listitem', { name: 'ride.mp4' })
     expect(within(ride).getByText('New')).toBeInTheDocument()
     expect(within(ride).getByText('Will be imported')).toBeInTheDocument()
-    expect(within(ride).getByRole('textbox', { name: 'Sync of ride.mp4 (seconds)' })).toHaveValue('330')
-    expect(within(ride).getByText('05:30')).toBeInTheDocument()
+    expect(within(ride).getByRole('textbox', { name: 'Sync of ride.mp4' })).toHaveValue('05:30')
+    expect(within(ride).getByText('330 s')).toBeInTheDocument()
     expect(screen.getByRole('listitem', { name: 'early.mp4' })).toHaveTextContent(
       'Not imported: starts more than an hour before or after the activity',
     )

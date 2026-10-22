@@ -35,7 +35,9 @@ use std::process::Command;
 /// 1. Stream-level `creation_time` tag from the first video stream
 /// 2. Container-level `creation_time` from the format tags
 /// 3. QuickTime-specific `com.apple.quicktime.creationdate` tag
-/// 4. File-system modification time (converted to RFC 3339) as final fallback
+///
+/// Without any of them the time stays unknown: the file-system modification
+/// time is usually when the file was copied, not recorded.
 ///
 /// # Phases
 /// 1. Resolve ffprobe binary and spawn the subprocess
@@ -225,19 +227,8 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
         .map(|s| s.to_string());
     if metadata.creation_time.is_some() {
         metadata.time_source = Some("ffprobe".to_string());
-    }
-
-    if metadata.creation_time.is_none() {
-        log::warn!("No creation time found in video metadata. Using file system modified time as fallback.");
-        if let Ok(fs_meta) = std::fs::metadata(file_path) {
-            if let Ok(modified) = fs_meta.modified() {
-                let dt: chrono::DateTime<chrono::Utc> = modified.into();
-                let rfc3339 = dt.to_rfc3339();
-                log::debug!("Fallback file modified time: {}", rfc3339);
-                metadata.creation_time = Some(rfc3339);
-                metadata.time_source = Some("file_mtime".to_string());
-            }
-        }
+    } else {
+        log::warn!("No creation time found in video metadata.");
     }
 
     // ffprobe timestamps are a salvage sync fallback, not authoritative

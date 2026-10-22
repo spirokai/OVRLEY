@@ -11,7 +11,6 @@ const TELEMETRY_STATUS_LABELS = {
 const TIME_SOURCE_KEYS = {
   gps: 'toolbar.timeSourceGps',
   ffprobe: 'toolbar.timeSourceMetadata',
-  file_mtime: 'toolbar.timeSourceFileModified',
   filename: 'toolbar.timeSourceFilename',
 }
 

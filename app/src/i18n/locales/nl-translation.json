@@ -402,7 +402,6 @@
     "startTime": "Starttijd",
     "syncOffset": "Synchronisatieverschuiving",
     "timeSource": "Tijdbron",
-    "timeSourceFileModified": "Bestand gewijzigd",
     "timeSourceGps": "GPS-tijdstempel",
     "timeSourceMetadata": "Metagegevens",
     "timeSourceFilename": "Bestandsnaam",

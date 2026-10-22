@@ -402,7 +402,6 @@
     "startTime": "Czas rozpoczęcia",
     "syncOffset": "Przesunięcie synchronizacji",
     "timeSource": "Źródło czasu",
-    "timeSourceFileModified": "Zmodyfikowano plik",
     "timeSourceGps": "Znacznik czasu GPS",
     "timeSourceMetadata": "Metadane",
     "timeSourceFilename": "Nazwa pliku",

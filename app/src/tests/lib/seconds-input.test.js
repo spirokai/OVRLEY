@@ -6,21 +6,24 @@ const PAL = { num: 25, den: 1 }
 const NTSC = { num: 30000, den: 1001 }
 
 describe('seconds input helpers', () => {
-  test('accept only a number being typed, with a sign only where allowed', () => {
-    for (const draft of ['', '3', '330', '330.', '330.5', '.5']) expect(normalizeSecondsDraft(draft, false)).toBe(draft)
-    expect(normalizeSecondsDraft('330,5', false)).toBe('330.5')
-    for (const text of ['1:30', '5garbage', 'abc', '1.2.3', '-5', '1e3', ' 5']) expect(normalizeSecondsDraft(text, false)).toBeNull()
+  test('accept only a clock or seconds being typed, with a sign only where allowed', () => {
+    for (const draft of ['', '3', '330', '330.5', '.5', '5:', '5:30', '1:01:40.5', '01:01:']) expect(normalizeSecondsDraft(draft, false)).toBe(draft)
+    expect(normalizeSecondsDraft('5:30,5', false)).toBe('5:30.5')
+    for (const text of ['1:2:3:4', '5.5:30', '5garbage', 'abc', '1.2.3', '-5', '1e3', ' 5']) expect(normalizeSecondsDraft(text, false)).toBeNull()
     expect(normalizeSecondsDraft('-', true)).toBe('-')
-    expect(normalizeSecondsDraft('-12.5', true)).toBe('-12.5')
+    expect(normalizeSecondsDraft('-05:30', true)).toBe('-05:30')
     expect(normalizeSecondsDraft('1-2', true)).toBeNull()
   })
 
-  test('parse complete numbers only', () => {
+  test('parse a complete clock or plain seconds', () => {
+    expect(parseSecondsDraft('05:30')).toBe(330)
+    expect(parseSecondsDraft('01:01:40')).toBe(3700)
+    expect(parseSecondsDraft('5:00.04')).toBe(300.04)
+    expect(parseSecondsDraft('-05:30')).toBe(-330)
     expect(parseSecondsDraft('330')).toBe(330)
     expect(parseSecondsDraft('330.')).toBe(330)
     expect(parseSecondsDraft('.5')).toBe(0.5)
-    expect(parseSecondsDraft('-12.5')).toBe(-12.5)
-    for (const draft of ['', '-', '.', '-.']) expect(parseSecondsDraft(draft)).toBeNull()
+    for (const draft of ['', '-', '.', '-.', '5:', ':30', '5:60', '1:60:00', '1::30']) expect(parseSecondsDraft(draft)).toBeNull()
   })
 
   test('show up to three decimals without trailing zeros', () => {
@@ -47,5 +50,6 @@ describe('seconds input helpers', () => {
     expect(formatSecondsClock(300.04)).toBe('05:00.04')
     expect(formatSecondsClock(1 / 30)).toBe('00:00.033')
     expect(formatSecondsClock(0)).toBe('00:00')
+    expect(formatSecondsClock(-0.0001)).toBe('00:00')
   })
 })

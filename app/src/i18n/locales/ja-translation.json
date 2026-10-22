@@ -402,7 +402,6 @@
     "startTime": "開始時刻",
     "syncOffset": "同期オフセット",
     "timeSource": "時刻のソース",
-    "timeSourceFileModified": "ファイル変更時刻",
     "timeSourceGps": "GPSタイムスタンプ",
     "timeSourceMetadata": "メタデータ",
     "timeSourceFilename": "ファイル名",

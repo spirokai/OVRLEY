@@ -2,7 +2,8 @@
  * Pure helpers of the seconds input: what can be typed, how a draft parses, how
  * a value is shown, and how it snaps to a frame grid.
  *
- * A draft holds digits, at most one `.` and, for signed values, a leading `-`.
+ * A draft is a clock (`5:30`, `1:01:40.5`) or plain seconds (`330`): digits, up
+ * to two `:`, one `.` in the last part and, for signed values, a leading `-`.
  * A comma is read as the decimal point.
  */
 
@@ -11,12 +12,12 @@ import { framesToSeconds, secondsToFrames, snapDurationToFrames } from './video-
 /** Decimals shown for a value; three resolve every frame up to 500 fps. */
 const SHOWN_DECIMALS = 3
 
-const SIGNED_DRAFT = /^-?\d*\.?\d*$/
-const UNSIGNED_DRAFT = /^\d*\.?\d*$/
-const COMPLETE_NUMBER = /^-?(\d+\.?\d*|\.\d+)$/
+const SIGNED_DRAFT = /^-?(?:\d*:){0,2}\d*\.?\d*$/
+const UNSIGNED_DRAFT = /^(?:\d*:){0,2}\d*\.?\d*$/
+const COMPLETE_CLOCK = /^(-?)(?:(?:(\d+):)?(\d+):)?(\d+\.?\d*|\.\d+)$/
 
 /**
- * Normalizes typed text into a draft, or rejects it when it holds anything but a number being typed.
+ * Normalizes typed text into a draft, or rejects it when it holds anything but a time being typed.
  * @param {string} text Text in the field.
  * @param {boolean} signed Whether negative values are allowed.
  * @returns {string|null} Draft, or null when the text is rejected.
@@ -27,18 +28,23 @@ export function normalizeSecondsDraft(text, signed) {
 }
 
 /**
- * Parses a draft that holds a complete number.
+ * Parses a draft that holds a complete time. After a `:`, minutes and seconds stay below 60.
  * @param {string} draft Normalized draft.
- * @returns {number|null} Seconds, or null for an incomplete draft (empty, `-`, `.`).
+ * @returns {number|null} Seconds, or null for an incomplete or invalid draft (empty, `-`, `5:`, `5:75`).
  */
 export function parseSecondsDraft(draft) {
-  return COMPLETE_NUMBER.test(draft) ? Number(draft) : null
+  const match = COMPLETE_CLOCK.exec(draft)
+  if (match === null) return null
+  const [, sign, hours, minutes, seconds] = match
+  if ((hours !== undefined && Number(minutes) >= 60) || (minutes !== undefined && Number(seconds) >= 60)) return null
+  const total = Number(hours ?? 0) * 3600 + Number(minutes ?? 0) * 60 + Number(seconds)
+  return sign === '-' ? -total : total
 }
 
 /**
- * Formats seconds as field text: up to three decimals, without trailing zeros.
+ * Formats seconds as plain seconds: up to three decimals, without trailing zeros.
  * @param {number} seconds Value.
- * @returns {string} Field text.
+ * @returns {string} Seconds text.
  */
 export function formatSecondsText(seconds) {
   return String(Number(seconds.toFixed(SHOWN_DECIMALS)) || 0)

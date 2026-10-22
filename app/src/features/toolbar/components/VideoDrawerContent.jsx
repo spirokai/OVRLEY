@@ -96,7 +96,7 @@ function TransitionDefaultsSection() {
           onSelect={section.onTypeChange}
         />
         <Label htmlFor="transition-defaults-duration" className="text-xs font-bold text-muted-foreground">
-          {t('video-preview.transitionDuration', 'Duration (seconds)')}
+          {t('video-preview.transitionDuration', 'Duration')}
         </Label>
         <SecondsInput
           id="transition-defaults-duration"
@@ -107,7 +107,7 @@ function TransitionDefaultsSection() {
           className="h-7 text-xs"
         />
         <Label htmlFor="transition-defaults-threshold" className="text-xs font-bold text-muted-foreground">
-          {t('video-preview.continuityThreshold', 'Continuity threshold (seconds)')}
+          {t('video-preview.continuityThreshold', 'Continuity threshold')}
         </Label>
         <SecondsInput
           id="transition-defaults-threshold"

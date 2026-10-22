@@ -402,7 +402,6 @@
     "startTime": "Starttid",
     "syncOffset": "Synkroniseringsförskjutning",
     "timeSource": "Tidskälla",
-    "timeSourceFileModified": "Filen ändrad",
     "timeSourceGps": "GPS-tidsstämpel",
     "timeSourceMetadata": "Metadata",
     "timeSourceFilename": "Filnamn",

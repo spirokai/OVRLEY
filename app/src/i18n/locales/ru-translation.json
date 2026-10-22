@@ -402,7 +402,6 @@
     "startTime": "Время начала",
     "syncOffset": "Смещение синхронизации",
     "timeSource": "Источник времени",
-    "timeSourceFileModified": "Файл изменён",
     "timeSourceGps": "Временная метка GPS",
     "timeSourceMetadata": "Метаданные",
     "timeSourceFilename": "Имя файла",

@@ -1,6 +1,6 @@
 /**
- * The one input for times and durations in seconds: digits only, with the value
- * as a read-only clock readout inside the field (`330` → `05:30`).
+ * The one input for times and durations: the value is typed as a clock (`05:30`)
+ * or as plain seconds, with a read-only seconds readout inside the field (`330 s`).
  */
 
 import { useId } from 'react'
@@ -37,7 +37,6 @@ export function SecondsInput({ value, onCommit, fps, mode = 'time', signed = fal
         <Input
           {...props}
           type="text"
-          inputMode="decimal"
           value={field.text}
           onChange={field.onChange}
           onBlur={field.onBlur}

@@ -402,7 +402,6 @@
     "startTime": "Čas zahájení",
     "syncOffset": "Posun synchronizace",
     "timeSource": "Zdroj času",
-    "timeSourceFileModified": "Soubor změněn",
     "timeSourceGps": "Časové razítko GPS",
     "timeSourceMetadata": "Metadata",
     "timeSourceFilename": "Název souboru",

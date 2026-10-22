@@ -1,5 +1,5 @@
 /**
- * Behavior tests for the shared seconds input: what can be typed, the readout,
+ * Behavior tests for the shared seconds input: clock entry, the seconds readout,
  * frame snapping on commit, and validation.
  */
 
@@ -17,16 +17,20 @@ function renderInput(props) {
 }
 
 describe('SecondsInput', () => {
-  test('ignores anything but a number and reads the value as a clock while typing', async () => {
+  test('shows the value as a clock, ignores anything but a time, and reads the draft in seconds', async () => {
     const user = userEvent.setup()
     const { input } = renderInput({ value: 3700 })
-    expect(input).toHaveValue('3700')
-    expect(screen.getByText('01:01:40')).toBeInTheDocument()
+    expect(input).toHaveValue('01:01:40')
+    expect(screen.getByText('3700 s')).toBeInTheDocument()
 
     await user.clear(input)
-    await user.type(input, '3a3:0x')
-    expect(input).toHaveValue('330')
-    expect(screen.getByText('05:30')).toBeInTheDocument()
+    await user.type(input, '5a:3x0')
+    expect(input).toHaveValue('5:30')
+    expect(screen.getByText('330 s')).toBeInTheDocument()
+
+    await user.clear(input)
+    await user.type(input, '330')
+    expect(screen.getByText('330 s')).toBeInTheDocument()
   })
 
   test('commits on Enter or leaving the field, snapped to the nearest frame', async () => {
@@ -34,12 +38,12 @@ describe('SecondsInput', () => {
     const { input, onCommit, rerender } = renderInput({ value: 0 })
 
     await user.clear(input)
-    await user.type(input, '300.03{Enter}')
+    await user.type(input, '5:00.03{Enter}')
     expect(onCommit).toHaveBeenCalledExactlyOnceWith(300.04)
 
     // The field shows the stored value once the store has it.
     rerender(<SecondsInput aria-label="Start" value={300.04} fps={PAL} onCommit={onCommit} />)
-    expect(input).toHaveValue('300.04')
+    expect(input).toHaveValue('05:00.04')
 
     await user.clear(input)
     await user.type(input, '12')
@@ -52,31 +56,34 @@ describe('SecondsInput', () => {
     const { input, onCommit } = renderInput({ value: 10 })
 
     await user.clear(input)
-    await user.type(input, '10.01{Enter}')
+    await user.type(input, '00:10.01{Enter}')
     expect(onCommit).not.toHaveBeenCalled()
-    expect(input).toHaveValue('10')
+    expect(input).toHaveValue('00:10')
 
     await user.clear(input)
     await user.type(input, '42{Escape}')
-    expect(input).toHaveValue('10')
+    expect(input).toHaveValue('00:10')
     fireEvent.blur(input)
     expect(onCommit).not.toHaveBeenCalled()
   })
 
-  test('rejects incomplete numbers, negative values unless signed, and durations of 0', async () => {
+  test('rejects incomplete or invalid times, negative values unless signed, and durations of 0', async () => {
     const user = userEvent.setup()
     const { input, onCommit, unmount } = renderInput({ value: 5 })
 
     await user.clear(input)
     await user.type(input, '-.{Enter}')
     expect(input).toHaveValue('.')
-    expect(screen.getByRole('alert')).toHaveTextContent('Enter a number of seconds')
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a time like 05:30 or a number of seconds')
     expect(input).toHaveAttribute('aria-invalid', 'true')
+    await user.clear(input)
+    await user.type(input, '5:75{Enter}')
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a time like 05:30 or a number of seconds')
     unmount()
 
     const signed = renderInput({ value: 5, signed: true })
     await user.clear(signed.input)
-    await user.type(signed.input, '-2{Enter}')
+    await user.type(signed.input, '-00:02{Enter}')
     expect(signed.onCommit).toHaveBeenCalledExactlyOnceWith(-2)
     signed.unmount()
 

@@ -402,7 +402,6 @@
     "startTime": "Hora de início",
     "syncOffset": "Deslocamento de sincronização",
     "timeSource": "Fonte do horário",
-    "timeSourceFileModified": "Arquivo modificado",
     "timeSourceGps": "Carimbo de data/hora GPS",
     "timeSourceMetadata": "Metadados",
     "timeSourceFilename": "Nome",

@@ -49,7 +49,7 @@ describe('JoinTransitionControl', () => {
       commitDuration,
     }
     const { rerender } = render(<JoinTransitionControl id="join" model={model} />)
-    const duration = screen.getByLabelText('Transition duration (seconds)')
+    const duration = screen.getByLabelText('Transition duration')
     fireEvent.change(duration, { target: { value: '0' } })
     fireEvent.blur(duration)
     expect(commitDuration).not.toHaveBeenCalled()

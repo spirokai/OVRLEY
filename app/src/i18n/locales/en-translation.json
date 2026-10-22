@@ -87,7 +87,8 @@
     "redColorComponent0255": "Red color component (0-255)",
     "saturationPercentage0100": "Saturation percentage (0-100)",
     "secondsAboveZero": "Enter a duration above 0 seconds",
-    "secondsInvalid": "Enter a number of seconds",
+    "secondsInvalid": "Enter a time like 05:30 or a number of seconds",
+    "secondsReadout": "{{seconds}} s",
     "system": "System"
   },
   "overlay-editor": {
@@ -442,7 +443,6 @@
     "startTime": "Start time",
     "syncOffset": "Sync Offset",
     "timeSource": "Time source",
-    "timeSourceFileModified": "File modified",
     "timeSourceGps": "GPS timestamp",
     "timeSourceMetadata": "Metadata",
     "timeSourceFilename": "Filename",
@@ -469,7 +469,7 @@
     "default": "Default",
     "defaultIs": "Default ({{transition}})",
     "tooLong": "Too long for the video pieces it joins",
-    "duration": "Transition duration (seconds)",
+    "duration": "Transition duration",
     "filter": "Filter transitions",
     "picker": "Transitions"
   },
@@ -543,12 +543,12 @@
       "fileUnavailable": "The local preview server could not read the video file. The file may have been moved, deleted, or become unavailable.",
       "unsupportedFormat": "This video format is not supported by the system video player."
     },
-    "continuityThreshold": "Continuity threshold (seconds)",
+    "continuityThreshold": "Continuity threshold",
     "deletedPartIndicator": "Deleted part – not exported",
     "renderingTransition": "Rendering transition preview…",
     "overlapPlaybackWarning": "Videos overlap here. The preview plays the earlier video first; one combined export is not possible.",
     "theVideoPreviewCouldNotBeLoaded": "The video preview could not be loaded.",
-    "transitionDuration": "Duration (seconds)",
+    "transitionDuration": "Duration",
     "transitionType": "Transition",
     "unsupportedVideoFile": "Not a supported video file (MP4, MOV, MKV).",
     "videoCount": "{{count}} videos",
@@ -577,7 +577,7 @@
     "importSpanTooLong": "Not imported: the videos start more than 12 hours apart. Edit their sync to import them.",
     "importPositioned": "Recording time unknown: use the arrows to place it after another video.",
     "importOverlap": "Overlaps {{name}} by {{duration}}",
-    "importSyncOf": "Sync of {{name}} (seconds)",
+    "importSyncOf": "Sync of {{name}}",
     "importMoveUp": "Move {{name}} up",
     "importMoveDown": "Move {{name}} down",
     "importRemoveFromProject": "Remove {{name}} from the project"

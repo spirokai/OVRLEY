@@ -155,7 +155,7 @@ export function resolveVideosSync(videos, activitySummary, sessionMode) {
 
 function parseCreationTimeMs(video) {
   if (typeof video.creationTime !== 'string' || video.creationTime.trim() === '') return null
-  if (video.timeSource === 'gps' || video.timeSource === 'file_mtime') {
+  if (video.timeSource === 'gps') {
     const parsed = Date.parse(video.creationTime)
     return Number.isFinite(parsed) ? parsed : null
   }

@@ -21,15 +21,15 @@ export function formatClockDuration(seconds) {
 }
 
 /**
- * Formats seconds as a clock readout: `mm:ss`, or `hh:mm:ss` from one hour on,
- * with up to three decimals when the value has a fraction (`330.5` → `05:30.5`).
+ * Formats seconds as a clock: `mm:ss`, or `hh:mm:ss` from one hour on, with up
+ * to three decimals when the value has a fraction (`330.5` → `05:30.5`).
  *
  * @param {number} seconds - Value in seconds.
- * @returns {string} Clock readout.
+ * @returns {string} Clock text.
  */
 export function formatSecondsClock(seconds) {
-  const sign = seconds < 0 ? '-' : ''
   const rounded = Number(Math.abs(seconds).toFixed(3))
+  const sign = seconds < 0 && rounded > 0 ? '-' : ''
   const wholeSeconds = Math.floor(rounded)
   const fraction = String(Number((rounded - wholeSeconds).toFixed(3))).slice(1)
   const hours = Math.floor(wholeSeconds / 3600)

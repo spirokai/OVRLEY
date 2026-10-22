@@ -172,18 +172,18 @@ describe('VideoDrawerContent', () => {
     expect(onRemoveVideo).toHaveBeenCalledExactlyOnceWith('video-2')
 
     const [, thirdOffset] = screen.getAllByLabelText('Start on timeline')
-    expect(thirdOffset).toHaveValue('50')
-    // Only seconds can be typed; the start snaps to the clip's frames (30 fps).
-    fireEvent.change(thirdOffset, { target: { value: '1:10' } })
-    expect(thirdOffset).toHaveValue('50')
-    fireEvent.change(thirdOffset, { target: { value: '70.52' } })
+    expect(thirdOffset).toHaveValue('00:50')
+    // Only a time can be typed; the start snaps to the clip's frames (30 fps).
+    fireEvent.change(thirdOffset, { target: { value: '1:10s' } })
+    expect(thirdOffset).toHaveValue('00:50')
+    fireEvent.change(thirdOffset, { target: { value: '1:10.52' } })
     fireEvent.blur(thirdOffset)
     expect(useStore.getState().videoEdits).toMatchObject({
       'video-1': { offsetSeconds: 0 },
       'video-2': { offsetSeconds: 100 },
       'video-3': { offsetSeconds: 2116 / 30 },
     })
-    expect(thirdOffset).toHaveValue('70.533')
+    expect(thirdOffset).toHaveValue('01:10.533')
   })
 
   test('lists deleted parts of a clip and restores them', () => {
@@ -234,7 +234,7 @@ describe('VideoDrawerContent', () => {
     expect(screen.getAllByLabelText('Transition into this video')).toHaveLength(1)
     expect(screen.getByRole('region', { name: 'climb.mp4' })).toHaveTextContent('wipeleft, 2 s')
 
-    const duration = screen.getByLabelText('Duration (seconds)')
+    const duration = screen.getByLabelText('Duration')
     fireEvent.change(duration, { target: { value: '3' } })
     fireEvent.blur(duration)
     expect(useStore.getState().transitionDefaults).toMatchObject({ type: 'wipeleft', durationSeconds: 3 })

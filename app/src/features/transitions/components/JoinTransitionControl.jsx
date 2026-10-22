@@ -28,7 +28,7 @@ export function JoinTransitionControl({ model, id }) {
             mode="duration"
             onCommit={model.commitDuration}
             className="h-7 text-xs"
-            aria-label={t('transitions.duration', 'Transition duration (seconds)')}
+            aria-label={t('transitions.duration', 'Transition duration')}
           />
         ) : null}
       </div>

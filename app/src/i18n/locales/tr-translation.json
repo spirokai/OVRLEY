@@ -402,7 +402,6 @@
     "startTime": "Başlangıç zamanı",
     "syncOffset": "Senkronizasyon ofseti",
     "timeSource": "Zaman kaynağı",
-    "timeSourceFileModified": "Dosya değiştirildi",
     "timeSourceGps": "GPS zaman damgası",
     "timeSourceMetadata": "Meta veriler",
     "timeSourceFilename": "Dosya adı",

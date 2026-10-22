@@ -79,7 +79,7 @@ function VideoImportRow({ row, windowKind }) {
         signed
         onCommit={row.onOffsetCommit}
         className="h-8 text-xs"
-        aria-label={t('video-preview.importSyncOf', { defaultValue: 'Sync of {{name}} (seconds)', name: row.filename })}
+        aria-label={t('video-preview.importSyncOf', { defaultValue: 'Sync of {{name}}', name: row.filename })}
       />
       <div className="flex flex-wrap items-center justify-end">
         {row.isManual ? (
@@ -153,7 +153,7 @@ function TransitionSection({ transition }) {
           onSelect={transition.onTypeChange}
         />
         <Label htmlFor="import-transition-duration" className="text-xs font-bold text-muted-foreground">
-          {t('video-preview.transitionDuration', 'Duration (seconds)')}
+          {t('video-preview.transitionDuration', 'Duration')}
         </Label>
         <SecondsInput
           id="import-transition-duration"

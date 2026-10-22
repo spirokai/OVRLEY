@@ -402,7 +402,6 @@
     "startTime": "开始时间",
     "syncOffset": "同步偏移",
     "timeSource": "时间来源",
-    "timeSourceFileModified": "文件修改时间",
     "timeSourceGps": "GPS 时间戳",
     "timeSourceMetadata": "元数据",
     "timeSourceFilename": "文件名",

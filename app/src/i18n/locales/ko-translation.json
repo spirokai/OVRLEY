@@ -402,7 +402,6 @@
     "startTime": "시작 시간",
     "syncOffset": "동기화 오프셋",
     "timeSource": "시간 소스",
-    "timeSourceFileModified": "파일 수정됨",
     "timeSourceGps": "GPS 타임스탬프",
     "timeSourceMetadata": "메타데이터",
     "timeSourceFilename": "파일 이름",
