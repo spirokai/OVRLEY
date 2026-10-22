@@ -1,5 +1,8 @@
 //! Original-density lap numbers use hold; timer resets use exact boundaries; deltas preserve gaps.
-use super::format::{LapHistory, LapSample};
+use super::{
+    delta::compute_delta_to_best,
+    format::{LapHistory, LapSample},
+};
 use crate::{
     error::{WidgetError, WidgetResult},
     interpolation::{interpolate_numeric_series_value, MissingSamplePolicy},
@@ -26,8 +29,12 @@ pub(crate) struct LapTiming {
     delta_to_best_lap_seconds: Vec<Option<f64>>,
     #[serde(default)]
     lap_durations_seconds: Vec<f64>,
-    #[serde(default)]
-    lap_durations_best_so_far_seconds: Vec<f64>,
+    /// User-disabled canonical lap IDs, strictly increasing; set by [`LapTiming::select`].
+    #[serde(skip)]
+    disabled_laps: Vec<usize>,
+    /// Delta against the best enabled completed lap; the finalized series when none is disabled.
+    #[serde(skip)]
+    selected_delta_seconds: Vec<Option<f64>>,
 }
 
 impl LapTiming {
@@ -61,18 +68,14 @@ impl LapTiming {
                 "lap timing requires ordered boundaries and canonical lap numbers".into(),
             ));
         }
-        let count = self.lap_start_elapsed_seconds.len().saturating_sub(1);
-        if self.lap_durations_seconds.len() != count
-            || self.lap_durations_best_so_far_seconds.len() != count
-        {
+        if self.lap_durations_seconds.len() != self.lap_start_elapsed_seconds.len() {
             return Err(WidgetError::Config(
-                "lap duration metadata must contain one entry per completed lap".into(),
+                "lap duration metadata must contain one entry per lap".into(),
             ));
         }
         if self
             .lap_durations_seconds
             .iter()
-            .chain(&self.lap_durations_best_so_far_seconds)
             .any(|time| !time.is_finite() || *time < 0.0)
         {
             return Err(WidgetError::Config(
@@ -82,11 +85,45 @@ impl LapTiming {
         Ok(())
     }
 
+    /// Applies the user's disabled laps: they leave the history and stop serving as delta references.
+    ///
+    /// `disabled` must hold strictly increasing IDs of laps this activity observed.
+    /// `distance` is the finalized distance column, empty when the activity has none.
+    pub fn select(&mut self, disabled: Vec<usize>, distance: &[Option<f64>]) -> WidgetResult<()> {
+        if disabled.windows(2).any(|pair| pair[0] >= pair[1])
+            || disabled
+                .last()
+                .is_some_and(|lap| *lap >= self.lap_start_elapsed_seconds.len())
+        {
+            return Err(WidgetError::Config(
+                "disabled laps must be strictly increasing IDs of observed laps".into(),
+            ));
+        }
+        self.selected_delta_seconds = if disabled.is_empty() {
+            self.delta_to_best_lap_seconds.clone()
+        } else {
+            if self.lap_time_seconds.len() != self.lap_number.len() {
+                return Err(WidgetError::Config(
+                    "lap selection requires aligned lap numbers and lap times".into(),
+                ));
+            }
+            compute_delta_to_best(
+                distance,
+                &self.lap_number,
+                &self.lap_time_seconds,
+                &self.lap_durations_seconds,
+                &disabled,
+            )
+        };
+        self.disabled_laps = disabled;
+        Ok(())
+    }
+
     pub fn history(&self, end: f64) -> LapHistory<'_> {
         LapHistory {
             starts: &self.lap_start_elapsed_seconds,
             durations: &self.lap_durations_seconds,
-            best_so_far: &self.lap_durations_best_so_far_seconds,
+            disabled: &self.disabled_laps,
             end,
         }
     }
@@ -106,7 +143,7 @@ impl LapTiming {
             second,
             interpolate_numeric_series_value(
                 times,
-                &self.delta_to_best_lap_seconds,
+                &self.selected_delta_seconds,
                 second,
                 MissingSamplePolicy::Preserve,
             ),

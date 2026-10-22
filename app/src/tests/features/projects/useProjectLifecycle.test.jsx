@@ -65,6 +65,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: null,
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
+      laps: { disabled: [] },
       render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
@@ -107,6 +108,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: 'utc',
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
+      laps: { disabled: [] },
       render: {
         renderTarget: 'current',
         batchVideoFolder: null,
@@ -143,6 +145,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         metadata: { duration_seconds: 100 },
         file_format: 'fit',
         file_name: 'ride.fit',
+        lap_start_elapsed_seconds: [],
+        lap_durations_seconds: [],
       },
     }
     const prepareActivityPath = vi.fn(
@@ -457,6 +461,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: null,
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
+      laps: { disabled: [] },
       render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
@@ -517,6 +522,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: null,
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
+      laps: { disabled: [] },
       render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
@@ -567,6 +573,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: null,
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
+      laps: { disabled: [] },
       render: {
         ...DEFAULT_RENDER_SETTINGS,
         batchVideoFolder: null,

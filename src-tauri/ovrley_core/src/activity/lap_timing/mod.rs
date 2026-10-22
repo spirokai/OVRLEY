@@ -6,11 +6,11 @@
 //! boundary. Trimming and densification call [`lap_time_at`] to construct their
 //! aligned timer series using the shared widget sampler's boundary arithmetic.
 //!
-//! Boundary-source resolution and distance-based delta calculation remain
-//! private implementation details so callers consume one canonical contract.
+//! Boundary-source resolution remains a private implementation detail so
+//! callers consume one canonical contract. Distance-based deltas use the shared
+//! widget derivation, which hosts also apply to a user lap selection.
 
 mod boundaries;
-mod delta;
 mod derive;
 
 use crate::activity::schema::{NumericSeries, ParsedActivity};
@@ -29,7 +29,7 @@ pub(crate) struct LapTimingResult {
     pub(crate) lap_start_elapsed_seconds: Vec<f64>,
     /// Live difference from the best previously completed lap at the same distance.
     pub(crate) delta_to_best_lap_seconds: NumericSeries,
-    /// Fastest duration among laps closed by a subsequent boundary.
+    /// Fastest lap duration, including the final lap closed by the activity's end.
     pub(crate) best_lap_time_seconds: Option<f64>,
     /// Completed durations indexed by canonical lap ID.
     pub(crate) lap_durations_seconds: Vec<f64>,
@@ -74,12 +74,12 @@ pub(crate) fn validate_lap_timing_contract(activity: &ParsedActivity) -> CoreRes
         ));
     }
 
-    let completed_lap_count = activity.lap_start_elapsed_seconds.len().saturating_sub(1);
-    if activity.lap_durations_seconds.len() != completed_lap_count
-        || activity.lap_durations_best_so_far_seconds.len() != completed_lap_count
+    let lap_count = activity.lap_start_elapsed_seconds.len();
+    if activity.lap_durations_seconds.len() != lap_count
+        || activity.lap_durations_best_so_far_seconds.len() != lap_count
     {
         return Err(CoreError::Activity(
-            "lap duration metadata must contain one entry per completed lap".into(),
+            "lap duration metadata must contain one entry per lap".into(),
         ));
     }
     if activity

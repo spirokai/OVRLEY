@@ -98,7 +98,7 @@ impl ParsedActivity {
         LapHistory {
             starts: &self.lap_start_elapsed_seconds,
             durations: &self.lap_durations_seconds,
-            best_so_far: &self.lap_durations_best_so_far_seconds,
+            disabled: &[],
             end: self.trim_end_seconds,
         }
     }
@@ -150,7 +150,7 @@ impl DenseActivityReport {
         LapHistory {
             starts: &self.series.lap_start_elapsed_seconds,
             durations: &self.series.lap_durations_seconds,
-            best_so_far: &self.series.lap_durations_best_so_far_seconds,
+            disabled: &[],
             end: self.frame_elapsed_seconds.last().copied().unwrap_or(0.0),
         }
     }

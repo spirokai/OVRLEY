@@ -171,7 +171,7 @@ fn finalizes_raw_activity_axis_g_force_and_lean_angle_samples() {
     assert_eq!(activity.lap_number, vec![0, 1]);
     assert_eq!(activity.lap_time_seconds, vec![Some(0.0), Some(0.0)]);
     assert_eq!(activity.lap_start_elapsed_seconds, vec![0.0, 1.0]);
-    assert_eq!(activity.lap_durations_seconds, vec![1.0]);
+    assert_eq!(activity.lap_durations_seconds, vec![1.0, 0.0]);
     assert_eq!(activity.g_force_x, vec![Some(0.1), Some(-0.4)]);
     assert_eq!(activity.g_force_y, vec![Some(-0.2), Some(0.5)]);
     assert_eq!(activity.g_force_z, vec![Some(0.3), Some(-0.6)]);

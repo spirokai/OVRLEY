@@ -6,7 +6,7 @@ use super::{
     },
     frame::{LapTimerFrame, TextLayer, TextRun},
     validation::{LapTimerMode, ValidatedLapTimer},
-    LINE_HEIGHT_RATIO, LOG_COLUMN_GAP_RATIO, LOG_HEADER_OPACITY, LOG_ROW_GAP_RATIO,
+    LINE_HEIGHT_RATIO, LOG_COLUMN_GAP_RATIO, LOG_HEADER_OPACITY, LOG_ROW_GAP_RATIO, PLACEHOLDER,
     TABLE_VERTICAL_METRICS_TEXT,
 };
 use crate::{
@@ -164,8 +164,15 @@ pub fn prepare_lap_timer_layout(
         }
         layout.style = style.clone();
         if config.mode == LapTimerMode::BestLap {
-            for best in history.best_so_far {
-                let text = format_lap_duration(*best);
+            let enabled = history
+                .durations
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| !history.is_disabled(*index));
+            let mut best = f64::INFINITY;
+            for (_, duration) in enabled {
+                best = best.min(*duration);
+                let text = format_lap_duration(best);
                 if !layout.best_values.contains_key(&text) {
                     let run = TextRun::new(
                         &text,
@@ -190,7 +197,8 @@ impl LapTimerLayout {
     ) -> WidgetResult<LapTimerFrame> {
         let mut runs = self.static_runs(history, content)?;
         runs.extend(self.dynamic_runs(content)?);
-        LapTimerFrame::new(runs, None, self.config.x)
+        Ok(LapTimerFrame::new(runs, None, self.config.x)?
+            .shown(content != &LapTimerContent::Hidden))
     }
 
     /// Only the current time/delta repaint while completed history and the label stay cached.
@@ -200,7 +208,7 @@ impl LapTimerLayout {
         content: &LapTimerContent,
     ) -> WidgetResult<LapTimerFrame> {
         let key = match content {
-            LapTimerContent::Value { .. } => StaticContent::Label,
+            LapTimerContent::Value { .. } | LapTimerContent::Hidden => StaticContent::Label,
             LapTimerContent::Log {
                 completed_lap_count,
                 current_row,
@@ -232,7 +240,10 @@ impl LapTimerLayout {
                 .layer
                 .clone()
         };
-        LapTimerFrame::new(self.dynamic_runs(content)?, background, self.config.x)
+        Ok(
+            LapTimerFrame::new(self.dynamic_runs(content)?, background, self.config.x)?
+                .shown(content != &LapTimerContent::Hidden),
+        )
     }
 
     fn static_runs(
@@ -242,7 +253,7 @@ impl LapTimerLayout {
     ) -> WidgetResult<Vec<TextRun>> {
         let mut runs = Vec::new();
         match content {
-            LapTimerContent::Value { .. } => {
+            LapTimerContent::Value { .. } | LapTimerContent::Hidden => {
                 if let Some(label) = &self.label {
                     runs.push(label.clone());
                 }
@@ -264,7 +275,10 @@ impl LapTimerLayout {
                 } else {
                     0.0
                 };
-                for (display_index, lap_index) in (0..rows.len()).rev().enumerate() {
+                let enabled_rows = (0..rows.len())
+                    .rev()
+                    .filter(|lap_index| !history.is_disabled(*lap_index));
+                for (display_index, lap_index) in enabled_rows.enumerate() {
                     let y = offset + display_index as f32 * self.row_stride;
                     runs.extend(rows[lap_index].iter().cloned().map(|run| run.offset_y(y)));
                     let delta = best.map(|best| history.durations[lap_index] - best);
@@ -295,6 +309,12 @@ impl LapTimerLayout {
     fn dynamic_runs(&self, content: &LapTimerContent) -> WidgetResult<Vec<TextRun>> {
         let mut runs = Vec::new();
         match content {
+            LapTimerContent::Hidden => runs.push(TextRun::new(
+                PLACEHOLDER,
+                TABLE_VERTICAL_METRICS_TEXT,
+                self.style.clone(),
+                &self.value_font,
+            )?),
             LapTimerContent::Value { text, color } => {
                 runs.push(if let Some(value) = self.best_values.get(text) {
                     value.clone()

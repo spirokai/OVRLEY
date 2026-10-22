@@ -130,6 +130,7 @@ impl Fixture {
                         .iter()
                         .map(|source| (source.source_id.clone(), 0.0))
                         .collect(),
+                    disabled_laps: Vec::new(),
                 }
             } else {
                 BatchActivity::EmbeddedActivity {}

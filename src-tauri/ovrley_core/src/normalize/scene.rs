@@ -120,6 +120,8 @@ pub struct ValidatedSceneConfig {
     pub update_rate: NonZeroU32,
     /// Clock origin for elapsed-time widgets, including video lead-in.
     pub export_start_seconds: f64,
+    /// Strictly increasing lap IDs the activity sampler excludes from lap widgets.
+    pub disabled_laps: Vec<usize>,
 }
 
 use ovrley_widgets::model::scene::{validate_scene_presentation, ValidatedScenePresentation};
@@ -162,6 +164,7 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         start
     };
     let custom_export_range_active = raw.custom_export_range_active;
+    let disabled_laps = validate_disabled_laps(raw.disabled_laps, "scene.disabled_laps")?;
 
     Ok(ValidatedSceneConfig {
         presentation,
@@ -171,7 +174,18 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         custom_export_range_active,
         update_rate,
         export_start_seconds,
+        disabled_laps,
     })
+}
+
+/// Lap selections are strictly increasing canonical lap IDs; the activity bounds them.
+pub(crate) fn validate_disabled_laps(laps: Vec<usize>, field: &str) -> CoreResult<Vec<usize>> {
+    if laps.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(CoreError::Config(format!(
+            "{field} must be strictly increasing lap IDs"
+        )));
+    }
+    Ok(laps)
 }
 
 impl ValidatedSceneConfig {

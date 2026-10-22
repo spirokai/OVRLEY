@@ -10,6 +10,7 @@ import {
   VIDEO_SYNC_SPEED_FONT,
   VIDEO_SYNC_SPEED_WIDGETS,
   VIDEO_SYNC_SPEED_SCENE,
+  VIDEO_SYNC_DISABLED_LAPS,
   VIDEO_SYNC_EMPTY_WIDGETS,
 } from '../data/videoSyncConstants'
 import { buildActivityCourseSegments } from '../utils/activitySyncInput'
@@ -60,6 +61,7 @@ export default function useVideoSyncPreview({
     widgets: hasSpeed ? VIDEO_SYNC_SPEED_WIDGETS : VIDEO_SYNC_EMPTY_WIDGETS,
     scene: speedScene,
     activity,
+    disabledLaps: VIDEO_SYNC_DISABLED_LAPS,
     second: previewSecond,
     defaultFont: VIDEO_SYNC_SPEED_FONT,
   })

@@ -330,8 +330,8 @@ fn activity_ingress_rejects_an_active_lap_without_canonical_time() {
             "lap_number": [0, 0],
             "lap_time_seconds": [null, 1.0],
             "lap_start_elapsed_seconds": [0.0],
-            "lap_durations_seconds": [],
-            "lap_durations_best_so_far_seconds": []
+            "lap_durations_seconds": [1.0],
+            "lap_durations_best_so_far_seconds": [1.0]
         }"#,
     )
     .unwrap_err();
@@ -352,8 +352,8 @@ fn activity_ingress_accepts_canonical_lap_timing() {
             "delta_to_best_lap_seconds": [null, null, null],
             "lap_start_elapsed_seconds": [0.0, 4.0],
             "best_lap_time_seconds": 4.0,
-            "lap_durations_seconds": [4.0],
-            "lap_durations_best_so_far_seconds": [4.0]
+            "lap_durations_seconds": [4.0, 0.0],
+            "lap_durations_best_so_far_seconds": [4.0, 0.0]
         }"#,
     )
     .unwrap();

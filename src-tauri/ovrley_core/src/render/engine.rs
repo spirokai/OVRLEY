@@ -103,7 +103,9 @@ impl<'a> ExportWidgets<'a> {
         let activity = profiler.measure("prepare.activity_sampler", || -> CoreResult<_> {
             let bytes = serde_json::to_vec(activity)
                 .map_err(|error| CoreError::Render(format!("activity serialization: {error}")))?;
-            Ok(ActivitySampler::from_json(&bytes)?)
+            let mut activity = ActivitySampler::from_json(&bytes)?;
+            activity.select_laps(scene.disabled_laps.clone())?;
+            Ok(activity)
         })?;
         let rasters = profiler.measure("prepare.rasters", || {
             config

@@ -264,6 +264,7 @@ export function createPreviewSession(module, onError) {
         previous.widgets === next.widgets &&
         previous.scene === next.scene &&
         previous.activityId === next.activityId &&
+        previous.disabledLaps === next.disabledLaps &&
         previous.defaultFont === next.defaultFont &&
         !next.widgets.some(isTimeDependentWidget)
       )
@@ -301,6 +302,16 @@ export function createPreviewSession(module, onError) {
             .catch((error) => {
               if (!disposed && activityId === nextId) onError(error)
             })
+      }
+      // The session applies the selection to in-flight activity bytes on arrival.
+      if (previous?.disabledLaps !== next.disabledLaps) {
+        try {
+          upload(encoder.encode(JSON.stringify(next.disabledLaps)), (ptr, len) => check(module._ovrley_preview_disabled_laps(handle, ptr, len)))
+        } catch (error) {
+          onError(error)
+          return
+        }
+        for (const widget of widgets.values()) if (WIDGET_TYPE_DEFINITIONS[widget.type].timeDependent) widget.revision = -1
       }
       schedule()
     },

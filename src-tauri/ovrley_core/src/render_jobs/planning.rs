@@ -353,6 +353,7 @@ pub(crate) fn plan_batch_item(
     offset: f64,
     skip_overlay: bool,
     activity_end: Option<f64>,
+    disabled_laps: &[usize],
     auto_sync: bool,
     output_frame_count: u32,
     container_fps: Fps,
@@ -392,6 +393,7 @@ pub(crate) fn plan_batch_item(
         },
         export_start_seconds: offset,
         custom_export_range_active: Some(true),
+        disabled_laps: disabled_laps.to_vec(),
     };
     let mut config = template.config.clone().with_scene(scene);
     if skip_overlay || coverage.end <= coverage.start {

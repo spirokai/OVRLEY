@@ -1,6 +1,39 @@
 import { formatClockDuration, formatZonedDateTime } from '@/lib/time-format'
 import { getActivityAttributeLabel } from '@/lib/widget/widget-presentation'
 
+/**
+ * Formats a lap duration as mm:ss.cc, or hh:mm:ss.cc from one hour, matching the lap timer widget.
+ *
+ * @param {number} seconds - Lap duration in seconds.
+ * @returns {string} Lap-timer duration text.
+ */
+export function formatLapDuration(seconds) {
+  const hundredths = Math.round(seconds * 100)
+  const hours = Math.floor(hundredths / 360_000)
+  const totalMinutes = Math.floor(hundredths / 6_000)
+  const minutes = hours > 0 ? totalMinutes % 60 : totalMinutes
+  const pad = (value) => String(value).padStart(2, '0')
+  const clock = `${pad(minutes)}:${pad(Math.floor(hundredths / 100) % 60)}.${pad(hundredths % 100)}`
+  return hours > 0 ? `${pad(hours)}:${clock}` : clock
+}
+
+/**
+ * Builds the drawer rows for the activity's detected laps.
+ *
+ * @param {Array<{id: number, startSeconds: number, durationSeconds: number}>} laps - Canonical activity laps.
+ * @param {number[]} disabledLaps - Lap IDs excluded from lap widgets.
+ * @returns {Array<{id: number, number: string, duration: string, start: string, enabled: boolean}>} Lap table rows.
+ */
+export function buildLapRows(laps, disabledLaps) {
+  return laps.map((lap) => ({
+    id: lap.id,
+    number: String(lap.id + 1),
+    duration: formatLapDuration(lap.durationSeconds),
+    start: formatClockDuration(lap.startSeconds),
+    enabled: !disabledLaps.includes(lap.id),
+  }))
+}
+
 const METRIC_GROUPS_BY_SOURCE = {
   direct: ['extracted'],
   derived: ['derived'],

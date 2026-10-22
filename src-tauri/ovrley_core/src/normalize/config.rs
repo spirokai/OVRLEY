@@ -49,6 +49,9 @@ pub struct SceneConfig {
     pub ffmpeg: Value,
     #[serde(default)]
     pub custom_export_range_active: Option<bool>,
+    /// Editor-disabled lap IDs of the rendered activity; absent when none is disabled.
+    #[serde(default, skip_serializing)]
+    pub disabled_laps: Vec<usize>,
 }
 
 use ovrley_widgets::model::scene::ScenePresentationConfig;

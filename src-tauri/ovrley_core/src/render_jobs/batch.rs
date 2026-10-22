@@ -213,7 +213,7 @@ fn run_batch(
 fn execute_batch_item(
     paths: &AppPaths,
     template: &super::planning::ValidatedBatchTemplate,
-    external_activity: Option<&(ParsedActivity, f64)>,
+    external_activity: Option<&(ParsedActivity, f64, Vec<usize>)>,
     auto_sync: bool,
     job: &AcceptedJob,
     executor: &dyn BatchJobExecutor,
@@ -222,8 +222,8 @@ fn execute_batch_item(
     check_source_freshness(&job.source)?;
     session.check_cancelled()?;
     let embedded;
-    let (activity, end) = match external_activity {
-        Some((activity, end)) => (activity, Some(*end)),
+    let (activity, end, disabled_laps) = match external_activity {
+        Some((activity, end, disabled_laps)) => (activity, Some(*end), disabled_laps.as_slice()),
         None => {
             let prepared = executor
                 .embedded_activity(paths, &job.source)
@@ -239,7 +239,8 @@ fn execute_batch_item(
                 Err(error) => return Err(error),
             };
             embedded = activity;
-            (&embedded, end)
+            // Embedded telemetry carries no editor lap selection.
+            (&embedded, end, [].as_slice())
         }
     };
     let plan = plan_batch_item(
@@ -248,6 +249,7 @@ fn execute_batch_item(
         job.offset,
         job.skip_overlay,
         end,
+        disabled_laps,
         auto_sync,
         job.output.frames,
         job.output.container_fps,

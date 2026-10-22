@@ -263,7 +263,7 @@ impl ActivitySampler {
             &activity.sample_distance_progress,
             activity.trim_end_seconds,
         );
-        Ok(Self {
+        let mut sampler = Self {
             diving,
             elevation,
             route,
@@ -282,7 +282,9 @@ impl ActivitySampler {
             full_activity_distance,
             full_activity_total_ascent,
             lap_timing: activity.lap_timing,
-        })
+        };
+        sampler.select_laps(Vec::new())?;
+        Ok(sampler)
     }
 
     pub fn gauge_range(&self, metric: MetricKind) -> (f64, f64) {
@@ -319,6 +321,12 @@ impl ActivitySampler {
             full_activity_total_ascent: self.full_activity_total_ascent,
             ..MetricSample::default()
         }
+    }
+
+    /// Replaces the user's disabled laps, strictly increasing IDs of laps this activity observed.
+    pub fn select_laps(&mut self, disabled: Vec<usize>) -> WidgetResult<()> {
+        self.lap_timing
+            .select(disabled, &self.numeric[&MetricKind::Distance].values)
     }
 
     pub fn lap_history(&self) -> crate::widgets::lap_timer::format::LapHistory<'_> {

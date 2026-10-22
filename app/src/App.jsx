@@ -113,10 +113,12 @@ function App() {
       drawerContent = (
         <ActivityDrawerContent
           activitySummary={activityImport.activitySummary}
+          disabledLaps={activityImport.disabledLaps}
           filename={activityImport.activityFilename}
           onBrowseActivity={activityImport.handleActivityFileOpen}
           onDeleteActivity={activityImport.deleteActivity}
           onDropActivityFiles={activityImport.handleActivityFilesDrop}
+          onLapEnabledChange={activityImport.setLapEnabled}
         />
       )
     } else if (toolbarDrawer.activeTool === VIDEO_TOOL) {

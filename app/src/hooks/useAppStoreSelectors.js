@@ -10,6 +10,7 @@ function selectOverlayPreview(state) {
     importedVideoDuration: state.importedVideoDuration,
     videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
     parsedActivity: state.parsedActivity,
+    disabledLaps: state.disabledLaps,
     importedBackgroundImagePath: state.importedBackgroundImagePath,
     fallbackDurationSeconds: state.fallbackDurationSeconds,
   }
@@ -67,7 +68,9 @@ export function useActivityStore() {
       activityFilename: state.activitySource?.path?.split(/[/\\]/).at(-1) ?? state.activitySummary?.fileName ?? null,
       activitySource: state.activitySource,
       clearActivityFile: state.clearActivityFile,
+      disabledLaps: state.disabledLaps,
       parsedActivitySource: state.parsedActivitySource,
+      setLapEnabled: state.setLapEnabled,
       setErrorMessage: state.setErrorMessage,
       setProcessing: state.setProcessing,
     })),

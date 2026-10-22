@@ -13,6 +13,8 @@ const mp4Telemetry = {
   metadata: { duration_seconds: 120, sample_count: 240 },
   file_format: 'mp4-telemetry',
   valid_attributes: ['speed'],
+  lap_start_elapsed_seconds: [],
+  lap_durations_seconds: [],
 }
 
 const activityFile = {
@@ -21,6 +23,8 @@ const activityFile = {
   metadata: { duration_seconds: 3600, sample_count: 7200 },
   file_format: 'fit',
   valid_attributes: ['speed', 'heartrate'],
+  lap_start_elapsed_seconds: [],
+  lap_durations_seconds: [],
 }
 
 function resetStore() {

@@ -9,8 +9,20 @@ use crate::error::{WidgetError, WidgetResult};
 pub struct LapHistory<'a> {
     pub starts: &'a [f64],
     pub durations: &'a [f64],
-    pub best_so_far: &'a [f64],
+    /// User-disabled canonical lap IDs, strictly increasing; they neither draw nor count as best.
+    pub disabled: &'a [usize],
     pub end: f64,
+}
+
+impl LapHistory<'_> {
+    pub fn is_disabled(&self, lap: usize) -> bool {
+        self.disabled.binary_search(&lap).is_ok()
+    }
+
+    /// Whether `lap_number` is an observed lap the user left enabled; the out-lap never is.
+    pub fn is_enabled(&self, lap_number: i64) -> bool {
+        usize::try_from(lap_number).is_ok_and(|lap| !self.is_disabled(lap))
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -71,6 +83,8 @@ pub enum LapTimerContent {
         text: String,
         color: [u8; 4],
     },
+    /// A disabled current lap draws nothing; the placeholder's footprint keeps the widget selectable.
+    Hidden,
     Log {
         completed_lap_count: usize,
         current_row: Option<([String; 3], [u8; 4])>,
@@ -113,17 +127,30 @@ pub fn delta_color(positive: [u8; 4], negative: [u8; 4], delta: Option<f64>) -> 
     }
 }
 
+/// Fastest enabled lap among the first `count` completed laps; none while all are disabled.
 pub fn best_completed_lap(history: LapHistory<'_>, count: usize) -> WidgetResult<Option<f64>> {
-    count
-        .checked_sub(1)
-        .map(|index| {
-            history.best_so_far.get(index).copied().ok_or_else(|| {
-                WidgetError::Render(format!(
-                    "best lap metadata is missing for completed lap {count}"
-                ))
-            })
-        })
-        .transpose()
+    let durations = history.durations.get(..count).ok_or_else(|| {
+        WidgetError::Render(format!(
+            "lap duration metadata is missing for completed lap {count}"
+        ))
+    })?;
+    Ok(durations
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| !history.is_disabled(*index))
+        .map(|(_, duration)| *duration)
+        .reduce(f64::min))
+}
+
+/// Running time of the enabled active lap; the out-lap and disabled laps show the placeholder.
+fn active_lap_text(history: LapHistory<'_>, sample: LapSample) -> WidgetResult<String> {
+    if !history.is_enabled(sample.lap_number) {
+        return Ok(PLACEHOLDER.into());
+    }
+    sample
+        .lap_time_seconds
+        .map(format_lap_duration)
+        .ok_or_else(|| WidgetError::Render("active lap is missing its canonical lap time".into()))
 }
 
 pub fn lap_timer_value_text(
@@ -136,24 +163,20 @@ pub fn lap_timer_value_text(
         LapTimerMode::LapLog => Err(WidgetError::Render(
             "lap_log must use the dedicated table renderer".into(),
         )),
-        LapTimerMode::BestLap if sample.completed_lap_count > 0 => Ok(format_lap_duration(
-            best_completed_lap(history, sample.completed_lap_count)?
-                .expect("completed laps have a best time"),
-        )),
-        LapTimerMode::CurrentLap | LapTimerMode::BestLap if sample.lap_number < 0 => {
-            Ok(PLACEHOLDER.into())
-        }
-        LapTimerMode::CurrentLap | LapTimerMode::BestLap => sample
-            .lap_time_seconds
-            .map(format_lap_duration)
-            .ok_or_else(|| {
-                WidgetError::Render("active lap is missing its canonical lap time".into())
-            }),
+        LapTimerMode::BestLap => match best_completed_lap(history, sample.completed_lap_count)? {
+            Some(best) => Ok(format_lap_duration(best)),
+            None => active_lap_text(history, sample),
+        },
+        LapTimerMode::CurrentLap => active_lap_text(history, sample),
     }
 }
 
-pub fn current_log_row(sample: LapSample) -> WidgetResult<Option<LapLogTextRow>> {
-    if sample.lap_number < 0 {
+/// The enabled active lap's row; the out-lap and disabled laps have none.
+pub fn current_log_row(
+    history: LapHistory<'_>,
+    sample: LapSample,
+) -> WidgetResult<Option<LapLogTextRow>> {
+    if !history.is_enabled(sample.lap_number) {
         return Ok(None);
     }
     let time = sample.lap_time_seconds.ok_or_else(|| {
@@ -184,6 +207,7 @@ pub fn lap_log_text_state(
         .iter()
         .enumerate()
         .rev()
+        .filter(|(index, _)| !history.is_disabled(*index))
         .map(|(index, duration)| {
             let delta = best.map(|best| duration - best);
             LapLogTextRow {
@@ -198,7 +222,7 @@ pub fn lap_log_text_state(
         .collect();
     Ok(LapLogTextState {
         completed_rows,
-        current_row: current_log_row(sample)?,
+        current_row: current_log_row(history, sample)?,
     })
 }
 
@@ -217,8 +241,14 @@ pub fn lap_timer_content(
     if config.mode == LapTimerMode::LapLog {
         Ok(LapTimerContent::Log {
             completed_lap_count: sample.completed_lap_count,
-            current_row: current_log_row(sample)?.map(|row| (row.cells, color(row.delta_seconds))),
+            current_row: current_log_row(history, sample)?
+                .map(|row| (row.cells, color(row.delta_seconds))),
         })
+    } else if matches!(config.mode, LapTimerMode::CurrentLap | LapTimerMode::Delta)
+        && sample.lap_number >= 0
+        && !history.is_enabled(sample.lap_number)
+    {
+        Ok(LapTimerContent::Hidden)
     } else {
         Ok(LapTimerContent::Value {
             text: lap_timer_value_text(config.mode, history, sample)?,

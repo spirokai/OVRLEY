@@ -1,20 +1,19 @@
 //! Assembly of canonical lap-timing series during activity finalization.
 //!
 //! This module coordinates boundary resolution, sample-aligned live lap times,
-//! completed-lap duration metadata, and distance-based deltas. It deliberately
-//! leaves the final observed lap incomplete until a subsequent boundary closes
-//! it, matching the canonical parsed-activity contract.
+//! lap duration metadata, and distance-based deltas. The activity's end closes
+//! the final observed lap, so every lap start has a duration.
 
 use super::boundaries::resolve_laps;
-use super::delta::compute_delta_to_best;
 use super::LapTimingResult;
 use crate::activity::schema::{LapMarkers, NumericSeries};
+use ovrley_widgets::widgets::lap_timer::delta::compute_delta_to_best;
 
 /// Derives canonical lap timing from one authoritative boundary source.
 ///
 /// Explicit source laps take precedence over beacon or VBO timing markers. All
-/// output series align with `elapsed_series`; compact durations include only
-/// laps closed by a subsequent boundary.
+/// output series align with `elapsed_series`; compact durations hold one entry
+/// per lap start, the last closed by the activity's end.
 pub(crate) fn derive_lap_timing(
     elapsed_series: &[f64],
     distance_series: &[Option<f64>],
@@ -43,6 +42,7 @@ pub(crate) fn derive_lap_timing(
         &resolved.lap_number,
         &lap_time_seconds,
         &lap_durations_seconds,
+        &[],
     );
 
     LapTimingResult {
@@ -69,10 +69,9 @@ fn empty_result(sample_count: usize) -> LapTimingResult {
     }
 }
 
-/// Computes sample-aligned live lap times and durations of completed laps.
+/// Computes sample-aligned live lap times and the duration of every lap.
 ///
-/// Consecutive lap starts close completed laps. End-of-file never synthesizes a
-/// closing boundary for the final observed lap.
+/// Each lap start closes the previous lap; the final sample closes the last.
 fn compute_lap_times(
     elapsed: &[f64],
     lap_number: &[i64],
@@ -92,9 +91,11 @@ fn compute_lap_times(
                 .map(|start| elapsed - start)
         })
         .collect();
+    let activity_end = elapsed[elapsed.len() - 1];
     let lap_durations_seconds = lap_start_elapsed
-        .windows(2)
-        .map(|boundaries| boundaries[1] - boundaries[0])
+        .iter()
+        .zip(lap_start_elapsed.iter().skip(1).chain([&activity_end]))
+        .map(|(start, end)| end - start)
         .collect();
 
     (lap_time_seconds, lap_durations_seconds)

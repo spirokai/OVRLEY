@@ -28,6 +28,7 @@ pub use raster::{validate_template_rasters, RasterSource, ValidatedRaster};
 pub use scene::{
     validate_ffmpeg_config, validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig,
 };
+pub(crate) use scene::validate_disabled_laps;
 pub use widgets::{validate_elevation_plots, validate_route_plots};
 
 macro_rules! define_requirements {

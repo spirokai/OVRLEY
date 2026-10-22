@@ -235,13 +235,26 @@ function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
  * @param {string|null} options.importedVideoPath - Imported-video path, if any.
  * @param {number} options.timelineStart - Active editor timeline start second.
  * @param {number} options.timelineEnd - Active editor timeline end second.
+ * @param {number[]} options.disabledLaps - Activity lap IDs excluded from lap widgets.
  * @param {number} options.fps - Validated overlay FPS.
  * @param {number} options.widgetUpdateRate - Validated widget update-rate divisor.
  * @returns {object} Render-effective config.
  */
 export function createRenderEffectiveConfig(options) {
-  const { availableCodecs, config, codec, exportMode, range, globalDefaults, importedVideoPath, timelineStart, timelineEnd, widgetUpdateRate, fps } =
-    options
+  const {
+    availableCodecs,
+    config,
+    codec,
+    exportMode,
+    range,
+    globalDefaults,
+    importedVideoPath,
+    disabledLaps,
+    timelineStart,
+    timelineEnd,
+    widgetUpdateRate,
+    fps,
+  } = options
 
   if (!config?.scene) {
     throw new Error('No valid config available')
@@ -274,6 +287,7 @@ export function createRenderEffectiveConfig(options) {
   }
 
   applyTimelineSceneFields(scene, timelineStart, timelineEnd)
+  scene.disabled_laps = disabledLaps
   applyCodecDefaults(scene, codec)
   applyCustomExportRange(scene, range, shouldComposite ? importedVideoPath : null)
   if (shouldComposite) {

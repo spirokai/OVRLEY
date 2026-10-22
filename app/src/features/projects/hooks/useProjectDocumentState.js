@@ -22,6 +22,7 @@ export default function useProjectDocumentState() {
       batchVideoFolder: state.batchVideoFolder,
       batchOutputFolder: state.batchOutputFolder,
       config: state.config,
+      disabledLaps: state.disabledLaps,
       globalDefaults: state.globalDefaults,
       importedVideoPath: state.importedVideoPath,
       importingVideo: state.importingVideo,

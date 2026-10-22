@@ -591,7 +591,7 @@ fn racebox_fixture_imports_through_the_path_entry_point() {
     assert_eq!(activity.lap_number[closing_lap_index - 1], 3);
     assert_eq!(activity.lap_number[closing_lap_index], -1);
     assert_eq!(activity.lap_time_seconds[closing_lap_index], None);
-    assert_eq!(activity.lap_durations_seconds.len(), 4);
+    assert_eq!(activity.lap_durations_seconds.len(), 5);
 }
 
 #[test]
@@ -613,7 +613,7 @@ fn csv_lap_values_normalize_positive_integer_labels_and_reject_other_values() {
         .parsed_activity;
 
     assert_eq!(activity.lap_number, vec![0, 0, 1, 1, 2, -1, -1, -1, -1, -1]);
-    assert_eq!(activity.lap_durations_seconds, vec![2.0, 2.0, 1.0]);
+    assert_eq!(activity.lap_durations_seconds, vec![2.0, 2.0, 1.0, 4.0]);
 }
 
 #[test]
@@ -1558,7 +1558,7 @@ Time,Lap,Latitude,Longitude\n\
             .parsed_activity;
 
         assert_eq!(activity.lap_start_elapsed_seconds, vec![0.0, 2.0]);
-        assert_eq!(activity.lap_durations_seconds, vec![2.0]);
+        assert_eq!(activity.lap_durations_seconds, vec![2.0, 1.0]);
     }
 
     #[test]
@@ -1571,7 +1571,7 @@ Time,Lap,Latitude,Longitude\n\
 
         let circuit_tools_fast_lap_durations = [108.55, 108.42, 108.46, 109.03, 107.05, 107.05];
         assert!((17.0..=18.0).contains(&activity.lap_start_elapsed_seconds[0]));
-        assert_eq!(activity.lap_durations_seconds.len(), 7);
+        assert_eq!(activity.lap_durations_seconds.len(), 8);
         assert!(
             (150.0..=170.0).contains(&activity.lap_durations_seconds[0]),
             "unexpected first VBO lap duration: {}",

@@ -36,6 +36,8 @@ export const VIDEO_SYNC_SPEED_SCENE = {
   border_thickness: 0,
 }
 export const VIDEO_SYNC_EMPTY_WIDGETS = []
+// The sync preview draws only speed, which no lap selection affects.
+export const VIDEO_SYNC_DISABLED_LAPS = []
 export const VIDEO_SYNC_DETECTED_LOCATION_ID = 'detected-course-location'
 
 export const VIDEO_SYNC_DEFAULT_SPEED_THRESHOLD_KMH = 5

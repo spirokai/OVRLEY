@@ -75,6 +75,8 @@ pub enum BatchActivity {
         /// Automatic baselines keyed by the queued source identities. The backend
         /// applies the reference correction once; jobs carry no timing mode.
         automatic_offsets: HashMap<String, f64>,
+        /// Editor-disabled lap IDs of `activity`, strictly increasing.
+        disabled_laps: Vec<usize>,
     },
 }
 

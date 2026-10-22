@@ -63,6 +63,20 @@ pub unsafe extern "C" fn ovrley_preview_activity(
     session.status(result)
 }
 
+/// JSON array of the editor's disabled lap IDs.
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_disabled_laps(
+    session: *mut Session,
+    ptr: *const u8,
+    len: usize,
+) -> u32 {
+    let session = &mut *session;
+    let result = bytes(ptr, len)
+        .and_then(|b| serde_json::from_slice(b).map_err(|e| WidgetError::Config(e.to_string())))
+        .and_then(|disabled| session.preview.select_laps(disabled));
+    session.status(result)
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn ovrley_preview_font(
     session: *mut Session,

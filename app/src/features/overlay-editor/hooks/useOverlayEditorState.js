@@ -66,6 +66,7 @@ export default function useOverlayEditorState({
     importedVideoDuration,
     videoSyncOffsetSeconds,
     parsedActivity,
+    disabledLaps,
     importedBackgroundImagePath,
     fallbackDurationSeconds,
   } = useOverlayPreviewStore()
@@ -153,6 +154,7 @@ export default function useOverlayEditorState({
   )
   return {
     activity: parsedActivity,
+    disabledLaps,
     globalDefaults,
     previewSecond: selectedSecond,
     sceneSize,

@@ -24,6 +24,7 @@ const activitySummary = {
   durationSeconds: 3723,
   fileFormat: 'fit',
   fileName: 'morning-ride.fit',
+  laps: [],
   originalSampleCount: 3599,
   sport: 'cycling',
   syncTime: '2026-07-18T07:20:03.000Z',
@@ -41,6 +42,7 @@ describe('ActivityDrawerContent', () => {
         onBrowseActivity={onBrowseActivity}
         onDeleteActivity={vi.fn()}
         onDropActivityFiles={vi.fn()}
+        onLapEnabledChange={vi.fn()}
       />,
     )
 
@@ -56,10 +58,12 @@ describe('ActivityDrawerContent', () => {
     render(
       <ActivityDrawerContent
         activitySummary={activitySummary}
+        disabledLaps={[]}
         filename="morning-ride.fit"
         onBrowseActivity={vi.fn()}
         onDeleteActivity={onDeleteActivity}
         onDropActivityFiles={vi.fn()}
+        onLapEnabledChange={vi.fn()}
       />,
     )
 

@@ -1,4 +1,5 @@
 //! Shared current-lap, best-lap, delta and lap-log rendering.
+pub mod delta;
 pub mod format;
 pub mod frame;
 pub mod interaction;

@@ -21,8 +21,11 @@ function reportPreviewActivityReleaseError(error) {
 }
 
 function setActivityState(set, get, update) {
-  const previousIds = previewActivityIds(get())
+  const previous = get()
+  const previousIds = previewActivityIds(previous)
   set(update)
+  // Lap IDs belong to one activity; any replacement or removal purges the selection.
+  if (get().parsedActivity !== previous.parsedActivity) set({ disabledLaps: [] })
   const retainedIds = previewActivityIds(get())
   for (const id of previousIds) {
     if (!retainedIds.has(id)) releasePreviewActivity(id).catch(reportPreviewActivityReleaseError)
@@ -70,6 +73,11 @@ function createActivitySummary(activity) {
     endTime: activity.metadata?.end_time ?? null,
     fileFormat: activity.file_format,
     fileName: activity.file_name,
+    laps: activity.lap_start_elapsed_seconds.map((startSeconds, id) => ({
+      id,
+      startSeconds,
+      durationSeconds: activity.lap_durations_seconds[id],
+    })),
     originalSampleCount: activity.metadata?.original_sample_count ?? null,
     sampleCount: activity.metadata?.sample_count ?? 0,
     sport: activity.metadata?.sport ?? null,
@@ -97,6 +105,8 @@ export function createMediaSlice(set, get) {
     parsedActivity: null,
     parsedActivitySource: null, // 'activity-file' | 'video-telemetry' | null
     stashedVideoTelemetry: null,
+    // Strictly increasing lap IDs of parsedActivity excluded from lap widgets.
+    disabledLaps: [],
     activeRenderId: null,
     activeRenderOutputPath: null,
     renderProgress: { ...DEFAULT_RENDER_PROGRESS },
@@ -159,6 +169,13 @@ export function createMediaSlice(set, get) {
     clearError: () =>
       set((state) => {
         state.errorMessage = null
+      }),
+
+    setLapEnabled: (lapId, enabled) =>
+      set((state) => {
+        const disabledLaps = state.disabledLaps.filter((id) => id !== lapId)
+        if (!enabled) disabledLaps.push(lapId)
+        state.disabledLaps = disabledLaps.sort((left, right) => left - right)
       }),
 
     setActivitySource: (source) => {

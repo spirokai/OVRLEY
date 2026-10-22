@@ -138,6 +138,7 @@ pub fn video_batch_request(
             timezone_mode: VideoSyncTimezoneMode::Utc,
             reference: None,
             automatic_offsets: [(source.source_id.clone(), offset)].into(),
+            disabled_laps: Vec::new(),
         },
         output_directory: directory.to_str().unwrap().into(),
         jobs: vec![BatchRenderJob {

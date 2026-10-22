@@ -1,29 +1,34 @@
-//! Distance-aligned delta calculation against the best completed lap.
+//! Distance-aligned delta calculation against the best enabled completed lap.
 //!
 //! Each active lap is converted to lap-relative distance/time points. A sample
-//! can receive a delta only after at least one earlier lap has completed and the
-//! best prior lap contains enough distance coverage for interpolation.
+//! can receive a delta only after at least one earlier enabled lap has completed
+//! and the best such lap contains enough distance coverage for interpolation.
+//! Finalization derives the canonical series with no disabled laps; hosts
+//! re-derive it for a user lap selection.
 
-use crate::activity::schema::NumericSeries;
-use ovrley_widgets::interpolation::interpolate_points;
+use crate::interpolation::interpolate_points;
 
-/// Computes each sample's live time delta against the best previously completed lap.
+/// Computes each sample's live time delta against the best previously completed enabled lap.
 ///
-/// Samples outside a lap, on the first lap, or without usable distance/time
-/// values remain `None`. After passing reference distance coverage, delta keeps
-/// accumulating against the completed reference lap duration.
-pub(super) fn compute_delta_to_best(
+/// `disabled` holds strictly increasing canonical lap IDs that never serve as a
+/// reference. Samples outside a lap, before any enabled lap completes, or without
+/// usable distance/time values remain `None`; an absent distance series yields
+/// no deltas. After passing reference distance coverage, delta keeps accumulating
+/// against the completed reference lap duration.
+pub fn compute_delta_to_best(
     distance_series: &[Option<f64>],
     lap_number: &[i64],
     lap_time_series: &[Option<f64>],
     lap_durations: &[f64],
-) -> NumericSeries {
+    disabled: &[usize],
+) -> Vec<Option<f64>> {
     let sample_count = lap_number.len();
-    if sample_count == 0 || lap_durations.is_empty() {
+    if sample_count == 0 || lap_durations.is_empty() || distance_series.is_empty() {
         return vec![None; sample_count];
     }
 
-    let lap_start_distances = compute_lap_start_distances(distance_series, lap_number);
+    let lap_start_distances =
+        compute_lap_start_distances(distance_series, lap_number, lap_durations.len());
     let reference_points_by_lap = build_reference_lap_points(
         distance_series,
         lap_time_series,
@@ -31,7 +36,7 @@ pub(super) fn compute_delta_to_best(
         &lap_start_distances,
         lap_durations.len(),
     );
-    let reference_lap_indices = best_lap_indices(lap_durations);
+    let reference_lap_indices = best_lap_indices(lap_durations, disabled);
 
     let mut delta = vec![None; sample_count];
 
@@ -44,7 +49,9 @@ pub(super) fn compute_delta_to_best(
         if lap_index == 0 || lap_index > lap_durations.len() {
             continue;
         }
-        let reference_lap_index = reference_lap_indices[lap_index - 1];
+        let Some(reference_lap_index) = reference_lap_indices[lap_index - 1] else {
+            continue;
+        };
         if reference_lap_index >= lap_start_distances.len()
             || lap_index >= lap_start_distances.len()
         {
@@ -92,12 +99,11 @@ pub(super) fn compute_delta_to_best(
 ///
 /// Missing distance at a lap's opening sample retains the zero placeholder used
 /// by the existing delta contract.
-fn compute_lap_start_distances(distance_series: &[Option<f64>], lap_number: &[i64]) -> Vec<f64> {
-    let max_lap = lap_number.iter().copied().max().unwrap_or(-1);
-    if max_lap < 0 {
-        return Vec::new();
-    }
-    let count = (max_lap + 1) as usize;
+fn compute_lap_start_distances(
+    distance_series: &[Option<f64>],
+    lap_number: &[i64],
+    count: usize,
+) -> Vec<f64> {
     let mut start_distances = vec![0.0; count];
     let mut current_lap = -1;
     for (index, &lap) in lap_number.iter().enumerate() {
@@ -114,28 +120,30 @@ fn compute_lap_start_distances(distance_series: &[Option<f64>], lap_number: &[i6
     start_distances
 }
 
-/// Selects the fastest completed lap available at each completion point.
+/// Selects the fastest enabled completed lap available at each completion point.
 ///
-/// Entry `n` identifies the best lap among completed laps `0..=n`; equal
-/// durations preserve the earliest matching lap.
-fn best_lap_indices(durations: &[f64]) -> Vec<usize> {
-    let mut best_index = 0;
+/// Entry `n` identifies the best enabled lap among completed laps `0..=n`, or
+/// `None` while every such lap is disabled; equal durations preserve the
+/// earliest matching lap.
+fn best_lap_indices(durations: &[f64], disabled: &[usize]) -> Vec<Option<usize>> {
+    let mut best_index: Option<usize> = None;
     durations
         .iter()
         .enumerate()
         .map(|(index, duration)| {
-            if *duration < durations[best_index] {
-                best_index = index;
+            if disabled.binary_search(&index).is_err()
+                && best_index.is_none_or(|best| *duration < durations[best])
+            {
+                best_index = Some(index);
             }
             best_index
         })
         .collect()
 }
 
-/// Builds lap-relative distance/time interpolation points for completed laps.
+/// Builds lap-relative distance/time interpolation points for every lap.
 ///
-/// The incomplete final lap is excluded because it cannot be selected as a
-/// reference until a subsequent boundary closes it.
+/// A lap serves as a reference only for laps that start after it closes.
 fn build_reference_lap_points(
     distance_series: &[Option<f64>],
     lap_time_series: &[Option<f64>],
@@ -166,8 +174,11 @@ mod tests {
     /// Verifies reference selection tracks the earliest fastest completed lap.
     #[test]
     fn best_lap_selection_uses_prefix_minimum_indices() {
-        assert_eq!(best_lap_indices(&[10.0, 5.0, 7.0, 4.0]), vec![0, 1, 1, 3]);
-        assert_eq!(best_lap_indices(&[5.0, 5.0]), vec![0, 0]);
+        assert_eq!(
+            best_lap_indices(&[10.0, 5.0, 7.0, 4.0], &[]),
+            vec![Some(0), Some(1), Some(1), Some(3)]
+        );
+        assert_eq!(best_lap_indices(&[5.0, 5.0], &[]), vec![Some(0), Some(0)]);
     }
 
     /// Verifies an overdue lap keeps accumulating delta after passing reference distance coverage.
@@ -191,7 +202,8 @@ mod tests {
                 Some(12.0),
                 Some(20.0),
             ],
-            &[10.0],
+            &[10.0, 20.0],
+            &[],
         );
 
         assert_eq!(delta[4], Some(2.0));

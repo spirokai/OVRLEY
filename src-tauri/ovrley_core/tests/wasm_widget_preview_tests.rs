@@ -270,7 +270,7 @@ fn every_family_parsed_activity() -> ovrley_core::activity::schema::ParsedActivi
         "lap_number": [-1, 0, 0, 0, 0, 1, 1, 2, 2],
         "lap_time_seconds": [null, 0.0, 0.5, 1.0, 1.5, 0.0, 0.5, 0.0, 0.5],
         "lap_start_elapsed_seconds": [0.5, 2.5, 3.5],
-        "lap_durations_seconds": [2.0, 1.0], "lap_durations_best_so_far_seconds": [2.0, 1.0],
+        "lap_durations_seconds": [2.0, 1.0, 0.5], "lap_durations_best_so_far_seconds": [2.0, 1.0, 0.5],
         "delta_to_best_lap_seconds": [null, null, null, null, null, 0.0, -0.5, null, 0.25],
     }).to_string()).unwrap()
 }
@@ -1722,7 +1722,7 @@ fn lap_timer_activity() -> ovrley_core::activity::schema::ParsedActivity {
         "lap_number": [-1,0,0,0,1,1,2,2,-1,-1],
         "lap_time_seconds": [null,0,0.5,1.5,0,0.5,0,0.25,null,null],
         "lap_start_elapsed_seconds": [0.5,2.5,3.75],
-        "lap_durations_seconds": [2,1.25], "lap_durations_best_so_far_seconds": [2,1.25],
+        "lap_durations_seconds": [2,1.25,60.25], "lap_durations_best_so_far_seconds": [2,1.25,1.25],
         "delta_to_best_lap_seconds": [null,null,null,null,0,-0.125,null,0.75,null,null]
     }"#).unwrap()
 }

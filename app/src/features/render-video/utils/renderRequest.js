@@ -69,6 +69,7 @@ export function createBatchRenderRequest({ editorSnapshot, settings, inspectionI
       : {
           mode: 'externalActivity',
           activity: editorSnapshot.parsedActivity,
+          disabledLaps: editorSnapshot.disabledLaps,
           timezoneMode: calibration.timezoneMode,
           reference:
             calibration.reference === null
@@ -121,6 +122,7 @@ function createCurrentRenderConfig(state, settings) {
     importedVideoFpsDen: state.importedVideoFpsDen,
     importedVideoResolution: state.importedVideoResolution,
     videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+    disabledLaps: state.disabledLaps,
     timelineStart: state.startSecond,
     timelineEnd: state.endSecond,
   })

@@ -44,6 +44,7 @@ fn minimal_scene() -> ValidatedSceneConfig {
         custom_export_range_active: Some(false),
         update_rate: std::num::NonZeroU32::MIN,
         export_start_seconds: 0.0,
+        disabled_laps: Vec::new(),
     }
 }
 

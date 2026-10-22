@@ -296,7 +296,7 @@ ovrley_widgets::numeric_activity_struct!(
         /// Duration of the fastest completed lap in the whole session.
         #[serde(default)]
         pub best_lap_time_seconds: Option<f64>,
-        /// Array of completed-lap durations, indexed by 0-based lap number.
+        /// Duration of every lap, indexed by 0-based lap number; the activity's end closes the last.
         #[serde(default)]
         pub lap_durations_seconds: Vec<f64>,
         /// Prefix-min of `lap_durations_seconds`; `best_so_far[n]` is the fastest lap among laps `0..=n`.

@@ -52,6 +52,8 @@ pub struct PreviewSession {
     pub fonts: PreviewFonts,
     pub images: crate::widgets::raster::preview::PreviewImages,
     activity: Option<ActivitySampler>,
+    /// The editor's disabled laps, applied to every activity this session samples.
+    disabled_laps: Vec<usize>,
     pub widgets: BTreeMap<u32, PreviewInstance>,
     next_id: u32,
 }
@@ -156,7 +158,9 @@ impl PreviewSession {
         self.activity = if bytes.is_empty() {
             None
         } else {
-            Some(ActivitySampler::from_json(bytes)?)
+            let mut activity = ActivitySampler::from_json(bytes)?;
+            activity.select_laps(self.disabled_laps.clone())?;
+            Some(activity)
         };
         for widget in self.widgets.values_mut() {
             let widget = &mut widget.widget;
@@ -165,6 +169,17 @@ impl PreviewSession {
             if let PreviewWidget::Route(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::LapTimer(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::Gauge(widget) = widget { widget.invalidate_activity(); }
+        }
+        Ok(())
+    }
+    /// Replaces the disabled laps; an activity still in flight receives them on arrival.
+    pub fn select_laps(&mut self, disabled: Vec<usize>) -> WidgetResult<()> {
+        if let Some(activity) = &mut self.activity {
+            activity.select_laps(disabled.clone())?;
+        }
+        self.disabled_laps = disabled;
+        for widget in self.widgets.values_mut() {
+            if let PreviewWidget::LapTimer(widget) = &mut widget.widget { widget.invalidate_activity(); }
         }
         Ok(())
     }

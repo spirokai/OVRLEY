@@ -29,10 +29,11 @@ use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 const PROJECT_FORMAT: &str = "ovrley-project";
-const PROJECT_VERSION: u32 = 4;
+const PROJECT_VERSION: u32 = 5;
 const PROJECT_VERSION_V1: u32 = 1;
 const PROJECT_VERSION_V2: u32 = 2;
 const PROJECT_VERSION_V3: u32 = 3;
+const PROJECT_VERSION_V4: u32 = 4;
 const MAX_MANUAL_LANDMARKS: usize = 5;
 const MAX_MANUAL_LOCATION_LANDMARKS: usize = 1;
 const DEFAULT_MANUAL_SPEED_THRESHOLD_KMH: f64 = 5.0;
@@ -137,9 +138,18 @@ pub(crate) struct ProjectDocument {
     editor: ProjectEditor,
     sources: ProjectSources,
     sync: ProjectSync,
+    laps: ProjectLaps,
     render: ProjectRender,
     timeline: ProjectTimeline,
     raster_assets: BTreeMap<String, String>,
+}
+
+/// The activity's lap selection; stale IDs never survive an activity change in the editor.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProjectLaps {
+    /// Strictly increasing canonical lap IDs excluded from lap widgets.
+    disabled: Vec<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -532,6 +542,12 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
     if project.timeline.view_start >= project.timeline.view_end {
         return Err("Timeline viewport requires viewStart < viewEnd".into());
     }
+    if project.laps.disabled.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err("laps.disabled must be strictly increasing lap IDs".into());
+    }
+    if !project.laps.disabled.is_empty() && project.sources.activity.is_none() {
+        return Err("laps.disabled requires an activity source".into());
+    }
     if !project.sync.manual.landmarks.is_empty() && project.sources.video.is_none() {
         return Err("sync.manual.landmarks require a video source".into());
     }
@@ -718,6 +734,9 @@ fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, St
     ) {
         insert_fixed_width_digits(&mut value)?;
     }
+    if matches!(version, PROJECT_VERSION_V3 | PROJECT_VERSION_V4) {
+        insert_lap_selection(&mut value)?;
+    }
     let mut legacy = match version {
         PROJECT_VERSION_V1 => {
             let project: ProjectDocumentV1 = serde_json::from_value(value)
@@ -744,9 +763,9 @@ fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, St
         }
         PROJECT_VERSION_V2 => serde_json::from_value(value)
             .map_err(|error| format!("Invalid version 2 project: {error}"))?,
-        PROJECT_VERSION_V3 => {
+        PROJECT_VERSION_V3 | PROJECT_VERSION_V4 => {
             let project: ProjectDocument = serde_json::from_value(value)
-                .map_err(|error| format!("Invalid version 3 project: {error}"))?;
+                .map_err(|error| format!("Invalid version {version} project: {error}"))?;
             return Ok(ProjectDocument {
                 version: PROJECT_VERSION,
                 ..project
@@ -754,7 +773,7 @@ fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, St
         }
         PROJECT_VERSION => {
             return serde_json::from_value(value)
-                .map_err(|error| format!("Invalid version 4 project: {error}"));
+                .map_err(|error| format!("Invalid version 5 project: {error}"));
         }
         other => return Err(format!("Unsupported project version: {other}")),
     };
@@ -774,6 +793,7 @@ fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, St
         editor: legacy.editor,
         sources: legacy.sources,
         sync: legacy.sync,
+        laps: ProjectLaps::default(),
         render: migrate_legacy_render(legacy.render)?,
         timeline: legacy.timeline,
         raster_assets: BTreeMap::new(),
@@ -791,6 +811,20 @@ fn insert_fixed_width_digits(value: &mut Value) -> Result<(), String> {
         .is_some()
     {
         return Err("Legacy project cannot contain fixed_width_digits".into());
+    }
+    Ok(())
+}
+
+// Version 5 adds the lap selection; earlier projects disable no laps.
+fn insert_lap_selection(value: &mut Value) -> Result<(), String> {
+    let project = value
+        .as_object_mut()
+        .ok_or_else(|| "Project must be an object".to_string())?;
+    if project
+        .insert("laps".into(), serde_json::json!({ "disabled": [] }))
+        .is_some()
+    {
+        return Err("Legacy project cannot contain laps".into());
     }
     Ok(())
 }
@@ -1366,6 +1400,7 @@ mod tests {
                     "turnThresholdDegrees": 90.0
                 }
             },
+            "laps": { "disabled": [] },
             "render": {
                 "renderTarget": "current", "batchVideoFolder": null, "batchOutputFolder": null,
                 "fps": 30.0, "widgetUpdateRate": 1, "exportMode": "transparent", "codec": "prores_ks",
@@ -1386,6 +1421,7 @@ mod tests {
     fn valid_v2_project_json() -> String {
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
         project["version"] = Value::from(PROJECT_VERSION_V2);
+        project.as_object_mut().unwrap().remove("laps");
         project["editor"]["globalDefaults"]
             .as_object_mut()
             .unwrap()
@@ -1919,6 +1955,7 @@ mod tests {
     fn legacy_projects_migrate_to_fixed_width_digits() {
         let mut v3: Value = serde_json::from_str(&valid_project_json()).unwrap();
         v3["version"] = Value::from(PROJECT_VERSION_V3);
+        v3.as_object_mut().unwrap().remove("laps");
         v3["editor"]["globalDefaults"]
             .as_object_mut()
             .unwrap()

@@ -25,7 +25,8 @@ pub(super) struct AcceptedJob {
 pub(super) struct AcceptedBatch {
     pub(super) template: ValidatedBatchTemplate,
     pub(super) auto_sync: bool,
-    pub(super) external_activity: Option<(ParsedActivity, f64)>,
+    /// External activity, its timeline end, and its disabled laps.
+    pub(super) external_activity: Option<(ParsedActivity, f64, Vec<usize>)>,
     pub(super) jobs: Vec<AcceptedJob>,
 }
 
@@ -77,10 +78,16 @@ pub(super) fn accept_batch(
     let template = validate_batch_template(request.template, encoding, resources)?;
     let external_activity = match request.activity {
         BatchActivity::EmbeddedActivity {} => None,
-        BatchActivity::ExternalActivity { activity, .. } => {
+        BatchActivity::ExternalActivity {
+            activity,
+            disabled_laps,
+            ..
+        } => {
             let activity = crate::activity::normalize_parsed_activity(activity)?;
             let end = validate_render_activity(&activity)?;
-            Some((activity, end))
+            let disabled_laps =
+                crate::normalize::validate_disabled_laps(disabled_laps, "activity.disabledLaps")?;
+            Some((activity, end, disabled_laps))
         }
     };
     let jobs = request

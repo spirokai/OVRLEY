@@ -103,7 +103,7 @@ fn tcx_preserves_lap_start_times_through_idle_gap_filling() {
             Some(2.0)
         ]
     );
-    assert_eq!(activity.lap_durations_seconds, vec![4.0]);
+    assert_eq!(activity.lap_durations_seconds, vec![4.0, 2.0]);
     assert_eq!(activity.metadata["inserted_idle_sample_count"], 3);
     ovrley_core::activity::normalize_parsed_activity(activity).unwrap();
 }

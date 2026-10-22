@@ -127,6 +127,8 @@ impl TextLayer {
 pub struct LapTimerFrame {
     runs: Vec<TextRun>,
     background: Option<Arc<TextLayer>>,
+    /// Hidden frames keep their layout bounds but draw nothing.
+    shown: bool,
     pub content_bounds: Rect,
     pub bounds: Rect,
     pub content_width: f32,
@@ -160,13 +162,22 @@ impl LapTimerFrame {
         Ok(Self {
             runs,
             background,
+            shown: true,
             content_bounds,
             bounds,
             content_width,
         })
     }
 
+    pub fn shown(mut self, shown: bool) -> Self {
+        self.shown = shown;
+        self
+    }
+
     pub fn draw(&self, canvas: &Canvas) {
+        if !self.shown {
+            return;
+        }
         if let Some(layer) = &self.background {
             canvas.draw_image(&layer.image, (layer.bounds.left, layer.bounds.top), None);
         }
