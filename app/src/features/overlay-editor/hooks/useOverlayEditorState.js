@@ -20,11 +20,10 @@ import {
 import useWidgetSelection from './useWidgetSelection'
 import { useEditorViewport } from './useEditorViewport'
 import { useEditorKeyboard } from './useEditorKeyboard'
-import { useOverlayPreviewStore } from '@/hooks/useAppStoreSelectors'
+import { useOverlayPreviewStore, useVideoSyncPreviewSecond } from '@/hooks/useAppStoreSelectors'
 import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
 import { applyWidgetDrafts } from '@/lib/widget/widget-resolver'
-import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/preview-perf'
 import { useWidgetDraftView } from './useWidgetDraftState'
 
 function getWidgetRefCallbacks(widgetLiveEdits, orderedWidgetIds) {
@@ -41,10 +40,6 @@ function commitWidgetUpdates(config, onConfigChange, updatesById) {
   onConfigChange(updateWidgetsInConfig(config, updatesById))
 }
 
-function recordPreviewUpdate() {
-  incrementPreviewPerfCounter(previewPerfCounterName('React preview updates'))
-}
-
 /** @param {object} options Committed config, global defaults, commit callback, and shared edits. @returns {object} Editor preview state. */
 export default function useOverlayEditorState({
   config,
@@ -59,8 +54,8 @@ export default function useOverlayEditorState({
   videoSyncMode = false,
   videoSyncMarkControls = null,
 }) {
+  const videoSyncPreviewSecond = useVideoSyncPreviewSecond(videoSyncMode)
   const {
-    selectedSecond,
     exportRange,
     importedVideoPath,
     importedVideoDuration,
@@ -91,7 +86,6 @@ export default function useOverlayEditorState({
   const commitUpdate = useCallback((widgetId, updates) => commitWidgetUpdate(config, onConfigChange, widgetId, updates), [config, onConfigChange])
   const commitUpdates = useCallback((updatesById) => commitWidgetUpdates(config, onConfigChange, updatesById), [config, onConfigChange])
 
-  useEffect(recordPreviewUpdate, [selectedSecond])
   useEffect(() => resetWidgetDrafts(), [config, resetWidgetDrafts])
 
   const state = {
@@ -103,7 +97,6 @@ export default function useOverlayEditorState({
     globalDefaults,
     moveableRef,
     orderedWidgetIds,
-    previewSecond: selectedSecond,
     widgetMap,
     sceneElement,
     sceneSize,
@@ -146,7 +139,7 @@ export default function useOverlayEditorState({
       }),
     [globalDefaults, sceneSize, previewExportRange, parsedActivity, fallbackDurationSeconds, previewRasterScale],
   )
-  const markControls = resolveVideoSyncMarkControls(videoSyncMarkControls, selectedSecond, videoSyncMode)
+  const markControls = resolveVideoSyncMarkControls(videoSyncMarkControls, videoSyncPreviewSecond, videoSyncMode)
   if (videoSyncMode && markControls === null) throw new Error('Video sync editor requires mark controls')
   useEffect(
     () => drawGrid(gridRef, sceneSize, viewport.displayScale, gridVisible && !videoSyncMode),
@@ -156,7 +149,7 @@ export default function useOverlayEditorState({
     activity: parsedActivity,
     disabledLaps,
     globalDefaults,
-    previewSecond: selectedSecond,
+    previewSecond: videoSyncPreviewSecond,
     sceneSize,
     setSceneElement,
     widgets,

@@ -1,15 +1,32 @@
+import { memo } from 'react'
 import { Pause, Play, Rewind, RotateCcw, StepBack, StepForward, Volume2, VolumeX, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTranslation } from 'react-i18next'
+import { usePlayheadClockLabel } from '@/hooks/useAppStoreSelectors'
+import { formatClockDuration } from '@/lib/time-format'
+
+/**
+ * Playhead clock; its own component so it is the only toolbar element that re-renders on playback frames.
+ *
+ * @param {{ timeLabel: { timelineMinimum: number, totalDuration: number } }} props Timeline bounds.
+ */
+function PlayerTimeLabel({ timeLabel }) {
+  const current = usePlayheadClockLabel(timeLabel.timelineMinimum, timeLabel.totalDuration)
+  return (
+    <span className="text-xs font-medium tabular-nums text-muted-foreground">
+      {current} / {formatClockDuration(timeLabel.totalDuration)}
+    </span>
+  )
+}
 
 /**
  * Presentational toolbar for zoom, fit target, transport, and time display controls.
  *
  * @param {{ toolbar: object, videoSyncMode: boolean }} props Toolbar view model and active workspace mode.
  */
-export default function PlayerToolbar({ toolbar, videoSyncMode }) {
+function PlayerToolbar({ toolbar, videoSyncMode }) {
   const { t } = useTranslation()
   return (
     <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
@@ -179,10 +196,10 @@ export default function PlayerToolbar({ toolbar, videoSyncMode }) {
             {toolbar.isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </Button>
         ) : null}
-        <span className="text-xs font-medium tabular-nums text-muted-foreground">
-          {toolbar.timeLabel.current} / {toolbar.timeLabel.total}
-        </span>
+        <PlayerTimeLabel timeLabel={toolbar.timeLabel} />
       </div>
     </div>
   )
 }
+
+export default memo(PlayerToolbar)

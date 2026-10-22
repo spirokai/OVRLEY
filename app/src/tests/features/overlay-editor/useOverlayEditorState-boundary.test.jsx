@@ -144,7 +144,8 @@ describe('useOverlayEditorState module contract', () => {
       }),
     )
 
-    expect(result.current.previewSecond).toBe(9)
+    // Outside video sync mode the playhead reaches the WASM session through a store subscription, not editor state.
+    expect(result.current.previewSecond).toBeNull()
     expect(result.current.widgets).toHaveLength(1)
     expect(result.current.widgetRefCallbacks['speed-widget']).toEqual(expect.any(Function))
 
@@ -157,7 +158,7 @@ describe('useOverlayEditorState module contract', () => {
       })
     })
 
-    expect(result.current.previewSecond).toBe(9)
+    expect(result.current.previewSecond).toBeNull()
     expect(result.current.activity).toEqual({
       trim_end_seconds: 3,
       metadata: { duration_seconds: 3 },

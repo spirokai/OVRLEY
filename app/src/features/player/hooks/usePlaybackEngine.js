@@ -253,13 +253,17 @@ export default function usePlaybackEngine({
     return () => window.cancelAnimationFrame(animationFrameId)
   }, [effectivePreviewFps, hasActivity, isTimelinePlaybackActive, pausePreviewPlayback, setPlaybackAnchor, setSelectedSecond, timelineMinimum])
 
+  // Playhead read - commands read the committed playhead so their identity survives playback frames.
+  const readPlayheadSecond = useCallback(() => playbackSecondRef.current, [])
+
   // Play command - restart from the timeline start at the end and otherwise resume the current playhead.
   const play = useCallback(() => {
     if (!hasActivity) {
       return
     }
-    let initialSecond = clampedPlayhead
-    if (clampedPlayhead >= totalDuration) initialSecond = timelineMinimum
+    const playheadSecond = playbackSecondRef.current
+    let initialSecond = playheadSecond
+    if (playheadSecond >= totalDuration) initialSecond = timelineMinimum
     const nextSource = resolvePlaybackSource({
       shouldUseVideoPlayback,
       playheadSecond: initialSecond,
@@ -274,7 +278,6 @@ export default function usePlaybackEngine({
       second: initialSecond,
     })
   }, [
-    clampedPlayhead,
     hasActivity,
     importedVideoDuration,
     resetPlaybackOrchestration,
@@ -288,8 +291,8 @@ export default function usePlaybackEngine({
 
   // Transport commands - all non-play actions resolve to a paused playhead position.
   const pause = useCallback(() => {
-    pauseAtSecond(clampedPlayhead)
-  }, [clampedPlayhead, pauseAtSecond])
+    pauseAtSecond(playbackSecondRef.current)
+  }, [pauseAtSecond])
 
   const resetToStart = useCallback(() => {
     pauseAtSecond(timelineMinimum)
@@ -297,10 +300,10 @@ export default function usePlaybackEngine({
 
   const stepBySeconds = useCallback(
     (deltaSeconds) => {
-      const targetSecond = clamp(clampedPlayhead + deltaSeconds, timelineMinimum, totalDuration)
+      const targetSecond = clamp(playbackSecondRef.current + deltaSeconds, timelineMinimum, totalDuration)
       pauseAtSecond(targetSecond)
     },
-    [clampedPlayhead, pauseAtSecond, timelineMinimum, totalDuration],
+    [pauseAtSecond, timelineMinimum, totalDuration],
   )
 
   const scrubTo = useCallback(
@@ -341,6 +344,7 @@ export default function usePlaybackEngine({
     jumpToEnd,
     pause,
     play,
+    readPlayheadSecond,
     resetToStart,
     scrubTo,
     stepBySeconds,

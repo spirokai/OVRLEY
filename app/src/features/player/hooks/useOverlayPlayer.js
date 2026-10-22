@@ -2,10 +2,9 @@
  * Top-level player orchestration hook for the presentational overlay player components.
  */
 
-import { useEffect, useEffectEvent, useMemo, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { hasOpenOverlay, isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
-import { formatClockDuration } from '@/lib/time-format'
 import { videoOverlapsActivity } from '@/lib/video-sync'
 import useStore from '@/store/useStore'
 import { snapTimelineSecondToFrame } from '../utils/playerTiming'
@@ -75,10 +74,15 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
 
   // Durable domains - each hook owns behavior for one player concern, while this hook wires them together.
   const playback = usePlaybackEngine({ ...playerStore, backgroundMode })
-  const { hasActivity, isPlaying, pause, play, stepBySeconds } = playback
-  const exportBoundarySecond = playback.importedVideoPath
-    ? snapTimelineSecondToFrame(playback.clampedPlayhead, playerStore.importedVideoFps, playback.videoSyncOffsetSeconds)
-    : playback.clampedPlayhead
+  const { hasActivity, isPlaying, pause, play, readPlayheadSecond, stepBySeconds } = playback
+  // Export boundary read - commands resolve the frame-snapped playhead when invoked, not on every playback frame.
+  const readExportBoundarySecond = useCallback(
+    () =>
+      playback.importedVideoPath
+        ? snapTimelineSecondToFrame(readPlayheadSecond(), playerStore.importedVideoFps, playback.videoSyncOffsetSeconds)
+        : readPlayheadSecond(),
+    [playback.importedVideoPath, playback.videoSyncOffsetSeconds, playerStore.importedVideoFps, readPlayheadSecond],
+  )
   const exportTimeline = useExportRangeTimeline({
     defaultEndSecond: playback.importedVideoPath ? playback.videoSyncOffsetSeconds + playback.importedVideoDuration : playback.totalDuration,
     timelineMinimum: playback.timelineMinimum,
@@ -100,25 +104,30 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
   const activityDurationSeconds = playerStore.activitySummary?.durationSeconds ?? 0
   const canSelectClip = hasVideo && playback.hasActivity
 
-  const nudgeClip = (laneId, deltaSeconds) => {
-    setKeyboardSyncOffsetSeconds((currentOffset) => {
-      const nextOffset = moveClipOffset({
-        currentOffset: currentOffset ?? playerStore.videoSyncOffsetSeconds,
-        deltaSeconds,
-        laneId,
+  // Clip nudge commands - stable identities keep lane view models memoized during playback.
+  const nudgeClip = useCallback(
+    (laneId, deltaSeconds) => {
+      setKeyboardSyncOffsetSeconds((currentOffset) => {
+        const nextOffset = moveClipOffset({
+          currentOffset: currentOffset ?? playerStore.videoSyncOffsetSeconds,
+          deltaSeconds,
+          laneId,
+        })
+        const roundedOffset = Math.round(nextOffset * 10) / 10
+        return videoOverlapsActivity({ videoStart: roundedOffset, videoDuration: playback.importedVideoDuration })
+          ? roundedOffset
+          : (currentOffset ?? playerStore.videoSyncOffsetSeconds)
       })
-      const roundedOffset = Math.round(nextOffset * 10) / 10
-      return videoOverlapsActivity({ videoStart: roundedOffset, videoDuration: playback.importedVideoDuration })
-        ? roundedOffset
-        : (currentOffset ?? playerStore.videoSyncOffsetSeconds)
-    })
-  }
+    },
+    [playback.importedVideoDuration, playerStore.videoSyncOffsetSeconds],
+  )
 
-  const commitClipNudge = () => {
+  const { setVideoSyncOffset } = playerStore
+  const commitClipNudge = useCallback(() => {
     if (keyboardSyncOffsetSeconds === null) return
-    playerStore.setVideoSyncOffset(keyboardSyncOffsetSeconds)
+    setVideoSyncOffset(keyboardSyncOffsetSeconds)
     setKeyboardSyncOffsetSeconds(null)
-  }
+  }, [keyboardSyncOffsetSeconds, setVideoSyncOffset])
 
   // Selection is scoped to the current media pair and ends when the user clicks elsewhere.
   useEffect(() => {
@@ -254,12 +263,12 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       case 'export.setIn':
         if (!hasActivityData && !hasVideo) return
         event.preventDefault()
-        exportTimeline.setBoundary('from', exportBoundarySecond)
+        exportTimeline.setBoundary('from', readExportBoundarySecond())
         return
       case 'export.setOut':
         if (!hasActivityData && !hasVideo) return
         event.preventDefault()
-        exportTimeline.setBoundary('to', exportBoundarySecond)
+        exportTimeline.setBoundary('to', readExportBoundarySecond())
         return
       case 'export.clear':
         if (!hasActivityData && !hasVideo) return
@@ -412,6 +421,74 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     [displayedFitTargetId, fitTarget, viewportFitTargets],
   )
 
+  // Toolbar view model - memoized without the playhead so the toolbar skips playback frames; the time label
+  // subscribes to the playhead itself.
+  const { clear: clearExportRange, isCustom: isExportRangeCustom, rangeLabel: exportRangeLabel, setBoundary: setExportBoundary } = exportTimeline
+  const { jumpToEnd, resetToStart, timelineMinimum, totalDuration } = playback
+  const { isVideoMuted, toggleVideoMute } = playerStore
+  const { isFullTimelineVisible, resetView, zoomIn, zoomOut } = viewport
+  const toolbar = useMemo(
+    () => ({
+      exportRange: {
+        clear: clearExportRange,
+        isCustom: isExportRangeCustom,
+        isDisabled: !hasActivityData && !hasVideo,
+        label: exportRangeLabel,
+        setEnd: () => setExportBoundary('to', readExportBoundarySecond()),
+        setStart: () => setExportBoundary('from', readExportBoundarySecond()),
+      },
+      fitTargets,
+      resetView: {
+        disabled: isFullTimelineVisible,
+        onClick: resetView,
+      },
+      timeLabel: {
+        timelineMinimum,
+        totalDuration,
+      },
+      hasVideo,
+      isMuted: isVideoMuted,
+      toggleMute: toggleVideoMute,
+      transport: {
+        isDisabled: !hasActivity,
+        isPlaying,
+        jumpToEnd,
+        pause,
+        play,
+        resetToStart,
+        stepBackward: () => stepBySeconds(-1),
+        stepForward: () => stepBySeconds(1),
+      },
+      zoomIn,
+      zoomOut,
+    }),
+    [
+      clearExportRange,
+      exportRangeLabel,
+      fitTargets,
+      hasActivity,
+      hasActivityData,
+      hasVideo,
+      isExportRangeCustom,
+      isFullTimelineVisible,
+      isPlaying,
+      isVideoMuted,
+      jumpToEnd,
+      pause,
+      play,
+      readExportBoundarySecond,
+      resetToStart,
+      resetView,
+      setExportBoundary,
+      stepBySeconds,
+      timelineMinimum,
+      toggleVideoMute,
+      totalDuration,
+      zoomIn,
+      zoomOut,
+    ],
+  )
+
   // View model - components receive only render-ready state and callbacks, not store or calculation details.
   return {
     isVisible: playback.hasActivity || hasVideo,
@@ -438,39 +515,6 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       widthPx: viewport.widthPx,
       videoSyncMode,
     },
-    toolbar: {
-      exportRange: {
-        clear: exportTimeline.clear,
-        isCustom: exportTimeline.isCustom,
-        isDisabled: !hasActivityData && !hasVideo,
-        label: exportTimeline.rangeLabel,
-        setEnd: () => exportTimeline.setBoundary('to', exportBoundarySecond),
-        setStart: () => exportTimeline.setBoundary('from', exportBoundarySecond),
-      },
-      fitTargets,
-      resetView: {
-        disabled: viewport.isFullTimelineVisible,
-        onClick: viewport.resetView,
-      },
-      timeLabel: {
-        current: formatClockDuration(playback.clampedPlayhead),
-        total: formatClockDuration(playback.totalDuration),
-      },
-      hasVideo,
-      isMuted: playerStore.isVideoMuted,
-      toggleMute: playerStore.toggleVideoMute,
-      transport: {
-        isDisabled: !playback.hasActivity,
-        isPlaying: playback.isPlaying,
-        jumpToEnd: playback.jumpToEnd,
-        pause: playback.pause,
-        play: playback.play,
-        resetToStart: playback.resetToStart,
-        stepBackward: () => playback.stepBySeconds(-1),
-        stepForward: () => playback.stepBySeconds(1),
-      },
-      zoomIn: viewport.zoomIn,
-      zoomOut: viewport.zoomOut,
-    },
+    toolbar,
   }
 }

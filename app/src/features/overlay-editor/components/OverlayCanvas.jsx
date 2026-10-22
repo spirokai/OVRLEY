@@ -11,7 +11,6 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
     scene,
     activity,
     disabledLaps,
-    previewSecond,
     globalDefaults,
     setSceneElement,
     sceneSize,
@@ -27,7 +26,6 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
     scene,
     activity,
     disabledLaps,
-    second: previewSecond,
     defaultFont: globalDefaults.font_values,
   })
   return (

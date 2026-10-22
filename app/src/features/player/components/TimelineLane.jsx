@@ -1,10 +1,11 @@
+import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
 /**
  * Presentational clip lane renderer.
  *
  * @param {{ lane: object }} props Lane view model.
  */
-export default function TimelineLane({ lane }) {
+function TimelineLane({ lane }) {
   const { t } = useTranslation()
   const Icon = lane.icon
 
@@ -69,3 +70,5 @@ export default function TimelineLane({ lane }) {
     </div>
   )
 }
+
+export default memo(TimelineLane)

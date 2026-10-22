@@ -72,6 +72,8 @@ export default function useTimelineViewport({
   // Duration ref - viewport actions use the latest duration without recreating every callback.
   const totalDurationRef = useRef(totalDuration)
   const timelineMinimumRef = useRef(timelineMinimum)
+  // Playhead ref - zoom commands pivot on the latest playhead without changing identity every playback frame.
+  const playheadSecondRef = useRef(playheadSecond)
   const [containerElement, setContainerElement] = useState(null)
   const [widthPx, setWidthPx] = useState(0)
   const [pixelGrid, setPixelGrid] = useState(() => ({ ratio: getDevicePixelRatio(), origin: 0 }))
@@ -106,6 +108,10 @@ export default function useTimelineViewport({
   useEffect(() => {
     timelineMinimumRef.current = timelineMinimum
   }, [timelineMinimum])
+
+  useEffect(() => {
+    playheadSecondRef.current = playheadSecond
+  }, [playheadSecond])
 
   // Full-range reset - loading different media should never leave the user stranded in an old viewport.
   useEffect(() => {
@@ -261,12 +267,12 @@ export default function useTimelineViewport({
   )
 
   const zoomOut = useCallback(() => {
-    zoomBy(-1, playheadSecond)
-  }, [playheadSecond, zoomBy])
+    zoomBy(-1, playheadSecondRef.current)
+  }, [zoomBy])
 
   const zoomIn = useCallback(() => {
-    zoomBy(1, playheadSecond)
-  }, [playheadSecond, zoomBy])
+    zoomBy(1, playheadSecondRef.current)
+  }, [zoomBy])
 
   // Pan command - lane-background drag passes seconds, while pure helpers enforce clamping.
   const panBy = useCallback(
