@@ -102,11 +102,6 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
       <div className="space-y-4">
         <SectionHeading icon={Target} title={t('widget-editor.indicator', 'Indicator')} />
         <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            label={t('widget-editor.indicatorColor', 'Indicator Color')}
-            value={compass.indicator_color}
-            onChange={(indicator_color) => updateCompass({ indicator_color })}
-          />
           <SizeSlider
             label={t('widget-editor.indicatorSize', 'Indicator Size')}
             value={compass.indicator_size}
@@ -118,50 +113,60 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
             onChange={(indicator_size) => updateCompassSize({ indicator_size })}
             onCommit={commit}
           />
+          <SliderField
+            editable
+            label={t('widget-editor.cornerRadius', 'Corner Radius')}
+            value={compass.indicator_corner_radius}
+            min={0}
+            max={100}
+            step={1}
+            integerDisplay
+            valueDisplay={`${compass.indicator_corner_radius}`}
+            suffix="%"
+            onSliderChange={(indicator_corner_radius) => updateCompass({ indicator_corner_radius })}
+          />
         </div>
-        <SliderField
-          editable
-          label={t('widget-editor.cornerRadius', 'Corner Radius')}
-          value={compass.indicator_corner_radius}
-          min={0}
-          max={100}
-          step={1}
-          integerDisplay
-          valueDisplay={`${compass.indicator_corner_radius}`}
-          suffix="%"
-          onSliderChange={(indicator_corner_radius) => updateCompass({ indicator_corner_radius })}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <ColorField
+            label={t('widget-editor.indicatorColor', 'Indicator Color')}
+            value={compass.indicator_color}
+            onChange={(indicator_color) => updateCompass({ indicator_color })}
+          />
+        </div>
       </div>
 
       <div className="space-y-4">
-        <SectionHeading icon={Type} title={t('widget-editor.cardinalLabels', 'Cardinal Labels')} />
-        <div className="flex items-center justify-between gap-2 px-1">
-          <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.showLabels', 'Show Labels')}</span>
-          <ToggleField
-            checked={compass.show_cardinal_labels}
-            onCheckedChange={(show_cardinal_labels) => updateCompassSize({ show_cardinal_labels })}
-          />
-        </div>
-        <FontSelectField
-          label={t('widget-editor.font', 'Font')}
-          value={widget.data.font}
-          onValueChange={(font) => updateWidgetData(widget.id, { font })}
-          recommendedFonts={availableFonts.recommendedFonts}
-          systemFonts={availableFonts.systemFonts}
-          triggerClassName="h-9 border-border/70 bg-surface text-xs"
-          labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
+        <SectionHeading
+          icon={Type}
+          title={t('widget-editor.cardinalLabels', 'Cardinal Labels')}
+          trailing={
+            <ToggleField
+              label={t('widget-editor.showLabels', 'Show Labels')}
+              checked={compass.show_cardinal_labels}
+              onCheckedChange={(show_cardinal_labels) => updateCompassSize({ show_cardinal_labels })}
+            />
+          }
+        />
+        <SizeSlider
+          label={t('widget-editor.fontSize', 'Font Size')}
+          value={compass.cardinal_font_size}
+          min={6}
+          max={120}
+          disabled={!compass.show_cardinal_labels}
+          valueDisplay={`${Math.round(compass.cardinal_font_size)}`}
+          suffix="px"
+          onChange={(cardinal_font_size) => updateCompassSize({ cardinal_font_size })}
+          onCommit={commit}
         />
         <div className="grid grid-cols-2 gap-4">
-          <SizeSlider
-            label={t('widget-editor.fontSize', 'Font Size')}
-            value={compass.cardinal_font_size}
-            min={6}
-            max={120}
-            disabled={!compass.show_cardinal_labels}
-            valueDisplay={`${Math.round(compass.cardinal_font_size)}`}
-            suffix="px"
-            onChange={(cardinal_font_size) => updateCompassSize({ cardinal_font_size })}
-            onCommit={commit}
+          <FontSelectField
+            label={t('widget-editor.font', 'Font')}
+            value={widget.data.font}
+            onValueChange={(font) => updateWidgetData(widget.id, { font })}
+            recommendedFonts={availableFonts.recommendedFonts}
+            systemFonts={availableFonts.systemFonts}
+            triggerClassName="h-9 border-border/70 bg-surface text-xs"
+            labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
           />
           <ColorField
             label={t('widget-editor.labelColor', 'Label Color')}
@@ -173,11 +178,17 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
       </div>
 
       <div className="space-y-4">
-        <SectionHeading icon={Hash} title={t('widget-editor.headingValue', 'Value')} />
-        <div className="flex items-center justify-between gap-2 px-1">
-          <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.showValue', 'Show Value')}</span>
-          <ToggleField checked={compass.show_value} onCheckedChange={(show_value) => updateCompassSize({ show_value })} />
-        </div>
+        <SectionHeading
+          icon={Hash}
+          title={t('widget-editor.headingValue', 'Value')}
+          trailing={
+            <ToggleField
+              label={t('widget-editor.showValue', 'Show Value')}
+              checked={compass.show_value}
+              onCheckedChange={(show_value) => updateCompassSize({ show_value })}
+            />
+          }
+        />
         <SizeSlider
           label={t('widget-editor.fontSize', 'Font Size')}
           value={widget.data.font_size}

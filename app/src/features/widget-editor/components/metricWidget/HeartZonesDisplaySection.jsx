@@ -7,7 +7,7 @@ import { useAvailableFonts } from '@/hooks/useFonts'
 import { useTranslation } from 'react-i18next'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { buildZoneCalculationUpdate, updateManualZone } from '../../utils/heartZones'
-import { ColorField, FieldBlock, NumberField, SelectField, SizeSlider, SliderField, ToggleField } from '../widgetFormControls'
+import { ColorField, NumberField, SelectField, SizeSlider, SliderField, ToggleField } from '../widgetFormControls'
 
 const ZONE_CALCULATION_OPTIONS = [
   { value: 'lthr', labelKey: 'widget-editor.zoneCalculationLthr', defaultLabel: 'Lactate Threshold HR' },
@@ -66,41 +66,45 @@ export default function HeartZonesDisplaySection({ widget, updateWidgetData, upd
             onCommit={commit}
           />
         </div>
-        <SliderField
-          editable
-          label={t('widget-editor.cornerRadius', 'Corner Radius')}
-          value={Math.min(zones.track_corner_radius, maxCornerRadius)}
-          min={0}
-          max={maxCornerRadius}
-          step={1}
-          integerDisplay
-          suffix="px"
-          onSliderChange={(track_corner_radius) => updateZones({ track_corner_radius })}
-        />
-        <SelectField
-          label={t('widget-editor.zoneCalculation', 'Zone Calculation')}
-          value={zones.zone_calculation}
-          options={zoneCalculationOptions}
-          onValueChange={(zone_calculation) => updateZones(buildZoneCalculationUpdate(zones, zone_calculation))}
-        />
-        {zones.zone_calculation === 'lthr' ? (
-          <NumberField
-            label={t('widget-editor.lthr', 'Lactate Threshold HR')}
-            value={zones.lthr}
-            min={1}
-            suffix="bpm"
-            onChange={(value) => updateZones({ lthr: Math.max(Number(value), 1) })}
+        <div className="grid grid-cols-2 gap-4">
+          <SliderField
+            editable
+            label={t('widget-editor.cornerRadius', 'Corner Radius')}
+            value={Math.min(zones.track_corner_radius, maxCornerRadius)}
+            min={0}
+            max={maxCornerRadius}
+            step={1}
+            integerDisplay
+            suffix="px"
+            onSliderChange={(track_corner_radius) => updateZones({ track_corner_radius })}
           />
-        ) : null}
-        {zones.zone_calculation === 'max_heartrate' ? (
-          <NumberField
-            label={t('widget-editor.maxHeartrate', 'Max Heart Rate')}
-            value={zones.max_heartrate}
-            min={1}
-            suffix="bpm"
-            onChange={(value) => updateZones({ max_heartrate: Math.max(Number(value), 1) })}
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <SelectField
+            label={t('widget-editor.zoneCalculation', 'Zone Calculation')}
+            value={zones.zone_calculation}
+            options={zoneCalculationOptions}
+            onValueChange={(zone_calculation) => updateZones(buildZoneCalculationUpdate(zones, zone_calculation))}
           />
-        ) : null}
+          {zones.zone_calculation === 'lthr' ? (
+            <NumberField
+              label={t('widget-editor.lthr', 'Lactate Threshold HR')}
+              value={zones.lthr}
+              min={1}
+              suffix="bpm"
+              onChange={(value) => updateZones({ lthr: Math.max(Number(value), 1) })}
+            />
+          ) : null}
+          {zones.zone_calculation === 'max_heartrate' ? (
+            <NumberField
+              label={t('widget-editor.maxHeartrate', 'Max Heart Rate')}
+              value={zones.max_heartrate}
+              min={1}
+              suffix="bpm"
+              onChange={(value) => updateZones({ max_heartrate: Math.max(Number(value), 1) })}
+            />
+          ) : null}
+        </div>
         {zones.zone_calculation === 'manual'
           ? zones.manual_zones.map((zone, index) => (
               <div key={index} className="grid grid-cols-2 gap-4">
@@ -151,22 +155,20 @@ export default function HeartZonesDisplaySection({ widget, updateWidgetData, upd
 
       <div className="space-y-4">
         <SectionHeading icon={Target} title={t('widget-editor.indicator', 'Indicator')} />
-        <FieldBlock label={t('widget-editor.style', 'Style')}>
-          <ToggleGroup
-            type="single"
-            className="w-full"
-            value={zones.indicator_style}
-            onValueChange={(indicator_style) => {
-              if (indicator_style) updateZones({ indicator_style })
-            }}
-          >
-            {INDICATOR_STYLE_OPTIONS.map((option) => (
-              <ToggleGroupItem key={option.value} value={option.value} className="h-7 w-full px-3 text-xs">
-                {t(option.labelKey, option.defaultLabel)}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </FieldBlock>
+        <ToggleGroup
+          type="single"
+          className="w-full"
+          value={zones.indicator_style}
+          onValueChange={(indicator_style) => {
+            if (indicator_style) updateZones({ indicator_style })
+          }}
+        >
+          {INDICATOR_STYLE_OPTIONS.map((option) => (
+            <ToggleGroupItem key={option.value} value={option.value} className="h-7 w-full px-3 text-xs">
+              {t(option.labelKey, option.defaultLabel)}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
         <div className="grid grid-cols-2 gap-4">
           <ColorField
             label={t('widget-editor.indicatorColor', 'Indicator Color')}

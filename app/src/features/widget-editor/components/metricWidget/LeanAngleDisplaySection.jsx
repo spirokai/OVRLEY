@@ -4,7 +4,7 @@ import { SectionHeading } from '@/components/ui/section-heading'
 import { buildUniformResizeUpdate } from '../../utils/widgetSize'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { ColorField, SizeSlider, SliderField } from '../widgetFormControls'
-import TrackFilledColorFields from './TrackFilledColorFields'
+import TrackStyleSection from './TrackStyleSection'
 import FontSelectField from '@/components/ui/font-select-field'
 import { useAvailableFonts } from '@/hooks/useFonts'
 import { useTranslation } from 'react-i18next'
@@ -63,47 +63,14 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            label={t('widget-editor.emptyColor', 'Empty Color')}
-            value={leanVariant.track_empty_color}
-            onChange={(track_empty_color) => updateLean({ track_empty_color })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.emptyOpacity', 'Empty Opacity')}
-            value={leanVariant.track_empty_opacity}
-            min={0}
-            max={1}
-            step={0.05}
-            valueScale={100}
-            valueDisplay={`${Math.round(leanVariant.track_empty_opacity * 100)}`}
-            suffix="%"
-            onSliderChange={(track_empty_opacity) => updateLean({ track_empty_opacity })}
-          />
-        </div>
-        <TrackFilledColorFields data={leanVariant} updateVariant={updateLean} />
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            label={t('widget-editor.borderColor', 'Border Color')}
-            value={leanVariant.track_border_color}
-            onChange={(track_border_color) => updateLean({ track_border_color })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.border', 'Border')}
-            value={leanVariant.track_border_thickness}
-            min={0}
-            max={borderThicknessMax}
-            step={1}
-            integerDisplay
-            valueDisplay={`${leanVariant.track_border_thickness}`}
-            suffix="px"
-            onSliderChange={(track_border_thickness) => updateLeanSize({ track_border_thickness })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
-          />
-        </div>
       </div>
+      <TrackStyleSection
+        data={leanVariant}
+        updateVariant={updateLean}
+        updateVariantSize={updateLeanSize}
+        onCommit={() => commitWidgetSize(widget.id)}
+        borderMax={borderThicknessMax}
+      />
       <div className="space-y-4">
         <SectionHeading icon={Type} title={t('widget-editor.label', 'Label')} />
         <div className="grid grid-cols-2 gap-4">

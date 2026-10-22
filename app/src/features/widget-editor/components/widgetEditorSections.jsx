@@ -191,21 +191,21 @@ export function FontSection({
           onChange={(value) => updateWidgetData(widget.id, { color: value })}
         />
       </div>
-      <div className="grid grid-cols-2 gap-4 items-end pt-2">
-        {widget.category === 'labels' && typography.font ? (
-          <SizeSlider
-            label={t('widget-editor.fontWeight', 'Font Weight')}
-            value={typography.weight}
-            min={typography.weightAxis?.min ?? 1}
-            max={typography.weightAxis?.max ?? 1000}
-            disabled={!typography.weightAxis}
-            step={100}
-            valueDisplay={String(typography.weight)}
-            onChange={(value) => updateWidgetSize(widget.id, { font_weight: value })}
-            onCommit={() => commitWidgetSize(widget.id)}
-          />
-        ) : null}
-        {widget.category === 'labels' ? (
+      {widget.category === 'labels' ? (
+        <div className="grid grid-cols-2 gap-4 items-end pt-2">
+          {typography.font ? (
+            <SizeSlider
+              label={t('widget-editor.fontWeight', 'Font Weight')}
+              value={typography.weight}
+              min={typography.weightAxis?.min ?? 1}
+              max={typography.weightAxis?.max ?? 1000}
+              disabled={!typography.weightAxis}
+              step={100}
+              valueDisplay={String(typography.weight)}
+              onChange={(value) => updateWidgetSize(widget.id, { font_weight: value })}
+              onCommit={() => commitWidgetSize(widget.id)}
+            />
+          ) : null}
           <SliderField
             editable
             label={t('widget-editor.letterSpacing', 'Letter Spacing')}
@@ -218,8 +218,8 @@ export function FontSection({
             onSliderChange={(value) => updateWidgetSize(widget.id, { letter_spacing: value })}
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   )
 }

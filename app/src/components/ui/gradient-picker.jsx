@@ -18,26 +18,30 @@ import { cn } from '@/lib/utils'
  * @param {object} props - Component props.
  * @param {{ offset: number, color: string }[]} props.stops - Gradient stops; offsets in [0, 1], colors as `#rrggbb`.
  * @param {(stops: { offset: number, color: string }[]) => void} props.onChange - Receives the next stops.
- * @param {string} [props.label] - Optional field label shown above the track.
+ * @param {() => void} [props.onCommit] - Called when an interaction ends; lets `onChange` act as a live preview while dragging.
+ * @param {string} [props.label] - Field label shown above the track; defaults to "Gradient".
  * @param {string} [props.className] - Additional class names for the root element.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function GradientPicker({ stops, onChange, label, className }) {
+export default function GradientPicker({ stops, onChange, onCommit, label, className }) {
   const { t } = useTranslation()
+  const fieldLabel = label ?? t('components.gradient', 'Gradient')
   const { trackRef, canAddStop, canRemoveStop, handleTrackPointerDown, getStopHandlers, setStopColor, removeStop } = useGradientPicker({
     stops,
     onChange,
+    onCommit,
   })
 
   return (
     <div className={cn('space-y-3', className)}>
-      {label ? <Label className="h-3 text-[9px] text-muted-foreground uppercase font-bold">{label}</Label> : null}
-      {/* Matches the slider's vertical rhythm; the track's ::before extends its hit area into this padding. */}
-      <div className="py-2">
+      <Label className="h-3 text-[9px] text-muted-foreground uppercase font-bold">{fieldLabel}</Label>
+      {/* Matches the slider's vertical rhythm; the track's ::before extends its hit area into this padding.
+          The horizontal inset keeps stop nodes at 0% and 100% (half a node wide) inside the field width. */}
+      <div className="px-2 py-2">
         <div
           ref={trackRef}
           role="group"
-          aria-label={label ?? t('components.gradientStops', 'Gradient stops')}
+          aria-label={t('components.gradientStops', 'Gradient stops')}
           title={canAddStop ? t('components.gradientAddStopHint', 'Click to add a color stop') : undefined}
           className={cn(
             'relative h-2.5 touch-none rounded-xs border border-border/70 shadow-xs before:absolute before:inset-x-0 before:-inset-y-2 before:content-[""]',

@@ -23,15 +23,22 @@ const KEYBOARD_LARGE_STEP = 0.1
  *
  * @param {object} options - Hook options.
  * @param {{ offset: number, color: string }[]} options.stops - Gradient stops.
- * @param {(stops: { offset: number, color: string }[]) => void} options.onChange - Receives the next stops.
+ * @param {(stops: { offset: number, color: string }[]) => void} options.onChange - Receives the next stops, once per frame while dragging.
+ * @param {() => void} [options.onCommit] - Called once an interaction ends, for consumers that treat `onChange` as a live preview.
  * @returns {object} Track ref, track handlers, and per-stop handler factories.
  */
-export function useGradientPicker({ stops, onChange }) {
+export function useGradientPicker({ stops, onChange, onCommit }) {
   const trackRef = useRef(null)
   const dragRef = useRef(null)
   const suppressClickRef = useRef(false)
   const frameRef = useRef(null)
   const latestRef = useAsRef({ stops, onChange })
+
+  // Discrete edits are complete interactions: preview and commit together.
+  const applyStops = (nextStops) => {
+    onChange(nextStops)
+    onCommit?.()
+  }
 
   useEffect(() => () => cancelAnimationFrame(frameRef.current), [])
 
@@ -56,14 +63,14 @@ export function useGradientPicker({ stops, onChange }) {
 
   const removeStop = (index) => {
     if (canRemoveStop) {
-      onChange(removeGradientStop(stops, index))
+      applyStops(removeGradientStop(stops, index))
     }
   }
 
   const handleTrackPointerDown = (event) => {
     // Pointer events from the portaled color popover bubble through the React tree.
     if (event.button !== 0 || !canAddStop || !event.currentTarget.contains(event.target)) return
-    onChange(addGradientStop(stops, offsetFromClientX(event.clientX)))
+    applyStops(addGradientStop(stops, offsetFromClientX(event.clientX)))
   }
 
   const getStopHandlers = (index) => ({
@@ -84,8 +91,10 @@ export function useGradientPicker({ stops, onChange }) {
     onPointerUp: (event) => {
       event.currentTarget.releasePointerCapture(event.pointerId)
       flushDrag()
-      suppressClickRef.current = dragRef.current?.moved ?? false
+      const moved = dragRef.current?.moved ?? false
+      suppressClickRef.current = moved
       dragRef.current = null
+      if (moved) onCommit?.()
     },
     onClick: (event) => {
       // Preventing default stops the popover trigger from toggling after a drag.
@@ -103,13 +112,13 @@ export function useGradientPicker({ stops, onChange }) {
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         event.preventDefault()
         const step = (event.shiftKey ? KEYBOARD_LARGE_STEP : KEYBOARD_STEP) * (event.key === 'ArrowLeft' ? -1 : 1)
-        onChange(moveGradientStop(stops, index, toGradientOffset(stops[index].offset + step)))
+        applyStops(moveGradientStop(stops, index, toGradientOffset(stops[index].offset + step)))
       }
     },
   })
 
   const setStopColor = (index, color) => {
-    onChange(setGradientStopColor(stops, index, color))
+    applyStops(setGradientStopColor(stops, index, color))
   }
 
   return { trackRef, canAddStop, canRemoveStop, handleTrackPointerDown, getStopHandlers, setStopColor, removeStop }

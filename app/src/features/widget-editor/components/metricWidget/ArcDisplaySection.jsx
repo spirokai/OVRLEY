@@ -9,7 +9,7 @@ import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { FontSection, UnitsControlRow } from '../widgetEditorSections'
 import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from '../widgetFormControls'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
-import TrackFilledColorFields from './TrackFilledColorFields'
+import TrackStyleSection from './TrackStyleSection'
 import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry, getArcTrackDimensions } from '../../utils/gaugeGeometry'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
 import { useTranslation } from 'react-i18next'
@@ -176,49 +176,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             commitWidgetSize={commitWidgetSize}
             widgetId={widget.id}
           />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            label={t('widget-editor.borderColor', 'Border Color')}
-            value={arcData.track_border_color}
-            onChange={(track_border_color) => updateArc({ track_border_color })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.border', 'Border')}
-            value={arcData.track_border_thickness}
-            min={0}
-            max={6}
-            step={1}
-            integerDisplay
-            valueDisplay={`${arcData.track_border_thickness}`}
-            suffix="px"
-            onSliderChange={(track_border_thickness) => updateArcSize({ track_border_thickness })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            label={t('widget-editor.emptyColor', 'Empty Color')}
-            value={arcData.track_empty_color}
-            onChange={(track_empty_color) => updateArc({ track_empty_color })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.emptyOpacity', 'Empty Opacity')}
-            value={arcData.track_empty_opacity}
-            min={0}
-            max={1}
-            step={0.05}
-            valueScale={100}
-            valueDisplay={`${Math.round((arcData.track_empty_opacity ?? 0) * 100)}`}
-            suffix="%"
-            onSliderChange={(track_empty_opacity) => updateArc({ track_empty_opacity })}
-          />
-        </div>
-        <TrackFilledColorFields data={arcData} updateVariant={updateArc} supportsGradient={!isGtGauge} />
-        {isGtGauge ? (
-          <div className="grid grid-cols-2 gap-4">
+          {isGtGauge ? (
             <SliderField
               editable
               label={t('widget-editor.glow', 'Glow')}
@@ -231,45 +189,56 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
               suffix="%"
               onSliderChange={(glow) => updateArc({ glow })}
             />
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
-      <FontSection
-        widget={widget}
-        updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
-        title={t('widget-editor.label', 'Label')}
-        fontSizeLabel={t('widget-editor.fontSize', 'Font Size')}
+      <TrackStyleSection
+        data={arcData}
+        updateVariant={updateArc}
+        updateVariantSize={updateArcSize}
+        onCommit={() => commitWidgetSize(widget.id)}
+        borderMax={6}
+        supportsGradient={!isGtGauge}
       />
-      <div className="grid grid-cols-2 gap-4">
-        <SliderField
-          editable
-          label={t('widget-editor.horizontalOffset', 'Horizontal Offset')}
-          value={arcData.inner_widget_offset_x}
-          min={-50}
-          max={50}
-          step={1}
-          integerDisplay
-          valueDisplay={`${arcData.inner_widget_offset_x}`}
-          suffix="px"
-          onSliderChange={(value) => updateBoundedNumber(updateArcSize, 'inner_widget_offset_x', value, -10_000, 10_000)}
-          onSliderCommit={() => commitWidgetSize(widget.id)}
+
+      <div className="space-y-4">
+        <FontSection
+          widget={widget}
+          updateWidgetData={updateWidgetData}
+          updateWidgetSize={updateWidgetSize}
+          commitWidgetSize={commitWidgetSize}
+          title={t('widget-editor.label', 'Label')}
+          fontSizeLabel={t('widget-editor.fontSize', 'Font Size')}
         />
-        <SliderField
-          editable
-          label={t('widget-editor.verticalOffset', 'Vertical Offset')}
-          value={arcData.inner_widget_offset_y}
-          min={-50}
-          max={50}
-          step={1}
-          integerDisplay
-          valueDisplay={`${arcData.inner_widget_offset_y}`}
-          suffix="px"
-          onSliderChange={(value) => updateBoundedNumber(updateArcSize, 'inner_widget_offset_y', value, -10_000, 10_000)}
-          onSliderCommit={() => commitWidgetSize(widget.id)}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <SliderField
+            editable
+            label={t('widget-editor.horizontalOffset', 'Horizontal Offset')}
+            value={arcData.inner_widget_offset_x}
+            min={-50}
+            max={50}
+            step={1}
+            integerDisplay
+            valueDisplay={`${arcData.inner_widget_offset_x}`}
+            suffix="px"
+            onSliderChange={(value) => updateBoundedNumber(updateArcSize, 'inner_widget_offset_x', value, -10_000, 10_000)}
+            onSliderCommit={() => commitWidgetSize(widget.id)}
+          />
+          <SliderField
+            editable
+            label={t('widget-editor.verticalOffset', 'Vertical Offset')}
+            value={arcData.inner_widget_offset_y}
+            min={-50}
+            max={50}
+            step={1}
+            integerDisplay
+            valueDisplay={`${arcData.inner_widget_offset_y}`}
+            suffix="px"
+            onSliderChange={(value) => updateBoundedNumber(updateArcSize, 'inner_widget_offset_y', value, -10_000, 10_000)}
+            onSliderCommit={() => commitWidgetSize(widget.id)}
+          />
+        </div>
       </div>
       {definition.hasDecimalControl ? (
         <div className="grid grid-cols-2 gap-4">
@@ -303,13 +272,14 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
       ) : null}
 
       <div className="space-y-4">
-        <div className="flex w-full items-center gap-3">
-          <SectionHeading icon={Tags} title={t('widget-editor.minmaxLabels', 'Min/Max Labels')} />
-          <div className="shrink-0 pt-1">
+        <SectionHeading
+          icon={Tags}
+          title={t('widget-editor.minmaxLabels', 'Min/Max Labels')}
+          trailing={
             <ToggleField checked={arcData.show_min_max_labels} onCheckedChange={(show_min_max_labels) => updateArc({ show_min_max_labels })} />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4 pt-2">
+          }
+        />
+        <div className="grid grid-cols-2 gap-4">
           <FontSelectField
             label={t('widget-editor.labelFont', 'Label Font')}
             value={arcData.min_max_label_font}

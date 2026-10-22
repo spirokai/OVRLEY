@@ -6,7 +6,7 @@ import { SlidersHorizontal, Tags } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import { useAvailableFonts } from '@/hooks/useFonts'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
-import TrackFilledColorFields from './TrackFilledColorFields'
+import TrackStyleSection from './TrackStyleSection'
 import { getLinearBarGapMax, getLinearTrackCornerRadiusMax, getSuggestedLinearBarGeometry } from '../../utils/gaugeGeometry'
 import { useTranslation } from 'react-i18next'
 import { translateOptions } from '@/i18n'
@@ -153,57 +153,25 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            label={t('widget-editor.borderColor', 'Border Color')}
-            value={linearData.track_border_color}
-            onChange={(value) => updateLinear({ track_border_color: value })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.border', 'Border')}
-            value={linearData.track_border_thickness}
-            min={0}
-            max={6}
-            step={1}
-            integerDisplay
-            valueDisplay={`${linearData.track_border_thickness}`}
-            suffix="px"
-            onSliderChange={(value) => updateLinearSize({ track_border_thickness: value })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            label={t('widget-editor.emptyColor', 'Empty Color')}
-            value={linearData.track_empty_color}
-            onChange={(value) => updateLinear({ track_empty_color: value })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.emptyOpacity', 'Empty Opacity')}
-            value={linearData.track_empty_opacity}
-            min={0}
-            max={1}
-            step={0.05}
-            valueScale={100}
-            valueDisplay={`${Math.round(linearData.track_empty_opacity * 100)}`}
-            suffix="%"
-            onSliderChange={(value) => updateLinear({ track_empty_opacity: value })}
-          />
-        </div>
-        <TrackFilledColorFields data={linearData} updateVariant={updateLinear} />
       </div>
 
+      <TrackStyleSection
+        data={linearData}
+        updateVariant={updateLinear}
+        updateVariantSize={updateLinearSize}
+        onCommit={() => commitWidgetSize(widget.id)}
+        borderMax={6}
+      />
+
       <div className="space-y-4">
-        <div className="flex flex-row items-center gap-3">
-          <SectionHeading icon={Tags} title={t('widget-editor.minmaxLabels', 'Min/Max Labels')} />
-          <div className="shrink-0 pt-1">
+        <SectionHeading
+          icon={Tags}
+          title={t('widget-editor.minmaxLabels', 'Min/Max Labels')}
+          trailing={
             <ToggleField checked={linearData.show_min_max_labels} onCheckedChange={(checked) => updateLinear({ show_min_max_labels: checked })} />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4 pt-2">
+          }
+        />
+        <div className="grid grid-cols-2 gap-4">
           <FontSelectField
             label={t('widget-editor.labelFont', 'Label Font')}
             value={linearData.min_max_label_font}
