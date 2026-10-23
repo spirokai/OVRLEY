@@ -167,9 +167,17 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
     let encoder_availability = ENCODERS
         .iter()
         .map(|encoder| {
+            // Linux exports through VAAPI and NVENC. The editor hides QSV and AMF there, so skip
+            // probing them rather than initialising a GPU path nothing can select.
+            let hidden_on_linux = cfg!(target_os = "linux")
+                && matches!(
+                    encoder.id,
+                    EncoderId::H264Qsv | EncoderId::HevcQsv | EncoderId::H264Amf | EncoderId::HevcAmf
+                );
             (
                 encoder.id,
-                super::probes::probe_encoder(&ffmpeg_path, vaapi_device.as_deref(), encoder),
+                !hidden_on_linux
+                    && super::probes::probe_encoder(&ffmpeg_path, vaapi_device.as_deref(), encoder),
             )
         })
         .collect::<std::collections::BTreeMap<_, _>>();
