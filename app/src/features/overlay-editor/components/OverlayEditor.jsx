@@ -4,6 +4,7 @@
 
 import { memo } from 'react'
 import { LayoutGrid } from 'lucide-react'
+import useStore from '@/store/useStore'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { WIDGET_ICONS } from '@/lib/widget/widget-icons'
@@ -30,6 +31,7 @@ function OverlayEditorContent(props) {
   const { t } = useTranslation()
   const statusTranslation = PROJECT_STATUS_TRANSLATIONS[projectStatus]
   const editor = useOverlayEditorState(props)
+  const platformOs = useStore((state) => state.platformOs)
   const {
     viewport,
     viewportContentSize,
@@ -103,7 +105,16 @@ function OverlayEditorContent(props) {
             ) : (
               // CSS zoom, unlike a scale transform, does not force an offscreen render surface around the composited widget canvases.
               // Zoom also creates no stacking context, so isolate keeps Moveable's z-index 3000 controls below app modals.
-              <div className="absolute left-0 top-0 isolate" style={{ ...sceneSize, zoom: displayScale }}>
+              // WebKitGTK reports offsetLeft/offsetTop wrongly inside a CSS zoom container when GNOME text scaling is not 1.0,
+              // which misplaces Moveable's selection. Linux scales with a transform instead.
+              <div
+                className="absolute left-0 top-0 isolate"
+                style={
+                  platformOs === 'linux'
+                    ? { ...sceneSize, transform: `scale(${displayScale})`, transformOrigin: 'top left' }
+                    : { ...sceneSize, zoom: displayScale }
+                }
+              >
                 <OverlayCanvas
                   state={editor}
                   backgroundMode={backgroundMode}
