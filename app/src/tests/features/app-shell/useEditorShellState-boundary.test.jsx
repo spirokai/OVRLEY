@@ -10,7 +10,6 @@ describe('useEditorShellState boundary', () => {
     expect(result.current.editorZoomLevel).toBe(1)
     expect(result.current.editorBackgroundMode).toBe('checker')
     expect(result.current.editorGridVisible).toBe(false)
-    expect(result.current.uiScale).toBeGreaterThan(0)
     expect(typeof result.current.increaseZoom).toBe('function')
     expect(typeof result.current.decreaseZoom).toBe('function')
   })

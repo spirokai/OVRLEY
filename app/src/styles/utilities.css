@@ -1,12 +1,10 @@
 /* App-shell scaling, overlay grid pattern, scrollbars, and number input resets */
 
-/* App-shell responsive scaling — scales the entire shell with viewport width.
-   CSS zoom instead of a scale transform: layout and pixel snapping then happen at screen resolution, and the
-   compositor does not need an offscreen pass to scale the shell's composited canvases. */
+/* App-shell responsive scaling lives in the root font-size (index.css). A CSS zoom here would sit above
+   Moveable's targets, and WebKit reports zoomed offsets differently from Chromium, misplacing selection boxes. */
 .app-shell {
   width: 100%;
   height: 100%;
-  zoom: var(--app-scale, 1);
 }
 
 /* Muted overlay grid background pattern (checkerboard style) */

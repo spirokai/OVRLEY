@@ -147,12 +147,7 @@ function App() {
   }
 
   return (
-    <div
-      className="app-shell"
-      style={{
-        '--app-scale': `${editorShell.uiScale}`,
-      }}
-    >
+    <div className="app-shell">
       <div className="relative flex h-full flex-col bg-background text-foreground">
         <ErrorAlert />
         <StartupProjectsDialog {...projectLifecycle.startupProjectDialog} open={projectLifecycle.startupProjectDialog.open && !appUpdate.open} />

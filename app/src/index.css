@@ -19,7 +19,8 @@
   font-family: 'Figtree Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  font-size: clamp(10px, 0.5vw + 7px, 13.5px);
+  /* Sole UI scaling: 9px at a 600px-wide window to 14.6px from ~1555px. */
+  font-size: clamp(9px, 0.584vw + 5.5px, 14.6px);
   text-transform: uppercase;
   font-optical-sizing: auto;
   letter-spacing: 0.03em;

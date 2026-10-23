@@ -14,25 +14,10 @@
  */
 
 import { clamp } from '@/lib/utils'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 // Enable debug controls during local development.
 const DEBUG_MODE_ENABLED = true
-
-/**
- * Derives the UI scale factor from the viewport width.
- *
- * The editor chrome scales gently with available width so controls stay usable
- * on narrower layouts without overgrowing on large monitors. The factor is
- * derived from a 1440px reference width and then clamped to a conservative
- * range so the shell remains visually stable across desktop sizes.
- *
- * @param {number} width - Viewport width in pixels.
- * @returns {number} UI scale factor.
- */
-function getUiScale(width) {
-  return clamp(Number((width / 1440).toFixed(3)), 0.9, 1.08)
-}
 
 /**
  * Container hook for editor shell chrome state.
@@ -41,7 +26,6 @@ function getUiScale(width) {
  *
  * - Own editor-only presentation state such as zoom and background mode.
  * - Expose direct setters for toolbar controls.
- * - Keep UI scale in sync with the current window width when running in a browser.
  * - Remain safe when `window` is unavailable during tests or server-style renders.
  *
  * The returned state is deliberately local to the current session. Template
@@ -65,7 +49,6 @@ function getUiScale(width) {
  *   setEditorGridVisible: Function,
  *   setEditorSnapToGrid: Function,
  *   setEditorZoomLevel: Function,
- *   uiScale: number,
  * }}
  */
 export default function useEditorShellState() {
@@ -75,29 +58,9 @@ export default function useEditorShellState() {
   const [editorBackgroundMode, setEditorBackgroundMode] = useState('checker')
   const [editorGridVisible, setEditorGridVisible] = useState(false)
   const [editorSnapToGrid, setEditorSnapToGrid] = useState(false)
-  const [uiScale, setUiScale] = useState(() => (typeof window === 'undefined' ? 1 : getUiScale(window.innerWidth)))
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false)
   const [activeKeyboardWorkspace, setActiveKeyboardWorkspace] = useState('editor')
   const debugModeEnabled = import.meta.env.DEV && DEBUG_MODE_ENABLED
-
-  // Resize subscription for responsive chrome scaling. In non-browser
-  // environments there is nothing to subscribe to, so the hook becomes a
-  // predictable no-op and keeps the default scale of `1`.
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return undefined
-    }
-
-    const syncUiScale = () => {
-      setUiScale(getUiScale(window.innerWidth))
-    }
-
-    syncUiScale()
-    window.addEventListener('resize', syncUiScale)
-    return () => {
-      window.removeEventListener('resize', syncUiScale)
-    }
-  }, [])
 
   // Zoom adjustments use fixed increments and clamp to editor-supported bounds
   // so wheel/toolbar interactions cannot push the viewport into unusable ranges.
@@ -139,6 +102,5 @@ export default function useEditorShellState() {
     setEditorGridVisible,
     setEditorSnapToGrid,
     setEditorZoomLevel,
-    uiScale,
   }
 }

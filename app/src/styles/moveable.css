@@ -12,12 +12,6 @@
   display: none !important;
 }
 
-/* Keep screen coordinates while sharing the shell's stacking context with dialogs. */
-.ovrley-selection-border {
-  transform: scale(calc(1 / var(--app-scale)));
-  transform-origin: top left;
-}
-
 /* control box points — sized inside the zoomed app shell, so they scale with the UI */
 .moveable-control {
   height: 10px !important;
@@ -61,5 +55,5 @@
 }
 
 .moveable-guideline-group .moveable-size-value {
-  font-size: calc(14px * var(--app-scale, 1)) !important;
+  font-size: 14px !important;
 }
