@@ -1,11 +1,12 @@
 /**
  * Review of a video import before anything joins the collection: every video in
- * timeline order with its sync, whether it will be imported, overlaps, and what
- * prevents a single-file export, plus the sync and transition settings.
+ * timeline order with its sync, a switch to import (or keep) it, whether it starts
+ * far from the activity, overlaps, and what prevents a single-file export, plus the
+ * sync and transition settings. Importing videos far from the activity asks first.
  * Pure presentational - all logic is in useVideoImportReview.
  */
 
-import { AlertTriangle, ArrowDown, ArrowUp, Blend, Download, Loader2, RotateCcw, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, Blend, Download, Loader2, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,32 +14,46 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Label } from '@/components/ui/label'
 import { SecondsInput } from '@/components/ui/seconds-input'
 import { SectionHeading } from '@/components/ui/section-heading'
+import { Switch } from '@/components/ui/switch'
 import { TransitionSelect } from '@/features/transitions'
 import { VideoSyncControls } from '@/features/video-sync'
 import { formatSecondsClock } from '@/lib/time-format'
 import { cn } from '@/lib/utils'
 
 const ICON_BUTTON_CLASS = 'h-8 w-8 shrink-0 text-muted-foreground hover:bg-surface-accent-soft hover:text-primary'
+// Text selection is off app-wide (`index.css`); the dialog's text can be copied.
+const SELECTABLE_TEXT_CLASS = 'select-text **:select-text'
 
-function verdictLabel(row, windowKind, t) {
-  if (row.verdict === 'kept') return t('video-preview.importKept', 'Already imported')
-  if (row.verdict === 'import') return t('video-preview.importJoins', 'Will be imported')
-  if (row.verdict === 'outside') return t('video-preview.importKeptOutside', 'Starts more than an hour before or after the activity')
-  if (windowKind === 'activity')
-    return t('video-preview.importOutsideActivity', 'Not imported: starts more than an hour before or after the activity')
-  if (windowKind === 'videos') return t('video-preview.importOutsideVideos', 'Not imported: starts more than an hour away from the other videos')
-  return t('video-preview.importSpanTooLong', 'Not imported: the videos start more than 12 hours apart. Edit their sync to import them.')
+function statusLabel(row, t) {
+  if (row.isNew) return row.isIncluded ? t('video-preview.importJoins', 'Will be imported') : t('video-preview.importSkipped', 'Not imported')
+  return row.isIncluded ? t('video-preview.importKept', 'Already imported') : t('video-preview.importRemoved', 'Will be removed from the project')
+}
+
+function farLabel(windowKind, t) {
+  if (windowKind === 'activity') return t('video-preview.importOutsideActivity', 'Starts more than an hour before or after the activity')
+  if (windowKind === 'videos') return t('video-preview.importOutsideVideos', 'Starts more than an hour away from the other videos')
+  return t('video-preview.importSpanTooLong', 'Starts more than 12 hours away from the other videos')
 }
 
 function VideoImportRow({ row, windowKind }) {
   const { t } = useTranslation()
-  const isExcluded = row.verdict === 'excluded'
   return (
     <li
       aria-label={row.filename}
-      className="grid grid-cols-[minmax(0,1fr)_9.5rem_4.25rem] items-start gap-3 rounded-sm px-2 py-2 hover:bg-surface-elevated"
+      className="grid grid-cols-[2rem_minmax(0,1fr)_9.5rem_4.25rem] items-start gap-3 rounded-sm px-2 py-2 hover:bg-surface-elevated"
     >
-      <div className={cn('min-w-0 space-y-0.5', isExcluded && 'opacity-60')}>
+      <div className="flex h-8 items-center">
+        <Switch
+          checked={row.isIncluded}
+          onCheckedChange={row.onIncludedChange}
+          aria-label={
+            row.isNew
+              ? t('video-preview.importInclude', { defaultValue: 'Import {{name}}', name: row.filename })
+              : t('video-preview.importKeep', { defaultValue: 'Keep {{name}} in the project', name: row.filename })
+          }
+        />
+      </div>
+      <div className={cn('min-w-0 space-y-0.5', !row.isIncluded && 'opacity-60')}>
         <p className="flex min-w-0 items-center gap-2 text-xs font-medium text-foreground">
           <span className="truncate" title={row.path}>
             {row.filename}
@@ -53,11 +68,12 @@ function VideoImportRow({ row, windowKind }) {
         <p
           className={cn(
             'text-[0.7rem] leading-tight',
-            row.verdict === 'import' ? 'text-green-700' : row.verdict === 'kept' ? 'text-muted-foreground/70' : 'text-amber-500',
+            !row.isIncluded ? (row.isNew ? 'text-muted-foreground/70' : 'text-amber-500') : row.isNew ? 'text-green-700' : 'text-muted-foreground/70',
           )}
         >
-          {verdictLabel(row, windowKind, t)}
+          {statusLabel(row, t)}
         </p>
+        {row.isFar ? <p className="text-[0.7rem] leading-tight text-amber-500">{farLabel(windowKind, t)}</p> : null}
         {row.isPositioned ? (
           <p className="text-[0.7rem] leading-tight text-muted-foreground/70">
             {t('video-preview.importPositioned', 'Recording time unknown: use the arrows to place it after another video.')}
@@ -78,6 +94,7 @@ function VideoImportRow({ row, windowKind }) {
         fps={row.fps}
         signed
         onCommit={row.onOffsetCommit}
+        disabled={!row.isIncluded}
         className="h-8 text-xs"
         aria-label={t('video-preview.importSyncOf', { defaultValue: 'Sync of {{name}}', name: row.filename })}
       />
@@ -89,47 +106,38 @@ function VideoImportRow({ row, windowKind }) {
             size="icon"
             className={ICON_BUTTON_CLASS}
             onClick={row.onOffsetReset}
+            disabled={!row.isIncluded}
             aria-label={t('toolbar.resetVideoStart', { defaultValue: 'Place {{name}} automatically again', name: row.filename })}
             title={t('toolbar.resetVideoStartHint', 'Set by hand. Click to place it by its recording time again.')}
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
         ) : null}
-        {row.onMoveUp ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={ICON_BUTTON_CLASS}
-            onClick={row.onMoveUp}
-            aria-label={t('video-preview.importMoveUp', { defaultValue: 'Move {{name}} up', name: row.filename })}
-          >
-            <ArrowUp className="h-3.5 w-3.5" />
-          </Button>
-        ) : null}
-        {row.onMoveDown ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={ICON_BUTTON_CLASS}
-            onClick={row.onMoveDown}
-            aria-label={t('video-preview.importMoveDown', { defaultValue: 'Move {{name}} down', name: row.filename })}
-          >
-            <ArrowDown className="h-3.5 w-3.5" />
-          </Button>
-        ) : null}
-        {row.onRemove ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={ICON_BUTTON_CLASS}
-            onClick={row.onRemove}
-            aria-label={t('video-preview.importRemoveFromProject', { defaultValue: 'Remove {{name}} from the project', name: row.filename })}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+        {row.isPositioned ? (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={ICON_BUTTON_CLASS}
+              onClick={row.onMoveUp}
+              disabled={row.onMoveUp === null}
+              aria-label={t('video-preview.importMoveUp', { defaultValue: 'Move {{name}} up', name: row.filename })}
+            >
+              <ArrowUp className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={ICON_BUTTON_CLASS}
+              onClick={row.onMoveDown}
+              disabled={row.onMoveDown === null}
+              aria-label={t('video-preview.importMoveDown', { defaultValue: 'Move {{name}} down', name: row.filename })}
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+            </Button>
+          </>
         ) : null}
       </div>
     </li>
@@ -179,6 +187,7 @@ export function VideoImportDialog(props) {
   const { open, phase, onCancel } = props
   const isProbing = phase === 'probing'
   const isImporting = phase === 'importing'
+  const isConfirming = phase === 'confirming'
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && !isImporting && onCancel()}>
       <DialogContent
@@ -193,7 +202,7 @@ export function VideoImportDialog(props) {
           </DialogDescription>
         ) : (
           <>
-            <DialogDescription className="text-sm text-muted-foreground">
+            <DialogDescription className={cn('text-sm text-muted-foreground', SELECTABLE_TEXT_CLASS)}>
               {t(
                 'video-preview.importDescription',
                 'Check the sync of every video before importing. Sync is the start of a video in seconds from the start of the activity (or of the first video).',
@@ -206,7 +215,7 @@ export function VideoImportDialog(props) {
               </div>
               <div className="flex min-h-0 min-w-0 flex-col gap-3">
                 {props.issues.length > 0 ? (
-                  <div role="alert" className="flex gap-2 rounded-sm bg-amber-500/15 p-3 text-amber-500">
+                  <div role="alert" className={cn('flex gap-2 rounded-sm bg-amber-500/15 p-3 text-amber-500', SELECTABLE_TEXT_CLASS)}>
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                     <div className="space-y-1 text-xs">
                       <p className="font-semibold">{t('video-preview.importSingleFileBlocked', 'These videos cannot be exported as one file:')}</p>
@@ -220,7 +229,10 @@ export function VideoImportDialog(props) {
                 ) : null}
                 <ul
                   aria-label={t('video-preview.importVideos', 'Videos')}
-                  className="max-h-[55vh] min-h-0 space-y-1 overflow-y-auto rounded-sm border border-border/70 bg-surface p-2 [scrollbar-gutter:stable]"
+                  className={cn(
+                    'max-h-[55vh] min-h-0 space-y-1 overflow-y-auto rounded-sm border border-border/70 bg-surface p-2 [scrollbar-gutter:stable]',
+                    SELECTABLE_TEXT_CLASS,
+                  )}
                 >
                   {props.rows.map((row) => (
                     <VideoImportRow key={row.id} row={row} windowKind={props.windowKind} />
@@ -238,9 +250,23 @@ export function VideoImportDialog(props) {
                 </ul>
               </div>
             </div>
+            {isConfirming ? (
+              <div role="alert" className={cn('mt-6 flex gap-2 rounded-sm bg-amber-500/15 p-3 text-xs text-amber-500', SELECTABLE_TEXT_CLASS)}>
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>
+                  {t('video-preview.importFarConfirm', {
+                    defaultValue:
+                      'These videos start far from the activity or the other videos: {{names}}. The timeline will run from {{from}} to {{to}}. Import them anyway?',
+                    names: props.farConfirmation.names.join(', '),
+                    from: props.farConfirmation.from,
+                    to: props.farConfirmation.to,
+                  })}
+                </p>
+              </div>
+            ) : null}
             <div className="mt-6 flex items-center justify-end gap-3">
               {props.error !== null ? (
-                <p role="alert" className="mr-auto text-xs text-red-700">
+                <p role="alert" className={cn('mr-auto text-xs text-red-700', SELECTABLE_TEXT_CLASS)}>
                   {props.error}
                 </p>
               ) : null}
@@ -248,14 +274,16 @@ export function VideoImportDialog(props) {
                 type="button"
                 variant="outline"
                 className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
-                onClick={onCancel}
+                onClick={isConfirming ? props.onBack : onCancel}
                 disabled={isImporting}
               >
-                {t('video-preview.cancel', 'Cancel')}
+                {isConfirming ? t('video-preview.importBack', 'Back') : t('video-preview.cancel', 'Cancel')}
               </Button>
               <Button type="button" onClick={props.onConfirm} disabled={isImporting || props.importCount === 0}>
                 {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                {t('video-preview.importConfirm', { defaultValue: 'Import {{count}} videos', count: props.importCount })}
+                {isConfirming
+                  ? t('video-preview.importAnyway', 'Import anyway')
+                  : t('video-preview.importConfirm', { defaultValue: 'Import {{count}} videos', count: props.importCount })}
               </Button>
             </div>
           </>

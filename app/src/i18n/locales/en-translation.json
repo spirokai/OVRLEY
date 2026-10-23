@@ -571,16 +571,21 @@
     "importNew": "New",
     "importKept": "Already imported",
     "importJoins": "Will be imported",
-    "importKeptOutside": "Starts more than an hour before or after the activity",
-    "importOutsideActivity": "Not imported: starts more than an hour before or after the activity",
-    "importOutsideVideos": "Not imported: starts more than an hour away from the other videos",
-    "importSpanTooLong": "Not imported: the videos start more than 12 hours apart. Edit their sync to import them.",
+    "importOutsideActivity": "Starts more than an hour before or after the activity",
+    "importOutsideVideos": "Starts more than an hour away from the other videos",
+    "importSpanTooLong": "Starts more than 12 hours away from the other videos",
+    "importSkipped": "Not imported",
+    "importRemoved": "Will be removed from the project",
     "importPositioned": "Recording time unknown: use the arrows to place it after another video.",
     "importOverlap": "Overlaps {{name}} by {{duration}}",
     "importSyncOf": "Sync of {{name}}",
+    "importInclude": "Import {{name}}",
+    "importKeep": "Keep {{name}} in the project",
     "importMoveUp": "Move {{name}} up",
     "importMoveDown": "Move {{name}} down",
-    "importRemoveFromProject": "Remove {{name}} from the project"
+    "importFarConfirm": "These videos start far from the activity or the other videos: {{names}}. The timeline will run from {{from}} to {{to}}. Import them anyway?",
+    "importBack": "Back",
+    "importAnyway": "Import anyway"
   },
   "widgets": {
     "activityAttributes": {

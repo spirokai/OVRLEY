@@ -8,7 +8,8 @@ function row(overrides = {}) {
     filename: 'ride.mp4',
     path: '/clips/ride.mp4',
     isNew: true,
-    verdict: 'import',
+    isIncluded: true,
+    isFar: false,
     offsetSeconds: 330,
     fps: { num: 30, den: 1 },
     formatLabel: '1920×1080 · 30 fps',
@@ -20,7 +21,7 @@ function row(overrides = {}) {
     onOffsetReset: vi.fn(),
     onMoveUp: null,
     onMoveDown: null,
-    onRemove: null,
+    onIncludedChange: vi.fn(),
     ...overrides,
   }
 }
@@ -33,8 +34,16 @@ function model(overrides = {}) {
     windowKind: 'activity',
     rows: [
       row(),
-      row({ id: 'early', filename: 'early.mp4', path: '/clips/early.mp4', verdict: 'excluded', offsetSeconds: -4500 }),
-      row({ id: 'old', filename: 'old.mp4', path: '/clips/old.mp4', isNew: false, verdict: 'outside', isManual: true, onRemove: vi.fn() }),
+      row({ id: 'early', filename: 'early.mp4', path: '/clips/early.mp4', isIncluded: false, isFar: true, offsetSeconds: -4500 }),
+      row({
+        id: 'extra',
+        filename: 'extra.mp4',
+        path: '/clips/extra.mp4',
+        isIncluded: false,
+        isManual: true,
+        isPositioned: true,
+      }),
+      row({ id: 'old', filename: 'old.mp4', path: '/clips/old.mp4', isNew: false, isFar: true, isManual: true }),
     ],
     failures: [{ key: '/clips/notes.txt', name: 'notes.txt', message: 'Not a supported video file (MP4, MOV, MKV).' }],
     importCount: 1,
@@ -65,15 +74,17 @@ function model(overrides = {}) {
       onTypeChange: vi.fn(),
       onDurationCommit: vi.fn(),
     },
+    farConfirmation: null,
     error: null,
     onCancel: vi.fn(),
     onConfirm: vi.fn(),
+    onBack: vi.fn(),
     ...overrides,
   }
 }
 
 describe('VideoImportDialog', () => {
-  test('lists every video with its sync, verdict, and the reasons one file is not possible', () => {
+  test('lists every video with its switch, sync, status, and the reasons one file is not possible', () => {
     const props = model()
     render(<VideoImportDialog {...props} />)
 
@@ -82,19 +93,50 @@ describe('VideoImportDialog', () => {
     expect(within(ride).getByText('Will be imported')).toBeInTheDocument()
     expect(within(ride).getByRole('textbox', { name: 'Sync of ride.mp4' })).toHaveValue('05:30')
     expect(within(ride).getByText('330 s')).toBeInTheDocument()
-    expect(screen.getByRole('listitem', { name: 'early.mp4' })).toHaveTextContent(
-      'Not imported: starts more than an hour before or after the activity',
-    )
+    fireEvent.click(within(ride).getByRole('switch', { name: 'Import ride.mp4' }))
+    expect(props.rows[0].onIncludedChange).toHaveBeenCalledExactlyOnceWith(false)
+
+    const early = screen.getByRole('listitem', { name: 'early.mp4' })
+    expect(early).toHaveTextContent('Not imported')
+    expect(early).toHaveTextContent('Starts more than an hour before or after the activity')
     expect(screen.getByRole('listitem', { name: 'notes.txt' })).toHaveTextContent('Not imported: Not a supported video file (MP4, MOV, MKV).')
     expect(screen.getByRole('alert')).toHaveTextContent('Videos overlap (ride.mp4, old.mp4).')
 
+    // A switched-off row cannot be edited.
+    const extra = screen.getByRole('listitem', { name: 'extra.mp4' })
+    expect(within(extra).getByRole('textbox', { name: 'Sync of extra.mp4' })).toBeDisabled()
+    for (const name of ['Place extra.mp4 automatically again', 'Move extra.mp4 up', 'Move extra.mp4 down']) {
+      expect(within(extra).getByRole('button', { name })).toBeDisabled()
+    }
+    fireEvent.click(within(extra).getByRole('switch', { name: 'Import extra.mp4' }))
+    expect(props.rows[2].onIncludedChange).toHaveBeenCalledExactlyOnceWith(true)
+
     const old = screen.getByRole('listitem', { name: 'old.mp4' })
-    fireEvent.click(within(old).getByRole('button', { name: 'Remove old.mp4 from the project' }))
-    expect(props.rows[2].onRemove).toHaveBeenCalledOnce()
+    expect(old).toHaveTextContent('Already imported')
+    fireEvent.click(within(old).getByRole('switch', { name: 'Keep old.mp4 in the project' }))
+    expect(props.rows[3].onIncludedChange).toHaveBeenCalledExactlyOnceWith(false)
     fireEvent.click(within(old).getByRole('button', { name: 'Place old.mp4 automatically again' }))
-    expect(props.rows[2].onOffsetReset).toHaveBeenCalledOnce()
+    expect(props.rows[3].onOffsetReset).toHaveBeenCalledOnce()
 
     fireEvent.click(screen.getByRole('button', { name: 'Import 1 video' }))
+    expect(props.onConfirm).toHaveBeenCalledOnce()
+  })
+
+  test('an existing video switched off is removed from the project', () => {
+    render(<VideoImportDialog {...model({ rows: [row({ isNew: false, isIncluded: false })] })} />)
+    expect(screen.getByRole('listitem', { name: 'ride.mp4' })).toHaveTextContent('Will be removed from the project')
+  })
+
+  test('asks before importing videos far from the activity', () => {
+    const props = model({ phase: 'confirming', farConfirmation: { names: ['early.mp4', 'late.mp4'], from: '-01:15:00', to: '15:20:00' } })
+    render(<VideoImportDialog {...props} />)
+
+    expect(screen.getAllByRole('alert')[1]).toHaveTextContent(
+      'These videos start far from the activity or the other videos: early.mp4, late.mp4. The timeline will run from -01:15:00 to 15:20:00. Import them anyway?',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(props.onBack).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Import anyway' }))
     expect(props.onConfirm).toHaveBeenCalledOnce()
   })
 

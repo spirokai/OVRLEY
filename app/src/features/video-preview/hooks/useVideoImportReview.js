@@ -12,11 +12,8 @@ import { transitionLabel } from '@/features/transitions'
 import { deriveVideoSyncControls } from '@/features/toolbar/utils/videoSyncControls'
 import { filenameFromSelectedPath } from '@/lib/utils'
 import {
-  addVideos,
-  findUndeterminedVideoIds,
   moveVideoNextTo,
   placeAutomaticVideos,
-  removeVideo,
   resetCreationTimes,
   resetVideoOffset,
   setVideoOffset,
@@ -26,9 +23,10 @@ import {
 } from '@/lib/video-program/collection-edits'
 import { nextImportOrder } from '@/lib/video-program/imported-video'
 import { NO_TRANSITION } from '@/lib/video-program/transition-catalog'
+import { formatSecondsClock } from '@/lib/time-format'
 import { deriveCompatibility } from '@/lib/video-program/video-collection'
 import useStore from '@/store/useStore'
-import { buildImportReview } from '../utils/importReview'
+import { buildImportReview, openImportReview, resolveImportSwitches, settleImportReview } from '../utils/importReview'
 import { formatVideoFormat } from '../utils/videoFormat'
 import { commitReviewedImport, probeVideo } from '../videoImportOperations'
 
@@ -86,10 +84,7 @@ export default function useVideoImportReview({ onImported }) {
     setReview({
       token,
       phase: 'reviewing',
-      collection: produce(snapshotCollection(current), (draft) => {
-        if (videos.length > 0) addVideos(draft, videos)
-      }),
-      newIds: new Set(videos.map((video) => video.id)),
+      ...openImportReview(snapshotCollection(current), videos),
       failures,
       transitionDefaults: { ...current.transitionDefaults },
       adoptsFormat: current.importedVideos.length === 0,
@@ -97,29 +92,41 @@ export default function useVideoImportReview({ onImported }) {
     })
   }
 
-  /** Applies a collection recipe to the draft; returns the reason when it is rejected. */
-  const edit = (recipe, ...args) => {
+  /**
+   * Applies a collection recipe and switch changes to the review, then settles the draft;
+   * returns the reason when the change is rejected.
+   */
+  const change = (recipe, args, switchChanges = []) => {
     const current = reviewRef.current
     try {
-      setReview({ ...current, collection: produce(current.collection, (draft) => void recipe(draft, ...args)), error: null })
+      const switchOverrides = new Map([...current.switchOverrides, ...switchChanges])
+      const next = { ...current, collection: produce(current.collection, (draft) => void recipe(draft, ...args)), switchOverrides }
+      setReview({ ...next, phase: 'reviewing', collection: settleImportReview(next), error: null })
       return null
     } catch (error) {
       setReview({ ...current, error: error.message })
       return error.message
     }
   }
+  const edit = (recipe, ...args) => change(recipe, args)
+  // Editing a video keeps it switched on whatever the defaults become.
+  const editVideo = (videoId, recipe, ...args) => change(recipe, [videoId, ...args], [[videoId, true]])
 
   const derived = useMemo(() => {
     if (review === null || review.phase === 'probing') return null
-    const undeterminedIds = findUndeterminedVideoIds(review.collection)
-    return buildImportReview({ collection: review.collection, newIds: review.newIds, undeterminedIds, transitionDefaults: review.transitionDefaults })
+    const { includedIds, undeterminedIds } = resolveImportSwitches(review)
+    const { collection, newIds, transitionDefaults } = review
+    return { includedIds, ...buildImportReview({ collection, newIds, includedIds, undeterminedIds, transitionDefaults }) }
   }, [review])
 
   const confirm = async () => {
     const current = reviewRef.current
-    const reviewed = produce(current.collection, (draft) => {
-      for (const video of current.collection.importedVideos) if (!derived.joiningIds.has(video.id)) removeVideo(draft, video.id)
-    })
+    // Videos switched on far from the activity (or the other videos) stretch the timeline: ask first.
+    if (current.phase === 'reviewing' && derived.rows.some((row) => row.isIncluded && row.isFar)) {
+      setReview({ ...current, phase: 'confirming', error: null })
+      return
+    }
+    const reviewed = derived.included
     const adoptedFormat = current.adoptsFormat ? deriveCompatibility(reviewed.importedVideos).reference : null
     setReview({ ...current, phase: 'importing', error: null })
     try {
@@ -139,14 +146,19 @@ export default function useVideoImportReview({ onImported }) {
     }
   }
 
-  const { rows, windowKind, issues, joiningIds } = derived
+  const { rows, windowKind, issues, included, timeline, includedIds } = derived
   const clips = review.collection.importedVideos
+  // Switched-off videos are not on the timeline, so a positioned video moves among the switched-on ones.
+  const includedRows = rows.filter((row) => row.isIncluded)
   const moveTo = (videoId, index) => {
     // A positioned video sits right after the row above its new place, or before the first row.
-    const others = rows.filter((row) => row.id !== videoId)
-    edit(moveVideoNextTo, videoId, index === 0 ? others[0].id : others[index - 1].id, index === 0 ? 'before' : 'after')
+    const others = includedRows.filter((row) => row.id !== videoId)
+    editVideo(videoId, moveVideoNextTo, index === 0 ? others[0].id : others[index - 1].id, index === 0 ? 'before' : 'after')
   }
   const { type, durationSeconds } = review.transitionDefaults
+  const setIncluded = (videoId, isIncluded) => change(() => {}, [], [[videoId, isIncluded]])
+  const farRows = includedRows.filter((row) => row.isFar)
+  const sharedOffsetControls = deriveVideoSyncControls(included)
   const setTransitionDefaults = (changes) =>
     setReview({ ...reviewRef.current, transitionDefaults: { ...reviewRef.current.transitionDefaults, ...changes } })
 
@@ -157,25 +169,41 @@ export default function useVideoImportReview({ onImported }) {
       phase: review.phase,
       fileCount: review.newIds.size + review.failures.length,
       windowKind,
-      rows: rows.map((row, index) => ({
-        ...row,
-        formatLabel: formatVideoFormat(row, t),
-        onOffsetCommit: (seconds) => edit(setVideoOffset, row.id, seconds),
-        onOffsetReset: () => edit(resetVideoOffset, row.id),
-        onMoveUp: row.isPositioned && !row.isFirst ? () => moveTo(row.id, index - 1) : null,
-        onMoveDown: row.isPositioned && !row.isLast ? () => moveTo(row.id, index + 1) : null,
-        onRemove: row.verdict === 'outside' ? () => edit(removeVideo, row.id) : null,
-      })),
+      rows: rows.map((row) => {
+        // A switched-off video keeps its sync and position until it is switched on again.
+        const index = includedRows.indexOf(row)
+        const canMove = row.isPositioned && row.isIncluded
+        return {
+          ...row,
+          formatLabel: formatVideoFormat(row, t),
+          onOffsetCommit: (seconds) => editVideo(row.id, setVideoOffset, seconds),
+          onOffsetReset: () => editVideo(row.id, resetVideoOffset),
+          onMoveUp: canMove && index > 0 ? () => moveTo(row.id, index - 1) : null,
+          onMoveDown: canMove && index < includedRows.length - 1 ? () => moveTo(row.id, index + 1) : null,
+          onIncludedChange: (isIncluded) => setIncluded(row.id, isIncluded),
+        }
+      }),
       failures: review.failures.map(({ path, message }) => ({ key: path, name: filenameFromSelectedPath(path), message })),
-      importCount: [...review.newIds].filter((videoId) => joiningIds.has(videoId)).length,
+      importCount: [...review.newIds].filter((videoId) => includedIds.has(videoId)).length,
       issues: issues.map((issue) => formatCombinedExportIssue(issue, clips, t)),
+      farConfirmation:
+        review.phase === 'confirming'
+          ? {
+              names: farRows.map((row) => row.filename),
+              from: formatSecondsClock(timeline.fromSecond),
+              to: formatSecondsClock(timeline.toSecond),
+            }
+          : null,
       sync: {
         ...deriveVideoSyncControls(review.collection),
+        // The shared offset is the start of the first video switched on.
+        sharedOffsetSeconds: sharedOffsetControls.sharedOffsetSeconds,
+        sharedOffsetFps: sharedOffsetControls.sharedOffsetFps,
         // The rows show their own warnings; manual sync needs an imported video.
         videoSyncWarning: null,
         openManualVideoSync: null,
         computeVideoSync: () => edit(placeAutomaticVideos),
-        commitSharedOffset: (seconds) => edit(shiftVideoOffsets, seconds - deriveVideoSyncControls(reviewRef.current.collection).sharedOffsetSeconds),
+        commitSharedOffset: (seconds) => edit(shiftVideoOffsets, seconds - sharedOffsetControls.sharedOffsetSeconds),
         resetVideoCreationTimes: () => edit(resetCreationTimes),
         setVideoCreationTimesFromFilenames: () => edit(applyFilenameCreationTimes),
         setVideoSyncTimezoneMode: (mode) => edit(setVideoSyncTimezoneMode, mode),
@@ -192,6 +220,7 @@ export default function useVideoImportReview({ onImported }) {
       error: review.error,
       onCancel: () => setReview(null),
       onConfirm: confirm,
+      onBack: () => setReview({ ...reviewRef.current, phase: 'reviewing' }),
     },
   }
 }

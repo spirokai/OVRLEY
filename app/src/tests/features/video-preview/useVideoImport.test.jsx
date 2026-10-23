@@ -96,9 +96,9 @@ describe('reviewing an import', () => {
     await selectFiles(result, ['/clips/b.mp4', '/clips/a.mp4'])
 
     expect(dialog(result)).toMatchObject({ open: true, phase: 'reviewing', importCount: 2, issues: [] })
-    expect(dialog(result).rows.map(({ filename, isNew, verdict, offsetSeconds }) => [filename, isNew, verdict, offsetSeconds])).toEqual([
-      ['a.mp4', true, 'import', 0],
-      ['b.mp4', true, 'import', 300],
+    expect(dialog(result).rows.map(({ filename, isNew, isIncluded, offsetSeconds }) => [filename, isNew, isIncluded, offsetSeconds])).toEqual([
+      ['a.mp4', true, true, 0],
+      ['b.mp4', true, true, 300],
     ])
     expect(importedPaths()).toEqual([])
     expect(boundaries.registerPreviewVideo).not.toHaveBeenCalled()
@@ -118,8 +118,8 @@ describe('reviewing an import', () => {
   })
 
   test('lists failed and duplicate files while the other files still import', async () => {
-    probe('/clips/existing.mp4')
-    probe('/clips/good.mp4')
+    probe('/clips/existing.mp4', { creationTime: '2026-07-18T08:00:00Z' })
+    probe('/clips/good.mp4', { creationTime: '2026-07-18T08:05:00Z' })
     probe('/clips/no-fps.mp4', { fpsNum: undefined })
     const { result } = renderImport()
     await selectFiles(result, ['/clips/existing.mp4'])
@@ -141,7 +141,7 @@ describe('reviewing an import', () => {
       ['missing.mp4', 'probe failed: /clips/missing.mp4'],
       ['no-fps.mp4', 'Imported video metadata contains an invalid frame rate numerator'],
     ])
-    expect(row(result, 'existing.mp4')).toMatchObject({ isNew: false, verdict: 'kept' })
+    expect(row(result, 'existing.mp4')).toMatchObject({ isNew: false, isIncluded: true })
     expect(dialog(result).importCount).toBe(1)
 
     await confirm(result)
@@ -204,7 +204,7 @@ describe('reviewing an import', () => {
 })
 
 describe('which videos are imported', () => {
-  test('with an activity, a video starting more than an hour before it is excluded until its sync brings it closer', async () => {
+  test('with an activity, a video starting more than an hour before it is switched off and asks before it is imported', async () => {
     useStore.getState().activateActivityFile(activityFile)
     probe('/clips/ride.mp4', { creationTime: '2026-07-18T08:00:30Z' })
     probe('/clips/early.mp4', { creationTime: '2026-07-18T06:45:00Z' })
@@ -213,30 +213,93 @@ describe('which videos are imported', () => {
     await selectFiles(result, ['/clips/ride.mp4', '/clips/early.mp4'])
 
     expect(dialog(result).windowKind).toBe('activity')
-    expect(row(result, 'early.mp4')).toMatchObject({ verdict: 'excluded', offsetSeconds: -4500 })
+    expect(row(result, 'early.mp4')).toMatchObject({ isIncluded: false, isFar: true, offsetSeconds: -4500 })
     expect(dialog(result).importCount).toBe(1)
 
+    // A sync edit never switches a video on or off; only the warning follows it.
+    act(() => row(result, 'early.mp4').onIncludedChange(true))
     act(() => row(result, 'early.mp4').onOffsetCommit(-3000))
-    expect(row(result, 'early.mp4')).toMatchObject({ verdict: 'import', offsetSeconds: -3000, isManual: true })
+    expect(row(result, 'early.mp4')).toMatchObject({ isIncluded: true, isFar: false, offsetSeconds: -3000, isManual: true })
+    act(() => row(result, 'early.mp4').onOffsetCommit(-4000))
+    expect(row(result, 'early.mp4')).toMatchObject({ isIncluded: true, isFar: true })
 
     await confirm(result)
+    expect(dialog(result)).toMatchObject({
+      phase: 'confirming',
+      farConfirmation: { names: ['early.mp4'], from: '-01:06:40', to: '02:00' },
+    })
+    expect(importedPaths()).toEqual([])
+    act(() => dialog(result).onBack())
+    expect(dialog(result)).toMatchObject({ phase: 'reviewing', farConfirmation: null })
+
+    await confirm(result)
+    await confirm(result)
     expect(importedPaths()).toEqual(['/clips/ride.mp4', '/clips/early.mp4'])
-    expect(useStore.getState().videoEdits[useStore.getState().importedVideos[1].id]).toMatchObject({ offsetSeconds: -3000, offsetSource: 'manual' })
+    expect(useStore.getState().videoEdits[useStore.getState().importedVideos[1].id]).toMatchObject({ offsetSeconds: -4000, offsetSource: 'manual' })
   })
 
-  test('a fresh import without an activity takes nothing while its videos start more than 12 hours apart', async () => {
+  test('a fresh import without an activity switches on the largest group of videos starting within 12 hours', async () => {
     probe('/clips/morning.mp4', { creationTime: '2026-07-18T08:00:00Z' })
+    probe('/clips/noon.mp4', { creationTime: '2026-07-18T12:00:00Z' })
     probe('/clips/next-day.mp4', { creationTime: '2026-07-19T09:00:00Z' })
     const { result } = renderImport()
 
-    await selectFiles(result, ['/clips/morning.mp4', '/clips/next-day.mp4'])
+    await selectFiles(result, ['/clips/morning.mp4', '/clips/noon.mp4', '/clips/next-day.mp4'])
 
     expect(dialog(result).windowKind).toBe('span')
-    expect(dialog(result).rows.map((candidate) => candidate.verdict)).toEqual(['excluded', 'excluded'])
-    expect(dialog(result).importCount).toBe(0)
+    expect(dialog(result).rows.map(({ filename, isIncluded, isFar }) => [filename, isIncluded, isFar])).toEqual([
+      ['morning.mp4', true, false],
+      ['noon.mp4', true, false],
+      ['next-day.mp4', false, true],
+    ])
+    expect(dialog(result).importCount).toBe(2)
+  })
 
-    act(() => row(result, 'next-day.mp4').onOffsetCommit(600))
-    expect(dialog(result).rows.map((candidate) => candidate.verdict)).toEqual(['import', 'import'])
+  test('switches follow the defaults when times are detected again, unless the user set them', async () => {
+    useStore.getState().activateActivityFile(activityFile)
+    // Camera clocks: as UTC both start inside the activity, as Sofia time three hours before it.
+    probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:30.000000Z', timeSource: 'ffprobe' })
+    probe('/clips/b.mp4', { creationTime: '2026-07-18T08:01:00.000000Z', timeSource: 'ffprobe' })
+    const { result } = renderImport()
+    await selectFiles(result, ['/clips/a.mp4', '/clips/b.mp4'])
+    const switches = () => dialog(result).rows.map(({ filename, isIncluded, isFar }) => [filename, isIncluded, isFar])
+    expect(switches()).toEqual([
+      ['a.mp4', true, false],
+      ['b.mp4', true, false],
+    ])
+
+    act(() => row(result, 'b.mp4').onIncludedChange(false))
+    act(() => dialog(result).sync.setVideoSyncTimezoneMode('local'))
+    expect(switches()).toEqual([
+      ['a.mp4', false, true],
+      ['b.mp4', false, true],
+    ])
+    act(() => dialog(result).sync.setVideoSyncTimezoneMode('utc'))
+    expect(switches()).toEqual([
+      ['a.mp4', true, false],
+      ['b.mp4', false, false],
+    ])
+  })
+
+  test('a switched-off video is not imported, cannot be moved, and keeps its sync until it is switched on again', async () => {
+    useStore.getState().activateActivityFile(activityFile)
+    probe('/clips/ride.mp4', { creationTime: '2026-07-18T08:00:30Z' })
+    probe('/clips/extra.mp4', { creationTime: '2026-07-18T08:01:00Z' })
+    probe('/clips/more.mp4', { creationTime: '2026-07-18T08:01:30Z' })
+    const { result } = renderImport()
+    await selectFiles(result, ['/clips/ride.mp4', '/clips/extra.mp4', '/clips/more.mp4'])
+
+    act(() => row(result, 'extra.mp4').onOffsetCommit(10))
+    act(() => row(result, 'extra.mp4').onIncludedChange(false))
+    expect(row(result, 'extra.mp4')).toMatchObject({ isIncluded: false, overlaps: [] })
+    expect(dialog(result).importCount).toBe(2)
+    act(() => row(result, 'extra.mp4').onIncludedChange(true))
+    expect(row(result, 'extra.mp4')).toMatchObject({ isIncluded: true, offsetSeconds: 10 })
+    act(() => row(result, 'extra.mp4').onIncludedChange(false))
+    await confirm(result)
+
+    expect(importedPaths()).toEqual(['/clips/ride.mp4', '/clips/more.mp4'])
+    expect(boundaries.registerPreviewVideo.mock.calls.map(([path]) => path)).toEqual(['/clips/ride.mp4', '/clips/more.mp4'])
   })
 
   test('without an activity, a new video must start within an hour of the videos already imported', async () => {
@@ -250,14 +313,14 @@ describe('which videos are imported', () => {
     await selectFiles(result, ['/clips/close.mp4', '/clips/far.mp4'])
 
     expect(dialog(result).windowKind).toBe('videos')
-    expect(dialog(result).rows.map(({ filename, isNew, verdict }) => [filename, isNew, verdict])).toEqual([
-      ['first.mp4', false, 'kept'],
-      ['close.mp4', true, 'import'],
-      ['far.mp4', true, 'excluded'],
+    expect(dialog(result).rows.map(({ filename, isNew, isIncluded, isFar }) => [filename, isNew, isIncluded, isFar])).toEqual([
+      ['first.mp4', false, true, false],
+      ['close.mp4', true, true, false],
+      ['far.mp4', true, false, true],
     ])
   })
 
-  test('an existing video outside the activity window stays unless it is removed from the project', async () => {
+  test('an existing video outside the activity window stays switched on and is removed from the project when switched off', async () => {
     probe('/clips/ride.mp4', { creationTime: '2026-07-18T08:00:30Z' })
     probe('/clips/late.mp4', { creationTime: '2026-07-18T08:01:00Z' })
     const { result } = renderImport()
@@ -268,10 +331,10 @@ describe('which videos are imported', () => {
     useStore.getState().setVideoOffset(ride.id, 9000)
 
     await selectFiles(result, ['/clips/late.mp4'])
-    expect(row(result, 'ride.mp4')).toMatchObject({ verdict: 'outside', onRemove: expect.any(Function) })
+    expect(row(result, 'ride.mp4')).toMatchObject({ isIncluded: true, isFar: true })
 
-    act(() => row(result, 'ride.mp4').onRemove())
-    expect(row(result, 'ride.mp4')).toBeUndefined()
+    act(() => row(result, 'ride.mp4').onIncludedChange(false))
+    expect(row(result, 'ride.mp4')).toMatchObject({ isIncluded: false })
     await confirm(result)
 
     expect(importedPaths()).toEqual(['/clips/late.mp4'])
@@ -301,12 +364,52 @@ describe('editing in the dialog', () => {
     expect(row(result, 'b.mp4')).toMatchObject({ offsetSeconds: 12897, isManual: false })
   })
 
-  test('videos without a recording time follow the previous video and move with the arrows', async () => {
+  test('videos without a recording time start switched off after the last switched-on video, which they follow', async () => {
+    useStore.getState().activateActivityFile(activityFile)
+    probe('/clips/ride.mp4', { creationTime: '2026-07-18T08:00:30Z' })
+    probe('/clips/late.mp4', { creationTime: '2026-07-18T10:00:00Z' })
+    probe('/clips/first.mp4')
+    probe('/clips/second.mp4')
+    const { result } = renderImport()
+    await selectFiles(result, ['/clips/ride.mp4', '/clips/late.mp4', '/clips/first.mp4', '/clips/second.mp4'])
+
+    const placement = () => dialog(result).rows.map(({ filename, isIncluded, offsetSeconds }) => [filename, isIncluded, offsetSeconds])
+    expect(placement()).toEqual([
+      ['ride.mp4', true, 30],
+      ['first.mp4', false, 60],
+      ['second.mp4', false, 90],
+      ['late.mp4', false, 7200],
+    ])
+    expect(row(result, 'first.mp4')).toMatchObject({ isPositioned: true, onMoveUp: null, onMoveDown: null })
+
+    // A switched-off video leaves no gap: the second follows the ride while the first waits after it.
+    act(() => row(result, 'second.mp4').onIncludedChange(true))
+    const expected = [
+      ['ride.mp4', true, 30],
+      ['second.mp4', true, 60],
+      ['first.mp4', false, 90],
+    ]
+    expect(placement().slice(0, 3)).toEqual(expected)
+    // Switched on, a video stays where it waited.
+    act(() => row(result, 'first.mp4').onIncludedChange(true))
+    expect(placement().slice(0, 3)).toEqual([expected[0], expected[1], ['first.mp4', true, 90]])
+    await confirm(result)
+    const { importedVideos, videoEdits } = useStore.getState()
+    expect(importedVideos.map((video) => [video.path, videoEdits[video.id].offsetSeconds])).toEqual([
+      ['/clips/ride.mp4', 30],
+      ['/clips/first.mp4', 90],
+      ['/clips/second.mp4', 60],
+    ])
+  })
+
+  test('the arrows move a video without a recording time among the switched-on videos', async () => {
     probe('/clips/known.mp4', { creationTime: '2026-07-18T08:00:00Z' })
     probe('/clips/first.mp4')
     probe('/clips/second.mp4')
     const { result } = renderImport()
     await selectFiles(result, ['/clips/known.mp4', '/clips/first.mp4', '/clips/second.mp4'])
+    act(() => row(result, 'first.mp4').onIncludedChange(true))
+    act(() => row(result, 'second.mp4').onIncludedChange(true))
 
     expect(dialog(result).rows.map(({ filename, offsetSeconds, isPositioned }) => [filename, offsetSeconds, isPositioned])).toEqual([
       ['known.mp4', 0, false],
