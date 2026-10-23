@@ -133,7 +133,7 @@ export default function HexColorPicker({
             >
               <ColorPickerSwatch className={cn('size-5 shrink-0 rounded-xs border border-border/70 shadow-sm', swatchClassName)} />
               {showValue ? (
-                <span className={cn('truncate font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground', valueClassName)}>
+                <span className={cn('truncate font-mono text-[0.815rem] uppercase tracking-[0.18em] text-muted-foreground', valueClassName)}>
                   {displayValue}
                 </span>
               ) : null}
@@ -167,7 +167,7 @@ export default function HexColorPicker({
             </div>
 
             <div className="space-y-2">
-              <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-muted-foreground">{t('components.presets', 'Presets')}</p>
+              <p className="text-[0.667rem] font-bold uppercase tracking-[0.24em] text-muted-foreground">{t('components.presets', 'Presets')}</p>
               <div className="grid grid-cols-6 gap-2">
                 {presetColors.map((presetColor) => (
                   <button

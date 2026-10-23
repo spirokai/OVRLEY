@@ -159,7 +159,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center justify-between gap-2 pl-1 pt-2 pb-2">
-            <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
+            <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">
               {t('widget-editor.showFullActivity', 'Show Full Activity')}
             </Label>
             <ToggleField

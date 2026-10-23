@@ -69,7 +69,7 @@ export default function TemplateSection({
         <SelectContent>
           {templateGroups.map((group) => (
             <SelectGroup key={group.key}>
-              <SelectLabel className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
+              <SelectLabel className="flex items-center gap-2 text-[0.741rem] font-bold uppercase tracking-widest">
                 <span>{group.label}</span>
               </SelectLabel>
               <SelectSeparator className="my-0" />

@@ -158,7 +158,7 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
           />
 
           <div className="flex items-center justify-between gap-2 px-1 pt-6">
-            <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
+            <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">
               {t('widget-editor.showFullActivity', 'Show Full Activity')}
             </Label>
             <ToggleField
@@ -286,7 +286,9 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
         <div className="grid grid-cols-2 gap-4 pt-2">
           <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center gap-2 pl-1 pb-3">
-              <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.metricLabel', 'Metric Label')}</Label>
+              <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">
+                {t('widget-editor.metricLabel', 'Metric Label')}
+              </Label>
               <ToggleField
                 label={t('widget-editor.labelMetric', 'Label Metric')}
                 checked={widget.data.show_depth_metric}
@@ -328,7 +330,9 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
           </div>
           <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center gap-2 pl-1 pb-3">
-              <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.imperialLabel', 'Imperial Label')}</Label>
+              <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">
+                {t('widget-editor.imperialLabel', 'Imperial Label')}
+              </Label>
               <ToggleField
                 label={t('widget-editor.labelImperial', 'Label Imperial')}
                 checked={widget.data.show_depth_imperial}

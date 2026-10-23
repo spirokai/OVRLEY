@@ -34,7 +34,7 @@ export default function GradientPicker({ stops, onChange, onCommit, label, class
 
   return (
     <div className={cn('space-y-3', className)}>
-      <Label className="h-3 text-[9px] text-muted-foreground uppercase font-bold">{fieldLabel}</Label>
+      <Label className="h-3 text-[0.667rem] text-muted-foreground uppercase font-bold">{fieldLabel}</Label>
       {/* Matches the slider's vertical rhythm; the track's ::before extends its hit area into this padding.
           The horizontal inset keeps stop nodes at 0% and 100% (half a node wide) inside the field width. */}
       <div className="px-2 py-2">

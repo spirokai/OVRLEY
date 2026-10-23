@@ -52,7 +52,7 @@ function OverlayEditorContent(props) {
         {showProjectStatus ? (
           <Badge
             variant={projectStatus === 'Modified' ? 'secondary' : 'outline'}
-            className={`h-6 rounded-xs text-[10px] shadow-lg ${projectStatus === 'Modified' ? 'border-accent-border bg-surface-accent-soft/20 text-primary' : 'bg-card/85'}`}
+            className={`h-6 rounded-xs text-[0.741rem] shadow-lg ${projectStatus === 'Modified' ? 'border-accent-border bg-surface-accent-soft/20 text-primary' : 'bg-card/85'}`}
           >
             {t(statusTranslation.key, statusTranslation.defaultLabel)}
           </Badge>
@@ -122,7 +122,7 @@ function OverlayEditorContent(props) {
                     <div
                       key={badge.id}
                       data-widget-badge-id={badge.id}
-                      className="absolute flex h-5 items-center gap-1 rounded-xs border border-border/70 bg-card/90 px-2 text-[11px] font-semibold leading-none text-muted-foreground shadow-sm"
+                      className="absolute flex h-5 items-center gap-1 rounded-xs border border-border/70 bg-card/90 px-2 text-[0.815rem] font-semibold leading-none text-muted-foreground shadow-sm"
                       style={{ left: badge.left, top: badge.top, transform: `rotate(${badge.rotation}deg)`, transformOrigin: 'top left' }}
                     >
                       <Icon className="h-3 w-3" />

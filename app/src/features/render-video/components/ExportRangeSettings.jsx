@@ -35,7 +35,7 @@ export default function ExportRangeSettings({ range, onExportRangeChange, showUs
       {ctx.isCustom ? (
         <div className={`grid gap-4 ${showUseVideoRangeAction ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]' : 'grid-cols-2'}`}>
           <div className="space-y-1.5">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('render-video.from', 'From')}</Label>
+            <Label className="text-[0.741rem] text-muted-foreground uppercase font-bold">{t('render-video.from', 'From')}</Label>
             <BlurInput
               value={ctx.fromTime}
               onKeyDown={ctx.preventDecimalInput}
@@ -46,7 +46,7 @@ export default function ExportRangeSettings({ range, onExportRangeChange, showUs
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('render-video.to', 'To')}</Label>
+            <Label className="text-[0.741rem] text-muted-foreground uppercase font-bold">{t('render-video.to', 'To')}</Label>
             <BlurInput
               value={ctx.toTime}
               onKeyDown={ctx.preventDecimalInput}
@@ -62,7 +62,7 @@ export default function ExportRangeSettings({ range, onExportRangeChange, showUs
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-9 border-border/80 bg-surface-elevated px-2 text-[10px] font-semibold text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
+                className="h-9 border-border/80 bg-surface-elevated px-2 text-[0.741rem] font-semibold text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
                 onClick={onUseVideoRange}
               >
                 {t('render-video.useVideoRange', 'Use Video Range')}

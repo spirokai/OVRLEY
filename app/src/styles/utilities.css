@@ -26,13 +26,13 @@
       color-mix(in srgb, var(--grid-line) 20%, transparent) 75%,
       color-mix(in srgb, var(--grid-line) 20%, transparent)
     );
-  background-size: 32px 32px;
+  background-size: 2.37rem 2.37rem;
 }
 
 /* App scrollbar — cross-browser styling */
 * {
-  --scrollbar-size: 6px;
-  --scrollbar-thumb-radius: 3px;
+  --scrollbar-size: 0.444rem;
+  --scrollbar-thumb-radius: 0.222rem;
   --scrollbar-thumb-border: 1px solid transparent;
   --scrollbar-thumb-background-clip: content-box;
   --scrollbar-thumb-color: color-mix(in srgb, var(--foreground) 40%, transparent);
@@ -68,7 +68,7 @@
 
 /* Widget drawer scrollbar — extra thin variant */
 .thin-scrollbar {
-  --scrollbar-size: 2px;
+  --scrollbar-size: 0.148rem;
   --scrollbar-thumb-radius: 1px;
   --scrollbar-thumb-border: 0;
   --scrollbar-thumb-background-clip: border-box;

@@ -61,7 +61,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData, updateW
           onSliderChange={(value) => updateWidgetData(widget.id, { decimals: value })}
         />
         <div className="flex items-center justify-between rounded-sm pl-8 py-2.5 mt-4.5">
-          <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.showSign', 'Show sign')}</Label>
+          <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.showSign', 'Show sign')}</Label>
           <ToggleField checked={widget.data.show_sign} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_sign: checked })} />
         </div>
       </div>

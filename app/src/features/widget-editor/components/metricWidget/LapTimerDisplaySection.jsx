@@ -33,7 +33,7 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
       />
       {widget.data.lap_timer_mode === 'lap_log' ? (
         <div className="flex items-center justify-between gap-2 pl-1">
-          <Label className="pt-1 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.renumberLaps', 'Renumber laps')}</Label>
+          <Label className="pt-1 text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.renumberLaps', 'Renumber laps')}</Label>
           <ToggleField checked={widget.data.renumber_laps} onCheckedChange={(renumber_laps) => updateWidgetData(widget.id, { renumber_laps })} />
         </div>
       ) : null}
@@ -73,7 +73,7 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
             recommendedFonts={availableFonts.recommendedFonts}
             systemFonts={availableFonts.systemFonts}
             triggerClassName="h-9 border-border/70 bg-surface text-xs"
-            labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
+            labelClassName="text-[0.667rem] text-muted-foreground uppercase font-bold"
           />
           <ColorField
             label={t('widget-editor.labelColor', 'Label Color')}

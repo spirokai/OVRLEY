@@ -181,7 +181,7 @@ export function FontSection({
           recommendedFonts={availableFonts.recommendedFonts}
           systemFonts={availableFonts.systemFonts}
           triggerClassName="h-9 border-border/70 bg-surface text-xs"
-          labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
+          labelClassName="text-[0.667rem] text-muted-foreground uppercase font-bold"
         />
         <ColorField
           label={colorLabel}

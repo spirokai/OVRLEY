@@ -78,7 +78,7 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
       {isDistanceWidget ? (
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center justify-between py-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <span className="text-[0.741rem] font-bold uppercase tracking-wider text-muted-foreground">
               {t('widget-editor.showFullDistance', 'Show Full Distance')}
             </span>
             <ToggleField
@@ -109,7 +109,7 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
       {isTotalAscentWidget ? (
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center justify-between py-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <span className="text-[0.741rem] font-bold uppercase tracking-wider text-muted-foreground">
               {t('widget-editor.showFullAscent', 'Show Full Ascent')}
             </span>
             <ToggleField

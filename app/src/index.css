@@ -19,7 +19,8 @@
   font-family: 'Figtree Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  /* Sole UI scaling: 9px at a 600px-wide window to 14.6px from ~1555px. */
+  /* Sole UI scaling: 9px at a 600px-wide window to 14.6px from ~1555px. Fixed UI sizes are rem, converted
+     from their design px at the 13.5px root they were drawn against (px / 13.5). */
   font-size: clamp(9px, 0.584vw + 5.5px, 14.6px);
   text-transform: uppercase;
   font-optical-sizing: auto;
@@ -95,7 +96,7 @@
 
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 23.704rem;
   min-height: 100vh;
   font-size: 1rem;
   background-color: var(--background);

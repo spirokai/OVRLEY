@@ -65,7 +65,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2 px-1 pb-2">
-              <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.majorTicks', 'Major Ticks')}</span>
+              <span className="text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.majorTicks', 'Major Ticks')}</span>
               <ToggleField checked={showMajorTicks} onCheckedChange={(checked) => updateTape({ show_major_ticks: checked })} />
             </div>
             <SliderField
@@ -98,7 +98,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
           </div>
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2 px-1 pb-2">
-              <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.minorTicks', 'Minor Ticks')}</span>
+              <span className="text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.minorTicks', 'Minor Ticks')}</span>
               <ToggleField checked={showMinorTicks} onCheckedChange={(checked) => updateTape({ show_minor_ticks: checked })} />
             </div>
             <SliderField
@@ -159,15 +159,15 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
           recommendedFonts={availableFonts.recommendedFonts}
           systemFonts={availableFonts.systemFonts}
           triggerClassName="h-9 border-border/70 bg-surface text-xs"
-          labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
+          labelClassName="text-[0.667rem] text-muted-foreground uppercase font-bold"
         />
         <div className="grid grid-cols-2 gap-4 py-2">
           <div className="flex items-center justify-between gap-2 px-1">
-            <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.minorLabels', 'Minor Labels')}</span>
+            <span className="text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.minorLabels', 'Minor Labels')}</span>
             <ToggleField checked={showMinorLabels} onCheckedChange={(checked) => updateTape({ show_minor_labels: checked })} />
           </div>
           <div className="flex items-center justify-between gap-2 px-1">
-            <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.majorLabels', 'Major Labels')}</span>
+            <span className="text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.majorLabels', 'Major Labels')}</span>
             <ToggleField checked={showMajorLabels} onCheckedChange={(checked) => updateTape({ show_major_labels: checked })} />
           </div>
         </div>
@@ -214,7 +214,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
       <div className="space-y-4">
         <SectionHeading icon={Target} title={t('widget-editor.indicator', 'Indicator')} />
         <div className="flex items-center justify-between gap-2 px-1">
-          <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.showIndicator', 'Show Indicator')}</span>
+          <span className="text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.showIndicator', 'Show Indicator')}</span>
           <ToggleField checked={tapeData.show_indicator} onCheckedChange={(checked) => updateTape({ show_indicator: checked })} />
         </div>
         <div className="grid grid-cols-2 gap-4">

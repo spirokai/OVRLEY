@@ -5,14 +5,14 @@ import { useTranslation } from 'react-i18next'
 const VARIANT_STYLES = {
   compact: {
     content: 'gap-2 py-3',
-    heading: 'text-[10px] tracking-wider',
+    heading: 'text-[0.741rem] tracking-wider',
     icon: 'h-4 w-4',
     root: 'gap-3',
     tag: 'h5',
   },
   drawer: {
     content: 'gap-2',
-    heading: 'text-[10px] tracking-wider',
+    heading: 'text-[0.741rem] tracking-wider',
     icon: 'h-4 w-4',
     root: 'gap-3',
     tag: 'h3',

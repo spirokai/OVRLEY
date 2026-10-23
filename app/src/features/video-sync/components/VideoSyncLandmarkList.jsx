@@ -30,7 +30,7 @@ export function VideoSyncLandmarkList({ hasLocationLandmark, landmarkCards, onCl
             type="button"
             variant="ghost"
             size="sm"
-            className="h-6 px-2 text-[10px] text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
+            className="h-6 px-2 text-[0.741rem] text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
             disabled={landmarkCards.length === 0}
             onClick={onClear}
           >

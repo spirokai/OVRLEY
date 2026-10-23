@@ -60,7 +60,7 @@ const CONTENT_ALIGNMENT_OPTIONS = [
 ]
 
 export const CONTROL_CLASS = 'h-9 border-border/70 bg-surface text-xs'
-export const FIELD_LABEL_CLASS = 'h-3 text-[9px] text-muted-foreground uppercase font-bold'
+export const FIELD_LABEL_CLASS = 'h-3 text-[0.667rem] text-muted-foreground uppercase font-bold'
 
 /**
  * Renders the alignment selector for intrinsic value widgets.
@@ -214,7 +214,7 @@ export function NumberField({ label, value, onChange, min, max, disabled = false
           className={cn(CONTROL_CLASS, suffix && 'pr-16')}
         />
         {suffix ? (
-          <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center text-[10px] font-mono text-muted-foreground">
+          <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center text-[0.741rem] font-mono text-muted-foreground">
             {suffix}
           </span>
         ) : null}
@@ -271,7 +271,7 @@ function SliderValueInput({ valueDisplay, valueScale, value, min, max, step, dis
   })
 
   return (
-    <div className="group relative flex h-3.75 min-w-[5ch] shrink-0 items-center justify-end text-right text-[10px] leading-none font-mono text-muted-foreground">
+    <div className="group relative flex h-3.75 min-w-[5ch] shrink-0 items-center justify-end text-right text-[0.741rem] leading-none font-mono text-muted-foreground">
       <span
         aria-hidden="true"
         className={cn('pointer-events-none group-focus-within:invisible group-has-aria-invalid:invisible', disabled && 'opacity-50')}
@@ -351,7 +351,7 @@ export function SliderField({
             onSliderCommit={onSliderCommit}
           />
         ) : (
-          <span className={cn('text-[10px] font-mono text-muted-foreground', disabled && 'opacity-50')}>{displayValue}</span>
+          <span className={cn('text-[0.741rem] font-mono text-muted-foreground', disabled && 'opacity-50')}>{displayValue}</span>
         )}
       </div>
       <div className="flex items-center gap-3 px-1">

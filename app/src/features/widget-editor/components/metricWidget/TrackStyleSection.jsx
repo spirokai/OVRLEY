@@ -29,7 +29,7 @@ export default function TrackStyleSection({ data, updateVariant, updateVariantSi
         trailing={
           supportsGradient ? (
             <div className="flex items-center gap-1.5">
-              <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.fillGradient', 'Gradient')}</span>
+              <span className="text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.fillGradient', 'Gradient')}</span>
               <ToggleField
                 label={t('widget-editor.fillGradient', 'Gradient')}
                 checked={data.track_filled_gradient}

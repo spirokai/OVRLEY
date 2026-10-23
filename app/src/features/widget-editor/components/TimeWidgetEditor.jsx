@@ -64,7 +64,9 @@ export default function TimeWidgetEditor({ widget, updateWidgetData, updateWidge
 
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center justify-between gap-2 pl-1 pt-2 pb-2">
-                <Label className="pt-1 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.hundredths', 'Hundredths')}</Label>
+                <Label className="pt-1 text-[0.667rem] text-muted-foreground uppercase font-bold">
+                  {t('widget-editor.hundredths', 'Hundredths')}
+                </Label>
                 <ToggleField
                   checked={widget.data.show_hundredths}
                   onCheckedChange={(showHundredths) => updateWidgetData(widget.id, { show_hundredths: showHundredths })}

@@ -56,7 +56,7 @@ export default function OverlaySettingsSection({
     <>
       <div className="flex items-center gap-3 mb-2">
         <Video className="h-4 w-4 text-primary" />
-        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('scene-settings.overlay', 'Overlay')}</h4>
+        <h4 className="text-[0.741rem] font-bold text-muted-foreground uppercase tracking-widest">{t('scene-settings.overlay', 'Overlay')}</h4>
         <Separator className="flex-1" />
       </div>
 

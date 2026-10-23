@@ -33,10 +33,10 @@ export default function RenderExportSettings(ctx) {
           {ctx.showExportModeOverride ? (
             <Tabs value={ctx.exportMode} onValueChange={ctx.handleExportModeChange}>
               <TabsList className="h-7 bg-surface p-0.5" variant="toolbar">
-                <TabsTrigger value="transparent" className="px-2 text-[10px]" variant="toolbar" disabled={ctx.settingsLocked}>
+                <TabsTrigger value="transparent" className="px-2 text-[0.741rem]" variant="toolbar" disabled={ctx.settingsLocked}>
                   {t('render-video.transparent', 'Transparent')}
                 </TabsTrigger>
-                <TabsTrigger value="composite" className="px-2 text-[10px]" variant="toolbar" disabled={ctx.settingsLocked}>
+                <TabsTrigger value="composite" className="px-2 text-[0.741rem]" variant="toolbar" disabled={ctx.settingsLocked}>
                   {t('render-video.fullVideo', 'Full Video')}
                 </TabsTrigger>
               </TabsList>
@@ -49,7 +49,9 @@ export default function RenderExportSettings(ctx) {
 
       <div className="grid gap-8 lg:grid-cols-1">
         <div className="space-y-2">
-          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('render-video.framerate', 'Framerate')}</Label>
+          <Label className="text-[0.741rem] font-bold uppercase tracking-widest text-muted-foreground">
+            {t('render-video.framerate', 'Framerate')}
+          </Label>
           {ctx.fpsLocked ? (
             <div className="flex h-9 items-center rounded-sm border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground">
               {ctx.isBatchTarget
@@ -73,7 +75,7 @@ export default function RenderExportSettings(ctx) {
 
         {!ctx.fpsLocked && ctx.fpsMode === 'custom' && (
           <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            <Label className="text-[0.741rem] font-bold uppercase tracking-widest text-muted-foreground">
               {t('render-video.customFps', 'Custom FPS')}
             </Label>
             <BlurInput
@@ -111,14 +113,14 @@ export default function RenderExportSettings(ctx) {
               }}
             >
               {ctx.updateRateOptions.map((rate) => (
-                <TabsTrigger key={rate} value={rate.toString()} className="text-[10px]" disabled={ctx.settingsLocked}>
+                <TabsTrigger key={rate} value={rate.toString()} className="text-[0.741rem]" disabled={ctx.settingsLocked}>
                   1/{rate}
                 </TabsTrigger>
               ))}
             </TabsList>
           </Tabs>
           {ctx.showContainerFps ? (
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-[0.741rem] text-muted-foreground">
               {t('render-video.outputContainerFps', 'Output container: {{fps}} fps', {
                 fps: ctx.containerFps.toFixed(2).replace(/\.00$/, ''),
               })}
@@ -128,7 +130,7 @@ export default function RenderExportSettings(ctx) {
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            <Label className="text-[0.741rem] font-bold uppercase tracking-widest text-muted-foreground">
               {t('render-video.codecOutputFormat', 'Codec / Output Format')}
             </Label>
             <Select value={ctx.selectedOutputFormatValue} onValueChange={ctx.handleOutputFormatChange} disabled={ctx.settingsLocked}>
@@ -137,10 +139,10 @@ export default function RenderExportSettings(ctx) {
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectLabel className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest">
+                  <SelectLabel className="flex items-center justify-between gap-3 text-[0.741rem] font-bold uppercase tracking-widest">
                     <span>{t('render-video.transparentCodecs', 'Transparent Codecs')}</span>
                     {ctx.showVideoImportedBadge && (
-                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] normal-case tracking-normal text-primary">
+                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[0.667rem] normal-case tracking-normal text-primary">
                         {t('render-video.videoImported', 'Video imported')}
                       </span>
                     )}
@@ -154,10 +156,10 @@ export default function RenderExportSettings(ctx) {
                 </SelectGroup>
 
                 <SelectGroup>
-                  <SelectLabel className="mt-1 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest">
+                  <SelectLabel className="mt-1 flex items-center justify-between gap-3 text-[0.741rem] font-bold uppercase tracking-widest">
                     <span>{t('render-video.mp4Codecs', 'MP4 Codecs')}</span>
                     {ctx.showVideoRequiredBadge && (
-                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] normal-case tracking-normal text-primary">
+                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[0.667rem] normal-case tracking-normal text-primary">
                         {t('render-video.videoRequired', 'Video required')}
                       </span>
                     )}
@@ -171,7 +173,7 @@ export default function RenderExportSettings(ctx) {
                         <span className="flex w-full items-center justify-between gap-3">
                           <span className="min-w-0 truncate">{option.label}</span>
                           {!available && (
-                            <span className="shrink-0 text-right text-[10px] text-muted-foreground">
+                            <span className="shrink-0 text-right text-[0.741rem] text-muted-foreground">
                               {t('render-video.unavailable', 'Unavailable')}
                             </span>
                           )}
@@ -185,7 +187,7 @@ export default function RenderExportSettings(ctx) {
           </div>
 
           <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            <Label className="text-[0.741rem] font-bold uppercase tracking-widest text-muted-foreground">
               {t('render-video.hardwareAcceleration', 'Hardware Acceleration')}
             </Label>
             <Select value={ctx.selectedAccelerationValue} onValueChange={ctx.handleAccelerationChange} disabled={ctx.settingsLocked}>
@@ -198,7 +200,9 @@ export default function RenderExportSettings(ctx) {
                     <span className="flex w-full items-center justify-between gap-3">
                       <span className="min-w-0 truncate">{option.label}</span>
                       {!option.available && (
-                        <span className="shrink-0 text-right text-[10px] text-muted-foreground">{t('render-video.unavailable', 'Unavailable')}</span>
+                        <span className="shrink-0 text-right text-[0.741rem] text-muted-foreground">
+                          {t('render-video.unavailable', 'Unavailable')}
+                        </span>
                       )}
                     </span>
                   </SelectItem>
@@ -213,21 +217,21 @@ export default function RenderExportSettings(ctx) {
             <div className="flex items-center justify-between">
               <Tabs value={ctx.settings.qualityType} onValueChange={ctx.handleQualityTypeChange}>
                 <TabsList className="h-7 bg-surface p-0.5" variant="toolbar">
-                  <TabsTrigger value="quality" className="px-2 text-[10px]" variant="toolbar">
+                  <TabsTrigger value="quality" className="px-2 text-[0.741rem]" variant="toolbar">
                     {t('render-video.quality', 'Quality')}
                   </TabsTrigger>
-                  <TabsTrigger value="bitrate" className="px-2 text-[10px]" variant="toolbar">
+                  <TabsTrigger value="bitrate" className="px-2 text-[0.741rem]" variant="toolbar">
                     {t('render-video.bitrate', 'Bitrate')}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
-              <span className="rounded bg-surface-strong px-2 py-0.5 text-[10px] font-semibold text-muted-foreground tabular-nums">
+              <span className="rounded bg-surface-strong px-2 py-0.5 text-[0.741rem] font-semibold text-muted-foreground tabular-nums">
                 {ctx.settings.qualityType === 'quality' ? 'CRF ' : ''}
                 {ctx.settings.qualityValue}
                 {ctx.settings.qualityType === 'bitrate' ? ' Mbps' : ''}
               </span>
             </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground/70">
+            <div className="flex justify-between text-[0.741rem] text-muted-foreground/70">
               <span>{ctx.settings.qualityType === 'quality' ? t('render-video.worse', 'Worse') : t('render-video.smallerFile', 'Smaller file')}</span>
               <span>{ctx.settings.qualityType === 'quality' ? t('render-video.better', 'Better') : t('render-video.largerFile', 'Larger file')}</span>
             </div>
@@ -268,7 +272,7 @@ export default function RenderExportSettings(ctx) {
           </div>
         ) : (
           <div className="space-y-2 pt-4">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            <Label className="text-[0.741rem] font-bold uppercase tracking-widest text-muted-foreground">
               {t('render-video.outputFile', 'Output file')}
             </Label>
             <ButtonGroup className="w-full">
@@ -329,10 +333,10 @@ export function RenderTargetTabs({ renderTarget, onRenderTargetChange, disabled 
   return (
     <Tabs value={renderTarget} onValueChange={onRenderTargetChange}>
       <TabsList className="grid h-8 w-full grid-cols-2 bg-surface p-0.5">
-        <TabsTrigger value="current" className="text-[10px]" disabled={disabled}>
+        <TabsTrigger value="current" className="text-[0.741rem]" disabled={disabled}>
           {t('render-video.currentVideo', 'Current video')}
         </TabsTrigger>
-        <TabsTrigger value="batch" className="text-[10px]" disabled={disabled}>
+        <TabsTrigger value="batch" className="text-[0.741rem]" disabled={disabled}>
           {t('render-video.batch', 'Batch')}
         </TabsTrigger>
       </TabsList>

@@ -14,7 +14,7 @@ function CourseLocationAction({ actionPoint, onConfirm }) {
   if (!actionPoint) return null
   return (
     <div
-      className="absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+8px)] bg-surface rounded-sm shadow-md"
+      className="absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+0.593rem)] bg-surface rounded-sm shadow-md"
       style={{ left: actionPoint.x, top: actionPoint.y }}
       onClick={(event) => event.stopPropagation()}
     >
@@ -37,7 +37,7 @@ function MapStyleSelector({ style, onStyleChange }) {
   return (
     <div className="absolute bottom-2 left-2 z-10" onClick={(event) => event.stopPropagation()}>
       <Select value={style} onValueChange={onStyleChange}>
-        <SelectTrigger size="sm" className="h-7 w-28 bg-surface/95 px-2 text-[10px] shadow-md" aria-label={label}>
+        <SelectTrigger size="sm" className="h-7 w-28 bg-surface/95 px-2 text-[0.741rem] shadow-md" aria-label={label}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

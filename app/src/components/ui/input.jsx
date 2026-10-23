@@ -28,7 +28,7 @@ const Input = React.forwardRef(({ className, type, variant = 'default', ...props
         'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-1',
         'aria-invalid:ring-destructive/20 aria-invalid:border-destructive',
         variant === 'inline' &&
-          'rounded-xs h-4.75 border-transparent px-1 py-0 text-right text-[10px] leading-3.25 font-mono text-muted-foreground shadow-none focus:border-input focus:bg-surface focus:text-foreground md:text-[10px] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
+          'rounded-xs h-4.75 border-transparent px-1 py-0 text-right text-[0.741rem] leading-3.25 font-mono text-muted-foreground shadow-none focus:border-input focus:bg-surface focus:text-foreground md:text-[0.741rem] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
         className,
       )}
       {...props}

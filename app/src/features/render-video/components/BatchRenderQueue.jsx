@@ -70,7 +70,7 @@ export default function BatchRenderQueue({
             <div className="flex shrink-0 items-center gap-4">
               <div className="flex items-center gap-1">
                 <div className="flex items-center gap-0.5">
-                  <Label htmlFor="batch-auto-sync" className="text-[10px] text-muted-foreground">
+                  <Label htmlFor="batch-auto-sync" className="text-[0.741rem] text-muted-foreground">
                     {t('render-video.batchAuto', 'Auto')}
                   </Label>
                   <HelpTooltip
@@ -87,7 +87,7 @@ export default function BatchRenderQueue({
                   disabled={batchRunning}
                 />
               </div>
-              <Label className="flex items-center gap-2 text-[10px] text-muted-foreground">
+              <Label className="flex items-center gap-2 text-[0.741rem] text-muted-foreground">
                 {t('render-video.showAll', 'Show all')}
                 <Switch aria-label={t('render-video.showAll', 'Show all')} checked={showAllBatchVideos} onCheckedChange={setShowAllBatchVideos} />
               </Label>
@@ -155,7 +155,7 @@ export function BatchFolderPicker({ label, folder, onPick, disabled, onRefresh, 
   const { t } = useTranslation()
   return (
     <div className="min-w-0 shrink-0 space-y-2">
-      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</Label>
+      <Label className="text-[0.741rem] font-bold uppercase tracking-widest text-muted-foreground">{label}</Label>
       <ButtonGroup className="w-full">
         <div className="relative min-w-0 flex-1">
           <Button

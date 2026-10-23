@@ -47,7 +47,7 @@ export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updat
   if (data.track_fill_style !== 'bars') {
     return (
       <div className="flex items-center justify-between gap-2 px-1 pb-2 pt-2">
-        <span className="text-[9px] font-bold uppercase text-muted-foreground">{t('widget-editor.flatTrack', 'Flat Track')}</span>
+        <span className="text-[0.667rem] font-bold uppercase text-muted-foreground">{t('widget-editor.flatTrack', 'Flat Track')}</span>
         <ToggleField checked={data.track_fill_flat} onCheckedChange={(track_fill_flat) => updateVariant({ track_fill_flat })} />
       </div>
     )
