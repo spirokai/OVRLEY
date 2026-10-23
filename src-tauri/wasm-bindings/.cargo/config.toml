@@ -16,4 +16,7 @@ rustflags = [
   "link-arg=-sEXPORT_ES6=1",
   "-C",
   "link-arg=-sENVIRONMENT=web",
+  # Keeps function names in the wasm so trap stacks name the Rust/Skia frame.
+  "-C",
+  "link-arg=--profiling-funcs",
 ]

@@ -66,7 +66,10 @@ function guardModule(module) {
         const panicPtr = module._ovrley_panic_ptr()
         const panic = decoder.decode(module.HEAPU8.subarray(panicPtr, panicPtr + module._ovrley_panic_len()))
         const cause = panic || `${error.message} (no Rust panic was recorded)`
-        guarded.crash = new Error(`WASM renderer crashed: ${cause}. Restart OVRLEY.`, { cause: error })
+        const heapMb = Math.round(module.HEAPU8.length / 1048576)
+        guarded.crash = new Error(`WASM renderer crashed in ${name} (heap ${heapMb} MB): ${cause}. Restart OVRLEY.`, { cause: error })
+        // The trap's stack carries the wasm frame names that the banner cannot show.
+        console.error(guarded.crash.message, error)
         // The next editor mount instantiates a fresh module.
         modulePromise = undefined
         throw guarded.crash
