@@ -1,8 +1,5 @@
 {
-  "branches": [
-    {"name": "main"},
-    {"name": "rust-rewrite"}
-  ],
+  "branches": [{ "name": "main" }, { "name": "rust-rewrite" }, { "name": "rust-wasm" }],
   "tagFormat": "${version}",
   "plugins": ["@semantic-release/commit-analyzer"]
 }
