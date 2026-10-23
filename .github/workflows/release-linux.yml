@@ -7,7 +7,14 @@ permissions:
   contents: write
 
 jobs:
+  wasm:
+    name: WASM bindings
+    uses: ./.github/workflows/workflow_wasm.yml
+    with:
+      ref: ''
+
   build:
+    needs: wasm
     name: Build Debian package
     runs-on: ubuntu-latest
 
@@ -17,6 +24,12 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+
+      - name: Download WASM bindings
+        uses: actions/download-artifact@v7
+        with:
+          name: ovrley-wasm-bindings
+          path: src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm
 
       - name: Resolve release tag
         id: release_tag
@@ -100,6 +113,7 @@ jobs:
         run: pnpm tauri build --bundles deb
         env:
           VITE_OVRLEY_VERSION: ${{ steps.release_tag.outputs.tag }}
+          OVRLEY_WASM_PREBUILT: '1'
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 

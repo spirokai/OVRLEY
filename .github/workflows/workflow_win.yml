@@ -20,6 +20,10 @@ on:
         description: Commit SHA the release tag must point at
         required: true
         type: string
+      wasm_prebuilt:
+        description: The caller already uploaded the ovrley-wasm-bindings artifact in this run
+        required: true
+        type: boolean
     secrets:
       TAURI_SIGNING_PRIVATE_KEY:
         required: true
@@ -30,7 +34,16 @@ permissions:
   contents: write
 
 jobs:
+  wasm:
+    name: WASM bindings
+    if: ${{ !inputs.wasm_prebuilt }}
+    uses: ./.github/workflows/workflow_wasm.yml
+    with:
+      ref: ${{ inputs.release_ref }}
+
   build:
+    needs: wasm
+    if: ${{ !cancelled() && needs.wasm.result != 'failure' }}
     name: Build Windows x86_64
     runs-on: windows-latest
     steps:
@@ -40,6 +53,12 @@ jobs:
           ref: ${{ inputs.release_ref }}
           fetch-depth: 0
           fetch-tags: true
+
+      - name: Download WASM bindings
+        uses: actions/download-artifact@v7
+        with:
+          name: ovrley-wasm-bindings
+          path: src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -105,6 +124,7 @@ jobs:
         run: pnpm tauri build --bundles nsis
         env:
           VITE_OVRLEY_VERSION: ${{ steps.release.outputs.tag }}
+          OVRLEY_WASM_PREBUILT: '1'
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 

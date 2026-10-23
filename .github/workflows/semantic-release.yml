@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - rust-rewrite
+      - rust-wasm
   workflow_dispatch:
 
 permissions:
@@ -45,7 +46,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         env:
-          OVRLEY_SKIP_FFMPEG_INSTALL: "1"
+          OVRLEY_SKIP_FFMPEG_INSTALL: '1'
 
       - name: Tag release
         env:

@@ -6,7 +6,7 @@ on:
       notes:
         description: GitHub Release notes and updater manifest notes
         required: false
-        default: ""
+        default: ''
         type: string
 
 permissions:
@@ -90,41 +90,51 @@ jobs:
           release_id="$(jq -r '.id' "$release_file")"
           echo "id=$release_id" >> "$GITHUB_OUTPUT"
 
+  wasm:
+    name: WASM bindings
+    needs: resolve
+    uses: ./.github/workflows/workflow_wasm.yml
+    with:
+      ref: ${{ needs.resolve.outputs.commit }}
+
   windows:
     name: Windows build
-    needs: resolve
+    needs: [resolve, wasm]
     uses: ./.github/workflows/workflow_win.yml
     with:
       release_ref: ${{ needs.resolve.outputs.ref }}
       release_tag: ${{ needs.resolve.outputs.tag }}
       release_version: ${{ needs.resolve.outputs.version }}
       release_commit: ${{ needs.resolve.outputs.commit }}
+      wasm_prebuilt: true
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   macos:
     name: macOS Apple Silicon build
-    needs: resolve
+    needs: [resolve, wasm]
     uses: ./.github/workflows/workflow_macos.yml
     with:
       release_ref: ${{ needs.resolve.outputs.ref }}
       release_tag: ${{ needs.resolve.outputs.tag }}
       release_version: ${{ needs.resolve.outputs.version }}
       release_commit: ${{ needs.resolve.outputs.commit }}
+      wasm_prebuilt: true
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   linux:
     name: AppImage build
-    needs: resolve
+    needs: [resolve, wasm]
     uses: ./.github/workflows/workflow_linux.yml
     with:
       release_ref: ${{ needs.resolve.outputs.ref }}
       release_tag: ${{ needs.resolve.outputs.tag }}
       release_version: ${{ needs.resolve.outputs.version }}
       release_commit: ${{ needs.resolve.outputs.commit }}
+      wasm_prebuilt: true
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

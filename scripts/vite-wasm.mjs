@@ -18,11 +18,14 @@ export function wasmBindingsPlugin() {
   return {
     name: 'ovrley-wasm-bindings',
     async generateBundle() {
-      await new Promise((resolveBuild, rejectBuild) => {
-        const child = spawn(process.execPath, [buildScript], { cwd: root, stdio: 'inherit' })
-        child.once('error', rejectBuild)
-        child.once('close', (code) => code === 0 ? resolveBuild() : rejectBuild(new Error(`WASM build failed (${code})`)))
-      })
+      // CI builds the host-independent bindings once and supplies them in artifactDir.
+      if (process.env.OVRLEY_WASM_PREBUILT !== '1') {
+        await new Promise((resolveBuild, rejectBuild) => {
+          const child = spawn(process.execPath, [buildScript], { cwd: root, stdio: 'inherit' })
+          child.once('error', rejectBuild)
+          child.once('close', (code) => (code === 0 ? resolveBuild() : rejectBuild(new Error(`WASM build failed (${code})`))))
+        })
+      }
       for (const [name, asset] of assets) {
         this.emitFile({ type: 'asset', fileName: `wasm-bindings${name}`, source: await readFile(asset.file) })
       }
