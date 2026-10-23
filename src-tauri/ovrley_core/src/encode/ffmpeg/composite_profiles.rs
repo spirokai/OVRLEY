@@ -39,6 +39,19 @@ const VAAPI_FILTER: &str =
 [1:v]setpts=PTS-STARTPTS,format=yuva420p,{atlas_slot_crops};\
 {atlas_slot_overlays}[out]";
 
+// The filter graph uploads each overlay slot with `hwupload`, which needs a device
+// of its own; `-hwaccel vaapi` alone only gives the decoder one.
+const VAAPI_INPUT_ARGS: &[&str] = &[
+    "-init_hw_device",
+    "vaapi=va",
+    "-filter_hw_device",
+    "va",
+    "-hwaccel",
+    "vaapi",
+    "-hwaccel_output_format",
+    "vaapi",
+];
+
 const AMF_D3D11_INPUT_ARGS: &[&str] = &["-init_hw_device", "d3d11va=dx", "-filter_hw_device", "dx"];
 
 const AMF_D3D11_FILTER: &str = "[0:v]{base_video_filters}null[base];\
@@ -335,7 +348,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
     CompositeProfile {
         codec_id: CompositeCodecId::VaapiH264,
         cpu_cores_per_frame_worker: 4,
-        input_args: &["-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"],
+        input_args: VAAPI_INPUT_ARGS,
         filter_complex: Some(VAAPI_FILTER),
         output_args: &[],
         quality_args: &["-rc_mode", "CQP", "-qp", "{quality}"],
@@ -353,7 +366,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
     CompositeProfile {
         codec_id: CompositeCodecId::VaapiHevc,
         cpu_cores_per_frame_worker: 4,
-        input_args: &["-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"],
+        input_args: VAAPI_INPUT_ARGS,
         filter_complex: Some(VAAPI_FILTER),
         output_args: &["-tag:v", "hvc1"],
         quality_args: &["-rc_mode", "CQP", "-qp", "{quality}"],
