@@ -17,6 +17,9 @@ jobs:
     needs: wasm
     name: Build Debian package
     runs-on: ubuntu-latest
+    env:
+      # Cargo's built-in git client is slow at cloning the rust-skia submodules.
+      CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
 
     steps:
       - name: Checkout
@@ -87,6 +90,12 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: deb
+          workspaces: 'src-tauri -> target'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

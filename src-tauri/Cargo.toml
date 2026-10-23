@@ -25,7 +25,8 @@ tauri-build = { version = "2.5.3", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.9.5", features = ["protocol-asset"] }
+# TEMPORARY: devtools in release builds for WebKit debugging. Revert before release.
+tauri = { version = "2.9.5", features = ["protocol-asset", "devtools"] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"

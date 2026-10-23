@@ -5,6 +5,21 @@ use ovrley_widgets::{
     preview::PreviewSession,
     preview_widget::WidgetRequest,
 };
+use std::sync::{Once, OnceLock};
+
+// panic = "abort" turns every panic into an opaque `unreachable` trap; the first message is the root cause.
+static PANIC: OnceLock<String> = OnceLock::new();
+static PANIC_HOOK: Once = Once::new();
+
+fn install_panic_hook() {
+    PANIC_HOOK.call_once(|| {
+        let default_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let _ = PANIC.set(info.to_string());
+            default_hook(info);
+        }));
+    });
+}
 
 #[derive(Default)]
 pub struct Session {
@@ -44,7 +59,21 @@ unsafe fn request(ptr: *const u8, len: usize) -> WidgetResult<WidgetRequest> {
 
 #[no_mangle]
 pub extern "C" fn ovrley_preview_create() -> *mut Session {
+    install_panic_hook();
     Box::into_raw(Box::default())
+}
+
+/// Recorded first panic message; empty when the module aborted without panicking (e.g. allocation failure).
+#[no_mangle]
+pub extern "C" fn ovrley_panic_ptr() -> *const u8 {
+    PANIC
+        .get()
+        .map_or(std::ptr::null(), |message| message.as_ptr())
+}
+
+#[no_mangle]
+pub extern "C" fn ovrley_panic_len() -> usize {
+    PANIC.get().map_or(0, String::len)
 }
 
 #[no_mangle]

@@ -46,6 +46,9 @@ jobs:
     if: ${{ !cancelled() && needs.wasm.result != 'failure' }}
     name: Build Windows x86_64
     runs-on: windows-latest
+    env:
+      # Cargo's built-in git client is slow at cloning the rust-skia submodules.
+      CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
     steps:
       - name: Checkout selected release ref
         uses: actions/checkout@v6
@@ -113,6 +116,12 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: windows
+          workspaces: 'src-tauri -> target'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

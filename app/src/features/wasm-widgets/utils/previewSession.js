@@ -40,9 +40,40 @@ export function widgetFonts(widget) {
 /** @returns {Promise<object>} One compiled module shared by independently disposable editor sessions. */
 export async function loadWidgetModule() {
   modulePromise ??= import(/* @vite-ignore */ `${BASE_URL}/wasm_bindings.js`).then(({ default: createModule }) =>
-    createModule({ locateFile: (name) => `${BASE_URL}/${name}` }),
+    createModule({ locateFile: (name) => `${BASE_URL}/${name}` }).then(guardModule),
   )
   return modulePromise
+}
+
+/**
+ * A trap leaves Rust state half-mutated, so every later call would fail with unrelated memory errors.
+ * The first trap is converted into one terminal error carrying the recorded Rust panic.
+ * @param {object} module Emscripten module.
+ * @returns {object} Module whose `_ovrley_*` exports throw the terminal crash once trapped.
+ */
+function guardModule(module) {
+  const guarded = Object.create(module)
+  guarded.crash = null
+  for (const name of Object.keys(module)) {
+    if (!name.startsWith('_ovrley_')) continue
+    const exported = module[name]
+    guarded[name] = (...args) => {
+      if (guarded.crash) throw guarded.crash
+      try {
+        return exported(...args)
+      } catch (error) {
+        if (!(error instanceof WebAssembly.RuntimeError)) throw error
+        const panicPtr = module._ovrley_panic_ptr()
+        const panic = decoder.decode(module.HEAPU8.subarray(panicPtr, panicPtr + module._ovrley_panic_len()))
+        const cause = panic || `${error.message} (no Rust panic was recorded)`
+        guarded.crash = new Error(`WASM renderer crashed: ${cause}. Restart OVRLEY.`, { cause: error })
+        // The next editor mount instantiates a fresh module.
+        modulePromise = undefined
+        throw guarded.crash
+      }
+    }
+  }
+  return guarded
 }
 
 /**
@@ -252,6 +283,10 @@ export function createPreviewSession(module, onError) {
   }
   return {
     setSnapshot(next) {
+      if (module.crash) {
+        onError(module.crash)
+        return
+      }
       if (next.activityId === undefined) {
         onError(new Error('Finalized activity is missing its native preview identity. Reload the activity.'))
         return
