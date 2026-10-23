@@ -97,6 +97,28 @@ describe('useOverlayEditorState module contract', () => {
       expect(canvas.style.left).toBe('90px')
       expect(canvas.style.transform).toBe('none')
     }
+    // Fractional content keeps a whole-pixel offset plus a translate, so the box is exact.
+    presentWidgetGeometry(
+      canvas,
+      {
+        left: 90,
+        top: 40,
+        width: 180,
+        height: 150,
+        content_width: 160.5,
+        content: { left: 100.25, top: 60.75, width: 160.5, height: 80.25 },
+        rotation: 0,
+        rotation_origin: [80.25, 40.125],
+      },
+      target,
+    )
+    expect(target.style.left).toBe('100px')
+    expect(target.style.top).toBe('60px')
+    expect(target.style.width).toBe('160.5px')
+    expect(target.style.height).toBe('80.25px')
+    expect(target.style.transform).toBe('translate(0.25px, 0.75px) rotate(0deg)')
+    expect(target.style.transformOrigin).toBe('80.25px 40.125px')
+    expect(canvas.style.left).toBe('90px')
     rerender(<WasmCanvases config={{ ...config, plots: [{ ...route, rotation: 90 }] }} attach={attach} />)
     expect(attach).toHaveBeenCalledTimes(1)
     unmount()

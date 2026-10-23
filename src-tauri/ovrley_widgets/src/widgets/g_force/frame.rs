@@ -38,12 +38,10 @@ pub struct GForceFrame {
 
 impl GForceFrame {
     pub fn draw(&self, canvas: &Canvas, cache: &GForceCache) {
-        canvas.draw_image_rect(
-            &cache.parent_circle_image,
-            None,
-            cache.parent_circle_rect,
-            &Paint::default(),
-        );
+        canvas.save();
+        canvas.translate((cache.x, cache.y));
+        cache.parent_circle.draw(canvas, None);
+        canvas.restore();
         canvas.draw_circle(
             Point::new(cache.x + self.state.marker_x, cache.y + self.state.marker_y),
             self.marker_radius,

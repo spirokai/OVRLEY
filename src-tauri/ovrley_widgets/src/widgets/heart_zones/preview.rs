@@ -46,7 +46,7 @@ impl PreviewHeartZones {
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
         Ok(Self {
-            cache: prepare_heart_zones_cache(widget, scene, fonts)?,
+            cache: prepare_heart_zones_cache(widget, scene, fonts, host.raster_scale)?,
             preview_raster_scale: host.raster_scale,
             surface: None,
             last_sample: None,
@@ -81,7 +81,7 @@ impl PreviewHeartZones {
         }
         let frame = self.cache.prepare_frame(raw);
         let bounds = self.cache.bounds;
-        let (width, height) = render_tile(
+        let (width, height, bounds) = render_tile(
             &mut self.surface,
             &mut self.pixels,
             SHAPE_COLOR_TYPE,

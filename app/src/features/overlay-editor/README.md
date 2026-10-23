@@ -10,7 +10,7 @@ presented content geometry.
   scene rectangle read plus one per visible badge on every refresh.
 - `useSelectionBorder` measures scene bounds and viewport clipping on mount,
   container/zoom changes, ResizeObserver notifications, scrolling, and window
-  resizing. Changing Moveable vertices only runs `getPixelAlignedBorders` against
+  resizing. Changing Moveable vertices only runs `projectSelectionBorders` against
   those measurements. Keeping vertices out of the measurement effect avoids
   repeated layout reads and the extra React commits caused by setting border
   state after every render. Zoom remains an explicit dependency because CSS

@@ -96,6 +96,7 @@ impl PreviewGauge {
                 range,
                 offset,
                 fonts,
+                self.preview_raster_scale,
             )?);
         }
         Ok(self.layout.as_ref().expect("gauge layout prepared"))
@@ -156,7 +157,7 @@ impl PreviewGauge {
         let layout = self.layout.as_ref().expect("gauge layout prepared");
         let frame = layout.prepare_frame(state, fonts)?;
         let bounds = frame.bounds;
-        let (width, height) = render_tile(
+        let (width, height, bounds) = render_tile(
             &mut self.surface,
             &mut self.pixels,
             SHAPE_COLOR_TYPE,

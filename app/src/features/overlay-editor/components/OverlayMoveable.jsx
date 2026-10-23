@@ -74,7 +74,8 @@ export default function OverlayMoveable({
 }
 
 // Native Moveable lines shimmer under fractional scene transforms, even with inverse zoom.
-// Draw a device-pixel-aligned SVG outside the scaled scene to keep border thickness steady.
+// Draw an SVG outside the scaled scene with a device-pixel stroke to keep border thickness steady;
+// vertices stay fractional so the border tracks the widget content while it moves or resizes.
 const SELECTION_BORDER_ABLES = [
   {
     name: 'selectionBorder',

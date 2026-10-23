@@ -19,6 +19,9 @@ pub trait FontResolver {
         weight: f32,
         italic: bool,
     ) -> WidgetResult<Typeface>;
+    /// Whether glyph heights and baselines snap to whole pixels. Grid fitting keeps static export
+    /// text crisp; a preview re-rendered while resizing would instead grow and move in pixel steps.
+    fn grid_fit(&self) -> bool;
 }
 
 /// Fully resolved text style ready for Skia drawing.
@@ -228,7 +231,9 @@ pub fn resolve_styled_font(
     let mut font = Font::from_typeface(typeface, font_size);
     font.set_edging(skia_safe::font::Edging::SubpixelAntiAlias);
     font.set_subpixel(true);
-    font.set_hinting(skia_safe::FontHinting::Full);
+    let grid_fit = fonts.grid_fit();
+    font.set_hinting(if grid_fit { skia_safe::FontHinting::Full } else { skia_safe::FontHinting::None });
+    font.set_baseline_snap(grid_fit);
     Ok(font)
 }
 

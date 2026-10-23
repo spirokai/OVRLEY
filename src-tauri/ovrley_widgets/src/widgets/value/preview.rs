@@ -5,7 +5,7 @@ use crate::{
     model::scene::{validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation},
     render::text::FontResolver,
     render::{
-        preview::{render_tile, PreviewRasterScale},
+        preview::{render_tile, PreviewRasterScale, StaticRaster},
         text::{validated_value_style, ResolvedTextStyle},
     },
     widgets::value::{
@@ -20,7 +20,7 @@ use crate::{
     },
 };
 use serde::{Deserialize, Serialize};
-use skia_safe::{surfaces, AlphaType, Canvas, Color, ColorType, Image, ImageInfo, Rect, Surface};
+use skia_safe::{surfaces, AlphaType, Canvas, ColorType, ImageInfo, Point, Rect, Surface};
 
 #[derive(Clone, PartialEq, Deserialize)]
 pub struct WidgetRequest {
@@ -145,19 +145,13 @@ impl From<skia_safe::Rect> for ContentBounds {
     }
 }
 
-struct StaticImage {
-    image: Image,
-    left: f32,
-    top: f32,
-}
-
 /// Layout and drawing state, borrowed apart from the tile surface while rendering.
 struct ValueLayout {
     config: ValuePresentation,
     style: ResolvedTextStyle,
     scale: f32,
     static_parts: StaticMetricParts,
-    static_image: Option<StaticImage>,
+    static_image: Option<StaticRaster>,
 }
 
 impl ValueLayout {
@@ -166,12 +160,7 @@ impl ValueLayout {
         let frame = prepare_metric_frame(&self.style, parts, self.scale, fonts, self.config.base())?;
         let mut bounds = frame.bounds;
         if let Some(cache) = &self.static_image {
-            bounds.join(Rect::from_xywh(
-                cache.left,
-                cache.top,
-                cache.image.width() as f32,
-                cache.image.height() as f32,
-            ));
+            bounds.join(cache.bounds());
         }
         Ok((frame, bounds))
     }
@@ -184,7 +173,7 @@ impl ValueLayout {
         frame: &MetricFrame,
     ) -> WidgetResult<()> {
         if let Some(cache) = &self.static_image {
-            canvas.draw_image(&cache.image, (cache.left, cache.top), None);
+            cache.draw(canvas, None);
         }
         draw_prepared_metric_frame(
             canvas,
@@ -266,21 +255,16 @@ impl PreviewWidget {
         let static_image = if static_parts.icon || static_parts.unit {
             let parts = config.parts(None, 0.0);
             let frame = prepare_metric_frame(&style, &parts, scene.scale, fonts, config.base())?;
-            let bounds = frame.bounds;
-            let mut surface = surface(
-                bounds.width() as u32,
-                bounds.height() as u32,
+            Some(StaticRaster::new(
+                preview_raster_scale,
+                Point::default(),
+                frame.bounds,
                 TEXT_COLOR_TYPE,
-            )?;
-            let canvas = surface.canvas();
-            canvas.clear(Color::TRANSPARENT);
-            canvas.translate((-bounds.left, -bounds.top));
-            draw_static_metric_parts_for_value(canvas, config.base(), &style, scene.scale, fonts)?;
-            Some(StaticImage {
-                image: surface.image_snapshot(),
-                left: bounds.left,
-                top: bounds.top,
-            })
+                |canvas| {
+                    draw_static_metric_parts_for_value(canvas, config.base(), &style, scene.scale, fonts)?;
+                    Ok(())
+                },
+            )?)
         } else {
             None
         };
@@ -348,7 +332,7 @@ impl PreviewWidget {
         }
         let (frame, bounds) = self.layout.frame(&parts, fonts)?;
         let layout = &self.layout;
-        let (width, height) = render_tile(
+        let (width, height, bounds) = render_tile(
             &mut self.surface,
             &mut self.pixels,
             TEXT_COLOR_TYPE,

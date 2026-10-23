@@ -9,6 +9,7 @@ use super::{
 };
 use crate::{
     activity::ActivitySampler,
+    render::preview::PreviewRasterScale,
     error::{WidgetError, WidgetResult},
     model::{
         scene::{validate_scene_presentation, ScenePresentationConfig},
@@ -71,7 +72,7 @@ pub fn resize_gauge(
     let offset = activity.map_or(0.0, |activity| {
         activity.gauge_altitude_offset(widget.starting_altitude_m())
     });
-    let origin = GaugeLayout::new(&widget, &scene, range, offset, fonts)?
+    let origin = GaugeLayout::new(&widget, &scene, range, offset, fonts, PreviewRasterScale::NATIVE)?
         .prepare_frame(sample_gauge(&widget, activity, second), fonts)?
         .content_bounds;
     if origin.is_empty() {
@@ -191,7 +192,7 @@ pub fn resize_gauge(
             }
         };
     let display_type = display_type.to_owned();
-    let bounds = GaugeLayout::new(&widget, &scene, range, offset, fonts)?
+    let bounds = GaugeLayout::new(&widget, &scene, range, offset, fonts, PreviewRasterScale::NATIVE)?
         .prepare_frame(sample_gauge(&widget, activity, second), fonts)?
         .content_bounds;
     Ok(ResizeUpdate {

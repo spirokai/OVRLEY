@@ -10,7 +10,12 @@ use skia_safe::{FontMgr, Typeface};
 use std::collections::BTreeMap;
 
 #[derive(Default)]
-pub struct PreviewFonts(BTreeMap<(String, u32, bool), Typeface>);
+pub struct PreviewFonts {
+    faces: BTreeMap<(String, u32, bool), Typeface>,
+    /// The editor leaves text unhinted so resizing scales it continuously; export-parity
+    /// hosts grid-fit it exactly like native export.
+    grid_fit: bool,
+}
 
 #[derive(serde::Deserialize)]
 pub struct FontRequest {
@@ -26,8 +31,11 @@ impl PreviewFonts {
     pub fn register(&mut self, request: FontRequest, bytes: &[u8]) -> WidgetResult<()> {
         let face = Typeface::make_deserialize(bytes, FontMgr::default())
             .ok_or_else(|| WidgetError::Render(format!("unable to load font resource: {}", request.font)))?;
-        self.0.insert((request.font, request.font_weight.to_bits(), request.italic), face);
+        self.faces.insert((request.font, request.font_weight.to_bits(), request.italic), face);
         Ok(())
+    }
+    pub fn set_grid_fit(&mut self, grid_fit: bool) {
+        self.grid_fit = grid_fit;
     }
 }
 
@@ -40,10 +48,13 @@ impl FontResolver for PreviewFonts {
     ) -> WidgetResult<Typeface> {
         let name =
             name.ok_or_else(|| WidgetError::Render("preview requires a font identity".into()))?;
-        self.0
+        self.faces
             .get(&(name.to_owned(), weight.to_bits(), italic))
             .cloned()
             .ok_or_else(|| WidgetError::Render(format!("font not registered: {name}")))
+    }
+    fn grid_fit(&self) -> bool {
+        self.grid_fit
     }
 }
 

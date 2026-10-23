@@ -319,6 +319,8 @@ fn scuba_widgets_render_in_the_preview_cache_and_export_frame_with_matching_pixe
         )
         .unwrap();
         let mut preview = PreviewSession::default();
+        // Compared against native export, which grid-fits text.
+        preview.fonts.set_grid_fit(true);
         let request: FontRequest = serde_json::from_value(json!({"font": "Inter.ttf"})).unwrap();
         preview.fonts.register(request, &font).unwrap();
         preview.replace_activity(&bytes).unwrap();

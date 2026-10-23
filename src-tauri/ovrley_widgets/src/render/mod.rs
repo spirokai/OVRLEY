@@ -3,7 +3,7 @@ mod digit_cells;
 pub mod icons;
 pub mod image;
 pub mod pixels;
-pub(crate) mod preview;
+pub mod preview;
 pub mod shadow;
 pub mod svg;
 pub mod text;

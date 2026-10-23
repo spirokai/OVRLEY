@@ -6,10 +6,11 @@
 use crate::error::{WidgetError, WidgetResult};
 use crate::model::validation::{require_bool, require_hex_color};
 use crate::render::text::parse_color;
-use crate::widgets::value::preview::{surface, SHAPE_COLOR_TYPE};
+use crate::render::preview::{PreviewRasterScale, StaticRaster};
+use crate::widgets::value::preview::SHAPE_COLOR_TYPE;
 use serde::{Deserialize, Serialize};
 use skia_safe::{
-    gradient, paint::Style, Canvas, ClipOp, Color, Color4f, Image, Matrix, Paint, Path, Point,
+    gradient, paint::Style, Canvas, ClipOp, Color4f, Matrix, Paint, Path, Point,
     RRect, Rect, Shader, TileMode,
 };
 
@@ -171,15 +172,16 @@ impl TrackFillColor {
 #[derive(Clone, Debug)]
 pub enum TrackFill {
     Paint(Paint),
-    Image { image: Image, x: f32, y: f32 },
+    Image { raster: StaticRaster, origin: Point },
 }
 
 impl TrackFill {
     /// Solid colors keep `paint`. Gradients draw the full fill with `paint` into a
     /// raster covering `bounds`, placed at `origin` like the gauge's static raster.
-    pub fn prepare(
+    pub(crate) fn prepare(
         color: &TrackFillColor,
         paint: Paint,
+        raster_scale: PreviewRasterScale,
         bounds: Rect,
         origin: (f32, f32),
         draw_full_fill: impl FnOnce(&Canvas, &Paint),
@@ -187,16 +189,12 @@ impl TrackFill {
         if let TrackFillColor::Solid(_) = color {
             return Ok(Self::Paint(paint));
         }
-        let mut surface = surface(bounds.width() as u32, bounds.height() as u32, SHAPE_COLOR_TYPE)?;
-        let canvas = surface.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        canvas.translate((-bounds.left, -bounds.top));
-        draw_full_fill(canvas, &paint);
-        Ok(Self::Image {
-            image: surface.image_snapshot(),
-            x: origin.0 + bounds.left,
-            y: origin.1 + bounds.top,
-        })
+        let origin = Point::from(origin);
+        let raster = StaticRaster::new(raster_scale, origin, bounds, SHAPE_COLOR_TYPE, |canvas| {
+            draw_full_fill(canvas, &paint);
+            Ok(())
+        })?;
+        Ok(Self::Image { raster, origin })
     }
 
     /// Solid fills run `paint_fill`; gradient fills reveal the raster within `reveal`,
@@ -204,10 +202,11 @@ impl TrackFill {
     pub fn draw(&self, canvas: &Canvas, reveal: &FillShape, paint_fill: impl FnOnce(&Paint)) {
         match self {
             Self::Paint(paint) => paint_fill(paint),
-            Self::Image { image, x, y } => {
+            Self::Image { raster, origin } => {
                 canvas.save();
                 reveal.clip(canvas);
-                canvas.draw_image(image, (*x, *y), None);
+                canvas.translate(*origin);
+                raster.draw(canvas, None);
                 canvas.restore();
             }
         }
@@ -242,7 +241,7 @@ impl FillShape {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use skia_safe::surfaces;
+    use skia_safe::{surfaces, Color};
 
     fn stop(offset: f32, color: &str) -> GradientStop {
         GradientStop { offset, color: color.into() }

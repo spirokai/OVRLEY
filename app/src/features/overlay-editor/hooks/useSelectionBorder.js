@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useState } from 'react'
-import { getPixelAlignedBorders } from '../utils/selectionBorderGeometry'
+import { projectSelectionBorders } from '../utils/selectionBorderGeometry'
 
 /** @param {HTMLElement} container Scene container. @param {object[][]} borders Scene vertices per border. @param {number} zoom Moveable's inverse viewport scale. @returns {object|null} Screen borders. */
 export function useSelectionBorder(container, borders, zoom) {
@@ -35,7 +35,7 @@ export function useSelectionBorder(container, borders, zoom) {
       viewportGeometry === null
         ? null
         : {
-            ...getPixelAlignedBorders(borders, viewportGeometry.bounds, viewportGeometry.sceneSize, viewportGeometry.pixelRatio),
+            ...projectSelectionBorders(borders, viewportGeometry.bounds, viewportGeometry.sceneSize, viewportGeometry.pixelRatio),
             clipPath: viewportGeometry.clipPath,
           },
     [borders, viewportGeometry],

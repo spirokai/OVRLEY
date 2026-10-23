@@ -48,6 +48,9 @@ impl ovrley_widgets::render::text::FontResolver for NativeFonts<'_> {
                 .ok_or_else(|| WidgetError::Render("System default font unavailable".into())),
         }
     }
+    fn grid_fit(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]

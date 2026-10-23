@@ -10,6 +10,7 @@ use super::{
     TABLE_VERTICAL_METRICS_TEXT,
 };
 use crate::{
+    render::preview::PreviewRasterScale,
     error::{WidgetError, WidgetResult},
     model::{scene::ValidatedScenePresentation, standard_widgets::widget_font_weight},
     render::text::{
@@ -208,6 +209,7 @@ impl LapTimerLayout {
         &self,
         history: LapHistory<'_>,
         content: &LapTimerContent,
+        raster_scale: PreviewRasterScale,
     ) -> WidgetResult<LapTimerFrame> {
         let key = match content {
             LapTimerContent::Value { .. } | LapTimerContent::Hidden => StaticContent::Label,
@@ -229,7 +231,7 @@ impl LapTimerLayout {
                 let layer = if runs.is_empty() {
                     None
                 } else {
-                    Some(Arc::new(TextLayer::new(runs, self.config.x)?))
+                    Some(Arc::new(TextLayer::new(runs, self.config.x, raster_scale)?))
                 };
                 *cache = Some(CachedStatic {
                     content: key,

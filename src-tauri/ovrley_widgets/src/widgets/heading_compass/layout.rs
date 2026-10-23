@@ -4,6 +4,7 @@ use crate::{
     error::{WidgetError, WidgetResult},
     model::{scene::ValidatedScenePresentation, standard_widgets::widget_font_weight},
     render::{
+        preview::{PreviewRasterScale, StaticRaster},
         shadow::shadow_paint,
         text::{parse_color, resolve_styled_font, FontResolver},
     },
@@ -155,8 +156,8 @@ pub struct HeadingCompassCache {
     pub layout: HeadingCompassLayout,
     pub center: Point,
     pub rotation_mode: CompassRotationMode,
-    pub(crate) static_image: Image,
-    pub(crate) static_origin: Point,
+    /// Track, fixed labels or needle around the compass center.
+    pub(crate) static_layer: StaticRaster,
     /// Stable raster bounds: rotation never changes the surface size.
     pub(crate) dial_bounds: Rect,
     pub(crate) opacity: f32,
@@ -174,6 +175,7 @@ pub fn prepare_heading_compass_cache(
     widget: &ValidatedHeadingCompass,
     scene: &ValidatedScenePresentation,
     fonts: &dyn FontResolver,
+    raster_scale: PreviewRasterScale,
 ) -> WidgetResult<HeadingCompassCache> {
     let scale = scene.scale;
     let thickness = widget.track_thickness * scale;
@@ -244,69 +246,72 @@ pub fn prepare_heading_compass_cache(
         + 2.0)
         .ceil();
 
-    let size = (half * 2.0) as u32;
-    let mut static_surface = surface(size, size, SHAPE_COLOR_TYPE)?;
-    let canvas = static_surface.canvas();
-    canvas.clear(Color::TRANSPARENT);
-    canvas.translate((half, half));
-    let mut track_paint = Paint::default();
-    track_paint.set_anti_alias(true);
-    track_paint.set_color(parse_color(&widget.track_fill, 1.0));
-    if let Some(track) = rounded_segment_path(
-        ArcGaugeGeometry {
-            center_x: 0.0,
-            center_y: 0.0,
-            inner_widget_center_x: 0.0,
-            inner_widget_center_y: 0.0,
-            radius: layout.inner_radius + thickness * 0.5,
-            start_angle: layout.track_start_angle,
-            sweep_angle: layout.track_sweep_angle,
-        },
-        thickness,
-        widget.track_corner_radius * scale,
-    ) {
-        draw_with_shadow(
-            canvas,
-            &track,
-            &track_paint,
-            shadow_color,
-            shadow_sigma,
-            shadow_offset,
-        );
-    }
     let mut indicator_paint = Paint::default();
     indicator_paint.set_anti_alias(true);
     indicator_paint.set_color(parse_color(&widget.indicator_color, 1.0));
-    let needle = indicator_path(indicator_size, widget.indicator_corner_radius);
+    // Dial-local coordinates: the compass center is the origin.
+    let static_layer = StaticRaster::new(
+        raster_scale,
+        center,
+        Rect::new(-half, -half, half, half),
+        SHAPE_COLOR_TYPE,
+        |canvas| {
+            let mut track_paint = Paint::default();
+            track_paint.set_anti_alias(true);
+            track_paint.set_color(parse_color(&widget.track_fill, 1.0));
+            if let Some(track) = rounded_segment_path(
+                ArcGaugeGeometry {
+                    center_x: 0.0,
+                    center_y: 0.0,
+                    inner_widget_center_x: 0.0,
+                    inner_widget_center_y: 0.0,
+                    radius: layout.inner_radius + thickness * 0.5,
+                    start_angle: layout.track_start_angle,
+                    sweep_angle: layout.track_sweep_angle,
+                },
+                thickness,
+                widget.track_corner_radius * scale,
+            ) {
+                draw_with_shadow(
+                    canvas,
+                    &track,
+                    &track_paint,
+                    shadow_color,
+                    shadow_sigma,
+                    shadow_offset,
+                );
+            }
+            match widget.rotation_mode {
+                // Fixed labels in the gap fade exactly as rotating ones would.
+                CompassRotationMode::Indicator => draw_card(
+                    canvas,
+                    &card,
+                    &layout,
+                    Point::new(0.0, 0.0),
+                    0.0,
+                    shadow_offset,
+                    1.0,
+                ),
+                CompassRotationMode::Compass => draw_with_shadow(
+                    canvas,
+                    &indicator_path(indicator_size, widget.indicator_corner_radius),
+                    &indicator_paint,
+                    shadow_color,
+                    shadow_sigma,
+                    shadow_offset,
+                ),
+            }
+            Ok(())
+        },
+    )?;
     let (card, indicator) = match widget.rotation_mode {
         CompassRotationMode::Indicator => {
-            // Fixed labels in the gap fade exactly as rotating ones would.
-            draw_card(
-                canvas,
-                &card,
-                &layout,
-                Point::new(0.0, 0.0),
-                0.0,
-                shadow_offset,
-                1.0,
-            );
             let shadow = shadow_paint(&indicator_paint, shadow_color, shadow_sigma);
             (Vec::new(), Some((indicator_paint, shadow)))
         }
-        CompassRotationMode::Compass => {
-            draw_with_shadow(
-                canvas,
-                &needle,
-                &indicator_paint,
-                shadow_color,
-                shadow_sigma,
-                shadow_offset,
-            );
-            (card, None)
-        }
+        CompassRotationMode::Compass => (card, None),
     };
-    let static_origin = Point::new(center.x - half, center.y - half);
-    let mut dial_bounds = Rect::from_xywh(static_origin.x, static_origin.y, half * 2.0, half * 2.0);
+    let mut dial_bounds = static_layer.bounds().with_offset(center);
     dial_bounds.join(Rect::from_xywh(
         center.x - layout.outer_radius,
         center.y - layout.outer_radius,
@@ -321,8 +326,7 @@ pub fn prepare_heading_compass_cache(
         layout,
         center,
         rotation_mode: widget.rotation_mode,
-        static_image: static_surface.image_snapshot(),
-        static_origin,
+        static_layer,
         dial_bounds,
         opacity: widget.opacity * scene.opacity,
         shadow_offset,
@@ -337,7 +341,10 @@ impl HeadingCompassCache {
     pub(crate) fn draw_static(&self, canvas: &Canvas) {
         let mut paint = Paint::default();
         paint.set_alpha_f(self.opacity);
-        canvas.draw_image(&self.static_image, self.static_origin, Some(&paint));
+        canvas.save();
+        canvas.translate(self.center);
+        self.static_layer.draw(canvas, Some(&paint));
+        canvas.restore();
     }
 
     pub(crate) fn draw_card(&self, canvas: &Canvas, card_rotation: f32) {

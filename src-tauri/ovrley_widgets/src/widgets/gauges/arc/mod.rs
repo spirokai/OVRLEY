@@ -14,12 +14,13 @@ use super::{
 use crate::{
     error::WidgetResult,
     model::{scene::ValidatedScenePresentation, types::TrackFillStyle},
+    render::preview::{PreviewRasterScale, StaticRaster},
     render::track_fill::TrackFill,
     render::text::{
         origin_x_for_centered_text, parse_color, resolve_font, validated_value_style, FontResolver,
         ResolvedTextStyle,
     },
-    widgets::value::preview::{surface, SHAPE_COLOR_TYPE},
+    widgets::value::preview::SHAPE_COLOR_TYPE,
 };
 pub use geometry::{
     arc_gauge_geometry, arc_point, arc_radius, arc_start_end_angles, corner_gauge_geometry,
@@ -35,13 +36,12 @@ pub(crate) use path::{ArcTrackSpec, RevealClip};
 pub(crate) use segment::rounded_segment_path;
 #[cfg(test)]
 pub(crate) use segment::{rounded_segment_geometry, segment_geometries};
-use skia_safe::{Canvas, Color, Font, Image, Point, Rect};
+use skia_safe::{Canvas, Font, Point, Rect};
 
 #[derive(Clone, Debug)]
 pub struct ArcGaugeCache {
-    pub static_image: Image,
-    pub static_image_x: f32,
-    pub static_image_y: f32,
+    /// Track, ticks and labels in gauge-local coordinates; the gauge origin is (x, y).
+    pub(crate) static_layer: StaticRaster,
     pub content_bounds: Rect,
     pub x: f32,
     pub y: f32,
@@ -236,24 +236,30 @@ impl ArcGaugeMeasure {
         self,
         gauge: &ValidatedArcGaugeWidget,
         scene: &ValidatedScenePresentation,
+        raster_scale: PreviewRasterScale,
     ) -> WidgetResult<ArcGaugeCache> {
         let bounds = self.local_bounds;
-        let mut surface = surface(bounds.width() as u32, bounds.height() as u32, SHAPE_COLOR_TYPE)?;
-        let canvas = surface.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        canvas.translate((-bounds.left, -bounds.top));
-        layer::draw_static_layer(
-            canvas,
-            gauge,
-            scene,
-            self.local_geometry,
-            self.bar_geometry,
-            scene.scale,
-            &self.text_style,
-        );
-        for text in self.texts {
-            text.draw(canvas);
-        }
+        let static_layer = StaticRaster::new(
+            raster_scale,
+            Point::new(self.x, self.y),
+            bounds,
+            SHAPE_COLOR_TYPE,
+            |canvas| {
+                layer::draw_static_layer(
+                    canvas,
+                    gauge,
+                    scene,
+                    self.local_geometry,
+                    self.bar_geometry,
+                    scene.scale,
+                    &self.text_style,
+                );
+                for text in &self.texts {
+                    text.draw(canvas);
+                }
+                Ok(())
+            },
+        )?;
         // The fill raster shares the static raster's frame, so the sweep is gauge-local.
         let local = self.local_geometry;
         let fill_paint = gauge.track_filled_color.sweep_paint(
@@ -263,9 +269,7 @@ impl ArcGaugeMeasure {
             local.sweep_angle,
         )?;
         let mut cache = ArcGaugeCache {
-            static_image: surface.image_snapshot(),
-            static_image_x: self.x + bounds.left,
-            static_image_y: self.y + bounds.top,
+            static_layer,
             content_bounds: self.content_bounds,
             x: self.x,
             y: self.y,
@@ -293,6 +297,7 @@ impl ArcGaugeMeasure {
         cache.fill = TrackFill::prepare(
             &gauge.track_filled_color,
             fill_paint,
+            raster_scale,
             bounds,
             (self.x, self.y),
             |canvas, paint| layer::draw_full_fill_layer(canvas, &cache, local, paint),
@@ -308,19 +313,15 @@ pub fn prepare_arc_gauge_cache(
     altitude_offset_m: f64,
     unit_text: Option<&str>,
     fonts: &dyn FontResolver,
+    raster_scale: PreviewRasterScale,
 ) -> WidgetResult<ArcGaugeCache> {
     measure_arc_gauge(gauge, scene, range, altitude_offset_m, unit_text, fonts)?
-        .into_cache(gauge, scene)
+        .into_cache(gauge, scene, raster_scale)
 }
 
 impl ArcGaugeCache {
     pub fn raster_bounds(&self) -> Rect {
-        Rect::from_xywh(
-            self.static_image_x,
-            self.static_image_y,
-            self.static_image.width() as f32,
-            self.static_image.height() as f32,
-        )
+        self.static_layer.bounds().with_offset((self.x, self.y))
     }
     pub(crate) fn frame_layout(&self) -> GaugeFrameLayout<'_> {
         GaugeFrameLayout {
@@ -345,11 +346,10 @@ impl ArcGaugeCache {
         )
     }
     pub fn draw(&self, canvas: &Canvas, fill01: f32) {
-        canvas.draw_image(
-            &self.static_image,
-            (self.static_image_x, self.static_image_y),
-            None,
-        );
+        canvas.save();
+        canvas.translate((self.x, self.y));
+        self.static_layer.draw(canvas, None);
+        canvas.restore();
         if fill01 > 0.0 && self.geometry.radius > 0.0 {
             layer::draw_fill(canvas, self, self.geometry, fill01);
         }

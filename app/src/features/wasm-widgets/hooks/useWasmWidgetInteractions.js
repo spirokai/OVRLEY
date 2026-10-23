@@ -134,7 +134,14 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       const ids = selectedWidgets.map((widget) => widget.id)
       const controller = getWidgetInteraction(events[0].target).group(ids)
       const origins = controller.begin(state.setLiveWidgetDrafts)
-      gesture.current = { controller, origins, ids, widgets: selectedWidgets, groupOrigin: groupResizeOrigin(moveable.getRect(), direction) }
+      gesture.current = {
+        controller,
+        origins,
+        ids,
+        widgets: selectedWidgets,
+        direction,
+        groupOrigin: groupResizeOrigin(moveable.getRect(), direction),
+      }
       setGroupGestureType('resize')
       events.forEach(({ target, set, dragStart }) => {
         const { bounds } = origins[target.dataset.widgetId]
@@ -151,9 +158,10 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       const intents = Object.fromEntries(
         current.widgets.map((widget) => {
           const origin = current.origins[widget.id]
+          // Anchor each child at the group's fixed corner so the stationary group edges stay exact.
           const anchor = resizeAnchor(
             origin.bounds,
-            [1, 1],
+            current.direction,
             ['course', 'elevation', 'diving_profile', 'raster'].includes(widget.type) ? origin.data.rotation : 0,
             origin.rotationOrigin,
           )

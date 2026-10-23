@@ -108,6 +108,8 @@ fn elevation_activity() -> ovrley_core::activity::schema::ParsedActivity {
 
 fn elevation_preview(request: &Value, activity: &[u8]) -> (PreviewSession, u32) {
     let mut preview = PreviewSession::default();
+    // Compared against native export, which grid-fits text.
+    preview.fonts.set_grid_fit(true);
     let font: ovrley_widgets::preview::FontRequest = serde_json::from_value(json!({"font": "Inter.ttf"})).unwrap();
     let dirs = vec![common::test_config::repo_git_root().join("fonts")];
     let bytes = preview_font_resource(&dirs, &font.font, font.font_weight, font.italic).unwrap();
@@ -1014,6 +1016,8 @@ fn route_preview_matches_export_and_keeps_marker_out_of_selection_bounds() {
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
         let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
         let mut preview = PreviewSession::default();
+        // Compared against native export, which grid-fits text.
+        preview.fonts.set_grid_fit(true);
         preview.replace_activity(&bytes).unwrap();
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         let mut selection = None;
@@ -1090,6 +1094,8 @@ fn route_gestures_reuse_geometry_until_resize_commit_and_keep_every_opposite_cor
     for fixed in [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] {
         let request = route_request();
         let mut preview = PreviewSession::default();
+        // Compared against native export, which grid-fits text.
+        preview.fonts.set_grid_fit(true);
         preview.replace_activity(&bytes).unwrap();
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         preview.render(0.75).unwrap();
@@ -1149,6 +1155,8 @@ fn route_gestures_reuse_geometry_until_resize_commit_and_keep_every_opposite_cor
         let anchored = opposite(&final_geometry, fixed);
         assert!((anchored[0] - point[0]).abs() < 0.001 && (anchored[1] - point[1]).abs() < 0.001);
         let mut reloaded = PreviewSession::default();
+        // Compared against native export, which grid-fits text.
+        reloaded.fonts.set_grid_fit(true);
         reloaded.replace_activity(&bytes).unwrap();
         let reloaded_id = reloaded.create_widget(serde_json::from_value(committed).unwrap()).unwrap();
         reloaded.render(2.35).unwrap();
@@ -1480,6 +1488,7 @@ fn gauge_resize_preserves_opposite_corners_and_commits_fractional_geometry_durin
                         sampler.gauge_range(widget.metric()),
                         0.0,
                         &NativeFonts(&font_dirs),
+                        ovrley_widgets::render::preview::PreviewRasterScale::NATIVE,
                     )
                     .unwrap();
                     let frame = layout
@@ -1962,6 +1971,8 @@ fn g_force_resize_keeps_visible_corners_fixed_and_commits_fractional_variant_geo
 fn lean_angle_preview() -> (PreviewSession, Value) {
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
     let mut preview = PreviewSession::default();
+    // Compared against native export, which grid-fits text.
+    preview.fonts.set_grid_fit(true);
     let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
     preview
         .fonts
@@ -2212,6 +2223,8 @@ fn lean_angle_resize_preserves_visible_corners_across_playback_and_commits_diame
 fn gradient_preview() -> (PreviewSession, Value) {
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
     let mut preview = PreviewSession::default();
+    // Compared against native export, which grid-fits text.
+    preview.fonts.set_grid_fit(true);
     let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
     preview
         .fonts
@@ -2488,6 +2501,8 @@ fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
     };
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
     let mut preview = PreviewSession::default();
+    // Compared against native export, which grid-fits text.
+    preview.fonts.set_grid_fit(true);
     let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
     preview
         .fonts
@@ -2697,6 +2712,8 @@ fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
 fn label_preview() -> (PreviewSession, Value) {
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
     let mut preview = PreviewSession::default();
+    // Compared against native export, which grid-fits text.
+    preview.fonts.set_grid_fit(true);
     preview.fonts.register(
         ovrley_widgets::preview::FontRequest {
             font: "Inter.ttf".into(), font_weight: 537.0, italic: true,
@@ -2817,6 +2834,8 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
     request["widget"]["opacity"] = json!(0.8);
     request["widget"]["color"] = json!("#abcdef");
     let mut preview = PreviewSession::default();
+    // Compared against native export, which grid-fits text.
+    preview.fonts.set_grid_fit(true);
     preview
         .fonts
         .register(
@@ -2933,6 +2952,8 @@ fn live_resize_keeps_the_opposite_content_corner_fixed_and_commits_the_same_geom
     origin["scene"]["shadow_strength"] = json!(5);
     origin["scene"]["shadow_distance"] = json!(8);
     let mut preview = PreviewSession::default();
+    // Compared against native export, which grid-fits text.
+    preview.fonts.set_grid_fit(true);
     preview
         .fonts
         .register(
@@ -3127,7 +3148,16 @@ fn heading_compass_resize_preserves_the_fixed_corner_and_scales_pixel_fields() {
 }
 
 fn heart_zones_preview(indicator_style: &str) -> (PreviewSession, Value) {
-    let (preview, mut request) = lean_angle_preview();
+    let (mut preview, mut request) = lean_angle_preview();
+    // Zone labels resolve their own weight, like the editor's per-widget font requests.
+    let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
+    preview
+        .fonts
+        .register(
+            ovrley_widgets::preview::FontRequest { font: "Inter.ttf".into(), font_weight: 800.0, italic: false },
+            &preview_font_resource(&font_dirs, "Inter.ttf", 800.0, false).unwrap(),
+        )
+        .unwrap();
     request["type"] = json!("heartrate");
     request["scene"]["opacity"] = json!(0.9);
     request["widget"] = json!({

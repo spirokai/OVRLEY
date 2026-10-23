@@ -47,10 +47,15 @@ test('border movement reuses viewport measurements until scrolling', () => {
   })
   rerender([[{ x: 20, y: 10 }]])
   expect(result.current.polygons).toEqual(['20,25'])
+  expect(result.current.strokeWidth).toBe(1)
   expect(measure).toHaveBeenCalledTimes(2)
+
+  // Vertices keep their fractional screen position so the border tracks unsnapped content.
+  rerender([[{ x: 20.5, y: 10 }]])
+  expect(result.current.polygons).toEqual(['20.25,25'])
 
   measure.mockReturnValue({ ...bounds, top: 15 })
   fireEvent.scroll(window)
-  expect(result.current.polygons).toEqual(['20,20'])
+  expect(result.current.polygons).toEqual(['20.25,20'])
   expect(measure).toHaveBeenCalledTimes(4)
 })

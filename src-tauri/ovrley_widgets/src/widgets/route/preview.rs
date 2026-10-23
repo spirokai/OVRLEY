@@ -98,9 +98,10 @@ impl PreviewRoute {
             self.layout = None;
         }
         if let Some(layout) = self.layout.as_mut() {
-            // x/y never participate in path or static-layer preparation.
-            layout.set_position(config.x, config.y);
+            // Prepared paths ignore x/y, but the cached remaining raster sits on the position's
+            // sub-pixel grid, so a move rebuilds the layout from them.
             if layout.config != config
+                || self.preview_raster_scale != preview_raster_scale
                 || self.scene.scale != scene.scale
                 || self.scene.opacity != scene.opacity
                 || self.scene.shadow_color != scene.shadow_color
@@ -247,6 +248,7 @@ impl PreviewRoute {
                 self.config.clone(),
                 self.scene.clone(),
                 geometry,
+                self.preview_raster_scale,
             )?);
         }
         Ok(changed)
@@ -289,7 +291,7 @@ impl PreviewRoute {
         }
         let layout = self.layout.as_ref().expect("route layout prepared");
         let frame = layout.frame(progress);
-        let (width, height) = render_tile(
+        let (width, height, bounds) = render_tile(
             &mut self.surface,
             &mut self.pixels,
             SHAPE_COLOR_TYPE,
@@ -309,7 +311,7 @@ impl PreviewRoute {
                 rotation_origin: [f32; 2],
             }
             let rotation_origin = frame.content_bounds.rotation_origin();
-            let tile = TileBounds::from(frame.bounds);
+            let tile = TileBounds::from(bounds);
             self.geometry = serde_json::to_vec(&Geometry {
                 widget: WidgetGeometry::new(
                     tile,

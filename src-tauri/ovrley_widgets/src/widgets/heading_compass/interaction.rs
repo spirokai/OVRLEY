@@ -5,7 +5,7 @@ use crate::{
     activity::ActivitySampler,
     error::WidgetResult,
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
-    render::text::FontResolver,
+    render::{preview::PreviewRasterScale, text::FontResolver},
     widgets::value::config::ValueConfig,
 };
 use serde::Serialize;
@@ -57,7 +57,7 @@ pub fn resize_heading_compass(
     config.value_offset_x = (config.value_offset_x * factor).clamp(-10_000.0, 10_000.0);
     config.value_offset_y = (config.value_offset_y * factor).clamp(-10_000.0, 10_000.0);
     let raw = activity.and_then(|activity| activity.heading_at(second));
-    let bounds = prepare_heading_compass_cache(&config, &scene, fonts)?
+    let bounds = prepare_heading_compass_cache(&config, &scene, fonts, PreviewRasterScale::NATIVE)?
         .prepare_frame(raw, fonts)?
         .content_bounds;
     Ok(ResizeUpdate {

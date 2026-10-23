@@ -16,17 +16,17 @@ use crate::{
         types::TrackFillStyle,
     },
     render::text::{parse_color, resolve_font, FontResolver, ResolvedTextStyle},
+    render::preview::{PreviewRasterScale, StaticRaster},
     render::track_fill::TrackFill,
-    widgets::value::preview::{surface, SHAPE_COLOR_TYPE},
+    widgets::value::preview::SHAPE_COLOR_TYPE,
 };
 pub use geometry::{bar_fill_rect, bordered_bar_fill_rect};
-use skia_safe::{Canvas, Color, Image, Rect};
+use skia_safe::{Canvas, Point, Rect};
 
 #[derive(Clone, Debug)]
 pub struct LinearGaugeCache {
-    pub static_image: Image,
-    pub static_image_x: f32,
-    pub static_image_y: f32,
+    /// Track and labels in gauge-local coordinates; the gauge origin is (x, y).
+    pub(crate) static_layer: StaticRaster,
     pub content_bounds: Rect,
     pub x: f32,
     pub y: f32,
@@ -144,17 +144,23 @@ impl LinearGaugeMeasure {
         self,
         gauge: &ValidatedLinearGaugeWidget,
         scene: &ValidatedScenePresentation,
+        raster_scale: PreviewRasterScale,
     ) -> WidgetResult<LinearGaugeCache> {
         let scale = scene.scale;
         let bounds = self.local_bounds;
-        let mut surface = surface(bounds.width() as u32, bounds.height() as u32, SHAPE_COLOR_TYPE)?;
-        let canvas = surface.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        canvas.translate((-bounds.left, -bounds.top));
-        layer::draw_static_layer(canvas, gauge, scene, self.width, self.height, scale);
-        for text in self.texts {
-            text.draw(canvas);
-        }
+        let static_layer = StaticRaster::new(
+            raster_scale,
+            Point::new(self.x, self.y),
+            bounds,
+            SHAPE_COLOR_TYPE,
+            |canvas| {
+                layer::draw_static_layer(canvas, gauge, scene, self.width, self.height, scale);
+                for text in &self.texts {
+                    text.draw(canvas);
+                }
+                Ok(())
+            },
+        )?;
         let track_border_thickness = gauge.track_border_thickness * scale;
         // The fill raster shares the static raster's frame, so the axis is gauge-local.
         let (start, end) = geometry::fill_axis(
@@ -169,9 +175,7 @@ impl LinearGaugeMeasure {
             end,
         )?;
         let mut cache = LinearGaugeCache {
-            static_image: surface.image_snapshot(),
-            static_image_x: self.x + bounds.left,
-            static_image_y: self.y + bounds.top,
+            static_layer,
             content_bounds: self.content_bounds,
             x: self.x,
             y: self.y,
@@ -190,6 +194,7 @@ impl LinearGaugeMeasure {
         cache.fill = TrackFill::prepare(
             &gauge.track_filled_color,
             fill_paint,
+            raster_scale,
             bounds,
             (self.x, self.y),
             |canvas, paint| layer::draw_full_fill_layer(canvas, &cache, paint),
@@ -204,8 +209,9 @@ pub fn prepare_linear_gauge_cache(
     range: (f64, f64),
     altitude_offset_m: f64,
     fonts: &dyn FontResolver,
+    raster_scale: PreviewRasterScale,
 ) -> WidgetResult<LinearGaugeCache> {
-    measure_linear_gauge(gauge, scene, range, altitude_offset_m, fonts)?.into_cache(gauge, scene)
+    measure_linear_gauge(gauge, scene, range, altitude_offset_m, fonts)?.into_cache(gauge, scene, raster_scale)
 }
 
 impl LinearGaugeCache {
@@ -218,19 +224,13 @@ impl LinearGaugeCache {
         }
     }
     pub fn raster_bounds(&self) -> Rect {
-        Rect::from_xywh(
-            self.static_image_x,
-            self.static_image_y,
-            self.static_image.width() as f32,
-            self.static_image.height() as f32,
-        )
+        self.static_layer.bounds().with_offset((self.x, self.y))
     }
     pub fn draw(&self, canvas: &Canvas, fill01: f32) {
-        canvas.draw_image(
-            &self.static_image,
-            (self.static_image_x, self.static_image_y),
-            None,
-        );
+        canvas.save();
+        canvas.translate((self.x, self.y));
+        self.static_layer.draw(canvas, None);
+        canvas.restore();
         match self.track_fill_style {
             TrackFillStyle::Bars => layer::draw_segmented_fill(canvas, self, fill01),
             TrackFillStyle::Fill => layer::draw_continuous_fill(canvas, self, fill01),

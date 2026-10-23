@@ -121,7 +121,8 @@ impl PreviewLapTimer {
         let sample =
             activity.map_or_else(LapSample::default, |activity| activity.lap_timer_at(second));
         let content = lap_timer_content(&self.config, history, sample)?;
-        let frame = self.layout(history, fonts)?.prepare_cached_frame(history, &content)?;
+        let raster_scale = self.preview_raster_scale;
+        let frame = self.layout(history, fonts)?.prepare_cached_frame(history, &content, raster_scale)?;
         frame.draw(canvas);
         Ok(frame.bounds.into())
     }
@@ -139,9 +140,10 @@ impl PreviewLapTimer {
         if self.last_content.as_ref() == Some(&content) {
             return Ok(());
         }
-        let frame = self.layout(history, fonts)?.prepare_cached_frame(history, &content)?;
+        let raster_scale = self.preview_raster_scale;
+        let frame = self.layout(history, fonts)?.prepare_cached_frame(history, &content, raster_scale)?;
         let bounds = frame.bounds;
-        let (width, height) = render_tile(
+        let (width, height, bounds) = render_tile(
             &mut self.surface,
             &mut self.pixels,
             TEXT_COLOR_TYPE,

@@ -7,6 +7,7 @@ use crate::{
     error::{WidgetError, WidgetResult},
     model::scene::ValidatedScenePresentation,
     render::{
+        preview::{PreviewRasterScale, StaticRaster},
         shadow::shadow_paint,
         text::{parse_color, resolve_styled_font, FontResolver},
     },
@@ -188,8 +189,7 @@ pub struct HeartZonesCache {
     pub(crate) layout: HeartZonesLayout,
     pub(crate) zones: [HeartZoneRange; ZONE_COUNT],
     /// Index 0 shows no active zone; index `i + 1` shows zone `i` active and labelled.
-    pub(crate) states: Vec<Image>,
-    pub(crate) state_origin: Point,
+    pub(crate) states: Vec<StaticRaster>,
     pub(crate) indicator: IndicatorShape,
     pub(crate) indicator_paint: Paint,
     /// Pre-blurred indicator shadow and its top-left relative to the indicator x.
@@ -204,6 +204,7 @@ pub fn prepare_heart_zones_cache(
     widget: &ValidatedHeartZones,
     scene: &ValidatedScenePresentation,
     fonts: &dyn FontResolver,
+    raster_scale: PreviewRasterScale,
 ) -> WidgetResult<HeartZonesCache> {
     let scale = scene.scale;
     let layout = heart_zones_layout(
@@ -231,11 +232,6 @@ pub fn prepare_heart_zones_cache(
     let mut track = layout.active_rect(0);
     track.join(layout.active_rect(ZONE_COUNT - 1));
     track.outset((padding, padding));
-    let state_origin = Point::new(track.left.floor(), track.top.floor());
-    let state_size = (
-        (track.right.ceil() - state_origin.x) as u32,
-        (track.bottom.ceil() - state_origin.y) as u32,
-    );
     let font = resolve_styled_font(
         fonts,
         Some(&widget.font),
@@ -248,66 +244,64 @@ pub fn prepare_heart_zones_cache(
     label_paint.set_color(parse_color(&widget.label_color, 1.0));
     let states = (0..=ZONE_COUNT)
         .map(|state| {
-            let mut raster = surface(state_size.0, state_size.1, SHAPE_COLOR_TYPE)?;
-            let canvas = raster.canvas();
-            canvas.clear(Color::TRANSPARENT);
-            canvas.translate((-state_origin.x, -state_origin.y));
-            let active = state.checked_sub(1);
-            for index in (0..ZONE_COUNT).filter(|index| Some(*index) != active) {
-                let mut paint = Paint::default();
-                paint.set_anti_alias(true);
-                paint.set_color(scale_hsv(
-                    parse_color(&widget.zone_colors[index], 1.0),
-                    1.0,
-                    INACTIVE_ZONE_SATURATION,
-                ));
-                let rrect = layout.zone_rrect(layout.zone_rect(index), index);
-                draw_with_shadow(
-                    canvas,
-                    &rrect,
-                    &paint,
-                    shadow_color,
-                    shadow_sigma,
-                    shadow_offset,
-                );
-            }
-            if let Some(index) = active {
-                let mut paint = Paint::default();
-                paint.set_anti_alias(true);
-                paint.set_color(scale_hsv(
-                    parse_color(&widget.zone_colors[index], 1.0),
-                    ACTIVE_ZONE_BRIGHTNESS,
-                    ACTIVE_ZONE_SATURATION,
-                ));
-                let rect = layout.active_rect(index);
-                let rrect = layout.zone_rrect(rect, index);
-                draw_with_shadow(
-                    canvas,
-                    &rrect,
-                    &paint,
-                    shadow_color,
-                    shadow_sigma,
-                    shadow_offset,
-                );
-                if !widget.show_label {
-                    return Ok(raster.image_snapshot());
+            StaticRaster::new(raster_scale, Point::default(), track, SHAPE_COLOR_TYPE, |canvas| {
+                let active = state.checked_sub(1);
+                for index in (0..ZONE_COUNT).filter(|index| Some(*index) != active) {
+                    let mut paint = Paint::default();
+                    paint.set_anti_alias(true);
+                    paint.set_color(scale_hsv(
+                        parse_color(&widget.zone_colors[index], 1.0),
+                        1.0,
+                        INACTIVE_ZONE_SATURATION,
+                    ));
+                    let rrect = layout.zone_rrect(layout.zone_rect(index), index);
+                    draw_with_shadow(
+                        canvas,
+                        &rrect,
+                        &paint,
+                        shadow_color,
+                        shadow_sigma,
+                        shadow_offset,
+                    );
                 }
-                let text = format!("Z{}", index + 1);
-                let blob = TextBlob::from_str(&text, &font).ok_or_else(|| {
-                    WidgetError::Render("unable to lay out heart zone label".into())
-                })?;
-                let (_, ink) = font.measure_str(&text, None);
-                // Centre the painted glyphs, not their advance box, in the zone.
-                canvas.draw_text_blob(
-                    &blob,
-                    (
-                        rect.center_x() - ink.center_x(),
-                        rect.center_y() - ink.center_y(),
-                    ),
-                    &label_paint,
-                );
-            }
-            Ok(raster.image_snapshot())
+                if let Some(index) = active {
+                    let mut paint = Paint::default();
+                    paint.set_anti_alias(true);
+                    paint.set_color(scale_hsv(
+                        parse_color(&widget.zone_colors[index], 1.0),
+                        ACTIVE_ZONE_BRIGHTNESS,
+                        ACTIVE_ZONE_SATURATION,
+                    ));
+                    let rect = layout.active_rect(index);
+                    let rrect = layout.zone_rrect(rect, index);
+                    draw_with_shadow(
+                        canvas,
+                        &rrect,
+                        &paint,
+                        shadow_color,
+                        shadow_sigma,
+                        shadow_offset,
+                    );
+                    if !widget.show_label {
+                        return Ok(());
+                    }
+                    let text = format!("Z{}", index + 1);
+                    let blob = TextBlob::from_str(&text, &font).ok_or_else(|| {
+                        WidgetError::Render("unable to lay out heart zone label".into())
+                    })?;
+                    let (_, ink) = font.measure_str(&text, None);
+                    // Centre the painted glyphs, not their advance box, in the zone.
+                    canvas.draw_text_blob(
+                        &blob,
+                        (
+                            rect.center_x() - ink.center_x(),
+                            rect.center_y() - ink.center_y(),
+                        ),
+                        &label_paint,
+                    );
+                }
+                Ok(())
+            })
         })
         .collect::<WidgetResult<Vec<_>>>()?;
 
@@ -335,12 +329,7 @@ pub fn prepare_heart_zones_cache(
         })
         .transpose()?;
 
-    let mut bounds = Rect::from_xywh(
-        state_origin.x,
-        state_origin.y,
-        state_size.0 as f32,
-        state_size.1 as f32,
-    );
+    let mut bounds = states[0].bounds();
     let mut travel = Rect::new(
         layout.left + extent.left,
         extent.top,
@@ -353,7 +342,6 @@ pub fn prepare_heart_zones_cache(
         layout,
         zones: widget.zones,
         states,
-        state_origin,
         indicator,
         indicator_paint,
         indicator_shadow,

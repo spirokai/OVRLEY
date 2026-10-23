@@ -85,7 +85,7 @@ impl PreviewHeading {
         }
         let frame = self.cache.prepare_frame(raw);
         let bounds = frame.bounds;
-        let (width, height) = render_tile(
+        let (width, height, bounds) = render_tile(
             &mut self.surface,
             &mut self.pixels,
             SHAPE_COLOR_TYPE,

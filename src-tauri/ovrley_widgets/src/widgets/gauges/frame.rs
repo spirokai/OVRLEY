@@ -218,6 +218,7 @@ impl GaugeLayout {
         range: (f64, f64),
         altitude_offset_m: f64,
         fonts: &dyn FontResolver,
+        raster_scale: crate::render::preview::PreviewRasterScale,
     ) -> WidgetResult<Self> {
         match widget {
             ValidatedGauge::Linear(widget) => {
@@ -227,6 +228,7 @@ impl GaugeLayout {
                     range,
                     altitude_offset_m,
                     fonts,
+                    raster_scale,
                 )?))
             }
             ValidatedGauge::Arc(config) => Ok(Self::Arc(super::arc::prepare_arc_gauge_cache(
@@ -236,6 +238,7 @@ impl GaugeLayout {
                 altitude_offset_m,
                 widget.unit_text().as_deref(),
                 fonts,
+                raster_scale,
             )?)),
         }
     }

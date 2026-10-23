@@ -2,13 +2,14 @@
 use super::{LINE_HEIGHT_RATIO, TABLE_VERTICAL_METRICS_TEXT};
 use crate::{
     error::{WidgetError, WidgetResult},
+    render::preview::{PreviewRasterScale, StaticRaster},
     render::text::{
         baseline_for_text_top_with_line_height, draw_text_blob, layout_text,
         measure_text_with_font, text_selection_bounds, ResolvedTextStyle,
     },
-    widgets::value::preview::{surface, TEXT_COLOR_TYPE},
+    widgets::value::preview::TEXT_COLOR_TYPE,
 };
-use skia_safe::{Canvas, Color, Font, Image, Rect, TextBlob};
+use skia_safe::{Canvas, Font, Point, Rect, TextBlob};
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
@@ -96,29 +97,21 @@ impl TextRun {
 
 #[derive(Clone, Debug)]
 pub(super) struct TextLayer {
-    image: Image,
+    raster: StaticRaster,
     content_bounds: Rect,
-    bounds: Rect,
     content_width: f32,
 }
 
 impl TextLayer {
-    pub fn new(runs: Vec<TextRun>, x: f32) -> WidgetResult<Self> {
+    pub fn new(runs: Vec<TextRun>, x: f32, raster_scale: PreviewRasterScale) -> WidgetResult<Self> {
         let frame = LapTimerFrame::new(runs, None, x)?;
-        let mut surface = surface(
-            frame.bounds.width() as u32,
-            frame.bounds.height() as u32,
-            TEXT_COLOR_TYPE,
-        )?;
-        let canvas = surface.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        // Integer origins retain the glyphs' original subpixel placement.
-        canvas.translate((-frame.bounds.left, -frame.bounds.top));
-        frame.draw(canvas);
+        let raster = StaticRaster::new(raster_scale, Point::default(), frame.bounds, TEXT_COLOR_TYPE, |canvas| {
+            frame.draw(canvas);
+            Ok(())
+        })?;
         Ok(Self {
-            image: surface.image_snapshot(),
+            raster,
             content_bounds: frame.content_bounds,
-            bounds: frame.bounds,
             content_width: frame.content_width,
         })
     }
@@ -141,7 +134,7 @@ impl LapTimerFrame {
         x: f32,
     ) -> WidgetResult<Self> {
         let (mut content_bounds, mut bounds, mut content_width) = if let Some(layer) = &background {
-            (layer.content_bounds, layer.bounds, layer.content_width)
+            (layer.content_bounds, layer.raster.bounds(), layer.content_width)
         } else {
             let first = runs
                 .first()
@@ -179,7 +172,7 @@ impl LapTimerFrame {
             return;
         }
         if let Some(layer) = &self.background {
-            canvas.draw_image(&layer.image, (layer.bounds.left, layer.bounds.top), None);
+            layer.raster.draw(canvas, None);
         }
         for run in &self.runs {
             draw_text_blob(canvas, &run.blob, run.baseline, &run.style);

@@ -56,6 +56,8 @@ fn request(metric: &str, unit: &str) -> Value {
 fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
     let mut preview = PreviewSession::default();
+    // Compared against native export, which grid-fits text.
+    preview.fonts.set_grid_fit(true);
     preview
         .fonts
         .register(

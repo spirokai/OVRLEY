@@ -41,7 +41,7 @@ impl PreviewLeanAngle {
         host: &WidgetHost,
     ) -> WidgetResult<Self> {
         Ok(Self {
-            cache: prepare_lean_angle_cache(config, scene)?,
+            cache: prepare_lean_angle_cache(config, scene, host.raster_scale)?,
             preview_raster_scale: host.raster_scale,
             surface: None,
             last_sample: None,
@@ -95,7 +95,7 @@ impl PreviewLeanAngle {
         }
         let frame = self.cache.prepare_frame(raw, fonts)?;
         let bounds = frame.bounds;
-        let (width, height) = render_tile(
+        let (width, height, bounds) = render_tile(
             &mut self.surface,
             &mut self.pixels,
             SHAPE_COLOR_TYPE,

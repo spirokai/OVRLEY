@@ -109,7 +109,7 @@ impl PreviewDivingProfile {
             return Ok(());
         }
         if let Some(layout) = self.layout.as_mut() {
-            layout.set_position(config.x, config.y);
+            // The cached remaining raster sits on the position's sub-pixel grid, so a move rebuilds.
             if layout.config != config || layout.scene != scene {
                 self.layout = None;
             }
@@ -219,6 +219,7 @@ impl PreviewDivingProfile {
                 geometry,
                 activity.and_then(|a| a.diving.depth_range()),
                 fonts,
+                self.preview_raster_scale,
             )?);
         }
         Ok(changed)
@@ -273,7 +274,7 @@ impl PreviewDivingProfile {
             return Ok(());
         }
         let frame = layout.frame(state)?;
-        let (width, height) = render_tile(
+        let (width, height, bounds) = render_tile(
             &mut self.surface,
             &mut self.pixels,
             SHAPE_COLOR_TYPE,
@@ -292,7 +293,7 @@ impl PreviewDivingProfile {
                 rotation: f32,
                 rotation_origin: [f32; 2],
             }
-            let tile = TileBounds::from(frame.bounds);
+            let tile = TileBounds::from(bounds);
             self.geometry = serde_json::to_vec(&Geometry {
                 widget: WidgetGeometry::new(
                     tile,

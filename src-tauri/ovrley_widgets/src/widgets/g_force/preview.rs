@@ -42,7 +42,7 @@ impl PreviewGForce {
         scene: &ValidatedScenePresentation,
         host: &WidgetHost,
     ) -> WidgetResult<Self> {
-        let cache = prepare_g_force_cache(&config, scene, host.raster_scale.value())?;
+        let cache = prepare_g_force_cache(&config, scene, host.raster_scale)?;
         Ok(Self {
             config,
             cache,
@@ -107,7 +107,7 @@ impl PreviewGForce {
         }
         let frame = self.cache.prepare_frame(sample, fonts)?;
         let bounds = frame.bounds;
-        let (width, height) = render_tile(
+        let (width, height, bounds) = render_tile(
             &mut self.surface,
             &mut self.pixels,
             SHAPE_COLOR_TYPE,

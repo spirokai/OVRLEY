@@ -46,7 +46,7 @@ impl PreviewHeadingCompass {
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
         Ok(Self {
-            cache: prepare_heading_compass_cache(widget, scene, fonts)?,
+            cache: prepare_heading_compass_cache(widget, scene, fonts, host.raster_scale)?,
             preview_raster_scale: host.raster_scale,
             surface: None,
             last_sample: None,
@@ -100,7 +100,7 @@ impl PreviewHeadingCompass {
         }
         let frame = self.cache.prepare_frame(raw, fonts)?;
         let bounds = frame.bounds;
-        let (width, height) = render_tile(
+        let (width, height, bounds) = render_tile(
             &mut self.surface,
             &mut self.pixels,
             SHAPE_COLOR_TYPE,

@@ -2,6 +2,7 @@ mod common;
 
 use ovrley_core::normalize::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
+use ovrley_widgets::render::preview::PreviewRasterScale;
 use ovrley_widgets::widgets::lean_angle::layout::prepare_lean_angle_cache;
 use std::collections::BTreeMap;
 
@@ -24,7 +25,7 @@ fn full_lean_angle_config_validates_and_prepares_one_static_cache() {
     assert_eq!(widget.diameter, 180.0);
     assert_eq!(widget.track_thickness, 24.0);
 
-    let cache = prepare_lean_angle_cache(widget, &config.scene.presentation).unwrap();
+    let cache = prepare_lean_angle_cache(widget, &config.scene.presentation, PreviewRasterScale::NATIVE).unwrap();
     assert!((cache.layout.center_x - 77.94229).abs() < 0.0001);
     assert_eq!(cache.layout.center_y, 90.0);
     assert_eq!(
@@ -103,7 +104,7 @@ fn gradient_fill_mirrors_from_upright_to_either_lean_direction() {
     let ovrley_widgets::widgets::value::validation::ValidatedValue::LeanAngle(widget) = &config.values[0] else {
         panic!("lean_angle display type must use the dedicated prepared value");
     };
-    let cache = prepare_lean_angle_cache(widget, &config.scene.presentation).unwrap();
+    let cache = prepare_lean_angle_cache(widget, &config.scene.presentation, PreviewRasterScale::NATIVE).unwrap();
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
     let fonts = ovrley_core::fonts::NativeFonts(&font_dirs);
     let center_x = widget.x + cache.layout.center_x;

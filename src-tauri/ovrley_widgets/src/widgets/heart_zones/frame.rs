@@ -28,7 +28,7 @@ impl HeartZonesFrame {
     pub fn draw(&self, canvas: &Canvas, cache: &HeartZonesCache) {
         let mut paint = Paint::default();
         paint.set_alpha_f(cache.opacity);
-        canvas.draw_image(&cache.states[self.state], cache.state_origin, Some(&paint));
+        cache.states[self.state].draw(canvas, Some(&paint));
         let Some(x) = self.indicator_x else {
             return;
         };

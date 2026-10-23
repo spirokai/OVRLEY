@@ -7,15 +7,18 @@ use super::{
 use crate::{
     error::{WidgetError, WidgetResult},
     model::{scene::ValidatedScenePresentation, standard_widgets::widget_font_weight},
-    render::text::{parse_color, resolve_font, FontResolver, ResolvedTextStyle},
+    render::{
+        preview::{PreviewRasterScale, StaticRaster},
+        text::{parse_color, resolve_font, FontResolver, ResolvedTextStyle},
+    },
     widgets::{
         route::layout::{outward, rotated_rect, scaled_rect, stroke_paint},
-        value::preview::{surface, SHAPE_COLOR_TYPE, ContentBounds},
+        value::preview::{SHAPE_COLOR_TYPE, ContentBounds},
     },
 };
 use skia_safe::{
-    gradient, path_utils, BlurStyle, Canvas, ClipOp, Color, Color4f, Image, MaskFilter, Matrix,
-    Paint, Path, PathBuilder, Rect, TileMode,
+    gradient, path_utils, BlurStyle, Canvas, ClipOp, Color4f, MaskFilter, Matrix, Paint,
+    Path, PathBuilder, Point, Rect, TileMode,
 };
 use std::sync::{Arc, Mutex};
 
@@ -26,9 +29,8 @@ pub struct ElevationLayout {
     pub geometry: Arc<ElevationGeometry>,
     pub altitude_offset_m: f64,
     scale: [f32; 2],
-    remaining: Image,
-    remaining_bounds: Rect,
-    raster: Rect,
+    /// Remaining profile at the final angle, relative to the widget origin.
+    remaining: StaticRaster,
     labels: [Option<ElevationLabel>; 2],
     bounds: Rect,
     content_bounds: ContentBounds,
@@ -48,7 +50,6 @@ struct ElevationMeasure {
     blur: f32,
     rotation: (f32, f32),
     remaining_bounds: Rect,
-    raster: Rect,
     labels: [Option<ElevationLabel>; 2],
     bounds: Rect,
     content_bounds: ContentBounds,
@@ -244,7 +245,6 @@ impl ElevationLayout {
             offset,
             blur,
             remaining_bounds,
-            raster,
             labels,
             bounds,
             content_bounds,
@@ -271,6 +271,7 @@ impl ElevationLayout {
         altitude_offset_m: f64,
         elevation_range: Option<(f64, f64)>,
         fonts: &dyn FontResolver,
+        raster_scale: PreviewRasterScale,
     ) -> WidgetResult<Self> {
         let ElevationMeasure {
             scale,
@@ -278,21 +279,11 @@ impl ElevationLayout {
             offset,
             blur,
             remaining_bounds,
-            raster,
             labels,
             bounds,
             content_bounds,
             rotation: (sin, cos),
         } = Self::measure(&config, &scene, &geometry, altitude_offset_m, elevation_range, fonts)?;
-        let mut layer = surface(
-            remaining_bounds.width() as u32,
-            remaining_bounds.height() as u32,
-            SHAPE_COLOR_TYPE,
-        )?;
-        let canvas = layer.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        canvas.translate((-remaining_bounds.left, -remaining_bounds.top));
-        canvas.rotate(config.rotation, None);
         let paths = geometry.paths.lock().expect("elevation paths lock");
         let matrix = Matrix::scale((scale[0], scale[1]));
         let path = paths.0.with_transform(&matrix);
@@ -309,34 +300,44 @@ impl ElevationLayout {
         );
         let completed_area_clip = Arc::new(Mutex::new(stroke_outline(&path, &completed_line)?));
         let area_gradient_height = config.area_gradient.then_some(config.height * scene.scale);
-        canvas.save();
-        canvas.clip_path(
-            &stroke_outline(&path, &remaining_line)?,
-            ClipOp::Difference,
-            true,
-        );
-        canvas.draw_path(
-            &area,
-            &area_paint(
-                &config.area_remaining_color,
-                config.area_remaining_opacity * scene.opacity,
-                area_gradient_height,
-            )?,
-        );
-        canvas.restore();
-        if blur > 0.0 {
-            canvas.save();
-            canvas.translate(offset);
-            let mut shadow = stroke_paint(
-                &scene.shadow_color,
-                stroke,
-                config.remaining_line_opacity * scene.opacity,
-            );
-            shadow.set_mask_filter(MaskFilter::blur(BlurStyle::Normal, blur, true));
-            canvas.draw_path(&path, &shadow);
-            canvas.restore();
-        }
-        canvas.draw_path(&path, &remaining_line);
+        let remaining = StaticRaster::new(
+            raster_scale,
+            Point::new(config.x, config.y),
+            remaining_bounds,
+            SHAPE_COLOR_TYPE,
+            |canvas| {
+                canvas.rotate(config.rotation, None);
+                canvas.save();
+                canvas.clip_path(
+                    &stroke_outline(&path, &remaining_line)?,
+                    ClipOp::Difference,
+                    true,
+                );
+                canvas.draw_path(
+                    &area,
+                    &area_paint(
+                        &config.area_remaining_color,
+                        config.area_remaining_opacity * scene.opacity,
+                        area_gradient_height,
+                    )?,
+                );
+                canvas.restore();
+                if blur > 0.0 {
+                    canvas.save();
+                    canvas.translate(offset);
+                    let mut shadow = stroke_paint(
+                        &scene.shadow_color,
+                        stroke,
+                        config.remaining_line_opacity * scene.opacity,
+                    );
+                    shadow.set_mask_filter(MaskFilter::blur(BlurStyle::Normal, blur, true));
+                    canvas.draw_path(&path, &shadow);
+                    canvas.restore();
+                }
+                canvas.draw_path(&path, &remaining_line);
+                Ok(())
+            },
+        )?;
         drop(paths);
         let completed_area = area_paint(
             &config.area_completed_color,
@@ -364,9 +365,7 @@ impl ElevationLayout {
             geometry,
             altitude_offset_m,
             scale,
-            remaining: layer.image_snapshot(),
-            remaining_bounds,
-            raster,
+            remaining,
             labels,
             bounds,
             content_bounds,
@@ -378,21 +377,6 @@ impl ElevationLayout {
             marker,
             variant,
         })
-    }
-
-    pub fn set_position(&mut self, x: f32, y: f32) {
-        if self.config.x == x && self.config.y == y {
-            return;
-        }
-        self.config.x = x;
-        self.config.y = y;
-        self.bounds = outward(self.raster.with_offset((x, y)).with_outset((1.0, 1.0)));
-        self.content_bounds = ContentBounds::rotated_frame(
-            Self::measure_content(&self.config, &self.scene),
-            self.config.rotation,
-            x,
-            y,
-        );
     }
 
     /// Elevation keeps its plot frame, including for flat or stationary telemetry.
@@ -441,11 +425,7 @@ impl ElevationLayout {
     pub fn draw(&self, canvas: &Canvas, frame: &ElevationFrame) {
         canvas.save();
         canvas.translate((self.config.x, self.config.y));
-        canvas.draw_image(
-            &self.remaining,
-            (self.remaining_bounds.left, self.remaining_bounds.top),
-            None,
-        );
+        self.remaining.draw(canvas, None);
         canvas.rotate(self.config.rotation, None);
         let (line, area) = self.geometry.completed_paths(&frame.state);
         let (line, area) = if self.scale == [1.0, 1.0] {

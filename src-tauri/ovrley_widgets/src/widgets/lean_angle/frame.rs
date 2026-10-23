@@ -46,11 +46,10 @@ pub struct LeanAngleFrame {
 
 impl LeanAngleFrame {
     pub fn draw(&self, canvas: &Canvas, cache: &LeanAngleCache) {
-        canvas.draw_image(
-            &cache.static_image,
-            (cache.static_image_x, cache.static_image_y),
-            None,
-        );
+        canvas.save();
+        canvas.translate((cache.x, cache.y));
+        cache.static_layer.draw(canvas, None);
+        canvas.restore();
         if let Some((path, paint)) = &self.fill {
             canvas.save();
             canvas.clip_path(&self.inner_track, ClipOp::Intersect, true);

@@ -6,11 +6,14 @@ use super::{
 use crate::{
     error::WidgetResult,
     model::scene::ValidatedScenePresentation,
-    render::text::parse_color,
-    widgets::value::preview::{surface, SHAPE_COLOR_TYPE, ContentBounds},
+    render::{
+        preview::{PreviewRasterScale, StaticRaster},
+        text::parse_color,
+    },
+    widgets::value::preview::{SHAPE_COLOR_TYPE, ContentBounds},
 };
 use skia_safe::{
-    BlurStyle, Canvas, Color, Image, MaskFilter, Paint, PaintCap, PaintJoin, Path, Rect,
+    BlurStyle, Canvas, MaskFilter, Paint, PaintCap, PaintJoin, Path, Point, Rect,
 };
 use std::sync::Arc;
 
@@ -19,9 +22,8 @@ pub struct RouteLayout {
     pub config: ValidatedRoutePlot,
     pub scene: ValidatedScenePresentation,
     pub geometry: Arc<RouteGeometry>,
-    remaining: Image,
-    remaining_bounds: Rect,
-    remaining_image_bounds: Rect,
+    /// Remaining line at the final angle, relative to the widget origin.
+    remaining: StaticRaster,
     bounds: Rect,
     content_bounds: ContentBounds,
     scale: [f32; 2],
@@ -146,6 +148,7 @@ impl RouteLayout {
         config: ValidatedRoutePlot,
         scene: ValidatedScenePresentation,
         geometry: Arc<RouteGeometry>,
+        raster_scale: PreviewRasterScale,
     ) -> WidgetResult<Self> {
         let RemainingStroke {
             scale,
@@ -158,34 +161,34 @@ impl RouteLayout {
         // bitmap every frame. Positions stay relative to the widget for cheap dragging.
         let remaining_image_bounds =
             outward(rotated_rect(remaining_bounds, config.rotation, 0.0, 0.0));
-        let mut layer = surface(
-            remaining_image_bounds.width() as u32,
-            remaining_image_bounds.height() as u32,
+        let remaining = StaticRaster::new(
+            raster_scale,
+            Point::new(config.x, config.y),
+            remaining_image_bounds,
             SHAPE_COLOR_TYPE,
+            |canvas| {
+                let path = geometry.path.lock().expect("route path lock");
+                canvas.rotate(config.rotation, None);
+                let opacity = config.remaining_line_opacity * scene.opacity;
+                if blur > 0.0 {
+                    canvas.save();
+                    canvas.translate((offset[0], offset[1]));
+                    canvas.scale((scale[0], scale[1]));
+                    let mut paint = stroke_paint(&scene.shadow_color, width / scale[0], opacity);
+                    paint.set_mask_filter(MaskFilter::blur(BlurStyle::Normal, blur / scale[0], true));
+                    canvas.draw_path(&path, &paint);
+                    canvas.restore();
+                }
+                canvas.save();
+                canvas.scale((scale[0], scale[1]));
+                canvas.draw_path(
+                    &path,
+                    &stroke_paint(&config.remaining_line_color, width / scale[0], opacity),
+                );
+                canvas.restore();
+                Ok(())
+            },
         )?;
-        let canvas = layer.canvas();
-        let path = geometry.path.lock().expect("route path lock");
-        canvas.clear(Color::TRANSPARENT);
-        canvas.translate((-remaining_image_bounds.left, -remaining_image_bounds.top));
-        canvas.rotate(config.rotation, None);
-        let opacity = config.remaining_line_opacity * scene.opacity;
-        if blur > 0.0 {
-            canvas.save();
-            canvas.translate((offset[0], offset[1]));
-            canvas.scale((scale[0], scale[1]));
-            let mut paint = stroke_paint(&scene.shadow_color, width / scale[0], opacity);
-            paint.set_mask_filter(MaskFilter::blur(BlurStyle::Normal, blur / scale[0], true));
-            canvas.draw_path(&path, &paint);
-            canvas.restore();
-        }
-        canvas.save();
-        canvas.scale((scale[0], scale[1]));
-        canvas.draw_path(
-            &path,
-            &stroke_paint(&config.remaining_line_color, width / scale[0], opacity),
-        );
-        canvas.restore();
-        drop(path);
         let (bounds, content_bounds) =
             Self::measure_bounds(&config, &scene, &geometry, remaining_bounds);
         let completed_paint = stroke_paint(
@@ -212,9 +215,7 @@ impl RouteLayout {
             config,
             scene,
             geometry,
-            remaining: layer.image_snapshot(),
-            remaining_bounds,
-            remaining_image_bounds,
+            remaining,
             bounds,
             content_bounds,
             scale,
@@ -264,20 +265,6 @@ impl RouteLayout {
         (bounds, content_bounds)
     }
 
-    pub fn set_position(&mut self, x: f32, y: f32) {
-        if self.config.x == x && self.config.y == y {
-            return;
-        }
-        self.config.x = x;
-        self.config.y = y;
-        (self.bounds, self.content_bounds) = Self::measure_bounds(
-            &self.config,
-            &self.scene,
-            &self.geometry,
-            self.remaining_bounds,
-        );
-    }
-
     pub fn frame(&self, progress: f32) -> RouteFrame {
         RouteFrame {
             state: self.geometry.state(progress),
@@ -289,14 +276,7 @@ impl RouteLayout {
     pub fn draw(&self, canvas: &Canvas, frame: &RouteFrame) {
         canvas.save();
         canvas.translate((self.config.x, self.config.y));
-        canvas.draw_image(
-            &self.remaining,
-            (
-                self.remaining_image_bounds.left,
-                self.remaining_image_bounds.top,
-            ),
-            None,
-        );
+        self.remaining.draw(canvas, None);
         canvas.rotate(self.config.rotation, None);
         let scale = self.scale;
         let completed: Path = self.geometry.completed_path(&frame.state);

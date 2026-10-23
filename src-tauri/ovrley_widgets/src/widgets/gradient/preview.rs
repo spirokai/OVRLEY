@@ -112,7 +112,7 @@ impl PreviewGradient {
         }
         let frame = self.frame(raw, fonts)?;
         let bounds = frame.bounds;
-        let (width, height) = render_tile(
+        let (width, height, bounds) = render_tile(
             &mut self.surface,
             &mut self.pixels,
             TEXT_COLOR_TYPE,

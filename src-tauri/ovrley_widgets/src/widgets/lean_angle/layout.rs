@@ -3,11 +3,15 @@ use super::validation::ValidatedLeanAngleWidget;
 use crate::{
     error::WidgetResult,
     model::scene::ValidatedScenePresentation,
-    render::{shadow::shadow_paint, text::parse_color},
-    widgets::value::preview::{surface, SHAPE_COLOR_TYPE},
+    render::{
+        preview::{PreviewRasterScale, StaticRaster},
+        shadow::shadow_paint,
+        text::parse_color,
+    },
+    widgets::value::preview::SHAPE_COLOR_TYPE,
 };
 use skia_safe::{
-    paint::Style, BlendMode, ClipOp, Color, Image, Paint, Path, PathBuilder, PathFillType, Point,
+    paint::Style, BlendMode, ClipOp, Paint, Path, PathBuilder, PathFillType, Point, Rect,
 };
 
 const START_ANGLE: f32 = 210.0;
@@ -103,9 +107,8 @@ pub(crate) fn inset_geometry(
 pub struct LeanAngleCache {
     config: ValidatedLeanAngleWidget,
     scene: ValidatedScenePresentation,
-    pub static_image: Image,
-    pub static_image_x: f32,
-    pub static_image_y: f32,
+    /// Empty track, border and zero guide in widget-local coordinates; the origin is (x, y).
+    pub static_layer: StaticRaster,
     pub x: f32,
     pub y: f32,
     pub width: u32,
@@ -129,6 +132,7 @@ impl LeanAngleCache {
 pub fn prepare_lean_angle_cache(
     widget: &ValidatedLeanAngleWidget,
     scene: &ValidatedScenePresentation,
+    raster_scale: PreviewRasterScale,
 ) -> WidgetResult<LeanAngleCache> {
     let scale = scene.scale;
     let layout = lean_angle_layout(
@@ -148,62 +152,67 @@ pub fn prepare_lean_angle_cache(
     };
     let padding = (border_thickness.max(1.0) * 0.5 + shadow_extent).ceil();
     let track_bounds = outer_path.compute_tight_bounds();
-    let left = track_bounds.left.floor() - padding;
-    let top = track_bounds.top.floor() - padding;
-    let width = (track_bounds.right.ceil() + padding - left) as u32;
-    let height = (track_bounds.bottom.ceil() + padding - top) as u32;
-    let mut surface = surface(width, height, SHAPE_COLOR_TYPE)?;
-    let canvas = surface.canvas();
-    canvas.clear(Color::TRANSPARENT);
-    canvas.translate((-left, -top));
-    if border_thickness > 0.0 {
-        let mut source = Paint::default();
-        source.set_anti_alias(true);
-        if let Some(paint) = shadow_paint(
-            &source,
-            parse_color(&scene.shadow_color, widget.opacity),
-            scene.shadow_strength * scale,
-        ) {
-            canvas.save();
-            canvas.translate((scene.shadow_distance * scale, scene.shadow_distance * scale));
-            canvas.draw_path(&border_path, &paint);
-            canvas.restore();
-        }
-        let mut paint = Paint::default();
-        paint.set_anti_alias(true);
-        paint.set_style(Style::Fill);
-        paint.set_color(parse_color(&widget.track_border_color, widget.opacity));
-        canvas.draw_path(&outer_path, &paint);
-        paint.set_blend_mode(BlendMode::Clear);
-        canvas.draw_path(&inner_path, &paint);
-    }
-    let mut paint = Paint::default();
-    paint.set_anti_alias(true);
-    paint.set_style(Style::Fill);
-    paint.set_color(parse_color(
-        &widget.track_empty_color,
-        widget.track_empty_opacity * widget.opacity,
-    ));
-    canvas.draw_path(&inner_path, &paint);
-    paint.set_style(Style::Stroke);
-    paint.set_stroke_width(widget.diameter / 200.0 * scale);
-    paint.set_color(parse_color(widget.track_filled_color.leading_color(), 1.0));
-    canvas.save();
-    canvas.clip_path(&inner_path, ClipOp::Intersect, true);
-    canvas.save_layer_alpha_f(None, 0.4 * widget.opacity);
-    canvas.draw_line(
-        Point::new(geometry.center_x, geometry.center_y - geometry.outer_radius),
-        Point::new(geometry.center_x, geometry.center_y - geometry.inner_radius),
-        &paint,
+    let static_bounds = Rect::new(
+        track_bounds.left.floor() - padding,
+        track_bounds.top.floor() - padding,
+        track_bounds.right.ceil() + padding,
+        track_bounds.bottom.ceil() + padding,
     );
-    canvas.restore();
-    canvas.restore();
+    let static_layer = StaticRaster::new(
+        raster_scale,
+        Point::new(widget.x, widget.y),
+        static_bounds,
+        SHAPE_COLOR_TYPE,
+        |canvas| {
+            if border_thickness > 0.0 {
+                let mut source = Paint::default();
+                source.set_anti_alias(true);
+                if let Some(paint) = shadow_paint(
+                    &source,
+                    parse_color(&scene.shadow_color, widget.opacity),
+                    scene.shadow_strength * scale,
+                ) {
+                    canvas.save();
+                    canvas.translate((scene.shadow_distance * scale, scene.shadow_distance * scale));
+                    canvas.draw_path(&border_path, &paint);
+                    canvas.restore();
+                }
+                let mut paint = Paint::default();
+                paint.set_anti_alias(true);
+                paint.set_style(Style::Fill);
+                paint.set_color(parse_color(&widget.track_border_color, widget.opacity));
+                canvas.draw_path(&outer_path, &paint);
+                paint.set_blend_mode(BlendMode::Clear);
+                canvas.draw_path(&inner_path, &paint);
+            }
+            let mut paint = Paint::default();
+            paint.set_anti_alias(true);
+            paint.set_style(Style::Fill);
+            paint.set_color(parse_color(
+                &widget.track_empty_color,
+                widget.track_empty_opacity * widget.opacity,
+            ));
+            canvas.draw_path(&inner_path, &paint);
+            paint.set_style(Style::Stroke);
+            paint.set_stroke_width(widget.diameter / 200.0 * scale);
+            paint.set_color(parse_color(widget.track_filled_color.leading_color(), 1.0));
+            canvas.save();
+            canvas.clip_path(&inner_path, ClipOp::Intersect, true);
+            canvas.save_layer_alpha_f(None, 0.4 * widget.opacity);
+            canvas.draw_line(
+                Point::new(geometry.center_x, geometry.center_y - geometry.outer_radius),
+                Point::new(geometry.center_x, geometry.center_y - geometry.inner_radius),
+                &paint,
+            );
+            canvas.restore();
+            canvas.restore();
+            Ok(())
+        },
+    )?;
     Ok(LeanAngleCache {
         config: widget.clone(),
         scene: scene.clone(),
-        static_image: surface.image_snapshot(),
-        static_image_x: widget.x + left,
-        static_image_y: widget.y + top,
+        static_layer,
         x: widget.x,
         y: widget.y,
         width: layout.width.ceil() as u32,

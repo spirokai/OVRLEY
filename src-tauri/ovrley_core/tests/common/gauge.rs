@@ -3,7 +3,7 @@
 
 use ovrley_core::{activity::schema::DenseActivityReport, normalize::ValidatedRenderConfig};
 use ovrley_widgets::{
-    render::text::FontResolver,
+    render::{preview::PreviewRasterScale, text::FontResolver},
     widgets::{
         gauges::{
             frame::GaugeLayout,
@@ -28,7 +28,7 @@ pub fn gauge_layout(
     let metric = gauge.metric();
     let range = metric_range(dense.full_activity_metric_ranges.get(&metric).copied());
     let offset = altitude_offset_m(gauge.starting_altitude_m(), None);
-    let layout = GaugeLayout::new(&gauge, &config.scene.presentation, range, offset, fonts).unwrap();
+    let layout = GaugeLayout::new(&gauge, &config.scene.presentation, range, offset, fonts, PreviewRasterScale::NATIVE).unwrap();
     let states = (0..dense.frame_count)
         .map(|index| gauge_frame_state(&gauge, dense.metric_sample(metric, index, 0.0), range, offset))
         .collect();

@@ -6,14 +6,17 @@ use super::{
 use crate::{
     error::WidgetResult,
     model::{scene::ValidatedScenePresentation, standard_widgets::widget_font_weight},
-    render::text::{parse_color, resolve_font, FontResolver, ResolvedTextStyle},
+    render::{
+        preview::{PreviewRasterScale, StaticRaster},
+        text::{parse_color, resolve_font, FontResolver, ResolvedTextStyle},
+    },
     widgets::{
         elevation::label::{ElevationLabel, LabelRun},
         route::layout::{outward, rotated_rect, scaled_rect, stroke_paint},
-        value::preview::{surface, SHAPE_COLOR_TYPE, ContentBounds},
+        value::preview::{SHAPE_COLOR_TYPE, ContentBounds},
     },
 };
-use skia_safe::{BlurStyle, Canvas, Color, Image, MaskFilter, Matrix, Paint, Rect};
+use skia_safe::{BlurStyle, Canvas, MaskFilter, Matrix, Paint, Point, Rect};
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
@@ -22,9 +25,8 @@ pub struct DivingProfileLayout {
     pub scene: ValidatedScenePresentation,
     pub geometry: Arc<DivingGeometry>,
     scale: [f32; 2],
-    remaining: Image,
-    remaining_bounds: Rect,
-    raster: Rect,
+    /// Remaining profile at the final angle, relative to the widget origin.
+    remaining: StaticRaster,
     labels: [Option<ElevationLabel>; 2],
     bounds: Rect,
     content_bounds: ContentBounds,
@@ -43,7 +45,6 @@ struct DivingProfileMeasure {
     opacity: f32,
     rotation: (f32, f32),
     remaining_bounds: Rect,
-    raster: Rect,
     labels: [Option<ElevationLabel>; 2],
     bounds: Rect,
     content_bounds: ContentBounds,
@@ -211,7 +212,6 @@ impl DivingProfileLayout {
             blur,
             opacity,
             remaining_bounds,
-            raster,
             labels,
             bounds,
             content_bounds,
@@ -236,6 +236,7 @@ impl DivingProfileLayout {
         geometry: Arc<DivingGeometry>,
         depth_range: Option<(f64, f64)>,
         fonts: &dyn FontResolver,
+        raster_scale: PreviewRasterScale,
     ) -> WidgetResult<Self> {
         let DivingProfileMeasure {
             scale,
@@ -244,22 +245,11 @@ impl DivingProfileLayout {
             blur,
             opacity,
             remaining_bounds,
-            raster,
             labels,
             bounds,
             content_bounds,
             rotation: (sin, cos),
         } = Self::measure(&config, &scene, &geometry, depth_range, fonts)?;
-        let mut layer = surface(
-            remaining_bounds.width() as u32,
-            remaining_bounds.height() as u32,
-            SHAPE_COLOR_TYPE,
-        )?;
-        let canvas = layer.canvas();
-        canvas.clear(Color::TRANSPARENT);
-        canvas.translate((-remaining_bounds.left, -remaining_bounds.top));
-        canvas.rotate(config.rotation, None);
-
         let matrix = Matrix::scale((scale[0], scale[1]));
         let paths = geometry.paths.lock().expect("diving profile paths lock");
         let path = paths.remaining.with_transform(&matrix);
@@ -276,36 +266,46 @@ impl DivingProfileLayout {
             (config.completed_line_width * scene.scale).max(1.0),
             config.completed_line_opacity * opacity,
         );
-        canvas.draw_path(
-            &area,
-            &fill_paint(
-                &config.ceiling_area_color,
-                config.ceiling_area_opacity * opacity,
-            ),
-        );
-        if config.ceiling_line_width > 0.0 {
-            canvas.draw_path(
-                &ceiling,
-                &stroke_paint(
-                    &config.ceiling_line_color,
-                    config.ceiling_line_width * scene.scale,
-                    config.ceiling_line_opacity * opacity,
-                ),
-            );
-        }
-        if blur > 0.0 {
-            canvas.save();
-            canvas.translate(offset);
-            let mut shadow = stroke_paint(
-                &scene.shadow_color,
-                stroke,
-                config.remaining_line_opacity * opacity,
-            );
-            shadow.set_mask_filter(MaskFilter::blur(BlurStyle::Normal, blur, true));
-            canvas.draw_path(&path, &shadow);
-            canvas.restore();
-        }
-        canvas.draw_path(&path, &remaining_line);
+        let remaining = StaticRaster::new(
+            raster_scale,
+            Point::new(config.x, config.y),
+            remaining_bounds,
+            SHAPE_COLOR_TYPE,
+            |canvas| {
+                canvas.rotate(config.rotation, None);
+                canvas.draw_path(
+                    &area,
+                    &fill_paint(
+                        &config.ceiling_area_color,
+                        config.ceiling_area_opacity * opacity,
+                    ),
+                );
+                if config.ceiling_line_width > 0.0 {
+                    canvas.draw_path(
+                        &ceiling,
+                        &stroke_paint(
+                            &config.ceiling_line_color,
+                            config.ceiling_line_width * scene.scale,
+                            config.ceiling_line_opacity * opacity,
+                        ),
+                    );
+                }
+                if blur > 0.0 {
+                    canvas.save();
+                    canvas.translate(offset);
+                    let mut shadow = stroke_paint(
+                        &scene.shadow_color,
+                        stroke,
+                        config.remaining_line_opacity * opacity,
+                    );
+                    shadow.set_mask_filter(MaskFilter::blur(BlurStyle::Normal, blur, true));
+                    canvas.draw_path(&path, &shadow);
+                    canvas.restore();
+                }
+                canvas.draw_path(&path, &remaining_line);
+                Ok(())
+            },
+        )?;
         let marker = fill_paint(&config.marker_color, config.marker_opacity * opacity);
         let mut variant = marker.clone();
         match config.marker_variant.as_str() {
@@ -323,9 +323,7 @@ impl DivingProfileLayout {
             scene,
             geometry,
             scale,
-            remaining: layer.image_snapshot(),
-            remaining_bounds,
-            raster,
+            remaining,
             labels,
             bounds,
             content_bounds,
@@ -335,21 +333,6 @@ impl DivingProfileLayout {
             marker,
             variant,
         })
-    }
-
-    pub fn set_position(&mut self, x: f32, y: f32) {
-        if self.config.x == x && self.config.y == y {
-            return;
-        }
-        self.config.x = x;
-        self.config.y = y;
-        self.bounds = outward(self.raster.with_offset((x, y)).with_outset((1.0, 1.0)));
-        self.content_bounds = ContentBounds::rotated_frame(
-            Self::measure_content(&self.config, &self.scene),
-            self.config.rotation,
-            x,
-            y,
-        );
     }
 
     /// The plot frame stays stable for flat or missing external telemetry.
@@ -397,11 +380,7 @@ impl DivingProfileLayout {
     pub fn draw(&self, canvas: &Canvas, frame: &DivingProfileFrame) {
         canvas.save();
         canvas.translate((self.config.x, self.config.y));
-        canvas.draw_image(
-            &self.remaining,
-            (self.remaining_bounds.left, self.remaining_bounds.top),
-            None,
-        );
+        self.remaining.draw(canvas, None);
         canvas.rotate(self.config.rotation, None);
         let line = self
             .geometry
