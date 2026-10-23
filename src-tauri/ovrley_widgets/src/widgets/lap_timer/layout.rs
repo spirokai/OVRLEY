@@ -134,7 +134,9 @@ pub fn prepare_lap_timer_layout(
         for (index, duration) in history.durations.iter().enumerate() {
             layout.completed_rows.push([
                 TextRun::cell(
-                    &(index + 1).to_string(),
+                    &history
+                        .display_number(index, config.renumber_laps)
+                        .to_string(),
                     layout.column_rights[0],
                     data_top,
                     &style,

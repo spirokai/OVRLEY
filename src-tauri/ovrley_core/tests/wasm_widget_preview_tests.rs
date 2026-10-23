@@ -1742,7 +1742,7 @@ fn lap_timer_preview() -> (PreviewSession, Value) {
         "font": "Inter.ttf", "font_size": 48, "color": "#abcdef", "opacity": 0.8,
         "label_font": "Teko.ttf", "label_font_size": 17.5, "label_color": "#123456",
         "show_label": true, "label": "Current Lap", "lap_timer_mode": "current_lap",
-        "positive_delta_color": "#00ff00", "negative_delta_color": "#ff0000",
+        "positive_delta_color": "#00ff00", "negative_delta_color": "#ff0000", "renumber_laps": true,
     });
     (preview, request)
 }

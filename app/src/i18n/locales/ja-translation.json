@@ -706,6 +706,7 @@
     "pixelsPerDegree": "1度あたりのピクセル",
     "position": "位置",
     "positiveDeltaColor": "正の差分の色",
+    "renumberLaps": "ラップ番号を振り直す",
     "profileDetail": "プロファイル詳細",
     "remainingColor": "残り部分の色",
     "remainingOpacity": "残り部分の不透明度",

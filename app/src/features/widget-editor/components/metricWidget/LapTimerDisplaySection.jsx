@@ -2,6 +2,7 @@ import { DISPLAY_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { buildDisplayModeUpdate } from '@/lib/widget/widget-resolver'
 import { Type } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
+import { Label } from '@/components/ui/label'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { useAvailableFonts } from '@/hooks/useFonts'
 import { FontSection } from '../widgetEditorSections'
@@ -30,6 +31,12 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
         onValueChange={(mode) => updateWidgetData(widget.id, buildDisplayModeUpdate(widget.data.display_type, mode))}
         options={DISPLAY_TYPE_DEFINITIONS.lap_timer.modes.map(({ value, label, labelKey }) => ({ value, label: t(labelKey, label) }))}
       />
+      {widget.data.lap_timer_mode === 'lap_log' ? (
+        <div className="flex items-center justify-between gap-2 pl-1">
+          <Label className="pt-1 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.renumberLaps', 'Renumber laps')}</Label>
+          <ToggleField checked={widget.data.renumber_laps} onCheckedChange={(renumber_laps) => updateWidgetData(widget.id, { renumber_laps })} />
+        </div>
+      ) : null}
       <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
       <div className="space-y-4">
         <div className="flex w-full items-center gap-3">

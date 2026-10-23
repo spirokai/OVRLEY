@@ -191,6 +191,9 @@ function normalizeValue(value = {}, globalDefaults) {
     if (value.label_font_size === undefined) withDefaults.label_font_size = mode.defaults.label_font_size
     if (value.label_color === undefined)
       withDefaults.label_color = globalDefaults?.color_text || DISPLAY_TYPE_DEFINITIONS.lap_timer.defaults.label_color
+    if (typeof withDefaults.renumber_laps !== 'boolean') {
+      throw new Error(`Invalid renumber_laps: ${String(withDefaults.renumber_laps)}`)
+    }
   }
   const pickedValue = pickDefined(withDefaults, WIDGET_TYPE_DEFINITIONS[type].configKeys)
   if (!supportsContentAlignment) delete pickedValue.content_alignment

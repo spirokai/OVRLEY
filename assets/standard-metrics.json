@@ -162,6 +162,7 @@
           "show_label": true,
           "negative_delta_color": "#61ffab",
           "positive_delta_color": "#ff6e83",
+          "renumber_laps": true,
           "label_font": "Arial.ttf",
           "label_color": "#ffffff"
         },

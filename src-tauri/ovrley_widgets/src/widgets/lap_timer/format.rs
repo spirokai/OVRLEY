@@ -23,6 +23,16 @@ impl LapHistory<'_> {
     pub fn is_enabled(&self, lap_number: i64) -> bool {
         usize::try_from(lap_number).is_ok_and(|lap| !self.is_disabled(lap))
     }
+
+    /// 1-based label for canonical lap `lap`; renumbering skips disabled laps before it.
+    pub fn display_number(&self, lap: usize, renumber: bool) -> usize {
+        let skipped = if renumber {
+            self.disabled.partition_point(|disabled| *disabled < lap)
+        } else {
+            0
+        };
+        lap - skipped + 1
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -175,8 +185,12 @@ pub fn lap_timer_value_text(
 pub fn current_log_row(
     history: LapHistory<'_>,
     sample: LapSample,
+    renumber: bool,
 ) -> WidgetResult<Option<LapLogTextRow>> {
-    if !history.is_enabled(sample.lap_number) {
+    let Ok(lap) = usize::try_from(sample.lap_number) else {
+        return Ok(None);
+    };
+    if history.is_disabled(lap) {
         return Ok(None);
     }
     let time = sample.lap_time_seconds.ok_or_else(|| {
@@ -184,7 +198,7 @@ pub fn current_log_row(
     })?;
     Ok(Some(LapLogTextRow {
         cells: [
-            (sample.lap_number + 1).to_string(),
+            history.display_number(lap, renumber).to_string(),
             format_lap_duration(time),
             format_lap_delta(sample.delta_seconds),
         ],
@@ -195,6 +209,7 @@ pub fn current_log_row(
 pub fn lap_log_text_state(
     history: LapHistory<'_>,
     sample: LapSample,
+    renumber: bool,
 ) -> WidgetResult<LapLogTextState> {
     let count = sample.completed_lap_count;
     let durations = history.durations.get(..count).ok_or_else(|| {
@@ -212,7 +227,7 @@ pub fn lap_log_text_state(
             let delta = best.map(|best| duration - best);
             LapLogTextRow {
                 cells: [
-                    (index + 1).to_string(),
+                    history.display_number(index, renumber).to_string(),
                     format_lap_duration(*duration),
                     format_lap_delta(delta),
                 ],
@@ -222,7 +237,7 @@ pub fn lap_log_text_state(
         .collect();
     Ok(LapLogTextState {
         completed_rows,
-        current_row: current_log_row(history, sample)?,
+        current_row: current_log_row(history, sample, renumber)?,
     })
 }
 
@@ -241,7 +256,7 @@ pub fn lap_timer_content(
     if config.mode == LapTimerMode::LapLog {
         Ok(LapTimerContent::Log {
             completed_lap_count: sample.completed_lap_count,
-            current_row: current_log_row(history, sample)?
+            current_row: current_log_row(history, sample, config.renumber_laps)?
                 .map(|row| (row.cells, color(row.delta_seconds))),
         })
     } else if matches!(config.mode, LapTimerMode::CurrentLap | LapTimerMode::Delta)

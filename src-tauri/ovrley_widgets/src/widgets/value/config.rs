@@ -110,6 +110,8 @@ pub struct ValueConfig {
     #[serde(default)]
     pub negative_delta_color: Option<String>,
     #[serde(default)]
+    pub renumber_laps: Option<bool>,
+    #[serde(default)]
     pub width: Option<f32>,
     #[serde(default)]
     pub height: Option<f32>,

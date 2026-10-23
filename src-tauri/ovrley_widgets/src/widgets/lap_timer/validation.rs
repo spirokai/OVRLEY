@@ -34,6 +34,8 @@ pub struct ValidatedLapTimer {
     pub color: [u8; 4],
     pub positive_delta_color: [u8; 4],
     pub negative_delta_color: [u8; 4],
+    /// Lap log numbers count only enabled laps instead of showing canonical lap IDs.
+    pub renumber_laps: bool,
     pub opacity: f32,
     pub show_label: bool,
     pub label: String,
@@ -121,6 +123,7 @@ pub fn validate_lap_timer(value: ValueConfig, index: usize) -> WidgetResult<Vali
         color,
         positive_delta_color,
         negative_delta_color,
+        renumber_laps: require_bool(value.renumber_laps, &field("renumber_laps"))?,
         opacity,
         show_label: require_bool(value.show_label, &field("show_label"))?,
         label: require_string(value.label, &field("label"))?,
