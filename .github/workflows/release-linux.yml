@@ -28,12 +28,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Download WASM bindings
-        uses: actions/download-artifact@v7
-        with:
-          name: ovrley-wasm-bindings
-          path: src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm
-
       - name: Resolve release tag
         id: release_tag
         shell: bash
@@ -96,6 +90,13 @@ jobs:
         with:
           key: deb
           workspaces: 'src-tauri -> target'
+
+      # After the Cargo cache restore: rust-cache prunes unknown target/ entries on a partial cache hit.
+      - name: Download WASM bindings
+        uses: actions/download-artifact@v7
+        with:
+          name: ovrley-wasm-bindings
+          path: src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
