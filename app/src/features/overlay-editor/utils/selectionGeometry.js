@@ -80,6 +80,9 @@ export function buildWidgetBadges({
     const node = widgetNodes[id]
     if (!visibleIds.has(id) || !node || node.style.visibility === 'hidden') continue
     const geometry = getGeometry(node)
+    // A wrapper has no geometry until its session renders it, e.g. while the scene is swapped.
+    // The widget's render event refreshes the badges once it does.
+    if (!geometry) continue
     const angle = ((geometry.rotation ?? 0) * Math.PI) / 180
     const cos = Math.cos(angle)
     const sin = Math.sin(angle)
