@@ -1,0 +1,6 @@
+build/
+.flatpak-builder/
+repo/
+wasm/
+*.log
+*.flatpak

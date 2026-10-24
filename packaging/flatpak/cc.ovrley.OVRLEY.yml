@@ -1,0 +1,83 @@
+app-id: cc.ovrley.OVRLEY
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+  - org.freedesktop.Sdk.Extension.node24
+command: OVRLEY
+
+finish-args:
+  - --share=ipc
+  - --share=network # map tiles
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio # video preview audio
+  - --device=dri # GPU rendering and VAAPI/NVENC export
+  - --filesystem=xdg-documents # ~/Documents/OVRLEY holds templates and renders
+  - --filesystem=xdg-videos
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node24/bin:/run/build/ovrley/tools/bin
+  build-args:
+    - --share=network # dependencies are fetched during the build (not for Flathub)
+  env:
+    CARGO_HOME: /run/build/ovrley/cargo
+    CARGO_NET_GIT_FETCH_WITH_CLI: 'true' # cargo's own git client is slow at rust-skia's submodules
+
+modules:
+  - name: ovrley
+    buildsystem: simple
+    build-options:
+      env:
+        OVRLEY_SKIP_FFMPEG_INSTALL: '1'
+        OVRLEY_WASM_PREBUILT: '1'
+        # Outside the source tree: pnpm prepares git dependencies by running `pnpm install`
+        # next to the store, and inside the tree that finds our workspace and loops.
+        npm_config_store_dir: /run/build/pnpm-store
+        # Local default. The release workflow replaces this with the release version.
+        OVRLEY_VERSION: 0.0.0
+    build-commands:
+      # Frontend. pnpm runs itself by name when it prepares git dependencies, so it needs a PATH entry.
+      - mkdir -p tools/bin && ln -s "$PWD/pnpm/bin/pnpm.cjs" tools/bin/pnpm
+      - timeout 900 pnpm install --frozen-lockfile
+      - mkdir -p src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm
+      - cp wasm_bindings.js wasm_bindings.wasm src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm/
+      # Same version stamping as the other release builds
+      - node scripts/set-release-version.mjs "$OVRLEY_VERSION" && VITE_OVRLEY_VERSION="$OVRLEY_VERSION" pnpm --dir app build
+      # Backend; the Tauri CLI is not used, so enable the embedded frontend explicitly
+      - cd src-tauri && TAURI_CONFIG="$(cat ../packaging/flatpak/tauri.flatpak.conf.json)" cargo build --release --locked --features tauri/custom-protocol
+      # Install
+      - install -Dm755 src-tauri/target/release/app /app/bin/OVRLEY
+      - touch /app/bin/.ovrley-portable # in-app updates are not available in the sandbox
+      - mkdir -p /app/lib/OVRLEY
+      - cp -r fonts templates /app/lib/OVRLEY/
+      - node packaging/flatpak/make-third-party-notices.mjs /app/lib/OVRLEY/THIRD_PARTY_NOTICES.txt
+      - install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.desktop /app/share/applications/cc.ovrley.OVRLEY.desktop
+      - install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.metainfo.xml /app/share/metainfo/cc.ovrley.OVRLEY.metainfo.xml
+      - install -Dm644 src-tauri/icons/icon.svg /app/share/icons/hicolor/scalable/apps/cc.ovrley.OVRLEY.svg
+      - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/512x512/apps/cc.ovrley.OVRLEY.png
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - .git
+          - node_modules
+          - app/node_modules
+          - app/dist
+          - src-tauri/target
+          - vendor/ffmpeg
+          - debug
+          - benchmarks
+          - packaging/flatpak/build
+          - packaging/flatpak/.flatpak-builder
+      - type: archive
+        url: https://registry.npmjs.org/pnpm/-/pnpm-10.25.0.tgz
+        sha512: 5e82639027af37cf832061bcc6d639c219634488e0f2baebe785028a793de7b525ffcd3f7ff574f5e9860654e098fe852ba8ac5dd5cefe1767d23a020a92f501
+        strip-components: 1
+        dest: pnpm
+      # Prebuilt WASM preview renderer, built by CI (scripts/build-wasm.mjs)
+      - type: file
+        path: wasm/wasm_bindings.js
+      - type: file
+        path: wasm/wasm_bindings.wasm
