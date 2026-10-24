@@ -192,6 +192,16 @@ describe('placement anchors', () => {
     expect(offsets(state)).toEqual({ known: 30, first: 60, second: 80 })
   })
 
+  test('a clip whose time cannot be determined and that has no anchor keeps its start when times are detected again', () => {
+    let state = apply(undetermined(), removeVideo, 'known')
+    state = produce(state, (draft) => {
+      draft.videoEdits.first.offsetSeconds = 45
+      placeAutomaticVideos(draft)
+    })
+    expect(state.videoEdits.first.placementAnchor).toBeNull()
+    expect(offsets(state)).toEqual({ first: 45, second: 65 })
+  })
+
   test('moving an anchored clip past the clip anchored to it hands its anchor on instead of forming a cycle', () => {
     const state = apply(undetermined(), moveVideoNextTo, 'first', 'second', 'after')
     expect(state.videoEdits.second.placementAnchor).toEqual({ videoId: 'known', side: 'after' })

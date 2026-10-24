@@ -9,6 +9,7 @@ function row(overrides = {}) {
     path: '/clips/ride.mp4',
     isNew: true,
     isIncluded: true,
+    hasOtherResolution: false,
     isFar: false,
     offsetSeconds: 330,
     fps: { num: 30, den: 1 },
@@ -32,6 +33,7 @@ function model(overrides = {}) {
     phase: 'reviewing',
     fileCount: 3,
     windowKind: 'activity',
+    resolutionLabel: '1920×1080',
     rows: [
       row(),
       row({ id: 'early', filename: 'early.mp4', path: '/clips/early.mp4', isIncluded: false, isFar: true, offsetSeconds: -4500 }),
@@ -120,6 +122,18 @@ describe('VideoImportDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Import 1 video' }))
     expect(props.onConfirm).toHaveBeenCalledOnce()
+  })
+
+  test('a video with another resolution cannot be switched on', () => {
+    render(
+      <VideoImportDialog
+        {...model({ rows: [row({ isIncluded: false, hasOtherResolution: true, formatLabel: '3840×2160 · 25 fps', onIncludedChange: null })] })}
+      />,
+    )
+    const ride = screen.getByRole('listitem', { name: 'ride.mp4' })
+    expect(ride).toHaveTextContent('Cannot be imported: the overlay is laid out for 1920×1080')
+    expect(within(ride).getByRole('switch', { name: 'Import ride.mp4' })).toBeDisabled()
+    expect(within(ride).getByRole('textbox', { name: 'Sync of ride.mp4' })).toBeDisabled()
   })
 
   test('an existing video switched off is removed from the project', () => {

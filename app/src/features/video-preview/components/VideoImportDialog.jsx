@@ -24,7 +24,13 @@ const ICON_BUTTON_CLASS = 'h-8 w-8 shrink-0 text-muted-foreground hover:bg-surfa
 // Text selection is off app-wide (`index.css`); the dialog's text can be copied.
 const SELECTABLE_TEXT_CLASS = 'select-text **:select-text'
 
-function statusLabel(row, t) {
+function statusLabel(row, resolutionLabel, t) {
+  if (row.hasOtherResolution) {
+    return t('video-preview.importOtherResolution', {
+      defaultValue: 'Cannot be imported: the overlay is laid out for {{resolution}}',
+      resolution: resolutionLabel,
+    })
+  }
   if (row.isNew) return row.isIncluded ? t('video-preview.importJoins', 'Will be imported') : t('video-preview.importSkipped', 'Not imported')
   return row.isIncluded ? t('video-preview.importKept', 'Already imported') : t('video-preview.importRemoved', 'Will be removed from the project')
 }
@@ -35,7 +41,7 @@ function farLabel(windowKind, t) {
   return t('video-preview.importSpanTooLong', 'Starts more than 12 hours away from the other videos')
 }
 
-function VideoImportRow({ row, windowKind }) {
+function VideoImportRow({ row, windowKind, resolutionLabel }) {
   const { t } = useTranslation()
   return (
     <li
@@ -46,6 +52,7 @@ function VideoImportRow({ row, windowKind }) {
         <Switch
           checked={row.isIncluded}
           onCheckedChange={row.onIncludedChange}
+          disabled={row.onIncludedChange === null}
           aria-label={
             row.isNew
               ? t('video-preview.importInclude', { defaultValue: 'Import {{name}}', name: row.filename })
@@ -64,14 +71,29 @@ function VideoImportRow({ row, windowKind }) {
             </Badge>
           ) : null}
         </p>
-        <p className={cn('text-[0.7rem] tabular-nums', row.isIncompatible ? 'text-amber-500' : 'text-muted-foreground/70')}>{row.formatLabel}</p>
+        <p
+          className={cn(
+            'text-[0.7rem] tabular-nums',
+            row.hasOtherResolution ? 'text-red-700' : row.isIncompatible ? 'text-amber-500' : 'text-muted-foreground/70',
+          )}
+        >
+          {row.formatLabel}
+        </p>
         <p
           className={cn(
             'text-[0.7rem] leading-tight',
-            !row.isIncluded ? (row.isNew ? 'text-muted-foreground/70' : 'text-amber-500') : row.isNew ? 'text-green-700' : 'text-muted-foreground/70',
+            row.hasOtherResolution
+              ? 'text-red-700'
+              : !row.isIncluded
+                ? row.isNew
+                  ? 'text-muted-foreground/70'
+                  : 'text-amber-500'
+                : row.isNew
+                  ? 'text-green-700'
+                  : 'text-muted-foreground/70',
           )}
         >
-          {statusLabel(row, t)}
+          {statusLabel(row, resolutionLabel, t)}
         </p>
         {row.isFar ? <p className="text-[0.7rem] leading-tight text-amber-500">{farLabel(windowKind, t)}</p> : null}
         {row.isPositioned ? (
@@ -235,7 +257,7 @@ export function VideoImportDialog(props) {
                   )}
                 >
                   {props.rows.map((row) => (
-                    <VideoImportRow key={row.id} row={row} windowKind={props.windowKind} />
+                    <VideoImportRow key={row.id} row={row} windowKind={props.windowKind} resolutionLabel={props.resolutionLabel} />
                   ))}
                   {props.failures.map((failure) => (
                     <li key={failure.key} aria-label={failure.name} className="space-y-0.5 rounded-sm px-2 py-2 opacity-60">

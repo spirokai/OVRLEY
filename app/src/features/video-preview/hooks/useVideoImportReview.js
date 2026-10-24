@@ -26,8 +26,8 @@ import { NO_TRANSITION } from '@/lib/video-program/transition-catalog'
 import { formatSecondsClock } from '@/lib/time-format'
 import { deriveCompatibility } from '@/lib/video-program/video-collection'
 import useStore from '@/store/useStore'
-import { buildImportReview, openImportReview, resolveImportSwitches, settleImportReview } from '../utils/importReview'
-import { formatVideoFormat } from '../utils/videoFormat'
+import { buildImportReview, buildShownCollection, openImportReview, resolveImportSwitches, switchOnWaitingVideo } from '../utils/importReview'
+import { formatVideoDetails } from '../utils/videoFormat'
 import { commitReviewedImport, probeVideo } from '../videoImportOperations'
 
 function errorMessage(error) {
@@ -92,31 +92,38 @@ export default function useVideoImportReview({ onImported }) {
     })
   }
 
-  /**
-   * Applies a collection recipe and switch changes to the review, then settles the draft;
-   * returns the reason when the change is rejected.
-   */
-  const change = (recipe, args, switchChanges = []) => {
+  /** Applies a change of the review state; returns the reason when the change is rejected. */
+  const update = (makeChanges) => {
     const current = reviewRef.current
     try {
-      const switchOverrides = new Map([...current.switchOverrides, ...switchChanges])
-      const next = { ...current, collection: produce(current.collection, (draft) => void recipe(draft, ...args)), switchOverrides }
-      setReview({ ...next, phase: 'reviewing', collection: settleImportReview(next), error: null })
+      setReview({ ...current, ...makeChanges(current), phase: 'reviewing', error: null })
       return null
     } catch (error) {
       setReview({ ...current, error: error.message })
       return error.message
     }
   }
+  /** Applies a collection recipe and switch changes to the review. */
+  const change = (recipe, args, switchChanges = []) =>
+    update((current) => ({
+      collection: produce(current.collection, (draft) => void recipe(draft, ...args)),
+      switchOverrides: new Map([...current.switchOverrides, ...switchChanges]),
+    }))
   const edit = (recipe, ...args) => change(recipe, args)
-  // Editing a video keeps it switched on whatever the defaults become.
+  // Editing a video's sync keeps it switched on whatever the defaults become.
   const editVideo = (videoId, recipe, ...args) => change(recipe, [videoId, ...args], [[videoId, true]])
 
   const derived = useMemo(() => {
     if (review === null || review.phase === 'probing') return null
-    const { includedIds, undeterminedIds } = resolveImportSwitches(review)
-    const { collection, newIds, transitionDefaults } = review
-    return { includedIds, ...buildImportReview({ collection, newIds, includedIds, undeterminedIds, transitionDefaults }) }
+    const { includedIds, undeterminedIds, unplacedIds, blockedIds, resolution } = resolveImportSwitches(review)
+    const { newIds, transitionDefaults } = review
+    const shown = buildShownCollection({ collection: review.collection, includedIds, unplacedIds })
+    return {
+      includedIds,
+      resolution,
+      shown,
+      ...buildImportReview({ collection: shown, newIds, includedIds, undeterminedIds, unplacedIds, blockedIds, transitionDefaults }),
+    }
   }, [review])
 
   const confirm = async () => {
@@ -146,17 +153,20 @@ export default function useVideoImportReview({ onImported }) {
     }
   }
 
-  const { rows, windowKind, issues, included, timeline, includedIds } = derived
+  const { rows, windowKind, issues, included, timeline, includedIds, resolution, shown } = derived
   const clips = review.collection.importedVideos
   // Switched-off videos are not on the timeline, so a positioned video moves among the switched-on ones.
   const includedRows = rows.filter((row) => row.isIncluded)
   const moveTo = (videoId, index) => {
     // A positioned video sits right after the row above its new place, or before the first row.
     const others = includedRows.filter((row) => row.id !== videoId)
-    editVideo(videoId, moveVideoNextTo, index === 0 ? others[0].id : others[index - 1].id, index === 0 ? 'before' : 'after')
+    // Moving only places the video: its switch keeps following the defaults.
+    change(moveVideoNextTo, [videoId, index === 0 ? others[0].id : others[index - 1].id, index === 0 ? 'before' : 'after'])
   }
   const { type, durationSeconds } = review.transitionDefaults
-  const setIncluded = (videoId, isIncluded) => change(() => {}, [], [[videoId, isIncluded]])
+  const setIncluded = (row, isIncluded) =>
+    // A waiting video switched on joins the others where it waited; other switches are set by the user.
+    row.isWaiting ? update((current) => switchOnWaitingVideo(current, row.id, shown, includedIds)) : change(() => {}, [], [[row.id, isIncluded]])
   const farRows = includedRows.filter((row) => row.isFar)
   const sharedOffsetControls = deriveVideoSyncControls(included)
   const setTransitionDefaults = (changes) =>
@@ -169,18 +179,20 @@ export default function useVideoImportReview({ onImported }) {
       phase: review.phase,
       fileCount: review.newIds.size + review.failures.length,
       windowKind,
+      resolutionLabel: resolution === null ? null : `${resolution.width}×${resolution.height}`,
       rows: rows.map((row) => {
         // A switched-off video keeps its sync and position until it is switched on again.
         const index = includedRows.indexOf(row)
         const canMove = row.isPositioned && row.isIncluded
         return {
           ...row,
-          formatLabel: formatVideoFormat(row, t),
+          formatLabel: formatVideoDetails(row, t),
           onOffsetCommit: (seconds) => editVideo(row.id, setVideoOffset, seconds),
           onOffsetReset: () => editVideo(row.id, resetVideoOffset),
           onMoveUp: canMove && index > 0 ? () => moveTo(row.id, index - 1) : null,
           onMoveDown: canMove && index < includedRows.length - 1 ? () => moveTo(row.id, index + 1) : null,
-          onIncludedChange: (isIncluded) => setIncluded(row.id, isIncluded),
+          // The overlay is laid out for one resolution: a video with another one cannot be switched on.
+          onIncludedChange: row.hasOtherResolution ? null : (isIncluded) => setIncluded(row, isIncluded),
         }
       }),
       failures: review.failures.map(({ path, message }) => ({ key: path, name: filenameFromSelectedPath(path), message })),

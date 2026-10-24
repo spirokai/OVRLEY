@@ -26,6 +26,7 @@ vi.mock('@/lib/file-dialog', async (importOriginal) => ({
 
 const formats = {
   hd30: { resolution: { width: 1920, height: 1080 }, fpsNum: 30, fpsDen: 1 },
+  hd60: { resolution: { width: 1920, height: 1080 }, fpsNum: 60, fpsDen: 1 },
   uhd60: { resolution: { width: 3840, height: 2160 }, fpsNum: 60, fpsDen: 1 },
 }
 
@@ -255,6 +256,66 @@ describe('which videos are imported', () => {
     expect(dialog(result).importCount).toBe(2)
   })
 
+  test('a first import against an activity reads camera clocks the way that puts most videos near it', async () => {
+    useStore.getState().activateActivityFile(activityFile)
+    // As UTC: a minute before the activity and inside it. As Sofia time: both three hours before it.
+    // Inferred per video, the first (overlapping the activity in neither reading) would be read as local time.
+    probe('/clips/before.mp4', { creationTime: '2026-07-18T07:59:00.000000Z', timeSource: 'ffprobe' })
+    probe('/clips/inside.mp4', { creationTime: '2026-07-18T08:01:00.000000Z', timeSource: 'ffprobe' })
+    const { result } = renderImport()
+    await selectFiles(result, ['/clips/before.mp4', '/clips/inside.mp4'])
+
+    expect(dialog(result).sync.videoSyncTimezoneMode).toBe('utc')
+    expect(dialog(result).rows.map(({ filename, isIncluded, offsetSeconds }) => [filename, isIncluded, offsetSeconds])).toEqual([
+      ['before.mp4', true, -60],
+      ['inside.mp4', true, 60],
+    ])
+    await confirm(result)
+
+    // Adding videos keeps the reading of the collection.
+    act(() => useStore.getState().setVideoSyncTimezoneMode('local'))
+    probe('/clips/more.mp4', { creationTime: '2026-07-18T08:01:30.000000Z', timeSource: 'ffprobe' })
+    await selectFiles(result, ['/clips/more.mp4'])
+    expect(dialog(result).sync.videoSyncTimezoneMode).toBe('local')
+  })
+
+  test('a new video with another resolution than the videos already imported cannot be switched on', async () => {
+    probe('/clips/first.mp4', { creationTime: '2026-07-18T08:00:00Z' })
+    const { result } = renderImport()
+    await selectFiles(result, ['/clips/first.mp4'])
+    await confirm(result)
+
+    probe('/clips/uhd.mp4', { creationTime: '2026-07-18T08:01:00Z', format: formats.uhd60 })
+    probe('/clips/hd.mp4', { creationTime: '2026-07-18T08:02:00Z' })
+    await selectFiles(result, ['/clips/uhd.mp4', '/clips/hd.mp4'])
+
+    expect(dialog(result).resolutionLabel).toBe('1920×1080')
+    expect(row(result, 'uhd.mp4')).toMatchObject({ hasOtherResolution: true, isIncluded: false, onIncludedChange: null })
+    expect(row(result, 'hd.mp4')).toMatchObject({ hasOtherResolution: false, isIncluded: true })
+    // Editing other videos never switches it on.
+    act(() => dialog(result).sync.commitSharedOffset(5))
+    expect(row(result, 'uhd.mp4').isIncluded).toBe(false)
+    await confirm(result)
+    expect(importedPaths()).toEqual(['/clips/first.mp4', '/clips/hd.mp4'])
+  })
+
+  test('a fresh import takes the resolution of most new videos', async () => {
+    probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:00Z' })
+    probe('/clips/b.mp4', { creationTime: '2026-07-18T08:01:00Z', format: formats.uhd60 })
+    probe('/clips/c.mp4', { creationTime: '2026-07-18T08:02:00Z', format: formats.uhd60 })
+    const { result } = renderImport()
+    await selectFiles(result, ['/clips/a.mp4', '/clips/b.mp4', '/clips/c.mp4'])
+
+    expect(dialog(result).resolutionLabel).toBe('3840×2160')
+    expect(dialog(result).rows.map(({ filename, isIncluded, hasOtherResolution }) => [filename, isIncluded, hasOtherResolution])).toEqual([
+      ['a.mp4', false, true],
+      ['b.mp4', true, false],
+      ['c.mp4', true, false],
+    ])
+    await confirm(result)
+    expect(useStore.getState().config.scene).toMatchObject({ width: 3840, height: 2160 })
+  })
+
   test('switches follow the defaults when times are detected again, unless the user set them', async () => {
     useStore.getState().activateActivityFile(activityFile)
     // Camera clocks: as UTC both start inside the activity, as Sofia time three hours before it.
@@ -402,6 +463,52 @@ describe('editing in the dialog', () => {
     ])
   })
 
+  test('a video without a recording time switched on where it starts far from the activity stays on', async () => {
+    probe('/clips/ride.mp4', { creationTime: '2026-07-18T08:00:30Z' })
+    probe('/clips/unknown.mp4')
+    const { result } = renderImport()
+    await selectFiles(result, ['/clips/ride.mp4'])
+    await confirm(result)
+    useStore.getState().activateActivityFile(activityFile)
+    useStore.getState().setVideoOffset(useStore.getState().importedVideos[0].id, 9000)
+
+    await selectFiles(result, ['/clips/unknown.mp4'])
+    expect(row(result, 'unknown.mp4')).toMatchObject({ isWaiting: true, isIncluded: false, isFar: false, offsetSeconds: 9030 })
+    act(() => row(result, 'unknown.mp4').onIncludedChange(true))
+    expect(row(result, 'unknown.mp4')).toMatchObject({ isWaiting: false, isIncluded: true, isFar: true, offsetSeconds: 9030 })
+  })
+
+  test('a video placed by hand follows the video it was placed after when the timezone changes, and comes back', async () => {
+    useStore.getState().activateActivityFile(activityFile)
+    // As UTC both camera clocks are inside the activity; as Sofia time three hours before it.
+    probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:00.000000Z', timeSource: 'ffprobe' })
+    probe('/clips/b.mp4', { creationTime: '2026-07-18T08:01:00.000000Z', timeSource: 'ffprobe' })
+    probe('/clips/unknown.mp4')
+    const { result } = renderImport()
+    await selectFiles(result, ['/clips/a.mp4', '/clips/b.mp4', '/clips/unknown.mp4'])
+    act(() => row(result, 'unknown.mp4').onIncludedChange(true))
+    act(() => row(result, 'unknown.mp4').onMoveUp())
+    const placement = () => dialog(result).rows.map(({ filename, isIncluded, offsetSeconds }) => [filename, isIncluded, offsetSeconds])
+    const placedByHand = [
+      ['a.mp4', true, 0],
+      ['unknown.mp4', true, 30],
+      ['b.mp4', true, 60],
+    ]
+    expect(placement()).toEqual(placedByHand)
+
+    // Once switched on, it follows the defaults like the others: off and far with the video it follows.
+    act(() => dialog(result).sync.setVideoSyncTimezoneMode('local'))
+    expect(row(result, 'unknown.mp4')).toMatchObject({ isIncluded: false, isFar: true, offsetSeconds: 30 - 3 * 3600 })
+    act(() => dialog(result).sync.setVideoSyncTimezoneMode('utc'))
+    expect(placement()).toEqual(placedByHand)
+
+    // Switched by hand, it keeps the user's choice.
+    act(() => row(result, 'unknown.mp4').onIncludedChange(false))
+    act(() => dialog(result).sync.setVideoSyncTimezoneMode('local'))
+    act(() => dialog(result).sync.setVideoSyncTimezoneMode('utc'))
+    expect(row(result, 'unknown.mp4')).toMatchObject({ isIncluded: false, isWaiting: false, offsetSeconds: 30 })
+  })
+
   test('the arrows move a video without a recording time among the switched-on videos', async () => {
     probe('/clips/known.mp4', { creationTime: '2026-07-18T08:00:00Z' })
     probe('/clips/first.mp4')
@@ -432,12 +539,12 @@ describe('editing in the dialog', () => {
   test('shows overlaps and what prevents a single-file export, and commits the chosen transition', async () => {
     probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:00Z' })
     probe('/clips/b.mp4', { creationTime: '2026-07-18T08:00:20Z' })
-    probe('/clips/c.mp4', { creationTime: '2026-07-18T08:05:00Z', format: formats.uhd60 })
+    probe('/clips/c.mp4', { creationTime: '2026-07-18T08:05:00Z', format: formats.hd60 })
     const { result } = renderImport()
     await selectFiles(result, ['/clips/a.mp4', '/clips/b.mp4', '/clips/c.mp4'])
 
     expect(row(result, 'a.mp4').overlaps).toEqual([{ name: 'b.mp4', seconds: 10 }])
-    expect(row(result, 'c.mp4')).toMatchObject({ isIncompatible: true, formatLabel: '3840×2160 · 60 fps' })
+    expect(row(result, 'c.mp4')).toMatchObject({ isIncluded: true, isIncompatible: true, formatLabel: '1920×1080 · 60 fps · 00:30' })
     expect(dialog(result).issues).toEqual([
       'Videos overlap (a.mp4, b.mp4). Move a video or delete the overlapping part.',
       'Videos differ in resolution or frame rate (c.mp4). Remove them or export separate files.',

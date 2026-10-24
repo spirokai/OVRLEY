@@ -182,7 +182,7 @@ export function moveVideoNextTo(draft, videoId, anchorVideoId, side) {
 
 /**
  * Places every automatic clip by detected time; a clip whose time cannot be
- * determined but that has a placement anchor sits next to its anchor instead.
+ * determined sits next to its placement anchor, or keeps its start without one.
  * Clips placed by hand keep their start.
  */
 export function placeAutomaticVideos(draft) {
@@ -192,8 +192,8 @@ export function placeAutomaticVideos(draft) {
   draft.importedVideos.forEach((video, index) => {
     const edits = draft.videoEdits[video.id]
     if (edits.offsetSource === 'manual') return
-    if (!placements[index].determined && edits.placementAnchor !== null) {
-      anchored.push(video.id)
+    if (!placements[index].determined) {
+      if (edits.placementAnchor !== null) anchored.push(video.id)
       return
     }
     edits.offsetSeconds = placements[index].offsetSeconds
