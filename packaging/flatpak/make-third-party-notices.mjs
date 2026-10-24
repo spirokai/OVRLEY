@@ -16,7 +16,7 @@ writeFileSync(
     'FFmpeg',
     '------',
     'This Flatpak does not bundle FFmpeg. OVRLEY runs the unmodified ffmpeg and ffprobe',
-    'command-line tools provided by the Flatpak runtime as separate processes.',
+    'command-line tools as provided by the Flatpak runtime as separate processes.',
     '',
     'Project: https://ffmpeg.org/',
     'Source code: https://ffmpeg.org/download.html',
