@@ -368,7 +368,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         cpu_cores_per_frame_worker: 4,
         input_args: VAAPI_INPUT_ARGS,
         filter_complex: Some(VAAPI_FILTER),
-        output_args: &["-tag:v", "hvc1"],
+        output_args: &["-tag:v", "hvc1", "-compression_level", "7", "-async_depth", "4"],
         quality_args: &["-rc_mode", "CQP", "-qp", "{quality}"],
         bitrate_args: &[
             "-rc_mode",
