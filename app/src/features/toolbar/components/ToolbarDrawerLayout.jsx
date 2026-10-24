@@ -52,8 +52,8 @@ export function ToolbarDrawerLayout({
       <VerticalToolbar activeTool={activeTool} drawerVisible={visible} width={TOOLBAR_WIDTH} onSelectTool={selectTool} />
       <div className="relative h-full min-w-0">
         <div
-          className={`absolute inset-y-0 left-0 z-60 flex flex-col overflow-hidden border-r border-border bg-card shadow-lg shadow-black/80 transition-transform duration-300 ease-in-out ${
-            visible ? 'pointer-events-auto translate-x-0' : 'pointer-events-none -translate-x-full'
+          className={`absolute inset-y-0 left-0 z-60 flex flex-col overflow-hidden border-r border-border bg-card shadow-lg shadow-black/80 transition-[translate,visibility] duration-300 ease-in-out ${
+            visible ? 'pointer-events-auto visible translate-x-0' : 'pointer-events-none invisible -translate-x-full'
           }`}
           style={{ width: DRAWER_WIDTH }}
           aria-hidden={!visible}
