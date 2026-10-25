@@ -1,7 +1,8 @@
 //! --fonts prepares resources and validates configs; only --run renders frames.
 use ovrley_core::{
     activity::{
-        build_dense_activity_report_validated, parse_activity_json, validate_render_activity,
+        build_dense_activity_report_validated, parse_activity_json, splits::derive_split_table,
+        validate_render_activity,
     },
     commands::parse_and_validate_config,
     debug::RenderProfiler,
@@ -9,7 +10,7 @@ use ovrley_core::{
     paths::AppPaths,
     render::{ExportWidgets, FrameSize},
 };
-use ovrley_widgets::preview::FontRequest;
+use ovrley_widgets::{preview::FontRequest, widgets::value::validation::ValidatedValue};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, fs, path::PathBuf, time::Instant};
@@ -34,6 +35,7 @@ struct Case {
     start_frame: usize,
     dynamic: bool,
     request: Option<Value>,
+    split_table: Option<String>,
 }
 
 fn main() -> Result<(), String> {
@@ -90,6 +92,28 @@ fn main() -> Result<(), String> {
             serde_json::to_vec(&fonts).map_err(|e| e.to_string())?,
         )
         .map_err(|e| e.to_string())?;
+        // Preview sessions receive split tables from core; export derives its own in prepare.
+        for (case, config) in plan.cases.iter().zip(&configs) {
+            let Some(filename) = &case.split_table else {
+                continue;
+            };
+            let [ValidatedValue::SplitsRun(widget)] = config.values.as_slice() else {
+                return Err(format!("{}: split table requires one splits widget", case.id));
+            };
+            let activity_path = plan
+                .activities
+                .get(&case.activity)
+                .ok_or_else(|| format!("Unknown activity: {}", case.activity))?;
+            let activity =
+                parse_activity_json(&fs::read_to_string(activity_path).map_err(|e| e.to_string())?)
+                    .map_err(|e| e.to_string())?;
+            let table = derive_split_table(&activity, widget.length);
+            fs::write(
+                directory.join(filename),
+                serde_json::to_vec(&table).map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
+        }
         return Ok(());
     }
     let mut results = Vec::new();

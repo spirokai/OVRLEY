@@ -20,6 +20,8 @@ export const fixtures = {
   racechrono: ['sample RaceChrono-parse-debug.json', 60],
   racebox: ['sample Racebox-parse-debug.json', 400],
   dive: ['Shearwater-Cloud-Dive-01-parse-debug.json', 1560],
+  // Three 1 km splits are complete at 520 s; the fourth completes at 550 s, inside the measured pass.
+  splits: ['afternoon-ride-parse-debug.json', 520],
 }
 
 /** @param {object} input Activity payloads, HUD template, image path, and frame counts. @returns {object[]} Fixed cases; no rendering occurs. */
@@ -144,6 +146,7 @@ export function createCases({ activities, template, image, frames, warmup, fps }
   ])
   for (const mode of ['current_lap', 'best_lap', 'delta', 'lap_log'])
     specs.push([`lap-${mode}`, 'lap_timer', 'racebox', { displayType: 'lap_timer', lapTimerMode: mode }, {}])
+  specs.push(['splits-run', 'splits_run', 'splits', { displayType: 'splits_run' }, {}])
   const globals = { ...DEFAULT_GLOBAL_DEFAULTS, ...template.settings.globalDefaults }
   const result = []
   for (const [id, type, activity, selection, overrides] of [['empty', null, 'ride', {}, {}], ...specs]) {
@@ -171,6 +174,7 @@ export function createCases({ activities, template, image, frames, warmup, fps }
       rolling_chart: ['speed', 'heartrate'],
       gradient: ['gradient'],
       lap_timer: ['lap_time_seconds', 'delta_to_best_lap_seconds'],
+      splits_run: ['distance'],
     }
     for (const field of required[type] ?? [])
       if (
@@ -195,7 +199,9 @@ export function createCases({ activities, template, image, frames, warmup, fps }
       request = { type, widget: type === 'raster' ? { ...widget, resourceId: 'benchmark-image' } : widget, scene: effective.scene }
       fonts = widgetFonts({ type, data: request.widget })
     }
-    result.push({ id, activity, start_frame, dynamic, config: effective, request, fonts })
+    // The native resource step derives the table core would hand the editor for this split length.
+    const split_table = type === 'splits_run' ? `split-table-${id}.json` : null
+    result.push({ id, activity, start_frame, dynamic, config: effective, request, fonts, split_table })
   }
   return result
 }
@@ -246,6 +252,7 @@ export async function play({ entry, frames, warmup, fps, fonts }) {
       send(font.request, (id, idLen) => upload(data, (ptr, len) => check(module._ovrley_preview_font(session, id, idLen, ptr, len))))
     }
     if (entry.dynamic) upload(await bytes(`${entry.activity}.json`), (ptr, len) => check(module._ovrley_preview_activity(session, ptr, len)))
+    if (entry.split_table !== null) upload(await bytes(entry.split_table), (ptr, len) => check(module._ovrley_preview_split_table(session, ptr, len)))
     if (entry.request?.type === 'raster') {
       const png = await bytes('image.png')
       upload(encoder.encode('benchmark-image'), (id, idLen) =>

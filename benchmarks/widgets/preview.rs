@@ -42,6 +42,13 @@ pub(super) fn run(plan: &Plan, directory: &Path) -> Result<(), String> {
                 .replace_activity(&fs::read(path).map_err(|error| error.to_string())?)
                 .map_err(|error| error.to_string())?;
         }
+        if let Some(filename) = &case.split_table {
+            session
+                .replace_split_table(
+                    &fs::read(directory.join(filename)).map_err(|error| error.to_string())?,
+                )
+                .map_err(|error| error.to_string())?;
+        }
         if case
             .request
             .as_ref()
