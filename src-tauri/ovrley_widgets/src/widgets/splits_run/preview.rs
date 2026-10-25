@@ -10,14 +10,21 @@ use crate::{
     error::{WidgetError, WidgetResult},
     host::WidgetHost,
     model::scene::{validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation},
-    render::preview::{render_tile, PreviewRasterScale},
+    render::preview::{render_tile, PreviewRasterScale, StaticRaster},
     render::text::FontResolver,
     widgets::value::{
         config::ValueConfig,
         preview::{TileBounds, WidgetGeometry, TEXT_COLOR_TYPE},
     },
 };
-use skia_safe::{Canvas, Surface};
+use skia_safe::{Canvas, Point, Rect, Surface};
+
+/// A composited export frame, reused while its content holds.
+struct DrawnFrame {
+    content: SplitsContent,
+    raster: StaticRaster,
+    bounds: Rect,
+}
 
 pub struct PreviewSplitsRun {
     config: ValidatedSplitsRun,
@@ -25,6 +32,8 @@ pub struct PreviewSplitsRun {
     preview_raster_scale: PreviewRasterScale,
     layout: Option<SplitsLayout>,
     last_content: Option<SplitsContent>,
+    /// Export draws onto a restored frame base every frame; equal content blits this raster.
+    drawn: Option<DrawnFrame>,
     surface: Option<Surface>,
     pub pixels: Vec<u8>,
     pub geometry: Vec<u8>,
@@ -47,6 +56,7 @@ impl PreviewSplitsRun {
             preview_raster_scale: host.raster_scale,
             layout: None,
             last_content: None,
+            drawn: None,
             surface: None,
             pixels: Vec::new(),
             geometry: Vec::new(),
@@ -69,6 +79,7 @@ impl PreviewSplitsRun {
     pub fn invalidate_activity(&mut self) {
         self.layout = None;
         self.last_content = None;
+        self.drawn = None;
     }
 
     fn layout(&mut self, table: Option<&SplitTable>, fonts: &dyn FontResolver) -> WidgetResult<&SplitsLayout> {
@@ -100,11 +111,19 @@ impl PreviewSplitsRun {
     ) -> WidgetResult<TileBounds> {
         let table = self.table(activity);
         let content = splits_content(table, second);
-        let raster_scale = self.preview_raster_scale;
-        let layout = self.layout(table, fonts)?;
-        let frame = layout.prepare_frame(table, &content, raster_scale)?;
-        frame.draw(canvas, layout);
-        Ok(frame.bounds.into())
+        if self.drawn.as_ref().map(|drawn| &drawn.content) != Some(&content) {
+            let raster_scale = self.preview_raster_scale;
+            let layout = self.layout(table, fonts)?;
+            let frame = layout.prepare_frame(table, &content, raster_scale)?;
+            let raster = StaticRaster::new(raster_scale, Point::default(), frame.bounds, TEXT_COLOR_TYPE, |canvas| {
+                frame.draw(canvas, layout);
+                Ok(())
+            })?;
+            self.drawn = Some(DrawnFrame { content, raster, bounds: frame.bounds });
+        }
+        let drawn = self.drawn.as_ref().expect("splits frame drawn");
+        drawn.raster.draw(canvas, None);
+        Ok(drawn.bounds.into())
     }
 
     pub fn render(&mut self, activity: Option<&ActivitySampler>, second: f64, fonts: &dyn FontResolver) -> WidgetResult<()> {
