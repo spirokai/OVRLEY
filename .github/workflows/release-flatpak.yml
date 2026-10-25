@@ -61,7 +61,6 @@ jobs:
           mock="$RUNNER_TEMP/mock/files"
           install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.desktop "$mock/share/applications/cc.ovrley.OVRLEY.desktop"
           install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.metainfo.xml "$mock/share/metainfo/cc.ovrley.OVRLEY.metainfo.xml"
-          install -Dm644 src-tauri/icons/icon.svg "$mock/share/icons/hicolor/scalable/apps/cc.ovrley.OVRLEY.svg"
           install -Dm644 src-tauri/icons/icon.png "$mock/share/icons/hicolor/512x512/apps/cc.ovrley.OVRLEY.png"
           appstreamcli compose --verbose --print-report=full --prefix=/ --origin=flatpak \
             --components=cc.ovrley.OVRLEY,cc.ovrley.OVRLEY.desktop \
