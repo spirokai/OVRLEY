@@ -25,11 +25,17 @@
   <launchable type="desktop-id">cc.ovrley.OVRLEY.desktop</launchable>
   <url type="homepage">https://www.ovrley.cc</url>
   <url type="bugtracker">https://github.com/spirokai/OVRLEY/issues</url>
+  <url type="vcs-browser">https://github.com/spirokai/OVRLEY</url>
+  <url type="help">https://github.com/spirokai/OVRLEY#readme</url>
   <categories>
     <category>AudioVideo</category>
     <category>Video</category>
   </categories>
   <content_rating type="oars-1.1" />
+  <branding>
+    <color type="primary" scheme_preference="light">#d8e2e8</color>
+    <color type="primary" scheme_preference="dark">#00111b</color>
+  </branding>
   <provides>
     <binary>OVRLEY</binary>
   </provides>
