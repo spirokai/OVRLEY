@@ -55,6 +55,9 @@ modules:
       - node packaging/flatpak/make-third-party-notices.mjs /app/lib/OVRLEY/THIRD_PARTY_NOTICES.txt
       - install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.desktop /app/share/applications/cc.ovrley.OVRLEY.desktop
       - install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.metainfo.xml /app/share/metainfo/cc.ovrley.OVRLEY.metainfo.xml
+      # Installers show the MetaInfo release, so stamp it with the build version too
+      - sed -i "s|<release version=\"[^\"]*\" date=\"[^\"]*\" />|<release version=\"$OVRLEY_VERSION\" date=\"$(date -u +%Y-%m-%d)\" />|" /app/share/metainfo/cc.ovrley.OVRLEY.metainfo.xml
+      - grep -q "<release version=\"$OVRLEY_VERSION\"" /app/share/metainfo/cc.ovrley.OVRLEY.metainfo.xml
       - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/512x512/apps/cc.ovrley.OVRLEY.png
     sources:
       - type: dir
