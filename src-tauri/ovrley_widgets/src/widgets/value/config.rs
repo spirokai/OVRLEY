@@ -106,6 +106,20 @@ pub struct ValueConfig {
     #[serde(default)]
     pub label: Option<String>,
     #[serde(default)]
+    pub split_distance: Option<f64>,
+    #[serde(default)]
+    pub split_unit: Option<String>,
+    #[serde(default)]
+    pub max_splits: Option<u32>,
+    #[serde(default)]
+    pub visible_columns: Option<Vec<String>>,
+    #[serde(default)]
+    pub row_gap: Option<f32>,
+    #[serde(default)]
+    pub bar_width: Option<f32>,
+    #[serde(default)]
+    pub track_border_opacity: Option<f32>,
+    #[serde(default)]
     pub positive_delta_color: Option<String>,
     #[serde(default)]
     pub negative_delta_color: Option<String>,

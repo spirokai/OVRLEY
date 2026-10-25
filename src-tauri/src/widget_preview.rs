@@ -36,6 +36,29 @@ pub(crate) fn backend_preview_activity(
     Ok(tauri::ipc::Response::new(bytes.clone()))
 }
 
+/// Running splits of one retained activity for a widget's split length.
+#[tauri::command]
+pub(crate) fn backend_preview_split_table(
+    state: tauri::State<'_, PreviewActivities>,
+    activity_id: String,
+    length: ovrley_widgets::widgets::splits_run::table::SplitLength,
+) -> Result<tauri::ipc::Response, String> {
+    if !length.distance.is_finite() || length.distance <= 0.0 {
+        return Err(format!("split length must be positive, got {}", length.distance));
+    }
+    let activity: ovrley_core::activity::schema::ParsedActivity = {
+        let snapshots = state.0.lock().expect("preview activities lock");
+        let bytes = snapshots
+            .get(&activity_id)
+            .ok_or_else(|| format!("unknown preview activity: {activity_id}"))?;
+        serde_json::from_slice(bytes).map_err(|e| e.to_string())?
+    };
+    let table = ovrley_core::activity::splits::derive_split_table(&activity, length);
+    Ok(tauri::ipc::Response::new(
+        serde_json::to_vec(&table).map_err(|e| e.to_string())?,
+    ))
+}
+
 #[tauri::command]
 pub(crate) fn backend_release_preview_activity(
     state: tauri::State<'_, PreviewActivities>,

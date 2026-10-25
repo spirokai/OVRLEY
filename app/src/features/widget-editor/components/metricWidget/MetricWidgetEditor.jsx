@@ -19,6 +19,7 @@ import HeartZonesDisplaySection from './HeartZonesDisplaySection'
 import LeanAngleDisplaySection from './LeanAngleDisplaySection'
 import GForceWidgetEditor from '../GForceWidgetEditor'
 import LapTimerDisplaySection from './LapTimerDisplaySection'
+import SplitsRunDisplaySection from './SplitsRunDisplaySection'
 import { useTranslation } from 'react-i18next'
 
 /**
@@ -37,6 +38,7 @@ const DISPLAY_SECTION = {
   lean_angle: LeanAngleDisplaySection,
   g_force: GForceWidgetEditor,
   lap_timer: LapTimerDisplaySection,
+  splits_run: SplitsRunDisplaySection,
 }
 
 /**

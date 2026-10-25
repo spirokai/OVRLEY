@@ -19,6 +19,8 @@ pub(crate) mod lap_timing;
 pub mod sampling;
 /// Serializable activity payloads and internal dense/trimmed report types.
 pub mod schema;
+/// On-demand running splits for a configured split length.
+pub mod splits;
 /// Native Subsurface XML dive extraction.
 pub mod subsurface;
 /// Native Garmin TCX extraction into canonical raw activity samples.

@@ -27,6 +27,7 @@ use crate::widgets::{
     heart_zones::validation::ValidatedHeartZones,
     lap_timer::validation::ValidatedLapTimer,
     lean_angle::validation::ValidatedLeanAngleWidget,
+    splits_run::validation::ValidatedSplitsRun,
     time::validation::ValidatedTimeValue,
 };
 use serde::{Deserialize, Serialize};
@@ -484,6 +485,7 @@ pub enum ValidatedValue {
     ArcGauge(ValidatedArcGaugeWidget),
     GForce(ValidatedGForceWidget),
     LapTimer(ValidatedLapTimer),
+    SplitsRun(ValidatedSplitsRun),
 }
 
 impl ValidatedValue {
@@ -499,6 +501,7 @@ impl ValidatedValue {
             Self::ArcGauge(value) => value.metric,
             Self::GForce(_) => MetricKind::GForce,
             Self::LapTimer(_) => MetricKind::LapTimer,
+            Self::SplitsRun(_) => MetricKind::SplitsRun,
         }
     }
 
@@ -515,6 +518,7 @@ impl ValidatedValue {
             Self::ArcGauge(value) => value.display_type,
             Self::GForce(_) => DisplayType::GForce,
             Self::LapTimer(_) => DisplayType::LapTimer,
+            Self::SplitsRun(_) => DisplayType::SplitsRun,
         }
     }
 

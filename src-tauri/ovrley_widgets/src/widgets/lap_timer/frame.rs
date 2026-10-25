@@ -12,8 +12,9 @@ use crate::{
 use skia_safe::{Canvas, Font, Point, Rect, TextBlob};
 use std::sync::Arc;
 
+/// One prepared table cell; split tables share lap-log typography.
 #[derive(Clone, Debug)]
-pub(super) struct TextRun {
+pub(crate) struct TextRun {
     blob: TextBlob,
     style: ResolvedTextStyle,
     baseline: f32,
@@ -92,6 +93,10 @@ impl TextRun {
         self.content.offset((0.0, offset));
         self.bounds.offset((0.0, offset));
         self
+    }
+
+    pub fn draw(&self, canvas: &Canvas) {
+        draw_text_blob(canvas, &self.blob, self.baseline, &self.style);
     }
 }
 
@@ -175,7 +180,7 @@ impl LapTimerFrame {
             layer.raster.draw(canvas, None);
         }
         for run in &self.runs {
-            draw_text_blob(canvas, &run.blob, run.baseline, &run.style);
+            run.draw(canvas);
         }
     }
 }

@@ -4,6 +4,7 @@ pub mod gradient;
 pub mod lean_angle;
 pub mod g_force;
 pub mod lap_timer;
+pub mod splits_run;
 pub mod heading;
 pub mod heading_compass;
 pub mod heart_zones;

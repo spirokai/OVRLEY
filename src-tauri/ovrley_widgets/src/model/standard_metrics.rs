@@ -30,6 +30,7 @@ pub enum StandardMetricFormatterKind {
     Distance,
     Elevation,
     LapTimer,
+    Splits,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]

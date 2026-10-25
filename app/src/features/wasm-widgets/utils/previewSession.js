@@ -1,5 +1,5 @@
 import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
-import { previewActivity, previewFont, rasterPreviewPng } from '@/api/backend'
+import { previewActivity, previewFont, previewSplitTable, rasterPreviewPng } from '@/api/backend'
 import { isPreviewPerfEnabled, recordPreviewPerfDuration, setPreviewPerfValue } from '@/lib/preview-perf'
 import { createWidgetInteraction, registerWidgetInteraction, unregisterWidgetInteraction } from './widgetInteraction'
 import { presentWidgetGeometry } from './widgetPresentation'
@@ -35,7 +35,12 @@ export function widgetFonts(widget) {
     font: widget.type === 'g_force' || widget.data.display_type === 'heading_tape' ? widget.data.label_font : widget.data.font,
     ...(widget.type === 'label' ? { font_weight: widget.data.font_weight, italic: widget.data.italic } : {}),
   }
-  return widget.type === 'lap_timer' ? [valueFont, { font: widget.data.label_font }] : [valueFont]
+  return widget.type === 'lap_timer' || widget.type === 'splits_run' ? [valueFont, { font: widget.data.label_font }] : [valueFont]
+}
+
+/** @param {object} widget Effective splits widget. @returns {{distance: number, unit: string}} Split length identifying its core-derived table. */
+export function splitLength(widget) {
+  return { distance: widget.data.split_distance, unit: widget.data.split_unit }
 }
 
 /** @returns {Promise<object>} One compiled module shared by independently disposable editor sessions. */
@@ -94,6 +99,8 @@ export function createPreviewSession(module, onError) {
   const targets = new Map()
   const fonts = new Map()
   const images = new Map()
+  // Split lengths requested for the current activity; Rust core derives each table once.
+  const splitTables = new Set()
   let snapshot
   let activityId
   let activityReady = true
@@ -173,6 +180,27 @@ export function createPreviewSession(module, onError) {
         resource.error = error
         schedule()
       })
+  }
+  function loadSplitTables(widgetList) {
+    if (!activityReady || activityId === null) return
+    for (const widget of widgetList) {
+      if (widget.type !== 'splits_run') continue
+      const length = splitLength(widget)
+      const key = JSON.stringify(length)
+      if (splitTables.has(key)) continue
+      splitTables.add(key)
+      const requestedId = activityId
+      previewSplitTable(requestedId, length)
+        .then((bytes) => {
+          if (disposed || activityId !== requestedId) return
+          upload(new Uint8Array(bytes), (ptr, len) => check(module._ovrley_preview_split_table(handle, ptr, len)))
+          for (const instance of widgets.values()) if (instance.type === 'splits_run') instance.revision = -1
+          schedule()
+        })
+        .catch((error) => {
+          if (!disposed && activityId === requestedId) onError(error)
+        })
+    }
   }
   function render() {
     frame = null
@@ -319,6 +347,7 @@ export function createPreviewSession(module, onError) {
       if (nextId !== activityId) {
         activityId = nextId
         activityReady = false
+        splitTables.clear()
         // Explicitly clear old values while replacement bytes are in flight.
         check(module._ovrley_preview_activity(handle, 0, 0))
         for (const [id, widget] of widgets) {
@@ -336,6 +365,7 @@ export function createPreviewSession(module, onError) {
               upload(new Uint8Array(bytes), (ptr, len) => check(module._ovrley_preview_activity(handle, ptr, len)))
               activityReady = true
               for (const widget of widgets.values()) if (WIDGET_TYPE_DEFINITIONS[widget.type].timeDependent) widget.revision = -1
+              loadSplitTables(snapshot.widgets)
               schedule()
             })
             .catch((error) => {
@@ -352,6 +382,7 @@ export function createPreviewSession(module, onError) {
         }
         for (const widget of widgets.values()) if (WIDGET_TYPE_DEFINITIONS[widget.type].timeDependent) widget.revision = -1
       }
+      if (previous?.widgets !== next.widgets) loadSplitTables(next.widgets)
       schedule()
     },
     attach(id, canvas, target = canvas?.parentElement) {
