@@ -174,3 +174,27 @@ The rolling chart redraws every frame, because its window slides with the playhe
 - A cheaper gradient can at best reach flat-fill cost (5-line WASM preview 4.8 → 3.0 ms). A candidate is stepped solid bands (16–32) clipped to horizontal strips; it trades visible stepping against extra path redraws, so band count needs measuring. Not implemented.
 
 Runs: no fill `1792933629235-6388`, `1792933638604-12228`; flat fill `1792934211672-19312`, `1792934223069-19520`; gradient fill `1792934240624-21548`, `1792934252775-23452`. Cases `rolling-chart-{1-line,5-lines}{,-no-area,-flat-area}` in `browser.js`.
+
+## Export: premultiplied frame buffer (reverted)
+
+Export draws every widget into a straight-alpha (`RGBA8888` `Unpremul`) frame. Skia converts each touched destination pixel to premultiplied, blends, and converts back. Blitting the 662 x 349 splits tile costs 0.77 ms into a warm straight-alpha 4K frame against 0.20 ms into a premultiplied one; a tile-sized premultiplied surface also costs 0.21 ms, so frame size is not the factor. A preceding base restore adds about 0.2 ms of cold-cache cost on either format.
+
+The experiment drew export into a premultiplied buffer and converted once downstream: the `yuva420p` converter read premultiplied input (chroma directly, luma through the shared unpremultiply table), and RGBA pipes (transparent codecs, QSV full overlay, untagged composite sources) ran one table pass over the atlas. Every consumer needs straight alpha: FFmpeg `rgba` input, ProRes 4444 and the other transparent codecs, and the hardware overlays (`overlay_cuda`, `overlay_vaapi`, `overlay_qsv` have no premultiplied mode).
+
+Native benchmark on the production overlay atlas, ms/frame:
+
+| Widget (atlas)            | Draw straight | Draw premultiplied | `yuva420p` convert straight / premultiplied | Unpremultiply pass |
+| ------------------------- | ------------: | -----------------: | ------------------------------------------: | -----------------: |
+| splits-run (668 x 426)    |         0.890 |              0.268 |                               0.758 / 0.760 |              0.150 |
+| speed-text (350 x 140)    |         0.273 |              0.104 |                               0.127 / 0.134 |              0.027 |
+| heading-tape (1200 x 200) |         2.253 |              1.641 |                               0.559 / 0.513 |              0.106 |
+
+A 4K `prores_ks` export of a full template drew 18.4 ms/frame straight and 4.4 ms premultiplied. Its first run was slower overall because the dev profile compiled `ovrley_widgets`, which holds the unpremultiply pass, without optimization (59.6 ms/frame; 6.73 ms vs 0.15 ms release on the splits atlas). `ovrley_widgets` now builds at `opt-level = 3` in dev, like `ovrley_core`.
+
+Outcome: end-to-end export performance in production builds was unchanged, and text looked slightly less sharp, since 8-bit premultiplied storage quantizes the colour of low-alpha antialiased and shadow pixels. The change is reverted. It remains a performance option for low-end machines, where rendering rather than encoding limits export: `prores_ks` and other software encoders render on a single worker, so drawing time there is wall time.
+
+Export also keeps the composited splits frame and blits it while its content holds (export draw 1.03 → 0.97 ms/frame); the blit into the straight-alpha frame is the remaining cost.
+
+## Export: two render workers for `prores_ks` (reverted)
+
+`prores_ks` reserves no cores per frame worker, so it renders on one worker. With one worker the 4K transparent export was balanced: rendering took 20.5 ms/frame and the writer waited 16.3 ms/frame for frames, for 48.0 fps. Reserving 6 cores per worker ran two workers on 12 logical cores (worker time 1.95x wall). The writer then stopped waiting for frames (0.08 ms), but FFmpeg writes blocked for 21.1 ms/frame and workers waited 21.7 ms/frame for free buffers. Throughput fell to 46.2 fps, because the second worker competed with the encoder's CPU threads. `prores_ks` at 4K tops out around 46–48 fps on this machine, which is also why faster drawing (the premultiplied buffer above) left its end-to-end speed unchanged. The profile is back to a single worker. `prores_videotoolbox` encodes on the media engine, leaving FFmpeg only the atlas `xstack` and pixel conversion on the CPU, so it now reserves 4 cores per worker (2–4 workers on Apple silicon); this still needs measuring on macOS.
