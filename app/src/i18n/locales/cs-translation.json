@@ -553,6 +553,7 @@
       "lapLog": "Přehled kol"
     },
     "types": {
+      "rolling_chart": { "name": "Grafy", "shortName": "Grafy" },
       "diving_profile": {
         "name": "Profil ponoru",
         "shortName": "Profil ponoru"
@@ -612,6 +613,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Metriky",
+    "chartMetric": "Metrika",
+    "addMetric": "Přidat metriku",
+    "moveUp": "Posunout nahoru",
+    "moveDown": "Posunout dolů",
+    "removeMetric": "Odebrat metriku",
+    "timeWindow": "Časové okno",
+    "areaFill": "Výplň plochy",
+    "areaOpacity": "Krytí plochy",
+    "legend": "Legenda",
     "decompressionCeiling": "Dekompresní strop",
     "ceilingLineColor": "Barva čáry",
     "ceilingAreaColor": "Barva oblasti",

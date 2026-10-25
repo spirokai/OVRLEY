@@ -79,6 +79,9 @@ struct RawDefinition {
     activity: Option<WidgetTelemetry>,
     #[serde(default)]
     modes: Vec<RawMode>,
+    /// Rolling charts may plot this metric. Absent means false, as in the manifests' `widgetDefaults`.
+    #[serde(default)]
+    plottable: bool,
 }
 
 #[derive(Deserialize)]
@@ -102,6 +105,7 @@ struct RawManifest {
 struct TelemetryManifest {
     definitions: HashMap<String, WidgetTelemetry>,
     numeric_metrics: Vec<MetricKind>,
+    plottable_metrics: Vec<MetricKind>,
     modes: HashMap<String, HashMap<String, Vec<ActivitySeries>>>,
 }
 
@@ -111,6 +115,7 @@ fn load_manifest() -> TelemetryManifest {
     let mut manifest = TelemetryManifest {
         definitions: HashMap::new(),
         numeric_metrics: Vec::new(),
+        plottable_metrics: Vec::new(),
         modes: HashMap::new(),
     };
     for json in [
@@ -130,6 +135,15 @@ fn load_manifest() -> TelemetryManifest {
                 if !activity.sources.is_empty() {
                     manifest
                         .numeric_metrics
+                        .push(parse_metric_kind(&definition.key));
+                }
+                if definition.plottable {
+                    assert!(
+                        !activity.sources.is_empty(),
+                        "plottable metrics must have numeric sources"
+                    );
+                    manifest
+                        .plottable_metrics
                         .push(parse_metric_kind(&definition.key));
                 }
                 assert!(
@@ -181,6 +195,14 @@ pub fn numeric_metrics() -> &'static [MetricKind] {
     &TELEMETRY_MANIFEST
         .get_or_init(load_manifest)
         .numeric_metrics
+}
+
+/// Whether a rolling chart may plot this metric.
+pub fn is_plottable_metric(kind: MetricKind) -> bool {
+    TELEMETRY_MANIFEST
+        .get_or_init(load_manifest)
+        .plottable_metrics
+        .contains(&kind)
 }
 
 /// Extra telemetry required by a selected widget/display mode.

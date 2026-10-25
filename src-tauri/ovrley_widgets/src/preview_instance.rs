@@ -13,6 +13,9 @@ impl WidgetRequest {
             Self::DivingProfile {
                 widget, transient, ..
             } => ([widget.x as f64, widget.y as f64], *transient),
+            Self::RollingChart {
+                widget, transient, ..
+            } => ([widget.x as f64, widget.y as f64], *transient),
             Self::Elevation {
                 widget, transient, ..
             } => ([widget.x as f64, widget.y as f64], *transient),
@@ -61,6 +64,13 @@ impl WidgetRequest {
     fn pixel_config(&mut self) {
         match self {
             Self::DivingProfile {
+                widget, transient, ..
+            } => {
+                widget.x = 0.0;
+                widget.y = 0.0;
+                *transient = false;
+            }
+            Self::RollingChart {
                 widget, transient, ..
             } => {
                 widget.x = 0.0;

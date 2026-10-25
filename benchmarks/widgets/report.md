@@ -153,3 +153,24 @@ node debug/g-force-analysis/probe.mjs
 ```
 
 Neither command builds the application or WASM module.
+
+## Rolling chart: line and area fill costs
+
+The rolling chart redraws every frame, because its window slides with the playhead. Cases use the ride fixture at 60 s with the manifest defaults: 600 x 150 plot at scene scale 2, 30 s window, halo marker, legend, area fill with gradient at 60% opacity. Only the series list and the fill switches vary. Values are ms/frame.
+
+| Case                   | Native preview | WASM preview | WASM playback |
+| ---------------------- | -------------: | -----------: | ------------: |
+| 1 line, no fill        |           0.32 |         0.37 |          0.48 |
+| 1 line, flat fill      |           0.64 |         1.03 |          1.15 |
+| 1 line, gradient fill  |           0.87 |         1.50 |          1.62 |
+| 5 lines, no fill       |           0.88 |         0.97 |          1.08 |
+| 5 lines, flat fill     |           1.65 |         3.04 |          3.15 |
+| 5 lines, gradient fill |           2.60 |         4.78 |          4.89 |
+
+- Cost grows linearly with the number of lines: about 0.14 ms per line without fill (native preview), on top of about 0.18 ms fixed per-frame work.
+- The area fill dominates. At 5 lines in WASM, filling at all adds about 2.1 ms (blending five overlapping semi-transparent regions), and the gradient adds about 1.7 ms on top. The gradient is computed per covered pixel; its shader is already built once per series.
+- Without fill, WASM is 1.1–1.2x native, in line with other plots. The 1.6–1.9x WASM gap appears only with fill.
+- Disabling anti-aliasing on the fill made no measurable difference and was reverted.
+- A cheaper gradient can at best reach flat-fill cost (5-line WASM preview 4.8 → 3.0 ms). A candidate is stepped solid bands (16–32) clipped to horizontal strips; it trades visible stepping against extra path redraws, so band count needs measuring. Not implemented.
+
+Runs: no fill `1792933629235-6388`, `1792933638604-12228`; flat fill `1792934211672-19312`, `1792934223069-19520`; gradient fill `1792934240624-21548`, `1792934252775-23452`. Cases `rolling-chart-{1-line,5-lines}{,-no-area,-flat-area}` in `browser.js`.

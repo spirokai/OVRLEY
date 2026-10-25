@@ -553,6 +553,7 @@
       "lapLog": "랩 기록"
     },
     "types": {
+      "rolling_chart": { "name": "차트", "shortName": "차트" },
       "diving_profile": {
         "name": "다이빙 프로필",
         "shortName": "잠수 프로필"
@@ -612,6 +613,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "지표",
+    "chartMetric": "지표",
+    "addMetric": "지표 추가",
+    "moveUp": "위로 이동",
+    "moveDown": "아래로 이동",
+    "removeMetric": "지표 제거",
+    "timeWindow": "시간 범위",
+    "areaFill": "영역 채우기",
+    "areaOpacity": "영역 불투명도",
+    "legend": "범례",
     "decompressionCeiling": "감압 천장",
     "ceilingLineColor": "선 색상",
     "ceilingAreaColor": "영역 색상",

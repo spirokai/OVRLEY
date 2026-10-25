@@ -17,11 +17,13 @@ use crate::widgets::gauges::preview::PreviewGauge;
 use crate::widgets::route::{config::CoursePlotConfig, preview::PreviewRoute};
 use crate::widgets::elevation::{config::ElevationPlotConfig, preview::PreviewElevation};
 use crate::widgets::diving_profile::{config::DivingProfileConfig, preview::PreviewDivingProfile};
+use crate::widgets::rolling_chart::{config::RollingChartConfig, preview::PreviewRollingChart, validation::ValidatedRollingChart};
 
 /// A validated widget handed to the engine by a host other than the editor preview.
 /// Rasters carry the image the host resolved and prepared for its raster scale.
 pub enum ValidatedWidget<'a> {
     DivingProfile(&'a ValidatedDivingProfile),
+    RollingChart(&'a ValidatedRollingChart),
     Elevation(&'a ValidatedElevationPlot),
     Route(&'a ValidatedRoutePlot),
     Raster { geometry: &'a RasterGeometry, source_id: String, image: RasterImage },
@@ -44,11 +46,14 @@ pub enum FrameKey {
     /// Retained geometry identity and frame state.
     Elevation(usize, ElevationFrameState),
     DivingProfile(DivingFrameState),
+    /// The playhead second; the window slides with it.
+    RollingChart(f64),
 }
 
 #[derive(Clone, PartialEq)]
 pub enum WidgetRequest {
     DivingProfile { widget: DivingProfileConfig, scene: ScenePresentationConfig, transient: bool },
+    RollingChart { widget: RollingChartConfig, scene: ScenePresentationConfig, transient: bool },
     Elevation { widget: ElevationPlotConfig, scene: ScenePresentationConfig, transient: bool },
     Route { widget: CoursePlotConfig, scene: ScenePresentationConfig, transient: bool },
     Raster { widget: RasterConfig, scene: ScenePresentationConfig, transient: bool },
@@ -79,6 +84,8 @@ impl<'de> Deserialize<'de> for WidgetRequest {
         let input = Input::deserialize(deserializer)?;
         if input.r#type == "diving_profile" {
             Ok(Self::DivingProfile { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene, transient: input.transient })
+        } else if input.r#type == "rolling_chart" {
+            Ok(Self::RollingChart { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene, transient: input.transient })
         } else if input.r#type == "course" {
             Ok(Self::Route { widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?, scene: input.scene, transient: input.transient })
         } else if input.r#type == "elevation" {
@@ -111,6 +118,7 @@ impl<'de> Deserialize<'de> for WidgetRequest {
 
 pub enum PreviewWidget {
     DivingProfile(PreviewDivingProfile),
+    RollingChart(PreviewRollingChart),
     Elevation(PreviewElevation),
     Route(PreviewRoute),
     Raster(PreviewRaster),
@@ -131,6 +139,7 @@ impl PreviewWidget {
     pub fn new(request: WidgetRequest, fonts: &dyn FontResolver, images: &(impl ImageSource + ?Sized)) -> WidgetResult<Self> {
         match request {
             WidgetRequest::DivingProfile {widget, scene, ..} => Ok(Self::DivingProfile(PreviewDivingProfile::new(widget, scene)?)),
+            WidgetRequest::RollingChart {widget, scene, ..} => Ok(Self::RollingChart(PreviewRollingChart::new(widget, scene, fonts)?)),
             WidgetRequest::Elevation {widget, scene, ..} => Ok(Self::Elevation(PreviewElevation::new(widget, scene)?)),
             WidgetRequest::Route {widget, scene, ..} => Ok(Self::Route(PreviewRoute::new(widget, scene)?)),
             WidgetRequest::Raster {widget, scene, ..} => Ok(Self::Raster(PreviewRaster::new(widget, scene, images)?)),
@@ -151,6 +160,7 @@ impl PreviewWidget {
     pub fn from_validated(widget: ValidatedWidget<'_>, scene: &ValidatedScenePresentation, host: &WidgetHost, fonts: &dyn FontResolver) -> WidgetResult<Self> {
         Ok(match widget {
             ValidatedWidget::DivingProfile(widget) => Self::DivingProfile(PreviewDivingProfile::from_validated(widget.clone(), scene.clone(), host)?),
+            ValidatedWidget::RollingChart(widget) => Self::RollingChart(PreviewRollingChart::from_validated(widget, scene, host, fonts)?),
             ValidatedWidget::Elevation(widget) => Self::Elevation(PreviewElevation::from_validated(widget.clone(), scene.clone(), host)?),
             ValidatedWidget::Route(widget) => Self::Route(PreviewRoute::from_validated(widget.clone(), scene.clone(), host)?),
             ValidatedWidget::Raster { geometry, source_id, image } => Self::Raster(PreviewRaster::from_validated(geometry, scene, source_id, image)?),
@@ -176,6 +186,7 @@ impl PreviewWidget {
     pub fn frame_key(&mut self, activity: Option<&ActivitySampler>, second: f64, fonts: &dyn FontResolver) -> WidgetResult<FrameKey> {
         Ok(match self {
             Self::DivingProfile(widget) => FrameKey::DivingProfile(widget.frame_key(activity, second, fonts)?),
+            Self::RollingChart(widget) => FrameKey::RollingChart(widget.frame_key(second)),
             Self::Elevation(widget) => { let (geometry, state) = widget.frame_key(activity, second, fonts)?; FrameKey::Elevation(geometry, state) }
             Self::Route(widget) => { let (geometry, progress) = widget.frame_key(activity, second)?; FrameKey::Route(geometry, progress) }
             Self::Raster(_) | Self::Backdrop(_) | Self::Label(_) => FrameKey::Static,
@@ -191,16 +202,17 @@ impl PreviewWidget {
         })
     }
     pub fn pixels(&self) -> &Vec<u8> {
-        match self { Self::DivingProfile(widget) => &widget.pixels, Self::Elevation(widget) => &widget.pixels, Self::Route(widget) => &widget.pixels, Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::LeanAngle(widget) => &widget.pixels, Self::GForce(widget) => &widget.pixels, Self::LapTimer(widget) => &widget.pixels, Self::HeadingTape(widget) => &widget.pixels, Self::HeadingCompass(widget) => &widget.pixels, Self::HeartZones(widget) => &widget.pixels, Self::Gauge(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
+        match self { Self::DivingProfile(widget) => &widget.pixels, Self::RollingChart(widget) => &widget.pixels, Self::Elevation(widget) => &widget.pixels, Self::Route(widget) => &widget.pixels, Self::Raster(widget) => &widget.pixels, Self::Backdrop(widget) => &widget.pixels, Self::Label(widget) => &widget.pixels, Self::Gradient(widget) => &widget.pixels, Self::LeanAngle(widget) => &widget.pixels, Self::GForce(widget) => &widget.pixels, Self::LapTimer(widget) => &widget.pixels, Self::HeadingTape(widget) => &widget.pixels, Self::HeadingCompass(widget) => &widget.pixels, Self::HeartZones(widget) => &widget.pixels, Self::Gauge(widget) => &widget.pixels, Self::Value(widget) => &widget.pixels }
     }
     pub fn geometry(&self) -> &Vec<u8> {
-        match self { Self::DivingProfile(widget) => &widget.geometry, Self::Elevation(widget) => &widget.geometry, Self::Route(widget) => &widget.geometry, Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::LeanAngle(widget) => &widget.geometry, Self::GForce(widget) => &widget.geometry, Self::LapTimer(widget) => &widget.geometry, Self::HeadingTape(widget) => &widget.geometry, Self::HeadingCompass(widget) => &widget.geometry, Self::HeartZones(widget) => &widget.geometry, Self::Gauge(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
+        match self { Self::DivingProfile(widget) => &widget.geometry, Self::RollingChart(widget) => &widget.geometry, Self::Elevation(widget) => &widget.geometry, Self::Route(widget) => &widget.geometry, Self::Raster(widget) => &widget.geometry, Self::Backdrop(widget) => &widget.geometry, Self::Label(widget) => &widget.geometry, Self::Gradient(widget) => &widget.geometry, Self::LeanAngle(widget) => &widget.geometry, Self::GForce(widget) => &widget.geometry, Self::LapTimer(widget) => &widget.geometry, Self::HeadingTape(widget) => &widget.geometry, Self::HeadingCompass(widget) => &widget.geometry, Self::HeartZones(widget) => &widget.geometry, Self::Gauge(widget) => &widget.geometry, Self::Value(widget) => &widget.geometry }
     }
     /// Scene rectangle a render at `second` would draw into, from layout alone: no surface
     /// is allocated and nothing is drawn. Rasters report their rotated scene extent.
     pub fn layout_bounds(&mut self, activity: Option<&ActivitySampler>, second: f64, fonts: &dyn FontResolver) -> WidgetResult<TileBounds> {
         match self {
             Self::DivingProfile(widget) => widget.layout_bounds(activity, fonts),
+            Self::RollingChart(widget) => Ok(widget.layout_bounds()),
             Self::Elevation(widget) => widget.layout_bounds(activity, second, fonts),
             Self::Route(widget) => widget.layout_bounds(activity, second),
             Self::Raster(widget) => Ok(widget.layout_bounds()),
@@ -222,6 +234,7 @@ impl PreviewWidget {
     pub fn draw(&mut self, canvas: &Canvas, activity: Option<&ActivitySampler>, second: f64, fonts: &dyn FontResolver) -> WidgetResult<TileBounds> {
         match self {
             Self::DivingProfile(widget) => widget.draw(canvas, activity, second, fonts),
+            Self::RollingChart(widget) => Ok(widget.draw(canvas, activity, second)),
             Self::Elevation(widget) => widget.draw(canvas, activity, second, fonts),
             Self::Route(widget) => widget.draw(canvas, activity, second),
             Self::Raster(widget) => widget.draw(canvas),
@@ -241,10 +254,10 @@ impl PreviewWidget {
     /// Scene bounds of the rendered tile, which the serialized geometry is derived from.
     /// Playhead families have none before their first render.
     pub fn bounds(&self) -> Option<TileBounds> {
-        match self { Self::DivingProfile(widget) => widget.bounds, Self::Elevation(widget) => widget.bounds, Self::Route(widget) => widget.bounds, Self::Raster(widget) => Some(widget.bounds), Self::Backdrop(widget) => Some(widget.bounds), Self::Label(widget) => Some(widget.bounds), Self::Gradient(widget) => widget.bounds, Self::LeanAngle(widget) => widget.bounds, Self::GForce(widget) => widget.bounds, Self::LapTimer(widget) => widget.bounds, Self::HeadingTape(widget) => widget.bounds, Self::HeadingCompass(widget) => widget.bounds, Self::HeartZones(widget) => widget.bounds, Self::Gauge(widget) => widget.bounds, Self::Value(widget) => widget.bounds }
+        match self { Self::DivingProfile(widget) => widget.bounds, Self::RollingChart(widget) => widget.bounds, Self::Elevation(widget) => widget.bounds, Self::Route(widget) => widget.bounds, Self::Raster(widget) => Some(widget.bounds), Self::Backdrop(widget) => Some(widget.bounds), Self::Label(widget) => Some(widget.bounds), Self::Gradient(widget) => widget.bounds, Self::LeanAngle(widget) => widget.bounds, Self::GForce(widget) => widget.bounds, Self::LapTimer(widget) => widget.bounds, Self::HeadingTape(widget) => widget.bounds, Self::HeadingCompass(widget) => widget.bounds, Self::HeartZones(widget) => widget.bounds, Self::Gauge(widget) => widget.bounds, Self::Value(widget) => widget.bounds }
     }
     pub fn revision(&self) -> u32 {
-        match self { Self::DivingProfile(widget) => widget.revision, Self::Elevation(widget) => widget.revision, Self::Route(widget) => widget.revision, Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::GForce(widget) => widget.revision, Self::LapTimer(widget) => widget.revision, Self::HeadingTape(widget) => widget.revision, Self::HeadingCompass(widget) => widget.revision, Self::HeartZones(widget) => widget.revision, Self::Gauge(widget) => widget.revision, Self::Value(widget) => widget.revision }
+        match self { Self::DivingProfile(widget) => widget.revision, Self::RollingChart(widget) => widget.revision, Self::Elevation(widget) => widget.revision, Self::Route(widget) => widget.revision, Self::Raster(widget) => widget.revision, Self::Backdrop(widget) => widget.revision, Self::Label(widget) => widget.revision, Self::Gradient(widget) => widget.revision, Self::LeanAngle(widget) => widget.revision, Self::GForce(widget) => widget.revision, Self::LapTimer(widget) => widget.revision, Self::HeadingTape(widget) => widget.revision, Self::HeadingCompass(widget) => widget.revision, Self::HeartZones(widget) => widget.revision, Self::Gauge(widget) => widget.revision, Self::Value(widget) => widget.revision }
     }
 }
 
@@ -270,6 +283,7 @@ pub struct ResizeRequest {
 #[serde(untagged)]
 pub enum ResizeUpdate {
     DivingProfile(crate::widgets::diving_profile::interaction::ResizeUpdate),
+    RollingChart(crate::widgets::rolling_chart::interaction::ResizeUpdate),
     Elevation(crate::widgets::elevation::interaction::ResizeUpdate),
     Route(crate::widgets::route::interaction::ResizeUpdate),
     Raster(crate::widgets::raster::interaction::ResizeUpdate),

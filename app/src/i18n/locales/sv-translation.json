@@ -553,6 +553,7 @@
       "lapLog": "Varvlogg"
     },
     "types": {
+      "rolling_chart": { "name": "Diagram", "shortName": "Diagram" },
       "diving_profile": {
         "name": "Dykprofil",
         "shortName": "Dykprofil"
@@ -612,6 +613,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Mätvärden",
+    "chartMetric": "Mätvärde",
+    "addMetric": "Lägg till mätvärde",
+    "moveUp": "Flytta upp",
+    "moveDown": "Flytta ned",
+    "removeMetric": "Ta bort mätvärde",
+    "timeWindow": "Tidsfönster",
+    "areaFill": "Ytfyllnad",
+    "areaOpacity": "Ytopacitet",
+    "legend": "Förklaring",
     "decompressionCeiling": "Dekompressionstak",
     "ceilingLineColor": "Linjefärg",
     "ceilingAreaColor": "Fyllningsfärg",

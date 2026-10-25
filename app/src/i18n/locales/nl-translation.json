@@ -553,6 +553,7 @@
       "lapLog": "Rondeoverzicht"
     },
     "types": {
+      "rolling_chart": { "name": "Grafieken", "shortName": "Grafieken" },
       "diving_profile": {
         "name": "Duikprofiel",
         "shortName": "Duikprofiel"
@@ -612,6 +613,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Meetwaarden",
+    "chartMetric": "Meetwaarde",
+    "addMetric": "Meetwaarde toevoegen",
+    "moveUp": "Omhoog",
+    "moveDown": "Omlaag",
+    "removeMetric": "Meetwaarde verwijderen",
+    "timeWindow": "Tijdvenster",
+    "areaFill": "Vlakvulling",
+    "areaOpacity": "Vlakdekking",
+    "legend": "Legenda",
     "decompressionCeiling": "Decompressieplafond",
     "ceilingLineColor": "Lijnkleur",
     "ceilingAreaColor": "Vulkleur",

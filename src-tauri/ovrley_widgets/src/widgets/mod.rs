@@ -15,3 +15,5 @@ pub mod raster;
 pub mod route;
 pub mod elevation;
 pub mod diving_profile;
+pub mod plot_marker;
+pub mod rolling_chart;

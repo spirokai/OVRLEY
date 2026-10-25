@@ -12,6 +12,7 @@ use crate::{
     },
     widgets::{
         elevation::label::{ElevationLabel, LabelRun},
+        plot_marker::PlotMarker,
         route::layout::{outward, rotated_rect, scaled_rect, stroke_paint},
         value::preview::{SHAPE_COLOR_TYPE, ContentBounds},
     },
@@ -33,8 +34,7 @@ pub struct DivingProfileLayout {
     rotation: (f32, f32),
     matrix: Matrix,
     completed_line: Paint,
-    marker: Paint,
-    variant: Paint,
+    marker: PlotMarker,
 }
 
 struct DivingProfileMeasure {
@@ -56,6 +56,21 @@ pub struct DivingProfileFrame {
     pub content_bounds: ContentBounds,
     marker: Option<(f32, f32)>,
     labels: [Option<Arc<LabelRun>>; 2],
+}
+
+fn diving_marker(
+    config: &ValidatedDivingProfile,
+    scene: &ValidatedScenePresentation,
+    opacity: f32,
+) -> PlotMarker {
+    PlotMarker::new(
+        config.marker_variant,
+        config.marker_size,
+        config.marker_variant_diameter,
+        &config.marker_color,
+        config.marker_opacity * opacity,
+        scene.scale,
+    )
 }
 
 fn fill_paint(color: &str, opacity: f32) -> Paint {
@@ -108,14 +123,7 @@ impl DivingProfileLayout {
             0.0,
         ));
         let content = Self::measure_content(config, scene);
-        let radius =
-            (config.marker_size * scene.scale)
-                .max(2.0)
-                .max(match config.marker_variant.as_str() {
-                    "ring" => config.marker_variant_diameter * scene.scale * 0.5 + 0.75,
-                    "halo" => config.marker_variant_diameter * scene.scale * 0.5,
-                    _ => 0.0,
-                });
+        let radius = diving_marker(config, scene, opacity).extent();
         let mut raster = content;
         raster.join(
             Rect::new(
@@ -306,18 +314,7 @@ impl DivingProfileLayout {
                 Ok(())
             },
         )?;
-        let marker = fill_paint(&config.marker_color, config.marker_opacity * opacity);
-        let mut variant = marker.clone();
-        match config.marker_variant.as_str() {
-            "ring" => {
-                variant.set_style(skia_safe::paint::Style::Stroke);
-                variant.set_stroke_width(1.5);
-            }
-            "halo" => {
-                variant = fill_paint(&config.marker_color, config.marker_opacity * opacity * 0.35)
-            }
-            _ => {}
-        }
+        let marker = diving_marker(&config, &scene, opacity);
         Ok(Self {
             config,
             scene,
@@ -331,7 +328,6 @@ impl DivingProfileLayout {
             matrix,
             completed_line,
             marker,
-            variant,
         })
     }
 
@@ -392,18 +388,7 @@ impl DivingProfileLayout {
             return;
         };
         // Circular markers need only their scene position; avoid rotating their rasterization.
-        if self.config.marker_variant != "single" {
-            canvas.draw_circle(
-                marker,
-                self.config.marker_variant_diameter * self.scene.scale * 0.5,
-                &self.variant,
-            );
-        }
-        canvas.draw_circle(
-            marker,
-            (self.config.marker_size * self.scene.scale).max(2.0),
-            &self.marker,
-        );
+        self.marker.draw(canvas, marker);
         for (index, run) in frame.labels.iter().enumerate() {
             if let Some(run) = run {
                 self.labels[index]

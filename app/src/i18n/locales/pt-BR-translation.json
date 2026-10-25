@@ -553,6 +553,7 @@
       "lapLog": "Registro de voltas"
     },
     "types": {
+      "rolling_chart": { "name": "Gráficos", "shortName": "Gráficos" },
       "diving_profile": {
         "name": "Perfil de mergulho",
         "shortName": "Perfil de mergulho"
@@ -612,6 +613,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Métricas",
+    "chartMetric": "Métrica",
+    "addMetric": "Adicionar métrica",
+    "moveUp": "Mover para cima",
+    "moveDown": "Mover para baixo",
+    "removeMetric": "Remover métrica",
+    "timeWindow": "Janela de tempo",
+    "areaFill": "Preenchimento de área",
+    "areaOpacity": "Opacidade da área",
+    "legend": "Legenda",
     "decompressionCeiling": "Teto de descompressão",
     "ceilingLineColor": "Cor da linha",
     "ceilingAreaColor": "Cor da área",

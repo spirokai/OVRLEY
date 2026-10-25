@@ -13,6 +13,7 @@ use ovrley_widgets::model::telemetry::{mode_activity, widget_telemetry, Activity
 use ovrley_widgets::widgets::{
     backdrop::validation::ValidatedBackdrop, elevation::validation::ValidatedElevationPlot,
     diving_profile::validation::ValidatedDivingProfile,
+    rolling_chart::validation::ValidatedRollingChart,
     g_force::validation::GForceAxis, label::validation::ValidatedLabel,
     route::validation::ValidatedRoutePlot, value::validation::ValidatedValue,
 };
@@ -113,6 +114,11 @@ impl ValidatedRenderConfig {
         if !self.diving_profiles.is_empty() {
             requirements.include_widget("diving_profile");
         }
+        for chart in &self.rolling_charts {
+            for series in &chart.series {
+                requirements.include_widget(series.metric.as_str());
+            }
+        }
         requirements
     }
 }
@@ -128,6 +134,7 @@ pub struct ValidatedRenderConfig<S = ValidatedSceneConfig> {
     pub course_plots: Vec<ValidatedRoutePlot>,
     pub elevation_plots: Vec<ValidatedElevationPlot>,
     pub diving_profiles: Vec<ValidatedDivingProfile>,
+    pub rolling_charts: Vec<ValidatedRollingChart>,
 }
 
 /// Validates every value widget and label in the config. Returns the first
@@ -168,6 +175,7 @@ impl<S> ValidatedRenderConfig<S> {
             course_plots: self.course_plots,
             elevation_plots: self.elevation_plots,
             diving_profiles: self.diving_profiles,
+            rolling_charts: self.rolling_charts,
         }
     }
 }

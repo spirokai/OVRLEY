@@ -197,15 +197,3 @@ pub fn rgba_from_hex(hex: &str, field: &str, opacity: f32) -> WidgetResult<[u8; 
     let a = ((source_alpha as f32) * opacity.clamp(0.0, 1.0)).round() as u8;
     Ok([r, g, b, a])
 }
-
-// ---------------------------------------------------------------------------
-// Enum normalization
-// ---------------------------------------------------------------------------
-
-pub fn normalize_marker_variant(value: &str) -> String {
-    match value.to_lowercase().as_str() {
-        "ring" => "ring".to_string(),
-        "halo" => "halo".to_string(),
-        _ => "single".to_string(),
-    }
-}

@@ -4,6 +4,7 @@ import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { WIDGET_COLLECTIONS, requireWidgetTypeDefinition } from '@/lib/widget/widget-catalog'
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 import { widgetFonts } from '@/features/wasm-widgets/utils/previewSession'
+import i18n from '@/i18n'
 
 const FILL_GRADIENT = {
   track_filled_gradient: true,
@@ -27,6 +28,35 @@ export function createCases({ activities, template, image, frames, warmup, fps }
     ['course', 'course', 'ride', {}, { width: 560, height: 258, show_full_activity: true }],
     ['elevation', 'elevation', 'ride', {}, { width: 618, height: 163, show_full_activity: true }],
     ['diving_profile', 'diving_profile', 'dive', {}, { width: 618, height: 163, show_full_activity: true }],
+    ['rolling-chart', 'rolling_chart', 'ride', {}, {}],
+    // Defaults, then the same chart with its area fill switched off.
+    ...[
+      ['', {}],
+      ['-no-area', { area_fill: false }],
+      ['-flat-area', { area_fill: true, area_gradient: false }],
+    ].flatMap(([suffix, fill]) => [
+      [`rolling-chart-1-line${suffix}`, 'rolling_chart', 'ride', {}, { ...fill, series: [{ metric: 'speed', color: '#ffffff' }] }],
+      [
+        `rolling-chart-5-lines${suffix}`,
+        'rolling_chart',
+        'ride',
+        {},
+        {
+          ...fill,
+          series: ['speed', 'heartrate', 'cadence', 'power', 'temperature'].map((metric, index) => ({
+            metric,
+            color: ['#ffffff', '#e0103a', '#30c4d1', '#f5b700', '#7ed957'][index],
+          })),
+        },
+      ],
+    ]),
+    [
+      'rolling-chart-area-gradient',
+      'rolling_chart',
+      'ride',
+      {},
+      { width: 580, height: 110, window_seconds: 30, area_fill: true, area_gradient: true },
+    ],
     ['gradient', 'gradient', 'ride', {}, { font_size: 45, triangle_width: 36 }],
     ['time-daytime', 'time', 'ride', {}, { font_size: 45, time_mode: 'daytime' }],
     ['time-elapsed', 'time', 'ride', {}, { font_size: 45, time_mode: 'elapsed', elapsed_origin: 'activity' }],
@@ -138,6 +168,7 @@ export function createCases({ activities, template, image, frames, warmup, fps }
       course: ['sample_course_points'],
       elevation: ['sample_elevations'],
       diving_profile: ['depth', 'first_stop_depth'],
+      rolling_chart: ['speed', 'heartrate'],
       gradient: ['gradient'],
       lap_timer: ['lap_time_seconds', 'delta_to_best_lap_seconds'],
     }
@@ -156,7 +187,7 @@ export function createCases({ activities, template, image, frames, warmup, fps }
       config[definition.collection].push(mergeWidgetData(widget, { ...overrides, id, x: 200, y: 200 }))
       dynamic = definition.timeDependent
     }
-    const effective = createEditorEffectiveConfig({ config, globalDefaults: globals })
+    const effective = createEditorEffectiveConfig({ config, globalDefaults: globals, language: i18n.resolvedLanguage })
     let request = null
     let fonts = []
     if (type !== null) {

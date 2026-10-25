@@ -393,7 +393,7 @@ fn minimal_plot() -> ValidatedElevationPlot {
         area_completed_color: "#00ff00".into(),
         area_completed_opacity: 0.5,
         area_gradient: false,
-        marker_variant: "single".into(),
+        marker_variant: ovrley_widgets::widgets::plot_marker::MarkerVariant::Single,
         marker_variant_diameter: 0.0,
         marker_size: 8.0,
         marker_color: "#ff0000".into(),

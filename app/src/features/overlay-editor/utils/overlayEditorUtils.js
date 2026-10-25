@@ -41,7 +41,7 @@ export function getWidgetResizeOptions(widget, isGroupSelection) {
   return {
     canResizeSelected: true,
     canRotateSelected: widget.type === 'course' || widget.type === 'raster',
-    showEdgeResizeHandles: widget.type === 'raster' || widget.type === 'elevation' || widget.type === 'diving_profile',
+    showEdgeResizeHandles: ['raster', 'elevation', 'diving_profile', 'rolling_chart'].includes(widget.type),
     maintainAspectRatio:
       ['arc', 'corner', 'gt_gauge', 'lean_angle', 'heading_compass', 'g_force'].includes(widget.data.display_type) ||
       (widget.type === 'backdrop' && widget.data.display_type === 'circle') ||
@@ -50,13 +50,13 @@ export function getWidgetResizeOptions(widget, isGroupSelection) {
   }
 }
 
-function materializeWidget(globalDefaults, widget) {
-  return { ...widget, data: getEffectiveWidgetData(widget, globalDefaults) }
+function materializeWidget(globalDefaults, language, widget) {
+  return { ...widget, data: getEffectiveWidgetData(widget, globalDefaults, language) }
 }
 
 /** @param {object[]} rawWidgets Config widgets. @param {object} globalDefaults Validated defaults. @returns {object[]} Effective preview widgets. */
-export function materializeWidgets(rawWidgets, globalDefaults) {
-  return rawWidgets.map(materializeWidget.bind(null, globalDefaults))
+export function materializeWidgets(rawWidgets, globalDefaults, language) {
+  return rawWidgets.map(materializeWidget.bind(null, globalDefaults, language))
 }
 
 /** @param {object[]} widgets Ordered config widgets. @returns {string[]} Canonical widget IDs. */

@@ -3,6 +3,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { resolveVideoSyncMarkControls } from '@/features/video-sync'
 import { useWasmWidgetInteractions } from '@/features/wasm-widgets/hooks/useWasmWidgetInteractions'
@@ -73,7 +74,10 @@ export default function useOverlayEditorState({
     useWidgetDraftView(widgetLiveEdits)
 
   const rawWidgets = useMemo(() => buildConfigWidgets(config), [config])
-  const effectiveWidgets = useMemo(() => materializeWidgets(rawWidgets, globalDefaults), [globalDefaults, rawWidgets])
+  const { i18n } = useTranslation()
+  const language = i18n.resolvedLanguage
+  // Chart legends are projected in the app language, so a language switch re-materializes widgets.
+  const effectiveWidgets = useMemo(() => materializeWidgets(rawWidgets, globalDefaults, language), [globalDefaults, rawWidgets, language])
   const widgets = useMemo(() => applyWidgetDrafts(effectiveWidgets, liveWidgetDrafts), [effectiveWidgets, liveWidgetDrafts])
   const widgetMap = useMemo(() => getWidgetMap(widgets), [widgets])
   const orderedWidgetIds = useMemo(() => getOrderedWidgetIds(rawWidgets), [rawWidgets])

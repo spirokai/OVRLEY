@@ -392,8 +392,9 @@ export function SizeSlider({ onChange, onCommit, ...props }) {
  * @param {*} props.checked - Value for checked.
  * @param {*} props.onCheckedChange - Callback invoked to checked change.
  * @param {*} props.className - Additional class names to merge into the element.
+ * @param {boolean} [props.disabled=false] - Whether the switch is inert.
  * @returns {JSX.Element} Rendered component output.
  */
-export function ToggleField({ checked, onCheckedChange, className, label }) {
-  return <Switch size="xs" aria-label={label} checked={checked} onCheckedChange={onCheckedChange} className={className} />
+export function ToggleField({ checked, onCheckedChange, className, label, disabled = false }) {
+  return <Switch size="xs" aria-label={label} checked={checked} onCheckedChange={onCheckedChange} className={className} disabled={disabled} />
 }

@@ -363,6 +363,20 @@ impl ActivitySampler {
         column.at(&self.times, second)
     }
 
+    /// Rolling charts plot observed coverage only; a missing sample breaks the line.
+    pub fn plot_value(&self, metric: MetricKind, second: f64) -> Option<f64> {
+        let column = &self.numeric[&metric];
+        if second < 0.0 || second > self.end || !column.contains(second) {
+            return None;
+        }
+        column.at(&self.times, second)
+    }
+
+    /// Observed minimum and maximum over the whole activity, which a rolling chart spans.
+    pub fn plot_range(&self, metric: MetricKind) -> Option<(f64, f64)> {
+        self.numeric[&metric].range
+    }
+
     /// Heading uses the shortest arc while retaining gap bridging and edge clamping.
     pub fn heading_at(&self, second: f64) -> Option<f64> {
         if second < 0.0 || second > self.end {

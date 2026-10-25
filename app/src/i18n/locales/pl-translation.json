@@ -553,6 +553,7 @@
       "lapLog": "Rejestr okrążeń"
     },
     "types": {
+      "rolling_chart": { "name": "Wykresy", "shortName": "Wykresy" },
       "diving_profile": {
         "name": "Profil nurkowania",
         "shortName": "Profil nurkowania"
@@ -612,6 +613,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Metryki",
+    "chartMetric": "Metryka",
+    "addMetric": "Dodaj metrykę",
+    "moveUp": "Przesuń w górę",
+    "moveDown": "Przesuń w dół",
+    "removeMetric": "Usuń metrykę",
+    "timeWindow": "Okno czasowe",
+    "areaFill": "Wypełnienie obszaru",
+    "areaOpacity": "Krycie obszaru",
+    "legend": "Legenda",
     "decompressionCeiling": "Sufit dekompresyjny",
     "ceilingLineColor": "Kolor linii",
     "ceilingAreaColor": "Kolor obszaru",

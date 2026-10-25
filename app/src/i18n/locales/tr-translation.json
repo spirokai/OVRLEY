@@ -553,6 +553,7 @@
       "lapLog": "Tur günlüğü"
     },
     "types": {
+      "rolling_chart": { "name": "Grafikler", "shortName": "Grafikler" },
       "diving_profile": {
         "name": "Dalış Profili",
         "shortName": "Dalış Profili"
@@ -612,6 +613,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Ölçümler",
+    "chartMetric": "Ölçüm",
+    "addMetric": "Ölçüm ekle",
+    "moveUp": "Yukarı taşı",
+    "moveDown": "Aşağı taşı",
+    "removeMetric": "Ölçümü kaldır",
+    "timeWindow": "Zaman aralığı",
+    "areaFill": "Alan dolgusu",
+    "areaOpacity": "Alan opaklığı",
+    "legend": "Gösterge",
     "decompressionCeiling": "Dekompresyon Tavanı",
     "ceilingLineColor": "Çizgi Rengi",
     "ceilingAreaColor": "Alan Rengi",

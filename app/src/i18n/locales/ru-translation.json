@@ -553,6 +553,7 @@
       "lapLog": "Журнал кругов"
     },
     "types": {
+      "rolling_chart": { "name": "Графики", "shortName": "Графики" },
       "diving_profile": {
         "name": "Профиль погружения",
         "shortName": "Профиль погружения"
@@ -612,6 +613,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Метрики",
+    "chartMetric": "Метрика",
+    "addMetric": "Добавить метрику",
+    "moveUp": "Переместить вверх",
+    "moveDown": "Переместить вниз",
+    "removeMetric": "Удалить метрику",
+    "timeWindow": "Временное окно",
+    "areaFill": "Заливка области",
+    "areaOpacity": "Непрозрачность области",
+    "legend": "Легенда",
     "decompressionCeiling": "Декомпрессионный потолок",
     "ceilingLineColor": "Цвет линии",
     "ceilingAreaColor": "Цвет области",

@@ -553,6 +553,7 @@
       "lapLog": "Registro giri"
     },
     "types": {
+      "rolling_chart": { "name": "Grafici", "shortName": "Grafici" },
       "diving_profile": {
         "name": "Profilo di immersione",
         "shortName": "Profilo immersione"
@@ -612,6 +613,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Metriche",
+    "chartMetric": "Metrica",
+    "addMetric": "Aggiungi metrica",
+    "moveUp": "Sposta su",
+    "moveDown": "Sposta giù",
+    "removeMetric": "Rimuovi metrica",
+    "timeWindow": "Finestra temporale",
+    "areaFill": "Riempimento area",
+    "areaOpacity": "Opacità dell'area",
+    "legend": "Legenda",
     "decompressionCeiling": "Tetto di decompressione",
     "ceilingLineColor": "Colore linea",
     "ceilingAreaColor": "Colore area",

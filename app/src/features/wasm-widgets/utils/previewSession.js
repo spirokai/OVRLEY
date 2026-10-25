@@ -19,6 +19,7 @@ export function widgetFonts(widget) {
   if (widget.type === 'diving_profile') {
     return widget.data.show_depth_metric || widget.data.show_depth_imperial ? [{ font: widget.data.point_label.font }] : []
   }
+  if (widget.type === 'rolling_chart') return widget.data.show_legend ? [{ font: widget.data.legend_font }] : []
   if (widget.type === 'elevation') {
     return widget.data.show_elevation_metric || widget.data.show_elevation_imperial ? [{ font: widget.data.point_label.font }] : []
   }
