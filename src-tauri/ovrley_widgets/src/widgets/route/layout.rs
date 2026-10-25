@@ -12,7 +12,7 @@ use crate::{
     },
     widgets::{
         plot_marker::PlotMarker,
-        value::preview::{SHAPE_COLOR_TYPE, ContentBounds},
+        value::preview::{ContentBounds, SHAPE_COLOR_TYPE},
     },
 };
 
@@ -26,9 +26,7 @@ fn route_marker(config: &ValidatedRoutePlot, scene: &ValidatedScenePresentation)
         scene.scale,
     )
 }
-use skia_safe::{
-    BlurStyle, Canvas, MaskFilter, Paint, PaintCap, PaintJoin, Path, Point, Rect,
-};
+use skia_safe::{BlurStyle, Canvas, MaskFilter, Paint, PaintCap, PaintJoin, Path, Point, Rect};
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
@@ -188,7 +186,11 @@ impl RouteLayout {
                     canvas.translate((offset[0], offset[1]));
                     canvas.scale((scale[0], scale[1]));
                     let mut paint = stroke_paint(&scene.shadow_color, width / scale[0], opacity);
-                    paint.set_mask_filter(MaskFilter::blur(BlurStyle::Normal, blur / scale[0], true));
+                    paint.set_mask_filter(MaskFilter::blur(
+                        BlurStyle::Normal,
+                        blur / scale[0],
+                        true,
+                    ));
                     canvas.draw_path(&path, &paint);
                     canvas.restore();
                 }

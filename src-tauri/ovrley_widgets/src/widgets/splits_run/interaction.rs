@@ -1,5 +1,7 @@
 //! Uniform resizing: text, bars and gaps scale together with the opposite visible corner fixed.
-use super::{format::splits_content, layout::prepare_splits_layout, validation::validate_splits_run};
+use super::{
+    format::splits_content, layout::prepare_splits_layout, validation::validate_splits_run,
+};
 use crate::{
     activity::ActivitySampler,
     error::WidgetResult,
@@ -47,7 +49,8 @@ pub fn resize_splits_run(
     config.track_border_thickness *= factor;
     let table = activity.and_then(|activity| activity.split_table(config.length));
     let content = splits_content(table, second);
-    let (bounds, _) = prepare_splits_layout(&config, &scene, table, fonts)?.frame_bounds(table, &content);
+    let (bounds, _) =
+        prepare_splits_layout(&config, &scene, table, fonts)?.frame_bounds(table, &content);
     Ok(ResizeUpdate {
         x: config.x + point[0] - (bounds.left + bounds.width() * fixed[0]),
         y: config.y + point[1] - (bounds.top + bounds.height() * fixed[1]),

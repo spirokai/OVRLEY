@@ -43,7 +43,9 @@ impl WidgetHost {
                     value
                         .as_f64()
                         .filter(|value| value.is_finite())
-                        .ok_or_else(|| WidgetError::Config(format!("{field}: required finite second")))
+                        .ok_or_else(|| {
+                            WidgetError::Config(format!("{field}: required finite second"))
+                        })
                 })
                 .transpose()
         };
@@ -59,7 +61,8 @@ impl WidgetHost {
             .unwrap_or(false);
         let export_window = if active {
             let required = |field| {
-                finite(field)?.ok_or_else(|| WidgetError::Config(format!("{field}: required finite second")))
+                finite(field)?
+                    .ok_or_else(|| WidgetError::Config(format!("{field}: required finite second")))
             };
             let (start, end) = (required("start")?, required("end")?);
             if start < 0.0 || end <= start {
@@ -89,7 +92,9 @@ impl WidgetHost {
 
     pub(crate) fn placeholder_duration(&self) -> WidgetResult<f64> {
         self.placeholder_duration.ok_or_else(|| {
-            WidgetError::Config("preview_duration_seconds: required non-negative finite second".into())
+            WidgetError::Config(
+                "preview_duration_seconds: required non-negative finite second".into(),
+            )
         })
     }
 

@@ -623,6 +623,7 @@
     "removeMetric": "指標を削除",
     "timeWindow": "時間範囲",
     "areaFill": "塗りつぶし",
+    "lineCurve": "線の曲率",
     "areaOpacity": "塗りの不透明度",
     "legend": "凡例",
     "decompressionCeiling": "減圧シーリング",

@@ -623,6 +623,7 @@
     "removeMetric": "Remove metric",
     "timeWindow": "Time Window",
     "areaFill": "Area Fill",
+    "lineCurve": "Line Curve",
     "areaOpacity": "Area Opacity",
     "legend": "Legend",
     "decompressionCeiling": "Decompression Ceiling",

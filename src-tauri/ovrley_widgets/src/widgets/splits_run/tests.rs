@@ -6,14 +6,31 @@ use super::{
 
 fn table() -> SplitTable {
     SplitTable {
-        length: SplitLength { distance: 1.0, unit: SplitUnit::Km },
+        length: SplitLength {
+            distance: 1.0,
+            unit: SplitUnit::Km,
+        },
         first_split: 0,
         completed: vec![
-            CompletedSplit { end_seconds: 300.0, pace_seconds: 300.0 },
-            CompletedSplit { end_seconds: 540.0, pace_seconds: 240.0 },
+            CompletedSplit {
+                end_seconds: 300.0,
+                pace_seconds: 300.0,
+            },
+            CompletedSplit {
+                end_seconds: 540.0,
+                pace_seconds: 240.0,
+            },
         ],
         live_seconds: vec![0.0, 150.0, 299.0, 301.0, 400.0, 541.0, 600.0],
-        live_pace_seconds: vec![None, Some(310.0), Some(300.0), Some(250.0), Some(245.0), Some(280.0), Some(270.0)],
+        live_pace_seconds: vec![
+            None,
+            Some(310.0),
+            Some(300.0),
+            Some(250.0),
+            Some(245.0),
+            Some(280.0),
+            Some(270.0),
+        ],
         slowest_pace_seconds: Some(300.0),
     }
 }
@@ -42,9 +59,19 @@ fn content_quantizes_bars_against_the_slowest_split() {
     assert_eq!(content.completed, 1);
     // The next sample belongs to split 3, so split 2 holds its last one.
     assert_eq!(content.pace_text, "4:05");
-    assert_eq!(content.bar_ticks, Some((245.0 / 300.0 * f64::from(BAR_TICKS)).round() as u32));
+    assert_eq!(
+        content.bar_ticks,
+        Some((245.0 / 300.0 * f64::from(BAR_TICKS)).round() as u32)
+    );
     let missing = splits_content(None, 450.0);
-    assert_eq!((missing.number, missing.pace_text.as_str(), missing.bar_ticks), (1, "-:--", None));
+    assert_eq!(
+        (
+            missing.number,
+            missing.pace_text.as_str(),
+            missing.bar_ticks
+        ),
+        (1, "-:--", None)
+    );
     // Before the running split covers distance it shows the same placeholder.
     assert_eq!(splits_content(Some(&table), -1.0).bar_ticks, None);
 }

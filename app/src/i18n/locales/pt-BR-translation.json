@@ -623,6 +623,7 @@
     "removeMetric": "Remover métrica",
     "timeWindow": "Janela de tempo",
     "areaFill": "Preenchimento de área",
+    "lineCurve": "Curvatura da linha",
     "areaOpacity": "Opacidade da área",
     "legend": "Legenda",
     "decompressionCeiling": "Teto de descompressão",

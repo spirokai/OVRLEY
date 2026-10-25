@@ -7,10 +7,10 @@
 
 use super::config::CoursePlotConfig;
 use crate::error::{WidgetError, WidgetResult};
-use crate::widgets::plot_marker::MarkerVariant;
 use crate::model::validation::{
     require_f32, require_hex_color, require_non_negative_f32, require_opacity, require_positive_f32,
 };
+use crate::widgets::plot_marker::MarkerVariant;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedRoutePlot {

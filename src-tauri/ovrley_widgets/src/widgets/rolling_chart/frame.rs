@@ -1,10 +1,11 @@
 //! One frame samples every series across the window ending at the playhead.
-use super::layout::{normalized, sample_times, RollingChartCache};
+use super::layout::{normalized, cut_corners, sample_times, RollingChartCache};
 use crate::activity::ActivitySampler;
 use skia_safe::{Canvas, PathBuilder, Point};
 
 pub struct SeriesFrame {
-    /// Contiguous observed stretches; gaps in the telemetry break the line.
+    /// Contiguous observed stretches; gaps in the telemetry break the line. Curved charts
+    /// join the recorded samples, others the time grid.
     runs: Vec<Vec<Point>>,
     /// The playhead's value at the right edge, when observed.
     marker: Option<Point>,
@@ -22,27 +23,42 @@ impl RollingChartCache {
             .series
             .iter()
             .map(|style| {
-                let mut runs: Vec<Vec<Point>> = Vec::new();
+                let Some((activity, range)) =
+                    activity.and_then(|activity| activity.plot_range(style.metric).map(|range| (activity, range)))
+                else {
+                    return SeriesFrame { runs: Vec::new(), marker: None };
+                };
+                let point = |(time, value): (f64, f64)| Point::new(self.x(time, second), self.y(normalized(value, range)));
+                let mut runs: Vec<Vec<(f64, f64)>> = Vec::new();
                 let mut open = false;
                 let mut last = None;
-                let range = activity.and_then(|activity| activity.plot_range(style.metric));
                 for &time in &times {
-                    let point = activity.zip(range).and_then(|(activity, range)| {
-                        activity.plot_value(style.metric, time).map(|value| {
-                            Point::new(self.x(time, second), self.y(normalized(value, range)))
-                        })
-                    });
-                    match point {
-                        Some(point) if open => runs.last_mut().expect("open run").push(point),
-                        Some(point) => {
-                            runs.push(vec![point]);
+                    let sample = activity.plot_value(style.metric, time).map(|value| (time, value));
+                    match sample {
+                        Some(sample) if open => runs.last_mut().expect("open run").push(sample),
+                        Some(sample) => {
+                            runs.push(vec![sample]);
                             open = true;
                         }
                         None => open = false,
                     }
-                    last = point;
+                    last = sample;
                 }
-                SeriesFrame { runs, marker: last }
+                let runs = runs
+                    .into_iter()
+                    .map(|run| {
+                        let (first, end) = (run[0], run[run.len() - 1]);
+                        // Corners exist only at recorded samples; denser data than the grid draws the grid.
+                        let knots = (self.curve > 0.0 && run.len() > 1)
+                            .then(|| activity.plot_knots(style.metric, first.0, end.0, run.len()))
+                            .flatten();
+                        match knots {
+                            Some(knots) => [first].into_iter().chain(knots).chain([end]).map(point).collect(),
+                            None => run.into_iter().map(point).collect(),
+                        }
+                    })
+                    .collect();
+                SeriesFrame { runs, marker: last.map(point) }
             })
             .collect();
         RollingChartFrame { series }
@@ -56,9 +72,7 @@ impl RollingChartFrame {
             for run in &frame.runs {
                 let mut line = PathBuilder::new();
                 line.move_to(run[0]);
-                for point in &run[1..] {
-                    line.line_to(*point);
-                }
+                cut_corners(&mut line, run, cache.curve);
                 if run.len() == 1 {
                     // A lone sample still paints a round dot.
                     line.line_to(run[0]);
@@ -68,9 +82,8 @@ impl RollingChartFrame {
                     let (first, last) = (run[0], run[run.len() - 1]);
                     let mut fill = PathBuilder::new();
                     fill.move_to((first.x, cache.plot.bottom));
-                    for point in run {
-                        fill.line_to(*point);
-                    }
+                    fill.line_to(first);
+                    cut_corners(&mut fill, run, cache.curve);
                     fill.line_to((last.x, cache.plot.bottom));
                     fill.close();
                     canvas.draw_path(&fill.detach(), area);

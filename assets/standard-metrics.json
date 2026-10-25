@@ -595,7 +595,7 @@
           "arc_angle": 270,
           "tick_count": 9,
           "tick_length": 9,
-          "tick_color": "#8c8c8c",
+          "tick_color": "#adadad",
           "glow": 0.6,
           "track_fill_style": "fill",
           "inner_widget_offset_x": 0,

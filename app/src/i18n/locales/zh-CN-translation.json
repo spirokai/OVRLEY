@@ -623,6 +623,7 @@
     "removeMetric": "移除指标",
     "timeWindow": "时间窗口",
     "areaFill": "区域填充",
+    "lineCurve": "线条曲率",
     "areaOpacity": "区域不透明度",
     "legend": "图例",
     "decompressionCeiling": "减压上限",

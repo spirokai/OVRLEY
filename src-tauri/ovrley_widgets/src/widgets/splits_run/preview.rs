@@ -9,7 +9,9 @@ use crate::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
     host::WidgetHost,
-    model::scene::{validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation},
+    model::scene::{
+        validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
+    },
     render::preview::{render_tile, PreviewRasterScale, StaticRaster},
     render::text::FontResolver,
     widgets::value::{
@@ -46,10 +48,18 @@ impl PreviewSplitsRun {
     pub fn new(widget: ValueConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
         let config = validate_splits_run(widget, 0)?;
         let host = WidgetHost::from_scene(&scene)?;
-        Ok(Self::from_validated(config, validate_scene_presentation(scene)?, &host))
+        Ok(Self::from_validated(
+            config,
+            validate_scene_presentation(scene)?,
+            &host,
+        ))
     }
 
-    pub fn from_validated(config: ValidatedSplitsRun, scene: ValidatedScenePresentation, host: &WidgetHost) -> Self {
+    pub fn from_validated(
+        config: ValidatedSplitsRun,
+        scene: ValidatedScenePresentation,
+        host: &WidgetHost,
+    ) -> Self {
         Self {
             config,
             scene,
@@ -82,9 +92,18 @@ impl PreviewSplitsRun {
         self.drawn = None;
     }
 
-    fn layout(&mut self, table: Option<&SplitTable>, fonts: &dyn FontResolver) -> WidgetResult<&SplitsLayout> {
+    fn layout(
+        &mut self,
+        table: Option<&SplitTable>,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<&SplitsLayout> {
         if self.layout.is_none() {
-            self.layout = Some(prepare_splits_layout(&self.config, &self.scene, table, fonts)?);
+            self.layout = Some(prepare_splits_layout(
+                &self.config,
+                &self.scene,
+                table,
+                fonts,
+            )?);
         }
         Ok(self.layout.as_ref().expect("layout prepared"))
     }
@@ -98,7 +117,11 @@ impl PreviewSplitsRun {
     ) -> WidgetResult<TileBounds> {
         let table = self.table(activity);
         let content = splits_content(table, second);
-        Ok(self.layout(table, fonts)?.frame_bounds(table, &content).1.into())
+        Ok(self
+            .layout(table, fonts)?
+            .frame_bounds(table, &content)
+            .1
+            .into())
     }
 
     /// Draws the frame at `second` onto a host canvas in scene coordinates.
@@ -115,18 +138,33 @@ impl PreviewSplitsRun {
             let raster_scale = self.preview_raster_scale;
             let layout = self.layout(table, fonts)?;
             let frame = layout.prepare_frame(table, &content, raster_scale)?;
-            let raster = StaticRaster::new(raster_scale, Point::default(), frame.bounds, TEXT_COLOR_TYPE, |canvas| {
-                frame.draw(canvas, layout);
-                Ok(())
-            })?;
-            self.drawn = Some(DrawnFrame { content, raster, bounds: frame.bounds });
+            let raster = StaticRaster::new(
+                raster_scale,
+                Point::default(),
+                frame.bounds,
+                TEXT_COLOR_TYPE,
+                |canvas| {
+                    frame.draw(canvas, layout);
+                    Ok(())
+                },
+            )?;
+            self.drawn = Some(DrawnFrame {
+                content,
+                raster,
+                bounds: frame.bounds,
+            });
         }
         let drawn = self.drawn.as_ref().expect("splits frame drawn");
         drawn.raster.draw(canvas, None);
         Ok(drawn.bounds.into())
     }
 
-    pub fn render(&mut self, activity: Option<&ActivitySampler>, second: f64, fonts: &dyn FontResolver) -> WidgetResult<()> {
+    pub fn render(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<()> {
         let table = self.table(activity);
         let content = splits_content(table, second);
         if self.last_content.as_ref() == Some(&content) {

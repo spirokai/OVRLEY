@@ -19,7 +19,10 @@ impl HeartZonesCache {
                     indicator_x: Some(self.layout.indicator_x(index, progress)),
                 }
             }
-            None => HeartZonesFrame { state: 0, indicator_x: None },
+            None => HeartZonesFrame {
+                state: 0,
+                indicator_x: None,
+            },
         }
     }
 }

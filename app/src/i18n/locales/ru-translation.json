@@ -623,6 +623,7 @@
     "removeMetric": "Удалить метрику",
     "timeWindow": "Временное окно",
     "areaFill": "Заливка области",
+    "lineCurve": "Кривизна линий",
     "areaOpacity": "Непрозрачность области",
     "legend": "Легенда",
     "decompressionCeiling": "Декомпрессионный потолок",

@@ -110,10 +110,16 @@ pub(super) struct TextLayer {
 impl TextLayer {
     pub fn new(runs: Vec<TextRun>, x: f32, raster_scale: PreviewRasterScale) -> WidgetResult<Self> {
         let frame = LapTimerFrame::new(runs, None, x)?;
-        let raster = StaticRaster::new(raster_scale, Point::default(), frame.bounds, TEXT_COLOR_TYPE, |canvas| {
-            frame.draw(canvas);
-            Ok(())
-        })?;
+        let raster = StaticRaster::new(
+            raster_scale,
+            Point::default(),
+            frame.bounds,
+            TEXT_COLOR_TYPE,
+            |canvas| {
+                frame.draw(canvas);
+                Ok(())
+            },
+        )?;
         Ok(Self {
             raster,
             content_bounds: frame.content_bounds,
@@ -139,7 +145,11 @@ impl LapTimerFrame {
         x: f32,
     ) -> WidgetResult<Self> {
         let (mut content_bounds, mut bounds, mut content_width) = if let Some(layer) = &background {
-            (layer.content_bounds, layer.raster.bounds(), layer.content_width)
+            (
+                layer.content_bounds,
+                layer.raster.bounds(),
+                layer.content_width,
+            )
         } else {
             let first = runs
                 .first()

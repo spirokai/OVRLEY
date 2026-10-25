@@ -623,6 +623,7 @@
     "removeMetric": "지표 제거",
     "timeWindow": "시간 범위",
     "areaFill": "영역 채우기",
+    "lineCurve": "선 곡률",
     "areaOpacity": "영역 불투명도",
     "legend": "범례",
     "decompressionCeiling": "감압 천장",

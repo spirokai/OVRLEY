@@ -112,23 +112,30 @@ impl SplitTable {
         if !positive(self.length.distance) {
             return invalid("length must be finite and positive");
         }
-        if self.completed.iter().any(|split| {
-            !split.end_seconds.is_finite() || !positive(split.pace_seconds)
-        }) || self
+        if self
             .completed
-            .windows(2)
-            .any(|pair| pair[0].end_seconds >= pair[1].end_seconds)
+            .iter()
+            .any(|split| !split.end_seconds.is_finite() || !positive(split.pace_seconds))
+            || self
+                .completed
+                .windows(2)
+                .any(|pair| pair[0].end_seconds >= pair[1].end_seconds)
         {
             return invalid("completed splits must be ordered with finite positive paces");
         }
         if self.live_seconds.len() != self.live_pace_seconds.len()
             || self.live_seconds.iter().any(|second| !second.is_finite())
             || self.live_seconds.windows(2).any(|pair| pair[0] >= pair[1])
-            || self.live_pace_seconds.iter().flatten().any(|pace| !positive(*pace))
+            || self
+                .live_pace_seconds
+                .iter()
+                .flatten()
+                .any(|pace| !positive(*pace))
         {
             return invalid("live paces must align with increasing finite seconds");
         }
-        let has_pace = !self.completed.is_empty() || self.live_pace_seconds.iter().any(Option::is_some);
+        let has_pace =
+            !self.completed.is_empty() || self.live_pace_seconds.iter().any(Option::is_some);
         match self.slowest_pace_seconds {
             Some(pace) if has_pace && positive(pace) => Ok(()),
             None if !has_pace => Ok(()),
@@ -152,7 +159,11 @@ impl SplitTable {
 
     /// Interpolates between the running split's own samples; the edges hold its nearest one.
     fn live_pace_at(&self, completed: usize, second: f64) -> Option<f64> {
-        if self.live_seconds.first().is_none_or(|first| second < *first) {
+        if self
+            .live_seconds
+            .first()
+            .is_none_or(|first| second < *first)
+        {
             return None;
         }
         let next = self.live_seconds.partition_point(|time| *time <= second);

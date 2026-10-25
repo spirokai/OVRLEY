@@ -270,12 +270,26 @@ fn draw_segmented_fill(
     let radius = geometry.radius + cache.track_thickness;
     let mut wedge = PathBuilder::new();
     wedge.move_to((geometry.center_x, geometry.center_y));
-    wedge.line_to(arc_point(geometry.center_x, geometry.center_y, radius, start));
-    append_circular_arc(&mut wedge, geometry.center_x, geometry.center_y, radius, start, sweep);
+    wedge.line_to(arc_point(
+        geometry.center_x,
+        geometry.center_y,
+        radius,
+        start,
+    ));
+    append_circular_arc(
+        &mut wedge,
+        geometry.center_x,
+        geometry.center_y,
+        radius,
+        start,
+        sweep,
+    );
     wedge.close();
-    cache.fill.draw(canvas, &FillShape::Path(wedge.detach()), |paint| {
-        draw_bars(canvas, cache, geometry, bars, filled_count, paint)
-    });
+    cache
+        .fill
+        .draw(canvas, &FillShape::Path(wedge.detach()), |paint| {
+            draw_bars(canvas, cache, geometry, bars, filled_count, paint)
+        });
 }
 
 fn draw_continuous_fill(

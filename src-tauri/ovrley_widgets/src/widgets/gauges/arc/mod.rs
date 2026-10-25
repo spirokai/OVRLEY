@@ -15,11 +15,11 @@ use crate::{
     error::WidgetResult,
     model::{scene::ValidatedScenePresentation, types::TrackFillStyle},
     render::preview::{PreviewRasterScale, StaticRaster},
-    render::track_fill::TrackFill,
     render::text::{
         origin_x_for_centered_text, parse_color, resolve_font, validated_value_style, FontResolver,
         ResolvedTextStyle,
     },
+    render::track_fill::TrackFill,
     widgets::value::preview::SHAPE_COLOR_TYPE,
 };
 pub use geometry::{
@@ -315,8 +315,11 @@ pub fn prepare_arc_gauge_cache(
     fonts: &dyn FontResolver,
     raster_scale: PreviewRasterScale,
 ) -> WidgetResult<ArcGaugeCache> {
-    measure_arc_gauge(gauge, scene, range, altitude_offset_m, unit_text, fonts)?
-        .into_cache(gauge, scene, raster_scale)
+    measure_arc_gauge(gauge, scene, range, altitude_offset_m, unit_text, fonts)?.into_cache(
+        gauge,
+        scene,
+        raster_scale,
+    )
 }
 
 impl ArcGaugeCache {

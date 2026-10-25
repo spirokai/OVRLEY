@@ -623,6 +623,7 @@
     "removeMetric": "Messwert entfernen",
     "timeWindow": "Zeitfenster",
     "areaFill": "Flächenfüllung",
+    "lineCurve": "Linienkrümmung",
     "areaOpacity": "Flächendeckkraft",
     "legend": "Legende",
     "decompressionCeiling": "Dekompressionsgrenze",

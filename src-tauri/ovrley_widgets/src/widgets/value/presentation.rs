@@ -9,10 +9,7 @@ use crate::widgets::time::{
     validation::{validate_time_value, ValidatedTimeValue},
 };
 use crate::{
-    activity::ActivitySampler,
-    error::WidgetResult,
-    host::WidgetHost,
-    model::types::MetricKind,
+    activity::ActivitySampler, error::WidgetResult, host::WidgetHost, model::types::MetricKind,
 };
 
 pub enum ValuePresentation {

@@ -232,7 +232,11 @@ pub fn resolve_styled_font(
     font.set_edging(skia_safe::font::Edging::SubpixelAntiAlias);
     font.set_subpixel(true);
     let grid_fit = fonts.grid_fit();
-    font.set_hinting(if grid_fit { skia_safe::FontHinting::Full } else { skia_safe::FontHinting::None });
+    font.set_hinting(if grid_fit {
+        skia_safe::FontHinting::Full
+    } else {
+        skia_safe::FontHinting::None
+    });
     font.set_baseline_snap(grid_fit);
     Ok(font)
 }

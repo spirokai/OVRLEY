@@ -82,7 +82,8 @@ export default function PlotMarkerSection({
           disabled={disabled}
           valueDisplay={`${opacity}`}
           suffix="%"
-          onSliderChange={(marker_opacity) => updateWidgetData(widget.id, { marker_opacity })}
+          onSliderChange={(marker_opacity) => updateWidgetSize(widget.id, { marker_opacity })}
+          onSliderCommit={commit}
         />
         {variant !== 'single' ? (
           <SizeSlider

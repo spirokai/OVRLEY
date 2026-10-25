@@ -1,4 +1,5 @@
-use super::layout::{normalized, sample_times, wrap_entries};
+use super::layout::{normalized, cut_corners, sample_times, wrap_entries};
+use skia_safe::{PathBuilder, Point};
 
 #[test]
 fn samples_span_both_window_edges_on_a_fixed_time_grid() {
@@ -36,4 +37,21 @@ fn legend_entries_wrap_onto_new_rows_at_the_plot_width() {
     // An entry wider than the plot still occupies its own row instead of an empty one.
     assert_eq!(wrap_entries(&[150.0, 20.0], 10.0, 100.0), vec![(0, 0.0), (1, 0.0)]);
     assert_eq!(wrap_entries(&[20.0, 150.0], 10.0, 100.0), vec![(0, 0.0), (1, 0.0)]);
+}
+
+#[test]
+fn cut_corners_stay_inside_the_polyline_and_vanish_at_zero() {
+    // Screen y grows downward: the middle sample is a spike, then a ramp kink.
+    let vertices = [Point::new(0.0, 100.0), Point::new(40.0, 0.0), Point::new(80.0, 100.0), Point::new(120.0, 60.0), Point::new(160.0, 50.0)];
+    let traced = |curve: f32| {
+        let mut path = PathBuilder::new();
+        path.move_to(vertices[0]);
+        cut_corners(&mut path, &vertices, curve);
+        path.detach().compute_tight_bounds()
+    };
+    assert_eq!(traced(0.0).top, 0.0);
+    // Cutting more of each segment lowers the spike's tip further, never past its neighbours.
+    let (half, full) = (traced(0.5), traced(1.0));
+    assert!(0.0 < half.top && half.top < full.top && full.top < 100.0);
+    assert_eq!(full.bottom, 100.0);
 }

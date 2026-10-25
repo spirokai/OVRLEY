@@ -12,7 +12,7 @@ use crate::{
     widgets::{plot_marker::PlotMarker, value::preview::SHAPE_COLOR_TYPE},
 };
 use skia_safe::{
-    gradient, paint::Style, Color4f, Paint, PaintCap, PaintJoin, Point, Rect, TextBlob, TileMode,
+    gradient, paint::Style, Color4f, Paint, PaintCap, PaintJoin, PathBuilder, Point, Rect, TextBlob, TileMode,
 };
 
 /// Legend row height, swatch length and gaps, relative to the legend font size.
@@ -150,6 +150,8 @@ pub struct RollingChartCache {
     pub(crate) window: f64,
     /// Seconds between grid samples.
     pub(crate) step: f64,
+    /// 0..=2: corner cut share of each half segment, then pull toward neighbours beyond 1.
+    pub(crate) curve: f32,
     pub(crate) series: Vec<SeriesStyle>,
     pub(crate) legend: Option<StaticRaster>,
     /// Stable raster bounds: lines, areas and markers never leave them.
@@ -275,6 +277,7 @@ pub fn prepare_rolling_chart_cache(
         stroke,
         window,
         step: window / f64::from((plot.width() / SAMPLE_SPACING).max(1.0)),
+        curve: chart.line_curve,
         series,
         legend,
         bounds: Rect::new(
@@ -346,4 +349,42 @@ fn draw_legend(
             Ok(())
         },
     )
+}
+
+/// Continues a path standing at `vertices[0]` through the rest. Each interior corner is cut
+/// by a quadratic curve over `curve` of the half segments beside it, with the vertex as its
+/// control point: the tip moves inward and the curve stays inside the corner. Beyond 1,
+/// interior vertices first pull toward their neighbours' midpoint, up to halfway at 2.
+pub fn cut_corners(path: &mut PathBuilder, vertices: &[Point], curve: f32) {
+    let last = vertices.len() - 1;
+    let pulled: Vec<Point>;
+    let vertices = if curve > 1.0 {
+        let pull = (curve - 1.0) / 2.0;
+        pulled = (0..=last)
+            .map(|i| match i {
+                0 => vertices[0],
+                i if i == last => vertices[last],
+                i => {
+                    let at = vertices[i];
+                    at + ((vertices[i - 1] + vertices[i + 1]) * 0.5 - at) * pull
+                }
+            })
+            .collect();
+        &pulled
+    } else {
+        vertices
+    };
+    let curve = curve.min(1.0);
+    if curve > 0.0 {
+        for window in vertices.windows(3) {
+            let (before, at, after) = (window[0], window[1], window[2]);
+            path.line_to(at + (before - at) * (curve / 2.0));
+            path.quad_to(at, at + (after - at) * (curve / 2.0));
+        }
+    } else {
+        for point in &vertices[1..last] {
+            path.line_to(*point);
+        }
+    }
+    path.line_to(vertices[last]);
 }

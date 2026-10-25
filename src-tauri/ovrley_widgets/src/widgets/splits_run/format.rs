@@ -43,7 +43,9 @@ pub fn splits_content(table: Option<&SplitTable>, second: f64) -> SplitsContent 
     SplitsContent {
         completed: sample.completed,
         number: sample.number,
-        pace_text: sample.pace_seconds.map_or_else(|| PLACEHOLDER.into(), format_pace),
+        pace_text: sample
+            .pace_seconds
+            .map_or_else(|| PLACEHOLDER.into(), format_pace),
         bar_ticks: sample
             .pace_seconds
             .map(|pace| (table.bar_fraction(pace) * f64::from(BAR_TICKS)).round() as u32),
@@ -59,7 +61,11 @@ pub struct SplitRow {
 }
 
 /// Completed rows shown under the running split, newest first, within `max_splits` rows in total.
-pub fn completed_rows(config: &ValidatedSplitsRun, table: Option<&SplitTable>, completed: usize) -> Vec<SplitRow> {
+pub fn completed_rows(
+    config: &ValidatedSplitsRun,
+    table: Option<&SplitTable>,
+    completed: usize,
+) -> Vec<SplitRow> {
     let Some(table) = table else {
         return Vec::new();
     };

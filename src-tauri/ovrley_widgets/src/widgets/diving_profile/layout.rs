@@ -14,7 +14,7 @@ use crate::{
         elevation::label::{ElevationLabel, LabelRun},
         plot_marker::PlotMarker,
         route::layout::{outward, rotated_rect, scaled_rect, stroke_paint},
-        value::preview::{SHAPE_COLOR_TYPE, ContentBounds},
+        value::preview::{ContentBounds, SHAPE_COLOR_TYPE},
     },
 };
 use skia_safe::{BlurStyle, Canvas, MaskFilter, Matrix, Paint, Point, Rect};

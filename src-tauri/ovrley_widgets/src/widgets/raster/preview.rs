@@ -1,7 +1,13 @@
-use super::{config::RasterConfig, frame::RasterFrame, validation::{validate_raster_geometry, RasterGeometry}};
+use super::{
+    config::RasterConfig,
+    frame::RasterFrame,
+    validation::{validate_raster_geometry, RasterGeometry},
+};
 use crate::{
     error::{WidgetError, WidgetResult},
-    model::scene::{validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation},
+    model::scene::{
+        validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
+    },
     render::image::{ImageSource, RasterImage},
     widgets::value::preview::{TileBounds, WidgetGeometry},
 };
@@ -80,9 +86,10 @@ impl PreviewRaster {
         let source = if widget.path.is_none() || widget.resource_error_code.is_some() {
             None
         } else {
-            let id = widget.resource_id.as_ref().ok_or_else(|| {
-                WidgetError::Config("Raster has no loaded image resource".into())
-            })?;
+            let id = widget
+                .resource_id
+                .as_ref()
+                .ok_or_else(|| WidgetError::Config("Raster has no loaded image resource".into()))?;
             Some((id.clone(), images.resolve_image(id)?))
         };
         Self::build(&config, &scene, source, previous)
@@ -165,12 +172,20 @@ impl PreviewRaster {
                 AlphaType::Unpremul,
                 None,
             );
-            self.image = Some(
-                images::raster_from_data(&info, Data::new_copy(&self.pixels), width as usize * 4)
-                    .ok_or_else(|| WidgetError::Render("unable to wrap raster RGBA pixels".into()))?,
-            );
+            self.image =
+                Some(
+                    images::raster_from_data(
+                        &info,
+                        Data::new_copy(&self.pixels),
+                        width as usize * 4,
+                    )
+                    .ok_or_else(|| {
+                        WidgetError::Render("unable to wrap raster RGBA pixels".into())
+                    })?,
+                );
         }
-        self.frame.draw(canvas, self.image.as_ref(), self.scene_opacity);
+        self.frame
+            .draw(canvas, self.image.as_ref(), self.scene_opacity);
         Ok(self.layout_bounds())
     }
 }

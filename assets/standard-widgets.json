@@ -389,6 +389,7 @@
         "window_seconds": 30,
         "line_width": 4,
         "line_opacity": 100,
+        "line_curve": 50,
         "area_fill": true,
         "area_gradient": true,
         "area_opacity": 60,

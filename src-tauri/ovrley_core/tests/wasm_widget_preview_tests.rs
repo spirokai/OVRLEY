@@ -3451,7 +3451,7 @@ fn rolling_chart_preview() -> (PreviewSession, Value) {
     request["widget"] = manifest["definitions"].as_array().unwrap().iter().find(|w| w["type"] == "rolling_chart").unwrap()["defaults"].clone();
     request["widget"].as_object_mut().unwrap().extend(json!({
         "x": 60.25, "y": 80.5, "width": 300, "height": 90, "opacity": 0.9, "window_seconds": 5,
-        "area_fill": true, "area_gradient": true, "marker_variant": "ring", "marker_variant_diameter": 20,
+        "area_fill": true, "area_gradient": true, "line_curve": 60, "marker_variant": "ring", "marker_variant_diameter": 20,
         "legend_font": "Inter.ttf", "legend_font_size": 14,
         "series": [
             {"metric": "speed", "label": "Speed", "color": "#ffffff"},

@@ -44,6 +44,9 @@ pub struct ValidatedRollingChart {
     pub line_width: f32,
     /// 0..=1.
     pub line_opacity: f32,
+    /// 0..=2: up to 1 the share of each half segment a corner cut spans; beyond, how far
+    /// samples also pull toward their neighbours first.
+    pub line_curve: f32,
     /// Area opacity in 0..=1; none without an area fill.
     pub area_opacity: Option<f32>,
     pub area_gradient: bool,
@@ -125,6 +128,8 @@ pub fn validate_rolling_chart(
         )?),
         line_width: ranged(chart.line_width, "line_width", 0.5, 50.0)?,
         line_opacity: percent(chart.line_opacity, "line_opacity")?,
+        // The first half of the percentage cuts corners; the second also pulls samples inward.
+        line_curve: percent(chart.line_curve, "line_curve")? * 2.0,
         area_opacity: chart.area_fill.then_some(area_opacity),
         area_gradient: chart.area_gradient,
         series,

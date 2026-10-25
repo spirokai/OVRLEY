@@ -13,7 +13,12 @@ struct RectangleCorners {
     bottom_left: bool,
 }
 
-pub(crate) fn draw_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f32, opacity: f32) {
+pub(crate) fn draw_backdrop(
+    canvas: &Canvas,
+    backdrop: &ValidatedBackdrop,
+    scale: f32,
+    opacity: f32,
+) {
     match backdrop.display_type {
         BackdropType::Circle => draw_circle_backdrop(canvas, backdrop, scale, opacity),
         BackdropType::Rectangle => draw_rectangle_backdrop(canvas, backdrop, scale, opacity),
@@ -47,7 +52,12 @@ fn draw_circle_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f3
     canvas.draw_circle(center, (diameter - border).max(0.0) * 0.5, &border_paint);
 }
 
-fn draw_rectangle_backdrop(canvas: &Canvas, backdrop: &ValidatedBackdrop, scale: f32, opacity: f32) {
+fn draw_rectangle_backdrop(
+    canvas: &Canvas,
+    backdrop: &ValidatedBackdrop,
+    scale: f32,
+    opacity: f32,
+) {
     let width = backdrop.width * scale;
     let height = backdrop.height * scale;
     let border = (backdrop.border_thickness * scale).max(0.0);

@@ -187,9 +187,22 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
             step={1}
             valueDisplay={`${data.line_opacity}`}
             suffix="%"
-            onSliderChange={(line_opacity) => updateWidgetData(widget.id, { line_opacity })}
+            onSliderChange={(line_opacity) => updateWidgetSize(widget.id, { line_opacity })}
+            onSliderCommit={commit}
           />
         </div>
+        <SliderField
+          editable
+          label={t('widget-editor.lineCurve', 'Line Curve')}
+          value={data.line_curve}
+          min={0}
+          max={100}
+          step={5}
+          valueDisplay={`${data.line_curve}`}
+          suffix="%"
+          onSliderChange={(line_curve) => updateWidgetSize(widget.id, { line_curve })}
+          onSliderCommit={commit}
+        />
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center justify-between gap-2 px-1">
             <Label className={TOGGLE_LABEL_CLASS}>{t('widget-editor.areaFill', 'Area Fill')}</Label>
@@ -221,7 +234,8 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
           disabled={!data.area_fill}
           valueDisplay={`${data.area_opacity}`}
           suffix="%"
-          onSliderChange={(area_opacity) => updateWidgetData(widget.id, { area_opacity })}
+          onSliderChange={(area_opacity) => updateWidgetSize(widget.id, { area_opacity })}
+          onSliderCommit={commit}
         />
       </div>
       <PlotMarkerSection

@@ -15,7 +15,7 @@ use crate::{
         validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
     },
     render::preview::{render_tile, PreviewRasterScale},
-    widgets::value::preview::{SHAPE_COLOR_TYPE, TileBounds, WidgetGeometry},
+    widgets::value::preview::{TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
 };
 use skia_safe::{Canvas, Surface};
 use std::sync::Arc;
@@ -233,11 +233,7 @@ impl PreviewRoute {
     }
 
     /// Prepares the layout for the geometry at `second`; reports whether it was rebuilt.
-    fn layout(
-        &mut self,
-        activity: Option<&ActivitySampler>,
-        second: f64,
-    ) -> WidgetResult<bool> {
+    fn layout(&mut self, activity: Option<&ActivitySampler>, second: f64) -> WidgetResult<bool> {
         let geometry = self.geometry_at(activity, second)?;
         let changed = self
             .layout
@@ -277,14 +273,22 @@ impl PreviewRoute {
         second: f64,
     ) -> WidgetResult<(usize, f32)> {
         self.layout(activity, second)?;
-        let geometry = &self.layout.as_ref().expect("route layout prepared").geometry;
+        let geometry = &self
+            .layout
+            .as_ref()
+            .expect("route layout prepared")
+            .geometry;
         let progress = self.progress(activity, second, geometry.source_point_count == 0);
         Ok((Arc::as_ptr(geometry) as usize, progress))
     }
 
     pub fn render(&mut self, activity: Option<&ActivitySampler>, second: f64) -> WidgetResult<()> {
         let layout_changed = self.layout(activity, second)?;
-        let geometry = &self.layout.as_ref().expect("route layout prepared").geometry;
+        let geometry = &self
+            .layout
+            .as_ref()
+            .expect("route layout prepared")
+            .geometry;
         let progress = self.progress(activity, second, geometry.source_point_count == 0);
         if !layout_changed && self.last_progress == Some(progress) {
             return Ok(());

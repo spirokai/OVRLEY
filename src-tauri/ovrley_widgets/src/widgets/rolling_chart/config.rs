@@ -24,6 +24,7 @@ pub struct RollingChartConfig {
     pub window_seconds: f32,
     pub line_width: f32,
     pub line_opacity: f32,
+    pub line_curve: f32,
     pub area_fill: bool,
     pub area_gradient: bool,
     pub area_opacity: f32,

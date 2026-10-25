@@ -14,12 +14,12 @@ use crate::{
     widgets::{
         plot_marker::PlotMarker,
         route::layout::{outward, rotated_rect, scaled_rect, stroke_paint},
-        value::preview::{SHAPE_COLOR_TYPE, ContentBounds},
+        value::preview::{ContentBounds, SHAPE_COLOR_TYPE},
     },
 };
 use skia_safe::{
-    gradient, path_utils, BlurStyle, Canvas, ClipOp, Color4f, MaskFilter, Matrix, Paint,
-    Path, PathBuilder, Point, Rect, TileMode,
+    gradient, path_utils, BlurStyle, Canvas, ClipOp, Color4f, MaskFilter, Matrix, Paint, Path,
+    PathBuilder, Point, Rect, TileMode,
 };
 use std::sync::{Arc, Mutex};
 
@@ -63,7 +63,10 @@ pub struct ElevationFrame {
     labels: [Option<Arc<LabelRun>>; 2],
 }
 
-fn elevation_marker(config: &ValidatedElevationPlot, scene: &ValidatedScenePresentation) -> PlotMarker {
+fn elevation_marker(
+    config: &ValidatedElevationPlot,
+    scene: &ValidatedScenePresentation,
+) -> PlotMarker {
     PlotMarker::new(
         config.marker_variant,
         config.marker_size,
@@ -265,7 +268,15 @@ impl ElevationLayout {
         elevation_range: Option<(f64, f64)>,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Rect> {
-        Ok(Self::measure(config, scene, geometry, altitude_offset_m, elevation_range, fonts)?.bounds)
+        Ok(Self::measure(
+            config,
+            scene,
+            geometry,
+            altitude_offset_m,
+            elevation_range,
+            fonts,
+        )?
+        .bounds)
     }
 
     pub fn new(
@@ -287,7 +298,14 @@ impl ElevationLayout {
             bounds,
             content_bounds,
             rotation: (sin, cos),
-        } = Self::measure(&config, &scene, &geometry, altitude_offset_m, elevation_range, fonts)?;
+        } = Self::measure(
+            &config,
+            &scene,
+            &geometry,
+            altitude_offset_m,
+            elevation_range,
+            fonts,
+        )?;
         let paths = geometry.paths.lock().expect("elevation paths lock");
         let matrix = Matrix::scale((scale[0], scale[1]));
         let path = paths.0.with_transform(&matrix);

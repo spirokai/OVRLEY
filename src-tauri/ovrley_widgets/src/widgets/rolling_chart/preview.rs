@@ -7,7 +7,9 @@ use crate::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
     host::WidgetHost,
-    model::scene::{validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation},
+    model::scene::{
+        validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
+    },
     render::{
         preview::{render_tile, PreviewRasterScale},
         text::FontResolver,
@@ -68,8 +70,15 @@ impl PreviewRollingChart {
     }
 
     /// Draws the frame at `second` onto a host canvas in scene coordinates.
-    pub fn draw(&self, canvas: &Canvas, activity: Option<&ActivitySampler>, second: f64) -> TileBounds {
-        self.cache.prepare_frame(activity, second).draw(canvas, &self.cache);
+    pub fn draw(
+        &self,
+        canvas: &Canvas,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+    ) -> TileBounds {
+        self.cache
+            .prepare_frame(activity, second)
+            .draw(canvas, &self.cache);
         self.cache.bounds.into()
     }
 
