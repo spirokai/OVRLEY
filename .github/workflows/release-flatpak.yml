@@ -49,6 +49,24 @@ jobs:
           sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
+      - name: Diagnose AppStream metadata
+        continue-on-error: true
+        shell: bash
+        run: |
+          # flatpak-builder deletes the compose issue report on failure. Run the same compose
+          # on a mock install tree so its details are visible in this log, before the long build.
+          appstreamcli --version
+          appstreamcli compose --help | head -40
+          appstreamcli validate --no-net packaging/flatpak/cc.ovrley.OVRLEY.metainfo.xml || true
+          mock="$RUNNER_TEMP/mock/files"
+          install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.desktop "$mock/share/applications/cc.ovrley.OVRLEY.desktop"
+          install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.metainfo.xml "$mock/share/metainfo/cc.ovrley.OVRLEY.metainfo.xml"
+          install -Dm644 src-tauri/icons/icon.svg "$mock/share/icons/hicolor/scalable/apps/cc.ovrley.OVRLEY.svg"
+          install -Dm644 src-tauri/icons/icon.png "$mock/share/icons/hicolor/512x512/apps/cc.ovrley.OVRLEY.png"
+          appstreamcli compose --verbose --print-report=full --prefix=/ --origin=flatpak \
+            --components=cc.ovrley.OVRLEY,cc.ovrley.OVRLEY.desktop \
+            --result-root="$RUNNER_TEMP/mock/out" "$mock" || true
+
       - name: Download WASM bindings
         uses: actions/download-artifact@v7
         with:

@@ -40,16 +40,6 @@
   <requires>
     <display_length compare="ge">1100</display_length>
   </requires>
-  <screenshots>
-    <screenshot type="default">
-      <caption>Telemetry overlay rendered on top of video footage</caption>
-      <image type="source">https://raw.githubusercontent.com/spirokai/OVRLEY/main/docs/screenshots/hero.jpg</image>
-    </screenshot>
-    <screenshot>
-      <caption>Another overlay layout</caption>
-      <image type="source">https://raw.githubusercontent.com/spirokai/OVRLEY/main/docs/screenshots/hero2.jpg</image>
-    </screenshot>
-  </screenshots>
   <releases>
     <release version="2.49.2" date="2026-10-13" />
   </releases>
