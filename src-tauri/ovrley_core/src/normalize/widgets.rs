@@ -24,6 +24,7 @@ use ovrley_widgets::widgets::{
     heart_zones::validation::validate_heart_zones,
     label::validation::validate_label,
     lap_timer::validation::validate_lap_timer,
+    splits_run::validation::validate_splits_run,
     lean_angle::validation::validate_lean_angle,
     route::{
         config::CoursePlotConfig,
@@ -102,6 +103,9 @@ fn validate_render_value(
             .map_err(Into::into),
         (MetricKind::LapTimer, _) => validate_lap_timer(value, index)
             .map(ValidatedValue::LapTimer)
+            .map_err(Into::into),
+        (MetricKind::SplitsRun, _) => validate_splits_run(value, index)
+            .map(ValidatedValue::SplitsRun)
             .map_err(Into::into),
         (MetricKind::Time, DisplayType::Text) => validate_time_value(value, index)
             .map(ValidatedValue::TimeText)

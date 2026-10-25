@@ -231,6 +231,45 @@
         },
         "geometryFields": ["x", "y"]
       },
+      "splits_run": {
+        "labelKey": "widgets.displayTypes.splitsRun",
+        "icon": {
+          "source": "shared",
+          "assetFile": "display-type-splits-run.svg"
+        },
+        "layoutMode": "intrinsic",
+        "defaults": {
+          "font_size": 30,
+          "label": "SPLITS",
+          "label_font": "Arial.ttf",
+          "label_font_size": 15,
+          "label_color": "#ffffff",
+          "split_distance": 1,
+          "split_unit": "km",
+          "max_splits": 10,
+          "visible_columns": ["split", "bar", "pace"],
+          "row_gap": 8,
+          "bar_width": 160,
+          "track_thickness": 20,
+          "track_corner_radius": 4,
+          "track_filled_color": "#dce2e8",
+          "track_filled_opacity": 1,
+          "track_filled_gradient": false,
+          "track_filled_gradient_stops": [
+            { "offset": 0, "color": "#40e0d0" },
+            { "offset": 1, "color": "#c65102" }
+          ],
+          "track_border_thickness": 0,
+          "track_border_color": "#ffffff",
+          "track_border_opacity": 1
+        },
+        "geometryBindings": {},
+        "globalBindings": {
+          "label_font": "font_text",
+          "label_color": "color_text"
+        },
+        "geometryFields": ["x", "y"]
+      },
       "heading_tape": {
         "labelKey": "widgets.displayTypes.headingTape",
         "icon": {
@@ -2174,6 +2213,31 @@
         "display_type": "lap_timer"
       },
       "displayTypes": ["lap_timer"]
+    },
+    {
+      "type": "splits_run",
+      "activity": {
+        "sources": [],
+        "requires": ["distance"]
+      },
+      "current": true,
+      "nameKey": "widgets.types.splits_run.name",
+      "shortNameKey": "widgets.types.splits_run.shortName",
+      "supportedDisplayUnits": [],
+      "formatter": "splits",
+      "unitsMode": "hidden",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-splits-run.svg"
+      },
+      "category": "running",
+      "contentAlignment": false,
+      "defaults": {
+        "show_units": false,
+        "display_unit": "none",
+        "display_type": "splits_run"
+      },
+      "displayTypes": ["splits_run"]
     }
   ],
   "widgetDefaults": {

@@ -16,9 +16,12 @@ use crate::{
         },
         types::MetricKind,
     },
-    widgets::value::{
-        format::{resolve_metric_display_value, MetricSample},
-        validation::ValidatedValueWidget,
+    widgets::{
+        splits_run::table::{SplitLength, SplitTable},
+        value::{
+            format::{resolve_metric_display_value, MetricSample},
+            validation::ValidatedValueWidget,
+        },
     },
 };
 use serde::Deserialize;
@@ -132,6 +135,8 @@ pub struct ActivitySampler {
     full_activity_distance: Option<f64>,
     full_activity_total_ascent: Option<f64>,
     lap_timing: crate::widgets::lap_timer::sampling::LapTiming,
+    /// Split tables the host derived from this activity, one per configured split length.
+    split_tables: Vec<SplitTable>,
 }
 impl ActivitySampler {
     pub fn from_json(bytes: &[u8]) -> WidgetResult<Self> {
@@ -282,6 +287,7 @@ impl ActivitySampler {
             full_activity_distance,
             full_activity_total_ascent,
             lap_timing: activity.lap_timing,
+            split_tables: Vec::new(),
         };
         sampler.select_laps(Vec::new())?;
         Ok(sampler)
@@ -327,6 +333,16 @@ impl ActivitySampler {
     pub fn select_laps(&mut self, disabled: Vec<usize>) -> WidgetResult<()> {
         self.lap_timing
             .select(disabled, &self.numeric[&MetricKind::Distance].values)
+    }
+
+    /// Adds or replaces the table for its split length.
+    pub fn insert_split_table(&mut self, table: SplitTable) {
+        self.split_tables.retain(|existing| existing.length != table.length);
+        self.split_tables.push(table);
+    }
+
+    pub fn split_table(&self, length: SplitLength) -> Option<&SplitTable> {
+        self.split_tables.iter().find(|table| table.length == length)
     }
 
     pub fn lap_history(&self) -> crate::widgets::lap_timer::format::LapHistory<'_> {

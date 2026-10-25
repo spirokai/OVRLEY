@@ -157,6 +157,9 @@ impl PreviewSession {
             WidgetRequest::LapTimer(origin) => Ok(ResizeUpdate::LapTimer(crate::widgets::lap_timer::interaction::resize_lap_timer(
                 origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
             )?)),
+            WidgetRequest::SplitsRun(origin) => Ok(ResizeUpdate::SplitsRun(crate::widgets::splits_run::interaction::resize_splits_run(
+                origin.widget, origin.scene, factor, request.fixed, request.point, self.activity.as_ref(), request.second, &self.fonts,
+            )?)),
             WidgetRequest::Value(origin) => Ok(ResizeUpdate::Value(crate::widgets::value::interaction::resize_value(
                 crate::widgets::value::interaction::ResizeRequest {origin, factor, fixed: request.fixed, point: request.point, second: request.second}, self.activity.as_ref(), &self.fonts,
             )?)),
@@ -179,7 +182,21 @@ impl PreviewSession {
             if let PreviewWidget::Elevation(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::Route(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::LapTimer(widget) = widget { widget.invalidate_activity(); }
+            if let PreviewWidget::SplitsRun(widget) = widget { widget.invalidate_activity(); }
             if let PreviewWidget::Gauge(widget) = widget { widget.invalidate_activity(); }
+        }
+        Ok(())
+    }
+    /// Adds a split table core derived from the current activity; widgets of that length re-layout.
+    pub fn replace_split_table(&mut self, bytes: &[u8]) -> WidgetResult<()> {
+        let table = crate::widgets::splits_run::table::SplitTable::from_json(bytes)?;
+        let activity = self
+            .activity
+            .as_mut()
+            .ok_or_else(|| WidgetError::Config("split tables require a loaded activity".into()))?;
+        activity.insert_split_table(table);
+        for widget in self.widgets.values_mut() {
+            if let PreviewWidget::SplitsRun(widget) = &mut widget.widget { widget.invalidate_activity(); }
         }
         Ok(())
     }
@@ -225,6 +242,7 @@ impl PreviewSession {
                 PreviewWidget::LeanAngle(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::GForce(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::LapTimer(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
+                PreviewWidget::SplitsRun(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::Gauge(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,
                 PreviewWidget::HeadingTape(widget) => widget.render(self.activity.as_ref(), second)?,
                 PreviewWidget::HeadingCompass(widget) => widget.render(self.activity.as_ref(), second, &self.fonts)?,

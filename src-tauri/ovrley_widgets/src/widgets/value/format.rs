@@ -290,6 +290,9 @@ fn format_validated_standard_metric_parts(
         Some(StandardMetricFormatterKind::LapTimer) => {
             unreachable!("lap_timer must use the dedicated lap timer renderer")
         }
+        Some(StandardMetricFormatterKind::Splits) => {
+            unreachable!("splits_run must use the dedicated splits renderer")
+        }
         None => "--".to_string(),
     };
 

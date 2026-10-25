@@ -129,7 +129,7 @@ fn every_family_preview() -> Vec<(PreviewSession, Value)> {
     let defaults: Value = serde_json::from_str(include_str!("../../../assets/standard-widgets.json")).unwrap();
     let mut cases = vec![
         label_preview(), gradient_preview(), lean_angle_preview(), g_force_preview(),
-        lap_timer_preview(), heading_preview(), heading_compass_preview("indicator"), heading_compass_preview("compass"),
+        lap_timer_preview(), splits_run_preview(), heading_preview(), heading_compass_preview("indicator"), heading_compass_preview("compass"),
         heart_zones_preview("line"), heart_zones_preview("arrow"),
         gauge_preview("linear", "speed", "horizontal", "fill"),
         gauge_preview("arc", "speed", "horizontal", "fill"),
@@ -261,6 +261,7 @@ fn every_family_parsed_activity() -> ovrley_core::activity::schema::ParsedActivi
         "barometric_altitude": [100.0, 115.0, null, 165.0, 180.0, 125.0, 90.0, 95.0, 99.0],
         "elevation": [10.0, 15.0, 20.0, 30.0, 35.0, 25.0, 5.0, 7.0, 9.0],
         "speed": [0.0, 9.0, 10.0, 99.4, 100.0, 140.0, 5.0, null, 12.0],
+        "distance": [0.0, 4.0, 9.0, 13.0, null, 24.0, 29.0, 33.0, 38.0],
         "heading": [350.0, 10.0, 90.0, 180.0, 270.0, 359.0, 0.5, 45.0, 120.0],
         "heartrate": [80.0, 110.0, 130.0, 150.0, null, 170.0, 185.0, 190.0, 100.0],
         "gradient": [-12.5, -1.0, 0.0, 3.0, 9.9, 10.0, 25.0, -25.0, 1.0],
@@ -679,13 +680,13 @@ fn atlas_frames_reassemble_overlapping_rotated_widgets_of_every_family_into_the_
         config[collection].as_array_mut().unwrap().push(widget);
     }
     let config = validate_render_config_with_resources(parse_config_value(&config).unwrap(), Some(&resources)).unwrap();
-    assert_eq!(config.values.len(), 15, "every value family is exported");
+    assert_eq!(config.values.len(), 16, "every value family is exported");
 
     let atlas = assert_atlas_frames_match_the_full_frame("every family", &config, &every_family_parsed_activity());
     // Every layer is visible; neighbouring widgets either share a slot or overlay in layer order.
     let mut layers: Vec<_> = atlas.slots().iter().flat_map(|slot| slot.layers.clone()).collect();
     layers.sort_unstable();
-    assert_eq!(layers, (0..21).collect::<Vec<_>>());
+    assert_eq!(layers, (0..22).collect::<Vec<_>>());
     assert!(overlapping_widgets_are_planned(&atlas), "every family: {atlas:?}");
 }
 
@@ -1864,6 +1865,155 @@ fn lap_timer_resize_keeps_all_opposite_corners_fixed_across_modes_and_playhead_c
                     preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
                     preview.render(second).unwrap();
                     assert_eq!(preview.widgets[&id].geometry(), &live, "live and committed {mode}");
+                }
+            }
+        }
+    }
+}
+
+fn splits_run_preview() -> (PreviewSession, Value) {
+    let (mut preview, mut request) = lean_angle_preview();
+    let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
+    let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
+    preview.fonts.register(
+        ovrley_widgets::preview::FontRequest { font: "Teko.ttf".into(), font_weight: weight, italic: false },
+        &preview_font_resource(&font_dirs, "Teko.ttf", weight, false).unwrap(),
+    ).unwrap();
+    request["type"] = json!("splits_run");
+    request["widget"] = json!({
+        "value": "splits_run", "display_type": "splits_run", "x": 600.25, "y": 100.5,
+        "font": "Inter.ttf", "font_size": 30, "color": "#abcdef", "opacity": 0.8,
+        "label": "Splits", "label_font": "Teko.ttf", "label_font_size": 15, "label_color": "#123456",
+        "split_distance": 10, "split_unit": "m", "max_splits": 3, "visible_columns": ["split", "bar", "pace"],
+        "row_gap": 6, "bar_width": 150, "track_thickness": 18, "track_corner_radius": 6,
+        "track_filled_color": "#dce2e8", "track_filled_opacity": 0.9, "track_filled_gradient": true,
+        "track_filled_gradient_stops": [{ "offset": 0, "color": "#40e0d0" }, { "offset": 1, "color": "#c65102" }],
+        "track_border_thickness": 2, "track_border_color": "#ffffff", "track_border_opacity": 0.7,
+    });
+    (preview, request)
+}
+
+fn splits_run_table(activity: &ovrley_core::activity::schema::ParsedActivity) -> Vec<u8> {
+    use ovrley_widgets::widgets::splits_run::table::{SplitLength, SplitUnit};
+    let length = SplitLength { distance: 10.0, unit: SplitUnit::M };
+    serde_json::to_vec(&ovrley_core::activity::splits::derive_split_table(activity, length)).unwrap()
+}
+
+#[test]
+fn splits_run_matches_export_pixels_skips_unchanged_samples_and_rejects_malformed_fields() {
+    use ovrley_core::{
+        activity::{interpolate::densify_activity, trim::trim_activity},
+        debug::RenderProfiler,
+        paths::AppPaths,
+        render::render_full_frames,
+    };
+    let (mut preview, request) = splits_run_preview();
+    {
+        // Without an activity the table shows one placeholder row.
+        let mut render = |patch: Value| {
+            let mut request = request.clone();
+            request["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+            let id = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
+            preview.render(0.0).unwrap();
+            let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let pixels = preview.widgets[&id].pixels().clone();
+            preview.widgets.remove(&id);
+            (geometry["content_width"].as_f64().unwrap(), pixels)
+        };
+        let (narrow, _) = render(json!({}));
+        let (wide, _) = render(json!({ "bar_width": 250 }));
+        assert!((wide - narrow - 100.0 * 1.7).abs() < 1e-3, "the bar width alone widens the table: {narrow} -> {wide}");
+        let (_, placeholder) = render(json!({ "visible_columns": ["bar"] }));
+        let (_, invisible) = render(json!({ "visible_columns": ["bar"], "track_filled_opacity": 0, "track_border_thickness": 0 }));
+        assert_ne!(placeholder, invisible, "an empty table draws a placeholder bar");
+    }
+    let activity = every_family_parsed_activity();
+    let table = splits_run_table(&activity);
+    assert!(preview.replace_split_table(&table).is_err(), "split tables belong to a loaded activity");
+    preview.replace_activity(&serde_json::to_vec(&activity).unwrap()).unwrap();
+    assert!(preview.replace_split_table(b"{}").is_err(), "malformed split tables fail at ingress");
+    preview.replace_split_table(&table).unwrap();
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
+    let seconds = vec![0.0, 0.25, 0.75, 1.0, 1.6, 2.2, 2.75, 3.1, 3.6, 4.0];
+    let variants = [
+        ("gradient with border", json!({})),
+        ("solid without border", json!({ "track_filled_gradient": false, "track_border_thickness": 0 })),
+        ("bars and pace only", json!({ "visible_columns": ["pace", "bar"] })),
+        ("text only, one row", json!({ "visible_columns": ["split", "pace"], "max_splits": 1 })),
+        ("short bars under a wider header", json!({ "bar_width": 4, "label": "Splits of the whole run" })),
+    ];
+    for (variant, patch) in variants {
+        let mut request = request.clone();
+        request["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+        let config = common::seam::validated_config_from_value(json!({
+            "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
+        }));
+        let requirements = config.render_data_requirements();
+        let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
+        let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let scene_width = config.scene.presentation.width as usize;
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        let mut distinct = std::collections::HashSet::new();
+        for index in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 5, 2, 0] {
+            let second = seconds[index];
+            preview.render(second).unwrap();
+            let widget = &preview.widgets[&id];
+            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
+            assert!(difference <= EXPORT_TILE_TOLERANCE, "{variant} differs from export by {difference} at {second}");
+            distinct.insert(widget.pixels().clone());
+            let revision = widget.revision();
+            preview.render(second).unwrap();
+            assert_eq!(preview.widgets[&id].revision(), revision, "{variant}: an unchanged sample must not redraw");
+        }
+        assert!(distinct.len() > 3, "{variant}: completed splits and the running split must change the table");
+        preview.widgets.remove(&id);
+    }
+    for (field, value) in [
+        ("split_unit", json!("yd")), ("split_distance", json!(0)), ("visible_columns", json!([])),
+        ("visible_columns", json!(["split", "split"])), ("track_border_thickness", json!(9)), ("bar_width", Value::Null),
+        ("max_splits", json!(0)), ("label_font", Value::Null), ("display_type", json!("text")),
+    ] {
+        let mut malformed = request.clone();
+        malformed["widget"][field] = value;
+        assert!(preview.create_widget(serde_json::from_value(malformed).unwrap()).is_err(), "{field}");
+    }
+}
+
+#[test]
+fn splits_run_resize_scales_every_dimension_and_keeps_opposite_corners_fixed() {
+    let (mut preview, mut origin) = splits_run_preview();
+    let activity = every_family_parsed_activity();
+    preview.replace_activity(&serde_json::to_vec(&activity).unwrap()).unwrap();
+    preview.replace_split_table(&splits_run_table(&activity)).unwrap();
+    let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
+    for scale in [1.7, 0.8] {
+        origin["scene"]["scale"] = json!(scale);
+        preview.update_widget(id, serde_json::from_value(origin.clone()).unwrap()).unwrap();
+        preview.render(2.2).unwrap();
+        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let bounds = &geometry["content"];
+        for fixed in [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]] {
+            let point = [bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0], bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1]];
+            for (factor, second) in [(1.25, 3.6), (0.01, 4.0), (1.25, 0.0)] {
+                let mut gesture = origin.clone();
+                gesture.as_object_mut().unwrap().extend(json!({"factor": factor, "fixed": fixed, "point": point, "second": second}).as_object().unwrap().clone());
+                let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(gesture).unwrap()).unwrap()).unwrap();
+                // The font clamp bounds the factor, so every dimension keeps its proportion.
+                let applied = if factor == 0.01 { 8.0 / 30.0 } else { factor };
+                for (field, configured) in [("font_size", 30.0), ("label_font_size", 15.0), ("row_gap", 6.0), ("bar_width", 150.0), ("track_thickness", 18.0), ("track_corner_radius", 6.0), ("track_border_thickness", 2.0)] {
+                    assert!((patch[field].as_f64().unwrap() - configured * applied).abs() < 1e-4, "{field} at factor {factor}");
+                }
+                let mut committed = origin.clone();
+                committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+                preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
+                preview.render(second).unwrap();
+                let actual: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+                for (axis, start, size) in [(0, "left", "width"), (1, "top", "height")] {
+                    let corner = actual["content"][start].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
+                    assert!((corner - point[axis]).abs() < 0.003, "scale {scale} factor {factor} at {second}");
                 }
             }
         }
