@@ -47,3 +47,7 @@ http-cache-semantics = "=2.1.0"
 # Per-pixel overlay conversion runs in ovrley_core; unoptimized it makes dev exports unusably slow.
 [profile.dev.package.ovrley_core]
 opt-level = 3
+
+# Dependency debug symbols dominate target/debug (~14 GB) and are not needed to debug this app.
+[profile.dev.package."*"]
+debug = false

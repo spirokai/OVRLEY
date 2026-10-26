@@ -26,6 +26,21 @@ test('badges use fractional content geometry and its rotation pivot without read
   expect(badge.rotation).toBe(90)
 })
 
+test('badges skip widgets whose session has not rendered them yet', () => {
+  const node = document.createElement('div')
+  const badges = buildWidgetBadges({
+    displayScale: 1,
+    getGeometry: () => undefined,
+    hoveredWidgetId: null,
+    orderedWidgetIds: ['route'],
+    sceneElement: document.createElement('div'),
+    selectedWidgetIds: ['route'],
+    widgetMap: { route: { type: 'course' } },
+    widgetNodes: { route: node },
+  })
+  expect(badges).toEqual([])
+})
+
 test('border movement reuses viewport measurements until scrolling', () => {
   vi.stubGlobal(
     'ResizeObserver',

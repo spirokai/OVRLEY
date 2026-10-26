@@ -387,25 +387,21 @@ pub(super) fn probe_codec(name: &str, ffmpeg_path: &Path, args: &[String]) -> bo
     }
 }
 
+/// Returns the lowest-numbered DRM render node, which is the device VAAPI opens.
+///
+/// Render nodes are character devices, so `Path::is_file` is false for them.
+/// Primary `card*` nodes are not used: libva cannot initialise a driver on them.
 pub(super) fn find_vaapi_device() -> Option<std::path::PathBuf> {
-    let dri_dir = Path::new("/dev/dri");
-    if !dri_dir.is_dir() {
-        return None;
-    }
-
-    let preferred = dri_dir.join("renderD128");
-    if preferred.is_file() {
-        return Some(preferred);
-    }
-
-    let mut entries = fs::read_dir(dri_dir).ok()?;
-    entries.find_map(|entry| {
-        let path = entry.ok()?.path();
-        let name = path.file_name()?.to_string_lossy();
-        if name.starts_with("renderD") || name.starts_with("card") {
-            Some(path)
-        } else {
-            None
-        }
-    })
+    let mut render_nodes: Vec<std::path::PathBuf> = fs::read_dir("/dev/dri")
+        .ok()?
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            path.file_name()?
+                .to_string_lossy()
+                .starts_with("renderD")
+                .then_some(path)
+        })
+        .collect();
+    render_nodes.sort();
+    render_nodes.into_iter().next()
 }

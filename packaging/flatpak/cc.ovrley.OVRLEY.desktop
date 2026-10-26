@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=OVRLEY
+GenericName=Telemetry Overlay Editor
+Comment=Turn activity, flight and motorsport telemetry into video overlays
+Exec=OVRLEY
+Icon=cc.ovrley.OVRLEY
+Categories=AudioVideo;Video;
+Keywords=telemetry;overlay;gpx;fit;gopro;dji;video;
+StartupWMClass=cc.ovrley.OVRLEY
+Terminal=false

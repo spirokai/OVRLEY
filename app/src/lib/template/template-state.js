@@ -57,7 +57,7 @@ function buildEffectiveValueData(widgetData = {}, globals) {
   const labelFont = resolved.min_max_label_font || globals?.font_values
   if (!nextData.min_max_label_font && labelFont) nextData.min_max_label_font = labelFont
   if (!nextData.color) nextData.color = globals?.color_values || getThemeColor('ice')
-  if (resolved.value === 'lap_timer') {
+  if (resolved.value === 'lap_timer' || resolved.value === 'splits_run') {
     if (!nextData.label_font) nextData.label_font = globals?.font_text
     if (!nextData.label_color) nextData.label_color = globals?.color_text || getThemeColor('ice')
   }
@@ -157,7 +157,7 @@ export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null, 
   if (nextConfig.values) {
     for (const value of nextConfig.values) {
       if (shouldApply('font_values')) Object.assign(value, createFontSelection(globals.font_values))
-      if (value.value === 'lap_timer' && shouldApply('font_text')) value.label_font = globals.font_text
+      if ((value.value === 'lap_timer' || value.value === 'splits_run') && shouldApply('font_text')) value.label_font = globals.font_text
       if (shouldApply('font_values')) {
         if (value.display_variants?.linear) value.display_variants.linear.min_max_label_font = globals.font_values
         if (value.display_variants?.arc) value.display_variants.arc.min_max_label_font = globals.font_values
@@ -165,7 +165,7 @@ export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null, 
         if (value.display_variants?.g_force) value.display_variants.g_force.label_font = globals.font_values
       }
       if (shouldApply('color_values')) value.color = globals.color_values
-      if (value.value === 'lap_timer' && shouldApply('color_text')) value.label_color = globals.color_text
+      if ((value.value === 'lap_timer' || value.value === 'splits_run') && shouldApply('color_text')) value.label_color = globals.color_text
       if (shouldApply('color_icons') && Object.hasOwn(value, 'icon_color')) value.icon_color = globals.color_icons
       if (shouldApply('color_units') && value.value !== 'time') value.unit_color = globals.color_units
     }

@@ -187,13 +187,15 @@ function normalizeValue(value = {}, globalDefaults) {
   }
   if (type === 'lap_timer') {
     const mode = requireDisplayMode(withDefaults.display_type, value.lap_timer_mode)
-    if (value.label_font === undefined) withDefaults.label_font = globalDefaults?.font_text || DISPLAY_TYPE_DEFINITIONS.lap_timer.defaults.label_font
     if (value.label_font_size === undefined) withDefaults.label_font_size = mode.defaults.label_font_size
-    if (value.label_color === undefined)
-      withDefaults.label_color = globalDefaults?.color_text || DISPLAY_TYPE_DEFINITIONS.lap_timer.defaults.label_color
     if (typeof withDefaults.renumber_laps !== 'boolean') {
       throw new Error(`Invalid renumber_laps: ${String(withDefaults.renumber_laps)}`)
     }
+  }
+  if (type === 'lap_timer' || type === 'splits_run') {
+    const display = DISPLAY_TYPE_DEFINITIONS[withDefaults.display_type]
+    if (value.label_font === undefined) withDefaults.label_font = globalDefaults?.font_text || display.defaults.label_font
+    if (value.label_color === undefined) withDefaults.label_color = globalDefaults?.color_text || display.defaults.label_color
   }
   const pickedValue = pickDefined(withDefaults, WIDGET_TYPE_DEFINITIONS[type].configKeys)
   if (!supportsContentAlignment) delete pickedValue.content_alignment

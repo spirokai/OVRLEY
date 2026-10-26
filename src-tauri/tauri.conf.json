@@ -50,13 +50,15 @@
       "deb": {
         "depends": [
           "gstreamer1.0-libav",
+          "gstreamer1.0-plugins-bad",
           "gstreamer1.0-plugins-good",
           "libayatana-appindicator3-1",
           "libgtk-3-0",
           "librsvg2-2",
           "libssl3",
           "libwebkit2gtk-4.1-0"
-        ]
+        ],
+        "recommends": ["intel-media-va-driver | intel-media-va-driver-non-free", "mesa-va-drivers | mesa-libgallium"]
       }
     },
     "icon": ["icons/32x32.png", "icons/64x64.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico", "icons/icon.png"]

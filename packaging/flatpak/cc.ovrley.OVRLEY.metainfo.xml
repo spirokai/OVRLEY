@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>cc.ovrley.OVRLEY</id>
+  <name>OVRLEY</name>
+  <summary>Turn telemetry into customizable video overlays</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <developer id="cc.ovrley">
+    <name>spirokai</name>
+  </developer>
+  <description>
+    <p>
+      OVRLEY turns telemetry from activities, flights, motorsports and cameras into fully customizable overlays for your videos. Design the overlay in a visual editor, then let the native rendering engine export it.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Import FIT, GPX, SRT, IGC, CSV and VBO files, or telemetry embedded in supported camera videos</li>
+      <li>Drag-and-drop editor with live preview, reusable templates and undo/redo</li>
+      <li>More than 40 widgets and animated gauges for speed, heart rate, power, G-force, lap times, maps and more</li>
+      <li>Export transparent overlays for editors such as DaVinci Resolve, or final video with the overlay baked in</li>
+      <li>Hardware-accelerated export with NVIDIA NVENC and VAAPI (Intel and AMD)</li>
+      <li>Works fully offline: all processing happens on your computer</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">cc.ovrley.OVRLEY.desktop</launchable>
+  <url type="homepage">https://www.ovrley.cc</url>
+  <url type="bugtracker">https://github.com/spirokai/OVRLEY/issues</url>
+  <url type="vcs-browser">https://github.com/spirokai/OVRLEY</url>
+  <url type="help">https://github.com/spirokai/OVRLEY#readme</url>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+  </categories>
+  <content_rating type="oars-1.1" />
+  <branding>
+    <color type="primary" scheme_preference="light">#00111b</color>
+    <color type="primary" scheme_preference="dark">#00111b</color>
+  </branding>
+  <provides>
+    <binary>OVRLEY</binary>
+  </provides>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">1100</display_length>
+  </requires>
+  <releases>
+    <release version="2.49.2" date="2026-10-13" />
+  </releases>
+</component>

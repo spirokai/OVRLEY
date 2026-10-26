@@ -30,6 +30,11 @@ export function getWidgetInteraction(target) {
   return controller
 }
 
+/** @param {HTMLElement} target Rendered widget wrapper. @returns {object|undefined} Its preview interaction controller, if its session has rendered it. */
+export function findWidgetInteraction(target) {
+  return targets.get(target)
+}
+
 /** @param {HTMLElement} target Widget wrapper. @param {object} controller Session-owned interaction methods. */
 export function registerWidgetInteraction(target, controller) {
   targets.set(target, controller)

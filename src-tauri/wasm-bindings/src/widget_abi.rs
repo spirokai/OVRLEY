@@ -106,6 +106,18 @@ pub unsafe extern "C" fn ovrley_preview_disabled_laps(
     session.status(result)
 }
 
+/// JSON split table core derived from the loaded activity for one split length.
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_split_table(
+    session: *mut Session,
+    ptr: *const u8,
+    len: usize,
+) -> u32 {
+    let session = &mut *session;
+    let result = bytes(ptr, len).and_then(|b| session.preview.replace_split_table(b));
+    session.status(result)
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn ovrley_preview_font(
     session: *mut Session,

@@ -60,6 +60,8 @@ pub enum DisplayType {
     GForce,
     #[serde(rename = "lap_timer")]
     LapTimer,
+    #[serde(rename = "splits_run")]
+    SplitsRun,
 }
 
 impl DisplayType {
@@ -77,6 +79,7 @@ impl DisplayType {
             DisplayType::LeanAngle => "lean_angle",
             DisplayType::GForce => "g_force",
             DisplayType::LapTimer => "lap_timer",
+            DisplayType::SplitsRun => "splits_run",
         }
     }
 }
@@ -123,6 +126,7 @@ impl<'de> Deserialize<'de> for DisplayType {
                 "lean_angle" => Ok(DisplayType::LeanAngle),
                 "g_force" => Ok(DisplayType::GForce),
                 "lap_timer" => Ok(DisplayType::LapTimer),
+                "splits_run" => Ok(DisplayType::SplitsRun),
                 _ => Ok(DisplayType::default()),
             },
             _ => Ok(DisplayType::default()),
