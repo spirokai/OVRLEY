@@ -29,6 +29,7 @@ import { CONTROL_CLASS, ColorField, FieldBlock, SizeSlider, SliderField, ToggleF
 
 const TOGGLE_LABEL_CLASS = 'p-0 text-[9px] text-muted-foreground uppercase font-bold'
 const ROW_BUTTON_CLASS = 'text-muted-foreground hover:text-foreground'
+const ADD_BUTTON_CLASS = 'shadow-none text-muted-foreground hover:bg-surface-elevated hover:text-foreground [&_svg]:size-[0.9rem]'
 
 /**
  * One plotted metric: its metric, line color, and ordering controls.
@@ -129,15 +130,18 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
   return (
     <>
       <DimensionsSection widget={widget} setNumericField={setNumericField} min={8} />
+      <FieldBlock label={t('widget-editor.timeWindow', 'Time Window')}>
+        <Input {...windowInput} aria-label={t('widget-editor.timeWindow', 'Time Window')} className={CONTROL_CLASS} />
+      </FieldBlock>
       <div className="space-y-3">
         <SectionHeading
           icon={ChartLine}
           title={t('widget-editor.chartMetrics', 'Metrics')}
           trailing={
             <Button
-              variant="ghost"
+              variant="outline"
               size="toolbar-icon"
-              className={ROW_BUTTON_CLASS}
+              className={ADD_BUTTON_CLASS}
               disabled={series.length >= CHART_LIMITS.maxSeries || unused.length === 0}
               onClick={() => setSeries(addChartSeries(series))}
               aria-label={t('widget-editor.addMetric', 'Add metric')}
@@ -162,10 +166,20 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
         ))}
       </div>
       <div className="space-y-4">
-        <SectionHeading icon={Palette} title={t('widget-editor.lineStyling', 'Line Styling')} />
-        <FieldBlock label={t('widget-editor.timeWindow', 'Time Window')}>
-          <Input {...windowInput} aria-label={t('widget-editor.timeWindow', 'Time Window')} className={CONTROL_CLASS} />
-        </FieldBlock>
+        <SectionHeading
+          icon={Palette}
+          title={t('widget-editor.lineStyling', 'Line Styling')}
+          trailing={
+            <div className="flex items-center gap-1.5">
+              <span className={TOGGLE_LABEL_CLASS}>{t('widget-editor.fill', 'Fill')}</span>
+              <ToggleField
+                label={t('widget-editor.fill', 'Fill')}
+                checked={data.area_fill}
+                onCheckedChange={(area_fill) => updateWidgetData(widget.id, { area_fill })}
+              />
+            </div>
+          }
+        />
         <div className="grid grid-cols-2 gap-4">
           <SizeSlider
             label={t('widget-editor.thickness', 'Thickness')}
@@ -193,7 +207,7 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
         </div>
         <SliderField
           editable
-          label={t('widget-editor.lineCurve', 'Line Curve')}
+          label={t('widget-editor.smoothing', 'Smoothing')}
           value={data.line_curve}
           min={0}
           max={100}
@@ -203,16 +217,21 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
           onSliderChange={(line_curve) => updateWidgetSize(widget.id, { line_curve })}
           onSliderCommit={commit}
         />
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center justify-between gap-2 px-1">
-            <Label className={TOGGLE_LABEL_CLASS}>{t('widget-editor.areaFill', 'Area Fill')}</Label>
-            <ToggleField
-              label={t('widget-editor.areaFill', 'Area Fill')}
-              checked={data.area_fill}
-              onCheckedChange={(area_fill) => updateWidgetData(widget.id, { area_fill })}
-            />
-          </div>
-          <div className="flex items-center justify-between gap-2 px-1">
+        <div className="grid grid-cols-2 items-end gap-4">
+          <SliderField
+            editable
+            label={t('widget-editor.areaOpacity', 'Area Opacity')}
+            value={data.area_opacity}
+            min={0}
+            max={100}
+            step={1}
+            disabled={!data.area_fill}
+            valueDisplay={`${data.area_opacity}`}
+            suffix="%"
+            onSliderChange={(area_opacity) => updateWidgetSize(widget.id, { area_opacity })}
+            onSliderCommit={commit}
+          />
+          <div className="flex h-9 items-center justify-between gap-2 px-1">
             <Label className={TOGGLE_LABEL_CLASS} disabled={!data.area_fill}>
               {t('widget-editor.areaGradient', 'Gradient')}
             </Label>
@@ -224,19 +243,6 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
             />
           </div>
         </div>
-        <SliderField
-          editable
-          label={t('widget-editor.areaOpacity', 'Area Opacity')}
-          value={data.area_opacity}
-          min={0}
-          max={100}
-          step={1}
-          disabled={!data.area_fill}
-          valueDisplay={`${data.area_opacity}`}
-          suffix="%"
-          onSliderChange={(area_opacity) => updateWidgetSize(widget.id, { area_opacity })}
-          onSliderCommit={commit}
-        />
       </div>
       <PlotMarkerSection
         widget={widget}
@@ -265,17 +271,17 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
             />
           }
         />
-        <FontSelectField
-          label={t('widget-editor.font', 'Font')}
-          value={data.legend_font}
-          disabled={!data.show_legend}
-          onValueChange={(legend_font) => updateWidgetData(widget.id, { legend_font })}
-          recommendedFonts={availableFonts.recommendedFonts}
-          systemFonts={availableFonts.systemFonts}
-          triggerClassName={CONTROL_CLASS}
-          labelClassName={TOGGLE_LABEL_CLASS}
-        />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 items-end gap-4">
+          <FontSelectField
+            label={t('widget-editor.font', 'Font')}
+            value={data.legend_font}
+            disabled={!data.show_legend}
+            onValueChange={(legend_font) => updateWidgetData(widget.id, { legend_font })}
+            recommendedFonts={availableFonts.recommendedFonts}
+            systemFonts={availableFonts.systemFonts}
+            triggerClassName={CONTROL_CLASS}
+            labelClassName={TOGGLE_LABEL_CLASS}
+          />
           <SizeSlider
             label={t('widget-editor.fontSize', 'Font Size')}
             value={data.legend_font_size}
@@ -288,6 +294,8 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
             onChange={(legend_font_size) => updateWidgetSize(widget.id, { legend_font_size })}
             onCommit={commit}
           />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
           <ColorField
             label={t('widget-editor.fontColor', 'Font Color')}
             value={data.legend_color}
