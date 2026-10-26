@@ -214,6 +214,8 @@
     "from": "От",
     "fullVideo": "Полное видео",
     "hardwareAcceleration": "Аппаратное ускорение",
+    "hardwareAccelerationVaapiHelp": "Для VAAPI нужен драйвер VA-API для вашей видеокарты. Установите его через пакетный менеджер:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nЗапустите vainfo, чтобы убедиться, что драйвер загружается. Для видеокарт NVIDIA используйте вариант NVIDIA GPU.",
+    "hardwareAccelerationVaapiHelpLabel": "Требования к драйверам VAAPI",
     "keepAppOpen": "Не закрывайте приложение во время рендеринга",
     "loadAGpxfitActivityFirst": "Сначала загрузите активность GPX/FIT",
     "loadATemplateAndGpxfitActivityFirst": "Сначала загрузите шаблон и активность GPX/FIT",

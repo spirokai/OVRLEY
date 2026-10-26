@@ -2,6 +2,7 @@ import { FolderOpen, Play, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
 import { DialogTitle } from '@/components/ui/dialog'
+import { HelpTooltip } from '@/components/ui/help-tooltip'
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
@@ -190,13 +191,31 @@ export default function RenderExportSettings(ctx) {
             </Label>
             <Select value={ctx.selectedAccelerationValue} onValueChange={ctx.handleAccelerationChange} disabled={ctx.settingsLocked}>
               <SelectTrigger className="h-9 text-xs">
-                <SelectValue />
+                {/* Explicit label so the item's help icon is not mirrored into the trigger. */}
+                <SelectValue>{ctx.selectedAccelerationOptions.find((option) => option.value === ctx.selectedAccelerationValue)?.label}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {ctx.selectedAccelerationOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value} disabled={!option.available}>
                     <span className="flex w-full items-center justify-between gap-3">
-                      <span className="min-w-0 truncate">{option.label}</span>
+                      <span className="flex min-w-0 items-center gap-1">
+                        <span className="min-w-0 truncate">{option.label}</span>
+                        {option.value === 'vaapi' && (
+                          // Disabled items drop pointer events, so re-enable them for the icon and keep its clicks from selecting the item.
+                          <span
+                            className="pointer-events-auto"
+                            onPointerUp={(event) => event.stopPropagation()}
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <HelpTooltip
+                              portal
+                              contentClassName="w-[25rem]"
+                              content={t('render-video.hardwareAccelerationVaapiHelp')}
+                              ariaLabel={t('render-video.hardwareAccelerationVaapiHelpLabel')}
+                            />
+                          </span>
+                        )}
+                      </span>
                       {!option.available && (
                         <span className="shrink-0 text-right text-[10px] text-muted-foreground">{t('render-video.unavailable', 'Unavailable')}</span>
                       )}

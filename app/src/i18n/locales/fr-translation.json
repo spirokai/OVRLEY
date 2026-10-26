@@ -214,6 +214,8 @@
     "from": "De",
     "fullVideo": "Vidéo complète",
     "hardwareAcceleration": "Accélération matérielle",
+    "hardwareAccelerationVaapiHelp": "VAAPI nécessite le pilote VA-API de votre GPU. Installez-le avec votre gestionnaire de paquets :\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nLancez vainfo pour vérifier que le pilote se charge. Les GPU NVIDIA utilisent plutôt l'option NVIDIA GPU.",
+    "hardwareAccelerationVaapiHelpLabel": "Pilotes requis pour VAAPI",
     "keepAppOpen": "Veuillez laisser l’application ouverte pendant le rendu",
     "loadAGpxfitActivityFirst": "Chargez d’abord une activité GPX/FIT",
     "loadATemplateAndGpxfitActivityFirst": "Chargez d’abord un modèle et une activité GPX/FIT",

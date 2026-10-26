@@ -214,6 +214,8 @@
     "from": "시작",
     "fullVideo": "전체 동영상",
     "hardwareAcceleration": "하드웨어 가속",
+    "hardwareAccelerationVaapiHelp": "VAAPI를 사용하려면 GPU의 VA-API 드라이버가 필요합니다. 패키지 관리자로 설치하세요:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nvainfo를 실행해 드라이버가 로드되는지 확인하세요. NVIDIA GPU는 대신 NVIDIA GPU 옵션을 사용합니다.",
+    "hardwareAccelerationVaapiHelpLabel": "VAAPI 드라이버 요구 사항",
     "keepAppOpen": "렌더링 중에는 애플리케이션을 열어 두세요",
     "loadAGpxfitActivityFirst": "GPX/FIT 활동을 먼저 로드하세요",
     "loadATemplateAndGpxfitActivityFirst": "템플릿과 GPX/FIT 활동을 먼저 로드하세요",

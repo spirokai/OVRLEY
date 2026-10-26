@@ -214,6 +214,8 @@
     "from": "Från",
     "fullVideo": "Hela videon",
     "hardwareAcceleration": "Hårdvaruacceleration",
+    "hardwareAccelerationVaapiHelp": "VAAPI kräver VA-API-drivrutinen för din GPU. Installera den med din pakethanterare:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nKör vainfo för att kontrollera att drivrutinen laddas. NVIDIA-GPU:er använder alternativet NVIDIA GPU i stället.",
+    "hardwareAccelerationVaapiHelpLabel": "Drivrutinskrav för VAAPI",
     "keepAppOpen": "Håll programmet öppet under renderingen",
     "loadAGpxfitActivityFirst": "Läs först in en GPX/FIT-aktivitet",
     "loadATemplateAndGpxfitActivityFirst": "Läs först in en mall och en GPX/FIT-aktivitet",
