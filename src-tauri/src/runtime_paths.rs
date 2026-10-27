@@ -39,14 +39,29 @@ pub(crate) fn app_paths(app: &AppHandle) -> Result<AppPaths, String> {
     } else {
         portable_resource_root().unwrap_or(app.path().resource_dir().map_err(|e| e.to_string())?)
     };
-    let user_data_root = app
-        .path()
-        .document_dir()
-        .map_err(|e| e.to_string())?
-        .join("OVRLEY");
-    let paths = AppPaths::from_runtime_roots(repo_root, resource_root, user_data_root);
+    let paths = AppPaths::from_runtime_roots(repo_root, resource_root, user_data_root(app)?);
     paths.ensure_dirs().map_err(|e| e.to_string())?;
     Ok(paths)
+}
+
+/// Returns the `OVRLEY` user data root inside the user's documents directory.
+///
+/// The XDG documents entry is optional on Linux (`~/.config/user-dirs.dirs`
+/// may not define it), so its absence resolves to `$HOME/Documents`.
+pub(crate) fn user_data_root(app: &AppHandle) -> Result<PathBuf, String> {
+    let path = app.path();
+    resolve_user_data_root(path.document_dir().ok(), || path.home_dir()).map_err(|e| e.to_string())
+}
+
+fn resolve_user_data_root(
+    document_dir: Option<PathBuf>,
+    home_dir: impl FnOnce() -> tauri::Result<PathBuf>,
+) -> tauri::Result<PathBuf> {
+    let documents_dir = match document_dir {
+        Some(dir) => dir,
+        None => home_dir()?.join("Documents"),
+    };
+    Ok(documents_dir.join("OVRLEY"))
 }
 
 fn portable_resource_root() -> Option<PathBuf> {
@@ -65,4 +80,33 @@ fn has_bundled_ffmpeg(root: &Path) -> bool {
         .join("bin")
         .join(binary_name)
         .is_file()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_data_root_lives_in_documents_dir() {
+        let root = resolve_user_data_root(Some(PathBuf::from("/home/rider/Docs")), || {
+            panic!("home dir must not be resolved when documents dir exists")
+        })
+        .unwrap();
+
+        assert_eq!(root, PathBuf::from("/home/rider/Docs/OVRLEY"));
+    }
+
+    #[test]
+    fn user_data_root_uses_home_documents_when_documents_dir_is_undefined() {
+        let root = resolve_user_data_root(None, || Ok(PathBuf::from("/home/rider"))).unwrap();
+
+        assert_eq!(root, PathBuf::from("/home/rider/Documents/OVRLEY"));
+    }
+
+    #[test]
+    fn user_data_root_fails_without_home_dir() {
+        let result = resolve_user_data_root(None, || Err(tauri::Error::UnknownPath));
+
+        assert!(matches!(result, Err(tauri::Error::UnknownPath)));
+    }
 }
