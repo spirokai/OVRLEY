@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { Pause, Play, Rewind, RotateCcw, StepBack, StepForward, Volume2, VolumeX, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Pause, Play, Rewind, RotateCcw, Scissors, StepBack, StepForward, Volume2, VolumeX, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -18,6 +18,67 @@ function PlayerTimeLabel({ timeLabel }) {
     <span className="text-xs font-medium tabular-nums text-muted-foreground">
       {current} / {formatClockDuration(timeLabel.totalDuration)}
     </span>
+  )
+}
+
+function DeletedPartControls({ deletedPart }) {
+  const { t } = useTranslation()
+  const startLabel = t('player.startDeletedPart', 'Start deleted video part at playhead (or Alt+drag on a clip)')
+  const endLabel = t('player.endDeletedPart', 'End deleted video part at playhead')
+  const clearLabel = t('player.cancelDeletedPart', 'Cancel deleted video part')
+  return (
+    <div className="ml-2 flex items-center gap-1">
+      <SimpleTooltip side="top" content={startLabel}>
+        <Button
+          type="button"
+          aria-label={startLabel}
+          size="toolbar-icon"
+          variant="ghost"
+          disabled={!deletedPart.canStart}
+          onClick={deletedPart.start}
+          aria-keyshortcuts="Shift+I"
+        >
+          <span aria-hidden="true" className="flex items-center font-mono text-base font-normal">
+            [<Scissors className="h-3 w-3" />
+          </span>
+        </Button>
+      </SimpleTooltip>
+      <SimpleTooltip side="top" content={endLabel}>
+        <Button
+          type="button"
+          aria-label={endLabel}
+          size="toolbar-icon"
+          variant="ghost"
+          disabled={!deletedPart.canEnd}
+          onClick={deletedPart.end}
+          aria-keyshortcuts="Shift+O"
+        >
+          <span aria-hidden="true" className="flex items-center font-mono text-base font-normal">
+            <Scissors className="h-3 w-3" />]
+          </span>
+        </Button>
+      </SimpleTooltip>
+      {deletedPart.markLabel !== null ? (
+        <div className="ml-1 flex min-w-0 items-center gap-0.5 text-destructive">
+          <span className="max-w-40 truncate text-xs font-medium tabular-nums" title={deletedPart.markLabel}>
+            {deletedPart.markLabel}
+          </span>
+          <SimpleTooltip side="top" content={clearLabel}>
+            <Button
+              type="button"
+              aria-label={clearLabel}
+              size="toolbar-icon"
+              variant="ghost"
+              className="text-destructive"
+              onClick={deletedPart.clear}
+              aria-keyshortcuts="Shift+X"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </SimpleTooltip>
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -122,6 +183,7 @@ function PlayerToolbar({ toolbar, videoSyncMode }) {
             ) : null}
           </div>
         ) : null}
+        {!videoSyncMode && toolbar.deletedPart.isVisible ? <DeletedPartControls deletedPart={toolbar.deletedPart} /> : null}
       </div>
 
       <div className="flex items-center gap-1 rounded-xs border border-border/30 p-0.5 shadow-sm">

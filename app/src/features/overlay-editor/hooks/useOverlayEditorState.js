@@ -11,21 +11,25 @@ import { buildWasmScene } from '@/features/wasm-widgets/utils/previewScene'
 import {
   getEditorGridSize,
   getOrderedWidgetIds,
-  getPreviewExportRange,
   getSceneSize,
   getViewportContentSize,
   getWidgetMap,
   getWidgetResizeOptions,
   materializeWidgets,
+  resolvePreviewExportRange,
 } from '../utils/overlayEditorUtils'
 import useWidgetSelection from './useWidgetSelection'
 import { useEditorViewport } from './useEditorViewport'
 import { useEditorKeyboard } from './useEditorKeyboard'
 import { useOverlayPreviewStore, useVideoSyncPreviewSecond } from '@/hooks/useAppStoreSelectors'
+import { useActivityContext, usePlayheadActivityCoverage, useVideoTimeline } from '@/hooks/useVideoTimeline'
 import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
 import { applyWidgetDrafts } from '@/lib/widget/widget-resolver'
 import { useWidgetDraftView } from './useWidgetDraftState'
+
+// Embedded telemetry carries no editor lap selection, as in the export.
+const NO_DISABLED_LAPS = []
 
 function getWidgetRefCallbacks(widgetLiveEdits, orderedWidgetIds) {
   const callbacks = {}
@@ -56,16 +60,17 @@ export default function useOverlayEditorState({
   videoSyncMarkControls = null,
 }) {
   const videoSyncPreviewSecond = useVideoSyncPreviewSecond(videoSyncMode)
-  const {
-    exportRange,
-    importedVideoPath,
-    importedVideoDuration,
-    videoSyncOffsetSeconds,
-    parsedActivity,
-    disabledLaps,
-    importedBackgroundImagePath,
-    fallbackDurationSeconds,
-  } = useOverlayPreviewStore()
+  const { exportRange, disabledLaps, importedBackgroundImagePath, fallbackDurationSeconds } = useOverlayPreviewStore()
+  // Widgets read activity time: timeline seconds shifted by the activity origin. Without an
+  // external activity the clip at the playhead supplies its own telemetry from its start.
+  const activityContext = useActivityContext()
+  const hasActivityCoverage = usePlayheadActivityCoverage()
+  const { clips, bounds: videoBounds } = useVideoTimeline()
+  const activity = activityContext?.activity ?? null
+  const activityOriginSecond = activityContext?.originSecond ?? 0
+  const activityClipVideoId = activityContext?.videoId ?? null
+  const previewDisabledLaps = activityClipVideoId === null ? disabledLaps : NO_DISABLED_LAPS
+  const activityClipDurationSeconds = activityClipVideoId === null ? null : clips.find((clip) => clip.id === activityClipVideoId).durationSeconds
   const moveableRef = useRef(null)
   const clipboardRef = useRef(null)
   const gridRef = useRef(null)
@@ -84,8 +89,8 @@ export default function useOverlayEditorState({
   const widgetRefCallbacks = useMemo(() => getWidgetRefCallbacks(widgetLiveEdits, orderedWidgetIds), [orderedWidgetIds, widgetLiveEdits])
   const sceneSize = useMemo(() => getSceneSize(config), [config])
   const previewExportRange = useMemo(
-    () => getPreviewExportRange(exportRange, importedVideoPath, importedVideoDuration, videoSyncOffsetSeconds),
-    [exportRange, importedVideoDuration, importedVideoPath, videoSyncOffsetSeconds],
+    () => resolvePreviewExportRange({ exportRange, activityOriginSecond, activityClipDurationSeconds, videoBounds }),
+    [activityClipDurationSeconds, activityOriginSecond, exportRange, videoBounds],
   )
   const commitUpdate = useCallback((widgetId, updates) => commitWidgetUpdate(config, onConfigChange, widgetId, updates), [config, onConfigChange])
   const commitUpdates = useCallback((updatesById) => commitWidgetUpdates(config, onConfigChange, updatesById), [config, onConfigChange])
@@ -93,7 +98,7 @@ export default function useOverlayEditorState({
   useEffect(() => resetWidgetDrafts(), [config, resetWidgetDrafts])
 
   const state = {
-    activity: parsedActivity,
+    activity,
     clearWidgetDrafts,
     commitWidgetUpdate: commitUpdate,
     commitWidgetUpdates: commitUpdates,
@@ -137,11 +142,11 @@ export default function useOverlayEditorState({
         globalDefaults,
         sceneSize,
         exportRange: previewExportRange,
-        activity: parsedActivity,
+        activity,
         fallbackDurationSeconds,
         previewRasterScale,
       }),
-    [globalDefaults, sceneSize, previewExportRange, parsedActivity, fallbackDurationSeconds, previewRasterScale],
+    [globalDefaults, sceneSize, previewExportRange, activity, fallbackDurationSeconds, previewRasterScale],
   )
   const markControls = resolveVideoSyncMarkControls(videoSyncMarkControls, videoSyncPreviewSecond, videoSyncMode)
   if (videoSyncMode && markControls === null) throw new Error('Video sync editor requires mark controls')
@@ -150,8 +155,11 @@ export default function useOverlayEditorState({
     [sceneSize, viewport.displayScale, gridVisible, videoSyncMode],
   )
   return {
-    activity: parsedActivity,
-    disabledLaps,
+    activity,
+    activityOriginSecond,
+    disabledLaps: previewDisabledLaps,
+    // Frames without activity coverage show raster widgets only, as in the export.
+    hasActivityCoverage,
     globalDefaults,
     previewSecond: videoSyncPreviewSecond,
     sceneSize,

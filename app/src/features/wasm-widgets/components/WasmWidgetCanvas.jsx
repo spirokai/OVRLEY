@@ -1,7 +1,7 @@
 import { useWasmCanvas } from '../hooks/useWasmCanvas'
 
-/** @param {object} props Standalone widget canvas registration. @returns {JSX.Element} Rust-positioned canvas. */
-export function WasmWidgetCanvas({ widget, attach, registerNode, handleWidgetMouseDown }) {
+/** @param {object} props Standalone widget canvas registration; hidden canvases stay editable. @returns {JSX.Element} Rust-positioned canvas. */
+export function WasmWidgetCanvas({ widget, attach, registerNode, handleWidgetMouseDown, isHidden }) {
   const separateRaster = widget.type === 'course' || widget.type === 'elevation' || widget.type === 'diving_profile'
   const { wrapperRef, canvasRef } = useWasmCanvas({ id: widget.id, attach, registerNode, separateRaster })
   const canvas = (
@@ -9,7 +9,7 @@ export function WasmWidgetCanvas({ widget, attach, registerNode, handleWidgetMou
       ref={canvasRef}
       data-wasm-widget-id={widget.id}
       aria-label={`${widget.type} preview`}
-      className={`pointer-events-none absolute ${separateRaster ? 'z-3' : ''}`}
+      className={`pointer-events-none absolute ${separateRaster ? 'z-3' : ''} ${isHidden ? 'invisible' : ''}`}
     />
   )
   return (

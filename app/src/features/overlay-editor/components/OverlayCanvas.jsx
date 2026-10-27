@@ -10,7 +10,9 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
     widgets,
     scene,
     activity,
+    activityOriginSecond,
     disabledLaps,
+    hasActivityCoverage,
     globalDefaults,
     setSceneElement,
     sceneSize,
@@ -25,6 +27,7 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
     widgets,
     scene,
     activity,
+    activityOriginSecond,
     disabledLaps,
     defaultFont: globalDefaults.font_values,
   })
@@ -62,6 +65,7 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
             attach={attach}
             registerNode={widgetRefCallbacks[widget.id]}
             handleWidgetMouseDown={handleWidgetMouseDown}
+            isHidden={!hasActivityCoverage && widget.type !== 'raster'}
           />
         ))}
       </div>

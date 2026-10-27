@@ -33,7 +33,7 @@ export default function useVideoSyncCalculation() {
     completeVideoSyncDetection,
     failVideoSyncCalculation,
     failVideoSyncDetection,
-    importedVideoDuration,
+    hasVideo,
     isCalculating,
     landmarks,
     manualVideoSyncDetection,
@@ -48,7 +48,7 @@ export default function useVideoSyncCalculation() {
       completeVideoSyncDetection: state.completeVideoSyncDetection,
       failVideoSyncCalculation: state.failVideoSyncCalculation,
       failVideoSyncDetection: state.failVideoSyncDetection,
-      importedVideoDuration: state.importedVideoDuration,
+      hasVideo: state.manualVideoSync.videoId !== null,
       isCalculating: Object.values(state.manualVideoSyncResults).some((result) => result.status === MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.CALCULATING),
       landmarks: state.manualVideoSync.landmarks,
       manualVideoSyncDetection: state.manualVideoSyncDetection,
@@ -61,7 +61,6 @@ export default function useVideoSyncCalculation() {
   const settings = useMemo(() => ({ speedThresholdKmh, turnThresholdDegrees }), [speedThresholdKmh, turnThresholdDegrees])
   const detectorInput = useMemo(() => (parsedActivity === null ? null : createActivitySyncInput(parsedActivity)), [parsedActivity])
   const domainEligibility = useMemo(() => getVideoSyncEligibility(landmarks, manualVideoSyncDetection), [landmarks, manualVideoSyncDetection])
-  const hasVideo = importedVideoDuration !== null
   const latestDetectionRequest = useRef(null)
   const eligibility = useMemo(() => {
     let allExplanation = null

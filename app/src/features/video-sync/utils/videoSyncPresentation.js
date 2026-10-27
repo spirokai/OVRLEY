@@ -100,9 +100,9 @@ export function buildVideoSyncCandidateCards(candidates, appliedOffset) {
 export function resolveVideoSyncMarkControls(markControls, timelineSecond, enabled) {
   if (!enabled || markControls === null) return null
 
-  const videoSecond = timelineSecond - markControls.videoSyncOffsetSeconds
-  const hasVideo = markControls.importedVideoDuration !== null
-  const isInsideVideo = hasVideo && videoSecond >= 0 && videoSecond < markControls.importedVideoDuration
+  const videoSecond = timelineSecond - markControls.videoOffsetSeconds
+  const hasVideo = markControls.videoDurationSeconds !== null
+  const isInsideVideo = hasVideo && videoSecond >= 0 && videoSecond < markControls.videoDurationSeconds
   const canMark = isInsideVideo && markControls.hasLandmarkCapacity
   const markDisabledReason = !hasVideo
     ? markControls.videoRequiredReason

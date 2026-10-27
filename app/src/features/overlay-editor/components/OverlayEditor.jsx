@@ -22,7 +22,7 @@ function OverlayEditorContent(props) {
     backgroundMode,
     gridVisible,
     importedBackgroundImageFilename,
-    importedVideoFilename,
+    importedVideoLabel,
     showProjectStatus,
     projectStatus,
     undoRedoControls,
@@ -68,7 +68,7 @@ function OverlayEditorContent(props) {
           backgroundMode={editorShell.editorBackgroundMode}
           onSetBackgroundMode={editorShell.setEditorBackgroundMode}
           importedBackgroundImageFilename={importedBackgroundImageFilename}
-          importedVideoFilename={importedVideoFilename}
+          importedVideoLabel={importedVideoLabel}
           zoomLevel={editorShell.editorZoomLevel}
           onZoomIn={editorShell.increaseZoom}
           onZoomOut={editorShell.decreaseZoom}

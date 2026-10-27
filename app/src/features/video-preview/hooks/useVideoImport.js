@@ -1,141 +1,81 @@
 /**
- * Video import - background media selection and preview management.
+ * Video import - background media selection and preview management. Selected
+ * videos are reviewed in the import dialog before they join the collection.
  */
 
-import { clearPreviewVideo, extractVideoTelemetry, importPreviewVideo, preparePreviewVideo } from '@/api/backend'
-import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
-import { openSinglePath } from '@/lib/file-dialog'
-import { normalizeUpdateRateForFps } from '@/lib/update-rate'
-import { createImportedVideoState } from '@/store/slices/createVideoImportSlice'
+import { useMemo } from 'react'
+import { clearPreviewVideos, removePreviewVideo } from '@/api/backend'
+import { changeVideoCollection } from '@/features/undo-redo/undoHistory'
+import { openMultiplePaths } from '@/lib/file-dialog'
+import { filenameFromSelectedPath } from '@/lib/file-dialog'
+import { joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import useStore from '@/store/useStore'
 import i18next from 'i18next'
+import useVideoImportReview from './useVideoImportReview'
 
-const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'mkv'])
 const DEBUG_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
 
 function pathExtension(path) {
   return typeof path === 'string' ? path.split('.').pop()?.toLowerCase() || '' : ''
 }
 
-function isVideoPath(path) {
-  return VIDEO_EXTENSIONS.has(pathExtension(path))
-}
-
-async function extractAndStoreVideoTelemetry(filePath) {
-  try {
-    const response = await extractVideoTelemetry(filePath)
-    if (response?.parsed_activity) {
-      await runWithoutEditorHistory(useStore, () => useStore.getState().loadVideoTelemetry(response.parsed_activity))
-    }
-  } catch (error) {
-    console.warn('MP4 telemetry extraction failed (non-fatal):', error)
-  }
-}
-
 /**
- * Probes a project video without mutating preview-server or application state.
- * @param {string} path Absolute video path.
- * @returns {Promise<{path: string, metadata: object, telemetry: object|null}>} Prepared video source.
+ * Summarizes one imported video for drawers and project views.
+ * @param {object} video Imported video entity.
+ * @returns {object} Presentational video summary.
  */
-export async function prepareVideoPath(path) {
-  if (typeof path !== 'string' || path.length === 0) throw new Error('Video import requires a file path.')
-  if (!isVideoPath(path)) throw new Error('Selected file is not a supported video.')
-
-  const telemetryPromise = extractVideoTelemetry(path)
-    .then((response) => response?.parsed_activity ?? null)
-    .catch((error) => {
-      console.warn('MP4 telemetry extraction failed (non-fatal):', error)
-      return null
-    })
-  const [preview, telemetry] = await Promise.all([preparePreviewVideo(path), telemetryPromise])
-  const importedVideoState = createImportedVideoState({ ...preview.metadata, previewWarnings: preview.warnings })
-  return { path, importedVideoState, telemetry }
-}
-
-async function importVideoSelection(selection, { setImportingVideo, setImportedVideo, setConfig, clearVideoTelemetry, onSetBackgroundMode }) {
-  if (typeof selection !== 'string') {
-    throw new Error('Video import requires a file path.')
+function createVideoSummary(video) {
+  return {
+    id: video.id,
+    path: video.path,
+    filename: filenameFromSelectedPath(video.path),
+    duration: video.durationSeconds,
+    fps: video.fps.num / video.fps.den,
+    resolution: video.resolution,
+    creationTime: video.creationTime,
+    timeSource: video.timeSource,
+    codecName: video.codecName,
+    codecLongName: video.codecLongName,
+    bitRate: video.bitRate,
+    cameraType: video.cameraType,
+    cameraModel: video.cameraModel,
+    offsetSeconds: video.offsetSeconds,
+    telemetryStatus: video.telemetry.status,
   }
-
-  const path = selection
-  if (path.length === 0) {
-    throw new Error('Video import requires a file path.')
-  }
-
-  if (!isVideoPath(path)) {
-    throw new Error('Dropped file is not a supported video.')
-  }
-
-  setImportingVideo(true)
-  clearVideoTelemetry()
-
-  const response = await importPreviewVideo(path)
-  const metadata = {
-    ...response.metadata,
-    importId: response.importId,
-    previewUrl: response.previewUrl,
-    previewWarnings: response.warnings ?? [],
-  }
-  const currentConfig = useStore.getState().config
-  if (!currentConfig?.scene) {
-    throw new Error('Cannot import video without an active template scene')
-  }
-
-  await runWithoutEditorHistory(useStore, () => {
-    const importedVideoResolution = setImportedVideo(metadata)
-    setConfig({
-      ...currentConfig,
-      scene: {
-        ...currentConfig.scene,
-        width: importedVideoResolution.width,
-        height: importedVideoResolution.height,
-      },
-    })
-    if (metadata.fps) {
-      const { renderSettings, setRenderFpsAndUpdateRate } = useStore.getState()
-      const fps = Math.round(metadata.fps)
-      setRenderFpsAndUpdateRate(fps, normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate))
-    }
-  })
-  onSetBackgroundMode?.('video')
-
-  await extractAndStoreVideoTelemetry(path)
 }
 
 export default function useVideoImport({ debugModeEnabled = false, onSetBackgroundMode }) {
-  const importedVideoPath = useStore((state) => state.importedVideoPath)
-  const importedVideoDuration = useStore((state) => state.importedVideoDuration)
-  const importedVideoFps = useStore((state) => state.importedVideoFps)
-  const importedVideoResolution = useStore((state) => state.importedVideoResolution)
-  const importedVideoCreationTime = useStore((state) => state.importedVideoCreationTime)
-  const importedVideoTimeSource = useStore((state) => state.importedVideoTimeSource)
-  const importedVideoCodecName = useStore((state) => state.importedVideoCodecName)
-  const importedVideoCodecLongName = useStore((state) => state.importedVideoCodecLongName)
-  const importedVideoBitRate = useStore((state) => state.importedVideoBitRate)
-  const importedVideoCameraType = useStore((state) => state.importedVideoCameraType)
-  const importedVideoCameraModel = useStore((state) => state.importedVideoCameraModel)
+  const importedVideos = useStore((state) => state.importedVideos)
+  const videoEdits = useStore((state) => state.videoEdits)
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
-  const setImportedVideo = useStore((state) => state.setImportedVideo)
   const setImportedBackgroundImage = useStore((state) => state.setImportedBackgroundImage)
-  const clearImportedVideo = useStore((state) => state.clearImportedVideo)
+  const clearImportedVideos = useStore((state) => state.clearImportedVideos)
   const setImportingVideo = useStore((state) => state.setImportingVideo)
-  const setConfig = useStore((state) => state.setConfig)
-  const clearVideoTelemetry = useStore((state) => state.clearVideoTelemetry)
   const setErrorMessage = useStore((state) => state.setErrorMessage)
 
-  const importedVideoFilename = importedVideoPath ? importedVideoPath.split(/[/\\]/).pop() : null
-  const importedBackgroundImageFilename = importedBackgroundImagePath ? importedBackgroundImagePath.split(/[/\\]/).pop() : null
-  const importedMediaFilename = importedBackgroundImageFilename || importedVideoFilename
+  const videoSummaries = useMemo(
+    () => sortVideosByTimeline(joinVideoEdits(importedVideos, videoEdits)).map(createVideoSummary),
+    [importedVideos, videoEdits],
+  )
+  const hasVideos = videoSummaries.length > 0
+  const importedVideoLabel =
+    videoSummaries.length > 1
+      ? i18next.t('video-preview.videoCount', { defaultValue: '{{count}} videos', count: videoSummaries.length })
+      : (videoSummaries[0]?.filename ?? null)
+  const importedBackgroundImageFilename = importedBackgroundImagePath ? filenameFromSelectedPath(importedBackgroundImagePath) : null
+  const importedMediaFilename = importedBackgroundImageFilename || importedVideoLabel
 
-  const loadVideoPath = async (path) => {
+  const review = useVideoImportReview({ onImported: (videos) => videos.length > 0 && onSetBackgroundMode?.('video') })
+
+  const applyBackgroundImage = async (path) => {
+    setImportingVideo(true)
     try {
-      await importVideoSelection(path, {
-        setImportingVideo,
-        setImportedVideo,
-        setConfig,
-        clearVideoTelemetry,
-        onSetBackgroundMode,
-      })
+      if (hasVideos) {
+        await clearPreviewVideos()
+        useStore.getState().clearTransitionProxies()
+      }
+      changeVideoCollection(useStore, () => setImportedBackgroundImage(path))
+      onSetBackgroundMode?.('image')
     } finally {
       setImportingVideo(false)
     }
@@ -143,7 +83,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
 
   const handleImportVideo = async () => {
     try {
-      const selected = await openSinglePath(
+      const selected = await openMultiplePaths(
         [
           {
             name: debugModeEnabled ? i18next.t('video-preview.videoOrImage', 'Video or Image') : 'Video',
@@ -156,98 +96,80 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
         return
       }
 
-      if (debugModeEnabled && DEBUG_IMAGE_EXTENSIONS.has(pathExtension(selected))) {
-        setImportingVideo(true)
-        try {
-          if (importedVideoPath) {
-            await clearPreviewVideo()
-          }
-          setImportedBackgroundImage(selected)
-          onSetBackgroundMode?.('image')
-        } finally {
-          setImportingVideo(false)
-        }
+      if (debugModeEnabled && selected.length === 1 && DEBUG_IMAGE_EXTENSIONS.has(pathExtension(selected[0]))) {
+        await applyBackgroundImage(selected[0])
         return
       }
 
-      await loadVideoPath(selected)
+      await review.start(selected)
     } catch (err) {
       console.error('Failed to import background media:', err)
       setErrorMessage(`Video import failed: ${err.message}`)
-    } finally {
-      setImportingVideo(false)
     }
   }
 
   const handleVideoFilesDrop = async (selections) => {
     try {
-      if (selections.length !== 1) {
-        throw new Error('Drop exactly one video file.')
+      // Only native drops carry file paths; browser File objects cannot be registered.
+      if (selections.some((selection) => typeof selection !== 'string')) {
+        throw new Error('Dropped files must be local files.')
       }
-
-      const selection = selections[0]
-      const path = typeof selection === 'string' ? selection : selection.name
-      if (debugModeEnabled && typeof path === 'string' && DEBUG_IMAGE_EXTENSIONS.has(pathExtension(path))) {
-        setImportingVideo(true)
-        try {
-          if (importedVideoPath) {
-            await clearPreviewVideo()
-          }
-          setImportedBackgroundImage(path)
-          onSetBackgroundMode?.('image')
-        } finally {
-          setImportingVideo(false)
-        }
+      if (debugModeEnabled && selections.length === 1 && DEBUG_IMAGE_EXTENSIONS.has(pathExtension(selections[0]))) {
+        await applyBackgroundImage(selections[0])
         return
       }
 
-      await loadVideoPath(selection)
+      await review.start(selections)
     } catch (err) {
       console.error('Video drop failed:', err)
       setErrorMessage(`Video drop failed: ${err.message}`)
-    } finally {
-      setImportingVideo(false)
     }
   }
 
-  const handleClearImportedVideo = async () => {
+  /**
+   * Removes one clip from the collection, then releases its preview registration.
+   * @param {string} videoId Clip to remove.
+   */
+  const removeVideo = async (videoId) => {
     try {
-      if (importedVideoPath) {
-        await clearPreviewVideo()
+      const state = useStore.getState()
+      const { importId } = state.importedVideos.find((video) => video.id === videoId)?.preview ?? {}
+      // Playback stops before the clip leaves; the removal clamps the playhead.
+      if (state.previewPlaybackState === 'playing') state.pausePreviewPlayback(state.selectedSecond)
+      changeVideoCollection(useStore, () => useStore.getState().removeImportedVideo(videoId))
+      await removePreviewVideo(importId)
+      if (useStore.getState().importedVideos.length === 0) onSetBackgroundMode?.('checker')
+    } catch (err) {
+      console.error('Failed to remove video:', err)
+      setErrorMessage(`Removing the video failed: ${err.message}`)
+    }
+  }
+
+  const handleClearImportedVideos = async () => {
+    try {
+      if (hasVideos) {
+        await clearPreviewVideos()
+        useStore.getState().clearTransitionProxies()
       }
     } catch (err) {
-      console.error('Failed to clear preview video:', err)
+      console.error('Failed to clear preview videos:', err)
     } finally {
-      clearImportedVideo()
+      changeVideoCollection(useStore, () => clearImportedVideos())
       onSetBackgroundMode?.('checker')
     }
   }
 
-  const videoSummary = {
-    path: importedVideoPath,
-    filename: importedVideoFilename,
-    duration: importedVideoDuration,
-    fps: importedVideoFps,
-    resolution: importedVideoResolution,
-    creationTime: importedVideoCreationTime,
-    timeSource: importedVideoTimeSource,
-    codecName: importedVideoCodecName,
-    codecLongName: importedVideoCodecLongName,
-    bitRate: importedVideoBitRate,
-    cameraType: importedVideoCameraType,
-    cameraModel: importedVideoCameraModel,
-  }
-
   return {
     debugModeEnabled,
+    hasVideos,
     importedBackgroundImageFilename,
     importedMediaFilename,
-    importedVideoFilename,
-    videoSummary,
-    clearImportedVideo: handleClearImportedVideo,
+    importedVideoLabel,
+    videoSummaries,
+    clearImportedVideos: handleClearImportedVideos,
     handleImportVideo,
     handleVideoFilesDrop,
-    loadVideoPath,
-    prepareVideoPath,
+    importDialog: review.dialog,
+    removeVideo,
   }
 }

@@ -3,9 +3,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { videoOverlapsActivity } from '@/lib/video-sync'
+import { getVideosTimelineBounds } from '@/lib/video-program/video-collection'
 import { getTimelineMinimum } from '../utils/playerTiming'
-import { snapClipOffset, viewPxToSeconds } from '../utils/timelineGeometry'
+import { snapClipDelta, videoIdFromLaneId, viewPxToSeconds } from '../utils/timelineGeometry'
 
 const AUTO_SCROLL_EDGE_RATIO = 0.15
 const AUTO_SCROLL_MIN_ZOOM_SCALE = 0.1
@@ -41,34 +41,59 @@ function getAutoScrollPointerSecond(metrics, clientX, elapsedSeconds) {
   return edgeSecond + deltaSecond
 }
 
+function clipEdges(clips) {
+  return clips.flatMap((clip) => [clip.offsetSeconds, clip.offsetSeconds + clip.durationSeconds])
+}
+
+function roundToTenth(seconds) {
+  return Math.round(seconds * 10) / 10
+}
+
 /**
- * Owns horizontal drag gestures for activity and video clips.
- *
- * @param {object} options Drag command inputs.
- * @param {function} options.setVideoSyncOffset Store action for committing the sync offset.
- * @param {function} [options.setVideoSyncOffsetPreview=options.setVideoSyncOffset] Store action for updating the transient preview offset.
- * @returns {object} Per-lane drag props, dragging flag, and metrics sync command.
+ * Resolves which clips move for a lane and which edges they snap to. Dragging a
+ * video lane moves that clip; dragging the activity lane moves every clip in the
+ * opposite direction because the activity stays at timeline zero.
  */
-export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPreview = setVideoSyncOffset }) {
+function resolveLaneMovement(laneId, metrics) {
+  const videoId = videoIdFromLaneId(laneId)
+  const activityEdges = metrics.hasActivityData ? [0, metrics.activityDurationSeconds] : []
+  if (videoId === null) {
+    return { videoId, direction: -1, movingClips: metrics.clips, fixedEdges: activityEdges }
+  }
+  const movingClips = metrics.clips.filter((clip) => clip.id === videoId)
+  const otherClips = metrics.clips.filter((clip) => clip.id !== videoId)
+  return { videoId, direction: 1, movingClips, fixedEdges: [...activityEdges, ...clipEdges(otherClips)] }
+}
+
+/**
+ * Owns horizontal drag gestures and keyboard nudges for activity and video clips.
+ *
+ * @param {object} options Clip commands.
+ * @param {function} options.setVideoDragPreview Store action for the transient shift of the dragged clip(s).
+ * @param {function} options.setVideoOffset Store action committing one clip's offset.
+ * @param {function} options.shiftVideoOffsets Store action committing the same shift for every clip.
+ * @returns {object} Per-lane drag props, keyboard nudge commands, dragging flag, and metrics sync command.
+ */
+export default function useClipDrag({ setVideoDragPreview, setVideoOffset, shiftVideoOffsets }) {
   const [isDragging, setIsDragging] = useState(false)
   const [snapGuidelineSecond, setSnapGuidelineSecond] = useState(null)
 
   const dragRef = useRef(null)
+  const nudgeRef = useRef(null)
   const autoScrollFrameRef = useRef(null)
   const autoScrollTimestampRef = useRef(null)
   const autoScrollTickRef = useRef(null)
-  const offsetFrameRef = useRef(null)
-  const pendingOffsetRef = useRef(null)
+  const previewFrameRef = useRef(null)
+  const pendingPreviewRef = useRef(null)
 
   const metricsRef = useRef({
     viewStart: 0,
     viewEnd: 0,
     widthPx: 0,
     timelineMinimum: 0,
-    hasVideo: false,
-    videoSyncOffsetSeconds: 0,
+    clips: [],
+    hasActivityData: false,
     activityDurationSeconds: 0,
-    importedVideoDuration: 0,
   })
 
   const updateMetrics = useCallback((metrics) => {
@@ -82,32 +107,45 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
     autoScrollFrameRef.current = null
   }, [])
 
-  const cancelPendingOffset = useCallback(() => {
-    if (offsetFrameRef.current !== null) {
-      window.cancelAnimationFrame?.(offsetFrameRef.current)
-      offsetFrameRef.current = null
+  const cancelPendingPreview = useCallback(() => {
+    if (previewFrameRef.current !== null) {
+      window.cancelAnimationFrame?.(previewFrameRef.current)
+      previewFrameRef.current = null
     }
-    pendingOffsetRef.current = null
+    pendingPreviewRef.current = null
   }, [])
 
-  const publishPreviewOffset = useCallback(
-    (offset) => {
-      pendingOffsetRef.current = offset
-      if (offsetFrameRef.current !== null) return
+  const publishPreview = useCallback(
+    (preview) => {
+      pendingPreviewRef.current = preview
+      if (previewFrameRef.current !== null) return
       if (typeof window.requestAnimationFrame !== 'function') {
-        pendingOffsetRef.current = null
-        setVideoSyncOffsetPreview(offset)
+        pendingPreviewRef.current = null
+        setVideoDragPreview(preview)
         return
       }
 
-      offsetFrameRef.current = window.requestAnimationFrame(() => {
-        offsetFrameRef.current = null
-        const nextOffset = pendingOffsetRef.current
-        pendingOffsetRef.current = null
-        if (nextOffset !== null) setVideoSyncOffsetPreview(nextOffset)
+      previewFrameRef.current = window.requestAnimationFrame(() => {
+        previewFrameRef.current = null
+        const nextPreview = pendingPreviewRef.current
+        pendingPreviewRef.current = null
+        if (nextPreview !== null) setVideoDragPreview(nextPreview)
       })
     },
-    [setVideoSyncOffsetPreview],
+    [setVideoDragPreview],
+  )
+
+  // Commit - one clip snaps its start to a tenth of a second; a shared shift keeps relative placement and rounds the earliest clip.
+  const commitShift = useCallback(
+    ({ videoId, movingClips }, deltaSeconds) => {
+      if (videoId !== null) {
+        setVideoOffset(videoId, roundToTenth(movingClips[0].offsetSeconds + deltaSeconds))
+        return
+      }
+      const earliestOffset = Math.min(...movingClips.map((clip) => clip.offsetSeconds))
+      shiftVideoOffsets(roundToTenth(earliestOffset + deltaSeconds) - earliestOffset)
+    },
+    [setVideoOffset, shiftVideoOffsets],
   )
 
   const updateDragOffset = useCallback(
@@ -123,31 +161,29 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
         viewEnd: metrics.viewEnd,
         widthPx,
       })
-      const direction = drag.laneId === 'activity' ? -1 : 1
-      const raw = drag.initialOffset + direction * deltaSeconds
-      const snap = snapClipOffset({
-        activityDuration: metrics.activityDurationSeconds,
-        proposedOffset: raw,
-        videoDuration: metrics.importedVideoDuration,
+      const snap = snapClipDelta({
+        proposedDelta: drag.initialDelta + drag.movement.direction * deltaSeconds,
+        movingEdges: clipEdges(drag.movement.movingClips),
+        fixedEdges: drag.movement.fixedEdges,
         viewEnd: metrics.viewEnd,
         viewStart: metrics.viewStart,
         widthPx,
       })
-      const desiredOffset = snap.offset
-      if (!videoOverlapsActivity({ videoStart: desiredOffset, videoDuration: metrics.importedVideoDuration })) return
+      const desiredDelta = snap.delta
 
-      drag.desiredOffset = desiredOffset
-      metrics.timelineMinimum = getTimelineMinimum({ hasVideo: metrics.hasVideo, videoSyncOffsetSeconds: desiredOffset })
-      const nextOffset = drag.laneId === 'video' ? Math.max(desiredOffset, metrics.viewStart) : desiredOffset
-      const guidelineSecond = nextOffset === desiredOffset ? snap.guidelineSecond : null
-      if (nextOffset === drag.currentOffset && guidelineSecond === drag.guidelineSecond) return
+      drag.desiredDelta = desiredDelta
+      metrics.timelineMinimum = getTimelineMinimum({ videoBounds: shiftedBounds(metrics.clips, drag.movement, desiredDelta) })
+      const nextDelta =
+        drag.movement.videoId === null ? desiredDelta : Math.max(desiredDelta, metrics.viewStart - drag.movement.movingClips[0].offsetSeconds)
+      const guidelineSecond = nextDelta === desiredDelta ? snap.guidelineSecond : null
+      if (nextDelta === drag.currentDelta && guidelineSecond === drag.guidelineSecond) return
 
-      drag.currentOffset = nextOffset
+      drag.currentDelta = nextDelta
       drag.guidelineSecond = guidelineSecond
       setSnapGuidelineSecond(guidelineSecond)
-      publishPreviewOffset(nextOffset)
+      publishPreview({ videoId: drag.movement.videoId, deltaSeconds: nextDelta })
     },
-    [publishPreviewOffset],
+    [publishPreview],
   )
 
   const autoScrollTick = useCallback(
@@ -157,7 +193,7 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
       if (drag?.type !== 'clip-drag') return
 
       const metrics = metricsRef.current
-      metrics.timelineMinimum = getTimelineMinimum({ hasVideo: metrics.hasVideo, videoSyncOffsetSeconds: drag.desiredOffset })
+      metrics.timelineMinimum = getTimelineMinimum({ videoBounds: shiftedBounds(metrics.clips, drag.movement, drag.desiredDelta) })
       const previousTimestamp = autoScrollTimestampRef.current
       const elapsedSeconds = previousTimestamp === null ? 1 / 60 : Math.min((timestamp - previousTimestamp) / 1000, AUTO_SCROLL_MAX_FRAME_SECONDS)
       autoScrollTimestampRef.current = timestamp
@@ -170,8 +206,7 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
       const followResult = metrics.followSecond?.(targetSecond, metrics.timelineMinimum)
       if (!followResult) return
 
-      const direction = drag.laneId === 'activity' ? -1 : 1
-      drag.initialOffset += direction * followResult.deltaStart
+      drag.initialDelta += drag.movement.direction * followResult.deltaStart
       metrics.viewStart = followResult.viewport.viewStart
       metrics.viewEnd = followResult.viewport.viewEnd
       updateDragOffset(drag.pointerClientX)
@@ -196,57 +231,78 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
       if (drag?.type !== 'clip-drag' || drag.pointerId !== event.pointerId) return
       event.stopPropagation()
       cancelAutoScroll()
-      cancelPendingOffset()
+      cancelPendingPreview()
       event.currentTarget.releasePointerCapture?.(event.pointerId)
       dragRef.current = null
       setIsDragging(false)
+      setSnapGuidelineSecond(null)
 
       const metrics = metricsRef.current
-      const snap = snapClipOffset({
-        activityDuration: metrics.activityDurationSeconds,
-        proposedOffset: drag.currentOffset,
-        videoDuration: metrics.importedVideoDuration,
+      const snap = snapClipDelta({
+        proposedDelta: drag.currentDelta,
+        movingEdges: clipEdges(drag.movement.movingClips),
+        fixedEdges: drag.movement.fixedEdges,
         viewEnd: metrics.viewEnd,
         viewStart: metrics.viewStart,
         widthPx: getTimelineWidth(metrics),
       })
-      const requestedOffset = commit ? Math.round(snap.offset * 10) / 10 : drag.initialOffset
-      const nextOffset = videoOverlapsActivity({ videoStart: requestedOffset, videoDuration: metrics.importedVideoDuration })
-        ? requestedOffset
-        : drag.currentOffset
-      setSnapGuidelineSecond(null)
-      setVideoSyncOffset(nextOffset)
-      setVideoSyncOffsetPreview(null)
+      if (commit) commitShift(drag.movement, snap.delta)
+      setVideoDragPreview(null)
     },
-    [cancelAutoScroll, cancelPendingOffset, setVideoSyncOffset, setVideoSyncOffsetPreview],
+    [cancelAutoScroll, cancelPendingPreview, commitShift, setVideoDragPreview],
   )
 
   useEffect(
     () => () => {
       cancelAutoScroll()
-      cancelPendingOffset()
-      setVideoSyncOffsetPreview(null)
+      cancelPendingPreview()
+      setVideoDragPreview(null)
     },
-    [cancelAutoScroll, cancelPendingOffset, setVideoSyncOffsetPreview],
+    [cancelAutoScroll, cancelPendingPreview, setVideoDragPreview],
   )
+
+  // Keyboard nudges - accumulate a transient shift for one lane and commit it as one edit.
+  const nudgeLane = useCallback(
+    (laneId, deltaSeconds) => {
+      const metrics = metricsRef.current
+      if (metrics.clips.length === 0) return
+      const nudge =
+        nudgeRef.current?.laneId === laneId ? nudgeRef.current : { laneId, movement: resolveLaneMovement(laneId, metrics), deltaSeconds: 0 }
+      nudge.deltaSeconds += nudge.movement.direction * deltaSeconds
+      nudgeRef.current = nudge
+      setVideoDragPreview({ videoId: nudge.movement.videoId, deltaSeconds: nudge.deltaSeconds })
+    },
+    [setVideoDragPreview],
+  )
+
+  const commitNudge = useCallback(() => {
+    const nudge = nudgeRef.current
+    if (nudge === null) return
+    nudgeRef.current = null
+    commitShift(nudge.movement, nudge.deltaSeconds)
+    setVideoDragPreview(null)
+  }, [commitShift, setVideoDragPreview])
 
   const getLaneDragProps = useCallback(
     (laneId) => ({
       onPointerDown: (event) => {
         if (!isPrimaryButton(event)) return
+        const metrics = metricsRef.current
+        if (metrics.clips.length === 0) return
         event.stopPropagation()
         event.preventDefault()
         event.currentTarget.setPointerCapture?.(event.pointerId)
         cancelAutoScroll()
-        cancelPendingOffset()
-        setVideoSyncOffsetPreview(metricsRef.current.videoSyncOffsetSeconds)
+        cancelPendingPreview()
+        const movement = resolveLaneMovement(laneId, metrics)
+        setVideoDragPreview({ videoId: movement.videoId, deltaSeconds: 0 })
         setSnapGuidelineSecond(null)
         dragRef.current = {
           type: 'clip-drag',
-          laneId,
-          initialOffset: metricsRef.current.videoSyncOffsetSeconds,
-          currentOffset: metricsRef.current.videoSyncOffsetSeconds,
-          desiredOffset: metricsRef.current.videoSyncOffsetSeconds,
+          movement,
+          initialDelta: 0,
+          currentDelta: 0,
+          desiredDelta: 0,
           pointerId: event.pointerId,
           pointerClientX: event.clientX,
           startClientX: event.clientX,
@@ -265,13 +321,23 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
       onPointerUp: (event) => endDrag(event, true),
       onPointerCancel: (event) => endDrag(event, false),
     }),
-    [cancelPendingOffset, cancelAutoScroll, endDrag, scheduleAutoScroll, setVideoSyncOffsetPreview, updateDragOffset],
+    [cancelPendingPreview, cancelAutoScroll, endDrag, scheduleAutoScroll, setVideoDragPreview, updateDragOffset],
   )
 
   return {
+    commitNudge,
     getLaneDragProps,
     isDragging,
+    nudgeLane,
     snapGuidelineSecond,
     updateMetrics,
   }
+}
+
+function shiftedBounds(clips, movement, deltaSeconds) {
+  return getVideosTimelineBounds(
+    clips.map((clip) =>
+      movement.videoId === null || clip.id === movement.videoId ? { ...clip, offsetSeconds: clip.offsetSeconds + deltaSeconds } : clip,
+    ),
+  )
 }

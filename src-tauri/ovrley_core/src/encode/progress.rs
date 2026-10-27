@@ -221,6 +221,8 @@ struct RenderSession {
     next_render_id: u64,
     sink: Arc<dyn ProgressSink>,
     last_fps_emit_at: Option<Instant>,
+    /// Set while one piece of a multi-piece item renders: item frames before it.
+    piece_start: Option<u32>,
 }
 
 impl Default for RenderController {
@@ -252,6 +254,7 @@ impl RenderController {
                 next_render_id: 0,
                 sink: progress_sink.clone(),
                 last_fps_emit_at: None,
+                piece_start: None,
             })),
             cancel_flag: Arc::new(AtomicBool::new(false)),
             progress_sink,
@@ -343,8 +346,29 @@ impl RenderController {
         progress.rendering_fps = None;
         progress.filename = None;
         session.last_fps_emit_at = None;
+        session.piece_start = None;
         self.publish_progress(session);
         Ok(())
+    }
+
+    /// Reports the next piece pipeline of the current item as item progress:
+    /// its frame counts start at `item_frames_before` and the total stays the
+    /// item's. The estimate covers the remaining pieces at the observed rate.
+    pub(crate) fn begin_piece(&self, item_frames_before: u32) {
+        let mut session = self.session.lock().expect("render session mutex poisoned");
+        session.piece_start = Some(item_frames_before);
+        session.last_fps_emit_at = None;
+    }
+
+    /// Publishes an item phase after its frames, such as joining pieces.
+    pub(crate) fn set_item_message(&self, message: &str) {
+        let mut session = self.session.lock().expect("render session mutex poisoned");
+        session.piece_start = None;
+        let progress = &mut session.progress;
+        progress.current = progress.total;
+        progress.message = message.to_string();
+        progress.estimated_seconds_remaining = None;
+        self.publish_progress(session);
     }
 
     /// Cancellable preparation boundary, including immediately before FFmpeg startup.
@@ -384,7 +408,25 @@ impl RenderController {
         if due {
             session.last_fps_emit_at = Some(now);
         }
+        let piece_start = session.piece_start;
         let progress = &mut session.progress;
+        let (current, total, rendered, encoded, estimate) = match piece_start {
+            None => (current, total, rendered, encoded, estimate),
+            Some(start) => {
+                let later_frames = progress.total - start - total;
+                (
+                    start + current,
+                    progress.total,
+                    start + rendered,
+                    start + encoded,
+                    estimate
+                        .zip(rendering_fps.filter(|fps| *fps > 0.0))
+                        .map(|(estimate, fps)| {
+                            estimate + (f64::from(later_frames) / fps).ceil() as u64
+                        }),
+                )
+            }
+        };
         progress.current = current;
         progress.total = total;
         progress.rendered = rendered;
@@ -442,5 +484,54 @@ impl RenderController {
     /// Returns the shared cancellation flag for internal worker coordination.
     pub fn cancel_flag(&self) -> Arc<AtomicBool> {
         self.cancel_flag.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn piece_pipelines_report_progress_of_the_whole_item() {
+        let controller = RenderController::default();
+        controller.reserve(Arc::new(NullSink)).unwrap();
+        controller.begin_item(90, "Preparing").unwrap();
+        controller.begin_piece(0);
+        controller.set_frame_progress(10, 30, 10, 5, Some(4), Some(15.0));
+        let progress = controller.progress();
+        assert_eq!(
+            (
+                progress.current,
+                progress.total,
+                progress.rendered,
+                progress.encoded
+            ),
+            (10, 90, 10, 5)
+        );
+        // The piece's own estimate plus the 60 later frames at the observed rate.
+        assert_eq!(progress.estimated_seconds_remaining, Some(8));
+        controller.begin_piece(30);
+        controller.set_frame_progress(30, 60, 30, 20, Some(2), Some(30.0));
+        let progress = controller.progress();
+        assert_eq!(
+            (
+                progress.current,
+                progress.total,
+                progress.rendered,
+                progress.encoded
+            ),
+            (60, 90, 60, 50)
+        );
+        assert_eq!(progress.estimated_seconds_remaining, Some(2));
+        controller.set_item_message("Joining output pieces...");
+        let progress = controller.progress();
+        assert_eq!(
+            (progress.current, progress.message.as_str()),
+            (90, "Joining output pieces...")
+        );
+        // A new item reports its own pipeline directly.
+        controller.begin_item(40, "Preparing").unwrap();
+        controller.set_frame_progress(10, 40, 10, 10, Some(1), Some(30.0));
+        assert_eq!(controller.progress().current, 10);
     }
 }

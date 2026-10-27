@@ -145,17 +145,18 @@ pub fn plan_batch_output_targets(
     directory: &Path,
     kind: RenderOutputKind,
     sources: &[PathBuf],
-    calibration_source: Option<&Path>,
 ) -> CoreResult<Vec<RenderOutputTarget>> {
     if !directory.is_absolute() || !directory.is_dir() {
         return Err(CoreError::OutputInvalid(
             RenderPathError::OutputDirectoryInvalid,
         ));
     }
-    let directory = fs::canonicalize(directory).map_err(|source| CoreError::OutputIo {
-        path: directory.to_path_buf(),
-        source,
-    })?;
+    let directory = fs::canonicalize(directory)
+        .map(without_verbatim_prefix)
+        .map_err(|source| CoreError::OutputIo {
+            path: directory.to_path_buf(),
+            source,
+        })?;
     let case_sensitive = directory_is_case_sensitive(&directory)?;
     let file_handle = |path: &Path| {
         same_file::Handle::from_path(path).map_err(|source| CoreError::OutputIo {
@@ -166,7 +167,6 @@ pub fn plan_batch_output_targets(
     let input_handles = sources
         .iter()
         .map(PathBuf::as_path)
-        .chain(calibration_source)
         .map(file_handle)
         .collect::<CoreResult<Vec<_>>>()?;
     let mut output_handles = Vec::new();
@@ -224,6 +224,72 @@ pub fn plan_batch_output_targets(
             )
         })
         .collect()
+}
+
+/// Windows canonical paths carry the `\\?\` verbatim prefix. FFmpeg's concat
+/// demuxer cannot resolve manifest entries next to such a manifest path, so
+/// output targets keep the equivalent plain form.
+fn without_verbatim_prefix(path: PathBuf) -> PathBuf {
+    let Some(text) = path.to_str() else {
+        return path;
+    };
+    if let Some(unc) = text.strip_prefix(r"\\?\UNC\") {
+        PathBuf::from(format!(r"\\{unc}"))
+    } else if let Some(local) = text.strip_prefix(r"\\?\") {
+        PathBuf::from(local)
+    } else {
+        path
+    }
+}
+
+/// Validates one exact combined-output path that must not replace any input.
+pub fn plan_file_output_target(
+    raw_path: &str,
+    kind: RenderOutputKind,
+    overwrite: bool,
+    sources: &[PathBuf],
+) -> CoreResult<RenderOutputTarget> {
+    let path = Path::new(raw_path);
+    if path.is_absolute() && path.is_file() {
+        let output = same_file::Handle::from_path(path).map_err(|source| CoreError::OutputIo {
+            path: path.to_path_buf(),
+            source,
+        })?;
+        for source in sources {
+            let input =
+                same_file::Handle::from_path(source).map_err(|error| CoreError::OutputIo {
+                    path: source.clone(),
+                    source: error,
+                })?;
+            if input == output {
+                return Err(CoreError::OutputInvalid(
+                    RenderPathError::OutputAliasesInput {
+                        path: path.display().to_string(),
+                    },
+                ));
+            }
+        }
+    }
+    RenderOutputTarget::validate(raw_path, kind, overwrite)
+}
+
+/// Creates a new hidden directory next to the target for its rendered parts.
+pub fn create_parts_directory(target: &RenderOutputTarget) -> CoreResult<PathBuf> {
+    let parent = target.path().parent().expect("absolute output path");
+    let stem = target
+        .path()
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .expect("validated Unicode output");
+    for attempt in 0u32.. {
+        let path = parent.join(format!(".ovrley-parts-{stem}-{attempt}"));
+        match fs::create_dir(&path) {
+            Ok(()) => return Ok(path),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(source) => return Err(CoreError::OutputIo { path, source }),
+        }
+    }
+    unreachable!("an unused parts directory name exists")
 }
 
 /// Query the selected filesystem rather than assuming the host's default case
@@ -386,40 +452,32 @@ mod tests {
     }
 
     #[test]
-    fn batch_outputs_reject_input_and_calibration_aliases_before_overwrite() {
+    fn batch_outputs_reject_input_aliases_before_overwrite() {
         let directory = temp_target("batch-aliases");
         fs::create_dir_all(&directory).unwrap();
         let source = directory.join("ride.mp4");
         let target = directory.join("ride_video.mp4");
         fs::write(&source, b"source video").unwrap();
-        fs::write(&target, b"reference video").unwrap();
-        for (inputs, reference) in [
-            (vec![source.clone(), target.clone()], None),
-            (vec![source.clone()], Some(target.as_path())),
-        ] {
-            let error = plan_batch_output_targets(
-                &directory,
-                RenderOutputKind::Composite,
-                &inputs,
-                reference,
-            )
-            .unwrap_err();
-            assert!(error.to_string().contains("aliases an input"));
-            assert_eq!(fs::read(&target).unwrap(), b"reference video");
-        }
+        fs::write(&target, b"other video").unwrap();
+        let error = plan_batch_output_targets(
+            &directory,
+            RenderOutputKind::Composite,
+            &[source.clone(), target.clone()],
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("aliases an input"));
+        assert_eq!(fs::read(&target).unwrap(), b"other video");
         fs::remove_file(&target).unwrap();
         fs::hard_link(&source, &target).unwrap();
         assert!(plan_batch_output_targets(
             &directory,
             RenderOutputKind::Composite,
             &[source.clone()],
-            None
         )
         .is_err());
         assert_eq!(fs::read(&source).unwrap(), b"source video");
         fs::remove_file(&target).unwrap();
-        plan_batch_output_targets(&directory, RenderOutputKind::Composite, &[source], None)
-            .unwrap();
+        plan_batch_output_targets(&directory, RenderOutputKind::Composite, &[source]).unwrap();
         fs::remove_dir_all(directory).unwrap();
     }
 

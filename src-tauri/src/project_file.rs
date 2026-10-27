@@ -8,6 +8,9 @@ use crate::raster_resources::RasterResources;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use chrono::DateTime;
 use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, EncoderId};
+use ovrley_core::encode::ffmpeg::transitions::{
+    is_xfade_transition, transition_defaults, NO_TRANSITION,
+};
 use ovrley_core::encode::quality::{validate_quality, QualityType};
 use ovrley_core::normalize::validate_template_rasters;
 use ovrley_widgets::widgets::raster::config::RasterConfig;
@@ -29,11 +32,12 @@ use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 const PROJECT_FORMAT: &str = "ovrley-project";
-const PROJECT_VERSION: u32 = 5;
+const PROJECT_VERSION: u32 = 6;
 const PROJECT_VERSION_V1: u32 = 1;
 const PROJECT_VERSION_V2: u32 = 2;
 const PROJECT_VERSION_V3: u32 = 3;
 const PROJECT_VERSION_V4: u32 = 4;
+const PROJECT_VERSION_V5: u32 = 5;
 const MAX_MANUAL_LANDMARKS: usize = 5;
 const MAX_MANUAL_LOCATION_LANDMARKS: usize = 1;
 const DEFAULT_MANUAL_SPEED_THRESHOLD_KMH: f64 = 5.0;
@@ -139,6 +143,7 @@ pub(crate) struct ProjectDocument {
     sources: ProjectSources,
     sync: ProjectSync,
     laps: ProjectLaps,
+    transition_defaults: ProjectTransitionDefaults,
     render: ProjectRender,
     timeline: ProjectTimeline,
     raster_assets: BTreeMap<String, String>,
@@ -154,13 +159,28 @@ struct ProjectLaps {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectDocumentV5 {
+    format: String,
+    version: u32,
+    saved_at: String,
+    editor: ProjectEditor,
+    sources: ProjectSourcesV5,
+    sync: ProjectSyncV5,
+    laps: ProjectLaps,
+    render: ProjectRenderV5,
+    timeline: ProjectTimeline,
+    raster_assets: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectDocumentV2 {
     format: String,
     version: u32,
     saved_at: String,
     editor: ProjectEditor,
-    sources: ProjectSources,
-    sync: ProjectSync,
+    sources: ProjectSourcesV5,
+    sync: ProjectSyncV5,
     render: LegacyProjectRender,
     timeline: ProjectTimeline,
 }
@@ -172,7 +192,7 @@ struct ProjectDocumentV1 {
     version: u32,
     saved_at: String,
     editor: ProjectEditor,
-    sources: ProjectSources,
+    sources: ProjectSourcesV5,
     sync: ProjectSyncV1,
     render: LegacyProjectRender,
     timeline: ProjectTimeline,
@@ -221,6 +241,14 @@ enum PathLocator {
 #[serde(deny_unknown_fields)]
 struct ProjectSources {
     activity: Option<ProjectSource>,
+    /// Imported videos in import order.
+    videos: Vec<ProjectVideo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProjectSourcesV5 {
+    activity: Option<ProjectSource>,
     video: Option<ProjectSource>,
 }
 
@@ -230,12 +258,97 @@ struct ProjectSource {
     path: PathLocator,
 }
 
+/// One imported video with its user edits. A `null` transition follows the
+/// project transition defaults; a present one is a user override.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectVideo {
+    id: String,
+    path: PathLocator,
+    offset_seconds: f64,
+    /// Whether the start was set by hand; detecting times again keeps a manual start.
+    offset_source: OffsetSource,
+    deleted_parts: Vec<ProjectDeletedPart>,
+    #[serde(deserialize_with = "deserialize_required_option")]
+    transition_in: Option<ProjectTransition>,
+    /// Places a video whose time cannot be determined next to another video.
+    #[serde(deserialize_with = "deserialize_required_option")]
+    placement_anchor: Option<ProjectPlacementAnchor>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum OffsetSource {
+    Auto,
+    Manual,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectPlacementAnchor {
+    video_id: String,
+    side: PlacementSide,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum PlacementSide {
+    Before,
+    After,
+}
+
+/// A clip-local source range excluded from output and the transition of the join it leaves.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectDeletedPart {
+    id: String,
+    from_second: f64,
+    to_second: f64,
+    #[serde(deserialize_with = "deserialize_required_option")]
+    transition: Option<ProjectTransition>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectTransition {
+    #[serde(rename = "type")]
+    transition_type: String,
+    duration_seconds: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectTransitionDefaults {
+    #[serde(rename = "type")]
+    transition_type: String,
+    duration_seconds: f64,
+    split_gap_threshold_seconds: f64,
+}
+
+impl Default for ProjectTransitionDefaults {
+    fn default() -> Self {
+        let defaults = transition_defaults();
+        Self {
+            transition_type: defaults.transition_type.clone(),
+            duration_seconds: defaults.duration_seconds,
+            split_gap_threshold_seconds: defaults.split_gap_threshold_seconds,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectSync {
-    video_offset_seconds: f64,
     video_timezone_mode: Option<VideoTimezoneMode>,
     manual: ProjectManualVideoSync,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectSyncV5 {
+    video_offset_seconds: f64,
+    video_timezone_mode: Option<VideoTimezoneMode>,
+    manual: ProjectManualVideoSyncV5,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -245,9 +358,22 @@ struct ProjectSyncV1 {
     video_timezone_mode: Option<VideoTimezoneMode>,
 }
 
+/// Landmarks belong to the video whose manual sync workspace is selected.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectManualVideoSync {
+    #[serde(deserialize_with = "deserialize_required_option")]
+    video_id: Option<String>,
+    landmarks: Vec<ProjectLandmark>,
+    #[serde(default)]
+    detected_location_second: Option<f64>,
+    speed_threshold_kmh: f64,
+    turn_threshold_degrees: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectManualVideoSyncV5 {
     landmarks: Vec<ProjectLandmark>,
     #[serde(default)]
     detected_location_second: Option<f64>,
@@ -283,17 +409,19 @@ enum ProjectLandmark {
         video_second: f64,
         #[serde(
             rename = "activitySecond",
-            deserialize_with = "deserialize_required_activity_second"
+            deserialize_with = "deserialize_required_option"
         )]
         activity_second: Option<f64>,
     },
 }
 
-fn deserialize_required_activity_second<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+/// Deserializes a nullable field that must be present.
+fn deserialize_required_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
 {
-    Option::<f64>::deserialize(deserializer)
+    Option::<T>::deserialize(deserializer)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -303,9 +431,26 @@ enum VideoTimezoneMode {
     Utc,
 }
 
+/// `outputMode: combined` renders the whole program to one file; `separate`
+/// renders every project video to its own file in `batchOutputFolder`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectRender {
+    output_mode: OutputMode,
+    batch_output_folder: Option<String>,
+    fps: f64,
+    widget_update_rate: u32,
+    export_mode: ExportMode,
+    codec: String,
+    quality_type: QualityType,
+    quality_value: f64,
+    range: ProjectRange,
+}
+
+/// Versions 3 to 5 rendered batches from a video folder.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectRenderV5 {
     // Older projects omit these choices; absent values mean current / no folders.
     #[serde(default)]
     render_target: RenderTarget,
@@ -338,6 +483,14 @@ enum ExportMode {
     Composite,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum OutputMode {
+    Combined,
+    Separate,
+}
+
+/// Versions 3 to 5 render target: the current video or a batch of a video folder.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum RenderTarget {
@@ -374,7 +527,8 @@ struct ProjectTimeline {
 #[serde(rename_all = "camelCase")]
 struct ResolvedSources {
     activity_path: Option<String>,
-    video_path: Option<String>,
+    /// Absolute paths in `sources.videos` order.
+    video_paths: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -383,6 +537,8 @@ pub(crate) struct ReadProjectResult {
     project: ProjectDocument,
     resolved_sources: ResolvedSources,
     raster_load_results: HashMap<String, RasterLoadResult>,
+    /// Video folder of a version 3 to 5 batch project; the frontend tells the user it is no longer imported.
+    legacy_batch_video_folder: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -401,11 +557,27 @@ enum RasterLoadResult {
 struct ValidatedProject {
     document: ProjectDocument,
     populated_rasters: HashSet<String>,
+    legacy_batch_video_folder: Option<String>,
 }
 
 struct LoadedArchive {
     project: ProjectDocument,
     rasters: HashMap<String, Result<SelectedRaster, RasterError>>,
+    legacy_batch_video_folder: Option<String>,
+}
+
+/// A project in the current format and, for a version 3 to 5 batch project, its video folder.
+struct MigratedProject {
+    document: ProjectDocument,
+    legacy_batch_video_folder: Option<String>,
+}
+
+fn validate_folder(folder: &str) -> Result<(), String> {
+    validate_locator(&PathLocator::Absolute(folder.to_string()))?;
+    if folder.trim() != folder {
+        return Err("Batch folder paths must not contain surrounding whitespace".into());
+    }
+    Ok(())
 }
 
 struct RasterAsset {
@@ -492,23 +664,12 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
     if let Some(source) = &project.sources.activity {
         validate_locator(&source.path)?;
     }
-    if let Some(source) = &project.sources.video {
-        validate_locator(&source.path)?;
-    }
-    for folder in [
-        &project.render.batch_video_folder,
-        &project.render.batch_output_folder,
-    ]
-    .into_iter()
-    .flatten()
-    {
-        validate_locator(&PathLocator::Absolute(folder.clone()))?;
-        if folder.trim() != folder {
-            return Err("Batch folder paths must not contain surrounding whitespace".into());
-        }
+    validate_videos(&project.sources.videos)?;
+    validate_transition_defaults(&project.transition_defaults)?;
+    if let Some(folder) = &project.render.batch_output_folder {
+        validate_folder(folder)?;
     }
     for (label, value) in [
-        ("sync.videoOffsetSeconds", project.sync.video_offset_seconds),
         ("render.fps", project.render.fps),
         ("render.range.from", project.render.range.from),
         ("render.range.to", project.render.range.to),
@@ -529,8 +690,8 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
         return Err("render.codec must not be empty".into());
     }
     if matches!(project.render.export_mode, ExportMode::Composite)
-        && matches!(project.render.render_target, RenderTarget::Current)
-        && project.sources.video.is_none()
+        && matches!(project.render.output_mode, OutputMode::Combined)
+        && project.sources.videos.is_empty()
     {
         return Err("Composite export mode requires a video source".into());
     }
@@ -548,8 +709,22 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
     if !project.laps.disabled.is_empty() && project.sources.activity.is_none() {
         return Err("laps.disabled requires an activity source".into());
     }
-    if !project.sync.manual.landmarks.is_empty() && project.sources.video.is_none() {
-        return Err("sync.manual.landmarks require a video source".into());
+    match &project.sync.manual.video_id {
+        Some(video_id)
+            if !project
+                .sources
+                .videos
+                .iter()
+                .any(|video| &video.id == video_id) =>
+        {
+            return Err(format!(
+                "sync.manual.videoId does not reference a project video: {video_id}"
+            ));
+        }
+        None if !project.sync.manual.landmarks.is_empty() => {
+            return Err("sync.manual.landmarks require sync.manual.videoId".into());
+        }
+        _ => {}
     }
     if project.sync.manual.detected_location_second.is_some() && project.sources.activity.is_none()
     {
@@ -558,6 +733,135 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
     validate_manual_video_sync(&project.sync.manual)?;
     validate_editor(&project.editor)?;
     validate_project_rasters(&project.editor.config, &project.raster_assets)
+}
+
+fn validate_transition_type(transition_type: &str) -> Result<(), String> {
+    if transition_type != NO_TRANSITION && !is_xfade_transition(transition_type) {
+        return Err(format!("unknown transition type: {transition_type}"));
+    }
+    Ok(())
+}
+
+fn validate_transition(transition: &ProjectTransition) -> Result<(), String> {
+    validate_transition_type(&transition.transition_type)?;
+    let duration = transition.duration_seconds;
+    if transition.transition_type == NO_TRANSITION {
+        if duration != 0.0 {
+            return Err("durationSeconds of no transition must be 0".into());
+        }
+    } else if !duration.is_finite() || duration <= 0.0 {
+        return Err("durationSeconds must be a positive finite number".into());
+    }
+    Ok(())
+}
+
+fn validate_transition_defaults(defaults: &ProjectTransitionDefaults) -> Result<(), String> {
+    validate_transition_type(&defaults.transition_type)
+        .map_err(|error| format!("transitionDefaults {error}"))?;
+    // The duration stays positive for "no transition" so that choosing a type later keeps it.
+    if !defaults.duration_seconds.is_finite() || defaults.duration_seconds <= 0.0 {
+        return Err("transitionDefaults.durationSeconds must be a positive finite number".into());
+    }
+    if !defaults.split_gap_threshold_seconds.is_finite()
+        || defaults.split_gap_threshold_seconds < 0.0
+    {
+        return Err(
+            "transitionDefaults.splitGapThresholdSeconds must be a finite non-negative number"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+/// Validates the video collection. Bounds that need the probed duration
+/// (deleted parts, landmarks) are checked by the frontend after import.
+fn validate_videos(videos: &[ProjectVideo]) -> Result<(), String> {
+    let mut video_ids = HashSet::new();
+    let mut part_ids = HashSet::new();
+    for video in videos {
+        if video.id.trim().is_empty() {
+            return Err("sources.videos id must not be empty".into());
+        }
+        if !video_ids.insert(video.id.as_str()) {
+            return Err(format!("sources.videos id is duplicated: {}", video.id));
+        }
+        validate_locator(&video.path)?;
+        if !video.offset_seconds.is_finite() {
+            return Err("sources.videos offsetSeconds must be finite".into());
+        }
+        if let Some(transition) = &video.transition_in {
+            validate_transition(transition)
+                .map_err(|error| format!("sources.videos transitionIn {error}"))?;
+        }
+
+        let mut parts: Vec<&ProjectDeletedPart> = video.deleted_parts.iter().collect();
+        for part in &parts {
+            if part.id.trim().is_empty() {
+                return Err("sources.videos deletedParts id must not be empty".into());
+            }
+            // Joins are keyed by deleted-part ID across the whole program.
+            if !part_ids.insert(part.id.as_str()) {
+                return Err(format!(
+                    "sources.videos deletedParts id is duplicated: {}",
+                    part.id
+                ));
+            }
+            if !part.from_second.is_finite()
+                || !part.to_second.is_finite()
+                || part.from_second < 0.0
+                || part.from_second >= part.to_second
+            {
+                return Err(
+                    "sources.videos deletedParts require finite 0 <= fromSecond < toSecond".into(),
+                );
+            }
+            if let Some(transition) = &part.transition {
+                validate_transition(transition)
+                    .map_err(|error| format!("sources.videos deletedParts transition {error}"))?;
+            }
+        }
+        parts.sort_by(|left, right| left.from_second.total_cmp(&right.from_second));
+        if parts
+            .windows(2)
+            .any(|pair| pair[1].from_second < pair[0].to_second)
+        {
+            return Err("sources.videos deletedParts must not overlap".into());
+        }
+    }
+    validate_placement_anchors(videos)
+}
+
+/// Anchors reference another project video and never form a cycle.
+fn validate_placement_anchors(videos: &[ProjectVideo]) -> Result<(), String> {
+    let anchors: HashMap<&str, &str> = videos
+        .iter()
+        .filter_map(|video| {
+            video
+                .placement_anchor
+                .as_ref()
+                .map(|anchor| (video.id.as_str(), anchor.video_id.as_str()))
+        })
+        .collect();
+    for (video_id, anchor_id) in &anchors {
+        if !videos.iter().any(|video| video.id == *anchor_id) {
+            return Err(format!(
+                "sources.videos placementAnchor does not reference a project video: {anchor_id}"
+            ));
+        }
+        let mut current = Some(*anchor_id);
+        for _ in 0..=anchors.len() {
+            match current {
+                Some(id) if id == *video_id => {
+                    return Err(format!(
+                        "sources.videos placementAnchor forms a cycle: {video_id}"
+                    ))
+                }
+                Some(id) => current = anchors.get(id).copied(),
+                None => break,
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_project_rasters(
@@ -726,7 +1030,7 @@ fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
     Ok(())
 }
 
-fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, String> {
+fn migrate_project(version: u32, mut value: Value) -> Result<MigratedProject, String> {
     ovrley_core::normalize::migrate_saved_font_input(&mut value);
     if matches!(
         version,
@@ -747,10 +1051,10 @@ fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, St
                 saved_at: project.saved_at,
                 editor: project.editor,
                 sources: project.sources,
-                sync: ProjectSync {
+                sync: ProjectSyncV5 {
                     video_offset_seconds: project.sync.video_offset_seconds,
                     video_timezone_mode: project.sync.video_timezone_mode,
-                    manual: ProjectManualVideoSync {
+                    manual: ProjectManualVideoSyncV5 {
                         landmarks: Vec::new(),
                         detected_location_second: None,
                         speed_threshold_kmh: DEFAULT_MANUAL_SPEED_THRESHOLD_KMH,
@@ -763,17 +1067,18 @@ fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, St
         }
         PROJECT_VERSION_V2 => serde_json::from_value(value)
             .map_err(|error| format!("Invalid version 2 project: {error}"))?,
-        PROJECT_VERSION_V3 | PROJECT_VERSION_V4 => {
-            let project: ProjectDocument = serde_json::from_value(value)
+        PROJECT_VERSION_V3 | PROJECT_VERSION_V4 | PROJECT_VERSION_V5 => {
+            let project = serde_json::from_value(value)
                 .map_err(|error| format!("Invalid version {version} project: {error}"))?;
-            return Ok(ProjectDocument {
-                version: PROJECT_VERSION,
-                ..project
-            });
+            return migrate_v5_project(project);
         }
         PROJECT_VERSION => {
             return serde_json::from_value(value)
-                .map_err(|error| format!("Invalid version 5 project: {error}"));
+                .map(|document| MigratedProject {
+                    document,
+                    legacy_batch_video_folder: None,
+                })
+                .map_err(|error| format!("Invalid version 6 project: {error}"));
         }
         other => return Err(format!("Unsupported project version: {other}")),
     };
@@ -786,9 +1091,9 @@ fn migrate_project(version: u32, mut value: Value) -> Result<ProjectDocument, St
         return Err("Legacy project cannot contain rasters".into());
     }
     config.insert("rasters".into(), Value::Array(Vec::new()));
-    Ok(ProjectDocument {
+    migrate_v5_project(ProjectDocumentV5 {
         format: legacy.format,
-        version: PROJECT_VERSION,
+        version: PROJECT_VERSION_V5,
         saved_at: legacy.saved_at,
         editor: legacy.editor,
         sources: legacy.sources,
@@ -829,7 +1134,78 @@ fn insert_lap_selection(value: &mut Value) -> Result<(), String> {
     Ok(())
 }
 
-fn migrate_legacy_render(render: LegacyProjectRender) -> Result<ProjectRender, String> {
+/// Versions 1 to 5 store at most one video. It becomes a one-clip collection at its
+/// saved offset that owns the manual sync landmarks, with no deleted parts,
+/// transitions following the defaults, and the hard transition defaults.
+/// A batch render from a video folder keeps rendering separate files to the
+/// same output folder; the folder itself is handed to the frontend to import.
+fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, String> {
+    let render = project.render;
+    for folder in [&render.batch_video_folder, &render.batch_output_folder]
+        .into_iter()
+        .flatten()
+    {
+        validate_folder(folder)?;
+    }
+    let legacy_batch_video_folder = match render.render_target {
+        RenderTarget::Batch => render.batch_video_folder,
+        RenderTarget::Current => None,
+    };
+    let video = project.sources.video.map(|source| ProjectVideo {
+        id: Uuid::new_v4().to_string(),
+        path: source.path,
+        offset_seconds: project.sync.video_offset_seconds,
+        offset_source: OffsetSource::Auto,
+        deleted_parts: Vec::new(),
+        transition_in: None,
+        placement_anchor: None,
+    });
+    let manual = project.sync.manual;
+    let document = ProjectDocument {
+        format: project.format,
+        version: PROJECT_VERSION,
+        saved_at: project.saved_at,
+        editor: project.editor,
+        sync: ProjectSync {
+            video_timezone_mode: project.sync.video_timezone_mode,
+            manual: ProjectManualVideoSync {
+                video_id: video.as_ref().map(|video| video.id.clone()),
+                landmarks: manual.landmarks,
+                detected_location_second: manual.detected_location_second,
+                speed_threshold_kmh: manual.speed_threshold_kmh,
+                turn_threshold_degrees: manual.turn_threshold_degrees,
+            },
+        },
+        sources: ProjectSources {
+            activity: project.sources.activity,
+            videos: video.into_iter().collect(),
+        },
+        laps: project.laps,
+        transition_defaults: ProjectTransitionDefaults::default(),
+        render: ProjectRender {
+            output_mode: match render.render_target {
+                RenderTarget::Current => OutputMode::Combined,
+                RenderTarget::Batch => OutputMode::Separate,
+            },
+            batch_output_folder: render.batch_output_folder,
+            fps: render.fps,
+            widget_update_rate: render.widget_update_rate,
+            export_mode: render.export_mode,
+            codec: render.codec,
+            quality_type: render.quality_type,
+            quality_value: render.quality_value,
+            range: render.range,
+        },
+        timeline: project.timeline,
+        raster_assets: project.raster_assets,
+    };
+    Ok(MigratedProject {
+        document,
+        legacy_batch_video_folder,
+    })
+}
+
+fn migrate_legacy_render(render: LegacyProjectRender) -> Result<ProjectRenderV5, String> {
     if let Some(bitrate) = render.bitrate_mbps {
         if !bitrate.is_finite() || bitrate <= 0.0 {
             return Err("render.bitrateMbps must be a positive finite number or null".into());
@@ -849,7 +1225,7 @@ fn migrate_legacy_render(render: LegacyProjectRender) -> Result<ProjectRender, S
         ),
         CodecSelection::Transparent(_) => false,
     };
-    Ok(ProjectRender {
+    Ok(ProjectRenderV5 {
         render_target: RenderTarget::Current,
         batch_video_folder: None,
         batch_output_folder: None,
@@ -889,7 +1265,10 @@ fn parse_project(input: &str) -> Result<ValidatedProject, String> {
     if format != PROJECT_FORMAT {
         return Err(format!("Unsupported project format: {format}"));
     }
-    let mut project = migrate_project(version, value)?;
+    let MigratedProject {
+        document: mut project,
+        legacy_batch_video_folder,
+    } = migrate_project(version, value)?;
     let populated_rasters = validate_project(&project)?;
     let scene = project
         .editor
@@ -906,6 +1285,7 @@ fn parse_project(input: &str) -> Result<ValidatedProject, String> {
     Ok(ValidatedProject {
         document: project,
         populated_rasters,
+        legacy_batch_video_folder,
     })
 }
 
@@ -935,15 +1315,15 @@ fn resolved_sources(
         .as_ref()
         .map(|source| resolve_locator(project_path, &source.path).map(path_string))
         .transpose()?;
-    let video_path = project
+    let video_paths = project
         .sources
-        .video
-        .as_ref()
-        .map(|source| resolve_locator(project_path, &source.path).map(path_string))
-        .transpose()?;
+        .videos
+        .iter()
+        .map(|video| resolve_locator(project_path, &video.path).map(path_string))
+        .collect::<Result<_, _>>()?;
     Ok(ResolvedSources {
         activity_path,
-        video_path,
+        video_paths,
     })
 }
 
@@ -1026,6 +1406,7 @@ fn read_archive(path: &Path) -> Result<LoadedArchive, ProjectFileError> {
     let ValidatedProject {
         document,
         populated_rasters,
+        legacy_batch_video_folder,
     } = parse_project(&contents)?;
     let mapped_names: HashSet<_> = document.raster_assets.values().collect();
     for name in entries.rasters.keys() {
@@ -1042,6 +1423,7 @@ fn read_archive(path: &Path) -> Result<LoadedArchive, ProjectFileError> {
     Ok(LoadedArchive {
         project: document,
         rasters,
+        legacy_batch_video_folder,
     })
 }
 
@@ -1105,7 +1487,11 @@ fn read_project_file_sync(
     path: String,
 ) -> Result<ReadProjectResult, ProjectFileError> {
     let project_path = PathBuf::from(path);
-    let LoadedArchive { project, rasters } = read_archive(&project_path)?;
+    let LoadedArchive {
+        project,
+        rasters,
+        legacy_batch_video_folder,
+    } = read_archive(&project_path)?;
     let resolved_sources = resolved_sources(&project_path, &project)?;
     let mut raster_load_results = HashMap::with_capacity(rasters.len());
     for (id, image) in rasters {
@@ -1121,6 +1507,7 @@ fn read_project_file_sync(
         project,
         resolved_sources,
         raster_load_results,
+        legacy_batch_video_folder,
     })
 }
 
@@ -1298,15 +1685,60 @@ fn prepare_raster_assets(
         .collect())
 }
 
+/// Reads the format version of an existing project archive, or `None` when the
+/// target is missing or is not a readable project (it is then replaced as before).
+fn existing_project_version(path: &Path) -> Option<u32> {
+    let mut archive = ZipArchive::new(File::open(path).ok()?).ok()?;
+    let mut entry = archive.by_name(PROJECT_JSON_ENTRY).ok()?;
+    if entry.size() > MAX_PROJECT_JSON_SIZE {
+        return None;
+    }
+    let mut contents = String::with_capacity(entry.size() as usize);
+    entry.read_to_string(&mut contents).ok()?;
+    parse_project_header(&contents)
+        .ok()
+        .map(|(_, version, _)| version)
+}
+
+/// Keeps an older-format project next to the target before it is first
+/// overwritten in the current format. The `.bak` suffix keeps the copy out of
+/// project listings, which only include `.oly` files.
+fn backup_legacy_project(target: &Path) -> Result<Option<PathBuf>, String> {
+    let Some(version) = existing_project_version(target) else {
+        return Ok(None);
+    };
+    if version >= PROJECT_VERSION {
+        return Ok(None);
+    }
+    let mut name = target
+        .file_name()
+        .ok_or_else(|| "Project target has no file name".to_string())?
+        .to_os_string();
+    name.push(format!(".v{version}.bak"));
+    let backup = target.with_file_name(name);
+    fs::copy(target, &backup)
+        .map_err(|error| format!("Failed to back up the version {version} project: {error}"))?;
+    Ok(Some(backup))
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WriteProjectResult {
+    path: String,
+    /// Set when this save replaced an older-format project and kept its backup.
+    backup_path: Option<String>,
+}
+
 fn write_project_file_sync(
     path: String,
     project_json: String,
     ffmpeg: Option<&Path>,
     images: HashMap<String, Arc<SelectedRaster>>,
-) -> Result<String, ProjectFileError> {
+) -> Result<WriteProjectResult, ProjectFileError> {
     let ValidatedProject {
         document: mut project,
         populated_rasters,
+        ..
     } = parse_project(&project_json)?;
     let assets = prepare_raster_assets(&populated_rasters, images)?;
     project.raster_assets = assets
@@ -1325,11 +1757,13 @@ fn write_project_file_sync(
         .parent()
         .ok_or_else(|| "Project target has no parent directory".to_string())?;
     fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    // The thumbnail shows the first video on the timeline.
     let thumbnail = project
         .sources
-        .video
-        .as_ref()
-        .and_then(|source| resolve_locator(&target, &source.path).ok())
+        .videos
+        .iter()
+        .min_by(|left, right| left.offset_seconds.total_cmp(&right.offset_seconds))
+        .and_then(|video| resolve_locator(&target, &video.path).ok())
         .and_then(|video_path| ffmpeg.and_then(|ffmpeg| generate_thumbnail(ffmpeg, &video_path)));
     let temporary = PendingArchive::new(parent);
     write_archive(
@@ -1338,8 +1772,12 @@ fn write_project_file_sync(
         thumbnail.as_deref(),
         &assets,
     )?;
+    let backup = backup_legacy_project(&target)?;
     temporary.commit(&target)?;
-    Ok(path)
+    Ok(WriteProjectResult {
+        path,
+        backup_path: backup.map(path_string),
+    })
 }
 
 #[tauri::command]
@@ -1349,7 +1787,7 @@ pub(crate) async fn write_project_file(
     path: String,
     project_json: String,
     raster_resource_ids: HashMap<String, String>,
-) -> Result<String, String> {
+) -> Result<WriteProjectResult, String> {
     let images = resources
         .owned_assets(raster_resource_ids)
         .map_err(|error| format!("[project_error:raster_unavailable] {error}"))?;
@@ -1388,12 +1826,12 @@ mod tests {
             },
             "sources": {
                 "activity": { "path": { "kind": "project-relative", "value": "media/session.fit" } },
-                "video": null
+                "videos": []
             },
             "sync": {
-                "videoOffsetSeconds": 0.0,
                 "videoTimezoneMode": null,
                 "manual": {
+                    "videoId": null,
                     "landmarks": [],
                     "detectedLocationSecond": null,
                     "speedThresholdKmh": 5.0,
@@ -1401,8 +1839,11 @@ mod tests {
                 }
             },
             "laps": { "disabled": [] },
+            "transitionDefaults": {
+                "type": "wipeleft", "durationSeconds": 2.0, "splitGapThresholdSeconds": 2.0
+            },
             "render": {
-                "renderTarget": "current", "batchVideoFolder": null, "batchOutputFolder": null,
+                "outputMode": "combined", "batchOutputFolder": null,
                 "fps": 30.0, "widgetUpdateRate": 1, "exportMode": "transparent", "codec": "prores_ks",
                 "qualityType": "quality", "qualityValue": 18, "range": { "type": "all", "from": 0.0, "to": 0.0 }
             },
@@ -1418,8 +1859,28 @@ mod tests {
         project.to_string()
     }
 
-    fn valid_v2_project_json() -> String {
+    fn valid_v5_project_json() -> String {
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["version"] = Value::from(PROJECT_VERSION_V5);
+        project
+            .as_object_mut()
+            .unwrap()
+            .remove("transitionDefaults");
+        let sources = project["sources"].as_object_mut().unwrap();
+        sources.remove("videos");
+        sources.insert("video".into(), Value::Null);
+        project["render"]["batchVideoFolder"] = Value::Null;
+        let render = project["render"].as_object_mut().unwrap();
+        render.remove("outputMode");
+        render.insert("renderTarget".into(), Value::from("current"));
+        let sync = project["sync"].as_object_mut().unwrap();
+        sync.insert("videoOffsetSeconds".into(), Value::from(0.0));
+        sync["manual"].as_object_mut().unwrap().remove("videoId");
+        project.to_string()
+    }
+
+    fn valid_v2_project_json() -> String {
+        let mut project: Value = serde_json::from_str(&valid_v5_project_json()).unwrap();
         project["version"] = Value::from(PROJECT_VERSION_V2);
         project.as_object_mut().unwrap().remove("laps");
         project["editor"]["globalDefaults"]
@@ -1451,6 +1912,7 @@ mod tests {
         for source in [
             valid_v1_project_json(),
             valid_v2_project_json(),
+            valid_v5_project_json(),
             valid_project_json(),
         ] {
             for weight in [None, Some(537)] {
@@ -1519,6 +1981,7 @@ mod tests {
         for source in [
             valid_v1_project_json(),
             valid_v2_project_json(),
+            valid_v5_project_json(),
             valid_project_json(),
         ] {
             for spacing in [
@@ -1583,6 +2046,40 @@ mod tests {
         })
     }
 
+    fn video(id: &str, path: &str, offset_seconds: f64) -> Value {
+        serde_json::json!({
+            "id": id,
+            "path": { "kind": "project-relative", "value": path },
+            "offsetSeconds": offset_seconds,
+            "offsetSource": "auto",
+            "deletedParts": [],
+            "transitionIn": null,
+            "placementAnchor": null
+        })
+    }
+
+    fn multi_video_project_json() -> Value {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        let mut second = video("clip-b", "media/b.mp4", 70.0);
+        second["deletedParts"] = serde_json::json!([
+            { "id": "cut-1", "fromSecond": 5.0, "toSecond": 10.0, "transition": null },
+            { "id": "cut-2", "fromSecond": 20.0, "toSecond": 30.0,
+              "transition": { "type": "dissolve", "durationSeconds": 1.5 } }
+        ]);
+        second["transitionIn"] = serde_json::json!({ "type": "none", "durationSeconds": 0.0 });
+        second["placementAnchor"] = serde_json::json!({ "videoId": "clip-a", "side": "after" });
+        project["sources"]["videos"] =
+            serde_json::json!([video("clip-a", "media/a.mp4", -12.5), second]);
+        project["sync"]["manual"]["videoId"] = Value::from("clip-b");
+        project["sync"]["manual"]["landmarks"] = serde_json::json!([
+            { "id": "stop-1", "type": "stop", "videoSecond": 4.0 }
+        ]);
+        project["transitionDefaults"] = serde_json::json!({
+            "type": "none", "durationSeconds": 3.0, "splitGapThresholdSeconds": 0.5
+        });
+        project
+    }
+
     #[test]
     fn embedded_rasters_survive_source_loss_and_follow_reachable_widgets() {
         let directory =
@@ -1626,6 +2123,7 @@ mod tests {
         let LoadedArchive {
             project,
             rasters: images,
+            ..
         } = read_archive(&path).unwrap();
         assert_eq!(project.raster_assets.len(), 1);
         assert_eq!(
@@ -1648,7 +2146,7 @@ mod tests {
     }
 
     #[test]
-    fn v3_archives_preserve_rasters_and_both_quality_modes() {
+    fn archives_preserve_rasters_and_both_quality_modes() {
         let directory =
             std::env::temp_dir().join(format!("ovrley-raster-quality-project-{}", Uuid::new_v4()));
         fs::create_dir_all(&directory).unwrap();
@@ -1666,9 +2164,7 @@ mod tests {
                     "image", &source
                 )])))
                 .unwrap();
-            project["sources"]["video"] = serde_json::json!({
-                "path": { "kind": "project-relative", "value": "video.mp4" }
-            });
+            project["sources"]["videos"] = serde_json::json!([video("clip", "video.mp4", 0.0)]);
             project["render"]["exportMode"] = Value::from("composite");
             project["render"]["codec"] = Value::from("libx265");
             project["render"]["qualityType"] = serde_json::to_value(quality_type).unwrap();
@@ -1746,10 +2242,9 @@ mod tests {
         fs::create_dir_all(&directory).unwrap();
         let path = directory.join("Race.oly");
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
-        project["render"]["renderTarget"] = Value::from("batch");
+        project["render"]["outputMode"] = Value::from("separate");
         project["render"]["exportMode"] = Value::from("composite");
         project["render"]["codec"] = Value::from("libx264");
-        project["render"]["batchVideoFolder"] = Value::from(path_string(directory.join("videos")));
         project["render"]["batchOutputFolder"] =
             Value::from(path_string(directory.join("renders")));
         write_project_file_sync(
@@ -1763,13 +2258,10 @@ mod tests {
             read_project_file_sync(&RasterResources::default(), path_string(path)).unwrap();
         assert_eq!(result.project.version, PROJECT_VERSION);
         assert!(matches!(
-            result.project.render.render_target,
-            RenderTarget::Batch
+            result.project.render.output_mode,
+            OutputMode::Separate
         ));
-        assert_eq!(
-            result.project.render.batch_video_folder,
-            Some(path_string(directory.join("videos")))
-        );
+        assert_eq!(result.legacy_batch_video_folder, None);
         assert_eq!(
             result.project.render.batch_output_folder,
             Some(path_string(directory.join("renders")))
@@ -1800,8 +2292,14 @@ mod tests {
         });
 
         let parsed = parse_project(&project.to_string()).unwrap().document;
-        let serialized = serde_json::to_value(parsed).unwrap();
+        let mut serialized = serde_json::to_value(parsed).unwrap();
         assert_eq!(serialized["version"], PROJECT_VERSION);
+        let video_id = serialized["sync"]["manual"]
+            .as_object_mut()
+            .unwrap()
+            .remove("videoId")
+            .unwrap();
+        assert_eq!(video_id, serialized["sources"]["videos"][0]["id"]);
         assert_eq!(serialized["sync"]["manual"], project["sync"]["manual"]);
         assert_eq!(serialized["render"]["qualityType"], "quality");
         assert_eq!(
@@ -1871,9 +2369,7 @@ mod tests {
         fs::create_dir_all(&directory).unwrap();
         let path = directory.join("Race.oly");
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
-        project["sources"]["video"] = serde_json::json!({
-            "path": { "kind": "project-relative", "value": "missing.mp4" }
-        });
+        project["sources"]["videos"] = serde_json::json!([video("clip", "missing.mp4", 0.0)]);
         let missing_ffmpeg = directory.join("missing-ffmpeg-binary");
 
         write_project_file_sync(
@@ -1896,7 +2392,7 @@ mod tests {
         for invalid in [
             "not json".to_string(),
             valid_project_json().replace(PROJECT_FORMAT, "wrong-project"),
-            valid_project_json().replace("\"version\":4", "\"version\":99"),
+            valid_project_json().replace(&format!("\"version\":{PROJECT_VERSION}"), "\"version\":99"),
             valid_project_json().replace("\"fps\":30.0", "\"fps\":0.0"),
             valid_project_json().replace("\"qualityValue\":18", "\"qualityValue\":52"),
             valid_project_json()
@@ -1905,11 +2401,12 @@ mod tests {
             assert!(parse_project(&invalid).is_err());
         }
         for (field, value) in [
-            ("renderTarget", serde_json::json!("invalid")),
-            ("renderTarget", Value::Null),
-            ("batchVideoFolder", serde_json::json!(42)),
+            ("outputMode", serde_json::json!("invalid")),
+            ("outputMode", Value::Null),
+            // Version 3 render targets are not v4 fields.
+            ("renderTarget", serde_json::json!("current")),
+            ("batchVideoFolder", Value::Null),
             ("batchOutputFolder", serde_json::json!(false)),
-            ("batchVideoFolder", serde_json::json!("")),
             ("batchOutputFolder", serde_json::json!("relative/folder")),
             (
                 "batchOutputFolder",
@@ -1926,11 +2423,26 @@ mod tests {
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
         project["render"]["batchQueue"] = serde_json::json!([]);
         assert!(parse_project(&project.to_string()).is_err());
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["render"]
+            .as_object_mut()
+            .unwrap()
+            .remove("outputMode");
+        assert!(parse_project(&project.to_string()).is_err());
+        for folder in [
+            serde_json::json!(42),
+            serde_json::json!(""),
+            serde_json::json!("relative/folder"),
+        ] {
+            let mut project: Value = serde_json::from_str(&valid_v5_project_json()).unwrap();
+            project["render"]["batchVideoFolder"] = folder;
+            assert!(parse_project(&project.to_string()).is_err());
+        }
     }
 
     #[test]
-    fn projects_without_batch_choices_load_with_documented_defaults() {
-        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+    fn legacy_projects_without_batch_choices_load_with_documented_defaults() {
+        let mut project: Value = serde_json::from_str(&valid_v5_project_json()).unwrap();
         let render = project["render"].as_object_mut().unwrap();
         render.remove("renderTarget");
         render.remove("batchVideoFolder");
@@ -1939,21 +2451,24 @@ mod tests {
             project.to_string(),
             valid_v1_project_json(),
             valid_v2_project_json(),
+            valid_v5_project_json(),
         ] {
-            let parsed = parse_project(&input).unwrap().document;
-            assert!(matches!(parsed.render.render_target, RenderTarget::Current));
-            assert!(parsed.render.batch_video_folder.is_none());
+            let parsed = parse_project(&input).unwrap();
+            assert_eq!(parsed.legacy_batch_video_folder, None);
+            let parsed = parsed.document;
+            assert!(matches!(parsed.render.output_mode, OutputMode::Combined));
             assert!(parsed.render.batch_output_folder.is_none());
             let serialized = serde_json::to_value(parsed).unwrap();
-            assert_eq!(serialized["render"]["renderTarget"], "current");
-            assert!(serialized["render"]["batchVideoFolder"].is_null());
+            assert_eq!(serialized["render"]["outputMode"], "combined");
+            assert!(serialized["render"].get("renderTarget").is_none());
+            assert!(serialized["render"].get("batchVideoFolder").is_none());
             assert!(serialized["render"]["batchOutputFolder"].is_null());
         }
     }
 
     #[test]
     fn legacy_projects_migrate_to_fixed_width_digits() {
-        let mut v3: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        let mut v3: Value = serde_json::from_str(&valid_v5_project_json()).unwrap();
         v3["version"] = Value::from(PROJECT_VERSION_V3);
         v3.as_object_mut().unwrap().remove("laps");
         v3["editor"]["globalDefaults"]
@@ -1980,7 +2495,38 @@ mod tests {
     }
 
     #[test]
-    fn migrates_v1_and_v2_to_canonical_v3_without_embedded_rasters() {
+    fn single_video_batch_folder_projects_hand_their_video_folder_to_the_frontend() {
+        let videos = path_string(std::env::temp_dir().join("ovrley-batch-videos"));
+        let renders = path_string(std::env::temp_dir().join("ovrley-batch-renders"));
+        let mut project: Value = serde_json::from_str(&valid_v5_project_json()).unwrap();
+        project["render"]["renderTarget"] = Value::from("batch");
+        project["render"]["exportMode"] = Value::from("composite");
+        project["render"]["codec"] = Value::from("libx264");
+        project["render"]["batchVideoFolder"] = Value::from(videos.clone());
+        project["render"]["batchOutputFolder"] = Value::from(renders.clone());
+
+        let parsed = parse_project(&project.to_string()).unwrap();
+        assert_eq!(parsed.legacy_batch_video_folder, Some(videos.clone()));
+        assert!(matches!(
+            parsed.document.render.output_mode,
+            OutputMode::Separate
+        ));
+        assert_eq!(parsed.document.render.batch_output_folder, Some(renders));
+        let serialized = serde_json::to_value(&parsed.document).unwrap();
+        assert!(serialized["render"].get("batchVideoFolder").is_none());
+
+        project["render"]["renderTarget"] = Value::from("current");
+        project["render"]["exportMode"] = Value::from("transparent");
+        assert_eq!(
+            parse_project(&project.to_string())
+                .unwrap()
+                .legacy_batch_video_folder,
+            None
+        );
+    }
+
+    #[test]
+    fn migrates_v1_and_v2_to_canonical_v6_without_embedded_rasters() {
         let parsed = parse_project(&valid_v1_project_json()).unwrap().document;
         assert_eq!(parsed.version, PROJECT_VERSION);
         assert!(parsed.sync.manual.landmarks.is_empty());
@@ -2010,14 +2556,18 @@ mod tests {
     }
 
     #[test]
-    fn legacy_archives_migrate_on_read_and_write_both_v3_features_on_save() {
+    fn legacy_archives_migrate_on_read_and_are_backed_up_on_first_save() {
         let directory = std::env::temp_dir().join(format!(
             "ovrley-project-legacy-save-test-{}",
             Uuid::new_v4()
         ));
         fs::create_dir_all(&directory).unwrap();
         let path = directory.join("Legacy.oly");
-        for legacy_json in [valid_v1_project_json(), valid_v2_project_json()] {
+        for (legacy_version, legacy_json) in [
+            (PROJECT_VERSION_V1, valid_v1_project_json()),
+            (PROJECT_VERSION_V2, valid_v2_project_json()),
+            (PROJECT_VERSION_V5, valid_v5_project_json()),
+        ] {
             write_archive(&path, &legacy_json, None, &BTreeMap::new()).unwrap();
             let previous = fs::read(&path).unwrap();
             let loaded =
@@ -2027,13 +2577,27 @@ mod tests {
             assert!(loaded.raster_load_results.is_empty());
             assert_eq!(fs::read(&path).unwrap(), previous);
 
-            write_project_file_sync(
+            let saved = serde_json::to_string(&loaded.project).unwrap();
+            let result = write_project_file_sync(
                 path_string(path.clone()),
-                serde_json::to_string(&loaded.project).unwrap(),
+                saved.clone(),
                 None,
                 HashMap::new(),
             )
             .unwrap();
+            let backup = directory.join(format!("Legacy.oly.v{legacy_version}.bak"));
+            assert_eq!(result.backup_path, Some(path_string(backup.clone())));
+            assert_eq!(fs::read(&backup).unwrap(), previous);
+            assert!(list_project_files(path_string(directory.clone()))
+                .unwrap()
+                .iter()
+                .all(|project| project.name == "Legacy"));
+            let resaved =
+                write_project_file_sync(path_string(path.clone()), saved, None, HashMap::new())
+                    .unwrap();
+            assert_eq!(resaved.backup_path, None);
+            assert_eq!(fs::read(&backup).unwrap(), previous);
+
             let mut archive = ZipArchive::new(File::open(&path).unwrap()).unwrap();
             let stored: Value =
                 serde_json::from_reader(archive.by_name(PROJECT_JSON_ENTRY).unwrap()).unwrap();
@@ -2048,7 +2612,7 @@ mod tests {
     }
 
     #[test]
-    fn v3_requires_the_combined_raster_and_quality_contract() {
+    fn requires_the_combined_raster_and_quality_contract() {
         for field in ["qualityType", "qualityValue"] {
             let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
             project["render"].as_object_mut().unwrap().remove(field);
@@ -2106,7 +2670,6 @@ mod tests {
 
         let mut landmark_without_video: Value =
             serde_json::from_str(&valid_project_json()).unwrap();
-        landmark_without_video["sources"]["video"] = Value::Null;
         landmark_without_video["sync"]["manual"]["landmarks"] = serde_json::json!([
             { "id": "stop", "type": "stop", "videoSecond": 1.0 }
         ]);
@@ -2183,6 +2746,218 @@ mod tests {
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
         project["savedAt"] = Value::from("notTtimestamp");
 
+        assert!(parse_project(&project.to_string()).is_err());
+    }
+
+    #[test]
+    fn migrates_the_v3_video_to_a_one_clip_collection_that_owns_the_landmarks() {
+        let mut project: Value = serde_json::from_str(&valid_v5_project_json()).unwrap();
+        project["sources"]["video"] = serde_json::json!({
+            "path": { "kind": "project-relative", "value": "media/ride.mp4" }
+        });
+        project["sync"]["videoOffsetSeconds"] = Value::from(12.5);
+        project["sync"]["videoTimezoneMode"] = Value::from("utc");
+        project["sync"]["manual"]["landmarks"] = serde_json::json!([
+            { "id": "stop-1", "type": "stop", "videoSecond": 4.0 }
+        ]);
+
+        let parsed = parse_project(&project.to_string()).unwrap().document;
+        assert_eq!(parsed.version, PROJECT_VERSION);
+        assert_eq!(parsed.sources.videos.len(), 1);
+        let video = &parsed.sources.videos[0];
+        assert!(Uuid::parse_str(&video.id).is_ok());
+        assert!(
+            matches!(&video.path, PathLocator::ProjectRelative(path) if path == "media/ride.mp4")
+        );
+        assert_eq!(video.offset_seconds, 12.5);
+        assert!(video.deleted_parts.is_empty());
+        assert!(video.transition_in.is_none());
+        assert!(video.placement_anchor.is_none());
+        assert_eq!(
+            parsed.sync.manual.video_id.as_deref(),
+            Some(video.id.as_str())
+        );
+        assert_eq!(parsed.sync.manual.landmarks.len(), 1);
+        assert!(matches!(
+            parsed.sync.video_timezone_mode,
+            Some(VideoTimezoneMode::Utc)
+        ));
+        let serialized = serde_json::to_value(&parsed).unwrap();
+        assert_eq!(
+            serialized["transitionDefaults"],
+            serde_json::json!({
+                "type": "none", "durationSeconds": 2.0, "splitGapThresholdSeconds": 2.0
+            })
+        );
+        assert!(serialized["sync"].get("videoOffsetSeconds").is_none());
+
+        let without_video = parse_project(&valid_v5_project_json()).unwrap().document;
+        assert!(without_video.sources.videos.is_empty());
+        assert_eq!(without_video.sync.manual.video_id, None);
+    }
+
+    #[test]
+    fn v4_round_trips_the_video_collection_and_resolves_every_video_path() {
+        let directory =
+            std::env::temp_dir().join(format!("ovrley-project-videos-{}", Uuid::new_v4()));
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("Session.oly");
+        let project = multi_video_project_json();
+
+        let result = write_project_file_sync(
+            path_string(path.clone()),
+            project.to_string(),
+            None,
+            HashMap::new(),
+        )
+        .unwrap();
+        assert_eq!(result.backup_path, None);
+        let loaded =
+            read_project_file_sync(&RasterResources::default(), path_string(path)).unwrap();
+        let mut serialized = serde_json::to_value(&loaded.project).unwrap();
+        serialized["savedAt"] = project["savedAt"].clone();
+        assert_eq!(serialized["sources"], project["sources"]);
+        assert_eq!(serialized["sync"], project["sync"]);
+        assert_eq!(
+            serialized["transitionDefaults"],
+            project["transitionDefaults"]
+        );
+        assert_eq!(
+            loaded.resolved_sources.video_paths,
+            vec![
+                path_string(directory.join("media/a.mp4")),
+                path_string(directory.join("media/b.mp4"))
+            ]
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn rejects_malformed_v4_video_collection_contracts() {
+        let cases: [(&str, fn(&mut Value)); 27] = [
+            ("missing placementAnchor", |project| {
+                project["sources"]["videos"][0]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("placementAnchor");
+            }),
+            ("unknown anchor video", |project| {
+                project["sources"]["videos"][1]["placementAnchor"]["videoId"] =
+                    Value::from("missing");
+            }),
+            ("anchor to itself", |project| {
+                project["sources"]["videos"][1]["placementAnchor"]["videoId"] =
+                    Value::from("clip-b");
+            }),
+            ("anchor cycle", |project| {
+                project["sources"]["videos"][0]["placementAnchor"] =
+                    serde_json::json!({ "videoId": "clip-b", "side": "before" });
+            }),
+            ("unknown anchor side", |project| {
+                project["sources"]["videos"][1]["placementAnchor"]["side"] = Value::from("over");
+            }),
+            ("empty video id", |project| {
+                project["sources"]["videos"][0]["id"] = Value::from(" ")
+            }),
+            ("duplicate video id", |project| {
+                project["sources"]["videos"][1]["id"] = Value::from("clip-a")
+            }),
+            ("non-finite offset", |project| {
+                project["sources"]["videos"][0]["offsetSeconds"] = Value::from("1")
+            }),
+            ("unknown offset source", |project| {
+                project["sources"]["videos"][0]["offsetSource"] = Value::from("dragged")
+            }),
+            ("missing offset source", |project| {
+                project["sources"]["videos"][0]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("offsetSource");
+            }),
+            ("missing transitionIn", |project| {
+                project["sources"]["videos"][0]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("transitionIn");
+            }),
+            ("unknown transition", |project| {
+                project["sources"]["videos"][1]["transitionIn"] =
+                    serde_json::json!({ "type": "custom", "durationSeconds": 1.0 });
+            }),
+            ("hard cut with duration", |project| {
+                project["sources"]["videos"][1]["transitionIn"] =
+                    serde_json::json!({ "type": "none", "durationSeconds": 2.0 });
+            }),
+            ("transition without duration", |project| {
+                project["sources"]["videos"][1]["transitionIn"] =
+                    serde_json::json!({ "type": "fade", "durationSeconds": 0.0 });
+            }),
+            ("deleted part transition", |project| {
+                project["sources"]["videos"][1]["deletedParts"][0]["transition"] =
+                    serde_json::json!({ "type": "fade", "durationSeconds": -1.0 });
+            }),
+            ("missing deleted part transition", |project| {
+                project["sources"]["videos"][1]["deletedParts"][0]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("transition");
+            }),
+            ("empty deleted part id", |project| {
+                project["sources"]["videos"][1]["deletedParts"][0]["id"] = Value::from("")
+            }),
+            ("duplicate deleted part id across videos", |project| {
+                project["sources"]["videos"][0]["deletedParts"] = serde_json::json!([
+                    { "id": "cut-1", "fromSecond": 1.0, "toSecond": 2.0, "transition": null }
+                ]);
+            }),
+            ("negative deleted part start", |project| {
+                project["sources"]["videos"][1]["deletedParts"][0]["fromSecond"] = Value::from(-1.0)
+            }),
+            ("empty deleted part", |project| {
+                project["sources"]["videos"][1]["deletedParts"][0]["toSecond"] = Value::from(5.0)
+            }),
+            ("overlapping deleted parts", |project| {
+                project["sources"]["videos"][1]["deletedParts"][1]["fromSecond"] = Value::from(9.0)
+            }),
+            ("unknown manual video", |project| {
+                project["sync"]["manual"]["videoId"] = Value::from("missing")
+            }),
+            ("landmarks without manual video", |project| {
+                project["sync"]["manual"]["videoId"] = Value::Null
+            }),
+            ("missing manual video", |project| {
+                project["sync"]["manual"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("videoId");
+            }),
+            ("missing transition defaults", |project| {
+                project
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("transitionDefaults");
+            }),
+            ("unknown default transition", |project| {
+                project["transitionDefaults"]["type"] = Value::from("swirl")
+            }),
+            ("negative split gap threshold", |project| {
+                project["transitionDefaults"]["splitGapThresholdSeconds"] = Value::from(-0.1);
+            }),
+        ];
+        assert!(parse_project(&multi_video_project_json().to_string()).is_ok());
+        for (label, corrupt) in cases {
+            let mut project = multi_video_project_json();
+            corrupt(&mut project);
+            assert!(
+                parse_project(&project.to_string()).is_err(),
+                "accepted invalid contract: {label}"
+            );
+        }
+        let mut project = multi_video_project_json();
+        project["transitionDefaults"]["durationSeconds"] = Value::from(0.0);
+        assert!(parse_project(&project.to_string()).is_err());
+        let mut project = multi_video_project_json();
+        project["sources"]["video"] = Value::Null;
         assert!(parse_project(&project.to_string()).is_err());
     }
 }

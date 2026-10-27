@@ -8,6 +8,55 @@
  * store actions do not depend on hidden module state or timer windows.
  */
 
+import { releasePreviewActivity } from '@/api/backend'
+import { getCourseWidgetDimensions } from '@/lib/widget/widget-defaults'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
+
+/**
+ * Fits course plots to the aspect ratio of an activity route.
+ * @param {*} state - Current store draft state.
+ * @param {Array<[number, number]>|undefined} coursePoints - Activity route points, when the activity has a route.
+ */
+export function applyCoursePlotDimensions(state, coursePoints) {
+  if (!coursePoints || !state.config?.plots) return
+  const dimensions = getCourseWidgetDimensions(coursePoints, WIDGET_TYPE_DEFINITIONS.course.courseSizing)
+  if (!dimensions) return
+  for (const plot of state.config.plots) {
+    if (plot.value === 'course') {
+      plot.width = dimensions.width
+      plot.height = dimensions.height
+    }
+  }
+}
+
+function previewActivityIds(state) {
+  const ids = new Set()
+  const activities = [state.parsedActivity, ...state.importedVideos.map((video) => video.telemetry.activity)]
+  for (const activity of activities) {
+    // Browser-only activity data has no native snapshot to release.
+    if (activity !== null && activity.preview_activity_id !== undefined) ids.add(activity.preview_activity_id)
+  }
+  return ids
+}
+
+function reportPreviewActivityReleaseError(error) {
+  console.error('Unable to release preview activity', error)
+}
+
+/**
+ * Store listener releasing native preview activity snapshots once neither the
+ * external activity nor any video's embedded telemetry references them.
+ * @param {object} state Next store state.
+ * @param {object} previous Previous store state.
+ */
+export function releaseUnreferencedPreviewActivities(state, previous) {
+  if (state.parsedActivity === previous.parsedActivity && state.importedVideos === previous.importedVideos) return
+  const retainedIds = previewActivityIds(state)
+  for (const id of previewActivityIds(previous)) {
+    if (!retainedIds.has(id)) releasePreviewActivity(id).catch(reportPreviewActivityReleaseError)
+  }
+}
+
 export const DEFAULT_CONFIG = {
   scene: {
     width: 1920,

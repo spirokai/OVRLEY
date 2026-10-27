@@ -27,10 +27,8 @@ describe('timelineViewport utilities', () => {
         activityDurationSeconds: 25,
         fallbackDurationSeconds: 25,
         hasActivityData: true,
-        hasVideo: true,
-        importedVideoDuration: 30,
         totalDuration: 25,
-        videoSyncOffsetSeconds: -5,
+        videoBounds: { startSecond: -5, endSecond: 25 },
       })[0].viewport,
     ).toEqual({ viewStart: -5, viewEnd: 25 })
   })
@@ -71,15 +69,26 @@ describe('timelineViewport utilities', () => {
       activityDurationSeconds: 45,
       fallbackDurationSeconds: 73,
       hasActivityData: true,
-      hasVideo: true,
-      importedVideoDuration: 20,
       totalDuration: 100,
-      videoSyncOffsetSeconds: 10,
+      videoBounds: { startSecond: 10, endSecond: 30 },
     })
 
     expect(targets.map((target) => target.id)).toEqual(['all', 'video', 'activity'])
     expect(getMatchingFitTargetId({ targets, viewport: targets[1].viewport })).toBe('video')
     expect(rangesMatch({ viewStart: 0, viewEnd: 100 }, { viewStart: 0, viewEnd: 100.0005 })).toBe(true)
+  })
+
+  test('fits the video target to the bounds spanning every imported clip', () => {
+    const targets = buildFitTargets({
+      activityDurationSeconds: undefined,
+      fallbackDurationSeconds: 73,
+      hasActivityData: false,
+      totalDuration: 40,
+      videoBounds: { startSecond: 0, endSecond: 40 },
+    })
+
+    expect(targets.map((target) => target.id)).toEqual(['video'])
+    expect(targets[0].viewport).toEqual({ viewStart: 0, viewEnd: 40 })
   })
 
   test('computes a major and minor tick strip from its anchor', () => {

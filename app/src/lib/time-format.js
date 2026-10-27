@@ -70,6 +70,24 @@ export function formatClockDuration(seconds) {
 }
 
 /**
+ * Formats seconds as a clock: `mm:ss`, or `hh:mm:ss` from one hour on, with up
+ * to three decimals when the value has a fraction (`330.5` → `05:30.5`).
+ *
+ * @param {number} seconds - Value in seconds.
+ * @returns {string} Clock text.
+ */
+export function formatSecondsClock(seconds) {
+  const rounded = Number(Math.abs(seconds).toFixed(3))
+  const sign = seconds < 0 && rounded > 0 ? '-' : ''
+  const wholeSeconds = Math.floor(rounded)
+  const fraction = String(Number((rounded - wholeSeconds).toFixed(3))).slice(1)
+  const hours = Math.floor(wholeSeconds / 3600)
+  const clock = [Math.floor((wholeSeconds % 3600) / 60), wholeSeconds % 60].map((part) => String(part).padStart(2, '0'))
+  if (hours > 0) clock.unshift(String(hours).padStart(2, '0'))
+  return `${sign}${clock.join(':')}${fraction}`
+}
+
+/**
  * Resolves canonical calendar and clock fields in an IANA timezone.
  *
  * @param {string} timestamp - Canonical timestamp.

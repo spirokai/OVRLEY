@@ -78,8 +78,22 @@ export function getSceneSize(config) {
   return { width: config.scene.width, height: config.scene.height }
 }
 
-/** @param {object} exportRange Committed export range. @param {string|null} importedVideoPath Imported video. @param {number} importedVideoDuration Duration. @param {number} videoSyncOffsetSeconds Offset. @returns {object} Preview range. */
-export function getPreviewExportRange(exportRange, importedVideoPath, importedVideoDuration, videoSyncOffsetSeconds) {
-  if (importedVideoPath === null || exportRange.type === 'custom') return exportRange
-  return { type: 'custom', from: videoSyncOffsetSeconds, to: videoSyncOffsetSeconds + importedVideoDuration }
+/**
+ * The export range in the activity time widgets read: the custom range shifted by
+ * the activity origin; without one, the telemetry clip's own duration, or the
+ * interval covered by the videos.
+ * @param {object} options Range inputs.
+ * @param {{type: 'all'|'custom', from: number, to: number}} options.exportRange Timeline export range.
+ * @param {number} options.activityOriginSecond Timeline second of activity second 0.
+ * @param {number|null} options.activityClipDurationSeconds Duration of the clip supplying embedded telemetry, or null with an external activity.
+ * @param {{startSecond: number, endSecond: number}|null} options.videoBounds Interval covered by the videos.
+ * @returns {{type: 'all'|'custom', from: number, to: number}} Preview export range.
+ */
+export function resolvePreviewExportRange({ exportRange, activityOriginSecond, activityClipDurationSeconds, videoBounds }) {
+  if (exportRange.type === 'custom') {
+    return { ...exportRange, from: exportRange.from - activityOriginSecond, to: exportRange.to - activityOriginSecond }
+  }
+  if (activityClipDurationSeconds !== null) return { type: 'custom', from: 0, to: activityClipDurationSeconds }
+  if (videoBounds === null) return exportRange
+  return { type: 'custom', from: videoBounds.startSecond, to: videoBounds.endSecond }
 }

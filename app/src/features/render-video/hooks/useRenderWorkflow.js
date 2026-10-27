@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 import useStore from '@/store/useStore'
 import { loadRememberedRenderDirectory } from '@/lib/file-dialog'
-import { createRenderSettingsDraft, isRendererBusy } from '../utils/renderRequest'
+import { createRenderSettingsDraft, isRendererBusy, renderTransport } from '../utils/renderRequest'
 import { formatRenderPathError, normalizeRenderOutputPath } from '../utils/renderPresentation'
 import useRenderExecution from './useRenderExecution'
 import i18next from 'i18next'
@@ -18,12 +18,14 @@ export default function useRenderWorkflow({ backendStatus }) {
   const { t } = useTranslation()
   const [renderDialogPhase, setRenderDialogPhase] = useState('closed')
   const [renderSettingsDraft, setRenderSettingsDraft] = useState(null)
-  const execution = useRenderExecution({ reviewTarget: renderDialogPhase === 'confirm' ? renderSettingsDraft.renderTarget : null })
-  const { activitySummary, config, renderStatus, renderingVideo, rendererBusy, setErrorMessage } = execution
+  const transport = useStore((state) => renderTransport(state))
+  const execution = useRenderExecution({ reviewTarget: renderDialogPhase === 'confirm' ? transport : null })
+  const { activitySummary, config, hasVideoTelemetry, renderStatus, renderingVideo, rendererBusy, setErrorMessage } = execution
   const [outputPathError, setOutputPathError] = useState(null)
-  const [pendingOverwritePath, setPendingOverwritePath] = useState(null)
+  // An output file that exists awaits confirmation, with the batch review it was submitted with.
+  const [pendingOverwrite, setPendingOverwrite] = useState(null)
   const opening = useRef(false)
-  const hasParsedActivity = activitySummary !== null
+  const hasParsedActivity = activitySummary !== null || hasVideoTelemetry
   const renderDisabled = config === null || !hasParsedActivity || rendererBusy || backendStatus !== 'connected'
   const renderTooltipContent = useMemo(() => {
     if (config === null) {
@@ -45,7 +47,7 @@ export default function useRenderWorkflow({ backendStatus }) {
 
   const clearOutputReview = useCallback(() => {
     setOutputPathError(null)
-    setPendingOverwritePath(null)
+    setPendingOverwrite(null)
   }, [])
 
   const openRenderDialog = useCallback(async () => {
@@ -75,7 +77,7 @@ export default function useRenderWorkflow({ backendStatus }) {
   const updateRenderSettingsDraft = useCallback(
     (updates) => {
       if (isRendererBusy(useStore.getState())) return
-      if (updates.renderTarget !== undefined) useStore.getState().setRenderTarget(updates.renderTarget)
+      if (updates.outputMode !== undefined) useStore.getState().setOutputMode(updates.outputMode)
       if (updates.outputPath !== undefined || updates.exportMode !== undefined) clearOutputReview()
       setRenderSettingsDraft((draft) => {
         if (draft === null) return draft
@@ -92,14 +94,16 @@ export default function useRenderWorkflow({ backendStatus }) {
   const submitRender = useCallback(
     async (batchReview, overwrite = false, expectedPath = null) => {
       if (renderSettingsDraft === null || isRendererBusy(useStore.getState()) || backendStatus !== 'connected') return
-      const target = renderSettingsDraft.renderTarget
+      const target = renderTransport(useStore.getState())
       if (target === 'batch' && batchReview === null) return
-      if (target === 'current' && !renderSettingsDraft.outputPath) {
+      // A single render and a combined export write one chosen file.
+      const writesOutputFile = target === 'single' || renderSettingsDraft.outputMode === 'combined'
+      if (writesOutputFile && !renderSettingsDraft.outputPath) {
         setOutputPathError({ reason: 'outputFileRequired' })
         return
       }
       if (expectedPath !== null && renderSettingsDraft.outputPath !== expectedPath) {
-        setPendingOverwritePath(null)
+        setPendingOverwrite(null)
         return
       }
       try {
@@ -109,15 +113,15 @@ export default function useRenderWorkflow({ backendStatus }) {
           overwrite,
           onAccepted: () => {
             clearOutputReview()
-            if (target === 'current') setRenderDialogPhase('progress')
+            if (target === 'single') setRenderDialogPhase('progress')
           },
         })
       } catch (error) {
         if (target === 'batch' && error.code === 'reinspectionRequired') throw error
-        else if (target === 'current' && error.code === 'already_exists') setPendingOverwritePath(renderSettingsDraft.outputPath)
-        else if (target === 'current' && error.code === 'output_error') setOutputPathError(error)
+        else if (writesOutputFile && error.code === 'already_exists') setPendingOverwrite({ path: renderSettingsDraft.outputPath, batchReview })
+        else if (writesOutputFile && error.code === 'output_error') setOutputPathError(error)
         else {
-          if (target === 'current') setRenderDialogPhase('closed')
+          if (target === 'single') setRenderDialogPhase('closed')
           setErrorMessage(formatRenderPathError(error, t))
         }
       }
@@ -127,9 +131,9 @@ export default function useRenderWorkflow({ backendStatus }) {
 
   const handleRenderVideoConfirm = useCallback((batchReview) => submitRender(batchReview), [submitRender])
   const handleOverwriteConfirm = useCallback(() => {
-    if (pendingOverwritePath !== null) return submitRender(null, true, pendingOverwritePath)
-  }, [pendingOverwritePath, submitRender])
-  const handleOverwriteCancel = useCallback(() => setPendingOverwritePath(null), [])
+    if (pendingOverwrite !== null) return submitRender(pendingOverwrite.batchReview, true, pendingOverwrite.path)
+  }, [pendingOverwrite, submitRender])
+  const handleOverwriteCancel = useCallback(() => setPendingOverwrite(null), [])
   const handleRenderPreviewFrame = useCallback(() => {
     if (!renderDisabled) return execution.renderPreviewFrame()
   }, [execution, renderDisabled])
@@ -148,8 +152,8 @@ export default function useRenderWorkflow({ backendStatus }) {
     renderTooltipContent,
     renderingVideo,
     outputPathError: formatRenderPathError(outputPathError, t),
-    overwriteOpen: pendingOverwritePath !== null,
-    pendingOverwritePath,
+    overwriteOpen: pendingOverwrite !== null,
+    pendingOverwritePath: pendingOverwrite?.path ?? null,
     updateRenderSettingsDraft,
   }
 }

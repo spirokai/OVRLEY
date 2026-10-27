@@ -1,18 +1,33 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import usePlaybackEngine from '@/features/player/hooks/usePlaybackEngine'
+import { buildTimelineProgram } from '@/lib/video-program/timeline'
+import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
+
+function videoTimeline(videos, offsets) {
+  const { importedVideos, videoEdits } = videoStoreState(videos, offsets)
+  const { clips, program, bounds } = buildTimelineProgram({
+    videos: importedVideos,
+    videoEdits,
+    dragPreview: null,
+    transitionDefaults: DEFAULT_TRANSITION_SETTINGS,
+  })
+  return { program, videoBounds: bounds, videoIdentity: clips.map((clip) => `${clip.id}:${clip.durationSeconds}`).join('|') }
+}
+
+function singleVideoTimeline({ durationSeconds = 4, offsetSeconds = 2 } = {}) {
+  return videoTimeline([createTestVideo({ path: 'C:\\clips\\ride.mp4', durationSeconds })], { 'video-1': offsetSeconds })
+}
 
 function createOptions(overrides = {}) {
   return {
-    activitySummary: {
-      durationSeconds: 8,
-    },
+    activityDurationSeconds: 8,
     backgroundMode: 'black',
     beginPreviewScrub: vi.fn(),
     commitPreviewScrub: vi.fn(),
     fallbackDurationSeconds: 0,
-    importedVideoDuration: 4,
-    importedVideoPath: 'C:\\clips\\ride.mp4',
+    hasActivityData: true,
     pausePreviewPlayback: vi.fn(),
     previewPlaybackSource: 'timeline',
     previewPlaybackState: 'paused',
@@ -22,7 +37,7 @@ function createOptions(overrides = {}) {
     startPreviewPlayback: vi.fn(),
     updatePreviewScrub: vi.fn(),
     updateRate: 1,
-    videoSyncOffsetSeconds: 2,
+    ...singleVideoTimeline(),
     ...overrides,
   }
 }
@@ -87,9 +102,8 @@ describe('usePlaybackEngine', () => {
   test('starts at the negative video beginning once, then resumes from paused activity time zero', () => {
     const options = createOptions({
       backgroundMode: 'video',
-      importedVideoDuration: 10,
       selectedSecond: 0,
-      videoSyncOffsetSeconds: -5,
+      ...singleVideoTimeline({ durationSeconds: 10, offsetSeconds: -5 }),
     })
     const { result, rerender } = renderHook((props) => usePlaybackEngine(props), {
       initialProps: options,
@@ -131,11 +145,9 @@ describe('usePlaybackEngine', () => {
 
   test('advances timeline playback on animation frames and pauses at the exact end', () => {
     const options = createOptions({
-      activitySummary: {
-        durationSeconds: 3,
-      },
-      importedVideoPath: null,
+      activityDurationSeconds: 3,
       selectedSecond: 1,
+      ...videoTimeline([], {}),
     })
     const raf = installRafHarness()
     const nowSpy = vi.spyOn(performance, 'now')
@@ -247,5 +259,77 @@ describe('usePlaybackEngine', () => {
     })
 
     expect(options.pausePreviewPlayback).toHaveBeenCalledWith(8)
+  })
+
+  test('starts playback in a gap at the next clip and inside a clip at the playhead', () => {
+    const timeline = videoTimeline(
+      [
+        createTestVideo({ id: 'first', durationSeconds: 4 }),
+        createTestVideo({ id: 'second', path: '/videos/second.mp4', durationSeconds: 4, importOrder: 1 }),
+      ],
+      { first: 0, second: 10 },
+    )
+    const options = createOptions({ activityDurationSeconds: 20, backgroundMode: 'video', selectedSecond: 6, ...timeline })
+    const { result, rerender } = renderHook((props) => usePlaybackEngine(props), {
+      initialProps: options,
+    })
+
+    act(() => {
+      result.current.play()
+    })
+    expect(options.startPreviewPlayback).toHaveBeenLastCalledWith({ source: 'video', second: 10 })
+
+    rerender({ ...options, selectedSecond: 11 })
+    act(() => {
+      result.current.play()
+    })
+    expect(options.startPreviewPlayback).toHaveBeenLastCalledWith({ source: 'video', second: 11 })
+  })
+
+  test('moves a zero playhead to an earlier start when the video collection changes', () => {
+    const first = createTestVideo({ id: 'first', durationSeconds: 10 })
+    const options = createOptions({ selectedSecond: 0, ...videoTimeline([first], { first: 2 }) })
+    const { rerender } = renderHook((props) => usePlaybackEngine(props), {
+      initialProps: options,
+    })
+
+    expect(options.setSelectedSecond).not.toHaveBeenCalled()
+
+    const second = createTestVideo({ id: 'second', path: '/videos/second.mp4', durationSeconds: 10, importOrder: 1 })
+    const extended = videoTimeline([first, second], { first: 2, second: -3 })
+    rerender({ ...options, ...extended })
+
+    expect(extended.videoBounds).toEqual({ startSecond: -3, endSecond: 12 })
+    expect(options.setSelectedSecond).toHaveBeenCalledWith(-3)
+  })
+
+  test('plays video telemetry without an external activity across the clip bounds', () => {
+    const options = createOptions({
+      activityDurationSeconds: 0,
+      fallbackDurationSeconds: 73,
+      ...videoTimeline(
+        [
+          createTestVideo({ id: 'first', durationSeconds: 5 }),
+          createTestVideo({ id: 'second', path: '/videos/second.mp4', durationSeconds: 5, importOrder: 1 }),
+        ],
+        { first: 0, second: 7 },
+      ),
+    })
+    const { result } = renderHook((props) => usePlaybackEngine(props), {
+      initialProps: options,
+    })
+
+    expect(result.current.hasActivity).toBe(true)
+    expect(result.current.totalDuration).toBe(12)
+    expect(result.current.timelineMinimum).toBe(0)
+  })
+
+  test('disables playback without activity data or video telemetry', () => {
+    const { result } = renderHook((props) => usePlaybackEngine(props), {
+      initialProps: createOptions({ activityDurationSeconds: 0, hasActivityData: false }),
+    })
+
+    expect(result.current.hasActivity).toBe(false)
+    expect(result.current.totalDuration).toBe(6)
   })
 })

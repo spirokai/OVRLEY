@@ -1,6 +1,6 @@
 /**
  * Renders the render video dialog portion of the application interface.
- * Renders either the current video or, in batch mode, every video in a folder.
+ * Renders the activity overlay, or the imported videos as one combined file or one file per video.
  * Pure presentational - all logic is in useRenderVideoDialogState.
  */
 
@@ -8,7 +8,7 @@ import { AlertTriangle, Loader2, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import BatchRenderQueue from './BatchRenderQueue'
-import RenderExportSettings, { RenderTargetTabs } from './RenderExportSettings'
+import RenderExportSettings, { OutputModeTabs } from './RenderExportSettings'
 import RenderProgressPanel from './RenderProgressPanel'
 import useRenderVideoDialogState from '../hooks/useRenderVideoDialogState'
 import { useTranslation } from 'react-i18next'
@@ -49,7 +49,7 @@ export default function RenderVideoDialog(props) {
     >
       <DialogContent
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
-        className={`w-full rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50 ${ctx.isBatchTarget ? 'max-w-6xl' : 'max-w-xl'}`}
+        className={`w-full rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50 ${ctx.hasImportedVideo ? 'max-w-6xl' : 'max-w-xl'}`}
         aria-describedby={undefined}
         onEscapeKeyDown={(event) => {
           if (ctx.isProgress || ctx.submissionPending || ctx.batchRunning) {
@@ -75,7 +75,7 @@ export default function RenderVideoDialog(props) {
         ) : hasBlockingResolutionMismatch ? (
           <div className="space-y-12 p-3">
             <DialogTitle className="sr-only">{t('render-video.videoResolutionMismatch', 'Video resolution mismatch')}</DialogTitle>
-            <RenderTargetTabs renderTarget={ctx.settings.renderTarget} onRenderTargetChange={ctx.handleRenderTargetChange} />
+            <OutputModeTabs outputMode={ctx.settings.outputMode} onOutputModeChange={ctx.handleOutputModeChange} />
             <div className="space-y-8">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-10 w-10 shrink-0 text-red-500" />
@@ -109,7 +109,7 @@ export default function RenderVideoDialog(props) {
             </div>
           </div>
         ) : (
-          <div className={`grid gap-12 ${ctx.isBatchTarget ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
+          <div className={`grid gap-12 ${ctx.hasImportedVideo ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
             <div className={ctx.showBatchProgress ? 'min-w-0 md:flex md:h-150 md:flex-col md:justify-center md:overflow-y-auto' : 'min-w-0'}>
               {ctx.showBatchProgress ? (
                 <>
@@ -126,7 +126,7 @@ export default function RenderVideoDialog(props) {
               )}
             </div>
 
-            {ctx.isBatchTarget && (
+            {ctx.hasImportedVideo && (
               <>
                 <BatchRenderQueue {...ctx} />
                 <div className="flex items-center justify-end gap-3 md:col-span-2">
@@ -152,7 +152,7 @@ export default function RenderVideoDialog(props) {
                         disabled={ctx.batchStartDisabled}
                       >
                         {ctx.batchRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                        {ctx.batchRunning ? t('render-video.rendering', 'Rendering...') : t('render-video.startBatchRender', 'Start Batch Render')}
+                        {ctx.batchRunning ? t('render-video.rendering', 'Rendering...') : t('render-video.startRender', 'Start Render')}
                       </Button>
                     )}
                   </div>

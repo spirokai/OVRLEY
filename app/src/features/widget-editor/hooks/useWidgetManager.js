@@ -7,6 +7,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
+import { useActivityContext } from '@/hooks/useVideoTimeline'
 import { requireWidgetTypeDefinition } from '@/lib/widget/widget-catalog'
 import { deleteWidgetsInConfig, ensureWidgetIdsInConfig, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget/widget-config'
 import { buildConfigWidgets, getWidgetTypeName, groupWidgetsForSidebar, withAltitudeEditorPresentation } from '@/lib/widget/widget-presentation'
@@ -45,12 +46,13 @@ const CONTENT_ALIGNMENT_FACTORS = {
 export function useWidgetManager({ widgetLiveEdits }) {
   const { t } = useTranslation()
   // Store selectors — shallow-pick zustand state needed for widget management
-  const { config, globalDefaults, isMarqueeSelecting, parsedActivity, selectedWidgetId, setConfig, setSelectedWidgetId } = useStore(
+  // New course plots fit the route of the activity driving widgets at the playhead.
+  const activity = useActivityContext()?.activity ?? null
+  const { config, globalDefaults, isMarqueeSelecting, selectedWidgetId, setConfig, setSelectedWidgetId } = useStore(
     useShallow((state) => ({
       config: state.config,
       globalDefaults: state.globalDefaults,
       isMarqueeSelecting: state.isMarqueeSelecting,
-      parsedActivity: state.parsedActivity,
       selectedWidgetId: state.selectedWidgetId,
       setConfig: state.setConfig,
       setSelectedWidgetId: state.setSelectedWidgetId,
@@ -61,9 +63,9 @@ export function useWidgetManager({ widgetLiveEdits }) {
   // Derived state — group and build the sidebar widget list from config
   const widgets = useMemo(() => {
     const configWidgets = applyWidgetDrafts(buildConfigWidgets(config), liveEdits.liveWidgetDrafts)
-    const presentedWidgets = configWidgets.map((widget) => withAltitudeEditorPresentation(widget, parsedActivity))
+    const presentedWidgets = configWidgets.map((widget) => withAltitudeEditorPresentation(widget, activity))
     return groupWidgetsForSidebar(presentedWidgets, (type) => getWidgetTypeName(type, t))
-  }, [config, liveEdits.liveWidgetDrafts, parsedActivity, t])
+  }, [activity, config, liveEdits.liveWidgetDrafts, t])
 
   // Update handler — applies partial updates to a widget via config utility
   const updateWidgetData = (id, updates) => {
@@ -125,7 +127,7 @@ export function useWidgetManager({ widgetLiveEdits }) {
   const addWidget = (selection) => {
     const category = requireWidgetTypeDefinition(selection.type).collection
     const data = createWidgetDefaults(selection, globalDefaults, {
-      coursePoints: parsedActivity?.sample_course_points,
+      coursePoints: activity?.sample_course_points,
       sceneFontSize: globalDefaults.font_size,
     })
 

@@ -61,6 +61,8 @@ export default function useVideoSyncPreview({
     widgets: hasSpeed ? VIDEO_SYNC_SPEED_WIDGETS : VIDEO_SYNC_EMPTY_WIDGETS,
     scene: speedScene,
     activity,
+    // Manual sync aligns a video to the external activity, which starts at timeline second 0.
+    activityOriginSecond: 0,
     disabledLaps: VIDEO_SYNC_DISABLED_LAPS,
     second: previewSecond,
     defaultFont: VIDEO_SYNC_SPEED_FONT,

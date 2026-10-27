@@ -1,61 +1,87 @@
 /**
  * Composes preview-video source resolution, warning lifecycle, scrub
- * scheduling, and playback synchronization around the active <video> element.
+ * scheduling, and playback synchronization around two <video> elements: the
+ * active one shows the piece at the playhead, the parked one waits on the next
+ * piece so a cut swaps elements instead of reloading one.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { openHevcSupport } from '@/api/backend'
+import { useTransitionProxyJobs, useVideoTimeline } from '@/hooks/useVideoTimeline'
+import { framesToSeconds } from '@/lib/video-program/frame-grid'
+import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
+import { assignPreviewSlots, EMPTY_PREVIEW_SLOTS } from '@/lib/video-program/preview-slots'
+import { listShownTransitionJoinKeys, resolveContinuation, resolveTransitionWindow } from '@/lib/video-program/transition-proxies'
 import useStore from '@/store/useStore'
 import { useVideoPlaybackClock } from './useVideoPlaybackClock'
 import { useVideoPreviewWarnings } from './useVideoPreviewWarnings'
 import { SCRUB_SEEK_EPSILON_SECONDS, SCRUB_SEEK_INTERVAL_MS } from '../data/videoPreviewConstants'
 import { primeVideoFirstFrame, syncVideoCurrentTime } from '../utils/videoPreviewPlayback'
 import { createVideoPreviewScrubScheduler } from '../utils/videoPreviewScrubScheduler'
-import { isVideoPreviewOutOfRange, resolveVideoPreviewSource } from '../utils/videoPreviewSource'
+import { resolveVideoPreviewSource } from '../utils/videoPreviewSource'
 import i18next from 'i18next'
 
+function previewSourceOf(clip) {
+  return resolveVideoPreviewSource({ importedVideoPath: clip.path, importedVideoPreviewUrl: clip.preview.url })
+}
+
 /**
- * Manages the video preview element and synchronization with the global playhead.
+ * Manages the two preview video elements and their synchronization with the global playhead.
  *
- * @param {React.RefObject<HTMLVideoElement>} videoRef - Ref to the video element.
+ * @param {Array<React.RefObject<HTMLVideoElement>>} slotRefs - Refs to the two video elements.
  * @param {boolean} isActive - Whether the imported video preview is currently visible.
- * @returns {{ videoSrc: string, importId: string|null, isOutOfRange: boolean, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
+ * @returns {{ slots: Array<{src: string, isActive: boolean}>, videoSrc: string, importId: string|null, isOutOfRange: boolean, isDeleted: boolean, isInOverlap: boolean, transition: {proxyStatus: 'queued'|'rendering'|'ready'|'failed', proxyUrl: string|null, elapsedSeconds: number, isPlaying: boolean}|null, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
+ *   Inside a transition window `transition` describes its proxy, shown over the outgoing piece once ready.
  */
-export function useVideoPreview(videoRef, isActive = true) {
-  // Store selectors - subscribes to video import state, playhead position, playback mode, and sync offset.
-  const importedVideoPath = useStore((state) => state.importedVideoPath)
-  const importedVideoImportId = useStore((state) => state.importedVideoImportId)
-  const importedVideoPreviewUrl = useStore((state) => state.importedVideoPreviewUrl)
-  const importedVideoPreviewWarnings = useStore((state) => state.importedVideoPreviewWarnings)
-  const importedVideoCodecName = useStore((state) => state.importedVideoCodecName)
+export function useVideoPreview(slotRefs, isActive = true) {
+  // Store selectors - subscribes to the displayed clips, playhead position, playback mode, and drag state.
+  const { clips, program } = useVideoTimeline().displayed
+  const isDragPreview = useStore((state) => state.videoDragPreview !== null)
   const platformOs = useStore((state) => state.platformOs)
-  const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)
-  const videoSyncOffsetPreviewSeconds = useStore((state) => state.videoSyncOffsetPreviewSeconds)
   const selectedSecond = useStore((state) => state.selectedSecond)
   const previewPlaybackState = useStore((state) => state.previewPlaybackState)
   const previewPlaybackSource = useStore((state) => state.previewPlaybackSource)
   const pausePreviewPlayback = useStore((state) => state.pausePreviewPlayback)
   const setSelectedSecond = useStore((state) => state.setSelectedSecond)
   const startPreviewPlayback = useStore((state) => state.startPreviewPlayback)
-  const videoDuration = useStore((state) => state.importedVideoDuration || 0)
-  const effectiveVideoSyncOffsetSeconds = videoSyncOffsetPreviewSeconds ?? videoSyncOffsetSeconds
+  const transitionProxies = useStore((state) => state.transitionProxies)
+  const transitionProxyJobs = useTransitionProxyJobs()
 
-  // Derived state - determines whether the video should play and which source URL to load.
-  const videoEndSecond = videoSyncOffsetSeconds + videoDuration
-  const isVideoPlaybackMode =
-    isActive && previewPlaybackState === 'playing' && previewPlaybackSource === 'video' && videoSyncOffsetPreviewSeconds === null
-  const videoSrc = useMemo(
-    () =>
-      resolveVideoPreviewSource({
-        importedVideoPath,
-        importedVideoPreviewUrl,
-      }),
-    [importedVideoPath, importedVideoPreviewUrl],
-  )
+  // Derived state - the clip at the playhead (or the upcoming/last clip outside clips) owns the video element.
+  const target = resolvePreviewTarget(program, selectedSecond)
+  const activeClip = target === null ? null : clips.find((clip) => clip.id === target.videoId)
+  const videoOffsetSeconds = activeClip?.offsetSeconds ?? 0
+  const desiredVideoSecond = target?.sourceSecond ?? 0
+  const playingPieceId = target?.isInside ? target.piece.id : null
+  const pieceEndSourceSecond = target?.isInside ? target.piece.sourceEndSecond : null
+  const activePath = activeClip?.path ?? null
+  const activePreviewUrl = activeClip?.preview.url ?? null
+  const isVideoPlaybackMode = isActive && previewPlaybackState === 'playing' && previewPlaybackSource === 'video' && !isDragPreview
+  const videoSrc = activePath === null ? '' : resolveVideoPreviewSource({ importedVideoPath: activePath, importedVideoPreviewUrl: activePreviewUrl })
+
+  // Element slots - the active element shows the target piece; the parked one waits on the piece after it.
+  const shownJoinKeys = listShownTransitionJoinKeys(transitionProxyJobs, transitionProxies)
+  const continuation = target === null ? null : resolveContinuation(program, target.piece.id, shownJoinKeys)
+  const preloadPiece = continuation?.piece ?? null
+  const preloadClip = preloadPiece === null ? null : clips.find((clip) => clip.id === preloadPiece.videoId)
+  const [previousSlots, setPreviousSlots] = useState(EMPTY_PREVIEW_SLOTS)
+  const slotState = assignPreviewSlots(previousSlots, {
+    active: videoSrc ? { src: videoSrc, pieceId: target.piece.id } : null,
+    preload: preloadClip ? { src: previewSourceOf(preloadClip), pieceId: preloadPiece.id } : null,
+  })
+  if (slotState !== previousSlots) setPreviousSlots(slotState)
+  const videoRef = slotRefs[slotState.activeIndex]
+  const parkedRef = slotRefs[1 - slotState.activeIndex]
+  const parkedSlot = slotState.slots[1 - slotState.activeIndex]
+  // The next piece continues after the start its incoming transition already showed.
+  const parkedSecond =
+    parkedSlot !== null && parkedSlot.pieceId === preloadPiece?.id
+      ? preloadPiece.sourceStartSecond + continuation.second - preloadPiece.timelineStartSecond
+      : null
 
   // Warning lifecycle - tracks metadata, native-player, and slow-seek messages separately from playback sync.
   const { hevcPlaybackWarning, metadataStatusMessage, nativeVideoError, seekWarning } = useVideoPreviewWarnings({
-    codecName: importedVideoCodecName,
+    codecName: activeClip?.codecName ?? null,
     isActive,
     videoRef,
     videoSrc,
@@ -67,17 +93,33 @@ export function useVideoPreview(videoRef, isActive = true) {
     })
   }, [])
 
-  const handoffVideoPlaybackToTimeline = useCallback(() => {
-    startPreviewPlayback({ source: 'timeline', second: videoEndSecond })
-  }, [startPreviewPlayback, videoEndSecond])
+  // Piece end - continue with the next piece (skipping gaps, deleted parts, and the start a shown
+  // transition already played) or hand the rest of the activity to the timeline clock, holding the
+  // last frame of the piece.
+  const handlePieceEnded = () => {
+    const playingPiece = program.pieces.find((piece) => piece.id === playingPieceId)
+    const next = resolveContinuation(program, playingPieceId, shownJoinKeys)
+    if (next !== null) {
+      startPreviewPlayback({ source: 'video', second: next.second })
+      return
+    }
+    const video = videoRef.current
+    if (video) {
+      video.pause()
+      syncVideoCurrentTime(video, framesToSeconds(playingPiece.sourceEndFrame - 1, playingPiece.fps))
+    }
+    startPreviewPlayback({ source: 'timeline', second: playingPiece.timelineEndSecond })
+  }
 
   // Video playback clock - publishes preview time from the video element while playing.
   useVideoPlaybackClock({
     videoRef,
     isActive: Boolean(videoSrc) && isVideoPlaybackMode,
-    videoSyncOffsetSeconds,
+    videoFps: activeClip?.fps ?? null,
+    videoOffsetSeconds,
+    pieceEndSourceSecond,
     onPreviewSecond: setSelectedSecond,
-    onPlaybackEnded: handoffVideoPlaybackToTimeline,
+    onPlaybackEnded: handlePieceEnded,
   })
 
   const scrubSchedulerRef = useRef(null)
@@ -85,7 +127,7 @@ export function useVideoPreview(videoRef, isActive = true) {
 
   // Drag preview - seek the video directly from the transient offset without committing global sync state.
   useEffect(() => {
-    if (videoSyncOffsetPreviewSeconds === null) {
+    if (!isDragPreview) {
       return
     }
 
@@ -98,8 +140,8 @@ export function useVideoPreview(videoRef, isActive = true) {
       video.pause()
     }
 
-    scrubSchedulerRef.current?.schedule(selectedSecond - videoSyncOffsetPreviewSeconds)
-  }, [selectedSecond, videoRef, videoSrc, videoSyncOffsetPreviewSeconds])
+    scrubSchedulerRef.current?.schedule(desiredVideoSecond)
+  }, [desiredVideoSecond, isDragPreview, videoRef, videoSrc])
 
   // Scrub scheduler ownership - preserve throttle state across playhead updates.
   useEffect(() => {
@@ -131,12 +173,10 @@ export function useVideoPreview(videoRef, isActive = true) {
     }
 
     const syncPlaybackState = () => {
-      if (videoSyncOffsetPreviewSeconds !== null) {
+      if (isDragPreview) {
         videoPlaybackOwnerRef.current = null
         return
       }
-
-      const desiredVideoSecond = selectedSecond - videoSyncOffsetSeconds
 
       const handlePlaybackFailure = (error) => {
         const currentState = useStore.getState()
@@ -164,10 +204,16 @@ export function useVideoPreview(videoRef, isActive = true) {
 
       if (isVideoPlaybackMode) {
         scrubSchedulerRef.current?.clear()
+        // A new piece (also of the same video, after a deleted part) or a moved clip restarts from the playhead.
         const owner = videoPlaybackOwnerRef.current
-        if (owner?.video !== video || owner.videoSyncOffsetSeconds !== videoSyncOffsetSeconds) {
+        if (
+          owner?.video !== video ||
+          owner.videoSrc !== videoSrc ||
+          owner.videoOffsetSeconds !== videoOffsetSeconds ||
+          owner.pieceId !== playingPieceId
+        ) {
           syncVideoCurrentTime(video, desiredVideoSecond)
-          videoPlaybackOwnerRef.current = { video, videoSyncOffsetSeconds }
+          videoPlaybackOwnerRef.current = { video, videoSrc, videoOffsetSeconds, pieceId: playingPieceId }
         }
 
         if (video.paused) {
@@ -209,32 +255,79 @@ export function useVideoPreview(videoRef, isActive = true) {
       video.removeEventListener('loadedmetadata', handleLoadedMetadata)
     }
   }, [
+    desiredVideoSecond,
     isActive,
+    isDragPreview,
     isVideoPlaybackMode,
     pausePreviewPlayback,
+    playingPieceId,
     previewPlaybackState,
-    selectedSecond,
+    videoOffsetSeconds,
     videoRef,
     videoSrc,
-    videoSyncOffsetPreviewSeconds,
-    videoSyncOffsetSeconds,
   ])
 
+  // Parked element - stays paused on the first frame of the next piece, ready to take over at the cut.
+  useEffect(() => {
+    const video = parkedRef.current
+    if (!video || parkedSlot === null) {
+      return undefined
+    }
+
+    const park = () => {
+      if (!video.paused) {
+        video.pause()
+      }
+      if (parkedSecond !== null) {
+        syncVideoCurrentTime(video, parkedSecond)
+      }
+    }
+    const handleLoadedMetadata = () => {
+      park()
+      primeVideoFirstFrame(video)
+    }
+
+    park()
+    video.addEventListener('loadedmetadata', handleLoadedMetadata)
+    return () => {
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata)
+    }
+  }, [parkedRef, parkedSecond, parkedSlot])
+
+  // Transition window - its proxy (once rendered) covers the end of the outgoing piece.
+  const transitionWindow = isDragPreview ? null : resolveTransitionWindow(program, selectedSecond)
+  const transitionJob = transitionWindow === null ? null : transitionProxyJobs.find((job) => job.joinKey === transitionWindow.join.key)
+  const transitionProxy = transitionJob === undefined || transitionJob === null ? null : (transitionProxies[transitionJob.key] ?? null)
+  const transition =
+    transitionWindow === null
+      ? null
+      : {
+          proxyStatus: transitionProxy?.status ?? 'queued',
+          proxyUrl: transitionProxy?.status === 'ready' ? transitionProxy.url : null,
+          elapsedSeconds: transitionWindow.elapsedSeconds,
+          isPlaying: isVideoPlaybackMode,
+        }
+
   // Derived return values - aggregate imported-video warnings with local preview messages.
-  const isOutOfRange = isVideoPreviewOutOfRange({
-    selectedSecond,
-    videoDuration,
-    videoSyncOffsetSeconds: effectiveVideoSyncOffsetSeconds,
-  })
+  const isOutOfRange = target === null || !target.isInside
+  const isInOverlap = program.overlaps.some((overlap) => selectedSecond >= overlap.startSecond && selectedSecond < overlap.endSecond)
   const videoPreviewHelpAvailable = Boolean(hevcPlaybackWarning) && platformOs === 'windows'
-  const videoPreviewMessages = [hevcPlaybackWarning, ...importedVideoPreviewWarnings, metadataStatusMessage, seekWarning, nativeVideoError].filter(
-    Boolean,
-  )
+  const videoPreviewMessages = [
+    hevcPlaybackWarning,
+    ...(activeClip?.previewWarnings ?? []),
+    metadataStatusMessage,
+    seekWarning,
+    nativeVideoError,
+  ].filter(Boolean)
 
   return {
+    slots: slotState.slots.map((slot, index) => ({ src: slot?.src ?? '', isActive: index === slotState.activeIndex })),
     videoSrc,
-    importId: importedVideoImportId,
+    importId: activeClip?.preview.importId ?? null,
     isOutOfRange,
+    isDeleted: target?.isDeleted ?? false,
+    isInOverlap,
+    transition,
     hevcPlaybackWarning,
     openVideoPreviewHelp,
     videoPreviewHelpAvailable,

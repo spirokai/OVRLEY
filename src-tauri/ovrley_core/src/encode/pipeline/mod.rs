@@ -2,6 +2,7 @@
 
 #[cfg(test)]
 mod atlas_export_tests;
+pub(crate) mod assemble;
 mod buffers;
 #[doc(hidden)]
 pub mod diagnostics;
@@ -129,7 +130,7 @@ impl VideoEncoding {
 pub(crate) fn encode_video(
     paths: &AppPaths,
     config: &ValidatedRenderConfig,
-    activity: &ParsedActivity,
+    activity: Option<&ParsedActivity>,
     dense: &DenseActivityReport,
     controller: &RenderController,
     target: &RenderOutputTarget,
@@ -155,10 +156,12 @@ pub(crate) fn encode_video(
     };
     let mut prepare_profiler = RenderProfiler::default();
     let prepare_started = Instant::now();
+    // A video without telemetry samples no activity; its plan keeps rasters only.
+    let no_activity = ParsedActivity::default();
     let export = ExportWidgets::prepare(
         &paths.font_dirs,
         config,
-        activity,
+        activity.unwrap_or(&no_activity),
         dense,
         size,
         coverage.blank_leading_frame_count,

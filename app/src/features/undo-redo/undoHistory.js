@@ -19,7 +19,7 @@ function partializeUndoableState(state) {
     globalDefaults: state.globalDefaults,
     aspectRatio: state.aspectRatio,
     renderSettings: state.renderSettings,
-    videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+    videoEdits: state.videoEdits,
     startSecond: state.startSecond,
     endSecond: state.endSecond,
   }
@@ -95,6 +95,31 @@ export function replaceEditorDocument(store, operation, ...args) {
       temporalState.resume()
     }
   }
+}
+
+function rebaseVideoEdits(historicalEdits, currentEdits) {
+  return Object.fromEntries(Object.keys(currentEdits).map((videoId) => [videoId, historicalEdits[videoId] ?? currentEdits[videoId]]))
+}
+
+/**
+ * Replaces or changes the imported-video collection without adding an undo/redo
+ * entry. History keeps earlier edits of videos that remain, starts removed videos'
+ * edits nowhere, and gives newly added videos their current edits.
+ *
+ * @param {object} store - Zustand application store.
+ * @param {Function} operation - Synchronous collection change.
+ * @returns {*} Operation result.
+ */
+export function changeVideoCollection(store, operation) {
+  const result = runWithoutEditorHistory(store, operation)
+  const currentEdits = store.getState().videoEdits
+  const temporalState = store.temporal.getState()
+  const rebase = (historyState) => ({ ...historyState, videoEdits: rebaseVideoEdits(historyState.videoEdits, currentEdits) })
+  store.temporal.setState({
+    pastStates: temporalState.pastStates.map(rebase),
+    futureStates: temporalState.futureStates.map(rebase),
+  })
+  return result
 }
 
 /**

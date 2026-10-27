@@ -26,6 +26,7 @@ import { RESOLUTIONS } from '../data/sceneSettingsConstants'
 import { sanitizeNumber } from '../utils/sceneSettingsUtils'
 import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { getWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
+import { deriveCompatibility } from '@/lib/video-program/video-collection'
 
 function getResolutionPresetId(scene) {
   if (!scene) return '1080p'
@@ -63,11 +64,10 @@ function getDefaultResolutionPreset(aspectRatio) {
 
 export default function useSceneSettingsState({ config, onConfigChange, widgetLiveEdits }) {
   const {
-    activitySummary,
+    hasActivity,
     aspectRatio,
     globalDefaults,
-    importedVideoFps,
-    importedVideoResolution,
+    importedVideos,
     setAspectRatioPreset,
     setCustomAspectRatio,
     renderSettings,
@@ -77,11 +77,10 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
     setRenderWidgetUpdateRate,
   } = useStore(
     useShallow((state) => ({
-      activitySummary: state.activitySummary,
+      hasActivity: state.activitySummary !== null,
       aspectRatio: state.aspectRatio,
       globalDefaults: state.globalDefaults,
-      importedVideoFps: state.importedVideoFps,
-      importedVideoResolution: state.importedVideoResolution,
+      importedVideos: state.importedVideos,
       setAspectRatioPreset: state.setAspectRatioPreset,
       setCustomAspectRatio: state.setCustomAspectRatio,
       renderSettings: state.renderSettings,
@@ -91,6 +90,10 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
       setRenderWidgetUpdateRate: state.setRenderWidgetUpdateRate,
     })),
   )
+  const videoFormat = useMemo(() => deriveCompatibility(importedVideos).reference, [importedVideos])
+  const importedVideoFps = videoFormat === null ? null : videoFormat.fps.num / videoFormat.fps.den
+  const importedVideoResolution = videoFormat?.resolution ?? null
+  const hasTimelineMedia = hasActivity || importedVideos.length > 0
 
   const availableFonts = useAvailableFonts()
   const prepareFontEdit = useFontPreparation()
@@ -177,9 +180,10 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
 
   return {
     overlaySettings: {
-      activitySummary,
+      hasTimelineMedia,
       aspectRatio,
       exportRange: renderSettings.range,
+      renderFps: renderSettings.fps,
       fpsMode,
       importedVideoFps,
       importedVideoResolution,

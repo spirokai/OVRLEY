@@ -53,10 +53,9 @@ export default function useAppShellComposition() {
   useAppBootstrap()
   const startupReady = backendState.backendReady && templateRestoreComplete
   const projectLifecycle = useProjectLifecycle({
-    clearImportedVideo: videoControls.clearImportedVideo,
+    clearImportedVideos: videoControls.clearImportedVideos,
     onSetBackgroundMode: editorShell.setEditorBackgroundMode,
     prepareActivityPath: activityImport.prepareActivityPath,
-    prepareVideoPath: videoControls.prepareVideoPath,
     startupReady,
   })
   useWindowCloseGuard(projectLifecycle.handleCloseRequest)

@@ -6,6 +6,7 @@ import { VIDEO_SYNC_TOOL } from '@/store/slices/createLayoutSlice'
 import { VIDEO_SYNC_LANDMARK_TYPES } from '@/features/video-sync/data/videoSyncConstants'
 import useVideoSyncWorkspace from '@/features/video-sync/hooks/useVideoSyncWorkspace'
 import { resolveVideoSyncMarkControls } from '@/features/video-sync/utils/videoSyncPresentation'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 vi.mock('@/features/video-sync/hooks/useVideoSyncCalculation', () => ({
   default: () => ({
@@ -20,7 +21,6 @@ vi.mock('@/features/video-sync/hooks/useVideoSyncCalculation', () => ({
   }),
 }))
 
-const videoSummary = { path: 'C:\\video.mp4', timeSource: 'ffprobe' }
 const videoSync = {}
 
 function createToolbarDrawer(overrides = {}) {
@@ -36,10 +36,10 @@ describe('useVideoSyncWorkspace', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
     useStore.setState({
-      importedVideoDuration: 20,
+      ...videoStoreState([createTestVideo({ path: 'C:\\video.mp4', durationSeconds: 20 })], { 'video-1': 2 }),
       selectedSecond: 8,
-      videoSyncOffsetSeconds: 2,
       manualVideoSync: {
+        videoId: 'video-1',
         landmarks: [],
         detectedLocationSecond: null,
         speedThresholdKmh: 5,
@@ -62,7 +62,7 @@ describe('useVideoSyncWorkspace', () => {
           visible: state.leftDrawerVisible,
         })),
       )
-      return useVideoSyncWorkspace({ toolbarDrawer, videoSummary, videoSync })
+      return useVideoSyncWorkspace({ toolbarDrawer, videoSync })
     })
 
     expect(result.current.videoSyncMode).toBe(false)
@@ -80,7 +80,7 @@ describe('useVideoSyncWorkspace', () => {
     let renderCount = 0
     const { result } = renderHook(() => {
       renderCount += 1
-      return useVideoSyncWorkspace({ toolbarDrawer: createToolbarDrawer(), videoSummary, videoSync })
+      return useVideoSyncWorkspace({ toolbarDrawer: createToolbarDrawer(), videoSync })
     })
 
     act(() => {
@@ -107,8 +107,30 @@ describe('useVideoSyncWorkspace', () => {
     expect(useStore.getState().manualVideoSync.landmarks).toEqual([{ id: 'landmark-1', type: VIDEO_SYNC_LANDMARK_TYPES.STOP, videoSecond: 7 }])
   })
 
+  test('marks landmarks against the manual-sync target clip among several clips', () => {
+    useStore.setState({
+      ...videoStoreState(
+        [
+          createTestVideo({ id: 'video-1', path: 'C:\\first.mp4', durationSeconds: 20 }),
+          createTestVideo({ id: 'video-2', path: 'C:\\second.mp4', durationSeconds: 10, importOrder: 1 }),
+        ],
+        { 'video-1': 2, 'video-2': 30 },
+      ),
+      selectedSecond: 33,
+    })
+    act(() => useStore.getState().selectVideoSyncVideo('video-2'))
+    const { result } = renderHook(() => useVideoSyncWorkspace({ toolbarDrawer: createToolbarDrawer(), videoSync }))
+
+    expect(result.current.drawer).toMatchObject({ appliedOffset: 30, hasVideos: true })
+    expect(result.current.markControls).toMatchObject({ videoDurationSeconds: 10, videoOffsetSeconds: 30 })
+
+    act(() => result.current.markControls.onMarkStop())
+
+    expect(useStore.getState().manualVideoSync.landmarks).toEqual([{ id: 'landmark-1', type: VIDEO_SYNC_LANDMARK_TYPES.STOP, videoSecond: 3 }])
+  })
+
   test('keeps sensitivity drafts local until commit and scrubs landmarks through the applied offset', () => {
-    const { result } = renderHook(() => useVideoSyncWorkspace({ toolbarDrawer: createToolbarDrawer(), videoSummary, videoSync }))
+    const { result } = renderHook(() => useVideoSyncWorkspace({ toolbarDrawer: createToolbarDrawer(), videoSync }))
 
     act(() => result.current.drawer.onSpeedThresholdChange(10))
     expect(useStore.getState().manualVideoSync.speedThresholdKmh).toBe(5)
@@ -124,7 +146,7 @@ describe('useVideoSyncWorkspace', () => {
     const markControls = {
       hasLandmarkCapacity: true,
       hasLocationLandmark: false,
-      importedVideoDuration: 10,
+      videoDurationSeconds: 10,
       landmarkLimitReason: 'Landmark limit',
       locationLimitReason: 'Location limit',
       onMarkLeftTurn: vi.fn(),
@@ -133,7 +155,7 @@ describe('useVideoSyncWorkspace', () => {
       onMarkStop: vi.fn(),
       playheadOutsideVideoReason: 'Outside video',
       videoRequiredReason: 'Video required',
-      videoSyncOffsetSeconds: 0,
+      videoOffsetSeconds: 0,
     }
 
     expect(resolveVideoSyncMarkControls(markControls, 0.5, true)).toMatchObject({
@@ -141,7 +163,7 @@ describe('useVideoSyncWorkspace', () => {
       canMarkLocation: true,
       markDisabledReason: null,
     })
-    expect(resolveVideoSyncMarkControls({ ...markControls, importedVideoDuration: null }, 0.5, true)).toMatchObject({
+    expect(resolveVideoSyncMarkControls({ ...markControls, videoDurationSeconds: null }, 0.5, true)).toMatchObject({
       canMark: false,
       markDisabledReason: 'Video required',
     })

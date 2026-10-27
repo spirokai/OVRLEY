@@ -505,15 +505,6 @@ export async function rasterPreviewPng(resourceId) {
   return invokeCommand('raster_preview_png', { resourceId })
 }
 
-/**
- * Lists supported video files (mp4/mov/mkv) directly inside a directory.
- * @param {string} directory - Absolute directory path.
- * @returns {Promise<string[]>} Absolute video paths sorted by name.
- */
-export async function listDirectoryVideoFiles(directory) {
-  return invokeCommand('list_directory_video_files', { directory })
-}
-
 /** @returns {Promise<string>} Absolute Documents/OVRLEY/projects directory. */
 export async function getDefaultProjectDirectory() {
   return invokeCommand('default_project_directory')
@@ -559,20 +550,11 @@ export async function readProjectFile(path) {
  * @param {string} path - Absolute `.oly` path.
  * @param {string} projectJson - Canonical project JSON.
  * @param {object} config - Current editor config containing Rust resource identities.
- * @returns {Promise<string>} Written path.
+ * @returns {Promise<{path: string, backupPath: string|null}>} Written path, and the backup kept when the
+ *   save replaced an older-format project.
  */
 export async function writeProjectFile(path, projectJson, config) {
   return invokeCommand('write_project_file', { path, projectJson, rasterResourceIds: rasterResourceIds(config) })
-}
-
-/**
- * Imports a video into the local HTTP preview server.
- *
- * @param {string} path - Absolute path to the source video file.
- * @returns {Promise<object>} Promise resolving to preview URL, import ID, metadata, and warnings.
- */
-export async function importPreviewVideo(path) {
-  return apiCall('backend_import_preview_video', { path })
 }
 
 /**
@@ -611,11 +593,10 @@ export async function createVideoInspection() {
  */
 
 /**
- * Inspects a queued or calibration video without registering a preview or extracting its parsed activity.
+ * Inspects a queued video without registering a preview or extracting its parsed activity.
  * Embedded activity resolution remains job preparation; duration supplies provisional work estimates.
- * Effective editor timestamp overrides stay in calibration inputs, separate from this file descriptor.
  * @param {string} inspectionId Active configuration inspection identity.
- * @param {string} path Source path, including reference videos outside the queued folder.
+ * @param {string} path Source path.
  * @returns {Promise<InspectedVideoSource>} Session-owned metadata descriptor.
  */
 export async function inspectVideoSource(inspectionId, path) {
@@ -625,13 +606,17 @@ export async function inspectVideoSource(inspectionId, path) {
 /**
  * Plans native batch destinations and frame totals for fresh inspected sources.
  * Coverage for embedded telemetry is finalized during owning-job preparation.
- * @param {{inspectionId: string, sourceIds: string[], calibrationSourceId: string|null}} selection Session-owned source identities.
+ * An output joins its pieces in order with one transition per join (a hard cut
+ * `{type: 'none', durationSeconds: 0}` or an `xfade`; transparent outputs take hard
+ * cuts only); a `sourceNamed` destination writes one file per output (pieces of one
+ * source), a `file` destination one combined output.
+ * @param {{inspectionId: string, outputs: Array<{id: string, pieces: Array<{sourceId: string, startFrame: number, endFrame: number, skipOverlay: boolean}>, transitions: Array<{type: string, durationSeconds: number}>}>, destination: {kind: 'sourceNamed', directory: string}|{kind: 'file', path: string, overwrite: boolean}}} selection
+ *   Session-owned outputs to plan.
  * @param {{exportMode: string, exportCodec: string, fps: number, updateRate: number, qualityType: string, qualityValue: number, qsvFullInitArgs: string[]|null}} encoding Captured encoder settings.
- * @param {string} outputDirectory Absolute output folder.
- * @returns {Promise<{status: 'planned', plans: Array<{sourceId: string, outputPath: string, outputDurationSeconds: number, plannedFrames: number, containerFpsNum: number, containerFpsDen: number}>}|{status: 'rejected', inspectionId: string, issues: object[]}>} Native planning result.
+ * @returns {Promise<{status: 'planned', plans: Array<{outputId: string, outputPath: string, outputDurationSeconds: number, plannedFrames: number, outputFrames: number, containerFpsNum: number, containerFpsDen: number}>}|{status: 'rejected', inspectionId: string, issues: object[]}>} Native planning result.
  */
-export async function planBatchOutputs(selection, encoding, outputDirectory) {
-  return apiCall('backend_plan_batch_outputs', { selection, encoding, outputDirectory })
+export async function planBatchOutputs(selection, encoding) {
+  return apiCall('backend_plan_batch_outputs', { selection, encoding })
 }
 
 /**
@@ -645,7 +630,7 @@ export async function disposeVideoInspection(inspectionId) {
 }
 
 /**
- * Registers an already-probed video with the local preview server.
+ * Registers an already-probed video with the local preview server. Existing registrations stay valid.
  * @param {string} path Absolute source video path.
  * @returns {Promise<{importId: string, previewUrl: string}>} Runtime preview identity.
  */
@@ -654,21 +639,48 @@ export async function registerPreviewVideo(path) {
 }
 
 /**
- * Clears the currently registered local HTTP preview video.
- *
- * @returns {Promise<*>} Promise resolving when the preview has been cleared.
+ * Removes one local HTTP preview registration; other registrations keep serving.
+ * @param {string} importId Opaque preview import ID.
+ * @returns {Promise<null>} Resolves when the registration has been removed.
  */
-export async function clearPreviewVideo() {
-  return apiCall('backend_clear_preview_video', {})
+export async function removePreviewVideo(importId) {
+  return apiCall('backend_remove_preview_video', { importId })
 }
 
 /**
- * Returns current local HTTP preview server state.
- *
- * @returns {Promise<object|null>} Promise resolving to current preview server state or null.
+ * Removes every local HTTP preview registration, transition proxies included.
+ * @returns {Promise<null>} Resolves when all registrations have been removed.
  */
-export async function getVideoState() {
-  return apiCall('backend_get_video_state', {})
+export async function clearPreviewVideos() {
+  return apiCall('backend_clear_preview_videos', {})
+}
+
+/**
+ * Renders the preview proxy of one transition (`xfade` of the outgoing tail into
+ * the incoming head, crossfaded audio) and serves it like an imported video.
+ * @param {{outgoing: {path: string, startSecond: number, hasAudio: boolean}, incoming: {path: string, startSecond: number, hasAudio: boolean}, transition: string, durationSeconds: number, width: number, height: number, fpsNum: number, fpsDen: number}} request
+ *   Proxy request (see `listTransitionProxyJobs`).
+ * @returns {Promise<{importId: string, previewUrl: string}>} Runtime preview identity of the proxy.
+ */
+export async function renderTransitionProxy(request) {
+  return apiCall('backend_render_transition_proxy', { request })
+}
+
+/**
+ * Stops serving a transition proxy and deletes its file.
+ * @param {string} importId Proxy preview import ID.
+ * @returns {Promise<null>} Resolves when the proxy is gone.
+ */
+export async function releaseTransitionProxy(importId) {
+  return apiCall('backend_release_transition_proxy', { importId })
+}
+
+/**
+ * Returns diagnostic state for every registered preview video.
+ * @returns {Promise<Array<{importId: string, previewUrl: string, path: string, pathExists: boolean, fileSize: number, contentType: string}>>} Registrations ordered by path.
+ */
+export async function getPreviewVideos() {
+  return apiCall('backend_get_preview_videos', {})
 }
 
 /**

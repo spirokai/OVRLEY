@@ -13,6 +13,7 @@ import useRenderVideoDialogState from '@/features/render-video/hooks/useRenderVi
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG, DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 describe('useRenderVideoDialogState', () => {
   beforeEach(() => {
@@ -39,7 +40,7 @@ describe('useRenderVideoDialogState', () => {
     const onClose = vi.fn()
     const onConfirm = vi.fn()
     const initialSettings = {
-      renderTarget: 'current',
+      outputMode: 'combined',
       exportMode: 'transparent',
       fps: 30,
       widgetUpdateRate: 1,
@@ -88,17 +89,11 @@ describe('useRenderVideoDialogState', () => {
   })
 
   test('switches imported-video dialogs between composite and transparent defaults while preserving later range edits', async () => {
-    useStore.setState({
-      importedVideoPath: 'C:\\video.mp4',
-      importedVideoFps: 30,
-      importedVideoDuration: 12,
-      importedVideoResolution: { width: 1920, height: 1080 },
-      videoSyncOffsetSeconds: 5,
-    })
+    useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12 })], { clip: 5 }))
 
     const { result } = renderHook(() => {
       const [settings, setSettings] = useState({
-        renderTarget: 'current',
+        outputMode: 'combined',
         exportMode: 'composite',
         fps: 30,
         widgetUpdateRate: 1,
@@ -187,5 +182,40 @@ describe('useRenderVideoDialogState', () => {
       from: 5,
       to: 17,
     })
+  })
+
+  test('applies the committed interval covered by every imported clip as the video range', () => {
+    useStore.setState(
+      videoStoreState(
+        [
+          createTestVideo({ id: 'late', path: 'C:\\late.mp4', durationSeconds: 10, importOrder: 0 }),
+          createTestVideo({ id: 'early', path: 'C:\\early.mp4', durationSeconds: 12, importOrder: 1 }),
+        ],
+        { late: 30, early: 5 },
+      ),
+    )
+    const onSettingsChange = vi.fn()
+    const transparent = {
+      outputMode: 'combined',
+      exportMode: 'transparent',
+      fps: 30,
+      widgetUpdateRate: 1,
+      codec: 'prores_ks',
+      qualityType: 'quality',
+      qualityValue: 18,
+      exportAcceleration: 'cpu',
+      range: { ...DEFAULT_EXPORT_RANGE },
+    }
+    const { result, rerender } = renderHook(
+      ({ settings }) => useRenderVideoDialogState({ phase: 'confirm', settings, onSettingsChange, onClose: vi.fn(), onConfirm: vi.fn() }),
+      { initialProps: { settings: transparent } },
+    )
+
+    expect(result.current.videoBounds).toEqual({ startSecond: 5, endSecond: 40 })
+    act(() => result.current.handleApplyImportedVideoRange())
+    expect(onSettingsChange).toHaveBeenLastCalledWith({ range: { type: 'custom', from: 5, to: 40 } })
+
+    rerender({ settings: { ...transparent, exportMode: 'composite', codec: 'libx264' } })
+    expect(result.current.renderSummaryItems).toContain('35 sec')
   })
 })

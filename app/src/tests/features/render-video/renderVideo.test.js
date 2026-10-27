@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from 'vite-plus/test'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 import { createPreviewRenderRequest, createRenderRequest } from '@/features/render-video/utils/renderRequest'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 describe('render request preparation', () => {
   beforeEach(() => {
@@ -75,37 +76,61 @@ describe('render request preparation', () => {
     expect(request.payload).toMatchObject({ outputPath: 'C:/renders/overlay.mov', overwrite: false })
   })
 
-  test('clamps a composite custom range to the imported video when submitting the job', () => {
-    useStore.setState({
-      importedVideoPath: 'C:/clip.mp4',
-      importedVideoDuration: 30,
-      importedVideoFps: 30,
-      importedVideoFpsNum: 30,
-      importedVideoFpsDen: 1,
-      importedVideoResolution: { width: 1920, height: 1080 },
-      videoSyncOffsetSeconds: 10,
-    })
+  test('renders videos through the batch service at the destination of their output mode', () => {
+    useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:/clip.mp4', durationSeconds: 30 })], { clip: 10 }))
     const settings = {
       ...useStore.getState().renderSettings,
       exportMode: 'composite',
       codec: 'libx264',
-      range: { type: 'custom', from: 5.25, to: 39.75 },
       outputPath: 'C:/renders/video.mp4',
     }
-    const request = createRenderRequest({ editorSnapshot: useStore.getState(), settings })
-    expect(request.payload.config.scene).toMatchObject({
-      start: 10,
-      end: 39.75,
-      composite_sync_offset: 10,
-      composite_video_trim_start: 0,
-      composite_render_duration: 29.75,
+    const outputs = [
+      { id: 'C:/renders/video.mp4', pieces: [{ sourceId: 'source', startFrame: 0, endFrame: 900, skipOverlay: false }], transitions: [] },
+    ]
+    const batchReview = { inspectionId: 'inspection', outputs, offsets: { source: 10 } }
+    const request = createRenderRequest({ editorSnapshot: useStore.getState(), settings, batchReview })
+    expect(request.target).toBe('batch')
+    expect(request.payload).toMatchObject({
+      inspectionId: 'inspection',
+      activity: { mode: 'externalActivity', offsets: { source: 10 } },
+      destination: { kind: 'file', path: 'C:/renders/video.mp4', overwrite: false },
+      outputs,
     })
-    expect(request.payload).toMatchObject({ outputPath: 'C:/renders/video.mp4', overwrite: false })
-    expect(() =>
-      createRenderRequest({
-        editorSnapshot: useStore.getState(),
-        settings: { ...settings, range: { type: 'custom', from: 0, to: 5 } },
-      }),
-    ).toThrow('Custom export range must overlap the imported video range')
+    expect(createRenderRequest({ editorSnapshot: useStore.getState(), settings, batchReview, overwrite: true }).payload.destination.overwrite).toBe(
+      true,
+    )
+
+    const separate = { ...settings, outputMode: 'separate' }
+    expect(() => createRenderRequest({ editorSnapshot: useStore.getState(), settings: separate, batchReview })).toThrow(
+      'Render output target is required',
+    )
+    useStore.setState({ batchOutputFolder: 'C:/renders' })
+    expect(createRenderRequest({ editorSnapshot: useStore.getState(), settings: separate, batchReview }).payload.destination).toEqual({
+      kind: 'sourceNamed',
+      directory: 'C:/renders',
+    })
+  })
+
+  test('previews the frame of the clip the preview shows, against its own telemetry in clip-local time', () => {
+    const telemetryActivity = { sample_elapsed_seconds: [0, 15, 30], trim_end_seconds: 30 }
+    const video = createTestVideo({
+      id: 'clip',
+      path: 'C:/clip.mp4',
+      durationSeconds: 30,
+      telemetry: { status: 'ready', activity: telemetryActivity },
+    })
+    const other = createTestVideo({ id: 'other', path: 'C:/other.mp4', durationSeconds: 30, importOrder: 1 })
+    useStore.setState({
+      parsedActivity: null,
+      startSecond: 0,
+      endSecond: 0,
+      selectedSecond: 112,
+      ...videoStoreState([other, video], { other: 0, clip: 100 }),
+    })
+
+    const preview = createPreviewRenderRequest(useStore.getState())
+    expect(preview.parsedActivity).toBe(telemetryActivity)
+    expect(preview.second).toBe(12)
+    expect(preview.config.scene.composite_video_path).toBe('C:/clip.mp4')
   })
 })

@@ -11,7 +11,10 @@ import { createLayoutSlice } from './slices/createLayoutSlice'
 import { createRenderSettingsSlice } from './slices/createRenderSettingsSlice'
 import { createBatchRenderSlice } from './slices/createBatchRenderSlice'
 import { createManualVideoSyncSlice } from './slices/createManualVideoSyncSlice'
+import { createDeletedPartsSlice } from './slices/createDeletedPartsSlice'
+import { createTransitionProxySlice } from './slices/createTransitionProxySlice'
 import { withEditorHistory } from '@/features/undo-redo/undoHistory'
+import { releaseUnreferencedPreviewActivities } from './store-utils'
 
 function createStoreState(set, get) {
   return {
@@ -19,6 +22,8 @@ function createStoreState(set, get) {
     ...createEditorSlice(set, get),
     ...createMediaSlice(set, get),
     ...createVideoImportSlice(set, get),
+    ...createDeletedPartsSlice(set, get),
+    ...createTransitionProxySlice(set),
     ...createRenderSettingsSlice(set, get),
     ...createBatchRenderSlice(set),
     ...createManualVideoSyncSlice(set, get),
@@ -29,6 +34,8 @@ function createStoreState(set, get) {
 const storeInitializer = withEditorHistory(createStoreState)
 
 const useStore = create(storeInitializer)
+
+useStore.subscribe(releaseUnreferencedPreviewActivities)
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   window.__OVRLEY_STORE__ = useStore

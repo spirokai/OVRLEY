@@ -1,5 +1,6 @@
 //! FFmpeg boundary concerns: discovery, capability detection, profiles, and args.
 
+pub mod assemble;
 pub mod binary;
 pub mod catalog;
 pub mod composite;
@@ -9,4 +10,6 @@ pub mod detect;
 pub(crate) mod probes;
 pub mod settings;
 mod transparent_filters;
+pub mod transition_proxy;
+pub mod transitions;
 pub mod transparent_profiles;

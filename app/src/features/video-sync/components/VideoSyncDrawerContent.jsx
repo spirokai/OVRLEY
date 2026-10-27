@@ -36,7 +36,7 @@ export function VideoSyncDrawerContent({
   speedValueLabel,
   turnThresholdDraftDegrees,
   turnValueLabel,
-  videoSummary,
+  hasVideos,
   videoSync,
 }) {
   const { t } = useTranslation()
@@ -60,7 +60,7 @@ export function VideoSyncDrawerContent({
 
         <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-4 thin-scrollbar">
           <TabsContent value="autodetect" className="outline-none pt-6">
-            {videoSummary?.path ? <VideoSyncControls {...videoSync} importedVideoTimeSource={videoSummary.timeSource} /> : null}
+            {hasVideos ? <VideoSyncControls {...videoSync} /> : null}
           </TabsContent>
 
           <TabsContent value="manual" className="outline-none">

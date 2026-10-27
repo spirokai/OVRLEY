@@ -17,8 +17,9 @@
  * @param {number} props.updateRate - Current update rate divisor.
  * @param {number[]} props.updateRateOptions - Available update rate divisors.
  * @param {function} props.onUpdateRateChange - Callback for update rate change.
- * @param {object} props.activitySummary - Activity summary data (or null).
+ * @param {boolean} props.hasTimelineMedia - Whether an activity or videos define the timeline.
  * @param {object} props.exportRange - Export range state.
+ * @param {number} props.renderFps - Render frame rate the export range snaps to.
  * @param {function} props.onExportRangeChange - Callback for export range change.
  * @returns {JSX.Element} Rendered overlay settings section.
  */
@@ -46,8 +47,9 @@ export default function OverlaySettingsSection({
   updateRate,
   updateRateOptions,
   onUpdateRateChange,
-  activitySummary,
+  hasTimelineMedia,
   exportRange,
+  renderFps,
   onExportRangeChange,
   videoResolutionMismatch,
 }) {
@@ -147,9 +149,9 @@ export default function OverlaySettingsSection({
         </Tabs>
       </div>
 
-      {activitySummary ? (
+      {hasTimelineMedia ? (
         <div className="space-y-3 rounded-xs border-none bg-surface-accent-soft/70 p-4">
-          <ExportRangeSettings range={exportRange} onExportRangeChange={onExportRangeChange} />
+          <ExportRangeSettings range={exportRange} fps={renderFps} onExportRangeChange={onExportRangeChange} />
         </div>
       ) : null}
     </>

@@ -45,7 +45,9 @@ export default function RenderExportSettings(ctx) {
         </div>
       </div>
 
-      <RenderTargetTabs renderTarget={ctx.settings.renderTarget} onRenderTargetChange={ctx.handleRenderTargetChange} disabled={ctx.settingsLocked} />
+      {ctx.hasImportedVideo ? (
+        <OutputModeTabs outputMode={ctx.settings.outputMode} onOutputModeChange={ctx.handleOutputModeChange} disabled={ctx.settingsLocked} />
+      ) : null}
 
       <div className="grid gap-8 lg:grid-cols-1">
         <div className="space-y-2">
@@ -54,7 +56,7 @@ export default function RenderExportSettings(ctx) {
           </Label>
           {ctx.fpsLocked ? (
             <div className="flex h-9 items-center rounded-sm border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground">
-              {ctx.isBatchTarget
+              {ctx.isSeparate
                 ? t('render-video.lockedToEachVideoFps', "Locked to each video's FPS")
                 : t('render-video.lockedToVideoFps', 'Locked to video FPS ({{fps}} fps)', { fps: Math.round(ctx.lockedVideoFps) })}
             </div>
@@ -250,13 +252,14 @@ export default function RenderExportSettings(ctx) {
         {ctx.showExportRangeSettings && (
           <ExportRangeSettings
             range={ctx.settings.range}
+            fps={ctx.settings.fps}
             onExportRangeChange={(range) => ctx.onSettingsChange({ range })}
             showUseVideoRangeAction={ctx.hasImportedVideo}
             onUseVideoRange={ctx.handleApplyImportedVideoRange}
           />
         )}
 
-        {ctx.isBatchTarget ? (
+        {ctx.hasImportedVideo && ctx.isSeparate ? (
           <div className="space-y-2 pt-4">
             <BatchFolderPicker
               label={t('render-video.outputFolder', 'Output folder')}
@@ -293,11 +296,16 @@ export default function RenderExportSettings(ctx) {
               </Button>
             </ButtonGroup>
             {ctx.outputPathError ? <p className="text-xs text-red-500">{ctx.outputPathError}</p> : null}
+            {ctx.hasImportedVideo && ctx.batchOutputError ? (
+              <p role="alert" className="text-xs text-red-700">
+                {ctx.batchOutputError}
+              </p>
+            ) : null}
           </div>
         )}
       </div>
 
-      {!ctx.isBatchTarget && (
+      {!ctx.hasImportedVideo && (
         <div className="flex items-center justify-end gap-3 pt-2">
           <Button
             type="button"
@@ -324,20 +332,20 @@ export default function RenderExportSettings(ctx) {
 }
 
 /**
- * Presents the current-video and batch target choices.
- * @param {object} props Target selection and change handler.
- * @returns {JSX.Element} Target tabs.
+ * Presents the output modes of a video export: one combined file or one file per video.
+ * @param {object} props Output mode and change handler.
+ * @returns {JSX.Element} Output mode tabs.
  */
-export function RenderTargetTabs({ renderTarget, onRenderTargetChange, disabled = false }) {
+export function OutputModeTabs({ outputMode, onOutputModeChange, disabled = false }) {
   const { t } = useTranslation()
   return (
-    <Tabs value={renderTarget} onValueChange={onRenderTargetChange}>
+    <Tabs value={outputMode} onValueChange={onOutputModeChange}>
       <TabsList className="grid h-8 w-full grid-cols-2 bg-surface p-0.5">
-        <TabsTrigger value="current" className="text-[0.741rem]" disabled={disabled}>
-          {t('render-video.currentVideo', 'Current video')}
+        <TabsTrigger value="combined" className="text-[0.741rem]" disabled={disabled}>
+          {t('render-video.combinedOutput', 'One video file')}
         </TabsTrigger>
-        <TabsTrigger value="batch" className="text-[0.741rem]" disabled={disabled}>
-          {t('render-video.batch', 'Batch')}
+        <TabsTrigger value="separate" className="text-[0.741rem]" disabled={disabled}>
+          {t('render-video.separateOutputs', 'Separate files')}
         </TabsTrigger>
       </TabsList>
     </Tabs>

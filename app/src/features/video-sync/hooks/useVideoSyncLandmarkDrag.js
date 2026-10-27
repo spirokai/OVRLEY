@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { clamp } from '@/lib/utils'
 import { pointerToSecond } from '@/features/player/utils/timelineGeometry'
 
-function getLandmarkVideoSecond({ event, metrics, videoSyncOffsetSeconds, videoDuration }) {
+function getLandmarkVideoSecond({ event, metrics, videoOffsetSeconds, videoDuration }) {
   const rect = metrics.containerElement.getBoundingClientRect()
   const timelineSecond = pointerToSecond({
     clientX: event.clientX,
@@ -17,7 +17,7 @@ function getLandmarkVideoSecond({ event, metrics, videoSyncOffsetSeconds, videoD
     viewStart: metrics.viewStart,
     widthPx: metrics.widthPx,
   })
-  return clamp(timelineSecond - videoSyncOffsetSeconds, 0, videoDuration)
+  return clamp(timelineSecond - videoOffsetSeconds, 0, videoDuration)
 }
 
 /**
@@ -31,8 +31,8 @@ function getLandmarkVideoSecond({ event, metrics, videoSyncOffsetSeconds, videoD
  * @param {number} options.widthPx Measured timeline width.
  * @param {number} options.timelineMinimum Minimum legal timeline second.
  * @param {number} options.totalDuration Maximum legal timeline second.
- * @param {number|null} options.videoDuration Imported video duration.
- * @param {number} options.videoSyncOffsetSeconds Committed video offset.
+ * @param {number|null} options.videoDuration Duration of the video whose landmarks are matched.
+ * @param {number} options.videoOffsetSeconds Committed offset of the video whose landmarks are matched.
  * @param {function} options.scrubTo Timeline scrub callback for handle clicks.
  * @param {function} options.moveLandmark Store action for committing a landmark position.
  * @param {function} [options.followSecond] Existing viewport edge-follow callback.
@@ -47,7 +47,7 @@ export default function useVideoSyncLandmarkDrag({
   timelineMinimum,
   totalDuration,
   videoDuration,
-  videoSyncOffsetSeconds,
+  videoOffsetSeconds,
   scrubTo,
   moveLandmark,
   followSecond,
@@ -96,12 +96,12 @@ export default function useVideoSyncLandmarkDrag({
         event,
         metrics: metricsRef.current,
         videoDuration,
-        videoSyncOffsetSeconds,
+        videoOffsetSeconds,
       })
       drag.videoSecond = videoSecond
       setDragPreview({ id: drag.id, videoSecond })
     },
-    [enabled, followPointerAtEdge, videoDuration, videoSyncOffsetSeconds],
+    [enabled, followPointerAtEdge, videoDuration, videoOffsetSeconds],
   )
 
   const endLandmarkDrag = useCallback(

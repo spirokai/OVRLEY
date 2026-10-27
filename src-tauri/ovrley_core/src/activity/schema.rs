@@ -369,6 +369,14 @@ ovrley_widgets::numeric_activity_struct!(
     }
 );
 
+impl DenseActivityReport {
+    /// The report of a render without any activity: no frame samples activity data,
+    /// so every frame shows rasters only.
+    pub fn without_activity() -> Self {
+        Self::default()
+    }
+}
+
 ovrley_widgets::numeric_activity_struct!(
     plain,
     /// Activity samples after applying a scene trim but before per-frame densifying.
