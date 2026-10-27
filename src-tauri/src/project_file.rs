@@ -1137,8 +1137,11 @@ fn insert_lap_selection(value: &mut Value) -> Result<(), String> {
 /// Versions 1 to 5 store at most one video. It becomes a one-clip collection at its
 /// saved offset that owns the manual sync landmarks, with no deleted parts,
 /// transitions following the defaults, and the hard transition defaults.
-/// A batch render from a video folder keeps rendering separate files to the
-/// same output folder; the folder itself is handed to the frontend to import.
+/// A project without a video that rendered a video folder keeps rendering
+/// separate files to the same output folder; the folder itself is handed to the
+/// frontend to import. Older versions saved the render dialog's target tab, so a
+/// batch target next to the project's own video is a leftover: that project
+/// renders its video as before.
 fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, String> {
     let render = project.render;
     for folder in [&render.batch_video_folder, &render.batch_output_folder]
@@ -1147,9 +1150,12 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
     {
         validate_folder(folder)?;
     }
-    let legacy_batch_video_folder = match render.render_target {
-        RenderTarget::Batch => render.batch_video_folder,
-        RenderTarget::Current => None,
+    let renders_video_folder =
+        matches!(render.render_target, RenderTarget::Batch) && project.sources.video.is_none();
+    let legacy_batch_video_folder = if renders_video_folder {
+        render.batch_video_folder
+    } else {
+        None
     };
     let video = project.sources.video.map(|source| ProjectVideo {
         id: Uuid::new_v4().to_string(),
@@ -1183,9 +1189,10 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
         laps: project.laps,
         transition_defaults: ProjectTransitionDefaults::default(),
         render: ProjectRender {
-            output_mode: match render.render_target {
-                RenderTarget::Current => OutputMode::Combined,
-                RenderTarget::Batch => OutputMode::Separate,
+            output_mode: if renders_video_folder {
+                OutputMode::Separate
+            } else {
+                OutputMode::Combined
             },
             batch_output_folder: render.batch_output_folder,
             fps: render.fps,
@@ -2514,6 +2521,17 @@ mod tests {
         assert_eq!(parsed.document.render.batch_output_folder, Some(renders));
         let serialized = serde_json::to_value(&parsed.document).unwrap();
         assert!(serialized["render"].get("batchVideoFolder").is_none());
+
+        // A batch target saved next to the project's own video is a leftover tab choice.
+        project["sources"]["video"] =
+            serde_json::json!({ "path": { "kind": "project-relative", "value": "ride.mp4" } });
+        let parsed = parse_project(&project.to_string()).unwrap();
+        assert_eq!(parsed.legacy_batch_video_folder, None);
+        assert!(matches!(
+            parsed.document.render.output_mode,
+            OutputMode::Combined
+        ));
+        assert_eq!(parsed.document.sources.videos.len(), 1);
 
         project["render"]["renderTarget"] = Value::from("current");
         project["render"]["exportMode"] = Value::from("transparent");
