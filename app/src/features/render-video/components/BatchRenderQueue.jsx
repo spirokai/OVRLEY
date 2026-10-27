@@ -76,22 +76,7 @@ export default function BatchRenderQueue({
               </Label>
             </div>
           </div>
-          {combinedBlockers.length > 0 && (
-            <ul
-              role="alert"
-              aria-label={t('render-video.combinedUnavailableTitle', 'One video file cannot be rendered')}
-              className="shrink-0 space-y-1 text-xs text-red-700"
-            >
-              {combinedBlockers.map((blocker) => (
-                <li key={blocker}>{blocker}</li>
-              ))}
-            </ul>
-          )}
-          {batchReviewError && (
-            <div role="alert" className="shrink-0 space-y-2 text-xs text-red-700">
-              <p>{batchReviewError === 'reinspectionRequired' ? t('render-video.reinspectionRequired') : batchReviewError}</p>
-            </div>
-          )}
+          <BatchReviewAlerts combinedBlockers={combinedBlockers} batchReviewError={batchReviewError} />
         </>
       )}
       <div
@@ -118,6 +103,35 @@ export default function BatchRenderQueue({
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * Reasons the reviewed videos cannot be rendered: combined-file blockers and inspection errors.
+ * @param {{ combinedBlockers: string[], batchReviewError: string|null }} props Review problems.
+ * @returns {JSX.Element} Alerts, empty without problems.
+ */
+export function BatchReviewAlerts({ combinedBlockers, batchReviewError }) {
+  const { t } = useTranslation()
+  return (
+    <>
+      {combinedBlockers.length > 0 && (
+        <ul
+          role="alert"
+          aria-label={t('render-video.combinedUnavailableTitle', 'One video file cannot be rendered')}
+          className="shrink-0 space-y-1 text-xs text-red-700"
+        >
+          {combinedBlockers.map((blocker) => (
+            <li key={blocker}>{blocker}</li>
+          ))}
+        </ul>
+      )}
+      {batchReviewError && (
+        <div role="alert" className="shrink-0 space-y-2 text-xs text-red-700">
+          <p>{batchReviewError === 'reinspectionRequired' ? t('render-video.reinspectionRequired') : batchReviewError}</p>
+        </div>
+      )}
+    </>
   )
 }
 

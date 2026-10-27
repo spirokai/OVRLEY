@@ -61,12 +61,16 @@ function freezeRequest(value) {
   return value
 }
 
-/** @param {object} state Editor snapshot. @returns {object} Editable settings using the store's canonical field names. */
+/**
+ * @param {object} state Editor snapshot.
+ * @returns {object} Editable settings using the store's canonical field names. A single video always renders to one file.
+ */
 export function createRenderSettingsDraft(state) {
   const { renderSettings, importedVideos } = state
   const fps = Math.trunc(renderSettings.fps)
   return {
     ...renderSettings,
+    outputMode: importedVideos.length > 1 ? renderSettings.outputMode : 'combined',
     fps,
     widgetUpdateRate: normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate),
     exportMode: renderSettings.outputMode === 'separate' || importedVideos.length > 0 ? renderSettings.exportMode : 'transparent',

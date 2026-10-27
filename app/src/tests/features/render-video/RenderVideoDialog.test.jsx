@@ -14,6 +14,14 @@ globalThis.ResizeObserver ??= class ResizeObserver {
   disconnect() {}
 }
 
+// Output modes and the video queue appear only with more than one video.
+function twoVideos() {
+  return [
+    createTestVideo({ id: 'ride', path: 'C:\\videos\\ride.mp4' }),
+    createTestVideo({ id: 'climb', path: 'C:\\videos\\climb.mp4', importOrder: 1 }),
+  ]
+}
+
 function RenderVideoDialogHarness({ initialSettings }) {
   const [settings, setSettings] = useState(initialSettings)
 
@@ -150,7 +158,7 @@ describe('RenderVideoDialog', () => {
   })
 
   test('renders videos as one combined file or as separate files in an output folder', async () => {
-    useStore.setState(videoStoreState([createTestVideo({ id: 'ride', path: 'C:\\videos\\ride.mp4' })]))
+    useStore.setState(videoStoreState(twoVideos(), { climb: 120 }))
     const user = userEvent.setup()
 
     render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), exportMode: 'composite', codec: 'libx264' }} />)
@@ -187,7 +195,15 @@ describe('RenderVideoDialog', () => {
   })
 
   test('blocks only a combined file on the video resolution mismatch', async () => {
-    useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12, width: 640, height: 360 })]))
+    useStore.setState(
+      videoStoreState(
+        [
+          createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12, width: 640, height: 360 }),
+          createTestVideo({ id: 'climb', path: 'C:\\climb.mp4', durationSeconds: 12, width: 640, height: 360, importOrder: 1 }),
+        ],
+        { climb: 20 },
+      ),
+    )
     const user = userEvent.setup()
 
     render(<RenderVideoDialogHarness initialSettings={transparentSettings()} />)
@@ -200,7 +216,7 @@ describe('RenderVideoDialog', () => {
   })
 
   test('keeps start disabled until imported videos have fresh native inspection', () => {
-    useStore.setState(videoStoreState([createTestVideo({ id: 'ride', path: 'C:\\videos\\ride.mp4' })]))
+    useStore.setState(videoStoreState(twoVideos(), { climb: 120 }))
     useStore.getState().setBatchOutputFolder('C:\\renders')
 
     render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), outputMode: 'separate' }} />)
@@ -236,7 +252,12 @@ describe('RenderVideoDialog', () => {
       outputs: [],
       resultCounts: { succeeded: 0, failed: 0, cancelled: 0, unstarted: 0 },
     }
-    useStore.setState({ batchSnapshot: snapshot, ...videoStoreState([createTestVideo({ id: 'ride', path: id })]) })
+    useStore.setState({
+      batchSnapshot: snapshot,
+      ...videoStoreState([createTestVideo({ id: 'ride', path: id }), createTestVideo({ id: 'climb', path: 'C:/videos/climb.mp4', importOrder: 1 })], {
+        climb: 120,
+      }),
+    })
     render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), outputMode: 'separate' }} />)
 
     expect(screen.getByText('11% Complete')).toBeInTheDocument()

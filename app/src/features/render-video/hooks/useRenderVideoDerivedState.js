@@ -60,6 +60,8 @@ export default function useRenderVideoDerivedState({ settings }) {
   // A closed dialog has no draft; its hidden controls read committed settings.
   const displaySettings = settings === null ? renderSettings : settings
   const hasImportedVideo = importedVideos.length > 0
+  // Output modes and the video queue only matter when there is more than one video.
+  const hasMultipleVideos = importedVideos.length > 1
   const videoFormat = useMemo(() => deriveCompatibility(importedVideos).reference, [importedVideos])
   const videoBounds = useMemo(() => getVideosTimelineBounds(joinVideoEdits(importedVideos, videoEdits)), [importedVideos, videoEdits])
   const importedVideoFps = videoFormat === null ? null : videoFormat.fps.num / videoFormat.fps.den
@@ -116,6 +118,7 @@ export default function useRenderVideoDerivedState({ settings }) {
     defaultBitrateForCodec,
     exportMode,
     hasImportedVideo,
+    hasMultipleVideos,
     importedVideoFps,
     importedVideoResolution,
     isSeparate,

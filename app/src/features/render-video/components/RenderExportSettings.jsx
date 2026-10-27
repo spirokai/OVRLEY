@@ -45,7 +45,7 @@ export default function RenderExportSettings(ctx) {
         </div>
       </div>
 
-      {ctx.hasImportedVideo ? (
+      {ctx.hasMultipleVideos ? (
         <OutputModeTabs outputMode={ctx.settings.outputMode} onOutputModeChange={ctx.handleOutputModeChange} disabled={ctx.settingsLocked} />
       ) : null}
 
