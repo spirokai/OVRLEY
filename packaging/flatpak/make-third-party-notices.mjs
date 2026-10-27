@@ -1,12 +1,11 @@
-// Writes the notices file installed with the Flatpak. FFmpeg is not bundled here; the
-// runtime provides it, so describe that build instead of the downloaded release binaries.
+// Writes the notices file installed with the Flatpak, describing the bundled FFmpeg build.
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 
 const output = process.argv[2]
 if (!output) throw new Error('Usage: node make-third-party-notices.mjs <output file>')
 
-const ffmpeg = (...args) => execFileSync('ffmpeg', ['-hide_banner', ...args], { encoding: 'utf8' }).trim()
+const ffmpeg = (...args) => execFileSync('vendor/ffmpeg/bin/ffmpeg', ['-hide_banner', ...args], { encoding: 'utf8' }).trim()
 
 writeFileSync(
   output,
@@ -15,15 +14,18 @@ writeFileSync(
     '',
     'FFmpeg',
     '------',
-    'This Flatpak does not bundle FFmpeg. OVRLEY runs the unmodified ffmpeg and ffprobe',
-    'command-line tools as provided by the Flatpak runtime as separate processes.',
+    'This Flatpak includes unmodified FFmpeg and FFprobe command-line binaries as separate',
+    'components. OVRLEY runs them as subprocesses; they are not linked into the OVRLEY executable.',
     '',
     'Project: https://ffmpeg.org/',
     'Source code: https://ffmpeg.org/download.html',
     'License information: https://ffmpeg.org/legal.html',
     '',
-    'ffmpeg -version (runtime build)',
-    '-------------------------------',
+    'The binaries are downloaded from BtbN FFmpeg builds:',
+    'https://github.com/BtbN/FFmpeg-Builds',
+    '',
+    'ffmpeg -version',
+    '---------------',
     ffmpeg('-version'),
     '',
     'ffmpeg -L',
