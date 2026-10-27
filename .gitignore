@@ -62,6 +62,8 @@ tmp/
 # Agent scratch files
 .agents/release-notes.md
 .claude/skills
+.agents/plans/
+.vite-hooks/
 
 # Generated package resources
 /THIRD_PARTY_NOTICES.txt
