@@ -554,6 +554,7 @@
       "lapLog": "Rundenprotokoll"
     },
     "types": {
+      "rolling_chart": { "name": "Diagramme", "shortName": "Diagramme" },
       "diving_profile": {
         "name": "Tauchprofil",
         "shortName": "Tauchprofil"
@@ -614,6 +615,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Messwerte",
+    "chartMetric": "Messwert",
+    "addMetric": "Messwert hinzufügen",
+    "moveUp": "Nach oben",
+    "moveDown": "Nach unten",
+    "removeMetric": "Messwert entfernen",
+    "timeWindow": "Zeitfenster",
+    "fill": "Füllung",
+    "areaOpacity": "Flächendeckkraft",
+    "legend": "Legende",
     "decompressionCeiling": "Dekompressionsgrenze",
     "ceilingLineColor": "Linienfarbe",
     "ceilingAreaColor": "Flächenfarbe",

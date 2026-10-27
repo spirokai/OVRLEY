@@ -62,7 +62,8 @@ const BUILTIN_PROFILES: &[TransparentProfile] = &[
     },
     TransparentProfile {
         codec_id: TransparentCodecId::ProresVideotoolbox,
-        cpu_cores_per_frame_worker: 0,
+        // The media engine encodes; FFmpeg's CPU work is the atlas xstack and pixel conversion.
+        cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: None,
         output_args: &["-profile:v", "4", "-f", "mov", "-pix_fmt", "yuva444p10le"],
@@ -107,7 +108,7 @@ mod tests {
             vec![
                 ("prores_ks", 0),
                 ("prores_ks_vulkan", 4),
-                ("prores_videotoolbox", 0),
+                ("prores_videotoolbox", 4),
                 ("qtrle", 6),
             ]
         );

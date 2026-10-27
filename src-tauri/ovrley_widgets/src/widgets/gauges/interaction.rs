@@ -9,12 +9,12 @@ use super::{
 };
 use crate::{
     activity::ActivitySampler,
-    render::preview::PreviewRasterScale,
     error::{WidgetError, WidgetResult},
     model::{
         scene::{validate_scene_presentation, ScenePresentationConfig},
         validation::require_positive_f32,
     },
+    render::preview::PreviewRasterScale,
     render::text::FontResolver,
     widgets::value::config::ValueConfig,
 };
@@ -72,9 +72,16 @@ pub fn resize_gauge(
     let offset = activity.map_or(0.0, |activity| {
         activity.gauge_altitude_offset(widget.starting_altitude_m())
     });
-    let origin = GaugeLayout::new(&widget, &scene, range, offset, fonts, PreviewRasterScale::NATIVE)?
-        .prepare_frame(sample_gauge(&widget, activity, second), fonts)?
-        .content_bounds;
+    let origin = GaugeLayout::new(
+        &widget,
+        &scene,
+        range,
+        offset,
+        fonts,
+        PreviewRasterScale::NATIVE,
+    )?
+    .prepare_frame(sample_gauge(&widget, activity, second), fonts)?
+    .content_bounds;
     if origin.is_empty() {
         return Err(WidgetError::Render(
             "gauge has no visible content to resize".into(),
@@ -192,9 +199,16 @@ pub fn resize_gauge(
             }
         };
     let display_type = display_type.to_owned();
-    let bounds = GaugeLayout::new(&widget, &scene, range, offset, fonts, PreviewRasterScale::NATIVE)?
-        .prepare_frame(sample_gauge(&widget, activity, second), fonts)?
-        .content_bounds;
+    let bounds = GaugeLayout::new(
+        &widget,
+        &scene,
+        range,
+        offset,
+        fonts,
+        PreviewRasterScale::NATIVE,
+    )?
+    .prepare_frame(sample_gauge(&widget, activity, second), fonts)?
+    .content_bounds;
     Ok(ResizeUpdate {
         x: x + point[0] - (bounds.left + bounds.width() * fixed[0]),
         y: y + point[1] - (bounds.top + bounds.height() * fixed[1]),

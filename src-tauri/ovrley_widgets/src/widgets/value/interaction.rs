@@ -2,8 +2,8 @@
 use crate::{
     error::WidgetResult,
     model::scene::validate_scene_presentation,
-    render::text::FontResolver,
     render::text::validated_value_style,
+    render::text::FontResolver,
     widgets::value::{
         frame::prepare_metric_frame, presentation::ValuePresentation, preview::WidgetRequest,
     },

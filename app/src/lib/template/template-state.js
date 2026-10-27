@@ -23,6 +23,8 @@
 import { createFontSelection, createLabelFontSelection, getFontFamilyName } from '@/lib/fonts'
 import { getThemeColor } from '@/lib/color-utils'
 import { resolveActiveWidgetData } from '../widget/widget-resolver'
+import { WIDGET_TYPE_DEFINITIONS } from '../widget/widget-catalog'
+import i18next from 'i18next'
 import { DEFAULT_GLOBAL_DEFAULTS } from './template-constants'
 import { mergeSceneGlobalDefaults, normalizeGlobalDefaults, normalizeTemplateConfig } from './template-normalization'
 import { pickDefined } from '@/lib/utils'
@@ -69,8 +71,20 @@ function buildEffectiveValueData(widgetData = {}, globals) {
   return nextData
 }
 
-function buildEffectivePlotData(widgetData = {}, globals) {
+/**
+ * Chart legends name each metric in the app language at render time, so templates never store labels.
+ * @param {object[]} series Durable chart rows.
+ * @param {string} language App language.
+ * @returns {object[]} Rows with their capitalized legend labels.
+ */
+function buildChartLegendSeries(series, language) {
+  const translate = i18next.getFixedT(language)
+  return series.map((item) => ({ ...item, label: translate(WIDGET_TYPE_DEFINITIONS[item.metric].shortNameKey).toLocaleUpperCase(language) }))
+}
+
+function buildEffectivePlotData(widgetData = {}, globals, language) {
   const nextData = { ...widgetData }
+  if (nextData.value === 'rolling_chart') nextData.series = buildChartLegendSeries(nextData.series, language)
   if (!nextData.color) nextData.color = globals?.color_values || getThemeColor('ice')
   if (nextData.opacity === undefined) nextData.opacity = globals?.opacity
   if ((nextData.value === 'elevation' || nextData.value === 'diving_profile') && globals?.font_values) {
@@ -82,12 +96,18 @@ function buildEffectivePlotData(widgetData = {}, globals) {
   return nextData
 }
 
-export function getEffectiveWidgetData(widget, globals) {
+/**
+ * @param {object|null} widget Durable widget.
+ * @param {object} globals Canonical global defaults.
+ * @param {string} [language] App language that names chart legends; required for charts.
+ * @returns {object|null} Render-effective widget data.
+ */
+export function getEffectiveWidgetData(widget, globals, language) {
   if (!widget) return widget
   if (widget.category === 'backdrops') return resolveActiveWidgetData(widget.data)
   if (widget.category === 'labels') return buildEffectiveLabelData(widget.data, globals)
   if (widget.category === 'values') return buildEffectiveValueData(widget.data, globals)
-  if (widget.category === 'plots') return buildEffectivePlotData(widget.data, globals)
+  if (widget.category === 'plots') return buildEffectivePlotData(widget.data, globals, language)
   return widget.data
 }
 
@@ -105,7 +125,11 @@ export function createDurableEditorState({ config, globalDefaults }) {
   return { config: normalizeTemplateConfig(config, nextGlobalDefaults), globalDefaults: nextGlobalDefaults }
 }
 
-export function createEditorEffectiveConfig({ config, globalDefaults }) {
+/**
+ * @param {{config: object|null, globalDefaults: object, language?: string}} state Durable state and the app language that names chart legends; required for charts.
+ * @returns {object|null} Render-effective config.
+ */
+export function createEditorEffectiveConfig({ config, globalDefaults, language }) {
   if (!config) return config
   const normalizedGlobals = normalizeGlobalDefaults(globalDefaults)
   const nextConfig = {
@@ -131,7 +155,7 @@ export function createEditorEffectiveConfig({ config, globalDefaults }) {
   }
   if (Array.isArray(config.plots)) {
     nextConfig.plots = []
-    for (const plot of config.plots) nextConfig.plots.push(buildEffectivePlotData(plot, normalizedGlobals))
+    for (const plot of config.plots) nextConfig.plots.push(buildEffectivePlotData(plot, normalizedGlobals, language))
   }
   return nextConfig
 }
@@ -174,6 +198,10 @@ export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null, 
     for (const plot of nextConfig.plots) {
       if ((plot.value === 'elevation' || plot.value === 'diving_profile') && shouldApply('font_values')) {
         plot.point_label = { ...(plot.point_label || {}), ...createFontSelection(globals.font_values) }
+      }
+      if (plot.value === 'rolling_chart') {
+        if (shouldApply('font_values')) plot.legend_font = globals.font_values
+        if (shouldApply('color_values')) plot.legend_color = globals.color_values
       }
       if (shouldApply('color_values') && Object.hasOwn(plot, 'color')) plot.color = globals.color_values
     }

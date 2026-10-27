@@ -554,6 +554,7 @@
       "lapLog": "Journal des tours"
     },
     "types": {
+      "rolling_chart": { "name": "Graphiques", "shortName": "Graphiques" },
       "diving_profile": {
         "name": "Profil de plongée",
         "shortName": "Profil de plongée"
@@ -614,6 +615,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Mesures",
+    "chartMetric": "Mesure",
+    "addMetric": "Ajouter une mesure",
+    "moveUp": "Monter",
+    "moveDown": "Descendre",
+    "removeMetric": "Retirer la mesure",
+    "timeWindow": "Fenêtre temporelle",
+    "fill": "Remplissage",
+    "areaOpacity": "Opacité de la zone",
+    "legend": "Légende",
     "decompressionCeiling": "Plafond de décompression",
     "ceilingLineColor": "Couleur de la ligne",
     "ceilingAreaColor": "Couleur de la zone",

@@ -136,7 +136,7 @@ fn every_family_preview() -> Vec<(PreviewSession, Value)> {
         gauge_preview("corner", "speed", "bottom-left", "fill"),
         gauge_preview("gt_gauge", "speed", "bottom-left", "fill"),
     ];
-    for kind in ["course", "elevation", "diving_profile", "backdrop", "raster", "speed", "time"] {
+    for kind in ["course", "elevation", "diving_profile", "rolling_chart", "backdrop", "raster", "speed", "time"] {
         let (preview, mut request) = lean_angle_preview();
         request["type"] = json!(kind);
         request["widget"] = if matches!(kind, "speed" | "time") {
@@ -159,6 +159,13 @@ fn every_family_preview() -> Vec<(PreviewSession, Value)> {
         request["scene"]["export_start_seconds"] = json!(0.0);
         if matches!(kind, "speed" | "time") { request["widget"]["font"] = json!("Inter.ttf"); }
         if matches!(kind, "elevation" | "diving_profile") { request["widget"]["point_label"]["font"] = json!("Inter.ttf"); }
+        if kind == "rolling_chart" {
+            // The editor names legends when it projects render data; templates store none.
+            request["widget"]["legend_font"] = json!("Inter.ttf");
+            for series in request["widget"]["series"].as_array_mut().unwrap() {
+                series["label"] = json!(series["metric"].as_str().unwrap().to_uppercase());
+            }
+        }
         if kind == "raster" { request["widget"]["id"] = json!("raster"); }
         if kind == "backdrop" {
             request["widget"].as_object_mut().unwrap().extend(json!({
@@ -664,6 +671,10 @@ fn atlas_frames_reassemble_overlapping_rotated_widgets_of_every_family_into_the_
                 }).as_object().unwrap().clone());
                 "rasters"
             }
+            "rolling_chart" => {
+                widget["value"] = json!(kind);
+                "plots"
+            }
             "course" | "elevation" | "diving_profile" => {
                 widget["value"] = json!(kind);
                 widget["rotation"] = json!(match kind.as_str() { "course" => 27.0, "elevation" => 230.0, _ => 37.0 });
@@ -686,7 +697,7 @@ fn atlas_frames_reassemble_overlapping_rotated_widgets_of_every_family_into_the_
     // Every layer is visible; neighbouring widgets either share a slot or overlay in layer order.
     let mut layers: Vec<_> = atlas.slots().iter().flat_map(|slot| slot.layers.clone()).collect();
     layers.sort_unstable();
-    assert_eq!(layers, (0..22).collect::<Vec<_>>());
+    assert_eq!(layers, (0..23).collect::<Vec<_>>());
     assert!(overlapping_widgets_are_planned(&atlas), "every family: {atlas:?}");
 }
 
@@ -3431,4 +3442,159 @@ fn heart_zones_resize_reflows_the_track_and_preserves_the_fixed_corner() {
         let corner = actual["content"][position].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
         assert!((corner - point[axis]).abs() < 0.002, "heart zones corner moved on axis {axis}");
     }
+}
+
+fn rolling_chart_preview() -> (PreviewSession, Value) {
+    let (preview, mut request) = lean_angle_preview();
+    let manifest: Value = serde_json::from_str(include_str!("../../../assets/standard-widgets.json")).unwrap();
+    request["type"] = json!("rolling_chart");
+    request["widget"] = manifest["definitions"].as_array().unwrap().iter().find(|w| w["type"] == "rolling_chart").unwrap()["defaults"].clone();
+    request["widget"].as_object_mut().unwrap().extend(json!({
+        "x": 60.25, "y": 80.5, "width": 300, "height": 90, "opacity": 0.9, "window_seconds": 5,
+        "area_fill": true, "area_gradient": true, "line_curve": 60, "marker_variant": "ring", "marker_variant_diameter": 20,
+        "legend_font": "Inter.ttf", "legend_font_size": 14,
+        "series": [
+            {"metric": "speed", "label": "Speed", "color": "#ffffff"},
+            {"metric": "heartrate", "label": "HR", "color": "#e0103a"},
+        ],
+    }).as_object().unwrap().clone());
+    (preview, request)
+}
+
+#[test]
+fn rolling_chart_matches_export_pixels_slides_with_the_playhead_and_validates_at_ingress() {
+    use ovrley_core::{
+        activity::{interpolate::densify_activity, trim::trim_activity},
+        debug::RenderProfiler, paths::AppPaths,
+        render::render_full_frames,
+    };
+    let activity = every_family_parsed_activity();
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
+    let seconds = vec![0.0, 1.0, 1.25, 2.5, 4.0];
+    let (mut preview, request) = rolling_chart_preview();
+    preview.replace_activity(&every_family_activity()).unwrap();
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": request["scene"], "values": [], "labels": [], "plots": [request["widget"]],
+    }));
+    let requirements = config.render_data_requirements();
+    assert!(requirements.speed && requirements.heartrate, "plotted metrics are export requirements");
+    let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
+    let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
+    let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+    let scene_width = config.scene.presentation.width as usize;
+    let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+    for (index, second) in seconds.iter().enumerate() {
+        preview.render(*second).unwrap();
+        let widget = &preview.widgets[&id];
+        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
+        assert!(difference <= EXPORT_TILE_TOLERANCE, "rolling chart differs from export by {difference} at {second}");
+        let revision = widget.revision();
+        preview.render(*second).unwrap();
+        assert_eq!(preview.widgets[&id].revision(), revision, "unchanged second re-rendered");
+    }
+    // The window slides continuously with the playhead.
+    preview.render(1.0).unwrap();
+    let previous = preview.widgets[&id].pixels().clone();
+    preview.render(1.05).unwrap();
+    assert_ne!(preview.widgets[&id].pixels(), &previous, "lines slide between samples");
+    let six: Vec<Value> = ["speed", "heartrate", "cadence", "power", "temperature", "altitude"]
+        .iter()
+        .map(|metric| json!({"metric": metric, "label": metric, "color": "#ffffff"}))
+        .collect();
+    for (field, malformed) in [
+        ("series", json!([])),
+        ("series", json!(six)),
+        ("series", json!([{"metric": "left_right_balance", "label": "L/R", "color": "#ffffff"}])),
+        ("series", json!([{"metric": "speed", "label": "A", "color": "#ffffff"}, {"metric": "speed", "label": "B", "color": "#000000"}])),
+        ("series", json!([{"metric": "bogus", "label": "A", "color": "#ffffff"}])),
+        ("series", json!([{"metric": "speed", "label": " ", "color": "#ffffff"}])),
+        ("series", json!([{"metric": "speed", "label": "A", "color": "white"}])),
+        ("window_seconds", json!(4)),
+        ("window_seconds", json!(301)),
+        ("line_width", json!(0)),
+        ("line_opacity", json!(101)),
+        ("area_opacity", json!(-1)),
+        ("area_fill", Value::Null),
+        ("marker_variant", json!("star")),
+        ("marker_size", json!(0)),
+        ("legend_font", json!("")),
+        ("legend_font_size", json!(0)),
+        ("legend_color", Value::Null),
+        ("show_legend", Value::Null),
+        ("width", json!(0)),
+        ("opacity", json!(2)),
+    ] {
+        let mut invalid = request.clone();
+        invalid["widget"][field] = malformed;
+        let rejected = serde_json::from_value(invalid).map_or(true, |request| preview.create_widget(request).is_err());
+        assert!(rejected, "malformed {field} must fail at ingress");
+    }
+}
+
+#[test]
+fn rolling_chart_resize_reflows_the_plot_and_preserves_the_fixed_corner() {
+    let (mut preview, origin) = rolling_chart_preview();
+    preview.replace_activity(&every_family_activity()).unwrap();
+    let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
+    preview.render(1.0).unwrap();
+    let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let bounds = &geometry["content"];
+    // The fixture scene renders at scale 1.7; the legend row adds 1.6 legend font sizes below the plot.
+    let legend = 14.0 * 1.6;
+    assert!((bounds["width"].as_f64().unwrap() - 300.0 * 1.7).abs() < 0.01);
+    assert!((bounds["height"].as_f64().unwrap() - (90.0 + legend) * 1.7).abs() < 0.01);
+    let fixed = [1.0, 0.0];
+    let point = [
+        bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap(),
+        bounds["top"].as_f64().unwrap(),
+    ];
+    let mut gesture = origin.clone();
+    gesture["size"] = json!([420.5 * 1.7, (120.25 + legend) * 1.7]);
+    gesture["fixed"] = json!(fixed);
+    gesture["point"] = json!(point);
+    gesture["second"] = json!(1.0);
+    let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(gesture).unwrap()).unwrap()).unwrap();
+    assert!((patch["width"].as_f64().unwrap() - 420.5).abs() < 0.001);
+    assert!((patch["height"].as_f64().unwrap() - 120.25).abs() < 0.001);
+    let mut committed = origin;
+    committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+    preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
+    preview.render(1.0).unwrap();
+    let actual: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    for (axis, position, size) in [(0, "left", "width"), (1, "top", "height")] {
+        let corner = actual["content"][position].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
+        assert!((corner - point[axis]).abs() < 0.002, "rolling chart corner moved on axis {axis}");
+    }
+    // A narrow plot wraps the two legend entries onto two rows; the plot keeps the remaining height.
+    let mut narrow = committed_request(&preview, id);
+    narrow["size"] = json!([60.0 * 1.7, (120.25 + legend) * 1.7]);
+    narrow["fixed"] = json!(fixed);
+    narrow["point"] = json!(point);
+    narrow["second"] = json!(1.0);
+    let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(narrow.clone()).unwrap()).unwrap()).unwrap();
+    assert!((patch["height"].as_f64().unwrap() - (120.25 - legend)).abs() < 0.001, "wrapped legend takes a second row");
+    narrow["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+    for field in ["size", "fixed", "point", "second"] {
+        narrow.as_object_mut().unwrap().remove(field);
+    }
+    preview.update_widget(id, serde_json::from_value(narrow).unwrap()).unwrap();
+    preview.render(1.0).unwrap();
+    let wrapped: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    assert!((wrapped["content"]["height"].as_f64().unwrap() - (120.25 + legend) * 1.7).abs() < 0.01);
+}
+
+/// The request a test last committed to `id`, rebuilt from the fixture with its committed frame.
+fn committed_request(preview: &PreviewSession, id: u32) -> Value {
+    let (_, mut request) = rolling_chart_preview();
+    let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let scale = 1.7;
+    let legend = 14.0 * 1.6;
+    request["widget"].as_object_mut().unwrap().extend(json!({
+        "x": geometry["content"]["left"], "y": geometry["content"]["top"],
+        "width": geometry["content"]["width"].as_f64().unwrap() / scale,
+        "height": geometry["content"]["height"].as_f64().unwrap() / scale - legend,
+    }).as_object().unwrap().clone());
+    request
 }

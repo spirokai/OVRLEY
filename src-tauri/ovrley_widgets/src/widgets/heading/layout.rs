@@ -105,7 +105,11 @@ pub fn prepare_heading_cache(
     let image_width = tape_width
         .checked_add(2)
         .ok_or_else(|| WidgetError::Render("heading strip image width overflow".into()))?;
-    let mut tape = surface(image_width, layout.body_height.ceil() as u32, SHAPE_COLOR_TYPE)?;
+    let mut tape = surface(
+        image_width,
+        layout.body_height.ceil() as u32,
+        SHAPE_COLOR_TYPE,
+    )?;
     let canvas = tape.canvas();
     canvas.clear(skia_safe::Color::TRANSPARENT);
     // Wrapped strokes/labels also fill these gutters, so bilinear sampling sees across north.

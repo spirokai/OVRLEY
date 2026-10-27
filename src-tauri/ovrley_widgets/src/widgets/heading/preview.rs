@@ -6,12 +6,14 @@ use crate::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
     host::WidgetHost,
-    model::scene::{validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation},
-    render::text::FontResolver,
+    model::scene::{
+        validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
+    },
     render::preview::{render_tile, PreviewRasterScale},
+    render::text::FontResolver,
     widgets::value::{
         config::ValueConfig,
-        preview::{SHAPE_COLOR_TYPE, TileBounds, WidgetGeometry},
+        preview::{TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
     },
 };
 use skia_safe::{Canvas, Surface};
@@ -69,7 +71,12 @@ impl PreviewHeading {
     }
 
     /// Draws the frame at `second` onto a host canvas in scene coordinates.
-    pub fn draw(&self, canvas: &Canvas, activity: Option<&ActivitySampler>, second: f64) -> TileBounds {
+    pub fn draw(
+        &self,
+        canvas: &Canvas,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+    ) -> TileBounds {
         let raw = activity.and_then(|activity| activity.heading_at(second));
         let frame = self.cache.prepare_frame(raw);
         frame.draw(canvas, &self.cache);

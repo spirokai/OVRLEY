@@ -19,7 +19,7 @@ use crate::{
     },
     widgets::{
         route::sampling::RouteWindow,
-        value::preview::{SHAPE_COLOR_TYPE, TileBounds, WidgetGeometry},
+        value::preview::{TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
     },
 };
 use skia_safe::{Canvas, Surface};
@@ -47,7 +47,10 @@ impl PreviewDivingProfile {
         show_full_activity: bool,
         host: &WidgetHost,
     ) -> WidgetResult<(Option<RouteWindow>, f64)> {
-        Ok((host.plot_window(show_full_activity), host.placeholder_duration()?))
+        Ok((
+            host.plot_window(show_full_activity),
+            host.placeholder_duration()?,
+        ))
     }
 
     pub fn new(widget: DivingProfileConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
@@ -198,7 +201,16 @@ impl PreviewDivingProfile {
     ) -> WidgetResult<TileBounds> {
         let geometry = self.geometry_at(activity);
         let range = activity.and_then(|a| a.diving.depth_range());
-        Ok(DivingProfileLayout::measure_bounds(&self.config, &self.scene, &geometry, range, fonts)?.into())
+        Ok(
+            DivingProfileLayout::measure_bounds(
+                &self.config,
+                &self.scene,
+                &geometry,
+                range,
+                fonts,
+            )?
+            .into(),
+        )
     }
 
     /// Prepares the layout for the activity's geometry; reports whether it was rebuilt.

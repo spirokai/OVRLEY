@@ -2,7 +2,10 @@
 use super::{config::BackdropConfig, frame::prepare_backdrop_frame, validation::validate_backdrop};
 use crate::{
     error::{WidgetError, WidgetResult},
-    model::{scene::{validate_scene_presentation, ScenePresentationConfig}, types::BackdropType},
+    model::{
+        scene::{validate_scene_presentation, ScenePresentationConfig},
+        types::BackdropType,
+    },
 };
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -16,8 +19,11 @@ pub struct ResizeUpdate {
 }
 
 pub fn resize_backdrop(
-    widget: BackdropConfig, scene: ScenePresentationConfig,
-    size: [f32; 2], fixed: [f32; 2], point: [f32; 2],
+    widget: BackdropConfig,
+    scene: ScenePresentationConfig,
+    size: [f32; 2],
+    fixed: [f32; 2],
+    point: [f32; 2],
 ) -> WidgetResult<ResizeUpdate> {
     if size.iter().any(|value| !value.is_finite() || *value <= 0.0) {
         return Err(WidgetError::Config("invalid backdrop resize size".into()));

@@ -10,9 +10,7 @@ use crate::{
     },
     widgets::value::preview::SHAPE_COLOR_TYPE,
 };
-use skia_safe::{
-    paint::Style, BlendMode, ClipOp, Paint, PathBuilder, PathFillType, Point, Rect,
-};
+use skia_safe::{paint::Style, BlendMode, ClipOp, Paint, PathBuilder, PathFillType, Point, Rect};
 
 const GUIDE_DEFAULT_THICKNESS_PX: f32 = 2.0;
 const GUIDE_REFERENCE_DIAMETER_PX: f32 = 400.0;
@@ -114,7 +112,8 @@ pub fn prepare_g_force_cache(
                         None,
                     );
                     canvas.save();
-                    canvas.translate((scene.shadow_distance * scale, scene.shadow_distance * scale));
+                    canvas
+                        .translate((scene.shadow_distance * scale, scene.shadow_distance * scale));
                     canvas.draw_path(&ring_path.detach(), &paint);
                     canvas.restore();
                 }

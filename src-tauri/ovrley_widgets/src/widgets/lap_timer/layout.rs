@@ -10,9 +10,9 @@ use super::{
     TABLE_VERTICAL_METRICS_TEXT,
 };
 use crate::{
-    render::preview::PreviewRasterScale,
     error::{WidgetError, WidgetResult},
     model::{scene::ValidatedScenePresentation, standard_widgets::widget_font_weight},
+    render::preview::PreviewRasterScale,
     render::text::{
         measure_text_with_font, parse_color, resolve_font, rgba_color, FontResolver,
         ResolvedTextStyle,

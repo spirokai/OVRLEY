@@ -12,7 +12,10 @@ use crate::{
     render::{
         preview::{PreviewRasterScale, StaticRaster},
         shadow::shadow_paint,
-        text::{measure_text_with_font, parse_color, resolve_font, rgba_color, FontResolver, ResolvedTextStyle},
+        text::{
+            measure_text_with_font, parse_color, resolve_font, rgba_color, FontResolver,
+            ResolvedTextStyle,
+        },
         track_fill::{FillShape, TrackFill},
     },
     widgets::{
@@ -51,7 +54,11 @@ impl BarStyle {
     /// Outer and border-inset shapes of a bar `length` long, built like a linear gauge track.
     fn shapes(&self, top: f32, length: f32) -> (RRect, RRect) {
         let radius = self.radius.min(length * 0.5);
-        let outer = RRect::new_rect_xy(Rect::from_xywh(self.left, top, length, self.height), radius, radius);
+        let outer = RRect::new_rect_xy(
+            Rect::from_xywh(self.left, top, length, self.height),
+            radius,
+            radius,
+        );
         let inner_rect = Rect::from_xywh(
             self.left + self.border,
             top + self.border,
@@ -59,7 +66,10 @@ impl BarStyle {
             (self.height - self.border * 2.0).max(0.0),
         );
         let inner_radius = (radius - self.border).max(0.0);
-        (outer, RRect::new_rect_xy(inner_rect, inner_radius, inner_radius))
+        (
+            outer,
+            RRect::new_rect_xy(inner_rect, inner_radius, inner_radius),
+        )
     }
 
     /// The border hugs the bar's own length; it casts the shadow when present, otherwise the fill does.
@@ -136,7 +146,10 @@ pub struct SplitsLayout {
     static_layer: Arc<Mutex<Option<CachedStatic>>>,
 }
 
-pub fn validated_splits_style(config: &ValidatedSplitsRun, scene: &ValidatedScenePresentation) -> ResolvedTextStyle {
+pub fn validated_splits_style(
+    config: &ValidatedSplitsRun,
+    scene: &ValidatedScenePresentation,
+) -> ResolvedTextStyle {
     let opacity = config.opacity;
     ResolvedTextStyle {
         x: config.x,
@@ -149,10 +162,12 @@ pub fn validated_splits_style(config: &ValidatedSplitsRun, scene: &ValidatedScen
         line_height: config.font_size * scene.scale * LINE_HEIGHT_RATIO,
         color: rgba_color(config.color, 1.0),
         opacity,
-        shadow_color: (!scene.shadow_color.is_empty()).then(|| parse_color(&scene.shadow_color, opacity)),
+        shadow_color: (!scene.shadow_color.is_empty())
+            .then(|| parse_color(&scene.shadow_color, opacity)),
         shadow_strength: scene.shadow_strength * scene.scale,
         shadow_distance: scene.shadow_distance * scene.scale,
-        border_color: (!scene.border_color.is_empty()).then(|| parse_color(&scene.border_color, opacity)),
+        border_color: (!scene.border_color.is_empty())
+            .then(|| parse_color(&scene.border_color, opacity)),
         border_thickness: scene.border_thickness * scene.scale,
         numerals: scene.numerals,
     }
@@ -179,12 +194,17 @@ pub fn prepare_splits_layout(
         ..style.clone()
     };
     let value_font = resolve_font(fonts, style.font_name.as_deref(), style.font_size)?;
-    let label_font = resolve_font(fonts, label_style.font_name.as_deref(), label_style.font_size)?;
+    let label_font = resolve_font(
+        fonts,
+        label_style.font_name.as_deref(),
+        label_style.font_size,
+    )?;
     let width = |text: &str, font: &Font| measure_text_with_font(text, font, style.numerals).width;
     let widest_digit = ('0'..='9')
         .map(|digit| width(digit.encode_utf8(&mut [0; 4]), &value_font))
         .fold(0.0, f32::max);
-    let number_width = widest_digit * digit_count(table.map_or(1, SplitTable::last_number) as u64) as f32;
+    let number_width =
+        widest_digit * digit_count(table.map_or(1, SplitTable::last_number) as u64) as f32;
     let minute_digits = table
         .and_then(SplitTable::slowest_printed_pace)
         .map_or(1, |pace| digit_count(pace.round() as u64 / 60));
@@ -199,8 +219,16 @@ pub fn prepare_splits_layout(
     // Shown columns sit side by side and their widths and gaps make the table width;
     // a wider header widens the table, keeping the pace column at its right edge.
     let number_right = config.x + number_width;
-    let bar_left = if columns.split { number_right + style.font_size * NUMBER_BAR_GAP_RATIO } else { config.x };
-    let track_length = if columns.bar { config.bar_width * scale } else { 0.0 };
+    let bar_left = if columns.split {
+        number_right + style.font_size * NUMBER_BAR_GAP_RATIO
+    } else {
+        config.x
+    };
+    let track_length = if columns.bar {
+        config.bar_width * scale
+    } else {
+        0.0
+    };
     let pace_left = if columns.bar {
         bar_left + track_length + gap
     } else if columns.split {
@@ -216,9 +244,21 @@ pub fn prepare_splits_layout(
         number_right
     };
     let table_right = columns_right.max(config.x + label_width + gap + length_width);
-    let mut header = vec![TextRun::cell(&length_text, table_right, config.y, &label_style, &label_font)?];
+    let mut header = vec![TextRun::cell(
+        &length_text,
+        table_right,
+        config.y,
+        &label_style,
+        &label_font,
+    )?];
     if !label.trim().is_empty() {
-        header.push(TextRun::cell(&label, config.x + label_width, config.y, &label_style, &label_font)?);
+        header.push(TextRun::cell(
+            &label,
+            config.x + label_width,
+            config.y,
+            &label_style,
+            &label_font,
+        )?);
     }
 
     let text_height = style.font_size * LINE_HEIGHT_RATIO;
@@ -239,15 +279,27 @@ pub fn prepare_splits_layout(
     let fill_paint = config.track_filled_color.linear_paint(
         config.track_filled_opacity * opacity,
         Point::new(bar_left + border, 0.0),
-        Point::new(bar_left + border + (track_length - border * 2.0).max(1.0), 0.0),
+        Point::new(
+            bar_left + border + (track_length - border * 2.0).max(1.0),
+            0.0,
+        ),
     )?;
     let mut border_paint = Paint::default();
     border_paint.set_anti_alias(true);
-    border_paint.set_color(parse_color(&config.track_border_color, config.track_border_opacity * opacity));
+    border_paint.set_color(parse_color(
+        &config.track_border_color,
+        config.track_border_opacity * opacity,
+    ));
     let mut shadow_source = Paint::default();
     shadow_source.set_anti_alias(true);
     let shadow = (!scene.shadow_color.is_empty())
-        .then(|| shadow_paint(&shadow_source, parse_color(&scene.shadow_color, opacity), scene.shadow_strength * scale))
+        .then(|| {
+            shadow_paint(
+                &shadow_source,
+                parse_color(&scene.shadow_color, opacity),
+                scene.shadow_strength * scale,
+            )
+        })
         .flatten()
         .map(|paint| (paint, scene.shadow_distance * scale));
     let bar = BarStyle {
@@ -260,7 +312,8 @@ pub fn prepare_splits_layout(
         border_paint,
         shadow,
     };
-    let (_, running_fill_shape) = bar.shapes(data_top + (row_height - bar_height) * 0.5, bar.length);
+    let (_, running_fill_shape) =
+        bar.shapes(data_top + (row_height - bar_height) * 0.5, bar.length);
 
     Ok(SplitsLayout {
         config: config.clone(),
@@ -292,7 +345,13 @@ impl SplitsLayout {
     }
 
     fn cell(&self, text: &str, right: f32, row: usize) -> WidgetResult<TextRun> {
-        TextRun::cell(text, right, self.row_top(row) + self.text_offset, &self.style, &self.value_font)
+        TextRun::cell(
+            text,
+            right,
+            self.row_top(row) + self.text_offset,
+            &self.style,
+            &self.value_font,
+        )
     }
 
     /// Header and rows; the running split is row 0.
@@ -312,35 +371,59 @@ impl SplitsLayout {
     fn bounds(&self, content: Rect) -> Rect {
         let mut bounds = content;
         bounds.outset((self.padding, self.padding));
-        Rect::new(bounds.left.floor(), bounds.top.floor(), bounds.right.ceil(), bounds.bottom.ceil())
+        Rect::new(
+            bounds.left.floor(),
+            bounds.top.floor(),
+            bounds.right.ceil(),
+            bounds.bottom.ceil(),
+        )
     }
 
     fn draw_row(&self, canvas: &Canvas, row: usize, split: &SplitRow) -> WidgetResult<()> {
         let columns = self.config.columns;
         if columns.split {
-            self.cell(&split.number.to_string(), self.number_right, row)?.draw(canvas);
+            self.cell(&split.number.to_string(), self.number_right, row)?
+                .draw(canvas);
         }
         if columns.bar {
             let top = self.row_top(row) + self.bar_offset;
-            self.bar.draw(canvas, top, self.bar.length * split.bar_fraction, BarFill::Paint(&self.bar.fill_paint));
+            self.bar.draw(
+                canvas,
+                top,
+                self.bar.length * split.bar_fraction,
+                BarFill::Paint(&self.bar.fill_paint),
+            );
         }
         if columns.pace {
-            self.cell(&split.pace_text, self.pace_right, row)?.draw(canvas);
+            self.cell(&split.pace_text, self.pace_right, row)?
+                .draw(canvas);
         }
         Ok(())
     }
 
     /// A running split without a pace caches a faint full-length bar beside its `-:--` pace.
-    fn draw_static(&self, canvas: &Canvas, number: usize, placeholder: bool, rows: &[SplitRow]) -> WidgetResult<()> {
+    fn draw_static(
+        &self,
+        canvas: &Canvas,
+        number: usize,
+        placeholder: bool,
+        rows: &[SplitRow],
+    ) -> WidgetResult<()> {
         for run in &self.header {
             run.draw(canvas);
         }
         if self.config.columns.split {
-            self.cell(&number.to_string(), self.number_right, 0)?.draw(canvas);
+            self.cell(&number.to_string(), self.number_right, 0)?
+                .draw(canvas);
         }
         if placeholder && self.config.columns.bar {
             canvas.save_layer_alpha_f(None, PLACEHOLDER_BAR_OPACITY);
-            self.bar.draw(canvas, self.row_top(0) + self.bar_offset, self.bar.length, BarFill::Paint(&self.bar.fill_paint));
+            self.bar.draw(
+                canvas,
+                self.row_top(0) + self.bar_offset,
+                self.bar.length,
+                BarFill::Paint(&self.bar.fill_paint),
+            );
             canvas.restore();
         }
         for (index, row) in rows.iter().enumerate() {
@@ -389,22 +472,40 @@ impl SplitsLayout {
         let content_bounds = self.content_bounds(rows.len() + 1);
         let bounds = self.bounds(content_bounds);
         let layer = {
-            let mut cache = self.static_layer.lock().expect("splits cache lock poisoned");
+            let mut cache = self
+                .static_layer
+                .lock()
+                .expect("splits cache lock poisoned");
             let placeholder = content.bar_ticks.is_none();
             let key = (content.completed, content.number, placeholder);
             if cache.as_ref().map(|cache| cache.key) != Some(key) {
-                let layer = StaticRaster::new(raster_scale, Point::default(), bounds, TEXT_COLOR_TYPE, |canvas| {
-                    self.draw_static(canvas, content.number, placeholder, &rows)
-                })?;
-                *cache = Some(CachedStatic { key, layer: Arc::new(layer) });
+                let layer = StaticRaster::new(
+                    raster_scale,
+                    Point::default(),
+                    bounds,
+                    TEXT_COLOR_TYPE,
+                    |canvas| self.draw_static(canvas, content.number, placeholder, &rows),
+                )?;
+                *cache = Some(CachedStatic {
+                    key,
+                    layer: Arc::new(layer),
+                });
             }
-            cache.as_ref().expect("static split state prepared").layer.clone()
+            cache
+                .as_ref()
+                .expect("static split state prepared")
+                .layer
+                .clone()
         };
         let running_bar = content
             .bar_ticks
             .filter(|ticks| self.config.columns.bar && *ticks > 0)
             .map(|ticks| -> WidgetResult<_> {
-                Ok((self.row_top(0) + self.bar_offset, self.running_bar_length(ticks), self.running_fill(raster_scale)?))
+                Ok((
+                    self.row_top(0) + self.bar_offset,
+                    self.running_bar_length(ticks),
+                    self.running_fill(raster_scale)?,
+                ))
             })
             .transpose()?;
         Ok(SplitsFrame {
@@ -422,12 +523,22 @@ impl SplitsLayout {
         })
     }
 
-    pub(super) fn draw_running_bar(&self, canvas: &Canvas, top: f32, length: f32, fill: &TrackFill) {
+    pub(super) fn draw_running_bar(
+        &self,
+        canvas: &Canvas,
+        top: f32,
+        length: f32,
+        fill: &TrackFill,
+    ) {
         self.bar.draw(canvas, top, length, BarFill::Raster(fill));
     }
 
     /// Layout-only bounds; no surface is allocated.
-    pub fn frame_bounds(&self, table: Option<&SplitTable>, content: &SplitsContent) -> (Rect, Rect) {
+    pub fn frame_bounds(
+        &self,
+        table: Option<&SplitTable>,
+        content: &SplitsContent,
+    ) -> (Rect, Rect) {
         let rows = completed_rows(&self.config, table, content.completed).len() + 1;
         let content_bounds = self.content_bounds(rows);
         (content_bounds, self.bounds(content_bounds))

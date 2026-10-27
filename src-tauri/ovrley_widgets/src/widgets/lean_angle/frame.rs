@@ -13,7 +13,8 @@ use crate::{
     model::{
         scene::{Numerals, ValidatedScenePresentation},
         standard_metrics::standard_metric_unit_label,
-        standard_widgets::widget_font_weight, types::MetricKind,
+        standard_widgets::widget_font_weight,
+        types::MetricKind,
     },
     render::text::{
         draw_text_blob, layout_text, measure_text_with_font, parse_color, resolve_styled_font,

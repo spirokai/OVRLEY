@@ -50,10 +50,11 @@ function renderValues(values) {
  * source/encoding fields. Each native video plan owns its dimensions and clock.
  * @param {object} config Committed template configuration.
  * @param {object} globalDefaults Captured global presentation defaults.
+ * @param {string} language App language that names chart legends.
  * @returns {object} Canonical shared batch template.
  */
-export function createBatchRenderTemplate(config, globalDefaults) {
-  const effective = createEditorEffectiveConfig({ config, globalDefaults })
+export function createBatchRenderTemplate(config, globalDefaults, language) {
+  const effective = createEditorEffectiveConfig({ config, globalDefaults, language })
   // Editor-effective scenes also contain widget defaults. Project only the
   // native ScenePresentationConfig fields; widgets are already materialized.
   const scene = Object.fromEntries(SCENE_PRESENTATION_KEYS.map((key) => [key, effective.scene[key]]))
@@ -238,6 +239,7 @@ function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
  * @param {number[]} options.disabledLaps - Activity lap IDs excluded from lap widgets.
  * @param {number} options.fps - Validated overlay FPS.
  * @param {number} options.widgetUpdateRate - Validated widget update-rate divisor.
+ * @param {string} options.language - App language that names chart legends.
  * @returns {object} Render-effective config.
  */
 export function createRenderEffectiveConfig(options) {
@@ -254,13 +256,14 @@ export function createRenderEffectiveConfig(options) {
     timelineEnd,
     widgetUpdateRate,
     fps,
+    language,
   } = options
 
   if (!config?.scene) {
     throw new Error('No valid config available')
   }
 
-  const nextConfig = createEditorEffectiveConfig({ config, globalDefaults })
+  const nextConfig = createEditorEffectiveConfig({ config, globalDefaults, language })
   const scene = {
     ...nextConfig.scene,
   }

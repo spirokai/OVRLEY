@@ -49,38 +49,6 @@ export default function SplitsRunDisplaySection({ widget, updateWidgetData, upda
       <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
 
       <div className="space-y-4">
-        <SectionHeading icon={Type} title={t('widget-editor.label', 'Label')} />
-        <TextField label={t('widget-editor.label', 'Label')} value={data.label} onChange={(label) => update({ label })} />
-        <SizeSlider
-          label={t('widget-editor.labelFontSize', 'Label Font Size')}
-          value={data.label_font_size}
-          min={6}
-          max={100}
-          step={0.5}
-          valueDisplay={`${data.label_font_size}`}
-          suffix="px"
-          onChange={(label_font_size) => updateSize({ label_font_size })}
-          onCommit={commit}
-        />
-        <div className="grid grid-cols-2 items-end gap-4">
-          <FontSelectField
-            label={t('widget-editor.labelFont', 'Label Font')}
-            value={data.label_font}
-            onValueChange={(label_font) => update({ label_font })}
-            recommendedFonts={availableFonts.recommendedFonts}
-            systemFonts={availableFonts.systemFonts}
-            triggerClassName="h-9 border-border/70 bg-surface text-xs"
-            labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
-          />
-          <ColorField
-            label={t('widget-editor.labelColor', 'Label Color')}
-            value={data.label_color}
-            onChange={(label_color) => update({ label_color })}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-4">
         <SectionHeading icon={Rows3} title={t('widget-editor.splits', 'Splits')} />
         <div className="grid grid-cols-2 items-end gap-4">
           <NumberField
@@ -142,6 +110,38 @@ export default function SplitsRunDisplaySection({ widget, updateWidgetData, upda
         </div>
       </div>
 
+      <div className="space-y-4">
+        <SectionHeading icon={Type} title={t('widget-editor.label', 'Label')} />
+        <TextField label={t('widget-editor.label', 'Label')} value={data.label} onChange={(label) => update({ label })} />
+        <SizeSlider
+          label={t('widget-editor.labelFontSize', 'Label Font Size')}
+          value={data.label_font_size}
+          min={6}
+          max={100}
+          step={0.5}
+          valueDisplay={`${data.label_font_size}`}
+          suffix="px"
+          onChange={(label_font_size) => updateSize({ label_font_size })}
+          onCommit={commit}
+        />
+        <div className="grid grid-cols-2 items-end gap-4">
+          <FontSelectField
+            label={t('widget-editor.labelFont', 'Label Font')}
+            value={data.label_font}
+            onValueChange={(label_font) => update({ label_font })}
+            recommendedFonts={availableFonts.recommendedFonts}
+            systemFonts={availableFonts.systemFonts}
+            triggerClassName="h-9 border-border/70 bg-surface text-xs"
+            labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
+          />
+          <ColorField
+            label={t('widget-editor.labelColor', 'Label Color')}
+            value={data.label_color}
+            onChange={(label_color) => update({ label_color })}
+          />
+        </div>
+      </div>
+
       {showBar ? (
         <div className="space-y-4">
           <SectionHeading
@@ -180,17 +180,32 @@ export default function SplitsRunDisplaySection({ widget, updateWidgetData, upda
               onCommit={commit}
             />
           </div>
-          <SliderField
-            editable
-            label={t('widget-editor.cornerRadius', 'Corner Radius')}
-            value={Math.min(data.track_corner_radius, maxCornerRadius)}
-            min={0}
-            max={maxCornerRadius}
-            step={1}
-            integerDisplay
-            suffix="px"
-            onSliderChange={(track_corner_radius) => update({ track_corner_radius })}
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <SliderField
+              editable
+              label={t('widget-editor.border', 'Border')}
+              value={Math.min(data.track_border_thickness, maxBorderThickness)}
+              min={0}
+              max={maxBorderThickness}
+              step={1}
+              integerDisplay
+              valueDisplay={`${Math.min(data.track_border_thickness, maxBorderThickness)}`}
+              suffix="px"
+              onSliderChange={(track_border_thickness) => updateSize({ track_border_thickness })}
+              onSliderCommit={commit}
+            />
+            <SliderField
+              editable
+              label={t('widget-editor.cornerRadius', 'Corner Radius')}
+              value={Math.min(data.track_corner_radius, maxCornerRadius)}
+              min={0}
+              max={maxCornerRadius}
+              step={1}
+              integerDisplay
+              suffix="px"
+              onSliderChange={(track_corner_radius) => update({ track_corner_radius })}
+            />
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <ColorField
               label={t('widget-editor.filledColor', 'Filled Color')}
@@ -219,30 +234,17 @@ export default function SplitsRunDisplaySection({ widget, updateWidgetData, upda
             />
             <SliderField
               editable
-              label={t('widget-editor.border', 'Border')}
-              value={Math.min(data.track_border_thickness, maxBorderThickness)}
+              label={t('widget-editor.borderOpacity', 'Border Opacity')}
+              value={data.track_border_opacity}
               min={0}
-              max={maxBorderThickness}
-              step={1}
-              integerDisplay
-              valueDisplay={`${Math.min(data.track_border_thickness, maxBorderThickness)}`}
-              suffix="px"
-              onSliderChange={(track_border_thickness) => updateSize({ track_border_thickness })}
-              onSliderCommit={commit}
+              max={1}
+              step={0.05}
+              valueScale={100}
+              valueDisplay={`${Math.round(data.track_border_opacity * 100)}`}
+              suffix="%"
+              onSliderChange={(track_border_opacity) => update({ track_border_opacity })}
             />
           </div>
-          <SliderField
-            editable
-            label={t('widget-editor.borderOpacity', 'Border Opacity')}
-            value={data.track_border_opacity}
-            min={0}
-            max={1}
-            step={0.05}
-            valueScale={100}
-            valueDisplay={`${Math.round(data.track_border_opacity * 100)}`}
-            suffix="%"
-            onSliderChange={(track_border_opacity) => update({ track_border_opacity })}
-          />
           {data.track_filled_gradient ? (
             <GradientPicker
               stops={data.track_filled_gradient_stops}

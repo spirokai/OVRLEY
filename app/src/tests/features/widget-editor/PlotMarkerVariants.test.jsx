@@ -79,7 +79,7 @@ describe('plot marker variant controls', () => {
   test('route editor shows the variant diameter control for ring markers', () => {
     render(<RouteMapWidgetEditor widget={makeRouteWidget({ marker_variant: 'ring' })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
 
-    expect(screen.getByText('Type')).toBeInTheDocument()
+    expect(screen.getByText('Marker Type')).toBeInTheDocument()
     expect(screen.getByText('Ring Diameter')).toBeInTheDocument()
   })
 

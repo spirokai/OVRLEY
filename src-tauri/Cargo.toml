@@ -48,6 +48,10 @@ http-cache-semantics = "=2.1.0"
 [profile.dev.package.ovrley_core]
 opt-level = 3
 
+# Widget sampling, layout and pixel conversion run per frame in export, like ovrley_core.
+[profile.dev.package.ovrley_widgets]
+opt-level = 3
+
 # Dependency debug symbols dominate target/debug (~14 GB) and are not needed to debug this app.
 [profile.dev.package."*"]
 debug = false

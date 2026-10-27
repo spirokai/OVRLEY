@@ -15,8 +15,8 @@ use crate::{
         standard_widgets::widget_font_weight,
         types::TrackFillStyle,
     },
-    render::text::{parse_color, resolve_font, FontResolver, ResolvedTextStyle},
     render::preview::{PreviewRasterScale, StaticRaster},
+    render::text::{parse_color, resolve_font, FontResolver, ResolvedTextStyle},
     render::track_fill::TrackFill,
     widgets::value::preview::SHAPE_COLOR_TYPE,
 };
@@ -211,7 +211,11 @@ pub fn prepare_linear_gauge_cache(
     fonts: &dyn FontResolver,
     raster_scale: PreviewRasterScale,
 ) -> WidgetResult<LinearGaugeCache> {
-    measure_linear_gauge(gauge, scene, range, altitude_offset_m, fonts)?.into_cache(gauge, scene, raster_scale)
+    measure_linear_gauge(gauge, scene, range, altitude_offset_m, fonts)?.into_cache(
+        gauge,
+        scene,
+        raster_scale,
+    )
 }
 
 impl LinearGaugeCache {

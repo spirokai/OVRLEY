@@ -2,7 +2,7 @@
 //!
 //! Every widget draws through the same engine as the editor preview, in the
 //! export's layer order: backdrops, rasters and labels (the static layer), then
-//! intrinsic values, boxed values, routes, elevation plots and diving profiles.
+//! intrinsic values, boxed values, routes, elevation plots, diving profiles and rolling charts.
 //!
 //! Widgets sample the activity like the preview does: at the activity second of
 //! each dense frame. Export planning keeps ownership of update-rate decimation
@@ -271,6 +271,7 @@ impl<'a> ExportWidgets<'a> {
         layers.extend(config.course_plots.iter().map(|widget| (ValidatedWidget::Route(widget), Layer::Dynamic)));
         layers.extend(config.elevation_plots.iter().map(|widget| (ValidatedWidget::Elevation(widget), Layer::Dynamic)));
         layers.extend(config.diving_profiles.iter().map(|widget| (ValidatedWidget::DivingProfile(widget), Layer::Dynamic)));
+        layers.extend(config.rolling_charts.iter().map(|widget| (ValidatedWidget::RollingChart(widget), Layer::Dynamic)));
         layers
     }
 

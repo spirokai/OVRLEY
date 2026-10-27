@@ -2,7 +2,9 @@
 use crate::{
     error::{WidgetError, WidgetResult},
     host::WidgetHost,
-    model::scene::{validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation},
+    model::scene::{
+        validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
+    },
     render::text::FontResolver,
     render::{
         preview::{render_tile, PreviewRasterScale, StaticRaster},
@@ -156,8 +158,13 @@ struct ValueLayout {
 
 impl ValueLayout {
     /// Layout step: the metric frame and the tile rectangle covering it and the static parts.
-    fn frame(&self, parts: &MetricDisplayParts, fonts: &dyn FontResolver) -> WidgetResult<(MetricFrame, Rect)> {
-        let frame = prepare_metric_frame(&self.style, parts, self.scale, fonts, self.config.base())?;
+    fn frame(
+        &self,
+        parts: &MetricDisplayParts,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<(MetricFrame, Rect)> {
+        let frame =
+            prepare_metric_frame(&self.style, parts, self.scale, fonts, self.config.base())?;
         let mut bounds = frame.bounds;
         if let Some(cache) = &self.static_image {
             bounds.join(cache.bounds());
@@ -240,7 +247,12 @@ impl PreviewWidget {
     pub fn new(request: WidgetRequest, fonts: &dyn FontResolver) -> WidgetResult<Self> {
         let host = WidgetHost::from_scene(&request.scene)?;
         let config = ValuePresentation::new(request.widget, &host)?;
-        Self::from_validated(config, &validate_scene_presentation(request.scene)?, &host, fonts)
+        Self::from_validated(
+            config,
+            &validate_scene_presentation(request.scene)?,
+            &host,
+            fonts,
+        )
     }
 
     pub fn from_validated(
@@ -261,7 +273,13 @@ impl PreviewWidget {
                 frame.bounds,
                 TEXT_COLOR_TYPE,
                 |canvas| {
-                    draw_static_metric_parts_for_value(canvas, config.base(), &style, scene.scale, fonts)?;
+                    draw_static_metric_parts_for_value(
+                        canvas,
+                        config.base(),
+                        &style,
+                        scene.scale,
+                        fonts,
+                    )?;
                     Ok(())
                 },
             )?)

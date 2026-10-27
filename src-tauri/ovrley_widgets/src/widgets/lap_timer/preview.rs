@@ -11,11 +11,11 @@ use crate::{
     model::scene::{
         validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
     },
-    render::text::FontResolver,
     render::preview::{render_tile, PreviewRasterScale},
+    render::text::FontResolver,
     widgets::value::{
         config::ValueConfig,
-        preview::{TEXT_COLOR_TYPE, TileBounds, WidgetGeometry},
+        preview::{TileBounds, WidgetGeometry, TEXT_COLOR_TYPE},
     },
 };
 use skia_safe::{Canvas, Surface};
@@ -38,7 +38,11 @@ impl PreviewLapTimer {
     pub fn new(widget: ValueConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
         let config = validate_lap_timer(widget, 0)?;
         let host = WidgetHost::from_scene(&scene)?;
-        Ok(Self::from_validated(config, validate_scene_presentation(scene)?, &host))
+        Ok(Self::from_validated(
+            config,
+            validate_scene_presentation(scene)?,
+            &host,
+        ))
     }
 
     pub fn from_validated(
@@ -106,7 +110,11 @@ impl PreviewLapTimer {
             activity.map_or_else(LapSample::default, |activity| activity.lap_timer_at(second));
         let content = lap_timer_content(&self.config, history, sample)?;
         // Direct glyph runs bound the same rectangle as the cached static layer.
-        Ok(self.layout(history, fonts)?.prepare_frame(history, &content)?.bounds.into())
+        Ok(self
+            .layout(history, fonts)?
+            .prepare_frame(history, &content)?
+            .bounds
+            .into())
     }
 
     /// Draws the frame at `second` onto a host canvas in scene coordinates.
@@ -122,7 +130,9 @@ impl PreviewLapTimer {
             activity.map_or_else(LapSample::default, |activity| activity.lap_timer_at(second));
         let content = lap_timer_content(&self.config, history, sample)?;
         let raster_scale = self.preview_raster_scale;
-        let frame = self.layout(history, fonts)?.prepare_cached_frame(history, &content, raster_scale)?;
+        let frame =
+            self.layout(history, fonts)?
+                .prepare_cached_frame(history, &content, raster_scale)?;
         frame.draw(canvas);
         Ok(frame.bounds.into())
     }
@@ -141,7 +151,9 @@ impl PreviewLapTimer {
             return Ok(());
         }
         let raster_scale = self.preview_raster_scale;
-        let frame = self.layout(history, fonts)?.prepare_cached_frame(history, &content, raster_scale)?;
+        let frame =
+            self.layout(history, fonts)?
+                .prepare_cached_frame(history, &content, raster_scale)?;
         let bounds = frame.bounds;
         let (width, height, bounds) = render_tile(
             &mut self.surface,

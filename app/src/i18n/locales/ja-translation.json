@@ -554,6 +554,7 @@
       "lapLog": "ラップログ"
     },
     "types": {
+      "rolling_chart": { "name": "チャート", "shortName": "チャート" },
       "diving_profile": {
         "name": "ダイビングプロファイル",
         "shortName": "潜水プロファイル"
@@ -614,6 +615,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "指標",
+    "chartMetric": "指標",
+    "addMetric": "指標を追加",
+    "moveUp": "上へ移動",
+    "moveDown": "下へ移動",
+    "removeMetric": "指標を削除",
+    "timeWindow": "時間範囲",
+    "fill": "塗りつぶし",
+    "areaOpacity": "塗りの不透明度",
+    "legend": "凡例",
     "decompressionCeiling": "減圧シーリング",
     "ceilingLineColor": "線の色",
     "ceilingAreaColor": "領域の色",

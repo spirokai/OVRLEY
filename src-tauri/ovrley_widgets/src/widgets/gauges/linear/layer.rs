@@ -9,12 +9,12 @@ use super::super::track_path::{translated_track_cap_path, translated_track_cap_r
 use super::geometry::{bordered_bar_fill_rect, segment_rect, track_cap_frame};
 use super::LinearGaugeCache;
 use crate::model::scene::ValidatedScenePresentation;
+use crate::model::types::TrackFillStyle;
 use crate::render::{shadow::shadow_paint, text::parse_color, track_fill::FillShape};
+use crate::widgets::gauges::bar_geometry::ResolvedBarGeometry;
 use crate::widgets::gauges::validation::{
     ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
 };
-use crate::model::types::TrackFillStyle;
-use crate::widgets::gauges::bar_geometry::ResolvedBarGeometry;
 use skia_safe::{BlendMode, Canvas, ClipOp, Paint, PathBuilder, PathFillType, RRect, Rect};
 
 /// Builds the padded, cached image containing every frame-invariant element.
@@ -219,7 +219,10 @@ pub(super) fn draw_segmented_fill(canvas: &Canvas, cache: &LinearGaugeCache, fil
     reveal.offset((cache.x, cache.y));
     cache.fill.draw(canvas, &FillShape::Rect(reveal), |paint| {
         for index in 0..filled_count {
-            canvas.draw_rrect(bar_fill_rrect(index, bars, cache, (cache.x, cache.y)), paint);
+            canvas.draw_rrect(
+                bar_fill_rrect(index, bars, cache, (cache.x, cache.y)),
+                paint,
+            );
         }
     });
 }
@@ -244,16 +247,20 @@ pub(super) fn draw_continuous_fill(canvas: &Canvas, cache: &LinearGaugeCache, fi
     let inner_rrect = inner_track_rrect(cache, (cache.x, cache.y));
     if radius == 0.0 {
         let reveal = FillShape::Rect(fill_rect);
-        cache.fill.draw(canvas, &reveal, |paint| reveal.draw(canvas, paint));
+        cache
+            .fill
+            .draw(canvas, &reveal, |paint| reveal.draw(canvas, paint));
         return;
     }
     if cache.track_fill_flat {
-        cache.fill.draw(canvas, &FillShape::Rect(fill_rect), |paint| {
-            canvas.save();
-            canvas.clip_rect(fill_rect, ClipOp::Intersect, true);
-            canvas.draw_rrect(inner_rrect, paint);
-            canvas.restore();
-        });
+        cache
+            .fill
+            .draw(canvas, &FillShape::Rect(fill_rect), |paint| {
+                canvas.save();
+                canvas.clip_rect(fill_rect, ClipOp::Intersect, true);
+                canvas.draw_rrect(inner_rrect, paint);
+                canvas.restore();
+            });
         return;
     }
     let revealed_length = match cache.orientation {

@@ -2,19 +2,13 @@
  * Supports widget editing flows related to diving profile widget editor.
  */
 
-import { Map, Mountain, Palette } from 'lucide-react'
+import { Mountain, Palette } from 'lucide-react'
 import { SectionHeading } from '@/components/ui/section-heading'
-import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
+import { ColorField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection } from './widgetEditorSections'
+import PlotMarkerSection from './PlotMarkerSection'
 import { Label } from '@/components/ui/label'
 import { useTranslation } from 'react-i18next'
-import { translateOptions } from '@/i18n'
-
-const MARKER_VARIANT_OPTIONS = [
-  { value: 'single', labelKey: 'widget-editor.singleCircle', defaultLabel: 'Single Circle' },
-  { value: 'ring', labelKey: 'widget-editor.concentricRing', defaultLabel: 'Concentric Ring' },
-  { value: 'halo', labelKey: 'widget-editor.solidHalo', defaultLabel: 'Solid Halo' },
-]
 
 /**
  * Renders the diving profile widget editor component.
@@ -27,20 +21,12 @@ const MARKER_VARIANT_OPTIONS = [
  */
 export default function DivingProfileWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
   const { t } = useTranslation()
-  const markerVariantOptions = translateOptions(MARKER_VARIANT_OPTIONS, t)
   const lineWidth = widget.data.completed_line_width
   const remainingLineOpacity = widget.data.remaining_line_opacity
   const yScale = widget.data.y_scale
   const simplifyTolerance = widget.data.simplify_tolerance_px
   const targetDensity = widget.data.target_density
-  const markerSize = widget.data.marker_size
-  const markerOpacity = widget.data.marker_opacity
-  const markerVariant = widget.data.marker_variant
-  const markerVariantDiameter = widget.data.marker_variant_diameter
   const labelFontSize = widget.data.point_label.font_size
-  const showVariantDiameter = markerVariant !== 'single'
-  const variantDiameterLabel =
-    markerVariant === 'ring' ? t('widget-editor.ringDiameter', 'Ring Diameter') : t('widget-editor.haloDiameter', 'Halo Diameter')
   return (
     <>
       <DimensionsSection widget={widget} setNumericField={setNumericField} />
@@ -217,57 +203,12 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
           </div>
         </div>
       </div>
-      <div className="space-y-4">
-        <SectionHeading icon={Map} title={t('widget-editor.marker', 'Marker')} />
-        <div className="grid grid-cols-2 gap-4">
-          <SelectField
-            label={t('widget-editor.markerType', 'Marker Type')}
-            value={markerVariant}
-            options={markerVariantOptions}
-            onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
-          />
-          <SizeSlider
-            label={t('widget-editor.size', 'Size')}
-            value={markerSize}
-            min={1}
-            max={50}
-            step={1}
-            valueDisplay={`${markerSize}`}
-            suffix="px"
-            onChange={(value) => updateWidgetSize(widget.id, { marker_size: value })}
-            onCommit={() => commitWidgetSize(widget.id)}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField value={widget.data.marker_color} onChange={(value) => updateWidgetData(widget.id, { marker_color: value })} />
-          <SliderField
-            editable
-            label={t('widget-editor.opacity', 'Opacity')}
-            value={markerOpacity}
-            min={0}
-            max={100}
-            step={1}
-            valueDisplay={`${markerOpacity}`}
-            suffix="%"
-            onSliderChange={(value) => updateWidgetData(widget.id, { marker_opacity: value })}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          {showVariantDiameter ? (
-            <SizeSlider
-              label={variantDiameterLabel}
-              value={markerVariantDiameter}
-              min={Math.max(Math.round(markerSize * 2), 4)}
-              max={120}
-              step={1}
-              valueDisplay={`${markerVariantDiameter}`}
-              suffix="px"
-              onChange={(value) => updateWidgetSize(widget.id, { marker_variant_diameter: value })}
-              onCommit={() => commitWidgetSize(widget.id)}
-            />
-          ) : null}
-        </div>
-      </div>
+      <PlotMarkerSection
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
+      />
 
       <div className="space-y-4">
         <SectionHeading icon={Mountain} title={t('widget-editor.labels', 'Labels')} />

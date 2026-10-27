@@ -1,5 +1,8 @@
 use super::validation::ValidatedLabel;
-use crate::{model::scene::{Numerals, ValidatedScenePresentation}, render::text::{ResolvedTextStyle, parse_color}};
+use crate::{
+    model::scene::{Numerals, ValidatedScenePresentation},
+    render::text::{parse_color, ResolvedTextStyle},
+};
 use skia_safe::Color;
 
 /// Resolves a text style from a validated label and scene config.
@@ -30,12 +33,13 @@ pub fn validated_label_style(
         line_height: validated.font_size * scale * 0.92,
         color,
         opacity,
-        shadow_color: (!scene.shadow_color.is_empty()).then(|| parse_color(&scene.shadow_color, opacity)),
+        shadow_color: (!scene.shadow_color.is_empty())
+            .then(|| parse_color(&scene.shadow_color, opacity)),
         shadow_strength: scene.shadow_strength * scale,
         shadow_distance: scene.shadow_distance * scale,
-        border_color: (!scene.border_color.is_empty()).then(|| parse_color(&scene.border_color, opacity)),
+        border_color: (!scene.border_color.is_empty())
+            .then(|| parse_color(&scene.border_color, opacity)),
         border_thickness: scene.border_thickness * scale,
         numerals: Numerals::Default,
     }
 }
-

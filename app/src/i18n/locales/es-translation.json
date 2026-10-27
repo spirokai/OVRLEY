@@ -554,6 +554,7 @@
       "lapLog": "Registro de vueltas"
     },
     "types": {
+      "rolling_chart": { "name": "Gráficos", "shortName": "Gráficos" },
       "diving_profile": {
         "name": "Perfil de buceo",
         "shortName": "Perfil de buceo"
@@ -614,6 +615,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Métricas",
+    "chartMetric": "Métrica",
+    "addMetric": "Añadir métrica",
+    "moveUp": "Subir",
+    "moveDown": "Bajar",
+    "removeMetric": "Quitar métrica",
+    "timeWindow": "Ventana de tiempo",
+    "fill": "Relleno",
+    "areaOpacity": "Opacidad del área",
+    "legend": "Leyenda",
     "decompressionCeiling": "Techo de descompresión",
     "ceilingLineColor": "Color de la línea",
     "ceilingAreaColor": "Color del área",

@@ -595,7 +595,7 @@
           "arc_angle": 270,
           "tick_count": 9,
           "tick_length": 9,
-          "tick_color": "#8c8c8c",
+          "tick_color": "#adadad",
           "glow": 0.6,
           "track_fill_style": "fill",
           "inner_widget_offset_x": 0,
@@ -623,6 +623,7 @@
   "definitions": [
     {
       "type": "depth",
+      "plottable": true,
       "activity": {
         "column": { "unit": "m", "zeroIsAvailable": true },
         "sources": ["depth"],
@@ -728,6 +729,7 @@
     },
     {
       "type": "average_ppo2",
+      "plottable": true,
       "activity": {
         "column": { "unit": "ata", "zeroIsAvailable": true },
         "sources": ["average_ppo2"],
@@ -779,6 +781,7 @@
     },
     {
       "type": "water_temperature",
+      "plottable": true,
       "activity": {
         "column": { "unit": "celsius", "zeroIsAvailable": true },
         "sources": ["water_temperature"],
@@ -808,6 +811,7 @@
     },
     {
       "type": "speed",
+      "plottable": true,
       "activity": {
         "column": {
           "idleValue": "zero",
@@ -950,6 +954,7 @@
     },
     {
       "type": "distance_to_home",
+      "plottable": true,
       "activity": {
         "column": {
           "rawSample": false,
@@ -1076,6 +1081,7 @@
     },
     {
       "type": "heartrate",
+      "plottable": true,
       "activity": {
         "column": {
           "unit": "bpm"
@@ -1108,6 +1114,7 @@
     },
     {
       "type": "cadence",
+      "plottable": true,
       "activity": {
         "column": {
           "idleValue": "zero",
@@ -1140,6 +1147,7 @@
     },
     {
       "type": "power",
+      "plottable": true,
       "activity": {
         "column": {
           "idleValue": "zero",
@@ -1172,6 +1180,7 @@
     },
     {
       "type": "engine_power",
+      "plottable": true,
       "activity": {
         "column": {
           "unit": "watts"
@@ -1203,6 +1212,7 @@
     },
     {
       "type": "engine_load",
+      "plottable": true,
       "activity": {
         "column": {
           "unit": "percent"
@@ -1234,6 +1244,7 @@
     },
     {
       "type": "temperature",
+      "plottable": true,
       "activity": {
         "column": {
           "unit": "celsius"
@@ -1309,6 +1320,7 @@
     },
     {
       "type": "g_force",
+      "plottable": true,
       "activity": {
         "column": {
           "idleValue": "zero",
@@ -1349,6 +1361,7 @@
     },
     {
       "type": "air_pressure",
+      "plottable": true,
       "activity": {
         "column": {
           "unit": "bar"
@@ -1397,6 +1410,7 @@
     },
     {
       "type": "ground_contact_time",
+      "plottable": true,
       "activity": {
         "column": {
           "idleValue": "missing",
@@ -1466,6 +1480,7 @@
     },
     {
       "type": "stride_length",
+      "plottable": true,
       "activity": {
         "column": {
           "idleValue": "missing",
@@ -1515,6 +1530,7 @@
     },
     {
       "type": "stroke_rate",
+      "plottable": true,
       "activity": {
         "column": {
           "idleValue": "zero",
@@ -1548,6 +1564,7 @@
     },
     {
       "type": "torque",
+      "plottable": true,
       "activity": {
         "column": {
           "idleValue": "missing",
@@ -1581,6 +1598,7 @@
     },
     {
       "type": "vertical_speed",
+      "plottable": true,
       "activity": {
         "column": {
           "idleValue": "zero",
@@ -1668,6 +1686,7 @@
     },
     {
       "type": "vertical_ratio",
+      "plottable": true,
       "activity": {
         "column": {
           "input": false,
@@ -1703,6 +1722,7 @@
     },
     {
       "type": "vertical_oscillation",
+      "plottable": true,
       "activity": {
         "column": {
           "idleValue": "missing",
@@ -1742,6 +1762,7 @@
     },
     {
       "type": "core_temperature",
+      "plottable": true,
       "activity": {
         "column": {
           "unit": "celsius"
@@ -1815,6 +1836,7 @@
     },
     {
       "type": "altitude",
+      "plottable": true,
       "activity": {
         "coverageSource": "elevation",
         "sources": ["barometric_altitude", "elevation"],
@@ -2058,6 +2080,7 @@
     },
     {
       "type": "rpm",
+      "plottable": true,
       "activity": {
         "column": {
           "rawSample": false,
@@ -2091,6 +2114,7 @@
     },
     {
       "type": "throttle_position",
+      "plottable": true,
       "activity": {
         "column": {
           "rawSample": false,
@@ -2123,6 +2147,7 @@
     },
     {
       "type": "brake_position",
+      "plottable": true,
       "activity": {
         "column": {
           "rawSample": false,
@@ -2155,6 +2180,7 @@
     },
     {
       "type": "lean_angle",
+      "plottable": true,
       "activity": {
         "column": {
           "idleValue": "zero",
@@ -2242,6 +2268,7 @@
   ],
   "widgetDefaults": {
     "metric": true,
+    "plottable": false,
     "globalBindings": {
       "font": "font_values",
       "color": "color_values",

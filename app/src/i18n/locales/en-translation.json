@@ -554,6 +554,7 @@
       "lapLog": "Lap Log"
     },
     "types": {
+      "rolling_chart": { "name": "Charts", "shortName": "Charts" },
       "diving_profile": {
         "name": "Diving Profile",
         "shortName": "Dive Profile"
@@ -614,6 +615,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Metrics",
+    "chartMetric": "Metric",
+    "addMetric": "Add metric",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "removeMetric": "Remove metric",
+    "timeWindow": "Time Window",
+    "fill": "Fill",
+    "areaOpacity": "Area Opacity",
+    "legend": "Legend",
     "decompressionCeiling": "Decompression Ceiling",
     "ceilingLineColor": "Line Color",
     "ceilingAreaColor": "Area Color",

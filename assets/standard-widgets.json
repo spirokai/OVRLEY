@@ -39,6 +39,7 @@
   },
   "widgetDefaults": {
     "current": true,
+    "plottable": false,
     "metric": false,
     "layoutMode": "intrinsic",
     "displayTypes": [],
@@ -162,6 +163,7 @@
     },
     {
       "type": "gradient",
+      "plottable": true,
       "activity": {
         "column": {
           "idleValue": "zero",
@@ -348,6 +350,62 @@
           "font_size": 21,
           "color": "#30c4d1"
         }
+      }
+    },
+    {
+      "type": "rolling_chart",
+      "activity": {
+        "sources": [],
+        "requires": []
+      },
+      "nameKey": "widgets.types.rolling_chart.name",
+      "shortNameKey": "widgets.types.rolling_chart.shortName",
+      "category": "general",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-rolling-chart.svg"
+      },
+      "collection": "plots",
+      "layoutMode": "boxed",
+      "timeDependent": true,
+      "globalBindings": {
+        "opacity": "opacity",
+        "legend_font": "font_values",
+        "legend_color": "color_values"
+      },
+      "chartLimits": {
+        "maxSeries": 5,
+        "minWindowSeconds": 5,
+        "maxWindowSeconds": 300
+      },
+      "seriesPalette": ["#ffffff", "#e0103a", "#30c4d1", "#f5b700", "#7ed957"],
+      "defaults": {
+        "value": "rolling_chart",
+        "x": 100,
+        "y": 100,
+        "width": 360,
+        "height": 130,
+        "opacity": 1,
+        "window_seconds": 30,
+        "line_width": 4,
+        "line_opacity": 100,
+        "line_curve": 50,
+        "area_fill": true,
+        "area_gradient": true,
+        "area_opacity": 60,
+        "series": [
+          { "metric": "speed", "color": "#ffffff" },
+          { "metric": "heartrate", "color": "#e0103a" }
+        ],
+        "show_marker": true,
+        "marker_variant": "halo",
+        "marker_variant_diameter": 18,
+        "marker_size": 5,
+        "marker_opacity": 100,
+        "show_legend": true,
+        "legend_font": "Arial.ttf",
+        "legend_font_size": 13,
+        "legend_color": "#ffffff"
       }
     },
     {
