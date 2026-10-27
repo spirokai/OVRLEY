@@ -173,7 +173,8 @@ pub fn prepare_lean_angle_cache(
                     scene.shadow_strength * scale,
                 ) {
                     canvas.save();
-                    canvas.translate((scene.shadow_distance * scale, scene.shadow_distance * scale));
+                    canvas
+                        .translate((scene.shadow_distance * scale, scene.shadow_distance * scale));
                     canvas.draw_path(&border_path, &paint);
                     canvas.restore();
                 }

@@ -544,6 +544,7 @@
       "headingTape": "方位テープ",
       "heartZones": "心拍ゾーン",
       "lapTimer": "ラップタイム",
+      "splitsRun": "スプリット",
       "leanAngle": "傾斜角",
       "linear": "リニアバー",
       "text": "テキスト"
@@ -555,6 +556,7 @@
       "lapLog": "ラップログ"
     },
     "types": {
+      "rolling_chart": { "name": "チャート", "shortName": "チャート" },
       "diving_profile": {
         "name": "ダイビングプロファイル",
         "shortName": "潜水プロファイル"
@@ -594,6 +596,7 @@
       "iso": { "name": "ISO", "shortName": "ISO" },
       "label": { "name": "テキスト", "shortName": "テキスト" },
       "lap_timer": { "name": "ラップタイマー", "shortName": "ラップタイム" },
+      "splits_run": { "name": "ランニングスプリット", "shortName": "スプリット" },
       "lean_angle": { "name": "傾斜角", "shortName": "傾斜角" },
       "left_right_balance": { "name": "左右バランス", "shortName": "左右バランス" },
       "pace": { "name": "ペース", "shortName": "ペース" },
@@ -614,6 +617,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "指標",
+    "chartMetric": "指標",
+    "addMetric": "指標を追加",
+    "moveUp": "上へ移動",
+    "moveDown": "下へ移動",
+    "removeMetric": "指標を削除",
+    "timeWindow": "時間範囲",
+    "fill": "塗りつぶし",
+    "areaOpacity": "塗りの不透明度",
+    "legend": "凡例",
     "decompressionCeiling": "減圧シーリング",
     "ceilingLineColor": "線の色",
     "ceilingAreaColor": "領域の色",
@@ -734,6 +747,17 @@
     "compass": "コンパス",
     "compassDial": "ダイヤル",
     "heartZones": "ゾーン",
+    "splits": "スプリット",
+    "splitLength": "スプリット距離",
+    "splitColumns": "列",
+    "splitColumnSplit": "スプリット",
+    "splitColumnBar": "バー",
+    "splitColumnPace": "ペース",
+    "maxSplits": "最大スプリット数",
+    "rowGap": "行間",
+    "bar": "バー",
+    "barHeight": "バーの高さ",
+    "barWidth": "バーの幅",
     "zoneCalculation": "ゾーン計算",
     "zoneCalculationLthr": "乳酸閾値心拍数",
     "zoneCalculationMaxHeartrate": "最大心拍数",

@@ -6,9 +6,11 @@ use super::{
 use crate::{
     error::{WidgetError, WidgetResult},
     host::WidgetHost,
-    model::scene::{validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation},
+    model::scene::{
+        validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
+    },
     render::pixels::read_surface_rgba,
-    widgets::value::preview::{surface, SHAPE_COLOR_TYPE, TileBounds, WidgetGeometry},
+    widgets::value::preview::{surface, TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
 };
 use skia_safe::{Canvas, Color};
 
@@ -49,9 +51,13 @@ impl PreviewBackdrop {
         read_surface_rgba(&mut surface, &mut pixels)?;
         let bounds = TileBounds::from(bounds);
         let geometry = serde_json::to_vec(&WidgetGeometry::new(
-            bounds, (width, height), preview_raster_scale.value(),
-            frame.content_bounds.width(), frame.content_bounds.into(),
-        )).map_err(|e| WidgetError::Render(e.to_string()))?;
+            bounds,
+            (width, height),
+            preview_raster_scale.value(),
+            frame.content_bounds.width(),
+            frame.content_bounds.into(),
+        ))
+        .map_err(|e| WidgetError::Render(e.to_string()))?;
         Ok(Self {
             pixels,
             geometry,

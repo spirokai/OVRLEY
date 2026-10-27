@@ -10,11 +10,23 @@ use crate::{
         preview::{PreviewRasterScale, StaticRaster},
         text::parse_color,
     },
-    widgets::value::preview::{SHAPE_COLOR_TYPE, ContentBounds},
+    widgets::{
+        plot_marker::PlotMarker,
+        value::preview::{ContentBounds, SHAPE_COLOR_TYPE},
+    },
 };
-use skia_safe::{
-    BlurStyle, Canvas, MaskFilter, Paint, PaintCap, PaintJoin, Path, Point, Rect,
-};
+
+fn route_marker(config: &ValidatedRoutePlot, scene: &ValidatedScenePresentation) -> PlotMarker {
+    PlotMarker::new(
+        config.marker_variant,
+        config.marker_size,
+        config.marker_variant_diameter,
+        &config.marker_color,
+        config.marker_opacity * scene.opacity,
+        scene.scale,
+    )
+}
+use skia_safe::{BlurStyle, Canvas, MaskFilter, Paint, PaintCap, PaintJoin, Path, Point, Rect};
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
@@ -28,8 +40,7 @@ pub struct RouteLayout {
     content_bounds: ContentBounds,
     scale: [f32; 2],
     completed_paint: Paint,
-    marker_paint: Paint,
-    variant_paint: Paint,
+    marker: PlotMarker,
 }
 
 struct RemainingStroke {
@@ -175,7 +186,11 @@ impl RouteLayout {
                     canvas.translate((offset[0], offset[1]));
                     canvas.scale((scale[0], scale[1]));
                     let mut paint = stroke_paint(&scene.shadow_color, width / scale[0], opacity);
-                    paint.set_mask_filter(MaskFilter::blur(BlurStyle::Normal, blur / scale[0], true));
+                    paint.set_mask_filter(MaskFilter::blur(
+                        BlurStyle::Normal,
+                        blur / scale[0],
+                        true,
+                    ));
                     canvas.draw_path(&path, &paint);
                     canvas.restore();
                 }
@@ -196,21 +211,7 @@ impl RouteLayout {
             (config.completed_line_width * scene.scale).max(1.0) / scale[0],
             config.completed_line_opacity * scene.opacity,
         );
-        let mut marker_paint = Paint::default();
-        marker_paint.set_anti_alias(true);
-        let marker_opacity = config.marker_opacity * scene.opacity;
-        marker_paint.set_color(parse_color(&config.marker_color, marker_opacity));
-        let mut variant_paint = marker_paint.clone();
-        match config.marker_variant.as_str() {
-            "ring" => {
-                variant_paint.set_style(skia_safe::paint::Style::Stroke);
-                variant_paint.set_stroke_width(1.5);
-            }
-            "halo" => {
-                variant_paint.set_color(parse_color(&config.marker_color, marker_opacity * 0.35));
-            }
-            _ => {}
-        }
+        let marker = route_marker(&config, &scene);
         Ok(Self {
             config,
             scene,
@@ -220,8 +221,7 @@ impl RouteLayout {
             content_bounds,
             scale,
             completed_paint,
-            marker_paint,
-            variant_paint,
+            marker,
         })
     }
 
@@ -247,12 +247,7 @@ impl RouteLayout {
         let content = Self::measure_content(config, scene, geometry);
         let mut raster = content;
         let scale = geometry.scale_to(config).map(|value| value * scene.scale);
-        let marker_radius = (config.marker_size * scene.scale).max(2.0);
-        let radius = match config.marker_variant.as_str() {
-            "ring" => marker_radius.max(config.marker_variant_diameter * scene.scale * 0.5 + 0.75),
-            "halo" => marker_radius.max(config.marker_variant_diameter * scene.scale * 0.5),
-            _ => marker_radius,
-        };
+        let radius = route_marker(config, scene).extent();
         // Allocate marker overflow for the entire path once; playback cannot resize the raster.
         raster.join(scaled_rect(geometry.point_bounds, scale).with_outset((radius, radius)));
         if config.remaining_line_opacity > 0.0 {
@@ -288,15 +283,7 @@ impl RouteLayout {
             frame.state.marker_x * scale[0],
             frame.state.marker_y * scale[1],
         );
-        let variant_radius = self.config.marker_variant_diameter * self.scene.scale * 0.5;
-        if self.config.marker_variant != "single" {
-            canvas.draw_circle(point, variant_radius, &self.variant_paint);
-        }
-        canvas.draw_circle(
-            point,
-            (self.config.marker_size * self.scene.scale).max(2.0),
-            &self.marker_paint,
-        );
+        self.marker.draw(canvas, point);
         canvas.restore();
     }
 }

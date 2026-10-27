@@ -12,13 +12,14 @@ use crate::{
         text::{parse_color, resolve_font, FontResolver, ResolvedTextStyle},
     },
     widgets::{
+        plot_marker::PlotMarker,
         route::layout::{outward, rotated_rect, scaled_rect, stroke_paint},
-        value::preview::{SHAPE_COLOR_TYPE, ContentBounds},
+        value::preview::{ContentBounds, SHAPE_COLOR_TYPE},
     },
 };
 use skia_safe::{
-    gradient, path_utils, BlurStyle, Canvas, ClipOp, Color4f, MaskFilter, Matrix, Paint,
-    Path, PathBuilder, Point, Rect, TileMode,
+    gradient, path_utils, BlurStyle, Canvas, ClipOp, Color4f, MaskFilter, Matrix, Paint, Path,
+    PathBuilder, Point, Rect, TileMode,
 };
 use std::sync::{Arc, Mutex};
 
@@ -39,8 +40,7 @@ pub struct ElevationLayout {
     completed_line: Paint,
     completed_area: Paint,
     completed_area_clip: Arc<Mutex<Path>>,
-    marker: Paint,
-    variant: Paint,
+    marker: PlotMarker,
 }
 
 struct ElevationMeasure {
@@ -61,6 +61,20 @@ pub struct ElevationFrame {
     pub content_bounds: ContentBounds,
     marker: (f32, f32),
     labels: [Option<Arc<LabelRun>>; 2],
+}
+
+fn elevation_marker(
+    config: &ValidatedElevationPlot,
+    scene: &ValidatedScenePresentation,
+) -> PlotMarker {
+    PlotMarker::new(
+        config.marker_variant,
+        config.marker_size,
+        config.marker_variant_diameter,
+        &config.marker_color,
+        config.marker_opacity * scene.opacity,
+        scene.scale,
+    )
 }
 
 fn fill_paint(color: &str, opacity: f32) -> Paint {
@@ -142,14 +156,7 @@ impl ElevationLayout {
             0.0,
         ));
         let content = Self::measure_content(config, scene);
-        let radius =
-            (config.marker_size * scene.scale)
-                .max(2.0)
-                .max(match config.marker_variant.as_str() {
-                    "ring" => config.marker_variant_diameter * scene.scale * 0.5 + 0.75,
-                    "halo" => config.marker_variant_diameter * scene.scale * 0.5,
-                    _ => 0.0,
-                });
+        let radius = elevation_marker(config, scene).extent();
         let mut raster = content;
         raster.join(
             Rect::new(
@@ -261,7 +268,15 @@ impl ElevationLayout {
         elevation_range: Option<(f64, f64)>,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Rect> {
-        Ok(Self::measure(config, scene, geometry, altitude_offset_m, elevation_range, fonts)?.bounds)
+        Ok(Self::measure(
+            config,
+            scene,
+            geometry,
+            altitude_offset_m,
+            elevation_range,
+            fonts,
+        )?
+        .bounds)
     }
 
     pub fn new(
@@ -283,7 +298,14 @@ impl ElevationLayout {
             bounds,
             content_bounds,
             rotation: (sin, cos),
-        } = Self::measure(&config, &scene, &geometry, altitude_offset_m, elevation_range, fonts)?;
+        } = Self::measure(
+            &config,
+            &scene,
+            &geometry,
+            altitude_offset_m,
+            elevation_range,
+            fonts,
+        )?;
         let paths = geometry.paths.lock().expect("elevation paths lock");
         let matrix = Matrix::scale((scale[0], scale[1]));
         let path = paths.0.with_transform(&matrix);
@@ -344,21 +366,7 @@ impl ElevationLayout {
             config.area_completed_opacity * scene.opacity,
             area_gradient_height,
         )?;
-        let marker = fill_paint(&config.marker_color, config.marker_opacity * scene.opacity);
-        let mut variant = marker.clone();
-        match config.marker_variant.as_str() {
-            "ring" => {
-                variant.set_style(skia_safe::paint::Style::Stroke);
-                variant.set_stroke_width(1.5);
-            }
-            "halo" => {
-                variant = fill_paint(
-                    &config.marker_color,
-                    config.marker_opacity * scene.opacity * 0.35,
-                )
-            }
-            _ => {}
-        }
+        let marker = elevation_marker(&config, &scene);
         Ok(Self {
             config,
             scene,
@@ -375,7 +383,6 @@ impl ElevationLayout {
             completed_area,
             completed_area_clip,
             marker,
-            variant,
         })
     }
 
@@ -450,18 +457,7 @@ impl ElevationLayout {
         canvas.draw_path(&line, &self.completed_line);
         canvas.restore();
         // Circular markers need only their scene position; avoid rotating their rasterization.
-        if self.config.marker_variant != "single" {
-            canvas.draw_circle(
-                frame.marker,
-                self.config.marker_variant_diameter * self.scene.scale * 0.5,
-                &self.variant,
-            );
-        }
-        canvas.draw_circle(
-            frame.marker,
-            (self.config.marker_size * self.scene.scale).max(2.0),
-            &self.marker,
-        );
+        self.marker.draw(canvas, frame.marker);
         for (index, run) in frame.labels.iter().enumerate() {
             if let Some(run) = run {
                 self.labels[index]

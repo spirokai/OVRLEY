@@ -10,6 +10,7 @@ use crate::error::{WidgetError, WidgetResult};
 use crate::model::validation::{
     require_f32, require_hex_color, require_non_negative_f32, require_opacity, require_positive_f32,
 };
+use crate::widgets::plot_marker::MarkerVariant;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedRoutePlot {
@@ -26,7 +27,7 @@ pub struct ValidatedRoutePlot {
     pub remaining_line_width: f32,
     pub remaining_line_color: String,
     pub remaining_line_opacity: f32,
-    pub marker_variant: String,
+    pub marker_variant: MarkerVariant,
     pub marker_variant_diameter: f32,
     pub marker_size: f32,
     pub marker_color: String,
@@ -80,15 +81,7 @@ pub fn validate_route_plot(
     let marker_size = require_positive_f32(Some(plot.marker_size), &p("marker_size"))?;
     let marker_color = require_hex_color(Some(&plot.marker_color), &p("marker_color"))?;
     let marker_opacity = require_opacity(Some(plot.marker_opacity), &p("marker_opacity"))?;
-    let marker_variant = match plot.marker_variant.as_str() {
-        "single" | "ring" | "halo" => plot.marker_variant.clone(),
-        _ => {
-            return Err(WidgetError::Config(format!(
-                "{}: unsupported marker variant",
-                p("marker_variant")
-            )))
-        }
-    };
+    let marker_variant = MarkerVariant::parse(&plot.marker_variant, &p("marker_variant"))?;
     let marker_variant_diameter = require_positive_f32(
         Some(plot.marker_variant_diameter),
         &p("marker_variant_diameter"),

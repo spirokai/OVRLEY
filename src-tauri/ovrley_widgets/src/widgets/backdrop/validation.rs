@@ -47,7 +47,10 @@ struct BackdropShared {
     border_opacity: f32,
 }
 
-pub fn validate_backdrop(backdrop: &BackdropConfig, index: usize) -> WidgetResult<ValidatedBackdrop> {
+pub fn validate_backdrop(
+    backdrop: &BackdropConfig,
+    index: usize,
+) -> WidgetResult<ValidatedBackdrop> {
     let promoted = backdrop.with_promoted_display_variant(backdrop.display_type.as_str())?;
     let p = |field: &str| format!("backdrops[{index}].{field}");
 
@@ -94,11 +97,7 @@ fn validate_circle_backdrop(
 ) -> WidgetResult<ValidatedBackdrop> {
     let p = |field: &str| format!("backdrops[{index}].{field}");
     let diameter = require_positive_f32(backdrop.diameter, &p("diameter"))?;
-    require_border_fits_dimension(
-        shared.border_thickness,
-        diameter,
-        &p("border_thickness"),
-    )?;
+    require_border_fits_dimension(shared.border_thickness, diameter, &p("border_thickness"))?;
 
     Ok(ValidatedBackdrop {
         id: shared.id,

@@ -43,7 +43,9 @@ pub fn validate_label(label: &LabelConfig, index: usize) -> WidgetResult<Validat
     let text = label.text.clone();
 
     if !label.x.is_finite() || !label.y.is_finite() {
-        return Err(WidgetError::Config("label coordinates must be finite".into()));
+        return Err(WidgetError::Config(
+            "label coordinates must be finite".into(),
+        ));
     }
 
     // x, y: required
@@ -65,9 +67,9 @@ pub fn validate_label(label: &LabelConfig, index: usize) -> WidgetResult<Validat
     }
 
     // font_size: required
-    let font_size = label
-        .font_size
-        .ok_or_else(|| WidgetError::Config(format!("{}: required field missing", p("font_size"))))?;
+    let font_size = label.font_size.ok_or_else(|| {
+        WidgetError::Config(format!("{}: required field missing", p("font_size")))
+    })?;
 
     if !font_size.is_finite() || font_size <= 0.0 {
         return Err(WidgetError::Config(format!(

@@ -34,7 +34,9 @@ pub fn resize_heart_zones(
     point: [f32; 2],
 ) -> WidgetResult<ResizeUpdate> {
     if size.iter().any(|value| !value.is_finite() || *value <= 0.0) {
-        return Err(WidgetError::Config("invalid heart zones resize size".into()));
+        return Err(WidgetError::Config(
+            "invalid heart zones resize size".into(),
+        ));
     }
     let config = validate_heart_zones(widget, 0)?;
     let scale = validate_scene_presentation(scene)?.scale;

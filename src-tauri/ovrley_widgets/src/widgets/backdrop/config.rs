@@ -1,7 +1,10 @@
+use crate::{
+    error::{WidgetError, WidgetResult},
+    model::types::BackdropType,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
-use crate::{error::{WidgetError, WidgetResult}, model::types::BackdropType};
 
 /// Static geometric backdrop drawn below other widgets.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -47,20 +50,28 @@ pub struct BackdropConfig {
     pub extra: BTreeMap<String, Value>,
 }
 
-
 impl BackdropConfig {
     /// Resolve saved active-variant fields at ingress. Explicit flat fields win.
     pub(super) fn with_promoted_display_variant(&self, variant_key: &str) -> WidgetResult<Self> {
         let mut raw = serde_json::to_value(self)
             .map_err(|e| WidgetError::Config(format!("backdrop config serialization: {e}")))?;
         // Option fields serialize as null; omit them before promoting saved geometry.
-        raw.as_object_mut().expect("serialized backdrop is an object").retain(|_, value| !value.is_null());
-        if let Some(variant) = self.display_variants.get(variant_key).and_then(Value::as_object) {
-            let root = raw.as_object_mut().expect("serialized backdrop is an object");
+        raw.as_object_mut()
+            .expect("serialized backdrop is an object")
+            .retain(|_, value| !value.is_null());
+        if let Some(variant) = self
+            .display_variants
+            .get(variant_key)
+            .and_then(Value::as_object)
+        {
+            let root = raw
+                .as_object_mut()
+                .expect("serialized backdrop is an object");
             for (key, value) in variant {
                 root.entry(key.clone()).or_insert_with(|| value.clone());
             }
         }
-        serde_json::from_value(raw).map_err(|e| WidgetError::Config(format!("backdrop config: {e}")))
+        serde_json::from_value(raw)
+            .map_err(|e| WidgetError::Config(format!("backdrop config: {e}")))
     }
 }

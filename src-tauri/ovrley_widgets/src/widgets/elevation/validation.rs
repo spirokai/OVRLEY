@@ -5,6 +5,7 @@ use crate::{
         scene::ValidatedScenePresentation,
         validation::{require_f32, require_hex_color, require_opacity, require_positive_f32},
     },
+    widgets::plot_marker::MarkerVariant,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -29,7 +30,7 @@ pub struct ValidatedElevationPlot {
     pub area_completed_opacity: f32,
     /// Fades both area fills from their opacity at the plot top to transparent at its bottom.
     pub area_gradient: bool,
-    pub marker_variant: String,
+    pub marker_variant: MarkerVariant,
     pub marker_variant_diameter: f32,
     pub marker_size: f32,
     pub marker_color: String,
@@ -71,12 +72,6 @@ pub fn validate_elevation_plot(
         return Err(WidgetError::Config(format!(
             "{}: must be elevation",
             p("value")
-        )));
-    }
-    if !matches!(plot.marker_variant.as_str(), "single" | "ring" | "halo") {
-        return Err(WidgetError::Config(format!(
-            "{}: unsupported marker variant",
-            p("marker_variant")
         )));
     }
     let altitude_scale = match plot.starting_altitude_unit.as_deref() {
@@ -135,7 +130,7 @@ pub fn validate_elevation_plot(
         area_completed_color: color(&plot.area_completed_color, "area_completed_color")?,
         area_completed_opacity: opacity(plot.area_completed_opacity, "area_completed_opacity")?,
         area_gradient: plot.area_gradient,
-        marker_variant: plot.marker_variant.clone(),
+        marker_variant: MarkerVariant::parse(&plot.marker_variant, &p("marker_variant"))?,
         marker_variant_diameter: positive(plot.marker_variant_diameter, "marker_variant_diameter")?,
         marker_size: positive(plot.marker_size, "marker_size")?,
         marker_color: color(&plot.marker_color, "marker_color")?,

@@ -6,9 +6,11 @@ use crate::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
     host::WidgetHost,
-    model::scene::{validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation},
-    render::text::FontResolver,
+    model::scene::{
+        validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
+    },
     render::preview::{render_tile, PreviewRasterScale},
+    render::text::FontResolver,
     widgets::value::{
         config::ValueConfig,
         preview::{TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},

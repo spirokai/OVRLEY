@@ -544,6 +544,7 @@
       "headingTape": "Cinta de rumbo",
       "heartZones": "Zonas cardíacas",
       "lapTimer": "Tiempos de vuelta",
+      "splitsRun": "Parciales",
       "leanAngle": "Ángulo de inclinación",
       "linear": "Barra lineal",
       "text": "Texto"
@@ -555,6 +556,7 @@
       "lapLog": "Registro de vueltas"
     },
     "types": {
+      "rolling_chart": { "name": "Gráficos", "shortName": "Gráficos" },
       "diving_profile": {
         "name": "Perfil de buceo",
         "shortName": "Perfil de buceo"
@@ -594,6 +596,7 @@
       "iso": { "name": "ISO", "shortName": "ISO" },
       "label": { "name": "Texto", "shortName": "Texto" },
       "lap_timer": { "name": "Temporizador de vueltas", "shortName": "Vueltas" },
+      "splits_run": { "name": "Parciales de carrera", "shortName": "Parciales" },
       "lean_angle": { "name": "Ángulo de inclinación", "shortName": "Inclinación" },
       "left_right_balance": { "name": "Equilibrio izquierda/derecha", "shortName": "Izq./der." },
       "pace": { "name": "Ritmo", "shortName": "Ritmo" },
@@ -614,6 +617,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Métricas",
+    "chartMetric": "Métrica",
+    "addMetric": "Añadir métrica",
+    "moveUp": "Subir",
+    "moveDown": "Bajar",
+    "removeMetric": "Quitar métrica",
+    "timeWindow": "Ventana de tiempo",
+    "fill": "Relleno",
+    "areaOpacity": "Opacidad del área",
+    "legend": "Leyenda",
     "decompressionCeiling": "Techo de descompresión",
     "ceilingLineColor": "Color de la línea",
     "ceilingAreaColor": "Color del área",
@@ -734,6 +747,17 @@
     "compass": "Brújula",
     "compassDial": "Esfera",
     "heartZones": "Zonas",
+    "splits": "Parciales",
+    "splitLength": "Longitud del parcial",
+    "splitColumns": "Columnas",
+    "splitColumnSplit": "Parcial",
+    "splitColumnBar": "Barra",
+    "splitColumnPace": "Ritmo",
+    "maxSplits": "Máx. parciales",
+    "rowGap": "Espacio entre filas",
+    "bar": "Barra",
+    "barHeight": "Altura de barra",
+    "barWidth": "Ancho de barra",
     "zoneCalculation": "Cálculo de zonas",
     "zoneCalculationLthr": "FC umbral láctico",
     "zoneCalculationMaxHeartrate": "FC máxima",

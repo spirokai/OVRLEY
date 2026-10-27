@@ -544,6 +544,7 @@
       "headingTape": "Fita de direção",
       "heartZones": "Zonas cardíacas",
       "lapTimer": "Tempos de volta",
+      "splitsRun": "Parciais",
       "leanAngle": "Ângulo de inclinação",
       "linear": "Barra linear",
       "text": "Texto"
@@ -555,6 +556,7 @@
       "lapLog": "Registro de voltas"
     },
     "types": {
+      "rolling_chart": { "name": "Gráficos", "shortName": "Gráficos" },
       "diving_profile": {
         "name": "Perfil de mergulho",
         "shortName": "Perfil de mergulho"
@@ -594,6 +596,7 @@
       "iso": { "name": "ISO", "shortName": "ISO" },
       "label": { "name": "Texto", "shortName": "Texto" },
       "lap_timer": { "name": "Cronômetro de voltas", "shortName": "Tempos de volta" },
+      "splits_run": { "name": "Parciais de corrida", "shortName": "Parciais" },
       "lean_angle": { "name": "Ângulo de inclinação", "shortName": "Inclinação" },
       "left_right_balance": { "name": "Equilíbrio esquerda/direita", "shortName": "Esq./dir." },
       "pace": { "name": "Ritmo", "shortName": "Ritmo" },
@@ -614,6 +617,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Métricas",
+    "chartMetric": "Métrica",
+    "addMetric": "Adicionar métrica",
+    "moveUp": "Mover para cima",
+    "moveDown": "Mover para baixo",
+    "removeMetric": "Remover métrica",
+    "timeWindow": "Janela de tempo",
+    "fill": "Preenchimento",
+    "areaOpacity": "Opacidade da área",
+    "legend": "Legenda",
     "decompressionCeiling": "Teto de descompressão",
     "ceilingLineColor": "Cor da linha",
     "ceilingAreaColor": "Cor da área",
@@ -734,6 +747,17 @@
     "compass": "Bússola",
     "compassDial": "Mostrador",
     "heartZones": "Zonas",
+    "splits": "Parciais",
+    "splitLength": "Distância da parcial",
+    "splitColumns": "Colunas",
+    "splitColumnSplit": "Parcial",
+    "splitColumnBar": "Barra",
+    "splitColumnPace": "Ritmo",
+    "maxSplits": "Máx. de parciais",
+    "rowGap": "Espaço entre linhas",
+    "bar": "Barra",
+    "barHeight": "Altura da barra",
+    "barWidth": "Largura da barra",
     "zoneCalculation": "Cálculo das zonas",
     "zoneCalculationLthr": "FC do limiar de lactato",
     "zoneCalculationMaxHeartrate": "FC máxima",

@@ -13,7 +13,10 @@ pub struct BackdropFrame<'a> {
 impl BackdropFrame<'_> {
     pub fn draw(&self, canvas: &Canvas, scene_opacity: f32) {
         draw_backdrop(
-            canvas, self.backdrop, self.scale, self.backdrop.opacity * scene_opacity,
+            canvas,
+            self.backdrop,
+            self.scale,
+            self.backdrop.opacity * scene_opacity,
         );
     }
 }
@@ -31,5 +34,10 @@ pub fn prepare_backdrop_frame(backdrop: &ValidatedBackdrop, scale: f32) -> Backd
         content_bounds.right.ceil() + 1.0,
         content_bounds.bottom.ceil() + 1.0,
     );
-    BackdropFrame { bounds, content_bounds, backdrop, scale }
+    BackdropFrame {
+        bounds,
+        content_bounds,
+        backdrop,
+        scale,
+    }
 }

@@ -2,7 +2,7 @@
 //!
 //! Every widget draws through the same engine as the editor preview, in the
 //! export's layer order: backdrops, rasters and labels (the static layer), then
-//! intrinsic values, boxed values, routes, elevation plots and diving profiles.
+//! intrinsic values, boxed values, routes, elevation plots, diving profiles and rolling charts.
 //!
 //! Widgets sample the activity like the preview does: at the activity second of
 //! each dense frame. Export planning keeps ownership of update-rate decimation
@@ -21,7 +21,10 @@
 
 use super::{atlas::{AtlasPlan, SlotPlacement}, surface::wrap_native_surface, FrameSize};
 use crate::{
-    activity::schema::{DenseActivityReport, ParsedActivity},
+    activity::{
+        schema::{DenseActivityReport, ParsedActivity},
+        splits::derive_split_table,
+    },
     debug::RenderProfiler,
     error::{CoreError, CoreResult},
     fonts::NativeFonts,
@@ -34,7 +37,10 @@ use ovrley_widgets::{
     model::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode},
     preview_widget::{FrameKey, PreviewWidget, ValidatedWidget},
     render::{image::RasterImage, text::FontResolver},
-    widgets::{raster::image::downsample_raster, value::preview::TileBounds},
+    widgets::{
+        raster::image::downsample_raster,
+        value::{preview::TileBounds, validation::ValidatedValue},
+    },
 };
 use skia_safe::{AlphaType, ColorType, Data, IRect, Image};
 use std::{num::NonZeroUsize, path::PathBuf, sync::Arc, thread, time::Instant};
@@ -103,8 +109,20 @@ impl<'a> ExportWidgets<'a> {
         let activity = profiler.measure("prepare.activity_sampler", || -> CoreResult<_> {
             let bytes = serde_json::to_vec(activity)
                 .map_err(|error| CoreError::Render(format!("activity serialization: {error}")))?;
+            // Each configured split length gets its table before workers build their widgets.
+            let split_tables: Vec<_> = config
+                .values
+                .iter()
+                .filter_map(|value| match value {
+                    ValidatedValue::SplitsRun(widget) => Some(derive_split_table(activity, widget.length)),
+                    _ => None,
+                })
+                .collect();
             let mut activity = ActivitySampler::from_json(&bytes)?;
             activity.select_laps(scene.disabled_laps.clone())?;
+            for table in split_tables {
+                activity.insert_split_table(table);
+            }
             Ok(activity)
         })?;
         let rasters = profiler.measure("prepare.rasters", || {
@@ -253,6 +271,7 @@ impl<'a> ExportWidgets<'a> {
         layers.extend(config.course_plots.iter().map(|widget| (ValidatedWidget::Route(widget), Layer::Dynamic)));
         layers.extend(config.elevation_plots.iter().map(|widget| (ValidatedWidget::Elevation(widget), Layer::Dynamic)));
         layers.extend(config.diving_profiles.iter().map(|widget| (ValidatedWidget::DivingProfile(widget), Layer::Dynamic)));
+        layers.extend(config.rolling_charts.iter().map(|widget| (ValidatedWidget::RollingChart(widget), Layer::Dynamic)));
         layers
     }
 

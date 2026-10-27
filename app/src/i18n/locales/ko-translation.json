@@ -544,6 +544,7 @@
       "headingTape": "방향 테이프",
       "heartZones": "심박 구간",
       "lapTimer": "랩 타임",
+      "splitsRun": "스플릿",
       "leanAngle": "기울기 각도",
       "linear": "선형 막대",
       "text": "텍스트"
@@ -555,6 +556,7 @@
       "lapLog": "랩 기록"
     },
     "types": {
+      "rolling_chart": { "name": "차트", "shortName": "차트" },
       "diving_profile": {
         "name": "다이빙 프로필",
         "shortName": "잠수 프로필"
@@ -594,6 +596,7 @@
       "iso": { "name": "ISO", "shortName": "ISO" },
       "label": { "name": "텍스트", "shortName": "텍스트" },
       "lap_timer": { "name": "랩 타이머", "shortName": "랩 타임" },
+      "splits_run": { "name": "러닝 스플릿", "shortName": "스플릿" },
       "lean_angle": { "name": "기울기 각도", "shortName": "기울기" },
       "left_right_balance": { "name": "좌/우 균형", "shortName": "좌/우 균형" },
       "pace": { "name": "페이스", "shortName": "페이스" },
@@ -614,6 +617,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "지표",
+    "chartMetric": "지표",
+    "addMetric": "지표 추가",
+    "moveUp": "위로 이동",
+    "moveDown": "아래로 이동",
+    "removeMetric": "지표 제거",
+    "timeWindow": "시간 범위",
+    "fill": "채우기",
+    "areaOpacity": "영역 불투명도",
+    "legend": "범례",
     "decompressionCeiling": "감압 천장",
     "ceilingLineColor": "선 색상",
     "ceilingAreaColor": "영역 색상",
@@ -734,6 +747,17 @@
     "compass": "나침반",
     "compassDial": "다이얼",
     "heartZones": "구간",
+    "splits": "스플릿",
+    "splitLength": "스플릿 거리",
+    "splitColumns": "열",
+    "splitColumnSplit": "스플릿",
+    "splitColumnBar": "막대",
+    "splitColumnPace": "페이스",
+    "maxSplits": "최대 스플릿 수",
+    "rowGap": "행 간격",
+    "bar": "막대",
+    "barHeight": "막대 높이",
+    "barWidth": "막대 너비",
     "zoneCalculation": "구간 계산",
     "zoneCalculationLthr": "젖산 역치 심박수",
     "zoneCalculationMaxHeartrate": "최대 심박수",

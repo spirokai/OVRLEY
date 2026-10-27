@@ -183,6 +183,15 @@ export function previewActivity(activityId) {
   return invokeCommand('backend_preview_activity', { activityId })
 }
 
+/**
+ * @param {string} activityId Native snapshot identity.
+ * @param {{distance: number, unit: string}} length Split length configured on a splits widget.
+ * @returns {Promise<ArrayBuffer>} Serialized split table derived by Rust core.
+ */
+export function previewSplitTable(activityId, length) {
+  return invokeCommand('backend_preview_split_table', { activityId, length })
+}
+
 /** @param {string} activityId Snapshot no longer owned by the editor or stashed telemetry. @returns {Promise<void>} */
 export function releasePreviewActivity(activityId) {
   return invokeCommand('backend_release_preview_activity', { activityId })

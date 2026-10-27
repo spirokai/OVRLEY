@@ -6,7 +6,9 @@ use crate::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
     host::WidgetHost,
-    model::scene::{validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation},
+    model::scene::{
+        validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
+    },
     render::text::FontResolver,
     render::{
         preview::{render_tile, PreviewRasterScale},
@@ -14,7 +16,7 @@ use crate::{
     },
     widgets::value::{
         config::ValueConfig,
-        preview::{TEXT_COLOR_TYPE, TileBounds, WidgetGeometry},
+        preview::{TileBounds, WidgetGeometry, TEXT_COLOR_TYPE},
     },
 };
 use skia_safe::{Canvas, Surface};
@@ -38,7 +40,11 @@ impl PreviewGradient {
     pub fn new(widget: ValueConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
         let config = validate_gradient_widget(widget, 0)?;
         let host = WidgetHost::from_scene(&scene)?;
-        Ok(Self::from_validated(config, &validate_scene_presentation(scene)?, &host))
+        Ok(Self::from_validated(
+            config,
+            &validate_scene_presentation(scene)?,
+            &host,
+        ))
     }
 
     pub fn from_validated(
@@ -70,7 +76,12 @@ impl PreviewGradient {
 
     fn frame(&self, raw: Option<f64>, fonts: &dyn FontResolver) -> WidgetResult<GradientFrame> {
         prepare_gradient_frame(
-            &self.config, &self.style, raw, self.scale, self.scene_opacity, fonts,
+            &self.config,
+            &self.style,
+            raw,
+            self.scale,
+            self.scene_opacity,
+            fonts,
         )
     }
 

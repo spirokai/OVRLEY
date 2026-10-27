@@ -544,6 +544,7 @@
       "headingTape": "Kursband",
       "heartZones": "Herzfrequenzzonen",
       "lapTimer": "Rundenzeiten",
+      "splitsRun": "Splits",
       "leanAngle": "Neigungswinkel",
       "linear": "Linearer Balken",
       "text": "Text"
@@ -555,6 +556,7 @@
       "lapLog": "Rundenprotokoll"
     },
     "types": {
+      "rolling_chart": { "name": "Diagramme", "shortName": "Diagramme" },
       "diving_profile": {
         "name": "Tauchprofil",
         "shortName": "Tauchprofil"
@@ -594,6 +596,7 @@
       "iso": { "name": "ISO", "shortName": "ISO" },
       "label": { "name": "Text", "shortName": "Text" },
       "lap_timer": { "name": "Rundentimer", "shortName": "Runden" },
+      "splits_run": { "name": "Lauf-Splits", "shortName": "Splits" },
       "lean_angle": { "name": "Neigungswinkel", "shortName": "Neigung" },
       "left_right_balance": { "name": "Links/Rechts-Balance", "shortName": "L/R-Balance" },
       "pace": { "name": "Tempo", "shortName": "Tempo" },
@@ -614,6 +617,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Messwerte",
+    "chartMetric": "Messwert",
+    "addMetric": "Messwert hinzufügen",
+    "moveUp": "Nach oben",
+    "moveDown": "Nach unten",
+    "removeMetric": "Messwert entfernen",
+    "timeWindow": "Zeitfenster",
+    "fill": "Füllung",
+    "areaOpacity": "Flächendeckkraft",
+    "legend": "Legende",
     "decompressionCeiling": "Dekompressionsgrenze",
     "ceilingLineColor": "Linienfarbe",
     "ceilingAreaColor": "Flächenfarbe",
@@ -734,6 +747,17 @@
     "compass": "Kompass",
     "compassDial": "Skala",
     "heartZones": "Zonen",
+    "splits": "Splits",
+    "splitLength": "Split-Länge",
+    "splitColumns": "Spalten",
+    "splitColumnSplit": "Split",
+    "splitColumnBar": "Balken",
+    "splitColumnPace": "Pace",
+    "maxSplits": "Max. Splits",
+    "rowGap": "Zeilenabstand",
+    "bar": "Balken",
+    "barHeight": "Balkenhöhe",
+    "barWidth": "Balkenbreite",
     "zoneCalculation": "Zonenberechnung",
     "zoneCalculationLthr": "Laktatschwellen-HF",
     "zoneCalculationMaxHeartrate": "Maximale HF",

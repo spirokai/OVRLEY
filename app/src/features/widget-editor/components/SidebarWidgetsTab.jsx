@@ -14,6 +14,7 @@ import BackdropWidgetEditor from './BackdropWidgetEditor'
 import RasterWidgetEditor from './RasterWidgetEditor'
 import ElevationWidgetEditor from './ElevationWidgetEditor'
 import DivingProfileWidgetEditor from './DivingProfileWidgetEditor'
+import RollingChartWidgetEditor from './RollingChartWidgetEditor'
 import GradientWidgetEditor from './GradientWidgetEditor'
 import MetricWidgetEditor from './metricWidget/MetricWidgetEditor'
 import RouteMapWidgetEditor from './RouteMapWidgetEditor'
@@ -41,6 +42,7 @@ const WIDGET_EDITOR_MAP = {
   course: RouteMapWidgetEditor,
   elevation: ElevationWidgetEditor,
   diving_profile: DivingProfileWidgetEditor,
+  rolling_chart: RollingChartWidgetEditor,
 }
 
 /**

@@ -13,7 +13,6 @@ use crate::runtime_paths;
 use ovrley_core::error::RenderPathError;
 use serde::Serialize;
 use std::path::PathBuf;
-use tauri::Manager;
 
 /// Returns the default save path for a user template under the documents folder.
 #[tauri::command]
@@ -21,9 +20,7 @@ pub(crate) fn default_template_save_path(
     app: tauri::AppHandle,
     filename: String,
 ) -> Result<String, String> {
-    let mut path = app.path().document_dir().map_err(|e| e.to_string())?;
-    path.push("OVRLEY");
-    path.push("templates");
+    let mut path = runtime_paths::user_data_root(&app)?.join("templates");
     std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
     path.push(filename);
     Ok(path.to_string_lossy().to_string())

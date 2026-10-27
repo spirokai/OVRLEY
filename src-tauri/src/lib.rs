@@ -81,6 +81,7 @@ pub fn run() {
             tauri_commands::backend_font_capabilities,
             tauri_commands::backend_font_data,
             widget_preview::backend_preview_activity,
+            widget_preview::backend_preview_split_table,
             widget_preview::backend_release_preview_activity,
             widget_preview::backend_preview_font,
             tauri_commands::backend_render,

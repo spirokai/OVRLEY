@@ -5,13 +5,13 @@
 
 use crate::error::{WidgetError, WidgetResult};
 use crate::model::validation::{require_bool, require_hex_color};
-use crate::render::text::parse_color;
 use crate::render::preview::{PreviewRasterScale, StaticRaster};
+use crate::render::text::parse_color;
 use crate::widgets::value::preview::SHAPE_COLOR_TYPE;
 use serde::{Deserialize, Serialize};
 use skia_safe::{
-    gradient, paint::Style, Canvas, ClipOp, Color4f, Matrix, Paint, Path, Point,
-    RRect, Rect, Shader, TileMode,
+    gradient, paint::Style, Canvas, ClipOp, Color4f, Matrix, Paint, Path, Point, RRect, Rect,
+    Shader, TileMode,
 };
 
 pub const MIN_GRADIENT_STOPS: usize = 2;
@@ -244,7 +244,10 @@ mod tests {
     use skia_safe::{surfaces, Color};
 
     fn stop(offset: f32, color: &str) -> GradientStop {
-        GradientStop { offset, color: color.into() }
+        GradientStop {
+            offset,
+            color: color.into(),
+        }
     }
 
     fn p(field: &str) -> String {
@@ -254,18 +257,28 @@ mod tests {
     fn pixel(paint: &Paint, point: (i32, i32)) -> Color {
         let mut surface = surfaces::raster_n32_premul((200, 200)).unwrap();
         surface.canvas().draw_paint(paint);
-        surface.image_snapshot().peek_pixels().unwrap().get_color(point)
+        surface
+            .image_snapshot()
+            .peek_pixels()
+            .unwrap()
+            .get_color(point)
     }
 
     #[test]
     fn validation_sorts_stops_and_rejects_malformed_input() {
         let stops = || vec![stop(1.0, "#0000ff"), stop(0.0, "#ff0000")];
-        let fill = validate_track_fill_color(Some("#ffffff"), Some(true), Some(stops()), p).unwrap();
-        assert_eq!(fill, TrackFillColor::Gradient(vec![stop(0.0, "#ff0000"), stop(1.0, "#0000ff")]));
-        let fill = validate_track_fill_color(Some("#ffffff"), Some(false), Some(stops()), p).unwrap();
+        let fill =
+            validate_track_fill_color(Some("#ffffff"), Some(true), Some(stops()), p).unwrap();
+        assert_eq!(
+            fill,
+            TrackFillColor::Gradient(vec![stop(0.0, "#ff0000"), stop(1.0, "#0000ff")])
+        );
+        let fill =
+            validate_track_fill_color(Some("#ffffff"), Some(false), Some(stops()), p).unwrap();
         assert_eq!(fill, TrackFillColor::Solid("#ffffff".into()));
 
-        let validate = |stops| validate_track_fill_color(Some("#fff000"), Some(true), Some(stops), p);
+        let validate =
+            |stops| validate_track_fill_color(Some("#fff000"), Some(true), Some(stops), p);
         assert!(validate(vec![stop(0.0, "#ff0000")]).is_err());
         assert!(validate(vec![stop(0.0, "#ff0000"), stop(1.5, "#0000ff")]).is_err());
         assert!(validate(vec![stop(0.0, "blue"), stop(1.0, "#0000ff")]).is_err());
@@ -277,9 +290,14 @@ mod tests {
     fn sweep_runs_along_a_negative_sweep_and_clamps_cap_overhang() {
         let fill = TrackFillColor::Gradient(vec![stop(0.0, "#ff0000"), stop(1.0, "#0000ff")]);
         // Bottom-left corner: 0° sweeping counter-clockwise to -90°.
-        let paint = fill.sweep_paint(1.0, Point::new(100.0, 100.0), 0.0, -90.0).unwrap();
-        let (start, end, start_overhang) =
-            (pixel(&paint, (190, 99)), pixel(&paint, (101, 10)), pixel(&paint, (190, 110)));
+        let paint = fill
+            .sweep_paint(1.0, Point::new(100.0, 100.0), 0.0, -90.0)
+            .unwrap();
+        let (start, end, start_overhang) = (
+            pixel(&paint, (190, 99)),
+            pixel(&paint, (101, 10)),
+            pixel(&paint, (190, 110)),
+        );
         assert!(start.r() > 240 && start.b() < 15, "{start:?}");
         assert!(end.b() > 240 && end.r() < 15, "{end:?}");
         assert!(start_overhang.r() > 240, "{start_overhang:?}");
@@ -288,12 +306,17 @@ mod tests {
     #[test]
     fn mirrored_sweep_is_symmetric_about_the_center() {
         let fill = TrackFillColor::Gradient(vec![stop(0.0, "#ff0000"), stop(1.0, "#0000ff")]);
-        let paint = fill.mirrored_sweep_paint(1.0, Point::new(100.0, 100.0), 270.0, 60.0).unwrap();
+        let paint = fill
+            .mirrored_sweep_paint(1.0, Point::new(100.0, 100.0), 270.0, 60.0)
+            .unwrap();
         let center = pixel(&paint, (100, 10));
         // Pixel centers 39.5 and 160.5 mirror about x = 100.
         let (left, right) = (pixel(&paint, (39, 60)), pixel(&paint, (160, 60)));
         assert!(center.r() > 240 && center.b() < 15, "{center:?}");
-        assert!(left.r().abs_diff(right.r()) <= 1 && left.b().abs_diff(right.b()) <= 1, "{left:?} {right:?}");
+        assert!(
+            left.r().abs_diff(right.r()) <= 1 && left.b().abs_diff(right.b()) <= 1,
+            "{left:?} {right:?}"
+        );
         assert!(left.b() > left.r(), "{left:?}");
     }
 }

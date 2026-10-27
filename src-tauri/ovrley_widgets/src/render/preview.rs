@@ -120,10 +120,14 @@ pub(crate) fn render_tile(
 ) -> WidgetResult<(u32, u32, Rect)> {
     let bounds = raster_scale.align(bounds);
     let (width, height) = raster_scale.aligned_dimensions(bounds);
-    if surface.as_ref().map(|surface| (surface.width(), surface.height()))
+    if surface
+        .as_ref()
+        .map(|surface| (surface.width(), surface.height()))
         != Some((width as i32, height as i32))
     {
-        *surface = Some(crate::widgets::value::preview::surface(width, height, color_type)?);
+        *surface = Some(crate::widgets::value::preview::surface(
+            width, height, color_type,
+        )?);
         pixels.resize(width as usize * height as usize * 4, 0);
     }
     let surface = surface.as_mut().expect("tile surface allocated");

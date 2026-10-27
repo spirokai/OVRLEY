@@ -16,9 +16,12 @@ use crate::{
         },
         types::MetricKind,
     },
-    widgets::value::{
-        format::{resolve_metric_display_value, MetricSample},
-        validation::ValidatedValueWidget,
+    widgets::{
+        splits_run::table::{SplitLength, SplitTable},
+        value::{
+            format::{resolve_metric_display_value, MetricSample},
+            validation::ValidatedValueWidget,
+        },
     },
 };
 use serde::Deserialize;
@@ -132,6 +135,8 @@ pub struct ActivitySampler {
     full_activity_distance: Option<f64>,
     full_activity_total_ascent: Option<f64>,
     lap_timing: crate::widgets::lap_timer::sampling::LapTiming,
+    /// Split tables the host derived from this activity, one per configured split length.
+    split_tables: Vec<SplitTable>,
 }
 impl ActivitySampler {
     pub fn from_json(bytes: &[u8]) -> WidgetResult<Self> {
@@ -282,6 +287,7 @@ impl ActivitySampler {
             full_activity_distance,
             full_activity_total_ascent,
             lap_timing: activity.lap_timing,
+            split_tables: Vec::new(),
         };
         sampler.select_laps(Vec::new())?;
         Ok(sampler)
@@ -329,6 +335,16 @@ impl ActivitySampler {
             .select(disabled, &self.numeric[&MetricKind::Distance].values)
     }
 
+    /// Adds or replaces the table for its split length.
+    pub fn insert_split_table(&mut self, table: SplitTable) {
+        self.split_tables.retain(|existing| existing.length != table.length);
+        self.split_tables.push(table);
+    }
+
+    pub fn split_table(&self, length: SplitLength) -> Option<&SplitTable> {
+        self.split_tables.iter().find(|table| table.length == length)
+    }
+
     pub fn lap_history(&self) -> crate::widgets::lap_timer::format::LapHistory<'_> {
         self.lap_timing.history(self.end)
     }
@@ -361,6 +377,43 @@ impl ActivitySampler {
             return None;
         }
         column.at(&self.times, second)
+    }
+
+    /// Rolling charts plot observed coverage only; a missing sample breaks the line.
+    pub fn plot_value(&self, metric: MetricKind, second: f64) -> Option<f64> {
+        let column = &self.numeric[&metric];
+        if second < 0.0 || second > self.end || !column.contains(second) {
+            return None;
+        }
+        column.at(&self.times, second)
+    }
+
+    /// Recorded samples strictly inside `(start, end)`: the corners `plot_value` joins with
+    /// straight segments. None for angular and stepped columns, which never round, or when
+    /// more than `limit` samples fall inside.
+    pub fn plot_knots(&self, metric: MetricKind, start: f64, end: f64, limit: usize) -> Option<Vec<(f64, f64)>> {
+        let column = &self.numeric[&metric];
+        let inside = |count: usize, time: &dyn Fn(usize) -> f64| {
+            let first = partition(count, |i| time(i) <= start + 1e-9);
+            first..partition(count, |i| time(i) < end - 1e-9).max(first)
+        };
+        match column.policy {
+            InterpolationKind::Linear => {
+                let knots = inside(column.points.len(), &|i| column.points[i].0);
+                (knots.len() <= limit).then(|| column.points[knots].to_vec())
+            }
+            // Missing samples between observed ones read as zero, as in `at`.
+            InterpolationKind::Preserve => {
+                let knots = inside(self.times.len(), &|i| self.times[i]);
+                (knots.len() <= limit).then(|| knots.map(|i| (self.times[i], column.values[i].unwrap_or(0.0))).collect())
+            }
+            InterpolationKind::Angular | InterpolationKind::Hold => None,
+        }
+    }
+
+    /// Observed minimum and maximum over the whole activity, which a rolling chart spans.
+    pub fn plot_range(&self, metric: MetricKind) -> Option<(f64, f64)> {
+        self.numeric[&metric].range
     }
 
     /// Heading uses the shortest arc while retaining gap bridging and edge clamping.
@@ -446,4 +499,18 @@ impl ActivitySampler {
         }
         sample
     }
+}
+
+/// First index in `0..count` where `before` turns false; `before` must be monotone.
+fn partition(count: usize, before: impl Fn(usize) -> bool) -> usize {
+    let (mut low, mut high) = (0, count);
+    while low < high {
+        let mid = (low + high) / 2;
+        if before(mid) {
+            low = mid + 1;
+        } else {
+            high = mid;
+        }
+    }
+    low
 }

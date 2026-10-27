@@ -544,6 +544,7 @@
       "headingTape": "Heading Tape",
       "heartZones": "Heart Zones",
       "lapTimer": "Lap Times",
+      "splitsRun": "Splits",
       "leanAngle": "Lean Angle",
       "linear": "Linear Bar",
       "text": "Text"
@@ -555,6 +556,7 @@
       "lapLog": "Lap Log"
     },
     "types": {
+      "rolling_chart": { "name": "Charts", "shortName": "Charts" },
       "diving_profile": {
         "name": "Diving Profile",
         "shortName": "Dive Profile"
@@ -594,6 +596,7 @@
       "iso": { "name": "ISO", "shortName": "ISO" },
       "label": { "name": "Text", "shortName": "Text" },
       "lap_timer": { "name": "Lap Timer", "shortName": "Lap Times" },
+      "splits_run": { "name": "Running Splits", "shortName": "Splits" },
       "lean_angle": { "name": "Lean Angle", "shortName": "Lean" },
       "left_right_balance": { "name": "Left/Right Balance", "shortName": "L/R Bal." },
       "pace": { "name": "Pace", "shortName": "Pace" },
@@ -614,6 +617,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Metrics",
+    "chartMetric": "Metric",
+    "addMetric": "Add metric",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "removeMetric": "Remove metric",
+    "timeWindow": "Time Window",
+    "fill": "Fill",
+    "areaOpacity": "Area Opacity",
+    "legend": "Legend",
     "decompressionCeiling": "Decompression Ceiling",
     "ceilingLineColor": "Line Color",
     "ceilingAreaColor": "Area Color",
@@ -734,6 +747,17 @@
     "compass": "Compass",
     "compassDial": "Dial",
     "heartZones": "Zones",
+    "splits": "Splits",
+    "splitLength": "Split Length",
+    "splitColumns": "Columns",
+    "splitColumnSplit": "Split",
+    "splitColumnBar": "Bar",
+    "splitColumnPace": "Pace",
+    "maxSplits": "Max Splits",
+    "rowGap": "Row Gap",
+    "bar": "Bar",
+    "barHeight": "Bar Height",
+    "barWidth": "Bar Width",
     "zoneCalculation": "Zone Calculation",
     "zoneCalculationLthr": "Lactate Threshold HR",
     "zoneCalculationMaxHeartrate": "Max Heart Rate",

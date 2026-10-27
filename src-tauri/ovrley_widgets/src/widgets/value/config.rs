@@ -1,6 +1,6 @@
 use crate::model::types::{DisplayType, MetricKind, TrackFillStyle};
-use crate::widgets::heart_zones::zones::HeartZoneRange;
 use crate::render::track_fill::GradientStop;
+use crate::widgets::heart_zones::zones::HeartZoneRange;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -106,6 +106,20 @@ pub struct ValueConfig {
     #[serde(default)]
     pub label: Option<String>,
     #[serde(default)]
+    pub split_distance: Option<f64>,
+    #[serde(default)]
+    pub split_unit: Option<String>,
+    #[serde(default)]
+    pub max_splits: Option<u32>,
+    #[serde(default)]
+    pub visible_columns: Option<Vec<String>>,
+    #[serde(default)]
+    pub row_gap: Option<f32>,
+    #[serde(default)]
+    pub bar_width: Option<f32>,
+    #[serde(default)]
+    pub track_border_opacity: Option<f32>,
+    #[serde(default)]
     pub positive_delta_color: Option<String>,
     #[serde(default)]
     pub negative_delta_color: Option<String>,
@@ -159,7 +173,11 @@ pub struct ValueConfig {
     pub track_filled_gradient_stops: Option<Vec<GradientStop>>,
     #[serde(default)]
     pub track_fill_flat: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_track_fill_style")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_track_fill_style"
+    )]
     pub track_fill_style: Option<TrackFillStyle>,
     #[serde(default)]
     pub bar_count: Option<u32>,
@@ -289,6 +307,8 @@ pub struct ValueConfig {
 
 // Omitted track_fill_style retains the documented continuous-fill default;
 // malformed present values, including null, must fail at ingress.
-fn deserialize_track_fill_style<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<TrackFillStyle>, D::Error> {
+fn deserialize_track_fill_style<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<TrackFillStyle>, D::Error> {
     TrackFillStyle::deserialize(deserializer).map(Some)
 }

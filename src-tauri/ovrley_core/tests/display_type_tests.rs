@@ -24,6 +24,7 @@ fn recognized_display_type_strings_parse_to_expected_variants() {
         (r#""heart_zones""#, DisplayType::HeartZones),
         (r#""lean_angle""#, DisplayType::LeanAngle),
         (r#""g_force""#, DisplayType::GForce),
+        (r#""splits_run""#, DisplayType::SplitsRun),
     ];
 
     for (json_value, expected) in cases {
@@ -65,6 +66,7 @@ fn display_type_round_trips_each_variant() {
         (DisplayType::HeartZones, r#""heart_zones""#),
         (DisplayType::LeanAngle, r#""lean_angle""#),
         (DisplayType::GForce, r#""g_force""#),
+        (DisplayType::SplitsRun, r#""splits_run""#),
     ];
 
     for (variant, expected_json) in cases {
@@ -277,5 +279,9 @@ fn display_type_is_intrinsic_only_for_text() {
     assert_eq!(
         display_type_layout_mode(DisplayType::GForce),
         DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::SplitsRun),
+        DisplayTypeLayoutMode::Intrinsic
     );
 }

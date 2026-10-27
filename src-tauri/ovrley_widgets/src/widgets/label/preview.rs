@@ -1,11 +1,17 @@
-use super::{config::LabelConfig, frame::{prepare_label_frame, LabelFrame}, validation::{validate_label, ValidatedLabel}};
+use super::{
+    config::LabelConfig,
+    frame::{prepare_label_frame, LabelFrame},
+    validation::{validate_label, ValidatedLabel},
+};
 use crate::{
     error::{WidgetError, WidgetResult},
     host::WidgetHost,
-    model::scene::{validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation},
-    render::text::FontResolver,
+    model::scene::{
+        validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
+    },
     render::pixels::read_surface_rgba,
-    widgets::value::preview::{surface, SHAPE_COLOR_TYPE, TileBounds, WidgetGeometry},
+    render::text::FontResolver,
+    widgets::value::preview::{surface, TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
 };
 use skia_safe::{Canvas, Color};
 
@@ -19,13 +25,22 @@ pub struct PreviewLabel {
 }
 
 impl PreviewLabel {
-    pub fn new(widget: LabelConfig, scene: ScenePresentationConfig, fonts: &dyn FontResolver) -> WidgetResult<Self> {
+    pub fn new(
+        widget: LabelConfig,
+        scene: ScenePresentationConfig,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<Self> {
         let label = validate_label(&widget, 0)?;
         let host = WidgetHost::from_scene(&scene)?;
         Self::from_validated(&label, &validate_scene_presentation(scene)?, &host, fonts)
     }
 
-    pub fn from_validated(label: &ValidatedLabel, scene: &ValidatedScenePresentation, host: &WidgetHost, fonts: &dyn FontResolver) -> WidgetResult<Self> {
+    pub fn from_validated(
+        label: &ValidatedLabel,
+        scene: &ValidatedScenePresentation,
+        host: &WidgetHost,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<Self> {
         let preview_raster_scale = host.raster_scale;
         let frame = prepare_label_frame(label, scene, fonts)?;
         let bounds = frame.bounds;
@@ -39,8 +54,21 @@ impl PreviewLabel {
         let mut pixels = vec![0; width as usize * height as usize * 4];
         read_surface_rgba(&mut surface, &mut pixels)?;
         let bounds = TileBounds::from(bounds);
-        let geometry = serde_json::to_vec(&WidgetGeometry::new(bounds, (width, height), preview_raster_scale.value(), frame.content_width, frame.content_bounds.into())).map_err(|e| WidgetError::Render(e.to_string()))?;
-        Ok(Self { pixels, geometry, bounds, revision: 1, frame })
+        let geometry = serde_json::to_vec(&WidgetGeometry::new(
+            bounds,
+            (width, height),
+            preview_raster_scale.value(),
+            frame.content_width,
+            frame.content_bounds.into(),
+        ))
+        .map_err(|e| WidgetError::Render(e.to_string()))?;
+        Ok(Self {
+            pixels,
+            geometry,
+            bounds,
+            revision: 1,
+            frame,
+        })
     }
 
     /// Static text: every sample draws into the same rectangle.

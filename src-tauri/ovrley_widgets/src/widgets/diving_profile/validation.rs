@@ -5,6 +5,7 @@ use crate::{
         scene::ValidatedScenePresentation,
         validation::{require_f32, require_hex_color, require_opacity, require_positive_f32},
     },
+    widgets::plot_marker::MarkerVariant,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -29,7 +30,7 @@ pub struct ValidatedDivingProfile {
     pub ceiling_line_opacity: f32,
     pub ceiling_area_color: String,
     pub ceiling_area_opacity: f32,
-    pub marker_variant: String,
+    pub marker_variant: MarkerVariant,
     pub marker_variant_diameter: f32,
     pub marker_size: f32,
     pub marker_color: String,
@@ -72,12 +73,6 @@ pub fn validate_diving_profile(
             p("value")
         )));
     }
-    if !matches!(plot.marker_variant.as_str(), "single" | "ring" | "halo") {
-        return Err(WidgetError::Config(format!(
-            "{}: unsupported marker variant",
-            p("marker_variant")
-        )));
-    }
     if plot
         .point_label
         .font
@@ -115,7 +110,7 @@ pub fn validate_diving_profile(
         ceiling_line_opacity: opacity(plot.ceiling_line_opacity, "ceiling_line_opacity")?,
         ceiling_area_color: color(&plot.ceiling_area_color, "ceiling_area_color")?,
         ceiling_area_opacity: opacity(plot.ceiling_area_opacity, "ceiling_area_opacity")?,
-        marker_variant: plot.marker_variant.clone(),
+        marker_variant: MarkerVariant::parse(&plot.marker_variant, &p("marker_variant"))?,
         marker_variant_diameter: positive(plot.marker_variant_diameter, "marker_variant_diameter")?,
         marker_size: positive(plot.marker_size, "marker_size")?,
         marker_color: color(&plot.marker_color, "marker_color")?,

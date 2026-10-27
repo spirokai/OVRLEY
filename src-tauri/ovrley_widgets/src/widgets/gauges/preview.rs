@@ -11,11 +11,11 @@ use crate::{
     model::scene::{
         validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
     },
-    render::text::FontResolver,
     render::preview::{render_tile, PreviewRasterScale},
+    render::text::FontResolver,
     widgets::value::{
         config::ValueConfig,
-        preview::{SHAPE_COLOR_TYPE, TileBounds, WidgetGeometry},
+        preview::{TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
     },
 };
 use skia_safe::{Canvas, Surface};
@@ -40,7 +40,11 @@ impl PreviewGauge {
     pub fn new(widget: ValueConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
         let widget = ValidatedGauge::new(widget)?;
         let host = WidgetHost::from_scene(&scene)?;
-        Ok(Self::from_validated(widget, validate_scene_presentation(scene)?, &host))
+        Ok(Self::from_validated(
+            widget,
+            validate_scene_presentation(scene)?,
+            &host,
+        ))
     }
 
     pub fn from_validated(

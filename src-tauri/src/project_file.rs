@@ -23,7 +23,6 @@ use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
-use tauri::Manager;
 use uuid::Uuid;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
@@ -53,12 +52,7 @@ const THUMBNAIL_FILTER: &str =
 
 #[tauri::command]
 pub(crate) fn default_project_directory(app: tauri::AppHandle) -> Result<String, String> {
-    let directory = app
-        .path()
-        .document_dir()
-        .map_err(|error| error.to_string())?
-        .join("OVRLEY")
-        .join("projects");
+    let directory = crate::runtime_paths::user_data_root(&app)?.join("projects");
     fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
     Ok(path_string(directory))
 }

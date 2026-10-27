@@ -544,6 +544,7 @@
       "headingTape": "Riktningsband",
       "heartZones": "Pulszoner",
       "lapTimer": "Varvtider",
+      "splitsRun": "Mellantider",
       "leanAngle": "Lutningsvinkel",
       "linear": "Linjär stapel",
       "text": "Text"
@@ -555,6 +556,7 @@
       "lapLog": "Varvlogg"
     },
     "types": {
+      "rolling_chart": { "name": "Diagram", "shortName": "Diagram" },
       "diving_profile": {
         "name": "Dykprofil",
         "shortName": "Dykprofil"
@@ -594,6 +596,7 @@
       "iso": { "name": "ISO", "shortName": "ISO" },
       "label": { "name": "Text", "shortName": "Text" },
       "lap_timer": { "name": "Varvtimer", "shortName": "Varvtider" },
+      "splits_run": { "name": "Löpmellantider", "shortName": "Mellantider" },
       "lean_angle": { "name": "Lutningsvinkel", "shortName": "Lutning" },
       "left_right_balance": { "name": "Vänster/höger-balans", "shortName": "V/H-balans" },
       "pace": { "name": "Tempo", "shortName": "Tempo" },
@@ -614,6 +617,16 @@
     }
   },
   "widget-editor": {
+    "chartMetrics": "Mätvärden",
+    "chartMetric": "Mätvärde",
+    "addMetric": "Lägg till mätvärde",
+    "moveUp": "Flytta upp",
+    "moveDown": "Flytta ned",
+    "removeMetric": "Ta bort mätvärde",
+    "timeWindow": "Tidsfönster",
+    "fill": "Fyllning",
+    "areaOpacity": "Ytopacitet",
+    "legend": "Förklaring",
     "decompressionCeiling": "Dekompressionstak",
     "ceilingLineColor": "Linjefärg",
     "ceilingAreaColor": "Fyllningsfärg",
@@ -734,6 +747,17 @@
     "compass": "Kompass",
     "compassDial": "Urtavla",
     "heartZones": "Zoner",
+    "splits": "Mellantider",
+    "splitLength": "Delsträckans längd",
+    "splitColumns": "Kolumner",
+    "splitColumnSplit": "Delsträcka",
+    "splitColumnBar": "Stapel",
+    "splitColumnPace": "Tempo",
+    "maxSplits": "Max antal",
+    "rowGap": "Radavstånd",
+    "bar": "Stapel",
+    "barHeight": "Stapelhöjd",
+    "barWidth": "Stapelbredd",
     "zoneCalculation": "Zonberäkning",
     "zoneCalculationLthr": "Mjölksyratröskelpuls",
     "zoneCalculationMaxHeartrate": "Maxpuls",

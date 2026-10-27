@@ -19,7 +19,7 @@ use crate::{
     },
     widgets::{
         route::sampling::RouteWindow,
-        value::preview::{SHAPE_COLOR_TYPE, TileBounds, WidgetGeometry},
+        value::preview::{TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
     },
 };
 use skia_safe::{Canvas, Surface};
@@ -49,7 +49,10 @@ impl PreviewElevation {
         show_full_activity: bool,
         host: &WidgetHost,
     ) -> WidgetResult<(Option<RouteWindow>, f64)> {
-        Ok((host.plot_window(show_full_activity), host.placeholder_duration()?))
+        Ok((
+            host.plot_window(show_full_activity),
+            host.placeholder_duration()?,
+        ))
     }
 
     pub fn new(widget: ElevationPlotConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
@@ -240,12 +243,7 @@ impl PreviewElevation {
             geometry.state(progress, None, progress)
         } else {
             let activity = &activity.expect("elevation activity prepared").elevation;
-            activity.frame_state(
-                geometry,
-                second,
-                self.window,
-                activity.elevation_at(second),
-            )
+            activity.frame_state(geometry, second, self.window, activity.elevation_at(second))
         }
     }
 
@@ -258,10 +256,15 @@ impl PreviewElevation {
     ) -> WidgetResult<TileBounds> {
         let geometry = self.geometry_at(activity, second)?;
         let (offset, range) = self.label_range(activity);
-        Ok(
-            ElevationLayout::measure_bounds(&self.config, &self.scene, &geometry, offset, range, fonts)?
-                .into(),
-        )
+        Ok(ElevationLayout::measure_bounds(
+            &self.config,
+            &self.scene,
+            &geometry,
+            offset,
+            range,
+            fonts,
+        )?
+        .into())
     }
 
     /// Prepares the layout for the geometry at `second`; reports whether it was rebuilt.

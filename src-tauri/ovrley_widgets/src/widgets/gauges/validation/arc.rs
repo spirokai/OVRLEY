@@ -9,8 +9,8 @@ use crate::model::types::{DisplayType, MetricKind, TrackFillStyle};
 use crate::model::validation::{
     require_bool, require_f32, require_hex_color, require_positive_f32, require_string,
 };
-use crate::widgets::gauges::bar_geometry::{resolve_arc_track_geometry, ResolvedBarGeometry};
 use crate::render::track_fill::{validate_track_fill_color, TrackFillColor};
+use crate::widgets::gauges::bar_geometry::{resolve_arc_track_geometry, ResolvedBarGeometry};
 use crate::widgets::value::config::ValueConfig;
 use crate::widgets::value::validation::validate_arc_inner_value_widget;
 use crate::widgets::value::validation::ValidatedValueWidget;

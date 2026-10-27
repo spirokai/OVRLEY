@@ -24,7 +24,12 @@ use ovrley_widgets::widgets::{
     heart_zones::validation::validate_heart_zones,
     label::validation::validate_label,
     lap_timer::validation::validate_lap_timer,
+    splits_run::validation::validate_splits_run,
     lean_angle::validation::validate_lean_angle,
+    rolling_chart::{
+        config::RollingChartConfig,
+        validation::{validate_rolling_chart, ValidatedRollingChart},
+    },
     route::{
         config::CoursePlotConfig,
         validation::{validate_route_plot, ValidatedRoutePlot},
@@ -59,6 +64,7 @@ pub(super) fn validate_render_contents(
         course_plots: validate_route_plots(&raw.plots)?,
         elevation_plots: validate_elevation_plots(&raw.plots, &scene)?,
         diving_profiles: validate_diving_profiles(&raw.plots, &scene)?,
+        rolling_charts: validate_rolling_charts(&raw.plots)?,
         scene,
         backdrops,
         rasters,
@@ -102,6 +108,9 @@ fn validate_render_value(
             .map_err(Into::into),
         (MetricKind::LapTimer, _) => validate_lap_timer(value, index)
             .map(ValidatedValue::LapTimer)
+            .map_err(Into::into),
+        (MetricKind::SplitsRun, _) => validate_splits_run(value, index)
+            .map(ValidatedValue::SplitsRun)
             .map_err(Into::into),
         (MetricKind::Time, DisplayType::Text) => validate_time_value(value, index)
             .map(ValidatedValue::TimeText)
@@ -153,6 +162,17 @@ pub fn validate_elevation_plots(
 
 fn elevation_config_error(error: serde_json::Error) -> CoreError {
     CoreError::Config(format!("elevation plot config: {error}"))
+}
+
+fn validate_rolling_charts(plots: &serde_json::Value) -> CoreResult<Vec<ValidatedRollingChart>> {
+    config::find_plot_values(plots, "rolling_chart")
+        .into_iter()
+        .map(|(index, value)| {
+            let chart: RollingChartConfig = serde_json::from_value(value.clone())
+                .map_err(|error| CoreError::Config(format!("rolling chart config: {error}")))?;
+            Ok(validate_rolling_chart(&chart, index)?)
+        })
+        .collect()
 }
 
 fn validate_diving_profiles(
