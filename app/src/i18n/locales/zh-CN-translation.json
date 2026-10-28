@@ -214,6 +214,8 @@
     "from": "从",
     "fullVideo": "完整视频",
     "hardwareAcceleration": "硬件加速",
+    "hardwareAccelerationVaapiHelp": "VAAPI 需要安装显卡的 VA-API 驱动。请使用包管理器安装:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\n运行 vainfo 检查驱动是否成功加载。NVIDIA 显卡请改用 NVIDIA GPU 选项。",
+    "hardwareAccelerationVaapiHelpLabel": "VAAPI 驱动要求",
     "keepAppOpen": "渲染期间请保持应用打开",
     "loadAGpxfitActivityFirst": "请先加载 GPX/FIT 活动",
     "loadATemplateAndGpxfitActivityFirst": "请先加载模板和 GPX/FIT 活动",

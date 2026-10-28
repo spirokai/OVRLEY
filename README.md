@@ -7,6 +7,7 @@
 <div align="center">
   <img src="docs/hero.avif" alt="OVRLEY Dashboard Interface" width="100%" />
   <img src="docs/hero2.avif" alt="OVRLEY Dashboard Interface" width="100%" />
+  <img src="docs/widgets-showcase.avif" alt="OVRLEY Widget Showcase" width="100%" />
   <img src="docs/gauge-showcase.gif" alt="OVRLEY Gauge Showcase" width="100%" />
 </div>
 
@@ -16,21 +17,23 @@
   <h1><a href="https://www.ovrley.cc">WWW.OVRLEY.CC</a></h1>
   <br/>
   <br/>
-  <p>OVRLEY turns .fit, .gpx, .srt, .igc, .csv, .vbo, and embedded .mp4 telemetry from activities, flights, motorsports, and cameras into fully customizable overlays for your videos. Its visual editor lets you design the overlay while a fast native rendering engine handles the final export.</p>
+  <p>OVRLEY turns .fit, .gpx, .srt, .igc, .csv, .vbo, dive logs, and embedded .mp4 telemetry from activities, flights, dives, motorsports, and cameras into fully customizable overlays for your videos. Its visual editor lets you design the overlay while a fast native rendering engine handles the final export.</p>
 </div>
 
 ## Features
 
-- **Broad Import Support**: Import `.fit`, `.gpx`, `.srt`, `.igc`, `.csv`, and `.vbo` activity files, or use telemetry embedded in supported camera videos. OVRLEY works with data from fitness devices, drones, action cameras, and motorsport loggers.
+- **Broad Import Support**: Import `.fit`, `.gpx`, `.srt`, `.igc`, `.csv`, `.vbo`, and dive log files, or use telemetry embedded in supported camera videos. OVRLEY works with data from fitness devices, dive computers, drones, action cameras, and motorsport loggers.
 - **Interactive Editor**: Drag-and-drop visual editor with live previews, reusable templates, undo/redo, centering guides, and data-availability indicators.
-- **Full Customization**: Shape every widget with your own styling, color, font, and size.
-- **40+ Widgets**: Show speed, heart rate, power, cadence, G-force, lean angle, RPM, throttle, brake position, lap times, GPS position, ascent, camera settings, and much more.
-- **Highly Customizable Animated Gauges**: Display your data using linear, arc, or corner gauges with bar, fill, and segmented-bar styles. Dedicated G-force and lean-angle gauges are also included. Customize their size, colors, borders, labels, angles, and other visual details.
-- **Lap Timing**: Show the current lap, best lap, live time difference, or a complete lap log from supported CSV and VBO files.
+- **Full Customization**: Shape every widget with your own styling, color, gradient fills, font, and size.
+- **50+ Widgets**: Show speed, heart rate and heart zones, power, cadence, heading compass, G-force, lean angle, RPM, throttle, brake position, lap times, GPS position, ascent, running splits, diving profile, camera settings, and much more.
+- **Charts & Splits**: Rolling time charts with up to 5 fully customizable metric graphs, and a running splits table with a live-updating current split.
+- **Highly Customizable Animated Gauges**: Display your data using linear, arc, GT-styled arc, or corner gauges with bar, fill, and segmented-bar styles. Dedicated G-force and lean-angle gauges are also included. Customize their size, colors, gradients, borders, labels, angles, and other visual details.
+- **Lap Timing**: Show the current lap, best lap, live time difference, or a complete lap log. Individual laps can be toggled on or off without editing the activity file.
+- **Scuba Diving**: Dedicated dive metric widgets and a dive profile showing depth and the decompression ceiling.
 - **Transparent Overlays**: Export with alpha channel (in real-time speed) for maximum flexibility in post-production. Use in Premiere Pro, DaVinci Resolve, Final Cut Pro, or any editor that supports layered video.
 - **Final Video Export**: Export your final video footage with overlays baked in - no separate compositing step required. Multiple codecs, hardware-accelerated pipelines, and custom bitrate.
-- **Hardware-Accelerated Export**: Use supported NVIDIA, AMD, Intel, or Apple hardware to drastically speed up video export.
-- **Real-Time Preview**: Preview at up to 4K/30 fps directly inside the app before you export.
+- **Hardware-Accelerated Export**: Use supported NVIDIA, AMD, Intel, or Apple hardware (and VA-API on Linux) to drastically speed up video export. A typical cycling overlay exports at around 100-150 fps (H264@4K, RTX 3070-4070).
+- **Real-Time Preview**: Preview at up to 4K/30 fps directly inside the app. The preview runs on the same rendering engine as the final export, so what you see is what you get.
 - **Flexible Video Sync**: Automatically sync telemetry using camera timestamps, GPS timestamps or supported timestamps in video filenames. You can also adjust the sync by multiple approaches. Negative offsets are supported when the video starts before the telemetry.
 - **Video-Editing Timeline**: See video and telemetry as separate tracks, move through them frame by frame, zoom and pan, and choose exactly which part to export.
 - **Keyboard Shortcuts**: Use shortcuts for playback, editing, timeline navigation, and other common actions. The help button in the top toolbar shows the full list.
@@ -38,13 +41,14 @@
 - **100% Free & Offline**: No subscriptions. All data processing, rendering, and encoding happen locally on your machine. Your data never leaves your computer.
 - **Windows, macOS, and Linux**: Choose an installer build with automatic updates or one of the available portable/manual packages.
 
-> ### Using OVRLEY: Download the package for your operating system from the [latest release](https://github.com/spirokai/OVRLEY/releases/latest). Windows offers an installer and a portable ZIP, macOS uses a DMG, and Linux offers an AppImage and a DEB package. Installer, DMG, and AppImage builds can notify you when an update is available.
+> ### Using OVRLEY: Download the package for your operating system from the [latest release](https://github.com/spirokai/OVRLEY/releases/latest). Windows offers an installer and a portable ZIP, macOS uses a DMG, and Linux offers an AppImage, a DEB package, and a Flatpak. Installer, DMG, and AppImage builds can notify you when an update is available.
 
 ## Supported Files
 
 - **Fitness and outdoor activities:** `.fit` and `.gpx`
 - **Action cameras and drones:** `.srt` files and telemetry embedded in supported `.mp4` videos, including footage from DJI, GoPro, and Insta360 devices
 - **Flight logs:** `.igc`
+- **Dive logs:** `.fit`, `.uddf`, `.ssrf`, and `.xml`
 - **Motorsport and custom data logs:** `.csv` and `.vbo`
 - **Video footage:** `.mp4`, `.mov`, and `.mkv`
 
@@ -72,7 +76,7 @@ OVRLEY supports both exporting transparent overlays as well as final footage wit
 
 - `H.264/H.265`: Industry-standard codecs for maximum compatibility. Custom bitrate setting to balance quality and file size.
 
-**Hardware-Acceleration Options**: `NVENC/CUDA/AMF/QSV/VideoToolbox` hardware-accelerated encoding options to take full advantage of your system and GPU to speed up export times.
+**Hardware-Acceleration Options**: `NVENC/CUDA/AMF/QSV/VideoToolbox/VA-API` hardware-accelerated encoding options to take full advantage of your system and GPU to speed up export times.
 
 ## Dependencies
 

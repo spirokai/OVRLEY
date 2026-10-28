@@ -11,15 +11,25 @@ import { cn } from '@/lib/utils'
  * @param {string} [props.contentClassName=''] - Additional tooltip bubble classes.
  * @param {'top'|'bottom'|'left'|'right'} [props.side='bottom'] - Tooltip side.
  * @param {'start'|'center'|'end'} [props.align='start'] - Tooltip alignment.
+ * @param {boolean} [props.portal=false] - Renders the tooltip outside clipping containers such as dropdowns.
  * @returns {JSX.Element} Help tooltip.
  */
-export function HelpTooltip({ content, ariaLabel = content, className = '', contentClassName = '', side = 'bottom', align = 'start' }) {
+export function HelpTooltip({
+  content,
+  ariaLabel = content,
+  className = '',
+  contentClassName = '',
+  side = 'bottom',
+  align = 'start',
+  portal = false,
+}) {
   return (
     <SimpleTooltip
       content={content}
       side={side}
       align={align}
       delayMs={0}
+      portal={portal}
       className={cn('z-20 shrink-0', className)}
       contentClassName={cn('w-[20rem] whitespace-pre-line', contentClassName)}
     >

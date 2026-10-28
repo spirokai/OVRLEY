@@ -214,6 +214,8 @@
     "from": "Od",
     "fullVideo": "Celé video",
     "hardwareAcceleration": "Hardwarová akcelerace",
+    "hardwareAccelerationVaapiHelp": "VAAPI vyžaduje ovladač VA-API pro vaši GPU. Nainstalujte jej pomocí správce balíčků:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nPříkazem vainfo ověříte, že se ovladač načítá. GPU NVIDIA místo toho používají možnost NVIDIA GPU.",
+    "hardwareAccelerationVaapiHelpLabel": "Požadavky na ovladač VAAPI",
     "keepAppOpen": "Během vykreslování ponechte aplikaci otevřenou",
     "loadAGpxfitActivityFirst": "Nejprve načtěte aktivitu GPX/FIT",
     "loadATemplateAndGpxfitActivityFirst": "Nejprve načtěte šablonu a aktivitu GPX/FIT",

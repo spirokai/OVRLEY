@@ -30,7 +30,6 @@ modules:
     buildsystem: simple
     build-options:
       env:
-        OVRLEY_SKIP_FFMPEG_INSTALL: '1'
         OVRLEY_WASM_PREBUILT: '1'
         # Outside the source tree: pnpm prepares git dependencies by running `pnpm install`
         # next to the store, and inside the tree that finds our workspace and loops.
@@ -52,6 +51,9 @@ modules:
       - touch /app/bin/.ovrley-portable # in-app updates are not available in the sandbox
       - mkdir -p /app/lib/OVRLEY
       - cp -r fonts templates /app/lib/OVRLEY/
+      # Same FFmpeg build as the other Linux releases, fetched by pnpm install's postinstall
+      - mkdir -p /app/lib/OVRLEY/vendor/ffmpeg && cp -r vendor/ffmpeg/bin /app/lib/OVRLEY/vendor/ffmpeg/
+      - /app/lib/OVRLEY/vendor/ffmpeg/bin/ffmpeg -hide_banner -version
       - node packaging/flatpak/make-third-party-notices.mjs /app/lib/OVRLEY/THIRD_PARTY_NOTICES.txt
       - install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.desktop /app/share/applications/cc.ovrley.OVRLEY.desktop
       - install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.metainfo.xml /app/share/metainfo/cc.ovrley.OVRLEY.metainfo.xml

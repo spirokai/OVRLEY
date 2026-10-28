@@ -214,6 +214,8 @@
     "from": "Van",
     "fullVideo": "Volledige video",
     "hardwareAcceleration": "Hardwareversnelling",
+    "hardwareAccelerationVaapiHelp": "VAAPI heeft het VA-API-stuurprogramma van je GPU nodig. Installeer het met je pakketbeheerder:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nVoer vainfo uit om te controleren of het stuurprogramma laadt. NVIDIA-GPU's gebruiken in plaats daarvan de optie NVIDIA GPU.",
+    "hardwareAccelerationVaapiHelpLabel": "Vereiste VAAPI-stuurprogramma's",
     "keepAppOpen": "Houd de toepassing geopend tijdens het renderen",
     "loadAGpxfitActivityFirst": "Laad eerst een GPX/FIT-activiteit",
     "loadATemplateAndGpxfitActivityFirst": "Laad eerst een sjabloon en GPX/FIT-activiteit",
