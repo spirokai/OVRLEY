@@ -232,9 +232,10 @@ pub(super) fn parse_number(value: Option<&str>) -> Option<f64> {
 
 /// Applies metric-specific bounds and canonical heading normalization.
 ///
-/// Invalid coordinates, negative speed/distance/RPM, and out-of-range control
-/// positions are discarded. Headings wrap into `[0, 360)`; signed metrics such
-/// as lean angle and acceleration axes are retained unchanged.
+/// Invalid coordinates, negative speed/distance/RPM/cadence/power, and
+/// out-of-range control positions are discarded. Headings wrap into
+/// `[0, 360)`; signed metrics such as lean angle and acceleration axes are
+/// retained unchanged.
 fn validate(metric: Metric, value: f64) -> Option<f64> {
     match metric {
         Metric::Latitude if !(-90.0..=90.0).contains(&value) => None,
@@ -243,6 +244,8 @@ fn validate(metric: Metric, value: f64) -> Option<f64> {
         | Metric::Distance
         | Metric::DistanceToHome
         | Metric::Rpm
+        | Metric::Cadence
+        | Metric::Power
         | Metric::Depth
         | Metric::FirstStopDepth
         | Metric::AveragePpo2

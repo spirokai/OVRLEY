@@ -282,7 +282,8 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
         Metric::GForce | Metric::GForceX | Metric::GForceY | Metric::GForceZ => {
             matches!(unit, Unit::G)
         }
-        Metric::Rpm => matches!(unit, Unit::RevolutionsPerMinute),
+        Metric::Rpm | Metric::Cadence => matches!(unit, Unit::RevolutionsPerMinute),
+        Metric::Power => matches!(unit, Unit::Watts | Unit::Kilowatts),
         Metric::EnginePower => {
             matches!(
                 unit,
@@ -348,8 +349,8 @@ fn default_unit(metric: Metric) -> Unit {
         | Metric::DistanceToHome => Unit::Metres,
         Metric::Heading => Unit::Degrees,
         Metric::GForce | Metric::GForceX | Metric::GForceY | Metric::GForceZ => Unit::G,
-        Metric::Rpm => Unit::RevolutionsPerMinute,
-        Metric::EnginePower => Unit::Watts,
+        Metric::Rpm | Metric::Cadence => Unit::RevolutionsPerMinute,
+        Metric::Power | Metric::EnginePower => Unit::Watts,
         Metric::EngineLoad | Metric::ThrottlePosition | Metric::BrakePosition => Unit::Percent,
         Metric::Torque => Unit::NewtonMetres,
         Metric::LeanAngle => Unit::Degrees,

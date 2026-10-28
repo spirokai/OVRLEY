@@ -60,6 +60,10 @@ enum Metric {
     GForceZ,
     /// Engine speed in revolutions per minute.
     Rpm,
+    /// Rider pedalling cadence in revolutions per minute.
+    Cadence,
+    /// Rider mechanical power in watts.
+    Power,
     /// Engine power in watts.
     EnginePower,
     /// Engine load as a percentage from zero to one hundred.

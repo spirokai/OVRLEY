@@ -17,6 +17,7 @@ use super::types::{
 };
 use super::units::{
     declaration_compatible, parse_declared_unit, parse_units_row_unit, DeclaredUnit, Unit,
+    UnitDimension,
 };
 use super::Metric;
 use crate::error::{CoreError, CoreResult};
@@ -206,7 +207,7 @@ fn parse_header(index: usize, value: &str, profile: HeaderProfile) -> Option<Hea
             None,
             None,
         ),
-        "elapsed time" | "time s" => (
+        "elapsed time" | "time s" | "elapsedseconds" => (
             Metric::ElapsedSeconds,
             SourcePriority::Preferred,
             Some(TimingKind::ExplicitElapsed),
@@ -276,8 +277,10 @@ fn parse_header(index: usize, value: &str, profile: HeaderProfile) -> Option<Hea
         "speed" | "kph" | "speed kmh" => {
             (Metric::Speed, SourcePriority::DirectSpeed, None, None, None)
         }
-        "gspd" => (Metric::Speed, SourcePriority::DirectSpeed, None, None, None),
-        "vehspd1" => (Metric::Speed, SourcePriority::Vehicle, None, None, None),
+        "gspd" | "speedmps" => (Metric::Speed, SourcePriority::DirectSpeed, None, None, None),
+        "vehspd1" | "controllerspeedmps" => {
+            (Metric::Speed, SourcePriority::Vehicle, None, None, None)
+        }
         "distance" | "trip distance" => {
             (Metric::Distance, SourcePriority::Direct, None, None, None)
         }
@@ -296,7 +299,7 @@ fn parse_header(index: usize, value: &str, profile: HeaderProfile) -> Option<Hea
             None,
             None,
         ),
-        "elevation" | "altitude" | "alt" | "altitude above sealevel" => {
+        "elevation" | "altitude" | "alt" | "altitude above sealevel" | "altitudemeters" => {
             (Metric::Elevation, SourcePriority::Direct, None, None, None)
         }
         "pressure altitude" | "barometric altitude" => (
@@ -306,7 +309,7 @@ fn parse_header(index: usize, value: &str, profile: HeaderProfile) -> Option<Hea
             None,
             None,
         ),
-        "heading" | "bearing" | "hdg" | "compass heading" => {
+        "heading" | "bearing" | "hdg" | "compass heading" | "coursedegrees" => {
             (Metric::Heading, SourcePriority::Direct, None, None, None)
         }
         "accel xyz" | "combined acceleration" => {
@@ -354,18 +357,25 @@ fn parse_header(index: usize, value: &str, profile: HeaderProfile) -> Option<Hea
             None,
             Some(AccelerationKind::Semantic),
         ),
-        "rpm" | "engine rpm" => (Metric::Rpm, SourcePriority::Direct, None, None, None),
+        "rpm" | "engine rpm" | "motorrpm" => {
+            (Metric::Rpm, SourcePriority::Direct, None, None, None)
+        }
+        "cadencerpm" => (Metric::Cadence, SourcePriority::Direct, None, None, None),
+        "humanpowerw" => (Metric::Power, SourcePriority::Direct, None, None, None),
         "power"
         | "estimated power"
         | "engine kw (at the wheels)"
-        | "horsepower (at the wheels)" => (
+        | "horsepower (at the wheels)"
+        | "motorinputpowerw" => (
             Metric::EnginePower,
             SourcePriority::Direct,
             None,
             None,
             None,
         ),
-        "torque" | "estimated torque" => (Metric::Torque, SourcePriority::Direct, None, None, None),
+        "torque" | "estimated torque" | "pedaltorquenm" => {
+            (Metric::Torque, SourcePriority::Direct, None, None, None)
+        }
         "engine load" | "engine load absolute" | "absolute engine load" => (
             Metric::EngineLoad,
             SourcePriority::Direct,
@@ -456,7 +466,25 @@ fn parse_header(index: usize, value: &str, profile: HeaderProfile) -> Option<Hea
         ),
         _ => return None,
     };
-    let mut declared_unit = declared_unit;
+    // camelCase exporters spell the unit into the header name instead of an
+    // annotation; a contradicting annotation makes the column unusable.
+    let embedded_unit = match semantic.as_str() {
+        "elapsedseconds" => Some(Unit::Seconds),
+        "speedmps" | "controllerspeedmps" => Some(Unit::MetresPerSecond),
+        "altitudemeters" => Some(Unit::Metres),
+        "coursedegrees" => Some(Unit::Degrees),
+        "motorrpm" | "cadencerpm" => Some(Unit::RevolutionsPerMinute),
+        "humanpowerw" | "motorinputpowerw" => Some(Unit::Watts),
+        "pedaltorquenm" => Some(Unit::NewtonMetres),
+        _ => None,
+    };
+    let mut declared_unit = match (declared_unit, embedded_unit) {
+        (DeclaredUnit::Absent, Some(unit)) => DeclaredUnit::Supported(unit),
+        (DeclaredUnit::Supported(declared), Some(unit)) if declared != unit => {
+            DeclaredUnit::Unsupported(UnitDimension::Unknown)
+        }
+        (declared, _) => declared,
+    };
     if metric == Metric::Timestamp
         && annotation.as_deref().is_some_and(|ann| {
             ann.eq_ignore_ascii_case("utc")

@@ -269,6 +269,8 @@ pub(super) fn build_activity_columns(
         heading: preserve_heading_gaps,
     };
     let (rpm, _) = series(Metric::Rpm);
+    let (cadence, _) = series(Metric::Cadence);
+    let (power, _) = series(Metric::Power);
     let (engine_power, _) = series(Metric::EnginePower);
     let (engine_load, _) = series(Metric::EngineLoad);
     let (torque, _) = series(Metric::Torque);
@@ -400,8 +402,8 @@ pub(super) fn build_activity_columns(
         original_sample_count: data.len(),
         include_original_sample_count_metadata: false,
         heartrate: empty(),
-        cadence: empty(),
-        power: empty(),
+        cadence,
+        power,
         engine_power,
         engine_load,
         temperature: empty(),
