@@ -36,12 +36,34 @@ describe('WidgetDrawerContent', () => {
     await addBackdropRectangle(user)
 
     const [backdrop] = useStore.getState().config.backdrops
-    const { width, height, corner_radius, round_top_left, round_top_right, round_bottom_left, round_bottom_right, ...sharedDefaults } =
-      DISPLAY_TYPE_DEFINITIONS.rectangle.variantDefaults
+    const {
+      width,
+      height,
+      corner_radius,
+      round_top_left,
+      round_top_right,
+      round_bottom_left,
+      round_bottom_right,
+      edge_strips,
+      edge_strip_thickness,
+      edge_strip_color,
+      ...sharedDefaults
+    } = DISPLAY_TYPE_DEFINITIONS.rectangle.variantDefaults
     expect(backdrop).toMatchObject({
       ...sharedDefaults,
       display_variants: {
-        rectangle: { width, height, corner_radius, round_top_left, round_top_right, round_bottom_left, round_bottom_right },
+        rectangle: {
+          width,
+          height,
+          corner_radius,
+          round_top_left,
+          round_top_right,
+          round_bottom_left,
+          round_bottom_right,
+          edge_strips,
+          edge_strip_thickness,
+          edge_strip_color,
+        },
       },
     })
     expect(backdrop.id).toMatch(/^widget-\d+$/)

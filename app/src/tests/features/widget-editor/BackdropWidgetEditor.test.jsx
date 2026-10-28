@@ -59,6 +59,9 @@ function makeBackdropWidget(overrides = {}) {
           round_top_right: false,
           round_bottom_left: false,
           round_bottom_right: false,
+          edge_strips: [],
+          edge_strip_thickness: 6,
+          edge_strip_color: '#FF5722',
         },
       },
       ...overrides,
@@ -195,6 +198,9 @@ describe('BackdropWidgetEditor', () => {
       round_top_right: false,
       round_bottom_left: true,
       round_bottom_right: false,
+      edge_strips: [],
+      edge_strip_thickness: 6,
+      edge_strip_color: '#FF5722',
     }
 
     render(
@@ -240,6 +246,9 @@ describe('BackdropWidgetEditor', () => {
               round_top_right: false,
               round_bottom_left: false,
               round_bottom_right: false,
+              edge_strips: [],
+              edge_strip_thickness: 6,
+              edge_strip_color: '#FF5722',
             },
             circle: { diameter: 260 },
           },

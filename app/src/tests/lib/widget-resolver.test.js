@@ -10,8 +10,18 @@ import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
 describe('backdrop widget resolver', () => {
   test('stores shared backdrop fields at top level and rectangle geometry in the active variant', () => {
     const backdrop = createWidgetDefaults({ type: 'backdrop' })
-    const { width, height, corner_radius, round_top_left, round_top_right, round_bottom_left, round_bottom_right } =
-      DISPLAY_TYPE_DEFINITIONS.rectangle.variantDefaults
+    const {
+      width,
+      height,
+      corner_radius,
+      round_top_left,
+      round_top_right,
+      round_bottom_left,
+      round_bottom_right,
+      edge_strips,
+      edge_strip_thickness,
+      edge_strip_color,
+    } = DISPLAY_TYPE_DEFINITIONS.rectangle.variantDefaults
 
     expect(backdrop).toMatchObject(WIDGET_TYPE_DEFINITIONS.backdrop.defaults)
     expect(backdrop.width).toBeUndefined()
@@ -25,6 +35,9 @@ describe('backdrop widget resolver', () => {
         round_top_right,
         round_bottom_left,
         round_bottom_right,
+        edge_strips,
+        edge_strip_thickness,
+        edge_strip_color,
       },
     })
   })

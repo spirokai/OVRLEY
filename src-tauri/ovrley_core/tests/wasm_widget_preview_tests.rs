@@ -171,6 +171,7 @@ fn every_family_preview() -> Vec<(PreviewSession, Value)> {
             request["widget"].as_object_mut().unwrap().extend(json!({
                 "id": "backdrop", "width": 120, "height": 80, "corner_radius": 4,
                 "round_top_left": true, "round_top_right": true, "round_bottom_left": true, "round_bottom_right": true,
+                "edge_strips": ["top", "left"], "edge_strip_thickness": 6, "edge_strip_color": "#FF5722",
             }).as_object().unwrap().clone());
         }
         cases.push((preview, request));

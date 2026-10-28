@@ -1,6 +1,6 @@
 use crate::{
     error::{WidgetError, WidgetResult},
-    model::types::BackdropType,
+    model::types::{BackdropEdge, BackdropType},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -46,6 +46,12 @@ pub struct BackdropConfig {
     pub round_bottom_left: Option<bool>,
     #[serde(default)]
     pub round_bottom_right: Option<bool>,
+    #[serde(default)]
+    pub edge_strips: Option<Vec<BackdropEdge>>,
+    #[serde(default)]
+    pub edge_strip_thickness: Option<f32>,
+    #[serde(default)]
+    pub edge_strip_color: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

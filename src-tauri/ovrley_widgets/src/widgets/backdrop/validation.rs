@@ -7,7 +7,7 @@
 
 use super::config::BackdropConfig;
 use crate::error::{WidgetError, WidgetResult};
-use crate::model::types::BackdropType;
+use crate::model::types::{BackdropEdge, BackdropType};
 use crate::model::validation::{
     require_bool, require_border_fits_dimension, require_f32, require_hex_color,
     require_positive_f32, require_string, require_unit_opacity, rgba_from_hex,
@@ -33,6 +33,10 @@ pub struct ValidatedBackdrop {
     pub round_top_right: bool,
     pub round_bottom_left: bool,
     pub round_bottom_right: bool,
+    /// Rectangle edges painted with an inward strip; empty for circles.
+    pub edge_strips: Vec<BackdropEdge>,
+    pub edge_strip_thickness: f32,
+    pub edge_strip_color: String,
 }
 
 struct BackdropShared {
@@ -118,6 +122,9 @@ fn validate_circle_backdrop(
         round_top_right: false,
         round_bottom_left: false,
         round_bottom_right: false,
+        edge_strips: Vec::new(),
+        edge_strip_thickness: 0.0,
+        edge_strip_color: String::new(),
     })
 }
 
@@ -160,6 +167,28 @@ fn validate_rectangle_backdrop(
         corner_radius = shared.border_thickness;
     }
 
+    let edge_strips = backdrop
+        .edge_strips
+        .ok_or_else(|| WidgetError::Config(format!("{}: required", p("edge_strips"))))?;
+    for (position, edge) in edge_strips.iter().enumerate() {
+        if edge_strips[..position].contains(edge) {
+            return Err(WidgetError::Config(format!(
+                "{}: duplicate edge {edge:?}",
+                p("edge_strips")
+            )));
+        }
+    }
+    let edge_strip_thickness =
+        require_f32(backdrop.edge_strip_thickness, &p("edge_strip_thickness"))?;
+    if edge_strip_thickness < 0.0 || edge_strip_thickness * 2.0 > width.min(height) {
+        return Err(WidgetError::Config(format!(
+            "{}: must be within 0..=half the smaller dimension, got {edge_strip_thickness}",
+            p("edge_strip_thickness")
+        )));
+    }
+    let edge_strip_color =
+        require_hex_color(backdrop.edge_strip_color.as_deref(), &p("edge_strip_color"))?;
+
     Ok(ValidatedBackdrop {
         id: shared.id,
         x: shared.x,
@@ -179,5 +208,8 @@ fn validate_rectangle_backdrop(
         round_top_right,
         round_bottom_left,
         round_bottom_right,
+        edge_strips,
+        edge_strip_thickness,
+        edge_strip_color,
     })
 }

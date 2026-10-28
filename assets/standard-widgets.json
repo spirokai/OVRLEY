@@ -100,7 +100,10 @@
           "round_top_left": true,
           "round_top_right": false,
           "round_bottom_left": false,
-          "round_bottom_right": true
+          "round_bottom_right": true,
+          "edge_strips": [],
+          "edge_strip_thickness": 6,
+          "edge_strip_color": "#FF5722"
         }
       }
     }

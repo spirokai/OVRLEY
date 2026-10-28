@@ -30,8 +30,11 @@ pub fn resize_backdrop(
     }
     let mut backdrop = validate_backdrop(&widget, 0)?;
     let scene = validate_scene_presentation(scene)?;
-    // Preserve the editor's eight-pixel minimum and the required interior of the border.
-    let minimum = 8.0_f32.max(backdrop.border_thickness * 2.0 + 1.0);
+    // Preserve the editor's eight-pixel minimum, the required interior of the border,
+    // and room for opposing edge strips.
+    let minimum = 8.0_f32
+        .max(backdrop.border_thickness * 2.0 + 1.0)
+        .max(backdrop.edge_strip_thickness * 2.0);
     let width = (size[0] / scene.scale).max(minimum);
     let height = (size[1] / scene.scale).max(minimum);
     let variant = match backdrop.display_type {

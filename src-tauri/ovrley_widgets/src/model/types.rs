@@ -107,6 +107,17 @@ impl BackdropType {
     }
 }
 
+/// Rectangle edge that carries a colored backdrop strip. Unknown strings are
+/// rejected by serde.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BackdropEdge {
+    Top,
+    Right,
+    Bottom,
+    Left,
+}
+
 impl<'de> Deserialize<'de> for DisplayType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

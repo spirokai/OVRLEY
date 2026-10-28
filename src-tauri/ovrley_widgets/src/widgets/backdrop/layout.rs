@@ -1,9 +1,9 @@
 //! Static backdrop widget drawing.
 
 use super::validation::ValidatedBackdrop;
-use crate::model::types::BackdropType;
+use crate::model::types::{BackdropEdge, BackdropType};
 use crate::render::text::parse_color;
-use skia_safe::{paint::Style, Canvas, Paint, Path, PathBuilder, Point};
+use skia_safe::{paint::Style, Canvas, ClipOp, Paint, Path, PathBuilder, Point};
 
 #[derive(Clone, Copy)]
 struct RectangleCorners {
@@ -81,24 +81,75 @@ fn draw_rectangle_backdrop(
 
     canvas.draw_path(&fill_path, &fill_paint);
 
-    if backdrop.border_thickness <= 0.0 {
-        return;
+    if backdrop.border_thickness > 0.0 {
+        let border_alpha = opacity * backdrop.border_opacity;
+        let mut border_paint = backdrop_paint(&backdrop.border_color, border_alpha, Style::Stroke);
+        border_paint.set_stroke_width(border);
+        let stroke_inset = border * 0.5;
+        let stroke_path = rounded_rect_path(
+            backdrop.x + stroke_inset,
+            backdrop.y + stroke_inset,
+            (width - border).max(0.0),
+            (height - border).max(0.0),
+            radius,
+            corners,
+        );
+
+        canvas.draw_path(&stroke_path, &border_paint);
     }
 
-    let border_alpha = opacity * backdrop.border_opacity;
-    let mut border_paint = backdrop_paint(&backdrop.border_color, border_alpha, Style::Stroke);
-    border_paint.set_stroke_width(border);
-    let stroke_inset = border * 0.5;
-    let stroke_path = rounded_rect_path(
-        backdrop.x + stroke_inset,
-        backdrop.y + stroke_inset,
-        (width - border).max(0.0),
-        (height - border).max(0.0),
-        radius,
-        corners,
-    );
+    if !backdrop.edge_strips.is_empty() && backdrop.edge_strip_thickness > 0.0 {
+        let outer_path = rounded_rect_path(backdrop.x, backdrop.y, width, height, radius, corners);
+        draw_rectangle_edge_strips(canvas, backdrop, &outer_path, scale, radius, corners, opacity);
+    }
+}
 
-    canvas.draw_path(&stroke_path, &border_paint);
+/// Strips are painted inward over the fill and border, cut from the outer
+/// shape so they follow its rounded corners without changing the frame.
+fn draw_rectangle_edge_strips(
+    canvas: &Canvas,
+    backdrop: &ValidatedBackdrop,
+    outer_path: &Path,
+    scale: f32,
+    radius: f32,
+    corners: RectangleCorners,
+    opacity: f32,
+) {
+    let strip = backdrop.edge_strip_thickness * scale;
+    let has = |edge| backdrop.edge_strips.contains(&edge);
+    let (top, right, bottom, left) = (
+        has(BackdropEdge::Top),
+        has(BackdropEdge::Right),
+        has(BackdropEdge::Bottom),
+        has(BackdropEdge::Left),
+    );
+    // Sides without a strip push the cut-out past the outer shape so no seam is left there.
+    let inset = |active: bool| if active { strip } else { -1.0 };
+    let inner_left = backdrop.x + inset(left);
+    let inner_top = backdrop.y + inset(top);
+    let inner_right = backdrop.x + backdrop.width * scale - inset(right);
+    let inner_bottom = backdrop.y + backdrop.height * scale - inset(bottom);
+    // A corner between two strips stays concentric with the outer curve.
+    let inner_corners = RectangleCorners {
+        top_left: corners.top_left && top && left,
+        top_right: corners.top_right && top && right,
+        bottom_right: corners.bottom_right && bottom && right,
+        bottom_left: corners.bottom_left && bottom && left,
+    };
+    let inner_path = rounded_rect_path(
+        inner_left,
+        inner_top,
+        (inner_right - inner_left).max(0.0),
+        (inner_bottom - inner_top).max(0.0),
+        (radius - strip).max(0.0),
+        inner_corners,
+    );
+    let strip_paint = backdrop_paint(&backdrop.edge_strip_color, opacity, Style::Fill);
+
+    canvas.save();
+    canvas.clip_path(&inner_path, ClipOp::Difference, true);
+    canvas.draw_path(outer_path, &strip_paint);
+    canvas.restore();
 }
 
 fn rounded_rect_path(

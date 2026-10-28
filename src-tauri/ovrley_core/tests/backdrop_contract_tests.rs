@@ -63,7 +63,10 @@ fn valid_rectangle_backdrop_promotes_and_validates_active_variant() {
                     "round_top_left": true,
                     "round_top_right": false,
                     "round_bottom_left": true,
-                    "round_bottom_right": false
+                    "round_bottom_right": false,
+                    "edge_strips": [],
+                    "edge_strip_thickness": 4,
+                    "edge_strip_color": "#FF5722"
                 }
             }
         }],
@@ -111,7 +114,10 @@ fn valid_circle_backdrop_promotes_and_validates_active_variant() {
                     "round_top_left": true,
                     "round_top_right": false,
                     "round_bottom_left": true,
-                    "round_bottom_right": false
+                    "round_bottom_right": false,
+                    "edge_strips": [],
+                    "edge_strip_thickness": 4,
+                    "edge_strip_color": "#FF5722"
                 }
             }
         }],
@@ -477,7 +483,10 @@ fn rectangle_backdrop_json(id: &str, fill_color: &str) -> serde_json::Value {
                 "round_top_left": false,
                 "round_top_right": false,
                 "round_bottom_left": false,
-                "round_bottom_right": false
+                "round_bottom_right": false,
+                "edge_strips": [],
+                "edge_strip_thickness": 4,
+                "edge_strip_color": "#FF5722"
             }
         }
     })

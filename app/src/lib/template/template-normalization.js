@@ -124,11 +124,8 @@ function normalizeBackdrop(backdrop = {}) {
     }
   }
 
-  if (Object.keys(normalizedVariants).length > 0) {
-    pickedBackdrop.display_variants = normalizedVariants
-  }
-
-  return pickedBackdrop
+  pickedBackdrop.display_variants = normalizedVariants
+  return initDisplayVariant(pickedBackdrop, displayType)
 }
 
 function validateDisplayGeometry(value) {
