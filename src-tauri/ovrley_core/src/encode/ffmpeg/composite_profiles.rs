@@ -318,7 +318,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         cpu_cores_per_frame_worker: 0,
         input_args: &["-hwaccel", "videotoolbox"],
         filter_complex: Some(SOFTWARE_H264_FILTER),
-        output_args: &[],
+        output_args: &["-prio_speed", "1"],
         quality_args: &["-global_quality", "{videotoolbox_quality}"],
         bitrate_args: &[
             "-b:v",
@@ -334,7 +334,8 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         cpu_cores_per_frame_worker: 0,
         input_args: &["-hwaccel", "videotoolbox"],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
-        output_args: &["-tag:v", "hvc1"],
+        // Speed priority roughly doubles 4K media-engine HEVC throughput.
+        output_args: &["-tag:v", "hvc1", "-prio_speed", "1"],
         quality_args: &["-global_quality", "{videotoolbox_quality}"],
         bitrate_args: &[
             "-b:v",
@@ -483,6 +484,11 @@ mod tests {
         ] {
             assert_output_arg_pair(codec_id, "-temporal-aq", "true");
         }
+    }
+
+    #[test]
+    fn videotoolbox_hevc_prioritizes_speed() {
+        assert_output_arg_pair(CompositeCodecId::MacHevc, "-prio_speed", "1");
     }
 
     #[test]
