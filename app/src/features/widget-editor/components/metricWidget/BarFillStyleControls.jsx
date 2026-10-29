@@ -28,7 +28,7 @@ function buildBarGeometryUpdate(data, update, getCornerRadiusMax) {
   }
 }
 
-export function BarFillStyleField({ data, suggestBarGeometry, updateVariant }) {
+export function BarFillStyleField({ data, suggestBarGeometry, updateVariant, disabled = false }) {
   const { t } = useTranslation()
   return (
     <SelectField
@@ -36,17 +36,18 @@ export function BarFillStyleField({ data, suggestBarGeometry, updateVariant }) {
       value={data.track_fill_style ?? 'fill'}
       onValueChange={(track_fill_style) => updateVariant(buildFillStyleUpdate(data, track_fill_style, suggestBarGeometry))}
       options={translateOptions(FILL_STYLE_OPTIONS, t)}
+      disabled={disabled}
       contentProps={{ position: 'popper', side: 'bottom', align: 'start' }}
     />
   )
 }
 
-export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updateVariant, updateVariantSize, commitWidgetSize, widgetId }) {
+export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updateVariant, updateVariantDraft, commitWidgetDraft, widgetId }) {
   const { t } = useTranslation()
   if (data.track_fill_style !== 'bars') {
     return (
       <div className="flex items-center justify-between gap-2 px-1 pb-2 pt-2">
-        <span className="text-[9px] font-bold uppercase text-muted-foreground">{t('widget-editor.flatTrack', 'Flat Track')}</span>
+        <span className="text-[0.667rem] font-bold uppercase text-muted-foreground">{t('widget-editor.flatTrack', 'Flat Track')}</span>
         <ToggleField checked={data.track_fill_flat} onCheckedChange={(track_fill_flat) => updateVariant({ track_fill_flat })} />
       </div>
     )
@@ -63,8 +64,8 @@ export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updat
         step={1}
         integerDisplay
         valueDisplay={`${data.bar_count}`}
-        onSliderChange={(bar_count) => updateVariantSize(buildBarGeometryUpdate(data, { bar_count }, getCornerRadiusMax))}
-        onSliderCommit={() => commitWidgetSize(widgetId)}
+        onSliderChange={(bar_count) => updateVariantDraft(buildBarGeometryUpdate(data, { bar_count }, getCornerRadiusMax))}
+        onSliderCommit={() => commitWidgetDraft(widgetId)}
       />
       <SliderField
         editable
@@ -76,8 +77,8 @@ export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updat
         integerDisplay
         valueDisplay={`${data.bar_gap}`}
         suffix="px"
-        onSliderChange={(bar_gap) => updateVariantSize(buildBarGeometryUpdate(data, { bar_gap }, getCornerRadiusMax))}
-        onSliderCommit={() => commitWidgetSize(widgetId)}
+        onSliderChange={(bar_gap) => updateVariantDraft(buildBarGeometryUpdate(data, { bar_gap }, getCornerRadiusMax))}
+        onSliderCommit={() => commitWidgetDraft(widgetId)}
       />
     </>
   )

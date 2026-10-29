@@ -1,0 +1,58 @@
+name: Build WASM Bindings
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit or ref to build; empty builds the triggering ref
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build wasm32-unknown-emscripten bindings
+    runs-on: ubuntu-latest
+    env:
+      # Cargo's built-in git client is slow at cloning the rust-skia submodules.
+      CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install WASM Rust toolchain
+        run: rustup toolchain install 1.98.1 --profile minimal --target wasm32-unknown-emscripten
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm
+          workspaces: 'src-tauri/wasm-bindings -> ../target/wasm-bindings'
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 6.0.9
+          actions-cache-folder: emsdk-cache
+
+      - name: Build WASM bindings
+        run: node scripts/build-wasm.mjs
+
+      - name: Upload WASM bindings
+        uses: actions/upload-artifact@v7
+        with:
+          name: ovrley-wasm-bindings
+          path: |
+            src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm/wasm_bindings.js
+            src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm/wasm_bindings.wasm
+          if-no-files-found: error
+          retention-days: 1

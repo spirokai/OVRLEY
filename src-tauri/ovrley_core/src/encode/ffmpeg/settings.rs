@@ -3,14 +3,15 @@
 //! Owns: codec argument derivation from user-facing ffmpeg config values.
 //! Does not own: ffmpeg binary discovery, process spawning, pipeline execution.
 //!
-//! Allowed dependencies: serde_json, crate::error.
-//! Forbidden dependencies: crate::commands, crate::render.
+//! Allowed dependencies: serde_json, crate::error, crate::render atlas geometry.
+//! Forbidden dependencies: crate::commands.
 
 use crate::encode::ffmpeg::catalog::{CodecSelection, TransparentCodecId};
+use crate::encode::ffmpeg::transparent_filters::transparent_atlas_filter;
 use crate::encode::ffmpeg::transparent_profiles::transparent_profile;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::ValidatedFfmpegConfig;
-use crate::render::FrameSize;
+use crate::render::{AtlasPlan, FrameSize};
 use std::path::Path;
 
 /// Fully resolved ffmpeg settings for one render.
@@ -21,7 +22,7 @@ pub struct FfmpegSettings {
     pub loglevel: String,
     /// Input-side hardware-device setup args required before rawvideo input.
     pub input_args: Vec<String>,
-    /// Optional filter chain applied between rawvideo input and encode output.
+    /// Optional profile filter chain applied to the rebuilt full frame before encoding.
     pub filter_complex: Option<String>,
     /// Codec-specific output args appended before output path.
     pub output_args: Vec<String>,
@@ -30,10 +31,13 @@ pub struct FfmpegSettings {
 }
 
 impl FfmpegSettings {
-    /// Produces the final argv at the FFmpeg process boundary.
+    /// Produces the final argv at the FFmpeg process boundary. The input is the
+    /// `atlas` frame, rebuilt into the transparent `frame_size` frame before the
+    /// profile's filters.
     pub(crate) fn command_args(
         &self,
         output_path: &Path,
+        atlas: &AtlasPlan,
         frame_size: FrameSize,
         fps: &str,
         input_pix_fmt: &str,
@@ -44,7 +48,7 @@ impl FfmpegSettings {
             "-f".to_string(),
             "rawvideo".to_string(),
             "-s".to_string(),
-            format!("{}x{}", frame_size.width, frame_size.height),
+            format!("{}x{}", atlas.size().width, atlas.size().height),
             "-pix_fmt".to_string(),
             input_pix_fmt.to_string(),
             "-r".to_string(),
@@ -52,8 +56,10 @@ impl FfmpegSettings {
             "-i".to_string(),
             "-".to_string(),
         ]);
-        if let Some(filter) = &self.filter_complex {
-            args.extend(["-vf".to_string(), filter.clone()]);
+        let filters = [transparent_atlas_filter(atlas, frame_size), self.filter_complex.clone()];
+        let filters: Vec<String> = filters.into_iter().flatten().collect();
+        if !filters.is_empty() {
+            args.extend(["-vf".to_string(), filters.join(",")]);
         }
         args.extend(self.output_args.iter().cloned());
         args.extend(["-y".to_string(), output_path.to_string_lossy().into_owned()]);

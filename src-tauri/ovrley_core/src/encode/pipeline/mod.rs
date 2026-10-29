@@ -1,5 +1,7 @@
 //! Shared video preparation and encoding, with one supervised native pipeline.
 
+#[cfg(test)]
+mod atlas_export_tests;
 mod buffers;
 #[doc(hidden)]
 pub mod diagnostics;
@@ -19,7 +21,7 @@ use self::buffers::{
 use self::diagnostics::{
     format_pipe_write_failure, is_pipe_write_error, stderr_tail, EncoderMonitor,
 };
-use self::frames::{render_frames_parallel, ParallelFrameProgress};
+use self::frames::{render_frames_parallel, ParallelFrameProgress, PipedFrameFormat};
 use self::process::{PipelineKind, PipelineProcesses, PipelineShutdown};
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::debug::TimingBucket;
@@ -32,27 +34,47 @@ use crate::encode::ffmpeg::binary::resolve_ffmpeg_binary;
 use crate::encode::ffmpeg::composite::CompositeEncoding;
 use crate::encode::ffmpeg::composite_profiles::composite_profile;
 use crate::encode::ffmpeg::transparent_profiles::transparent_profile;
-use crate::encode::plan::{FrameProductionPlan, TransparentRenderPlan};
+use crate::encode::overlay_format::OverlayPixelFormat;
+use crate::encode::plan::{CompositeRenderPlan, FrameProductionPlan, TransparentRenderPlan};
 use crate::encode::progress::RenderController;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::ValidatedRenderConfig;
 use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
-use crate::render::{prepare_preview_assets, FrameSize, VideoFrameRenderer};
+use crate::debug::RenderProfiler;
+use crate::render::{ExportWidgets, FrameSize, PreparedAtlas, SlotPlacement};
+use crate::render_jobs::inspection::CompositeSourceMetadata;
 
-/// Process-ready settings. Source probing and activity timing belong to jobs.
+/// Encoding inputs fixed by job planning. Source probing and activity timing
+/// belong to jobs; a composite encoding is completed by the export's atlas plan.
+pub(crate) enum VideoEncodingRequest {
+    Composite {
+        render: CompositeRenderPlan,
+        source: CompositeSourceMetadata,
+    },
+    Transparent(TransparentRenderPlan),
+}
+
+/// Process-ready settings.
 pub(crate) enum VideoEncoding {
     Composite(CompositeEncoding),
     Transparent(TransparentRenderPlan),
 }
 
 impl VideoEncoding {
-    fn frame_plan(&self, size: FrameSize, output: &Path, input_format: &str) -> FramePipelinePlan {
+    fn frame_plan(
+        &self,
+        atlas: PreparedAtlas,
+        size: FrameSize,
+        output: &Path,
+        input_format: &str,
+    ) -> FramePipelinePlan {
         match self {
             Self::Composite(plan) => FramePipelinePlan {
                 kind: PipelineKind::Composite,
                 frames: plan.render.frames,
-                frame_size: size,
+                atlas,
+                pixel_format: plan.ffmpeg_settings.overlay_pixel_format,
                 output_frame_count: plan.render.output_frame_count,
                 cpu_cores_per_frame_worker: composite_profile(plan.ffmpeg_settings.codec_id)
                     .cpu_cores_per_frame_worker,
@@ -61,16 +83,18 @@ impl VideoEncoding {
             Self::Transparent(plan) => FramePipelinePlan {
                 kind: PipelineKind::Transparent,
                 frames: plan.frames,
-                frame_size: size,
-                output_frame_count: plan.output_frame_count,
-                cpu_cores_per_frame_worker: transparent_profile(plan.ffmpeg.codec_id)
-                    .cpu_cores_per_frame_worker,
                 ffmpeg_args: plan.ffmpeg.command_args(
                     output,
+                    atlas.plan(),
                     size,
                     &plan.container_fps,
                     input_format,
                 ),
+                atlas,
+                pixel_format: OverlayPixelFormat::Rgba,
+                output_frame_count: plan.output_frame_count,
+                cpu_cores_per_frame_worker: transparent_profile(plan.ffmpeg.codec_id)
+                    .cpu_cores_per_frame_worker,
             },
         }
     }
@@ -109,45 +133,85 @@ pub(crate) fn encode_video(
     dense: &DenseActivityReport,
     controller: &RenderController,
     target: &RenderOutputTarget,
-    encoding: VideoEncoding,
+    request: VideoEncodingRequest,
 ) -> CoreResult<String> {
     controller.check_cancelled()?;
     let size = FrameSize {
         width: config.scene.presentation.width,
         height: config.scene.presentation.height,
     };
-    let debug_dir = match &encoding {
-        VideoEncoding::Transparent(_) => Some(create_debug_dir(paths)?),
-        VideoEncoding::Composite(_) => None,
+    let debug_dir = match &request {
+        VideoEncodingRequest::Transparent(_) => Some(create_debug_dir(paths)?),
+        VideoEncodingRequest::Composite { .. } => None,
     };
-    let input_format = match &encoding {
-        VideoEncoding::Transparent(_) => input_pixel_format()?,
-        VideoEncoding::Composite(_) => "rgba".into(),
+    let input_format = match &request {
+        VideoEncodingRequest::Transparent(_) => input_pixel_format()?,
+        VideoEncodingRequest::Composite { .. } => "rgba".into(),
     };
-    let frame_plan = encoding.frame_plan(size, target.path(), &input_format);
+    let binary = resolve_ffmpeg_binary(&paths.repo_root)?;
+    let coverage = match &request {
+        VideoEncodingRequest::Composite { render, .. } => &render.coverage,
+        VideoEncodingRequest::Transparent(plan) => &plan.coverage,
+    };
+    let mut prepare_profiler = RenderProfiler::default();
+    let prepare_started = Instant::now();
+    let export = ExportWidgets::prepare(
+        &paths.font_dirs,
+        config,
+        activity,
+        dense,
+        size,
+        coverage.blank_leading_frame_count,
+        &mut prepare_profiler,
+    )?;
+    let (encoding, atlas) = match request {
+        // Every composite graph overlays the planned atlas slot by slot, in the
+        // placement its filter stack plans.
+        VideoEncodingRequest::Composite { render, source } => {
+            let atlas = export.plan_atlas(
+                &render.frames.dense_frame_indices(),
+                render.requested_codec_id.metadata().filter_stack_kind.slot_placement(),
+                &mut prepare_profiler,
+            )?;
+            let encoding = CompositeEncoding::new(
+                size,
+                render,
+                &atlas,
+                source.has_audio,
+                source.audio_bit_rate,
+                source.rotation_degrees,
+                source.color,
+                target,
+            )?;
+            (VideoEncoding::Composite(encoding), atlas)
+        }
+        // FFmpeg copies the planned atlas slots back onto the transparent full frame.
+        VideoEncodingRequest::Transparent(plan) => {
+            let atlas = export.plan_atlas(
+                &plan.frames.dense_frame_indices(),
+                SlotPlacement::Copy,
+                &mut prepare_profiler,
+            )?;
+            (VideoEncoding::Transparent(plan), atlas)
+        }
+    };
+    let atlas = export.prepare_atlas(atlas, &mut prepare_profiler)?;
+    controller.check_cancelled()?;
+    let frame_plan = encoding.frame_plan(atlas, size, target.path(), &input_format);
     let samples = if debug_dir.is_some() && render_sample_frames_enabled()? {
         sample_frame_indices(frame_plan.output_frame_count as usize)
     } else {
         Vec::new()
     };
-    let binary = resolve_ffmpeg_binary(&paths.repo_root)?;
-    let (assets, labels, prepare_timings, prepare_ms) =
-        prepare_preview_assets(paths, config, activity, dense)?;
-    controller.check_cancelled()?;
+    let prepare_timings = prepare_profiler.summary();
     if let Some(directory) = &debug_dir {
-        write_prepare_summary(directory, prepare_ms, prepare_timings, labels)?;
+        write_prepare_summary(
+            directory,
+            prepare_started.elapsed().as_secs_f64() * 1000.0,
+            prepare_timings.clone(),
+        )?;
     }
-    let coverage = match &encoding {
-        VideoEncoding::Composite(plan) => &plan.render.coverage,
-        VideoEncoding::Transparent(plan) => &plan.coverage,
-    };
-    let renderer = VideoFrameRenderer::new(
-        paths,
-        dense,
-        &assets,
-        size,
-        coverage.blank_leading_frame_count,
-    )?;
+    let sample_atlas = frame_plan.atlas.plan().clone();
     let observe = |index: u64, dense_index: usize, buffer: &FrameBuffer| {
         if samples.binary_search(&(index as usize)).is_ok() {
             write_sample_frame(
@@ -155,7 +219,7 @@ pub(crate) fn encode_video(
                     .as_ref()
                     .expect("samples require a debug directory"),
                 size,
-                &buffer.pixels,
+                &sample_atlas.unpack_rgba(&buffer.pixels, size)?,
                 dense_index,
             )?;
         }
@@ -163,7 +227,7 @@ pub(crate) fn encode_video(
     };
     let outcome = run_frame_pipeline(
         &binary,
-        renderer,
+        &export,
         frame_plan,
         controller,
         target,
@@ -180,7 +244,7 @@ pub(crate) fn encode_video(
             outcome.total_seconds * 1000.0,
             outcome.render_loop_ms,
             outcome.finalize_ms,
-            outcome.timings,
+            merge_timing_maps(prepare_timings, outcome.timings),
             outcome.workers,
             outcome.rendered_frames,
         )
@@ -189,7 +253,7 @@ pub(crate) fn encode_video(
             debug_dir
                 .as_ref()
                 .expect("transparent diagnostics directory"),
-            assets.scene(),
+            &config.scene,
             target.path(),
             plan.output_frame_count,
             plan.layout_frame_count,
@@ -224,7 +288,10 @@ pub(crate) type OrderedFrameObserver<'a> = dyn Fn(u64, usize, &FrameBuffer) -> C
 pub(crate) struct FramePipelinePlan {
     pub kind: PipelineKind,
     pub frames: FrameProductionPlan,
-    pub frame_size: FrameSize,
+    /// Slots and static bases of the piped atlas frames; its size is the piped frame size.
+    pub atlas: PreparedAtlas,
+    /// Format of the frames written to FFmpeg; the renderer always draws RGBA.
+    pub pixel_format: OverlayPixelFormat,
     pub output_frame_count: u32,
     pub cpu_cores_per_frame_worker: usize,
     pub ffmpeg_args: Vec<String>,
@@ -241,7 +308,7 @@ pub(crate) struct FramePipelineOutcome {
 
 pub(crate) fn run_frame_pipeline(
     binary: &Path,
-    renderer: VideoFrameRenderer<'_>,
+    export: &ExportWidgets<'_>,
     plan: FramePipelinePlan,
     controller: &RenderController,
     target: &RenderOutputTarget,
@@ -258,7 +325,8 @@ pub(crate) fn run_frame_pipeline(
         frame_sender,
         frame_receiver,
         buffers,
-    } = ParallelFramePoolPlan::for_frame_size(plan.frame_size, workers)?.create_channels();
+    } = ParallelFramePoolPlan::for_frame_size(plan.atlas.plan().size(), plan.pixel_format, workers)?
+        .create_channels();
     let shutdown = PipelineShutdown::shared(controller.cancel_flag());
     controller.set_frame_progress(0, plan.output_frame_count, 0, 0, None, None);
     controller.start_encoding()?;
@@ -273,8 +341,12 @@ pub(crate) fn run_frame_pipeline(
     )?;
     let started = Instant::now();
     let producer = render_frames_parallel(
-        renderer,
+        export,
         plan.frames,
+        PipedFrameFormat {
+            atlas: &plan.atlas,
+            pixel_format: plan.pixel_format,
+        },
         workers,
         encoding.progress(&monitor),
         plan.kind,

@@ -7,10 +7,10 @@
  * changes using durable widget ids.
  */
 
-import { beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vite-plus/test'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
-import { deleteWidgetInConfig } from '@/lib/widget/widget-config'
+import { deleteWidgetsInConfig } from '@/lib/widget/widget-config'
 
 function makeLabel(text, overrides = {}) {
   return {
@@ -55,7 +55,7 @@ describe('createEditorSlice selection ownership', () => {
     useStore.getState().setConfig(config)
     useStore.getState().setWidgetSelection(['widget-2', 'widget-3'], 'widget-2')
 
-    useStore.getState().setConfig(deleteWidgetInConfig(config, 'widget-1'))
+    useStore.getState().setConfig(deleteWidgetsInConfig(config, ['widget-1']))
 
     const state = useStore.getState()
 

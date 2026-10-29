@@ -123,13 +123,14 @@ impl Fixture {
             encoding,
             activity: if external {
                 BatchActivity::ExternalActivity {
-                    activity: activity(),
+                    activity: Box::new(activity()),
                     timezone_mode: VideoSyncTimezoneMode::Utc,
                     reference: None,
                     automatic_offsets: sources
                         .iter()
                         .map(|source| (source.source_id.clone(), 0.0))
                         .collect(),
+                    disabled_laps: Vec::new(),
                 }
             } else {
                 BatchActivity::EmbeddedActivity {}

@@ -40,11 +40,9 @@ fn zero_decimal_standard_metrics_round_like_canvas_preview() {
     let torque_validated = common::seam::expect_standard_value(values.next().unwrap(), 1);
 
     let speed_parts =
-        ovrley_core::render::format::format_validated_metric_parts(&speed_validated, &dense, 0)
-            .unwrap();
+        ovrley_widgets::widgets::value::format::format_metric_parts(&speed_validated, &dense.metric_sample(speed_validated.metric, 0, 0.0));
     let torque_parts =
-        ovrley_core::render::format::format_validated_metric_parts(&torque_validated, &dense, 0)
-            .unwrap();
+        ovrley_widgets::widgets::value::format::format_metric_parts(&torque_validated, &dense.metric_sample(torque_validated.metric, 0, 0.0));
 
     assert_eq!(speed_parts.standard_text().0, "31");
     assert_eq!(torque_parts.standard_text().0, "19");
@@ -60,8 +58,7 @@ fn engine_power_uses_the_standard_numeric_renderer_lookup() {
         common::seam::expect_standard_value(config.values.into_iter().next().unwrap(), 0);
 
     let parts =
-        ovrley_core::render::format::format_validated_metric_parts(&engine_power, &dense, 0)
-            .unwrap();
+        ovrley_widgets::widgets::value::format::format_metric_parts(&engine_power, &dense.metric_sample(engine_power.metric, 0, 0.0));
 
     assert_eq!(parts.standard_text().0, "12346");
 }

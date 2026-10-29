@@ -1,0 +1,22 @@
+[package]
+name = "wasm-bindings"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-or-later"
+
+[[bin]]
+name = "wasm_bindings"
+path = "src/main.rs"
+
+# Keep the browser toolchain isolated; both hosts use the same Skia revision.
+[workspace]
+
+[profile.wasm]
+inherits = "release"
+panic = "abort"
+
+[dependencies]
+ovrley_widgets = { path = "../ovrley_widgets" }
+serde_json = "1"
+skia-safe = { git = "https://github.com/rust-skia/rust-skia", rev = "b7f043e0b1e2a850e702245de811f01df1f6b0ff", version = "=0.153.3", features = ["binary-cache"] }

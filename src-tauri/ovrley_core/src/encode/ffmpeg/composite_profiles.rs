@@ -20,39 +20,58 @@ pub struct CompositeProfile {
     pub bitrate_args: &'static [&'static str],
 }
 
+// CPU overlay graphs crop every atlas slot (`{atlas_slot_crops}` labels the
+// crops) and chain one overlay per slot onto `[base]` at the slot's scene
+// position (`{atlas_slot_overlays}` leaves the last overlay unlabelled).
 const SOFTWARE_H264_FILTER: &str = "[0:v]{base_video_filters}null[base];\
-[1:v]setpts=PTS-STARTPTS[ovr];\
-[base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=yuv420p[out]";
+[1:v]setpts=PTS-STARTPTS,{atlas_slot_crops};\
+{atlas_slot_overlays},format=yuv420p[out]";
 
 const SOFTWARE_HEVC_FILTER: &str = "[0:v]{base_video_filters}null[base];\
-[1:v]setpts=PTS-STARTPTS[ovr];\
-[base][ovr]overlay=0:0:eof_action=repeat:shortest=1[out]";
+[1:v]setpts=PTS-STARTPTS,{atlas_slot_crops};\
+{atlas_slot_overlays}[out]";
 
+// Hardware overlay graphs crop every atlas slot on the CPU, upload each crop
+// and chain one hardware overlay per slot onto `[base]` the same way. QSV full
+// overlay places each slot on its coded main video.
 const VAAPI_FILTER: &str =
-    "[0:v]{base_video_filters}scale_vaapi=w={width}:h={height}:format=nv12[main_hw];\
-[1:v]setpts=PTS-STARTPTS,format=yuva420p,hwupload[overlay_hw];\
-[main_hw][overlay_hw]overlay_vaapi=x=0:y=0:eof_action=repeat:shortest=1[out]";
+    "[0:v]{base_video_filters}scale_vaapi=w={width}:h={height}:format=nv12[base];\
+[1:v]setpts=PTS-STARTPTS,format=yuva420p,{atlas_slot_crops};\
+{atlas_slot_overlays}[out]";
+
+// The filter graph uploads each overlay slot with `hwupload`, which needs a device
+// of its own; `-hwaccel vaapi` alone only gives the decoder one.
+const VAAPI_INPUT_ARGS: &[&str] = &[
+    "-init_hw_device",
+    "vaapi=va",
+    "-filter_hw_device",
+    "va",
+    "-hwaccel",
+    "vaapi",
+    "-hwaccel_output_format",
+    "vaapi",
+];
 
 const AMF_D3D11_INPUT_ARGS: &[&str] = &["-init_hw_device", "d3d11va=dx", "-filter_hw_device", "dx"];
 
 const AMF_D3D11_FILTER: &str = "[0:v]{base_video_filters}null[base];\
-[1:v]setpts=PTS-STARTPTS[ovr];\
-[base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=nv12,hwupload[out]";
+[1:v]setpts=PTS-STARTPTS,{atlas_slot_crops};\
+{atlas_slot_overlays},format=nv12,hwupload[out]";
 
 const CUDA_H264_FILTER: &str =
     "[0:v]{base_video_filters}scale_cuda=w={width}:h={height}:format=yuv420p[base];\
-[1:v]setpts=PTS-STARTPTS,format=yuva420p,hwupload[ovr];\
-[base][ovr]overlay_cuda=0:0:eof_action=repeat:shortest=1[out]";
+[1:v]setpts=PTS-STARTPTS,format=yuva420p,{atlas_slot_crops};\
+{atlas_slot_overlays}[out]";
 
 const CUDA_HEVC_FILTER: &str =
     "[0:v]{base_video_filters}scale_cuda=w={width}:h={height}:format=yuv420p[base];\
-[1:v]setpts=PTS-STARTPTS,format=yuva420p,hwupload[ovr];\
-[base][ovr]overlay_cuda=0:0:eof_action=repeat:shortest=1[out]";
+[1:v]setpts=PTS-STARTPTS,format=yuva420p,{atlas_slot_crops};\
+{atlas_slot_overlays}[out]";
 
 const QSV_FULL_FILTER: &str =
-    "[0:v]{base_video_filters}scale_qsv=w={main_width}:h={main_height}:format=nv12[main_hw];\
-[1:v]setpts=PTS-STARTPTS,{qsv_overlay_cpu_rotation_filter}hwupload=extra_hw_frames=16[overlay_hw];\
-[main_hw][overlay_hw]overlay_qsv=x=0:y=0[out]";
+    "[0:v]{base_video_filters}scale_qsv=w={main_width}:h={main_height}:format=nv12[base];\
+[1:v]setpts=PTS-STARTPTS,{atlas_slot_crops};\
+{atlas_slot_overlays}[out]";
 
 const BUILTIN_PROFILES: &[CompositeProfile] = &[
     CompositeProfile {
@@ -299,7 +318,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         cpu_cores_per_frame_worker: 0,
         input_args: &["-hwaccel", "videotoolbox"],
         filter_complex: Some(SOFTWARE_H264_FILTER),
-        output_args: &[],
+        output_args: &["-prio_speed", "1"],
         quality_args: &["-global_quality", "{videotoolbox_quality}"],
         bitrate_args: &[
             "-b:v",
@@ -315,7 +334,8 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         cpu_cores_per_frame_worker: 0,
         input_args: &["-hwaccel", "videotoolbox"],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
-        output_args: &["-tag:v", "hvc1"],
+        // Speed priority roughly doubles 4K media-engine HEVC throughput.
+        output_args: &["-tag:v", "hvc1", "-prio_speed", "1"],
         quality_args: &["-global_quality", "{videotoolbox_quality}"],
         bitrate_args: &[
             "-b:v",
@@ -329,7 +349,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
     CompositeProfile {
         codec_id: CompositeCodecId::VaapiH264,
         cpu_cores_per_frame_worker: 4,
-        input_args: &["-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"],
+        input_args: VAAPI_INPUT_ARGS,
         filter_complex: Some(VAAPI_FILTER),
         output_args: &[],
         quality_args: &["-rc_mode", "CQP", "-qp", "{quality}"],
@@ -347,9 +367,9 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
     CompositeProfile {
         codec_id: CompositeCodecId::VaapiHevc,
         cpu_cores_per_frame_worker: 4,
-        input_args: &["-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"],
+        input_args: VAAPI_INPUT_ARGS,
         filter_complex: Some(VAAPI_FILTER),
-        output_args: &["-tag:v", "hvc1"],
+        output_args: &["-tag:v", "hvc1", "-compression_level", "7", "-async_depth", "4"],
         quality_args: &["-rc_mode", "CQP", "-qp", "{quality}"],
         bitrate_args: &[
             "-rc_mode",
@@ -464,6 +484,11 @@ mod tests {
         ] {
             assert_output_arg_pair(codec_id, "-temporal-aq", "true");
         }
+    }
+
+    #[test]
+    fn videotoolbox_hevc_prioritizes_speed() {
+        assert_output_arg_pair(CompositeCodecId::MacHevc, "-prio_speed", "1");
     }
 
     #[test]

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
 import { calculateMatchScore, calculateTimingQuality } from '@/features/video-sync/utils/matchScore'
 import { matchVideoSyncCandidates } from '@/features/video-sync/utils/intervalConsensus'

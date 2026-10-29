@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach } from 'vitest'
+import { describe, expect, test, beforeEach, afterEach } from 'vite-plus/test'
 
 describe('hasTauriRuntime', () => {
   let hasTauriRuntime

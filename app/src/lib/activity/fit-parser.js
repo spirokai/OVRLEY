@@ -1,9 +1,81 @@
 /**
  * FIT file parser — reads FIT binary format and converts to normalized raw samples.
+ * Diving extraction is based on Unabara by Arnaud Dupuis (GPL-2.0):
+ * https://github.com/arnauddupuis/unabara/blob/main/src/core/format_parsers/fit_parser.cpp
  */
 
 import FitParser from 'fit-file-parser'
 import { safeGearValue, safeNumber } from './raw-sample-utils.js'
+
+const DIVE_SUB_SPORTS = new Set(['single_gas_diving', 'multi_gas_diving', 'gauge_diving', 'apnea_diving', 'apnea_hunting', 'ccr_diving'])
+const BAR_PER_ATMOSPHERE = 1.01325
+
+function extractDiveSamples(parsedFit, records, subSport) {
+  const gases = new Map()
+  for (const [index, gas] of (parsedFit.dive_gases ?? []).entries()) {
+    if (gas.status === 'disabled') continue
+    const oxygen = safeNumber(gas.oxygen_content)
+    const helium = safeNumber(gas.helium_content)
+    const validMix = oxygen !== null && helium !== null && oxygen >= 0 && helium >= 0 && oxygen + helium <= 100
+    gases.set(gas.message_index?.value ?? index, {
+      mode: gas.mode,
+      fraction_o2: validMix ? oxygen / 100 : null,
+      fraction_he: validMix ? helium / 100 : null,
+    })
+  }
+  const initialGas = [...gases.values()].find((gas) =>
+    subSport === 'ccr_diving' ? gas.mode === 'closed_circuit_diluent' : gas.mode !== 'closed_circuit_diluent',
+  )
+  let currentGas = initialGas
+  const switches = (parsedFit.events ?? [])
+    .filter((event) => event.event === 'dive_gas_switched' && Number.isFinite(event.timestamp?.getTime()))
+    .sort((left, right) => left.timestamp - right.timestamp)
+  let switchIndex = 0
+  const gasSwitchSamples = []
+  const state = {
+    depth: null,
+    first_stop_depth: null,
+    first_stop_time: null,
+    time_to_surface: null,
+    average_ppo2: null,
+    water_temperature: null,
+  }
+  const fields = [
+    ['depth', 'depth', 1],
+    ['next_stop_depth', 'first_stop_depth', 1],
+    ['next_stop_time', 'first_stop_time', 60],
+    ['time_to_surface', 'time_to_surface', 60],
+    // FIT reports one current ppO2 value in bar. Setpoints are never substituted.
+    ['po2', 'average_ppo2', BAR_PER_ATMOSPHERE],
+    ['temperature', 'water_temperature', 1],
+  ]
+  const recordSamples = records.map((record) => {
+    while (switchIndex < switches.length && switches[switchIndex].timestamp <= record.timestamp) {
+      const event = switches[switchIndex]
+      currentGas = gases.get(event.data)
+      if (event.timestamp > records[0].timestamp && event.timestamp < record.timestamp && currentGas) {
+        gasSwitchSamples.push({
+          timestamp: event.timestamp,
+          elapsed_seconds: (event.timestamp - records[0].timestamp) / 1000,
+          fraction_o2: currentGas.fraction_o2,
+          fraction_he: currentGas.fraction_he,
+        })
+      }
+      switchIndex++
+    }
+    for (const [source, target, divisor] of fields) {
+      if (record[source] === undefined) continue
+      const value = safeNumber(record[source])
+      state[target] = value === null ? null : value / divisor
+    }
+    return {
+      ...state,
+      fraction_o2: currentGas?.fraction_o2 ?? null,
+      fraction_he: currentGas?.fraction_he ?? null,
+    }
+  })
+  return { recordSamples, gasSwitchSamples }
+}
 
 /**
  * Returns optional record value.
@@ -39,11 +111,6 @@ function getOptionalRecordNumberFromKeys(record, keys) {
   return null
 }
 
-function getRecordElapsedSeconds(record, elapsedOffsetSeconds) {
-  const elapsedSeconds = safeNumber(record.elapsed_time)
-  return elapsedSeconds === null ? null : elapsedSeconds + elapsedOffsetSeconds
-}
-
 /** Missing timestamps leave lap timing unavailable rather than merging separate laps. */
 function extractLapTiming(laps, firstRecordTimestamp) {
   if (!laps.length || firstRecordTimestamp == null || laps.some((lap) => lap.start_time == null)) return null
@@ -56,12 +123,15 @@ function extractLapTiming(laps, firstRecordTimestamp) {
   const firstRecordTime = firstRecordTimestamp.getTime()
   if (!Number.isFinite(firstRecordTime)) throw new Error('FIT lap timing requires a valid first record timestamp.')
 
-  // A device can start a lap before writing its first record. Keep both on the same timeline.
-  const origin = Math.min(firstRecordTime, startTimes[0])
+  // Keep the recording at t=0 and shorten the lap in progress at the first record.
+  // Earlier laps have no recorded samples and do not extend the activity.
+  const firstObservedLapIndex = Math.max(
+    0,
+    startTimes.findLastIndex((start) => start <= firstRecordTime),
+  )
   return {
-    sync_time: new Date(origin).toISOString(),
-    lap_markers: { BeaconMarkers: startTimes.map((start) => (start - origin) / 1000) },
-    elapsedOffsetSeconds: (firstRecordTime - origin) / 1000,
+    sync_time: firstRecordTimestamp.toISOString(),
+    lap_markers: { BeaconMarkers: startTimes.slice(firstObservedLapIndex).map((start) => Math.max(0, (start - firstRecordTime) / 1000)) },
   }
 }
 
@@ -92,17 +162,20 @@ export default async function parseFitActivityFile(file) {
   const firstSession = Array.isArray(parsedFit?.sessions) ? parsedFit.sessions[0] || null : null
   const fileId = parsedFit?.file_id || null
   const lapTiming = extractLapTiming(parsedFit.laps ?? [], records[0].timestamp)
-  const elapsedOffsetSeconds = lapTiming?.elapsedOffsetSeconds ?? 0
+  const subSport = firstSession?.sub_sport ?? parsedFit.sports?.[0]?.sub_sport
+  const isDive = DIVE_SUB_SPORTS.has(subSport) || records.some((record) => record.depth !== undefined)
+  const diveSamples = isDive ? extractDiveSamples(parsedFit, records, subSport) : null
 
-  const raw_samples = records.map((record) => ({
+  const raw_samples = records.map((record, index) => ({
     air_pressure: safeNumber(record.absolute_pressure),
     barometric_altitude: getOptionalRecordNumberFromKeys(record, ['enhanced_altitude', 'altitude']),
     calories: getOptionalRecordNumber(record, 'calories'),
     cadence: safeNumber(record.cadence),
     core_temperature: safeNumber(record.core_temperature),
     distance: safeNumber(record.distance),
-    elapsed_seconds: getRecordElapsedSeconds(record, elapsedOffsetSeconds),
+    elapsed_seconds: safeNumber(record.elapsed_time),
     elevation: safeNumber(record.enhanced_altitude ?? record.altitude),
+    engine_power: safeNumber(record.motor_power),
     g_force: safeNumber(getOptionalRecordValue(record, ['g_force', 'gforce'])),
     gear_position: safeGearValue(getOptionalRecordValue(record, ['gear_ratio', 'gear', 'front_gear'])),
     gradient: safeNumber(record.grade),
@@ -125,7 +198,12 @@ export default async function parseFitActivityFile(file) {
     torque: safeNumber(getOptionalRecordValue(record, ['torque'])),
     vertical_oscillation: safeNumber(record.vertical_oscillation),
     vertical_speed: safeNumber(record.vertical_speed),
+    ...diveSamples?.recordSamples[index],
   }))
+  if (diveSamples) {
+    raw_samples.push(...diveSamples.gasSwitchSamples)
+    raw_samples.sort((left, right) => left.elapsed_seconds - right.elapsed_seconds)
+  }
 
   return {
     file_name: file.name,
@@ -144,7 +222,7 @@ export default async function parseFitActivityFile(file) {
     },
     raw_samples,
     options: {
-      skip_idle_gap_fill: false,
+      skip_idle_gap_fill: isDive,
       smoothing: {
         pace: { enabled: true, method: 'zero_phase_ma', window_seconds: 5.0 },
         heading: { enabled: true, method: 'circular_ema', window_seconds: 3.0 },

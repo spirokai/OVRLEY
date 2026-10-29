@@ -52,7 +52,7 @@ export function VideoSyncControls({
       </div>
 
       <div className="space-y-3">
-        <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('toolbar.syncOffset', 'Sync Offset')}</Label>
+        <Label className="text-[0.741rem] text-muted-foreground uppercase font-bold">{t('toolbar.syncOffset', 'Sync Offset')}</Label>
         <div className="grid grid-cols-2 items-center gap-4">
           <div className="relative flex-1">
             <BlurInput
@@ -98,7 +98,7 @@ export function VideoSyncControls({
           </Button>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-4 pt-1">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('toolbar.creationTime', 'Creation Time')}</Label>
+          <Label className="text-[0.741rem] text-muted-foreground uppercase font-bold">{t('toolbar.creationTime', 'Creation Time')}</Label>
           <Tabs
             value={canResetCreationTime ? 'filename' : 'detected'}
             onValueChange={(value) => (value === 'filename' ? setVideoCreationTimeFromFilename() : resetVideoCreationTime())}
@@ -114,7 +114,7 @@ export function VideoSyncControls({
           </Tabs>
           {timezone ? (
             <>
-              <Label htmlFor="video-sync-timezone-toggle" className="mb-2 text-[10px] text-muted-foreground uppercase font-bold">
+              <Label htmlFor="video-sync-timezone-toggle" className="mb-2 text-[0.741rem] text-muted-foreground uppercase font-bold">
                 {t('toolbar.applyTimezone', 'Apply Timezone')}
               </Label>
               <div className="mb-2 flex items-center gap-2">

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { buildEventBands, buildGraphGeometry, buildGraphScales, decimateGraphSamples } from '@/features/video-sync/utils/graphGeometry'
 
 function points(values, start = 0) {

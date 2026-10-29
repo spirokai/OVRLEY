@@ -1,8 +1,7 @@
 vi.mock('@/lib/font-resources', () => ({ prepareDocumentFonts: vi.fn(async () => {}) }))
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { createDurableTemplateState } from '@/lib/template/template-state'
-import { createDurableEditorState } from '@/lib/widget/editor-state'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
+import { createDurableTemplateState, createDurableEditorState } from '@/lib/template/template-state'
 import { loadProject } from '@/features/projects/projectOperations'
 import useProjectLifecycle from '@/features/projects/hooks/useProjectLifecycle'
 import { prepareDocumentFonts } from '@/lib/font-resources'
@@ -45,12 +44,12 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.registerPreviewVideo.mockResolvedValue({ importId: 'owner-import-id', previewUrl: 'http://preview/video' })
   })
 
-  test('normalizes legacy widget alignment at the frontend project-load seam', async () => {
+  test.each(['text', 'linear', 'arc', 'corner'])('normalizes legacy %s widget alignment at the frontend project-load seam', async (displayType) => {
     const initialState = useStore.getState()
     const editor = createDurableEditorState({
       config: {
         ...initialState.config,
-        values: [{ id: 'legacy-speed', value: 'speed', x: 300, y: 100 }],
+        values: [{ id: 'legacy-speed', value: 'speed', display_type: displayType, x: 300, y: 100 }],
       },
       globalDefaults: initialState.globalDefaults,
     })
@@ -66,6 +65,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: null,
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
+      laps: { disabled: [] },
       render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
@@ -108,6 +108,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: 'utc',
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
+      laps: { disabled: [] },
       render: {
         renderTarget: 'current',
         batchVideoFolder: null,
@@ -144,6 +145,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         metadata: { duration_seconds: 100 },
         file_format: 'fit',
         file_name: 'ride.fit',
+        lap_start_elapsed_seconds: [],
+        lap_durations_seconds: [],
       },
     }
     const prepareActivityPath = vi.fn(
@@ -458,6 +461,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: null,
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
+      laps: { disabled: [] },
       render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
@@ -518,6 +522,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: null,
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
+      laps: { disabled: [] },
       render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
@@ -568,6 +573,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videoTimezoneMode: null,
         manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
+      laps: { disabled: [] },
       render: {
         ...DEFAULT_RENDER_SETTINGS,
         batchVideoFolder: null,

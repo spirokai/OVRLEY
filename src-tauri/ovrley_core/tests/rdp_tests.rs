@@ -19,7 +19,7 @@
 //! - Tolerance boundary (exactly at max distance) removing or keeping
 //!   the wrong points
 
-use ovrley_core::rdp::{perpendicular_distance, simplify_rdp_indices};
+use ovrley_widgets::rdp::{perpendicular_distance, simplify_rdp_indices};
 
 /// Straight line (2 points) — both endpoints kept.
 #[test]

@@ -30,7 +30,7 @@ pub fn heading_tape_json() -> Value {
 
 /// Materialized shared presentation for video-local planning/pipeline tests.
 pub fn batch_template(
-) -> ovrley_core::normalize::raw::RenderConfig<ovrley_core::normalize::raw::ScenePresentationConfig>
+) -> ovrley_core::normalize::RenderConfig<ovrley_widgets::model::scene::ScenePresentationConfig>
 {
     let mut scene = super::seam::explicit_scene_json();
     for key in [
@@ -117,8 +117,8 @@ pub fn video_batch_request(
     inspection_id: &str,
     source: &ovrley_core::media::prepared_video::InspectedVideoSource,
     encoding: ovrley_core::render_jobs::contracts::BatchEncodingSettings,
-    template: ovrley_core::normalize::raw::RenderConfig<
-        ovrley_core::normalize::raw::ScenePresentationConfig,
+    template: ovrley_core::normalize::RenderConfig<
+        ovrley_widgets::model::scene::ScenePresentationConfig,
     >,
     activity: ovrley_core::activity::schema::ParsedActivity,
     offset: f64,
@@ -134,10 +134,11 @@ pub fn video_batch_request(
         template,
         encoding,
         activity: BatchActivity::ExternalActivity {
-            activity,
+            activity: Box::new(activity),
             timezone_mode: VideoSyncTimezoneMode::Utc,
             reference: None,
             automatic_offsets: [(source.source_id.clone(), offset)].into(),
+            disabled_laps: Vec::new(),
         },
         output_directory: directory.to_str().unwrap().into(),
         jobs: vec![BatchRenderJob {
@@ -166,6 +167,14 @@ pub fn empty_dense_series() -> DenseSeriesReport {
         engine_power: vec![],
         engine_load: vec![],
         temperature: vec![],
+        depth: vec![],
+        first_stop_depth: vec![],
+        first_stop_time: vec![],
+        time_to_surface: vec![],
+        average_ppo2: vec![],
+        fraction_o2: vec![],
+        fraction_he: vec![],
+        water_temperature: vec![],
         pace: vec![],
         g_force: vec![],
         g_force_x: vec![],
@@ -182,6 +191,7 @@ pub fn empty_dense_series() -> DenseSeriesReport {
         stroke_rate: vec![],
         torque: vec![],
         vertical_speed: vec![],
+        depth_vertical_speed: vec![],
         iso: vec![],
         aperture: vec![],
         shutter_speed: vec![],
@@ -255,6 +265,14 @@ pub fn minimal_trimmed_activity(times: Vec<f64>) -> TrimmedActivity {
         engine_power: vec![],
         engine_load: vec![],
         temperature: vec![],
+        depth: vec![],
+        first_stop_depth: vec![],
+        first_stop_time: vec![],
+        time_to_surface: vec![],
+        average_ppo2: vec![],
+        fraction_o2: vec![],
+        fraction_he: vec![],
+        water_temperature: vec![],
         pace: vec![],
         g_force: vec![],
         g_force_x: vec![],
@@ -271,6 +289,7 @@ pub fn minimal_trimmed_activity(times: Vec<f64>) -> TrimmedActivity {
         stroke_rate: vec![],
         torque: vec![],
         vertical_speed: vec![],
+        depth_vertical_speed: vec![],
         iso: vec![],
         aperture: vec![],
         shutter_speed: vec![],

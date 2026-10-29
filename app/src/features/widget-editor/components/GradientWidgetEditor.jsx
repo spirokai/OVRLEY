@@ -2,12 +2,12 @@
  * Supports widget editing flows related to gradient widget editor.
  */
 
-import { ColorField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
+import { ColorField, SliderField, ToggleField } from './widgetFormControls'
 import { Label } from '@/components/ui/label'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { FontSection, UnitsControlRow } from './widgetEditorSections'
 import { TrendingUp } from 'lucide-react'
-import { getThemeColor } from '@/lib/theme'
+import { getThemeColor } from '@/lib/color-utils'
 import { useTranslation } from 'react-i18next'
 
 /**
@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next'
  * @param {*} props.updateWidgetData - Value for update widget data.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function GradientWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function GradientWidgetEditor({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const valueOffset = widget.data.value_offset
   const decimals = widget.data.decimals
@@ -29,8 +29,8 @@ export default function GradientWidgetEditor({ widget, updateWidgetData, updateW
       <FontSection
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
         title={t('widget-editor.typography', 'Typography')}
         fontSizeLabel={t('widget-editor.fontSize', 'Font Size')}
         colorLabel={t('widget-editor.valueColor', 'Value Color')}
@@ -46,8 +46,8 @@ export default function GradientWidgetEditor({ widget, updateWidgetData, updateW
         integerDisplay
         valueDisplay={`${valueOffset}`}
         suffix="px"
-        onSliderChange={(value) => updateWidgetSize(widget.id, { value_offset: value })}
-        onSliderCommit={() => commitWidgetSize(widget.id)}
+        onSliderChange={(value) => updateWidgetDraft(widget.id, { value_offset: value })}
+        onSliderCommit={() => commitWidgetDraft(widget.id)}
       />
       <div className="grid grid-cols-2 gap-4">
         <SliderField
@@ -58,10 +58,11 @@ export default function GradientWidgetEditor({ widget, updateWidgetData, updateW
           max={2}
           step={1}
           valueDisplay={decimals.toString()}
-          onSliderChange={(value) => updateWidgetData(widget.id, { decimals: value })}
+          onSliderChange={(value) => updateWidgetDraft(widget.id, { decimals: value })}
+          onSliderCommit={() => commitWidgetDraft(widget.id)}
         />
         <div className="flex items-center justify-between rounded-sm pl-8 py-2.5 mt-4.5">
-          <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.showSign', 'Show sign')}</Label>
+          <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.showSign', 'Show sign')}</Label>
           <ToggleField checked={widget.data.show_sign} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_sign: checked })} />
         </div>
       </div>
@@ -87,7 +88,9 @@ export default function GradientWidgetEditor({ widget, updateWidgetData, updateW
           />
         </div>
 
-        <SizeSlider
+        <SliderField
+          editable
+          integerDisplay
           label={t('widget-editor.width', 'Width')}
           disabled={!widget.data.show_triangle}
           value={triangleWidth}
@@ -96,8 +99,8 @@ export default function GradientWidgetEditor({ widget, updateWidgetData, updateW
           step={1}
           valueDisplay={`${triangleWidth}`}
           suffix="px"
-          onChange={(value) => updateWidgetSize(widget.id, { triangle_width: value })}
-          onCommit={() => commitWidgetSize(widget.id)}
+          onSliderChange={(value) => updateWidgetDraft(widget.id, { triangle_width: value })}
+          onSliderCommit={() => commitWidgetDraft(widget.id)}
         />
         <UnitsControlRow
           widget={widget}

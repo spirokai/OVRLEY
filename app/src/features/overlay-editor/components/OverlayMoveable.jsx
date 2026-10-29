@@ -1,98 +1,32 @@
-/**
- * Renders the overlay moveable component.
- */
-
 import Moveable from 'react-moveable'
-import { useLayoutEffect, useMemo } from 'react'
-import { getEditorGridSize } from '../utils/overlayEditorUtils'
-import { CORNER_RESIZE_DIRECTIONS, EDGE_RESIZE_DIRECTIONS, MOVEABLE_ZOOM } from '../data/overlayEditorConstants'
+import { createPortal } from 'react-dom'
+import { CORNER_RESIZE_DIRECTIONS, EDGE_RESIZE_DIRECTIONS, SNAP_DIRECTIONS } from '../data/overlayEditorConstants'
+import { useSelectionBorder } from '../hooks/useSelectionBorder'
 
-const SNAP_DIRECTIONS = {
-  left: true,
-  top: true,
-  right: true,
-  bottom: true,
-  center: true,
-  middle: true,
-}
-
-function getGridGuidelines(max, gridSize, enabled) {
-  const guidelines = [0, max / 2, max]
-
-  if (enabled) {
-    for (let value = gridSize; value < max; value += gridSize) {
-      guidelines.push(value)
-    }
-  }
-
-  return [...new Set(guidelines)].sort((left, right) => left - right)
-}
-
-/**
- * Renders the overlay moveable component.
- *
- * @param {object} props - Component props.
- * @param {*} props.moveableRef - Value for moveable ref.
- * @param {*} props.selectedTarget - Value for selected target.
- * @param {*} props.selectedTargets - Value for selected targets.
- * @param {*} props.isGroupDragActive - Boolean flag for is group drag active.
- * @param {*} props.sceneElement - Value for scene element.
- * @param {*} props.displayScale - Value for display scale.
- * @param {*} props.canResizeSelected - Value for can resize selected.
- * @param {*} props.canScaleSelected - Value for can scale selected.
- * @param {*} props.canRotateSelected - Value for can rotate selected.
- * @param {*} props.maintainAspectRatio - Value for maintain aspect ratio.
- * @param {*} props.showEdgeResizeHandles - Whether to render edge resize handles.
- * @param {*} props.elementGuidelines - Value for element guidelines.
- * @param {*} props.sceneSize - Numeric scene size value.
- * @param {*} props.snapToGrid - Whether to snap Moveable to editor grid guides.
- * @param {*} props.handlers - Value for handlers.
- * @param {string|null} props.interactionType - Live interaction currently owning geometry.
- * @returns {JSX.Element} Rendered component output.
- */
+/** @param {object} props Selection targets, gesture handlers, and viewport guides. @returns {JSX.Element|null} WASM widget interaction handles. */
 export default function OverlayMoveable({
   moveableRef,
   selectedTarget,
   selectedTargets,
-  geometryVersion,
+  isGroupSelection,
   isGroupDragActive,
   sceneElement,
-  displayScale,
   canResizeSelected,
-  canScaleSelected,
   canRotateSelected,
   maintainAspectRatio,
   showEdgeResizeHandles,
   elementGuidelines,
-  sceneSize,
-  snapToGrid,
+  horizontalGuidelines,
+  verticalGuidelines,
+  zoom,
   handlers,
-  interactionType,
 }) {
-  const isGroupSelection = selectedTargets.length > 1
-  const gridSize = getEditorGridSize(sceneSize)
-  const moveableZoom = MOVEABLE_ZOOM / Math.max(displayScale, Number.EPSILON) / 2
-  const horizontalGuidelines = useMemo(() => getGridGuidelines(sceneSize.height, gridSize, snapToGrid), [gridSize, sceneSize.height, snapToGrid])
-  const verticalGuidelines = useMemo(() => getGridGuidelines(sceneSize.width, gridSize, snapToGrid), [gridSize, sceneSize.width, snapToGrid])
-
-  useLayoutEffect(() => {
-    const moveableOwnsGeometry = interactionType && interactionType !== 'slider'
-    if (moveableOwnsGeometry || !moveableRef.current || (!selectedTarget && !selectedTargets.length) || geometryVersion === 'none') {
-      return
-    }
-
-    moveableRef.current.updateRect()
-  }, [geometryVersion, interactionType, moveableRef, selectedTarget, selectedTargets])
-
-  if ((!selectedTarget && !selectedTargets.length) || !sceneElement) {
-    return null
-  }
-
+  if ((!selectedTarget && !selectedTargets.length) || !sceneElement) return null
   return (
     <Moveable
       ref={moveableRef}
       className="ovrley-moveable"
-      target={selectedTarget || undefined}
+      target={selectedTarget ?? undefined}
       targets={selectedTargets.length ? selectedTargets : undefined}
       container={sceneElement}
       rootContainer={document.body}
@@ -100,10 +34,12 @@ export default function OverlayMoveable({
       edge={false}
       groupable={isGroupSelection}
       passDragArea={isGroupSelection}
+      ables={SELECTION_BORDER_ABLES}
       hideChildMoveableDefaultLines={isGroupDragActive && isGroupSelection}
       draggable
       resizable={canResizeSelected}
-      scalable={canScaleSelected || isGroupSelection}
+      checkResizableError={false}
+      scalable={false}
       rotatable={canRotateSelected}
       renderDirections={showEdgeResizeHandles ? EDGE_RESIZE_DIRECTIONS : CORNER_RESIZE_DIRECTIONS}
       snappable
@@ -117,7 +53,7 @@ export default function OverlayMoveable({
       elementGuidelines={elementGuidelines}
       horizontalGuidelines={horizontalGuidelines}
       verticalGuidelines={verticalGuidelines}
-      zoom={moveableZoom}
+      zoom={zoom}
       onDragStart={handlers.onDragStart}
       onDrag={handlers.onDrag}
       onDragEnd={handlers.onDragEnd}
@@ -127,15 +63,51 @@ export default function OverlayMoveable({
       onResizeStart={handlers.onResizeStart}
       onResize={handlers.onResize}
       onResizeEnd={handlers.onResizeEnd}
-      onScaleStart={handlers.onScaleStart}
-      onScale={handlers.onScale}
-      onScaleEnd={handlers.onScaleEnd}
-      onScaleGroupStart={handlers.onScaleGroupStart}
-      onScaleGroup={handlers.onScaleGroup}
-      onScaleGroupEnd={handlers.onScaleGroupEnd}
+      onResizeGroupStart={handlers.onResizeGroupStart}
+      onResizeGroup={handlers.onResizeGroup}
+      onResizeGroupEnd={handlers.onResizeGroupEnd}
       onRotateStart={handlers.onRotateStart}
       onRotate={handlers.onRotate}
       onRotateEnd={handlers.onRotateEnd}
     />
+  )
+}
+
+// Native Moveable lines shimmer under fractional scene transforms, even with inverse zoom.
+// Draw an SVG outside the scaled scene with a device-pixel stroke to keep border thickness steady;
+// vertices stay fractional so the border tracks the widget content while it moves or resizes.
+const SELECTION_BORDER_ABLES = [
+  {
+    name: 'selectionBorder',
+    always: true,
+    render(moveable, React) {
+      const managers = moveable.props.groupable && !moveable.props.hideChildMoveableDefaultLines ? [moveable, ...moveable.moveables] : [moveable]
+      const borders = managers.map((manager) => {
+        const { left, top, pos1, pos2, pos3, pos4 } = manager.getState()
+        return [pos1, pos2, pos4, pos3].map(([x, y]) => ({ x: left + x, y: top + y }))
+      })
+      return [
+        React.createElement(SelectionBorder, { key: 'selection-border', container: moveable.getContainer(), borders, zoom: moveable.props.zoom }),
+      ]
+    },
+  },
+]
+
+function SelectionBorder({ container, borders, zoom }) {
+  const border = useSelectionBorder(container, borders, zoom)
+  if (border === null) return null // Measured in the layout effect before the first paint.
+  return createPortal(
+    <svg
+      aria-hidden="true"
+      className="ovrley-moveable ovrley-selection-border"
+      style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 1, clipPath: border.clipPath }}
+    >
+      <g fill="none" stroke="var(--theme-color-accent)" strokeWidth={border.strokeWidth}>
+        {border.polygons.map((points, index) => (
+          <polygon key={index} points={points} />
+        ))}
+      </g>
+    </svg>,
+    container.closest('.app-shell'),
   )
 }

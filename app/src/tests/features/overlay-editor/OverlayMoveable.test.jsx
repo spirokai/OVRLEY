@@ -1,64 +1,61 @@
-import { act, render } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { render } from '@testing-library/react'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import OverlayMoveable from '@/features/overlay-editor/components/OverlayMoveable'
 
-const moveableRef = { current: { updateRect: vi.fn() } }
-const moveableProps = {
-  canResizeSelected: false,
+const moveable = vi.hoisted(() => vi.fn(() => null))
+vi.mock('react-moveable', () => ({ default: moveable }))
+
+const props = {
+  canResizeSelected: true,
   canRotateSelected: false,
-  canScaleSelected: true,
-  displayScale: 1,
   elementGuidelines: [],
-  geometryVersion: 'initial',
-  handlers: {},
+  horizontalGuidelines: [0, 540, 1080],
+  verticalGuidelines: [0, 960, 1920],
+  zoom: 0.75,
+  handlers: { onResize: vi.fn(), onDragGroup: vi.fn(), onResizeGroupStart: vi.fn(), onResizeGroup: vi.fn(), onResizeGroupEnd: vi.fn() },
   isGroupDragActive: false,
-  maintainAspectRatio: false,
-  moveableRef,
+  isGroupSelection: false,
+  maintainAspectRatio: true,
+  moveableRef: { current: null },
   sceneElement: document.createElement('div'),
-  sceneSize: { width: 1920, height: 1080 },
   selectedTarget: document.createElement('div'),
   selectedTargets: [],
   showEdgeResizeHandles: false,
-  snapToGrid: false,
 }
 
-vi.mock('react-moveable', () => ({
-  default: () => null,
-}))
+describe('OverlayMoveable WASM gestures', () => {
+  beforeEach(() => moveable.mockClear())
 
-describe('OverlayMoveable geometry updates', () => {
-  beforeEach(() => {
-    moveableRef.current.updateRect.mockReset()
-    vi.stubGlobal('requestAnimationFrame', (callback) => {
-      callback(0)
-      return 1
+  test('uses resize handlers and viewport guides without legacy scaling', () => {
+    render(<OverlayMoveable {...props} />)
+    expect(moveable.mock.lastCall[0]).toMatchObject({
+      resizable: true,
+      scalable: false,
+      checkResizableError: false,
+      keepRatio: true,
+      renderDirections: ['nw', 'ne', 'se', 'sw'],
+      horizontalGuidelines: props.horizontalGuidelines,
+      verticalGuidelines: props.verticalGuidelines,
+      onResize: props.handlers.onResize,
     })
-    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    expect(moveable.mock.lastCall[0].onScale).toBeUndefined()
   })
 
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
-  test('updates once when the geometry signature changes', () => {
-    const { rerender } = render(<OverlayMoveable {...moveableProps} />)
-    moveableRef.current.updateRect.mockClear()
-
-    act(() => {
-      rerender(<OverlayMoveable {...moveableProps} geometryVersion="changed" />)
+  test('enables proportional group resize through the bounding-box handles', () => {
+    const selectedTargets = [document.createElement('div'), document.createElement('div')]
+    render(<OverlayMoveable {...props} selectedTarget={null} selectedTargets={selectedTargets} isGroupSelection isGroupDragActive />)
+    expect(moveable.mock.lastCall[0]).toMatchObject({
+      targets: selectedTargets,
+      groupable: true,
+      hideChildMoveableDefaultLines: true,
+      resizable: true,
+      scalable: false,
+      keepRatio: true,
+      renderDirections: ['nw', 'ne', 'se', 'sw'],
+      onDragGroup: props.handlers.onDragGroup,
+      onResizeGroupStart: props.handlers.onResizeGroupStart,
+      onResizeGroup: props.handlers.onResizeGroup,
+      onResizeGroupEnd: props.handlers.onResizeGroupEnd,
     })
-
-    expect(moveableRef.current.updateRect).toHaveBeenCalledTimes(1)
-  })
-
-  test('does not update when the geometry signature is unchanged', () => {
-    const { rerender } = render(<OverlayMoveable {...moveableProps} />)
-    moveableRef.current.updateRect.mockClear()
-
-    act(() => {
-      rerender(<OverlayMoveable {...moveableProps} />)
-    })
-
-    expect(moveableRef.current.updateRect).not.toHaveBeenCalled()
   })
 })

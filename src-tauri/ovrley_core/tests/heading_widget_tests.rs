@@ -15,21 +15,19 @@
 
 mod common;
 
-use ovrley_core::debug::RenderProfiler;
-use ovrley_core::normalize::raw::RenderConfig;
+use ovrley_core::normalize::RenderConfig;
 use ovrley_core::normalize::{
-    validate_render_config, validate_scene_config, ValidatedHeading, ValidatedSceneConfig,
+    validate_render_config, validate_scene_config, ValidatedSceneConfig,
 };
-use ovrley_core::render::surface::create_surface;
-use ovrley_core::render::text::{origin_x_for_centered_text, resolve_font};
-use ovrley_core::render::widgets::heading::draw::draw_heading_widget;
-use ovrley_core::render::widgets::heading::geometry::{
+use ovrley_core::render::surface::{create_surface, native_n32_image_info};
+use ovrley_widgets::render::text::resolve_font;
+use ovrley_widgets::widgets::heading::layout::prepare_heading_cache;
+use ovrley_widgets::widgets::heading::geometry::{
     chevron_vertices, heading_label_baseline, heading_tape_layout, heading_tick_position,
     visible_labels, visible_ticks, TapeTick,
 };
-use ovrley_core::render::widgets::heading::prepare::prepare_heading_cache;
-use ovrley_core::render::widgets::types::HeadingWidgetCache;
-use ovrley_core::types::DisplayType;
+use ovrley_widgets::widgets::heading::{layout::HeadingCache, validation::ValidatedHeading};
+use ovrley_widgets::render::text::origin_x_for_centered_text;
 use std::collections::BTreeMap;
 
 // ── Geometry helpers ──────────────────────────────────────────────────────
@@ -40,8 +38,8 @@ fn default_heading() -> ValidatedHeading {
     ValidatedHeading {
         x: 100.0,
         y: 200.0,
-        width: 400,
-        height: 80,
+        width: 400.0,
+        height: 80.0,
         pixels_per_degree: 5.0,
         major_tick_interval: 15,
         minor_ticks_per_major: 3,
@@ -58,7 +56,7 @@ fn default_heading() -> ValidatedHeading {
         show_major_labels: true,
         label_color: "#CCCCCC".to_string(),
         cardinal_label_color: "#FF0000".to_string(),
-        label_font: Some("Arial.ttf".to_string()),
+        label_font: "Arial.ttf".to_string(),
         label_font_size: 12.0,
         label_offset: 4.0,
         show_indicator: true,
@@ -66,14 +64,12 @@ fn default_heading() -> ValidatedHeading {
         indicator_placement: "top".to_string(),
         indicator_color: "#FF0000".to_string(),
         indicator_size: 10.0,
-        indicator_shadow: None,
-        rotation: 0.0,
         opacity: 1.0,
     }
 }
 
 fn default_render_config() -> RenderConfig {
-    let scene: ovrley_core::normalize::raw::SceneConfig =
+    let scene: ovrley_core::normalize::SceneConfig =
         serde_json::from_value(common::builders::scene_json()).unwrap();
     let config = RenderConfig {
         scene,
@@ -93,29 +89,21 @@ fn default_validated_scene() -> ValidatedSceneConfig {
     validate_scene_config(config.scene).unwrap()
 }
 
-fn default_cache() -> HeadingWidgetCache {
-    HeadingWidgetCache {
-        tape_image: {
-            let mut surface = create_surface(1800, 80).unwrap();
-            surface.canvas().clear(skia_safe::Color::TRANSPARENT);
-            surface.image_snapshot()
-        },
-        tape_width: 1800.0,
-        tape_body_y: 15.0,
-        tape_body_height: 65.0,
-        x: 100.0,
-        y: 200.0,
-        width: 400,
-        height: 80,
-        pixels_per_degree: 5.0,
-        show_indicator: true,
-        indicator_style: "chevron".to_string(),
-        indicator_placement: "top".to_string(),
-        indicator_color: "#FF0000".to_string(),
-        indicator_size: 10.0,
-        display_type: DisplayType::Tape,
-        indicator_shadow: None,
-    }
+fn default_cache() -> HeadingCache {
+    prepare_heading_cache(&default_heading(), &default_validated_scene().presentation, &ovrley_core::fonts::NativeFonts(&[common::test_config::repo_git_root().join("fonts")])).unwrap()
+}
+
+fn heading_pixels(cache: &HeadingCache, heading: f32) -> Vec<u8> {
+    let width = cache.frame.width().ceil() as u32;
+    let height = cache.frame.height().ceil() as u32;
+    let mut surface = create_surface(width, height).unwrap();
+    let canvas = surface.canvas();
+    canvas.clear(skia_safe::Color::TRANSPARENT);
+    canvas.translate((-cache.frame.left, -cache.frame.top));
+    cache.prepare_frame(Some(heading as f64)).draw(canvas, cache);
+    let mut pixels = vec![0; width as usize * height as usize * 4];
+    assert!(surface.read_pixels(&native_n32_image_info(width, height), &mut pixels, width as usize * 4, (0, 0)));
+    pixels
 }
 
 // ── Geometry: visible ticks ───────────────────────────────────────────────
@@ -241,7 +229,7 @@ fn visible_labels_respects_show_flags() {
 fn centered_heading_labels_use_tick_center_as_visual_center() {
     let workspace_root = common::test_config::repo_git_root();
     let font_dirs = vec![workspace_root.join("fonts")];
-    let font = resolve_font(&font_dirs, Some("JetBrains Mono.ttf"), 36.0).unwrap();
+    let font = resolve_font(&ovrley_core::fonts::NativeFonts(&font_dirs), Some("JetBrains Mono.ttf"), 36.0).unwrap();
     let center_x = 120.0;
     let text = "NE";
 
@@ -356,24 +344,18 @@ fn heading_label_baseline_uses_fixed_offset_from_major_tick_bottom() {
 #[test]
 fn prepare_heading_cache_produces_non_empty_tape() {
     let heading = default_heading();
-    let mut profiler = RenderProfiler::default();
 
-    let cache = prepare_heading_cache(
-        &default_validated_scene(),
-        &heading,
-        &[common::test_config::repo_git_root().join("fonts")],
-        &mut profiler,
-    )
+    let cache = prepare_heading_cache(&heading, &default_validated_scene().presentation, &ovrley_core::fonts::NativeFonts(&[common::test_config::repo_git_root().join("fonts")]))
     .unwrap();
 
     assert!((cache.tape_width - 1800.0).abs() < 1.0);
-    assert_eq!(cache.width, 400);
-    assert_eq!(cache.height, 80);
+    assert_eq!(cache.frame.width(), 400.0);
+    assert_eq!(cache.frame.height(), 80.0);
     assert!((cache.tape_body_y - 15.0).abs() < f32::EPSILON);
     assert!((cache.tape_body_height - 65.0).abs() < f32::EPSILON);
     assert!((cache.pixels_per_degree - 5.0).abs() < f32::EPSILON);
-    assert!((cache.x - 100.0).abs() < f32::EPSILON);
-    assert!((cache.y - 200.0).abs() < f32::EPSILON);
+    assert!((cache.frame.left - 100.0).abs() < f32::EPSILON);
+    assert!((cache.frame.top - 200.0).abs() < f32::EPSILON);
 }
 
 #[test]
@@ -383,18 +365,12 @@ fn prepare_heading_cache_with_no_labels() {
     heading.show_major_labels = false;
     heading.show_major_ticks = false;
     heading.show_minor_ticks = false;
-    let mut profiler = RenderProfiler::default();
 
-    let cache = prepare_heading_cache(
-        &default_validated_scene(),
-        &heading,
-        &[common::test_config::repo_git_root().join("fonts")],
-        &mut profiler,
-    )
+    let cache = prepare_heading_cache(&heading, &default_validated_scene().presentation, &ovrley_core::fonts::NativeFonts(&[common::test_config::repo_git_root().join("fonts")]))
     .unwrap();
 
-    assert_eq!(cache.width, 400);
-    assert_eq!(cache.height, 80);
+    assert_eq!(cache.frame.width(), 400.0);
+    assert_eq!(cache.frame.height(), 80.0);
 }
 
 #[test]
@@ -405,41 +381,36 @@ fn prepare_heading_cache_stores_indicator_config() {
     heading.indicator_placement = "both".to_string();
     heading.indicator_color = "#00FF00".to_string();
     heading.indicator_size = 20.0;
-    let mut profiler = RenderProfiler::default();
 
-    let cache = prepare_heading_cache(
-        &default_validated_scene(),
-        &heading,
-        &[common::test_config::repo_git_root().join("fonts")],
-        &mut profiler,
-    )
+    let cache = prepare_heading_cache(&heading, &default_validated_scene().presentation, &ovrley_core::fonts::NativeFonts(&[common::test_config::repo_git_root().join("fonts")]))
     .unwrap();
 
-    assert!(cache.show_indicator);
-    assert_eq!(cache.indicator_style, "highlight_bar");
-    assert_eq!(cache.indicator_placement, "both");
-    assert_eq!(cache.indicator_color, "#00FF00");
-    assert!((cache.indicator_size - 20.0).abs() < f32::EPSILON);
+    assert!((cache.prepare_frame(Some(0.0)).content_bounds.height() - 80.0).abs() < f32::EPSILON);
     assert!((cache.tape_body_y - 8.0).abs() < f32::EPSILON);
     assert!((cache.tape_body_height - 64.0).abs() < f32::EPSILON);
+
+    for style in ["highlight_bar", "chevron"] {
+        heading.indicator_style = style.to_string();
+        let cache = prepare_heading_cache(&heading, &default_validated_scene().presentation, &ovrley_core::fonts::NativeFonts(&[common::test_config::repo_git_root().join("fonts")])).unwrap();
+        let pixels = heading_pixels(&cache, 0.0);
+        // Ignore the centre indicator and faded sides when measuring the painted tape.
+        let rows: Vec<_> = (0..80).filter(|y| (50..350).filter(|x| !(180..220).contains(x))
+            .any(|x| pixels[(y * 400 + x) * 4 + 3] != 0)).collect();
+        let centre = (rows[0] + rows[rows.len() - 1]) as f32 * 0.5;
+        assert!((centre - 39.5).abs() <= 1.0, "{style}: painted tape is vertically centred, got {centre}");
+    }
 }
 
 #[test]
 fn prepare_heading_cache_indicator_size_pre_scaled() {
     let mut heading = default_heading();
     heading.indicator_size = 10.0;
-    let mut profiler = RenderProfiler::default();
 
-    let cache = prepare_heading_cache(
-        &default_validated_scene(),
-        &heading,
-        &[common::test_config::repo_git_root().join("fonts")],
-        &mut profiler,
-    )
+    let cache = prepare_heading_cache(&heading, &default_validated_scene().presentation, &ovrley_core::fonts::NativeFonts(&[common::test_config::repo_git_root().join("fonts")]))
     .unwrap();
 
     // With scale=1.0, indicator_size is unchanged
-    assert!((cache.indicator_size - 10.0).abs() < f32::EPSILON);
+    assert!((cache.tape_body_y - 15.0).abs() < f32::EPSILON);
 }
 
 // ── Draw: per-frame rendering ─────────────────────────────────────────────
@@ -450,12 +421,38 @@ fn draw_heading_widget_with_chevron_indicator() {
     let mut surface = create_surface(1920, 1080).unwrap();
     let canvas = surface.canvas();
     canvas.clear(skia_safe::Color::TRANSPARENT);
-    let mut profiler = RenderProfiler::default();
 
-    let report = draw_heading_widget(canvas, &cache, 90.0, &mut profiler);
+    let frame = cache.prepare_frame(Some(90.0));
+    frame.draw(canvas, &cache);
 
-    assert!(report.is_some());
-    let report = report.unwrap();
-    assert_eq!(report.geometry.widget_width, 400);
-    assert_eq!(report.geometry.widget_height, 80);
+    assert_eq!(frame.bounds.width(), 400.0);
+    assert_eq!(frame.bounds.height(), 80.0);
+}
+
+#[test]
+fn north_tick_keeps_its_full_stroke_while_crossing_the_repeat_seam() {
+    let mut heading = default_heading();
+    heading.show_indicator = false;
+    heading.show_major_ticks = false;
+    heading.show_minor_ticks = false;
+    heading.major_tick_thickness = 4.0;
+    for (pixels_per_degree, scale) in [(5.0, 1.0), (5.001, 1.3)] {
+        heading.pixels_per_degree = pixels_per_degree;
+        let mut scene = default_validated_scene();
+        scene.presentation.scale = scale;
+        let cache = prepare_heading_cache(&heading, &scene.presentation, &ovrley_core::fonts::NativeFonts(&[common::test_config::repo_git_root().join("fonts")])).unwrap();
+        let width = cache.frame.width().ceil() as usize;
+        let centre = width / 2;
+        let tick_alpha = |degrees| {
+            let pixels = heading_pixels(&cache, degrees);
+            (centre - 10..centre + 10).map(|x| pixels[(10 * width + x) * 4 + 3] as i32).sum::<i32>()
+        };
+        for degrees in [359.9, 359.95, 0.0, 0.05, 0.1] {
+            let north = tick_alpha(degrees);
+            let east = tick_alpha((degrees + 90.0) % 360.0);
+            let expected = 4.0 * scale * 255.0;
+            assert!((north as f32 - expected).abs() <= 4.0, "north lost stroke coverage at {degrees}: {north}");
+            assert!((north - east).abs() <= 4, "north differs from east at {degrees}: {north}/{east}");
+        }
+    }
 }

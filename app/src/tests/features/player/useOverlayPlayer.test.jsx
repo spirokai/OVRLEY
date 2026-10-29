@@ -1,10 +1,11 @@
 import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vite-plus/test'
 import useOverlayPlayer from '@/features/player/hooks/useOverlayPlayer'
 import useStore from '@/store/useStore'
 
 function createTimelineElement(width = 500) {
   return {
+    offsetWidth: width,
     getBoundingClientRect: () => ({
       left: 0,
       width,
@@ -126,7 +127,8 @@ describe('useOverlayPlayer', () => {
     })
 
     expect(useStore.getState().selectedSecond).toBe(50)
-    expect(result.current.timeline.playhead.style.left).toBe(250)
+    // The SVG origin sits half the head width left of the line center at 250px, snapped to a whole screen pixel.
+    expect(result.current.timeline.playhead.style.transform).toBe('translateX(244px)')
   })
 
   test('hides the complete export-range presentation in video-sync mode', () => {

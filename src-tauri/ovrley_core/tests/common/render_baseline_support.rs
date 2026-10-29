@@ -24,7 +24,7 @@ use ovrley_core::media::{video_probe::probe_video, SourceVideoMetadata};
 use ovrley_core::normalize::parse_config_value;
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::render_preview_to_path;
+use ovrley_core::render::render_preview_frame;
 use ovrley_core::render_jobs::execution::RenderExecutionService;
 use ovrley_core::render_jobs::planning::plan_single_render;
 use serde::Deserialize;
@@ -209,7 +209,7 @@ fn run_frame_case(case: &FrameCase) -> Result<()> {
         .artifacts_dir
         .join(format!("{}_preview.png", case.name));
 
-    render_preview_to_path(
+    render_preview_frame(
         &runtime.app_paths,
         &validated,
         &activity,

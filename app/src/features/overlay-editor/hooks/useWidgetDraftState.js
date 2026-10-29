@@ -1,153 +1,156 @@
 /**
- * Live widget draft state - temporary edits during drag/resize/scale/rotate.
- *
- * Maintains mutable refs for synchronous access during interaction callbacks
- * and a subscribable snapshot for rendering. Each draft contains the live data
- * patch shown by editors and, when a Moveable interaction is active, the live
- * DOM layout used by the canvas. Drafts are committed to config only when the
- * interaction ends.
+ * Shared inspector and group-drag patches, published once per animation frame.
+ * WASM owns gesture geometry; drafts contain only canonical widget data and
+ * global default updates.
  */
 
 import { useState, useSyncExternalStore } from 'react'
-import { clearLiveWidgetDraft, clearLiveWidgetDrafts } from '../utils/widgetDomHelpers'
+import { mergeWidgetData } from '@/lib/widget/widget-resolver'
+
+function notify(state) {
+  for (const listener of state.listeners) listener()
+}
+
+function publishDrafts(state) {
+  if (state.frame !== null) cancelAnimationFrame(state.frame)
+  state.frame = null
+  // Global default drafts are replaced, never mutated, so widget-only publishes keep their identity.
+  state.snapshot = { ...state.snapshot, liveWidgetDrafts: { ...state.drafts }, liveGlobalDefaults: state.globalDefaults }
+  notify(state)
+}
+
+function scheduleDrafts(state) {
+  if (state.frame === null) state.frame = requestAnimationFrame(publishDrafts.bind(null, state))
+}
+
+function mergeDraft(state, widgetId, updates) {
+  state.drafts[widgetId] = mergeWidgetData(state.drafts[widgetId], updates)
+}
+
+function setLiveWidgetDraft(state, widgetId, updates) {
+  mergeDraft(state, widgetId, updates)
+  scheduleDrafts(state)
+}
+
+function setLiveWidgetDrafts(state, updatesById) {
+  for (const [widgetId, updates] of Object.entries(updatesById)) mergeDraft(state, widgetId, updates)
+  scheduleDrafts(state)
+}
+
+function clearWidgetDrafts(state, widgetIds) {
+  let changed = false
+  for (const widgetId of widgetIds) {
+    changed ||= Object.hasOwn(state.drafts, widgetId) || Object.hasOwn(state.snapshot.liveWidgetDrafts, widgetId)
+    delete state.drafts[widgetId]
+  }
+  if (changed) publishDrafts(state)
+}
+
+function clearWidgetDraft(state, widgetId) {
+  clearWidgetDrafts(state, [widgetId])
+}
+
+function resetWidgetDrafts(state) {
+  state.drafts = {}
+  publishDrafts(state)
+}
+
+function setLiveGlobalDefault(state, key, value) {
+  state.globalDefaults = { ...state.globalDefaults, [key]: value }
+  scheduleDrafts(state)
+}
+
+function clearGlobalDefaultDrafts(state) {
+  if (Object.keys(state.globalDefaults).length === 0) return
+  state.globalDefaults = {}
+  publishDrafts(state)
+}
+
+function getGlobalDefaultDrafts(state) {
+  return state.globalDefaults
+}
+
+function getWidgetDraft(state, widgetId) {
+  return state.drafts[widgetId] ?? null
+}
+
+function getWidgetNode(state, widgetId) {
+  return state.snapshot.widgetNodes[widgetId] ?? null
+}
+
+function registerWidgetNode(registration, node) {
+  const { state, widgetId } = registration
+  const widgetNodes = { ...state.snapshot.widgetNodes }
+  if (node) {
+    state.nodeCallbacks.set(widgetId, registration.callback)
+    if (widgetNodes[widgetId] === node) return
+    widgetNodes[widgetId] = node
+  } else {
+    state.nodeCallbacks.delete(widgetId)
+    if (!Object.hasOwn(widgetNodes, widgetId)) return
+    delete widgetNodes[widgetId]
+  }
+  state.snapshot = { ...state.snapshot, widgetNodes }
+  notify(state)
+}
+
+function getWidgetNodeRef(state, widgetId) {
+  if (!state.nodeCallbacks.has(widgetId)) {
+    const registration = { state, widgetId }
+    registration.callback = registerWidgetNode.bind(null, registration)
+    state.nodeCallbacks.set(widgetId, registration.callback)
+  }
+  return state.nodeCallbacks.get(widgetId)
+}
+
+function getSnapshot(state) {
+  return state.snapshot
+}
+
+function unsubscribe(state, listener) {
+  state.listeners.delete(listener)
+  if (state.listeners.size === 0 && state.frame !== null) publishDrafts(state)
+}
+
+function subscribe(state, listener) {
+  state.listeners.add(listener)
+  return unsubscribe.bind(null, state, listener)
+}
 
 function createWidgetLiveEdits() {
-  const draftWidgetsRef = { current: {} }
-  const widgetNodesRef = { current: {} }
-  const activeWidgetInteractionRef = { current: null }
-  const listeners = new Set()
-  let snapshot = {
-    liveWidgetDrafts: {},
-    activeWidgetInteraction: null,
+  const globalDefaults = {}
+  const state = {
+    drafts: {},
+    globalDefaults,
+    frame: null,
+    listeners: new Set(),
+    nodeCallbacks: new Map(),
+    snapshot: { liveWidgetDrafts: {}, liveGlobalDefaults: globalDefaults, widgetNodes: {} },
   }
-
-  const notify = () => {
-    listeners.forEach((listener) => listener())
-  }
-
-  const updateSnapshot = (nextSnapshot) => {
-    snapshot = nextSnapshot
-    notify()
-  }
-
   return {
-    beginWidgetInteraction(widgetId, type) {
-      draftWidgetsRef.current[widgetId] = {
-        data: {},
-        layout: null,
-      }
-      activeWidgetInteractionRef.current = { widgetId, type }
-    },
-    clearWidgetDraft(widgetId) {
-      clearLiveWidgetDraft(draftWidgetsRef, widgetId)
-      if (!Object.hasOwn(snapshot.liveWidgetDrafts, widgetId)) return
-
-      const liveWidgetDrafts = { ...snapshot.liveWidgetDrafts }
-      delete liveWidgetDrafts[widgetId]
-      updateSnapshot({
-        ...snapshot,
-        activeWidgetInteraction: activeWidgetInteractionRef.current?.widgetId === widgetId ? null : activeWidgetInteractionRef.current,
-        liveWidgetDrafts,
-      })
-    },
-    clearWidgetDrafts(widgetIds) {
-      clearLiveWidgetDrafts(draftWidgetsRef, widgetIds)
-      const liveWidgetDrafts = { ...snapshot.liveWidgetDrafts }
-      let changed = false
-
-      widgetIds.forEach((widgetId) => {
-        if (!Object.hasOwn(liveWidgetDrafts, widgetId)) return
-        delete liveWidgetDrafts[widgetId]
-        changed = true
-      })
-
-      if (changed) {
-        const activeWidgetInteraction = widgetIds.includes(activeWidgetInteractionRef.current?.widgetId) ? null : activeWidgetInteractionRef.current
-        updateSnapshot({ ...snapshot, activeWidgetInteraction, liveWidgetDrafts })
-      }
-    },
-    draftWidgetsRef,
-    getSnapshot() {
-      return snapshot
-    },
-    getWidgetNode(widgetId) {
-      return widgetNodesRef.current[widgetId] ?? null
-    },
-    resetWidgetDrafts() {
-      draftWidgetsRef.current = {}
-      activeWidgetInteractionRef.current = null
-      updateSnapshot({ ...snapshot, activeWidgetInteraction: null, liveWidgetDrafts: {} })
-    },
-    setLiveWidgetDraft(widgetId, nextData, nextLayout) {
-      const currentDraft = draftWidgetsRef.current[widgetId] || { data: {}, layout: null }
-      const nextDraft = {
-        data: {
-          ...currentDraft.data,
-          ...nextData,
-        },
-        layout: nextLayout === undefined ? currentDraft.layout : nextLayout,
-      }
-      draftWidgetsRef.current[widgetId] = nextDraft
-      updateSnapshot({
-        ...snapshot,
-        activeWidgetInteraction: activeWidgetInteractionRef.current,
-        liveWidgetDrafts: {
-          ...snapshot.liveWidgetDrafts,
-          [widgetId]: nextDraft,
-        },
-      })
-    },
-    setLiveWidgetDraftsBatch(nextDraftsById) {
-      const liveWidgetDrafts = { ...snapshot.liveWidgetDrafts }
-      Object.entries(nextDraftsById).forEach(([widgetId, { data, layout }]) => {
-        const currentDraft = draftWidgetsRef.current[widgetId] || { data: {}, layout: null }
-        const nextDraft = {
-          data: {
-            ...currentDraft.data,
-            ...data,
-          },
-          layout: layout === undefined ? currentDraft.layout : layout,
-        }
-        draftWidgetsRef.current[widgetId] = nextDraft
-        liveWidgetDrafts[widgetId] = nextDraft
-      })
-
-      updateSnapshot({
-        ...snapshot,
-        activeWidgetInteraction: activeWidgetInteractionRef.current,
-        liveWidgetDrafts,
-      })
-    },
-    endWidgetInteraction(widgetId) {
-      if (activeWidgetInteractionRef.current?.widgetId !== widgetId) return
-      activeWidgetInteractionRef.current = null
-      updateSnapshot({ ...snapshot, activeWidgetInteraction: null })
-    },
-    setWidgetNode(widgetId, node) {
-      if (node && widgetNodesRef.current[widgetId] === node) return
-      if (!node && !widgetNodesRef.current[widgetId]) return
-
-      if (node) widgetNodesRef.current[widgetId] = node
-      else delete widgetNodesRef.current[widgetId]
-    },
-    subscribe(listener) {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
+    clearGlobalDefaultDrafts: clearGlobalDefaultDrafts.bind(null, state),
+    clearWidgetDraft: clearWidgetDraft.bind(null, state),
+    clearWidgetDrafts: clearWidgetDrafts.bind(null, state),
+    getGlobalDefaultDrafts: getGlobalDefaultDrafts.bind(null, state),
+    getSnapshot: getSnapshot.bind(null, state),
+    getWidgetDraft: getWidgetDraft.bind(null, state),
+    getWidgetNode: getWidgetNode.bind(null, state),
+    getWidgetNodeRef: getWidgetNodeRef.bind(null, state),
+    resetWidgetDrafts: resetWidgetDrafts.bind(null, state),
+    setLiveGlobalDefault: setLiveGlobalDefault.bind(null, state),
+    setLiveWidgetDraft: setLiveWidgetDraft.bind(null, state),
+    setLiveWidgetDrafts: setLiveWidgetDrafts.bind(null, state),
+    subscribe: subscribe.bind(null, state),
   }
 }
 
+/** @returns {object} Shared controller for widget and global default drafts and canvas registration. */
 export default function useWidgetDraftState() {
   const [controller] = useState(createWidgetLiveEdits)
   return controller
 }
 
-/**
- * Subscribes a component to a shared live-edit controller.
- *
- * @param {object} controller - Shared live-edit controller.
- * @returns {object} Controller methods and current render snapshot.
- */
+/** @param {object} controller Shared controller. @returns {object} Controller methods and current drafts/nodes. */
 export function useWidgetDraftView(controller) {
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot)
   return { ...controller, ...snapshot }

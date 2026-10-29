@@ -1,9 +1,10 @@
-import { Activity, Database, Route, Sparkles, Trash2 } from 'lucide-react'
+import { Activity, Database, Flag, Route, Sparkles, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { useFileDropZone } from '../hooks/useFileDropZone'
-import { buildActivityDrawerViewModel } from '../utils/activityDrawerUtils'
+import { buildActivityDrawerViewModel, buildLapRows } from '../utils/activityDrawerUtils'
+import { ActivityLapTable } from './ActivityLapTable'
 import { FileDragCursor, FileDropZone } from './FileDropZone'
 import { useTranslation } from 'react-i18next'
 
@@ -30,13 +31,23 @@ function MetricGrid({ metrics, emptyLabel }) {
  *
  * @param {object} props - Component props.
  * @param {object|null} props.activitySummary - Canonical activity summary normalized by the media store.
+ * @param {number[]} props.disabledLaps - Lap IDs excluded from lap widgets.
  * @param {string|null} props.filename - Imported activity filename, when a standalone activity file is loaded.
  * @param {() => void} props.onBrowseActivity - Opens the activity file picker.
  * @param {(() => void)|null} props.onDeleteActivity - Deletes a standalone imported activity when present.
  * @param {(selections: Array<File|string>) => void} props.onDropActivityFiles - Imports dropped activity files or native paths.
+ * @param {(lapId: number, enabled: boolean) => void} props.onLapEnabledChange - Includes or excludes a lap from lap widgets.
  * @returns {JSX.Element} Rendered drawer content.
  */
-export function ActivityDrawerContent({ activitySummary, filename, onBrowseActivity, onDeleteActivity, onDropActivityFiles }) {
+export function ActivityDrawerContent({
+  activitySummary,
+  disabledLaps,
+  filename,
+  onBrowseActivity,
+  onDeleteActivity,
+  onDropActivityFiles,
+  onLapEnabledChange,
+}) {
   const { t } = useTranslation()
   const { dragPosition, dropZoneProps, dropZoneRef, isDraggingFile, isOverDropZone } = useFileDropZone(onDropActivityFiles)
   const drawerViewModel = activitySummary ? buildActivityDrawerViewModel(activitySummary, t) : null
@@ -112,6 +123,13 @@ export function ActivityDrawerContent({ activitySummary, filename, onBrowseActiv
             <SectionHeading icon={Sparkles} title={t('toolbar.calculated', 'Calculated')} variant="drawer" />
             <MetricGrid metrics={drawerViewModel.metricGroups.derived} emptyLabel={t('toolbar.noDataCalculated', 'No data were calculated')} />
           </section>
+
+          {activitySummary.laps.length > 0 ? (
+            <section className="space-y-4">
+              <SectionHeading icon={Flag} title={t('toolbar.detectedLaps', 'Detected laps')} variant="drawer" />
+              <ActivityLapTable rows={buildLapRows(activitySummary.laps, disabledLaps)} onLapEnabledChange={onLapEnabledChange} />
+            </section>
+          ) : null}
         </div>
       ) : null}
     </div>

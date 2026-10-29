@@ -163,7 +163,7 @@ export function VideoSyncDrawerContent({
                     </Button>
                   </div>
                   {!canCalculate && calculation.eligibility.allExplanation ? (
-                    <p className="text-[10px] text-muted-foreground pt-2 pb-2">{calculation.eligibility.allExplanation}</p>
+                    <p className="text-[0.741rem] text-muted-foreground pt-2 pb-2">{calculation.eligibility.allExplanation}</p>
                   ) : null}
 
                   <VideoSyncCandidateList

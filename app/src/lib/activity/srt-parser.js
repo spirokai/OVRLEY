@@ -362,7 +362,6 @@ export function parseSrtActivityFile(text, fileName) {
         pace: { enabled: true, method: 'zero_phase_ma', window_seconds: 5.0 },
         speed: { enabled: true, method: 'zero_phase_ma', window_seconds: 0.5 },
         vertical_speed: { enabled: true, method: 'zero_phase_ma', window_seconds: 1.0 },
-        elevation: { enabled: true, method: 'zero_phase_ma', window_seconds: 1.0 },
         heading: { enabled: true, method: 'circular_ema', window_seconds: 0.5 },
       },
     },

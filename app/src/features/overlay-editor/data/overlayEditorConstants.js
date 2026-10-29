@@ -1,47 +1,33 @@
 /**
  * Consolidated constants for the overlay-editor feature.
- * Extracted from 7 source files — all data-only, no function definitions.
+ * Scene grid, gesture handles, backgrounds, and viewport limits.
  */
 
-// ---- From constants.js ----
-export const DEFAULT_GRADIENT_TRIANGLE_WIDTH = 72
 export const EDITOR_GRID_DIVISIONS = 72
 
-// ---- From OverlayMoveable.jsx ----
 export const CORNER_RESIZE_DIRECTIONS = ['nw', 'ne', 'se', 'sw']
 export const EDGE_RESIZE_DIRECTIONS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 export const MOVEABLE_ZOOM = 1.5
+// Handles keep full size from this editor viewport width and shrink with it below, down to the minimum scale.
+export const MOVEABLE_FULL_SIZE_VIEWPORT_WIDTH = 1600
+export const MOVEABLE_MIN_HANDLE_SCALE = 0.5
 
-// ---- From createOverlayMoveableHandlers.js ----
-export const AXIS_LOCK_THRESHOLD = 3
-
-// ---- From OverlayCanvas.jsx ----
 export const CANVAS_BACKGROUND_COLORS = {
   black: '#000000',
   checker: '#000000',
   white: '#f4ead2',
-  // for pixel parity debugging purposes
-  transparent: 'transparent',
+  video: '#000000',
+  image: '#000000',
 }
 
-// ---- From metricTextUtils.js ----
-export const METRIC_WIDGET_LINE_HEIGHT = 0.92
-export const METRIC_WIDGET_OUTER_GAP_PX = 8
-export const METRIC_WIDGET_UNITS_GAP_PX = 8
-export const GRADIENT_WIDGET_TRIANGLE_GAP_PX = 8
-export const GRADIENT_ZERO_EPSILON = 0.05
-export const MAX_GRADIENT_ABS_PERCENT = 25
-export const GRADIENT_ZERO_LINE_WIDTH_PX = 1
-export const NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT = '0123456789-:.%'
-
-// ---- From geometryUtils.js ----
-export const ROUTE_FALLBACK_INSET_MAX_RATIO = 0.45
-export const SIMPLIFY_MIN_TOLERANCE = 0.05
-export const DENSITY_CLAMP_MIN = 0.1
-export const DENSITY_CLAMP_MAX = 2
-
-// ---- From useOverlayEditorState.js ----
 export const VIEWPORT_PADDING = 72
 export const ZOOM_MIN = 0.35
 export const ZOOM_MAX = 4
-export const ZOOM_DELTA = 0.05
+
+export const PROJECT_STATUS_TRANSLATIONS = {
+  Unsaved: { key: 'overlay-editor.statusUnsaved', defaultLabel: 'Unsaved' },
+  Saved: { key: 'overlay-editor.statusSaved', defaultLabel: 'Saved' },
+  Modified: { key: 'overlay-editor.statusModified', defaultLabel: 'Modified' },
+}
+
+export const SNAP_DIRECTIONS = { left: true, top: true, right: true, bottom: true, center: true, middle: true }

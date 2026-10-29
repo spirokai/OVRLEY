@@ -2,9 +2,28 @@ import { open, save } from '@tauri-apps/plugin-dialog'
 import { dirname, isAbsolute } from '@tauri-apps/api/path'
 import { readSelectedFileBytes } from '@/api/backend'
 import { getOptionalPathPreference, getPreference, setPreference } from '@/lib/preferences-store'
-import { directoryFromSelectedPath, filenameFromSelectedPath, pathInDirectory } from '@/lib/utils'
 
 const LAST_RENDER_OUTPUT_DIR_KEY = 'last-render-output-dir'
+
+/** @param {string|null} path Optional native path. @returns {string|null} Final path component. */
+export function filenameFromSelectedPath(path) {
+  if (!path) return null
+  return String(path).split(/[\\/]/).filter(Boolean).at(-1) || null
+}
+
+/** @param {string} path Native file path. @returns {string} Parent directory. */
+export function directoryFromSelectedPath(path) {
+  const value = String(path)
+  const separatorIndex = Math.max(value.lastIndexOf('/'), value.lastIndexOf('\\'))
+  return separatorIndex < 0 ? '' : value.slice(0, separatorIndex)
+}
+
+/** @param {string} directory Native directory. @param {string} filename Filename only. @returns {string} Joined path. */
+export function pathInDirectory(directory, filename) {
+  if (!directory || !filename) throw new Error('Directory and filename are required')
+  const separator = String(directory).includes('\\') ? '\\' : '/'
+  return `${String(directory).replace(/[\\/]$/, '')}${separator}${filename}`
+}
 
 /** @returns {Promise<string|undefined>} Optional remembered absolute render directory. */
 export async function loadRememberedRenderDirectory() {

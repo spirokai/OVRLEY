@@ -20,6 +20,17 @@ export function roundToDevicePixel(value, pixelRatio = 1) {
 }
 
 /**
+ * Snaps a container-relative pixel value onto whole screen pixels, accounting for the container's own screen offset.
+ *
+ * @param {number} value Container-relative CSS pixel value.
+ * @param {{ ratio: number, origin: number }} pixelGrid Screen pixels per CSS pixel and the container's screen x in screen pixels.
+ * @returns {number} Container-relative CSS pixel value that lands on a screen pixel edge.
+ */
+export function snapToScreenPixel(value, { ratio, origin }) {
+  return (Math.round(origin + value * ratio) - origin) / ratio
+}
+
+/**
  * Converts a pointer's clientX to a clamped timeline second.
  *
  * @param {{ clientX: number, rect: DOMRect|{ left?: number, width?: number }, viewStart: number, viewEnd: number, widthPx: number, timelineMinimum?: number, totalDuration: number }} options

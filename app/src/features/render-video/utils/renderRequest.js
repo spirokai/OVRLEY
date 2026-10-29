@@ -1,6 +1,6 @@
 import { captureVideoSyncTimezoneMode, createBatchCalibration } from '@/lib/video-sync'
-import { buildPreviewFrameWindow } from '@/lib/preview-timing'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
+import { clamp } from '@/lib/utils'
 import { validateRenderSettings } from '@/store/slices/createRenderSettingsSlice'
 import { isQsvFullCodec } from './codecUtils'
 import { createBatchRenderTemplate, createRenderEffectiveConfig } from './renderConfig'
@@ -47,7 +47,7 @@ export function captureBatchSync(editorSnapshot, autoSync) {
 }
 
 /** @param {object} options Captured editor/settings and inspected batch sources. @returns {Readonly<object>} Native BatchRenderRequest. */
-export function createBatchRenderRequest({ editorSnapshot, settings, inspectionId, outputDirectory, jobs, calibrationSource, sync }) {
+export function createBatchRenderRequest({ editorSnapshot, settings, language, inspectionId, outputDirectory, jobs, calibrationSource, sync }) {
   const referenceVideo =
     sync.activitySummary !== null && editorSnapshot.importedVideoPath !== null
       ? {
@@ -69,6 +69,7 @@ export function createBatchRenderRequest({ editorSnapshot, settings, inspectionI
       : {
           mode: 'externalActivity',
           activity: editorSnapshot.parsedActivity,
+          disabledLaps: editorSnapshot.disabledLaps,
           timezoneMode: calibration.timezoneMode,
           reference:
             calibration.reference === null
@@ -93,7 +94,7 @@ export function createBatchRenderRequest({ editorSnapshot, settings, inspectionI
     structuredClone({
       inspectionId,
       autoSync: sync.autoSync,
-      template: createBatchRenderTemplate(editorSnapshot.config, editorSnapshot.globalDefaults),
+      template: createBatchRenderTemplate(editorSnapshot.config, editorSnapshot.globalDefaults, language),
       encoding: captureRenderEncoding(settings, editorSnapshot.availableCodecs),
       activity,
       outputDirectory,
@@ -102,8 +103,9 @@ export function createBatchRenderRequest({ editorSnapshot, settings, inspectionI
   )
 }
 
-function createCurrentRenderConfig(state, settings) {
+function createCurrentRenderConfig(state, settings, language) {
   return createRenderEffectiveConfig({
+    language,
     config: state.config,
     globalDefaults: state.globalDefaults,
     availableCodecs: state.availableCodecs,
@@ -121,22 +123,23 @@ function createCurrentRenderConfig(state, settings) {
     importedVideoFpsDen: state.importedVideoFpsDen,
     importedVideoResolution: state.importedVideoResolution,
     videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+    disabledLaps: state.disabledLaps,
     timelineStart: state.startSecond,
     timelineEnd: state.endSecond,
   })
 }
 
-/** @param {object} options Editor snapshot, canonical settings, optional batch review and overwrite choice. @returns {object} Captured execution payload and accepted settings. */
-export function createRenderRequest({ editorSnapshot, settings, batchReview, overwrite = false }) {
+/** @param {object} options Editor snapshot, canonical settings, app language naming chart legends, optional batch review and overwrite choice. @returns {object} Captured execution payload and accepted settings. */
+export function createRenderRequest({ editorSnapshot, settings, language, batchReview, overwrite = false }) {
   validateRenderSettings(settings)
   const { outputPath, renderTarget, fps, widgetUpdateRate, exportMode, codec, qualityType, qualityValue, range } = settings
   const acceptedSettings = { renderTarget, fps, widgetUpdateRate, exportMode, codec, qualityType, qualityValue, range: { ...range } }
   const target = settings.renderTarget
   const payload =
     target === 'batch'
-      ? createBatchRenderRequest({ editorSnapshot, settings, ...batchReview })
+      ? createBatchRenderRequest({ editorSnapshot, settings, language, ...batchReview })
       : {
-          config: createCurrentRenderConfig(editorSnapshot, settings),
+          config: createCurrentRenderConfig(editorSnapshot, settings, language),
           parsedActivity: editorSnapshot.parsedActivity,
           outputPath,
           overwrite,
@@ -149,15 +152,37 @@ export function createRenderRequest({ editorSnapshot, settings, batchReview, ove
   return { target, payload, settings: acceptedSettings }
 }
 
-/** @param {object} state Captured editor snapshot. @returns {object} Native preview frame inputs. */
-export function createPreviewRenderRequest(state) {
+// PNG requests need a one-frame scene window. At the end of the activity,
+// shift it backward so the renderer still receives a positive duration.
+function buildPreviewFrameWindow({ activityDuration, previewSecond, sceneFps }) {
+  const duration = Math.max(activityDuration, 0)
+  const second = clamp(previewSecond, 0, duration)
+  const frameDuration = 1 / Math.max(Math.trunc(sceneFps), 1)
+
+  if (duration <= 0) {
+    return { start: 0, end: frameDuration }
+  }
+
+  const maxWindowStart = Math.max(duration - frameDuration, 0)
+  const start = clamp(second, 0, maxWindowStart)
+  const end = Math.min(duration, Math.max(start + frameDuration, second + Number.EPSILON))
+
+  return { start, end }
+}
+
+/** @param {object} state Captured editor snapshot. @param {string} language App language naming chart legends. @returns {object} Native preview frame inputs. */
+export function createPreviewRenderRequest(state, language) {
   if (state.parsedActivity === null) throw new Error('No parsed activity available')
   const hasVideo = state.importedVideoPath !== null
-  const config = createCurrentRenderConfig(state, {
-    ...state.renderSettings,
-    exportMode: hasVideo ? 'composite' : 'transparent',
-    codec: hasVideo ? 'libx264' : 'prores_ks',
-  })
+  const config = createCurrentRenderConfig(
+    state,
+    {
+      ...state.renderSettings,
+      exportMode: hasVideo ? 'composite' : 'transparent',
+      codec: hasVideo ? 'libx264' : 'prores_ks',
+    },
+    language,
+  )
   const { start, end, fps } = config.scene
   const window = buildPreviewFrameWindow({ activityDuration: end - start, previewSecond: state.selectedSecond - start, sceneFps: fps })
   config.scene = { ...config.scene, start: start + window.start, end: start + window.end }

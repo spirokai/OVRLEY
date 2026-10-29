@@ -7,7 +7,7 @@
  * for the side-effect extraction refactoring.
  */
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 import { createDurableTemplateState, createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
@@ -94,6 +94,7 @@ describe('createTemplateSlice — pure state actions', () => {
         {
           id: 'value-1',
           value: 'speed',
+          display_type: 'text',
           x: 10,
           y: 20,
           icon_color: '#111111',
@@ -179,7 +180,7 @@ describe('createTemplateSlice — pure state actions', () => {
     expect(state.config.scene).not.toHaveProperty('font')
     expect(state.config.scene).not.toHaveProperty('color')
     expect(state.config.scene).not.toHaveProperty('font_size')
-    expect(effectiveConfig.scene.font_text).toBe('Arial.ttf')
+    expect(effectiveConfig.scene.font_text).toBe(DEFAULT_GLOBAL_DEFAULTS.font_text)
     expect(effectiveConfig.scene.color_text).toBe('#abcdef')
     expect(state.startSecond).toBe(0)
     expect(state.endSecond).toBe(73)

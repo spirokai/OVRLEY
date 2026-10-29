@@ -1,7 +1,7 @@
 //! Helper functions for the canvas-parity integration test.
 //!
 //! This module provides all the machinery to compare a Rust Skia-rendered
-//! frame against a Playwright-captured browser SVG frame.  The pipeline:
+//! frame against the editor's WASM canvases captured with Playwright. The pipeline:
 //!
 //! 1. Parse activity + config fixtures
 //! 2. Build a dense activity report (interpolated frame data)
@@ -32,7 +32,7 @@
 //!
 //! # Threshold constants
 //!
-//! All five constants at the module level (lines 548-552) control the
+//! The constants at the module level control the
 //! sensitivity of the diff.  See their individual doc comments for details.
 //!
 //! All functions in this module are only compiled when the `canvas-parity`
@@ -42,15 +42,14 @@ use anyhow::{bail, Context, Result};
 use ovrley_core::activity::parse_activity_json;
 use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
 use ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary;
+use ovrley_core::fonts::preview_font_resource;
 use ovrley_core::normalize::{
-    parse_template_value, validate_render_config, ValidatedRenderConfig, ValidatedSceneConfig,
+    migrate_saved_font_input, parse_template_value, validate_render_config, ValidatedRenderConfig,
 };
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::{
-    prepare_preview_assets, render_preview_with_prepared_assets, PreparedPreviewAssets,
-    PreviewRenderRequest,
-};
+use ovrley_core::render::render_preview_frame;
 use serde_json::Value;
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::{BufRead, Read};
 use std::net::TcpListener;
@@ -79,7 +78,8 @@ pub fn parse_fixtures_with_config(
     let config_path = fixture_root.join("config").join(config_filename);
 
     let activity_raw: Value = read_json(&activity_path)?;
-    let config_raw: Value = read_json(&config_path)?;
+    let mut config_raw: Value = read_json(&config_path)?;
+    migrate_saved_font_input(&mut config_raw);
 
     let activity = parse_activity_json(&serde_json::to_string(&activity_raw)?)
         .context("failed to parse activity fixture")?;
@@ -214,27 +214,15 @@ pub fn render_skia_preview(
     dense_activity: &DenseActivityReport,
     second: u32,
     out_path: &Path,
-) -> Result<PreparedPreviewAssets> {
+) -> Result<()> {
     println!(
         "  rendering Skia frame at second {second} → {}",
         out_path.display()
     );
-    let (prepared, label_cache_status, prepare_timings, extra_total_ms) =
-        prepare_preview_assets(paths, config, activity, dense_activity)
-            .context("prepare_preview_assets failed")?;
-    render_preview_with_prepared_assets(PreviewRenderRequest {
-        paths,
-        dense_activity,
-        prepared_preview_assets: &prepared,
-        second: f64::from(second),
-        prepare_timings,
-        label_cache_status,
-        extra_total_ms,
-        out_path,
-    })
-    .context("render_preview_with_prepared_assets failed")?;
+    render_preview_frame(paths, config, activity, dense_activity, f64::from(second), out_path)
+        .context("render_preview_frame failed")?;
     println!("  Skia render complete: {} kB", file_size_kb(out_path));
-    Ok(prepared)
+    Ok(())
 }
 
 /// Returns file size in KB.
@@ -283,13 +271,15 @@ pub fn write_mock_data(
     config: &ValidatedRenderConfig,
     config_raw: &Value,
     activity: &ParsedActivity,
-    activity_raw: &Value,
     selected_second: u32,
-    prepared: Option<&PreparedPreviewAssets>,
+    paths: &AppPaths,
 ) -> Result<()> {
     fs::create_dir_all(mock_dir)
         .with_context(|| format!("failed to create mock dir {}", mock_dir.display()))?;
-    let global_defaults = resolve_global_defaults(&config.scene, config_raw);
+    let global_defaults = config_raw
+        .pointer("/settings/globalDefaults")
+        .context("canvas parity fixture requires settings.globalDefaults")?
+        .clone();
 
     // 1. template.json — ovrley-template envelope wrapping the config
     let mut config_obj = config_raw
@@ -314,8 +304,20 @@ pub fn write_mock_data(
     write_json(&mock_dir.join("template.json"), &template)?;
     println!("  wrote template.json");
 
-    // 2. activity.json — raw parsed activity data (same as the fixture)
-    write_json(&mock_dir.join("activity.json"), activity_raw)?;
+    // Match the native preview boundary: retain finalized activity bytes, then
+    // attach the snapshot identity only to the frontend activity payload.
+    write_json(
+        &mock_dir.join("preview-activity.json"),
+        &serde_json::to_value(activity)?,
+    )?;
+    let mut preview_activity = activity.clone();
+    preview_activity
+        .extra
+        .insert("preview_activity_id".into(), Value::from("canvas-parity"));
+    write_json(
+        &mock_dir.join("activity.json"),
+        &serde_json::to_value(preview_activity)?,
+    )?;
     println!("  wrote activity.json");
 
     // 3. store-state.json — Zustand store snapshot
@@ -335,66 +337,91 @@ pub fn write_mock_data(
     write_json(&mock_dir.join("store-state.json"), &store_state)?;
     println!("  wrote store-state.json");
 
-    // 4. elevation-geometry.json — pre-computed Rust geometry for parity test
-    if let Some(assets) = prepared {
-        if let Some(geom) = assets.elevation_geometry_json() {
-            write_json(&mock_dir.join("elevation-geometry.json"), &geom)?;
-            println!("  wrote elevation-geometry.json");
-        }
-    }
-
-    // 5. route-geometry.json — pre-computed Rust route geometry for parity test
-    if let Some(assets) = prepared {
-        if let Some(geom) = assets.route_geometry_json() {
-            write_json(&mock_dir.join("route-geometry.json"), &geom)?;
-            println!("  wrote route-geometry.json");
-        }
-    }
+    write_preview_fonts(mock_dir, config, paths)?;
 
     Ok(())
 }
 
-fn resolve_global_defaults(scene: &ValidatedSceneConfig, config_raw: &Value) -> Value {
-    let mut derived = derive_global_defaults(scene);
+/// Serialize the same styled typefaces served by backend_preview_font.
+fn write_preview_fonts(
+    mock_dir: &Path,
+    config: &ValidatedRenderConfig,
+    paths: &AppPaths,
+) -> Result<()> {
+    use ovrley_widgets::widgets::value::validation::ValidatedValue;
 
-    let Some(derived_object) = derived.as_object_mut() else {
-        return derived;
+    let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
+    let mut requests = BTreeSet::new();
+    let mut metric_font = |font: &str| {
+        requests.insert((font.to_owned(), weight.to_bits(), false));
     };
-
-    let raw_globals = config_raw
-        .get("settings")
-        .and_then(|settings| settings.get("globalDefaults"))
-        .and_then(Value::as_object);
-
-    if let Some(raw_globals) = raw_globals {
-        for (key, value) in raw_globals {
-            derived_object
-                .entry(key.clone())
-                .or_insert_with(|| value.clone());
+    let defaults = read_json(&paths.repo_root.join("assets/standard-template.json"))?;
+    metric_font(
+        defaults
+            .pointer("/globals/font_values")
+            .and_then(Value::as_str)
+            .context("standard template requires globals.font_values")?,
+    );
+    if let Some(font) = &config.scene.presentation.font {
+        metric_font(font);
+    }
+    for value in &config.values {
+        match value {
+            ValidatedValue::StandardText(value) => metric_font(&value.font_name),
+            ValidatedValue::TimeText(value) => metric_font(&value.base.font_name),
+            ValidatedValue::Gradient(value) => metric_font(&value.font_name),
+            ValidatedValue::HeadingTape(value) => metric_font(&value.label_font),
+            ValidatedValue::LeanAngle(value) => metric_font(&value.font),
+            ValidatedValue::GForce(value) => metric_font(&value.label_font),
+            ValidatedValue::LapTimer(value) => {
+                metric_font(&value.font_name);
+                metric_font(&value.label_font_name);
+            }
+            ValidatedValue::LinearGauge(value) => {
+                if value.show_min_max_labels {
+                    metric_font(&value.min_max_label_font);
+                }
+            }
+            ValidatedValue::ArcGauge(value) => {
+                metric_font(&value.inner_value.font_name);
+                if value.show_min_max_labels {
+                    metric_font(&value.min_max_label_font);
+                }
+            }
         }
     }
-
-    derived
-}
-
-/// Derives global default values from a ValidatedSceneConfig.
-fn derive_global_defaults(scene: &ValidatedSceneConfig) -> Value {
-    serde_json::json!({
-        "font_values": scene.presentation.font.as_deref().unwrap_or("Arial.ttf"),
-        "font_text": scene.presentation.font.as_deref().unwrap_or("Arial.ttf"),
-        "color_values": "#ffffff",
-        "color_text": "#ffffff",
-        "color_icons": "#ffffff",
-        "color_units": "#ffffff",
-        "font_size": scene.presentation.font_size.unwrap_or(30.0),
-        "border_color": &scene.presentation.border_color,
-        "border_thickness": scene.presentation.border_thickness,
-        "shadow_color": &scene.presentation.shadow_color,
-        "shadow_strength": scene.presentation.shadow_strength,
-        "shadow_distance": scene.presentation.shadow_distance,
-        "opacity": scene.presentation.opacity.unwrap_or(1.0),
-        "scale": scene.presentation.scale,
-    })
+    for plot in &config.elevation_plots {
+        if let Some(font) = &plot.label_font {
+            metric_font(font);
+        }
+    }
+    for label in &config.labels {
+        requests.insert((
+            label.font_name.clone(),
+            label.typography.font_weight.to_bits(),
+            label.typography.italic,
+        ));
+    }
+    let mut resources = Vec::new();
+    for (index, (font, bits, italic)) in requests.into_iter().enumerate() {
+        let font_weight = f32::from_bits(bits);
+        let bytes = preview_font_resource(&paths.font_dirs, &font, font_weight, italic)?;
+        let filename = format!("font-{index}.bin");
+        fs::write(mock_dir.join(&filename), bytes)?;
+        resources.push(serde_json::json!({
+            "request": {"font": font, "font_weight": font_weight, "italic": italic},
+            "path": filename,
+        }));
+    }
+    write_json(
+        &mock_dir.join("fonts.json"),
+        &serde_json::json!({
+            "metric_font_weight": weight,
+            "resources": resources,
+        }),
+    )?;
+    println!("  wrote {} native font resources", resources.len());
+    Ok(())
 }
 
 fn derive_activity_summary(activity: &ParsedActivity) -> Value {
@@ -466,13 +493,19 @@ impl ViteServer {
         println!("  starting Vite dev server on port {port}...");
 
         let mut cmd = platform_command("pnpm");
-        cmd.args(["exec", "vite", "--port", &port.to_string(), "--strictPort"]);
-        // Vite must be run from the `app/` subdirectory where it's installed
+        cmd.args([
+            "exec",
+            "vp",
+            "dev",
+            "--port",
+            &port.to_string(),
+            "--strictPort",
+        ]);
         cmd.current_dir(git_root.join("app"));
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
         let process = cmd.spawn().with_context(|| {
             format!(
-                "failed to spawn `pnpm exec vite` on port {port}. \
+                "failed to spawn `pnpm exec vp dev` on port {port}. \
                  Is Node.js / pnpm / Vite installed? \
                  Try `pnpm install` from the repo root."
             )
@@ -638,6 +671,7 @@ fn find_free_port() -> Result<u16> {
 // ── Playwright runner ────────────────────────────────────────────────────────
 
 /// Result from the Playwright screenshot step.
+#[derive(serde::Deserialize)]
 pub struct CanvasScreenshotInfo {
     pub width: u32,
     pub height: u32,
@@ -700,33 +734,8 @@ pub fn run_playwright_screenshot(
         file_size_kb(out_path)
     );
 
-    // Parse JSON from stdout: {"width": 3840, "height": 2160, "bg": "transparent"}
-    let (canvas_w, canvas_h) = if let Ok(dims) = serde_json::from_str::<serde_json::Value>(trimmed)
-    {
-        let w = dims.get("width").and_then(|v| v.as_u64()).unwrap_or(3840) as u32;
-        let h = dims.get("height").and_then(|v| v.as_u64()).unwrap_or(2160) as u32;
-        let b = dims
-            .get("bg")
-            .and_then(|v| v.as_str())
-            .unwrap_or("transparent")
-            .to_string();
-        let editor_chrome = dims
-            .get("editorChrome")
-            .and_then(|v| v.as_str())
-            .unwrap_or("hidden");
-        println!("  canvas dimensions: {w}x{h}  bg: {b}  editor chrome: {editor_chrome}");
-        (w, h)
-    } else {
-        if !trimmed.is_empty() {
-            println!("  Playwright output: {trimmed}");
-        }
-        (3840, 2160)
-    };
-
-    Ok(CanvasScreenshotInfo {
-        width: canvas_w,
-        height: canvas_h,
-    })
+    serde_json::from_str(trimmed)
+        .context("Playwright must report screenshot width and height as JSON")
 }
 
 // ── SSIM runner ──────────────────────────────────────────────────────────────
@@ -1251,7 +1260,7 @@ pub fn generate_diff_png(
     let only_pixel_alpha_threshold = ONLY_PIXEL_ALPHA_THRESHOLD;
     let channel_tolerance = DIFF_CHANNEL_TOLERANCE;
 
-    for (i, chunk) in skia_bytes.chunks_exact(4).enumerate() {
+    for (i, chunk) in skia_bytes.as_chunks::<4>().0.iter().enumerate() {
         let offset = i * 4;
         let canvas_chunk = &canvas_bytes[offset..offset + 4];
         let has_skia_alpha = chunk[3] > alpha_threshold;

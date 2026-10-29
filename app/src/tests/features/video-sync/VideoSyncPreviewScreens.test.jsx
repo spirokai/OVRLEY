@@ -1,9 +1,10 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 
 const getMapStyleUrlTemplate = vi.hoisted(() => vi.fn())
-const prepareFont = vi.hoisted(() => vi.fn())
+const attachSpeedCanvas = vi.hoisted(() => vi.fn())
+const useWasmWidgets = vi.hoisted(() => vi.fn())
 const mapOptions = vi.hoisted(() => vi.fn())
 const markerOptions = vi.hoisted(() => vi.fn())
 const eventHandlers = vi.hoisted(() => new Map())
@@ -75,7 +76,7 @@ const popupContent = vi.hoisted(() => ({ addEventListener: vi.fn(), click: vi.fn
 
 vi.mock('@/api/backend', () => ({ getMapStyleUrlTemplate }))
 vi.mock('@/lib/preferences-store', () => ({ getPreference, setPreference }))
-vi.mock('@/lib/font-resources', () => ({ prepareFont }))
+vi.mock('@/features/wasm-widgets/hooks/useWasmWidgets', () => ({ useWasmWidgets }))
 
 vi.mock('maplibre-gl', () => ({
   LngLat: class {
@@ -149,7 +150,8 @@ describe('VideoSyncPreviewScreens', () => {
   beforeEach(() => {
     getMapStyleUrlTemplate.mockReset()
     getMapStyleUrlTemplate.mockResolvedValue('http://127.0.0.1:3210/styles/{style}')
-    prepareFont.mockReset().mockResolvedValue(undefined)
+    attachSpeedCanvas.mockReset()
+    useWasmWidgets.mockReset().mockReturnValue({ attach: attachSpeedCanvas, error: null })
     getPreference.mockReset()
     getPreference.mockResolvedValue(undefined)
     setPreference.mockReset()
@@ -238,7 +240,23 @@ describe('VideoSyncPreviewScreens', () => {
     expect(mapScreen).toHaveStyle({ width: '960px', height: '540px' })
     expect(video.nextElementSibling).toBe(mapScreen)
     expect(screen.getByTestId('video-sync-navigation-map')).toHaveClass('aspect-square')
-    expect(screen.getByTestId('video-sync-speed-diagnostic')).toHaveTextContent('18.0')
+    const speedCanvas = screen.getByLabelText('Speed preview')
+    expect(screen.getByTestId('video-sync-speed-diagnostic')).toContainElement(speedCanvas)
+    expect(attachSpeedCanvas).toHaveBeenCalledWith('video-sync-speed', speedCanvas)
+    expect(useWasmWidgets).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        activity: expect.objectContaining({ speed: [4, 6, 6, 6, 6] }),
+        second: 0.5,
+        defaultFont: 'JetBrains Mono.ttf',
+        scene: expect.objectContaining({ width: 1920, height: 1080, scale: 0.5 }),
+        widgets: [
+          expect.objectContaining({
+            type: 'speed',
+            data: expect.objectContaining({ display_type: 'text', decimals: 1, display_unit: 'kmh', show_units: true, show_icon: false }),
+          }),
+        ],
+      }),
+    )
     await waitFor(() => expect(markerOptions).toHaveBeenCalledWith({ color: 'var(--color-video-sync-location)', scale: 1, draggable: true }))
 
     act(() => markerEventHandlers.get('dragend')())

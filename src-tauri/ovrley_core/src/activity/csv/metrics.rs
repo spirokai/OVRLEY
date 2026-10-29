@@ -232,16 +232,31 @@ pub(super) fn parse_number(value: Option<&str>) -> Option<f64> {
 
 /// Applies metric-specific bounds and canonical heading normalization.
 ///
-/// Invalid coordinates, negative speed/distance/RPM, and out-of-range control
-/// positions are discarded. Headings wrap into `[0, 360)`; signed metrics such
-/// as lean angle and acceleration axes are retained unchanged.
+/// Invalid coordinates, negative speed/distance/RPM/cadence/power, and
+/// out-of-range control positions are discarded. Headings wrap into
+/// `[0, 360)`; signed metrics such as lean angle and acceleration axes are
+/// retained unchanged.
 fn validate(metric: Metric, value: f64) -> Option<f64> {
     match metric {
         Metric::Latitude if !(-90.0..=90.0).contains(&value) => None,
         Metric::Longitude if !(-180.0..=180.0).contains(&value) => None,
-        Metric::Speed | Metric::Distance | Metric::DistanceToHome | Metric::Rpm if value < 0.0 => {
+        Metric::Speed
+        | Metric::Distance
+        | Metric::DistanceToHome
+        | Metric::Rpm
+        | Metric::Cadence
+        | Metric::Power
+        | Metric::Depth
+        | Metric::FirstStopDepth
+        | Metric::AveragePpo2
+            if value < 0.0 =>
+        {
             None
         }
+        Metric::FirstStopTime | Metric::TimeToSurface if value < 0.0 || value.fract() != 0.0 => {
+            None
+        }
+        Metric::FractionO2 | Metric::FractionHe if !(0.0..=1.0).contains(&value) => None,
         Metric::ThrottlePosition | Metric::BrakePosition | Metric::EngineLoad
             if !(0.0..=100.0).contains(&value) =>
         {

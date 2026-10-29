@@ -4,7 +4,8 @@ use ovrley_core::commands::backend_list_system_fonts;
 use ovrley_core::commands::validate_config_value;
 use ovrley_core::normalize::parse_template_value;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::text::{measure_text, validated_label_style};
+use ovrley_widgets::render::text::measure_text;
+use ovrley_widgets::widgets::label::style::validated_label_style;
 use serde_json::json;
 
 #[test]
@@ -163,42 +164,28 @@ fn system_faces_are_discovered_lazily_with_real_static_weights_and_italics() {
 }
 
 #[test]
-fn label_weight_changes_measurement_and_invalidates_static_cache() {
-    use ovrley_core::debug::RenderProfiler;
-    use ovrley_core::render::{LabelCacheStatus, StaticLayer};
+fn label_weight_changes_measurement_and_exported_pixels() {
 
     let paths = AppPaths::from_repo_root(common::test_config::repo_git_root());
     let render = |weight| {
         let mut input = label_config(weight);
         input["labels"][0]["text"] = json!("Cache weight sample");
         let config = validate_config_value(&input).unwrap();
-        let style = validated_label_style(&config.labels[0], &config.scene, 1.0);
-        let width = measure_text("Cache weight sample", &style, &paths.font_dirs)
+        let style = validated_label_style(&config.labels[0], &config.scene.presentation, 1.0);
+        let width = measure_text("Cache weight sample", &style, &ovrley_core::fonts::NativeFonts(&paths.font_dirs))
             .unwrap()
             .width;
-        let layer = StaticLayer {
-            backdrops: &[],
-            rasters: &[],
-            labels: &config.labels,
-            values: &[],
-            scene: &config.scene,
-        }
-        .prepare(&paths, &mut RenderProfiler::default())
-        .unwrap();
-        (width, layer)
+        let frame = common::export::scene_frame(&config);
+        (width, frame)
     };
     let (thin_width, thin) = render(100.0);
     let (middle_width, middle) = render(537.0);
     let (heavy_width, heavy) = render(900.0);
     assert!(thin_width < middle_width && middle_width < heavy_width);
-    for layer in [&thin, &middle, &heavy] {
-        assert!(matches!(layer.cache_status, LabelCacheStatus::Miss));
-    }
-    assert_ne!(thin.base_rgba, middle.base_rgba);
-    assert_ne!(middle.base_rgba, heavy.base_rgba);
+    assert_ne!(thin, middle);
+    assert_ne!(middle, heavy);
     let (_, repeated) = render(537.0);
-    assert!(matches!(repeated.cache_status, LabelCacheStatus::Hit));
-    assert_eq!(middle.base_rgba, repeated.base_rgba);
+    assert_eq!(middle, repeated);
 }
 
 #[test]
@@ -238,9 +225,7 @@ fn italic_requires_a_boolean_at_render_and_saved_template_ingress() {
 }
 
 #[test]
-fn genuine_italic_changes_ink_bounds_and_cached_pixels_with_border_and_shadow() {
-    use ovrley_core::debug::RenderProfiler;
-    use ovrley_core::render::{LabelCacheStatus, StaticLayer};
+fn genuine_italic_changes_ink_bounds_and_exported_pixels_with_border_and_shadow() {
 
     let paths = AppPaths::from_repo_root(common::test_config::repo_git_root());
     let render = |font, italic| {
@@ -253,32 +238,21 @@ fn genuine_italic_changes_ink_bounds_and_cached_pixels_with_border_and_shadow() 
         input["scene"]["shadow_distance"] = json!(3);
         input["scene"]["border_thickness"] = json!(1);
         let config = validate_config_value(&input).unwrap();
-        let style = validated_label_style(&config.labels[0], &config.scene, 1.0);
-        let measurement = measure_text(&config.labels[0].text, &style, &paths.font_dirs).unwrap();
-        let layer = StaticLayer {
-            backdrops: &[],
-            rasters: &[],
-            labels: &config.labels,
-            values: &[],
-            scene: &config.scene,
-        }
-        .prepare(&paths, &mut RenderProfiler::default())
-        .unwrap();
-        (measurement, layer)
+        let style = validated_label_style(&config.labels[0], &config.scene.presentation, 1.0);
+        let measurement = measure_text(&config.labels[0].text, &style, &ovrley_core::fonts::NativeFonts(&paths.font_dirs)).unwrap();
+        let frame = common::export::scene_frame(&config);
+        (measurement, frame)
     };
     let (upright_bounds, upright) = render("Inter.ttf", false);
     let (italic_bounds, italic) = render("Inter.ttf", true);
-    assert!(matches!(upright.cache_status, LabelCacheStatus::Miss));
-    assert!(matches!(italic.cache_status, LabelCacheStatus::Miss));
-    assert_ne!(upright.base_rgba, italic.base_rgba);
+    assert_ne!(upright, italic);
     assert_ne!(upright_bounds.bounds_right, italic_bounds.bounds_right);
     let (_, repeated) = render("Inter.ttf", true);
-    assert!(matches!(repeated.cache_status, LabelCacheStatus::Hit));
-    assert_eq!(italic.base_rgba, repeated.base_rgba);
+    assert_eq!(italic, repeated);
     for font in ["Teko.ttf", "Oxanium.ttf"] {
         let (upright_bounds, upright) = render(font, false);
         let (italic_bounds, unsupported) = render(font, true);
-        assert_eq!(upright.base_rgba, unsupported.base_rgba);
+        assert_eq!(upright, unsupported);
         assert_eq!(upright_bounds.bounds_right, italic_bounds.bounds_right);
     }
     let normal =
@@ -337,8 +311,8 @@ fn spacing_layout_uses_grapheme_gaps_without_trailing_advance_and_scales_with_te
         let mut label = config.labels[0].clone();
         label.typography.letter_spacing = spacing;
         label.font_size = font_size;
-        let style = validated_label_style(&label, &config.scene, scale);
-        measure_text(text, &style, &paths.font_dirs).unwrap()
+        let style = validated_label_style(&label, &config.scene.presentation, scale);
+        measure_text(text, &style, &ovrley_core::fonts::NativeFonts(&paths.font_dirs)).unwrap()
     };
     // Four clusters: accented combining sequence, whitespace, supplementary character, accent.
     let text = "e\u{301} 😀é";
@@ -372,10 +346,7 @@ fn spacing_layout_uses_grapheme_gaps_without_trailing_advance_and_scales_with_te
 }
 
 #[test]
-fn spacing_invalidates_static_label_images_with_weight_italic_border_and_shadow() {
-    use ovrley_core::debug::RenderProfiler;
-    use ovrley_core::render::{LabelCacheStatus, StaticLayer};
-    let paths = AppPaths::from_repo_root(common::test_config::repo_git_root());
+fn spacing_changes_exported_label_pixels_with_weight_italic_border_and_shadow() {
     let render = |spacing| {
         let mut input = label_config(537.0);
         input["labels"][0]["text"] = json!("Spacing cache é e\u{301}");
@@ -387,25 +358,13 @@ fn spacing_invalidates_static_label_images_with_weight_italic_border_and_shadow(
         let config = validate_config_value(&input).unwrap();
         assert_eq!(config.labels[0].typography.font_weight, 537.0);
         assert!(config.labels[0].typography.italic);
-        StaticLayer {
-            backdrops: &[],
-            rasters: &[],
-            labels: &config.labels,
-            values: &[],
-            scene: &config.scene,
-        }
-        .prepare(&paths, &mut RenderProfiler::default())
-        .unwrap()
+        common::export::scene_frame(&config)
     };
     let zero = render(0.0);
     let positive = render(2.5);
     let negative = render(-2.5);
-    for layer in [&zero, &positive, &negative] {
-        assert!(matches!(layer.cache_status, LabelCacheStatus::Miss));
-    }
-    assert_ne!(zero.base_rgba, positive.base_rgba);
-    assert_ne!(positive.base_rgba, negative.base_rgba);
+    assert_ne!(zero, positive);
+    assert_ne!(positive, negative);
     let repeated = render(2.5);
-    assert!(matches!(repeated.cache_status, LabelCacheStatus::Hit));
-    assert_eq!(positive.base_rgba, repeated.base_rgba);
+    assert_eq!(positive, repeated);
 }

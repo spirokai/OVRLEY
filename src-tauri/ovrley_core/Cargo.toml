@@ -8,6 +8,7 @@ edition = "2021"
 rust-version = "1.95"
 
 [dependencies]
+ovrley_widgets = { path = "../ovrley_widgets" }
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
 csv = "1.4"
@@ -20,11 +21,18 @@ log = "0.4"
 same-file = "1"
 open = "5"
 image = { version = "=0.25.5", default-features = false, features = ["png", "jpeg", "bmp", "tiff"] }
-skia-safe = { version = "0.97.2", features = ["binary-cache"] }
+skia-safe = { git = "https://github.com/rust-skia/rust-skia", rev = "b7f043e0b1e2a850e702245de811f01df1f6b0ff", version = "=0.153.3", features = [
+  "binary-cache",
+  "no-compile",
+] }
 tzf-rs = { version = "1.3.7", default-features = false, features = ["bundled"] }
 # build.rs applies scripts/patches/telemetry-parser-dji-camera-metadata.patch
 # to this checkout automatically at build time (no fork needed).
 telemetry-parser = { git = "https://github.com/AdrianEddy/telemetry-parser.git", rev = "fd9a73e" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.3"
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSProcessInfo", "NSString"] }
 
 [features]
 canvas-parity = []
@@ -35,3 +43,9 @@ anyhow = "1.0"
 [[test]]
 name = "canvas_parity_tests"
 required-features = ["canvas-parity"]
+
+[[bin]]
+name = "benchmark_widgets"
+path = "../../benchmarks/widgets/native.rs"
+test = false
+bench = false

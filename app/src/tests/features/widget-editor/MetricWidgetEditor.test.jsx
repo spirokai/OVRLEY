@@ -1,7 +1,8 @@
-import { describe, test, expect, vi, beforeAll } from 'vitest'
+import { describe, test, expect, vi, beforeAll } from 'vite-plus/test'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MetricWidgetEditor from '@/features/widget-editor/components/metricWidget/MetricWidgetEditor'
+import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
 
 vi.mock('@/hooks/useFonts', async () => ({
   ...(await vi.importActual('@/hooks/useFonts')),
@@ -20,7 +21,7 @@ function makeWidget(type, data = {}) {
   return {
     id: 'value-0',
     type,
-    data,
+    data: { ...createWidgetDefaults({ type: type, displayType: data.display_type, lapTimerMode: 'current_lap' }, undefined), ...data },
   }
 }
 
@@ -265,7 +266,7 @@ describe('MetricWidgetEditor linear gauge controls', () => {
     expect(screen.getByText('Orientation')).toBeInTheDocument()
     expect(screen.getByText('Min/Max Labels')).toBeInTheDocument()
 
-    await user.click(screen.getAllByRole('switch')[1])
+    await user.click(screen.getAllByRole('switch').at(-1))
     expect(updateWidgetData).toHaveBeenCalledWith(
       'value-0',
       expect.objectContaining({
@@ -274,6 +275,60 @@ describe('MetricWidgetEditor linear gauge controls', () => {
         }),
       }),
     )
+
+    await user.click(screen.getByRole('switch', { name: 'Gradient' }))
+    expect(updateWidgetData).toHaveBeenCalledWith(
+      'value-0',
+      expect.objectContaining({
+        display_variants: expect.objectContaining({
+          linear: expect.objectContaining({ track_filled_gradient: true }),
+        }),
+      }),
+    )
+    expect(screen.queryByRole('group', { name: 'Gradient stops' })).not.toBeInTheDocument()
+  })
+
+  test('swaps the filled color for the gradient picker when the fill gradient is on', () => {
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('speed', {
+          display_type: 'linear',
+          display_unit: 'kmh',
+          display_variants: {
+            linear: {
+              width: 200,
+              height: 60,
+              rotation: 0,
+              orientation: 'horizontal',
+              track_corner_radius: 6,
+              track_border_thickness: 2,
+              track_border_color: '#ffffff',
+              track_empty_color: '#222222',
+              track_empty_opacity: 0.5,
+              track_filled_color: '#40e0d0',
+              track_filled_opacity: 1,
+              track_filled_gradient: true,
+              track_filled_gradient_stops: [
+                { offset: 0, color: '#40e0d0' },
+                { offset: 0.5, color: '#ffffff' },
+                { offset: 1, color: '#c65102' },
+              ],
+              track_fill_flat: false,
+              show_min_max_labels: false,
+              min_max_label_font: 'Arial.ttf',
+              min_max_label_font_size: 12,
+              min_max_label_color: '#ffffff',
+            },
+          },
+        })}
+        updateWidgetData={vi.fn()}
+        setNumericField={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('switch', { name: 'Gradient' })).toBeChecked()
+    expect(screen.getByRole('group', { name: 'Gradient stops' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Color stop at/ })).toHaveLength(3)
   })
 
   test('shows explicit bar count and gap controls without auto controls', () => {
@@ -446,8 +501,8 @@ describe('MetricWidgetEditor corner gauge controls', () => {
 describe('MetricWidgetEditor lean-angle controls', () => {
   test('shows Size without separate Width or Height controls and updates the canonical diameter', async () => {
     const updateWidgetData = vi.fn()
-    const updateWidgetSize = vi.fn()
-    const commitWidgetSize = vi.fn()
+    const updateWidgetDraft = vi.fn()
+    const commitWidgetDraft = vi.fn()
     render(
       <MetricWidgetEditor
         widget={makeWidget('lean_angle', {
@@ -473,8 +528,8 @@ describe('MetricWidgetEditor lean-angle controls', () => {
           },
         })}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
         setNumericField={vi.fn()}
       />,
     )
@@ -486,7 +541,7 @@ describe('MetricWidgetEditor lean-angle controls', () => {
     const sizeSlider = screen.getAllByRole('slider')[0]
     fireEvent.keyDown(sizeSlider, { key: 'End', code: 'End' })
 
-    expect(updateWidgetSize).toHaveBeenLastCalledWith(
+    expect(updateWidgetDraft).toHaveBeenLastCalledWith(
       'value-0',
       expect.objectContaining({
         font_size: 200,
@@ -495,12 +550,12 @@ describe('MetricWidgetEditor lean-angle controls', () => {
         }),
       }),
     )
-    expect(updateWidgetSize.mock.lastCall[1]).not.toHaveProperty('width')
-    expect(updateWidgetSize.mock.lastCall[1]).not.toHaveProperty('height')
-    expect(updateWidgetSize.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('width')
-    expect(updateWidgetSize.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('height')
-    expect(updateWidgetSize.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('font_size')
+    expect(updateWidgetDraft.mock.lastCall[1]).not.toHaveProperty('width')
+    expect(updateWidgetDraft.mock.lastCall[1]).not.toHaveProperty('height')
+    expect(updateWidgetDraft.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('width')
+    expect(updateWidgetDraft.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('height')
+    expect(updateWidgetDraft.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('font_size')
     expect(updateWidgetData).not.toHaveBeenCalled()
-    expect(commitWidgetSize).toHaveBeenCalledWith('value-0')
+    expect(commitWidgetDraft).toHaveBeenCalledWith('value-0')
   })
 })

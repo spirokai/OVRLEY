@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import useStore from '@/store/useStore'
 
 const mp4Telemetry = {
@@ -7,6 +7,8 @@ const mp4Telemetry = {
   metadata: { duration_seconds: 120, sample_count: 240 },
   file_format: 'mp4-telemetry',
   valid_attributes: ['speed'],
+  lap_start_elapsed_seconds: [],
+  lap_durations_seconds: [],
 }
 
 const activityFile = {
@@ -15,6 +17,8 @@ const activityFile = {
   metadata: { duration_seconds: 3600, sample_count: 7200 },
   file_format: 'fit',
   valid_attributes: ['speed', 'heartrate'],
+  lap_start_elapsed_seconds: [],
+  lap_durations_seconds: [],
 }
 
 const shortMp4Telemetry = {
@@ -24,6 +28,8 @@ const shortMp4Telemetry = {
   trim_end_seconds: 2.509,
   file_format: 'mp4-telemetry',
   valid_attributes: ['speed'],
+  lap_start_elapsed_seconds: [],
+  lap_durations_seconds: [],
 }
 
 function resetStore() {

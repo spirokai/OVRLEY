@@ -28,13 +28,13 @@ export default function FontSelectField({
   recommendedFonts = [],
   systemFonts = [],
   triggerClassName = 'h-8 text-xs',
-  labelClassName = 'text-[10px] text-muted-foreground uppercase font-bold',
+  labelClassName = 'text-[0.741rem] text-muted-foreground uppercase font-bold',
 }) {
   const { t } = useTranslation()
   const { recommendedOptions, filteredSystemFonts } = getFontSelectOptions(value, recommendedFonts, systemFonts)
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <Label className={labelClassName} disabled={disabled}>
         {label}
       </Label>

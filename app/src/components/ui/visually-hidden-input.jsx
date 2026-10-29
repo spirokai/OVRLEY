@@ -2,7 +2,7 @@
  * Renders the visually hidden input portion of the application interface.
  */
 
-/* eslint-disable react-hooks/refs */
+/* oxlint-disable react/refs */
 
 'use client'
 import * as React from 'react'

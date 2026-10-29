@@ -1,3 +1,5 @@
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
+
 export const VIDEO_SYNC_LANDMARK_TYPES = {
   STOP: 'stop',
   LEFT_TURN: 'leftTurn',
@@ -9,6 +11,33 @@ export const VIDEO_SYNC_MAX_LANDMARKS = 5
 export const VIDEO_SYNC_MAX_LOCATION_LANDMARKS = 1
 export const VIDEO_SYNC_PREVIEW_SCREEN_GAP = 16
 export const VIDEO_SYNC_SPEED_FONT = 'JetBrains Mono.ttf'
+export const VIDEO_SYNC_SPEED_WIDGETS = [
+  {
+    id: 'video-sync-speed',
+    type: 'speed',
+    data: {
+      ...WIDGET_TYPE_DEFINITIONS.speed.defaults,
+      value: 'speed',
+      x: 0,
+      y: 0,
+      font: VIDEO_SYNC_SPEED_FONT,
+      font_size: 189,
+      decimals: 1,
+      show_icon: false,
+    },
+  },
+]
+export const VIDEO_SYNC_SPEED_SCENE = {
+  opacity: 1,
+  shadow_color: '#000000',
+  shadow_strength: 0,
+  shadow_distance: 0,
+  border_color: '#000000',
+  border_thickness: 0,
+}
+export const VIDEO_SYNC_EMPTY_WIDGETS = []
+// The sync preview draws only speed, which no lap selection affects.
+export const VIDEO_SYNC_DISABLED_LAPS = []
 export const VIDEO_SYNC_DETECTED_LOCATION_ID = 'detected-course-location'
 
 export const VIDEO_SYNC_DEFAULT_SPEED_THRESHOLD_KMH = 5

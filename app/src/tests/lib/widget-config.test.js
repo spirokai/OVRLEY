@@ -6,14 +6,12 @@
  * config-to-widget mapping no longer depends on array position.
  */
 
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { buildConfigWidgets, groupWidgetsForSidebar } from '@/lib/widget/widget-presentation'
 import {
-  deleteWidgetInConfig,
   deleteWidgetsInConfig,
   duplicateWidgetsInConfig,
   ensureWidgetIdsInConfig,
-  findWidgetInConfig,
   replaceWidgetInConfig,
   updateWidgetInConfig,
   updateWidgetsInConfig,
@@ -23,6 +21,7 @@ function makeConfig({ backdrops = [], labels = [], values = [], plots = [] } = {
   return {
     scene: { width: 1920, height: 1080, fps: 30 },
     backdrops,
+    rasters: [],
     labels,
     values,
     plots,
@@ -53,19 +52,17 @@ describe('widget-config stable identity', () => {
       expect.objectContaining({
         id: 'widget-7',
         category: 'labels',
-        index: 0,
         name: 'Alpha',
       }),
       expect.objectContaining({
         id: 'widget-2',
         category: 'labels',
-        index: 1,
         name: 'Beta',
       }),
     ])
   })
 
-  test('widget CRUD upgrades legacy templates to durable ids before applying updates', () => {
+  test('widget CRUD preserves identities assigned at document ingress', () => {
     const legacyConfig = makeConfig({
       labels: [
         { text: 'Legacy A', x: 0, y: 0 },
@@ -73,10 +70,11 @@ describe('widget-config stable identity', () => {
       ],
     })
 
-    const [firstWidget, secondWidget] = buildConfigWidgets(legacyConfig)
-    const updatedConfig = updateWidgetInConfig(legacyConfig, secondWidget.id, { text: 'Updated B' })
+    const config = ensureWidgetIdsInConfig(legacyConfig)
+    const [firstWidget, secondWidget] = buildConfigWidgets(config)
+    const updatedConfig = updateWidgetInConfig(config, secondWidget.id, { text: 'Updated B' })
     const nextWidgets = buildConfigWidgets(updatedConfig)
-    const survivingConfig = deleteWidgetInConfig(updatedConfig, firstWidget.id)
+    const survivingConfig = deleteWidgetsInConfig(updatedConfig, [firstWidget.id])
 
     expect(firstWidget.id).toMatch(/^widget-\d+$/)
     expect(secondWidget.id).toMatch(/^widget-\d+$/)
@@ -93,15 +91,6 @@ describe('widget-config stable identity', () => {
         text: 'Updated B',
       }),
     ])
-    expect(findWidgetInConfig(updatedConfig, secondWidget.id)).toMatchObject({
-      category: 'labels',
-      id: secondWidget.id,
-      index: 1,
-      data: expect.objectContaining({
-        id: secondWidget.id,
-        text: 'Updated B',
-      }),
-    })
   })
 
   test('replacing a widget keeps the same durable id while resetting its data', () => {
@@ -145,7 +134,6 @@ describe('widget-config batch operations', () => {
     const result = updateWidgetsInConfig(config, {
       'widget-1': { x: 5, y: 5 },
       'widget-3': { text: 'C-updated' },
-      nonexistent: { text: 'nope' },
     })
 
     expect(result.labels[0]).toMatchObject({ id: 'widget-1', x: 5, y: 5, text: 'A' })
@@ -153,9 +141,43 @@ describe('widget-config batch operations', () => {
     expect(result.labels[2]).toMatchObject({ id: 'widget-3', text: 'C-updated' })
   })
 
-  test('updateWidgetsInConfig handles null / empty inputs', () => {
-    expect(updateWidgetsInConfig(null, {})).toBeNull()
-    expect(updateWidgetsInConfig(makeConfig(), null)).toEqual(makeConfig())
+  test('batch updates preserve the document when empty and reject unknown target identities', () => {
+    const config = makeConfig()
+    expect(updateWidgetsInConfig(config, {})).toBe(config)
+    expect(() => updateWidgetsInConfig(config, { nonexistent: { x: 10 } })).toThrow('Unknown widget ID: nonexistent')
+  })
+
+  test.each([
+    [
+      'backdrops',
+      'rectangle',
+      { corner_radius: 12, round_top_left: true, round_top_right: false, round_bottom_left: true, round_bottom_right: false },
+    ],
+    ['values', 'linear', { orientation: 'horizontal', track_thickness: 16, track_empty_opacity: 0.5 }],
+    ['values', 'linear', { orientation: 'vertical', track_thickness: 16, track_empty_opacity: 0.5 }],
+  ])('consecutive batch resizes preserve required %s/%s settings and inactive variants', (category, displayType, settings) => {
+    const variant = { width: 200, height: 80, ...settings }
+    const original = {
+      id: 'widget-resize',
+      x: 20,
+      y: 30,
+      display_type: displayType,
+      display_variants: { [displayType]: variant, text: { icon_size: 24 } },
+    }
+    const config = makeConfig({ [category]: [original], labels: [{ id: 'widget-label', text: 'Untouched' }] })
+    const firstPatch = { x: 15.25, display_variants: { [displayType]: { width: 250.5, height: 100.25 } } }
+    const first = updateWidgetsInConfig(config, { 'widget-resize': firstPatch })
+    const secondPatch = { x: 10.125, display_variants: { [displayType]: { width: 300.75, height: 120.5 } } }
+    const second = updateWidgetsInConfig(first, { 'widget-resize': secondPatch })
+
+    expect(first).toEqual(updateWidgetInConfig(config, 'widget-resize', firstPatch))
+    expect(second[category][0].display_variants).toEqual({
+      [displayType]: { ...variant, width: 300.75, height: 120.5 },
+      text: { icon_size: 24 },
+    })
+    expect(second.labels).toBe(config.labels)
+    expect(config[category][0]).toBe(original)
+    expect(variant).toEqual({ width: 200, height: 80, ...settings })
   })
 
   test('deleteWidgetsInConfig removes multiple widgets at once', () => {
@@ -172,9 +194,9 @@ describe('widget-config batch operations', () => {
     expect(result.labels).toEqual([expect.objectContaining({ id: 'widget-2', text: 'B' })])
   })
 
-  test('deleteWidgetsInConfig handles null / empty inputs', () => {
-    expect(deleteWidgetsInConfig(null, [])).toBeNull()
-    expect(deleteWidgetsInConfig(makeConfig(), [])).toEqual(makeConfig())
+  test('deleteWidgetsInConfig preserves an empty selection', () => {
+    const config = makeConfig()
+    expect(deleteWidgetsInConfig(config, [])).toBe(config)
   })
 
   test('duplicateWidgetsInConfig appends a duplicated widget with a new id and offset', () => {
@@ -204,10 +226,10 @@ describe('widget-config batch operations', () => {
 
 describe('groupWidgetsForSidebar', () => {
   test('groups widgets by type and sorts alphabetically', () => {
-    const typeLabels = { label: 'Text', speed: 'Speed', heart_rate: 'Heart Rate', cadence: 'Cadence' }
+    const typeLabels = { label: 'Text', speed: 'Speed', heartrate: 'Heart Rate', cadence: 'Cadence' }
     const widgets = [
       { id: 'w1', type: 'label', name: 'My Label', category: 'labels' },
-      { id: 'w2', type: 'heart_rate', name: 'HR', category: 'values' },
+      { id: 'w2', type: 'heartrate', name: 'HR', category: 'values' },
       { id: 'w3', type: 'speed', name: 'Speed', category: 'values' },
       { id: 'w4', type: 'cadence', name: 'Cad', category: 'values' },
     ]
@@ -215,13 +237,11 @@ describe('groupWidgetsForSidebar', () => {
     const result = groupWidgetsForSidebar(widgets, (type) => typeLabels[type])
 
     const types = [...new Set(result.map((w) => w.type))]
-    const groupLabels = result.map((w) => w.groupLabel).filter(Boolean)
 
-    expect(types).toEqual(['cadence', 'heart_rate', 'speed', 'label'])
-    expect(groupLabels.length).toBe(4)
+    expect(types).toEqual(['cadence', 'heartrate', 'speed', 'label'])
   })
 
-  test('only first widget per group gets a groupLabel', () => {
+  test('preserves label text within a group', () => {
     const typeLabels = { label: 'Text' }
     const widgets = [
       { id: 'w1', type: 'label', name: 'A' },
@@ -230,8 +250,7 @@ describe('groupWidgetsForSidebar', () => {
 
     const result = groupWidgetsForSidebar(widgets, (type) => typeLabels[type])
 
-    expect(result[0].groupLabel).toBe('Text')
-    expect(result[1].groupLabel).toBeNull()
+    expect(result.map((widget) => widget.name)).toEqual(['A', 'B'])
   })
 
   test('propagates a missing widget type contract failure', () => {
@@ -260,15 +279,14 @@ describe('ensureWidgetIdsInConfig', () => {
     expect(result.labels[0].id).toMatch(/^widget-\d+$/)
   })
 
-  test('replaces legacy index-derived ids', () => {
+  test('preserves existing identities regardless of their naming', () => {
     const config = makeConfig({
       labels: [{ id: 'label-0', text: 'Legacy' }],
     })
 
     const result = ensureWidgetIdsInConfig(config)
 
-    expect(result.labels[0].id).toMatch(/^widget-\d+$/)
-    expect(result.labels[0].id).not.toBe('label-0')
+    expect(result).toBe(config)
   })
 
   test('preserves existing durable ids', () => {
@@ -281,7 +299,7 @@ describe('ensureWidgetIdsInConfig', () => {
     expect(result.labels[0].id).toBe('widget-42')
   })
 
-  test('resolves id collisions by assigning a new generated id', () => {
+  test('rejects colliding identities at ingress', () => {
     const config = makeConfig({
       labels: [
         { id: 'widget-1', text: 'First' },
@@ -289,14 +307,16 @@ describe('ensureWidgetIdsInConfig', () => {
       ],
     })
 
-    const result = ensureWidgetIdsInConfig(config)
+    expect(() => ensureWidgetIdsInConfig(config)).toThrow('Duplicate widget ID: widget-1')
+  })
 
-    const ids = result.labels.map((l) => l.id)
+  test.each([null, 42, '', '   '])('rejects malformed present IDs: %s', (id) => {
+    expect(() => ensureWidgetIdsInConfig(makeConfig({ labels: [{ id }] }))).toThrow('Invalid widget ID')
+  })
 
-    expect(new Set(ids).size).toBe(2)
-    expect(ids[0]).toBe('widget-1')
-    expect(ids[1]).toMatch(/^widget-\d+$/)
-    expect(ids[1]).not.toBe('widget-1')
+  test('defaults absent collections and rejects malformed present collections', () => {
+    expect(ensureWidgetIdsInConfig({ scene: {} })).toMatchObject({ backdrops: [], rasters: [], labels: [], values: [], plots: [] })
+    expect(() => ensureWidgetIdsInConfig({ labels: null })).toThrow('Invalid widget collection: labels')
   })
 
   test('handles null config', () => {

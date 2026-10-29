@@ -82,6 +82,8 @@ export function parseGpxActivityFile(file, textContent) {
     const longitude = safeNumber(trackPoint.getAttribute('lon'))
     const elevation = safeNumber(trackPoint.getElementsByTagNameNS('*', 'ele')[0]?.textContent)
     const timestamp = trackPoint.getElementsByTagNameNS('*', 'time')[0]?.textContent?.trim() || null
+    const comment = trackPoint.getElementsByTagNameNS('*', 'cmt')[0]?.textContent
+    const speed2d = safeNumber(comment?.match(/(?:^|;)\s*2dSpeed:\s*([^;]+)/i)?.[1])
     const extensionValues = {}
     const extensionsNode = trackPoint.getElementsByTagNameNS('*', 'extensions')[0]
     if (extensionsNode) {
@@ -118,7 +120,7 @@ export function parseGpxActivityFile(file, textContent) {
       longitude,
       pace: readTrackPointMetric(extensionValues, ['pace']),
       power: readTrackPointMetric(extensionValues, ['power', 'powerinwatts', 'watts']),
-      speed: readTrackPointMetric(extensionValues, ['speed', 'enhanced_speed', 'speed_mps', 'speedmps']),
+      speed: readTrackPointMetric(extensionValues, ['speed', 'enhanced_speed', 'speed_mps', 'speedmps']) ?? speed2d,
       stride_length: readTrackPointMetric(extensionValues, ['stride_length', 'stridelength', 'step_length']),
       stroke_rate: readTrackPointMetric(extensionValues, ['stroke_rate', 'strokerate']),
       temperature: readTrackPointMetric(extensionValues, ['atemp', 'temperature', 'temp']),

@@ -53,33 +53,26 @@ pub fn build_route_geometry_command(
 
     let show_full_activity = course_plot.show_full_activity;
 
-    let route_samples = crate::render::widgets::route::prepare::build_route_samples(
-        &activity,
-        show_full_activity,
-        &scene,
-    )?;
-
-    let normalized =
-        crate::render::widgets::route::normalize::normalize_route_plot(course_plot, &scene);
-
-    let geometry = crate::render::widgets::route::prepare::build_route_geometry(
-        &normalized,
-        course_plot,
-        &route_samples,
-    )?;
+    let route_samples = activity
+        .route_activity()
+        .samples(scene.plot_window(show_full_activity));
+    let geometry =
+        ovrley_widgets::widgets::route::geometry::RouteGeometry::new(course_plot, &route_samples)?;
+    let scale = scene.presentation.scale;
+    let width = course_plot.width * scale;
+    let height = course_plot.height * scale;
 
     Ok(RouteGeometryResponse {
-        points: geometry.points.into_iter().map(|(x, y)| [x, y]).collect(),
+        points: geometry
+            .points
+            .into_iter()
+            .map(|(x, y)| [x * scale, y * scale])
+            .collect(),
         progress_values: geometry.progress_values,
-        bbox: [
-            geometry.bbox.0,
-            geometry.bbox.1,
-            geometry.bbox.2,
-            geometry.bbox.3,
-        ],
+        bbox: [0.0, 0.0, width, height],
         source_point_count: geometry.source_point_count,
         simplification: geometry.simplification,
-        widget_width: normalized.width,
-        widget_height: normalized.height,
+        widget_width: width.round() as u32,
+        widget_height: height.round() as u32,
     })
 }

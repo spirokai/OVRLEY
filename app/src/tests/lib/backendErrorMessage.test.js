@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'vitest'
-import { translateBackendError } from '@/lib/utils'
+import { describe, expect, test } from 'vite-plus/test'
+import { translateBackendError } from '@/i18n'
 
 describe('backend error messages for display', () => {
   test('translates tagged image errors', () => {

@@ -6,18 +6,21 @@
  * creating a new section component and registering it below.
  */
 
-import { getDisplayTypeDefaultFontSize, getDisplayTypeOptions, getStandardMetricDisplayUnit } from '@/lib/widget/standard-metrics'
 import { NumberField, SelectField } from '../widgetFormControls'
 import { useCallback } from 'react'
 import { buildDisplayTypeChangeUpdate } from '@/lib/widget/widget-resolver'
-import { isTextDisplayType } from '@/lib/widget/display-type-behavior'
+import { getWidgetDisplayTypeOptions } from '@/lib/widget/widget-catalog'
 import TextDisplaySection from './TextDisplaySection'
 import LinearDisplaySection from './LinearDisplaySection'
 import ArcDisplaySection from './ArcDisplaySection'
+import AltitudeTapeDisplaySection from './AltitudeTapeDisplaySection'
 import HeadingTapeDisplaySection from './HeadingTapeDisplaySection'
+import HeadingCompassDisplaySection from './HeadingCompassDisplaySection'
+import HeartZonesDisplaySection from './HeartZonesDisplaySection'
 import LeanAngleDisplaySection from './LeanAngleDisplaySection'
 import GForceWidgetEditor from '../GForceWidgetEditor'
 import LapTimerDisplaySection from './LapTimerDisplaySection'
+import SplitsRunDisplaySection from './SplitsRunDisplaySection'
 import { useTranslation } from 'react-i18next'
 
 /**
@@ -26,13 +29,18 @@ import { useTranslation } from 'react-i18next'
  * variant data extraction and update logic.
  */
 const DISPLAY_SECTION = {
+  altitude_tape: AltitudeTapeDisplaySection,
   heading_tape: HeadingTapeDisplaySection,
+  heading_compass: HeadingCompassDisplaySection,
+  heart_zones: HeartZonesDisplaySection,
   linear: LinearDisplaySection,
   arc: ArcDisplaySection,
   corner: ArcDisplaySection,
+  gt_gauge: ArcDisplaySection,
   lean_angle: LeanAngleDisplaySection,
   g_force: GForceWidgetEditor,
   lap_timer: LapTimerDisplaySection,
+  splits_run: SplitsRunDisplaySection,
 }
 
 /**
@@ -46,20 +54,18 @@ const DISPLAY_SECTION = {
 export default function MetricWidgetEditor({
   widget,
   updateWidgetData,
-  updateWidgetSize,
-  commitWidgetSize,
+  updateWidgetDraft,
+  commitWidgetDraft,
   setNumericField,
   showDisplayControls = true,
 }) {
   const { t } = useTranslation()
-  const displayType = widget.data.display_type || 'text'
-  const displayOptions = getDisplayTypeOptions(widget.type, t)
+  const displayType = widget.data.display_type
+  const displayOptions = getWidgetDisplayTypeOptions(widget.type, t)
 
   const handleDisplayTypeChange = useCallback(
     (value) => {
       const patch = buildDisplayTypeChangeUpdate(widget.data, value)
-      const defaultFontSize = getDisplayTypeDefaultFontSize(value)
-      if (defaultFontSize !== null) patch.font_size = defaultFontSize
       updateWidgetData(widget.id, patch)
     },
     [widget.id, widget.data, updateWidgetData],
@@ -82,16 +88,21 @@ export default function MetricWidgetEditor({
         </div>
       ) : null}
 
-      {isTextDisplayType(displayType) ? (
+      {displayType === 'text' ? (
         <TextDisplaySection
           widget={widget}
           updateWidgetData={updateWidgetData}
-          updateWidgetSize={updateWidgetSize}
-          commitWidgetSize={commitWidgetSize}
+          updateWidgetDraft={updateWidgetDraft}
+          commitWidgetDraft={commitWidgetDraft}
           setNumericField={setNumericField}
         />
       ) : DisplaySection ? (
-        <DisplaySection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
+        <DisplaySection
+          widget={widget}
+          updateWidgetData={updateWidgetData}
+          updateWidgetDraft={updateWidgetDraft}
+          commitWidgetDraft={commitWidgetDraft}
+        />
       ) : null}
 
       {widget.type === 'altitude' ? (
@@ -100,7 +111,7 @@ export default function MetricWidgetEditor({
             label={t('widget-editor.altitudeAtStart', 'Altitude at start')}
             value={widget.data.starting_altitude}
             placeholder={widget.startingAltitudePlaceholder}
-            suffix={getStandardMetricDisplayUnit(widget.type, widget.data)}
+            suffix={widget.data.display_unit}
             onChange={(rawValue) => setNumericField(widget.id, 'starting_altitude', rawValue, { optional: true, round: true })}
             onReset={() => updateWidgetData(widget.id, { starting_altitude: null })}
           />

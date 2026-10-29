@@ -194,10 +194,14 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
         } else {
             RenderOutputKind::Transparent
         };
-        let target =
-            plan_batch_output_targets(&paths.downloads_dir, kind, &[rotated.clone()], None)
-                .unwrap()
-                .remove(0);
+        let target = plan_batch_output_targets(
+            &paths.downloads_dir,
+            kind,
+            std::slice::from_ref(&rotated),
+            None,
+        )
+        .unwrap()
+        .remove(0);
         let outcome = execution.render(&paths, plan, &activity, &target);
         outcome.unwrap();
         let metadata = ovrley_core::media::video_probe::probe_video(
@@ -231,7 +235,9 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
                 .iter()
                 .all(|byte| *byte == 0));
             assert!(decode_frame(target.path(), covered_second)
-                .chunks_exact(4)
+                .as_chunks::<4>()
+                .0
+                .iter()
                 .any(|pixel| pixel[3] > 0));
         } else {
             let expected = decode_frame(&rotated, 0.0);
@@ -493,13 +499,16 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
         "plan",
         ovrley_core::output::RenderOutputKind::Composite,
     );
+    let size = ovrley_core::render::FrameSize {
+        width: scene.presentation.width,
+        height: scene.presentation.height,
+    };
     let plan = CompositeEncoding::new(
-        ovrley_core::render::FrameSize {
-            width: scene.presentation.width,
-            height: scene.presentation.height,
-        },
+        size,
         render,
+        &ovrley_core::render::AtlasPlan::full_frame(size, 0),
         true,
+        None,
         None,
         None,
         &output_target,
@@ -903,7 +912,6 @@ fn test_frame_worker_composite_render() {
         ovrley_core::output::RenderOutputKind::Composite,
     );
     let result = execution.render(&paths, plan, &activity, &output_target);
-    let result = result;
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();
     let output = paths.downloads_dir.join(&filename);
@@ -942,7 +950,6 @@ fn test_frame_worker_composite_render_with_audio() {
         ovrley_core::output::RenderOutputKind::Composite,
     );
     let result = execution.render(&paths, plan, &activity, &output_target);
-    let result = result;
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();
     let output = paths.downloads_dir.join(&filename);

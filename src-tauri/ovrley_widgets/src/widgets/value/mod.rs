@@ -1,0 +1,9 @@
+//! Telemetry value widgets: configuration, validation, formatting, layout, and preview surfaces.
+pub mod config;
+pub mod format;
+pub mod frame;
+pub mod interaction;
+pub mod layout;
+pub(crate) mod presentation;
+pub mod preview;
+pub mod validation;

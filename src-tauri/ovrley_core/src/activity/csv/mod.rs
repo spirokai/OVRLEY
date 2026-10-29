@@ -60,6 +60,10 @@ enum Metric {
     GForceZ,
     /// Engine speed in revolutions per minute.
     Rpm,
+    /// Rider pedalling cadence in revolutions per minute.
+    Cadence,
+    /// Rider mechanical power in watts.
+    Power,
     /// Engine power in watts.
     EnginePower,
     /// Engine load as a percentage from zero to one hundred.
@@ -74,6 +78,19 @@ enum Metric {
     LeanAngle,
     /// Gear position as an unscaled numeric value.
     GearPosition,
+    /// Dive depth and next decompression stop depth in metres.
+    Depth,
+    FirstStopDepth,
+    /// Recorded decompression predictions in whole minutes.
+    FirstStopTime,
+    TimeToSurface,
+    /// Oxygen partial pressure in absolute atmospheres.
+    AveragePpo2,
+    /// Active gas (OC) or diluent (CC) fractions, from zero to one.
+    FractionO2,
+    FractionHe,
+    /// Water temperature in degrees Celsius.
+    WaterTemperature,
     /// Raw date string companion for time-of-day timestamp reconstruction.
     ///
     /// This is not emitted as an activity metric; it supplies the calendar date
@@ -168,6 +185,7 @@ fn parse_csv_activity<R: Read>(
         let mut units_row = None;
         let mut data = None;
         let mut preamble = columns::LocalPreamble::default();
+        let mut dive_units = units::ShearwaterUnits::default();
         let mut awaiting_units_row = false;
         let mut record_count = 0;
 
@@ -175,7 +193,8 @@ fn parse_csv_activity<R: Read>(
             let record = record.map_err(csv_error)?;
             record_count = record_index + 1;
             if header.is_none() {
-                if let Some(candidate) = headers::parse_header_candidate(&record)? {
+                if let Some(mut candidate) = headers::parse_header_candidate(&record)? {
+                    dive_units.apply(&mut candidate.columns);
                     data = Some(columns::CsvColumnData::new(&candidate));
                     header = Some(candidate);
                     awaiting_units_row = true;
@@ -185,6 +204,7 @@ fn parse_csv_activity<R: Read>(
 
             let Some(header) = &header else {
                 preamble.observe(&record);
+                dive_units.observe(&record)?;
                 continue;
             };
             if awaiting_units_row {

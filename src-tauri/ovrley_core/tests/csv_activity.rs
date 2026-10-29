@@ -340,6 +340,24 @@ Timestamp (s),Speed\n\
 }
 
 #[test]
+fn aim_race_studio_with_gear_unit_and_pedal_pos_imports_successfully() {
+    let aim_csv = "Format,AiM CSV File\n\
+Date,\"Friday, July 3, 2026\"\n\
+Time,2:48 PM\n\
+\n\
+Time,Speed,GEAR,PEDAL POS\n\
+s,mph,gear,%\n\
+0.000,10.0,1,25.0\n\
+0.050,12.0,2,50.0\n";
+    let activity = parse_csv_activity_reader(Cursor::new(aim_csv), "11.csv")
+        .unwrap()
+        .parsed_activity;
+    assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 0.05]);
+    assert_eq!(activity.gear_position, gear_numbers(&[1.0, 2.0]));
+    assert_eq!(activity.throttle_position, vec![Some(25.0), Some(50.0)]);
+}
+
+#[test]
 fn local_preamble_timestamps_respect_dst_transitions_and_reject_non_unique_starts() {
     let (has_transition, examples) = local_transition_examples();
     if !has_transition {
@@ -591,7 +609,7 @@ fn racebox_fixture_imports_through_the_path_entry_point() {
     assert_eq!(activity.lap_number[closing_lap_index - 1], 3);
     assert_eq!(activity.lap_number[closing_lap_index], -1);
     assert_eq!(activity.lap_time_seconds[closing_lap_index], None);
-    assert_eq!(activity.lap_durations_seconds.len(), 4);
+    assert_eq!(activity.lap_durations_seconds.len(), 5);
 }
 
 #[test]
@@ -613,7 +631,7 @@ fn csv_lap_values_normalize_positive_integer_labels_and_reject_other_values() {
         .parsed_activity;
 
     assert_eq!(activity.lap_number, vec![0, 0, 1, 1, 2, -1, -1, -1, -1, -1]);
-    assert_eq!(activity.lap_durations_seconds, vec![2.0, 2.0, 1.0]);
+    assert_eq!(activity.lap_durations_seconds, vec![2.0, 2.0, 1.0, 4.0]);
 }
 
 #[test]
@@ -1287,7 +1305,7 @@ fn vehicle_power_aliases_and_units_convert_to_engine_power() {
     );
     let cv_activity = parse(cv);
     assert_close(cv_activity.engine_power[0], 14_709.975);
-    assert_close(cv_activity.engine_power[1], 7_354.9875);
+    assert_close(cv_activity.engine_power[1], 7_354.987_5);
     assert_eq!(
         parse(torque_pro_kw).engine_power,
         vec![Some(7_000.0), Some(8_000.0)]
@@ -1558,7 +1576,7 @@ Time,Lap,Latitude,Longitude\n\
             .parsed_activity;
 
         assert_eq!(activity.lap_start_elapsed_seconds, vec![0.0, 2.0]);
-        assert_eq!(activity.lap_durations_seconds, vec![2.0]);
+        assert_eq!(activity.lap_durations_seconds, vec![2.0, 1.0]);
     }
 
     #[test]
@@ -1571,7 +1589,7 @@ Time,Lap,Latitude,Longitude\n\
 
         let circuit_tools_fast_lap_durations = [108.55, 108.42, 108.46, 109.03, 107.05, 107.05];
         assert!((17.0..=18.0).contains(&activity.lap_start_elapsed_seconds[0]));
-        assert_eq!(activity.lap_durations_seconds.len(), 7);
+        assert_eq!(activity.lap_durations_seconds.len(), 8);
         assert!(
             (150.0..=170.0).contains(&activity.lap_durations_seconds[0]),
             "unexpected first VBO lap duration: {}",
@@ -1632,7 +1650,7 @@ Time,Lap,Latitude,Longitude\n\
             });
 
             assert!(
-                activity.lap_number.iter().any(|&v| v == -1),
+                activity.lap_number.contains(&-1),
                 "{} must have out-lap samples with lap_number == -1",
                 name
             );

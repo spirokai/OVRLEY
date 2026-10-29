@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { deepEqual } from '@/store/store-utils'
 import useStore from '@/store/useStore'
-import { filenameFromSelectedPath } from '@/lib/utils'
+import { filenameFromSelectedPath } from '@/lib/file-dialog'
 import { createProjectContentSnapshot, createProjectDirtyState } from '../utils/projectSnapshot'
 import { isRendererBusy } from '@/features/render-video/utils/renderRequest'
 
@@ -22,6 +22,7 @@ export default function useProjectDocumentState() {
       batchVideoFolder: state.batchVideoFolder,
       batchOutputFolder: state.batchOutputFolder,
       config: state.config,
+      disabledLaps: state.disabledLaps,
       globalDefaults: state.globalDefaults,
       importedVideoPath: state.importedVideoPath,
       importingVideo: state.importingVideo,

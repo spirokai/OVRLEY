@@ -9,10 +9,10 @@ mod common;
 
 use ovrley_core::commands::{parse_and_validate_config, validate_template_contents};
 use ovrley_core::normalize::parse_config_value;
-use ovrley_core::normalize::ContentAlignment;
 use ovrley_core::normalize::TEMPLATE_FILE_VERSION;
-use ovrley_core::render::widgets::types::PreparedValue;
+use ovrley_widgets::widgets::value::validation::ValidatedValue;
 use ovrley_core::render_jobs::planning::{plan_single_render, VideoRenderModePlan};
+use ovrley_widgets::widgets::value::validation::ContentAlignment;
 use serde_json::json;
 
 #[test]
@@ -239,7 +239,7 @@ fn time_uses_the_same_text_alignment_contract() {
         "plots": []
     }));
     match config.values.into_iter().next().unwrap() {
-        PreparedValue::TimeText(value) => {
+        ValidatedValue::TimeText(value) => {
             assert_eq!(value.base.content_alignment, ContentAlignment::Center)
         }
         other => panic!("expected time text value, got {other:?}"),

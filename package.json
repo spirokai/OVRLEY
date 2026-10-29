@@ -5,20 +5,31 @@
   "main": "index.js",
   "scripts": {
     "tauri": "node scripts/tauri.mjs",
+    "preinstall": "node scripts/require-pnpm.mjs",
     "postinstall": "node scripts/install-ffmpeg.mjs",
     "dev": "pnpm tauri dev",
     "build": "pnpm tauri build",
     "dev:frontend": "cd app && pnpm dev",
+    "wasm:build": "node scripts/build-wasm.mjs",
+    "wasm:skia:build": "node scripts/build-skia-wasm.mjs",
     "build:frontend": "cd app && pnpm build",
     "prepare:packaging": "node scripts/prepare-packaging-resources.mjs",
     "lint:frontend": "cd app && pnpm lint",
     "lint": "pnpm lint:frontend",
     "format:frontend": "cd app && pnpm format",
     "format": "pnpm format:frontend",
+    "format:check": "pnpm --dir app format:check",
+    "check": "vp check app vite.config.js",
+    "test": "pnpm --dir app test",
     "release": "semantic-release",
     "benchmark:transparent": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_transparent --",
     "benchmark:composite": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_composite --",
-    "benchmark:widget-rate": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_widget_rate --"
+    "benchmark:widget-rate": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_widget_rate --",
+    "benchmark:widgets": "node benchmarks/widgets/run.mjs",
+    "benchmark:widgets:build": "node benchmarks/widgets/run.mjs --build",
+    "benchmark:widgets:summary": "node benchmarks/widgets/summarize.mjs",
+    "benchmark:interactions": "node benchmarks/widget-interactions/run.mjs",
+    "prepare": "vp config"
   },
   "keywords": [],
   "author": "",
@@ -28,28 +39,11 @@
     "@playwright/test": "^1.52.0",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@tauri-apps/cli": "^2.9.6",
-    "semantic-release": "^25.0.3"
+    "eslint-plugin-react": "^7.37.5",
+    "semantic-release": "^25.0.3",
+    "vite-plus": "catalog:"
   },
   "dependencies": {
     "@tauri-apps/plugin-shell": "~2.3.3"
-  },
-  "pnpm": {
-    "packageExtensions": {
-      "react-css-styled@1.1.9": {
-        "peerDependencies": {
-          "react": "*"
-        }
-      },
-      "react-moveable@0.56.0": {
-        "peerDependencies": {
-          "react": "*"
-        }
-      },
-      "react-selecto@1.26.3": {
-        "peerDependencies": {
-          "react": "*"
-        }
-      }
-    }
   }
 }

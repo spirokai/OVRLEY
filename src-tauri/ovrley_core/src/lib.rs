@@ -25,8 +25,6 @@ pub mod encode;
 pub mod error;
 /// Font identities, face capabilities, and session resolution.
 pub mod fonts;
-/// Shared interpolation utilities used by activity and render modules.
-pub mod interpolation;
 /// Source media probing and embedded telemetry extraction.
 pub mod media;
 /// Render config validation seam — zero backend-owned defaults.
@@ -37,18 +35,9 @@ pub mod output;
 pub mod paths;
 /// Validation and oriented preview decoding for user-selected bitmap resources.
 pub mod raster;
-/// Shared Ramer-Douglas-Peucker line simplification.
-pub mod rdp;
 /// Skia-based overlay rendering.
 pub mod render;
 /// Batch render submission and lifecycle vocabulary.
 pub mod render_jobs;
-/// Shared standard-metric widget definitions.
-pub mod standard_metrics;
-/// Shared standard-widget definitions.
-pub mod standard_widgets;
-/// Cross-cutting domain types (MetricKind, etc.) shared by config, render, and activity.
-pub mod types;
 
 pub use error::{CoreError, CoreResult};
-pub use types::{BackdropType, DisplayType, MetricKind, TrackFillStyle};

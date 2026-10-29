@@ -141,7 +141,7 @@ impl ProgressEstimator {
                 .expect("recorded frame intervals must be finite")
         });
         let mid = samples.len() / 2;
-        let median = if samples.len() % 2 == 0 {
+        let median = if samples.len().is_multiple_of(2) {
             (samples[mid - 1] + samples[mid]) / 2.0
         } else {
             samples[mid]

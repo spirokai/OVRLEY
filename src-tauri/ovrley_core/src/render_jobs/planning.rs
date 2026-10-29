@@ -30,12 +30,12 @@ use crate::error::{CoreError, CoreResult};
 use crate::media::prepared_video::InspectedVideoSource;
 use crate::normalize::SceneConfig;
 use crate::normalize::{
-    raw::{RenderConfig, ScenePresentationConfig},
     validate_ffmpeg_config, validate_render_config_with_resources, validate_render_presentation,
-    ValidatedFfmpegConfig, ValidatedRenderConfig, ValidatedSceneConfig, ValidatedScenePresentation,
+    RenderConfig, ValidatedFfmpegConfig, ValidatedRenderConfig, ValidatedSceneConfig,
 };
 use crate::output::{plan_batch_output_targets, RenderOutputKind};
 use crate::raster::RasterResourceResolver;
+use ovrley_widgets::model::scene::{ScenePresentationConfig, ValidatedScenePresentation};
 
 /// Validated once at configuration/acceptance ingress; private fields keep
 /// consumers from substituting malformed settings after validation.
@@ -53,7 +53,7 @@ pub(crate) fn validate_batch_encoding(
     let layout_fps = Fps::new(raw.fps, 1)?;
     let update_rate = NonZeroU32::new(raw.update_rate)
         .ok_or_else(|| CoreError::Config("Batch updateRate must be positive".into()))?;
-    if raw.update_rate > raw.fps || raw.fps % raw.update_rate != 0 {
+    if raw.update_rate > raw.fps || !raw.fps.is_multiple_of(raw.update_rate) {
         return Err(CoreError::Config(
             "Batch updateRate must divide the selected FPS".into(),
         ));
@@ -353,6 +353,7 @@ pub(crate) fn plan_batch_item(
     offset: f64,
     skip_overlay: bool,
     activity_end: Option<f64>,
+    disabled_laps: &[usize],
     auto_sync: bool,
     output_frame_count: u32,
     container_fps: Fps,
@@ -392,6 +393,7 @@ pub(crate) fn plan_batch_item(
         },
         export_start_seconds: offset,
         custom_export_range_active: Some(true),
+        disabled_laps: disabled_laps.to_vec(),
     };
     let mut config = template.config.clone().with_scene(scene);
     if skip_overlay || coverage.end <= coverage.start {
@@ -400,6 +402,8 @@ pub(crate) fn plan_batch_item(
         config.values.clear();
         config.course_plots.clear();
         config.elevation_plots.clear();
+        config.diving_profiles.clear();
+        config.rolling_charts.clear();
     }
     let mode = match encoding.codec {
         CodecSelection::Composite(requested_codec_id) => VideoRenderModePlan::Composite {
@@ -419,11 +423,7 @@ pub(crate) fn plan_batch_item(
                 requested_codec_id,
                 qsv_full_init_args: encoding.qsv_full_init_args.clone(),
             },
-            source_metadata: Some(CompositeSourceMetadata {
-                has_audio: source.metadata.has_audio,
-                audio_bit_rate: source.metadata.audio_bit_rate,
-                rotation_degrees: source.metadata.rotation_degrees,
-            }),
+            source_metadata: Some(CompositeSourceMetadata::from_source(&source.metadata)),
         },
         CodecSelection::Transparent(_) => plan_transparent_render(
             &config.scene,

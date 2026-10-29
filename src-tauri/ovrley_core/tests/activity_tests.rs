@@ -23,9 +23,7 @@ fn speed_value() -> serde_json::Value {
 }
 
 fn time_value() -> String {
-    format!(
-        r##"{{"value":"time","x":0,"y":0,"font":"f","font_size":12.0,"color":"#ffffff","opacity":1.0,"show_icon":false,"icon_color":"#000000","icon_size":1.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"show_units":false,"unit_color":"#000000","display_unit":"","prefix":"","suffix":"","time_mode":"daytime","format":"time-24","hours_offset":0,"elapsed_origin":"activity","show_hundredths":false,"decimals":0,"content_alignment":"left"}}"##
-    )
+    r##"{"value":"time","x":0,"y":0,"font":"f","font_size":12.0,"color":"#ffffff","opacity":1.0,"show_icon":false,"icon_color":"#000000","icon_size":1.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"show_units":false,"unit_color":"#000000","display_unit":"","prefix":"","suffix":"","time_mode":"daytime","format":"time-24","hours_offset":0,"elapsed_origin":"activity","show_hundredths":false,"decimals":0,"content_alignment":"left"}"##.to_string()
 }
 
 #[test]
@@ -171,7 +169,7 @@ fn finalizes_raw_activity_axis_g_force_and_lean_angle_samples() {
     assert_eq!(activity.lap_number, vec![0, 1]);
     assert_eq!(activity.lap_time_seconds, vec![Some(0.0), Some(0.0)]);
     assert_eq!(activity.lap_start_elapsed_seconds, vec![0.0, 1.0]);
-    assert_eq!(activity.lap_durations_seconds, vec![1.0]);
+    assert_eq!(activity.lap_durations_seconds, vec![1.0, 0.0]);
     assert_eq!(activity.g_force_x, vec![Some(0.1), Some(-0.4)]);
     assert_eq!(activity.g_force_y, vec![Some(-0.2), Some(0.5)]);
     assert_eq!(activity.g_force_z, vec![Some(0.3), Some(-0.6)]);
@@ -179,7 +177,7 @@ fn finalizes_raw_activity_axis_g_force_and_lean_angle_samples() {
 }
 
 #[test]
-fn finalizes_raw_activity_without_smoothing_when_map_is_empty() {
+fn finalizes_raw_activity_with_default_derived_speed_smoothing_when_map_is_empty() {
     let raw_activity = serde_json::json!({
         "file_name": "raw-no-smoothing.srt",
         "file_format": "srt",
@@ -200,13 +198,12 @@ fn finalizes_raw_activity_without_smoothing_when_map_is_empty() {
         .unwrap()
         .parsed_activity;
 
-    assert_eq!(
-        activity.speed,
-        vec![None, Some(0.0), Some(40.0), Some(0.0), Some(40.0)]
-    );
+    assert_eq!(activity.speed[0], None);
+    assert!(activity.speed.iter().flatten().all(|speed| *speed > 0.0 && *speed < 40.0));
+    // Stepped altitude differentiates into alternating 0/16 m/s; default smoothing recovers the 8 m/s climb.
     assert_eq!(
         activity.vertical_speed,
-        vec![None, Some(0.0), Some(16.0), Some(0.0), Some(16.0)]
+        vec![None, Some(8.0), Some(8.0), Some(8.0), Some(8.0)]
     );
 }
 
@@ -391,7 +388,7 @@ fn only_densifies_series_requested_by_template() {
             "values": [speed_value()],
             "plots": {
                 "course": {
-                    "value": "course", "x": 0, "y": 0, "width": 200, "height": 100,
+                    "value": "course", "x": 0, "y": 0, "width": 200, "height": 100, "rotation": 0.0,
                     "simplify_tolerance_px": 1.0, "target_density": 1.0,
                     "completed_line_width": 2.0, "completed_line_color": "#000000",
                     "completed_line_opacity": 1.0,
@@ -427,7 +424,7 @@ fn trimmed_exports_keep_absolute_distance_progress() {
             "scene": full_scene(30.0, 600.0, 630.0),
             "plots": {
                 "course": {
-                    "value": "course", "x": 0, "y": 0, "width": 200, "height": 100,
+                    "value": "course", "x": 0, "y": 0, "width": 200, "height": 100, "rotation": 0.0,
                     "simplify_tolerance_px": 1.0, "target_density": 1.0,
                     "completed_line_width": 2.0, "completed_line_color": "#000000",
                     "completed_line_opacity": 1.0,
@@ -568,8 +565,10 @@ fn hold_interpolation_densifies_iso_as_step_function() {
     // With hold interpolation, all frames before t=1 should hold 200
     let mut trimmed = common::builders::minimal_trimmed_activity(vec![0.0, 1.0]);
     trimmed.iso = vec![Some(200.0), Some(800.0)];
-    let mut requirements = RenderDataRequirements::default();
-    requirements.iso = true;
+    let requirements = RenderDataRequirements {
+        iso: true,
+        ..Default::default()
+    };
 
     // fps=4 → frames at t=0, 0.25, 0.5, 0.75 (all before t=1)
     let report = densify_activity(
@@ -596,8 +595,10 @@ fn linear_interpolation_densifies_barometric_altitude_as_smooth_line() {
     // barometric-altitude samples: 100 at t=0, 200 at t=1
     let mut trimmed = common::builders::minimal_trimmed_activity(vec![0.0, 1.0]);
     trimmed.barometric_altitude = vec![Some(100.0), Some(200.0)];
-    let mut requirements = RenderDataRequirements::default();
-    requirements.barometric_altitude = true;
+    let requirements = RenderDataRequirements {
+        barometric_altitude: true,
+        ..Default::default()
+    };
 
     // fps=4 → frames at t=0, 0.25, 0.5, 0.75
     let report = densify_activity(

@@ -284,8 +284,8 @@ fn racechrono_vbo_fixture_resolves_standard_and_suffixed_channels() {
         .parsed_activity;
 
     assert_eq!(activity.file_format.as_deref(), Some("vbo"));
-    assert_close(activity.course[0].0, 1141.673_250 / 60.0);
-    assert_close(activity.course[0].1, -5879.371_750 / 60.0);
+    assert_close(activity.course[0].0, 1_141.673_250 / 60.0);
+    assert_close(activity.course[0].1, -5_879.371_750 / 60.0);
     assert_close(activity.speed[0], 2.401 / 3.6);
     assert_close(activity.elevation[0], 2292.7);
     assert_close(activity.g_force[0], 0.020);

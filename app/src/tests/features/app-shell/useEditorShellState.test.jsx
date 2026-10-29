@@ -7,7 +7,7 @@
  */
 
 import { act, renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import useEditorShellState from '@/features/app-shell/hooks/useEditorShellState'
 
 describe('useEditorShellState', () => {

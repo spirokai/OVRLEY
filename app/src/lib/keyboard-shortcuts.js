@@ -62,6 +62,21 @@ export function matchKeyboardShortcut(event, scope) {
 const NATIVE_EDITING_KEYS = new Set(['a', 'c', 'v', 'x', 'y', 'z'])
 
 /**
+ * Checks whether a DOM target is inside an interactive element that owns its input.
+ *
+ * @param {EventTarget} target DOM event target to inspect.
+ * @returns {boolean} True if the target is inside an interactive element.
+ */
+export function isInteractiveElement(target) {
+  if (!(target instanceof Element)) return false
+  return Boolean(
+    target.closest(
+      'input, textarea, select, button, a, [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [contenteditable="true"]',
+    ),
+  )
+}
+
+/**
  * Checks whether a form field should retain a matched shortcut.
  *
  * @param {KeyboardEvent} event - Keyboard event to inspect.

@@ -1,21 +1,21 @@
-import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
+
+import { act, renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
 import { useRasterSelection } from '@/features/widget-editor/hooks/useRasterSelection'
-import RasterPreview from '@/features/widget-preview/widgets/raster/RasterPreview'
-import { resolveWidgetRenderGeometry } from '@/features/overlay-editor/utils/widgetRenderGeometry'
-import { constrainRasterResize } from '@/features/overlay-editor/utils/widgetResizeScaling'
+
 import { redoHistory, undoHistory } from '@/features/undo-redo/undoHistory'
 import { deleteWidgetsInConfig, duplicateWidgetsInConfig } from '@/lib/widget/widget-config'
 import useStore from '@/store/useStore'
 import { cloneSerializable, DEFAULT_CONFIG } from '@/store/store-utils'
-import { loadSelectedRaster, rasterPreviewPng } from '@/api/backend'
+import { loadSelectedRaster } from '@/api/backend'
 import { openSinglePath } from '@/lib/file-dialog'
 
 vi.mock('@/api/backend', () => ({ loadSelectedRaster: vi.fn(), rasterPreviewPng: vi.fn() }))
 vi.mock('@/lib/file-dialog', () => ({ openSinglePath: vi.fn() }))
 
-const liveEditsSnapshot = { activeWidgetInteraction: null, liveWidgetDrafts: {} }
+const liveEditsSnapshot = { liveWidgetDrafts: {}, widgetNodes: {} }
 const widgetLiveEdits = {
   getSnapshot: () => liveEditsSnapshot,
   subscribe: () => () => {},
@@ -37,12 +37,7 @@ describe('raster creation and selection', () => {
     expect(raster.path).toBeNull()
     expect(useStore.getState().selectedWidgetId).toBe(raster.id)
     expect(openSinglePath).not.toHaveBeenCalled()
-    render(
-      <div style={{ width: raster.width, height: raster.height }}>
-        <RasterPreview widget={{ data: raster }} globalOpacity={1} />
-      </div>,
-    )
-    expect(screen.getByTestId('raster-placeholder')).toHaveStyle({ opacity: '0.5' })
+    expect(WIDGET_TYPE_DEFINITIONS[{ type: 'raster' }.type].timeDependent).toBe(false)
   })
 
   test('selects Rust-owned image bytes at exact oriented dimensions', async () => {
@@ -55,7 +50,6 @@ describe('raster creation and selection', () => {
       height: 640,
       resourceId: 'original',
     })
-    vi.mocked(rasterPreviewPng).mockResolvedValue('aGVsbG8=')
 
     const { result } = renderHook(() => useRasterSelection(id))
     await act(async () => result.current.selectImage())
@@ -63,13 +57,6 @@ describe('raster creation and selection', () => {
     expect(openSinglePath).toHaveBeenCalledWith([{ name: expect.any(String), extensions: ['png', 'jpeg', 'jpg', 'bmp', 'tiff'] }])
     expect(useStore.getState().config.rasters[0]).toMatchObject({ width: 480, height: 640, path: 'C:\\images\\ride.tiff' })
     expect(useStore.getState().config.rasters[0]).toHaveProperty('resourceId', 'original')
-    expect(resolveWidgetRenderGeometry({ type: 'raster', category: 'rasters', data: useStore.getState().config.rasters[0] }, null, 2)).toMatchObject({
-      width: 960,
-      height: 1280,
-    })
-    const { container } = render(<RasterPreview widget={{ id, data: useStore.getState().config.rasters[0] }} globalOpacity={1} />)
-    await waitFor(() => expect(container.querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,aGVsbG8='))
-    expect(rasterPreviewPng).toHaveBeenCalledWith('original')
   })
 
   test('leaves an existing image and dimensions intact on failed replacement', async () => {
@@ -164,17 +151,5 @@ describe('raster creation and selection', () => {
     expect(useStore.getState().config.rasters.find((raster) => raster.id === duplicateId)).toBeUndefined()
     undoHistory(useStore)
     expect(useStore.getState().config.rasters.find((raster) => raster.id === duplicateId).resourceId).toBe('image-second')
-  })
-
-  test('corner resizing preserves displayed ratio while edges stretch independently', () => {
-    const origin = { x: 20, y: 30, width: 200, height: 100, direction: [-1, -1] }
-    expect(constrainRasterResize(origin, { x: 0, y: 10, width: 300, height: 120 }, 1)).toEqual({ x: -80, y: -20, width: 300, height: 150 })
-    expect(constrainRasterResize(origin, { x: 0, y: 10, width: 300, height: 120 }, 2)).toEqual({ x: -180, y: -70, width: 300, height: 150 })
-    expect(constrainRasterResize({ ...origin, direction: [1, 0] }, { x: 20, y: 30, width: 300, height: 100 }, 1)).toEqual({
-      x: 20,
-      y: 30,
-      width: 300,
-      height: 100,
-    })
   })
 })

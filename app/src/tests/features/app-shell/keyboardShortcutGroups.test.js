@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { getKeyboardShortcutGroups } from '@/features/app-shell/utils/keyboardShortcutGroups'
 
 describe('keyboard shortcut help groups', () => {

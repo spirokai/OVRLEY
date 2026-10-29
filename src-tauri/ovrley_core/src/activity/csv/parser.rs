@@ -17,6 +17,7 @@ use super::types::{
 };
 use super::units::{
     declaration_compatible, parse_declared_unit, parse_units_row_unit, DeclaredUnit, Unit,
+    UnitDimension,
 };
 use super::Metric;
 use crate::error::{CoreError, CoreResult};
@@ -26,6 +27,7 @@ use csv::StringRecord;
 enum HeaderProfile {
     Generic,
     DjiAirData,
+    Shearwater,
 }
 
 /// Parses one record as a usable telemetry-header candidate.
@@ -38,12 +40,12 @@ pub(super) fn parse_header_candidate(record: &StringRecord) -> CoreResult<Option
     let gps_update_index = record
         .iter()
         .position(|value| normalize_syntax(value) == "gps update");
+    let profile = detect_header_profile(record);
     let mut columns = record
         .iter()
         .enumerate()
-        .filter_map(|(index, value)| parse_header(index, value))
+        .filter_map(|(index, value)| parse_header(index, value, profile))
         .collect::<Vec<_>>();
-    let profile = detect_header_profile(record);
     let has_timing = columns.iter().any(|column| column.metric.is_timing());
     let has_telemetry = columns.iter().any(|column| !column.metric.is_timing());
     if has_timing && has_telemetry {
@@ -82,6 +84,12 @@ pub(super) fn parse_header_candidate(record: &StringRecord) -> CoreResult<Option
 }
 
 fn detect_header_profile(record: &StringRecord) -> HeaderProfile {
+    if ["depth", "average ppo2", "fraction o2", "fraction he"]
+        .iter()
+        .all(|semantic| has_header_semantic(record, semantic))
+    {
+        return HeaderProfile::Shearwater;
+    }
     let has_distance = has_header_semantic(record, "distance");
     let has_mileage = has_header_semantic(record, "mileage");
     let has_airdata_marker = has_header_semantic(record, "compass heading")
@@ -118,7 +126,7 @@ fn resolve_profile_aliases(
         for column in columns {
             let is_distance_alias = record
                 .get(column.index)
-                .and_then(|value| split_header(value))
+                .and_then(split_header)
                 .is_some_and(|(semantic, _, _)| semantic == "distance");
             if is_distance_alias {
                 column.metric = Metric::DistanceToHome;
@@ -157,7 +165,7 @@ pub(super) fn is_compatible_units_row(record: &StringRecord, columns: &[HeaderCo
 /// Unknown aliases return `None`. Header annotations supply units or control
 /// semantics, while source qualifiers resolve source-specific meanings such as
 /// absolute GPS time and otherwise adjust precedence.
-fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
+fn parse_header(index: usize, value: &str, profile: HeaderProfile) -> Option<HeaderColumn> {
     let (semantic, annotation, source) = split_header(value)?;
     let declared_unit = annotation
         .as_deref()
@@ -199,7 +207,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
-        "elapsed time" | "time s" => (
+        "elapsed time" | "time s" | "elapsedseconds" => (
             Metric::ElapsedSeconds,
             SourcePriority::Preferred,
             Some(TimingKind::ExplicitElapsed),
@@ -215,6 +223,50 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         ),
         "latitude" => (Metric::Latitude, SourcePriority::Direct, None, None, None),
         "longitude" => (Metric::Longitude, SourcePriority::Direct, None, None, None),
+        "depth" if profile == HeaderProfile::Shearwater => {
+            (Metric::Depth, SourcePriority::Direct, None, None, None)
+        }
+        "first stop depth" if profile == HeaderProfile::Shearwater => (
+            Metric::FirstStopDepth,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
+        "first stop time" if profile == HeaderProfile::Shearwater => (
+            Metric::FirstStopTime,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
+        "time to surface" if profile == HeaderProfile::Shearwater => (
+            Metric::TimeToSurface,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
+        "average ppo2" if profile == HeaderProfile::Shearwater => (
+            Metric::AveragePpo2,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
+        "fraction o2" if profile == HeaderProfile::Shearwater => {
+            (Metric::FractionO2, SourcePriority::Direct, None, None, None)
+        }
+        "fraction he" if profile == HeaderProfile::Shearwater => {
+            (Metric::FractionHe, SourcePriority::Direct, None, None, None)
+        }
+        "water temp" if profile == HeaderProfile::Shearwater => (
+            Metric::WaterTemperature,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
         "gps" => (
             Metric::GpsCoordinate,
             SourcePriority::Direct,
@@ -222,9 +274,13 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
-        "speed" | "kph" | "speed kmh" => (Metric::Speed, SourcePriority::DirectSpeed, None, None, None),
-        "gspd" => (Metric::Speed, SourcePriority::DirectSpeed, None, None, None),
-        "vehspd1" => (Metric::Speed, SourcePriority::Vehicle, None, None, None),
+        "speed" | "kph" | "speed kmh" => {
+            (Metric::Speed, SourcePriority::DirectSpeed, None, None, None)
+        }
+        "gspd" | "speedmps" => (Metric::Speed, SourcePriority::DirectSpeed, None, None, None),
+        "vehspd1" | "controllerspeedmps" => {
+            (Metric::Speed, SourcePriority::Vehicle, None, None, None)
+        }
         "distance" | "trip distance" => {
             (Metric::Distance, SourcePriority::Direct, None, None, None)
         }
@@ -243,7 +299,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
-        "elevation" | "altitude" | "alt" | "altitude above sealevel" => {
+        "elevation" | "altitude" | "alt" | "altitude above sealevel" | "altitudemeters" => {
             (Metric::Elevation, SourcePriority::Direct, None, None, None)
         }
         "pressure altitude" | "barometric altitude" => (
@@ -253,7 +309,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
-        "heading" | "bearing" | "hdg" | "compass heading" => {
+        "heading" | "bearing" | "hdg" | "compass heading" | "coursedegrees" => {
             (Metric::Heading, SourcePriority::Direct, None, None, None)
         }
         "accel xyz" | "combined acceleration" => {
@@ -301,18 +357,25 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             Some(AccelerationKind::Semantic),
         ),
-        "rpm" | "engine rpm" => (Metric::Rpm, SourcePriority::Direct, None, None, None),
+        "rpm" | "engine rpm" | "motorrpm" => {
+            (Metric::Rpm, SourcePriority::Direct, None, None, None)
+        }
+        "cadencerpm" => (Metric::Cadence, SourcePriority::Direct, None, None, None),
+        "humanpowerw" => (Metric::Power, SourcePriority::Direct, None, None, None),
         "power"
         | "estimated power"
         | "engine kw (at the wheels)"
-        | "horsepower (at the wheels)" => (
+        | "horsepower (at the wheels)"
+        | "motorinputpowerw" => (
             Metric::EnginePower,
             SourcePriority::Direct,
             None,
             None,
             None,
         ),
-        "torque" | "estimated torque" => (Metric::Torque, SourcePriority::Direct, None, None, None),
+        "torque" | "estimated torque" | "pedaltorquenm" => {
+            (Metric::Torque, SourcePriority::Direct, None, None, None)
+        }
         "engine load" | "engine load absolute" | "absolute engine load" => (
             Metric::EngineLoad,
             SourcePriority::Direct,
@@ -320,7 +383,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             Some(ControlKind::Percentage),
             None,
         ),
-        "accelerator position" | "accelerator pedal position" => (
+        "accelerator position" | "accelerator pedal position" | "pedal pos" => (
             Metric::ThrottlePosition,
             SourcePriority::Pedal,
             None,
@@ -333,7 +396,8 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         | "throttle position (manifold)"
         | "throttle position manifold"
         | "manifold throttle position"
-        | "relative throttle position" | "tps pct"=> (
+        | "relative throttle position"
+        | "tps pct" => (
             Metric::ThrottlePosition,
             SourcePriority::Direct,
             None,
@@ -402,7 +466,25 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         ),
         _ => return None,
     };
-    let mut declared_unit = declared_unit;
+    // camelCase exporters spell the unit into the header name instead of an
+    // annotation; a contradicting annotation makes the column unusable.
+    let embedded_unit = match semantic.as_str() {
+        "elapsedseconds" => Some(Unit::Seconds),
+        "speedmps" | "controllerspeedmps" => Some(Unit::MetresPerSecond),
+        "altitudemeters" => Some(Unit::Metres),
+        "coursedegrees" => Some(Unit::Degrees),
+        "motorrpm" | "cadencerpm" => Some(Unit::RevolutionsPerMinute),
+        "humanpowerw" | "motorinputpowerw" => Some(Unit::Watts),
+        "pedaltorquenm" => Some(Unit::NewtonMetres),
+        _ => None,
+    };
+    let mut declared_unit = match (declared_unit, embedded_unit) {
+        (DeclaredUnit::Absent, Some(unit)) => DeclaredUnit::Supported(unit),
+        (DeclaredUnit::Supported(declared), Some(unit)) if declared != unit => {
+            DeclaredUnit::Unsupported(UnitDimension::Unknown)
+        }
+        (declared, _) => declared,
+    };
     if metric == Metric::Timestamp
         && annotation.as_deref().is_some_and(|ann| {
             ann.eq_ignore_ascii_case("utc")

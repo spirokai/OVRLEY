@@ -8,7 +8,7 @@
  */
 
 import { renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 
 const { setPreviewPerfValueSpy } = vi.hoisted(() => ({
   setPreviewPerfValueSpy: vi.fn(),
@@ -28,11 +28,7 @@ vi.mock('@/store/useStore', () => ({
   ),
 }))
 
-vi.mock('@/features/overlay-editor', () => ({
-  getEffectivePreviewFps: vi.fn(() => 30),
-}))
-
-vi.mock('@/lib/previewPerf', () => ({
+vi.mock('@/lib/preview-perf', () => ({
   incrementPreviewPerfCounter: vi.fn(),
   previewPerfCounterName: vi.fn((label) => `${label}/s`),
   setPreviewPerfValue: setPreviewPerfValueSpy,

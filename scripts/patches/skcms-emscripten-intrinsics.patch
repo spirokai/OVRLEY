@@ -1,0 +1,18 @@
+diff --git a/modules/skcms/skcms.cc b/modules/skcms/skcms.cc
+--- a/modules/skcms/skcms.cc
++++ b/modules/skcms/skcms.cc
+@@ -22,4 +22,4 @@
+-    #if defined(__clang__)
++    #if defined(__clang__) && !defined(__EMSCRIPTEN__)
+         // That #include <immintrin.h> is usually enough, but Clang's headers
+         // "helpfully" skip including the whole kitchen sink when _MSC_VER is
+         // defined, because lots of programs on Windows would include that and
+diff --git a/modules/skcms/src/skcms_TransformBaseline.cc b/modules/skcms/src/skcms_TransformBaseline.cc
+--- a/modules/skcms/src/skcms_TransformBaseline.cc
++++ b/modules/skcms/src/skcms_TransformBaseline.cc
+@@ -22,4 +22,4 @@
+-    #if defined(__clang__)
++    #if defined(__clang__) && !defined(__EMSCRIPTEN__)
+         // That #include <immintrin.h> is usually enough, but Clang's headers
+         // avoid #including the whole kitchen sink when _MSC_VER is defined,
+         // because lots of programs on Windows would include that and it'd be

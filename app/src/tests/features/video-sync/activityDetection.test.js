@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { createActivitySyncInput } from '@/features/video-sync/utils/activitySyncInput'
 import { detectActivityEventsFromInput } from '@/features/video-sync/utils/detectActivityEvents'
 import { detectStops } from '@/features/video-sync/utils/detectStops'

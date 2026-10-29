@@ -23,7 +23,7 @@ use ovrley_core::encode::debug::composite::write_composite_timing_summary;
 use ovrley_core::encode::ffmpeg::composite::CompositeEncoding;
 use ovrley_core::encode::fps::Fps;
 use ovrley_core::encode::progress::RenderController;
-use ovrley_core::normalize::raw::{parse_config_json, RenderConfig};
+use ovrley_core::normalize::{parse_config_json, RenderConfig};
 use ovrley_core::normalize::{parse_template_value, validate_render_config, ValidatedRenderConfig};
 use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
@@ -103,13 +103,16 @@ pub fn derive_fixture_composite_plan(
     let mut scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
     let render = derive_composite_render_plan(&config.scene, &mut scene, None).unwrap();
     let target = custom_output_target(&paths, "plan", RenderOutputKind::Composite);
+    let size = ovrley_core::render::FrameSize {
+        width: scene.presentation.width,
+        height: scene.presentation.height,
+    };
     CompositeEncoding::new(
-        ovrley_core::render::FrameSize {
-            width: scene.presentation.width,
-            height: scene.presentation.height,
-        },
+        size,
         render,
+        &ovrley_core::render::AtlasPlan::full_frame(size, 0),
         true,
+        None,
         None,
         None,
         &target,

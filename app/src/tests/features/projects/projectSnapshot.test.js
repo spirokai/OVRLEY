@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { createProjectDirtyState, createProjectSnapshot } from '@/features/projects/utils/projectSnapshot'
 import { createPathLocator } from '@/features/projects/utils/projectPaths'
 import { VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
@@ -101,7 +101,7 @@ describe('project snapshot contract', () => {
     }))
     const state = useStore.getState()
     const project = createProjectSnapshot(state, 'C:\\Events\\Race.oly')
-    expect(project.version).toBe(3)
+    expect(project.version).toBe(5)
     expect(project.editor.config.rasters).toEqual([raster])
     expect(project.rasterAssets).toEqual({})
     expect(project.render).toMatchObject({ qualityType, qualityValue })
@@ -188,7 +188,7 @@ describe('project snapshot contract', () => {
 
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
 
-    expect(project.version).toBe(3)
+    expect(project.version).toBe(5)
     expect(project.sync.manual).toEqual({
       landmarks: [
         { id: 'stop-1', type: 'stop', videoSecond: 4 },

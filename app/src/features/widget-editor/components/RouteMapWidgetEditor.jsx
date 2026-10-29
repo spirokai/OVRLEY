@@ -2,21 +2,15 @@
  * Supports widget editing flows related to route map widget editor.
  */
 
-import { Map, Palette } from 'lucide-react'
-import { useMemo } from 'react'
+import { Palette } from 'lucide-react'
 import { SectionHeading } from '@/components/ui/section-heading'
-import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
+import { ColorField, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection } from './widgetEditorSections'
-import { getThemeColor } from '@/lib/theme'
+import PlotMarkerSection from './PlotMarkerSection'
+import { getThemeColor } from '@/lib/color-utils'
 import { Label } from '@/components/ui/label'
 import { useTranslation } from 'react-i18next'
-import { translateOptions } from '@/i18n'
-
-const MARKER_VARIANT_OPTIONS = [
-  { value: 'single', labelKey: 'widget-editor.singleCircle', defaultLabel: 'Single Circle' },
-  { value: 'ring', labelKey: 'widget-editor.concentricRing', defaultLabel: 'Concentric Ring' },
-  { value: 'halo', labelKey: 'widget-editor.solidHalo', defaultLabel: 'Solid Halo' },
-]
+import { normalizeRotation } from '@/features/wasm-widgets/utils/widgetGestureGeometry'
 
 /**
  * Renders the route map widget editor component.
@@ -27,22 +21,14 @@ const MARKER_VARIANT_OPTIONS = [
  * @param {*} props.setNumericField - Value for set numeric field.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
+export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft, setNumericField }) {
   const { t } = useTranslation()
-  const markerVariantOptions = useMemo(() => translateOptions(MARKER_VARIANT_OPTIONS, t), [t])
   const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width
   const completedLineOpacity = widget.data.completed_line_opacity
   const remainingLineOpacity = widget.data.remaining_line_opacity
-  const markerSize = widget.data.marker_size
-  const markerOpacity = widget.data.marker_opacity
-  const markerVariant = widget.data.marker_variant
-  const markerVariantDiameter = widget.data.marker_variant_diameter
-  const rotation = widget.data.rotation
+  const rotation = normalizeRotation(widget.data.rotation)
   const simplifyTolerance = widget.data.simplify_tolerance_px
   const targetDensity = widget.data.target_density
-  const showVariantDiameter = markerVariant !== 'single'
-  const variantDiameterLabel =
-    markerVariant === 'ring' ? t('widget-editor.ringDiameter', 'Ring Diameter') : t('widget-editor.haloDiameter', 'Halo Diameter')
 
   return (
     <>
@@ -52,13 +38,13 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
         editable
         label={t('widget-editor.mapRotation', 'Map Rotation')}
         value={rotation}
-        min={-180}
-        max={180}
+        min={0}
+        max={360}
         step={1}
-        valueDisplay={`${rotation}`}
+        integerDisplay
         suffix="°"
-        onSliderChange={(rawValue) => updateWidgetSize(widget.id, { rotation: rawValue })}
-        onSliderCommit={() => commitWidgetSize(widget.id)}
+        onSliderChange={(rawValue) => updateWidgetDraft(widget.id, { rotation: rawValue })}
+        onSliderCommit={() => commitWidgetDraft(widget.id)}
       />
 
       <div className="space-y-4">
@@ -74,12 +60,12 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
           valueDisplay={`${lineWidth}`}
           suffix="px"
           onSliderChange={(value) =>
-            updateWidgetSize(widget.id, {
+            updateWidgetDraft(widget.id, {
               completed_line_width: value,
               remaining_line_width: value,
             })
           }
-          onSliderCommit={() => commitWidgetSize(widget.id)}
+          onSliderCommit={() => commitWidgetDraft(widget.id)}
         />
         <div className="grid grid-cols-2 gap-4">
           <SliderField
@@ -92,11 +78,11 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
             valueDisplay={`${simplifyTolerance.toFixed(2)}`}
             suffix="px"
             onSliderChange={(value) =>
-              updateWidgetSize(widget.id, {
+              updateWidgetDraft(widget.id, {
                 simplify_tolerance_px: Number(value.toFixed(2)),
               })
             }
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -108,11 +94,11 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
             valueDisplay={`${targetDensity.toFixed(2)}`}
             suffix="x"
             onSliderChange={(value) =>
-              updateWidgetSize(widget.id, {
+              updateWidgetDraft(widget.id, {
                 target_density: Number(value.toFixed(2)),
               })
             }
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -142,7 +128,8 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
             step={1}
             valueDisplay={`${completedLineOpacity}`}
             suffix="%"
-            onSliderChange={(value) => updateWidgetData(widget.id, { completed_line_opacity: value })}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { completed_line_opacity: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -153,12 +140,13 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
             step={1}
             valueDisplay={`${remainingLineOpacity}`}
             suffix="%"
-            onSliderChange={(value) => updateWidgetData(widget.id, { remaining_line_opacity: value })}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { remaining_line_opacity: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center justify-between gap-2 pl-1 pt-2 pb-2">
-            <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
+            <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">
               {t('widget-editor.showFullActivity', 'Show Full Activity')}
             </Label>
             <ToggleField
@@ -168,60 +156,12 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
           </div>
         </div>
       </div>
-      <div className="space-y-4">
-        <SectionHeading icon={Map} title={t('widget-editor.marker', 'Marker')} />
-        <div className="grid grid-cols-2 gap-4">
-          <SelectField
-            label={t('widget-editor.type', 'Type')}
-            value={markerVariant}
-            options={markerVariantOptions}
-            onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
-          />
-          <SizeSlider
-            label={t('widget-editor.size', 'Size')}
-            value={markerSize}
-            min={0}
-            max={50}
-            step={1}
-            valueDisplay={`${markerSize}`}
-            suffix="px"
-            onChange={(value) => updateWidgetSize(widget.id, { marker_size: value })}
-            onCommit={() => commitWidgetSize(widget.id)}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            value={widget.data.marker_color || getThemeColor('aqua')}
-            onChange={(value) => updateWidgetData(widget.id, { marker_color: value })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.opacity', 'Opacity')}
-            value={markerOpacity}
-            min={0}
-            max={100}
-            step={1}
-            valueDisplay={`${markerOpacity}`}
-            suffix="%"
-            onSliderChange={(value) => updateWidgetData(widget.id, { marker_opacity: value })}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          {showVariantDiameter ? (
-            <SizeSlider
-              label={variantDiameterLabel}
-              value={markerVariantDiameter}
-              min={Math.max(Math.round(markerSize * 2), 4)}
-              max={120}
-              step={1}
-              valueDisplay={`${markerVariantDiameter}`}
-              suffix="px"
-              onChange={(value) => updateWidgetSize(widget.id, { marker_variant_diameter: value })}
-              onCommit={() => commitWidgetSize(widget.id)}
-            />
-          ) : null}
-        </div>
-      </div>
+      <PlotMarkerSection
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
+      />
     </>
   )
 }

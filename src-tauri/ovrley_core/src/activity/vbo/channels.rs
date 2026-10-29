@@ -507,16 +507,14 @@ fn parse_name(raw: &str) -> (String, BTreeSet<String>) {
             tokens.pop();
         }
     }
-    if tokens.last().is_some_and(|last| {
-        DEVICE_QUALIFIERS.contains(&last.as_str()) && (last != "acc" || tokens.len() > 2)
+    let token_count = tokens.len();
+    if let Some(qualifier) = tokens.pop_if(|last| {
+        DEVICE_QUALIFIERS.contains(&last.as_str()) && (last != "acc" || token_count > 2)
     }) {
-        qualifiers.insert(tokens.pop().expect("device qualifier exists"));
+        qualifiers.insert(qualifier);
     }
-    if tokens
-        .last()
-        .is_some_and(|last| OTHER_QUALIFIERS.contains(&last.as_str()))
-    {
-        qualifiers.insert(tokens.pop().expect("calculation qualifier exists"));
+    if let Some(qualifier) = tokens.pop_if(|last| OTHER_QUALIFIERS.contains(&last.as_str())) {
+        qualifiers.insert(qualifier);
     }
     if let Some(number) = tokens.last().and_then(|last| last.parse::<u8>().ok()) {
         if (1..=63).contains(&number) {
@@ -635,7 +633,7 @@ fn declared_speed_unit(name: &str) -> Option<SpeedUnit> {
     } else if tokens
         .windows(2)
         .any(|pair| is_compound_unit_pair(pair[0], pair[1]) && pair[0] == "m")
-        || tokens.iter().any(|token| *token == "mps")
+        || tokens.contains(&"mps")
     {
         Some(SpeedUnit::MetersPerSecond)
     } else {

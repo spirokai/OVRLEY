@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test } from 'vite-plus/test'
 import { applyProjectOwnedState } from '@/features/projects/utils/projectHydration'
 import useStore from '@/store/useStore'
 
@@ -27,6 +27,7 @@ test('project restoration changes only project-owned settings', () => {
       videoTimezoneMode: 'utc',
       manual: { landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
     },
+    laps: { disabled: [] },
     render: {
       renderTarget: 'batch',
       batchVideoFolder: 'C:\\videos',
@@ -86,6 +87,7 @@ test('project hydration rejects landmarks without matching staged video bounds',
         turnThresholdDegrees: 90,
       },
     },
+    laps: { disabled: [] },
     render: {
       renderTarget: 'current',
       batchVideoFolder: null,

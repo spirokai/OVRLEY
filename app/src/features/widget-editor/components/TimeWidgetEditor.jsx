@@ -4,7 +4,7 @@
 
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Label } from '@/components/ui/label'
-import { ELAPSED_TIME_ORIGINS, TIME_WIDGET_MODES } from '@/lib/widget/standard-widgets'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { useTranslation } from 'react-i18next'
 import { FieldBlock, SelectField, TIME_FORMATS, ToggleField } from './widgetFormControls'
 import { translateOptions } from '@/i18n'
@@ -19,7 +19,7 @@ import { FontSection, IconSection } from './widgetEditorSections'
  * @param {*} props.setNumericField - Value for set numeric field.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function TimeWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
+export default function TimeWidgetEditor({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft, setNumericField }) {
   const { t } = useTranslation()
   const isElapsed = widget.data.time_mode === 'elapsed'
 
@@ -35,7 +35,7 @@ export default function TimeWidgetEditor({ widget, updateWidgetData, updateWidge
               if (timeMode) updateWidgetData(widget.id, { time_mode: timeMode })
             }}
           >
-            {TIME_WIDGET_MODES.map((mode) => (
+            {WIDGET_TYPE_DEFINITIONS.time.modes.map((mode) => (
               <ToggleGroupItem key={mode.value} value={mode.value} className="h-7 w-full px-3 text-xs">
                 {t(mode.labelKey, mode.defaultLabel)}
               </ToggleGroupItem>
@@ -54,7 +54,7 @@ export default function TimeWidgetEditor({ widget, updateWidgetData, updateWidge
                   if (elapsedOrigin) updateWidgetData(widget.id, { elapsed_origin: elapsedOrigin })
                 }}
               >
-                {ELAPSED_TIME_ORIGINS.map((origin) => (
+                {WIDGET_TYPE_DEFINITIONS.time.elapsedOrigins.map((origin) => (
                   <ToggleGroupItem key={origin.value} value={origin.value} className="h-7 w-full px-3 text-xs">
                     {t(origin.labelKey, origin.defaultLabel)}
                   </ToggleGroupItem>
@@ -64,7 +64,9 @@ export default function TimeWidgetEditor({ widget, updateWidgetData, updateWidge
 
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center justify-between gap-2 pl-1 pt-2 pb-2">
-                <Label className="pt-1 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.hundredths', 'Hundredths')}</Label>
+                <Label className="pt-1 text-[0.667rem] text-muted-foreground uppercase font-bold">
+                  {t('widget-editor.hundredths', 'Hundredths')}
+                </Label>
                 <ToggleField
                   checked={widget.data.show_hundredths}
                   onCheckedChange={(showHundredths) => updateWidgetData(widget.id, { show_hundredths: showHundredths })}
@@ -84,15 +86,15 @@ export default function TimeWidgetEditor({ widget, updateWidgetData, updateWidge
       <FontSection
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
         showContentAlignment
       />
       <IconSection
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
         setNumericField={setNumericField}
       />
     </>

@@ -7,12 +7,17 @@
   background-color: var(--theme-color-accent) !important;
 }
 
-/* control box points */
+/* Group child borders are also drawn by the screen-space selection renderer. */
+.ovrley-moveable .moveable-line[data-line-key^='render-line-'] {
+  display: none !important;
+}
+
+/* control box points — rem-sized so they scale with the UI */
 .moveable-control {
-  height: calc(10px / var(--app-scale, 1)) !important;
-  width: calc(10px / var(--app-scale, 1)) !important;
-  margin-top: calc(-5px / var(--app-scale, 1)) !important;
-  margin-left: calc(-5px / var(--app-scale, 1)) !important;
+  height: 0.741rem !important;
+  width: 0.741rem !important;
+  margin-top: -0.37rem !important;
+  margin-left: -0.37rem !important;
   border-radius: 0 !important;
 }
 
@@ -21,11 +26,34 @@
   border-color: var(--theme-color-accent) !important;
 }
 
+/* Moveable draws the rotation line 1px wide and scales it by its zoom. Under the scene's CSS zoom that 1px
+   first snaps up to a whole device pixel, so a small scene (large zoom) thickens the line and shifts it off
+   centre. Size the line in zoomed pixels instead of scaling it. */
+.ovrley-moveable .moveable-rotation {
+  width: var(--zoompx) !important;
+}
+
+.ovrley-moveable .moveable-rotation-line {
+  transform: none !important;
+}
+
+/* Margins are half the size, so the circle stays centred on its anchor; Moveable shifts the control 0.5px
+   right for its 1px line, so the left margin centres it on the zoomed line instead. */
+.moveable-control.moveable-rotation-control {
+  height: 1.037rem !important;
+  width: 1.037rem !important;
+  margin-top: -0.519rem !important;
+  margin-left: calc(var(--zoompx) / 2 - 0.519rem - 0.5px) !important;
+  background-color: #fff !important;
+  border: 0.148rem solid var(--theme-color-accent) !important;
+  border-radius: 50% !important;
+}
+
 /* dashed guides */
 .moveable-dashed {
   border-color: var(--theme-color-ice) !important;
 }
 
 .moveable-guideline-group .moveable-size-value {
-  font-size: calc(14px * var(--app-scale, 1)) !important;
+  font-size: 1.037rem !important;
 }

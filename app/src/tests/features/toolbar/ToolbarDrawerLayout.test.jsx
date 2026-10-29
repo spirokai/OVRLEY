@@ -1,5 +1,5 @@
 import { fireEvent, render } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vite-plus/test'
 import { ToolbarDrawerLayout } from '@/features/toolbar'
 
 function renderLayout(overrides = {}) {

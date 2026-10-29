@@ -24,8 +24,7 @@
  */
 
 import { Label } from '@/components/ui/label'
-import { BlurInput } from '@/components/ui/blur-input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { CONTROL_CLASS, FieldBlock, NumberField, SelectField } from '@/features/widget-editor/components/widgetFormControls'
 import { Separator } from '@/components/ui/separator'
 import { Video, Gauge, Bell } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -57,97 +56,62 @@ export default function OverlaySettingsSection({
     <>
       <div className="flex items-center gap-3 mb-2">
         <Video className="h-4 w-4 text-primary" />
-        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('scene-settings.overlay', 'Overlay')}</h4>
+        <h4 className="text-[0.741rem] font-bold text-muted-foreground uppercase tracking-widest">{t('scene-settings.overlay', 'Overlay')}</h4>
         <Separator className="flex-1" />
       </div>
 
       <div className="grid grid-cols-2 gap-4 pt-4">
-        <div className="space-y-2">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.aspectRatio', 'Aspect Ratio')}</Label>
-          <Select value={aspectRatio} onValueChange={onAspectRatioChange}>
-            <SelectTrigger className="h-9 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ASPECT_RATIOS.map((r) => (
-                <SelectItem key={r.id} value={r.id}>
-                  {t(r.labelKey)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.resolution', 'Resolution')}</Label>
-          <Select value={resId} disabled={aspectRatio === 'custom'} onValueChange={onResChange}>
-            <SelectTrigger className="h-9 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(RESOLUTIONS[aspectRatio] || []).map((r) => (
-                <SelectItem key={r.id} value={r.id}>
-                  {t(r.labelKey)}
-                </SelectItem>
-              ))}
-              <SelectItem value="custom">{t('scene-settings.custom', 'Custom')}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <SelectField
+          label={t('scene-settings.aspectRatio', 'Aspect Ratio')}
+          value={aspectRatio}
+          onValueChange={onAspectRatioChange}
+          options={ASPECT_RATIOS.map((r) => ({ value: r.id, label: t(r.labelKey) }))}
+        />
+        <SelectField
+          label={t('scene-settings.resolution', 'Resolution')}
+          value={resId}
+          disabled={aspectRatio === 'custom'}
+          onValueChange={onResChange}
+          options={[
+            ...(RESOLUTIONS[aspectRatio] || []).map((r) => ({ value: r.id, label: t(r.labelKey) })),
+            { value: 'custom', label: t('scene-settings.custom', 'Custom') },
+          ]}
+        />
       </div>
 
       {(aspectRatio === 'custom' || resId === 'custom') && (
         <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-1">
-          <div className="space-y-2">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.width', 'Width')}</Label>
-            <BlurInput type="number" value={scene?.width ?? ''} onChange={(e) => onUpdateScene('width', e.target.value)} className="h-9 text-xs" />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.height', 'Height')}</Label>
-            <BlurInput type="number" value={scene?.height ?? ''} onChange={(e) => onUpdateScene('height', e.target.value)} className="h-9 text-xs" />
-          </div>
+          <NumberField label={t('scene-settings.width', 'Width')} value={scene?.width ?? ''} onChange={(value) => onUpdateScene('width', value)} />
+          <NumberField
+            label={t('scene-settings.height', 'Height')}
+            value={scene?.height ?? ''}
+            onChange={(value) => onUpdateScene('height', value)}
+          />
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.framerate', 'Framerate')}</Label>
-          {importedVideoFps ? (
-            <div className="flex h-9 items-center rounded-sm border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground cursor-not-allowed opacity-50">
+        {importedVideoFps ? (
+          <FieldBlock label={t('scene-settings.framerate', 'Framerate')}>
+            <div className={`${CONTROL_CLASS} flex items-center rounded-sm border px-3 text-muted-foreground cursor-not-allowed opacity-50`}>
               {t('scene-settings.lockedToFps', 'Locked to {{fps}} fps', { fps: Math.round(importedVideoFps) })}
             </div>
-          ) : (
-            <Select value={fpsMode} onValueChange={onFpsModeChange}>
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="24">24 fps</SelectItem>
-                <SelectItem value="30">30 fps</SelectItem>
-                <SelectItem value="60">60 fps</SelectItem>
-                <SelectItem value="custom">{t('scene-settings.custom', 'Custom')}</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+          </FieldBlock>
+        ) : (
+          <SelectField
+            label={t('scene-settings.framerate', 'Framerate')}
+            value={fpsMode}
+            onValueChange={onFpsModeChange}
+            options={[
+              { value: '24', label: '24 fps' },
+              { value: '30', label: '30 fps' },
+              { value: '60', label: '60 fps' },
+              { value: 'custom', label: t('scene-settings.custom', 'Custom') },
+            ]}
+          />
+        )}
         {!importedVideoFps && fpsMode === 'custom' && (
-          <div className="space-y-2 animate-in fade-in slide-in-from-left-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.customFps', 'Custom FPS')}</Label>
-            <BlurInput
-              type="number"
-              min={1}
-              step={1}
-              inputMode="numeric"
-              value={scene?.fps ?? 30}
-              onKeyDown={(event) => {
-                if (['.', ',', 'e', 'E', '+', '-'].includes(event.key)) {
-                  event.preventDefault()
-                }
-              }}
-              onChange={onCustomFpsChange}
-              className="h-9 text-xs"
-            />
-          </div>
+          <NumberField label={t('scene-settings.customFps', 'Custom FPS')} value={scene?.fps ?? 30} min={1} step={1} onChange={onCustomFpsChange} />
         )}
       </div>
 

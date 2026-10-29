@@ -6,9 +6,8 @@
  * in-app editing.
  */
 
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import {
-  applyGlobalDefaults,
   createDurableTemplateState,
   createEditorEffectiveConfig,
   getEffectiveWidgetData,
@@ -26,7 +25,7 @@ describe('normalizeGlobalDefaults', () => {
     const result = normalizeGlobalDefaults({ font_text: 'Custom.ttf' })
 
     expect(result.font_text).toBe('Custom.ttf')
-    expect(result.font_values).toBe('Arial.ttf')
+    expect(result.font_values).toBe(DEFAULT_GLOBAL_DEFAULTS.font_values)
     expect(result.color_text).toBe('#ffffff')
     expect(result.color_values).toBe('#ffffff')
     expect(result.color_icons).toBe('#ffffff')
@@ -52,7 +51,7 @@ describe('normalizeGlobalDefaults', () => {
   test('handles undefined / null input', () => {
     const result = normalizeGlobalDefaults(undefined)
 
-    expect(result.font_text).toBe('Arial.ttf')
+    expect(result.font_text).toBe(DEFAULT_GLOBAL_DEFAULTS.font_text)
     expect(result.opacity).toBe(1)
   })
 
@@ -216,6 +215,20 @@ describe('normalizeTemplateConfig', () => {
     expect(result.plots[0].point_label.font).toBe('ElevFont.ttf')
   })
 
+  test('materializes area_gradient off for elevation plots saved before the field existed and keeps explicit values', () => {
+    const config = {
+      rasters: [],
+      plots: [
+        { id: 'plot-1', value: 'elevation', x: 30, y: 40, point_label: {} },
+        { id: 'plot-2', value: 'elevation', x: 30, y: 40, point_label: {}, area_gradient: true },
+      ],
+    }
+    const result = normalizeTemplateConfig(config, {})
+
+    expect(result.plots[0].area_gradient).toBe(false)
+    expect(result.plots[1].area_gradient).toBe(true)
+  })
+
   test('normalizes heading value widget with display_variants', () => {
     const config = {
       rasters: [],
@@ -303,7 +316,7 @@ describe('createDurableTemplateState', () => {
         composite_video_path: 'C:\\clip.mp4',
       },
       labels: [{ id: 'label-1', text: 'Ride', x: 10, y: 12 }],
-      values: [{ id: 'value-1', value: 'speed', x: 20, y: 22, show_units: true }],
+      values: [{ id: 'value-1', value: 'speed', display_type: 'text', x: 20, y: 22, show_units: true }],
       plots: [{ id: 'plot-1', value: 'elevation', x: 30, y: 32, point_label: {} }],
     }
     const globalDefaults = {
@@ -366,7 +379,7 @@ describe('createEditorEffectiveConfig', () => {
         composite_video_path: 'C:\\clip.mp4',
       },
       labels: [{ id: 'label-1', text: 'Ride', x: 10, y: 12 }],
-      values: [{ id: 'value-1', value: 'speed', x: 20, y: 22, show_units: true }],
+      values: [{ id: 'value-1', value: 'speed', display_type: 'text', x: 20, y: 22, show_units: true }],
       plots: [{ id: 'plot-1', value: 'elevation', x: 30, y: 32, point_label: {} }],
     }
     const globalDefaults = {
@@ -433,6 +446,11 @@ describe('createEditorEffectiveConfig', () => {
     const result = createEditorEffectiveConfig({ config, globalDefaults: { font_values: 'Fallback.ttf' } })
 
     expect(result.values[0].display_variants.heading_tape.label_font).toBe('Teko.ttf')
+    expect(result.values[0].label_font).toBe('Teko.ttf')
+    delete config.values[0].display_variants.heading_tape.label_font
+    expect(createEditorEffectiveConfig({ config, globalDefaults: { font_values: 'Inherited.ttf' } }).values[0].label_font).toBe('Inherited.ttf')
+    config.values[0].display_variants.heading_tape.label_font = ''
+    expect(createEditorEffectiveConfig({ config, globalDefaults: { font_values: 'Inherited.ttf' } }).values[0].label_font).toBe('')
   })
 })
 
@@ -540,7 +558,7 @@ describe('getEffectiveWidgetData', () => {
   })
 
   test('resolves value widget with global font and color defaults', () => {
-    const widget = { id: 'v1', category: 'values', data: { value: 'speed', x: 10, y: 20 } }
+    const widget = { id: 'v1', category: 'values', data: { value: 'speed', display_type: 'text', x: 10, y: 20 } }
     const globals = { font_values: 'ValFont.ttf', color_values: '#445566', color_icons: '#778899' }
     const result = getEffectiveWidgetData(widget, globals)
 
@@ -566,24 +584,5 @@ describe('getEffectiveWidgetData', () => {
 
   test('handles null widget', () => {
     expect(getEffectiveWidgetData(null, {})).toBeNull()
-  })
-})
-
-/* -------------------------------------------------------------------------- */
-/* applyGlobalDefaults (backward-compatible alias)                            */
-/* -------------------------------------------------------------------------- */
-
-describe('applyGlobalDefaults', () => {
-  test('is a backward-compatible alias for createEditorEffectiveConfig', () => {
-    const config = {
-      labels: [{ id: 'l1', text: 'Test' }],
-    }
-    const globalDefaults = { font_text: 'AliasFont.ttf' }
-
-    const fromAlias = applyGlobalDefaults(config, globalDefaults)
-    const fromMain = createEditorEffectiveConfig({ config, globalDefaults })
-
-    expect(fromAlias.labels[0].font).toBe(fromMain.labels[0].font)
-    expect(fromAlias.labels[0].font).toBe('AliasFont.ttf')
   })
 })

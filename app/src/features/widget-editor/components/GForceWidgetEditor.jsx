@@ -29,7 +29,7 @@ function GForceAxisRow({ label, value, onValueChange, onInvertChange, inverted, 
   const { t } = useTranslation()
   return (
     <div className="space-y-2" data-testid={`${label.toLowerCase()}-axis-row`}>
-      <Label className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.labelAxis', '{{label}} axis', { label })}</Label>
+      <Label className="text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.labelAxis', '{{label}} axis', { label })}</Label>
       <div className="grid grid-cols-2 gap-4">
         <Tabs value={value} onValueChange={onValueChange}>
           <TabsList variant="toolbar" aria-label={t('widget-editor.labelAxis', '{{label}} axis', { label })}>
@@ -43,7 +43,7 @@ function GForceAxisRow({ label, value, onValueChange, onInvertChange, inverted, 
           </TabsList>
         </Tabs>
         <div className="flex justify-between items-center gap-2 pl-1">
-          <Label htmlFor={switchId} className="text-[9px] text-muted-foreground uppercase font-bold">
+          <Label htmlFor={switchId} className="text-[0.667rem] text-muted-foreground uppercase font-bold">
             {t('widget-editor.invertSign', 'Invert sign')}
           </Label>
           <Switch id={switchId} checked={inverted} onCheckedChange={onInvertChange} />
@@ -54,7 +54,7 @@ function GForceAxisRow({ label, value, onValueChange, onInvertChange, inverted, 
 }
 
 /** Renders G-force display controls and axis mapping controls. */
-export default function GForceWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function GForceWidgetEditor({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const data = widget.data.display_variants.g_force
   const updateGForce = useDisplayVariantUpdater(widget, 'g_force', updateWidgetData)
@@ -70,8 +70,8 @@ export default function GForceWidgetEditor({ widget, updateWidgetData, updateWid
       <GForceDisplaySection
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
       />
       <div className="space-y-4">
         <SectionHeading icon={CircleGauge} title={t('widget-editor.axisMapping', 'Axis Mapping')} />

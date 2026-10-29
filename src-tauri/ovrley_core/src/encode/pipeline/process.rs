@@ -274,10 +274,7 @@ impl PipelineProcesses {
                 self.shutdown.signal_failure(error);
                 // A polling failure must not leave the stderr reader waiting
                 // on a live child. Retain ownership through forced teardown.
-                match terminate_ffmpeg(&mut self.child, self.pipeline) {
-                    Ok(status) => status,
-                    Err(error) => return Err(error),
-                }
+                terminate_ffmpeg(&mut self.child, self.pipeline)?
             }
         };
         if let Err(error) = join_shutdown_thread(
@@ -443,86 +440,6 @@ fn poll_child_exit(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn writer_io_errors_and_panics_stop_the_pipeline_with_the_original_reason() {
-        struct FailedPipe(bool);
-        impl std::io::Write for FailedPipe {
-            fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
-                assert!(!self.0, "injected writer panic");
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::BrokenPipe,
-                    "injected pipe failure",
-                ))
-            }
-            fn flush(&mut self) -> std::io::Result<()> {
-                Ok(())
-            }
-        }
-        for panic in [false, true] {
-            let channels = super::super::buffers::ParallelFramePoolPlan::for_resources(
-                crate::render::FrameSize {
-                    width: 2,
-                    height: 2,
-                },
-                std::num::NonZeroUsize::new(1).unwrap(),
-                2,
-            )
-            .unwrap()
-            .create_channels();
-            channels
-                .frame_sender
-                .send(FrameBuffer {
-                    pixels: vec![0; 16],
-                })
-                .unwrap();
-            let shutdown = PipelineShutdown::shared(Arc::new(AtomicBool::new(false)));
-            assert!(writer_worker(
-                FailedPipe(panic),
-                channels.frame_receiver,
-                channels.buffers,
-                Arc::clone(&shutdown),
-                PipelineKind::Transparent,
-            )
-            .is_none());
-            assert!(shutdown.is_stopped());
-            let failure = shutdown.failure.lock().unwrap().take().unwrap();
-            assert!(failure.writer);
-            assert!(failure.error.to_string().contains(if panic {
-                "writer thread panicked"
-            } else {
-                "injected pipe failure"
-            }));
-        }
-    }
-
-    #[test]
-    fn polling_and_later_failures_preserve_the_first_failure() {
-        let cancel = Arc::new(AtomicBool::new(false));
-        let shutdown = PipelineShutdown::shared(Arc::clone(&cancel));
-        shutdown.signal_failure(CoreError::Render("original frame failure".into()));
-        for _ in 0..10 {
-            assert!(shutdown.check().is_err());
-        }
-        shutdown.signal_writer_failure(CoreError::Encode("secondary pipe failure".into()));
-        cancel.store(true, Ordering::Relaxed);
-        let failure = shutdown.failure.lock().unwrap().take().unwrap();
-        assert!(!failure.writer);
-        assert!(failure.error.to_string().contains("original frame failure"));
-    }
-
-    #[test]
-    fn cancellation_does_not_become_a_pipe_failure() {
-        let shutdown = PipelineShutdown::shared(Arc::new(AtomicBool::new(true)));
-        shutdown.signal_writer_failure(CoreError::Encode("pipe closed during cancellation".into()));
-        assert!(shutdown.check().is_err());
-        assert!(shutdown.failure.lock().unwrap().is_none());
-    }
-}
-
 /// Result returned by the shared ffmpeg stdin writer thread.
 pub(crate) struct WriterResult {
     /// Number of complete frames written into ffmpeg stdin.
@@ -619,4 +536,85 @@ fn writer_worker_inner(
         written_frames,
         timings: profiler.summary(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn writer_io_errors_and_panics_stop_the_pipeline_with_the_original_reason() {
+        struct FailedPipe(bool);
+        impl std::io::Write for FailedPipe {
+            fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+                assert!(!self.0, "injected writer panic");
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::BrokenPipe,
+                    "injected pipe failure",
+                ))
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        for panic in [false, true] {
+            let channels = super::super::buffers::ParallelFramePoolPlan::for_resources(
+                crate::render::FrameSize {
+                    width: 2,
+                    height: 2,
+                },
+                crate::encode::overlay_format::OverlayPixelFormat::Rgba,
+                std::num::NonZeroUsize::new(1).unwrap(),
+                2,
+            )
+            .unwrap()
+            .create_channels();
+            channels
+                .frame_sender
+                .send(FrameBuffer {
+                    pixels: vec![0; 16],
+                })
+                .unwrap();
+            let shutdown = PipelineShutdown::shared(Arc::new(AtomicBool::new(false)));
+            assert!(writer_worker(
+                FailedPipe(panic),
+                channels.frame_receiver,
+                channels.buffers,
+                Arc::clone(&shutdown),
+                PipelineKind::Transparent,
+            )
+            .is_none());
+            assert!(shutdown.is_stopped());
+            let failure = shutdown.failure.lock().unwrap().take().unwrap();
+            assert!(failure.writer);
+            assert!(failure.error.to_string().contains(if panic {
+                "writer thread panicked"
+            } else {
+                "injected pipe failure"
+            }));
+        }
+    }
+
+    #[test]
+    fn polling_and_later_failures_preserve_the_first_failure() {
+        let cancel = Arc::new(AtomicBool::new(false));
+        let shutdown = PipelineShutdown::shared(Arc::clone(&cancel));
+        shutdown.signal_failure(CoreError::Render("original frame failure".into()));
+        for _ in 0..10 {
+            assert!(shutdown.check().is_err());
+        }
+        shutdown.signal_writer_failure(CoreError::Encode("secondary pipe failure".into()));
+        cancel.store(true, Ordering::Relaxed);
+        let failure = shutdown.failure.lock().unwrap().take().unwrap();
+        assert!(!failure.writer);
+        assert!(failure.error.to_string().contains("original frame failure"));
+    }
+
+    #[test]
+    fn cancellation_does_not_become_a_pipe_failure() {
+        let shutdown = PipelineShutdown::shared(Arc::new(AtomicBool::new(true)));
+        shutdown.signal_writer_failure(CoreError::Encode("pipe closed during cancellation".into()));
+        assert!(shutdown.check().is_err());
+        assert!(shutdown.failure.lock().unwrap().is_none());
+    }
 }

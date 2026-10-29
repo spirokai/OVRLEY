@@ -1,6 +1,6 @@
 /**
  * App bootstrap - one-time initialization effects on mount.
- * Hydrates platform OS info and fetches templates and available codecs.
+ * Hydrates platform OS info and fetches templates/codecs.
  *
  * Template fetching uses the dedicated useTemplateFetching orchestration hook
  * instead of calling a store action that performs network I/O directly.
@@ -13,7 +13,7 @@ import useTemplateFetching from '@/features/template-manager/hooks/useTemplateFe
 
 /**
  * Container hook for app-level bootstrap effects.
- * Runs on mount to detect the platform OS and preload templates/codecs.
+ * Runs on mount to preload platform/editor resources.
  *
  * @returns {void}
  */

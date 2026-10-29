@@ -845,8 +845,8 @@ pnpm release          # semantic-release
 
 ```
 pnpm install
-    ├── postinstall: scripts/install-ffmpeg.mjs downloads FFmpeg 8.1+ to vendor/ffmpeg/
-    └── pnpm --filter app install
+    ├── Installs root and app/ dependencies using the shared root pnpm-lock.yaml
+    └── postinstall: scripts/install-ffmpeg.mjs downloads FFmpeg 8.1+ to vendor/ffmpeg/
 
 pnpm tauri build
     ├── Vite builds app/ → app/dist/

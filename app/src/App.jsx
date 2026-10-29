@@ -61,7 +61,7 @@ function useRightClickDevtools() {
  * Renders the main application shell.
  * @returns {JSX.Element} Rendered component output.
  */
-function AppShell() {
+function App() {
   const { t, i18n } = useTranslation()
   useRightClickDevtools()
 
@@ -75,6 +75,7 @@ function AppShell() {
     layout,
     projectLifecycle,
     renderWorkflow,
+    startupReady,
     templateManagement,
     undoRedoControls,
     videoControls,
@@ -112,10 +113,12 @@ function AppShell() {
       drawerContent = (
         <ActivityDrawerContent
           activitySummary={activityImport.activitySummary}
+          disabledLaps={activityImport.disabledLaps}
           filename={activityImport.activityFilename}
           onBrowseActivity={activityImport.handleActivityFileOpen}
           onDeleteActivity={activityImport.deleteActivity}
           onDropActivityFiles={activityImport.handleActivityFilesDrop}
+          onLapEnabledChange={activityImport.setLapEnabled}
         />
       )
     } else if (toolbarDrawer.activeTool === VIDEO_TOOL) {
@@ -135,21 +138,16 @@ function AppShell() {
     }
   }
 
-  if (!toolbarDrawer.initialized) {
+  if (!toolbarDrawer.initialized || !startupReady) {
     return (
-      <div className="relative h-screen w-full bg-background text-foreground">
+      <div className="fixed inset-0 bg-background text-foreground" role="status">
         <LoadingOverlay show label={t('app.ovrleyIsStarting', 'OVRLEY is starting...')} />
       </div>
     )
   }
 
   return (
-    <div
-      className="app-shell"
-      style={{
-        '--app-scale': `${editorShell.uiScale}`,
-      }}
-    >
+    <div className="app-shell">
       <div className="relative flex h-full flex-col bg-background text-foreground">
         <ErrorAlert />
         <StartupProjectsDialog {...projectLifecycle.startupProjectDialog} open={projectLifecycle.startupProjectDialog.open && !appUpdate.open} />
@@ -239,7 +237,7 @@ function AppShell() {
           controlPanel={
             videoSyncWorkspace.videoSyncMode ? null : (
               <div
-                className="w-106 min-w-106 max-w-106 shrink-0 overflow-y-auto border-l border-border bg-card/60 backdrop-blur-sm"
+                className="w-106 min-w-106 max-w-106 shrink-0 overflow-y-auto bg-card/60"
                 onFocusCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
                 onPointerDownCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
               >
@@ -251,14 +249,6 @@ function AppShell() {
       </div>
     </div>
   )
-}
-
-/**
- * Renders the top-level application shell.
- * @returns {JSX.Element} Rendered component output.
- */
-function App() {
-  return <AppShell />
 }
 
 export default App

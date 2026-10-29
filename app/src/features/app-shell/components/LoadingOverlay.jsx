@@ -37,7 +37,7 @@ export default function LoadingOverlay({ label = i18next.t('app-shell.loadingEdi
   }
 
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-overlay/95">
+    <div className="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/95">
       <div className="flex flex-col items-center gap-2">
         <Spinner className="h-8 w-8" />
         <span className="text-sm text-muted-foreground">{label}</span>

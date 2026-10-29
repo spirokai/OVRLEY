@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vite-plus/test'
 import { VideoSyncLandmarkList } from '@/features/video-sync/components/VideoSyncLandmarkList'
 import { VideoSyncMarkControls } from '@/features/video-sync/components/VideoSyncMarkControls'
 import { buildVideoSyncDrawerPresentation } from '@/features/video-sync/utils/videoSyncPresentation'

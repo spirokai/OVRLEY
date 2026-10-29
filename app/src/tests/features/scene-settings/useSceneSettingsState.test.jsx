@@ -7,8 +7,9 @@
  */
 
 import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import useSceneSettingsState from '@/features/scene-settings/hooks/useSceneSettingsState'
+import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
@@ -43,9 +44,12 @@ describe('useSceneSettingsState', () => {
     const onConfigChange = vi.fn()
     const initialConfig = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
-    const { result, rerender } = renderHook(({ config }) => useSceneSettingsState({ config, onConfigChange }), {
-      initialProps: { config: initialConfig },
-    })
+    const { result, rerender } = renderHook(
+      ({ config }) => useSceneSettingsState({ config, onConfigChange, widgetLiveEdits: useWidgetDraftState() }),
+      {
+        initialProps: { config: initialConfig },
+      },
+    )
 
     act(() => {
       result.current.handlers.handleResolutionChange('custom')
@@ -81,9 +85,12 @@ describe('useSceneSettingsState', () => {
     const onConfigChange = vi.fn()
     const initialConfig = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
-    const { result, rerender } = renderHook(({ config }) => useSceneSettingsState({ config, onConfigChange }), {
-      initialProps: { config: initialConfig },
-    })
+    const { result, rerender } = renderHook(
+      ({ config }) => useSceneSettingsState({ config, onConfigChange, widgetLiveEdits: useWidgetDraftState() }),
+      {
+        initialProps: { config: initialConfig },
+      },
+    )
 
     act(() => {
       result.current.handlers.handleResolutionChange('custom')
@@ -106,7 +113,7 @@ describe('sceneStyleValue', () => {
     const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene, font_size: 42 } }
 
-    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange }))
+    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange, widgetLiveEdits: useWidgetDraftState() }))
 
     expect(result.current.globalSettings.sceneStyleValue('font_size', 30)).toBe(42)
   })
@@ -118,7 +125,7 @@ describe('sceneStyleValue', () => {
     const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
-    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange }))
+    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange, widgetLiveEdits: useWidgetDraftState() }))
 
     expect(result.current.globalSettings.sceneStyleValue('undefined_key', 'fallback')).toBe('fallback')
   })
@@ -131,7 +138,7 @@ describe('handleAspectRatioChange', () => {
     })
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
-    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange: vi.fn() }))
+    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange: vi.fn(), widgetLiveEdits: useWidgetDraftState() }))
 
     act(() => {
       result.current.handlers.handleAspectRatioChange('4:3')
@@ -149,7 +156,7 @@ describe('handleAspectRatioChange', () => {
     })
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
-    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange: vi.fn() }))
+    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange: vi.fn(), widgetLiveEdits: useWidgetDraftState() }))
 
     const initialWidth = useStore.getState().config.scene.width
     const initialHeight = useStore.getState().config.scene.height
@@ -171,7 +178,7 @@ describe('handleFpsModeChange', () => {
     })
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
-    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange: vi.fn() }))
+    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange: vi.fn(), widgetLiveEdits: useWidgetDraftState() }))
 
     act(() => {
       result.current.handlers.handleFpsModeChange('60')
@@ -187,7 +194,7 @@ describe('handleFpsModeChange', () => {
     const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene, fps: 30 } }
 
-    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange }))
+    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange, widgetLiveEdits: useWidgetDraftState() }))
 
     act(() => {
       result.current.handlers.handleFpsModeChange('custom')

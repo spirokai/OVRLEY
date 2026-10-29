@@ -2,17 +2,16 @@
  * Provides reusable color picker UI primitives for the application.
  */
 
-/* eslint-disable react-hooks/preserve-manual-memoization */
+/* oxlint-disable react/preserve-manual-memoization */
 
 'use client'
 import { cva } from 'class-variance-authority'
 import { PipetteIcon } from 'lucide-react'
 import { Direction as DirectionPrimitive, Slider as SliderPrimitive, Slot as SlotPrimitive } from 'radix-ui'
 import * as React from 'react'
-import { useComposedRefs } from '@/lib/compose-refs'
+import { useComposedRefs, useAsRef, useIsomorphicLayoutEffect, useLazyRef } from '@/hooks/useRefs'
 import { cn } from '@/lib/utils'
 import { VisuallyHiddenInput } from '@/components/ui/visually-hidden-input'
-import { useAsRef, useIsomorphicLayoutEffect, useLazyRef } from '@/lib/compose-refs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'

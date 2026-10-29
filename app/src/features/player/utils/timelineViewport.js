@@ -5,7 +5,6 @@
 import { clamp } from '@/lib/utils'
 import { formatClockDuration } from '@/lib/time-format'
 import { getTimelineMinimum } from './playerTiming'
-import { secondsToViewPx } from './timelineGeometry'
 import i18next from 'i18next'
 
 const VIEWPORT_MATCH_EPSILON_SECONDS = 0.001
@@ -16,6 +15,7 @@ const FIT_PADDING_RATIO = 0.04
 const TICK_TARGET_PX = 90
 const MAX_ZOOM_MAJOR_STEP_SECONDS = 2
 const FOLLOW_EDGE_PADDING_RATIO = 0.15
+const MINOR_TICKS_PER_STEP = 5
 const NICE_STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1200, 1500, 1800, 3600]
 
 function getTimelineBounds(timelineMinimum, totalDuration) {
@@ -243,41 +243,36 @@ function formatTickLabel(second, step) {
 }
 
 /**
- * Computes major and minor ticks for the timeline axis.
+ * Picks the smallest major tick step that keeps labels at least TICK_TARGET_PX apart.
  *
- * @param {{ viewStart: number, viewEnd: number, widthPx: number }} options
- * @returns {{ major: Array<{ second: number, x: number, label: string }>, minor: Array<{ second: number, x: number }> }}
+ * @param {number} pxPerSecond Positive timeline scale.
+ * @returns {number} Major tick step in seconds.
  */
-export function computeTimelineTicks({ viewStart, viewEnd, widthPx }) {
-  const span = viewEnd - viewStart
-  if (span <= 0 || widthPx <= 0) return { major: [], minor: [] }
-
-  const pxPerSecond = widthPx / span
+export function getTimelineTickStep(pxPerSecond) {
   const targetStep = TICK_TARGET_PX / pxPerSecond
+  return NICE_STEPS.find((candidate) => candidate >= targetStep) ?? NICE_STEPS[NICE_STEPS.length - 1]
+}
 
-  let step = NICE_STEPS[NICE_STEPS.length - 1]
-  for (const candidate of NICE_STEPS) {
-    if (candidate >= targetStep) {
-      step = candidate
-      break
+/**
+ * Computes major and minor ticks for a strip that starts at a major tick and covers the viewport width plus one major step.
+ * The strip stays unchanged while the viewport pans within one step, so playback follow only has to translate it.
+ *
+ * @param {{ anchorSecond: number, step: number, pxPerSecond: number, widthPx: number }} options
+ * @returns {{ major: Array<{ second: number, x: number, label: string }>, minor: Array<{ second: number, x: number }> }} X offsets from the anchor.
+ */
+export function computeTimelineTickStrip({ anchorSecond, step, pxPerSecond, widthPx }) {
+  const stepPx = step * pxPerSecond
+  const majorCount = Math.ceil(widthPx / stepPx) + 1
+  const major = []
+  const minor = []
+  for (let index = 0; index <= majorCount; index++) {
+    const second = anchorSecond + index * step
+    major.push({ second, x: index * stepPx, label: formatTickLabel(second, step) })
+    if (index === majorCount) break
+    for (let minorIndex = 1; minorIndex < MINOR_TICKS_PER_STEP; minorIndex++) {
+      const offset = (minorIndex * step) / MINOR_TICKS_PER_STEP
+      minor.push({ second: second + offset, x: (index * step + offset) * pxPerSecond })
     }
   }
-
-  const minorStep = step / 5
-  const firstMajor = Math.ceil(viewStart / step) * step
-  const firstMinor = Math.ceil(viewStart / minorStep) * minorStep
-
-  const major = []
-  for (let second = firstMajor; second <= viewEnd; second += step) {
-    const x = clamp(secondsToViewPx({ second, viewStart, viewEnd, widthPx }), 0, widthPx)
-    major.push({ second, x, label: formatTickLabel(second, step) })
-  }
-
-  const minor = []
-  for (let second = firstMinor; second <= viewEnd; second += minorStep) {
-    const x = clamp(secondsToViewPx({ second, viewStart, viewEnd, widthPx }), 0, widthPx)
-    minor.push({ second, x })
-  }
-
   return { major, minor }
 }

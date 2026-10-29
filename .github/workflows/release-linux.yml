@@ -7,9 +7,19 @@ permissions:
   contents: write
 
 jobs:
+  wasm:
+    name: WASM bindings
+    uses: ./.github/workflows/workflow_wasm.yml
+    with:
+      ref: ''
+
   build:
+    needs: wasm
     name: Build Debian package
     runs-on: ubuntu-latest
+    env:
+      # Cargo's built-in git client is slow at cloning the rust-skia submodules.
+      CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
 
     steps:
       - name: Checkout
@@ -75,6 +85,19 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: deb
+          workspaces: 'src-tauri -> target'
+
+      # After the Cargo cache restore: rust-cache prunes unknown target/ entries on a partial cache hit.
+      - name: Download WASM bindings
+        uses: actions/download-artifact@v7
+        with:
+          name: ovrley-wasm-bindings
+          path: src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -100,6 +123,7 @@ jobs:
         run: pnpm tauri build --bundles deb
         env:
           VITE_OVRLEY_VERSION: ${{ steps.release_tag.outputs.tag }}
+          OVRLEY_WASM_PREBUILT: '1'
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 

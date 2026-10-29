@@ -4,10 +4,8 @@ use common::builders::empty_dense_series;
 use ovrley_core::activity::parse_activity_json;
 use ovrley_core::activity::schema::DenseActivityReport;
 use ovrley_core::commands::validate_config_value;
-use ovrley_core::normalize::LapTimerMode;
-use ovrley_core::render::widgets::{
-    lap_log_text_state, lap_timer_value_text, types::PreparedValue,
-};
+use ovrley_widgets::widgets::lap_timer::validation::LapTimerMode;
+use ovrley_widgets::widgets::{lap_timer::format::{lap_log_text_state, lap_timer_value_text}, value::validation::ValidatedValue};
 use serde_json::json;
 
 fn lap_activity() -> DenseActivityReport {
@@ -34,21 +32,21 @@ fn renderer_text_covers_no_reference_zero_and_signed_deltas() {
     let mut activity = lap_activity();
 
     assert_eq!(
-        lap_timer_value_text(LapTimerMode::Delta, &activity, 0).unwrap(),
+        lap_timer_value_text(LapTimerMode::Delta, activity.lap_history(), activity.lap_sample(0)).unwrap(),
         "+0.00"
     );
     assert_eq!(
-        lap_timer_value_text(LapTimerMode::Delta, &activity, 2).unwrap(),
+        lap_timer_value_text(LapTimerMode::Delta, activity.lap_history(), activity.lap_sample(2)).unwrap(),
         "+0.00"
     );
     assert_eq!(
-        lap_timer_value_text(LapTimerMode::Delta, &activity, 3).unwrap(),
+        lap_timer_value_text(LapTimerMode::Delta, activity.lap_history(), activity.lap_sample(3)).unwrap(),
         "-0.25"
     );
 
     activity.series.delta_to_best_lap_seconds[3] = Some(0.75);
     assert_eq!(
-        lap_timer_value_text(LapTimerMode::Delta, &activity, 3).unwrap(),
+        lap_timer_value_text(LapTimerMode::Delta, activity.lap_history(), activity.lap_sample(3)).unwrap(),
         "+0.75"
     );
 }
@@ -74,23 +72,24 @@ fn delta_config_uses_its_canonical_mode_colors_and_data_requirement() {
             "show_label": true,
             "label": "Delta",
             "positive_delta_color": "#00ff00",
-            "negative_delta_color": "#ff0000"
+            "negative_delta_color": "#ff0000",
+            "renumber_laps": true
         }],
         "plots": []
     }));
 
-    let PreparedValue::LapTimer(widget) = &config.values[0] else {
+    let ValidatedValue::LapTimer(widget) = &config.values[0] else {
         panic!("expected a validated lap timer");
     };
-    assert_eq!(widget.validated.mode, LapTimerMode::Delta);
-    assert_eq!(widget.validated.label, "Delta");
-    assert_eq!(widget.validated.label_font_name, "Teko.ttf");
-    assert_eq!(widget.validated.label_font_size, 24.0);
-    assert_eq!(widget.validated.label_color, [18, 52, 86, 255]);
-    assert_eq!(widget.validated.positive_delta_color, [0, 255, 0, 255]);
-    assert_eq!(widget.validated.negative_delta_color, [255, 0, 0, 255]);
+    assert_eq!(widget.mode, LapTimerMode::Delta);
+    assert_eq!(widget.label, "Delta");
+    assert_eq!(widget.label_font_name, "Teko.ttf");
+    assert_eq!(widget.label_font_size, 24.0);
+    assert_eq!(widget.label_color, [18, 52, 86, 255]);
+    assert_eq!(widget.positive_delta_color, [0, 255, 0, 255]);
+    assert_eq!(widget.negative_delta_color, [255, 0, 0, 255]);
 
-    let requirements = config.render_data_requirements().unwrap();
+    let requirements = config.render_data_requirements();
     assert!(requirements.delta_to_best_lap_seconds);
     assert!(!requirements.lap_number);
     assert!(!requirements.lap_time_seconds);
@@ -117,7 +116,8 @@ fn lap_timer_label_typography_is_a_strict_ingress_contract() {
             "label_font_size": 24.0,
             "label_color": "#123456",
             "positive_delta_color": "#00ff00",
-            "negative_delta_color": "#ff0000"
+            "negative_delta_color": "#ff0000",
+            "renumber_laps": true
         }],
         "plots": []
     });
@@ -155,23 +155,23 @@ fn renderer_text_covers_out_lap_first_lap_boundary_and_later_best() {
     let activity = lap_activity();
 
     assert_eq!(
-        lap_timer_value_text(LapTimerMode::CurrentLap, &activity, 0).unwrap(),
+        lap_timer_value_text(LapTimerMode::CurrentLap, activity.lap_history(), activity.lap_sample(0)).unwrap(),
         "--:--.--"
     );
     assert_eq!(
-        lap_timer_value_text(LapTimerMode::BestLap, &activity, 1).unwrap(),
+        lap_timer_value_text(LapTimerMode::BestLap, activity.lap_history(), activity.lap_sample(1)).unwrap(),
         "00:00.50"
     );
     assert_eq!(
-        lap_timer_value_text(LapTimerMode::CurrentLap, &activity, 2).unwrap(),
+        lap_timer_value_text(LapTimerMode::CurrentLap, activity.lap_history(), activity.lap_sample(2)).unwrap(),
         "00:00.00"
     );
     assert_eq!(
-        lap_timer_value_text(LapTimerMode::BestLap, &activity, 2).unwrap(),
+        lap_timer_value_text(LapTimerMode::BestLap, activity.lap_history(), activity.lap_sample(2)).unwrap(),
         "00:04.00"
     );
     assert_eq!(
-        lap_timer_value_text(LapTimerMode::BestLap, &activity, 3).unwrap(),
+        lap_timer_value_text(LapTimerMode::BestLap, activity.lap_history(), activity.lap_sample(3)).unwrap(),
         "00:03.00"
     );
 }
@@ -186,11 +186,11 @@ fn renderer_text_uses_pretrim_best_history_for_a_scene_starting_mid_lap() {
     activity.series.lap_start_elapsed_seconds = vec![-8.0, -4.0, -1.0];
 
     assert_eq!(
-        lap_timer_value_text(LapTimerMode::CurrentLap, &activity, 0).unwrap(),
+        lap_timer_value_text(LapTimerMode::CurrentLap, activity.lap_history(), activity.lap_sample(0)).unwrap(),
         "00:01.00"
     );
     assert_eq!(
-        lap_timer_value_text(LapTimerMode::BestLap, &activity, 0).unwrap(),
+        lap_timer_value_text(LapTimerMode::BestLap, activity.lap_history(), activity.lap_sample(0)).unwrap(),
         "00:03.00"
     );
 }
@@ -205,7 +205,7 @@ fn renderer_text_uses_pretrim_delta_reference_for_a_scene_starting_mid_lap() {
     activity.series.delta_to_best_lap_seconds = vec![Some(-0.42)];
 
     assert_eq!(
-        lap_timer_value_text(LapTimerMode::Delta, &activity, 0).unwrap(),
+        lap_timer_value_text(LapTimerMode::Delta, activity.lap_history(), activity.lap_sample(0)).unwrap(),
         "-0.42"
     );
 }
@@ -214,17 +214,17 @@ fn renderer_text_uses_pretrim_delta_reference_for_a_scene_starting_mid_lap() {
 fn renderer_lap_log_rebases_completed_rows_without_changing_live_delta() {
     let mut activity = lap_activity();
 
-    let out_lap = lap_log_text_state(&activity, 0).unwrap();
+    let out_lap = lap_log_text_state(activity.lap_history(), activity.lap_sample(0), true).unwrap();
     assert!(out_lap.completed_rows.is_empty());
     assert_eq!(out_lap.current_row, None);
 
-    let first_lap = lap_log_text_state(&activity, 1).unwrap();
+    let first_lap = lap_log_text_state(activity.lap_history(), activity.lap_sample(1), true).unwrap();
     assert!(first_lap.completed_rows.is_empty());
     let first_lap_current = first_lap.current_row.unwrap();
     assert_eq!(first_lap_current.cells, ["1", "00:00.50", "+0.00"]);
     assert_eq!(first_lap_current.delta_seconds, None);
 
-    let after_two_completions = lap_log_text_state(&activity, 3).unwrap();
+    let after_two_completions = lap_log_text_state(activity.lap_history(), activity.lap_sample(3), true).unwrap();
     assert_eq!(
         after_two_completions
             .completed_rows
@@ -250,7 +250,7 @@ fn renderer_lap_log_rebases_completed_rows_without_changing_live_delta() {
 
     activity.series.lap_number[3] = Some(-1);
     activity.series.lap_time_seconds[3] = None;
-    let returned_to_out_lap = lap_log_text_state(&activity, 3).unwrap();
+    let returned_to_out_lap = lap_log_text_state(activity.lap_history(), activity.lap_sample(3), true).unwrap();
     assert_eq!(returned_to_out_lap.completed_rows.len(), 2);
     assert_eq!(returned_to_out_lap.current_row, None);
 }
@@ -265,11 +265,11 @@ fn renderer_lap_log_keeps_original_lap_numbers_when_scene_starts_mid_lap() {
     activity.series.delta_to_best_lap_seconds = vec![Some(-0.5), Some(0.0)];
     activity.series.lap_start_elapsed_seconds = vec![-4.5, -0.5, 1.0];
 
-    let scene_start = lap_log_text_state(&activity, 0).unwrap();
+    let scene_start = lap_log_text_state(activity.lap_history(), activity.lap_sample(0), true).unwrap();
     assert_eq!(scene_start.completed_rows[0].cells[0], "1");
     assert_eq!(scene_start.current_row.unwrap().cells[0], "2");
 
-    let completion_inside_scene = lap_log_text_state(&activity, 1).unwrap();
+    let completion_inside_scene = lap_log_text_state(activity.lap_history(), activity.lap_sample(1), true).unwrap();
     assert_eq!(completion_inside_scene.completed_rows[0].cells[0], "2");
     assert_eq!(completion_inside_scene.current_row.unwrap().cells[0], "3");
 }
@@ -295,18 +295,19 @@ fn lap_log_config_requests_all_canonical_lap_series() {
             "show_label": true,
             "label": "Lap Times",
             "positive_delta_color": "#00ff00",
-            "negative_delta_color": "#ff0000"
+            "negative_delta_color": "#ff0000",
+            "renumber_laps": true
         }],
         "plots": []
     }));
 
-    let PreparedValue::LapTimer(widget) = &config.values[0] else {
+    let ValidatedValue::LapTimer(widget) = &config.values[0] else {
         panic!("expected a validated lap timer");
     };
-    assert_eq!(widget.validated.mode, LapTimerMode::LapLog);
-    assert_eq!(widget.validated.label, "Lap Times");
+    assert_eq!(widget.mode, LapTimerMode::LapLog);
+    assert_eq!(widget.label, "Lap Times");
 
-    let requirements = config.render_data_requirements().unwrap();
+    let requirements = config.render_data_requirements();
     assert!(requirements.lap_number);
     assert!(requirements.lap_time_seconds);
     assert!(requirements.delta_to_best_lap_seconds);
@@ -318,7 +319,7 @@ fn renderer_text_uses_canonical_aligned_lap_time() {
     activity.series.lap_time_seconds[2] = Some(12.34);
 
     assert_eq!(
-        lap_timer_value_text(LapTimerMode::CurrentLap, &activity, 2).unwrap(),
+        lap_timer_value_text(LapTimerMode::CurrentLap, activity.lap_history(), activity.lap_sample(2)).unwrap(),
         "00:12.34"
     );
 }
@@ -332,8 +333,8 @@ fn activity_ingress_rejects_an_active_lap_without_canonical_time() {
             "lap_number": [0, 0],
             "lap_time_seconds": [null, 1.0],
             "lap_start_elapsed_seconds": [0.0],
-            "lap_durations_seconds": [],
-            "lap_durations_best_so_far_seconds": []
+            "lap_durations_seconds": [1.0],
+            "lap_durations_best_so_far_seconds": [1.0]
         }"#,
     )
     .unwrap_err();
@@ -354,8 +355,8 @@ fn activity_ingress_accepts_canonical_lap_timing() {
             "delta_to_best_lap_seconds": [null, null, null],
             "lap_start_elapsed_seconds": [0.0, 4.0],
             "best_lap_time_seconds": 4.0,
-            "lap_durations_seconds": [4.0],
-            "lap_durations_best_so_far_seconds": [4.0]
+            "lap_durations_seconds": [4.0, 0.0],
+            "lap_durations_best_so_far_seconds": [4.0, 0.0]
         }"#,
     )
     .unwrap();

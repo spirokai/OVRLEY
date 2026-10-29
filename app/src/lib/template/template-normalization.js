@@ -22,46 +22,15 @@
  */
 
 import { normalizeColorFields } from '@/lib/color-utils'
+import { pickDefined } from '@/lib/utils'
+import { WIDGET_TYPE_DEFINITIONS, DISPLAY_TYPE_DEFINITIONS, requireDisplayMode } from '@/lib/widget/widget-catalog'
 import { ensureWidgetIdsInConfig } from '../widget/widget-config'
 import { initDisplayVariant } from '../widget/widget-resolver'
-import {
-  COURSE_PLOT_KEYS,
-  BACKDROP_SHARED_KEYS,
-  BACKDROP_VARIANT_KEYS,
-  DEFAULT_GLOBAL_DEFAULTS,
-  DISPLAY_VARIANT_KEYS,
-  ELEVATION_PLOT_KEYS,
-  LAP_TIMER_KEYS,
-  LABEL_KEYS,
-  RASTER_KEYS,
-  SCENE_DURABLE_KEYS,
-  SCENE_RENDER_TIME_ONLY_KEYS,
-  VALUE_SHARED_KEYS,
-} from './template-constants'
-import {
-  TYPE_DEFAULTS,
-  TEXT_DEFAULTS,
-  COURSE_PLOT_DEFAULTS,
-  ELEVATION_PLOT_DEFAULTS,
-  GRADIENT_DEFAULTS,
-  LAP_TIMER_DEFAULTS,
-  LAP_TIMER_MODES,
-  ELAPSED_TIME_ORIGINS,
-  TIME_WIDGET_MODES,
-} from '../widget/standard-widgets'
+import { DEFAULT_GLOBAL_DEFAULTS, SCENE_DURABLE_KEYS, SCENE_RENDER_TIME_ONLY_KEYS } from './template-constants'
 
 function cloneSerializable(value) {
   if (value === undefined) return undefined
   return structuredClone(value)
-}
-
-function pickDefined(source, keys) {
-  const result = {}
-  if (!source) return result
-  for (const key of keys) {
-    if (source[key] !== undefined) result[key] = source[key]
-  }
-  return result
 }
 
 /**
@@ -120,27 +89,30 @@ function normalizeScene(scene = {}) {
 }
 
 function normalizeLabel(label = {}) {
-  const pickedLabel = pickDefined(label, LABEL_KEYS)
+  const pickedLabel = pickDefined(label, WIDGET_TYPE_DEFINITIONS.label.configKeys)
   return normalizeColorFields(pickedLabel)
 }
 
-function normalizeBackdropVariants(variants) {
-  if (!variants || typeof variants !== 'object') return undefined
+function normalizeVariants(variants, definitions) {
+  if (variants === undefined) return {}
+  if (variants === null || typeof variants !== 'object' || Array.isArray(variants)) throw new Error('Display variants must be an object')
   const normalized = {}
   for (const [displayType, variantConfig] of Object.entries(variants)) {
-    if (!variantConfig || typeof variantConfig !== 'object') continue
-    const allowedKeys = BACKDROP_VARIANT_KEYS[displayType]
-    if (!allowedKeys) continue
-    normalized[displayType] = normalizeColorFields(pickDefined(variantConfig, allowedKeys))
+    const definition = definitions[displayType]
+    if (!definition) throw new Error(`Unknown display variant: ${displayType}`)
+    if (variantConfig === null || typeof variantConfig !== 'object' || Array.isArray(variantConfig))
+      throw new Error(`Invalid display variant: ${displayType}`)
+    if (definition.variantKeys.length === 0) continue
+    normalized[displayType] = normalizeColorFields(pickDefined(variantConfig, definition.variantKeys))
   }
-  return Object.keys(normalized).length > 0 ? normalized : undefined
+  return normalized
 }
 
 function normalizeBackdrop(backdrop = {}) {
-  const pickedBackdrop = normalizeColorFields(pickDefined(backdrop, BACKDROP_SHARED_KEYS))
+  const pickedBackdrop = normalizeColorFields(pickDefined(backdrop, WIDGET_TYPE_DEFINITIONS.backdrop.configKeys))
   const displayType = pickedBackdrop.display_type
-  const allowedVariantKeys = BACKDROP_VARIANT_KEYS[displayType]
-  const normalizedVariants = normalizeBackdropVariants(backdrop.display_variants) || {}
+  const allowedVariantKeys = DISPLAY_TYPE_DEFINITIONS[displayType].variantKeys
+  const normalizedVariants = normalizeVariants(backdrop.display_variants, DISPLAY_TYPE_DEFINITIONS)
 
   if (allowedVariantKeys) {
     const promotedVariant = pickDefined(backdrop, allowedVariantKeys)
@@ -152,37 +124,23 @@ function normalizeBackdrop(backdrop = {}) {
     }
   }
 
-  if (Object.keys(normalizedVariants).length > 0) {
-    pickedBackdrop.display_variants = normalizedVariants
-  }
-
-  return pickedBackdrop
+  pickedBackdrop.display_variants = normalizedVariants
+  return initDisplayVariant(pickedBackdrop, displayType)
 }
 
-function normalizeDisplayVariants(variants) {
-  if (!variants || typeof variants !== 'object') return undefined
-  const normalized = {}
-  for (const [displayType, variantConfig] of Object.entries(variants)) {
-    if (!variantConfig || typeof variantConfig !== 'object') continue
-    const allowedKeys = DISPLAY_VARIANT_KEYS[displayType]
-    if (!allowedKeys) continue
-    normalized[displayType] = normalizeColorFields(pickDefined(variantConfig, allowedKeys))
+function validateDisplayGeometry(value) {
+  const displayType = value.display_type === undefined ? WIDGET_TYPE_DEFINITIONS[value.value].defaults.display_type : value.display_type
+  const definition = DISPLAY_TYPE_DEFINITIONS[displayType]
+  const variant = value.display_variants?.[displayType]
+  for (const field of definition.forbiddenFrameFields) {
+    if (Object.hasOwn(value, field) || (variant !== undefined && Object.hasOwn(variant, field))) {
+      throw new Error(
+        `${displayType} does not accept ${definition.forbiddenFrameFields.join(' or ')}; use ${definition.requiredPositiveFields.join(', ')}`,
+      )
+    }
   }
-  return Object.keys(normalized).length > 0 ? normalized : undefined
-}
-
-function normalizeLeanAngleGeometry(value) {
-  if (value.display_type !== 'lean_angle') return
-
-  const variant = value.display_variants?.lean_angle
-  if (Object.hasOwn(value, 'width') || Object.hasOwn(value, 'height')) {
-    throw new Error('lean_angle does not accept width or height; use diameter')
-  }
-  if (!variant || !Number.isFinite(variant.diameter) || variant.diameter <= 0) {
-    throw new Error('lean_angle diameter must be a positive finite number')
-  }
-  if (Object.hasOwn(variant, 'width') || Object.hasOwn(variant, 'height')) {
-    throw new Error('lean_angle does not accept width or height; use diameter')
+  for (const field of definition.requiredPositiveFields) {
+    if (!Number.isFinite(variant?.[field]) || variant[field] <= 0) throw new Error(`${displayType} ${field} must be a positive finite number`)
   }
 }
 
@@ -203,48 +161,51 @@ function normalizeLinearGaugeLabelPosition(variant) {
 
 function normalizeValue(value = {}, globalDefaults) {
   const type = value.value
-  if (!Object.hasOwn(TYPE_DEFAULTS, type)) {
+  if (WIDGET_TYPE_DEFINITIONS[type]?.collection !== 'values') {
     throw new Error(`Unknown value widget type: ${String(type)}`)
   }
 
-  normalizeLeanAngleGeometry(value)
-  const valueDefaults = type === 'gradient' ? GRADIENT_DEFAULTS : TYPE_DEFAULTS[type] || {}
-  const extraKeys = Object.keys(valueDefaults).filter((key) => !VALUE_SHARED_KEYS.includes(key))
-  const keys = [...VALUE_SHARED_KEYS, ...extraKeys, ...(type === 'lap_timer' ? LAP_TIMER_KEYS : [])]
-  const lapTimerDefaults = type === 'lap_timer' ? LAP_TIMER_DEFAULTS : {}
-  const withDefaults = { ...TEXT_DEFAULTS, ...TYPE_DEFAULTS[type], ...lapTimerDefaults, ...value }
+  validateDisplayGeometry(value)
+  const withDefaults = { ...WIDGET_TYPE_DEFINITIONS[type].defaults, ...value }
   if (type === 'time') {
-    if (!TIME_WIDGET_MODES.some((mode) => mode.value === withDefaults.time_mode)) {
+    if (!WIDGET_TYPE_DEFINITIONS.time.modes.some((mode) => mode.value === withDefaults.time_mode)) {
       throw new Error(`Invalid time_mode: ${String(withDefaults.time_mode)}`)
     }
-    if (!ELAPSED_TIME_ORIGINS.some((origin) => origin.value === withDefaults.elapsed_origin)) {
+    if (!WIDGET_TYPE_DEFINITIONS.time.elapsedOrigins.some((origin) => origin.value === withDefaults.elapsed_origin)) {
       throw new Error(`Invalid elapsed_origin: ${String(withDefaults.elapsed_origin)}`)
     }
     if (typeof withDefaults.show_hundredths !== 'boolean') {
       throw new Error(`Invalid show_hundredths: ${String(withDefaults.show_hundredths)}`)
     }
   }
-  const supportsContentAlignment = withDefaults.display_type === 'text' && type !== 'gradient' && type !== 'lap_timer'
+  const supportsContentAlignment = WIDGET_TYPE_DEFINITIONS[type].contentAlignment
   if (supportsContentAlignment && !['left', 'center', 'right'].includes(withDefaults.content_alignment)) {
     throw new Error(`Invalid content_alignment: ${String(withDefaults.content_alignment)}`)
   }
   if (type === 'lap_timer') {
-    const mode = LAP_TIMER_MODES.find((candidate) => candidate.value === value.lap_timer_mode)
-    if (value.label_font === undefined) withDefaults.label_font = globalDefaults?.font_text || LAP_TIMER_DEFAULTS.label_font
-    if (value.label_font_size === undefined && mode) withDefaults.label_font_size = mode.label_font_size
-    if (value.label_color === undefined) withDefaults.label_color = globalDefaults?.color_text || LAP_TIMER_DEFAULTS.label_color
+    const mode = requireDisplayMode(withDefaults.display_type, value.lap_timer_mode)
+    if (value.label_font_size === undefined) withDefaults.label_font_size = mode.defaults.label_font_size
+    if (typeof withDefaults.renumber_laps !== 'boolean') {
+      throw new Error(`Invalid renumber_laps: ${String(withDefaults.renumber_laps)}`)
+    }
   }
-  const pickedValue = pickDefined(withDefaults, keys)
+  if (type === 'lap_timer' || type === 'splits_run') {
+    const display = DISPLAY_TYPE_DEFINITIONS[withDefaults.display_type]
+    if (value.label_font === undefined) withDefaults.label_font = globalDefaults?.font_text || display.defaults.label_font
+    if (value.label_color === undefined) withDefaults.label_color = globalDefaults?.color_text || display.defaults.label_color
+  }
+  const pickedValue = pickDefined(withDefaults, WIDGET_TYPE_DEFINITIONS[type].configKeys)
   if (!supportsContentAlignment) delete pickedValue.content_alignment
   if (typeof pickedValue.display_unit !== 'string') {
     delete pickedValue.display_unit
   }
-  if (pickedValue.display_type && pickedValue.display_type !== 'text') {
+  if (pickedValue.display_variants !== undefined)
+    pickedValue.display_variants = normalizeVariants(pickedValue.display_variants, DISPLAY_TYPE_DEFINITIONS)
+  if (DISPLAY_TYPE_DEFINITIONS[pickedValue.display_type].layoutMode === 'boxed') {
     const initializedValue = initDisplayVariant(pickedValue, pickedValue.display_type)
     if (initializedValue.display_variants) pickedValue.display_variants = initializedValue.display_variants
   }
   if (pickedValue.display_variants) {
-    pickedValue.display_variants = normalizeDisplayVariants(pickedValue.display_variants)
     if (pickedValue.display_variants?.linear) {
       pickedValue.display_variants.linear = normalizeLinearGaugeLabelPosition(pickedValue.display_variants.linear)
     }
@@ -266,14 +227,12 @@ function normalizePointLabel(pointLabel, config, globalDefaults) {
 
 function normalizePlot(plot = {}, config, globalDefaults) {
   const type = plot.value
-  const plotBase = type === 'course' ? COURSE_PLOT_DEFAULTS : ELEVATION_PLOT_DEFAULTS
-  const withDefaults = { ...plotBase, ...plot }
-  if (type === 'elevation') {
+  if (WIDGET_TYPE_DEFINITIONS[type]?.collection !== 'plots') throw new Error(`Unknown plot widget type: ${type}`)
+  const withDefaults = { ...WIDGET_TYPE_DEFINITIONS[type].defaults, ...plot }
+  if (type === 'elevation' || type === 'diving_profile') {
     withDefaults.point_label = normalizePointLabel(plot.point_label, config, globalDefaults)
   }
-  let keys = COURSE_PLOT_KEYS
-  if (type === 'elevation') keys = ELEVATION_PLOT_KEYS
-  const pickedPlot = pickDefined(withDefaults, keys)
+  const pickedPlot = pickDefined(withDefaults, WIDGET_TYPE_DEFINITIONS[type].configKeys)
   return normalizeColorFields(pickedPlot)
 }
 
@@ -293,8 +252,8 @@ export function normalizeTemplateConfig(config, globalDefaults) {
   if (Array.isArray(nextConfig.backdrops)) {
     for (const backdrop of nextConfig.backdrops) normalizedConfig.backdrops.push(normalizeBackdrop(backdrop))
   }
-  for (const raster of config.rasters) {
-    const normalizedRaster = pickDefined(raster, RASTER_KEYS)
+  for (const raster of nextConfig.rasters) {
+    const normalizedRaster = pickDefined(raster, WIDGET_TYPE_DEFINITIONS.raster.configKeys)
     normalizedConfig.rasters.push(normalizedRaster)
   }
   if (Array.isArray(nextConfig.labels)) {
@@ -308,24 +267,3 @@ export function normalizeTemplateConfig(config, globalDefaults) {
   }
   return normalizedConfig
 }
-
-/**
- * Applies temporary preview-only overrides to already-effective widget data.
- *
- * @param {object} data - Effective widget data.
- * @param {object|null} previewOverrides - Ephemeral preview overrides.
- * @returns {object} Widget data including preview overrides.
- */
-export function applyPreviewOverrides(data, previewOverrides) {
-  if (!previewOverrides) return data
-  return { ...data, ...previewOverrides }
-}
-
-/**
- * Copies only explicitly defined keys from a record.
- *
- * @param {object|null|undefined} source - Source record.
- * @param {string[]} keys - Keys to preserve when defined.
- * @returns {object} Picked object without undefined entries.
- */
-export { pickDefined }

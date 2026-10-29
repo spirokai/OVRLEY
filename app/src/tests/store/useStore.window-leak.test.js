@@ -2,7 +2,7 @@
  * Characterizes the dev-mode window leak from the zustand store.
  * After refactoring, only __OVRLEY_STORE__ should remain.
  */
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vite-plus/test'
 
 describe('useStore window exposure', () => {
   test('exposes exactly one store reference on window in dev mode', async () => {

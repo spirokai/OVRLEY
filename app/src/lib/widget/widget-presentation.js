@@ -1,27 +1,7 @@
-/**
- * @file widget-presentation – Labels, builds, and groups widgets for rendering.
- *
- * These functions are purely concerned with how widgets are displayed in the
- * sidebar (widget drawer, widget editor sidebar tabs). They do NOT mutate
- * config — that responsibility lives in the sibling module widget-config.js.
- *
- * What this module owns:
- * - buildConfigWidgets      flattens config categories into a uniform widget list
- * - groupWidgetsForSidebar  groups and sorts widgets for sidebar display
- * - getWidgetTypeName       translates canonical widget names
- * - getActivityAttributeLabel labels activity attributes, including those without widgets
- *
- * What widget-config.js owns:
- * - Widget CRUD (ensureWidgetIdsInConfig, findWidgetInConfig, updateWidgetInConfig,
- *   updateWidgetsInConfig, replaceWidgetInConfig, deleteWidgetInConfig,
- *   deleteWidgetsInConfig)
- *
- * @module widget-presentation
- */
+/** Prepare widget lists, translated names, sidebar order, and activity-derived placeholders. */
 
-import { ensureWidgetIdsInConfig } from './widget-config'
-import { convertAltitudeValue, getElevationProfileSeries, getFirstAltitudeValue, getPreferredElevationSeries } from './altitude'
-import { WIDGET_TYPE_DEFINITIONS, requireWidgetTypeDefinition } from './standard-widgets'
+import { convertAltitudeValue, getStartingAltitude } from './altitude'
+import { WIDGET_COLLECTIONS, WIDGET_TYPE_DEFINITIONS, requireWidgetTypeDefinition } from './widget-catalog'
 
 /**
  * Returns a translated activity attribute label, including attributes without a widget definition.
@@ -52,32 +32,22 @@ export function getWidgetTypeName(type, translate) {
 
 /**
  * Flattens the config's backdrop/label/value/plot arrays into a uniform widget list
- * with consistent { id, type, category, index, name, data } entries.
+ * with consistent { id, type, category, name, data } entries.
  *
  * @param {*} config - Overlay template configuration data.
  * @returns {object[]} Uniform widget array for editor consumption.
  */
 export function buildConfigWidgets(config) {
-  if (!config) return []
-
-  const normalizedConfig = ensureWidgetIdsInConfig(config)
+  if (config === null) return []
   const widgets = []
 
-  ;(normalizedConfig.backdrops || []).forEach((item, index) => {
-    widgets.push({ id: item.id, type: 'backdrop', category: 'backdrops', index, name: 'Backdrop', data: item })
-  })
-  ;(normalizedConfig.rasters || []).forEach((item, index) => {
-    widgets.push({ id: item.id, type: 'raster', category: 'rasters', index, name: 'Raster', data: item })
-  })
-  ;(normalizedConfig.labels || []).forEach((item, index) => {
-    widgets.push({ id: item.id, type: 'label', category: 'labels', index, name: item.text || 'Text', data: item })
-  })
-  ;(normalizedConfig.values || []).forEach((item, index) => {
-    widgets.push({ id: item.id, type: item.value, category: 'values', index, name: item.value, data: item })
-  })
-  ;(normalizedConfig.plots || []).forEach((item, index) => {
-    widgets.push({ id: item.id, type: item.value, category: 'plots', index, name: item.value, data: item })
-  })
+  for (const [category, collection] of Object.entries(WIDGET_COLLECTIONS)) {
+    for (const data of config[category]) {
+      const type = collection.type ?? data[collection.typeField]
+      const definition = requireWidgetTypeDefinition(type)
+      widgets.push({ id: data.id, type, category, name: definition.nameField === null ? type : data[definition.nameField], data })
+    }
+  }
 
   return widgets
 }
@@ -89,47 +59,37 @@ export function buildConfigWidgets(config) {
  * @returns {object}
  */
 export function withAltitudeEditorPresentation(widget, activity) {
-  if (!['altitude', 'elevation'].includes(widget.type) || (widget.data.starting_altitude !== null && widget.data.starting_altitude !== undefined)) {
+  const source = WIDGET_TYPE_DEFINITIONS[widget.type].altitudeSource
+  if (source === null || (widget.data.starting_altitude !== null && widget.data.starting_altitude !== undefined)) {
     return widget
   }
 
-  const series = widget.type === 'altitude' ? getPreferredElevationSeries(activity) : getElevationProfileSeries(activity)
-  const firstValue = getFirstAltitudeValue(series ?? [])
+  const firstValue = getStartingAltitude(activity, source)
   if (firstValue === null) return widget
 
-  const unit = widget.type === 'altitude' ? widget.data.display_unit : widget.data.starting_altitude_unit
-  return { ...widget, startingAltitudePlaceholder: Math.round(convertAltitudeValue(firstValue, 'm', unit)) }
+  return { ...widget, startingAltitudePlaceholder: Math.round(convertAltitudeValue(firstValue, 'm', widget.data[source.unitField])) }
 }
 
 /**
- * Groups widgets by type name (using typeLabels lookup) and sorts
- * groups alphabetically. The first widget in each group gets a groupLabel;
- * subsequent widgets in the same group get null.
+ * Groups and names sidebar widgets, preserving label text and sorting groups alphabetically.
  *
  * @param {object[]} widgets - Uniform widget list from buildConfigWidgets.
  * @param {(type: string) => string} getTypeName - Resolves a configured widget type to its display name.
- * @returns {object[]} Widgets with groupLabel annotations.
+ * @returns {object[]} Named widgets in sidebar order.
  */
 export function groupWidgetsForSidebar(widgets, getTypeName) {
-  const grouped = widgets.reduce((accumulator, widget) => {
+  const grouped = {}
+  for (const widget of widgets) {
     const typeName = getTypeName(widget.type)
-    if (!accumulator[typeName]) accumulator[typeName] = []
-    accumulator[typeName].push({ ...widget, name: widget.type === 'label' ? widget.name : typeName })
-    return accumulator
-  }, {})
-
-  const sortTypeNames = (left, right) => {
-    if (left === 'Backdrop') return -1
-    if (right === 'Backdrop') return 1
-    return left.localeCompare(right)
+    const definition = requireWidgetTypeDefinition(widget.type)
+    if (!grouped[widget.type]) grouped[widget.type] = { name: typeName, priority: definition.sidebarPriority, widgets: [] }
+    grouped[widget.type].widgets.push({ ...widget, name: definition.nameField === null ? typeName : widget.name })
   }
+  const sorted = []
+  for (const group of Object.values(grouped).sort(sortWidgetGroups)) sorted.push(...group.widgets)
+  return sorted
+}
 
-  return Object.keys(grouped)
-    .sort(sortTypeNames)
-    .flatMap((typeName) =>
-      grouped[typeName].map((widget, widgetIndex) => ({
-        ...widget,
-        groupLabel: widgetIndex === 0 ? typeName : null,
-      })),
-    )
+function sortWidgetGroups(left, right) {
+  return left.priority - right.priority || left.name.localeCompare(right.name)
 }

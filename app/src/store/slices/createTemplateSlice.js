@@ -11,6 +11,7 @@ import { normalizeColorFields, isColorFieldKey } from '../../lib/color-utils'
 import { DEFAULT_GLOBAL_DEFAULTS } from '../../lib/template/template-constants'
 import { syncGlobalDefaultsToConfig } from '../../lib/template/template-state'
 import { normalizeGlobalDefaults } from '../../lib/template/template-normalization'
+import { scaleWidgetPositions } from '../../lib/widget/widget-config'
 import { cloneSerializable, DEFAULT_CONFIG, syncSceneTimingFromConfig, updateConfigPersistence } from '../store-utils'
 
 const initialGlobalDefaults = { ...DEFAULT_GLOBAL_DEFAULTS }
@@ -41,13 +42,19 @@ export function createTemplateSlice(set, get) {
         state.lastSavedTemplateState = templateState
       }),
 
-    setGlobalDefault: (key, value, labelFont) => {
+    setGlobalDefault: (key, value, labelFont, scaleOrigin) => {
+      if (key === 'scale' && (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)) {
+        throw new Error('globalDefaults.scale must be a finite positive number')
+      }
       const nextDefaults = normalizeGlobalDefaults({
         ...get().globalDefaults,
         [key]: isColorFieldKey(key) ? normalizeColorFields({ [key]: value })[key] : value,
       })
 
       set((state) => {
+        if (key === 'scale' && state.config) {
+          state.config = scaleWidgetPositions(state.config, nextDefaults.scale / state.globalDefaults.scale, scaleOrigin)
+        }
         state.globalDefaults = nextDefaults
 
         if (state.config) {
@@ -86,8 +93,11 @@ export function createTemplateSlice(set, get) {
       })
     },
 
-    resetGlobalDefaults: (labelFont) => {
+    resetGlobalDefaults: (labelFont, scaleOrigin) => {
       set((state) => {
+        if (state.config) {
+          state.config = scaleWidgetPositions(state.config, DEFAULT_GLOBAL_DEFAULTS.scale / state.globalDefaults.scale, scaleOrigin)
+        }
         state.globalDefaults = { ...DEFAULT_GLOBAL_DEFAULTS }
 
         if (state.config) {

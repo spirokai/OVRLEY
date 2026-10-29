@@ -13,8 +13,7 @@
 //! - Unknown metric strings silently mapping to a default variant
 //! - Variant name refactors breaking frontend communication
 
-use ovrley_core::MetricKind;
-use serde_json;
+use ovrley_widgets::model::types::MetricKind;
 
 #[test]
 fn metric_kind_round_trip_all_variants() {

@@ -10,7 +10,7 @@
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { SCENE_PRESENTATION_KEYS } from '@/lib/template/template-constants'
 import { clamp } from '@/lib/utils'
-import { videoOverlapsActivity } from '@/lib/video-timing'
+import { videoOverlapsActivity } from '@/lib/video-sync'
 import { isMp4Codec, isQsvFullCodec } from './codecUtils'
 
 function reduceFps(num, den) {
@@ -42,11 +42,7 @@ function resolveCompositeFps(fpsNum, fpsDen, fps) {
 }
 
 function renderValues(values) {
-  return values.map(({ display_variants: _displayVariants, ...value }) => {
-    if (value.display_type !== 'lean_angle') return value
-    const { width: _width, height: _height, ...renderValue } = value
-    return renderValue
-  })
+  return values.map(({ display_variants: _displayVariants, ...value }) => value)
 }
 
 /**
@@ -54,10 +50,11 @@ function renderValues(values) {
  * source/encoding fields. Each native video plan owns its dimensions and clock.
  * @param {object} config Committed template configuration.
  * @param {object} globalDefaults Captured global presentation defaults.
+ * @param {string} language App language that names chart legends.
  * @returns {object} Canonical shared batch template.
  */
-export function createBatchRenderTemplate(config, globalDefaults) {
-  const effective = createEditorEffectiveConfig({ config, globalDefaults })
+export function createBatchRenderTemplate(config, globalDefaults, language) {
+  const effective = createEditorEffectiveConfig({ config, globalDefaults, language })
   // Editor-effective scenes also contain widget defaults. Project only the
   // native ScenePresentationConfig fields; widgets are already materialized.
   const scene = Object.fromEntries(SCENE_PRESENTATION_KEYS.map((key) => [key, effective.scene[key]]))
@@ -239,19 +236,34 @@ function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
  * @param {string|null} options.importedVideoPath - Imported-video path, if any.
  * @param {number} options.timelineStart - Active editor timeline start second.
  * @param {number} options.timelineEnd - Active editor timeline end second.
+ * @param {number[]} options.disabledLaps - Activity lap IDs excluded from lap widgets.
  * @param {number} options.fps - Validated overlay FPS.
  * @param {number} options.widgetUpdateRate - Validated widget update-rate divisor.
+ * @param {string} options.language - App language that names chart legends.
  * @returns {object} Render-effective config.
  */
 export function createRenderEffectiveConfig(options) {
-  const { availableCodecs, config, codec, exportMode, range, globalDefaults, importedVideoPath, timelineStart, timelineEnd, widgetUpdateRate, fps } =
-    options
+  const {
+    availableCodecs,
+    config,
+    codec,
+    exportMode,
+    range,
+    globalDefaults,
+    importedVideoPath,
+    disabledLaps,
+    timelineStart,
+    timelineEnd,
+    widgetUpdateRate,
+    fps,
+    language,
+  } = options
 
   if (!config?.scene) {
     throw new Error('No valid config available')
   }
 
-  const nextConfig = createEditorEffectiveConfig({ config, globalDefaults })
+  const nextConfig = createEditorEffectiveConfig({ config, globalDefaults, language })
   const scene = {
     ...nextConfig.scene,
   }
@@ -278,6 +290,7 @@ export function createRenderEffectiveConfig(options) {
   }
 
   applyTimelineSceneFields(scene, timelineStart, timelineEnd)
+  scene.disabled_laps = disabledLaps
   applyCodecDefaults(scene, codec)
   applyCustomExportRange(scene, range, shouldComposite ? importedVideoPath : null)
   if (shouldComposite) {

@@ -7,7 +7,9 @@ import ActivitySection from './ActivitySection'
 import ActionButtons from './ActionButtons'
 import TemplateSection from './TemplateSection'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { isInteractiveElement } from '@/lib/utils'
+import { isInteractiveElement } from '@/lib/keyboard-shortcuts'
+import { cn } from '@/lib/utils'
+import useTrafficLightInset from '../hooks/useTrafficLightInset'
 
 /**
  * Renders the app header component.
@@ -37,6 +39,7 @@ export default function AppHeader({
 }) {
   const rawAppVersion = import.meta.env.VITE_OVRLEY_VERSION?.trim() || '0.00.0'
   const appVersion = rawAppVersion.startsWith('v') ? rawAppVersion : `v${rawAppVersion}`
+  const reserveTrafficLightInset = useTrafficLightInset()
 
   const handleHeaderMouseDown = (event) => {
     if (event.button !== 0 || event.defaultPrevented || isInteractiveElement(event.target)) {
@@ -53,8 +56,14 @@ export default function AppHeader({
   }
 
   return (
-    <header className="relative z-50 shrink-0 select-none border-b border-border bg-card backdrop-blur-sm" onMouseDown={handleHeaderMouseDown}>
-      <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-x-6 pb-3 pl-6 pr-1 pt-3">
+    <header className="relative z-50 shrink-0 select-none border-b border-border bg-card" onMouseDown={handleHeaderMouseDown}>
+      <div
+        className={cn(
+          'grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-x-6 pb-3 pr-1 pt-3',
+          // Clears the macOS traffic lights, which the overlay title bar draws at x=20.
+          reserveTrafficLightInset ? 'pl-28' : 'pl-6',
+        )}
+      >
         <ActivitySection
           appVersion={appVersion}
           onImportActivity={activityImport.handleActivityFileOpen}

@@ -11,7 +11,6 @@
 mod common;
 
 use ovrley_core::activity::schema::DenseActivityReport;
-use ovrley_core::render::format::format_validated_metric_parts;
 use serde_json::json;
 
 fn config_json(values_json: &str) -> ovrley_core::normalize::ValidatedRenderConfig {
@@ -112,14 +111,9 @@ fn format_parts_for_activity(
     let config = config_json(&format!("[{}]", vc_json));
     let validated =
         common::seam::expect_standard_value(config.values.into_iter().next().unwrap(), 0);
-    let parts = format_validated_metric_parts(&validated, &report, 0);
-    match parts {
-        Some(p) => {
-            let (value_text, unit_text) = p.standard_text();
-            (value_text.to_string(), unit_text.map(str::to_string))
-        }
-        None => ("--".to_string(), None),
-    }
+    let parts = ovrley_widgets::widgets::value::format::format_metric_parts(&validated, &report.metric_sample(validated.metric, 0, 0.0));
+    let (value_text, unit_text) = parts.standard_text();
+    (value_text.to_string(), unit_text.map(str::to_string))
 }
 
 #[test]
@@ -303,7 +297,7 @@ fn vertical_speed_formats_as_mps() {
 }
 
 #[test]
-fn vertical_speed_converts_to_ftmin() {
+fn vertical_speed_converts_to_ftmin_and_ftps() {
     let (value, unit) = format_parts(
         "vertical_speed",
         "vertical_speed",
@@ -316,6 +310,18 @@ fn vertical_speed_converts_to_ftmin() {
     );
     assert_eq!(value, "196.9");
     assert_eq!(unit, Some("FT/MIN".to_string()));
+    let (value, unit) = format_parts(
+        "vertical_speed",
+        "vertical_speed",
+        Some(2.0),
+        &[
+            ("display_unit", r#""ftps""#),
+            ("decimals", "1"),
+            ("show_units", "true"),
+        ],
+    );
+    assert_eq!(value, "6.6");
+    assert_eq!(unit, Some("FT/S".to_string()));
 }
 
 #[test]
@@ -506,14 +512,14 @@ fn balance_formats_l_suffix() {
 }
 
 #[test]
-fn balance_preserves_gap_as_zero_when_series_is_available() {
+fn balance_displays_gap_as_neutral_when_series_is_available() {
     let (value, _) = format_parts(
         "left_right_balance",
         "left_right_balance",
         None,
         &[("display_unit", r#""percent""#)],
     );
-    assert_eq!(value, "0/100");
+    assert_eq!(value, "50/50");
 }
 
 // ── New camera metric formatting ──────────────────────────────────────────

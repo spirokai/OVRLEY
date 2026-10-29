@@ -1,29 +1,20 @@
-import { convertStandardMetricValue } from './standard-metrics'
+import { ALTITUDE_UNIT_SCALES, WIDGET_TYPE_DEFINITIONS } from './widget-catalog'
 
 /**
  * @param {object|null} activity
- * @returns {Array<unknown>|undefined}
+ * @param {object} source Manifest altitude source policy.
+ * @returns {number|null} First activity altitude in canonical meters.
  */
-export function getPreferredElevationSeries(activity) {
-  const barometricSeries = activity?.barometric_altitude
-  if (Array.isArray(barometricSeries) && barometricSeries.some((value) => value !== null && value !== undefined)) return barometricSeries
-  return activity?.elevation
-}
-
-/**
- * @param {object|null} activity
- * @returns {Array<unknown>|undefined}
- */
-export function getElevationProfileSeries(activity) {
-  return activity?.sample_elevations?.length ? activity.sample_elevations : activity?.elevation
-}
-
-/**
- * @param {Array<unknown>} series
- * @returns {*|null}
- */
-export function getFirstAltitudeValue(series) {
-  return series.find((value) => value !== null && value !== undefined) ?? null
+export function getStartingAltitude(activity, source) {
+  for (const { field, requireValue } of source.series) {
+    const series = activity?.[field]
+    if (!Array.isArray(series) || series.length === 0) continue
+    for (const value of series) {
+      if (value !== null && value !== undefined) return value
+    }
+    if (!requireValue) return null
+  }
+  return null
 }
 
 /**
@@ -34,9 +25,7 @@ export function getFirstAltitudeValue(series) {
  */
 export function convertAltitudeValue(value, fromUnit, toUnit) {
   if (fromUnit === toUnit) return value
-  const fromScale = convertStandardMetricValue('altitude', 1, fromUnit)
-  const toScale = convertStandardMetricValue('altitude', 1, toUnit)
-  return (value / fromScale) * toScale
+  return (value / ALTITUDE_UNIT_SCALES[fromUnit]) * ALTITUDE_UNIT_SCALES[toUnit]
 }
 
 /**
@@ -58,32 +47,9 @@ export function convertAltitudeInputValue(value, fromUnit, toUnit) {
  * @returns {object}
  */
 export function buildMetricUnitUpdate(metricType, startingAltitude, currentUnit, nextUnit) {
-  if (metricType !== 'altitude') return { display_unit: nextUnit }
+  if (WIDGET_TYPE_DEFINITIONS[metricType].altitudeSource === null) return { display_unit: nextUnit }
   return {
     display_unit: nextUnit,
     starting_altitude: convertAltitudeInputValue(startingAltitude, currentUnit, nextUnit),
   }
-}
-
-/**
- * @param {Array<unknown>} series
- * @param {number|null} startingAltitude
- * @param {string} unit
- * @returns {number}
- */
-export function getAltitudeCorrectionMeters(series, startingAltitude, unit) {
-  if (startingAltitude === null || startingAltitude === undefined || startingAltitude === '') return 0
-  const firstValue = getFirstAltitudeValue(series)
-  if (firstValue === null) return 0
-  return convertAltitudeValue(startingAltitude, unit, 'm') - firstValue
-}
-
-/**
- * @param {number|null|undefined} value
- * @param {number} offset
- * @returns {number|null|undefined}
- */
-export function applyAltitudeOffset(value, offset) {
-  if (value === null || value === undefined) return value
-  return value + offset
 }

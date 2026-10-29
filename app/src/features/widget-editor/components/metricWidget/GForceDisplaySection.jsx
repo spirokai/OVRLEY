@@ -2,40 +2,42 @@ import { useMemo } from 'react'
 import { CircleGauge, Type } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import { SectionHeading } from '@/components/ui/section-heading'
-import { buildUniformResizeUpdate } from '@/features/overlay-editor/utils/widgetResizeScaling'
+import { buildUniformResizeUpdate } from '../../utils/widgetSize'
 import { useAvailableFonts } from '@/hooks/useFonts'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
-import { ColorField, SizeSlider, SliderField } from '../widgetFormControls'
+import { ColorField, SliderField } from '../widgetFormControls'
 import { useTranslation } from 'react-i18next'
 
 /** Standard controls for G-force geometry, paint, marker, and label styling. */
-export default function GForceDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function GForceDisplaySection({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const data = useMemo(() => widget.data.display_variants.g_force, [widget.data.display_variants.g_force])
   const updateGForce = useDisplayVariantUpdater(widget, 'g_force', updateWidgetData)
-  const updateGForceSize = useDisplayVariantUpdater(widget, 'g_force', updateWidgetSize)
+  const updateGForceDraft = useDisplayVariantUpdater(widget, 'g_force', updateWidgetDraft)
   const availableFonts = useAvailableFonts()
   const borderMax = Math.min(Math.floor((data.diameter - 1) / 2), 8)
 
   const handleDiameterChange = (diameter) => {
     const frameSize = data.width * (diameter / data.diameter)
     const update = buildUniformResizeUpdate(widget, frameSize)
-    if (update) updateWidgetSize(widget.id, update)
+    updateWidgetDraft(widget.id, update)
   }
 
   return (
     <>
       <div className="space-y-4">
         <SectionHeading icon={CircleGauge} title={t('widget-editor.gforcePlot', 'G-Force Plot')} />
-        <SizeSlider
+        <SliderField
+          editable
+          integerDisplay
           label={t('widget-editor.size', 'Size')}
           value={data.diameter}
           min={20}
           max={600}
           valueDisplay={`${data.diameter}`}
           suffix="px"
-          onChange={handleDiameterChange}
-          onCommit={() => commitWidgetSize(widget.id)}
+          onSliderChange={handleDiameterChange}
+          onSliderCommit={() => commitWidgetDraft(widget.id)}
         />
         <div className="grid grid-cols-2 gap-4">
           <ColorField
@@ -53,7 +55,8 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             valueScale={100}
             valueDisplay={`${Math.round(data.fill_opacity * 100)}`}
             suffix="%"
-            onSliderChange={(fill_opacity) => updateGForce({ fill_opacity })}
+            onSliderChange={(fill_opacity) => updateGForceDraft({ fill_opacity })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -71,8 +74,8 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             integerDisplay
             valueDisplay={`${data.border_thickness}`}
             suffix="px"
-            onSliderChange={(border_thickness) => updateGForceSize({ border_thickness })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(border_thickness) => updateGForceDraft({ border_thickness })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -81,15 +84,17 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             value={data.marker_color}
             onChange={(marker_color) => updateGForce({ marker_color })}
           />
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.markerSize', 'Marker Size')}
             value={data.marker_size}
             min={2}
             max={48}
             valueDisplay={`${data.marker_size}`}
             suffix="px"
-            onChange={(marker_size) => updateGForceSize({ marker_size })}
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(marker_size) => updateGForceDraft({ marker_size })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -103,7 +108,8 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             valueScale={100}
             valueDisplay={`${Math.round(data.marker_opacity * 100)}`}
             suffix="%"
-            onSliderChange={(marker_opacity) => updateGForce({ marker_opacity })}
+            onSliderChange={(marker_opacity) => updateGForceDraft({ marker_opacity })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -115,7 +121,8 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             valueScale={100}
             valueDisplay={`${Math.round(data.border_opacity * 100)}`}
             suffix="%"
-            onSliderChange={(border_opacity) => updateGForce({ border_opacity })}
+            onSliderChange={(border_opacity) => updateGForceDraft({ border_opacity })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
       </div>
@@ -130,17 +137,19 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             recommendedFonts={availableFonts.recommendedFonts}
             systemFonts={availableFonts.systemFonts}
             triggerClassName="h-9 border-border/70 bg-surface text-xs"
-            labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
+            labelClassName="text-[0.667rem] text-muted-foreground uppercase font-bold"
           />
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.fontSize', 'Font Size')}
             value={data.label_font_size}
             min={6}
             max={100}
             valueDisplay={`${data.label_font_size}`}
             suffix="px"
-            onChange={(label_font_size) => updateGForceSize({ label_font_size })}
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(label_font_size) => updateGForceDraft({ label_font_size })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -165,8 +174,8 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             integerDisplay
             valueDisplay={`${data.label_offset_x}`}
             suffix="px"
-            onSliderChange={(label_offset_x) => updateGForceSize({ label_offset_x })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(label_offset_x) => updateGForceDraft({ label_offset_x })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -177,8 +186,8 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             integerDisplay
             valueDisplay={`${data.label_offset_y}`}
             suffix="px"
-            onSliderChange={(label_offset_y) => updateGForceSize({ label_offset_y })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(label_offset_y) => updateGForceDraft({ label_offset_y })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
       </div>

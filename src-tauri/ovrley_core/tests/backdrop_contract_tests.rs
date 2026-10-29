@@ -1,84 +1,9 @@
 mod common;
 
-use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::commands::validate_config_value;
-use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::parse_config_value;
-use ovrley_core::paths::AppPaths;
-use ovrley_core::render::{prepare_preview_assets, LabelCacheStatus, StaticLayer};
-use ovrley_core::standard_widgets::{
-    backdrop_type_definition, backdrop_type_label, default_backdrop_display_types,
-    gradient_widget_definition, is_backdrop_type_supported, label_widget_definition,
-    plot_widget_definition,
-};
-use ovrley_core::BackdropType;
+use ovrley_widgets::model::types::BackdropType;
 use serde_json::json;
-
-#[test]
-fn standard_widgets_manifest_exposes_legacy_sections_through_definitions() {
-    let course = plot_widget_definition("course").expect("course plot definition");
-    assert_eq!(course.defaults["value"], "course");
-    assert_eq!(course.defaults["width"], 400);
-
-    let elevation = plot_widget_definition("elevation").expect("elevation plot definition");
-    assert_eq!(elevation.defaults["point_label"]["font"], "Arial.ttf");
-
-    let gradient = gradient_widget_definition("gradient").expect("gradient definition");
-    assert_eq!(gradient.defaults["triangle_width"], 72);
-
-    let label = label_widget_definition("label").expect("label definition");
-    assert_eq!(label.defaults["text"], "New Text");
-}
-
-#[test]
-fn backdrop_manifest_exposes_expected_types_and_defaults() {
-    assert_eq!(default_backdrop_display_types(), ["rectangle"]);
-    assert!(is_backdrop_type_supported("circle"));
-    assert!(is_backdrop_type_supported("rectangle"));
-    assert!(!is_backdrop_type_supported("triangle"));
-    assert_eq!(backdrop_type_label("circle"), "Circle");
-    assert_eq!(backdrop_type_label("unknown"), "unknown");
-
-    let circle = backdrop_type_definition("circle").expect("circle backdrop definition");
-    assert_eq!(
-        circle.defaults,
-        json!({
-            "display_type": "circle",
-            "x": 100,
-            "y": 100,
-            "opacity": 1,
-            "diameter": 200,
-            "fill_color": "#212121",
-            "fill_opacity": 0.5,
-            "border_thickness": 0,
-            "border_color": "#D6D6D6",
-            "border_opacity": 1
-        })
-    );
-
-    let rectangle = backdrop_type_definition("rectangle").expect("rectangle backdrop definition");
-    assert_eq!(
-        rectangle.defaults,
-        json!({
-            "display_type": "rectangle",
-            "x": 100,
-            "y": 100,
-            "opacity": 1,
-            "width": 300,
-            "height": 150,
-            "fill_color": "#212121",
-            "fill_opacity": 0.5,
-            "border_thickness": 0,
-            "border_color": "#D6D6D6",
-            "border_opacity": 1,
-            "corner_radius": 20,
-            "round_top_left": true,
-            "round_top_right": false,
-            "round_bottom_left": false,
-            "round_bottom_right": true
-        })
-    );
-}
 
 #[test]
 fn backdrop_type_deserializes_strictly() {
@@ -138,7 +63,10 @@ fn valid_rectangle_backdrop_promotes_and_validates_active_variant() {
                     "round_top_left": true,
                     "round_top_right": false,
                     "round_bottom_left": true,
-                    "round_bottom_right": false
+                    "round_bottom_right": false,
+                    "edge_strips": [],
+                    "edge_strip_thickness": 4,
+                    "edge_strip_color": "#FF5722"
                 }
             }
         }],
@@ -151,8 +79,8 @@ fn valid_rectangle_backdrop_promotes_and_validates_active_variant() {
     let backdrop = &validated.backdrops[0];
     assert_eq!(backdrop.id, "backdrop-1");
     assert_eq!(backdrop.display_type, BackdropType::Rectangle);
-    assert_eq!(backdrop.width, 100);
-    assert_eq!(backdrop.height, 60);
+    assert_eq!(backdrop.width, 100.0);
+    assert_eq!(backdrop.height, 60.0);
     assert_eq!(backdrop.corner_radius, 12.0);
     assert!(backdrop.round_top_left);
     assert!(!backdrop.round_top_right);
@@ -186,7 +114,10 @@ fn valid_circle_backdrop_promotes_and_validates_active_variant() {
                     "round_top_left": true,
                     "round_top_right": false,
                     "round_bottom_left": true,
-                    "round_bottom_right": false
+                    "round_bottom_right": false,
+                    "edge_strips": [],
+                    "edge_strip_thickness": 4,
+                    "edge_strip_color": "#FF5722"
                 }
             }
         }],
@@ -199,9 +130,9 @@ fn valid_circle_backdrop_promotes_and_validates_active_variant() {
     let backdrop = &validated.backdrops[0];
     assert_eq!(backdrop.id, "backdrop-circle");
     assert_eq!(backdrop.display_type, BackdropType::Circle);
-    assert_eq!(backdrop.diameter, 80);
-    assert_eq!(backdrop.width, 0);
-    assert_eq!(backdrop.height, 0);
+    assert_eq!(backdrop.diameter, 80.0);
+    assert_eq!(backdrop.width, 0.0);
+    assert_eq!(backdrop.height, 0.0);
     assert_eq!(backdrop.corner_radius, 0.0);
     assert_eq!(backdrop.fill_color, "#112233");
     assert_eq!(backdrop.border_color, "#445566");
@@ -337,7 +268,7 @@ fn rectangle_corner_radius_adjusts_to_border_only_when_a_corner_is_rounded() {
 }
 
 #[test]
-fn static_base_rgba_renders_rectangle_backdrop() {
+fn export_frame_renders_rectangle_backdrop() {
     let validated = validate_config_value(&json!({
         "scene": small_scene_json(32, 24),
         "backdrops": [rectangle_backdrop_json("static-base-rect", "#ff0000")],
@@ -346,24 +277,14 @@ fn static_base_rgba_renders_rectangle_backdrop() {
         "plots": []
     }))
     .unwrap();
-    let mut profiler = RenderProfiler::default();
-    let pixels = StaticLayer {
-        backdrops: &validated.backdrops,
-        rasters: &[],
-        labels: &validated.labels,
-        values: &validated.values,
-        scene: &validated.scene,
-    }
-    .prepare(&test_paths(), &mut profiler)
-    .unwrap()
-    .base_rgba;
+    let pixels = common::export::scene_frame(&validated);
 
     assert_eq!(rgba_at(&pixels, 32, 8, 8), [255, 0, 0, 255]);
     assert_eq!(rgba_at(&pixels, 32, 24, 20), [0, 0, 0, 0]);
 }
 
 #[test]
-fn static_base_rgba_renders_rectangle_fill_inside_border() {
+fn export_frame_renders_rectangle_fill_inside_border() {
     let mut backdrop = rectangle_backdrop_json("bordered-static-rect", "#ff0000");
     backdrop["border_thickness"] = json!(2);
     backdrop["border_color"] = json!("#0000ff");
@@ -375,24 +296,14 @@ fn static_base_rgba_renders_rectangle_fill_inside_border() {
         "plots": []
     }))
     .unwrap();
-    let mut profiler = RenderProfiler::default();
-    let pixels = StaticLayer {
-        backdrops: &validated.backdrops,
-        rasters: &[],
-        labels: &validated.labels,
-        values: &validated.values,
-        scene: &validated.scene,
-    }
-    .prepare(&test_paths(), &mut profiler)
-    .unwrap()
-    .base_rgba;
+    let pixels = common::export::scene_frame(&validated);
 
     assert_eq!(rgba_at(&pixels, 32, 5, 8), [0, 0, 255, 255]);
     assert_eq!(rgba_at(&pixels, 32, 6, 8), [255, 0, 0, 255]);
 }
 
 #[test]
-fn static_base_rgba_applies_rectangle_fill_alpha_multipliers() {
+fn export_frame_applies_rectangle_fill_alpha_multipliers() {
     let mut backdrop = rectangle_backdrop_json("alpha-static-rect", "#ff000080");
     backdrop["opacity"] = json!(0.5);
     backdrop["fill_opacity"] = json!(0.5);
@@ -404,23 +315,13 @@ fn static_base_rgba_applies_rectangle_fill_alpha_multipliers() {
         "plots": []
     }))
     .unwrap();
-    let mut profiler = RenderProfiler::default();
-    let pixels = StaticLayer {
-        backdrops: &validated.backdrops,
-        rasters: &[],
-        labels: &validated.labels,
-        values: &validated.values,
-        scene: &validated.scene,
-    }
-    .prepare(&test_paths(), &mut profiler)
-    .unwrap()
-    .base_rgba;
+    let pixels = common::export::scene_frame(&validated);
 
     assert_eq!(rgba_at(&pixels, 32, 8, 8), [255, 0, 0, 32]);
 }
 
 #[test]
-fn static_base_rgba_renders_circle_fill_inside_total_diameter_border() {
+fn export_frame_renders_circle_fill_inside_total_diameter_border() {
     let mut backdrop = circle_backdrop_json("bordered-static-circle", "#ff0000");
     backdrop["border_thickness"] = json!(2);
     backdrop["border_color"] = json!("#0000ff");
@@ -432,17 +333,7 @@ fn static_base_rgba_renders_circle_fill_inside_total_diameter_border() {
         "plots": []
     }))
     .unwrap();
-    let mut profiler = RenderProfiler::default();
-    let pixels = StaticLayer {
-        backdrops: &validated.backdrops,
-        rasters: &[],
-        labels: &validated.labels,
-        values: &validated.values,
-        scene: &validated.scene,
-    }
-    .prepare(&test_paths(), &mut profiler)
-    .unwrap()
-    .base_rgba;
+    let pixels = common::export::scene_frame(&validated);
 
     assert_eq!(rgba_at(&pixels, 32, 10, 6), [0, 0, 255, 255]);
     assert_eq!(rgba_at(&pixels, 32, 10, 11), [255, 0, 0, 255]);
@@ -450,7 +341,7 @@ fn static_base_rgba_renders_circle_fill_inside_total_diameter_border() {
 }
 
 #[test]
-fn static_base_rgba_applies_circle_fill_alpha_multipliers() {
+fn export_frame_applies_circle_fill_alpha_multipliers() {
     let mut backdrop = circle_backdrop_json("alpha-static-circle", "#ff000080");
     backdrop["opacity"] = json!(0.5);
     backdrop["fill_opacity"] = json!(0.5);
@@ -462,53 +353,107 @@ fn static_base_rgba_applies_circle_fill_alpha_multipliers() {
         "plots": []
     }))
     .unwrap();
-    let mut profiler = RenderProfiler::default();
-    let pixels = StaticLayer {
-        backdrops: &validated.backdrops,
-        rasters: &[],
-        labels: &validated.labels,
-        values: &validated.values,
-        scene: &validated.scene,
-    }
-    .prepare(&test_paths(), &mut profiler)
-    .unwrap()
-    .base_rgba;
+    let pixels = common::export::scene_frame(&validated);
 
     assert_eq!(rgba_at(&pixels, 32, 10, 11), [255, 0, 0, 32]);
 }
 
 #[test]
-fn static_cache_key_includes_backdrops() {
-    let paths = test_paths();
-    let activity: ParsedActivity = serde_json::from_value(json!({})).unwrap();
-    let dense = common::builders::minimal_dense_activity();
-    let first_config = validate_config_value(&json!({
-        "scene": small_scene_json(53, 47),
-        "backdrops": [rectangle_backdrop_json("cache-rect", "#ff0000")],
-        "labels": [],
-        "values": [],
-        "plots": []
-    }))
-    .unwrap();
-    let second_config = validate_config_value(&json!({
-        "scene": small_scene_json(53, 47),
-        "backdrops": [rectangle_backdrop_json("cache-rect", "#0000ff")],
-        "labels": [],
-        "values": [],
-        "plots": []
-    }))
-    .unwrap();
+fn wasm_backdrops_match_export_opacity_and_ignore_playhead_and_activity() {
+    use ovrley_widgets::preview::PreviewSession;
+    for mut backdrop in [rectangle_backdrop_json("wasm-rect", "#abcdef80"), circle_backdrop_json("wasm-circle", "#abcdef80")] {
+        backdrop["x"] = json!(20.25);
+        backdrop["y"] = json!(30.5);
+        backdrop["border_thickness"] = json!(2.25);
+        backdrop["border_opacity"] = json!(0.6);
+        backdrop["opacity"] = json!(0.75);
+        if backdrop["display_type"] == "rectangle" {
+            backdrop["display_variants"]["rectangle"]["corner_radius"] = json!(4.0);
+            backdrop["display_variants"]["rectangle"]["round_top_left"] = json!(true);
+            backdrop["display_variants"]["rectangle"]["round_bottom_right"] = json!(true);
+        }
+        let mut scene = small_scene_json(96, 96);
+        scene["scale"] = json!(1.75);
+        let mut request = json!({"type": "backdrop", "widget": backdrop, "scene": scene});
+        let mut preview = PreviewSession::default(); // No font or activity resources.
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        let widget = &preview.widgets[&id];
+        let geometry: serde_json::Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let pixels = widget.pixels().clone();
+        let revision = widget.revision();
+        let pixel_storage = widget.pixels().as_ptr();
+        let mut config = validate_config_value(&json!({"scene": scene, "backdrops": [backdrop], "labels": [], "values": [], "plots": []})).unwrap();
+        let native = common::export::scene_frame(&config);
+        let width = geometry["width"].as_u64().unwrap() as usize;
+        let height = geometry["height"].as_u64().unwrap() as usize;
+        let left = geometry["left"].as_f64().unwrap() as usize;
+        let top = geometry["top"].as_f64().unwrap() as usize;
+        // Tiles unpremultiply with integer rounding; export frames are drawn straight.
+        let (tile, frame) = (rgba_at(&pixels, width, width / 2, height / 2), rgba_at(&native, 96, left + width / 2, top + height / 2));
+        assert!(tile.iter().zip(frame).all(|(a, b)| a.abs_diff(b) <= 1), "tile {tile:?}, export {frame:?}");
+        assert!(pixels.as_chunks::<4>().0.iter().any(|pixel| pixel[3] > 0));
+        preview.replace_activity(br#"{"sample_elapsed_seconds":[0,1],"speed":[0,20],"trim_end_seconds":1}"#).unwrap();
+        for second in [0.0, 1.0, 0.25, 100.0] {
+            preview.render(second).unwrap();
+            assert_eq!(preview.widgets[&id].revision(), revision);
+            assert_eq!(preview.widgets[&id].pixels().as_ptr(), pixel_storage);
+            assert_eq!(preview.widgets[&id].pixels(), &pixels);
+        }
+        preview.replace_activity(&[]).unwrap();
+        preview.render(0.0).unwrap();
+        assert_eq!(preview.widgets[&id].revision(), revision);
+        request["scene"]["opacity"] = json!(0.5);
+        preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+        config.scene.presentation.opacity = 0.5;
+        let native = common::export::scene_frame(&config);
+        assert_eq!(rgba_at(preview.widgets[&id].pixels(), width, width / 2, height / 2)[3], 48);
+        assert_eq!(rgba_at(&native, 96, left + width / 2, top + height / 2)[3], 48);
+        request["widget"]["fill_color"] = json!("#ff0000");
+        request["scene"]["opacity"] = json!(0);
+        preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+        assert_ne!(preview.widgets[&id].revision(), revision);
+        assert_ne!(preview.widgets[&id].pixels(), &pixels);
+        assert!(preview.widgets[&id].pixels().as_chunks::<4>().0.iter().all(|pixel| pixel[3] == 0));
+        request["widget"]["border_thickness"] = json!(-1);
+        assert!(preview.update_widget(id, serde_json::from_value(request).unwrap()).is_err());
+    }
+}
 
-    let (_, first_status, _, _) =
-        prepare_preview_assets(&paths, &first_config, &activity, &dense).unwrap();
-    let (_, second_status, _, _) =
-        prepare_preview_assets(&paths, &first_config, &activity, &dense).unwrap();
-    let (_, changed_status, _, _) =
-        prepare_preview_assets(&paths, &second_config, &activity, &dense).unwrap();
-
-    assert!(matches!(first_status, LabelCacheStatus::Miss));
-    assert!(matches!(second_status, LabelCacheStatus::Hit));
-    assert!(matches!(changed_status, LabelCacheStatus::Miss));
+#[test]
+fn wasm_backdrop_resize_keeps_opposite_corners_and_fractional_dimensions() {
+    use ovrley_widgets::preview::PreviewSession;
+    for backdrop in [rectangle_backdrop_json("resize-rect", "#ff0000"), circle_backdrop_json("resize-circle", "#ff0000")] {
+        let mut scene = small_scene_json(96, 96);
+        scene["scale"] = json!(1.5);
+        let origin = json!({"type": "backdrop", "widget": backdrop, "scene": scene});
+        let mut preview = PreviewSession::default();
+        let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
+        let geometry: serde_json::Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let bounds = &geometry["content"];
+        for fixed in [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] {
+            let point = [bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0], bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1]];
+            let mut gesture = origin.clone();
+            gesture["size"] = json!([37.875, 28.125]);
+            gesture["fixed"] = json!(fixed);
+            gesture["point"] = json!(point);
+            gesture["second"] = json!(19.5);
+            let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(gesture).unwrap()).unwrap()).unwrap();
+            let mut committed = origin.clone();
+            committed["widget"]["x"] = patch["x"].clone();
+            committed["widget"]["y"] = patch["y"].clone();
+            let display_type = backdrop["display_type"].as_str().unwrap();
+            committed["widget"]["display_variants"][display_type].as_object_mut().unwrap().extend(patch["display_variants"][display_type].as_object().unwrap().clone());
+            preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
+            let resized: serde_json::Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let actual = &resized["content"];
+            assert_eq!(actual["width"], json!(37.875));
+            assert_eq!(actual["height"], json!(if display_type == "circle" { 37.875 } else { 28.125 }));
+            for (axis, position, dimension) in [(0, "left", "width"), (1, "top", "height")] {
+                let corner = actual[position].as_f64().unwrap() + actual[dimension].as_f64().unwrap() * fixed[axis];
+                assert!((corner - point[axis]).abs() < 0.002);
+            }
+        }
+    }
 }
 
 fn small_scene_json(width: u32, height: u32) -> serde_json::Value {
@@ -538,7 +483,10 @@ fn rectangle_backdrop_json(id: &str, fill_color: &str) -> serde_json::Value {
                 "round_top_left": false,
                 "round_top_right": false,
                 "round_bottom_left": false,
-                "round_bottom_right": false
+                "round_bottom_right": false,
+                "edge_strips": [],
+                "edge_strip_thickness": 4,
+                "edge_strip_color": "#FF5722"
             }
         }
     })
@@ -592,17 +540,4 @@ fn rgba_at(pixels: &[u8], width: usize, x: usize, y: usize) -> [u8; 4] {
         pixels[offset + 2],
         pixels[offset + 3],
     ]
-}
-
-fn test_paths() -> AppPaths {
-    let workspace_root = common::test_config::repo_git_root();
-    AppPaths {
-        repo_root: workspace_root.clone(),
-        font_dirs: vec![workspace_root.join("fonts")],
-        debug_render_dir: std::env::temp_dir(),
-        temp_dir: std::env::temp_dir(),
-        bundled_templates_dirs: vec![],
-        user_templates_dir: std::env::temp_dir(),
-        downloads_dir: std::env::temp_dir(),
-    }
 }

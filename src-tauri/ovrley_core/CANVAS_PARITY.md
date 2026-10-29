@@ -23,7 +23,7 @@ Before first run, from the repo root:
 
 ```bash
 pnpm install
-npx playwright install chromium
+pnpm exec playwright install chromium
 ```
 
 ## Fixtures
@@ -42,7 +42,7 @@ respectively.
 
 1. **Parse fixtures** → `ParsedActivity` + `RenderConfig`
 2. **Build dense report** → interpolated frame data via `build_dense_activity_report`
-3. **Render Skia** → `skia.png` via `render_preview_with_prepared_assets`
+3. **Render Skia** → `skia.png` via `render_preview_frame`
 4. **Write mock data** → `template.json`, `activity.json`, `store-state.json`
    for the frontend app
 5. **Start Vite** → dev server hosting the React editor app
@@ -107,11 +107,11 @@ Defined in `common/canvas_parity.rs`:
 
 ## Troubleshooting
 
-| Symptom                    | Likely cause                                                          |
-| -------------------------- | --------------------------------------------------------------------- |
-| Vite fails to start        | `pnpm install` not run; port already in use                           |
-| Playwright fails           | Playwright browsers not installed (`npx playwright install chromium`) |
-| SSIM always low            | Dimensions mismatch; Skia render may need scaling                     |
-| "Canvas-only" pixels       | Widget not rendered by Skia (missing widget implementation)           |
-| "Skia-only" pixels         | Widget visible in Skia but hidden/transparent in browser              |
-| Terminal blocks after test | Vite process orphaned — fixed by `taskkill /T` in `ViteServer::drop`  |
+| Symptom                    | Likely cause                                                                |
+| -------------------------- | --------------------------------------------------------------------------- |
+| Vite fails to start        | `pnpm install` not run; port already in use                                 |
+| Playwright fails           | Playwright browsers not installed (`pnpm exec playwright install chromium`) |
+| SSIM always low            | Dimensions mismatch; Skia render may need scaling                           |
+| "Canvas-only" pixels       | Widget not rendered by Skia (missing widget implementation)                 |
+| "Skia-only" pixels         | Widget visible in Skia but hidden/transparent in browser                    |
+| Terminal blocks after test | Vite process orphaned — fixed by `taskkill /T` in `ViteServer::drop`        |

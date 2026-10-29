@@ -21,16 +21,13 @@
  */
 
 import { createFontSelection, createLabelFontSelection, getFontFamilyName } from '@/lib/fonts'
-import { getThemeColor } from '@/lib/theme'
-import { resolveActiveBackdropData, resolveActiveMetricWidgetData } from '../widget/widget-resolver'
+import { getThemeColor } from '@/lib/color-utils'
+import { resolveActiveWidgetData } from '../widget/widget-resolver'
+import { WIDGET_TYPE_DEFINITIONS } from '../widget/widget-catalog'
+import i18next from 'i18next'
 import { DEFAULT_GLOBAL_DEFAULTS } from './template-constants'
-import {
-  applyPreviewOverrides,
-  mergeSceneGlobalDefaults,
-  normalizeGlobalDefaults,
-  normalizeTemplateConfig,
-  pickDefined,
-} from './template-normalization'
+import { mergeSceneGlobalDefaults, normalizeGlobalDefaults, normalizeTemplateConfig } from './template-normalization'
+import { pickDefined } from '@/lib/utils'
 
 function buildEffectiveSceneData(sceneData, globals) {
   if (!sceneData) return sceneData
@@ -41,19 +38,19 @@ function buildEffectiveSceneData(sceneData, globals) {
   }
 }
 
-function buildEffectiveLabelData(widgetData = {}, globals, previewOverrides = null) {
+function buildEffectiveLabelData(widgetData = {}, globals) {
   const nextData = { ...widgetData }
   const font = widgetData.font || globals?.font_text
   if (!nextData.font && font) nextData.font = font
   if (!nextData.font_family) nextData.font_family = getFontFamilyName(font || nextData.font_family)
   if (!nextData.color) nextData.color = globals?.color_text || getThemeColor('ice')
   if (nextData.opacity === undefined) nextData.opacity = globals?.opacity
-  return applyPreviewOverrides(nextData, previewOverrides)
+  return nextData
 }
 
-function buildEffectiveValueData(widgetData = {}, globals, previewOverrides = null) {
+function buildEffectiveValueData(widgetData = {}, globals) {
   // Resolve display_variants for non-text display types
-  const resolved = resolveActiveMetricWidgetData(widgetData)
+  const resolved = resolveActiveWidgetData(widgetData)
 
   const nextData = { ...resolved }
   const font = resolved.font || globals?.font_values
@@ -62,36 +59,56 @@ function buildEffectiveValueData(widgetData = {}, globals, previewOverrides = nu
   const labelFont = resolved.min_max_label_font || globals?.font_values
   if (!nextData.min_max_label_font && labelFont) nextData.min_max_label_font = labelFont
   if (!nextData.color) nextData.color = globals?.color_values || getThemeColor('ice')
-  if (resolved.value === 'lap_timer') {
+  if (resolved.value === 'lap_timer' || resolved.value === 'splits_run') {
     if (!nextData.label_font) nextData.label_font = globals?.font_text
     if (!nextData.label_color) nextData.label_color = globals?.color_text || getThemeColor('ice')
   }
+  // An absent heading label font inherits the value font from global defaults.
+  if (resolved.display_type === 'heading_tape' && nextData.label_font == null) nextData.label_font = globals.font_values
   if (nextData.icon_color === undefined) nextData.icon_color = globals?.color_icons || getThemeColor('aqua')
   if (nextData.unit_color === undefined && resolved.value !== 'time') nextData.unit_color = globals?.color_units || '#ffffff'
   if (nextData.opacity === undefined) nextData.opacity = globals?.opacity
-  return applyPreviewOverrides(nextData, previewOverrides)
+  return nextData
 }
 
-function buildEffectivePlotData(widgetData = {}, globals, previewOverrides = null) {
+/**
+ * Chart legends name each metric in the app language at render time, so templates never store labels.
+ * @param {object[]} series Durable chart rows.
+ * @param {string} language App language.
+ * @returns {object[]} Rows with their capitalized legend labels.
+ */
+function buildChartLegendSeries(series, language) {
+  const translate = i18next.getFixedT(language)
+  return series.map((item) => ({ ...item, label: translate(WIDGET_TYPE_DEFINITIONS[item.metric].shortNameKey).toLocaleUpperCase(language) }))
+}
+
+function buildEffectivePlotData(widgetData = {}, globals, language) {
   const nextData = { ...widgetData }
+  if (nextData.value === 'rolling_chart') nextData.series = buildChartLegendSeries(nextData.series, language)
   if (!nextData.color) nextData.color = globals?.color_values || getThemeColor('ice')
   if (nextData.opacity === undefined) nextData.opacity = globals?.opacity
-  if (nextData.value === 'elevation' && globals?.font_values) {
+  if ((nextData.value === 'elevation' || nextData.value === 'diving_profile') && globals?.font_values) {
     nextData.point_label = {
       ...(nextData.point_label || {}),
       ...(!nextData.point_label?.font ? createFontSelection(globals.font_values) : {}),
     }
   }
-  return applyPreviewOverrides(nextData, previewOverrides)
+  return nextData
 }
 
-export function getEffectiveWidgetData(widget, globals, previewOverrides = null) {
+/**
+ * @param {object|null} widget Durable widget.
+ * @param {object} globals Canonical global defaults.
+ * @param {string} [language] App language that names chart legends; required for charts.
+ * @returns {object|null} Render-effective widget data.
+ */
+export function getEffectiveWidgetData(widget, globals, language) {
   if (!widget) return widget
-  if (widget.category === 'backdrops') return resolveActiveBackdropData(widget.data, previewOverrides)
-  if (widget.category === 'labels') return buildEffectiveLabelData(widget.data, globals, previewOverrides)
-  if (widget.category === 'values') return buildEffectiveValueData(widget.data, globals, previewOverrides)
-  if (widget.category === 'plots') return buildEffectivePlotData(widget.data, globals, previewOverrides)
-  return applyPreviewOverrides({ ...widget.data }, previewOverrides)
+  if (widget.category === 'backdrops') return resolveActiveWidgetData(widget.data)
+  if (widget.category === 'labels') return buildEffectiveLabelData(widget.data, globals)
+  if (widget.category === 'values') return buildEffectiveValueData(widget.data, globals)
+  if (widget.category === 'plots') return buildEffectivePlotData(widget.data, globals, language)
+  return widget.data
 }
 
 export function createDurableTemplateState({ config, globalDefaults }) {
@@ -102,7 +119,17 @@ export function createDurableTemplateState({ config, globalDefaults }) {
   }
 }
 
-export function createEditorEffectiveConfig({ config, globalDefaults }) {
+/** @param {object} state Editor config and global defaults. @returns {{config: object, globalDefaults: object}} Canonical durable editor state. */
+export function createDurableEditorState({ config, globalDefaults }) {
+  const nextGlobalDefaults = mergeSceneGlobalDefaults(config.scene, globalDefaults)
+  return { config: normalizeTemplateConfig(config, nextGlobalDefaults), globalDefaults: nextGlobalDefaults }
+}
+
+/**
+ * @param {{config: object|null, globalDefaults: object, language?: string}} state Durable state and the app language that names chart legends; required for charts.
+ * @returns {object|null} Render-effective config.
+ */
+export function createEditorEffectiveConfig({ config, globalDefaults, language }) {
   if (!config) return config
   const normalizedGlobals = normalizeGlobalDefaults(globalDefaults)
   const nextConfig = {
@@ -116,7 +143,7 @@ export function createEditorEffectiveConfig({ config, globalDefaults }) {
   }
   if (Array.isArray(config.backdrops)) {
     nextConfig.backdrops = []
-    for (const backdrop of config.backdrops) nextConfig.backdrops.push(resolveActiveBackdropData(backdrop))
+    for (const backdrop of config.backdrops) nextConfig.backdrops.push(resolveActiveWidgetData(backdrop))
   }
   if (Array.isArray(config.labels)) {
     nextConfig.labels = []
@@ -128,13 +155,9 @@ export function createEditorEffectiveConfig({ config, globalDefaults }) {
   }
   if (Array.isArray(config.plots)) {
     nextConfig.plots = []
-    for (const plot of config.plots) nextConfig.plots.push(buildEffectivePlotData(plot, normalizedGlobals))
+    for (const plot of config.plots) nextConfig.plots.push(buildEffectivePlotData(plot, normalizedGlobals, language))
   }
   return nextConfig
-}
-
-export function applyGlobalDefaults(config, globalDefaults) {
-  return createEditorEffectiveConfig({ config, globalDefaults })
 }
 
 /**
@@ -158,23 +181,28 @@ export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null, 
   if (nextConfig.values) {
     for (const value of nextConfig.values) {
       if (shouldApply('font_values')) Object.assign(value, createFontSelection(globals.font_values))
-      if (value.value === 'lap_timer' && shouldApply('font_text')) value.label_font = globals.font_text
+      if ((value.value === 'lap_timer' || value.value === 'splits_run') && shouldApply('font_text')) value.label_font = globals.font_text
       if (shouldApply('font_values')) {
         if (value.display_variants?.linear) value.display_variants.linear.min_max_label_font = globals.font_values
         if (value.display_variants?.arc) value.display_variants.arc.min_max_label_font = globals.font_values
         if (value.display_variants?.corner) value.display_variants.corner.min_max_label_font = globals.font_values
         if (value.display_variants?.g_force) value.display_variants.g_force.label_font = globals.font_values
+        if (value.display_variants?.altitude_tape) value.display_variants.altitude_tape.label_font = globals.font_values
       }
       if (shouldApply('color_values')) value.color = globals.color_values
-      if (value.value === 'lap_timer' && shouldApply('color_text')) value.label_color = globals.color_text
+      if ((value.value === 'lap_timer' || value.value === 'splits_run') && shouldApply('color_text')) value.label_color = globals.color_text
       if (shouldApply('color_icons') && Object.hasOwn(value, 'icon_color')) value.icon_color = globals.color_icons
       if (shouldApply('color_units') && value.value !== 'time') value.unit_color = globals.color_units
     }
   }
   if (nextConfig.plots) {
     for (const plot of nextConfig.plots) {
-      if (plot.value === 'elevation' && shouldApply('font_values')) {
+      if ((plot.value === 'elevation' || plot.value === 'diving_profile') && shouldApply('font_values')) {
         plot.point_label = { ...(plot.point_label || {}), ...createFontSelection(globals.font_values) }
+      }
+      if (plot.value === 'rolling_chart') {
+        if (shouldApply('font_values')) plot.legend_font = globals.font_values
+        if (shouldApply('color_values')) plot.legend_color = globals.color_values
       }
       if (shouldApply('color_values') && Object.hasOwn(plot, 'color')) plot.color = globals.color_values
     }

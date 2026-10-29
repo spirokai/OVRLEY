@@ -1,0 +1,21 @@
+//! Widget implementations grouped by family.
+pub mod altitude_tape;
+pub mod backdrop;
+pub mod diving_profile;
+pub mod elevation;
+pub mod g_force;
+pub mod gauges;
+pub mod gradient;
+pub mod heading;
+pub mod heading_compass;
+pub mod heart_zones;
+pub mod label;
+pub mod lap_timer;
+pub mod lean_angle;
+pub mod plot_marker;
+pub mod raster;
+pub mod rolling_chart;
+pub mod route;
+pub mod splits_run;
+pub mod time;
+pub mod value;

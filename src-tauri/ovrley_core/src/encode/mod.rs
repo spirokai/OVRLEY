@@ -1,10 +1,12 @@
 //! Video encoding subsystem.
 //!
 //! The encoder receives already-densified activity data and rendered Skia
-//! frames, streams raw RGBA pixels to ffmpeg, and records timing/debug output.
+//! frames, streams raw overlay pixels to ffmpeg (RGBA, or `yuva420p` for
+//! composite graphs that blend in YUV; see [`overlay_format`]), and records
+//! timing/debug output.
 //! Callers submit work through [`crate::render_jobs::execution::RenderExecutionService`].
 //! Job planning fixes timing and settings; [`pipeline`] prepares assets and
-//! feeds ordered RGBA frames into one supervised FFmpeg process.
+//! feeds ordered frames into one supervised FFmpeg process.
 //!
 //! ## Thread Map
 //!
@@ -21,6 +23,8 @@ pub mod debug;
 pub mod ffmpeg;
 /// Rational frame-rate helpers shared by composite encoding modules.
 pub mod fps;
+/// Pixel format and conversion of the raw overlay frames piped to FFmpeg.
+pub mod overlay_format;
 /// Encoding runtime pipelines and their shared frame/process infrastructure.
 pub mod pipeline;
 /// Canonical composite-render data contract.

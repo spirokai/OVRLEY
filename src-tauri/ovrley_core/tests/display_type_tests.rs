@@ -6,9 +6,9 @@
 
 mod common;
 
-use ovrley_core::render::widgets::types::PreparedValue;
-use ovrley_core::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
-use ovrley_core::types::{DisplayType, TrackFillStyle};
+use ovrley_widgets::widgets::value::validation::ValidatedValue;
+use ovrley_widgets::model::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
+use ovrley_widgets::model::types::{DisplayType, TrackFillStyle};
 use serde_json::json;
 
 #[test]
@@ -18,9 +18,14 @@ fn recognized_display_type_strings_parse_to_expected_variants() {
         (r#""linear""#, DisplayType::Linear),
         (r#""arc""#, DisplayType::Arc),
         (r#""corner""#, DisplayType::Corner),
+        (r#""gt_gauge""#, DisplayType::GtGauge),
         (r#""heading_tape""#, DisplayType::Tape),
+        (r#""heading_compass""#, DisplayType::HeadingCompass),
+        (r#""heart_zones""#, DisplayType::HeartZones),
+        (r#""altitude_tape""#, DisplayType::AltitudeTape),
         (r#""lean_angle""#, DisplayType::LeanAngle),
         (r#""g_force""#, DisplayType::GForce),
+        (r#""splits_run""#, DisplayType::SplitsRun),
     ];
 
     for (json_value, expected) in cases {
@@ -39,12 +44,14 @@ fn legacy_bars_display_type_falls_back_to_text() {
 }
 
 #[test]
-fn track_fill_style_is_forgiving() {
+fn track_fill_style_rejects_malformed_present_values() {
     let bars: TrackFillStyle = serde_json::from_str(r#""bars""#).unwrap();
-    let unknown: TrackFillStyle = serde_json::from_str(r#""unknown""#).unwrap();
     assert_eq!(bars, TrackFillStyle::Bars);
     assert_eq!(bars.as_str(), "bars");
-    assert_eq!(unknown, TrackFillStyle::Fill);
+    assert_eq!(serde_json::from_str::<TrackFillStyle>(r#""fill""#).unwrap(), TrackFillStyle::Fill);
+    for malformed in [r#""unknown""#, "null", "3"] {
+        assert!(serde_json::from_str::<TrackFillStyle>(malformed).is_err());
+    }
 }
 
 #[test]
@@ -54,9 +61,14 @@ fn display_type_round_trips_each_variant() {
         (DisplayType::Linear, r#""linear""#),
         (DisplayType::Arc, r#""arc""#),
         (DisplayType::Corner, r#""corner""#),
+        (DisplayType::GtGauge, r#""gt_gauge""#),
         (DisplayType::Tape, r#""heading_tape""#),
+        (DisplayType::HeadingCompass, r#""heading_compass""#),
+        (DisplayType::HeartZones, r#""heart_zones""#),
+        (DisplayType::AltitudeTape, r#""altitude_tape""#),
         (DisplayType::LeanAngle, r#""lean_angle""#),
         (DisplayType::GForce, r#""g_force""#),
+        (DisplayType::SplitsRun, r#""splits_run""#),
     ];
 
     for (variant, expected_json) in cases {
@@ -162,6 +174,8 @@ fn complete_linear_display_type_validates_as_gauge() {
             "track_empty_opacity": 0.5,
             "track_filled_color": "#40e0d0",
             "track_filled_opacity": 1,
+            "track_filled_gradient": false,
+            "track_filled_gradient_stops": [{ "offset": 0, "color": "#40e0d0" }, { "offset": 1, "color": "#c65102" }],
             "show_min_max_labels": false,
             "min_max_label_font": "Arial.ttf",
             "min_max_label_font_size": 12,
@@ -172,11 +186,11 @@ fn complete_linear_display_type_validates_as_gauge() {
         "plots": []
     }));
 
-    let PreparedValue::LinearGauge(value) = config.values.into_iter().next().unwrap() else {
+    let ValidatedValue::LinearGauge(value) = config.values.into_iter().next().unwrap() else {
         panic!("linear display type should validate as a linear gauge prepared value");
     };
-    assert_eq!(value.validated.display_type, DisplayType::Linear);
-    assert_eq!(value.validated.width, 200);
+    assert_eq!(value.display_type, DisplayType::Linear);
+    assert_eq!(value.width, 200.0);
 }
 
 #[test]
@@ -219,11 +233,11 @@ fn complete_g_force_display_type_validates_with_canonical_marker_and_label_field
         "plots": []
     }));
 
-    let PreparedValue::GForce(value) = config.values.into_iter().next().unwrap() else {
+    let ValidatedValue::GForce(value) = config.values.into_iter().next().unwrap() else {
         panic!("g_force display type should validate as a G-force prepared value");
     };
-    assert_eq!(value.validated.marker_size, 12.0);
-    assert_eq!(value.validated.label_decimals, 1);
+    assert_eq!(value.marker_size, 12.0);
+    assert_eq!(value.label_decimals, 1);
 }
 
 #[test]
@@ -245,7 +259,23 @@ fn display_type_is_intrinsic_only_for_text() {
         DisplayTypeLayoutMode::Boxed
     );
     assert_eq!(
+        display_type_layout_mode(DisplayType::GtGauge),
+        DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
         display_type_layout_mode(DisplayType::Tape),
+        DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::HeadingCompass),
+        DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::HeartZones),
+        DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::AltitudeTape),
         DisplayTypeLayoutMode::Boxed
     );
     assert_eq!(
@@ -255,5 +285,9 @@ fn display_type_is_intrinsic_only_for_text() {
     assert_eq!(
         display_type_layout_mode(DisplayType::GForce),
         DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::SplitsRun),
+        DisplayTypeLayoutMode::Intrinsic
     );
 }

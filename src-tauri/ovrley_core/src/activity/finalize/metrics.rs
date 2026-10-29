@@ -9,9 +9,11 @@
 //! Phase 0 intentionally uses the standard gradient derivation for every format;
 //! the legacy GPX path is not ported.
 
-use crate::activity::elevation::preferred_elevation_series;
+use super::smoothing::{smoothing_window_for_seconds, zero_phase_smooth};
 use crate::activity::schema::{ActivityColumns, GearSeries, NumericSeries};
 use crate::media::telemetry_math::{bearing_degrees, finite_f64, haversine_distance, round_f64};
+use ovrley_widgets::model::telemetry::ZERO_AVAILABLE_ACTIVITY_SERIES;
+use ovrley_widgets::widgets::elevation::sampling::preferred_elevation_series;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
@@ -84,7 +86,7 @@ impl MetricCoverage {
         }
     }
 
-    fn from_descriptor(descriptor: &MetricDescriptor) -> Self {
+    fn from_descriptor(descriptor: &MetricDescriptor, zero_is_available: bool) -> Self {
         match &descriptor.series {
             MetricSeries::Numeric(series) => {
                 let available_count = series.iter().filter(|v| v.is_some()).count();
@@ -97,7 +99,11 @@ impl MetricCoverage {
                     available_count,
                     nonzero_count,
                     total_samples: series.len(),
-                    has_usable_values: nonzero_count > 0,
+                    has_usable_values: if zero_is_available {
+                        available_count > 0
+                    } else {
+                        nonzero_count > 0
+                    },
                 }
             }
             MetricSeries::Gear(series) => Self::from_series(series, descriptor.source),
@@ -119,7 +125,13 @@ pub fn build_metric_coverage(
 ) -> BTreeMap<String, MetricCoverage> {
     let mut coverage = BTreeMap::new();
     for (metric, descriptor) in metric_series_map {
-        coverage.insert(metric.clone(), MetricCoverage::from_descriptor(descriptor));
+        coverage.insert(
+            metric.clone(),
+            MetricCoverage::from_descriptor(
+                descriptor,
+                ZERO_AVAILABLE_ACTIVITY_SERIES.contains(&metric.as_str()),
+            ),
+        );
     }
     coverage
 }
@@ -630,20 +642,42 @@ pub fn derive_activity_metric_series(
     course_series: &[(Option<f64>, Option<f64>)],
     distance_series: &NumericSeries,
     elevation_base_series: &NumericSeries,
+    barometric_altitude_series: &NumericSeries,
     elapsed_series: &[f64],
     columns: &ActivityColumns,
 ) -> BTreeMap<String, MetricDescriptor> {
-    let direct = direct_metrics(columns, distance_series, elevation_base_series);
+    let direct = direct_metrics(
+        columns,
+        distance_series,
+        elevation_base_series,
+        barometric_altitude_series,
+    );
     let null_series: NumericSeries = columns.timestamp.iter().map(|_| None).collect();
     let preferred_altitude =
         preferred_elevation_series(&direct["barometric_altitude"], &direct["elevation"]).to_vec();
     let derived_speed = derive_numeric_rate_series(distance_series, elapsed_series);
+    // Explicit extraction settings are applied once by the finalizer. Otherwise,
+    // smooth distance-derived speed over one second before mixing in recorded
+    // values. At 1 Hz or slower the window is one sample, preserving those rates.
+    let derived_speed = if columns.options.smoothing.contains_key("speed") {
+        derived_speed
+    } else {
+        let timestamps_ms: Vec<_> = elapsed_series.iter().map(|second| second * 1000.0).collect();
+        let window = smoothing_window_for_seconds(&timestamps_ms, 1.0);
+        zero_phase_smooth(&derived_speed, window)
+    };
     let derived_heading = derive_heading_series(course_series, distance_series, 2.0);
     let derived_distance_to_home = derive_distance_to_home_series(course_series);
     let derived_total_ascent =
         derive_total_ascent_series(&direct["barometric_altitude"], &direct["elevation"]);
     let derived_gradient = derive_gradient_series(&preferred_altitude, distance_series);
     let derived_vertical_speed = derive_numeric_rate_series(&preferred_altitude, elapsed_series);
+    // Depth grows downwards, so its rate is negated to read positive while ascending.
+    let derived_depth_vertical_speed: NumericSeries =
+        derive_numeric_rate_series(&direct["depth"], elapsed_series)
+            .into_iter()
+            .map(|rate| rate.map(|rate| 0.0 - rate))
+            .collect();
     let derived_pace = derive_pace_series(
         &direct["speed"]
             .iter()
@@ -654,21 +688,12 @@ pub fn derive_activity_metric_series(
     let derived_torque = derive_torque_series(&direct["power"], &direct["cadence"]);
 
     let mut map = BTreeMap::new();
-    macro_rules! insert_metric {
-        ($name:literal, $fallback:expr) => {
-            map.insert(
-                $name.to_string(),
-                combine_series(&direct[$name], $fallback, false),
-            );
-        };
+    for (name, values) in &direct {
+        map.insert(
+            (*name).to_owned(),
+            combine_series(values, &null_series, false),
+        );
     }
-
-    insert_metric!("air_pressure", &null_series);
-    insert_metric!("barometric_altitude", &null_series);
-    insert_metric!("cadence", &null_series);
-    insert_metric!("core_temperature", &null_series);
-    insert_metric!("engine_power", &null_series);
-    insert_metric!("engine_load", &null_series);
     let derived_calories = derive_calories_from_power(&direct["power"], elapsed_series);
     map.insert(
         "calories".to_string(),
@@ -696,12 +721,17 @@ pub fn derive_activity_metric_series(
             series: MetricSeries::Numeric(derived_total_ascent),
         },
     );
-    insert_metric!("elevation", &null_series);
-    insert_metric!("brake_position", &null_series);
-    insert_metric!("g_force", &null_series);
-    insert_metric!("g_force_x", &null_series);
-    insert_metric!("g_force_y", &null_series);
-    insert_metric!("g_force_z", &null_series);
+    map.insert(
+        "depth_vertical_speed".to_string(),
+        MetricDescriptor {
+            source: if derived_depth_vertical_speed.iter().any(Option::is_some) {
+                MetricSource::Derived
+            } else {
+                MetricSource::Missing
+            },
+            series: MetricSeries::Numeric(derived_depth_vertical_speed),
+        },
+    );
     map.insert(
         "gear_position".to_string(),
         MetricDescriptor {
@@ -717,7 +747,6 @@ pub fn derive_activity_metric_series(
         "gradient".to_string(),
         combine_series(&derived_gradient, &direct["gradient"], true),
     );
-    insert_metric!("ground_contact_time", &null_series);
     map.insert(
         "heading".to_string(),
         if columns.preserve_direct_metric_gaps.heading {
@@ -726,15 +755,10 @@ pub fn derive_activity_metric_series(
             combine_series(&direct["heading"], &derived_heading, false)
         },
     );
-    insert_metric!("heartrate", &null_series);
-    insert_metric!("left_right_balance", &null_series);
-    insert_metric!("lean_angle", &null_series);
     map.insert(
         "pace".to_string(),
         combine_series(&direct["pace"], &derived_pace, false),
     );
-    insert_metric!("power", &null_series);
-    insert_metric!("rpm", &null_series);
     map.insert(
         "speed".to_string(),
         if columns.preserve_direct_metric_gaps.speed {
@@ -743,25 +767,14 @@ pub fn derive_activity_metric_series(
             combine_series(&direct["speed"], &derived_speed, false)
         },
     );
-    insert_metric!("stride_length", &null_series);
-    insert_metric!("stroke_rate", &null_series);
-    insert_metric!("temperature", &null_series);
-    insert_metric!("throttle_position", &null_series);
     map.insert(
         "torque".to_string(),
         combine_series(&direct["torque"], &derived_torque, false),
     );
-    insert_metric!("vertical_oscillation", &null_series);
     map.insert(
         "vertical_speed".to_string(),
         combine_series(&direct["vertical_speed"], &derived_vertical_speed, false),
     );
-    insert_metric!("iso", &null_series);
-    insert_metric!("aperture", &null_series);
-    insert_metric!("shutter_speed", &null_series);
-    insert_metric!("focal_length", &null_series);
-    insert_metric!("ev", &null_series);
-    insert_metric!("color_temperature", &null_series);
     map
 }
 
@@ -770,64 +783,36 @@ pub fn derive_activity_metric_series(
 /// Keeping direct collection table-driven gives derived metrics a consistent
 /// field naming surface and isolates the RawSample-to-metric mapping in one
 /// place.
-fn direct_metrics(
-    columns: &ActivityColumns,
-    distance_series: &NumericSeries,
-    elevation_base_series: &NumericSeries,
-) -> BTreeMap<&'static str, NumericSeries> {
-    let mut direct = BTreeMap::new();
-    macro_rules! collect {
-        ($name:literal, $field:ident) => {
-            direct.insert(
-                $name,
-                columns
-                    .$field
-                    .iter()
-                    .map(|value| value.and_then(finite_f64))
-                    .collect(),
-            );
-        };
-    }
-    collect!("air_pressure", air_pressure);
-    collect!("barometric_altitude", barometric_altitude);
-    collect!("cadence", cadence);
-    collect!("calories", calories);
-    collect!("core_temperature", core_temperature);
-    direct.insert("distance", distance_series.clone());
-    collect!("distance_to_home", distance_to_home);
-    direct.insert("elevation", elevation_base_series.clone());
-    collect!("brake_position", brake_position);
-    collect!("g_force", g_force);
-    collect!("g_force_x", g_force_x);
-    collect!("g_force_y", g_force_y);
-    collect!("g_force_z", g_force_z);
-    collect!("gradient", gradient);
-    collect!("ground_contact_time", ground_contact_time);
-    collect!("heading", heading);
-    collect!("heartrate", heartrate);
-    collect!("left_right_balance", left_right_balance);
-    collect!("lean_angle", lean_angle);
-    collect!("pace", pace);
-    collect!("power", power);
-    collect!("engine_power", engine_power);
-    collect!("engine_load", engine_load);
-    collect!("rpm", rpm);
-    collect!("speed", speed);
-    collect!("stride_length", stride_length);
-    collect!("stroke_rate", stroke_rate);
-    collect!("temperature", temperature);
-    collect!("throttle_position", throttle_position);
-    collect!("torque", torque);
-    collect!("vertical_oscillation", vertical_oscillation);
-    collect!("vertical_speed", vertical_speed);
-    collect!("iso", iso);
-    collect!("aperture", aperture);
-    collect!("shutter_speed", shutter_speed);
-    collect!("focal_length", focal_length);
-    collect!("ev", ev);
-    collect!("color_temperature", color_temperature);
-    direct
+macro_rules! direct_activity_columns {
+    (
+        numeric { $($numeric:ident,)* } text { $($text:ident,)* } integer { $($integer:ident,)* }
+        samples { numeric { $($sample:ident,)* } text { $($sample_text:ident,)* } integer { $($sample_integer:ident,)* } }
+        sources { $($source:ident: $variant:ident,)* } absent { $($absent:ident,)* }
+    ) => {
+        fn direct_metrics(
+            columns: &ActivityColumns,
+            distance_series: &NumericSeries,
+            elevation_base_series: &NumericSeries,
+            barometric_altitude_series: &NumericSeries,
+        ) -> BTreeMap<&'static str, NumericSeries> {
+            let mut direct = BTreeMap::new();
+            $(direct.insert(
+                stringify!($source),
+                columns.$source.iter().map(finite_sample).collect(),
+            );)*
+            direct.insert("distance", distance_series.clone());
+            direct.insert("elevation", elevation_base_series.clone());
+            direct.insert("barometric_altitude", barometric_altitude_series.clone());
+            direct
+        }
+    };
 }
+
+fn finite_sample(value: &Option<f64>) -> Option<f64> {
+    value.and_then(finite_f64)
+}
+
+ovrley_widgets::activity_input_columns!(direct_activity_columns);
 
 #[cfg(test)]
 mod tests {

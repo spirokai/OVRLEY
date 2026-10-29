@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
 import { withAltitudeEditorPresentation } from '@/lib/widget/widget-presentation'
 

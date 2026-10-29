@@ -102,8 +102,10 @@ dependencies = [
  "http",
  "http-cache-semantics",
  "log",
+ "objc2-app-kit",
  "open",
  "ovrley_core",
+ "ovrley_widgets",
  "reqwest",
  "serde",
  "serde_json",
@@ -227,7 +229,7 @@ dependencies = [
  "bitflags 2.10.0",
  "cexpr",
  "clang-sys",
- "itertools 0.12.1",
+ "itertools 0.10.5",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -859,7 +861,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1010,7 +1012,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2828,7 +2830,10 @@ dependencies = [
  "csv",
  "image",
  "log",
+ "objc2",
+ "objc2-foundation",
  "open",
+ "ovrley_widgets",
  "roxmltree",
  "same-file",
  "serde",
@@ -2837,6 +2842,20 @@ dependencies = [
  "telemetry-parser",
  "thiserror 2.0.17",
  "tzf-rs",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "ovrley_widgets"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "image",
+ "serde",
+ "serde_json",
+ "skia-safe",
+ "thiserror 2.0.17",
  "unicode-segmentation",
 ]
 
@@ -3249,7 +3268,7 @@ version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03da047801ff44bb6a4d407d4860c05fd70bb81714e6b2f3812603d5b145b042"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "itertools 0.12.1",
  "log",
  "multimap",
@@ -3366,7 +3385,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3764,7 +3783,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4151,9 +4170,8 @@ checksum = "56199f7ddabf13fe5074ce809e7d3f42b42ae711800501b5b16ea82ad029c39d"
 
 [[package]]
 name = "skia-bindings"
-version = "0.97.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6a38f4d460276ea40588c958396a9de0eec808c679009a5b52afdf6ebf34132"
+version = "0.153.3"
+source = "git+https://github.com/rust-skia/rust-skia?rev=b7f043e0b1e2a850e702245de811f01df1f6b0ff#b7f043e0b1e2a850e702245de811f01df1f6b0ff"
 dependencies = [
  "bindgen",
  "cc",
@@ -4168,9 +4186,8 @@ dependencies = [
 
 [[package]]
 name = "skia-safe"
-version = "0.97.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ecfc54fcd40dc5dea15dd2a84f8422cdb0f76c6a51ebb8835ce0b7ef590a21f"
+version = "0.153.3"
+source = "git+https://github.com/rust-skia/rust-skia?rev=b7f043e0b1e2a850e702245de811f01df1f6b0ff#b7f043e0b1e2a850e702245de811f01df1f6b0ff"
 dependencies = [
  "bitflags 2.10.0",
  "skia-bindings",
@@ -4824,7 +4841,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5670,7 +5687,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

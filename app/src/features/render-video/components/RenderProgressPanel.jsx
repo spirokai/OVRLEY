@@ -105,14 +105,14 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
           <div className="flex flex-col items-center">
             <div className="mb-1 flex items-center gap-1.5 text-muted-foreground">
               <Activity className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">{t('render-video.renderFps', 'Render FPS')}</span>
+              <span className="text-[0.741rem] font-bold uppercase tracking-wider">{t('render-video.renderFps', 'Render FPS')}</span>
             </div>
             <span className="text-lg font-mono font-bold tabular-nums text-foreground">{formatFps(renderingFps)}</span>
           </div>
           <div className="flex flex-col items-center">
             <div className="mb-1 flex items-center gap-1.5 text-muted-foreground">
               <Timer className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">{t('render-video.estRemaining', 'Est. Remaining')}</span>
+              <span className="text-[0.741rem] font-bold uppercase tracking-wider">{t('render-video.estRemaining', 'Est. Remaining')}</span>
             </div>
             <span className="text-lg font-mono font-bold tabular-nums text-foreground">{formatTime(estimatedSecondsRemaining)}</span>
           </div>
@@ -141,7 +141,7 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
       )}
 
       {!finished && (
-        <p className="text-center text-[10px] italic text-muted-foreground/50">
+        <p className="text-center text-[0.741rem] italic text-muted-foreground/50">
           {t('render-video.keepAppOpen', 'Please keep the application open during rendering')}
         </p>
       )}

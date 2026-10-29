@@ -8,7 +8,7 @@
 import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, syncSceneTimingFromConfig, syncSceneTimingToConfig } from '../store-utils'
 import { ensureWidgetIdsInConfig, replaceWidgetInConfig } from '../../lib/widget/widget-config'
 import { buildConfigWidgets } from '../../lib/widget/widget-presentation'
-import { getPrimarySelectionId, normalizeSelectionIds } from '../../features/overlay-editor/utils/overlayEditorHelpers'
+import { getPrimarySelectionId, normalizeSelectionIds } from '@/lib/widget/widget-config'
 
 /**
  * Reconciles selection after a config replacement.
@@ -90,6 +90,7 @@ export function createEditorSlice(set, get) {
     editorDocumentRevision: 0,
     selectedWidgetId: null,
     selectedWidgetIds: [],
+    isMarqueeSelecting: false,
     previewInterpolationEnabled: true,
     hasUnrenderedChanges: false,
     lastRenderedConfig: null,
@@ -269,6 +270,11 @@ export function createEditorSlice(set, get) {
     setWidgetSelection: (widgetIds, preferredWidgetId = null) =>
       set((state) => {
         setWidgetSelectionState(state, widgetIds, preferredWidgetId)
+      }),
+
+    setMarqueeSelecting: (isMarqueeSelecting) =>
+      set((state) => {
+        state.isMarqueeSelecting = isMarqueeSelecting
       }),
 
     setSelectedWidgetId: (widgetId) =>

@@ -7,12 +7,14 @@ import { RotateCcw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { WIDGET_ICONS } from '@/lib/widget/widget-icons'
-import { isStandardMetricWidgetType } from '@/lib/widget/standard-metrics'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { useWidgetManager } from '../hooks/useWidgetManager'
 import { PositionSection } from './widgetEditorSections'
 import BackdropWidgetEditor from './BackdropWidgetEditor'
 import RasterWidgetEditor from './RasterWidgetEditor'
 import ElevationWidgetEditor from './ElevationWidgetEditor'
+import DivingProfileWidgetEditor from './DivingProfileWidgetEditor'
+import RollingChartWidgetEditor from './RollingChartWidgetEditor'
 import GradientWidgetEditor from './GradientWidgetEditor'
 import MetricWidgetEditor from './metricWidget/MetricWidgetEditor'
 import RouteMapWidgetEditor from './RouteMapWidgetEditor'
@@ -21,6 +23,7 @@ import TimeWidgetEditor from './TimeWidgetEditor'
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAccordionAutoscroll } from '../hooks/useAccordionAutoscroll'
+import useHeldValue from '../hooks/useHeldValue'
 
 /**
  * Widget type → editor component dispatch map.
@@ -38,6 +41,8 @@ const WIDGET_EDITOR_MAP = {
   gradient: GradientWidgetEditor,
   course: RouteMapWidgetEditor,
   elevation: ElevationWidgetEditor,
+  diving_profile: DivingProfileWidgetEditor,
+  rolling_chart: RollingChartWidgetEditor,
 }
 
 /**
@@ -49,7 +54,7 @@ const WIDGET_EDITOR_MAP = {
  * @param {number} [sceneFontSize] - Scene fallback font size.
  * @returns {JSX.Element|null} Rendered editor component or null.
  */
-function renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField, sceneFontSize) {
+function renderWidgetEditor(widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft, setNumericField, sceneFontSize) {
   // Specialized editors take priority over the generic metric editor
   const Editor = WIDGET_EDITOR_MAP[widget.type]
   if (Editor) {
@@ -57,20 +62,20 @@ function renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWi
       <Editor
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
         setNumericField={setNumericField}
         sceneFontSize={sceneFontSize}
       />
     )
   }
-  if (isStandardMetricWidgetType(widget.type)) {
+  if (WIDGET_TYPE_DEFINITIONS[widget.type].metric) {
     return (
       <MetricWidgetEditor
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
         setNumericField={setNumericField}
       />
     )
@@ -92,14 +97,17 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
     config,
     widgets,
     selectedWidgetId,
+    isMarqueeSelecting,
     updateWidgetData,
-    updateWidgetSize,
-    commitWidgetSize,
+    updateWidgetDraft,
+    commitWidgetDraft,
     setNumericField,
     deleteWidget,
     resetWidget,
     setSelectedWidgetId,
   } = useWidgetManager({ widgetLiveEdits })
+  // The open item and its autoscroll wait for the marquee to finish.
+  const openWidgetId = useHeldValue(selectedWidgetId, isMarqueeSelecting)
 
   const handleAccordionAnimation = (widgetId, phase, event) => {
     if (event.target !== event.currentTarget) return
@@ -124,8 +132,8 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
           <Accordion
             type="single"
             collapsible
-            className="border-b border-border/70"
-            value={selectedWidgetId || undefined}
+            className="border-t border-r border-border/70"
+            value={openWidgetId || undefined}
             onValueChange={(value) => setSelectedWidgetId(value || null)}
           >
             {widgets.map((widget) => {
@@ -139,10 +147,10 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
                       else accordionItemsRef.current.delete(widget.id)
                     }}
                     value={widget.id}
-                    className="overflow-hidden border border-transparent border-b-none transition-all data-[state=open]:border-accent-border"
+                    className="relative border-b border-border/70 data-[state=open]:after:pointer-events-none data-[state=open]:after:absolute data-[state=open]:after:left-0 data-[state=open]:after:-right-px data-[state=open]:after:-top-px data-[state=open]:after:-bottom-px data-[state=open]:after:z-30 data-[state=open]:after:border data-[state=open]:after:border-accent-border data-[state=open]:after:content-['']"
                   >
                     <div className="relative group/widget-row">
-                      <AccordionTrigger className="group/trigger w-full px-3 py-3 pr-10 border-t border-border/70 data-[state=open]:border-r-transparent hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary ">
+                      <AccordionTrigger className="group/trigger w-full px-3 py-3 pr-10 hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary">
                         <div className="flex items-center gap-2.5 flex-1 min-w-0 text-muted-foreground transition-colors group-hover/widget-row:text-primary group-data-[state=open]/trigger:text-primary">
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded">
                             <Icon className="h-3.5 w-3.5" />
@@ -176,7 +184,8 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
                         <PositionSection
                           widget={widget}
                           setNumericField={setNumericField}
-                          updateWidgetData={updateWidgetData}
+                          updateWidgetDraft={updateWidgetDraft}
+                          commitWidgetDraft={commitWidgetDraft}
                           headerAction={
                             <Button
                               variant="ghost"
@@ -188,7 +197,14 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
                             </Button>
                           }
                         />
-                        {renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField, config?.scene?.font_size)}
+                        {renderWidgetEditor(
+                          widget,
+                          updateWidgetData,
+                          updateWidgetDraft,
+                          commitWidgetDraft,
+                          setNumericField,
+                          config?.scene?.font_size,
+                        )}
                       </div>
                     </AccordionContent>
                   </AccordionItem>

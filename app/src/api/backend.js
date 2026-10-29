@@ -2,7 +2,7 @@
  * Implements API helpers for backend.
  */
 
-import { rasterResourceIds } from '@/lib/widget/raster-resources'
+import { rasterResourceIds } from '@/lib/widget/widget-config'
 
 /**
  * Shared Tauri runtime detection.
@@ -178,6 +178,30 @@ export async function finalizeActivity(rawActivity) {
   })
 }
 
+/** @param {string} activityId Native snapshot identity. @returns {Promise<ArrayBuffer>} Original-density activity bytes. */
+export function previewActivity(activityId) {
+  return invokeCommand('backend_preview_activity', { activityId })
+}
+
+/**
+ * @param {string} activityId Native snapshot identity.
+ * @param {{distance: number, unit: string}} length Split length configured on a splits widget.
+ * @returns {Promise<ArrayBuffer>} Serialized split table derived by Rust core.
+ */
+export function previewSplitTable(activityId, length) {
+  return invokeCommand('backend_preview_split_table', { activityId, length })
+}
+
+/** @param {string} activityId Snapshot no longer owned by the editor or stashed telemetry. @returns {Promise<void>} */
+export function releasePreviewActivity(activityId) {
+  return invokeCommand('backend_release_preview_activity', { activityId })
+}
+
+/** @param {object} request Canonical font identity and optional explicit label styling; Rust owns metric defaults. @returns {Promise<ArrayBuffer>} Serialized Skia face. */
+export function previewFont(request) {
+  return invokeCommand('backend_preview_font', { request })
+}
+
 /**
  * Parses a native CSV activity path through the Rust columnar pipeline.
  *
@@ -205,6 +229,24 @@ export async function parseVboActivity(path) {
  */
 export async function parseTcxActivity(path) {
   return invokeCommand('backend_parse_tcx_activity', { path })
+}
+
+/**
+ * Parses and finalizes a native UDDF dive using the Rust parser.
+ * @param {string} path Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseUddfActivity(path) {
+  return invokeCommand('backend_parse_uddf_activity', { path })
+}
+
+/**
+ * Parses and finalizes a native Subsurface XML/SSRF dive using the Rust parser.
+ * @param {string} path Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseSubsurfaceActivity(path) {
+  return invokeCommand('backend_parse_subsurface_activity', { path })
 }
 
 /**

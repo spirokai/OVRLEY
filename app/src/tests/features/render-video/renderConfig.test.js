@@ -5,7 +5,7 @@
  * state into the backend-ready render payload.
  */
 
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 import { DEFAULT_EXPORT_RANGE } from '@/lib/template/template-constants'
 import { createBatchRenderTemplate, createRenderEffectiveConfig } from '@/features/render-video/utils/renderConfig'
 
@@ -20,7 +20,7 @@ describe('render config preparation', () => {
         end: 50,
       },
       labels: [],
-      values: [{ id: 'value-1', value: 'speed', x: 10, y: 20, content_alignment: 'right' }],
+      values: [{ id: 'value-1', value: 'speed', display_type: 'text', x: 10, y: 20, content_alignment: 'right' }],
       plots: [],
     }
     const renderConfig = createRenderEffectiveConfig({
@@ -53,7 +53,7 @@ describe('render config preparation', () => {
     expect(renderConfig.values[0].content_alignment).toBe('right')
   })
 
-  test('removes lean-angle ephemeral frame dimensions from the backend payload', () => {
+  test('sends the canonical lean-angle diameter config to the backend', () => {
     const config = {
       scene: {
         width: 1920,

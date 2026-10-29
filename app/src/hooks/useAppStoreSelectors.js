@@ -1,6 +1,45 @@
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { isRendererBusy } from '@/features/render-video/utils/renderRequest'
+import { formatClockDuration } from '@/lib/time-format'
+import { clamp } from '@/lib/utils'
+
+function selectOverlayPreview(state) {
+  return {
+    exportRange: state.renderSettings.range,
+    importedVideoPath: state.importedVideoPath,
+    importedVideoDuration: state.importedVideoDuration,
+    videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+    parsedActivity: state.parsedActivity,
+    disabledLaps: state.disabledLaps,
+    importedBackgroundImagePath: state.importedBackgroundImagePath,
+    fallbackDurationSeconds: state.fallbackDurationSeconds,
+  }
+}
+
+/** @returns {object} Source data and canonical timing for the overlay preview. The playhead is excluded so playback frames skip the editor. */
+export function useOverlayPreviewStore() {
+  return useStore(useShallow(selectOverlayPreview))
+}
+
+/**
+ * Subscribes to the playhead only while the editor shows the video sync workspace, which renders it directly.
+ * @param {boolean} enabled Whether video sync mode is active.
+ * @returns {number|null} Store playhead in video sync mode, otherwise null.
+ */
+export function useVideoSyncPreviewSecond(enabled) {
+  return useStore((state) => (enabled ? state.selectedSecond : null))
+}
+
+/**
+ * Formats the clamped playhead for the player clock; the formatted string changes once per displayed second.
+ * @param {number} timelineMinimum Earliest timeline second.
+ * @param {number} totalDuration Timeline duration in seconds.
+ * @returns {string} Formatted playhead clock.
+ */
+export function usePlayheadClockLabel(timelineMinimum, totalDuration) {
+  return useStore((state) => formatClockDuration(clamp(state.selectedSecond, timelineMinimum, totalDuration)))
+}
 
 export function useLayoutStore() {
   return useStore(
@@ -49,7 +88,9 @@ export function useActivityStore() {
       activityFilename: state.activitySource?.path?.split(/[/\\]/).at(-1) ?? state.activitySummary?.fileName ?? null,
       activitySource: state.activitySource,
       clearActivityFile: state.clearActivityFile,
+      disabledLaps: state.disabledLaps,
       parsedActivitySource: state.parsedActivitySource,
+      setLapEnabled: state.setLapEnabled,
       setErrorMessage: state.setErrorMessage,
       setProcessing: state.setProcessing,
     })),

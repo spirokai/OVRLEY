@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
+import { timeToSeconds } from '@/lib/time-format'
 import { parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import useStore from '@/store/useStore'
 

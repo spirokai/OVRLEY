@@ -1,0 +1,258 @@
+//! Linear gauge metric widget validation.
+//!
+//! Validates a raw `ValueConfig` into a `ValidatedLinearGaugeWidget` when the
+//! display type is `linear`. All gauge-specific fields (orientation,
+//! track styling, labels) are required and validated here.
+
+use crate::error::{WidgetError, WidgetResult};
+use crate::model::standard_metrics::standard_metric_definition;
+use crate::model::types::{DisplayType, MetricKind, TrackFillStyle};
+use crate::model::validation::{
+    require_bool, require_f32, require_hex_color, require_positive_f32, require_string,
+};
+use crate::render::track_fill::{validate_track_fill_color, TrackFillColor};
+use crate::widgets::gauges::bar_geometry::{
+    resolve_bar_style_geometry, track_corner_radius_max, ResolvedBarGeometry,
+};
+use crate::widgets::value::config::ValueConfig;
+use crate::widgets::value::validation::normalize_starting_altitude_m;
+
+/// Validated linear gauge orientation, restricted to horizontal or vertical.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ValidatedLinearGaugeOrientation {
+    Horizontal,
+    Vertical,
+}
+
+/// Validated min/max label position, constrained by gauge orientation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ValidatedLinearGaugeLabelPosition {
+    Left,
+    Right,
+    Bottom,
+    Top,
+}
+
+/// Fully validated linear gauge widget configuration.
+#[derive(Clone, Debug)]
+pub struct ValidatedLinearGaugeWidget {
+    pub metric: MetricKind,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub rotation: f32,
+    pub display_type: DisplayType,
+    pub orientation: ValidatedLinearGaugeOrientation,
+    pub track_corner_radius: f32,
+    pub track_border_thickness: f32,
+    pub track_border_color: String,
+    pub track_empty_color: String,
+    pub track_empty_opacity: f32,
+    pub track_filled_color: TrackFillColor,
+    pub track_filled_opacity: f32,
+    pub track_fill_flat: bool,
+    pub track_fill_style: TrackFillStyle,
+    pub bar_geometry: Option<ResolvedBarGeometry>,
+    pub show_min_max_labels: bool,
+    pub min_max_label_font: String,
+    pub min_max_label_font_size: f32,
+    pub min_max_label_position: ValidatedLinearGaugeLabelPosition,
+    pub min_max_label_color: String,
+    pub display_unit: Option<String>,
+    pub starting_altitude_m: Option<f64>,
+}
+
+/// Validates a raw value config as a linear gauge widget.
+///
+/// All gauge-specific fields are required (not optional) and are checked
+/// for valid ranges (opacity 0-1, orientation horizontal/vertical, etc.).
+pub fn validate_linear_gauge(
+    value: ValueConfig,
+    index: usize,
+) -> WidgetResult<ValidatedLinearGaugeWidget> {
+    let p = |f: &str| format!("values[{index}].{f}");
+
+    super::validate_supported_metric(value.value, DisplayType::Linear)?;
+
+    if value.display_type != DisplayType::Linear {
+        return Err(WidgetError::Config(format!(
+            "{}: expected linear display_type, got '{}'",
+            p("display_type"),
+            value.display_type.as_str()
+        )));
+    }
+
+    require_f32(Some(value.x), &p("x"))?;
+    require_f32(Some(value.y), &p("y"))?;
+    let width = require_positive_f32(value.width, &p("width"))?;
+    let height = require_positive_f32(value.height, &p("height"))?;
+
+    let orientation = match require_string(value.orientation, &p("orientation"))?.as_str() {
+        "horizontal" => ValidatedLinearGaugeOrientation::Horizontal,
+        "vertical" => ValidatedLinearGaugeOrientation::Vertical,
+        other => {
+            return Err(WidgetError::Config(format!(
+                "{}: expected horizontal or vertical, got {other}",
+                p("orientation")
+            )));
+        }
+    };
+
+    let min_max_label_position = match (
+        orientation,
+        require_string(value.min_max_label_position, &p("min_max_label_position"))?.as_str(),
+    ) {
+        (ValidatedLinearGaugeOrientation::Horizontal, "bottom") => {
+            ValidatedLinearGaugeLabelPosition::Bottom
+        }
+        (ValidatedLinearGaugeOrientation::Horizontal, "top") => {
+            ValidatedLinearGaugeLabelPosition::Top
+        }
+        (ValidatedLinearGaugeOrientation::Vertical, "left") => {
+            ValidatedLinearGaugeLabelPosition::Left
+        }
+        (ValidatedLinearGaugeOrientation::Vertical, "right") => {
+            ValidatedLinearGaugeLabelPosition::Right
+        }
+        (ValidatedLinearGaugeOrientation::Horizontal, other) => {
+            return Err(WidgetError::Config(format!(
+                "{}: expected bottom or top for horizontal gauge, got {other}",
+                p("min_max_label_position")
+            )));
+        }
+        (ValidatedLinearGaugeOrientation::Vertical, other) => {
+            return Err(WidgetError::Config(format!(
+                "{}: expected left or right for vertical gauge, got {other}",
+                p("min_max_label_position")
+            )));
+        }
+    };
+
+    let track_empty_opacity = require_f32(value.track_empty_opacity, &p("track_empty_opacity"))?;
+    let track_filled_opacity = require_f32(value.track_filled_opacity, &p("track_filled_opacity"))?;
+    let raw_corner_radius = require_f32(value.track_corner_radius, &p("track_corner_radius"))?;
+    if raw_corner_radius < 0.0 {
+        return Err(WidgetError::Config(format!(
+            "{}: must be >= 0",
+            p("track_corner_radius")
+        )));
+    }
+    for (field, opacity) in [
+        ("track_empty_opacity", track_empty_opacity),
+        ("track_filled_opacity", track_filled_opacity),
+    ] {
+        if !(0.0..=1.0).contains(&opacity) {
+            return Err(WidgetError::Config(format!(
+                "{}: must be 0.0..1.0, got {opacity}",
+                p(field)
+            )));
+        }
+    }
+
+    let track_border_thickness =
+        require_f32(value.track_border_thickness, &p("track_border_thickness"))?;
+    if track_border_thickness < 0.0 {
+        return Err(WidgetError::Config(format!(
+            "{}: must be >= 0, got {track_border_thickness}",
+            p("track_border_thickness")
+        )));
+    }
+    let track_fill_style = value.track_fill_style.unwrap_or_default();
+    let bar_span = match orientation {
+        ValidatedLinearGaugeOrientation::Horizontal => width as f32,
+        ValidatedLinearGaugeOrientation::Vertical => height as f32,
+    };
+    let bar_geometry = resolve_bar_style_geometry(
+        track_fill_style,
+        bar_span,
+        value.bar_count,
+        value.bar_gap,
+        &p("track_fill_style"),
+    )?;
+    let cross_extent = match orientation {
+        ValidatedLinearGaugeOrientation::Horizontal => height as f32,
+        ValidatedLinearGaugeOrientation::Vertical => width as f32,
+    };
+    let track_corner_radius = raw_corner_radius.clamp(
+        0.0,
+        track_corner_radius_max(cross_extent, bar_span, bar_geometry.as_ref()),
+    );
+
+    let display_unit = if value.value == MetricKind::Altitude {
+        Some(require_string(value.display_unit, &p("display_unit"))?)
+    } else {
+        value.display_unit
+    };
+    let starting_altitude_m = normalize_starting_altitude_m(
+        value.value,
+        value.starting_altitude,
+        display_unit.as_deref(),
+        &p("starting_altitude"),
+        &p("display_unit"),
+    )?;
+    // Absence retains canonical-unit labels; a supplied unit must be valid for this metric.
+    if let Some(unit) = &display_unit {
+        let definition =
+            standard_metric_definition(value.value).expect("supported standard gauge metric");
+        if unit != &definition.default_display_unit
+            && !definition
+                .supported_display_units
+                .iter()
+                .any(|option| &option.value == unit)
+        {
+            return Err(WidgetError::Config(format!(
+                "{}: unsupported display unit '{unit}'",
+                p("display_unit")
+            )));
+        }
+    }
+
+    Ok(ValidatedLinearGaugeWidget {
+        metric: value.value,
+        x: value.x,
+        y: value.y,
+        width,
+        height,
+        rotation: require_f32(Some(value.rotation.unwrap_or(0.0)), &p("rotation"))?,
+        display_type: value.display_type,
+        orientation,
+        track_corner_radius,
+        track_border_thickness,
+        track_border_color: require_hex_color(
+            value.track_border_color.as_deref(),
+            &p("track_border_color"),
+        )?,
+        track_empty_color: require_hex_color(
+            value.track_empty_color.as_deref(),
+            &p("track_empty_color"),
+        )?,
+        track_empty_opacity,
+        track_filled_color: validate_track_fill_color(
+            value.track_filled_color.as_deref(),
+            value.track_filled_gradient,
+            value.track_filled_gradient_stops,
+            p,
+        )?,
+        track_filled_opacity,
+        track_fill_flat: require_bool(value.track_fill_flat, &p("track_fill_flat"))?,
+        track_fill_style,
+        bar_geometry,
+        show_min_max_labels: require_bool(value.show_min_max_labels, &p("show_min_max_labels"))?,
+        min_max_label_font: super::validate_label_font(
+            value.min_max_label_font,
+            &p("min_max_label_font"),
+        )?,
+        min_max_label_font_size: require_positive_f32(
+            value.min_max_label_font_size,
+            &p("min_max_label_font_size"),
+        )?,
+        min_max_label_position,
+        min_max_label_color: require_hex_color(
+            value.min_max_label_color.as_deref(),
+            &p("min_max_label_color"),
+        )?,
+        display_unit,
+        starting_altitude_m,
+    })
+}

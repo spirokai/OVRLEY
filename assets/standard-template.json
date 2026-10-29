@@ -5,15 +5,16 @@
     "shadow_color": "#000000",
     "shadow_strength": 0,
     "shadow_distance": 0,
-    "font_values": "Arial.ttf",
-    "font_text": "Arial.ttf",
+    "font_values": "Oxanium.ttf",
+    "font_text": "Oxanium.ttf",
     "color_values": "#ffffff",
     "color_text": "#ffffff",
     "color_icons": "#ffffff",
     "color_units": "#ffffff",
     "font_size": 30,
     "opacity": 1,
-    "scale": 1
+    "scale": 1,
+    "fixed_width_digits": true
   },
   "fileFormat": "ovrley-template",
   "fileVersion": 3,
@@ -38,7 +39,8 @@
     "border_color",
     "border_thickness",
     "border_strength",
-    "border_distance"
+    "border_distance",
+    "fixed_width_digits"
   ],
   "renderTimeOnlyKeys": [
     "composite_video_path",

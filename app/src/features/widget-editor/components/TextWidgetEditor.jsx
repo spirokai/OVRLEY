@@ -13,15 +13,15 @@ import { useTranslation } from 'react-i18next'
  * @param {*} props.updateWidgetData - Value for update widget data.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function TextWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function TextWidgetEditor({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   return (
     <>
       <FontSection
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
         title={t('widget-editor.typography', 'Typography')}
         showTextInput
         colorLabel={t('widget-editor.color', 'Color')}

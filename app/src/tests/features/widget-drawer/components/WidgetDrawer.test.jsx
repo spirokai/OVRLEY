@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, test } from 'vitest'
+import { DISPLAY_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
+import { beforeEach, describe, expect, test } from 'vite-plus/test'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { WidgetDrawerContent as WidgetDrawerView } from '@/features/widget-drawer'
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
-import { BACKDROP_RECTANGLE_DEFAULTS } from '@/lib/widget/standard-widgets'
+
 import { cloneSerializable, DEFAULT_CONFIG } from '@/store/store-utils'
 import useStore from '@/store/useStore'
 
@@ -35,12 +36,34 @@ describe('WidgetDrawerContent', () => {
     await addBackdropRectangle(user)
 
     const [backdrop] = useStore.getState().config.backdrops
-    const { width, height, corner_radius, round_top_left, round_top_right, round_bottom_left, round_bottom_right, ...sharedDefaults } =
-      BACKDROP_RECTANGLE_DEFAULTS
+    const {
+      width,
+      height,
+      corner_radius,
+      round_top_left,
+      round_top_right,
+      round_bottom_left,
+      round_bottom_right,
+      edge_strips,
+      edge_strip_thickness,
+      edge_strip_color,
+      ...sharedDefaults
+    } = DISPLAY_TYPE_DEFINITIONS.rectangle.variantDefaults
     expect(backdrop).toMatchObject({
       ...sharedDefaults,
       display_variants: {
-        rectangle: { width, height, corner_radius, round_top_left, round_top_right, round_bottom_left, round_bottom_right },
+        rectangle: {
+          width,
+          height,
+          corner_radius,
+          round_top_left,
+          round_top_right,
+          round_bottom_left,
+          round_bottom_right,
+          edge_strips,
+          edge_strip_thickness,
+          edge_strip_color,
+        },
       },
     })
     expect(backdrop.id).toMatch(/^widget-\d+$/)

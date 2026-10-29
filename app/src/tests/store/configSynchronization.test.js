@@ -9,7 +9,7 @@
  * - Mixed update ordering must work without relying on timer windows.
  */
 
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import { createDurableTemplateState } from '@/lib/template/template-state'
 import { cloneSerializable, DEFAULT_CONFIG } from '@/store/store-utils'
 

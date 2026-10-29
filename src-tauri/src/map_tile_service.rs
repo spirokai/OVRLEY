@@ -167,7 +167,10 @@ impl MapTileService {
     }
 
     #[cfg(test)]
-    pub(crate) fn with_style_source_url(mut self, style_source_url: String) -> Result<Self, String> {
+    pub(crate) fn with_style_source_url(
+        mut self,
+        style_source_url: String,
+    ) -> Result<Self, String> {
         if !style_source_url.contains("{style}") {
             return Err("Style source URL must contain a {style} placeholder".to_string());
         }

@@ -1,33 +1,148 @@
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 /**
- * Characterization test for the useOverlayEditorState hook.
- *
- * Pins down the current public contract so that decomposition
- * cannot accidentally change what callers receive. Verifies the
- * hook is importable as a default export with the expected
- * function signature.
+ * Preview state and stable WASM canvas attachment across document edits.
  */
 
-import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
-import useOverlayEditorState from '@/features/overlay-editor/hooks/useOverlayEditorState'
-import { getPrimarySelectionId, normalizeSelectionIds } from '@/features/overlay-editor/utils/overlayEditorHelpers'
+import { act, render, renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
+import useOverlayEditorStateView from '@/features/overlay-editor/hooks/useOverlayEditorState'
+import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
+import { WasmWidgetCanvas } from '@/features/wasm-widgets/components/WasmWidgetCanvas'
+import { presentWidgetGeometry } from '@/features/wasm-widgets/utils/widgetPresentation'
+
+import { getPrimarySelectionId, normalizeSelectionIds } from '@/lib/widget/widget-config'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
+import { buildDisplayTypeChangeUpdate } from '@/lib/widget/widget-resolver'
+
+function useOverlayEditorState(options) {
+  const widgetLiveEdits = useWidgetDraftState()
+  const preview = useOverlayEditorStateView({
+    editorShell: { activeKeyboardWorkspace: 'editor' },
+    gridVisible: false,
+    snapToGrid: false,
+    zoomLevel: 1,
+    onZoomLevelChange: vi.fn(),
+    ...options,
+    widgetLiveEdits,
+  })
+  return { ...preview, widgetLiveEdits }
+}
 
 function resetStore() {
   useStore.setState(useStore.getInitialState(), true)
 }
 
+const globalDefaults = { ...DEFAULT_GLOBAL_DEFAULTS }
+
+function WasmCanvases({ config, attach }) {
+  const state = useOverlayEditorState({ config, globalDefaults, onConfigChange: vi.fn() })
+  return state.widgets.map((widget) => (
+    <WasmWidgetCanvas key={widget.id} widget={widget} attach={attach} registerNode={state.widgetRefCallbacks[widget.id]} />
+  ))
+}
+
 describe('useOverlayEditorState module contract', () => {
   beforeEach(resetStore)
 
-  test('exports a function as default', () => {
-    expect(typeof useOverlayEditorState).toBe('function')
+  test('keeps existing canvases attached across appearance edits and widget additions', () => {
+    const speed = { id: 'speed-widget', value: 'speed', x: 0, y: 0, display_type: 'text', opacity: 1 }
+    const config = { ...DEFAULT_CONFIG, values: [speed] }
+    const attach = vi.fn()
+    const { rerender } = render(<WasmCanvases config={config} attach={attach} />)
+    const canvas = attach.mock.calls[0][1]
+    expect(attach).toHaveBeenCalledTimes(1)
+
+    const editedSpeed = { ...speed, opacity: 0.5 }
+    rerender(<WasmCanvases config={{ ...config, values: [editedSpeed] }} attach={attach} />)
+    expect(attach).toHaveBeenCalledTimes(1)
+
+    const otherSpeed = { ...speed, id: 'other-speed' }
+    rerender(<WasmCanvases config={{ ...config, values: [editedSpeed, otherSpeed] }} attach={attach} />)
+    expect(attach).toHaveBeenCalledTimes(2)
+    expect(attach.mock.calls[0]).toEqual(['speed-widget', canvas])
+
+    rerender(<WasmCanvases config={{ ...config, values: [otherSpeed] }} attach={attach} />)
+    expect(attach).toHaveBeenCalledTimes(3)
+    expect(attach.mock.calls[2]).toEqual(['speed-widget', null])
   })
 
-  test('accepts config, globalDefaults, onConfigChange, zoomLevel, onZoomLevelChange', () => {
-    expect(useOverlayEditorState.length).toBe(1)
+  test('route rotation centers the selection while its sibling raster stays in scene coordinates', () => {
+    const route = { ...WIDGET_TYPE_DEFINITIONS.course.defaults, id: 'route-widget' }
+    const config = { ...DEFAULT_CONFIG, plots: [route] }
+    const attach = vi.fn()
+    const { rerender, unmount } = render(<WasmCanvases config={config} attach={attach} />)
+    const [, canvas, target] = attach.mock.calls[0]
+    expect(target.dataset.widgetId).toBe(route.id)
+    expect(canvas.parentElement).toBe(target.parentElement)
+    for (const rotation of [0, 45, 135]) {
+      presentWidgetGeometry(
+        canvas,
+        {
+          left: 90,
+          top: 40,
+          width: 180,
+          height: 150,
+          content_width: 160,
+          content: { left: 100, top: 60, width: 160, height: 80 },
+          rotation,
+          rotation_origin: [80, 40],
+        },
+        target,
+      )
+      expect(target.style.transformOrigin).toBe('80px 40px')
+      expect(target.style.left).toBe('100px')
+      expect(target.style.top).toBe('60px')
+      expect(canvas.style.left).toBe('90px')
+      expect(canvas.style.transform).toBe('none')
+    }
+    // Fractional content keeps a whole-pixel offset plus a translate, so the box is exact.
+    presentWidgetGeometry(
+      canvas,
+      {
+        left: 90,
+        top: 40,
+        width: 180,
+        height: 150,
+        content_width: 160.5,
+        content: { left: 100.25, top: 60.75, width: 160.5, height: 80.25 },
+        rotation: 0,
+        rotation_origin: [80.25, 40.125],
+      },
+      target,
+    )
+    expect(target.style.left).toBe('100px')
+    expect(target.style.top).toBe('60px')
+    expect(target.style.width).toBe('160.5px')
+    expect(target.style.height).toBe('80.25px')
+    expect(target.style.transform).toBe('translate(0.25px, 0.75px) rotate(0deg)')
+    expect(target.style.transformOrigin).toBe('80.25px 40.125px')
+    expect(canvas.style.left).toBe('90px')
+    rerender(<WasmCanvases config={{ ...config, plots: [{ ...route, rotation: 90 }] }} attach={attach} />)
+    expect(attach).toHaveBeenCalledTimes(1)
+    unmount()
+    expect(attach.mock.lastCall[1]).toBeNull()
+  })
+
+  test('keeps node registration stable across display changes', () => {
+    const speed = { id: 'speed-widget', value: 'speed', x: 0, y: 0, display_type: 'text' }
+    const { result, rerender } = renderHook(({ config }) => useOverlayEditorState({ config, globalDefaults, onConfigChange: vi.fn() }), {
+      initialProps: { config: { ...DEFAULT_CONFIG, values: [speed] } },
+    })
+    const wasmRef = result.current.widgetRefCallbacks['speed-widget']
+    const node = document.createElement('canvas')
+    act(() => wasmRef(node))
+    expect(result.current.widgetLiveEdits.getWidgetNode('speed-widget')).toBe(node)
+
+    rerender({ config: { ...DEFAULT_CONFIG, values: [{ ...speed, ...buildDisplayTypeChangeUpdate(speed, 'linear') }] } })
+    const linearRef = result.current.widgetRefCallbacks['speed-widget']
+    expect(linearRef).toBe(wasmRef)
+    act(() => {
+      wasmRef(null)
+      linearRef(node)
+    })
+    expect(result.current.widgetLiveEdits.getWidgetNode('speed-widget')).toBe(node)
   })
 
   test('keeps widgets and interaction refs available after the playhead leaves activity data', () => {
@@ -51,8 +166,9 @@ describe('useOverlayEditorState module contract', () => {
       }),
     )
 
-    expect(result.current.previewSecond).toBe(9)
-    expect(result.current.renderedWidgets).toHaveLength(1)
+    // Outside video sync mode the playhead reaches the WASM session through a store subscription, not editor state.
+    expect(result.current.previewSecond).toBeNull()
+    expect(result.current.widgets).toHaveLength(1)
     expect(result.current.widgetRefCallbacks['speed-widget']).toEqual(expect.any(Function))
 
     act(() => {
@@ -64,12 +180,12 @@ describe('useOverlayEditorState module contract', () => {
       })
     })
 
-    expect(result.current.previewSecond).toBe(9)
+    expect(result.current.previewSecond).toBeNull()
     expect(result.current.activity).toEqual({
       trim_end_seconds: 3,
       metadata: { duration_seconds: 3 },
     })
-    expect(result.current.renderedWidgets).toHaveLength(1)
+    expect(result.current.widgets).toHaveLength(1)
     expect(result.current.widgetRefCallbacks['speed-widget']).toEqual(expect.any(Function))
   })
 })

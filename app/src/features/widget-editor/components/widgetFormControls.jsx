@@ -3,7 +3,7 @@
  * Each component is a thin wrapper around a shadcn/ui primitive with consistent widget-editor styling.
  */
 
-/* eslint-disable react-refresh/only-export-components */
+/* oxlint-disable react/only-export-components */
 
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
@@ -60,7 +60,7 @@ const CONTENT_ALIGNMENT_OPTIONS = [
 ]
 
 export const CONTROL_CLASS = 'h-9 border-border/70 bg-surface text-xs'
-const FIELD_LABEL_CLASS = 'h-3 text-[9px] text-muted-foreground uppercase font-bold'
+export const FIELD_LABEL_CLASS = 'h-3 text-[0.667rem] text-muted-foreground uppercase font-bold'
 
 /**
  * Renders the alignment selector for intrinsic value widgets.
@@ -214,7 +214,7 @@ export function NumberField({ label, value, onChange, min, max, disabled = false
           className={cn(CONTROL_CLASS, suffix && 'pr-16')}
         />
         {suffix ? (
-          <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center text-[10px] font-mono text-muted-foreground">
+          <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center text-[0.741rem] font-mono text-muted-foreground">
             {suffix}
           </span>
         ) : null}
@@ -232,17 +232,28 @@ export function NumberField({ label, value, onChange, min, max, disabled = false
  * @param {string} [props.defaultLabel='Color'] - Default translation used when label is absent.
  * @param {*} props.value - Input value processed by the helper.
  * @param {*} props.onChange - Callback invoked to change.
+ * @param {React.ReactNode} [props.trailing] - Optional control aligned to the end of the label row.
  * @returns {JSX.Element} Rendered component output.
  */
-export function ColorField({ label, labelKey = 'widget-editor.color', defaultLabel = 'Color', value, onChange, disabled = false }) {
+export function ColorField({ label, labelKey = 'widget-editor.color', defaultLabel = 'Color', value, onChange, disabled = false, trailing = null }) {
   const { t } = useTranslation()
   const resolvedLabel = label ?? t(labelKey, defaultLabel)
+  const fieldLabel = (
+    <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
+      {resolvedLabel}
+    </Label>
+  )
 
   return (
     <div className="space-y-1">
-      <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
-        {resolvedLabel}
-      </Label>
+      {trailing ? (
+        <div className="flex h-3 items-center justify-between gap-2">
+          {fieldLabel}
+          {trailing}
+        </div>
+      ) : (
+        fieldLabel
+      )}
       <HexColorPicker value={value} onChange={onChange} disabled={disabled} triggerClassName="justify-start" />
     </div>
   )
@@ -255,12 +266,12 @@ function SliderValueInput({ valueDisplay, valueScale, value, min, max, step, dis
     onCommit: (displayValue) => {
       const nextValue = displayValue / valueScale
       onSliderChange(nextValue)
-      onSliderCommit?.(nextValue)
+      onSliderCommit(nextValue)
     },
   })
 
   return (
-    <div className="group relative flex h-3.75 min-w-[5ch] shrink-0 items-center justify-end text-right text-[10px] leading-none font-mono text-muted-foreground">
+    <div className="group relative flex h-3.75 min-w-[5ch] shrink-0 items-center justify-end text-right text-[0.741rem] leading-none font-mono text-muted-foreground">
       <span
         aria-hidden="true"
         className={cn('pointer-events-none group-focus-within:invisible group-has-aria-invalid:invisible', disabled && 'opacity-50')}
@@ -294,8 +305,8 @@ function SliderValueInput({ valueDisplay, valueScale, value, min, max, step, dis
  * @param {*} props.step - Value for step.
  * @param {'ltr'|'rtl'} [props.dir='ltr'] - Slider direction.
  * @param {boolean} props.integerDisplay - Whether to round the displayed value.
- * @param {*} props.onSliderChange - Callback invoked to slider change.
- * @param {*} props.onSliderCommit - Callback invoked when slider interaction ends.
+ * @param {Function} props.onSliderChange - Live value callback; editors write it to a draft published once per frame.
+ * @param {Function} props.onSliderCommit - Required commit callback when slider interaction or a typed edit ends.
  * @param {*} props.valueDisplay - Value for value display.
  * @param {string} [props.suffix=''] - Unit shown in the inactive readout.
  * @param {boolean} [props.editable=false] - Enables editing the readout in scene settings and widget editors.
@@ -340,7 +351,7 @@ export function SliderField({
             onSliderCommit={onSliderCommit}
           />
         ) : (
-          <span className={cn('text-[10px] font-mono text-muted-foreground', disabled && 'opacity-50')}>{displayValue}</span>
+          <span className={cn('text-[0.741rem] font-mono text-muted-foreground', disabled && 'opacity-50')}>{displayValue}</span>
         )}
       </div>
       <div className="flex items-center gap-3 px-1">
@@ -353,24 +364,12 @@ export function SliderField({
           disabled={disabled}
           value={[value]}
           onValueChange={([nextValue]) => onSliderChange(nextValue)}
-          onValueCommit={onSliderCommit ? ([nextValue]) => onSliderCommit(nextValue) : undefined}
+          onValueCommit={([nextValue]) => onSliderCommit(nextValue)}
           className="flex-1 py-2"
         />
       </div>
     </div>
   )
-}
-
-/**
- * Renders a size slider with a separate interaction commit callback.
- *
- * @param {object} props - Slider props.
- * @param {Function} props.onChange - Live size callback.
- * @param {Function} [props.onCommit] - Size commit callback.
- * @returns {JSX.Element} Rendered size slider.
- */
-export function SizeSlider({ onChange, onCommit, ...props }) {
-  return <SliderField {...props} editable integerDisplay onSliderChange={onChange} onSliderCommit={onCommit} />
 }
 
 /**
@@ -381,8 +380,9 @@ export function SizeSlider({ onChange, onCommit, ...props }) {
  * @param {*} props.checked - Value for checked.
  * @param {*} props.onCheckedChange - Callback invoked to checked change.
  * @param {*} props.className - Additional class names to merge into the element.
+ * @param {boolean} [props.disabled=false] - Whether the switch is inert.
  * @returns {JSX.Element} Rendered component output.
  */
-export function ToggleField({ checked, onCheckedChange, className }) {
-  return <Switch size="xs" checked={checked} onCheckedChange={onCheckedChange} className={className} />
+export function ToggleField({ checked, onCheckedChange, className, label, disabled = false }) {
+  return <Switch size="xs" aria-label={label} checked={checked} onCheckedChange={onCheckedChange} className={className} disabled={disabled} />
 }

@@ -1,2 +1,78 @@
 packages:
   - 'app'
+
+onlyBuiltDependencies:
+  - esbuild
+  - igc-parser
+overrides:
+  minimatch@<3.1.3: '>=3.1.3'
+  rollup@>=4.0.0 <4.59.0: '>=4.59.0'
+  minimatch@<3.1.4: '>=3.1.4'
+  ajv@<6.14.0: '>=6.14.0'
+  flatted@<3.4.0: '>=3.4.0'
+  brace-expansion@<1.1.13: '>=1.1.13'
+  picomatch@>=4.0.0 <4.0.4: '>=4.0.4'
+  vite@>=7.0.0 <=7.3.1: '>=7.3.2'
+  vite@>=7.1.0 <=7.3.1: '>=7.3.2'
+  postcss@<8.5.10: '>=8.5.10'
+  vite@>=7.0.0 <=7.3.4: '>=7.3.5'
+  undici@>=7.23.0 <7.28.0: '>=7.28.0'
+  undici@>=7.0.0 <7.28.0: '>=7.28.0'
+  undici@<6.27.0: '>=6.27.0'
+  js-yaml@>=4.0.0 <=4.1.1: '>=4.2.0'
+  '@babel/core@<=7.29.0': '>=7.29.6'
+  brace-expansion@<1.1.16: '>=1.1.16'
+  js-yaml@>=4.0.0 <4.3.0: '>=4.3.0'
+  postcss@<=8.5.11: '>=8.5.12'
+  brace-expansion@<1.1.17: '>=1.1.17'
+  postcss@<=8.5.22: '>=8.5.23'
+  undici@>=7.0.0 <7.29.0: '>=7.29.0'
+  undici@<6.28.0: '>=6.28.0'
+  brace-expansion@<1.1.18: '>=1.1.18'
+  js-yaml@>=4.0.0 <4.3.1: '>=4.3.1'
+  nanoid@<3.3.16: '>=3.3.16'
+  nanoid@<3.3.18: '>=3.3.18'
+  postcss@<=8.5.17: '>=8.5.18'
+  browserslist@<=4.28.6: '>=4.28.7'
+  nanoid@<3.3.12: '>=3.3.12'
+  '@humanfs/node@<0.16.8': '>=0.16.8'
+  vitest@>=2.1.0 <4.1.11: '>=4.1.11'
+  '@vitest/mocker@>=2.1.0 <4.1.11': '>=4.1.11'
+  baseline-browser-mapping@>=2.0.0 <2.11.0: '>=2.11.0'
+  js-yaml@>=4.0.0 <4.3.2: '>=4.3.2'
+  undici@>=6.25.0 <6.28.1: '>=6.28.1'
+  undici@>=7.11.0 <7.29.1: '>=7.29.1'
+  undici@>=7.0.0 <7.29.1: '>=7.29.1'
+  undici@<6.28.1: '>=6.28.1'
+  undici@>=6.7.0 <6.28.1: '>=6.28.1'
+  # jsdom imports Undici 7 internals that are absent from Undici 8.
+  jsdom>undici: '^7.29.1'
+  undici@>=7.15.0 <7.29.1: '>=7.29.1'
+  undici@>=7.1.0 <7.29.1: '>=7.29.1'
+  undici@>=7.24.1 <7.29.1: '>=7.29.1'
+  brace-expansion@<1.1.21: '>=1.1.21'
+  brace-expansion@<1.1.20: '>=1.1.20'
+  brace-expansion@<1.1.19: '>=1.1.19'
+  flatted@<=3.4.1: '>=3.4.2'
+  source-map-js@>=1.0.0 <1.2.2: '>=1.2.2'
+  handlebars@>=4.0.0 <=4.7.9: '>=4.7.10'
+  handlebars@>=3.0.0 <=4.7.9: '>=4.7.10'
+  vite@*: 'catalog:'
+packageExtensions:
+  react-css-styled@1.1.9:
+    peerDependencies:
+      react: '*'
+  react-moveable@0.56.0:
+    peerDependencies:
+      react: '*'
+  react-selecto@1.26.3:
+    peerDependencies:
+      react: '*'
+catalog:
+  vite: npm:@voidzero-dev/vite-plus-core@1.3.0
+  vite-plus: 1.3.0
+peerDependencyRules:
+  allowAny:
+    - vite
+  allowedVersions:
+    vite: '*'

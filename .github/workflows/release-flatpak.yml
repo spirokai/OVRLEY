@@ -46,14 +46,50 @@ jobs:
       - name: Install Flatpak tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Diagnose AppStream metadata
+        continue-on-error: true
+        shell: bash
+        run: |
+          # flatpak-builder deletes the compose issue report on failure. Run the same compose
+          # on a mock install tree so its details are visible in this log, before the long build.
+          appstreamcli --version
+          appstreamcli compose --help | head -40
+          appstreamcli validate --no-net packaging/flatpak/cc.ovrley.OVRLEY.metainfo.xml || true
+          mock="$RUNNER_TEMP/mock/files"
+          install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.desktop "$mock/share/applications/cc.ovrley.OVRLEY.desktop"
+          install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.metainfo.xml "$mock/share/metainfo/cc.ovrley.OVRLEY.metainfo.xml"
+          install -Dm644 src-tauri/icons/icon.png "$mock/share/icons/hicolor/512x512/apps/cc.ovrley.OVRLEY.png"
+          appstreamcli compose --verbose --print-report=full --prefix=/ --origin=flatpak \
+            --components=cc.ovrley.OVRLEY,cc.ovrley.OVRLEY.desktop \
+            --result-root="$RUNNER_TEMP/mock/out" "$mock" || true
 
       - name: Download WASM bindings
         uses: actions/download-artifact@v7
         with:
           name: ovrley-wasm-bindings
           path: packaging/flatpak/wasm
+
+      - name: Import Flatpak signing key
+        shell: bash
+        env:
+          FLATPAK_GPG_PRIVATE_KEY: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY }}
+          FLATPAK_GPG_FINGERPRINT: B427292B9F13708C4CE14EBEDD3BB8CE23CDB95C
+        run: |
+          set -euo pipefail
+          if [ -z "$FLATPAK_GPG_PRIVATE_KEY" ]; then
+            echo "The FLATPAK_GPG_PRIVATE_KEY secret is not set." >&2
+            exit 1
+          fi
+          export GNUPGHOME="$RUNNER_TEMP/flatpak-gnupg"
+          mkdir -m 700 "$GNUPGHOME"
+          echo "$FLATPAK_GPG_PRIVATE_KEY" | gpg --batch --import
+          # The bundle embeds the committed public key, so the secret must be its private half.
+          gpg --list-secret-keys "$FLATPAK_GPG_FINGERPRINT" > /dev/null
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+          echo "FLATPAK_GPG_FINGERPRINT=$FLATPAK_GPG_FINGERPRINT" >> "$GITHUB_ENV"
 
       - name: Build Flatpak
         shell: bash
@@ -65,11 +101,26 @@ jobs:
           test -f packaging/flatpak/wasm/wasm_bindings.wasm
           sed -i "s/^        OVRLEY_VERSION: .*/        OVRLEY_VERSION: $RELEASE_VERSION/" packaging/flatpak/cc.ovrley.OVRLEY.yml
           grep -q "OVRLEY_VERSION: $RELEASE_VERSION\$" packaging/flatpak/cc.ovrley.OVRLEY.yml
+          # Signed, because a bundle that carries a key only installs if its commit is signed by that key
           flatpak-builder --user --force-clean --disable-rofiles-fuse \
+            --gpg-sign="$FLATPAK_GPG_FINGERPRINT" --gpg-homedir="$GNUPGHOME" \
             --install-deps-from=flathub --repo=repo build packaging/flatpak/cc.ovrley.OVRLEY.yml
           mkdir -p dist-release
+          # The repo URL and key set up the remote that `flatpak update` uses after installing the bundle
           flatpak build-bundle repo "dist-release/OVRLEY-linux-$RELEASE_VERSION.flatpak" cc.ovrley.OVRLEY \
-            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
+            --repo-url=https://flatpak.ovrley.cc/ \
+            --gpg-keys=packaging/flatpak/ovrley-flatpak.gpg
+
+      - name: Check the bundle installs
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.release_tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Exercises the same signature check users hit; the runtime is already installed from the build.
+          flatpak install --user --noninteractive --bundle "dist-release/OVRLEY-linux-$RELEASE_VERSION.flatpak"
+          flatpak remote-list --user --show-details
 
       - name: Upload artifacts to release
         uses: softprops/action-gh-release@v3

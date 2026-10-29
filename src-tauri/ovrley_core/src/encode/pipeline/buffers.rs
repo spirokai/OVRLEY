@@ -1,7 +1,8 @@
-//! Bounded RGBA buffer ownership, queue backpressure, and timing aggregation.
+//! Bounded frame buffer ownership, queue backpressure, and timing aggregation.
 
 use super::process::PipelineShutdown;
 use crate::debug::{RenderProfiler, TimingBucket};
+use crate::encode::overlay_format::OverlayPixelFormat;
 use crate::error::{CoreError, CoreResult};
 use crate::render::FrameSize;
 use std::collections::BTreeMap;
@@ -11,9 +12,9 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-/// Reusable raw RGBA frame buffer exchanged through the encode queues.
+/// Reusable raw frame buffer exchanged through the encode queues.
 pub(crate) struct FrameBuffer {
-    /// Pixel bytes in row-major RGBA order.
+    /// Frame bytes in the pipeline's piped pixel format (row-major RGBA, or planar yuva420p).
     pub(crate) pixels: Vec<u8>,
 }
 
@@ -94,13 +95,11 @@ pub(super) fn diagnose_frame_worker_count_for_resources(
     cpu_cores_per_frame_worker: usize,
     logical_cores: usize,
 ) -> NonZeroUsize {
-    let workers = if cpu_cores_per_frame_worker == 0 {
-        1
-    } else {
-        (logical_cores / cpu_cores_per_frame_worker)
-            .clamp(1, MAX_FRAME_WORKERS)
-            .min(total_frames.max(1))
-    };
+    let workers = logical_cores
+        .checked_div(cpu_cores_per_frame_worker)
+        .map_or(1, |workers| {
+            workers.clamp(1, MAX_FRAME_WORKERS).min(total_frames.max(1))
+        });
     NonZeroUsize::new(workers).expect("diagnosed frame worker count is non-zero")
 }
 
@@ -112,7 +111,11 @@ pub(crate) struct ParallelFramePoolPlan {
 }
 
 impl ParallelFramePoolPlan {
-    pub(crate) fn for_frame_size(frame_size: FrameSize, workers: NonZeroUsize) -> CoreResult<Self> {
+    pub(crate) fn for_frame_size(
+        frame_size: FrameSize,
+        pixel_format: OverlayPixelFormat,
+        workers: NonZeroUsize,
+    ) -> CoreResult<Self> {
         let available_parallelism = std::thread::available_parallelism()
             .map_err(|error| {
                 CoreError::Encode(format!(
@@ -120,11 +123,12 @@ impl ParallelFramePoolPlan {
                 ))
             })?
             .get();
-        Self::for_resources(frame_size, workers, available_parallelism)
+        Self::for_resources(frame_size, pixel_format, workers, available_parallelism)
     }
 
     pub(super) fn for_resources(
         frame_size: FrameSize,
+        pixel_format: OverlayPixelFormat,
         workers: NonZeroUsize,
         available_parallelism: usize,
     ) -> CoreResult<Self> {
@@ -141,7 +145,7 @@ impl ParallelFramePoolPlan {
                 workers,
             )));
         }
-        let frame_byte_len = frame_size.rgba_len()?;
+        let frame_byte_len = pixel_format.frame_len(frame_size)?;
         let memory_limited_buffers = PARALLEL_FRAME_MEMORY_CEILING_BYTES / frame_byte_len;
         let buffer_count = memory_limited_buffers.min(MAX_PARALLEL_FRAME_BUFFERS);
         let required_buffers = workers
@@ -150,7 +154,7 @@ impl ParallelFramePoolPlan {
             .ok_or_else(|| CoreError::Encode("Parallel frame buffer count overflow".to_string()))?;
         if buffer_count < required_buffers {
             return Err(CoreError::Encode(format!(
-                "{}x{} parallel rendering with {} workers requires at least {required_buffers} RGBA buffers ({} MiB each), exceeding the {} MiB frame-pool ceiling",
+                "{}x{} parallel rendering with {} workers requires at least {required_buffers} frame buffers ({} MiB each), exceeding the {} MiB frame-pool ceiling",
                 frame_size.width,
                 frame_size.height,
                 workers,

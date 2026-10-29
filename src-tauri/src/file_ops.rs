@@ -13,7 +13,6 @@ use crate::runtime_paths;
 use ovrley_core::error::RenderPathError;
 use serde::Serialize;
 use std::path::PathBuf;
-use tauri::Manager;
 
 /// Returns the default save path for a user template under the documents folder.
 #[tauri::command]
@@ -21,9 +20,7 @@ pub(crate) fn default_template_save_path(
     app: tauri::AppHandle,
     filename: String,
 ) -> Result<String, String> {
-    let mut path = app.path().document_dir().map_err(|e| e.to_string())?;
-    path.push("OVRLEY");
-    path.push("templates");
+    let mut path = runtime_paths::user_data_root(&app)?.join("templates");
     std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
     path.push(filename);
     Ok(path.to_string_lossy().to_string())
@@ -89,8 +86,8 @@ pub(crate) struct RasterSelectionError {
     message: String,
 }
 
-impl From<ovrley_core::raster::RasterError> for RasterSelectionError {
-    fn from(error: ovrley_core::raster::RasterError) -> Self {
+impl From<ovrley_widgets::widgets::raster::error::RasterError> for RasterSelectionError {
+    fn from(error: ovrley_widgets::widgets::raster::error::RasterError) -> Self {
         Self {
             code: error.code(),
             message: error.to_string(),
@@ -165,6 +162,6 @@ pub(crate) fn list_directory_video_files(
         }
     }
 
-    paths.sort_by(|left, right| left.to_lowercase().cmp(&right.to_lowercase()));
+    paths.sort_by_key(|left| left.to_lowercase());
     Ok(paths)
 }

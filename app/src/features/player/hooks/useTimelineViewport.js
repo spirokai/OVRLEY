@@ -11,21 +11,31 @@ import { getTimelineMinimum } from '../utils/playerTiming'
 import {
   buildFitTargets,
   clampToView,
-  computeTimelineTicks,
+  computeTimelineTickStrip,
   fitToFull,
   followPlayhead,
   getMatchingFitTargetId,
+  getTimelineTickStep,
   panViewport,
   zoomRange,
 } from '../utils/timelineViewport'
+
+const PX_PER_SECOND_PRECISION = 1e6
 
 function getDevicePixelRatio() {
   if (typeof window === 'undefined') return 1
   return window.devicePixelRatio || 1
 }
 
-function getLeftPercent(x, widthPx) {
-  return widthPx > 0 ? `${(x / widthPx) * 100}%` : '0%'
+// Screen pixels per layout pixel, including ancestor scale transforms such as the app shell's UI scale,
+// plus the container's screen x. Snapping with devicePixelRatio alone lands on fractional screen pixels whenever
+// the shell is scaled or the container starts between screen pixels.
+function measureScreenPixelGrid(element) {
+  const layoutWidth = element.offsetWidth
+  if (layoutWidth === 0) return { ratio: getDevicePixelRatio(), origin: 0 } // Hidden timelines have no measurable scale.
+  const rect = element.getBoundingClientRect()
+  const devicePixelRatio = getDevicePixelRatio()
+  return { ratio: (rect.width / layoutWidth) * devicePixelRatio, origin: rect.left * devicePixelRatio }
 }
 
 /**
@@ -62,8 +72,11 @@ export default function useTimelineViewport({
   // Duration ref - viewport actions use the latest duration without recreating every callback.
   const totalDurationRef = useRef(totalDuration)
   const timelineMinimumRef = useRef(timelineMinimum)
+  // Playhead ref - zoom commands pivot on the latest playhead without changing identity every playback frame.
+  const playheadSecondRef = useRef(playheadSecond)
   const [containerElement, setContainerElement] = useState(null)
   const [widthPx, setWidthPx] = useState(0)
+  const [pixelGrid, setPixelGrid] = useState(() => ({ ratio: getDevicePixelRatio(), origin: 0 }))
   const viewport = useStore(useShallow((state) => state.timelineViewport))
   const setTimelineViewport = useStore((state) => state.setTimelineViewport)
   const setViewport = useCallback(
@@ -96,6 +109,10 @@ export default function useTimelineViewport({
     timelineMinimumRef.current = timelineMinimum
   }, [timelineMinimum])
 
+  useEffect(() => {
+    playheadSecondRef.current = playheadSecond
+  }, [playheadSecond])
+
   // Full-range reset - loading different media should never leave the user stranded in an old viewport.
   useEffect(() => {
     if (useStore.getState().skipNextTimelineViewportReset) {
@@ -123,6 +140,7 @@ export default function useTimelineViewport({
     const measureWidth = () => {
       const rect = containerElement.getBoundingClientRect?.()
       setWidthPx(rect?.width || 0)
+      setPixelGrid(measureScreenPixelGrid(containerElement))
     }
 
     measureWidth()
@@ -133,6 +151,7 @@ export default function useTimelineViewport({
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setWidthPx(entry.contentRect.width || containerElement.getBoundingClientRect?.().width || 0)
+        setPixelGrid(measureScreenPixelGrid(containerElement))
       }
     })
 
@@ -248,12 +267,12 @@ export default function useTimelineViewport({
   )
 
   const zoomOut = useCallback(() => {
-    zoomBy(-1, playheadSecond)
-  }, [playheadSecond, zoomBy])
+    zoomBy(-1, playheadSecondRef.current)
+  }, [zoomBy])
 
   const zoomIn = useCallback(() => {
-    zoomBy(1, playheadSecond)
-  }, [playheadSecond, zoomBy])
+    zoomBy(1, playheadSecondRef.current)
+  }, [zoomBy])
 
   // Pan command - lane-background drag passes seconds, while pure helpers enforce clamping.
   const panBy = useCallback(
@@ -296,24 +315,35 @@ export default function useTimelineViewport({
     [containerElement, panBy, viewport, zoomBy],
   )
 
-  // Tick model - presentational components receive rounded pixel positions and percent label positions.
-  const ticks = useMemo(() => {
-    const rawTicks = computeTimelineTicks({ viewStart: viewport.viewStart, viewEnd: viewport.viewEnd, widthPx })
-    const pixelRatio = getDevicePixelRatio()
+  // Tick model - the strip is rebuilt only when zoom, width, or the major step under the viewport start changes.
+  // Playback follow pans every frame, which then only moves the strip instead of restyling every tick.
+  // Panning keeps the span but recomputes viewEnd - viewStart with float error; quantize so the strip memo stays hit.
+  const pixelRatio = pixelGrid.ratio
+  const span = viewport.viewEnd - viewport.viewStart
+  const pxPerSecond = span > 0 && widthPx > 0 ? Math.round((widthPx / span) * PX_PER_SECOND_PRECISION) / PX_PER_SECOND_PRECISION : 0
+  const tickStep = pxPerSecond > 0 ? getTimelineTickStep(pxPerSecond) : 0
+  const tickAnchorSecond = tickStep > 0 ? Math.floor(viewport.viewStart / tickStep) * tickStep : 0
+  const tickStrip = useMemo(() => {
+    if (tickStep === 0) return { major: [], minor: [] } // Nothing to draw until the axis is measured.
+    const rawTicks = computeTimelineTickStrip({ anchorSecond: tickAnchorSecond, step: tickStep, pxPerSecond, widthPx })
 
     return {
       major: rawTicks.major.map((tick, index) => ({
         id: `major-${index}`,
         label: tick.label,
         lineStyle: { left: roundToDevicePixel(tick.x, pixelRatio) },
-        labelStyle: { left: getLeftPercent(tick.x, widthPx) },
+        labelStyle: { left: tick.x },
       })),
       minor: rawTicks.minor.map((tick, index) => ({
         id: `minor-${index}`,
         lineStyle: { left: roundToDevicePixel(tick.x, pixelRatio) },
       })),
     }
-  }, [viewport.viewEnd, viewport.viewStart, widthPx])
+  }, [pixelRatio, pxPerSecond, tickAnchorSecond, tickStep, widthPx])
+  const ticks = useMemo(() => {
+    const offset = roundToDevicePixel((tickAnchorSecond - viewport.viewStart) * pxPerSecond, pixelRatio)
+    return { ...tickStrip, stripStyle: { transform: `translateX(${offset}px)` } }
+  }, [pixelRatio, pxPerSecond, tickAnchorSecond, tickStrip, viewport.viewStart])
 
   // Viewport API - returns render-ready geometry plus commands for toolbar and gesture hooks.
   return {
@@ -326,6 +356,7 @@ export default function useTimelineViewport({
     handleWheel,
     isFullTimelineVisible,
     panBy,
+    pixelGrid,
     resetView,
     ticks,
     timelineMinimum,

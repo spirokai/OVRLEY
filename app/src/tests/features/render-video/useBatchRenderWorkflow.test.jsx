@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import * as backend from '@/api/backend'
 import useRenderVideoDialogState from '@/features/render-video/hooks/useRenderVideoDialogState'
 import useRenderExecution from '@/features/render-video/hooks/useRenderExecution'
@@ -23,7 +23,10 @@ vi.mock('@/api/backend', () => ({
   listDirectoryVideoFiles: vi.fn(),
   listAvailableFonts: vi.fn().mockResolvedValue({ recommendedFonts: [], systemFonts: [] }),
 }))
-vi.mock('@/lib/file-dialog', () => ({ openDirectoryPath: vi.fn() }))
+vi.mock('@/lib/file-dialog', async (importOriginal) => ({
+  ...(await importOriginal()),
+  openDirectoryPath: vi.fn(),
+}))
 
 const folder = 'C:/videos'
 const reference = `${folder}/reference.mp4`

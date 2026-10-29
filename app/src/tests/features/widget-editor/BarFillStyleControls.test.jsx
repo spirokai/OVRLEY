@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeAll, describe, expect, test, vi } from 'vitest'
+import { beforeAll, describe, expect, test, vi } from 'vite-plus/test'
 import { BarFillStyleDetails, BarFillStyleField } from '@/features/widget-editor/components/metricWidget/BarFillStyleControls'
 
 beforeAll(() => {

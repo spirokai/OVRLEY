@@ -1,12 +1,12 @@
 /* Tailwind v4 @theme inline block — maps design tokens to Tailwind utility classes */
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 0.296rem);
+  --radius-md: calc(var(--radius) - 0.148rem);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+  --radius-xl: calc(var(--radius) + 0.296rem);
+  --radius-2xl: calc(var(--radius) + 0.593rem);
+  --radius-3xl: calc(var(--radius) + 0.889rem);
+  --radius-4xl: calc(var(--radius) + 1.185rem);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

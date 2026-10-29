@@ -46,7 +46,7 @@ export default function EditorToolbar({
   const { t } = useTranslation()
   return (
     <div>
-      <div className="flex items-center gap-1 rounded-xs border border-border/70 bg-card/80 p-1 backdrop-blur-sm shadow-lg">
+      <div className="flex items-center gap-1 rounded-xs border border-border/70 bg-card/80 p-1 shadow-lg">
         <UndoRedoControls
           canRedo={undoRedoControls.canRedo}
           canUndo={undoRedoControls.canUndo}

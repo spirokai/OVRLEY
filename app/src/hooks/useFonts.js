@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import useStore from '@/store/useStore'
-import { getFontCatalog, getPreparedFont, isFontPrepared, prepareFont } from '@/lib/font-resources'
+import { getFontCatalog, isFontPrepared, prepareFont } from '@/lib/font-resources'
+import { getFontCapabilities } from '@/api/backend'
 import { createFontSelection, getFontWeightControl, supportsFontItalic } from '@/lib/fonts'
 
 /** @returns {Function} Commits the latest font intent after preparation; errors go to the editor's error owner. */
@@ -41,7 +42,24 @@ export function useFontPreparation() {
 
 /** @param {object} widget Effective widget. @param {Function} updateWidgetData Editor action. @returns {object} Label typography controls and actions. */
 export function useLabelTypography(widget, updateWidgetData) {
-  const font = widget.category === 'labels' ? getPreparedFont(widget.data.font) : null
+  const fontId = widget.category === 'labels' ? widget.data.font : null
+  const [capabilities, setCapabilities] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    if (fontId !== null) {
+      getFontCapabilities(fontId)
+        .then((font) => {
+          if (!cancelled) setCapabilities(font)
+        })
+        .catch((error) => {
+          if (!cancelled) useStore.getState().setErrorMessage(error.message)
+        })
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [fontId])
+  const font = capabilities?.id === fontId ? capabilities : null
   const controls = font ? getFontWeightControl(font, widget.data.font_weight, widget.data.italic) : null
   const italicSupported = font !== null && supportsFontItalic(font)
   return {

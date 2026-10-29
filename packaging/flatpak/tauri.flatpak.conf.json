@@ -1,0 +1,11 @@
+{
+  "identifier": "cc.ovrley.OVRLEY",
+  "bundle": {
+    "createUpdaterArtifacts": false,
+    "resources": {
+      "../vendor/ffmpeg": null,
+      "../INSTALL-linux.txt": null,
+      "../THIRD_PARTY_NOTICES.txt": null
+    }
+  }
+}

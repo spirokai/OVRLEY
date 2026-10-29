@@ -69,6 +69,8 @@ fn source_video_metadata_serializes_sync_and_legacy_creation_fields() {
         codec_long_name: None,
         codec_profile: None,
         pix_fmt: Some("yuv420p".to_string()),
+        color_range: Some("tv".to_string()),
+        color_space: Some("bt709".to_string()),
         bits_per_raw_sample: Some(8),
         bit_rate: None,
         audio_bit_rate: Some(128_000),
@@ -126,7 +128,7 @@ fn ffprobe_fixture_has_multiple_streams() {
     let probe: serde_json::Value = serde_json::from_str(&json_text).unwrap();
 
     let streams = probe["streams"].as_array().unwrap();
-    assert!(streams.len() >= 1);
+    assert!(!streams.is_empty());
 }
 
 #[test]

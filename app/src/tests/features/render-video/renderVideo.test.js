@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vite-plus/test'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
-import { createRenderRequest } from '@/features/render-video/utils/renderRequest'
+import { createPreviewRenderRequest, createRenderRequest } from '@/features/render-video/utils/renderRequest'
 
 describe('render request preparation', () => {
   beforeEach(() => {
@@ -9,12 +9,24 @@ describe('render request preparation', () => {
     useStore.setState({ parsedActivity: { sample_elapsed_seconds: [0, 10, 20] }, endSecond: 20 })
   })
 
+  test.each([
+    [3.5, 30, 3.5, 3.5 + 1 / 30],
+    [3.5, 29.97, 3.5, 3.5 + 1 / 29],
+    [20, 20, 19.95, 20],
+  ])('prepares a one-frame PNG request at second %s', (selectedSecond, fps, start, end) => {
+    useStore.setState({ selectedSecond, renderSettings: { ...useStore.getState().renderSettings, fps } })
+    const request = createPreviewRenderRequest(useStore.getState())
+    expect(request.config.scene).toMatchObject({ start, end, fps })
+    expect(request.second).toBe(selectedSecond)
+    expect(request.parsedActivity).toBe(useStore.getState().parsedActivity)
+  })
+
   test('prepares a render-effective payload from committed template state', () => {
     useStore.setState({
       config: {
         ...DEFAULT_CONFIG,
         scene: { ...DEFAULT_CONFIG.scene, fps: 60 },
-        values: [{ id: 'value-1', value: 'speed', x: 10, y: 20 }],
+        values: [{ id: 'value-1', value: 'speed', display_type: 'text', x: 10, y: 20 }],
       },
       globalDefaults: { ...useStore.getState().globalDefaults, color_values: '#abcdef' },
     })

@@ -1,16 +1,14 @@
 mod common;
 
-use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
-use ovrley_core::debug::RenderProfiler;
-use ovrley_core::normalize::raw::{RenderConfig, ValueConfig};
+use ovrley_core::activity::schema::DenseActivityReport;
+use ovrley_core::normalize::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::widgets::gauges::arc::{
+use ovrley_widgets::widgets::gauges::arc::{
     arc_gauge_geometry, arc_point, arc_radius, arc_start_end_angles,
 };
-use ovrley_core::render::widgets::types::PreparedValue;
-use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
-use ovrley_core::types::{DisplayType, MetricKind, TrackFillStyle};
+use ovrley_widgets::model::types::{DisplayType, TrackFillStyle};
+use ovrley_widgets::widgets::value::config::ValueConfig;
 use std::collections::BTreeMap;
 
 #[test]
@@ -94,32 +92,23 @@ fn arc_angle_validation_enforces_the_persisted_range() {
 }
 
 #[test]
-fn prepare_assets_builds_arc_cache_with_static_unit_and_frame_values() {
+fn arc_gauge_layout_keeps_its_unit_and_samples_frame_values() {
     let mut raw_config = full_arc_gauge_config(20, 30);
     raw_config["track_fill_flat"] = serde_json::json!(true);
     let config = validate_single_arc(raw_config).unwrap();
     let paths = test_paths();
-    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = dense_speed_activity(vec![Some(10.0), Some(30.0), Some(50.0)]);
-    let mut profiler = RenderProfiler::default();
 
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
-
-    let PreparedValue::ArcGauge(widget) = &assets.values()[0] else {
-        panic!("arc gauge should prepare a gauge cache at value index 0");
-    };
-    let cache = widget
-        .cache
-        .as_ref()
-        .expect("arc gauge cache must be prepared");
-    assert_eq!(cache.frame_states[1].fill01, 0.5);
-    assert_eq!(cache.frame_states[1].value_text, "108");
+    let (layout, frame_states) = common::gauge::gauge_layout(&config, &dense, &ovrley_core::fonts::NativeFonts(&paths.font_dirs));
+    assert_eq!(frame_states[1].fill01, 0.5);
+    assert_eq!(frame_states[1].value_text, "108");
+    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(layout) = &layout else { panic!("arc layout"); };
     assert!(
-        cache.has_unit,
+        layout.has_unit,
         "the unit belongs to the cached static layer"
     );
-    assert_eq!(cache.track_thickness, 12.0);
-    assert!(cache.track_fill_flat);
+    assert_eq!(layout.track_thickness, 12.0);
+    assert!(layout.track_fill_flat);
 }
 
 #[test]
@@ -130,60 +119,41 @@ fn bars_style_resolves_configured_arc_geometry_into_the_cache() {
     raw_config["bar_gap"] = serde_json::json!(4);
     let config = validate_single_arc(raw_config).unwrap();
     let paths = test_paths();
-    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
-    let mut profiler = RenderProfiler::default();
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
-
-    let PreparedValue::ArcGauge(widget) = &assets.values()[0] else {
-        panic!("arc bars should use the arc gauge cache");
-    };
-    let cache = widget
-        .cache
-        .as_ref()
-        .expect("arc bars cache must be prepared");
-    assert_eq!(cache.track_fill_style, TrackFillStyle::Bars);
-    assert_eq!(cache.bar_geometry.unwrap().count, 8);
+    let (layout, _) = common::gauge::gauge_layout(&config, &dense, &ovrley_core::fonts::NativeFonts(&paths.font_dirs));
+    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(layout) = &layout else { panic!("gauge layout"); };
+    assert_eq!(layout.track_fill_style, TrackFillStyle::Bars);
+    assert_eq!(layout.bar_geometry.unwrap().count, 8);
 }
 
 #[test]
-fn preview_render_reports_arc_gauge_without_text_or_icon_fallback() {
-    let mut scene = common::builders::scene_json();
-    scene["width"] = serde_json::json!(320);
-    scene["height"] = serde_json::json!(240);
-    let config = validate_render_config(RenderConfig {
-        scene: serde_json::from_value(scene).unwrap(),
-        backdrops: vec![],
-        rasters: vec![],
-        labels: vec![],
-        values: vec![serde_json::from_value(full_arc_gauge_config(20, 30)).unwrap()],
-        plots: serde_json::Value::Object(serde_json::Map::new()),
-        extra: BTreeMap::new(),
-    })
-    .unwrap();
+fn gradient_fill_follows_the_arc_from_its_start_to_its_end() {
+    let mut raw_config = full_arc_gauge_config(20, 30);
+    raw_config["track_filled_gradient"] = serde_json::json!(true);
+    raw_config["track_filled_gradient_stops"] = serde_json::json!([
+        { "offset": 1, "color": "#0000ff" },
+        { "offset": 0, "color": "#ff0000" },
+    ]);
+    let config = validate_single_arc(raw_config).unwrap();
     let paths = test_paths();
-    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
-    let dense = dense_speed_activity(vec![Some(0.0), Some(50.0), Some(100.0)]);
-    let out_path = std::env::temp_dir().join("arc_gauge_preview_report.png");
-
-    let report =
-        render_preview_with_report(&paths, &config, &activity, &dense, 0.0, &out_path).unwrap();
-
-    assert_eq!(report.metric_presentations.len(), 1);
-    assert_eq!(
-        report.metric_presentations[0].metric_kind,
-        MetricKind::Speed
-    );
-    assert_eq!(
-        report.metric_presentations[0].display_type,
-        DisplayType::Arc
-    );
-    assert_eq!(
-        report.metric_presentations[0].widget.geometry.widget_width,
-        160
-    );
-    assert_eq!(report.metric_presentations[0].widget.frame.progress01, 0.0);
-    let _ = std::fs::remove_file(out_path);
+    let fonts = ovrley_core::fonts::NativeFonts(&paths.font_dirs);
+    let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
+    let (layout, states) = common::gauge::gauge_layout(&config, &dense, &fonts);
+    let frame = layout.prepare_frame(states[1].clone(), &fonts).unwrap();
+    let mut surface = skia_safe::surfaces::raster_n32_premul((300, 300)).unwrap();
+    surface.canvas().clear(skia_safe::Color::TRANSPARENT);
+    frame.draw(surface.canvas(), &layout);
+    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(arc) = &layout else { panic!("arc layout"); };
+    let geometry = arc.geometry;
+    let mut color_at = |fraction: f32| {
+        let angle = geometry.start_angle + geometry.sweep_angle * fraction;
+        let point = arc_point(geometry.center_x, geometry.center_y, geometry.radius, angle);
+        surface.peek_pixels().unwrap().get_color((point.x as i32, point.y as i32))
+    };
+    let (start, middle, end) = (color_at(0.02), color_at(0.5), color_at(0.98));
+    assert!(start.r() > 230 && start.b() < 25, "{start:?}");
+    assert!(middle.r().abs_diff(middle.b()) < 30 && middle.r() > 90, "{middle:?}");
+    assert!(end.b() > 230 && end.r() < 25, "{end:?}");
 }
 
 fn validate_single_arc(
@@ -220,6 +190,8 @@ fn full_arc_gauge_config(x: i32, y: i32) -> serde_json::Value {
         "track_empty_opacity": 0.5,
         "track_filled_color": "#40e0d0",
         "track_filled_opacity": 1,
+        "track_filled_gradient": false,
+        "track_filled_gradient_stops": [{ "offset": 0, "color": "#40e0d0" }, { "offset": 1, "color": "#c65102" }],
         "track_fill_flat": false,
         "show_min_max_labels": true,
         "min_max_label_font": "Arial.ttf",
@@ -248,10 +220,10 @@ fn dense_speed_activity(speed: Vec<Option<f64>>) -> DenseActivityReport {
         frame_distance_progress: vec![Some(0.0); frame_count],
         full_activity_distance: None,
         full_activity_total_ascent: None,
-        full_activity_metric_ranges: ovrley_core::activity::metric_ranges::calculate_metric_range(
+        full_activity_metric_ranges: ovrley_core::activity::sampling::calculate_metric_range(
             &series.speed,
         )
-        .map(|range| (ovrley_core::MetricKind::Speed, range))
+        .map(|range| (ovrley_widgets::model::types::MetricKind::Speed, range))
         .into_iter()
         .collect(),
         series,

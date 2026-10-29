@@ -2,6 +2,7 @@
 .DS_Store
 .vscode/
 .idea/
+.zed/
 *.suo
 *.ntvs*
 *.njsproj
@@ -60,8 +61,12 @@ tmp/
 
 # Agent scratch files
 .agents/release-notes.md
+.claude/skills
+.agents/plans/
+.vite-hooks/
 
 # Generated package resources
-THIRD_PARTY_NOTICES.txt
+/THIRD_PARTY_NOTICES.txt
 INSTALL-macos.txt
 INSTALL-linux.txt
+INSTALL-debian.txt

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import i18n from '@/i18n/index.js'
 import { changeLanguagePreference, hydrateLanguagePreference } from '@/i18n/language-preference'
 

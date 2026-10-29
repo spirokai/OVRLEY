@@ -225,7 +225,7 @@ export default function useRenderExecution({ reviewTarget = null } = {}) {
     const state = useStore.getState()
     if (isRendererBusy(state)) return false
     if (settings.renderTarget === 'batch' && Object.entries(batchReview.reviewedInputs).some(([key, value]) => state[key] !== value)) return false
-    const request = createRenderRequest({ editorSnapshot: state, settings, batchReview, overwrite })
+    const request = createRenderRequest({ editorSnapshot: state, settings, language: i18next.resolvedLanguage, batchReview, overwrite })
     state.setRenderSubmissionTarget(request.target)
     const observer = observers.get(request.target) ?? createObserver(request.target)
     observer.beginSubmission()
@@ -271,7 +271,7 @@ export default function useRenderExecution({ reviewTarget = null } = {}) {
     if (isRendererBusy(state)) return
     state.setRenderSubmissionTarget('preview')
     try {
-      const { config, parsedActivity, second } = createPreviewRenderRequest(state)
+      const { config, parsedActivity, second } = createPreviewRenderRequest(state, i18next.resolvedLanguage)
       const result = await backend.renderPreviewFrame(config, parsedActivity, second)
       await backend.openVideo(result.path)
     } catch (error) {

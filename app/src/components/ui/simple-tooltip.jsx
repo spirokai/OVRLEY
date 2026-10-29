@@ -2,7 +2,8 @@
  * Provides reusable simple tooltip UI primitives for the application.
  */
 
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
 
 /**
@@ -16,10 +17,22 @@ import { cn } from '@/lib/utils'
  * @param {*} props.className - Additional class names to merge into the element.
  * @param {string} props.contentClassName - Additional class names for the tooltip bubble.
  * @param {number} [props.delayMs=500] - Delay before the fade-in starts, in milliseconds.
+ * @param {boolean} [props.portal=false] - Renders the bubble into document.body so clipping containers (e.g. dropdowns) cannot cut it off.
  * @returns {JSX.Element} Rendered component output.
  */
-export function SimpleTooltip({ content, children, side = 'top', align = 'center', className = '', contentClassName = '', delayMs = 400 }) {
+export function SimpleTooltip({
+  content,
+  children,
+  side = 'top',
+  align = 'center',
+  className = '',
+  contentClassName = '',
+  delayMs = 400,
+  portal = false,
+}) {
   const [show, setShow] = useState(false)
+  const [anchorRect, setAnchorRect] = useState(null)
+  const wrapperRef = useRef(null)
 
   if (!content) return children
 
@@ -53,22 +66,43 @@ export function SimpleTooltip({ content, children, side = 'top', align = 'center
     right: 'right-full -mr-px border-r-surface-tooltip',
   }[side]
 
-  return (
-    <div className={`relative inline-flex ${className}`} onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
-      {children}
-      {show && (
-        <div
-          className={cn(
-            `absolute ${sideClasses} ${alignment.content} z-1000 whitespace-nowrap rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-xs text-foreground shadow-2xl pointer-events-none animate-in fade-in duration-100 fill-mode-both ease-out`,
-            contentClassName,
-          )}
-          style={{ animationDelay: `${delayMs}ms` }}
-        >
-          {content}
-          {/* Arrow */}
-          <div className={`absolute border-4 border-transparent ${arrowClasses} ${alignment.arrow}`} />
-        </div>
+  const bubble = (
+    <div
+      className={cn(
+        `absolute ${sideClasses} ${alignment.content} z-1000 whitespace-nowrap rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-xs text-foreground shadow-2xl pointer-events-none animate-in fade-in duration-100 fill-mode-both ease-out`,
+        contentClassName,
       )}
+      style={{ animationDelay: `${delayMs}ms` }}
+    >
+      {content}
+      {/* Arrow */}
+      <div className={`absolute border-4 border-transparent ${arrowClasses} ${alignment.arrow}`} />
+    </div>
+  )
+
+  const handleMouseEnter = () => {
+    if (portal) {
+      setAnchorRect(wrapperRef.current.getBoundingClientRect())
+    }
+    setShow(true)
+  }
+
+  return (
+    <div ref={wrapperRef} className={`relative inline-flex ${className}`} onMouseEnter={handleMouseEnter} onMouseLeave={() => setShow(false)}>
+      {children}
+      {show &&
+        (portal
+          ? createPortal(
+              // A fixed box over the trigger keeps the bubble's relative positioning classes valid.
+              <div
+                className="pointer-events-none fixed z-1000"
+                style={{ top: anchorRect.top, left: anchorRect.left, width: anchorRect.width, height: anchorRect.height }}
+              >
+                {bubble}
+              </div>,
+              document.body,
+            )
+          : bubble)}
     </div>
   )
 }

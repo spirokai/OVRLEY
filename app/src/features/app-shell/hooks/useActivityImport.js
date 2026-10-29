@@ -1,5 +1,5 @@
 /**
- * Activity import - GPX/FIT/TCX/SRT/IGC/CSV/VBO file selection and import.
+ * Activity import - native and browser activity file selection and import.
  */
 
 import { useCallback } from 'react'
@@ -11,8 +11,17 @@ import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import useStore from '@/store/useStore'
 
 export default function useActivityImport() {
-  const { activityFilename, activitySource, activitySummary, clearActivityFile, parsedActivitySource, setErrorMessage, setProcessing } =
-    useActivityStore()
+  const {
+    activityFilename,
+    activitySource,
+    activitySummary,
+    clearActivityFile,
+    disabledLaps,
+    parsedActivitySource,
+    setErrorMessage,
+    setLapEnabled,
+    setProcessing,
+  } = useActivityStore()
 
   const loadActivitySelection = useCallback(
     async (selection) => {
@@ -51,9 +60,12 @@ export default function useActivityImport() {
       let selection = null
 
       if (hasTauriRuntime()) {
-        const selectedPath = await openSinglePath([{ name: 'Activity', extensions: ['gpx', 'fit', 'tcx', 'srt', 'igc', 'csv', 'vbo'] }], {
-          lastDirectoryKey: 'last-activity-import-dir',
-        })
+        const selectedPath = await openSinglePath(
+          [{ name: 'Activity', extensions: ['gpx', 'fit', 'tcx', 'srt', 'igc', 'csv', 'vbo', 'uddf', 'ssrf', 'xml'] }],
+          {
+            lastDirectoryKey: 'last-activity-import-dir',
+          },
+        )
         if (typeof selectedPath === 'string') selection = selectedPath
       } else {
         const selectedFile = await selectBrowserFile('.gpx,.fit,.srt,.igc')
@@ -84,9 +96,11 @@ export default function useActivityImport() {
     activityPath: activitySource?.path ?? null,
     activitySummary,
     deleteActivity: parsedActivitySource === 'activity-file' ? clearActivityFile : null,
+    disabledLaps,
     handleActivityFileOpen,
     handleActivityFilesDrop,
     loadActivityPath: loadActivitySelection,
     prepareActivityPath: parseActivityPath,
+    setLapEnabled,
   }
 }

@@ -1,23 +1,17 @@
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { useMemo } from 'react'
 import { SlidersHorizontal, Tags } from 'lucide-react'
-import { buildUniformResizeUpdate } from '@/features/overlay-editor/utils/widgetResizeScaling'
-import {
-  getStandardMetricDefinition,
-  getStandardMetricDisplayUnit,
-  getStandardMetricUnitOptions,
-  getStandardMetricUnitsMode,
-} from '@/lib/widget/standard-metrics'
+import { buildUniformResizeUpdate } from '../../utils/widgetSize'
 import FontSelectField from '@/components/ui/font-select-field'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { useAvailableFonts } from '@/hooks/useFonts'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { FontSection, UnitsControlRow } from '../widgetEditorSections'
-import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from '../widgetFormControls'
+import { ColorField, SelectField, SliderField, ToggleField } from '../widgetFormControls'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
-import { getArcGaugeLayout, getCornerGaugeLayout } from '@/features/widget-preview/widgets/arc-gauge/geometry'
-import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry } from '@/features/widget-preview/shared/gaugeBarGeometry'
+import TrackStyleSection from './TrackStyleSection'
+import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry, getArcTrackDimensions } from '../../utils/gaugeGeometry'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
-import { TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { useTranslation } from 'react-i18next'
 import { translateOptions } from '@/i18n'
 
@@ -28,19 +22,19 @@ const CORNER_ORIENTATION_OPTIONS = [
   { value: 'bottom-right', labelKey: 'widget-editor.bottomRight', defaultLabel: 'Bottom Right' },
 ]
 
-function suggestArcBarGeometry(data) {
-  const isCorner = data.corner_orientation != null
-  const layout = isCorner ? getCornerGaugeLayout(data, null, []) : getArcGaugeLayout(data, null, [])
+function suggestArcBarGeometry(data, displayType) {
+  const isCorner = displayType === 'corner'
+  const layout = getArcTrackDimensions(data, displayType)
   return getSuggestedArcBarGeometry({ ...layout, corner: isCorner, borderThickness: data.track_border_thickness })
 }
 
-function getArcGapMax(data) {
-  const layout = data.corner_orientation == null ? getArcGaugeLayout(data, null, []) : getCornerGaugeLayout(data, null, [])
+function getArcGapMax(data, displayType) {
+  const layout = getArcTrackDimensions(data, displayType)
   return getArcBarGapMax({ ...layout, bar_count: data.bar_count })
 }
 
-function getArcCornerRadiusMax(data) {
-  const layout = data.corner_orientation == null ? getArcGaugeLayout(data, null, []) : getCornerGaugeLayout(data, null, [])
+function getArcCornerRadiusMax(data, displayType) {
+  const layout = getArcTrackDimensions(data, displayType)
   return getArcTrackCornerRadiusMax({ ...data, ...layout })
 }
 
@@ -50,25 +44,22 @@ function getArcCornerRadiusMax(data) {
  * shared top-level metric data. Icons are deliberately absent because gauges do not
  * render them.
  */
-export default function ArcDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function ArcDisplaySection({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const displayType = widget.data.display_type
   const isCornerGauge = displayType === 'corner'
+  const isGtGauge = displayType === 'gt_gauge'
   const arcData = useMemo(() => widget.data.display_variants?.[displayType] ?? {}, [displayType, widget.data.display_variants])
   const updateArc = useDisplayVariantUpdater(widget, displayType, updateWidgetData)
-  const updateArcSize = useDisplayVariantUpdater(widget, displayType, updateWidgetSize)
+  const updateArcDraft = useDisplayVariantUpdater(widget, displayType, updateWidgetDraft)
   const availableFonts = useAvailableFonts()
-  const definition = getStandardMetricDefinition(widget.type)
-  const unitOptions = getStandardMetricUnitOptions(widget.type)
-  const unitsMode = getStandardMetricUnitsMode(widget.type)
+  const definition = WIDGET_TYPE_DEFINITIONS[widget.type]
+  const unitOptions = definition.supportedDisplayUnits
+  const unitsMode = definition.unitsMode
   const supportsUnitSelection = unitOptions.length > 1
-  const cornerRadiusMax = getArcCornerRadiusMax(arcData)
+  const cornerRadiusMax = getArcCornerRadiusMax(arcData, displayType)
   const size = widget.data.width ?? arcData.width
-  const barGapMax = arcData.track_fill_style === 'bars' ? getArcGapMax(arcData) : 0
-  const hasDecimalControl = definition?.maxDecimals !== undefined || definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
-  const maxDecimals = definition?.maxDecimals ?? 1
-  const defaultDecimals = TYPE_DEFAULTS[widget.type]?.decimals ?? 1
-  const decimals = Number.isFinite(widget.data.decimals) ? Math.min(Math.max(widget.data.decimals, 0), maxDecimals) : defaultDecimals
+  const barGapMax = arcData.track_fill_style === 'bars' ? getArcGapMax(arcData, displayType) : 0
 
   const updateBoundedNumber = (updateVariant, key, rawValue, min, max) => {
     const value = Number(rawValue)
@@ -78,7 +69,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
 
   const handleSizeChange = (nextSize) => {
     const update = buildUniformResizeUpdate(widget, nextSize)
-    if (update) updateWidgetSize(widget.id, update)
+    updateWidgetDraft(widget.id, update)
   }
 
   return (
@@ -89,7 +80,9 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           title={isCornerGauge ? t('widget-editor.cornerTrack', 'Corner Track') : t('widget-editor.arcTrack', 'Arc Track')}
         />
         <div className="grid grid-cols-1 gap-4">
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.size', 'Size')}
             value={size}
             min={30}
@@ -97,8 +90,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             step={1}
             valueDisplay={`${Math.round(size)}`}
             suffix="px"
-            onChange={handleSizeChange}
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={handleSizeChange}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4 pt-2">
@@ -108,6 +101,20 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
               value={arcData.corner_orientation}
               onValueChange={(corner_orientation) => updateArc({ corner_orientation })}
               options={translateOptions(CORNER_ORIENTATION_OPTIONS, t)}
+            />
+          ) : isGtGauge ? (
+            <SliderField
+              editable
+              label={t('widget-editor.tickLength', 'Tick Length')}
+              value={arcData.tick_length}
+              min={0}
+              max={100}
+              step={1}
+              integerDisplay
+              valueDisplay={`${arcData.tick_length}`}
+              suffix="px"
+              onSliderChange={(tick_length) => updateArcDraft({ tick_length })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           ) : (
             <SliderField
@@ -119,8 +126,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
               step={5}
               valueDisplay={`${arcData.arc_angle}`}
               suffix="°"
-              onSliderChange={(arc_angle) => updateArcSize({ arc_angle })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(arc_angle) => updateArcDraft({ arc_angle })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           )}
           <SliderField
@@ -134,16 +141,21 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             valueDisplay={`${arcData.track_thickness}`}
             suffix="px"
             onSliderChange={(track_thickness) =>
-              updateArcSize({
+              updateArcDraft({
                 track_thickness,
-                track_corner_radius: Math.min(arcData.track_corner_radius, getArcCornerRadiusMax({ ...arcData, track_thickness })),
+                track_corner_radius: Math.min(arcData.track_corner_radius, getArcCornerRadiusMax({ ...arcData, track_thickness }, displayType)),
               })
             }
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <BarFillStyleField data={arcData} suggestBarGeometry={suggestArcBarGeometry} updateVariant={updateArc} />
+          <BarFillStyleField
+            data={arcData}
+            suggestBarGeometry={(data) => suggestArcBarGeometry(data, displayType)}
+            updateVariant={updateArc}
+            disabled={isGtGauge}
+          />
           <SliderField
             editable
             label={t('widget-editor.cornerRadius', 'Corner Radius')}
@@ -154,126 +166,95 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             integerDisplay
             valueDisplay={`${arcData.track_corner_radius}`}
             suffix="px"
-            onSliderChange={(track_corner_radius) => updateArcSize({ track_corner_radius })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(track_corner_radius) => updateArcDraft({ track_corner_radius })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <BarFillStyleDetails
             data={arcData}
             barGapMax={barGapMax}
             getCornerRadiusMax={getArcCornerRadiusMax}
             updateVariant={updateArc}
-            updateVariantSize={updateArcSize}
-            commitWidgetSize={commitWidgetSize}
+            updateVariantDraft={updateArcDraft}
+            commitWidgetDraft={commitWidgetDraft}
             widgetId={widget.id}
           />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            label={t('widget-editor.borderColor', 'Border Color')}
-            value={arcData.track_border_color}
-            onChange={(track_border_color) => updateArc({ track_border_color })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.border', 'Border')}
-            value={arcData.track_border_thickness}
-            min={0}
-            max={6}
-            step={1}
-            integerDisplay
-            valueDisplay={`${arcData.track_border_thickness}`}
-            suffix="px"
-            onSliderChange={(track_border_thickness) => updateArcSize({ track_border_thickness })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            label={t('widget-editor.emptyColor', 'Empty Color')}
-            value={arcData.track_empty_color}
-            onChange={(track_empty_color) => updateArc({ track_empty_color })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.emptyOpacity', 'Empty Opacity')}
-            value={arcData.track_empty_opacity}
-            min={0}
-            max={1}
-            step={0.05}
-            valueScale={100}
-            valueDisplay={`${Math.round((arcData.track_empty_opacity ?? 0) * 100)}`}
-            suffix="%"
-            onSliderChange={(track_empty_opacity) => updateArc({ track_empty_opacity })}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            label={t('widget-editor.filledColor', 'Filled Color')}
-            value={arcData.track_filled_color}
-            onChange={(track_filled_color) => updateArc({ track_filled_color })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.filledOpacity', 'Filled Opacity')}
-            value={arcData.track_filled_opacity}
-            min={0}
-            max={1}
-            step={0.05}
-            valueScale={100}
-            valueDisplay={`${Math.round((arcData.track_filled_opacity ?? 0) * 100)}`}
-            suffix="%"
-            onSliderChange={(track_filled_opacity) => updateArc({ track_filled_opacity })}
-          />
+          {isGtGauge ? (
+            <SliderField
+              editable
+              label={t('widget-editor.glow', 'Glow')}
+              value={arcData.glow}
+              min={0}
+              max={1}
+              step={0.05}
+              valueScale={100}
+              valueDisplay={`${Math.round(arcData.glow * 100)}`}
+              suffix="%"
+              onSliderChange={(glow) => updateArcDraft({ glow })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
+            />
+          ) : null}
         </div>
       </div>
 
-      <FontSection
-        widget={widget}
-        updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
-        title={t('widget-editor.label', 'Label')}
-        fontSizeLabel={t('widget-editor.fontSize', 'Font Size')}
+      <TrackStyleSection
+        data={arcData}
+        updateVariant={updateArc}
+        updateVariantDraft={updateArcDraft}
+        onCommit={() => commitWidgetDraft(widget.id)}
+        borderMax={6}
+        supportsGradient={!isGtGauge}
       />
-      <div className="grid grid-cols-2 gap-4">
-        <SliderField
-          editable
-          label={t('widget-editor.horizontalOffset', 'Horizontal Offset')}
-          value={arcData.inner_widget_offset_x}
-          min={-50}
-          max={50}
-          step={1}
-          integerDisplay
-          valueDisplay={`${arcData.inner_widget_offset_x}`}
-          suffix="px"
-          onSliderChange={(value) => updateBoundedNumber(updateArcSize, 'inner_widget_offset_x', value, -10_000, 10_000)}
-          onSliderCommit={() => commitWidgetSize(widget.id)}
+
+      <div className="space-y-4">
+        <FontSection
+          widget={widget}
+          updateWidgetData={updateWidgetData}
+          updateWidgetDraft={updateWidgetDraft}
+          commitWidgetDraft={commitWidgetDraft}
+          title={t('widget-editor.label', 'Label')}
+          fontSizeLabel={t('widget-editor.fontSize', 'Font Size')}
         />
-        <SliderField
-          editable
-          label={t('widget-editor.verticalOffset', 'Vertical Offset')}
-          value={arcData.inner_widget_offset_y}
-          min={-50}
-          max={50}
-          step={1}
-          integerDisplay
-          valueDisplay={`${arcData.inner_widget_offset_y}`}
-          suffix="px"
-          onSliderChange={(value) => updateBoundedNumber(updateArcSize, 'inner_widget_offset_y', value, -10_000, 10_000)}
-          onSliderCommit={() => commitWidgetSize(widget.id)}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <SliderField
+            editable
+            label={t('widget-editor.horizontalOffset', 'Horizontal Offset')}
+            value={arcData.inner_widget_offset_x}
+            min={-50}
+            max={50}
+            step={1}
+            integerDisplay
+            valueDisplay={`${arcData.inner_widget_offset_x}`}
+            suffix="px"
+            onSliderChange={(value) => updateBoundedNumber(updateArcDraft, 'inner_widget_offset_x', value, -10_000, 10_000)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
+          />
+          <SliderField
+            editable
+            label={t('widget-editor.verticalOffset', 'Vertical Offset')}
+            value={arcData.inner_widget_offset_y}
+            min={-50}
+            max={50}
+            step={1}
+            integerDisplay
+            valueDisplay={`${arcData.inner_widget_offset_y}`}
+            suffix="px"
+            onSliderChange={(value) => updateBoundedNumber(updateArcDraft, 'inner_widget_offset_y', value, -10_000, 10_000)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
+          />
+        </div>
       </div>
-      {hasDecimalControl ? (
+      {definition.hasDecimalControl ? (
         <div className="grid grid-cols-2 gap-4">
           <SliderField
             editable
             label={t('widget-editor.decimals', 'Decimals')}
-            value={decimals}
+            value={widget.data.decimals}
             min={0}
-            max={maxDecimals}
+            max={definition.maxDecimals}
             step={1}
-            valueDisplay={String(decimals)}
-            onSliderChange={(value) => updateWidgetData(widget.id, { decimals: value })}
+            valueDisplay={String(widget.data.decimals)}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { decimals: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
       ) : null}
@@ -281,30 +262,28 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
       {unitsMode !== 'hidden' ? (
         <UnitsControlRow
           title={t('widget-editor.unit', 'Unit')}
-          checked={widget.data.show_units ?? definition?.showUnitsByDefault ?? false}
+          checked={widget.data.show_units}
           onCheckedChange={(show_units) => updateWidgetData(widget.id, { show_units })}
           colorValue={widget.data.unit_color}
           onColorChange={(unit_color) => updateWidgetData(widget.id, { unit_color })}
           selectLabel={t('widget-editor.unit', 'Unit')}
-          value={getStandardMetricDisplayUnit(widget.type, widget.data)}
+          value={widget.data.display_unit}
           onValueChange={(displayUnit) =>
-            updateWidgetData(
-              widget.id,
-              buildMetricUnitUpdate(widget.type, widget.data.starting_altitude, getStandardMetricDisplayUnit(widget.type, widget.data), displayUnit),
-            )
+            updateWidgetData(widget.id, buildMetricUnitUpdate(widget.type, widget.data.starting_altitude, widget.data.display_unit, displayUnit))
           }
           options={supportsUnitSelection ? unitOptions : undefined}
         />
       ) : null}
 
       <div className="space-y-4">
-        <div className="flex w-full items-center gap-3">
-          <SectionHeading icon={Tags} title={t('widget-editor.minmaxLabels', 'Min/Max Labels')} />
-          <div className="shrink-0 pt-1">
+        <SectionHeading
+          icon={Tags}
+          title={t('widget-editor.minmaxLabels', 'Min/Max Labels')}
+          trailing={
             <ToggleField checked={arcData.show_min_max_labels} onCheckedChange={(show_min_max_labels) => updateArc({ show_min_max_labels })} />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4 pt-2">
+          }
+        />
+        <div className="grid grid-cols-2 gap-4">
           <FontSelectField
             label={t('widget-editor.labelFont', 'Label Font')}
             value={arcData.min_max_label_font}
@@ -313,9 +292,11 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             recommendedFonts={availableFonts.recommendedFonts}
             systemFonts={availableFonts.systemFonts}
             triggerClassName="h-9 border-border/70 bg-surface text-xs"
-            labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
+            labelClassName="text-[0.667rem] text-muted-foreground uppercase font-bold"
           />
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.fontSize', 'Font Size')}
             disabled={!arcData.show_min_max_labels}
             value={arcData.min_max_label_font_size}
@@ -324,8 +305,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             step={1}
             valueDisplay={`${arcData.min_max_label_font_size}`}
             suffix="px"
-            onChange={(min_max_label_font_size) => updateArcSize({ min_max_label_font_size })}
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(min_max_label_font_size) => updateArcDraft({ min_max_label_font_size })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <ColorField

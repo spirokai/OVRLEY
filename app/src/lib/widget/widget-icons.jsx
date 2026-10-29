@@ -1,8 +1,7 @@
-/* eslint-disable react-refresh/only-export-components */
+/* oxlint-disable react/only-export-components */
 
 import { Image, Presentation, Timer, Type } from 'lucide-react'
-import { BACKDROP_TYPE_DEFINITIONS, DISPLAY_TYPE_DEFINITIONS, WIDGET_CATEGORY_NAME_KEYS, WIDGET_TYPE_DEFINITIONS } from './standard-widgets'
-import { getSupportedDisplayTypes, isStandardMetricWidgetType } from './standard-metrics'
+import { DISPLAY_TYPE_DEFINITIONS, WIDGET_CATEGORY_NAME_KEYS, WIDGET_TYPE_DEFINITIONS, getDisplayTypeLabelKey } from './widget-catalog'
 
 const iconAssetModules = import.meta.glob('../../../../assets/widget-icons/*.svg', {
   eager: true,
@@ -73,49 +72,38 @@ function materializeIcon(icon) {
 }
 
 function createMenuOptions(type) {
-  let definitions
-  let displayTypes
-  if (type === 'backdrop') {
-    definitions = BACKDROP_TYPE_DEFINITIONS
-    displayTypes = Object.keys(definitions)
-  } else if (isStandardMetricWidgetType(type)) {
-    definitions = DISPLAY_TYPE_DEFINITIONS
-    displayTypes = getSupportedDisplayTypes(type)
-  } else {
-    return [{ selection: {} }]
-  }
+  const displayTypes = WIDGET_TYPE_DEFINITIONS[type].displayTypes
+  if (displayTypes.length === 0) return [{ selection: {} }]
 
   const options = []
   for (const value of displayTypes) {
-    const definition = definitions[value]
-    if (definition.modes !== undefined) {
+    const definition = DISPLAY_TYPE_DEFINITIONS[value]
+    if (definition.modes.length > 0) {
       for (const mode of definition.modes) {
         const icon = materializeIcon(mode.icon)
-        options.push({ value: mode.value, labelKey: mode.labelKey, icon, selection: { lapTimerMode: mode.value } })
+        options.push({ value: mode.value, labelKey: mode.labelKey, icon, selection: { [definition.modeSelectionField]: mode.value } })
       }
     } else {
       const icon = materializeIcon(definition.icon)
-      options.push({ value, labelKey: definition.labelKey, icon, selection: { displayType: value } })
+      options.push({ value, labelKey: getDisplayTypeLabelKey(type, value), icon, selection: { displayType: value } })
     }
   }
   return options
 }
 
-export const WIDGET_ICON_SVGS = {}
 export const WIDGET_ICONS = {}
 for (const [type, definition] of Object.entries(WIDGET_TYPE_DEFINITIONS)) {
-  if (definition.icon.assetFile !== undefined) {
-    WIDGET_ICON_SVGS[type] = getIconSvgByAssetFile(definition.icon.assetFile)
-  }
   WIDGET_ICONS[type] = materializeIcon(definition.icon)
 }
 
 const groups = {}
+
 for (const [category, nameKey] of Object.entries(WIDGET_CATEGORY_NAME_KEYS)) {
   groups[category] = { category, nameKey, items: [] }
 }
+
 for (const [type, definition] of Object.entries(WIDGET_TYPE_DEFINITIONS)) {
-  if (isStandardMetricWidgetType(type) && !definition.current) continue
+  if (!definition.current) continue
   const options = createMenuOptions(type)
   groups[definition.category].items.push({
     type,

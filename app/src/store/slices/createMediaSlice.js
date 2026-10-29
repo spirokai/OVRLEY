@@ -3,7 +3,34 @@
  */
 
 import { DEFAULT_RENDER_PROGRESS, syncSceneTimingToConfig } from '../store-utils'
-import { getCourseWidgetDimensions } from '@/features/widget-editor/utils/widgetUtils'
+import { getCourseWidgetDimensions } from '@/lib/widget/widget-defaults'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
+import { releasePreviewActivity } from '@/api/backend'
+
+function previewActivityIds(state) {
+  const ids = new Set()
+  for (const activity of [state.parsedActivity, state.stashedVideoTelemetry]) {
+    // Browser-only activity data has no native snapshot to release.
+    if (activity !== null && activity.preview_activity_id !== undefined) ids.add(activity.preview_activity_id)
+  }
+  return ids
+}
+
+function reportPreviewActivityReleaseError(error) {
+  console.error('Unable to release preview activity', error)
+}
+
+function setActivityState(set, get, update) {
+  const previous = get()
+  const previousIds = previewActivityIds(previous)
+  set(update)
+  // Lap IDs belong to one activity; any replacement or removal purges the selection.
+  if (get().parsedActivity !== previous.parsedActivity) set({ disabledLaps: [] })
+  const retainedIds = previewActivityIds(get())
+  for (const id of previousIds) {
+    if (!retainedIds.has(id)) releasePreviewActivity(id).catch(reportPreviewActivityReleaseError)
+  }
+}
 
 function getDurationSeconds(activity) {
   const duration = Number(activity?.trim_end_seconds ?? activity?.metadata?.duration_seconds ?? 0)
@@ -26,7 +53,7 @@ function applyParsedDataToScene(state, activity) {
     const coursePoints = activity?.sample_course_points
     for (const plot of state.config.plots) {
       if (plot.value === 'course' && coursePoints) {
-        const dims = getCourseWidgetDimensions(coursePoints)
+        const dims = getCourseWidgetDimensions(coursePoints, WIDGET_TYPE_DEFINITIONS[plot.value].courseSizing)
         if (dims) {
           plot.width = dims.width
           plot.height = dims.height
@@ -46,6 +73,11 @@ function createActivitySummary(activity) {
     endTime: activity.metadata?.end_time ?? null,
     fileFormat: activity.file_format,
     fileName: activity.file_name,
+    laps: activity.lap_start_elapsed_seconds.map((startSeconds, id) => ({
+      id,
+      startSeconds,
+      durationSeconds: activity.lap_durations_seconds[id],
+    })),
     originalSampleCount: activity.metadata?.original_sample_count ?? null,
     sampleCount: activity.metadata?.sample_count ?? 0,
     sport: activity.metadata?.sport ?? null,
@@ -73,6 +105,8 @@ export function createMediaSlice(set, get) {
     parsedActivity: null,
     parsedActivitySource: null, // 'activity-file' | 'video-telemetry' | null
     stashedVideoTelemetry: null,
+    // Strictly increasing lap IDs of parsedActivity excluded from lap widgets.
+    disabledLaps: [],
     activeRenderId: null,
     activeRenderOutputPath: null,
     renderProgress: { ...DEFAULT_RENDER_PROGRESS },
@@ -137,6 +171,13 @@ export function createMediaSlice(set, get) {
         state.errorMessage = null
       }),
 
+    setLapEnabled: (lapId, enabled) =>
+      set((state) => {
+        const disabledLaps = state.disabledLaps.filter((id) => id !== lapId)
+        if (!enabled) disabledLaps.push(lapId)
+        state.disabledLaps = disabledLaps.sort((left, right) => left - right)
+      }),
+
     setActivitySource: (source) => {
       set((state) => {
         state.activitySource = source
@@ -165,14 +206,8 @@ export function createMediaSlice(set, get) {
       })
     },
 
-    /** Stores the full parsed activity object (with all metric series) for preview and rendering. */
-    setParsedActivity: (activity) =>
-      set((state) => {
-        state.parsedActivity = activity
-      }),
-
     activateActivityFile: (activity) => {
-      set((state) => {
+      setActivityState(set, get, (state) => {
         if (state.parsedActivitySource === 'video-telemetry') {
           state.stashedVideoTelemetry = state.parsedActivity
         }
@@ -186,12 +221,12 @@ export function createMediaSlice(set, get) {
     loadVideoTelemetry: (activity) => {
       const source = get().parsedActivitySource
       if (source === 'activity-file') {
-        set((state) => {
+        setActivityState(set, get, (state) => {
           state.stashedVideoTelemetry = activity
         })
       } else {
         get().clearVideoSyncForActivity()
-        set((state) => {
+        setActivityState(set, get, (state) => {
           state.parsedActivity = activity
           state.parsedActivitySource = 'video-telemetry'
           state.stashedVideoTelemetry = null
@@ -218,7 +253,7 @@ export function createMediaSlice(set, get) {
       })
 
       if (restoreVideoTelemetry && stashedVideoTelemetry) {
-        set((state) => {
+        setActivityState(set, get, (state) => {
           state.parsedActivity = stashedVideoTelemetry
           state.parsedActivitySource = 'video-telemetry'
           state.stashedVideoTelemetry = null
@@ -231,7 +266,7 @@ export function createMediaSlice(set, get) {
         get().clearVideoSyncForActivity()
         get().setActivitySummary(get().parsedActivity, { computeVideoSync: false })
       } else {
-        set((state) => {
+        setActivityState(set, get, (state) => {
           state.parsedActivity = null
           state.parsedActivitySource = null
           state.activitySummary = null
@@ -243,16 +278,15 @@ export function createMediaSlice(set, get) {
     clearVideoTelemetry: () => {
       const { parsedActivitySource } = get()
 
-      set((state) => {
+      setActivityState(set, get, (state) => {
         state.stashedVideoTelemetry = null
-      })
-
-      if (parsedActivitySource === 'video-telemetry') {
-        set((state) => {
+        if (parsedActivitySource === 'video-telemetry') {
           state.parsedActivity = null
           state.parsedActivitySource = null
           state.activitySummary = null
-        })
+        }
+      })
+      if (parsedActivitySource === 'video-telemetry') {
         get().clearVideoSyncForActivity()
       }
     },

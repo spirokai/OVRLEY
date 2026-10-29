@@ -2,22 +2,15 @@
  * Supports widget editing flows related to elevation widget editor.
  */
 
-import { Map, Mountain, Palette } from 'lucide-react'
-import { useMemo } from 'react'
+import { Mountain, Palette } from 'lucide-react'
 import { SectionHeading } from '@/components/ui/section-heading'
-import { ColorField, NumberField, SelectField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
+import { ColorField, NumberField, SelectField, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection } from './widgetEditorSections'
-import { getThemeColor } from '@/lib/theme'
+import PlotMarkerSection from './PlotMarkerSection'
+import { getThemeColor } from '@/lib/color-utils'
 import { Label } from '@/components/ui/label'
 import { convertAltitudeInputValue } from '@/lib/widget/altitude'
 import { useTranslation } from 'react-i18next'
-import { translateOptions } from '@/i18n'
-
-const MARKER_VARIANT_OPTIONS = [
-  { value: 'single', labelKey: 'widget-editor.singleCircle', defaultLabel: 'Single Circle' },
-  { value: 'ring', labelKey: 'widget-editor.concentricRing', defaultLabel: 'Concentric Ring' },
-  { value: 'halo', labelKey: 'widget-editor.solidHalo', defaultLabel: 'Solid Halo' },
-]
 
 const ALTITUDE_UNIT_OPTIONS = [
   { value: 'm', label: 'm' },
@@ -34,9 +27,8 @@ const ALTITUDE_UNIT_OPTIONS = [
  * @param {*} props.sceneFontSize - Scene fallback font size.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function ElevationWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField, sceneFontSize }) {
+export default function ElevationWidgetEditor({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft, setNumericField, sceneFontSize }) {
   const { t } = useTranslation()
-  const markerVariantOptions = useMemo(() => translateOptions(MARKER_VARIANT_OPTIONS, t), [t])
   const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width
   const remainingLineOpacity = widget.data.remaining_line_opacity
   const completedAreaOpacity = widget.data.area_completed_opacity
@@ -44,14 +36,7 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
   const yScale = widget.data.y_scale
   const simplifyTolerance = widget.data.simplify_tolerance_px
   const targetDensity = widget.data.target_density
-  const markerSize = widget.data.marker_size
-  const markerOpacity = widget.data.marker_opacity
-  const markerVariant = widget.data.marker_variant
-  const markerVariantDiameter = widget.data.marker_variant_diameter
   const labelFontSize = widget.data.point_label?.font_size ?? sceneFontSize ?? 12.5
-  const showVariantDiameter = markerVariant !== 'single'
-  const variantDiameterLabel =
-    markerVariant === 'ring' ? t('widget-editor.ringDiameter', 'Ring Diameter') : t('widget-editor.haloDiameter', 'Halo Diameter')
   return (
     <>
       <DimensionsSection widget={widget} setNumericField={setNumericField} />
@@ -68,12 +53,12 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
           valueDisplay={`${lineWidth}`}
           suffix="px"
           onSliderChange={(value) =>
-            updateWidgetSize(widget.id, {
+            updateWidgetDraft(widget.id, {
               completed_line_width: value,
               remaining_line_width: value,
             })
           }
-          onSliderCommit={() => commitWidgetSize(widget.id)}
+          onSliderCommit={() => commitWidgetDraft(widget.id)}
         />
 
         <div className="grid grid-cols-2 gap-4">
@@ -87,11 +72,11 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
             valueDisplay={`${simplifyTolerance.toFixed(2)}`}
             suffix="px"
             onSliderChange={(value) =>
-              updateWidgetSize(widget.id, {
+              updateWidgetDraft(widget.id, {
                 simplify_tolerance_px: Number(value.toFixed(2)),
               })
             }
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -103,11 +88,11 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
             valueDisplay={`${targetDensity.toFixed(2)}`}
             suffix="x"
             onSliderChange={(value) =>
-              updateWidgetSize(widget.id, {
+              updateWidgetDraft(widget.id, {
                 target_density: Number(value.toFixed(2)),
               })
             }
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -137,7 +122,8 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
             step={1}
             valueDisplay={`${widget.data.completed_line_opacity}`}
             suffix="%"
-            onSliderChange={(value) => updateWidgetData(widget.id, { completed_line_opacity: value })}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { completed_line_opacity: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -148,7 +134,8 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
             step={1}
             valueDisplay={`${remainingLineOpacity}`}
             suffix="%"
-            onSliderChange={(value) => updateWidgetData(widget.id, { remaining_line_opacity: value })}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { remaining_line_opacity: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -162,15 +149,15 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
             valueDisplay={`${yScale.toFixed(2)}`}
             suffix="x"
             onSliderChange={(value) =>
-              updateWidgetSize(widget.id, {
+              updateWidgetDraft(widget.id, {
                 y_scale: Number(value.toFixed(2)),
               })
             }
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
 
           <div className="flex items-center justify-between gap-2 px-1 pt-6">
-            <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
+            <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">
               {t('widget-editor.showFullActivity', 'Show Full Activity')}
             </Label>
             <ToggleField
@@ -180,7 +167,20 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
           </div>
         </div>
         <div className="space-y-4">
-          <SectionHeading icon={Palette} title={t('widget-editor.areaStyling', 'Area Styling')} />
+          <SectionHeading
+            icon={Palette}
+            title={t('widget-editor.areaStyling', 'Area Styling')}
+            trailing={
+              <div className="flex items-center gap-2 px-1">
+                <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.areaGradient', 'Gradient')}</Label>
+                <ToggleField
+                  label={t('widget-editor.areaGradient', 'Gradient')}
+                  checked={widget.data.area_gradient}
+                  onCheckedChange={(checked) => updateWidgetData(widget.id, { area_gradient: checked })}
+                />
+              </div>
+            }
+          />
           <div className="grid grid-cols-2 gap-4">
             <ColorField
               label={t('widget-editor.finishedColor', 'Finished Color')}
@@ -203,7 +203,8 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               step={1}
               valueDisplay={`${completedAreaOpacity}`}
               suffix="%"
-              onSliderChange={(value) => updateWidgetData(widget.id, { area_completed_opacity: value })}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { area_completed_opacity: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
             <SliderField
               editable
@@ -214,69 +215,24 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               step={1}
               valueDisplay={`${remainingAreaOpacity}`}
               suffix="%"
-              onSliderChange={(value) => updateWidgetData(widget.id, { area_remaining_opacity: value })}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { area_remaining_opacity: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           </div>
         </div>
       </div>
-      <div className="space-y-4">
-        <SectionHeading icon={Map} title={t('widget-editor.marker', 'Marker')} />
-        <div className="grid grid-cols-2 gap-4">
-          <SelectField
-            label={t('widget-editor.markerType', 'Marker Type')}
-            value={markerVariant}
-            options={markerVariantOptions}
-            onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
-          />
-          <SizeSlider
-            label={t('widget-editor.size', 'Size')}
-            value={markerSize}
-            min={0}
-            max={50}
-            step={1}
-            valueDisplay={`${markerSize}`}
-            suffix="px"
-            onChange={(value) => updateWidgetSize(widget.id, { marker_size: value })}
-            onCommit={() => commitWidgetSize(widget.id)}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <ColorField
-            value={widget.data.marker_color || getThemeColor('aqua')}
-            onChange={(value) => updateWidgetData(widget.id, { marker_color: value })}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.opacity', 'Opacity')}
-            value={markerOpacity}
-            min={0}
-            max={100}
-            step={1}
-            valueDisplay={`${markerOpacity}`}
-            suffix="%"
-            onSliderChange={(value) => updateWidgetData(widget.id, { marker_opacity: value })}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          {showVariantDiameter ? (
-            <SizeSlider
-              label={variantDiameterLabel}
-              value={markerVariantDiameter}
-              min={Math.max(Math.round(markerSize * 2), 4)}
-              max={120}
-              step={1}
-              valueDisplay={`${markerVariantDiameter}`}
-              suffix="px"
-              onChange={(value) => updateWidgetSize(widget.id, { marker_variant_diameter: value })}
-              onCommit={() => commitWidgetSize(widget.id)}
-            />
-          ) : null}
-        </div>
-      </div>
+      <PlotMarkerSection
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
+      />
 
       <div className="space-y-4">
         <SectionHeading icon={Mountain} title={t('widget-editor.labels', 'Labels')} />
-        <SizeSlider
+        <SliderField
+          editable
+          integerDisplay
           label={t('widget-editor.labelSize', 'Label Size')}
           value={labelFontSize}
           min={5}
@@ -284,14 +240,16 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
           step={1}
           valueDisplay={`${labelFontSize}`}
           suffix="px"
-          onChange={(value) => updateWidgetSize(widget.id, { point_label: { ...(widget.data.point_label ?? {}), font_size: value } })}
-          onCommit={() => commitWidgetSize(widget.id)}
+          onSliderChange={(value) => updateWidgetDraft(widget.id, { point_label: { ...(widget.data.point_label ?? {}), font_size: value } })}
+          onSliderCommit={() => commitWidgetDraft(widget.id)}
         />
 
         <div className="grid grid-cols-2 gap-4 pt-2">
           <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center gap-2 pl-1 pb-3">
-              <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.metricLabel', 'Metric Label')}</Label>
+              <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">
+                {t('widget-editor.metricLabel', 'Metric Label')}
+              </Label>
               <ToggleField
                 label={t('widget-editor.labelMetric', 'Label Metric')}
                 onCheckedChange={(checked) =>
@@ -312,8 +270,8 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               integerDisplay
               valueDisplay={`${widget.data.metric_label_offset_x}`}
               suffix="px"
-              onSliderChange={(value) => updateWidgetSize(widget.id, { metric_label_offset_x: value })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { metric_label_offset_x: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
             <SliderField
               editable
@@ -326,13 +284,15 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               integerDisplay
               valueDisplay={`${widget.data.metric_label_offset_y}`}
               suffix="px"
-              onSliderChange={(value) => updateWidgetSize(widget.id, { metric_label_offset_y: value })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { metric_label_offset_y: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           </div>
           <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center gap-2 pl-1 pb-3">
-              <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.imperialLabel', 'Imperial Label')}</Label>
+              <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">
+                {t('widget-editor.imperialLabel', 'Imperial Label')}
+              </Label>
               <ToggleField
                 label={t('widget-editor.labelImperial', 'Label Imperial')}
                 checked={widget.data.show_elevation_imperial}
@@ -354,8 +314,8 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               integerDisplay
               valueDisplay={`${widget.data.imperial_label_offset_x}`}
               suffix="px"
-              onSliderChange={(value) => updateWidgetSize(widget.id, { imperial_label_offset_x: value })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { imperial_label_offset_x: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
             <SliderField
               editable
@@ -368,8 +328,8 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               integerDisplay
               valueDisplay={`${widget.data.imperial_label_offset_y}`}
               suffix="px"
-              onSliderChange={(value) => updateWidgetSize(widget.id, { imperial_label_offset_y: value })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { imperial_label_offset_y: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           </div>
         </div>

@@ -1,16 +1,15 @@
 mod common;
 
-use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
-use ovrley_core::debug::RenderProfiler;
-use ovrley_core::normalize::raw::{RenderConfig, ValueConfig};
-use ovrley_core::normalize::{validate_render_config, ValidatedCornerGaugeOrientation};
+use ovrley_core::activity::schema::DenseActivityReport;
+use ovrley_core::normalize::RenderConfig;
+use ovrley_core::normalize::validate_render_config;
+use ovrley_widgets::widgets::gauges::validation::ValidatedCornerGaugeOrientation;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::widgets::gauges::arc::{
+use ovrley_widgets::widgets::gauges::arc::{
     arc_point, corner_gauge_geometry, corner_start_end_angles,
 };
-use ovrley_core::render::widgets::types::PreparedValue;
-use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
-use ovrley_core::types::{DisplayType, TrackFillStyle};
+use ovrley_widgets::model::types::{DisplayType, TrackFillStyle};
+use ovrley_widgets::widgets::value::config::ValueConfig;
 use std::collections::BTreeMap;
 
 #[test]
@@ -111,34 +110,17 @@ fn corner_orientation_is_required_and_restricted_to_bottom_corners() {
 }
 
 #[test]
-fn corner_gauge_prepares_a_shared_arc_cache_and_renders_a_frame() {
+fn corner_gauge_lays_out_the_shared_arc_gauge() {
     let config = validate_single_corner(full_corner_gauge_config("bottom-right")).unwrap();
     let paths = test_paths();
-    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = dense_speed_activity(vec![Some(0.0), Some(50.0), Some(100.0)]);
-    let mut profiler = RenderProfiler::default();
 
-    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
-    let PreparedValue::ArcGauge(widget) = &assets.values()[0] else {
-        panic!("corner gauge should use the shared arc cache");
-    };
-    let cache = widget
-        .cache
-        .as_ref()
-        .expect("corner gauge cache must be prepared");
-    assert_eq!(cache.start_angle, 180.0);
-    assert_eq!(cache.sweep_angle, 90.0);
-    assert_eq!(cache.frame_states[1].fill01, 0.5);
+    let (layout, frame_states) = common::gauge::gauge_layout(&config, &dense, &ovrley_core::fonts::NativeFonts(&paths.font_dirs));
+    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(layout) = &layout else { panic!("corner layout"); };
+    assert_eq!(layout.geometry.start_angle, 180.0);
+    assert_eq!(layout.geometry.sweep_angle, 90.0);
+    assert_eq!(frame_states[1].fill01, 0.5);
 
-    let out_path = std::env::temp_dir().join("corner_gauge_preview_report.png");
-    let report =
-        render_preview_with_report(&paths, &config, &activity, &dense, 1.0, &out_path).unwrap();
-    assert_eq!(
-        report.metric_presentations[0].display_type,
-        DisplayType::Corner
-    );
-    assert_eq!(report.metric_presentations[0].widget.frame.progress01, 1.0);
-    let _ = std::fs::remove_file(out_path);
 }
 
 #[test]
@@ -150,11 +132,11 @@ fn corner_bars_keep_the_configured_segment_count() {
     let config = validate_single_corner(value).unwrap();
 
     let gauge = match &config.values[0] {
-        ovrley_core::render::widgets::types::PreparedValue::ArcGauge(gauge) => gauge,
+        ovrley_widgets::widgets::value::validation::ValidatedValue::ArcGauge(gauge) => gauge,
         _ => panic!("corner should validate as an arc gauge"),
     };
-    assert_eq!(gauge.validated.track_fill_style, TrackFillStyle::Bars);
-    assert_eq!(gauge.validated.bar_geometry.unwrap().count, 6);
+    assert_eq!(gauge.track_fill_style, TrackFillStyle::Bars);
+    assert_eq!(gauge.bar_geometry.unwrap().count, 6);
 }
 
 fn validate_single_corner(
@@ -191,6 +173,8 @@ fn full_corner_gauge_config(corner_orientation: &str) -> serde_json::Value {
         "track_empty_opacity": 0.5,
         "track_filled_color": "#40e0d0",
         "track_filled_opacity": 1,
+        "track_filled_gradient": false,
+        "track_filled_gradient_stops": [{ "offset": 0, "color": "#40e0d0" }, { "offset": 1, "color": "#c65102" }],
         "track_fill_flat": false,
         "show_min_max_labels": true,
         "min_max_label_font": "Arial.ttf",
@@ -219,10 +203,10 @@ fn dense_speed_activity(speed: Vec<Option<f64>>) -> DenseActivityReport {
         frame_distance_progress: vec![Some(0.0); frame_count],
         full_activity_distance: None,
         full_activity_total_ascent: None,
-        full_activity_metric_ranges: ovrley_core::activity::metric_ranges::calculate_metric_range(
+        full_activity_metric_ranges: ovrley_core::activity::sampling::calculate_metric_range(
             &series.speed,
         )
-        .map(|range| (ovrley_core::MetricKind::Speed, range))
+        .map(|range| (ovrley_widgets::model::types::MetricKind::Speed, range))
         .into_iter()
         .collect(),
         series,

@@ -3,7 +3,7 @@
  */
 
 import { render } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vite-plus/test'
 
 vi.mock('@tauri-apps/api/core', () => ({ convertFileSrc: (path) => path }))
 vi.mock('@/features/app-shell/components/ActivitySection', () => ({

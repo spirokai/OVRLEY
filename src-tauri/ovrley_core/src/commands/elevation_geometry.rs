@@ -57,20 +57,13 @@ pub fn build_elevation_geometry_command(
 
     let show_full_activity = elevation_plot.show_full_activity;
 
-    let raw_points = crate::render::widgets::elevation::prepare::build_elevation_source_points(
-        &activity,
-        show_full_activity,
-        &scene,
-    )?;
-
-    let normalized = crate::render::widgets::elevation::normalize::normalize_elevation_plot(
+    let samples = activity
+        .elevation_activity()
+        .samples(scene.plot_window(show_full_activity));
+    let geometry = ovrley_widgets::widgets::elevation::geometry::ElevationGeometry::new(
         elevation_plot,
-        &scene,
-    );
-
-    let geometry = crate::render::widgets::elevation::prepare::build_elevation_geometry(
-        &normalized,
-        &raw_points,
+        scene.presentation.scale,
+        &samples,
     )?;
 
     Ok(ElevationGeometryResponse {
@@ -78,15 +71,10 @@ pub fn build_elevation_geometry_command(
         progress_values: geometry.progress_values,
         elapsed_fractions: geometry.elapsed_fractions,
         data_range: geometry.elevation_data_range.map(|(min, max)| [min, max]),
-        bbox: [
-            geometry.bbox.0,
-            geometry.bbox.1,
-            geometry.bbox.2,
-            geometry.bbox.3,
-        ],
+        bbox: [0.0, 0.0, geometry.key.width, geometry.key.height],
         source_point_count: geometry.source_point_count,
         simplification: geometry.simplification,
-        widget_width: normalized.width,
-        widget_height: normalized.height,
+        widget_width: geometry.key.width.round() as u32,
+        widget_height: geometry.key.height.round() as u32,
     })
 }

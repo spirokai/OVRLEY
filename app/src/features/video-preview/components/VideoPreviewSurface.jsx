@@ -83,7 +83,7 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
           ref={videoRef}
           src={videoSrc}
           className={cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')}
-          preload="metadata"
+          preload="auto"
           playsInline
           muted={isVideoMuted}
           onError={(event) => console.error('[VideoPreviewSurface] Video Error:', event)}

@@ -9,14 +9,14 @@ use std::thread::{self, JoinHandle};
 
 use serde::Serialize;
 
+use super::activity::RenderActivity;
 use super::batch_state::BatchState;
 use super::inspection::verify_composite_source_resolution;
 use super::planning::{plan_single_render, PlannedVideoRender, VideoRenderModePlan};
 use crate::activity::schema::ParsedActivity;
 use crate::activity::{parse_activity_json, validate_render_activity};
 use crate::debug::RenderProgress;
-use crate::encode::ffmpeg::composite::CompositeEncoding;
-use crate::encode::pipeline::{encode_video, VideoEncoding};
+use crate::encode::pipeline::{encode_video, VideoEncodingRequest};
 use crate::encode::progress::{ProgressSink, RenderController};
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::parse_config_json;
@@ -197,6 +197,9 @@ where
     let session = &reservation;
     let outcome = catch_unwind(AssertUnwindSafe(move || {
         session.check_cancelled()?;
+        // Prevent App Nap for the whole operation, including every batch item
+        // and native cleanup. Released on success, error, cancellation or panic.
+        let _activity = RenderActivity::begin("Rendering video");
         operation(session)
     }))
     .unwrap_or_else(|_| Err(CoreError::Encode("Render operation worker panicked".into())));
@@ -280,7 +283,7 @@ pub(crate) fn execute_render(
     session.check_cancelled()?;
     let dense = plan.prepare_activity(activity)?;
     session.check_cancelled()?;
-    let encoding = match plan.mode {
+    let request = match plan.mode {
         VideoRenderModePlan::Composite {
             render,
             source_metadata,
@@ -295,19 +298,9 @@ pub(crate) fn execute_render(
                 )?,
             };
             session.check_cancelled()?;
-            VideoEncoding::Composite(CompositeEncoding::new(
-                crate::render::FrameSize {
-                    width: plan.config.scene.presentation.width,
-                    height: plan.config.scene.presentation.height,
-                },
-                render,
-                source.has_audio,
-                source.audio_bit_rate,
-                source.rotation_degrees,
-                target,
-            )?)
+            VideoEncodingRequest::Composite { render, source }
         }
-        VideoRenderModePlan::Transparent(render) => VideoEncoding::Transparent(render),
+        VideoRenderModePlan::Transparent(render) => VideoEncodingRequest::Transparent(render),
     };
     encode_video(
         paths,
@@ -316,6 +309,6 @@ pub(crate) fn execute_render(
         &dense,
         session.controller(),
         target,
-        encoding,
+        request,
     )
 }

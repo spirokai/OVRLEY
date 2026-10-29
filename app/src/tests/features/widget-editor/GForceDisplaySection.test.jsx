@@ -1,7 +1,7 @@
-import { beforeAll, describe, expect, test, vi } from 'vitest'
+import { beforeAll, describe, expect, test, vi } from 'vite-plus/test'
 import { render, screen } from '@testing-library/react'
 import MetricWidgetEditor from '@/features/widget-editor/components/metricWidget/MetricWidgetEditor'
-import { createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
+import { createWidgetDefaults } from '@/lib/widget/widget-defaults'
 
 vi.mock('@/hooks/useFonts', async () => ({
   ...(await vi.importActual('@/hooks/useFonts')),
@@ -14,11 +14,6 @@ vi.mock('@/features/widget-editor/components/widgetFormControls', async (importO
     ...actual,
     SliderField: ({ label, value, onSliderChange }) => (
       <button type="button" aria-label={label} onClick={() => onSliderChange(value / 2)}>
-        {label}
-      </button>
-    ),
-    SizeSlider: ({ label, value, onChange }) => (
-      <button type="button" aria-label={label} onClick={() => onChange(value / 2)}>
         {label}
       </button>
     ),
@@ -38,7 +33,7 @@ describe('GForceWidgetEditor', () => {
     const widget = {
       id: 'g-force-1',
       type: 'g_force',
-      data: createMetricValueDefaults('g_force', { font_values: 'Arial.ttf' }, { displayType: 'g_force' }),
+      data: createWidgetDefaults({ type: 'g_force', displayType: 'g_force' }, { font_values: 'Arial.ttf' }),
     }
     render(<MetricWidgetEditor widget={widget} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
 
@@ -55,15 +50,15 @@ describe('GForceWidgetEditor', () => {
     const widget = {
       id: 'g-force-1',
       type: 'g_force',
-      data: createMetricValueDefaults('g_force', { font_values: 'Arial.ttf' }, { displayType: 'g_force' }),
+      data: createWidgetDefaults({ type: 'g_force', displayType: 'g_force' }, { font_values: 'Arial.ttf' }),
     }
     const updateWidgetData = vi.fn()
-    const updateWidgetSize = vi.fn()
-    render(<MetricWidgetEditor widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} setNumericField={vi.fn()} />)
+    const updateWidgetDraft = vi.fn()
+    render(<MetricWidgetEditor widget={widget} updateWidgetData={updateWidgetData} updateWidgetDraft={updateWidgetDraft} setNumericField={vi.fn()} />)
 
     screen.getByRole('button', { name: 'Size' }).click()
 
-    expect(updateWidgetSize).toHaveBeenCalledWith(
+    expect(updateWidgetDraft).toHaveBeenCalledWith(
       'g-force-1',
       expect.objectContaining({
         width: 137,

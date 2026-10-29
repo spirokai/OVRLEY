@@ -1,5 +1,5 @@
-import { afterEach, expect, test, vi } from 'vitest'
-import { resolveFontStyle, supportsFontItalic } from '@/lib/fonts'
+import { afterEach, expect, test, vi } from 'vite-plus/test'
+import { createLabelFontSelection, supportsFontItalic } from '@/lib/fonts'
 
 import { prepareFont } from '@/lib/font-resources'
 
@@ -43,7 +43,7 @@ test('registers genuine ital and slnt instances while weight-only fonts remain u
     for (const [index, font] of fonts.entries()) {
       expect(supportsFontItalic(font)).toBe(true)
       await prepareFont(font.id)
-      expect(resolveFontStyle(font, 537, true)).toMatchObject({ weight: 537, fontStyle: 'italic' })
+      expect(createLabelFontSelection(font, { font_weight: 537, italic: true })).toMatchObject({ font_weight: 537, italic: true })
       const faces = registered.filter((face) => face.family === `OVRLEY ${font.id}`)
       expect(faces.map((face) => face.style)).toEqual(['normal', 'italic'])
       expect(faces[0].variationSettings).toBe(`"${axisFonts[index].tag}" 0`)
@@ -51,7 +51,7 @@ test('registers genuine ital and slnt instances while weight-only fonts remain u
       expect(faces[1].weight).toBe('100 900')
     }
     expect(supportsFontItalic(upright)).toBe(false)
-    expect(resolveFontStyle(upright, 537, true)).toMatchObject({ weight: 537, fontStyle: 'normal' })
+    expect(createLabelFontSelection(upright, { font_weight: 537, italic: true })).toMatchObject({ font_weight: 537, italic: false })
   } finally {
     if (originalFonts) Object.defineProperty(document, 'fonts', originalFonts)
     else delete document.fonts

@@ -1,8 +1,9 @@
 //! Strict render-submission contract for static raster widgets.
 
-use super::raw::RasterConfig;
 use crate::error::{CoreError, CoreResult};
-use crate::raster::{valid_raster_id, RasterResourceResolver, SelectedRaster};
+use crate::raster::{RasterResourceResolver, SelectedRaster};
+use ovrley_widgets::widgets::raster::config::RasterConfig;
+use ovrley_widgets::widgets::raster::validation::{validate_raster_geometry, RasterGeometry};
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -22,16 +23,6 @@ pub enum RasterSource {
     Image(Arc<SelectedRaster>),
 }
 
-#[derive(Clone, Debug)]
-pub struct RasterGeometry {
-    pub x: f32,
-    pub y: f32,
-    pub width: f32,
-    pub height: f32,
-    pub rotation: f32,
-    pub opacity: f32,
-}
-
 struct ValidatedRasterDocument {
     geometry: RasterGeometry,
     path: Option<PathBuf>,
@@ -44,70 +35,29 @@ fn invalid_raster(id: &str, detail: String) -> CoreError {
     ))
 }
 
-fn raster_number(id: &str, index: usize, name: &str, value: f64) -> CoreResult<f32> {
-    if !value.is_finite() || value.abs() > f32::MAX as f64 {
-        return Err(invalid_raster(
-            id,
-            format!("rasters[{index}].{name} must be a finite number"),
-        ));
-    }
-    Ok(value as f32)
-}
-
 fn validate_raster_document(
     raw: &RasterConfig,
     index: usize,
 ) -> CoreResult<ValidatedRasterDocument> {
-    if !valid_raster_id(&raw.id) {
-        return Err(invalid_raster(
-            &raw.id,
-            format!(
-                "rasters[{index}].id must contain only letters, digits, hyphens or underscores"
-            ),
-        ));
-    }
-    let width = raster_number(&raw.id, index, "width", raw.width)?;
-    let height = raster_number(&raw.id, index, "height", raw.height)?;
-    let opacity = raster_number(&raw.id, index, "opacity", raw.opacity)?;
-    if width <= 0.0 || height <= 0.0 {
-        return Err(invalid_raster(
-            &raw.id,
-            format!("Raster {} must have a positive frame size", raw.id),
-        ));
-    }
-    if !(0.0..=1.0).contains(&raw.opacity) {
-        return Err(invalid_raster(
-            &raw.id,
-            format!("Raster {} opacity must be between 0 and 1", raw.id),
-        ));
-    }
+    let geometry = validate_raster_geometry(raw, index)?;
     let path = raw.path.as_ref().map(PathBuf::from);
-    if let Some(path) = &path {
-        if !path.is_absolute() {
-            return Err(CoreError::Config(format!(
-                "Raster {} requires an absolute image path [raster_error:relative_path:{}]",
-                raw.id, raw.id
-            )));
-        }
+    if path.as_ref().is_some_and(|path| !path.is_absolute()) {
+        return Err(CoreError::Config(format!(
+            "Raster {} requires an absolute image path [raster_error:relative_path:{}]",
+            raw.id, raw.id
+        )));
     }
-    Ok(ValidatedRasterDocument {
-        geometry: RasterGeometry {
-            x: raster_number(&raw.id, index, "x", raw.x)?,
-            y: raster_number(&raw.id, index, "y", raw.y)?,
-            width,
-            height,
-            rotation: raster_number(&raw.id, index, "rotation", raw.rotation)?,
-            opacity,
-        },
-        path,
-    })
+    Ok(ValidatedRasterDocument { geometry, path })
 }
 
 pub(crate) fn validate_unique_raster_ids(rasters: &[RasterConfig]) -> CoreResult<()> {
     let mut seen = HashSet::new();
     for raster in rasters {
         if !seen.insert(&raster.id) {
-            return Err(invalid_raster(&raster.id, format!("Raster {} id is duplicated", raster.id)));
+            return Err(invalid_raster(
+                &raster.id,
+                format!("Raster {} id is duplicated", raster.id),
+            ));
         }
     }
     Ok(())
@@ -154,7 +104,7 @@ pub(crate) fn validate_raster(
         ));
     }
     if let Some(error) = raw.resource_error_code {
-        return Err(error.for_widget(&raw.id));
+        return Err(error.for_widget(&raw.id).into());
     }
     let missing_resource = || {
         CoreError::Config(format!(
@@ -206,7 +156,7 @@ mod tests {
         let mut malformed_render_config = render_config;
         malformed_render_config["rasters"][0]["width"] = json!("4");
         assert!(
-            serde_json::from_value::<super::super::raw::RenderConfig>(malformed_render_config)
+            serde_json::from_value::<super::super::config::RenderConfig>(malformed_render_config)
                 .unwrap_err()
                 .to_string()
                 .contains("raster_error:invalid_config:configuration")

@@ -1,8 +1,8 @@
-import { createDurableEditorState } from '@/lib/widget/editor-state'
+import { createDurableEditorState } from '@/lib/template/template-state'
 import { createPathLocator } from './projectPaths'
 
 export const PROJECT_FORMAT = 'ovrley-project'
-export const PROJECT_VERSION = 3
+export const PROJECT_VERSION = 5
 export const LAST_PROJECT_DIRECTORY_KEY = 'last-project-dir'
 
 /**
@@ -28,6 +28,9 @@ export function createProjectContentSnapshot(state, projectPath) {
       videoTimezoneMode: state.videoSyncTimezoneMode,
       manual: state.manualVideoSync,
     },
+    laps: {
+      disabled: state.disabledLaps,
+    },
     render: {
       renderTarget: state.renderSettings.renderTarget,
       batchVideoFolder: state.batchVideoFolder,
@@ -47,7 +50,7 @@ export function createProjectContentSnapshot(state, projectPath) {
  * Explicitly projects only project-owned durable state.
  * @param {object} state Complete application state.
  * @param {string} projectPath Absolute destination project path.
- * @returns {object} Canonical version 3 payload.
+ * @returns {object} Canonical version 5 payload.
  */
 export function createProjectSnapshot(state, projectPath) {
   return {
@@ -75,6 +78,7 @@ export function createProjectDirtyState(project) {
       editor: project.editor,
       sources: project.sources,
       sync: project.sync,
+      laps: project.laps,
       render: project.render,
     },
     timeline: project.timeline,

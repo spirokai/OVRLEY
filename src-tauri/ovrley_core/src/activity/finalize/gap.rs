@@ -101,7 +101,7 @@ fn median(values: &[f64]) -> Option<f64> {
     let mut sorted = values.to_vec();
     sorted.sort_by(|left, right| left.total_cmp(right));
     let middle = sorted.len() / 2;
-    if sorted.len() % 2 == 0 {
+    if sorted.len().is_multiple_of(2) {
         Some((sorted[middle - 1] + sorted[middle]) / 2.0)
     } else {
         Some(sorted[middle])
@@ -214,22 +214,7 @@ fn zero_filled_idle_sample(
     synthetic.timestamp = timestamp_ms_value
         .and_then(DateTime::<Utc>::from_timestamp_millis)
         .map(|value| value.to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
-    synthetic.speed = Some(0.0);
-    synthetic.cadence = Some(0.0);
-    synthetic.power = Some(0.0);
-    synthetic.stroke_rate = Some(0.0);
-    synthetic.vertical_speed = Some(0.0);
-    synthetic.g_force = Some(0.0);
-    synthetic.g_force_x = Some(0.0);
-    synthetic.g_force_y = Some(0.0);
-    synthetic.g_force_z = Some(0.0);
-    synthetic.lean_angle = Some(0.0);
-    synthetic.gradient = Some(0.0);
-    synthetic.pace = None;
-    synthetic.torque = None;
-    synthetic.stride_length = None;
-    synthetic.ground_contact_time = None;
-    synthetic.vertical_oscillation = None;
+    synthetic.apply_idle_values();
     synthetic.synthetic_idle = true;
     synthetic
 }
@@ -362,8 +347,8 @@ pub fn build_distance_series(
     let mut total_distance_meters: f64 = 0.0;
     let mut previous_course = None;
 
-    for index in 0..course_points.len() {
-        let current_course = course_points[index].0.zip(course_points[index].1);
+    for (index, (latitude, longitude)) in course_points.iter().enumerate() {
+        let current_course = latitude.zip(*longitude);
         if let Some(direct_distance) = direct_distance_series
             .get(index)
             .copied()
@@ -390,7 +375,7 @@ pub fn build_distance_series(
         sparse_distance_series.push(round_f64(total_distance_meters, 3));
     }
 
-    let points = crate::interpolation::collect_valid_numeric_points(
+    let points = ovrley_widgets::interpolation::collect_valid_numeric_points(
         elapsed_seconds,
         &sparse_distance_series,
     );
@@ -401,7 +386,7 @@ pub fn build_distance_series(
             if first_observation.is_some_and(|first| *elapsed < first) {
                 return None;
             }
-            crate::interpolation::interpolate_points(&points, *elapsed)
+            ovrley_widgets::interpolation::interpolate_points(&points, *elapsed)
                 .and_then(|distance| round_f64(distance, 3))
         })
         .collect()
@@ -493,4 +478,34 @@ pub fn build_progress_series(distance_series: &[Option<f64>]) -> Vec<f64> {
         .iter()
         .map(|value| round_f64(value.unwrap_or(0.0) / total_distance_meters, 6).unwrap_or(0.0))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::zero_filled_idle_sample;
+    use crate::activity::schema::RawSample;
+
+    #[test]
+    fn idle_sample_preserves_context_and_resets_motion_values() {
+        let sample = RawSample {
+            elevation: Some(80.0),
+            heartrate: Some(140.0),
+            engine_power: Some(500.0),
+            speed: Some(5.0),
+            gradient: Some(8.0),
+            g_force_y: Some(0.4),
+            stride_length: Some(1.2),
+            ..Default::default()
+        };
+        let idle = zero_filled_idle_sample(&sample, 2.5, None);
+        assert_eq!(idle.elevation, sample.elevation);
+        assert_eq!(idle.heartrate, sample.heartrate);
+        assert_eq!(idle.engine_power, sample.engine_power);
+        assert_eq!(idle.speed, Some(0.0));
+        assert_eq!(idle.gradient, Some(0.0));
+        assert_eq!(idle.g_force_y, Some(0.0));
+        assert_eq!(idle.stride_length, None);
+        assert_eq!(idle.elapsed_seconds, Some(2.5));
+        assert!(idle.synthetic_idle);
+    }
 }

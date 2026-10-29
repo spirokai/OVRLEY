@@ -1,431 +1,86 @@
 /**
- * Main overlay editor component — renders the canvas, Moveable resize handles,
- * widget badge labels, zoom-to-fit viewport, and empty state.
- *
- * Composes focused hooks at the component level instead of relying on a single
- * god hook. Each hook owns one concern and receives only the data it needs.
+ * Presents the overlay editor canvas, controls, selection, and video-sync screens.
  */
 
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo } from 'react'
 import { LayoutGrid } from 'lucide-react'
+import useStore from '@/store/useStore'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
+import { WIDGET_ICONS } from '@/lib/widget/widget-icons'
+import { getWidgetTypeName } from '@/lib/widget/widget-presentation'
 import EditorToolbar from '@/features/app-shell/components/EditorToolbar'
+import { PROJECT_STATUS_TRANSLATIONS } from '../data/overlayEditorConstants'
+import { VideoSyncMarkControls, VideoSyncPreviewScreens } from '@/features/video-sync'
+import useOverlayEditorState from '../hooks/useOverlayEditorState'
 import OverlayCanvas from './OverlayCanvas'
 import OverlayMoveable from './OverlayMoveable'
-import { WIDGET_ICONS } from '../data/overlayEditorConfig'
-import { useOverlayEditorStateWithLiveEdits } from '../hooks/useOverlayEditorState'
-import useOverlayPreviewModels from '../hooks/useOverlayPreviewModels'
-import useWidgetSelection from '../hooks/useWidgetSelection'
-import { useEditorViewport } from '../hooks/useEditorViewport'
-import { useEditorKeyboard } from '../hooks/useEditorKeyboard'
-import useOverlayPointerHandlers from '../utils/createOverlayPointerHandlers'
-import { useDragHandlers } from '../hooks/useDragHandlers'
-import { useResizeHandlers } from '../hooks/useResizeHandlers'
-import { useScaleHandlers } from '../hooks/useScaleHandlers'
-import { useRotateHandlers } from '../hooks/useRotateHandlers'
-import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
-import { buildRenderedGeometrySignature, buildWidgetRenderGeometryModels } from '../utils/widgetRenderGeometry'
-import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
-import { useTranslation } from 'react-i18next'
-import { getWidgetTypeName } from '@/lib/widget/widget-presentation'
-import { resolveVideoSyncMarkControls, VIDEO_SYNC_PREVIEW_SCREEN_GAP, VideoSyncMarkControls, VideoSyncPreviewScreens } from '@/features/video-sync'
 
-const PROJECT_STATUS_TRANSLATIONS = {
-  Unsaved: { key: 'overlay-editor.statusUnsaved', defaultLabel: 'Unsaved' },
-  Saved: { key: 'overlay-editor.statusSaved', defaultLabel: 'Saved' },
-  Modified: { key: 'overlay-editor.statusModified', defaultLabel: 'Modified' },
-}
-
-function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels, selectedWidgetIds, widgets }) {
-  const { t } = useTranslation()
-  const visibleWidgets = useMemo(() => {
-    const visibleIds = new Set(selectedWidgetIds)
-    if (hoveredWidgetId) visibleIds.add(hoveredWidgetId)
-    return widgets.filter((widget) => visibleIds.has(widget.id))
-  }, [hoveredWidgetId, selectedWidgetIds, widgets])
-
-  if (!visibleWidgets.length) return null
-
-  return (
-    <div data-testid="widget-badge-layer" className="pointer-events-none absolute inset-0 z-50 overflow-visible">
-      {visibleWidgets.map((widget) => {
-        const Icon = WIDGET_ICONS[widget.type]
-        const renderGeometryModel = renderGeometryModels[widget.id]
-        const { renderGeometry } = renderGeometryModel
-        const left = renderGeometry.badgeLeft * displayScale - 2
-        const top = Math.max(renderGeometry.badgeTop * displayScale - 20, 0)
-
-        return (
-          <div
-            key={widget.id}
-            className="ml-1 absolute flex h-5 items-center gap-1 rounded-xs border border-border/70 bg-card/90 px-2 text-[11px] font-semibold leading-none text-muted-foreground shadow-sm"
-            style={{ left, top }}
-          >
-            <Icon className="h-3 w-3" />
-            <span>{getWidgetTypeName(widget.type, t)}</span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function CanvasStatusBadges({ height, showProjectStatus, status, width }) {
-  const { t } = useTranslation()
-  const statusTranslation = PROJECT_STATUS_TRANSLATIONS[status]
-  if (!statusTranslation) throw new Error(`Unknown project status: ${status}`)
-
-  return (
-    <div data-testid="canvas-status-badges" className="pointer-events-none absolute right-8 top-4 z-50 flex items-center gap-2">
-      {showProjectStatus ? (
-        <Badge
-          variant={status === 'Modified' ? 'secondary' : 'outline'}
-          className={`h-6 rounded-xs text-[10px] shadow-lg backdrop-blur-sm ${status === 'Modified' ? 'border-accent-border bg-surface-accent-soft/20 text-primary' : 'bg-card/85'}`}
-        >
-          {t(statusTranslation.key, statusTranslation.defaultLabel)}
-        </Badge>
-      ) : null}
-      <div className="rounded-xs border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">
-        {width} &times; {height}
-      </div>
-    </div>
-  )
-}
-
-function CanvasToolbar({ editorShell, importedBackgroundImageFilename, importedVideoFilename, undoRedoControls }) {
-  return (
-    <div data-testid="canvas-editor-toolbar" className="pointer-events-auto absolute left-1/2 top-4 z-50 -translate-x-1/2">
-      <EditorToolbar
-        backgroundMode={editorShell.editorBackgroundMode}
-        onSetBackgroundMode={editorShell.setEditorBackgroundMode}
-        importedBackgroundImageFilename={importedBackgroundImageFilename}
-        importedVideoFilename={importedVideoFilename}
-        zoomLevel={editorShell.editorZoomLevel}
-        onZoomIn={editorShell.increaseZoom}
-        onZoomOut={editorShell.decreaseZoom}
-        onResetZoom={editorShell.resetZoom}
-        gridVisible={editorShell.editorGridVisible}
-        onSetGridVisible={editorShell.setEditorGridVisible}
-        snapToGrid={editorShell.editorSnapToGrid}
-        onSetSnapToGrid={editorShell.setEditorSnapToGrid}
-        undoRedoControls={undoRedoControls}
-      />
-    </div>
-  )
-}
-
-function EmptyOverlayState() {
-  const { t } = useTranslation()
-  return (
-    <div className="flex h-full items-center justify-center p-8">
-      <div className="max-w-sm rounded-sm border border-dashed border-border/70 bg-card/60 px-8 py-10 text-center shadow-[0_30px_80px_rgba(0,0,0,0.25)] backdrop-blur-sm">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center bg-surface-elevated text-primary">
-          <LayoutGrid className="h-6 w-6" />
-        </div>
-        <p className="text-sm font-semibold text-foreground">{t('overlay-editor.overlayCanvasReady', 'Overlay canvas ready')}</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {t('overlay-editor.emptyEditorHint', 'Load a template or add widgets to start positioning the overlay.')}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function OverlayEditorContent({
-  editorShell,
-  config,
-  globalDefaults,
-  onConfigChange,
-  zoomLevel,
-  onZoomLevelChange,
-  backgroundMode,
-  gridVisible,
-  snapToGrid,
-  importedBackgroundImageFilename,
-  importedVideoFilename,
-  showProjectStatus,
-  projectStatus,
-  videoSyncMode = false,
-  videoSyncMarkControls = null,
-  undoRedoControls,
-  widgetLiveEdits,
-}) {
-  const [hoveredWidgetId, setHoveredWidgetId] = useState(null)
-  const [isGroupDragActive, setIsGroupDragActive] = useState(false)
-  const [groupDragSelectionIds, setGroupDragSelectionIds] = useState([])
-  const [selectionRect, setSelectionRect] = useState(null)
-  const [stageElement, setStageElement] = useState(null)
-  const clipboardRef = useRef(null)
-  const marqueeCleanupRef = useRef(null)
-  const marqueeSelectionRef = useRef(null)
-
-  // Derived state hook — widgets, scene, preview, drafts
-  const overlayState = useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onConfigChange }, widgetLiveEdits)
-  const activity = overlayState.activity
-  const resolvedVideoSyncMarkControls = resolveVideoSyncMarkControls(videoSyncMarkControls, overlayState.previewSecond, videoSyncMode)
-  const { metricPreviewModels, textPreviewModels } = useOverlayPreviewModels({
-    activity,
-    globalScale: overlayState.globalScale,
-    previewSecond: overlayState.previewSecond,
-    exportStartSecond: overlayState.previewExportStartSecond,
-    renderedWidgets: overlayState.canvasWidgets,
-  })
-
-  const renderGeometryModels = useMemo(
-    () =>
-      buildWidgetRenderGeometryModels({
-        widgets: overlayState.canvasWidgets,
-        metricPreviewModels,
-        textPreviewModels,
-        globalScale: overlayState.globalScale,
-        liveWidgetDrafts: overlayState.liveWidgetDrafts,
-      }),
-    [metricPreviewModels, overlayState.canvasWidgets, overlayState.globalScale, overlayState.liveWidgetDrafts, textPreviewModels],
-  )
-
-  // Selection management — composed after overlayState so it can consume orderedWidgetIds, renderedWidgetMap, widgetNodes
-  const selection = useWidgetSelection({
-    orderedWidgetIds: overlayState.orderedWidgetIds,
-    renderedWidgetMap: overlayState.renderedWidgetMap,
-    widgetNodes: overlayState.widgetNodes,
-    isGroupDragActive,
-    groupDragSelectionIds,
-  })
-
-  // Viewport tracking
-  const viewportContentSize = useMemo(
-    () =>
-      videoSyncMode
-        ? {
-            width: overlayState.sceneSize.width * 2 + VIDEO_SYNC_PREVIEW_SCREEN_GAP,
-            height: overlayState.sceneSize.height,
-          }
-        : overlayState.sceneSize,
-    [overlayState.sceneSize, videoSyncMode],
-  )
-  const { displayScale, handleWheel, scrollViewportRef, viewportRef } = useEditorViewport({
-    contentSize: viewportContentSize,
-    onZoomLevelChange,
-    sceneElement: overlayState.sceneElement,
-    sceneSize: overlayState.sceneSize,
-    zoomLevel,
-  })
-
-  // Keyboard shortcuts
-  useEditorKeyboard({
-    config,
+function OverlayEditorContent(props) {
+  const {
     editorShell,
-    onConfigChange,
-    selectedWidgetIds: selection.selectedWidgetIds,
-    selectedWidgets: selection.selectedWidgets,
-    setWidgetSelection: selection.setWidgetSelection,
-    clipboardRef,
-  })
-
-  // Pointer handlers
-  const { handleSceneMouseDown, handleWidgetMouseDown } = useOverlayPointerHandlers({
-    commitSelection: selection.commitSelection,
-    moveableRef: overlayState.moveableRef,
-    marqueeCleanupRef,
-    marqueeSelectionRef,
-    orderedWidgetIds: overlayState.orderedWidgetIds,
-    sceneElement: overlayState.sceneElement,
-    sceneSize: overlayState.sceneSize,
-    stageElement,
-    selectedWidgetId: selection.selectedWidgetId,
-    selectedWidgetIds: selection.selectedWidgetIds,
-    setGroupDragSelectionIds,
-    setIsGroupDragActive,
-    setSelectionRect,
-    setSelectionState: selection.setSelectionState,
-    widgetNodes: overlayState.widgetNodes,
-  })
-
-  // Moveable interaction hooks
-  const effectiveSelectedWidgetIds = selection.effectiveSelectedWidgetIds
-
-  const dragHandlers = useDragHandlers({
-    clearWidgetDraft: overlayState.clearWidgetDraft,
-    clearWidgetDrafts: overlayState.clearWidgetDrafts,
-    commitWidgetUpdate: overlayState.commitWidgetUpdate,
-    commitWidgetUpdates: overlayState.commitWidgetUpdates,
-    draftWidgetsRef: overlayState.draftWidgetsRef,
-    beginWidgetInteraction: overlayState.beginWidgetInteraction,
-    endWidgetInteraction: overlayState.endWidgetInteraction,
-    effectiveSelectedWidgetIds,
-    globalScale: overlayState.globalScale,
-    interactionStartRef: overlayState.interactionStartRef,
-    selectedWidget: selection.selectedWidget,
-    selectedWidgets: selection.selectedWidgets,
-    setGroupDragSelectionIds,
-    setIsGroupDragActive,
-    setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
-    setLiveWidgetDraftsBatch: overlayState.setLiveWidgetDraftsBatch,
-  })
-
-  const resizeHandlers = useResizeHandlers({
-    clearWidgetDraft: overlayState.clearWidgetDraft,
-    commitWidgetUpdate: overlayState.commitWidgetUpdate,
-    draftWidgetsRef: overlayState.draftWidgetsRef,
-    globalScale: overlayState.globalScale,
-    interactionStartRef: overlayState.interactionStartRef,
-    selectedWidget: selection.selectedWidget,
-    setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
-    beginWidgetInteraction: overlayState.beginWidgetInteraction,
-    endWidgetInteraction: overlayState.endWidgetInteraction,
-  })
-
-  const scaleHandlers = useScaleHandlers({
-    clearWidgetDraft: overlayState.clearWidgetDraft,
-    clearWidgetDrafts: overlayState.clearWidgetDrafts,
-    commitWidgetUpdate: overlayState.commitWidgetUpdate,
-    commitWidgetUpdates: overlayState.commitWidgetUpdates,
-    draftWidgetsRef: overlayState.draftWidgetsRef,
-    globalScale: overlayState.globalScale,
-    interactionStartRef: overlayState.interactionStartRef,
-    selectedTarget: selection.selectedTarget,
-    selectedWidget: selection.selectedWidget,
-    selectedWidgets: selection.selectedWidgets,
-    setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
-    setLiveWidgetDraftsBatch: overlayState.setLiveWidgetDraftsBatch,
-    beginWidgetInteraction: overlayState.beginWidgetInteraction,
-    endWidgetInteraction: overlayState.endWidgetInteraction,
-  })
-
-  const rotateHandlers = useRotateHandlers({
-    clearWidgetDraft: overlayState.clearWidgetDraft,
-    commitWidgetUpdate: overlayState.commitWidgetUpdate,
-    draftWidgetsRef: overlayState.draftWidgetsRef,
-    globalScale: overlayState.globalScale,
-    interactionStartRef: overlayState.interactionStartRef,
-    selectedWidget: selection.selectedWidget,
-    setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
-    beginWidgetInteraction: overlayState.beginWidgetInteraction,
-    endWidgetInteraction: overlayState.endWidgetInteraction,
-  })
-
-  const handlers = { ...dragHandlers, ...resizeHandlers, ...scaleHandlers, ...rotateHandlers }
-  const selectedRenderedGeometryVersion = useMemo(() => {
-    if (!selection.effectiveSelectedWidgetIds.length) {
-      return 'none'
-    }
-
-    return selection.effectiveSelectedWidgetIds
-      .map((widgetId) => {
-        const widget = overlayState.renderedWidgetMap[widgetId]
-        if (!widget) {
-          return 'missing'
-        }
-
-        return buildRenderedGeometrySignature(widget, renderGeometryModels[widgetId])
-      })
-      .join('|')
-  }, [overlayState.renderedWidgetMap, renderGeometryModels, selection.effectiveSelectedWidgetIds])
-
-  // Capability flags
-  const selectedWidget = selection.selectedWidget
-  const hasSingleSelection = Boolean(selectedWidget) && !selection.isGroupSelection
-  const isBackdropSelected = isBackdropWidget(selectedWidget)
-  const isFramedSelected = isFramedWidget(selectedWidget)
-  const selectedDisplayType = selectedWidget?.data?.display_type
-
-  const canResizeSelected = hasSingleSelection && isFramedSelected
-  const showEdgeResizeHandles =
-    canResizeSelected &&
-    (selectedWidget?.type === 'raster' || (selectedWidget?.type === 'elevation' && !isUniformResizeDisplayType(selectedDisplayType)))
-  const canScaleSelected = hasSingleSelection && !isFramedSelected
-  const canRotateSelected = hasSingleSelection && (selectedWidget?.type === 'course' || selectedWidget?.type === 'raster')
-  const maintainAspectRatio =
-    hasSingleSelection &&
-    (isUniformResizeDisplayType(selectedDisplayType) ||
-      (isBackdropSelected && selectedDisplayType === 'circle') ||
-      selectedWidget?.type === 'course' ||
-      !isFramedSelected)
-
-  // Marquee cleanup
-  useEffect(
-    () => () => {
-      marqueeCleanupRef.current?.()
-    },
-    [],
-  )
-
-  const valueFont =
-    config?.values?.find((v) => v.font || v.font_family)?.font ||
-    config?.values?.find((v) => v.font || v.font_family)?.font_family ||
-    globalDefaults?.font_values
-
-  const canvasSceneProps = useMemo(
-    () => ({
-      sceneFont: globalDefaults?.font_text,
-      sceneFontSize: globalDefaults?.font_size,
-      sceneStyle: overlayState.sceneStyle,
-      valueFont,
-      sceneSize: overlayState.sceneSize,
-    }),
-    [globalDefaults?.font_text, globalDefaults?.font_size, overlayState.sceneStyle, valueFont, overlayState.sceneSize],
-  )
-  const canvasDisplayProps = useMemo(
-    () => ({
-      displayScale,
-      globalScale: overlayState.globalScale,
-      globalOpacity: overlayState.globalOpacity,
-      backgroundMode,
-      gridVisible,
-    }),
-    [backgroundMode, displayScale, gridVisible, overlayState.globalOpacity, overlayState.globalScale],
-  )
-  const canvasDataProps = useMemo(
-    () => ({
-      widgets: overlayState.canvasWidgets,
-      activity,
-      previewSecond: overlayState.previewSecond,
-      metricPreviewModels,
-      textPreviewModels,
-      renderGeometryModels,
-      exportRange: overlayState.previewExportRange,
-    }),
-    [
-      activity,
-      metricPreviewModels,
-      overlayState.previewExportRange,
-      overlayState.previewSecond,
-      overlayState.canvasWidgets,
-      renderGeometryModels,
-      textPreviewModels,
-    ],
-  )
-  const canvasCallbacks = useMemo(
-    () => ({
-      setSceneElement: overlayState.setSceneElement,
-      handleWidgetMouseDown,
-      setHoveredWidgetId,
-      widgetRefCallbacks: overlayState.widgetRefCallbacks,
-    }),
-    [overlayState.setSceneElement, handleWidgetMouseDown, overlayState.widgetRefCallbacks],
-  )
-
-  if (videoSyncMode && resolvedVideoSyncMarkControls === null) {
-    throw new Error('Video sync editor requires mark controls')
-  }
-
-  if (!config) return <EmptyOverlayState />
-
+    backgroundMode,
+    gridVisible,
+    importedBackgroundImageFilename,
+    importedVideoFilename,
+    showProjectStatus,
+    projectStatus,
+    undoRedoControls,
+    videoSyncMode,
+  } = props
+  const { t } = useTranslation()
+  const statusTranslation = PROJECT_STATUS_TRANSLATIONS[projectStatus]
+  const editor = useOverlayEditorState(props)
+  const platformOs = useStore((state) => state.platformOs)
+  const {
+    viewport,
+    viewportContentSize,
+    selectionRect,
+    videoSyncMarkControls,
+    setStageElement,
+    handleSceneMouseDown,
+    activity,
+    previewSecond,
+    sceneSize,
+    setSceneElement,
+    handleWidgetMouseDown,
+    moveableProps,
+    widgetBadges,
+  } = editor
+  const { displayScale, viewportRef, scrollViewportRef, handleWheel } = viewport
   return (
     <div ref={viewportRef} className="relative flex h-full flex-1 overflow-hidden">
-      <CanvasStatusBadges
-        height={overlayState.sceneSize.height}
-        showProjectStatus={showProjectStatus}
-        status={projectStatus}
-        width={overlayState.sceneSize.width}
-      />
-      <CanvasToolbar
-        editorShell={editorShell}
-        importedBackgroundImageFilename={importedBackgroundImageFilename}
-        importedVideoFilename={importedVideoFilename}
-        undoRedoControls={undoRedoControls}
-      />
-      <div ref={scrollViewportRef} className="absolute left-0 right-0 top-12 bottom-0 overflow-auto" onWheel={handleWheel}>
+      <div data-testid="canvas-status-badges" className="pointer-events-none absolute right-8 top-4 z-50 flex items-center gap-2">
+        {showProjectStatus ? (
+          <Badge
+            variant={projectStatus === 'Modified' ? 'secondary' : 'outline'}
+            className={`h-6 rounded-xs text-[0.741rem] shadow-lg ${projectStatus === 'Modified' ? 'border-accent-border bg-surface-accent-soft/20 text-primary' : 'bg-card/85'}`}
+          >
+            {t(statusTranslation.key, statusTranslation.defaultLabel)}
+          </Badge>
+        ) : null}
+        <div className="rounded-xs border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg">
+          {sceneSize.width} &times; {sceneSize.height}
+        </div>
+      </div>
+      <div data-testid="canvas-editor-toolbar" className="pointer-events-auto absolute left-1/2 top-4 z-50 -translate-x-1/2">
+        <EditorToolbar
+          backgroundMode={editorShell.editorBackgroundMode}
+          onSetBackgroundMode={editorShell.setEditorBackgroundMode}
+          importedBackgroundImageFilename={importedBackgroundImageFilename}
+          importedVideoFilename={importedVideoFilename}
+          zoomLevel={editorShell.editorZoomLevel}
+          onZoomIn={editorShell.increaseZoom}
+          onZoomOut={editorShell.decreaseZoom}
+          onResetZoom={editorShell.resetZoom}
+          gridVisible={editorShell.editorGridVisible}
+          onSetGridVisible={editorShell.setEditorGridVisible}
+          snapToGrid={editorShell.editorSnapToGrid}
+          onSetSnapToGrid={editorShell.setEditorSnapToGrid}
+          undoRedoControls={undoRedoControls}
+        />
+      </div>
+      <div ref={scrollViewportRef} data-overlay-viewport className="absolute left-0 right-0 top-12 bottom-0 overflow-auto" onWheel={handleWheel}>
         <div
           ref={setStageElement}
           data-testid="overlay-editor-stage"
@@ -439,66 +94,61 @@ function OverlayEditorContent({
             {videoSyncMode ? (
               <VideoSyncPreviewScreens
                 activity={activity}
-                detection={resolvedVideoSyncMarkControls.detection}
+                detection={videoSyncMarkControls.detection}
                 displayScale={displayScale}
-                onDeleteCourseLocation={resolvedVideoSyncMarkControls.onDeleteCourseLocation}
-                onSetCourseLocation={resolvedVideoSyncMarkControls.onSetCourseLocation}
-                previewSecond={overlayState.previewSecond}
-                sceneSize={overlayState.sceneSize}
-                setSceneElement={overlayState.setSceneElement}
+                onDeleteCourseLocation={videoSyncMarkControls.onDeleteCourseLocation}
+                onSetCourseLocation={videoSyncMarkControls.onSetCourseLocation}
+                previewSecond={previewSecond}
+                sceneSize={sceneSize}
+                setSceneElement={setSceneElement}
               />
             ) : (
+              // CSS zoom, unlike a scale transform, does not force an offscreen render surface around the composited widget canvases.
+              // Zoom also creates no stacking context, so isolate keeps Moveable's z-index 3000 controls below app modals.
+              // WebKitGTK reports offsetLeft/offsetTop wrongly inside a CSS zoom container when GNOME text scaling is not 1.0,
+              // which misplaces Moveable's selection. Linux scales with a transform instead.
               <div
-                className="absolute left-0 top-0"
-                style={{
-                  width: overlayState.sceneSize.width,
-                  height: overlayState.sceneSize.height,
-                  transform: `scale(${displayScale})`,
-                  transformOrigin: 'top left',
-                }}
+                className="absolute left-0 top-0 isolate"
+                style={
+                  platformOs === 'linux'
+                    ? { ...sceneSize, transform: `scale(${displayScale})`, transformOrigin: 'top left' }
+                    : { ...sceneSize, zoom: displayScale }
+                }
               >
                 <OverlayCanvas
-                  sceneProps={canvasSceneProps}
-                  displayProps={canvasDisplayProps}
-                  dataProps={canvasDataProps}
-                  callbacks={canvasCallbacks}
-                />
-                <OverlayMoveable
-                  moveableRef={overlayState.moveableRef}
-                  selectedTarget={selection.selectedTarget}
-                  selectedTargets={selection.selectedTargets}
-                  geometryVersion={selectedRenderedGeometryVersion}
-                  isGroupDragActive={isGroupDragActive}
-                  sceneElement={overlayState.sceneElement}
+                  state={editor}
+                  backgroundMode={backgroundMode}
                   displayScale={displayScale}
-                  canResizeSelected={canResizeSelected}
-                  canScaleSelected={canScaleSelected}
-                  canRotateSelected={canRotateSelected}
-                  maintainAspectRatio={maintainAspectRatio}
-                  showEdgeResizeHandles={showEdgeResizeHandles}
-                  elementGuidelines={selection.elementGuidelines}
-                  sceneSize={overlayState.sceneSize}
-                  snapToGrid={snapToGrid}
-                  handlers={handlers}
-                  interactionType={overlayState.activeWidgetInteraction?.type ?? null}
+                  gridVisible={gridVisible}
+                  handleWidgetMouseDown={handleWidgetMouseDown}
                 />
+                <OverlayMoveable {...moveableProps} />
               </div>
             )}
-            {!videoSyncMode ? (
-              <WidgetBadgeLayer
-                displayScale={displayScale}
-                hoveredWidgetId={hoveredWidgetId}
-                renderGeometryModels={renderGeometryModels}
-                selectedWidgetIds={selection.selectedWidgetIds}
-                widgets={overlayState.canvasWidgets}
-              />
+            {!videoSyncMode && widgetBadges.length ? (
+              <div data-testid="widget-badge-layer" className="pointer-events-none absolute inset-0 z-50 overflow-visible">
+                {widgetBadges.map((badge) => {
+                  const Icon = WIDGET_ICONS[badge.type]
+                  return (
+                    <div
+                      key={badge.id}
+                      data-widget-badge-id={badge.id}
+                      className="absolute flex h-5 items-center gap-1 rounded-xs border border-border/70 bg-card/90 px-2 text-[0.815rem] font-semibold leading-none text-muted-foreground shadow-sm"
+                      style={{ left: badge.left, top: badge.top, transform: `rotate(${badge.rotation}deg)`, transformOrigin: 'top left' }}
+                    >
+                      <Icon className="h-3 w-3" />
+                      <span>{getWidgetTypeName(badge.type, t)}</span>
+                    </div>
+                  )
+                })}
+              </div>
             ) : null}
             {videoSyncMode ? (
               <div
-                className="pointer-events-none absolute left-0 top-0 [container-type:size]"
-                style={{ width: overlayState.sceneSize.width * displayScale, height: '100%' }}
+                className="pointer-events-none absolute left-0 top-0 @container-[size]"
+                style={{ width: sceneSize.width * displayScale, height: '100%' }}
               >
-                <VideoSyncMarkControls {...resolvedVideoSyncMarkControls} />
+                <VideoSyncMarkControls {...videoSyncMarkControls} />
               </div>
             ) : null}
           </div>
@@ -506,12 +156,7 @@ function OverlayEditorContent({
             <div
               data-testid="selection-rect"
               className="pointer-events-none absolute z-40 border border-primary/70 bg-primary/10"
-              style={{
-                left: selectionRect.x,
-                top: selectionRect.y,
-                width: selectionRect.width,
-                height: selectionRect.height,
-              }}
+              style={{ left: selectionRect.x, top: selectionRect.y, width: selectionRect.width, height: selectionRect.height }}
             />
           ) : null}
         </div>
@@ -520,8 +165,23 @@ function OverlayEditorContent({
   )
 }
 
+/** @param {object} props Editor inputs; config may be null before a template is loaded. @returns {JSX.Element} Overlay editor. */
 function OverlayEditor(props) {
-  return <OverlayEditorContent {...props} />
+  const { t } = useTranslation()
+  if (props.config !== null) return <OverlayEditorContent {...props} />
+  return (
+    <div className="flex h-full items-center justify-center p-8">
+      <div className="max-w-sm rounded-sm border border-dashed border-border/70 bg-card/60 px-8 py-10 text-center shadow-[0_30px_80px_rgba(0,0,0,0.25)]">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center bg-surface-elevated text-primary">
+          <LayoutGrid className="h-6 w-6" />
+        </div>
+        <p className="text-sm font-semibold text-foreground">{t('overlay-editor.overlayCanvasReady', 'Overlay canvas ready')}</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {t('overlay-editor.emptyEditorHint', 'Load a template or add widgets to start positioning the overlay.')}
+        </p>
+      </div>
+    </div>
+  )
 }
 
 export default memo(OverlayEditor)

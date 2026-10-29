@@ -9,6 +9,7 @@
  * @param {object} props - Component props.
  * @param {object} props.config - Overlay template configuration data.
  * @param {function} props.onConfigChange - Callback invoked on config change.
+ * @param {object} props.widgetLiveEdits - Shared widget registration and live edits.
  * @returns {JSX.Element} Rendered component output.
  */
 
@@ -16,8 +17,8 @@ import useSceneSettingsState from '../hooks/useSceneSettingsState'
 import OverlaySettingsSection from './OverlaySettingsSection'
 import GlobalSettingsSection from './GlobalSettingsSection'
 
-export default function SidebarSettingsTab({ config, onConfigChange }) {
-  const state = useSceneSettingsState({ config, onConfigChange })
+export default function SidebarSettingsTab({ config, onConfigChange, widgetLiveEdits }) {
+  const state = useSceneSettingsState({ config, onConfigChange, widgetLiveEdits })
   const { overlaySettings, globalSettings, handlers } = state
 
   return (
@@ -48,6 +49,8 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
       <GlobalSettingsSection
         globalDefaults={globalSettings.globalDefaults}
         onGlobalDefaultChange={globalSettings.setGlobalDefault}
+        onGlobalDefaultDraft={globalSettings.draftGlobalDefault}
+        onGlobalDefaultCommit={globalSettings.commitGlobalDefault}
         onResetDefaults={globalSettings.resetGlobalDefaults}
         sceneStyleValue={globalSettings.sceneStyleValue}
         availableFonts={globalSettings.availableFonts}

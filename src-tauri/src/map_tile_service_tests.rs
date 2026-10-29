@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Barrier, Mutex};
 use std::time::{Duration, SystemTime};
@@ -608,9 +608,9 @@ fn failed_same_tile_request_does_not_poison_later_retry() {
     std::fs::remove_dir_all(cache_root).expect("remove tile cache");
 }
 
-fn tile_server(cache_root: &PathBuf, upstream: &FakeUpstream) -> VideoServerHandle {
+fn tile_server(cache_root: &Path, upstream: &FakeUpstream) -> VideoServerHandle {
     let map_tile_service = MapTileService::new(
-        cache_root.clone(),
+        cache_root.to_path_buf(),
         format!("http://127.0.0.1:{}/{{z}}/{{x}}/{{y}}.pbf", upstream.port),
         "openfreemap-planet".to_string(),
     )
@@ -623,12 +623,12 @@ fn tile_server(cache_root: &PathBuf, upstream: &FakeUpstream) -> VideoServerHand
 }
 
 fn tile_server_with_timeouts(
-    cache_root: &PathBuf,
+    cache_root: &Path,
     upstream: &FakeUpstream,
     request_timeout: Duration,
 ) -> VideoServerHandle {
     let map_tile_service = MapTileService::new_with_timeouts(
-        cache_root.clone(),
+        cache_root.to_path_buf(),
         format!("http://127.0.0.1:{}/{{z}}/{{x}}/{{y}}.pbf", upstream.port),
         "openfreemap-planet".to_string(),
         request_timeout,

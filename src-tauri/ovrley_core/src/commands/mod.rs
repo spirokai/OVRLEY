@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::paths::AppPaths;
-use crate::render::render_preview_to_path;
+use crate::render::render_preview_frame;
 
 /// Health-check response sent to the frontend.
 #[derive(Debug, Serialize)]
@@ -59,12 +59,11 @@ pub fn backend_current_os() -> Value {
 /// The core command owns JSON serialization at the framework-agnostic boundary
 /// so the Tauri layer can stay a thin string-in/string-out adapter while tests
 /// exercise the same backend finalization path.
-pub fn backend_finalize_activity(paths: &AppPaths, raw_activity_json: &str) -> CoreResult<Value> {
-    serde_json::to_value(crate::activity::finalize::finalize_raw_activity_json(
-        raw_activity_json,
-        Some(&paths.repo_root),
-    )?)
-    .map_err(CoreError::Serialization)
+pub fn backend_finalize_activity(
+    paths: &AppPaths,
+    raw_activity_json: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    crate::activity::finalize::finalize_raw_activity_json(raw_activity_json, Some(&paths.repo_root))
 }
 
 /// Parses and finalizes a native CSV activity without a frontend RawActivity hop.
@@ -93,6 +92,30 @@ pub fn backend_parse_tcx_activity(
 ) -> CoreResult<FinalizeActivityResponse> {
     let mut response =
         crate::activity::tcx::parse_tcx_activity_path(Path::new(path), Some(&paths.repo_root))?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
+/// Parses and finalizes a native UDDF dive.
+pub fn backend_parse_uddf_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response =
+        crate::activity::uddf::parse_uddf_activity_path(Path::new(path), Some(&paths.repo_root))?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
+/// Parses and finalizes a native Subsurface XML/SSRF dive.
+pub fn backend_parse_subsurface_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response = crate::activity::subsurface::parse_subsurface_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?;
     response.debug_payload = None;
     Ok(response)
 }
@@ -144,7 +167,7 @@ pub fn backend_render_preview_frame(
     let second_label = format!("{second:.3}").replace('.', "_");
     let filename = format!("preview_frame_{timestamp}_t{second_label}.png");
     let output_path = paths.downloads_dir.join(&filename);
-    render_preview_to_path(
+    render_preview_frame(
         paths,
         &validated,
         &parsed_activity,

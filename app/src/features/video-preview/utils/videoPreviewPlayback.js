@@ -2,7 +2,7 @@
  * Pure helpers for syncing the preview <video> element.
  */
 
-import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
+import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/preview-perf'
 import i18next from 'i18next'
 
 const HAVE_CURRENT_DATA = 2

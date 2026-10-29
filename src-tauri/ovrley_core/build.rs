@@ -53,14 +53,14 @@ fn main() {
             // applied or the context no longer matches.
             let check = Command::new("git")
                 .args(["apply", "--check", &patch_path.to_string_lossy()])
-                .current_dir(&version.path())
+                .current_dir(version.path())
                 .output();
             match check {
                 Ok(output) if output.status.success() => {
                     // Patch not yet applied — apply it now.
                     let _ = Command::new("git")
                         .args(["apply", &patch_path.to_string_lossy()])
-                        .current_dir(&version.path())
+                        .current_dir(version.path())
                         .status();
                 }
                 _ => {} // Already applied, or context changed — skip.

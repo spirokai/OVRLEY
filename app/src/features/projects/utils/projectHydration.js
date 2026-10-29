@@ -4,6 +4,15 @@ import { getTimelineMinimum } from '@/features/player/utils/playerTiming'
 import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlice'
 import { activateParsedActivity } from '@/lib/activity/import-activity'
 
+// Laps belong to the activity file; one loaded as absent takes its lap selection with it.
+function resolveDisabledLaps(disabledLaps, { parsedActivity, parsedActivitySource }) {
+  if (parsedActivitySource !== 'activity-file') return []
+  if (disabledLaps.length > 0 && disabledLaps.at(-1) >= parsedActivity.lap_start_elapsed_seconds.length) {
+    throw new Error('Project laps.disabled must identify laps of the loaded activity')
+  }
+  return disabledLaps
+}
+
 function assertLandmarksFitVideo(landmarks, videoDurationSeconds) {
   if (landmarks.length === 0) return
   if (videoDurationSeconds === null) {
@@ -24,6 +33,7 @@ function assertLandmarksFitVideo(landmarks, videoDurationSeconds) {
 export function applyNewProjectState(store, { templateSource, templateState }) {
   const state = store.getState()
   state.clearActivityFile({ restoreVideoTelemetry: false })
+  state.clearVideoTelemetry()
   if (templateSource) {
     state.hydrateTemplateState(templateState, { source: templateSource })
   } else {
@@ -31,10 +41,6 @@ export function applyNewProjectState(store, { templateSource, templateState }) {
   }
   store.setState((draft) => {
     draft.activitySource = null
-    draft.parsedActivity = null
-    draft.parsedActivitySource = null
-    draft.activitySummary = null
-    draft.stashedVideoTelemetry = null
     draft.fallbackDurationSeconds = 73
     draft.startSecond = 0
     draft.endSecond = 73
@@ -69,6 +75,7 @@ export function applyNewProjectState(store, { templateSource, templateState }) {
 export function applyProjectOwnedState(store, project) {
   const state = store.getState()
   assertLandmarksFitVideo(project.sync.manual.landmarks, state.importedVideoDuration)
+  const disabledLaps = resolveDisabledLaps(project.laps.disabled, state)
   state.hydrateVideoSyncState(project.sync.manual)
   const hasVideo = Boolean(state.importedVideoPath)
   const timelineMinimum = getTimelineMinimum({
@@ -98,6 +105,7 @@ export function applyProjectOwnedState(store, project) {
     draft.lastSavedTemplateState = null
     draft.videoSyncOffsetSeconds = project.sync.videoOffsetSeconds
     draft.videoSyncTimezoneMode = project.sync.videoTimezoneMode
+    draft.disabledLaps = disabledLaps
     draft.videoSyncOffsetPreviewSeconds = null
     draft.videoSyncWarning = null
     draft.renderSettings = { ...renderSettings, range }
@@ -120,15 +128,13 @@ export function applyProjectOwnedState(store, project) {
  * @param {{activity: object|null, video: object|null}} prepared Prepared project resources.
  */
 export function applyPreparedProjectState(store, project, prepared) {
+  const state = store.getState()
+  state.clearActivityFile({ restoreVideoTelemetry: false })
+  state.clearVideoTelemetry()
   store.setState((draft) => {
     draft.activitySource = null
-    draft.parsedActivity = null
-    draft.parsedActivitySource = null
-    draft.activitySummary = null
-    draft.stashedVideoTelemetry = null
   })
 
-  const state = store.getState()
   state.clearImportedVideo()
   if (prepared.video) {
     store.setState(prepared.video.importedVideoState)

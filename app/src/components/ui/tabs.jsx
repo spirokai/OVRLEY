@@ -30,7 +30,7 @@ const tabsTriggerVariants = cva(
       variant: {
         default:
           'rounded-sm px-3 py-1 text-sm data-[state=active]:border-primary/0 data-[state=active]:bg-surface-accent-strong data-[state=active]:text-primary',
-        main: 'relative px-3 py-4 text-sm after:pointer-events-none after:absolute after:bottom-[-2px] after:left-0 after:right-0 after:z-10 after:h-[4px] after:bg-transparent after:content-[""] data-[state=active]:after:bg-primary data-[state=active]:text-primary',
+        main: 'relative px-3 py-4 text-sm after:pointer-events-none after:absolute after:bottom-[-0.148rem] after:left-0 after:right-0 after:z-10 after:h-[0.296rem] after:bg-transparent after:content-[""] data-[state=active]:after:bg-primary data-[state=active]:text-primary',
         toolbar:
           'h-5 rounded-none px-2 text-[0.7rem] uppercase text-muted-foreground hover:bg-surface-elevated hover:text-foreground data-[state=active]:bg-foreground data-[state=active]:text-surface',
       },

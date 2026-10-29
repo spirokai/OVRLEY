@@ -32,6 +32,7 @@ import { useProjectLifecycle } from '@/features/projects'
  *   handleOpenOutputDirectory: Function,
  *   layout: object,
  *   renderWorkflow: object,
+ *   startupReady: boolean,
  *   templateManagement: object,
  *   undoRedoControls: object,
  *   videoControls: object,
@@ -49,12 +50,14 @@ export default function useAppShellComposition() {
   const templateManagement = useTemplateManagement({ onTemplateCreated: editorShell.resetZoom })
   const renderWorkflow = useRenderWorkflow({ backendStatus: backendState.backendStatus })
   const videoControls = useVideoImport({ debugModeEnabled: editorShell.debugModeEnabled, onSetBackgroundMode: editorShell.setEditorBackgroundMode })
+  useAppBootstrap()
+  const startupReady = backendState.backendReady && templateRestoreComplete
   const projectLifecycle = useProjectLifecycle({
     clearImportedVideo: videoControls.clearImportedVideo,
     onSetBackgroundMode: editorShell.setEditorBackgroundMode,
     prepareActivityPath: activityImport.prepareActivityPath,
     prepareVideoPath: videoControls.prepareVideoPath,
-    startupReady: backendState.backendReady && templateRestoreComplete,
+    startupReady,
   })
   useWindowCloseGuard(projectLifecycle.handleCloseRequest)
   const undoRedoControls = useUndoRedo({
@@ -62,7 +65,6 @@ export default function useAppShellComposition() {
       renderWorkflow.renderDialogPhase !== 'closed' || templateManagement.newTemplateConfirmDialog.open || projectLifecycle.unsavedProjectDialog.open,
   })
 
-  useAppBootstrap()
   const appUpdate = useAppUpdate()
 
   const { restoreLastLoadedTemplate } = templateManagement
@@ -103,6 +105,7 @@ export default function useAppShellComposition() {
     layout,
     projectLifecycle,
     renderWorkflow,
+    startupReady,
     templateManagement,
     undoRedoControls,
     videoControls,

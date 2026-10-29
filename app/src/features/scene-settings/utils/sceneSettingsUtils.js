@@ -4,8 +4,6 @@
 
 import { formatZonedDateTime } from '@/lib/time-format'
 
-export { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
-
 export function sanitizeNumber(val) {
   if (val === undefined || val === null) return val
   const sanitized = val

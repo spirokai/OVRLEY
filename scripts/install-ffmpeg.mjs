@@ -1,385 +1,390 @@
-import { createWriteStream } from "node:fs";
-import { chmod, cp, mkdir, rm, stat } from "node:fs/promises";
-import { get } from "node:https";
-import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
-import { spawn, spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { createWriteStream } from 'node:fs'
+import { chmod, cp, mkdir, rm, stat } from 'node:fs/promises'
+import { get } from 'node:https'
+import { tmpdir } from 'node:os'
+import { basename, dirname, join, resolve } from 'node:path'
+import { spawn, spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
-const DEFAULT_WINDOWS_FFMPEG_ARCHIVE =
-  "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
-const DEFAULT_LINUX_FFMPEG_ARCHIVE =
-  "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz";
-const PINNED_DARWIN_FFMPEG_VERSION = "9.0";
-const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const installDir = join(rootDir, "vendor", "ffmpeg");
-const binDir = join(installDir, "bin");
-const binaryName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
-const probeBinaryName = process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
-const binaryPath = join(binDir, binaryName);
-const probeBinaryPath = join(binDir, probeBinaryName);
+// Pinned BtbN master snapshot: carries the Vulkan performance fixes the 9.0 branch lacks and
+// predates the master CUDA writable-copy regression that breaks chained overlay_cuda.
+const BTBN_FFMPEG_SNAPSHOT_URL = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08'
+const DEFAULT_WINDOWS_FFMPEG_ARCHIVE = `${BTBN_FFMPEG_SNAPSHOT_URL}/ffmpeg-N-127021-ge0c94b2d1c-win64-gpl.zip`
+const DEFAULT_LINUX_FFMPEG_ARCHIVE = `${BTBN_FFMPEG_SNAPSHOT_URL}/ffmpeg-N-127021-ge0c94b2d1c-linux64-gpl.tar.xz`
+// A pinned version matches itself or any of its point releases ("9.0" accepts "9.0.2").
+// Master snapshots report their build number ("N-127021-…" parses to "127021").
+const pinnedFfmpegVersions = {
+  darwin: '9.0',
+  win32: '127021',
+  linux: '127021',
+}
+const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const installDir = join(rootDir, 'vendor', 'ffmpeg')
+const binDir = join(installDir, 'bin')
+const binaryName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+const probeBinaryName = process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe'
+const binaryPath = join(binDir, binaryName)
+const probeBinaryPath = join(binDir, probeBinaryName)
 const requiredEncoders =
-  process.platform === "darwin"
-    ? ["prores_ks", "qtrle", "prores_videotoolbox"]
-    : process.platform === "win32" || process.platform === "linux"
-      ? ["prores_ks", "qtrle", "h264_qsv", "hevc_qsv"]
-      : ["prores_ks", "qtrle"];
+  process.platform === 'darwin'
+    ? ['prores_ks', 'qtrle', 'prores_videotoolbox']
+    : process.platform === 'win32' || process.platform === 'linux'
+      ? ['prores_ks', 'qtrle', 'h264_qsv', 'hevc_qsv']
+      : ['prores_ks', 'qtrle']
 const requiredFilters =
-  process.platform === "win32" || process.platform === "linux"
-    ? ["format", "hwupload", "overlay_qsv", "hwdownload"]
-    : ["format", "hwupload"];
+  process.platform === 'win32' || process.platform === 'linux' ? ['format', 'hwupload', 'overlay_qsv', 'hwdownload'] : ['format', 'hwupload']
 
 const defaultFfmpegArchives = {
-  "win32-x64": DEFAULT_WINDOWS_FFMPEG_ARCHIVE,
-  "linux-x64": DEFAULT_LINUX_FFMPEG_ARCHIVE,
-  "darwin-arm64": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1785863997_9.0/ffmpeg.zip",
-  "darwin-x64": "https://ffmpeg.martin-riedl.de/download/macos/amd64/1785871427_9.0/ffmpeg.zip",
-};
+  'win32-x64': DEFAULT_WINDOWS_FFMPEG_ARCHIVE,
+  'linux-x64': DEFAULT_LINUX_FFMPEG_ARCHIVE,
+  'darwin-arm64': 'https://ffmpeg.martin-riedl.de/download/macos/arm64/1785863997_9.0/ffmpeg.zip',
+  'darwin-x64': 'https://ffmpeg.martin-riedl.de/download/macos/amd64/1785871427_9.0/ffmpeg.zip',
+}
 
-const expectedFfmpegVersion =
-  process.platform === "darwin" && !process.env.OVRLEY_FFMPEG_ARCHIVE_URL ? PINNED_DARWIN_FFMPEG_VERSION : null;
+const expectedFfmpegVersion = process.env.OVRLEY_FFMPEG_ARCHIVE_URL ? null : (pinnedFfmpegVersions[process.platform] ?? null)
 
 const defaultFfprobeArchives = {
-  "darwin-arm64": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1785863997_9.0/ffprobe.zip",
-  "darwin-x64": "https://ffmpeg.martin-riedl.de/download/macos/amd64/1785871427_9.0/ffprobe.zip",
-};
+  'darwin-arm64': 'https://ffmpeg.martin-riedl.de/download/macos/arm64/1785863997_9.0/ffprobe.zip',
+  'darwin-x64': 'https://ffmpeg.martin-riedl.de/download/macos/amd64/1785871427_9.0/ffprobe.zip',
+}
 
 main().catch((error) => {
-  console.error(`[ffmpeg] ${error.message}`);
-  process.exit(1);
-});
+  console.error(`[ffmpeg] ${error.message}`)
+  process.exit(1)
+})
 
 async function main() {
-  if (process.env.OVRLEY_SKIP_FFMPEG_INSTALL === "1") {
-    console.log("[ffmpeg] Skipping install because OVRLEY_SKIP_FFMPEG_INSTALL=1");
-    return;
+  if (process.env.OVRLEY_SKIP_FFMPEG_INSTALL === '1') {
+    console.log('[ffmpeg] Skipping install because OVRLEY_SKIP_FFMPEG_INSTALL=1')
+    return
   }
 
-  const existingStatus = await checkFfmpeg(binaryPath);
+  const existingStatus = await checkFfmpeg(binaryPath)
   if (existingStatus.usable) {
-    console.log(`[ffmpeg] ${existingStatus.message}`);
-    console.log(`[ffmpeg] Using ${binaryPath}`);
-    verifyInstalledTools(binaryPath, probeBinaryPath);
-    return;
+    console.log(`[ffmpeg] ${existingStatus.message}`)
+    console.log(`[ffmpeg] Using ${binaryPath}`)
+    verifyInstalledTools(binaryPath, probeBinaryPath)
+    return
   }
-  console.log(`[ffmpeg] ${existingStatus.message}`);
+  console.log(`[ffmpeg] ${existingStatus.message}`)
 
-  const platformKey = `${process.platform}-${process.arch}`;
-  const archiveUrl = process.env.OVRLEY_FFMPEG_ARCHIVE_URL ?? defaultFfmpegArchives[platformKey];
+  const platformKey = `${process.platform}-${process.arch}`
+  const archiveUrl = process.env.OVRLEY_FFMPEG_ARCHIVE_URL ?? defaultFfmpegArchives[platformKey]
   if (!archiveUrl) {
-    console.log(`[ffmpeg] No bundled installer for ${platformKey}; install ffmpeg on PATH or set OVRLEY_FFMPEG.`);
-    return;
+    console.log(`[ffmpeg] No bundled installer for ${platformKey}; install ffmpeg on PATH or set OVRLEY_FFMPEG.`)
+    return
   }
 
-  const workDir = join(tmpdir(), `ovrley-ffmpeg-${process.pid}`);
-  const archivePath = join(workDir, basename(new URL(archiveUrl).pathname));
-  const extractDir = join(workDir, "extract");
+  const workDir = join(tmpdir(), `ovrley-ffmpeg-${process.pid}`)
+  const archivePath = join(workDir, basename(new URL(archiveUrl).pathname))
+  const extractDir = join(workDir, 'extract')
 
-  await rm(workDir, { recursive: true, force: true });
-  await mkdir(extractDir, { recursive: true });
-  await mkdir(binDir, { recursive: true });
+  await rm(workDir, { recursive: true, force: true })
+  await mkdir(extractDir, { recursive: true })
+  await mkdir(binDir, { recursive: true })
 
-  console.log(`[ffmpeg] Downloading ${archiveUrl}`);
-  await download(archiveUrl, archivePath);
-  await extractArchive(archivePath, extractDir);
+  console.log(`[ffmpeg] Downloading ${archiveUrl}`)
+  await download(archiveUrl, archivePath)
+  await extractArchive(archivePath, extractDir)
 
-  const ffprobeArchiveUrl = process.env.OVRLEY_FFPROBE_ARCHIVE_URL ?? defaultFfprobeArchives[platformKey];
+  const ffprobeArchiveUrl = process.env.OVRLEY_FFPROBE_ARCHIVE_URL ?? defaultFfprobeArchives[platformKey]
   if (ffprobeArchiveUrl) {
-    const ffprobeArchivePath = join(workDir, basename(new URL(ffprobeArchiveUrl).pathname));
-    const ffprobeExtractDir = join(workDir, "extract-ffprobe");
-    await mkdir(ffprobeExtractDir, { recursive: true });
-    console.log(`[ffmpeg] Downloading ${ffprobeArchiveUrl}`);
-    await download(ffprobeArchiveUrl, ffprobeArchivePath);
-    await extractArchive(ffprobeArchivePath, ffprobeExtractDir);
+    const ffprobeArchivePath = join(workDir, basename(new URL(ffprobeArchiveUrl).pathname))
+    const ffprobeExtractDir = join(workDir, 'extract-ffprobe')
+    await mkdir(ffprobeExtractDir, { recursive: true })
+    console.log(`[ffmpeg] Downloading ${ffprobeArchiveUrl}`)
+    await download(ffprobeArchiveUrl, ffprobeArchivePath)
+    await extractArchive(ffprobeArchivePath, ffprobeExtractDir)
   }
 
-  const discoveredBinary = await findFile(extractDir, binaryName);
+  const discoveredBinary = await findFile(extractDir, binaryName)
   if (!discoveredBinary) {
-    throw new Error(`Downloaded archive did not contain ${binaryName}`);
+    throw new Error(`Downloaded archive did not contain ${binaryName}`)
   }
 
-  const discoveredProbeBinary = await findFile(workDir, probeBinaryName);
+  const discoveredProbeBinary = await findFile(workDir, probeBinaryName)
   if (!discoveredProbeBinary) {
-    throw new Error(`Downloaded archive did not contain ${probeBinaryName}`);
+    throw new Error(`Downloaded archive did not contain ${probeBinaryName}`)
   }
 
-  await rm(installDir, { recursive: true, force: true });
-  await mkdir(binDir, { recursive: true });
-  await cp(discoveredBinary, binaryPath);
-  await cp(discoveredProbeBinary, probeBinaryPath);
+  await rm(installDir, { recursive: true, force: true })
+  await mkdir(binDir, { recursive: true })
+  await cp(discoveredBinary, binaryPath)
+  await cp(discoveredProbeBinary, probeBinaryPath)
 
-  if (process.platform !== "win32") {
-    await chmod(binaryPath, 0o755);
-    await chmod(probeBinaryPath, 0o755);
+  if (process.platform !== 'win32') {
+    await chmod(binaryPath, 0o755)
+    await chmod(probeBinaryPath, 0o755)
   }
 
-  const installedStatus = await checkFfmpeg(binaryPath);
+  const installedStatus = await checkFfmpeg(binaryPath)
   if (!installedStatus.usable) {
-    throw new Error(`Installed ffmpeg is not usable: ${installedStatus.message}`);
+    throw new Error(`Installed ffmpeg is not usable: ${installedStatus.message}`)
   }
-  console.log(`[ffmpeg] ${installedStatus.message}`);
-  verifyInstalledTools(binaryPath, probeBinaryPath);
+  console.log(`[ffmpeg] ${installedStatus.message}`)
+  verifyInstalledTools(binaryPath, probeBinaryPath)
 
-  await rm(workDir, { recursive: true, force: true });
-  console.log(`[ffmpeg] Installed ${binaryPath}`);
-  console.log(`[ffmpeg] Installed ${probeBinaryPath}`);
-  console.log("[ffmpeg] postinstall script finished");
+  await rm(workDir, { recursive: true, force: true })
+  console.log(`[ffmpeg] Installed ${binaryPath}`)
+  console.log(`[ffmpeg] Installed ${probeBinaryPath}`)
+  console.log('[ffmpeg] postinstall script finished')
 }
 
 function execFfmpeg(path, args, options) {
-  return spawnSync(path, args, options);
+  return spawnSync(path, args, options)
 }
 
 async function checkFfmpeg(path) {
   try {
-    await stat(path);
+    await stat(path)
   } catch {
     return {
       usable: false,
       message: `No bundled ffmpeg found at ${path}; downloading full build.`,
-    };
+    }
   }
 
-  const result = execFfmpeg(path, ["-version"], { encoding: "utf8" });
+  const result = execFfmpeg(path, ['-version'], { encoding: 'utf8' })
   if (result.status !== 0) {
     return {
       usable: false,
       message: `Bundled ffmpeg exists at ${path}, but failed to run; downloading full build.`,
-    };
+    }
   }
 
-  const version = parseVersion(result.stdout);
+  const version = parseVersion(result.stdout)
 
-  if (expectedFfmpegVersion && version !== expectedFfmpegVersion) {
+  if (expectedFfmpegVersion && !matchesPinnedVersion(version, expectedFfmpegVersion)) {
     return {
       usable: false,
       message: `Bundled ffmpeg version ${version} does not match pinned version ${expectedFfmpegVersion}; downloading the pinned build.`,
-    };
+    }
   }
 
-  const featureStatus = hasRequiredFfmpegFeatures(path);
+  const featureStatus = hasRequiredFfmpegFeatures(path)
   if (!featureStatus.usable) {
     return {
       usable: false,
-      message: `Bundled ffmpeg ${version} is missing required features (${featureStatus.missing.join(", ")}); downloading full build.`,
-    };
+      message: `Bundled ffmpeg ${version} is missing required features (${featureStatus.missing.join(', ')}); downloading full build.`,
+    }
   }
 
-  const probeStatus = checkFfprobe(join(dirname(path), probeBinaryName), expectedFfmpegVersion);
+  const probeStatus = checkFfprobe(join(dirname(path), probeBinaryName), expectedFfmpegVersion)
   if (!probeStatus.usable) {
-    return probeStatus;
+    return probeStatus
   }
 
   return {
     usable: true,
     message: `Bundled ffmpeg ${version} is current and has required features; ffprobe is available.`,
-  };
+  }
 }
 
 function checkFfprobe(path, expectedVersion = null) {
-  const result = execFfmpeg(path, ["-version"], { encoding: "utf8" });
+  const result = execFfmpeg(path, ['-version'], { encoding: 'utf8' })
   if (result.status !== 0) {
     return {
       usable: false,
       message: `Bundled ffprobe is missing or failed to run at ${path}; downloading full build.`,
-    };
+    }
   }
 
-  const version = parseVersion(result.stdout);
+  const version = parseVersion(result.stdout)
 
-  if (expectedVersion && version !== expectedVersion) {
+  if (expectedVersion && !matchesPinnedVersion(version, expectedVersion)) {
     return {
       usable: false,
-      message: `Bundled ffprobe version ${version ?? "unknown"} does not match pinned version ${expectedVersion}; downloading the pinned build.`,
-    };
+      message: `Bundled ffprobe version ${version ?? 'unknown'} does not match pinned version ${expectedVersion}; downloading the pinned build.`,
+    }
   }
 
   return {
     usable: true,
     message: `Bundled ffprobe is available at ${path}.`,
-  };
+  }
 }
 
 function verifyInstalledTools(ffmpegPath, ffprobePath) {
-  const ffmpegVersion = runVersionCheck("ffmpeg", ffmpegPath);
-  const ffprobeVersion = runVersionCheck("ffprobe", ffprobePath);
-  console.log(`[ffmpeg] Verified ffmpeg: ${ffmpegVersion}`);
-  console.log(`[ffmpeg] Verified ffmpeg path: ${ffmpegPath}`);
-  console.log(`[ffmpeg] Verified ffprobe: ${ffprobeVersion}`);
-  console.log(`[ffmpeg] Verified ffprobe path: ${ffprobePath}`);
+  const ffmpegVersion = runVersionCheck('ffmpeg', ffmpegPath)
+  const ffprobeVersion = runVersionCheck('ffprobe', ffprobePath)
+  console.log(`[ffmpeg] Verified ffmpeg: ${ffmpegVersion}`)
+  console.log(`[ffmpeg] Verified ffmpeg path: ${ffmpegPath}`)
+  console.log(`[ffmpeg] Verified ffprobe: ${ffprobeVersion}`)
+  console.log(`[ffmpeg] Verified ffprobe path: ${ffprobePath}`)
 }
 
 function runVersionCheck(label, path) {
-  const result = execFfmpeg(path, ["-version"], { encoding: "utf8" });
+  const result = execFfmpeg(path, ['-version'], { encoding: 'utf8' })
   if (result.status !== 0) {
-    const stderr = result.stderr?.trim();
-    throw new Error(`${label} verification failed at ${path}${stderr ? `: ${stderr}` : ""}`);
+    const stderr = result.stderr?.trim()
+    throw new Error(`${label} verification failed at ${path}${stderr ? `: ${stderr}` : ''}`)
   }
 
-  return firstNonEmptyLine(result.stdout) ?? `${label} -version completed successfully`;
+  return firstNonEmptyLine(result.stdout) ?? `${label} -version completed successfully`
 }
 
 function firstNonEmptyLine(output) {
   return output
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .find(Boolean);
+    .find(Boolean)
 }
 
 function parseVersion(output) {
-  const build = parseBuildIdentifier(output);
-  const match = build?.match(/^(?:n-?)?(\d+(?:\.\d+){0,2})(?:-|$)/i);
-  return match?.[1] ?? null;
+  const build = parseBuildIdentifier(output)
+  const match = build?.match(/^(?:n-?)?(\d+(?:\.\d+){0,2})(?:-|$)/i)
+  return match?.[1] ?? null
+}
+
+function matchesPinnedVersion(version, pinnedVersion) {
+  return version === pinnedVersion || (version?.startsWith(`${pinnedVersion}.`) ?? false)
 }
 
 function parseBuildIdentifier(output) {
-  const line = firstNonEmptyLine(output);
-  const match = line?.match(/^(?:ffmpeg|ffprobe) version\s+(\S+)/i);
-  return match?.[1] ?? null;
+  const line = firstNonEmptyLine(output)
+  const match = line?.match(/^(?:ffmpeg|ffprobe) version\s+(\S+)/i)
+  return match?.[1] ?? null
 }
 
 function hasRequiredFfmpegFeatures(path) {
-  const encoders = execFfmpeg(path, ["-hide_banner", "-encoders"], { encoding: "utf8" });
+  const encoders = execFfmpeg(path, ['-hide_banner', '-encoders'], { encoding: 'utf8' })
   if (encoders.status !== 0) {
     return {
       usable: false,
-      missing: ["encoder-list"],
-    };
+      missing: ['encoder-list'],
+    }
   }
 
-  const filters = execFfmpeg(path, ["-hide_banner", "-filters"], { encoding: "utf8" });
+  const filters = execFfmpeg(path, ['-hide_banner', '-filters'], { encoding: 'utf8' })
   if (filters.status !== 0) {
     return {
       usable: false,
-      missing: ["filter-list"],
-    };
+      missing: ['filter-list'],
+    }
   }
 
-  const missingEncoders = requiredEncoders.filter((encoder) => !hasListedFeature(encoders.stdout, encoder));
-  const missingFilters = requiredFilters.filter((filter) => !hasListedFeature(filters.stdout, filter));
+  const missingEncoders = requiredEncoders.filter((encoder) => !hasListedFeature(encoders.stdout, encoder))
+  const missingFilters = requiredFilters.filter((filter) => !hasListedFeature(filters.stdout, filter))
   if (missingEncoders.length > 0 || missingFilters.length > 0) {
     return {
       usable: false,
-      missing: [
-        ...missingEncoders.map((encoder) => `encoder:${encoder}`),
-        ...missingFilters.map((filter) => `filter:${filter}`),
-      ],
-    };
+      missing: [...missingEncoders.map((encoder) => `encoder:${encoder}`), ...missingFilters.map((filter) => `filter:${filter}`)],
+    }
   }
 
   return {
     usable: true,
     missing: [],
-  };
+  }
 }
 
 function hasListedFeature(output, feature) {
-  return new RegExp(`(^|\\s)${escapeRegExp(feature)}(\\s|$)`, "m").test(output);
+  return new RegExp(`(^|\\s)${escapeRegExp(feature)}(\\s|$)`, 'm').test(output)
 }
 
 function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function download(url, destination) {
   return new Promise((resolvePromise, reject) => {
     const request = get(url, (response) => {
       if ([301, 302, 303, 307, 308].includes(response.statusCode ?? 0)) {
-        const location = response.headers.location;
-        response.resume();
+        const location = response.headers.location
+        response.resume()
         if (!location) {
-          reject(new Error(`Redirect from ${url} did not include a location`));
-          return;
+          reject(new Error(`Redirect from ${url} did not include a location`))
+          return
         }
-        download(new URL(location, url).toString(), destination).then(resolvePromise, reject);
-        return;
+        download(new URL(location, url).toString(), destination).then(resolvePromise, reject)
+        return
       }
 
       if (response.statusCode !== 200) {
-        reject(new Error(`Failed to download ${url}: HTTP ${response.statusCode}`));
-        return;
+        reject(new Error(`Failed to download ${url}: HTTP ${response.statusCode}`))
+        return
       }
 
-      const file = createWriteStream(destination);
-      const totalBytes = Number(response.headers["content-length"] ?? 0);
-      let downloadedBytes = 0;
-      let lastProgressAt = 0;
+      const file = createWriteStream(destination)
+      const totalBytes = Number(response.headers['content-length'] ?? 0)
+      let downloadedBytes = 0
+      let lastProgressAt = 0
 
-      response.on("data", (chunk) => {
-        downloadedBytes += chunk.length;
-        const now = Date.now();
+      response.on('data', (chunk) => {
+        downloadedBytes += chunk.length
+        const now = Date.now()
         if (now - lastProgressAt < 500) {
-          return;
+          return
         }
-        lastProgressAt = now;
-        writeDownloadProgress(downloadedBytes, totalBytes);
-      });
+        lastProgressAt = now
+        writeDownloadProgress(downloadedBytes, totalBytes)
+      })
 
-      response.pipe(file);
-      file.on("finish", () => {
-        writeDownloadProgress(downloadedBytes, totalBytes);
-        process.stdout.write("\n");
-        file.close(resolvePromise);
-      });
-      file.on("error", reject);
-    });
-    request.on("error", reject);
-  });
+      response.pipe(file)
+      file.on('finish', () => {
+        writeDownloadProgress(downloadedBytes, totalBytes)
+        process.stdout.write('\n')
+        file.close(resolvePromise)
+      })
+      file.on('error', reject)
+    })
+    request.on('error', reject)
+  })
 }
 
 function writeDownloadProgress(downloadedBytes, totalBytes) {
-  const downloadedMb = bytesToMiB(downloadedBytes);
+  const downloadedMb = bytesToMiB(downloadedBytes)
   if (totalBytes > 0) {
-    const totalMb = bytesToMiB(totalBytes);
-    const percent = Math.min(100, (downloadedBytes / totalBytes) * 100);
-    process.stdout.write(`\r[ffmpeg] Downloaded ${downloadedMb} / ${totalMb} MiB (${percent.toFixed(1)}%)`);
-    return;
+    const totalMb = bytesToMiB(totalBytes)
+    const percent = Math.min(100, (downloadedBytes / totalBytes) * 100)
+    process.stdout.write(`\r[ffmpeg] Downloaded ${downloadedMb} / ${totalMb} MiB (${percent.toFixed(1)}%)`)
+    return
   }
 
-  process.stdout.write(`\r[ffmpeg] Downloaded ${downloadedMb} MiB`);
+  process.stdout.write(`\r[ffmpeg] Downloaded ${downloadedMb} MiB`)
 }
 
 function bytesToMiB(bytes) {
-  return (bytes / 1024 / 1024).toFixed(1);
+  return (bytes / 1024 / 1024).toFixed(1)
 }
 
 function extractArchive(archivePath, destination) {
-  if (process.platform === "win32") {
-    return run("powershell", [
-      "-NoProfile",
-      "-Command",
+  if (process.platform === 'win32') {
+    return run('powershell', [
+      '-NoProfile',
+      '-Command',
       `Expand-Archive -LiteralPath '${archivePath.replaceAll("'", "''")}' -DestinationPath '${destination.replaceAll("'", "''")}' -Force`,
-    ]);
+    ])
   }
-  if (archivePath.endsWith(".tar.xz")) {
-    return run("tar", ["-xf", archivePath, "-C", destination]);
+  if (archivePath.endsWith('.tar.xz')) {
+    return run('tar', ['-xf', archivePath, '-C', destination])
   }
-  return run("unzip", ["-q", archivePath, "-d", destination]);
+  return run('unzip', ['-q', archivePath, '-d', destination])
 }
 
 function run(command, args) {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { stdio: "inherit" });
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code === 0) resolvePromise();
-      else reject(new Error(`${command} exited with ${code}`));
-    });
-  });
+    const child = spawn(command, args, { stdio: 'inherit' })
+    child.on('error', reject)
+    child.on('close', (code) => {
+      if (code === 0) resolvePromise()
+      else reject(new Error(`${command} exited with ${code}`))
+    })
+  })
 }
 
 async function findFile(dir, targetName) {
-  const { readdir } = await import("node:fs/promises");
-  const entries = await readdir(dir, { withFileTypes: true });
+  const { readdir } = await import('node:fs/promises')
+  const entries = await readdir(dir, { withFileTypes: true })
   for (const entry of entries) {
-    const path = join(dir, entry.name);
+    const path = join(dir, entry.name)
     if (entry.isFile() && entry.name === targetName) {
-      return path;
+      return path
     }
     if (entry.isDirectory()) {
-      const found = await findFile(path, targetName);
-      if (found) return found;
+      const found = await findFile(path, targetName)
+      if (found) return found
     }
   }
-  return null;
+  return null
 }

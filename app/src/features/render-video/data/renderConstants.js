@@ -63,11 +63,13 @@ export const ACCELERATION_OPTIONS = [
   },
   { value: 'nvidia', label: 'NVIDIA GPU', platform: ['windows', 'linux'] },
   // { value: 'qsv', label: 'Intel Quick Sync', platform: ['windows', 'linux'] },
-  { value: 'amd', label: 'AMD GPU', platform: ['windows', 'linux'] },
+  // AMF is Direct3D 11 only here; AMD GPUs on Linux go through VAAPI.
+  { value: 'amd', label: 'AMD GPU', platform: ['windows'] },
   {
     value: 'qsv_full',
     label: 'Intel QSV',
-    platform: ['windows', 'linux'],
+    // Linux uses VAAPI for Intel; QSV decode plus encode hangs the GPU on Tiger Lake with kernel 7.0.
+    platform: ['windows'],
   },
   {
     value: 'videotoolbox',

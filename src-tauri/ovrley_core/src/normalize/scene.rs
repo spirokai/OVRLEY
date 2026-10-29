@@ -5,13 +5,10 @@
 //! render-affecting defaults. The frontend must materialise all defaults
 //! before sending the config.
 
-use super::helpers::{
-    require_f32, require_finite_f64, require_non_negative_f32, require_positive_f32,
-    require_positive_f64, require_positive_u32, require_u32,
-};
-use super::raw::{SceneConfig, ScenePresentationConfig};
+use super::config::SceneConfig;
 use crate::encode::ffmpeg::catalog::{CodecSelection, TransparentCodecId};
 use crate::error::{CoreError, CoreResult};
+use ovrley_widgets::model::validation::{require_finite_f64, require_positive_f64, require_u32};
 use serde_json::{Map, Value};
 use std::num::NonZeroU32;
 
@@ -123,26 +120,11 @@ pub struct ValidatedSceneConfig {
     pub update_rate: NonZeroU32,
     /// Clock origin for elapsed-time widgets, including video lead-in.
     pub export_start_seconds: f64,
+    /// Strictly increasing lap IDs the activity sampler excludes from lap widgets.
+    pub disabled_laps: Vec<usize>,
 }
 
-/// Shared presentation validated once before per-job timing is available.
-#[derive(Clone, Debug)]
-pub struct ValidatedScenePresentation {
-    pub width: u32,
-    pub height: u32,
-    pub scale: f32,
-    pub font: Option<String>,
-    pub font_size: Option<f32>,
-    pub opacity: f32,
-    pub decimal_rounding: Option<i32>,
-    pub time_format: Option<String>,
-    pub shadow_color: String,
-    pub shadow_strength: f32,
-    pub shadow_distance: f32,
-    pub border_color: String,
-    pub border_thickness: f32,
-    pub overlay_filename: Option<String>,
-}
+use ovrley_widgets::model::scene::{validate_scene_presentation, ValidatedScenePresentation};
 
 /// Validates scene config, rejecting missing or out-of-range fields.
 pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfig> {
@@ -182,6 +164,7 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         start
     };
     let custom_export_range_active = raw.custom_export_range_active;
+    let disabled_laps = validate_disabled_laps(raw.disabled_laps, "scene.disabled_laps")?;
 
     Ok(ValidatedSceneConfig {
         presentation,
@@ -191,49 +174,30 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         custom_export_range_active,
         update_rate,
         export_start_seconds,
+        disabled_laps,
     })
 }
 
-pub(crate) fn validate_scene_presentation(
-    raw: ScenePresentationConfig,
-) -> CoreResult<ValidatedScenePresentation> {
-    let width = require_positive_u32(raw.width, "scene.width")?;
-    let height = require_positive_u32(raw.height, "scene.height")?;
-    let scale = require_positive_f32(raw.scale, "scene.scale")?;
-    let opacity = require_f32(raw.opacity, "scene.opacity")?;
-    if !(0.0..=1.0).contains(&opacity) {
-        return Err(CoreError::Config(
-            "scene.opacity must be between 0 and 1".into(),
-        ));
+/// Lap selections are strictly increasing canonical lap IDs; the activity bounds them.
+pub(crate) fn validate_disabled_laps(laps: Vec<usize>, field: &str) -> CoreResult<Vec<usize>> {
+    if laps.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(CoreError::Config(format!(
+            "{field} must be strictly increasing lap IDs"
+        )));
     }
+    Ok(laps)
+}
 
-    let shadow_strength = require_f32(raw.shadow_strength, "scene.shadow_strength")?;
-    require_non_negative_f32(shadow_strength, "scene.shadow_strength")?;
-    let shadow_distance = require_f32(raw.shadow_distance, "scene.shadow_distance")?;
-    require_non_negative_f32(shadow_distance, "scene.shadow_distance")?;
-    let shadow_color = raw
-        .shadow_color
-        .ok_or_else(|| CoreError::Config("scene.shadow_color: required".into()))?;
-    let border_thickness = require_f32(raw.border_thickness, "scene.border_thickness")?;
-    require_non_negative_f32(border_thickness, "scene.border_thickness")?;
-    let border_color = raw
-        .border_color
-        .ok_or_else(|| CoreError::Config("scene.border_color: required".into()))?;
-
-    Ok(ValidatedScenePresentation {
-        width,
-        height,
-        scale,
-        font: raw.font,
-        font_size: raw.font_size,
-        opacity,
-        decimal_rounding: raw.decimal_rounding,
-        time_format: raw.time_format,
-        shadow_color,
-        shadow_strength,
-        shadow_distance,
-        border_color,
-        border_thickness,
-        overlay_filename: raw.overlay_filename,
-    })
+impl ValidatedSceneConfig {
+    pub(crate) fn plot_window(
+        &self,
+        show_full_activity: bool,
+    ) -> Option<ovrley_widgets::widgets::route::sampling::RouteWindow> {
+        (self.custom_export_range_active.unwrap_or(false) && !show_full_activity).then_some(
+            ovrley_widgets::widgets::route::sampling::RouteWindow {
+                start: self.start,
+                end: self.end,
+            },
+        )
+    }
 }

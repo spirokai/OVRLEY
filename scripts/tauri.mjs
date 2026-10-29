@@ -1,14 +1,28 @@
 import { spawn } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadLocalEnvironment } from './build-environment.mjs'
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+loadLocalEnvironment(rootDir)
 const tauriScript = join(rootDir, 'node_modules', '@tauri-apps', 'cli', 'tauri.js')
 
 const args = process.argv.slice(2)
 const tauriArgs =
   args[0] === 'dev'
-    ? [...args, '--config', JSON.stringify({ bundle: { resources: { '../THIRD_PARTY_NOTICES.txt': null } } })]
+    ? [
+        ...args,
+        '--config',
+        JSON.stringify({
+          bundle: {
+            resources: {
+              '../THIRD_PARTY_NOTICES.txt': null,
+              '../INSTALL-linux.txt': null,
+              '../INSTALL-macos.txt': null,
+            },
+          },
+        }),
+      ]
     : args
 const shouldBuildPortable =
   args[0] === 'build' &&
@@ -27,11 +41,7 @@ if (!shouldBuildPortable) {
     process.exitCode = buildCode
   } else {
     const profile = args.includes('--debug') || args.includes('-d') ? 'debug' : 'release'
-    process.exitCode = await run(process.execPath, [
-      join(rootDir, 'scripts', 'package-portable.mjs'),
-      '--profile',
-      profile,
-    ])
+    process.exitCode = await run(process.execPath, [join(rootDir, 'scripts', 'package-portable.mjs'), '--profile', profile])
   }
 }
 

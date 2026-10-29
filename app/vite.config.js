@@ -5,9 +5,10 @@
 import path from 'path'
 import fs from 'fs/promises'
 import { fileURLToPath } from 'url'
-import { defineConfig } from 'vite'
+import { defineConfig, lazyPlugins } from 'vite-plus'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { wasmBindingsPlugin } from '../scripts/vite-wasm.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -85,8 +86,15 @@ function parseDebugWritePlugin() {
 
 // https://vite.dev/config/
 export default defineConfig({
+  test: {
+    // Vitest v4 compatibility: preserve mock call history.
+    // Remove after tests no longer rely on calls from setup or earlier tests.
+    // https://viteplus.dev/guide/vitest-v5#remove-unneeded-compatibility-settings
+    // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
+    clearMocks: false,
+  },
   base: './',
-  plugins: [react(), tailwindcss(), parseDebugWritePlugin()],
+  plugins: lazyPlugins(() => [react(), tailwindcss(), parseDebugWritePlugin(), wasmBindingsPlugin()]),
   server: {
     host: true,
     port: 5173,

@@ -32,7 +32,7 @@ fn ensure_ffmpeg_object(config: &mut Value) -> Result<&mut Map<String, Value>, S
     let scene = config
         .get_mut("scene")
         .ok_or_else(|| "config missing 'scene'".to_string())?;
-    if scene.get("ffmpeg").map_or(true, |v| v.is_null()) {
+    if scene.get("ffmpeg").is_none_or(|v| v.is_null()) {
         scene
             .as_object_mut()
             .ok_or_else(|| "scene must be an object".to_string())?

@@ -43,6 +43,9 @@ mod project_file;
 mod raster_resources;
 mod runtime_paths;
 mod tauri_commands;
+#[cfg(target_os = "macos")]
+mod traffic_lights;
+mod widget_preview;
 
 use ovrley_core::render_jobs::execution::RenderExecutionService;
 use ovrley_core::render_jobs::inspection::VideoInspectionService;
@@ -66,6 +69,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(video_server)
+        .manage(widget_preview::PreviewActivities::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -78,6 +82,10 @@ pub fn run() {
             tauri_commands::backend_list_system_fonts,
             tauri_commands::backend_font_capabilities,
             tauri_commands::backend_font_data,
+            widget_preview::backend_preview_activity,
+            widget_preview::backend_preview_split_table,
+            widget_preview::backend_release_preview_activity,
+            widget_preview::backend_preview_font,
             tauri_commands::backend_render,
             tauri_commands::backend_submit_batch,
             tauri_commands::backend_batch_snapshot,
@@ -86,6 +94,8 @@ pub fn run() {
             tauri_commands::backend_parse_csv_activity,
             tauri_commands::backend_parse_vbo_activity,
             tauri_commands::backend_parse_tcx_activity,
+            tauri_commands::backend_parse_uddf_activity,
+            tauri_commands::backend_parse_subsurface_activity,
             tauri_commands::backend_render_preview_frame,
             tauri_commands::backend_suggest_output_path,
             tauri_commands::backend_progress,
@@ -158,6 +168,13 @@ pub fn run() {
             {
                 if let Some(window) = app.get_webview_window("main") {
                     window.set_decorations(false)?;
+                }
+            }
+
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    traffic_lights::keep_inset(&window);
                 }
             }
 

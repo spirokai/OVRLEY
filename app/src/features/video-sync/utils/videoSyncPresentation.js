@@ -1,10 +1,6 @@
 import { CornerUpLeft, CornerUpRight, MapPin, OctagonMinus } from 'lucide-react'
 import { formatClockDuration } from '@/lib/time-format'
-import { getInterpolatedActivityValue, getMetricSeries } from '@/features/overlay-editor/utils/overlayEditorUtils'
-import { formatStandardMetricDisplay } from '@/features/widget-preview/widgets/metric/format'
 import { VIDEO_SYNC_LANDMARK_TYPES, VIDEO_SYNC_PREVIEW_SCREEN_GAP } from '../data/videoSyncConstants'
-
-const SPEED_FORMAT = Object.freeze({ decimals: 1, display_unit: 'kmh', show_units: true })
 
 export const VIDEO_SYNC_LANDMARK_PRESENTATION = {
   [VIDEO_SYNC_LANDMARK_TYPES.STOP]: {
@@ -40,7 +36,7 @@ export const VIDEO_SYNC_LANDMARK_PRESENTATION = {
 /**
  * @param {{width: number, height: number}} sceneSize Video dimensions.
  * @param {number} displayScale Preview scale.
- * @returns {object} Screen, pair, and speed text styles.
+ * @returns {object} Screen and pair styles.
  */
 export function buildVideoSyncScreenLayout(sceneSize, displayScale) {
   const width = sceneSize.width * displayScale
@@ -49,16 +45,7 @@ export function buildVideoSyncScreenLayout(sceneSize, displayScale) {
   return {
     screenStyle: { width, height },
     pairStyle: { gridTemplateColumns: `repeat(2, ${width}px)`, width: width * 2 + gap, height, gap },
-    speedValueStyle: { fontSize: 189 * displayScale, lineHeight: 1 },
-    speedUnitsStyle: { fontSize: 55.5 * displayScale, lineHeight: 1 },
   }
-}
-
-/** @param {object|null} activity Parsed activity. @param {number} previewSecond Activity second. @returns {string|null} Speed readout. */
-export function getVideoSyncPreviewSpeed(activity, previewSecond) {
-  const speed = getMetricSeries(activity, 'speed')
-  if (!Array.isArray(speed) || !speed.some((value) => value !== null && value !== undefined)) return null
-  return formatStandardMetricDisplay('speed', getInterpolatedActivityValue(activity, 'speed', previewSecond), SPEED_FORMAT)
 }
 
 /**

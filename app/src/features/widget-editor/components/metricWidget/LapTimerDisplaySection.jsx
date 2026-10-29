@@ -1,25 +1,13 @@
+import { DISPLAY_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
+import { buildDisplayModeUpdate } from '@/lib/widget/widget-resolver'
 import { Type } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
+import { Label } from '@/components/ui/label'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { useAvailableFonts } from '@/hooks/useFonts'
 import { FontSection } from '../widgetEditorSections'
-import { ColorField, SelectField, SizeSlider, TextField, ToggleField } from '../widgetFormControls'
-import { LAP_TIMER_MODES } from '@/lib/widget/standard-widgets'
+import { ColorField, SelectField, SliderField, TextField, ToggleField } from '../widgetFormControls'
 import { useTranslation } from 'react-i18next'
-
-const LAP_TIMER_MODES_BY_VALUE = Object.fromEntries(LAP_TIMER_MODES.map((mode) => [mode.value, mode]))
-
-/**
- * Translation keys for LAP_TIMER_MODES labels, keyed by mode value.
- * The modes come from the shared manifest consumed by the backend and must
- * stay unchanged, so its English labels are only used as fallback defaults.
- */
-const LAP_TIMER_MODE_LABEL_KEYS = {
-  current_lap: 'widgets.lapTimerModes.currentLap',
-  best_lap: 'widgets.lapTimerModes.bestLap',
-  delta: 'widgets.lapTimerModes.delta',
-  lap_log: 'widgets.lapTimerModes.lapLog',
-}
 
 /**
  * Renders lap timer configuration controls.
@@ -27,11 +15,11 @@ const LAP_TIMER_MODE_LABEL_KEYS = {
  * @param {object} props
  * @param {object} props.widget - Lap timer widget configuration.
  * @param {Function} props.updateWidgetData - Updates widget data.
- * @param {Function} props.updateWidgetSize - Applies live size changes.
- * @param {Function} props.commitWidgetSize - Commits live size changes.
+ * @param {Function} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
+ * @param {Function} props.commitWidgetDraft - Commits the live widget draft.
  * @returns {JSX.Element} Lap timer controls.
  */
-export default function LapTimerDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function LapTimerDisplaySection({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const availableFonts = useAvailableFonts()
 
@@ -40,19 +28,16 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
       <SelectField
         label={t('widget-editor.readout', 'Readout')}
         value={widget.data.lap_timer_mode}
-        onValueChange={(mode) => {
-          const selectedMode = LAP_TIMER_MODES_BY_VALUE[mode]
-          if (!selectedMode) throw new Error(`Unsupported lap timer mode: ${mode}`)
-          updateWidgetData(widget.id, {
-            lap_timer_mode: mode,
-            label: selectedMode.label,
-            font_size: selectedMode.font_size,
-            label_font_size: selectedMode.label_font_size,
-          })
-        }}
-        options={LAP_TIMER_MODES.map(({ value, label }) => ({ value, label: t(LAP_TIMER_MODE_LABEL_KEYS[value], label) }))}
+        onValueChange={(mode) => updateWidgetData(widget.id, buildDisplayModeUpdate(widget.data.display_type, mode))}
+        options={DISPLAY_TYPE_DEFINITIONS.lap_timer.modes.map(({ value, label, labelKey }) => ({ value, label: t(labelKey, label) }))}
       />
-      <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
+      {widget.data.lap_timer_mode === 'lap_log' ? (
+        <div className="flex items-center justify-between gap-2 pl-1">
+          <Label className="pt-1 text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.renumberLaps', 'Renumber laps')}</Label>
+          <ToggleField checked={widget.data.renumber_laps} onCheckedChange={(renumber_laps) => updateWidgetData(widget.id, { renumber_laps })} />
+        </div>
+      ) : null}
+      <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetDraft={updateWidgetDraft} commitWidgetDraft={commitWidgetDraft} />
       <div className="space-y-4">
         <div className="flex w-full items-center gap-3">
           <SectionHeading icon={Type} title={t('widget-editor.label', 'Label')} />
@@ -69,7 +54,9 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
             onChange={(label) => updateWidgetData(widget.id, { label })}
           />
         ) : null}
-        <SizeSlider
+        <SliderField
+          editable
+          integerDisplay
           label={t('widget-editor.labelFontSize', 'Label Font Size')}
           value={widget.data.label_font_size}
           min={6}
@@ -77,8 +64,8 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
           step={0.5}
           valueDisplay={`${widget.data.label_font_size}`}
           suffix="px"
-          onChange={(label_font_size) => updateWidgetSize(widget.id, { label_font_size })}
-          onCommit={() => commitWidgetSize(widget.id)}
+          onSliderChange={(label_font_size) => updateWidgetDraft(widget.id, { label_font_size })}
+          onSliderCommit={() => commitWidgetDraft(widget.id)}
         />
         <div className="grid grid-cols-2 items-end gap-4">
           <FontSelectField
@@ -88,7 +75,7 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
             recommendedFonts={availableFonts.recommendedFonts}
             systemFonts={availableFonts.systemFonts}
             triggerClassName="h-9 border-border/70 bg-surface text-xs"
-            labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
+            labelClassName="text-[0.667rem] text-muted-foreground uppercase font-bold"
           />
           <ColorField
             label={t('widget-editor.labelColor', 'Label Color')}
