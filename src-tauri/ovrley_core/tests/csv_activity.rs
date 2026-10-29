@@ -340,6 +340,24 @@ Timestamp (s),Speed\n\
 }
 
 #[test]
+fn aim_race_studio_with_gear_unit_and_pedal_pos_imports_successfully() {
+    let aim_csv = "Format,AiM CSV File\n\
+Date,\"Friday, July 3, 2026\"\n\
+Time,2:48 PM\n\
+\n\
+Time,Speed,GEAR,PEDAL POS\n\
+s,mph,gear,%\n\
+0.000,10.0,1,25.0\n\
+0.050,12.0,2,50.0\n";
+    let activity = parse_csv_activity_reader(Cursor::new(aim_csv), "11.csv")
+        .unwrap()
+        .parsed_activity;
+    assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 0.05]);
+    assert_eq!(activity.gear_position, gear_numbers(&[1.0, 2.0]));
+    assert_eq!(activity.throttle_position, vec![Some(25.0), Some(50.0)]);
+}
+
+#[test]
 fn local_preamble_timestamps_respect_dst_transitions_and_reject_non_unique_starts() {
     let (has_transition, examples) = local_transition_examples();
     if !has_transition {

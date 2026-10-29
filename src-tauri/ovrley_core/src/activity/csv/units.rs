@@ -183,7 +183,7 @@ pub(super) fn parse_declared_unit(value: &str) -> DeclaredUnit {
         "ft-lb" | "ft-lbs" | "ft-lbf" | "ft·lbf" | "ft lb" | "ft lbs" | "ft lbf" | "lb-ft"
         | "lbs-ft" | "lb ft" | "lbs ft" | "lbf-ft" | "lbf ft" | "foot-pound" | "foot pound"
         | "foot pounds" => Unit::FootPounds,
-        "#" | "raw" => Unit::Raw,
+        "#" | "raw" | "gear" => Unit::Raw,
         _ => return DeclaredUnit::Unsupported(UnitDimension::Unknown),
     };
     DeclaredUnit::Supported(unit)

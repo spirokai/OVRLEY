@@ -383,7 +383,7 @@ fn parse_header(index: usize, value: &str, profile: HeaderProfile) -> Option<Hea
             Some(ControlKind::Percentage),
             None,
         ),
-        "accelerator position" | "accelerator pedal position" => (
+        "accelerator position" | "accelerator pedal position" | "pedal pos" => (
             Metric::ThrottlePosition,
             SourcePriority::Pedal,
             None,
