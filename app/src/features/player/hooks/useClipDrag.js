@@ -136,14 +136,16 @@ export default function useClipDrag({ setVideoDragPreview, setVideoOffset, shift
   )
 
   // Commit - one clip snaps its start to a tenth of a second; a shared shift keeps relative placement and rounds the earliest clip.
+  // An edge snapped onto another edge commits exactly, so touching clips stay touching.
   const commitShift = useCallback(
-    ({ videoId, movingClips }, deltaSeconds) => {
+    ({ videoId, movingClips }, { delta: deltaSeconds, guidelineSecond }) => {
+      const round = guidelineSecond === null ? roundToTenth : (seconds) => seconds
       if (videoId !== null) {
-        setVideoOffset(videoId, roundToTenth(movingClips[0].offsetSeconds + deltaSeconds))
+        setVideoOffset(videoId, round(movingClips[0].offsetSeconds + deltaSeconds))
         return
       }
       const earliestOffset = Math.min(...movingClips.map((clip) => clip.offsetSeconds))
-      shiftVideoOffsets(roundToTenth(earliestOffset + deltaSeconds) - earliestOffset)
+      shiftVideoOffsets(round(earliestOffset + deltaSeconds) - earliestOffset)
     },
     [setVideoOffset, shiftVideoOffsets],
   )
@@ -246,7 +248,7 @@ export default function useClipDrag({ setVideoDragPreview, setVideoOffset, shift
         viewStart: metrics.viewStart,
         widthPx: getTimelineWidth(metrics),
       })
-      if (commit) commitShift(drag.movement, snap.delta)
+      if (commit) commitShift(drag.movement, snap)
       setVideoDragPreview(null)
     },
     [cancelAutoScroll, cancelPendingPreview, commitShift, setVideoDragPreview],
@@ -279,7 +281,7 @@ export default function useClipDrag({ setVideoDragPreview, setVideoOffset, shift
     const nudge = nudgeRef.current
     if (nudge === null) return
     nudgeRef.current = null
-    commitShift(nudge.movement, nudge.deltaSeconds)
+    commitShift(nudge.movement, { delta: nudge.deltaSeconds, guidelineSecond: null })
     setVideoDragPreview(null)
   }, [commitShift, setVideoDragPreview])
 
