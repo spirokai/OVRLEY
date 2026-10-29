@@ -102,6 +102,7 @@ dependencies = [
  "http",
  "http-cache-semantics",
  "log",
+ "objc2-app-kit",
  "open",
  "ovrley_core",
  "ovrley_widgets",

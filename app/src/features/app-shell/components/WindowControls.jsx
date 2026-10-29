@@ -1,6 +1,7 @@
 import { Minus, Square, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { isMacOS } from '@/lib/utils'
 
 const noopWindow = {
   minimize: () => {},
@@ -11,7 +12,7 @@ const noopWindow = {
 /**
  * Window chrome controls for desktop environments.
  * Lazily loads the Tauri window API and falls back to no-op buttons in the browser.
- * Returns nothing on macOS — the OS provides native traffic light buttons.
+ * Renders only a spacer on macOS — the OS provides native traffic light buttons.
  */
 export default function WindowControls() {
   const { t } = useTranslation()
@@ -29,8 +30,8 @@ export default function WindowControls() {
     }
   }, [])
 
-  if (/mac/i.test(navigator.platform)) {
-    return null
+  if (isMacOS()) {
+    return <div className="w-0.1 shrink-0" aria-hidden="true" />
   }
 
   return (

@@ -1,4 +1,25 @@
 {
+  "app": {
+    "windows": [
+      {
+        "title": "OVRLEY",
+        "backgroundColor": "#00111b",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required --disable_direct_composition_video_overlays=1",
+        "width": 1920,
+        "height": 1080,
+        "minWidth": 1100,
+        "minHeight": 720,
+        "resizable": true,
+        "maximized": true,
+        "fullscreen": false,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 20, "y": 28 },
+        "useHttpsScheme": true
+      }
+    ]
+  },
   "bundle": {
     "macOS": {
       "signingIdentity": "-"

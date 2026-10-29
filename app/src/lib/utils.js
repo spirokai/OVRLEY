@@ -28,3 +28,8 @@ export function pickDefined(source, keys) {
   }
   return result
 }
+
+/** @returns {boolean} Whether the app is running on macOS. */
+export function isMacOS() {
+  return /mac/i.test(navigator.platform)
+}

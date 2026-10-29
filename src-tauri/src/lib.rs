@@ -43,6 +43,8 @@ mod project_file;
 mod raster_resources;
 mod runtime_paths;
 mod tauri_commands;
+#[cfg(target_os = "macos")]
+mod traffic_lights;
 mod widget_preview;
 
 use ovrley_core::render_jobs::execution::RenderExecutionService;
@@ -166,6 +168,13 @@ pub fn run() {
             {
                 if let Some(window) = app.get_webview_window("main") {
                     window.set_decorations(false)?;
+                }
+            }
+
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    traffic_lights::keep_inset(&window);
                 }
             }
 
