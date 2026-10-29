@@ -391,7 +391,7 @@ fn wasm_backdrops_match_export_opacity_and_ignore_playhead_and_activity() {
         // Tiles unpremultiply with integer rounding; export frames are drawn straight.
         let (tile, frame) = (rgba_at(&pixels, width, width / 2, height / 2), rgba_at(&native, 96, left + width / 2, top + height / 2));
         assert!(tile.iter().zip(frame).all(|(a, b)| a.abs_diff(b) <= 1), "tile {tile:?}, export {frame:?}");
-        assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
+        assert!(pixels.as_chunks::<4>().0.iter().any(|pixel| pixel[3] > 0));
         preview.replace_activity(br#"{"sample_elapsed_seconds":[0,1],"speed":[0,20],"trim_end_seconds":1}"#).unwrap();
         for second in [0.0, 1.0, 0.25, 100.0] {
             preview.render(second).unwrap();
@@ -413,7 +413,7 @@ fn wasm_backdrops_match_export_opacity_and_ignore_playhead_and_activity() {
         preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
         assert_ne!(preview.widgets[&id].revision(), revision);
         assert_ne!(preview.widgets[&id].pixels(), &pixels);
-        assert!(preview.widgets[&id].pixels().chunks_exact(4).all(|pixel| pixel[3] == 0));
+        assert!(preview.widgets[&id].pixels().as_chunks::<4>().0.iter().all(|pixel| pixel[3] == 0));
         request["widget"]["border_thickness"] = json!(-1);
         assert!(preview.update_widget(id, serde_json::from_value(request).unwrap()).is_err());
     }

@@ -6,8 +6,6 @@
 //! The output is [`ActivityColumns`], which the shared activity finalizer turns
 //! into the canonical [`ParsedActivity`](crate::activity::schema::ParsedActivity).
 
-use std::iter;
-
 use serde_json::json;
 
 use crate::activity::schema::{
@@ -87,7 +85,7 @@ pub fn build_activity_columns(
         let timestamps: Vec<f64> = (0..count)
             .map(|index| elapsed_origin_ms + index as f64 * interval_ms)
             .collect();
-        (timestamps, iter::repeat(None).take(count).collect())
+        (timestamps, std::iter::repeat_n(None, count).collect())
     };
     if anchor_ms.last().is_none_or(|last| *last < media_end_ms) {
         anchor_ms.push(media_end_ms);

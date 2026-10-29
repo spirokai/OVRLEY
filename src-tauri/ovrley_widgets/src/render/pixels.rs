@@ -32,7 +32,7 @@ pub fn read_surface_rgba(surface: &mut Surface, pixels: &mut [u8]) -> WidgetResu
         ));
     }
     // ImageData needs straight alpha; transparent and opaque pixels already match.
-    for pixel in pixels.chunks_exact_mut(4) {
+    for pixel in pixels.as_chunks_mut::<4>().0 {
         let alpha = usize::from(pixel[3]);
         if alpha == 0 || alpha == 255 {
             continue;
@@ -86,8 +86,10 @@ mod tests {
         let mut actual = vec![0; original.len()];
         read_surface_rgba(&mut surface, &mut actual).unwrap();
         for (index, (actual, expected)) in actual
-            .chunks_exact(4)
-            .zip(expected.chunks_exact(4))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(expected.as_chunks::<4>().0.iter())
             .enumerate()
         {
             assert_eq!(actual[3], expected[3], "alpha at pixel {index}");

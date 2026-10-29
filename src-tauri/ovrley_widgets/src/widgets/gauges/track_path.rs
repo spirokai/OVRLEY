@@ -8,7 +8,7 @@ use skia_safe::{Path, PathBuilder, PathFillType, Point};
 
 pub(crate) const TRACK_PATH_EPSILON: f32 = 0.001;
 
-const QUARTER_CIRCLE_KAPPA: f32 = 0.552_284_76;
+const QUARTER_CIRCLE_KAPPA: f32 = 0.552_284_8;
 
 #[derive(Clone, Copy, Debug)]
 /// Local coordinate frame at a track endpoint.

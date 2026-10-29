@@ -162,6 +162,6 @@ pub(crate) fn list_directory_video_files(
         }
     }
 
-    paths.sort_by(|left, right| left.to_lowercase().cmp(&right.to_lowercase()));
+    paths.sort_by_key(|left| left.to_lowercase());
     Ok(paths)
 }

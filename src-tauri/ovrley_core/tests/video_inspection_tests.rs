@@ -222,7 +222,7 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
                 .render_atlas(covered_frame, &atlas, &mut pixels, &mut profiler)
                 .unwrap();
             assert!(
-                pixels.chunks_exact(4).all(|pixel| pixel[3] == 0),
+                pixels.as_chunks::<4>().0.iter().all(|pixel| pixel[3] == 0),
                 "suppressed overlay without rasters is transparent in coverage"
             );
             let blank_frame = if offset < 0.0 {

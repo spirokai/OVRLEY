@@ -163,95 +163,6 @@ fn qsv_overlay_probe_args(candidate: &QsvProbeCandidate) -> Vec<String> {
     args
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn qsv_probe_exercises_nv12_scaling_and_the_render_overlay_graph_for_30_frames() {
-        for (index, candidate) in qsv_full_probe_candidates().iter().enumerate() {
-            let args = qsv_overlay_probe_args(candidate);
-            let init_args: Vec<_> = candidate
-                .init_args
-                .iter()
-                .map(|arg| (*arg).to_string())
-                .collect();
-            assert!(args[3..].starts_with(&init_args));
-            let graph = &args[args
-                .iter()
-                .position(|arg| arg == "-filter_complex")
-                .unwrap()
-                + 1];
-            assert!(graph.contains("[probe_main]trim=start=0:end=1,setpts=PTS-STARTPTS,scale_qsv=w=128:h=128:format=nv12[base]"));
-            assert!(graph.contains("[1:v]setpts=PTS-STARTPTS,crop=112:112:0:0,hwupload=extra_hw_frames=16[slot0];"));
-            assert_eq!(graph.matches(",hwupload=extra_hw_frames=16[slot").count(), 1);
-            assert!(graph.contains("[base][slot0]overlay_qsv=x=8:y=8[out]"));
-            assert!(!graph.contains("hwdownload"));
-            if index == 0 {
-                assert!(graph.starts_with("[0:v]format=nv12,hwupload[probe_main];"));
-            } else {
-                assert!(graph.starts_with("[0:v]format=bgra,hwupload=extra_hw_frames=16,scale_qsv=format=nv12[probe_main];"));
-            }
-            assert!(args.windows(2).any(|pair| pair == ["-frames:v", "30"]));
-            assert!(args.windows(2).any(|pair| pair == ["-c:v", "h264_qsv"]));
-        }
-    }
-
-    #[test]
-    fn qsv_selection_stops_after_preferred_backend_succeeds() {
-        let mut attempts = Vec::new();
-        let selected = select_qsv_full_init_args(|candidate| {
-            attempts.push(
-                candidate
-                    .init_args
-                    .iter()
-                    .map(|arg| (*arg).to_string())
-                    .collect::<Vec<_>>(),
-            );
-            true
-        })
-        .unwrap();
-
-        assert_eq!(attempts, vec![selected.clone()]);
-        assert_eq!(selected[1], "qsv=qs");
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn qsv_selection_returns_dxva2_arguments_after_default_backend_fails() {
-        let mut attempts = Vec::new();
-        let selected = select_qsv_full_init_args(|candidate| {
-            attempts.push(
-                candidate
-                    .init_args
-                    .iter()
-                    .map(|arg| (*arg).to_string())
-                    .collect::<Vec<_>>(),
-            );
-            attempts.len() == 2
-        })
-        .unwrap();
-
-        assert_eq!(attempts.len(), 2);
-        assert_eq!(attempts[0][1], "qsv=qs");
-        assert_eq!(attempts[1], selected);
-        assert_eq!(selected[1], "dxva2=dx");
-        assert_eq!(selected[3], "qsv=qs@dx");
-    }
-
-    #[test]
-    fn qsv_selection_reports_unavailable_when_every_backend_fails() {
-        let mut attempts = 0;
-        let selected = select_qsv_full_init_args(|_| {
-            attempts += 1;
-            false
-        });
-
-        assert!(selected.is_none());
-        assert_eq!(attempts, if cfg!(windows) { 2 } else { 1 });
-    }
-}
-
 /// Executes the probe strategy declared by the unique encoder catalog entry.
 pub(super) fn probe_encoder(
     ffmpeg_path: &Path,
@@ -404,4 +315,93 @@ pub(super) fn find_vaapi_device() -> Option<std::path::PathBuf> {
         .collect();
     render_nodes.sort();
     render_nodes.into_iter().next()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn qsv_probe_exercises_nv12_scaling_and_the_render_overlay_graph_for_30_frames() {
+        for (index, candidate) in qsv_full_probe_candidates().iter().enumerate() {
+            let args = qsv_overlay_probe_args(candidate);
+            let init_args: Vec<_> = candidate
+                .init_args
+                .iter()
+                .map(|arg| (*arg).to_string())
+                .collect();
+            assert!(args[3..].starts_with(&init_args));
+            let graph = &args[args
+                .iter()
+                .position(|arg| arg == "-filter_complex")
+                .unwrap()
+                + 1];
+            assert!(graph.contains("[probe_main]trim=start=0:end=1,setpts=PTS-STARTPTS,scale_qsv=w=128:h=128:format=nv12[base]"));
+            assert!(graph.contains("[1:v]setpts=PTS-STARTPTS,crop=112:112:0:0,hwupload=extra_hw_frames=16[slot0];"));
+            assert_eq!(graph.matches(",hwupload=extra_hw_frames=16[slot").count(), 1);
+            assert!(graph.contains("[base][slot0]overlay_qsv=x=8:y=8[out]"));
+            assert!(!graph.contains("hwdownload"));
+            if index == 0 {
+                assert!(graph.starts_with("[0:v]format=nv12,hwupload[probe_main];"));
+            } else {
+                assert!(graph.starts_with("[0:v]format=bgra,hwupload=extra_hw_frames=16,scale_qsv=format=nv12[probe_main];"));
+            }
+            assert!(args.windows(2).any(|pair| pair == ["-frames:v", "30"]));
+            assert!(args.windows(2).any(|pair| pair == ["-c:v", "h264_qsv"]));
+        }
+    }
+
+    #[test]
+    fn qsv_selection_stops_after_preferred_backend_succeeds() {
+        let mut attempts = Vec::new();
+        let selected = select_qsv_full_init_args(|candidate| {
+            attempts.push(
+                candidate
+                    .init_args
+                    .iter()
+                    .map(|arg| (*arg).to_string())
+                    .collect::<Vec<_>>(),
+            );
+            true
+        })
+        .unwrap();
+
+        assert_eq!(attempts, vec![selected.clone()]);
+        assert_eq!(selected[1], "qsv=qs");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn qsv_selection_returns_dxva2_arguments_after_default_backend_fails() {
+        let mut attempts = Vec::new();
+        let selected = select_qsv_full_init_args(|candidate| {
+            attempts.push(
+                candidate
+                    .init_args
+                    .iter()
+                    .map(|arg| (*arg).to_string())
+                    .collect::<Vec<_>>(),
+            );
+            attempts.len() == 2
+        })
+        .unwrap();
+
+        assert_eq!(attempts.len(), 2);
+        assert_eq!(attempts[0][1], "qsv=qs");
+        assert_eq!(attempts[1], selected);
+        assert_eq!(selected[1], "dxva2=dx");
+        assert_eq!(selected[3], "qsv=qs@dx");
+    }
+
+    #[test]
+    fn qsv_selection_reports_unavailable_when_every_backend_fails() {
+        let mut attempts = 0;
+        let selected = select_qsv_full_init_args(|_| {
+            attempts += 1;
+            false
+        });
+
+        assert!(selected.is_none());
+        assert_eq!(attempts, if cfg!(windows) { 2 } else { 1 });
+    }
 }

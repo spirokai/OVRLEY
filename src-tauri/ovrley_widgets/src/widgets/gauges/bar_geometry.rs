@@ -53,14 +53,11 @@ pub(crate) fn scale_bar_geometry(
     geometry: Option<ResolvedBarGeometry>,
     scale: f32,
 ) -> Option<ResolvedBarGeometry> {
-    match geometry {
-        Some(geometry) => Some(ResolvedBarGeometry {
-            count: geometry.count,
-            gap: geometry.gap * scale,
-            extent: geometry.extent * scale,
-        }),
-        None => None,
-    }
+    geometry.map(|geometry| ResolvedBarGeometry {
+        count: geometry.count,
+        gap: geometry.gap * scale,
+        extent: geometry.extent * scale,
+    })
 }
 
 /// Resolve the same cap limits and bar span at ingress and after intrinsic resizing.

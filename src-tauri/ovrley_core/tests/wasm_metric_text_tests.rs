@@ -112,7 +112,7 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
                     assert_eq!(sampled, expected, "{metric}/{unit:?} at {second}");
                     preview.render(second).unwrap();
                     let widget = &preview.widgets[&id];
-                    let geometry: Value = serde_json::from_slice(&widget.geometry()).unwrap();
+                    let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
                     let info = ImageInfo::new(
                         (
                             geometry["width"].as_i64().unwrap() as i32,
@@ -155,7 +155,7 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
                         &pixels, widget.pixels(),
                         "pixels: {metric}/{unit:?}/{alignment} at {second}"
                     );
-                    assert!(pixels.chunks_exact(4).any(|p| p[3] != 0));
+                    assert!(pixels.as_chunks::<4>().0.iter().any(|p| p[3] != 0));
                     let revision = widget.revision();
                     preview.render(second).unwrap();
                     assert_eq!(preview.widgets[&id].revision(), revision);

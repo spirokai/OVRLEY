@@ -126,7 +126,7 @@ fn resolve_profile_aliases(
         for column in columns {
             let is_distance_alias = record
                 .get(column.index)
-                .and_then(|value| split_header(value))
+                .and_then(split_header)
                 .is_some_and(|(semantic, _, _)| semantic == "distance");
             if is_distance_alias {
                 column.metric = Metric::DistanceToHome;

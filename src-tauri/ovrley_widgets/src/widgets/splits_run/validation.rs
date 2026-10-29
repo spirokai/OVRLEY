@@ -105,12 +105,12 @@ pub fn validate_splits_run(value: ValueConfig, index: usize) -> WidgetResult<Val
     }
 
     let row_gap = require_f32(value.row_gap, &p("row_gap"))?;
-    if !(row_gap >= 0.0) {
+    if row_gap < 0.0 {
         return invalid("row_gap", format!("must be >= 0, got {row_gap}"));
     }
     let track_thickness = require_positive_f32(value.track_thickness, &p("track_thickness"))?;
     let track_corner_radius = require_f32(value.track_corner_radius, &p("track_corner_radius"))?;
-    if !(track_corner_radius >= 0.0) {
+    if track_corner_radius < 0.0 {
         return invalid(
             "track_corner_radius",
             format!("must be >= 0, got {track_corner_radius}"),
@@ -118,7 +118,7 @@ pub fn validate_splits_run(value: ValueConfig, index: usize) -> WidgetResult<Val
     }
     let track_border_thickness =
         require_f32(value.track_border_thickness, &p("track_border_thickness"))?;
-    if !(track_border_thickness >= 0.0) || track_border_thickness * 2.0 >= track_thickness {
+    if track_border_thickness < 0.0 || track_border_thickness * 2.0 >= track_thickness {
         return invalid(
             "track_border_thickness",
             format!("must be >= 0 and leave a positive fill inside track_thickness, got {track_border_thickness}"),

@@ -82,7 +82,6 @@ pub(super) fn composite_filter_complex(
 ) -> String {
     let template = profile
         .filter_complex
-        .as_deref()
         .expect("composite profile catalog defines a filter graph");
     let filter_stack_kind = profile.codec_id.metadata().filter_stack_kind;
     let (atlas_slot_crops, atlas_slot_overlays) = atlas_slot_filters(

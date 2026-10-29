@@ -49,25 +49,7 @@ impl EncoderMonitor {
 
 fn parse_frame(line: &str) -> Option<u32> {
     let start = line.find("frame=")? + "frame=".len();
-    line[start..]
-        .trim_start()
-        .split_whitespace()
-        .next()?
-        .parse()
-        .ok()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn reads_padded_ffmpeg_progress_without_confusing_other_logs() {
-        assert_eq!(parse_frame("frame=  123 fps=30"), Some(123));
-        assert_eq!(parse_frame("frame=456"), Some(456));
-        assert_eq!(parse_frame("frame=unknown"), None);
-        assert_eq!(parse_frame("video:123kB audio:0kB"), None);
-    }
+    line[start..].split_whitespace().next()?.parse().ok()
 }
 
 /// Confirms that FFmpeg finalized a usable output file on success.
@@ -136,4 +118,17 @@ pub fn stderr_tail(stderr: &str) -> String {
     let lines = stderr.lines().collect::<Vec<_>>();
     let start = lines.len().saturating_sub(30);
     lines[start..].join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_padded_ffmpeg_progress_without_confusing_other_logs() {
+        assert_eq!(parse_frame("frame=  123 fps=30"), Some(123));
+        assert_eq!(parse_frame("frame=456"), Some(456));
+        assert_eq!(parse_frame("frame=unknown"), None);
+        assert_eq!(parse_frame("video:123kB audio:0kB"), None);
+    }
 }

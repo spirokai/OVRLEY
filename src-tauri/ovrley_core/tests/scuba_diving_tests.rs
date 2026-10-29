@@ -362,8 +362,8 @@ fn scuba_widgets_render_in_the_preview_cache_and_export_frame_with_matching_pixe
             {
                 let offset = ((y + top) * 700 + left) * 4;
                 for (a, b) in native[offset..offset + row.len()]
-                    .chunks_exact(4)
-                    .zip(row.chunks_exact(4))
+                    .as_chunks::<4>().0.iter()
+                    .zip(row.as_chunks::<4>().0.iter())
                 {
                     difference = difference.max(a[3].abs_diff(b[3]) as u16);
                     for channel in 0..3 {
@@ -380,7 +380,7 @@ fn scuba_widgets_render_in_the_preview_cache_and_export_frame_with_matching_pixe
                 "{kind} at {}: pixel difference {difference}",
                 seconds[index]
             );
-            assert!(rendered.pixels().chunks_exact(4).any(|pixel| pixel[3] > 0));
+            assert!(rendered.pixels().as_chunks::<4>().0.iter().any(|pixel| pixel[3] > 0));
             let revision = rendered.revision();
             preview.render(seconds[index]).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision);

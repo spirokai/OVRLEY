@@ -164,74 +164,6 @@ fn gps_jump_is_possible(from: &NativeSample, to: &NativeSample) -> bool {
         ) <= seconds * IMPOSSIBLE_GPS_JUMP_MPS
 }
 
-#[cfg(test)]
-mod cached_gps_tests {
-    use super::*;
-
-    fn gps_sample(
-        timestamp_ms: f64,
-        latitude: f64,
-        longitude: f64,
-        packet_index: usize,
-    ) -> NativeSample {
-        NativeSample {
-            timestamp_ms,
-            gps_time_anchor: true,
-            gps_packet_index: Some(packet_index),
-            latitude: Some(latitude),
-            longitude: Some(longitude),
-            speed: Some(0.0),
-            ..NativeSample::default()
-        }
-    }
-
-    #[test]
-    fn discards_cached_fix_after_confirmed_impossible_jump() {
-        let cached = (12.7158364, 77.2275231);
-        let mut samples = vec![
-            NativeSample {
-                timestamp_ms: 0.0,
-                gps_time_anchor: true,
-                ..NativeSample::default()
-            },
-            NativeSample {
-                timestamp_ms: 500.0,
-                g_force: Some(1.2),
-                ..NativeSample::default()
-            },
-            gps_sample(24_960.0, cached.0, cached.1, 24),
-            gps_sample(25_900.0, cached.0, cached.1, 24),
-            gps_sample(26_000.0, 12.4198418, 76.6687983, 25),
-            gps_sample(26_100.0, 12.4198420, 76.6687990, 25),
-            gps_sample(27_040.0, 12.4198500, 76.6688000, 26),
-        ];
-
-        discard_cached_gps_prefix(&mut samples, Some(cached));
-
-        assert_eq!(samples.len(), 7);
-        assert!(samples[2..4]
-            .iter()
-            .all(|sample| sample.gps_time_anchor && !sample.has_gps_payload()));
-        assert_eq!(samples[1].g_force, Some(1.2));
-        assert_eq!(samples[4].latitude, Some(12.4198418));
-    }
-
-    #[test]
-    fn keeps_stationary_fix_when_later_movement_is_plausible() {
-        let cached = (12.7158364, 77.2275231);
-        let mut samples = vec![
-            gps_sample(1000.0, cached.0, cached.1, 1),
-            gps_sample(2000.0, cached.0, cached.1, 2),
-            gps_sample(3000.0, 12.7158400, 77.2275300, 3),
-            gps_sample(3100.0, 12.7158410, 77.2275310, 3),
-        ];
-
-        discard_cached_gps_prefix(&mut samples, Some(cached));
-
-        assert!(samples.iter().all(NativeSample::has_gps_payload));
-    }
-}
-
 /// Reports whether a sample contains one of the GPS groups handled below.
 pub(crate) fn has_gps_source(tag_map: &BTreeMap<GroupId, TagMap>) -> bool {
     tag_map.contains_key(&GroupId::GPS) || tag_map.contains_key(&GroupId::Custom("GPS9".into()))
@@ -728,4 +660,72 @@ fn acceleration_components_to_g(x: f64, y: f64, z: f64, map: &TagMap) -> Option<
         finite_f64(y * unit_factor)?,
         finite_f64(z * unit_factor)?,
     ))
+}
+
+#[cfg(test)]
+mod cached_gps_tests {
+    use super::*;
+
+    fn gps_sample(
+        timestamp_ms: f64,
+        latitude: f64,
+        longitude: f64,
+        packet_index: usize,
+    ) -> NativeSample {
+        NativeSample {
+            timestamp_ms,
+            gps_time_anchor: true,
+            gps_packet_index: Some(packet_index),
+            latitude: Some(latitude),
+            longitude: Some(longitude),
+            speed: Some(0.0),
+            ..NativeSample::default()
+        }
+    }
+
+    #[test]
+    fn discards_cached_fix_after_confirmed_impossible_jump() {
+        let cached = (12.7158364, 77.2275231);
+        let mut samples = vec![
+            NativeSample {
+                timestamp_ms: 0.0,
+                gps_time_anchor: true,
+                ..NativeSample::default()
+            },
+            NativeSample {
+                timestamp_ms: 500.0,
+                g_force: Some(1.2),
+                ..NativeSample::default()
+            },
+            gps_sample(24_960.0, cached.0, cached.1, 24),
+            gps_sample(25_900.0, cached.0, cached.1, 24),
+            gps_sample(26_000.0, 12.4198418, 76.6687983, 25),
+            gps_sample(26_100.0, 12.4198420, 76.6687990, 25),
+            gps_sample(27_040.0, 12.4198500, 76.6688000, 26),
+        ];
+
+        discard_cached_gps_prefix(&mut samples, Some(cached));
+
+        assert_eq!(samples.len(), 7);
+        assert!(samples[2..4]
+            .iter()
+            .all(|sample| sample.gps_time_anchor && !sample.has_gps_payload()));
+        assert_eq!(samples[1].g_force, Some(1.2));
+        assert_eq!(samples[4].latitude, Some(12.4198418));
+    }
+
+    #[test]
+    fn keeps_stationary_fix_when_later_movement_is_plausible() {
+        let cached = (12.7158364, 77.2275231);
+        let mut samples = vec![
+            gps_sample(1000.0, cached.0, cached.1, 1),
+            gps_sample(2000.0, cached.0, cached.1, 2),
+            gps_sample(3000.0, 12.7158400, 77.2275300, 3),
+            gps_sample(3100.0, 12.7158410, 77.2275310, 3),
+        ];
+
+        discard_cached_gps_prefix(&mut samples, Some(cached));
+
+        assert!(samples.iter().all(NativeSample::has_gps_payload));
+    }
 }

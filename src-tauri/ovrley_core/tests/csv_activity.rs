@@ -1287,7 +1287,7 @@ fn vehicle_power_aliases_and_units_convert_to_engine_power() {
     );
     let cv_activity = parse(cv);
     assert_close(cv_activity.engine_power[0], 14_709.975);
-    assert_close(cv_activity.engine_power[1], 7_354.9875);
+    assert_close(cv_activity.engine_power[1], 7_354.987_5);
     assert_eq!(
         parse(torque_pro_kw).engine_power,
         vec![Some(7_000.0), Some(8_000.0)]
@@ -1632,7 +1632,7 @@ Time,Lap,Latitude,Longitude\n\
             });
 
             assert!(
-                activity.lap_number.iter().any(|&v| v == -1),
+                activity.lap_number.contains(&-1),
                 "{} must have out-lap samples with lap_number == -1",
                 name
             );

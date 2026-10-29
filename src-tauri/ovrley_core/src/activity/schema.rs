@@ -134,19 +134,14 @@ pub struct DirectMetricGapPolicy {
 }
 
 /// Metadata carrier for implicit lap boundaries.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub enum LapMarkers {
+    #[default]
     None,
     /// Activity-relative elapsed seconds of exact lap boundaries.
     BeaconMarkers(Vec<f64>),
     /// VBO: start/finish lat/lon points.
     TimingMarkers(Vec<TimingMarker>),
-}
-
-impl Default for LapMarkers {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// Single lap-timing marker from a VBO `[laptiming]` section.

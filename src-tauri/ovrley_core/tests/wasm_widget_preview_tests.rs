@@ -80,7 +80,7 @@ fn diving_profile_preview_matches_export_during_playback_and_seeking() {
         let mut difference = 0;
         for y in 0..h {
             let native = &native[((top + y) * 700 + left) * 4..((top + y) * 700 + left + w) * 4];
-            for (a, b) in native.chunks_exact(4).zip(widget.pixels()[y * w * 4..(y + 1) * w * 4].chunks_exact(4)) {
+            for (a, b) in native.as_chunks::<4>().0.iter().zip(widget.pixels()[y * w * 4..(y + 1) * w * 4].as_chunks::<4>().0.iter()) {
                 difference = difference.max(a[3].abs_diff(b[3]) as u16);
                 for c in 0..3 { difference = difference.max((a[c] as u16 * a[3] as u16).abs_diff(b[c] as u16 * b[3] as u16) / 255); }
             }
@@ -376,7 +376,7 @@ fn every_family_reports_layout_only_bounds_that_contain_its_drawing() {
                 let mut pixels = vec![0; width as usize * height as usize * 4];
                 read_surface_rgba(&mut surface, &mut pixels).unwrap();
                 let (right, bottom) = (bounds.left + bounds.width, bounds.top + bounds.height);
-                for (index, pixel) in pixels.chunks_exact(4).enumerate() {
+                for (index, pixel) in pixels.as_chunks::<4>().0.iter().enumerate() {
                     if pixel[3] == 0 {
                         continue;
                     }
@@ -428,7 +428,7 @@ fn assert_atlas_frames_match_the_full_frame(
         .collect();
     let covered = BLANK_LEADING_FRAMES..BLANK_LEADING_FRAMES + dense.frame_count;
     assert!(
-        covered.clone().any(|frame| expected[frame].chunks_exact(4).any(|pixel| pixel[3] > 0)),
+        covered.clone().any(|frame| expected[frame].as_chunks::<4>().0.iter().any(|pixel| pixel[3] > 0)),
         "{name}: covered frames must draw widgets"
     );
     let mut out_of_order = export.worker().unwrap();
@@ -780,15 +780,15 @@ fn elevation_preview_matches_export_labels_hover_seeking_and_activity_replacemen
             for y in 0..h {
                 let native = &native[((top + y) * 700 + left) * 4..((top + y) * 700 + left + w) * 4];
                 let pixels = &widget.pixels()[y * w * 4..(y + 1) * w * 4];
-                for (x, (a, b)) in native.chunks_exact(4).zip(pixels.chunks_exact(4)).enumerate() {
+                for (x, (a, b)) in native.as_chunks::<4>().0.iter().zip(pixels.as_chunks::<4>().0.iter()).enumerate() {
                     let previous = difference;
                     difference = difference.max(a[3].abs_diff(b[3]) as u16);
                     for c in 0..3 { difference = difference.max((a[c] as u16 * a[3] as u16).abs_diff(b[c] as u16 * b[3] as u16) / 255); }
-                    if difference > previous { largest = (x + left, y + top, <[u8; 4]>::try_from(a).unwrap(), <[u8; 4]>::try_from(b).unwrap()); }
+                    if difference > previous { largest = (x + left, y + top, *a, *b); }
                 }
             }
             assert!(difference <= 8, "{variant}/{full} export elevation differs at {second}: {difference}; {largest:?}");
-            assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] > 0));
+            assert!(widget.pixels().as_chunks::<4>().0.iter().any(|pixel| pixel[3] > 0));
             let revision = widget.revision();
             preview.render(second).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision);
@@ -1051,7 +1051,7 @@ fn route_preview_matches_export_and_keeps_marker_out_of_selection_bounds() {
             for y in 0..height {
                 let native_row = &native[((top + y) * 700 + left) * 4..((top + y) * 700 + left + width) * 4];
                 let preview_row = &widget.pixels()[y * width * 4..(y + 1) * width * 4];
-                for (a, b) in native_row.chunks_exact(4).zip(preview_row.chunks_exact(4)) {
+                for (a, b) in native_row.as_chunks::<4>().0.iter().zip(preview_row.as_chunks::<4>().0.iter()) {
                     max_difference = max_difference.max(a[3].abs_diff(b[3]) as u16);
                     // Native video draws into straight alpha; compare visible premultiplied color.
                     for channel in 0..3 {
@@ -1063,7 +1063,7 @@ fn route_preview_matches_export_and_keeps_marker_out_of_selection_bounds() {
             }
             // Allow edge quantization between native straight-alpha and preview premultiplied surfaces.
             assert!(max_difference <= 8, "{variant}/{full} export route differs at {second}: {max_difference}");
-            assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] > 0));
+            assert!(widget.pixels().as_chunks::<4>().0.iter().any(|pixel| pixel[3] > 0));
             let revision = widget.revision();
             preview.render(second).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision);
@@ -1190,7 +1190,7 @@ fn export_tile_difference(frame: &[u8], frame_width: usize, geometry: &Value, ti
     let (left, top) = (geometry["left"].as_f64().unwrap() as i64, geometry["top"].as_f64().unwrap() as i64);
     let frame_height = frame.len() / 4 / frame_width;
     let mut difference = 0;
-    for (index, b) in tile.chunks_exact(4).enumerate() {
+    for (index, b) in tile.as_chunks::<4>().0.iter().enumerate() {
         let (x, y) = (left + (index % width) as i64, top + (index / width) as i64);
         let a = if x < 0 || y < 0 || x as usize >= frame_width || y as usize >= frame_height {
             &[0; 4][..]
@@ -1319,7 +1319,7 @@ fn gauges_match_export_pixels_sampling_cache_revisions_and_activity_replacement(
                 "{display}/{metric}/{placement}/{fill} differs from export by {difference} at {}",
                 seconds[index]
             );
-            assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] != 0));
+            assert!(widget.pixels().as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0));
             let revision = widget.revision();
             preview.render(seconds[index]).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision);
@@ -1376,7 +1376,7 @@ fn gauges_match_export_pixels_sampling_cache_revisions_and_activity_replacement(
             assert!(
                 preview.widgets[&id]
                     .pixels()
-                    .chunks_exact(4)
+                    .as_chunks::<4>().0.iter()
                     .all(|pixel| pixel[3] == 0),
                 "{display}/{fill} must be transparent at zero global opacity"
             );
@@ -1594,7 +1594,7 @@ fn heading_tape_matches_export_pixels_sampling_revisions_and_activity_replacemen
             assert!((geometry["content"]["width"].as_f64().unwrap() - frame_width).abs() < 0.001, "tape width stays fixed as ticks and gaps cross its edges");
             let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
             assert!(difference <= EXPORT_TILE_TOLERANCE, "{style}/{placement} differs from export by {difference} at {second}");
-            assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] != 0));
+            assert!(widget.pixels().as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0));
             let revision = widget.revision();
             preview.render(second).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision);
@@ -1639,7 +1639,7 @@ fn heading_tape_matches_export_pixels_sampling_revisions_and_activity_replacemen
     cache.prepare_frame(Some(0.0)).draw(surface.canvas(), &cache);
     let mut composited = vec![0; 400 * 80 * 4];
     assert!(surface.read_pixels(&info.with_alpha_type(AlphaType::Unpremul), &mut composited, 400 * 4, (0, 0)));
-    assert!(composited.chunks_exact(4).all(|pixel| pixel[3] == 255), "fade preserves content underneath the tape");
+    assert!(composited.as_chunks::<4>().0.iter().all(|pixel| pixel[3] == 255), "fade preserves content underneath the tape");
     preview.widgets.remove(&id);
     for (field, invalid) in [("pixels_per_degree", json!(0)), ("label_font", json!("")), ("major_tick_interval", Value::Null), ("tick_alignment", json!("invalid")), ("show_indicator", json!("true"))] {
         let mut malformed = request.clone();
@@ -1803,7 +1803,7 @@ fn lap_timer_modes_match_export_pixels_sampling_and_resource_replacement() {
             let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
             let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
             assert!(difference <= EXPORT_TILE_TOLERANCE, "{mode} differs from export by {difference} at {second}");
-            assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] != 0));
+            assert!(widget.pixels().as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0));
             let revision = widget.revision();
             preview.render(second).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision);
@@ -2223,7 +2223,7 @@ fn lean_angle_preview_matches_export_and_tracks_signed_fill_resources_and_valida
         let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
         let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
         assert!(difference <= EXPORT_TILE_TOLERANCE, "lean-angle differs from export by {difference} at {second}");
-        assert!(widget.pixels().chunks_exact(4).any(|pixel| pixel[3] != 0));
+        assert!(widget.pixels().as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0));
         let revision = widget.revision();
         preview.render(second).unwrap();
         assert_eq!(preview.widgets[&id].revision(), revision);
@@ -2503,7 +2503,7 @@ fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_tri
         let mut pixels = vec![0; widget.pixels().len()];
         read_surface_rgba(&mut surface, &mut pixels).unwrap();
         assert_eq!(&pixels, widget.pixels(), "gradient at {second}");
-        assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+        assert!(pixels.as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0));
         let revision = widget.revision();
         preview.render(second).unwrap();
         assert_eq!(preview.widgets[&id].revision(), revision);
@@ -2565,7 +2565,7 @@ fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_tri
         .unwrap();
     preview.render(1.002).unwrap();
     assert_ne!(preview.widgets[&id].revision(), revision);
-    assert!(preview.widgets[&id].pixels().chunks_exact(4).all(|pixel| pixel[3] == 0));
+    assert!(preview.widgets[&id].pixels().as_chunks::<4>().0.iter().all(|pixel| pixel[3] == 0));
 }
 
 #[test]
@@ -2781,7 +2781,7 @@ fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
                     widget.pixels(),
                     "{mode}/{origin}/{alignment}/{second}"
                 );
-                assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+                assert!(pixels.as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0));
                 let revision = widget.revision();
                 preview.render(second).unwrap();
                 assert_eq!(preview.widgets[&id].revision(), revision);
@@ -2922,7 +2922,7 @@ fn label_pixels_match_native_and_only_config_changes_invalidate_the_static_revis
     let mut pixels = vec![0; widget.pixels().len()];
     read_surface_rgba(&mut surface, &mut pixels).unwrap();
     assert_eq!(&pixels, widget.pixels());
-    assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+    assert!(pixels.as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0));
     let revision = widget.revision();
     let original_geometry = widget.geometry().clone();
     preview.replace_activity(br#"{"sample_elapsed_seconds":[0,1],"speed":[0,20],"trim_end_seconds":1}"#).unwrap();
@@ -3027,7 +3027,7 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
         ] {
             preview.render(second).unwrap();
             let widget = &preview.widgets[&id];
-            let geometry: Value = serde_json::from_slice(&widget.geometry()).unwrap();
+            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
             let input: WidgetRequest = serde_json::from_value(request.clone()).unwrap();
             let validated = validate_value_widget(input.widget, 0).unwrap();
             let scene = validate_scene_presentation(input.scene).unwrap();
@@ -3073,7 +3073,7 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
             let mut pixels = vec![0; widget.pixels().len()];
             read_surface_rgba(&mut surface, &mut pixels).unwrap();
             assert_eq!(&pixels, widget.pixels(), "{alignment}, t={second}");
-            assert!(pixels.chunks_exact(4).any(|p| p[3] != 0));
+            assert!(pixels.as_chunks::<4>().0.iter().any(|p| p[3] != 0));
             let revision = widget.revision();
             preview.render(second).unwrap();
             assert_eq!(
@@ -3090,7 +3090,7 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
     request["scene"]["opacity"] = json!(0);
     preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
     preview.render(0.5).unwrap();
-    assert!(preview.widgets[&id].pixels().chunks_exact(4).all(|pixel| pixel[3] == 0));
+    assert!(preview.widgets[&id].pixels().as_chunks::<4>().0.iter().all(|pixel| pixel[3] == 0));
     request["widget"]["font_size"] = json!(0);
     assert!(preview
         .update_widget(id, serde_json::from_value(request).unwrap())
@@ -3138,7 +3138,7 @@ fn live_resize_keeps_the_opposite_content_corner_fixed_and_commits_the_same_geom
             .update_widget(id, serde_json::from_value(origin.clone()).unwrap())
             .unwrap();
         preview.render(0.5).unwrap();
-        let geometry: Value = serde_json::from_slice(&preview.widgets[&id].geometry()).unwrap();
+        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
         let bounds = &geometry["content"];
         assert!(bounds["width"].as_f64().unwrap() < geometry["width"].as_f64().unwrap());
         assert!(bounds["height"].as_f64().unwrap() < geometry["height"].as_f64().unwrap());
@@ -3169,7 +3169,7 @@ fn live_resize_keeps_the_opposite_content_corner_fixed_and_commits_the_same_geom
                     .unwrap();
                 preview.render(1.5).unwrap();
                 let resized: Value =
-                    serde_json::from_slice(&preview.widgets[&id].geometry()).unwrap();
+                    serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
                 let actual = &resized["content"];
                 let corner = [
                     actual["left"].as_f64().unwrap() + actual["width"].as_f64().unwrap() * fixed[0],

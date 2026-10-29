@@ -300,7 +300,7 @@ mod tests {
 
     fn assert_packed(plan: &AtlasPlan) {
         let size = plan.size();
-        assert!(size.width % 2 == 0 && size.height % 2 == 0, "atlas {size:?} must be even");
+        assert!(size.width.is_multiple_of(2) && size.height.is_multiple_of(2), "atlas {size:?} must be even");
         let atlas = frame_rect(size);
         for (index, slot) in plan.slots().iter().enumerate() {
             let rect = AtlasPlan::atlas_rect(slot);

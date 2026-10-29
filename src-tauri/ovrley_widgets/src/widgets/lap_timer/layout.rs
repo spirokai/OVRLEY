@@ -372,6 +372,8 @@ impl LapTimerLayout {
     }
 }
 
+// False positive: clippy counts only the direct call to `scaled`, not its `.map(scaled)` uses.
+#[allow(clippy::redundant_closure_call)]
 fn scaled_opacity_style(mut style: ResolvedTextStyle, multiplier: f32) -> ResolvedTextStyle {
     let scaled = |color: skia_safe::Color| {
         skia_safe::Color::from_argb(

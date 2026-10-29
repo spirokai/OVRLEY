@@ -264,7 +264,7 @@ fn format_validated_standard_metric_parts(
                 .unwrap_or_else(|| "--".to_string())
         }
         Some(StandardMetricFormatterKind::Shutter) => raw
-            .map(|seconds| format_shutter_value(seconds))
+            .map(format_shutter_value)
             .unwrap_or_else(|| "--".to_string()),
         Some(StandardMetricFormatterKind::Aperture) => raw
             .map(|fnum| format_aperture_value(fnum, decimals))

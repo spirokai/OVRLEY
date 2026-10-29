@@ -95,13 +95,11 @@ pub(super) fn diagnose_frame_worker_count_for_resources(
     cpu_cores_per_frame_worker: usize,
     logical_cores: usize,
 ) -> NonZeroUsize {
-    let workers = if cpu_cores_per_frame_worker == 0 {
-        1
-    } else {
-        (logical_cores / cpu_cores_per_frame_worker)
-            .clamp(1, MAX_FRAME_WORKERS)
-            .min(total_frames.max(1))
-    };
+    let workers = logical_cores
+        .checked_div(cpu_cores_per_frame_worker)
+        .map_or(1, |workers| {
+            workers.clamp(1, MAX_FRAME_WORKERS).min(total_frames.max(1))
+        });
     NonZeroUsize::new(workers).expect("diagnosed frame worker count is non-zero")
 }
 

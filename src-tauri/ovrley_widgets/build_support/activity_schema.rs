@@ -99,7 +99,7 @@ fn generate_metric_kinds(metrics: &Value, widgets: &Value, out: &Path) {
         {
             let numeric = widget["activity"]["sources"]
                 .as_array()
-                .is_some_and(nonempty);
+                .is_some_and(|sources| !sources.is_empty());
             if widget_collection(widget, manifest) == "values" || numeric {
                 let key = widget["type"]
                     .as_str()
@@ -121,10 +121,6 @@ fn generate_metric_kinds(metrics: &Value, widgets: &Value, out: &Path) {
     }
     generated.push_str("} } }\n");
     fs::write(out.join("metric_kinds.rs"), generated).unwrap();
-}
-
-fn nonempty(values: &Vec<Value>) -> bool {
-    !values.is_empty()
 }
 
 fn generate_struct_macros(

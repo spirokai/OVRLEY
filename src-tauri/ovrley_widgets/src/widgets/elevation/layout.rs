@@ -445,7 +445,7 @@ impl ElevationLayout {
         };
         canvas.save();
         canvas.clip_path(
-            &*self
+            &self
                 .completed_area_clip
                 .lock()
                 .expect("elevation stroke boundary lock"),

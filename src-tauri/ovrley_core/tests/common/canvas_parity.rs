@@ -1260,7 +1260,7 @@ pub fn generate_diff_png(
     let only_pixel_alpha_threshold = ONLY_PIXEL_ALPHA_THRESHOLD;
     let channel_tolerance = DIFF_CHANNEL_TOLERANCE;
 
-    for (i, chunk) in skia_bytes.chunks_exact(4).enumerate() {
+    for (i, chunk) in skia_bytes.as_chunks::<4>().0.iter().enumerate() {
         let offset = i * 4;
         let canvas_chunk = &canvas_bytes[offset..offset + 4];
         let has_skia_alpha = chunk[3] > alpha_threshold;

@@ -185,8 +185,10 @@ fn bundled_family_name(typeface: &Typeface) -> String {
                 if let (Some(length), Some(offset)) = (read(record + 8), read(record + 10)) {
                     if let Some(value) = bytes.get(strings + offset..strings + offset + length) {
                         let utf16: Vec<_> = value
-                            .chunks_exact(2)
-                            .map(|pair| u16::from_be_bytes(pair.try_into().unwrap()))
+                            .as_chunks::<2>()
+                            .0
+                            .iter()
+                            .map(|pair| u16::from_be_bytes(*pair))
                             .collect();
                         if let Ok(name) = String::from_utf16(&utf16) {
                             if !name.is_empty() {

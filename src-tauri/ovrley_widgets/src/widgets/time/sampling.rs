@@ -6,38 +6,6 @@ pub enum TimeSampler {
     Sync(Option<DateTime<Utc>>),
 }
 
-#[cfg(test)]
-mod tests {
-    use super::TimeSampler;
-
-    #[test]
-    fn recorded_times_bridge_gaps_and_seek_but_only_absent_samples_use_sync_time() {
-        let sync = Some("2000-01-01T00:00:00Z");
-        let samples = vec![
-            Some("2025-04-21T13:05:00Z".into()),
-            None,
-            Some("2025-04-21T13:05:02Z".into()),
-        ];
-        let sampler = TimeSampler::new(sync, &[0.0, 1.0, 2.0], &samples);
-        assert_eq!(sampler.at(1.5).as_deref(), Some("2025-04-21T13:05:01.500Z"));
-        assert_eq!(
-            sampler.at(0.25).as_deref(),
-            Some("2025-04-21T13:05:00.250Z")
-        );
-        assert_eq!(sampler.at(-1.0), None);
-        assert_eq!(sampler.at(3.0), None);
-        assert_eq!(
-            TimeSampler::new(sync, &[0.0], &[Some("invalid".into())]).at(0.0),
-            None
-        );
-        assert_eq!(
-            TimeSampler::new(sync, &[], &[]).at(-1.25).as_deref(),
-            Some("1999-12-31T23:59:58.750Z")
-        );
-        assert_eq!(TimeSampler::new(None, &[], &[]).at(0.0), None);
-    }
-}
-
 impl TimeSampler {
     pub fn new(sync_time: Option<&str>, seconds: &[f64], values: &[Option<String>]) -> Self {
         // Recorded timestamps are authoritative, even when malformed external samples
@@ -82,5 +50,37 @@ impl TimeSampler {
             }),
         };
         time.map(|time| time.to_rfc3339_opts(SecondsFormat::Millis, true))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TimeSampler;
+
+    #[test]
+    fn recorded_times_bridge_gaps_and_seek_but_only_absent_samples_use_sync_time() {
+        let sync = Some("2000-01-01T00:00:00Z");
+        let samples = vec![
+            Some("2025-04-21T13:05:00Z".into()),
+            None,
+            Some("2025-04-21T13:05:02Z".into()),
+        ];
+        let sampler = TimeSampler::new(sync, &[0.0, 1.0, 2.0], &samples);
+        assert_eq!(sampler.at(1.5).as_deref(), Some("2025-04-21T13:05:01.500Z"));
+        assert_eq!(
+            sampler.at(0.25).as_deref(),
+            Some("2025-04-21T13:05:00.250Z")
+        );
+        assert_eq!(sampler.at(-1.0), None);
+        assert_eq!(sampler.at(3.0), None);
+        assert_eq!(
+            TimeSampler::new(sync, &[0.0], &[Some("invalid".into())]).at(0.0),
+            None
+        );
+        assert_eq!(
+            TimeSampler::new(sync, &[], &[]).at(-1.25).as_deref(),
+            Some("1999-12-31T23:59:58.750Z")
+        );
+        assert_eq!(TimeSampler::new(None, &[], &[]).at(0.0), None);
     }
 }

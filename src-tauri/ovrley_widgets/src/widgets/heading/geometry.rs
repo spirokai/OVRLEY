@@ -299,14 +299,7 @@ pub fn visible_labels(
                     is_major_label: true,
                 });
             }
-        } else if tick.is_major && show_major_labels {
-            labels.push(TapeLabel {
-                degree: tick.degree,
-                x: tick.x,
-                text: format!("{}", tick.degree as u32),
-                is_major_label: false,
-            });
-        } else if !tick.is_major && show_minor_labels {
+        } else if (tick.is_major && show_major_labels) || (!tick.is_major && show_minor_labels) {
             labels.push(TapeLabel {
                 degree: tick.degree,
                 x: tick.x,

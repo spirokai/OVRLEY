@@ -26,8 +26,8 @@ pub(super) fn draw_static_layer(
     height: f32,
     scale: f32,
 ) {
-    let width_px = width as f32;
-    let height_px = height as f32;
+    let width_px = width;
+    let height_px = height;
     let radius = gauge.track_corner_radius * scale;
     let border = gauge.track_border_thickness * scale;
     let mut source = Paint::default();
@@ -147,8 +147,8 @@ fn bar_fill_rrect(
         index,
         bars.extent,
         bars.gap,
-        cache.width as f32,
-        cache.height as f32,
+        cache.width,
+        cache.height,
         cache.orientation,
     );
     let border = cache.track_border_thickness;
@@ -171,8 +171,8 @@ fn inner_track_rrect(cache: &LinearGaugeCache, origin: (f32, f32)) -> RRect {
     let inner_rect = Rect::from_xywh(
         origin.0 + inset,
         origin.1 + inset,
-        (cache.width as f32 - inset * 2.0).max(0.0),
-        (cache.height as f32 - inset * 2.0).max(0.0),
+        (cache.width - inset * 2.0).max(0.0),
+        (cache.height - inset * 2.0).max(0.0),
     );
     let radius = (cache.track_corner_radius - inset).max(0.0);
     RRect::new_rect_xy(inner_rect, radius, radius)
@@ -208,8 +208,8 @@ pub(super) fn draw_segmented_fill(canvas: &Canvas, cache: &LinearGaugeCache, fil
             index,
             bars.extent,
             bars.gap,
-            cache.width as f32,
-            cache.height as f32,
+            cache.width,
+            cache.height,
             cache.orientation,
         )
     };
@@ -232,8 +232,8 @@ pub(super) fn draw_continuous_fill(canvas: &Canvas, cache: &LinearGaugeCache, fi
     let (x, y, width, height) = bordered_bar_fill_rect(
         cache.x,
         cache.y,
-        cache.width as f32,
-        cache.height as f32,
+        cache.width,
+        cache.height,
         fill01,
         cache.orientation,
         cache.track_border_thickness,

@@ -136,7 +136,7 @@ fn geometry_elapsed_fractions_bounded_0_1() {
 
     for &frac in &geometry.elapsed_fractions {
         assert!(
-            frac >= -f32::EPSILON && frac <= 1.0 + f32::EPSILON,
+            (-f32::EPSILON..=1.0 + f32::EPSILON).contains(&frac),
             "elapsed_fraction {frac} out of [0, 1] range"
         );
     }

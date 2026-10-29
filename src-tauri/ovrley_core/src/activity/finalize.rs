@@ -401,6 +401,10 @@ impl ActivityColumns {
     pub fn len(&self) -> usize {
         self.timestamp.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.timestamp.is_empty()
+    }
 }
 
 /// Builds lat/lon tuples while preserving partial GPS samples.

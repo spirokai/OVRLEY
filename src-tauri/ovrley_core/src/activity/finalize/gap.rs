@@ -101,7 +101,7 @@ fn median(values: &[f64]) -> Option<f64> {
     let mut sorted = values.to_vec();
     sorted.sort_by(|left, right| left.total_cmp(right));
     let middle = sorted.len() / 2;
-    if sorted.len() % 2 == 0 {
+    if sorted.len().is_multiple_of(2) {
         Some((sorted[middle - 1] + sorted[middle]) / 2.0)
     } else {
         Some(sorted[middle])
@@ -347,8 +347,8 @@ pub fn build_distance_series(
     let mut total_distance_meters: f64 = 0.0;
     let mut previous_course = None;
 
-    for index in 0..course_points.len() {
-        let current_course = course_points[index].0.zip(course_points[index].1);
+    for (index, (latitude, longitude)) in course_points.iter().enumerate() {
+        let current_course = latitude.zip(*longitude);
         if let Some(direct_distance) = direct_distance_series
             .get(index)
             .copied()

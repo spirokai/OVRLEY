@@ -638,7 +638,7 @@ fn validate_manual_video_sync(manual: &ProjectManualVideoSync) -> Result<(), Str
         if id.trim().is_empty() {
             return Err("sync.manual.landmark id must not be empty".into());
         }
-        if ids.iter().any(|existing| *existing == id) {
+        if ids.contains(&id) {
             return Err(format!("sync.manual.landmark id is duplicated: {id}"));
         }
         ids.push(id);

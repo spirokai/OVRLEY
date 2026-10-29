@@ -37,8 +37,6 @@ pub(super) fn label_layout(
     max_value: f64,
     altitude_offset_m: f64,
 ) -> LinearGaugeLabelLayout {
-    let width = width as f32;
-    let height = height as f32;
     let gap = label_gap(gauge.min_max_label_font_size * scale);
     let min_label = format_gauge_label(
         gauge.metric,

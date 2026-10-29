@@ -128,7 +128,7 @@ fn ffprobe_fixture_has_multiple_streams() {
     let probe: serde_json::Value = serde_json::from_str(&json_text).unwrap();
 
     let streams = probe["streams"].as_array().unwrap();
-    assert!(streams.len() >= 1);
+    assert!(!streams.is_empty());
 }
 
 #[test]

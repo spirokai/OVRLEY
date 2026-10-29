@@ -412,7 +412,7 @@ mod tests {
         assert!(plan_batch_output_targets(
             &directory,
             RenderOutputKind::Composite,
-            &[source.clone()],
+            std::slice::from_ref(&source),
             None
         )
         .is_err());

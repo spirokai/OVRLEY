@@ -181,13 +181,13 @@ pub fn build_composite_ffmpeg_settings(
     if matches!(
         selected_profile.codec_id.metadata().filter_stack_kind,
         CompositeFilterStackKind::QsvFullOverlay
-    ) {
-        if render.qsv_full_init_args.is_empty() {
-            return Err(CoreError::Encode(format!(
-                "Requested experimental QSV overlay profile {} is unavailable; codec detection did not provide working QSV hardware-device init args.",
-                selected_profile.codec_id.metadata().profile_name
-            )));
-        }
+    )
+        && render.qsv_full_init_args.is_empty()
+    {
+        return Err(CoreError::Encode(format!(
+            "Requested experimental QSV overlay profile {} is unavailable; codec detection did not provide working QSV hardware-device init args.",
+            selected_profile.codec_id.metadata().profile_name
+        )));
     }
 
     let filter_stack_kind = selected_profile.codec_id.metadata().filter_stack_kind;

@@ -73,10 +73,9 @@ impl Fps {
         let scaled_denominator = u128::from(self.den) * 1_000_000_000;
         let whole_frames = scaled_numerator / scaled_denominator;
         let remainder = scaled_numerator % scaled_denominator;
-        let frame_count = if remainder == 0 {
-            whole_frames
-        } else if whole_frames > 0
-            && remainder * FRAME_BOUNDARY_TOLERANCE_DENOMINATOR <= scaled_denominator
+        let frame_count = if remainder == 0
+            || (whole_frames > 0
+                && remainder * FRAME_BOUNDARY_TOLERANCE_DENOMINATOR <= scaled_denominator)
         {
             whole_frames
         } else {

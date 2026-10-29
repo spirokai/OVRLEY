@@ -14,7 +14,6 @@
 //! - Variant name refactors breaking frontend communication
 
 use ovrley_widgets::model::types::MetricKind;
-use serde_json;
 
 #[test]
 fn metric_kind_round_trip_all_variants() {

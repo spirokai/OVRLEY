@@ -448,7 +448,7 @@ pub(super) fn build_activity_columns(
 /// ranges. Any extra tokens are ignored; missing or malformed values return
 /// `None`.
 fn parse_gps_coordinate(value: Option<&str>) -> Option<(f64, f64)> {
-    let mut parts = value?.trim().split_whitespace();
+    let mut parts = value?.split_whitespace();
     let lat: f64 = parts.next()?.parse().ok()?;
     let lon: f64 = parts.next()?.parse().ok()?;
     if !lat.is_finite() || !lon.is_finite() {

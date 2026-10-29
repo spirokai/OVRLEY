@@ -155,7 +155,7 @@ impl DivingProfileLayout {
             letter_spacing: 0.0,
             line_height: config.label_font_size * scene.scale * 0.92,
             color: parse_color(&config.label_color, opacity),
-            opacity: opacity,
+            opacity,
             shadow_color: Some(parse_color(&scene.shadow_color, opacity)),
             shadow_strength: scene.shadow_strength * scene.scale,
             shadow_distance: scene.shadow_distance * scene.scale,

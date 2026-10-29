@@ -66,8 +66,10 @@ fn render_data_requirements_heading_derived_from_metric_kind() {
 fn heading_uses_the_shortest_path_in_preview_trim_boundaries_and_native_frames() {
     use ovrley_core::activity::{interpolate::densify_activity, trim::trim_activity};
     use ovrley_widgets::activity::ActivitySampler;
-    let mut requirements = RenderDataRequirements::default();
-    requirements.heading = true;
+    let requirements = RenderDataRequirements {
+        heading: true,
+        ..Default::default()
+    };
     for (left, right, expected) in [
         (359.0, 1.0, [359.5, 359.75, 0.0, 0.25, 0.5]),
         (1.0, 359.0, [0.5, 0.25, 0.0, 359.75, 359.5]),

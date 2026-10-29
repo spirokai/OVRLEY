@@ -53,7 +53,7 @@ pub(crate) fn validate_batch_encoding(
     let layout_fps = Fps::new(raw.fps, 1)?;
     let update_rate = NonZeroU32::new(raw.update_rate)
         .ok_or_else(|| CoreError::Config("Batch updateRate must be positive".into()))?;
-    if raw.update_rate > raw.fps || raw.fps % raw.update_rate != 0 {
+    if raw.update_rate > raw.fps || !raw.fps.is_multiple_of(raw.update_rate) {
         return Err(CoreError::Config(
             "Batch updateRate must divide the selected FPS".into(),
         ));

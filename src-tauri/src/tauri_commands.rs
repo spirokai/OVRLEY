@@ -293,13 +293,13 @@ pub(crate) async fn backend_render_preview_frame(
 ) -> Result<String, String> {
     #[cfg(debug_assertions)]
     {
-        return call_and_serialize(commands::backend_render_preview_frame(
+        call_and_serialize(commands::backend_render_preview_frame(
             &runtime_paths::app_paths(&app)?,
             &config_json,
             &parsed_activity_json,
             second,
             Some(&*raster_resources),
-        ));
+        ))
     }
 
     #[cfg(not(debug_assertions))]

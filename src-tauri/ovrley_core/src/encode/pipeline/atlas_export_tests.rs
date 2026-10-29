@@ -244,7 +244,7 @@ fn atlas_export_decodes_to_the_full_frame_export() {
     let reference = decode(&paths, &reference);
     let frame_bytes = frame.width as usize * frame.height as usize * 3 / 2;
     assert_eq!(planned.len(), reference.len());
-    assert!(!planned.is_empty() && planned.len() % frame_bytes == 0);
+    assert!(!planned.is_empty() && planned.len().is_multiple_of(frame_bytes));
     for (index, (planned, reference)) in planned.chunks(frame_bytes).zip(reference.chunks(frame_bytes)).enumerate() {
         let total: u64 = planned.iter().zip(reference).map(|(a, b)| u64::from(a.abs_diff(*b))).sum();
         let mean = total as f64 / frame_bytes as f64;
@@ -269,13 +269,13 @@ fn transparent_atlas_export_decodes_to_the_same_pixels_as_the_full_frame_export(
     let planned = decode_as(&paths, &planned, "rgba");
     let reference = decode_as(&paths, &reference, "rgba");
     let frame_bytes = frame.rgba_len().unwrap();
-    assert!(!planned.is_empty() && planned.len() % frame_bytes == 0);
+    assert!(!planned.is_empty() && planned.len().is_multiple_of(frame_bytes));
     assert_eq!(planned.len(), reference.len());
-    let premultiplied = |rgba: &[u8], channel: usize| f32::from(rgba[channel]) * f32::from(rgba[3]) / 255.0;
+    let premultiplied = |rgba: &[u8; 4], channel: usize| f32::from(rgba[channel]) * f32::from(rgba[3]) / 255.0;
     for (index, (planned, reference)) in planned.chunks(frame_bytes).zip(reference.chunks(frame_bytes)).enumerate() {
         let differing = planned
-            .chunks_exact(4)
-            .zip(reference.chunks_exact(4))
+            .as_chunks::<4>().0.iter()
+            .zip(reference.as_chunks::<4>().0.iter())
             .filter(|(a, b)| {
                 a[3].abs_diff(b[3]) > 1 || (0..3).any(|channel| (premultiplied(a, channel) - premultiplied(b, channel)).abs() > 2.0)
             })
