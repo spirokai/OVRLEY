@@ -1,7 +1,7 @@
 /* oxlint-disable react/only-export-components */
 
 import { Image, Presentation, Timer, Type } from 'lucide-react'
-import { DISPLAY_TYPE_DEFINITIONS, WIDGET_CATEGORY_NAME_KEYS, WIDGET_TYPE_DEFINITIONS } from './widget-catalog'
+import { DISPLAY_TYPE_DEFINITIONS, WIDGET_CATEGORY_NAME_KEYS, WIDGET_TYPE_DEFINITIONS, getDisplayTypeLabelKey } from './widget-catalog'
 
 const iconAssetModules = import.meta.glob('../../../../assets/widget-icons/*.svg', {
   eager: true,
@@ -85,7 +85,7 @@ function createMenuOptions(type) {
       }
     } else {
       const icon = materializeIcon(definition.icon)
-      options.push({ value, labelKey: definition.labelKey, icon, selection: { displayType: value } })
+      options.push({ value, labelKey: getDisplayTypeLabelKey(type, value), icon, selection: { displayType: value } })
     }
   }
   return options

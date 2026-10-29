@@ -1,4 +1,5 @@
 //! Widget implementations grouped by family.
+pub mod altitude_tape;
 pub mod backdrop;
 pub mod diving_profile;
 pub mod elevation;

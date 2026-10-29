@@ -130,7 +130,7 @@ fn every_family_preview() -> Vec<(PreviewSession, Value)> {
     let mut cases = vec![
         label_preview(), gradient_preview(), lean_angle_preview(), g_force_preview(),
         lap_timer_preview(), splits_run_preview(), heading_preview(), heading_compass_preview("indicator"), heading_compass_preview("compass"),
-        heart_zones_preview("line"), heart_zones_preview("arrow"),
+        heart_zones_preview("line"), heart_zones_preview("arrow"), altitude_tape_preview(),
         gauge_preview("linear", "speed", "horizontal", "fill"),
         gauge_preview("arc", "speed", "horizontal", "fill"),
         gauge_preview("corner", "speed", "bottom-left", "fill"),
@@ -272,6 +272,7 @@ fn every_family_parsed_activity() -> ovrley_core::activity::schema::ParsedActivi
         "distance": [0.0, 4.0, 9.0, 13.0, null, 24.0, 29.0, 33.0, 38.0],
         "heading": [350.0, 10.0, 90.0, 180.0, 270.0, 359.0, 0.5, 45.0, 120.0],
         "heartrate": [80.0, 110.0, 130.0, 150.0, null, 170.0, 185.0, 190.0, 100.0],
+        "vertical_speed": [0.0, 3.0, 2.5, null, 1.0, -4.0, -2.0, 0.5, 0.25],
         "gradient": [-12.5, -1.0, 0.0, 3.0, 9.9, 10.0, 25.0, -25.0, 1.0],
         "depth": [0.0, 4.0, 9.5, 18.0, 24.0, 21.0, 12.0, 5.0, 0.0],
         "lean_angle": [-55.0, -10.0, 0.0, 12.0, 48.0, 61.0, -61.0, 5.0, 0.0],
@@ -692,13 +693,13 @@ fn atlas_frames_reassemble_overlapping_rotated_widgets_of_every_family_into_the_
         config[collection].as_array_mut().unwrap().push(widget);
     }
     let config = validate_render_config_with_resources(parse_config_value(&config).unwrap(), Some(&resources)).unwrap();
-    assert_eq!(config.values.len(), 16, "every value family is exported");
+    assert_eq!(config.values.len(), 17, "every value family is exported");
 
     let atlas = assert_atlas_frames_match_the_full_frame("every family", &config, &every_family_parsed_activity());
     // Every layer is visible; neighbouring widgets either share a slot or overlay in layer order.
     let mut layers: Vec<_> = atlas.slots().iter().flat_map(|slot| slot.layers.clone()).collect();
     layers.sort_unstable();
-    assert_eq!(layers, (0..23).collect::<Vec<_>>());
+    assert_eq!(layers, (0..24).collect::<Vec<_>>());
     assert!(overlapping_widgets_are_planned(&atlas), "every family: {atlas:?}");
 }
 
@@ -3408,40 +3409,180 @@ fn heart_zones_matches_export_pixels_moves_continuously_and_validates_at_ingress
     }
 }
 
+fn altitude_tape_preview() -> (PreviewSession, Value) {
+    let (preview, mut request) = lean_angle_preview();
+    request["type"] = json!("altitude");
+    request["scene"]["opacity"] = json!(0.9);
+    request["widget"] = json!({
+        "value": "altitude", "display_type": "altitude_tape", "x": 80.25, "y": 70.5,
+        "width": 80, "height": 160, "opacity": 0.8, "display_unit": "m", "starting_altitude": null,
+        "major_tick_interval": 20, "minor_ticks_per_major": 4, "major_tick_spacing": 40,
+        "major_tick_length_pct": 22, "minor_tick_length_pct": 12, "major_tick_thickness": 3, "minor_tick_thickness": 2,
+        "major_tick_color": "#ffffff", "minor_tick_color": "#bdbdbd", "show_tick_labels": true,
+        "tape_orientation": "left", "label_font": "Inter.ttf", "label_font_size": 12, "label_color": "#d9d9d9", "label_offset": 6,
+        "font": "Inter.ttf", "font_size": 20, "color": "#ffffff", "show_value_decimal": true,
+        "value_background_color": "#111111", "value_border_color": "#e8704a", "value_border_thickness": 2,
+        "value_shadow_color": "#00000099", "value_shadow_sigma": 4, "value_shadow_offset": 3,
+    });
+    // A second literal keeps each `json!` within the macro recursion limit.
+    request["widget"].as_object_mut().unwrap().extend(json!({
+        "show_vertical_speed": true, "vertical_speed_unit": "mps", "show_vertical_speed_decimal": true, "vertical_speed_font_size": 12,
+        "vertical_speed_bar_thickness": 5, "vertical_speed_positive_color": "#5ad17a",
+        "vertical_speed_negative_color": "#f2875c", "vertical_speed_trend_seconds": 6,
+    }).as_object().unwrap().clone());
+    (preview, request)
+}
+
 #[test]
-fn heart_zones_resize_reflows_the_track_and_preserves_the_fixed_corner() {
-    let (mut preview, origin) = heart_zones_preview("arrow");
-    preview.replace_activity(br#"{"sample_elapsed_seconds":[0,3],"heartrate":[100,180],"trim_end_seconds":3}"#).unwrap();
-    let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
-    preview.render(1.0).unwrap();
-    let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
-    let bounds = &geometry["content"];
-    // The fixture scene renders at scale 1.7; the content rectangle is the scaled track.
-    assert!((bounds["width"].as_f64().unwrap() - 680.0).abs() < 0.01);
-    assert!((bounds["height"].as_f64().unwrap() - 61.2).abs() < 0.01);
-    let fixed = [0.0, 1.0];
-    let point = [
-        bounds["left"].as_f64().unwrap(),
-        bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap(),
+fn altitude_tape_matches_export_pixels_scrolls_continuously_and_validates_at_ingress() {
+    use ovrley_core::{
+        activity::{interpolate::densify_activity, trim::trim_activity},
+        debug::RenderProfiler, paths::AppPaths,
+        render::render_full_frames,
+    };
+    // Altitude crosses zero and a major tick; vertical speed changes sign and has a gap.
+    // Depth descends past a major tick and ascends again, with its own ascent-positive rate.
+    let activity = ovrley_core::activity::parse_activity_json(r#"{
+        "sample_elapsed_seconds": [0,1,2,3,4], "trim_end_seconds": 4,
+        "barometric_altitude": [-12.5,8,33.7,null,61],
+        "vertical_speed": [2,4,-2,null,0],
+        "depth": [0,12.5,24,null,9],
+        "depth_vertical_speed": [0,-12.5,-11.5,null,7.5]
+    }"#).unwrap();
+    let bytes = serde_json::to_vec(&activity).unwrap();
+    let root = common::test_config::repo_git_root();
+    let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
+    let seconds = vec![0.0, 1.0, 1.001, 2.0, 3.0, 4.0];
+    // Altitude in metres pointing left with the trend; altitude in feet pointing right with an
+    // offset and no trend; depth in feet with its inverted axis and depth-derived trend.
+    for (metric, unit, starting_altitude, orientation, show_vertical_speed) in [
+        ("altitude", "m", Value::Null, "left", true),
+        ("altitude", "ft", json!(1500), "right", false),
+        ("depth", "ft", Value::Null, "left", true),
+    ] {
+        let (mut preview, mut request) = altitude_tape_preview();
+        request["type"] = json!(metric);
+        request["widget"]["value"] = json!(metric);
+        request["widget"]["display_unit"] = json!(unit);
+        request["widget"]["starting_altitude"] = starting_altitude;
+        request["widget"]["tape_orientation"] = json!(orientation);
+        request["widget"]["show_vertical_speed"] = json!(show_vertical_speed);
+        preview.replace_activity(&bytes).unwrap();
+        let config = common::seam::validated_config_from_value(json!({
+            "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [],
+        }));
+        let requirements = config.render_data_requirements();
+        // Each source exports only its own rate column.
+        let (rate, other) = if metric == "depth" {
+            (requirements.depth_vertical_speed, requirements.vertical_speed)
+        } else {
+            (requirements.vertical_speed, requirements.depth_vertical_speed)
+        };
+        assert_eq!(rate, show_vertical_speed, "{metric} {unit} trend export requirement");
+        assert!(!other, "{metric} {unit} does not export the other source's rate");
+        let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
+        let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let scene_width = config.scene.presentation.width as usize;
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        for (index, second) in seconds.iter().enumerate() {
+            preview.render(*second).unwrap();
+            let widget = &preview.widgets[&id];
+            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
+            assert!(difference <= EXPORT_TILE_TOLERANCE, "{unit} altitude tape differs from export by {difference} at {second}");
+            let revision = widget.revision();
+            preview.render(*second).unwrap();
+            assert_eq!(preview.widgets[&id].revision(), revision, "{unit} unchanged sample re-rendered");
+        }
+        // The tape scrolls in whole pixels; 1.28 m between these samples moves it about 4 px.
+        preview.render(1.0).unwrap();
+        let previous = preview.widgets[&id].pixels().clone();
+        preview.render(1.05).unwrap();
+        assert_ne!(preview.widgets[&id].pixels(), &previous, "{unit} tape scrolls between whole units");
+        for (field, malformed) in [
+            ("width", Value::Null),
+            ("height", json!(0)),
+            ("display_unit", json!("km")),
+            ("major_tick_interval", json!(30)),
+            ("minor_ticks_per_major", json!(0)),
+            ("major_tick_spacing", json!(0)),
+            ("major_tick_length_pct", json!(120)),
+            ("minor_tick_thickness", json!(0)),
+            ("major_tick_color", json!("white")),
+            ("show_tick_labels", Value::Null),
+            ("tape_orientation", json!("up")),
+            ("show_vertical_speed", Value::Null),
+            ("label_font", json!("")),
+            ("font_size", json!(0)),
+            ("show_value_decimal", Value::Null),
+            ("value_border_thickness", json!(-1)),
+            ("value_shadow_color", Value::Null),
+            ("vertical_speed_unit", json!("kmh")),
+            ("vertical_speed_bar_thickness", json!(0)),
+            ("vertical_speed_negative_color", json!("red")),
+            ("vertical_speed_trend_seconds", json!(0)),
+            ("opacity", json!(2)),
+        ] {
+            let mut invalid = request.clone();
+            invalid["widget"][field] = malformed;
+            assert!(preview.create_widget(serde_json::from_value(invalid).unwrap()).is_err(), "{unit} {field}");
+        }
+    }
+}
+
+#[test]
+fn framed_track_resize_reflows_the_frame_and_preserves_the_fixed_corner() {
+    // Fixture, display variant, activity, intrinsic frame and requested intrinsic frame.
+    let cases = [
+        (
+            heart_zones_preview("arrow"),
+            "heart_zones",
+            &br#"{"sample_elapsed_seconds":[0,3],"heartrate":[100,180],"trim_end_seconds":3}"#[..],
+            [400.0, 36.0],
+            [520.5, 30.25],
+        ),
+        (
+            altitude_tape_preview(),
+            "altitude_tape",
+            &br#"{"sample_elapsed_seconds":[0,3],"barometric_altitude":[100,130],"vertical_speed":[1,-1],"trim_end_seconds":3}"#[..],
+            [80.0, 160.0],
+            [96.5, 240.25],
+        ),
     ];
-    let mut gesture = origin.clone();
-    gesture["size"] = json!([520.5 * 1.7, 30.25 * 1.7]);
-    gesture["fixed"] = json!(fixed);
-    gesture["point"] = json!(point);
-    gesture["second"] = json!(1.0);
-    let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(gesture).unwrap()).unwrap()).unwrap();
-    let variant = &patch["display_variants"]["heart_zones"];
-    assert!((variant["width"].as_f64().unwrap() - 520.5).abs() < 0.001);
-    assert!((variant["height"].as_f64().unwrap() - 30.25).abs() < 0.001);
-    let mut committed = origin;
-    committed["widget"].as_object_mut().unwrap().extend(variant.as_object().unwrap().clone());
-    committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
-    preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
-    preview.render(1.0).unwrap();
-    let actual: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
-    for (axis, position, size) in [(0, "left", "width"), (1, "top", "height")] {
-        let corner = actual["content"][position].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
-        assert!((corner - point[axis]).abs() < 0.002, "heart zones corner moved on axis {axis}");
+    for ((mut preview, origin), display, activity, intrinsic, requested) in cases {
+        preview.replace_activity(activity).unwrap();
+        let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
+        preview.render(1.0).unwrap();
+        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let bounds = &geometry["content"];
+        // The fixture scene renders at scale 1.7; the content rectangle is the scaled frame.
+        assert!((bounds["width"].as_f64().unwrap() - intrinsic[0] * 1.7).abs() < 0.01, "{display} width");
+        assert!((bounds["height"].as_f64().unwrap() - intrinsic[1] * 1.7).abs() < 0.01, "{display} height");
+        let fixed = [0.0, 1.0];
+        let point = [
+            bounds["left"].as_f64().unwrap(),
+            bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap(),
+        ];
+        let mut gesture = origin.clone();
+        gesture["size"] = json!([requested[0] * 1.7, requested[1] * 1.7]);
+        gesture["fixed"] = json!(fixed);
+        gesture["point"] = json!(point);
+        gesture["second"] = json!(1.0);
+        let patch = serde_json::to_value(preview.resize_widget(serde_json::from_value(gesture).unwrap()).unwrap()).unwrap();
+        let variant = &patch["display_variants"][display];
+        assert!((variant["width"].as_f64().unwrap() - requested[0]).abs() < 0.001, "{display} resized width");
+        assert!((variant["height"].as_f64().unwrap() - requested[1]).abs() < 0.001, "{display} resized height");
+        let mut committed = origin;
+        committed["widget"].as_object_mut().unwrap().extend(variant.as_object().unwrap().clone());
+        committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
+        preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
+        preview.render(1.0).unwrap();
+        let actual: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        for (axis, position, size) in [(0, "left", "width"), (1, "top", "height")] {
+            let corner = actual["content"][position].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
+            assert!((corner - point[axis]).abs() < 0.002, "{display} corner moved on axis {axis}");
+        }
     }
 }
 

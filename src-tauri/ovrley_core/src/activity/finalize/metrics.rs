@@ -642,10 +642,16 @@ pub fn derive_activity_metric_series(
     course_series: &[(Option<f64>, Option<f64>)],
     distance_series: &NumericSeries,
     elevation_base_series: &NumericSeries,
+    barometric_altitude_series: &NumericSeries,
     elapsed_series: &[f64],
     columns: &ActivityColumns,
 ) -> BTreeMap<String, MetricDescriptor> {
-    let direct = direct_metrics(columns, distance_series, elevation_base_series);
+    let direct = direct_metrics(
+        columns,
+        distance_series,
+        elevation_base_series,
+        barometric_altitude_series,
+    );
     let null_series: NumericSeries = columns.timestamp.iter().map(|_| None).collect();
     let preferred_altitude =
         preferred_elevation_series(&direct["barometric_altitude"], &direct["elevation"]).to_vec();
@@ -666,6 +672,12 @@ pub fn derive_activity_metric_series(
         derive_total_ascent_series(&direct["barometric_altitude"], &direct["elevation"]);
     let derived_gradient = derive_gradient_series(&preferred_altitude, distance_series);
     let derived_vertical_speed = derive_numeric_rate_series(&preferred_altitude, elapsed_series);
+    // Depth grows downwards, so its rate is negated to read positive while ascending.
+    let derived_depth_vertical_speed: NumericSeries =
+        derive_numeric_rate_series(&direct["depth"], elapsed_series)
+            .into_iter()
+            .map(|rate| rate.map(|rate| 0.0 - rate))
+            .collect();
     let derived_pace = derive_pace_series(
         &direct["speed"]
             .iter()
@@ -707,6 +719,17 @@ pub fn derive_activity_metric_series(
                 MetricSource::Missing
             },
             series: MetricSeries::Numeric(derived_total_ascent),
+        },
+    );
+    map.insert(
+        "depth_vertical_speed".to_string(),
+        MetricDescriptor {
+            source: if derived_depth_vertical_speed.iter().any(Option::is_some) {
+                MetricSource::Derived
+            } else {
+                MetricSource::Missing
+            },
+            series: MetricSeries::Numeric(derived_depth_vertical_speed),
         },
     );
     map.insert(
@@ -770,6 +793,7 @@ macro_rules! direct_activity_columns {
             columns: &ActivityColumns,
             distance_series: &NumericSeries,
             elevation_base_series: &NumericSeries,
+            barometric_altitude_series: &NumericSeries,
         ) -> BTreeMap<&'static str, NumericSeries> {
             let mut direct = BTreeMap::new();
             $(direct.insert(
@@ -778,6 +802,7 @@ macro_rules! direct_activity_columns {
             );)*
             direct.insert("distance", distance_series.clone());
             direct.insert("elevation", elevation_base_series.clone());
+            direct.insert("barometric_altitude", barometric_altitude_series.clone());
             direct
         }
     };

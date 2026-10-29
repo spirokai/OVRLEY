@@ -99,6 +99,9 @@ struct RawDisplayTypeDefinition {
     /// Declared only by `heart_zones`.
     #[serde(default)]
     zone_model: Option<HeartZoneModel>,
+    /// Declared only by `altitude_tape`.
+    #[serde(default)]
+    major_tick_intervals: Option<Vec<u32>>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -259,6 +262,14 @@ pub fn heart_zone_model() -> &'static HeartZoneModel {
         .zone_model
         .as_ref()
         .expect("heart_zones display must declare zoneModel")
+}
+
+/// Tape units between major ticks the altitude tape offers.
+pub fn altitude_tape_major_tick_intervals() -> &'static [u32] {
+    manifest().display_types.definitions[DisplayType::AltitudeTape.as_str()]
+        .major_tick_intervals
+        .as_deref()
+        .expect("altitude_tape display must declare majorTickIntervals")
 }
 
 /// Return the permitted display types for a given metric kind.

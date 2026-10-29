@@ -22,6 +22,7 @@ fn recognized_display_type_strings_parse_to_expected_variants() {
         (r#""heading_tape""#, DisplayType::Tape),
         (r#""heading_compass""#, DisplayType::HeadingCompass),
         (r#""heart_zones""#, DisplayType::HeartZones),
+        (r#""altitude_tape""#, DisplayType::AltitudeTape),
         (r#""lean_angle""#, DisplayType::LeanAngle),
         (r#""g_force""#, DisplayType::GForce),
         (r#""splits_run""#, DisplayType::SplitsRun),
@@ -64,6 +65,7 @@ fn display_type_round_trips_each_variant() {
         (DisplayType::Tape, r#""heading_tape""#),
         (DisplayType::HeadingCompass, r#""heading_compass""#),
         (DisplayType::HeartZones, r#""heart_zones""#),
+        (DisplayType::AltitudeTape, r#""altitude_tape""#),
         (DisplayType::LeanAngle, r#""lean_angle""#),
         (DisplayType::GForce, r#""g_force""#),
         (DisplayType::SplitsRun, r#""splits_run""#),
@@ -270,6 +272,10 @@ fn display_type_is_intrinsic_only_for_text() {
     );
     assert_eq!(
         display_type_layout_mode(DisplayType::HeartZones),
+        DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::AltitudeTape),
         DisplayTypeLayoutMode::Boxed
     );
     assert_eq!(

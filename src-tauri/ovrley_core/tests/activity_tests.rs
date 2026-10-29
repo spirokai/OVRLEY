@@ -202,9 +202,10 @@ fn finalizes_raw_activity_with_default_derived_speed_smoothing_when_map_is_empty
 
     assert_eq!(activity.speed[0], None);
     assert!(activity.speed.iter().flatten().all(|speed| *speed > 0.0 && *speed < 40.0));
+    // Stepped altitude differentiates into alternating 0/16 m/s; default smoothing recovers the 8 m/s climb.
     assert_eq!(
         activity.vertical_speed,
-        vec![None, Some(0.0), Some(16.0), Some(0.0), Some(16.0)]
+        vec![None, Some(8.0), Some(8.0), Some(8.0), Some(8.0)]
     );
 }
 

@@ -297,7 +297,7 @@ fn vertical_speed_formats_as_mps() {
 }
 
 #[test]
-fn vertical_speed_converts_to_ftmin() {
+fn vertical_speed_converts_to_ftmin_and_ftps() {
     let (value, unit) = format_parts(
         "vertical_speed",
         "vertical_speed",
@@ -310,6 +310,18 @@ fn vertical_speed_converts_to_ftmin() {
     );
     assert_eq!(value, "196.9");
     assert_eq!(unit, Some("FT/MIN".to_string()));
+    let (value, unit) = format_parts(
+        "vertical_speed",
+        "vertical_speed",
+        Some(2.0),
+        &[
+            ("display_unit", r#""ftps""#),
+            ("decimals", "1"),
+            ("show_units", "true"),
+        ],
+    );
+    assert_eq!(value, "6.6");
+    assert_eq!(unit, Some("FT/S".to_string()));
 }
 
 #[test]

@@ -130,6 +130,7 @@ pub struct ActivitySampler {
     longitude: NumericColumn,
     fraction_he: NumericColumn,
     gradient: NumericColumn,
+    depth_vertical_speed: NumericColumn,
     g_force_axes: [NumericColumn; 3],
     g_force_magnitudes: [Vec<f64>; 3],
     full_activity_distance: Option<f64>,
@@ -229,6 +230,11 @@ impl ActivitySampler {
         )?;
         // Gradient bridges internal gaps; samples outside observed coverage stay missing.
         let gradient = NumericColumn::new(&times, activity.gradient, InterpolationKind::Linear)?;
+        let depth_vertical_speed = NumericColumn::new(
+            &times,
+            activity.depth_vertical_speed,
+            ActivitySeries::DepthVerticalSpeed.interpolation(),
+        )?;
         let g_force_axes = [activity.g_force_x, activity.g_force_y, activity.g_force_z]
             .map(|values| NumericColumn::new(&times, values, InterpolationKind::Preserve));
         let [x, y, z] = g_force_axes;
@@ -282,6 +288,7 @@ impl ActivitySampler {
             longitude,
             fraction_he,
             gradient,
+            depth_vertical_speed,
             g_force_axes,
             g_force_magnitudes,
             full_activity_distance,
@@ -373,6 +380,44 @@ impl ActivitySampler {
 
     pub fn heartrate_at(&self, second: f64) -> Option<f64> {
         let column = &self.numeric[&MetricKind::Heartrate];
+        if second < 0.0 || second > self.end || !column.contains(second) {
+            return None;
+        }
+        column.at(&self.times, second)
+    }
+
+    /// Observed altitude shifted so the first sample reads `starting_altitude_m` when set.
+    pub fn altitude_at(&self, second: f64, starting_altitude_m: Option<f64>) -> Option<f64> {
+        let column = &self.numeric[&MetricKind::Altitude];
+        if second < 0.0 || second > self.end || !column.contains(second) {
+            return None;
+        }
+        let offset = crate::widgets::value::format::altitude_offset_m(
+            starting_altitude_m,
+            column.points.first().map(|point| point.1),
+        );
+        column.at(&self.times, second).map(|altitude| altitude + offset)
+    }
+
+    pub fn depth_at(&self, second: f64) -> Option<f64> {
+        let column = &self.numeric[&MetricKind::Depth];
+        if second < 0.0 || second > self.end || !column.contains(second) {
+            return None;
+        }
+        column.at(&self.times, second)
+    }
+
+    /// Depth rate, positive while ascending, like vertical speed.
+    pub fn depth_vertical_speed_at(&self, second: f64) -> Option<f64> {
+        let column = &self.depth_vertical_speed;
+        if second < 0.0 || second > self.end || !column.contains(second) {
+            return None;
+        }
+        column.at(&self.times, second)
+    }
+
+    pub fn vertical_speed_at(&self, second: f64) -> Option<f64> {
+        let column = &self.numeric[&MetricKind::VerticalSpeed];
         if second < 0.0 || second > self.end || !column.contains(second) {
             return None;
         }

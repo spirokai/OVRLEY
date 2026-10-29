@@ -24,7 +24,7 @@ export function widgetResizeGeometry(widget, bounds, width, height) {
     widget.type === 'elevation' ||
     widget.type === 'diving_profile' ||
     widget.type === 'rolling_chart' ||
-    ['heading_tape', 'heart_zones', 'linear'].includes(widget.data.display_type)
+    ['altitude_tape', 'heading_tape', 'heart_zones', 'linear'].includes(widget.data.display_type)
     ? { size: [Math.max(width, 0.01), Math.max(height, 0.01)] }
     : { factor: Math.max(width / bounds.width, 0.01) }
 }

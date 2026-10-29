@@ -43,6 +43,7 @@
     "metric": false,
     "layoutMode": "intrinsic",
     "displayTypes": [],
+    "displayTypeLabelKeys": {},
     "initialDisplayTypes": [],
     "globalBindings": {},
     "nameField": null,
@@ -210,8 +211,7 @@
       "type": "elevation",
       "activity": {
         "column": {
-          "unit": "m",
-          "smoothing": "zero_phase_ma"
+          "unit": "m"
         },
         "sources": ["elevation"],
         "requires": ["barometric_altitude", "distance_progress"]

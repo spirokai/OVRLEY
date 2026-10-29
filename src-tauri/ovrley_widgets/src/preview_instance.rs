@@ -51,6 +51,7 @@ impl WidgetRequest {
             | Self::HeadingTape(request)
             | Self::HeadingCompass(request)
             | Self::HeartZones(request)
+            | Self::AltitudeTape(request)
             | Self::Gauge(request)
             | Self::Value(request) => (
                 [request.widget.x as f64, request.widget.y as f64],
@@ -121,6 +122,7 @@ impl WidgetRequest {
             | Self::HeadingTape(request)
             | Self::HeadingCompass(request)
             | Self::HeartZones(request)
+            | Self::AltitudeTape(request)
             | Self::Gauge(request)
             | Self::Value(request) => {
                 request.widget.x = 0.0;

@@ -116,6 +116,16 @@ fn shearwater_fixture_preserves_every_requested_observation_and_announces_seven_
         );
     }
     assert_eq!(activity.first_stop_depth.first(), Some(&Some(0.0)));
+    // The depth rate is derived from consecutive depths and reads positive while ascending.
+    let times = &activity.sample_elapsed_seconds;
+    for index in 1..times.len() {
+        let (Some(previous), Some(current)) = (activity.depth[index - 1], activity.depth[index]) else {
+            continue;
+        };
+        let expected = (previous - current) / (times[index] - times[index - 1]);
+        let actual = activity.depth_vertical_speed[index].unwrap();
+        assert!((actual - expected).abs() < 1e-6, "row {index}: {actual} != {expected}");
+    }
     assert!(
         activity.temperature.is_empty(),
         "water temperature has its own canonical column"

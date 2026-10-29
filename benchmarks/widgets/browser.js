@@ -16,16 +16,18 @@ const FILL_GRADIENT = {
 }
 
 export const fixtures = {
-  ride: ['afternoon-ride-parse-debug.json', 60],
+  ride: ['Evening_Ride-parse-debug.json', 60],
   racechrono: ['sample RaceChrono-parse-debug.json', 60],
   racebox: ['sample Racebox-parse-debug.json', 400],
   dive: ['Shearwater-Cloud-Dive-01-parse-debug.json', 1560],
   // Three 1 km splits are complete at 520 s; the fourth completes at 550 s, inside the measured pass.
-  splits: ['afternoon-ride-parse-debug.json', 520],
+  splits: ['Evening_Ride-parse-debug.json', 520],
+  // The drone climbs from -5.6 m to 22.4 m in the measured pass, crossing zero and major ticks.
+  flight: ['Jul-14th-2026-12-45PM-Flight-Airdata-parse-debug.json', 100],
 }
 
-/** @param {object} input Activity payloads, HUD template, image path, and frame counts. @returns {object[]} Fixed cases; no rendering occurs. */
-export function createCases({ activities, template, image, frames, warmup, fps }) {
+/** @param {object} input Activity payloads, HUD template, image path, frame counts, and an optional single case. @returns {object[]} Fixed cases; no rendering occurs. */
+export function createCases({ activities, template, image, frames, warmup, fps, only }) {
   const specs = [
     ['course', 'course', 'ride', {}, { width: 560, height: 258, show_full_activity: true }],
     ['elevation', 'elevation', 'ride', {}, { width: 618, height: 163, show_full_activity: true }],
@@ -81,6 +83,16 @@ export function createCases({ activities, template, image, frames, warmup, fps }
       'ride',
       { displayType: 'heart_zones' },
       { display_variants: { heart_zones: { width: 420, height: 36, indicator_style } } },
+    ]),
+    ...[
+      ['left', true],
+      ['right', false],
+    ].map(([tape_orientation, show_vertical_speed]) => [
+      `altitude-tape-${tape_orientation}`,
+      'altitude',
+      'flight',
+      { displayType: 'altitude_tape' },
+      { display_variants: { altitude_tape: { width: 110, height: 420, tape_orientation, show_vertical_speed } } },
     ]),
     [
       'lean-angle',
@@ -149,8 +161,11 @@ export function createCases({ activities, template, image, frames, warmup, fps }
   specs.push(['splits-run', 'splits_run', 'splits', { displayType: 'splits_run' }, {}])
   const globals = { ...DEFAULT_GLOBAL_DEFAULTS, ...template.settings.globalDefaults }
   const result = []
-  for (const [id, type, activity, selection, overrides] of [['empty', null, 'ride', {}, {}], ...specs]) {
+  const selected = [['empty', null, 'ride', {}, {}], ...specs].filter(([id]) => only === undefined || id === 'empty' || id === only)
+  if (only !== undefined && selected.length === 1) throw new Error(`Unknown case: ${only}`)
+  for (const [id, type, activity, selection, overrides] of selected) {
     const data = activities[activity]
+    if (data === undefined) throw new Error(`${id}: fixture ${fixtures[activity][0]} is missing from debug/activities`)
     const start_frame = fixtures[activity][1] * fps
     const scene = {
       ...template.config.scene,

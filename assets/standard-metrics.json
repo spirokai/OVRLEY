@@ -25,6 +25,13 @@
         "interpolation": "linear",
         "unit": "m"
       },
+      "depth_vertical_speed": {
+        "input": false,
+        "rawSample": false,
+        "idleValue": "zero",
+        "interpolation": "linear",
+        "unit": "mps"
+      },
       "g_force_x": {
         "idleValue": "zero",
         "interpolation": "preserve",
@@ -375,6 +382,56 @@
           "label_color": "#bdbdbd"
         }
       },
+      "altitude_tape": {
+        "labelKey": "widgets.displayTypes.altitudeTape",
+        "icon": {
+          "source": "shared",
+          "assetFile": "display-type-altitude-tape.svg"
+        },
+        "layoutMode": "boxed",
+        "majorTickIntervals": [5, 10, 20, 25, 50, 100, 200, 250, 500],
+        "defaults": {
+          "font_size": 26
+        },
+        "inheritedFields": {
+          "label_font": "font"
+        },
+        "variantDefaults": {
+          "width": 110,
+          "height": 420,
+          "rotation": 0,
+          "major_tick_interval": 20,
+          "minor_ticks_per_major": 4,
+          "major_tick_spacing": 70,
+          "major_tick_length_pct": 22,
+          "minor_tick_length_pct": 12,
+          "major_tick_thickness": 3,
+          "minor_tick_thickness": 2,
+          "major_tick_color": "#ffffff",
+          "minor_tick_color": "#bdbdbd",
+          "tape_orientation": "left",
+          "show_tick_labels": true,
+          "label_font": null,
+          "label_font_size": 15,
+          "label_color": "#d9d9d9",
+          "label_offset": 6,
+          "show_value_decimal": true,
+          "value_background_color": "#111111",
+          "value_border_color": "#e8704a",
+          "value_border_thickness": 2,
+          "value_shadow_color": "#00000099",
+          "value_shadow_sigma": 4,
+          "value_shadow_offset": 3,
+          "show_vertical_speed": true,
+          "vertical_speed_unit": "mps",
+          "show_vertical_speed_decimal": true,
+          "vertical_speed_font_size": 16,
+          "vertical_speed_bar_thickness": 5,
+          "vertical_speed_positive_color": "#5ad17a",
+          "vertical_speed_negative_color": "#f2875c",
+          "vertical_speed_trend_seconds": 6
+        }
+      },
       "lean_angle": {
         "labelKey": "widgets.displayTypes.leanAngle",
         "icon": {
@@ -647,7 +704,8 @@
         "show_units": true,
         "decimals": 1
       },
-      "displayTypes": ["text"]
+      "displayTypes": ["text", "altitude_tape"],
+      "displayTypeLabelKeys": { "altitude_tape": "widgets.displayTypes.depthTape" }
     },
     {
       "type": "first_stop_depth",
@@ -1618,6 +1676,11 @@
           "renderLabel": "M/S"
         },
         {
+          "value": "ftps",
+          "label": "ft/s",
+          "renderLabel": "FT/S"
+        },
+        {
           "value": "ftmin",
           "label": "ft/min",
           "renderLabel": "FT/MIN"
@@ -1869,6 +1932,7 @@
         "source": "custom",
         "assetFile": "widget-altitude.svg"
       },
+      "displayTypes": ["text", "linear", "arc", "corner", "gt_gauge", "altitude_tape"],
       "category": "general",
       "altitudeSource": {
         "series": [

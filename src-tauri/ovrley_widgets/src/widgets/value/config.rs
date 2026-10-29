@@ -301,6 +301,46 @@ pub struct ValueConfig {
     pub zone_gap: Option<f32>,
     #[serde(default)]
     pub label_font_weight: Option<f32>,
+    #[serde(default)]
+    pub major_tick_spacing: Option<f32>,
+    #[serde(default)]
+    pub major_tick_color: Option<String>,
+    #[serde(default)]
+    pub minor_tick_color: Option<String>,
+    #[serde(default)]
+    pub show_tick_labels: Option<bool>,
+    #[serde(default)]
+    pub show_value_decimal: Option<bool>,
+    #[serde(default)]
+    pub value_background_color: Option<String>,
+    #[serde(default)]
+    pub value_border_color: Option<String>,
+    #[serde(default)]
+    pub value_border_thickness: Option<f32>,
+    #[serde(default)]
+    pub value_shadow_color: Option<String>,
+    #[serde(default)]
+    pub value_shadow_sigma: Option<f32>,
+    #[serde(default)]
+    pub value_shadow_offset: Option<f32>,
+    #[serde(default)]
+    pub tape_orientation: Option<String>,
+    #[serde(default)]
+    pub show_vertical_speed: Option<bool>,
+    #[serde(default)]
+    pub vertical_speed_unit: Option<String>,
+    #[serde(default)]
+    pub show_vertical_speed_decimal: Option<bool>,
+    #[serde(default)]
+    pub vertical_speed_font_size: Option<f32>,
+    #[serde(default)]
+    pub vertical_speed_bar_thickness: Option<f32>,
+    #[serde(default)]
+    pub vertical_speed_positive_color: Option<String>,
+    #[serde(default)]
+    pub vertical_speed_negative_color: Option<String>,
+    #[serde(default)]
+    pub vertical_speed_trend_seconds: Option<f32>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

@@ -16,7 +16,9 @@ describe('manifest-backed widgets', () => {
     expect(group.items.map((item) => item.type).sort()).toEqual([...types, 'diving_profile'].sort())
     for (const type of types) {
       expect(WIDGET_TYPE_DEFINITIONS[type].category).toBe('scuba_diving')
-      expect(getWidgetDisplayTypeOptions(type, i18next.t)).toEqual([{ value: 'text', label: 'Text' }])
+      // Depth also offers the shared tape under its own name.
+      const tape = type === 'depth' ? [{ value: 'altitude_tape', label: 'Depth Tape' }] : []
+      expect(getWidgetDisplayTypeOptions(type, i18next.t)).toEqual([{ value: 'text', label: 'Text' }, ...tape])
     }
     expect(i18next.t('widgets.types.depth.shortName')).toBe('Depth')
     expect(i18next.t('widgets.types.first_stop_depth.shortName')).toBe('Stop Depth')
@@ -44,11 +46,13 @@ describe('manifest-backed widgets', () => {
       { value: 'heading_compass', label: 'Heading Compass' },
     ])
     expect(getWidgetDisplayTypeOptions('heartrate', i18next.t).at(-1)).toEqual({ value: 'heart_zones', label: 'Heart Zones' })
+    expect(getWidgetDisplayTypeOptions('altitude', i18next.t).at(-1)).toEqual({ value: 'altitude_tape', label: 'Altitude Tape' })
     expect(getWidgetDisplayTypeOptions('backdrop', i18next.t)).toEqual([
       { value: 'circle', label: 'Circle' },
       { value: 'rectangle', label: 'Rectangle' },
     ])
     const items = GROUPED_QUICKMENU_ITEMS.flatMap((group) => group.items)
+    expect(items.find((item) => item.type === 'depth').options.at(-1).labelKey).toBe('widgets.displayTypes.depthTape')
     expect(items.find((item) => item.type === 'heading').options.map((option) => option.selection)).toEqual([
       { displayType: 'text' },
       { displayType: 'heading_tape' },

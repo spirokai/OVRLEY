@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -102,28 +103,30 @@ async function main() {
   })
   try {
     const { createCases, fixtures } = await server.ssrLoadModule('/benchmarks/widgets/browser.js')
+    // Absent local fixtures fail only the cases that use them.
     const activities = Object.fromEntries(
-      await Promise.all(
-        Object.entries(fixtures).map(async ([id, [name]]) => {
-          const { parsed_activity: activity } = await json(join(root, 'debug/activities', name))
-          if (!activity || !Array.isArray(activity.sample_elapsed_seconds) || activity.sample_elapsed_seconds.length < 2)
-            throw new Error(`${name}: missing parsed activity timeline`)
-          return [id, activity]
-        }),
-      ),
+      (
+        await Promise.all(
+          Object.entries(fixtures).map(async ([id, [name]]) => {
+            const path = join(root, 'debug/activities', name)
+            if (!existsSync(path)) return null
+            const { parsed_activity: activity } = await json(path)
+            if (!activity || !Array.isArray(activity.sample_elapsed_seconds) || activity.sample_elapsed_seconds.length < 2)
+              throw new Error(`${name}: missing parsed activity timeline`)
+            return [id, activity]
+          }),
+        )
+      ).filter((entry) => entry !== null),
     )
-    let cases = createCases({
+    const cases = createCases({
       activities,
       template: await json(join(root, 'templates/futuristic-hud.json')),
       image: join(root, 'src-tauri/icons/128x128@2x.png'),
       frames,
       warmup,
       fps,
+      only: values.case,
     })
-    if (values.case) {
-      if (!cases.some((entry) => entry.id === values.case)) throw new Error(`Unknown case: ${values.case}`)
-      cases = cases.filter((entry) => entry.id === 'empty' || entry.id === values.case)
-    }
     if (!values.run && !values.plan) {
       console.info(cases.map((entry) => entry.id).join('\n'))
       return

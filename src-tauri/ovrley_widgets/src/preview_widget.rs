@@ -44,6 +44,7 @@ use crate::widgets::gradient::preview::PreviewGradient;
 use crate::widgets::heading::preview::PreviewHeading;
 use crate::widgets::heading_compass::preview::PreviewHeadingCompass;
 use crate::widgets::heart_zones::preview::PreviewHeartZones;
+use crate::widgets::altitude_tape::preview::{AltitudeTapeSample, PreviewAltitudeTape};
 use crate::widgets::lap_timer::preview::PreviewLapTimer;
 use crate::widgets::lean_angle::preview::PreviewLeanAngle;
 use crate::widgets::raster::{config::RasterConfig, preview::PreviewRaster};
@@ -75,6 +76,8 @@ pub enum ValidatedWidget<'a> {
 pub enum FrameKey {
     Static,
     Sample(Option<f64>),
+    /// Offset altitude and vertical speed.
+    AltitudeTape(AltitudeTapeSample),
     GForce(GForceSample),
     Gauge(GaugeFrameState),
     LapTimer(LapTimerContent),
@@ -134,6 +137,7 @@ pub enum WidgetRequest {
     HeadingTape(ValueRequest),
     HeadingCompass(ValueRequest),
     HeartZones(ValueRequest),
+    AltitudeTape(ValueRequest),
     Gauge(ValueRequest),
     Value(ValueRequest),
 }
@@ -233,6 +237,10 @@ impl<'de> Deserialize<'de> for WidgetRequest {
                 && request.widget.display_type == crate::model::types::DisplayType::HeartZones
             {
                 Self::HeartZones(request)
+            } else if matches!(metric, MetricKind::Altitude | MetricKind::Depth)
+                && request.widget.display_type == crate::model::types::DisplayType::AltitudeTape
+            {
+                Self::AltitudeTape(request)
             } else if matches!(
                 request.widget.display_type,
                 crate::model::types::DisplayType::Linear
@@ -264,6 +272,7 @@ pub enum PreviewWidget {
     HeadingTape(PreviewHeading),
     HeadingCompass(PreviewHeadingCompass),
     HeartZones(PreviewHeartZones),
+    AltitudeTape(PreviewAltitudeTape),
     Gauge(PreviewGauge),
     Value(ValuePreview),
 }
@@ -329,6 +338,9 @@ impl PreviewWidget {
                 request.scene,
                 fonts,
             )?)),
+            WidgetRequest::AltitudeTape(request) => Ok(Self::AltitudeTape(
+                PreviewAltitudeTape::new(request.widget, request.scene, fonts)?,
+            )),
             WidgetRequest::Gauge(request) => Ok(Self::Gauge(PreviewGauge::new(
                 request.widget,
                 request.scene,
@@ -398,6 +410,9 @@ impl PreviewWidget {
                 ValidatedValue::HeartZones(widget) => Self::HeartZones(
                     PreviewHeartZones::from_validated(widget, scene, host, fonts)?,
                 ),
+                ValidatedValue::AltitudeTape(widget) => Self::AltitudeTape(
+                    PreviewAltitudeTape::from_validated(widget, scene, host, fonts)?,
+                ),
                 ValidatedValue::LeanAngle(widget) => {
                     Self::LeanAngle(PreviewLeanAngle::from_validated(widget, scene, host)?)
                 }
@@ -453,6 +468,9 @@ impl PreviewWidget {
             Self::HeadingTape(widget) => FrameKey::Sample(widget.frame_key(activity, second)),
             Self::HeadingCompass(widget) => FrameKey::Sample(widget.frame_key(activity, second)),
             Self::HeartZones(widget) => FrameKey::Sample(widget.frame_key(activity, second)),
+            Self::AltitudeTape(widget) => {
+                FrameKey::AltitudeTape(widget.frame_key(activity, second))
+            }
             Self::Gauge(widget) => FrameKey::Gauge(widget.frame_key(activity, second)),
             Self::Value(widget) => FrameKey::Parts(widget.frame_key(activity, second)),
         })
@@ -474,6 +492,7 @@ impl PreviewWidget {
             Self::HeadingTape(widget) => &widget.pixels,
             Self::HeadingCompass(widget) => &widget.pixels,
             Self::HeartZones(widget) => &widget.pixels,
+            Self::AltitudeTape(widget) => &widget.pixels,
             Self::Gauge(widget) => &widget.pixels,
             Self::Value(widget) => &widget.pixels,
         }
@@ -495,6 +514,7 @@ impl PreviewWidget {
             Self::HeadingTape(widget) => &widget.geometry,
             Self::HeadingCompass(widget) => &widget.geometry,
             Self::HeartZones(widget) => &widget.geometry,
+            Self::AltitudeTape(widget) => &widget.geometry,
             Self::Gauge(widget) => &widget.geometry,
             Self::Value(widget) => &widget.geometry,
         }
@@ -523,6 +543,7 @@ impl PreviewWidget {
             Self::HeadingTape(widget) => Ok(widget.layout_bounds(activity, second)),
             Self::HeadingCompass(widget) => widget.layout_bounds(activity, second, fonts),
             Self::HeartZones(widget) => Ok(widget.layout_bounds()),
+            Self::AltitudeTape(widget) => Ok(widget.layout_bounds()),
             Self::Gauge(widget) => widget.layout_bounds(activity, second, fonts),
             Self::Value(widget) => widget.layout_bounds(activity, second, fonts),
         }
@@ -552,6 +573,7 @@ impl PreviewWidget {
             Self::HeadingTape(widget) => Ok(widget.draw(canvas, activity, second)),
             Self::HeadingCompass(widget) => widget.draw(canvas, activity, second, fonts),
             Self::HeartZones(widget) => Ok(widget.draw(canvas, activity, second)),
+            Self::AltitudeTape(widget) => Ok(widget.draw(canvas, activity, second)),
             Self::Gauge(widget) => widget.draw(canvas, activity, second, fonts),
             Self::Value(widget) => widget.draw(canvas, activity, second, fonts),
         }
@@ -575,6 +597,7 @@ impl PreviewWidget {
             Self::HeadingTape(widget) => widget.bounds,
             Self::HeadingCompass(widget) => widget.bounds,
             Self::HeartZones(widget) => widget.bounds,
+            Self::AltitudeTape(widget) => widget.bounds,
             Self::Gauge(widget) => widget.bounds,
             Self::Value(widget) => widget.bounds,
         }
@@ -596,6 +619,7 @@ impl PreviewWidget {
             Self::HeadingTape(widget) => widget.revision,
             Self::HeadingCompass(widget) => widget.revision,
             Self::HeartZones(widget) => widget.revision,
+            Self::AltitudeTape(widget) => widget.revision,
             Self::Gauge(widget) => widget.revision,
             Self::Value(widget) => widget.revision,
         }
@@ -638,6 +662,7 @@ pub enum ResizeUpdate {
     HeadingTape(crate::widgets::heading::interaction::ResizeUpdate),
     HeadingCompass(crate::widgets::heading_compass::interaction::ResizeUpdate),
     HeartZones(crate::widgets::heart_zones::interaction::ResizeUpdate),
+    AltitudeTape(crate::widgets::altitude_tape::interaction::ResizeUpdate),
     Gauge(crate::widgets::gauges::interaction::ResizeUpdate),
     Value(crate::widgets::value::interaction::ResizeUpdate),
 }

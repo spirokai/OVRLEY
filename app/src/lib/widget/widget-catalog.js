@@ -89,11 +89,18 @@ export function requireDisplayMode(displayType, value) {
   return modes[value]
 }
 
+/**
+ * A widget may name a shared display after its own metric (e.g. depth's "Depth Tape").
+ * @param {string} type Widget type. @param {string} displayType One of its displays. @returns {string} Translation key for the display's name.
+ */
+export function getDisplayTypeLabelKey(type, displayType) {
+  return requireWidgetTypeDefinition(type).displayTypeLabelKeys[displayType] ?? DISPLAY_TYPE_DEFINITIONS[displayType].labelKey
+}
+
 /** @param {string} type Widget type. @param {Function} translate Translator. @returns {object[]} Inspector display choices. */
 export function getWidgetDisplayTypeOptions(type, translate) {
   const options = []
-  for (const value of requireWidgetTypeDefinition(type).displayTypes)
-    options.push({ value, label: translate(DISPLAY_TYPE_DEFINITIONS[value].labelKey) })
+  for (const value of requireWidgetTypeDefinition(type).displayTypes) options.push({ value, label: translate(getDisplayTypeLabelKey(type, value)) })
   return options
 }
 

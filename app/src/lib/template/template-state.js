@@ -187,6 +187,7 @@ export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null, 
         if (value.display_variants?.arc) value.display_variants.arc.min_max_label_font = globals.font_values
         if (value.display_variants?.corner) value.display_variants.corner.min_max_label_font = globals.font_values
         if (value.display_variants?.g_force) value.display_variants.g_force.label_font = globals.font_values
+        if (value.display_variants?.altitude_tape) value.display_variants.altitude_tape.label_font = globals.font_values
       }
       if (shouldApply('color_values')) value.color = globals.color_values
       if ((value.value === 'lap_timer' || value.value === 'splits_run') && shouldApply('color_text')) value.label_color = globals.color_text

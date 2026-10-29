@@ -11,7 +11,7 @@ use ovrley_widgets::model::scene::{
 };
 use ovrley_widgets::model::telemetry::{mode_activity, widget_telemetry, ActivitySeries};
 use ovrley_widgets::widgets::{
-    backdrop::validation::ValidatedBackdrop, elevation::validation::ValidatedElevationPlot,
+    altitude_tape::validation::TapeSource, backdrop::validation::ValidatedBackdrop, elevation::validation::ValidatedElevationPlot,
     diving_profile::validation::ValidatedDivingProfile,
     rolling_chart::validation::ValidatedRollingChart,
     g_force::validation::GForceAxis, label::validation::ValidatedLabel,
@@ -100,6 +100,18 @@ impl ValidatedRenderConfig {
                             GForceAxis::Y => ActivitySeries::GForceY,
                             GForceAxis::Z => ActivitySeries::GForceZ,
                         }]);
+                    }
+                }
+                ValidatedValue::AltitudeTape(widget) => {
+                    requirements.include_widget(widget.source.metric().as_str());
+                    // The trend and its readout sample the source's own rate.
+                    if widget.show_vertical_speed {
+                        match widget.source {
+                            TapeSource::Altitude => requirements.include_widget("vertical_speed"),
+                            TapeSource::Depth => {
+                                requirements.extend([ActivitySeries::DepthVerticalSpeed])
+                            }
+                        }
                     }
                 }
                 _ => requirements.include_widget(value.metric_kind().as_str()),

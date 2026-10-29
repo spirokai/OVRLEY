@@ -28,6 +28,8 @@ export function widgetFonts(widget) {
     if (widget.data.show_min_max_labels) fonts.push({ font: widget.data.min_max_label_font })
     return fonts
   }
+  // The header and vertical-speed readout always use the label font.
+  if (widget.data.display_type === 'altitude_tape') return [{ font: widget.data.font }, { font: widget.data.label_font }]
   if (widget.data.display_type === 'heart_zones') {
     return widget.data.show_label ? [{ font: widget.data.font, font_weight: widget.data.label_font_weight }] : []
   }

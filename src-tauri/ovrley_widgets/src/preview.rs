@@ -182,6 +182,20 @@ impl PreviewSession {
                 )?,
             ));
         }
+        if let WidgetRequest::AltitudeTape(origin) = request.origin {
+            let size = request.size.ok_or_else(|| {
+                WidgetError::Config("altitude tape resize size is required".into())
+            })?;
+            return Ok(ResizeUpdate::AltitudeTape(
+                crate::widgets::altitude_tape::interaction::resize_altitude_tape(
+                    origin.widget,
+                    origin.scene,
+                    size,
+                    request.fixed,
+                    request.point,
+                )?,
+            ));
+        }
         if let WidgetRequest::Gauge(origin) = request.origin {
             return Ok(ResizeUpdate::Gauge(
                 crate::widgets::gauges::interaction::resize_gauge(
@@ -285,6 +299,7 @@ impl PreviewSession {
             | WidgetRequest::Raster { .. }
             | WidgetRequest::HeadingTape(_)
             | WidgetRequest::HeartZones(_)
+            | WidgetRequest::AltitudeTape(_)
             | WidgetRequest::Gauge(_) => unreachable!(),
             WidgetRequest::Label { widget, scene, .. } => Ok(ResizeUpdate::Label(
                 crate::widgets::label::interaction::resize_label(
@@ -508,6 +523,9 @@ impl PreviewSession {
                     widget.render(self.activity.as_ref(), second, &self.fonts)?
                 }
                 PreviewWidget::HeartZones(widget) => {
+                    widget.render(self.activity.as_ref(), second)?
+                }
+                PreviewWidget::AltitudeTape(widget) => {
                     widget.render(self.activity.as_ref(), second)?
                 }
                 _ => {}

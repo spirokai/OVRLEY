@@ -42,6 +42,9 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
+/// Zero-phase moving-average horizon applied to every source's altitude at ingress.
+const ALTITUDE_SMOOTHING_SECONDS: f64 = 1.0;
+
 #[derive(Clone, Debug, Serialize)]
 pub struct FinalizeActivityResponse {
     /// Canonical activity payload consumed by render, trim, and interpolation.
@@ -198,16 +201,18 @@ fn finalize_columns_with_debug(
         .collect();
     let distance_series =
         build_distance_series(&course_series, &direct_distance_series, &elapsed_series);
-    let elevation_base_series: Vec<Option<f64>> = columns
-        .elevation
-        .iter()
-        .map(|value| value.and_then(finite_f64))
-        .collect();
-    let barometric_altitude_series: Vec<Option<f64>> = columns
-        .barometric_altitude
-        .iter()
-        .map(|value| value.and_then(finite_f64))
-        .collect();
+    // Altitude is smoothed once here for every source, so derived vertical speed, gradient,
+    // total ascent and the elevation profile all read the same series.
+    let altitude_window = smoothing_window_for_seconds(
+        &elapsed_series.iter().map(|second| second * 1000.0).collect::<Vec<_>>(),
+        ALTITUDE_SMOOTHING_SECONDS,
+    );
+    let smooth_altitude = |series: &[Option<f64>]| {
+        let finite: Vec<_> = series.iter().map(|value| value.and_then(finite_f64)).collect();
+        zero_phase_smooth(&finite, altitude_window)
+    };
+    let elevation_base_series = smooth_altitude(&columns.elevation);
+    let barometric_altitude_series = smooth_altitude(&columns.barometric_altitude);
     let elevation_profile_series =
         preferred_elevation_series(&barometric_altitude_series, &elevation_base_series).to_vec();
 
@@ -215,6 +220,7 @@ fn finalize_columns_with_debug(
         &course_series,
         &distance_series,
         &elevation_base_series,
+        &barometric_altitude_series,
         &elapsed_series,
         columns,
     );

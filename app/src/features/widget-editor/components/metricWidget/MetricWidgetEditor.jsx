@@ -13,6 +13,7 @@ import { getWidgetDisplayTypeOptions } from '@/lib/widget/widget-catalog'
 import TextDisplaySection from './TextDisplaySection'
 import LinearDisplaySection from './LinearDisplaySection'
 import ArcDisplaySection from './ArcDisplaySection'
+import AltitudeTapeDisplaySection from './AltitudeTapeDisplaySection'
 import HeadingTapeDisplaySection from './HeadingTapeDisplaySection'
 import HeadingCompassDisplaySection from './HeadingCompassDisplaySection'
 import HeartZonesDisplaySection from './HeartZonesDisplaySection'
@@ -28,6 +29,7 @@ import { useTranslation } from 'react-i18next'
  * variant data extraction and update logic.
  */
 const DISPLAY_SECTION = {
+  altitude_tape: AltitudeTapeDisplaySection,
   heading_tape: HeadingTapeDisplaySection,
   heading_compass: HeadingCompassDisplaySection,
   heart_zones: HeartZonesDisplaySection,

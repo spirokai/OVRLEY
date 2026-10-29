@@ -22,6 +22,7 @@ use ovrley_widgets::widgets::{
     heading::validation::validate_heading,
     heading_compass::validation::validate_heading_compass,
     heart_zones::validation::validate_heart_zones,
+    altitude_tape::validation::validate_altitude_tape,
     label::validation::validate_label,
     lap_timer::validation::validate_lap_timer,
     splits_run::validation::validate_splits_run,
@@ -99,6 +100,9 @@ fn validate_render_value(
             .map_err(Into::into),
         (MetricKind::Heartrate, DisplayType::HeartZones) => validate_heart_zones(value, index)
             .map(ValidatedValue::HeartZones)
+            .map_err(Into::into),
+        (MetricKind::Altitude | MetricKind::Depth, DisplayType::AltitudeTape) => validate_altitude_tape(value, index)
+            .map(ValidatedValue::AltitudeTape)
             .map_err(Into::into),
         (MetricKind::LeanAngle, DisplayType::LeanAngle) => validate_lean_angle(value, index)
             .map(ValidatedValue::LeanAngle)

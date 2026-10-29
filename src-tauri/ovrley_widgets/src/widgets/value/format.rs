@@ -492,6 +492,7 @@ pub fn convert_standard_metric_value(
             _ => unreachable!("stride length unit validated at ingress"),
         },
         MetricKind::VerticalSpeed => match display_unit.unwrap_or("mps") {
+            "ftps" => value * 3.280_84,
             "ftmin" => value * 196.850_394,
             "ftph" => value * 11_811.023_64,
             "mph_vertical" => value * 3600.0,
