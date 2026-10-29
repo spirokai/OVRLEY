@@ -15,7 +15,7 @@ import {
   maxSplitBarCornerRadius,
 } from '../../utils/splitsRun'
 import { FontSection } from '../widgetEditorSections'
-import { ColorField, FieldBlock, NumberField, SelectField, SizeSlider, SliderField, TextField, ToggleField } from '../widgetFormControls'
+import { ColorField, FieldBlock, NumberField, SelectField, SliderField, TextField, ToggleField } from '../widgetFormControls'
 
 const COLUMN_LABELS = {
   split: ['widget-editor.splitColumnSplit', 'Split'],
@@ -29,24 +29,24 @@ const COLUMN_LABELS = {
  * @param {object} props
  * @param {object} props.widget - Splits widget configuration.
  * @param {Function} props.updateWidgetData - Updates widget data.
- * @param {Function} props.updateWidgetSize - Applies live size changes.
- * @param {Function} props.commitWidgetSize - Commits live size changes.
+ * @param {Function} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
+ * @param {Function} props.commitWidgetDraft - Commits the live widget draft.
  * @returns {JSX.Element} Splits controls.
  */
-export default function SplitsRunDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function SplitsRunDisplaySection({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const availableFonts = useAvailableFonts()
   const { data } = widget
   const update = (patch) => updateWidgetData(widget.id, patch)
-  const updateSize = (patch) => updateWidgetSize(widget.id, patch)
-  const commit = () => commitWidgetSize(widget.id)
+  const updateDraft = (patch) => updateWidgetDraft(widget.id, patch)
+  const commit = () => commitWidgetDraft(widget.id)
   const showBar = data.visible_columns.includes('bar')
   const maxCornerRadius = maxSplitBarCornerRadius(data)
   const maxBorderThickness = maxSplitBarBorderThickness(data)
 
   return (
     <>
-      <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
+      <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetDraft={updateWidgetDraft} commitWidgetDraft={commitWidgetDraft} />
 
       <div className="space-y-4">
         <SectionHeading icon={Rows3} title={t('widget-editor.splits', 'Splits')} />
@@ -76,7 +76,7 @@ export default function SplitsRunDisplaySection({ widget, updateWidgetData, upda
             value={data.visible_columns}
             onValueChange={(columns) => {
               const patch = buildVisibleColumnsUpdate(columns)
-              if (patch) updateSize(patch)
+              if (patch) updateDraft(patch)
             }}
           >
             {SPLIT_COLUMNS.map((column) => (
@@ -95,17 +95,20 @@ export default function SplitsRunDisplaySection({ widget, updateWidgetData, upda
             min={1}
             max={30}
             step={1}
-            onSliderChange={(max_splits) => update({ max_splits })}
+            onSliderChange={(max_splits) => updateDraft({ max_splits })}
+            onSliderCommit={commit}
           />
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.rowGap', 'Row Gap')}
             value={data.row_gap}
             min={0}
             max={100}
             valueDisplay={`${Math.round(data.row_gap)}`}
             suffix="px"
-            onChange={(row_gap) => updateSize({ row_gap })}
-            onCommit={commit}
+            onSliderChange={(row_gap) => updateDraft({ row_gap })}
+            onSliderCommit={commit}
           />
         </div>
       </div>
@@ -113,7 +116,9 @@ export default function SplitsRunDisplaySection({ widget, updateWidgetData, upda
       <div className="space-y-4">
         <SectionHeading icon={Type} title={t('widget-editor.label', 'Label')} />
         <TextField label={t('widget-editor.label', 'Label')} value={data.label} onChange={(label) => update({ label })} />
-        <SizeSlider
+        <SliderField
+          editable
+          integerDisplay
           label={t('widget-editor.labelFontSize', 'Label Font Size')}
           value={data.label_font_size}
           min={6}
@@ -121,8 +126,8 @@ export default function SplitsRunDisplaySection({ widget, updateWidgetData, upda
           step={0.5}
           valueDisplay={`${data.label_font_size}`}
           suffix="px"
-          onChange={(label_font_size) => updateSize({ label_font_size })}
-          onCommit={commit}
+          onSliderChange={(label_font_size) => updateDraft({ label_font_size })}
+          onSliderCommit={commit}
         />
         <div className="grid grid-cols-2 items-end gap-4">
           <FontSelectField
@@ -159,25 +164,29 @@ export default function SplitsRunDisplaySection({ widget, updateWidgetData, upda
             }
           />
           <div className="grid grid-cols-2 gap-4">
-            <SizeSlider
+            <SliderField
+              editable
+              integerDisplay
               label={t('widget-editor.barWidth', 'Bar Width')}
               value={data.bar_width}
               min={10}
               max={1600}
               valueDisplay={`${Math.round(data.bar_width)}`}
               suffix="px"
-              onChange={(bar_width) => updateSize({ bar_width })}
-              onCommit={commit}
+              onSliderChange={(bar_width) => updateDraft({ bar_width })}
+              onSliderCommit={commit}
             />
-            <SizeSlider
+            <SliderField
+              editable
+              integerDisplay
               label={t('widget-editor.barHeight', 'Bar Height')}
               value={data.track_thickness}
               min={2}
               max={200}
               valueDisplay={`${Math.round(data.track_thickness)}`}
               suffix="px"
-              onChange={(track_thickness) => updateSize(buildSplitBarHeightUpdate(data, track_thickness))}
-              onCommit={commit}
+              onSliderChange={(track_thickness) => updateDraft(buildSplitBarHeightUpdate(data, track_thickness))}
+              onSliderCommit={commit}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -191,7 +200,7 @@ export default function SplitsRunDisplaySection({ widget, updateWidgetData, upda
               integerDisplay
               valueDisplay={`${Math.min(data.track_border_thickness, maxBorderThickness)}`}
               suffix="px"
-              onSliderChange={(track_border_thickness) => updateSize({ track_border_thickness })}
+              onSliderChange={(track_border_thickness) => updateDraft({ track_border_thickness })}
               onSliderCommit={commit}
             />
             <SliderField
@@ -203,7 +212,8 @@ export default function SplitsRunDisplaySection({ widget, updateWidgetData, upda
               step={1}
               integerDisplay
               suffix="px"
-              onSliderChange={(track_corner_radius) => update({ track_corner_radius })}
+              onSliderChange={(track_corner_radius) => updateDraft({ track_corner_radius })}
+              onSliderCommit={commit}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -223,7 +233,8 @@ export default function SplitsRunDisplaySection({ widget, updateWidgetData, upda
               valueScale={100}
               valueDisplay={`${Math.round(data.track_filled_opacity * 100)}`}
               suffix="%"
-              onSliderChange={(track_filled_opacity) => update({ track_filled_opacity })}
+              onSliderChange={(track_filled_opacity) => updateDraft({ track_filled_opacity })}
+              onSliderCommit={commit}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -242,13 +253,14 @@ export default function SplitsRunDisplaySection({ widget, updateWidgetData, upda
               valueScale={100}
               valueDisplay={`${Math.round(data.track_border_opacity * 100)}`}
               suffix="%"
-              onSliderChange={(track_border_opacity) => update({ track_border_opacity })}
+              onSliderChange={(track_border_opacity) => updateDraft({ track_border_opacity })}
+              onSliderCommit={commit}
             />
           </div>
           {data.track_filled_gradient ? (
             <GradientPicker
               stops={data.track_filled_gradient_stops}
-              onChange={(track_filled_gradient_stops) => updateSize({ track_filled_gradient_stops })}
+              onChange={(track_filled_gradient_stops) => updateDraft({ track_filled_gradient_stops })}
               onCommit={commit}
             />
           ) : null}

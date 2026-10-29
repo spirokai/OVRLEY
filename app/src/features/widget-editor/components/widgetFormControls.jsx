@@ -266,7 +266,7 @@ function SliderValueInput({ valueDisplay, valueScale, value, min, max, step, dis
     onCommit: (displayValue) => {
       const nextValue = displayValue / valueScale
       onSliderChange(nextValue)
-      onSliderCommit?.(nextValue)
+      onSliderCommit(nextValue)
     },
   })
 
@@ -305,8 +305,8 @@ function SliderValueInput({ valueDisplay, valueScale, value, min, max, step, dis
  * @param {*} props.step - Value for step.
  * @param {'ltr'|'rtl'} [props.dir='ltr'] - Slider direction.
  * @param {boolean} props.integerDisplay - Whether to round the displayed value.
- * @param {*} props.onSliderChange - Callback invoked to slider change.
- * @param {*} props.onSliderCommit - Callback invoked when slider interaction ends.
+ * @param {Function} props.onSliderChange - Live value callback; editors write it to a draft published once per frame.
+ * @param {Function} props.onSliderCommit - Required commit callback when slider interaction or a typed edit ends.
  * @param {*} props.valueDisplay - Value for value display.
  * @param {string} [props.suffix=''] - Unit shown in the inactive readout.
  * @param {boolean} [props.editable=false] - Enables editing the readout in scene settings and widget editors.
@@ -364,24 +364,12 @@ export function SliderField({
           disabled={disabled}
           value={[value]}
           onValueChange={([nextValue]) => onSliderChange(nextValue)}
-          onValueCommit={onSliderCommit ? ([nextValue]) => onSliderCommit(nextValue) : undefined}
+          onValueCommit={([nextValue]) => onSliderCommit(nextValue)}
           className="flex-1 py-2"
         />
       </div>
     </div>
   )
-}
-
-/**
- * Renders a size slider with a separate interaction commit callback.
- *
- * @param {object} props - Slider props.
- * @param {Function} props.onChange - Live size callback.
- * @param {Function} [props.onCommit] - Size commit callback.
- * @returns {JSX.Element} Rendered size slider.
- */
-export function SizeSlider({ onChange, onCommit, ...props }) {
-  return <SliderField {...props} editable integerDisplay onSliderChange={onChange} onSliderCommit={onCommit} />
 }
 
 /**

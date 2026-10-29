@@ -7,7 +7,7 @@ import { useAvailableFonts } from '@/hooks/useFonts'
 import { useTranslation } from 'react-i18next'
 import { buildUniformResizeUpdate } from '../../utils/widgetSize'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
-import { ColorField, FieldBlock, SizeSlider, SliderField, ToggleField } from '../widgetFormControls'
+import { ColorField, FieldBlock, SliderField, ToggleField } from '../widgetFormControls'
 
 const ROTATION_MODE_OPTIONS = [
   { value: 'indicator', labelKey: 'widget-editor.indicator', defaultLabel: 'Indicator' },
@@ -20,17 +20,17 @@ const ROTATION_MODE_OPTIONS = [
  * @param {object} props
  * @param {object} props.widget - Widget config.
  * @param {Function} props.updateWidgetData - Updates widget data.
- * @param {Function} props.updateWidgetSize - Updates size-affecting widget data.
- * @param {Function} props.commitWidgetSize - Commits a size-affecting edit.
+ * @param {Function} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
+ * @param {Function} props.commitWidgetDraft - Commits the live widget draft.
  * @returns {JSX.Element}
  */
-export default function HeadingCompassDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function HeadingCompassDisplaySection({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const compass = useMemo(() => widget.data.display_variants?.heading_compass ?? {}, [widget.data.display_variants?.heading_compass])
   const updateCompass = useDisplayVariantUpdater(widget, 'heading_compass', updateWidgetData)
-  const updateCompassSize = useDisplayVariantUpdater(widget, 'heading_compass', updateWidgetSize)
+  const updateCompassDraft = useDisplayVariantUpdater(widget, 'heading_compass', updateWidgetDraft)
   const availableFonts = useAvailableFonts()
-  const commit = () => commitWidgetSize(widget.id)
+  const commit = () => commitWidgetDraft(widget.id)
 
   return (
     <>
@@ -53,7 +53,9 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
           </ToggleGroup>
         </FieldBlock>
         <div className="grid grid-cols-2 gap-4">
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.size', 'Size')}
             value={compass.diameter}
             min={60}
@@ -61,8 +63,8 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
             step={1}
             valueDisplay={`${Math.round(compass.diameter)}`}
             suffix="px"
-            onChange={(diameter) => updateWidgetSize(widget.id, buildUniformResizeUpdate(widget, diameter))}
-            onCommit={commit}
+            onSliderChange={(diameter) => updateWidgetDraft(widget.id, buildUniformResizeUpdate(widget, diameter))}
+            onSliderCommit={commit}
           />
           <ColorField
             label={t('widget-editor.trackFill', 'Track Fill')}
@@ -81,7 +83,7 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
             integerDisplay
             valueDisplay={`${compass.track_thickness}`}
             suffix="px"
-            onSliderChange={(track_thickness) => updateCompassSize({ track_thickness })}
+            onSliderChange={(track_thickness) => updateCompassDraft({ track_thickness })}
             onSliderCommit={commit}
           />
           <SliderField
@@ -94,7 +96,8 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
             integerDisplay
             valueDisplay={`${compass.track_corner_radius}`}
             suffix="px"
-            onSliderChange={(track_corner_radius) => updateCompass({ track_corner_radius })}
+            onSliderChange={(track_corner_radius) => updateCompassDraft({ track_corner_radius })}
+            onSliderCommit={commit}
           />
         </div>
       </div>
@@ -102,7 +105,9 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
       <div className="space-y-4">
         <SectionHeading icon={Target} title={t('widget-editor.indicator', 'Indicator')} />
         <div className="grid grid-cols-2 gap-4">
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.indicatorSize', 'Indicator Size')}
             value={compass.indicator_size}
             min={8}
@@ -110,8 +115,8 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
             step={1}
             valueDisplay={`${Math.round(compass.indicator_size)}`}
             suffix="px"
-            onChange={(indicator_size) => updateCompassSize({ indicator_size })}
-            onCommit={commit}
+            onSliderChange={(indicator_size) => updateCompassDraft({ indicator_size })}
+            onSliderCommit={commit}
           />
           <SliderField
             editable
@@ -123,7 +128,8 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
             integerDisplay
             valueDisplay={`${compass.indicator_corner_radius}`}
             suffix="%"
-            onSliderChange={(indicator_corner_radius) => updateCompass({ indicator_corner_radius })}
+            onSliderChange={(indicator_corner_radius) => updateCompassDraft({ indicator_corner_radius })}
+            onSliderCommit={commit}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -143,11 +149,13 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
             <ToggleField
               label={t('widget-editor.showLabels', 'Show Labels')}
               checked={compass.show_cardinal_labels}
-              onCheckedChange={(show_cardinal_labels) => updateCompassSize({ show_cardinal_labels })}
+              onCheckedChange={(show_cardinal_labels) => updateCompassDraft({ show_cardinal_labels })}
             />
           }
         />
-        <SizeSlider
+        <SliderField
+          editable
+          integerDisplay
           label={t('widget-editor.fontSize', 'Font Size')}
           value={compass.cardinal_font_size}
           min={6}
@@ -155,8 +163,8 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
           disabled={!compass.show_cardinal_labels}
           valueDisplay={`${Math.round(compass.cardinal_font_size)}`}
           suffix="px"
-          onChange={(cardinal_font_size) => updateCompassSize({ cardinal_font_size })}
-          onCommit={commit}
+          onSliderChange={(cardinal_font_size) => updateCompassDraft({ cardinal_font_size })}
+          onSliderCommit={commit}
         />
         <div className="grid grid-cols-2 gap-4">
           <FontSelectField
@@ -185,11 +193,13 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
             <ToggleField
               label={t('widget-editor.showValue', 'Show Value')}
               checked={compass.show_value}
-              onCheckedChange={(show_value) => updateCompassSize({ show_value })}
+              onCheckedChange={(show_value) => updateCompassDraft({ show_value })}
             />
           }
         />
-        <SizeSlider
+        <SliderField
+          editable
+          integerDisplay
           label={t('widget-editor.fontSize', 'Font Size')}
           value={widget.data.font_size}
           min={6}
@@ -197,8 +207,8 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
           disabled={!compass.show_value}
           valueDisplay={`${Math.round(widget.data.font_size)}`}
           suffix="px"
-          onChange={(font_size) => updateWidgetSize(widget.id, { font_size })}
-          onCommit={commit}
+          onSliderChange={(font_size) => updateWidgetDraft(widget.id, { font_size })}
+          onSliderCommit={commit}
         />
         <div className="grid grid-cols-2 gap-4">
           <ColorField
@@ -226,7 +236,7 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
             disabled={!compass.show_value}
             valueDisplay={`${compass.value_offset_x}`}
             suffix="px"
-            onSliderChange={(value_offset_x) => updateCompassSize({ value_offset_x })}
+            onSliderChange={(value_offset_x) => updateCompassDraft({ value_offset_x })}
             onSliderCommit={commit}
           />
           <SliderField
@@ -240,7 +250,7 @@ export default function HeadingCompassDisplaySection({ widget, updateWidgetData,
             disabled={!compass.show_value}
             valueDisplay={`${compass.value_offset_y}`}
             suffix="px"
-            onSliderChange={(value_offset_y) => updateCompassSize({ value_offset_y })}
+            onSliderChange={(value_offset_y) => updateCompassDraft({ value_offset_y })}
             onSliderCommit={commit}
           />
         </div>

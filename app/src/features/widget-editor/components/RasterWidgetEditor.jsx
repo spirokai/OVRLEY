@@ -8,8 +8,8 @@ import { normalizeRotation } from '@/features/wasm-widgets/utils/widgetGestureGe
 import { DimensionsSection } from './widgetEditorSections'
 import { SliderField } from './widgetFormControls'
 
-/** @param {{widget: object, updateWidgetSize: Function, commitWidgetSize: Function, setNumericField: Function}} props */
-export default function RasterWidgetEditor({ widget, updateWidgetSize, commitWidgetSize, setNumericField }) {
+/** @param {{widget: object, updateWidgetDraft: Function, commitWidgetDraft: Function, setNumericField: Function}} props */
+export default function RasterWidgetEditor({ widget, updateWidgetDraft, commitWidgetDraft, setNumericField }) {
   const { t } = useTranslation()
   const { error, isLoading, selectImage } = useRasterSelection(widget.id)
   const rotation = normalizeRotation(widget.data.rotation)
@@ -28,8 +28,8 @@ export default function RasterWidgetEditor({ widget, updateWidgetSize, commitWid
         step={1}
         integerDisplay
         suffix="°"
-        onSliderChange={(rotation) => updateWidgetSize(widget.id, { rotation })}
-        onSliderCommit={() => commitWidgetSize(widget.id)}
+        onSliderChange={(rotation) => updateWidgetDraft(widget.id, { rotation })}
+        onSliderCommit={() => commitWidgetDraft(widget.id)}
       />
       <ButtonGroup className="w-full pt-4">
         <Input

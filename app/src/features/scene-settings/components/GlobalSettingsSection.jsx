@@ -6,6 +6,8 @@
  * @param {object} props
  * @param {object} props.globalDefaults - Global default values.
  * @param {function} props.onGlobalDefaultChange - Callback to set a global default.
+ * @param {function} props.onGlobalDefaultDraft - Callback to preview a global default during a slider drag.
+ * @param {function} props.onGlobalDefaultCommit - Callback to commit a previewed global default.
  * @param {function} props.onResetDefaults - Callback to reset all global defaults.
  * @param {function} props.sceneStyleValue - Helper to resolve scene vs global default.
  * @param {object} props.availableFonts - Bundled recommended and system fonts.
@@ -20,7 +22,15 @@ import { Button } from '@/components/ui/button'
 import FontSelectField from '@/components/ui/font-select-field'
 import { useTranslation } from 'react-i18next'
 
-export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultChange, onResetDefaults, sceneStyleValue, availableFonts }) {
+export default function GlobalSettingsSection({
+  globalDefaults,
+  onGlobalDefaultChange,
+  onGlobalDefaultDraft,
+  onGlobalDefaultCommit,
+  onResetDefaults,
+  sceneStyleValue,
+  availableFonts,
+}) {
   const { t } = useTranslation()
   return (
     <div className="space-y-4">
@@ -119,7 +129,8 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
           valueScale={100}
           valueDisplay={`${Math.round(globalDefaults.opacity * 100)}`}
           suffix="%"
-          onSliderChange={(value) => onGlobalDefaultChange('opacity', value)}
+          onSliderChange={(value) => onGlobalDefaultDraft('opacity', value)}
+          onSliderCommit={() => onGlobalDefaultCommit('opacity')}
         />
         <SliderField
           editable
@@ -130,7 +141,8 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
           value={globalDefaults.scale}
           valueDisplay={`${globalDefaults.scale.toFixed(2)}`}
           suffix="x"
-          onSliderChange={(value) => onGlobalDefaultChange('scale', value)}
+          onSliderChange={(value) => onGlobalDefaultDraft('scale', value)}
+          onSliderCommit={() => onGlobalDefaultCommit('scale')}
         />
         <SliderField
           editable
@@ -140,7 +152,8 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
           value={sceneStyleValue('border_thickness', 0)}
           valueDisplay={`${sceneStyleValue('border_thickness', 0)}`}
           suffix="px"
-          onSliderChange={(value) => onGlobalDefaultChange('border_thickness', value)}
+          onSliderChange={(value) => onGlobalDefaultDraft('border_thickness', value)}
+          onSliderCommit={() => onGlobalDefaultCommit('border_thickness')}
         />
         <div className="grid grid-cols-2 gap-6">
           <SliderField
@@ -150,7 +163,8 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
             max={20}
             value={sceneStyleValue('shadow_strength', 0)}
             valueDisplay={String(sceneStyleValue('shadow_strength', 0))}
-            onSliderChange={(value) => onGlobalDefaultChange('shadow_strength', value)}
+            onSliderChange={(value) => onGlobalDefaultDraft('shadow_strength', value)}
+            onSliderCommit={() => onGlobalDefaultCommit('shadow_strength')}
           />
           <SliderField
             editable
@@ -159,7 +173,8 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
             max={20}
             value={sceneStyleValue('shadow_distance', 0)}
             valueDisplay={String(sceneStyleValue('shadow_distance', 0))}
-            onSliderChange={(value) => onGlobalDefaultChange('shadow_distance', value)}
+            onSliderChange={(value) => onGlobalDefaultDraft('shadow_distance', value)}
+            onSliderCommit={() => onGlobalDefaultCommit('shadow_distance')}
           />
         </div>
       </div>

@@ -2,7 +2,7 @@ import { Compass, Ruler, Type, Target } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { useAvailableFonts } from '@/hooks/useFonts'
-import { ColorField, SizeSlider, SliderField, ToggleField, SelectField } from '../widgetFormControls'
+import { ColorField, SliderField, ToggleField, SelectField } from '../widgetFormControls'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -31,11 +31,11 @@ const INDICATOR_PLACEMENT_OPTIONS = [
  * @param {object} props.widget - Widget config.
  * @param {Function} props.updateWidgetData - Updates widget data.
  */
-export default function HeadingTapeDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function HeadingTapeDisplaySection({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const tapeData = useMemo(() => widget.data.display_variants?.heading_tape ?? {}, [widget.data.display_variants?.heading_tape])
   const updateTape = useDisplayVariantUpdater(widget, 'heading_tape', updateWidgetData)
-  const updateTapeSize = useDisplayVariantUpdater(widget, 'heading_tape', updateWidgetSize)
+  const updateTapeDraft = useDisplayVariantUpdater(widget, 'heading_tape', updateWidgetDraft)
   const availableFonts = useAvailableFonts()
   const showMajorTicks = tapeData.show_major_ticks
   const showMinorTicks = tapeData.show_minor_ticks
@@ -47,7 +47,9 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
     <>
       <div className="space-y-4">
         <SectionHeading icon={Compass} title={t('widget-editor.tapeScale', 'Tape Scale')} />
-        <SizeSlider
+        <SliderField
+          editable
+          integerDisplay
           label={t('widget-editor.pixelsPerDegree', 'Pixels per Degree')}
           value={tapeData.pixels_per_degree}
           min={1}
@@ -55,8 +57,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
           step={0.5}
           valueDisplay={`${tapeData.pixels_per_degree}`}
           suffix="px"
-          onChange={(value) => updateTapeSize({ pixels_per_degree: value })}
-          onCommit={() => commitWidgetSize(widget.id)}
+          onSliderChange={(value) => updateTapeDraft({ pixels_per_degree: value })}
+          onSliderCommit={() => commitWidgetDraft(widget.id)}
         />
       </div>
 
@@ -78,8 +80,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
               disabled={!showMajorTicks}
               valueDisplay={`${tapeData.major_tick_length_pct}`}
               suffix="%"
-              onSliderChange={(value) => updateTapeSize({ major_tick_length_pct: value })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateTapeDraft({ major_tick_length_pct: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
             <SliderField
               editable
@@ -92,8 +94,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
               integerDisplay
               valueDisplay={`${tapeData.major_tick_thickness}`}
               suffix="px"
-              onSliderChange={(value) => updateTapeSize({ major_tick_thickness: value })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateTapeDraft({ major_tick_thickness: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           </div>
           <div className="space-y-4">
@@ -111,8 +113,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
               disabled={!showMinorTicks}
               valueDisplay={`${tapeData.minor_tick_length_pct}`}
               suffix="%"
-              onSliderChange={(value) => updateTapeSize({ minor_tick_length_pct: value })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateTapeDraft({ minor_tick_length_pct: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
             <SliderField
               editable
@@ -125,8 +127,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
               integerDisplay
               valueDisplay={`${tapeData.minor_tick_thickness}`}
               suffix="px"
-              onSliderChange={(value) => updateTapeSize({ minor_tick_thickness: value })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateTapeDraft({ minor_tick_thickness: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           </div>
         </div>
@@ -184,7 +186,9 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.fontSize', 'Font Size')}
             value={tapeData.label_font_size}
             min={6}
@@ -192,8 +196,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
             step={1}
             valueDisplay={`${tapeData.label_font_size}`}
             suffix="px"
-            onChange={(value) => updateTapeSize({ label_font_size: value })}
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(value) => updateTapeDraft({ label_font_size: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -205,8 +209,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
             integerDisplay
             valueDisplay={`${tapeData.label_offset}`}
             suffix="px"
-            onSliderChange={(value) => updateTapeSize({ label_offset: value })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(value) => updateTapeDraft({ label_offset: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
       </div>
@@ -238,7 +242,9 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
             value={tapeData.indicator_color}
             onChange={(value) => updateTape({ indicator_color: value })}
           />
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.indicatorSize', 'Indicator Size')}
             value={tapeData.indicator_size}
             min={4}
@@ -246,8 +252,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
             step={1}
             valueDisplay={`${tapeData.indicator_size}`}
             suffix="px"
-            onChange={(value) => updateTapeSize({ indicator_size: value })}
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(value) => updateTapeDraft({ indicator_size: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
       </div>

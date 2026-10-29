@@ -49,6 +49,8 @@ export default function SidebarSettingsTab({ config, onConfigChange, widgetLiveE
       <GlobalSettingsSection
         globalDefaults={globalSettings.globalDefaults}
         onGlobalDefaultChange={globalSettings.setGlobalDefault}
+        onGlobalDefaultDraft={globalSettings.draftGlobalDefault}
+        onGlobalDefaultCommit={globalSettings.commitGlobalDefault}
         onResetDefaults={globalSettings.resetGlobalDefaults}
         sceneStyleValue={globalSettings.sceneStyleValue}
         availableFonts={globalSettings.availableFonts}

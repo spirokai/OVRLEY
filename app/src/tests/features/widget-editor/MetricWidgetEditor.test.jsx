@@ -501,8 +501,8 @@ describe('MetricWidgetEditor corner gauge controls', () => {
 describe('MetricWidgetEditor lean-angle controls', () => {
   test('shows Size without separate Width or Height controls and updates the canonical diameter', async () => {
     const updateWidgetData = vi.fn()
-    const updateWidgetSize = vi.fn()
-    const commitWidgetSize = vi.fn()
+    const updateWidgetDraft = vi.fn()
+    const commitWidgetDraft = vi.fn()
     render(
       <MetricWidgetEditor
         widget={makeWidget('lean_angle', {
@@ -528,8 +528,8 @@ describe('MetricWidgetEditor lean-angle controls', () => {
           },
         })}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
         setNumericField={vi.fn()}
       />,
     )
@@ -541,7 +541,7 @@ describe('MetricWidgetEditor lean-angle controls', () => {
     const sizeSlider = screen.getAllByRole('slider')[0]
     fireEvent.keyDown(sizeSlider, { key: 'End', code: 'End' })
 
-    expect(updateWidgetSize).toHaveBeenLastCalledWith(
+    expect(updateWidgetDraft).toHaveBeenLastCalledWith(
       'value-0',
       expect.objectContaining({
         font_size: 200,
@@ -550,12 +550,12 @@ describe('MetricWidgetEditor lean-angle controls', () => {
         }),
       }),
     )
-    expect(updateWidgetSize.mock.lastCall[1]).not.toHaveProperty('width')
-    expect(updateWidgetSize.mock.lastCall[1]).not.toHaveProperty('height')
-    expect(updateWidgetSize.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('width')
-    expect(updateWidgetSize.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('height')
-    expect(updateWidgetSize.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('font_size')
+    expect(updateWidgetDraft.mock.lastCall[1]).not.toHaveProperty('width')
+    expect(updateWidgetDraft.mock.lastCall[1]).not.toHaveProperty('height')
+    expect(updateWidgetDraft.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('width')
+    expect(updateWidgetDraft.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('height')
+    expect(updateWidgetDraft.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('font_size')
     expect(updateWidgetData).not.toHaveBeenCalled()
-    expect(commitWidgetSize).toHaveBeenCalledWith('value-0')
+    expect(commitWidgetDraft).toHaveBeenCalledWith('value-0')
   })
 })

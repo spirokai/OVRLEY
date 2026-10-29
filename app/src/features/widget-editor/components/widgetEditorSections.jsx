@@ -6,7 +6,7 @@
 import { Italic, Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SectionHeading } from '@/components/ui/section-heading'
-import { ColorField, ContentAlignmentControl, NumberField, SelectField, SizeSlider, SliderField, TextField, ToggleField } from './widgetFormControls'
+import { ColorField, ContentAlignmentControl, NumberField, SelectField, SliderField, TextField, ToggleField } from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
 import { useAvailableFonts, useLabelTypography } from '@/hooks/useFonts'
 import { getThemeColor } from '@/lib/color-utils'
@@ -18,10 +18,11 @@ import { useTranslation } from 'react-i18next'
  * @param {object} props - Component props.
  * @param {*} props.widget - Widget definition being rendered or edited.
  * @param {*} props.setNumericField - Value for set numeric field.
- * @param {*} props.updateWidgetData - Value for update widget data.
+ * @param {Function} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
+ * @param {Function} props.commitWidgetDraft - Commits the live widget draft.
  * @returns {JSX.Element} Rendered component output.
  */
-export function PositionSection({ widget, setNumericField, updateWidgetData, headerAction = null }) {
+export function PositionSection({ widget, setNumericField, updateWidgetDraft, commitWidgetDraft, headerAction = null }) {
   const { t } = useTranslation()
   const opacity = Math.round(widget.data.opacity * 100)
   const usesHorizontalAnchor =
@@ -55,7 +56,8 @@ export function PositionSection({ widget, setNumericField, updateWidgetData, hea
         step={1}
         valueDisplay={`${opacity}`}
         suffix="%"
-        onSliderChange={(value) => updateWidgetData(widget.id, { opacity: value / 100 })}
+        onSliderChange={(value) => updateWidgetDraft(widget.id, { opacity: value / 100 })}
+        onSliderCommit={() => commitWidgetDraft(widget.id)}
       />
     </div>
   )
@@ -96,8 +98,8 @@ export function DimensionsSection({ widget, setNumericField, min = 0 }) {
  * @param {object} props - Component props.
  * @param {*} props.widget - Widget definition being rendered or edited.
  * @param {*} props.updateWidgetData - Value for update widget data.
- * @param {*} props.updateWidgetSize - Live size updater.
- * @param {*} props.commitWidgetSize - Commits a live size update.
+ * @param {*} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
+ * @param {*} props.commitWidgetDraft - Commits the live widget draft.
  * @param {string} [props.title] - Section heading title. Defaults to the translated "Typography".
  * @param {boolean} [props.showTextInput=false] - Whether to show the text input.
  * @param {string} [props.fontSizeLabel] - Label for the font size slider. Defaults to the translated "Font Size".
@@ -110,8 +112,8 @@ export function DimensionsSection({ widget, setNumericField, min = 0 }) {
 export function FontSection({
   widget,
   updateWidgetData,
-  updateWidgetSize,
-  commitWidgetSize,
+  updateWidgetDraft,
+  commitWidgetDraft,
   title,
   showTextInput = false,
   fontSizeLabel,
@@ -162,7 +164,9 @@ export function FontSection({
         />
       ) : null}
 
-      <SizeSlider
+      <SliderField
+        editable
+        integerDisplay
         label={fontSizeLabel ?? t('widget-editor.fontSize', 'Font Size')}
         value={fontSize}
         min={sizeMin}
@@ -170,8 +174,8 @@ export function FontSection({
         step={1}
         valueDisplay={`${fontSize}`}
         suffix="px"
-        onChange={(value) => updateWidgetSize(widget.id, { font_size: value })}
-        onCommit={() => commitWidgetSize(widget.id)}
+        onSliderChange={(value) => updateWidgetDraft(widget.id, { font_size: value })}
+        onSliderCommit={() => commitWidgetDraft(widget.id)}
       />
       <div className="grid grid-cols-2 gap-4 items-end">
         <FontSelectField
@@ -194,7 +198,9 @@ export function FontSection({
       {widget.category === 'labels' ? (
         <div className="grid grid-cols-2 gap-4 items-end pt-2">
           {typography.font ? (
-            <SizeSlider
+            <SliderField
+              editable
+              integerDisplay
               label={t('widget-editor.fontWeight', 'Font Weight')}
               value={typography.weight}
               min={typography.weightAxis?.min ?? 1}
@@ -202,8 +208,8 @@ export function FontSection({
               disabled={!typography.weightAxis}
               step={100}
               valueDisplay={String(typography.weight)}
-              onChange={(value) => updateWidgetSize(widget.id, { font_weight: value })}
-              onCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { font_weight: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           ) : null}
           <SliderField
@@ -215,8 +221,8 @@ export function FontSection({
             step={0.5}
             valueDisplay={`${widget.data.letter_spacing.toFixed(1)}`}
             suffix="%"
-            onSliderChange={(value) => updateWidgetSize(widget.id, { letter_spacing: value })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { letter_spacing: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
       ) : null}
@@ -230,8 +236,8 @@ export function FontSection({
  * @param {object} props - Component props.
  * @param {*} props.widget - Widget definition being rendered or edited.
  * @param {*} props.updateWidgetData - Value for update widget data.
- * @param {*} props.updateWidgetSize - Live size updater.
- * @param {*} props.commitWidgetSize - Commits a live size update.
+ * @param {*} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
+ * @param {*} props.commitWidgetDraft - Commits the live widget draft.
  * @param {*} props.setNumericField - Value for set numeric field.
  * @param {string} [props.title] - Section heading title. Defaults to the translated "Icon".
  * @param {boolean} [props.showUnitsToggle=false] - Whether to show the units toggle.
@@ -241,8 +247,8 @@ export function FontSection({
 export function IconSection({
   widget,
   updateWidgetData,
-  updateWidgetSize,
-  commitWidgetSize,
+  updateWidgetDraft,
+  commitWidgetDraft,
   setNumericField,
   title,
   showUnitsToggle = false,
@@ -264,7 +270,9 @@ export function IconSection({
           value={widget.data.icon_color || getThemeColor('aqua')}
           onChange={(value) => updateWidgetData(widget.id, { icon_color: value })}
         />
-        <SizeSlider
+        <SliderField
+          editable
+          integerDisplay
           label={t('widget-editor.size', 'Size')}
           value={iconSize}
           disabled={!widget.data.show_icon}
@@ -273,8 +281,8 @@ export function IconSection({
           step={1}
           valueDisplay={`${iconSize}`}
           suffix="px"
-          onChange={(value) => updateWidgetSize(widget.id, { icon_size: value })}
-          onCommit={() => commitWidgetSize(widget.id)}
+          onSliderChange={(value) => updateWidgetDraft(widget.id, { icon_size: value })}
+          onSliderCommit={() => commitWidgetDraft(widget.id)}
         />
       </div>
       <div className="grid grid-cols-2 gap-4">

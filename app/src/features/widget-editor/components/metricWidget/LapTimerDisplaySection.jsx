@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { useAvailableFonts } from '@/hooks/useFonts'
 import { FontSection } from '../widgetEditorSections'
-import { ColorField, SelectField, SizeSlider, TextField, ToggleField } from '../widgetFormControls'
+import { ColorField, SelectField, SliderField, TextField, ToggleField } from '../widgetFormControls'
 import { useTranslation } from 'react-i18next'
 
 /**
@@ -15,11 +15,11 @@ import { useTranslation } from 'react-i18next'
  * @param {object} props
  * @param {object} props.widget - Lap timer widget configuration.
  * @param {Function} props.updateWidgetData - Updates widget data.
- * @param {Function} props.updateWidgetSize - Applies live size changes.
- * @param {Function} props.commitWidgetSize - Commits live size changes.
+ * @param {Function} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
+ * @param {Function} props.commitWidgetDraft - Commits the live widget draft.
  * @returns {JSX.Element} Lap timer controls.
  */
-export default function LapTimerDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function LapTimerDisplaySection({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const availableFonts = useAvailableFonts()
 
@@ -37,7 +37,7 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
           <ToggleField checked={widget.data.renumber_laps} onCheckedChange={(renumber_laps) => updateWidgetData(widget.id, { renumber_laps })} />
         </div>
       ) : null}
-      <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
+      <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetDraft={updateWidgetDraft} commitWidgetDraft={commitWidgetDraft} />
       <div className="space-y-4">
         <div className="flex w-full items-center gap-3">
           <SectionHeading icon={Type} title={t('widget-editor.label', 'Label')} />
@@ -54,7 +54,9 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
             onChange={(label) => updateWidgetData(widget.id, { label })}
           />
         ) : null}
-        <SizeSlider
+        <SliderField
+          editable
+          integerDisplay
           label={t('widget-editor.labelFontSize', 'Label Font Size')}
           value={widget.data.label_font_size}
           min={6}
@@ -62,8 +64,8 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
           step={0.5}
           valueDisplay={`${widget.data.label_font_size}`}
           suffix="px"
-          onChange={(label_font_size) => updateWidgetSize(widget.id, { label_font_size })}
-          onCommit={() => commitWidgetSize(widget.id)}
+          onSliderChange={(label_font_size) => updateWidgetDraft(widget.id, { label_font_size })}
+          onSliderCommit={() => commitWidgetDraft(widget.id)}
         />
         <div className="grid grid-cols-2 items-end gap-4">
           <FontSelectField

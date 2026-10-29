@@ -95,8 +95,8 @@ describe('rolling chart editor', () => {
       <RollingChartWidgetEditor
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={vi.fn()}
-        commitWidgetSize={vi.fn()}
+        updateWidgetDraft={vi.fn()}
+        commitWidgetDraft={vi.fn()}
         setNumericField={vi.fn()}
       />,
     )

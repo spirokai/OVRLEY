@@ -13,7 +13,7 @@
  * @module useSceneSettingsState
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import useStore from '@/store/useStore'
@@ -26,6 +26,8 @@ import { RESOLUTIONS } from '../data/sceneSettingsConstants'
 import { sanitizeNumber } from '../utils/sceneSettingsUtils'
 import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { getWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
+import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
+import { scaleWidgetPositions } from '@/lib/widget/widget-config'
 
 function getResolutionPresetId(scene) {
   if (!scene) return '1080p'
@@ -65,7 +67,7 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
   const {
     activitySummary,
     aspectRatio,
-    globalDefaults,
+    globalDefaults: committedGlobalDefaults,
     importedVideoFps,
     importedVideoResolution,
     setAspectRatioPreset,
@@ -92,10 +94,13 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
     })),
   )
 
+  const { liveGlobalDefaults } = useWidgetDraftView(widgetLiveEdits)
+  const globalDefaults = useMemo(() => ({ ...committedGlobalDefaults, ...liveGlobalDefaults }), [committedGlobalDefaults, liveGlobalDefaults])
+  // Fixed point of a scale drag, captured from the committed layout when the drag starts.
+  const scaleOriginRef = useRef(null)
   const availableFonts = useAvailableFonts()
   const prepareFontEdit = useFontPreparation()
-  const getScaleOrigin = (nextScale) => {
-    if (nextScale === useStore.getState().globalDefaults.scale) return null
+  const getScaleOrigin = () => {
     const widgets = buildConfigWidgets(useStore.getState().config)
     if (!widgets.length) return null
     return getWidgetInteraction(widgetLiveEdits.getWidgetNode(widgets[0].id))
@@ -107,12 +112,32 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
       prepareFontEdit(key, [value], () => {
         useStore.getState().setGlobalDefault(key, value, key === 'font_text' ? getPreparedFont(value) : undefined)
       })
-    } else if (key === 'scale') setGlobalDefault(key, value, undefined, getScaleOrigin(value))
-    else setGlobalDefault(key, value)
+    } else setGlobalDefault(key, value)
+  }
+  const draftGlobalDefault = (key, value) => {
+    if (key === 'scale') {
+      if (!Object.hasOwn(widgetLiveEdits.getGlobalDefaultDrafts(), 'scale')) scaleOriginRef.current = getScaleOrigin()
+      const { config: committedConfig, globalDefaults: committed } = useStore.getState()
+      const scaledConfig = scaleWidgetPositions(committedConfig, value / committed.scale, scaleOriginRef.current)
+      widgetLiveEdits.setLiveWidgetDrafts(
+        Object.fromEntries(buildConfigWidgets(scaledConfig).map((widget) => [widget.id, { x: widget.data.x, y: widget.data.y }])),
+      )
+    }
+    widgetLiveEdits.setLiveGlobalDefault(key, value)
+  }
+  const commitGlobalDefault = (key) => {
+    const drafts = widgetLiveEdits.getGlobalDefaultDrafts()
+    if (!Object.hasOwn(drafts, key)) return
+    if (key === 'scale') {
+      setGlobalDefault(key, drafts.scale, undefined, scaleOriginRef.current)
+      widgetLiveEdits.clearWidgetDrafts(buildConfigWidgets(useStore.getState().config).map((widget) => widget.id))
+      scaleOriginRef.current = null
+    } else setGlobalDefault(key, drafts[key])
+    widgetLiveEdits.clearGlobalDefaultDrafts()
   }
   const resetGlobalDefaults = () =>
     prepareFontEdit(['font_text', 'font_values'], [DEFAULT_GLOBAL_DEFAULTS.font_text, DEFAULT_GLOBAL_DEFAULTS.font_values], () => {
-      useStore.getState().resetGlobalDefaults(getPreparedFont(DEFAULT_GLOBAL_DEFAULTS.font_text), getScaleOrigin(DEFAULT_GLOBAL_DEFAULTS.scale))
+      useStore.getState().resetGlobalDefaults(getPreparedFont(DEFAULT_GLOBAL_DEFAULTS.font_text), getScaleOrigin())
     })
   const editorConfig = useMemo(() => createEditorEffectiveConfig({ config, globalDefaults }), [config, globalDefaults])
   const scene = editorConfig?.scene ? { ...editorConfig.scene, fps: renderSettings.fps } : null
@@ -194,6 +219,8 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
       resetGlobalDefaults,
       sceneStyleValue,
       setGlobalDefault: changeGlobalDefault,
+      draftGlobalDefault,
+      commitGlobalDefault,
       availableFonts,
     },
     handlers,

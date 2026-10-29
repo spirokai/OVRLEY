@@ -33,8 +33,8 @@ const CONTENT_ALIGNMENT_FACTORS = {
  *   selectedWidgetId: string|null,
  *   isMarqueeSelecting: boolean,
  *   updateWidgetData: Function,
- *   updateWidgetSize: Function,
- *   commitWidgetSize: Function,
+ *   updateWidgetDraft: Function,
+ *   commitWidgetDraft: Function,
  *   setNumericField: Function,
  *   addWidget: Function,
  *   deleteWidget: Function,
@@ -86,7 +86,7 @@ export function useWidgetManager({ widgetLiveEdits }) {
     state.setConfig(updateWidgetInConfig(state.config, id, nextUpdates))
   }
 
-  const updateWidgetSize = (id, updates) => {
+  const updateWidgetDraft = (id, updates) => {
     const widget = widgets.find((item) => item.id === id)
     const tapeUpdate = updates.display_variants?.heading_tape
     const patch = Object.hasOwn(updates, 'rotation')
@@ -97,7 +97,7 @@ export function useWidgetManager({ widgetLiveEdits }) {
     liveEdits.setLiveWidgetDraft(id, patch)
   }
 
-  const commitWidgetSize = (id) => {
+  const commitWidgetDraft = (id) => {
     const draft = liveEdits.getWidgetDraft(id)
     if (draft) {
       setConfig(updateWidgetInConfig(config, id, draft))
@@ -158,8 +158,8 @@ export function useWidgetManager({ widgetLiveEdits }) {
     selectedWidgetId,
     isMarqueeSelecting,
     updateWidgetData,
-    updateWidgetSize,
-    commitWidgetSize,
+    updateWidgetDraft,
+    commitWidgetDraft,
     setNumericField,
     addWidget,
     deleteWidget,

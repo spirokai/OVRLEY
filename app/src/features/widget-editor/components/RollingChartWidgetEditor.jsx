@@ -25,7 +25,7 @@ import {
 } from '../utils/rollingChart'
 import PlotMarkerSection from './PlotMarkerSection'
 import { DimensionsSection } from './widgetEditorSections'
-import { CONTROL_CLASS, ColorField, FieldBlock, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
+import { CONTROL_CLASS, ColorField, FieldBlock, SliderField, ToggleField } from './widgetFormControls'
 
 const TOGGLE_LABEL_CLASS = 'p-0 text-[9px] text-muted-foreground uppercase font-bold'
 const ROW_BUTTON_CLASS = 'text-muted-foreground hover:text-foreground'
@@ -109,19 +109,19 @@ function ChartSeriesRow({ item, metrics, first, last, only, onMetricChange, onCo
  * @param {object} props - Component props.
  * @param {object} props.widget - Rolling chart widget.
  * @param {Function} props.updateWidgetData - Updates widget data.
- * @param {Function} props.updateWidgetSize - Applies live size changes.
- * @param {Function} props.commitWidgetSize - Commits live size changes.
+ * @param {Function} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
+ * @param {Function} props.commitWidgetDraft - Commits the live widget draft.
  * @param {Function} props.setNumericField - Parses and stores numeric input.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function RollingChartWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
+export default function RollingChartWidgetEditor({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft, setNumericField }) {
   const { t } = useTranslation()
   const availableFonts = useAvailableFonts()
   const { data } = widget
   const series = data.series
   const unused = unusedChartMetrics(series)
   const setSeries = (next) => updateWidgetData(widget.id, { series: next })
-  const commit = () => commitWidgetSize(widget.id)
+  const commit = () => commitWidgetDraft(widget.id)
   const windowInput = useWindowSecondsInput({
     value: data.window_seconds,
     onCommit: (window_seconds) => updateWidgetData(widget.id, { window_seconds }),
@@ -181,7 +181,9 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
           }
         />
         <div className="grid grid-cols-2 gap-4">
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.thickness', 'Thickness')}
             value={data.line_width}
             min={1}
@@ -189,8 +191,8 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
             step={1}
             valueDisplay={`${data.line_width}`}
             suffix="px"
-            onChange={(line_width) => updateWidgetSize(widget.id, { line_width })}
-            onCommit={commit}
+            onSliderChange={(line_width) => updateWidgetDraft(widget.id, { line_width })}
+            onSliderCommit={commit}
           />
           <SliderField
             editable
@@ -201,7 +203,7 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
             step={1}
             valueDisplay={`${data.line_opacity}`}
             suffix="%"
-            onSliderChange={(line_opacity) => updateWidgetSize(widget.id, { line_opacity })}
+            onSliderChange={(line_opacity) => updateWidgetDraft(widget.id, { line_opacity })}
             onSliderCommit={commit}
           />
         </div>
@@ -214,7 +216,7 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
           step={5}
           valueDisplay={`${data.line_curve}`}
           suffix="%"
-          onSliderChange={(line_curve) => updateWidgetSize(widget.id, { line_curve })}
+          onSliderChange={(line_curve) => updateWidgetDraft(widget.id, { line_curve })}
           onSliderCommit={commit}
         />
         <div className="grid grid-cols-2 items-end gap-4">
@@ -228,7 +230,7 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
             disabled={!data.area_fill}
             valueDisplay={`${data.area_opacity}`}
             suffix="%"
-            onSliderChange={(area_opacity) => updateWidgetSize(widget.id, { area_opacity })}
+            onSliderChange={(area_opacity) => updateWidgetDraft(widget.id, { area_opacity })}
             onSliderCommit={commit}
           />
           <div className="flex h-9 items-center justify-between gap-2 px-1">
@@ -247,8 +249,8 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
       <PlotMarkerSection
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
         showColor={false}
         disabled={!data.show_marker}
         trailing={
@@ -282,7 +284,9 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
             triggerClassName={CONTROL_CLASS}
             labelClassName={TOGGLE_LABEL_CLASS}
           />
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.fontSize', 'Font Size')}
             value={data.legend_font_size}
             min={6}
@@ -291,8 +295,8 @@ export default function RollingChartWidgetEditor({ widget, updateWidgetData, upd
             disabled={!data.show_legend}
             valueDisplay={`${data.legend_font_size}`}
             suffix="px"
-            onChange={(legend_font_size) => updateWidgetSize(widget.id, { legend_font_size })}
-            onCommit={commit}
+            onSliderChange={(legend_font_size) => updateWidgetDraft(widget.id, { legend_font_size })}
+            onSliderCommit={commit}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">

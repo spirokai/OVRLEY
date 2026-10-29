@@ -54,8 +54,8 @@ const DISPLAY_SECTION = {
 export default function MetricWidgetEditor({
   widget,
   updateWidgetData,
-  updateWidgetSize,
-  commitWidgetSize,
+  updateWidgetDraft,
+  commitWidgetDraft,
   setNumericField,
   showDisplayControls = true,
 }) {
@@ -92,12 +92,17 @@ export default function MetricWidgetEditor({
         <TextDisplaySection
           widget={widget}
           updateWidgetData={updateWidgetData}
-          updateWidgetSize={updateWidgetSize}
-          commitWidgetSize={commitWidgetSize}
+          updateWidgetDraft={updateWidgetDraft}
+          commitWidgetDraft={commitWidgetDraft}
           setNumericField={setNumericField}
         />
       ) : DisplaySection ? (
-        <DisplaySection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
+        <DisplaySection
+          widget={widget}
+          updateWidgetData={updateWidgetData}
+          updateWidgetDraft={updateWidgetDraft}
+          commitWidgetDraft={commitWidgetDraft}
+        />
       ) : null}
 
       {widget.type === 'altitude' ? (

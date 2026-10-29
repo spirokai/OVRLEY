@@ -73,15 +73,15 @@ describe('BackdropWidgetEditor', () => {
   test('updates shared rectangle styling fields without touching general opacity', async () => {
     const user = userEvent.setup()
     const updateWidgetData = vi.fn()
-    const updateWidgetSize = vi.fn()
-    const commitWidgetSize = vi.fn()
+    const updateWidgetDraft = vi.fn()
+    const commitWidgetDraft = vi.fn()
 
     render(
       <BackdropWidgetEditor
         widget={makeBackdropWidget()}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
       />,
     )
 
@@ -92,25 +92,25 @@ describe('BackdropWidgetEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Border Thickness' }))
 
     expect(updateWidgetData).toHaveBeenCalledWith('backdrop-1', { fill_color: '#123456' })
-    expect(updateWidgetData).toHaveBeenCalledWith('backdrop-1', { fill_opacity: 0.55 })
+    expect(updateWidgetDraft).toHaveBeenCalledWith('backdrop-1', { fill_opacity: 0.55 })
     expect(updateWidgetData).toHaveBeenCalledWith('backdrop-1', { border_color: '#123456' })
-    expect(updateWidgetData).toHaveBeenCalledWith('backdrop-1', { border_opacity: 0.3 })
-    expect(updateWidgetSize).toHaveBeenCalledWith('backdrop-1', { border_thickness: 3 })
-    expect(updateWidgetData).not.toHaveBeenCalledWith('backdrop-1', expect.objectContaining({ opacity: expect.any(Number) }))
+    expect(updateWidgetDraft).toHaveBeenCalledWith('backdrop-1', { border_opacity: 0.3 })
+    expect(updateWidgetDraft).toHaveBeenCalledWith('backdrop-1', { border_thickness: 3 })
+    expect(updateWidgetDraft).not.toHaveBeenCalledWith('backdrop-1', expect.objectContaining({ opacity: expect.any(Number) }))
   })
 
   test('updates rectangle dimensions and corner radius inside the active variant', async () => {
     const user = userEvent.setup()
     const updateWidgetData = vi.fn()
-    const updateWidgetSize = vi.fn()
-    const commitWidgetSize = vi.fn()
+    const updateWidgetDraft = vi.fn()
+    const commitWidgetDraft = vi.fn()
 
     render(
       <BackdropWidgetEditor
         widget={makeBackdropWidget()}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
       />,
     )
 
@@ -134,7 +134,7 @@ describe('BackdropWidgetEditor', () => {
         }),
       }),
     )
-    expect(updateWidgetSize).toHaveBeenCalledWith(
+    expect(updateWidgetDraft).toHaveBeenCalledWith(
       'backdrop-1',
       expect.objectContaining({
         display_variants: expect.objectContaining({

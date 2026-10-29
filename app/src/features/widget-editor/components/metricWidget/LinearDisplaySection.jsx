@@ -1,5 +1,5 @@
 import { SectionHeading } from '@/components/ui/section-heading'
-import { ToggleField, SelectField, SizeSlider, SliderField, ColorField } from '../widgetFormControls'
+import { ToggleField, SelectField, SliderField, ColorField } from '../widgetFormControls'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { useMemo } from 'react'
 import { SlidersHorizontal, Tags } from 'lucide-react'
@@ -38,11 +38,11 @@ const LABEL_POSITION_SWAP = {
  * @param {object} props.widget - Widget config.
  * @param {Function} props.updateWidgetData - Updates widget data.
  */
-export default function LinearDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function LinearDisplaySection({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const linearData = useMemo(() => widget.data.display_variants?.linear ?? {}, [widget.data.display_variants?.linear])
   const updateLinear = useDisplayVariantUpdater(widget, 'linear', updateWidgetData)
-  const updateLinearSize = useDisplayVariantUpdater(widget, 'linear', updateWidgetSize)
+  const updateLinearDraft = useDisplayVariantUpdater(widget, 'linear', updateWidgetDraft)
   const availableFonts = useAvailableFonts()
   const orientationOptions = useMemo(() => translateOptions(ORIENTATION_OPTIONS, t), [t])
   const positionOptions = useMemo(() => translateOptions(POSITION_OPTIONS, t), [t])
@@ -52,14 +52,14 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
     const nextWidth = linearData.height
     const nextHeight = linearData.width
     const nextData = { ...linearData, orientation, width: nextWidth, height: nextHeight }
-    updateLinearSize({
+    updateLinearDraft({
       orientation,
       width: nextWidth,
       height: nextHeight,
       track_corner_radius: Math.min(linearData.track_corner_radius, getLinearTrackCornerRadiusMax(nextData)),
       min_max_label_position: LABEL_POSITION_SWAP[linearData.min_max_label_position] ?? linearData.min_max_label_position,
     })
-    commitWidgetSize(widget.id)
+    commitWidgetDraft(widget.id)
   }
   const availablePositions = useMemo(() => {
     if (linearData.orientation === 'horizontal') {
@@ -89,7 +89,9 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
       <div className="space-y-4">
         <SectionHeading icon={SlidersHorizontal} title={t('widget-editor.gaugeTrack', 'Gauge Track')} />
         <div className="grid grid-cols-2 gap-4">
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.width', 'Width')}
             value={linearData.width}
             min={widthSliderBounds.min}
@@ -97,15 +99,17 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             step={1}
             valueDisplay={`${linearData.width}`}
             suffix="px"
-            onChange={(value) =>
-              updateLinearSize({
+            onSliderChange={(value) =>
+              updateLinearDraft({
                 width: value,
                 track_corner_radius: Math.min(linearData.track_corner_radius, getLinearTrackCornerRadiusMax({ ...linearData, width: value })),
               })
             }
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.height', 'Height')}
             value={linearData.height}
             min={heightSliderBounds.min}
@@ -113,13 +117,13 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             step={1}
             valueDisplay={`${linearData.height}`}
             suffix="px"
-            onChange={(value) =>
-              updateLinearSize({
+            onSliderChange={(value) =>
+              updateLinearDraft({
                 height: value,
                 track_corner_radius: Math.min(linearData.track_corner_radius, getLinearTrackCornerRadiusMax({ ...linearData, height: value })),
               })
             }
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4 pt-2">
@@ -135,8 +139,8 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             barGapMax={barGapMax}
             getCornerRadiusMax={getLinearTrackCornerRadiusMax}
             updateVariant={updateLinear}
-            updateVariantSize={updateLinearSize}
-            commitWidgetSize={commitWidgetSize}
+            updateVariantDraft={updateLinearDraft}
+            commitWidgetDraft={commitWidgetDraft}
             widgetId={widget.id}
           />
           <SliderField
@@ -149,8 +153,8 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             integerDisplay
             valueDisplay={`${linearData.track_corner_radius}`}
             suffix="px"
-            onSliderChange={(value) => updateLinearSize({ track_corner_radius: Math.min(Math.max(0, value), cornerRadiusMax) })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(value) => updateLinearDraft({ track_corner_radius: Math.min(Math.max(0, value), cornerRadiusMax) })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
       </div>
@@ -158,8 +162,8 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
       <TrackStyleSection
         data={linearData}
         updateVariant={updateLinear}
-        updateVariantSize={updateLinearSize}
-        onCommit={() => commitWidgetSize(widget.id)}
+        updateVariantDraft={updateLinearDraft}
+        onCommit={() => commitWidgetDraft(widget.id)}
         borderMax={6}
       />
 
@@ -182,7 +186,9 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             triggerClassName="h-9 border-border/70 bg-surface text-xs"
             labelClassName="text-[0.667rem] text-muted-foreground uppercase font-bold"
           />
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.fontSize', 'Font Size')}
             disabled={!linearData.show_min_max_labels}
             value={linearData.min_max_label_font_size}
@@ -191,8 +197,8 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             step={1}
             valueDisplay={`${linearData.min_max_label_font_size}`}
             suffix="px"
-            onChange={(value) => updateLinearSize({ min_max_label_font_size: value })}
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(value) => updateLinearDraft({ min_max_label_font_size: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
 

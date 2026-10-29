@@ -54,7 +54,7 @@ function GForceAxisRow({ label, value, onValueChange, onInvertChange, inverted, 
 }
 
 /** Renders G-force display controls and axis mapping controls. */
-export default function GForceWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function GForceWidgetEditor({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const data = widget.data.display_variants.g_force
   const updateGForce = useDisplayVariantUpdater(widget, 'g_force', updateWidgetData)
@@ -70,8 +70,8 @@ export default function GForceWidgetEditor({ widget, updateWidgetData, updateWid
       <GForceDisplaySection
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
       />
       <div className="space-y-4">
         <SectionHeading icon={CircleGauge} title={t('widget-editor.axisMapping', 'Axis Mapping')} />

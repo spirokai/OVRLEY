@@ -4,7 +4,7 @@
 
 import { Mountain, Palette } from 'lucide-react'
 import { SectionHeading } from '@/components/ui/section-heading'
-import { ColorField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
+import { ColorField, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection } from './widgetEditorSections'
 import PlotMarkerSection from './PlotMarkerSection'
 import { Label } from '@/components/ui/label'
@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next'
  * @param {*} props.setNumericField - Value for set numeric field.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function DivingProfileWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
+export default function DivingProfileWidgetEditor({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft, setNumericField }) {
   const { t } = useTranslation()
   const lineWidth = widget.data.completed_line_width
   const remainingLineOpacity = widget.data.remaining_line_opacity
@@ -43,12 +43,12 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
           valueDisplay={`${lineWidth}`}
           suffix="px"
           onSliderChange={(value) =>
-            updateWidgetSize(widget.id, {
+            updateWidgetDraft(widget.id, {
               completed_line_width: value,
               remaining_line_width: value,
             })
           }
-          onSliderCommit={() => commitWidgetSize(widget.id)}
+          onSliderCommit={() => commitWidgetDraft(widget.id)}
         />
 
         <div className="grid grid-cols-2 gap-4">
@@ -62,11 +62,11 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
             valueDisplay={`${simplifyTolerance.toFixed(2)}`}
             suffix="px"
             onSliderChange={(value) =>
-              updateWidgetSize(widget.id, {
+              updateWidgetDraft(widget.id, {
                 simplify_tolerance_px: Number(value.toFixed(2)),
               })
             }
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -78,11 +78,11 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
             valueDisplay={`${targetDensity.toFixed(2)}`}
             suffix="x"
             onSliderChange={(value) =>
-              updateWidgetSize(widget.id, {
+              updateWidgetDraft(widget.id, {
                 target_density: Number(value.toFixed(2)),
               })
             }
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -111,7 +111,8 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
             step={1}
             valueDisplay={`${widget.data.completed_line_opacity}`}
             suffix="%"
-            onSliderChange={(value) => updateWidgetData(widget.id, { completed_line_opacity: value })}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { completed_line_opacity: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -122,7 +123,8 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
             step={1}
             valueDisplay={`${remainingLineOpacity}`}
             suffix="%"
-            onSliderChange={(value) => updateWidgetData(widget.id, { remaining_line_opacity: value })}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { remaining_line_opacity: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -136,11 +138,11 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
             valueDisplay={`${yScale.toFixed(2)}`}
             suffix="x"
             onSliderChange={(value) =>
-              updateWidgetSize(widget.id, {
+              updateWidgetDraft(widget.id, {
                 y_scale: Number(value.toFixed(2)),
               })
             }
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
 
           <div className="flex items-center justify-between gap-2 px-1 pt-6">
@@ -175,8 +177,8 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
               step={1}
               suffix="px"
               valueDisplay={String(widget.data.ceiling_line_width)}
-              onSliderChange={(value) => updateWidgetSize(widget.id, { ceiling_line_width: value })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { ceiling_line_width: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
             <SliderField
               editable
@@ -187,7 +189,8 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
               step={1}
               suffix="%"
               valueDisplay={String(widget.data.ceiling_line_opacity)}
-              onSliderChange={(value) => updateWidgetData(widget.id, { ceiling_line_opacity: value })}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { ceiling_line_opacity: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
             <SliderField
               editable
@@ -198,7 +201,8 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
               step={1}
               suffix="%"
               valueDisplay={String(widget.data.ceiling_area_opacity)}
-              onSliderChange={(value) => updateWidgetData(widget.id, { ceiling_area_opacity: value })}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { ceiling_area_opacity: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           </div>
         </div>
@@ -206,13 +210,15 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
       <PlotMarkerSection
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
       />
 
       <div className="space-y-4">
         <SectionHeading icon={Mountain} title={t('widget-editor.labels', 'Labels')} />
-        <SizeSlider
+        <SliderField
+          editable
+          integerDisplay
           label={t('widget-editor.labelSize', 'Label Size')}
           value={labelFontSize}
           min={5}
@@ -220,8 +226,8 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
           step={1}
           valueDisplay={`${labelFontSize}`}
           suffix="px"
-          onChange={(value) => updateWidgetSize(widget.id, { point_label: { ...widget.data.point_label, font_size: value } })}
-          onCommit={() => commitWidgetSize(widget.id)}
+          onSliderChange={(value) => updateWidgetDraft(widget.id, { point_label: { ...widget.data.point_label, font_size: value } })}
+          onSliderCommit={() => commitWidgetDraft(widget.id)}
         />
 
         <div className="grid grid-cols-2 gap-4 pt-2">
@@ -251,8 +257,8 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
               integerDisplay
               valueDisplay={`${widget.data.metric_label_offset_x}`}
               suffix="px"
-              onSliderChange={(value) => updateWidgetSize(widget.id, { metric_label_offset_x: value })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { metric_label_offset_x: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
             <SliderField
               editable
@@ -265,8 +271,8 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
               integerDisplay
               valueDisplay={`${widget.data.metric_label_offset_y}`}
               suffix="px"
-              onSliderChange={(value) => updateWidgetSize(widget.id, { metric_label_offset_y: value })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { metric_label_offset_y: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           </div>
           <div className="flex flex-col gap-4">
@@ -295,8 +301,8 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
               integerDisplay
               valueDisplay={`${widget.data.imperial_label_offset_x}`}
               suffix="px"
-              onSliderChange={(value) => updateWidgetSize(widget.id, { imperial_label_offset_x: value })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { imperial_label_offset_x: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
             <SliderField
               editable
@@ -309,8 +315,8 @@ export default function DivingProfileWidgetEditor({ widget, updateWidgetData, up
               integerDisplay
               valueDisplay={`${widget.data.imperial_label_offset_y}`}
               suffix="px"
-              onSliderChange={(value) => updateWidgetSize(widget.id, { imperial_label_offset_y: value })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { imperial_label_offset_y: value })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           </div>
         </div>

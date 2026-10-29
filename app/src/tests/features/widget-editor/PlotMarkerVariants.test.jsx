@@ -53,8 +53,8 @@ describe('plot marker variant controls', () => {
         widget={{ id: 'dive', type: 'diving_profile', data: { ...WIDGET_TYPE_DEFINITIONS.diving_profile.defaults, marker_variant: 'halo' } }}
         updateWidgetData={update}
         setNumericField={vi.fn()}
-        updateWidgetSize={resize}
-        commitWidgetSize={commit}
+        updateWidgetDraft={resize}
+        commitWidgetDraft={commit}
       />,
     )
     expect(screen.getByText('Decompression Ceiling')).toBeInTheDocument()

@@ -11,13 +11,13 @@ import { ColorField, SliderField, ToggleField } from '../widgetFormControls'
  * @param {object} props - Component props.
  * @param {object} props.data - Active display variant data.
  * @param {(update: object) => void} props.updateVariant - Merges a patch into the display variant.
- * @param {(update: object) => void} props.updateVariantSize - Merges a live size patch into the display variant.
- * @param {() => void} props.onCommit - Commits a live size update.
+ * @param {(update: object) => void} props.updateVariantDraft - Merges a live draft patch into the display variant.
+ * @param {() => void} props.onCommit - Commits the live draft.
  * @param {number} props.borderMax - Upper bound of the border thickness.
  * @param {boolean} [props.supportsGradient=true] - Whether the display renders gradient fills.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function TrackStyleSection({ data, updateVariant, updateVariantSize, onCommit, borderMax, supportsGradient = true }) {
+export default function TrackStyleSection({ data, updateVariant, updateVariantDraft, onCommit, borderMax, supportsGradient = true }) {
   const { t } = useTranslation()
   const gradient = supportsGradient && data.track_filled_gradient
 
@@ -55,7 +55,8 @@ export default function TrackStyleSection({ data, updateVariant, updateVariantSi
           valueScale={100}
           valueDisplay={`${Math.round(data.track_empty_opacity * 100)}`}
           suffix="%"
-          onSliderChange={(track_empty_opacity) => updateVariant({ track_empty_opacity })}
+          onSliderChange={(track_empty_opacity) => updateVariantDraft({ track_empty_opacity })}
+          onSliderCommit={onCommit}
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
@@ -75,7 +76,8 @@ export default function TrackStyleSection({ data, updateVariant, updateVariantSi
           valueScale={100}
           valueDisplay={`${Math.round(data.track_filled_opacity * 100)}`}
           suffix="%"
-          onSliderChange={(track_filled_opacity) => updateVariant({ track_filled_opacity })}
+          onSliderChange={(track_filled_opacity) => updateVariantDraft({ track_filled_opacity })}
+          onSliderCommit={onCommit}
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
@@ -94,14 +96,14 @@ export default function TrackStyleSection({ data, updateVariant, updateVariantSi
           integerDisplay
           valueDisplay={`${data.track_border_thickness}`}
           suffix="px"
-          onSliderChange={(track_border_thickness) => updateVariantSize({ track_border_thickness })}
+          onSliderChange={(track_border_thickness) => updateVariantDraft({ track_border_thickness })}
           onSliderCommit={onCommit}
         />
       </div>
       {gradient ? (
         <GradientPicker
           stops={data.track_filled_gradient_stops}
-          onChange={(track_filled_gradient_stops) => updateVariantSize({ track_filled_gradient_stops })}
+          onChange={(track_filled_gradient_stops) => updateVariantDraft({ track_filled_gradient_stops })}
           onCommit={onCommit}
         />
       ) : null}

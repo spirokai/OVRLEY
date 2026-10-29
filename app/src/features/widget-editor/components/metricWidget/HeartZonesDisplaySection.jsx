@@ -7,7 +7,7 @@ import { useAvailableFonts } from '@/hooks/useFonts'
 import { useTranslation } from 'react-i18next'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { buildZoneCalculationUpdate, updateManualZone } from '../../utils/heartZones'
-import { ColorField, NumberField, SelectField, SizeSlider, SliderField, ToggleField } from '../widgetFormControls'
+import { ColorField, NumberField, SelectField, SliderField, ToggleField } from '../widgetFormControls'
 
 const ZONE_CALCULATION_OPTIONS = [
   { value: 'lthr', labelKey: 'widget-editor.zoneCalculationLthr', defaultLabel: 'Lactate Threshold HR' },
@@ -26,17 +26,17 @@ const INDICATOR_STYLE_OPTIONS = [
  * @param {object} props
  * @param {object} props.widget - Widget config.
  * @param {Function} props.updateWidgetData - Updates widget data.
- * @param {Function} props.updateWidgetSize - Updates size-affecting widget data.
- * @param {Function} props.commitWidgetSize - Commits a size-affecting edit.
+ * @param {Function} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
+ * @param {Function} props.commitWidgetDraft - Commits the live widget draft.
  * @returns {JSX.Element}
  */
-export default function HeartZonesDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function HeartZonesDisplaySection({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const zones = useMemo(() => widget.data.display_variants?.heart_zones ?? {}, [widget.data.display_variants?.heart_zones])
   const updateZones = useDisplayVariantUpdater(widget, 'heart_zones', updateWidgetData)
-  const updateZonesSize = useDisplayVariantUpdater(widget, 'heart_zones', updateWidgetSize)
+  const updateZonesDraft = useDisplayVariantUpdater(widget, 'heart_zones', updateWidgetDraft)
   const availableFonts = useAvailableFonts()
-  const commit = () => commitWidgetSize(widget.id)
+  const commit = () => commitWidgetDraft(widget.id)
   const zoneCalculationOptions = ZONE_CALCULATION_OPTIONS.map((option) => ({ value: option.value, label: t(option.labelKey, option.defaultLabel) }))
   const maxCornerRadius = Math.floor(Math.min((zones.width - zones.zone_gap * 4) / 5, zones.height) / 2)
 
@@ -45,25 +45,29 @@ export default function HeartZonesDisplaySection({ widget, updateWidgetData, upd
       <div className="space-y-4">
         <SectionHeading icon={HeartPulse} title={t('widget-editor.heartZones', 'Zones')} />
         <div className="grid grid-cols-2 gap-4">
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.width', 'Width')}
             value={zones.width}
             min={60}
             max={1600}
             valueDisplay={`${Math.round(zones.width)}`}
             suffix="px"
-            onChange={(width) => updateZonesSize({ width })}
-            onCommit={commit}
+            onSliderChange={(width) => updateZonesDraft({ width })}
+            onSliderCommit={commit}
           />
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.height', 'Height')}
             value={zones.height}
             min={8}
             max={200}
             valueDisplay={`${Math.round(zones.height)}`}
             suffix="px"
-            onChange={(height) => updateZonesSize({ height })}
-            onCommit={commit}
+            onSliderChange={(height) => updateZonesDraft({ height })}
+            onSliderCommit={commit}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -76,7 +80,8 @@ export default function HeartZonesDisplaySection({ widget, updateWidgetData, upd
             step={1}
             integerDisplay
             suffix="px"
-            onSliderChange={(track_corner_radius) => updateZones({ track_corner_radius })}
+            onSliderChange={(track_corner_radius) => updateZonesDraft({ track_corner_radius })}
+            onSliderCommit={commit}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -175,7 +180,9 @@ export default function HeartZonesDisplaySection({ widget, updateWidgetData, upd
             value={zones.indicator_color}
             onChange={(indicator_color) => updateZones({ indicator_color })}
           />
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.indicatorSize', 'Indicator Size')}
             value={zones.indicator_size}
             min={4}
@@ -183,8 +190,8 @@ export default function HeartZonesDisplaySection({ widget, updateWidgetData, upd
             disabled={zones.indicator_style !== 'arrow'}
             valueDisplay={`${Math.round(zones.indicator_size)}`}
             suffix="px"
-            onChange={(indicator_size) => updateZonesSize({ indicator_size })}
-            onCommit={commit}
+            onSliderChange={(indicator_size) => updateZonesDraft({ indicator_size })}
+            onSliderCommit={commit}
           />
         </div>
       </div>

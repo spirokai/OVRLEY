@@ -21,7 +21,7 @@ import { normalizeRotation } from '@/features/wasm-widgets/utils/widgetGestureGe
  * @param {*} props.setNumericField - Value for set numeric field.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
+export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft, setNumericField }) {
   const { t } = useTranslation()
   const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width
   const completedLineOpacity = widget.data.completed_line_opacity
@@ -43,8 +43,8 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
         step={1}
         integerDisplay
         suffix="°"
-        onSliderChange={(rawValue) => updateWidgetSize(widget.id, { rotation: rawValue })}
-        onSliderCommit={() => commitWidgetSize(widget.id)}
+        onSliderChange={(rawValue) => updateWidgetDraft(widget.id, { rotation: rawValue })}
+        onSliderCommit={() => commitWidgetDraft(widget.id)}
       />
 
       <div className="space-y-4">
@@ -60,12 +60,12 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
           valueDisplay={`${lineWidth}`}
           suffix="px"
           onSliderChange={(value) =>
-            updateWidgetSize(widget.id, {
+            updateWidgetDraft(widget.id, {
               completed_line_width: value,
               remaining_line_width: value,
             })
           }
-          onSliderCommit={() => commitWidgetSize(widget.id)}
+          onSliderCommit={() => commitWidgetDraft(widget.id)}
         />
         <div className="grid grid-cols-2 gap-4">
           <SliderField
@@ -78,11 +78,11 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
             valueDisplay={`${simplifyTolerance.toFixed(2)}`}
             suffix="px"
             onSliderChange={(value) =>
-              updateWidgetSize(widget.id, {
+              updateWidgetDraft(widget.id, {
                 simplify_tolerance_px: Number(value.toFixed(2)),
               })
             }
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -94,11 +94,11 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
             valueDisplay={`${targetDensity.toFixed(2)}`}
             suffix="x"
             onSliderChange={(value) =>
-              updateWidgetSize(widget.id, {
+              updateWidgetDraft(widget.id, {
                 target_density: Number(value.toFixed(2)),
               })
             }
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -128,7 +128,8 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
             step={1}
             valueDisplay={`${completedLineOpacity}`}
             suffix="%"
-            onSliderChange={(value) => updateWidgetData(widget.id, { completed_line_opacity: value })}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { completed_line_opacity: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -139,7 +140,8 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
             step={1}
             valueDisplay={`${remainingLineOpacity}`}
             suffix="%"
-            onSliderChange={(value) => updateWidgetData(widget.id, { remaining_line_opacity: value })}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { remaining_line_opacity: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -157,8 +159,8 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
       <PlotMarkerSection
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
       />
     </>
   )

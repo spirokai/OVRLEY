@@ -8,7 +8,7 @@ import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
 import { useTranslation } from 'react-i18next'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { ColorField, FieldBlock, SelectField, SizeSlider, SliderField, ToggleField } from '../widgetFormControls'
+import { ColorField, FieldBlock, SelectField, SliderField, ToggleField } from '../widgetFormControls'
 
 const ORIENTATION_OPTIONS = [
   { value: 'left', labelKey: 'widget-editor.left', defaultLabel: 'Left' },
@@ -25,17 +25,17 @@ const FONT_LABEL_CLASS = 'text-[0.667rem] text-muted-foreground uppercase font-b
  * @param {object} props
  * @param {object} props.widget - Widget config.
  * @param {Function} props.updateWidgetData - Updates widget data.
- * @param {Function} props.updateWidgetSize - Updates size-affecting widget data.
- * @param {Function} props.commitWidgetSize - Commits a size-affecting edit.
+ * @param {Function} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
+ * @param {Function} props.commitWidgetDraft - Commits the live widget draft.
  * @returns {JSX.Element}
  */
-export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const tape = useMemo(() => widget.data.display_variants?.altitude_tape ?? {}, [widget.data.display_variants?.altitude_tape])
   const updateTape = useDisplayVariantUpdater(widget, 'altitude_tape', updateWidgetData)
-  const updateTapeSize = useDisplayVariantUpdater(widget, 'altitude_tape', updateWidgetSize)
+  const updateTapeDraft = useDisplayVariantUpdater(widget, 'altitude_tape', updateWidgetDraft)
   const availableFonts = useAvailableFonts()
-  const commit = () => commitWidgetSize(widget.id)
+  const commit = () => commitWidgetDraft(widget.id)
   const unit = widget.data.display_unit
   const showSpeed = tape.show_vertical_speed
 
@@ -44,25 +44,29 @@ export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, u
       <div className="space-y-4">
         <SectionHeading icon={Mountain} title={t('widget-editor.tapeScale', 'Tape Scale')} />
         <div className="grid grid-cols-2 gap-4">
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.width', 'Width')}
             value={tape.width}
             min={40}
             max={600}
             valueDisplay={`${Math.round(tape.width)}`}
             suffix="px"
-            onChange={(width) => updateTapeSize({ width })}
-            onCommit={commit}
+            onSliderChange={(width) => updateTapeDraft({ width })}
+            onSliderCommit={commit}
           />
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.height', 'Height')}
             value={tape.height}
             min={120}
             max={2000}
             valueDisplay={`${Math.round(tape.height)}`}
             suffix="px"
-            onChange={(height) => updateTapeSize({ height })}
-            onCommit={commit}
+            onSliderChange={(height) => updateTapeDraft({ height })}
+            onSliderCommit={commit}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -73,7 +77,8 @@ export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, u
             max={MAJOR_TICK_INTERVALS.length - 1}
             step={1}
             valueDisplay={`${tape.major_tick_interval} ${unit}`}
-            onSliderChange={(index) => updateTape({ major_tick_interval: MAJOR_TICK_INTERVALS[index] })}
+            onSliderChange={(index) => updateTapeDraft({ major_tick_interval: MAJOR_TICK_INTERVALS[index] })}
+            onSliderCommit={commit}
           />
           <SliderField
             editable
@@ -84,7 +89,8 @@ export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, u
             step={1}
             integerDisplay
             suffix="px"
-            onSliderChange={(major_tick_spacing) => updateTape({ major_tick_spacing })}
+            onSliderChange={(major_tick_spacing) => updateTapeDraft({ major_tick_spacing })}
+            onSliderCommit={commit}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -127,7 +133,8 @@ export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, u
             step={1}
             integerDisplay
             suffix="%"
-            onSliderChange={(major_tick_length_pct) => updateTape({ major_tick_length_pct })}
+            onSliderChange={(major_tick_length_pct) => updateTapeDraft({ major_tick_length_pct })}
+            onSliderCommit={commit}
           />
           <SliderField
             editable
@@ -138,7 +145,8 @@ export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, u
             step={1}
             integerDisplay
             suffix="%"
-            onSliderChange={(minor_tick_length_pct) => updateTape({ minor_tick_length_pct })}
+            onSliderChange={(minor_tick_length_pct) => updateTapeDraft({ minor_tick_length_pct })}
+            onSliderCommit={commit}
           />
           <SliderField
             editable
@@ -149,7 +157,8 @@ export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, u
             step={0.5}
             valueDisplay={`${tape.major_tick_thickness}`}
             suffix="px"
-            onSliderChange={(major_tick_thickness) => updateTape({ major_tick_thickness })}
+            onSliderChange={(major_tick_thickness) => updateTapeDraft({ major_tick_thickness })}
+            onSliderCommit={commit}
           />
           <SliderField
             editable
@@ -160,7 +169,8 @@ export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, u
             step={0.5}
             valueDisplay={`${tape.minor_tick_thickness}`}
             suffix="px"
-            onSliderChange={(minor_tick_thickness) => updateTape({ minor_tick_thickness })}
+            onSliderChange={(minor_tick_thickness) => updateTapeDraft({ minor_tick_thickness })}
+            onSliderCommit={commit}
           />
           <ColorField
             label={t('widget-editor.majorTickColor', 'Major Color')}
@@ -206,7 +216,8 @@ export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, u
             step={1}
             integerDisplay
             suffix="px"
-            onSliderChange={(label_font_size) => updateTape({ label_font_size })}
+            onSliderChange={(label_font_size) => updateTapeDraft({ label_font_size })}
+            onSliderCommit={commit}
           />
           <ColorField
             label={t('widget-editor.labelColor', 'Label Color')}
@@ -247,7 +258,8 @@ export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, u
             step={1}
             integerDisplay
             suffix="px"
-            onSliderChange={(font_size) => updateWidgetData(widget.id, { font_size })}
+            onSliderChange={(font_size) => updateWidgetDraft(widget.id, { font_size })}
+            onSliderCommit={commit}
           />
           <ColorField
             label={t('widget-editor.fontColor', 'Font Color')}
@@ -305,7 +317,8 @@ export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, u
             integerDisplay
             suffix="s"
             disabled={!showSpeed}
-            onSliderChange={(vertical_speed_trend_seconds) => updateTape({ vertical_speed_trend_seconds })}
+            onSliderChange={(vertical_speed_trend_seconds) => updateTapeDraft({ vertical_speed_trend_seconds })}
+            onSliderCommit={commit}
           />
           <SliderField
             editable
@@ -317,7 +330,8 @@ export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, u
             integerDisplay
             suffix="px"
             disabled={!showSpeed}
-            onSliderChange={(vertical_speed_bar_thickness) => updateTape({ vertical_speed_bar_thickness })}
+            onSliderChange={(vertical_speed_bar_thickness) => updateTapeDraft({ vertical_speed_bar_thickness })}
+            onSliderCommit={commit}
           />
           <SliderField
             editable
@@ -329,7 +343,8 @@ export default function AltitudeTapeDisplaySection({ widget, updateWidgetData, u
             integerDisplay
             suffix="px"
             disabled={!showSpeed}
-            onSliderChange={(vertical_speed_font_size) => updateTape({ vertical_speed_font_size })}
+            onSliderChange={(vertical_speed_font_size) => updateTapeDraft({ vertical_speed_font_size })}
+            onSliderCommit={commit}
           />
           <div />
           <ColorField

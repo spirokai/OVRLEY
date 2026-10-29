@@ -44,7 +44,7 @@ function commitWidgetUpdates(config, onConfigChange, updatesById) {
 /** @param {object} options Committed config, global defaults, commit callback, and shared edits. @returns {object} Editor preview state. */
 export default function useOverlayEditorState({
   config,
-  globalDefaults,
+  globalDefaults: committedGlobalDefaults,
   onConfigChange,
   widgetLiveEdits,
   editorShell,
@@ -70,8 +70,10 @@ export default function useOverlayEditorState({
   const clipboardRef = useRef(null)
   const gridRef = useRef(null)
   const [sceneElement, setSceneElement] = useState(null)
-  const { liveWidgetDrafts, widgetNodes, clearWidgetDrafts, resetWidgetDrafts, setLiveWidgetDraft, setLiveWidgetDrafts } =
+  const { liveGlobalDefaults, liveWidgetDrafts, widgetNodes, clearWidgetDrafts, resetWidgetDrafts, setLiveWidgetDraft, setLiveWidgetDrafts } =
     useWidgetDraftView(widgetLiveEdits)
+  // Global default slider drags preview through drafts and commit once on release.
+  const globalDefaults = useMemo(() => ({ ...committedGlobalDefaults, ...liveGlobalDefaults }), [committedGlobalDefaults, liveGlobalDefaults])
 
   const rawWidgets = useMemo(() => buildConfigWidgets(config), [config])
   const { i18n } = useTranslation()

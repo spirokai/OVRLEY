@@ -17,11 +17,6 @@ vi.mock('@/features/widget-editor/components/widgetFormControls', async (importO
         {label}
       </button>
     ),
-    SizeSlider: ({ label, value, onChange }) => (
-      <button type="button" aria-label={label} onClick={() => onChange(value / 2)}>
-        {label}
-      </button>
-    ),
   }
 })
 
@@ -58,12 +53,12 @@ describe('GForceWidgetEditor', () => {
       data: createWidgetDefaults({ type: 'g_force', displayType: 'g_force' }, { font_values: 'Arial.ttf' }),
     }
     const updateWidgetData = vi.fn()
-    const updateWidgetSize = vi.fn()
-    render(<MetricWidgetEditor widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} setNumericField={vi.fn()} />)
+    const updateWidgetDraft = vi.fn()
+    render(<MetricWidgetEditor widget={widget} updateWidgetData={updateWidgetData} updateWidgetDraft={updateWidgetDraft} setNumericField={vi.fn()} />)
 
     screen.getByRole('button', { name: 'Size' }).click()
 
-    expect(updateWidgetSize).toHaveBeenCalledWith(
+    expect(updateWidgetDraft).toHaveBeenCalledWith(
       'g-force-1',
       expect.objectContaining({
         width: 137,

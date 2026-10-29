@@ -1,6 +1,7 @@
 /**
  * Shared inspector and group-drag patches, published once per animation frame.
- * WASM owns gesture geometry; drafts contain only canonical widget data updates.
+ * WASM owns gesture geometry; drafts contain only canonical widget data and
+ * global default updates.
  */
 
 import { useState, useSyncExternalStore } from 'react'
@@ -13,7 +14,8 @@ function notify(state) {
 function publishDrafts(state) {
   if (state.frame !== null) cancelAnimationFrame(state.frame)
   state.frame = null
-  state.snapshot = { ...state.snapshot, liveWidgetDrafts: { ...state.drafts } }
+  // Global default drafts are replaced, never mutated, so widget-only publishes keep their identity.
+  state.snapshot = { ...state.snapshot, liveWidgetDrafts: { ...state.drafts }, liveGlobalDefaults: state.globalDefaults }
   notify(state)
 }
 
@@ -51,6 +53,21 @@ function clearWidgetDraft(state, widgetId) {
 function resetWidgetDrafts(state) {
   state.drafts = {}
   publishDrafts(state)
+}
+
+function setLiveGlobalDefault(state, key, value) {
+  state.globalDefaults = { ...state.globalDefaults, [key]: value }
+  scheduleDrafts(state)
+}
+
+function clearGlobalDefaultDrafts(state) {
+  if (Object.keys(state.globalDefaults).length === 0) return
+  state.globalDefaults = {}
+  publishDrafts(state)
+}
+
+function getGlobalDefaultDrafts(state) {
+  return state.globalDefaults
 }
 
 function getWidgetDraft(state, widgetId) {
@@ -101,28 +118,33 @@ function subscribe(state, listener) {
 }
 
 function createWidgetLiveEdits() {
+  const globalDefaults = {}
   const state = {
     drafts: {},
+    globalDefaults,
     frame: null,
     listeners: new Set(),
     nodeCallbacks: new Map(),
-    snapshot: { liveWidgetDrafts: {}, widgetNodes: {} },
+    snapshot: { liveWidgetDrafts: {}, liveGlobalDefaults: globalDefaults, widgetNodes: {} },
   }
   return {
+    clearGlobalDefaultDrafts: clearGlobalDefaultDrafts.bind(null, state),
     clearWidgetDraft: clearWidgetDraft.bind(null, state),
     clearWidgetDrafts: clearWidgetDrafts.bind(null, state),
+    getGlobalDefaultDrafts: getGlobalDefaultDrafts.bind(null, state),
     getSnapshot: getSnapshot.bind(null, state),
     getWidgetDraft: getWidgetDraft.bind(null, state),
     getWidgetNode: getWidgetNode.bind(null, state),
     getWidgetNodeRef: getWidgetNodeRef.bind(null, state),
     resetWidgetDrafts: resetWidgetDrafts.bind(null, state),
+    setLiveGlobalDefault: setLiveGlobalDefault.bind(null, state),
     setLiveWidgetDraft: setLiveWidgetDraft.bind(null, state),
     setLiveWidgetDrafts: setLiveWidgetDrafts.bind(null, state),
     subscribe: subscribe.bind(null, state),
   }
 }
 
-/** @returns {object} Shared controller for widget drafts and canvas registration. */
+/** @returns {object} Shared controller for widget and global default drafts and canvas registration. */
 export default function useWidgetDraftState() {
   const [controller] = useState(createWidgetLiveEdits)
   return controller

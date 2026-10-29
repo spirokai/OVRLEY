@@ -54,7 +54,7 @@ const WIDGET_EDITOR_MAP = {
  * @param {number} [sceneFontSize] - Scene fallback font size.
  * @returns {JSX.Element|null} Rendered editor component or null.
  */
-function renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField, sceneFontSize) {
+function renderWidgetEditor(widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft, setNumericField, sceneFontSize) {
   // Specialized editors take priority over the generic metric editor
   const Editor = WIDGET_EDITOR_MAP[widget.type]
   if (Editor) {
@@ -62,8 +62,8 @@ function renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWi
       <Editor
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
         setNumericField={setNumericField}
         sceneFontSize={sceneFontSize}
       />
@@ -74,8 +74,8 @@ function renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWi
       <MetricWidgetEditor
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
         setNumericField={setNumericField}
       />
     )
@@ -99,8 +99,8 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
     selectedWidgetId,
     isMarqueeSelecting,
     updateWidgetData,
-    updateWidgetSize,
-    commitWidgetSize,
+    updateWidgetDraft,
+    commitWidgetDraft,
     setNumericField,
     deleteWidget,
     resetWidget,
@@ -184,7 +184,8 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
                         <PositionSection
                           widget={widget}
                           setNumericField={setNumericField}
-                          updateWidgetData={updateWidgetData}
+                          updateWidgetDraft={updateWidgetDraft}
+                          commitWidgetDraft={commitWidgetDraft}
                           headerAction={
                             <Button
                               variant="ghost"
@@ -196,7 +197,14 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
                             </Button>
                           }
                         />
-                        {renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField, config?.scene?.font_size)}
+                        {renderWidgetEditor(
+                          widget,
+                          updateWidgetData,
+                          updateWidgetDraft,
+                          commitWidgetDraft,
+                          setNumericField,
+                          config?.scene?.font_size,
+                        )}
                       </div>
                     </AccordionContent>
                   </AccordionItem>

@@ -42,7 +42,7 @@ export function BarFillStyleField({ data, suggestBarGeometry, updateVariant, dis
   )
 }
 
-export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updateVariant, updateVariantSize, commitWidgetSize, widgetId }) {
+export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updateVariant, updateVariantDraft, commitWidgetDraft, widgetId }) {
   const { t } = useTranslation()
   if (data.track_fill_style !== 'bars') {
     return (
@@ -64,8 +64,8 @@ export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updat
         step={1}
         integerDisplay
         valueDisplay={`${data.bar_count}`}
-        onSliderChange={(bar_count) => updateVariantSize(buildBarGeometryUpdate(data, { bar_count }, getCornerRadiusMax))}
-        onSliderCommit={() => commitWidgetSize(widgetId)}
+        onSliderChange={(bar_count) => updateVariantDraft(buildBarGeometryUpdate(data, { bar_count }, getCornerRadiusMax))}
+        onSliderCommit={() => commitWidgetDraft(widgetId)}
       />
       <SliderField
         editable
@@ -77,8 +77,8 @@ export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updat
         integerDisplay
         valueDisplay={`${data.bar_gap}`}
         suffix="px"
-        onSliderChange={(bar_gap) => updateVariantSize(buildBarGeometryUpdate(data, { bar_gap }, getCornerRadiusMax))}
-        onSliderCommit={() => commitWidgetSize(widgetId)}
+        onSliderChange={(bar_gap) => updateVariantDraft(buildBarGeometryUpdate(data, { bar_gap }, getCornerRadiusMax))}
+        onSliderCommit={() => commitWidgetDraft(widgetId)}
       />
     </>
   )

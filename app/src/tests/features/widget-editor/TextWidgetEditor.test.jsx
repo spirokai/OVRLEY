@@ -74,34 +74,39 @@ beforeAll(() => {
 
 describe('label weight controls', () => {
   test('changes fractional spacing through the live updater and commit without changing weight or italic', async () => {
-    const updateWidgetSize = vi.fn()
-    const commitWidgetSize = vi.fn()
+    const updateWidgetDraft = vi.fn()
+    const commitWidgetDraft = vi.fn()
     const updateWidgetData = vi.fn()
     const label = widget('Inter.ttf', 537, true)
     label.data.letter_spacing = -1.25
     render(
-      <TextWidgetEditor widget={label} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />,
+      <TextWidgetEditor
+        widget={label}
+        updateWidgetData={updateWidgetData}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
+      />,
     )
     await waitFor(() => expect(screen.getAllByRole('slider')).toHaveLength(3))
     const spacing = screen.getByRole('slider', { name: 'Spacing' })
     expect(spacing).toHaveAttribute('aria-valuenow', '-1.25')
     expect(screen.getByText('-1.3%')).toBeInTheDocument()
     fireEvent.keyDown(spacing, { key: 'ArrowRight' })
-    expect(updateWidgetSize).toHaveBeenCalledWith('title', { letter_spacing: -0.5 })
-    expect(commitWidgetSize).toHaveBeenCalledWith('title')
+    expect(updateWidgetDraft).toHaveBeenCalledWith('title', { letter_spacing: -0.5 })
+    expect(commitWidgetDraft).toHaveBeenCalledWith('title')
     expect(updateWidgetData).not.toHaveBeenCalled()
     await waitFor(() => expect(screen.getAllByRole('slider')).toHaveLength(3))
   })
   test('keeps weight and italic controls disabled for a static upright family', async () => {
     const updateWidgetData = vi.fn()
-    const updateWidgetSize = vi.fn()
-    const commitWidgetSize = vi.fn()
+    const updateWidgetDraft = vi.fn()
+    const commitWidgetDraft = vi.fn()
     render(
       <TextWidgetEditor
         widget={widget('Static', 537)}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
       />,
     )
     await waitFor(() => expect(screen.getAllByRole('slider')).toHaveLength(3))
@@ -110,8 +115,8 @@ describe('label weight controls', () => {
     expect(weight).toHaveAttribute('data-disabled')
     expect(weight).toHaveAttribute('aria-valuenow', '700')
     expect(weight).not.toHaveAttribute('tabindex')
-    expect(updateWidgetSize).not.toHaveBeenCalled()
-    expect(commitWidgetSize).not.toHaveBeenCalled()
+    expect(updateWidgetDraft).not.toHaveBeenCalled()
+    expect(commitWidgetDraft).not.toHaveBeenCalled()
     expect(updateWidgetData).not.toHaveBeenCalled()
   })
 
@@ -121,8 +126,8 @@ describe('label weight controls', () => {
       <TextWidgetEditor
         widget={widget('Inter.ttf', 900, true)}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={vi.fn()}
-        commitWidgetSize={vi.fn()}
+        updateWidgetDraft={vi.fn()}
+        commitWidgetDraft={vi.fn()}
       />,
     )
     await waitFor(() => expect(screen.getAllByRole('slider')).toHaveLength(3))
@@ -136,7 +141,7 @@ describe('label weight controls', () => {
   test('toggles italic through the committed updater without changing weight', async () => {
     const updateWidgetData = vi.fn()
     const label = widget('Inter.ttf', 537)
-    const props = { updateWidgetData, updateWidgetSize: vi.fn(), commitWidgetSize: vi.fn() }
+    const props = { updateWidgetData, updateWidgetDraft: vi.fn(), commitWidgetDraft: vi.fn() }
     const { rerender } = render(<TextWidgetEditor widget={label} {...props} />)
     const toggle = screen.getByRole('button', { name: 'Italic' })
     await waitFor(() => expect(toggle).toBeEnabled())
@@ -150,14 +155,14 @@ describe('label weight controls', () => {
   })
 
   test('uses the detected range and existing live-update and commit callbacks', async () => {
-    const updateWidgetSize = vi.fn()
-    const commitWidgetSize = vi.fn()
+    const updateWidgetDraft = vi.fn()
+    const commitWidgetDraft = vi.fn()
     render(
       <TextWidgetEditor
         widget={widget('Teko.ttf', 537)}
         updateWidgetData={vi.fn()}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
       />,
     )
     await waitFor(() => expect(screen.getAllByRole('slider')).toHaveLength(3))
@@ -166,7 +171,7 @@ describe('label weight controls', () => {
     expect(weight).toHaveAttribute('aria-valuemax', '700')
     expect(screen.getByText('537')).toBeInTheDocument()
     fireEvent.keyDown(weight, { key: 'ArrowRight' })
-    expect(updateWidgetSize).toHaveBeenCalledWith('title', { font_weight: 600 })
-    expect(commitWidgetSize).toHaveBeenCalledWith('title')
+    expect(updateWidgetDraft).toHaveBeenCalledWith('title', { font_weight: 600 })
+    expect(commitWidgetDraft).toHaveBeenCalledWith('title')
   })
 })

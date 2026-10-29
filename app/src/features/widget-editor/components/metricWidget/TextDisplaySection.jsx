@@ -25,7 +25,7 @@ const BALANCE_FORMAT_OPTIONS = [
  * @param {Function} props.updateWidgetData - Updates widget data.
  * @param {Function} props.setNumericField - Sets a numeric field.
  */
-export default function TextDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
+export default function TextDisplaySection({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft, setNumericField }) {
   const { t } = useTranslation()
   const definition = WIDGET_TYPE_DEFINITIONS[widget.type]
   const unitsMode = definition.unitsMode
@@ -46,8 +46,8 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
       <FontSection
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
         showContentAlignment
       />
 
@@ -61,7 +61,8 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
             max={definition.maxDecimals}
             step={1}
             valueDisplay={String(widget.data.decimals)}
-            onSliderChange={(value) => updateWidgetData(widget.id, { decimals: value })}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { decimals: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
       ) : null}
@@ -123,8 +124,8 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
       <IconSection
         widget={widget}
         updateWidgetData={updateWidgetData}
-        updateWidgetSize={updateWidgetSize}
-        commitWidgetSize={commitWidgetSize}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
         setNumericField={setNumericField}
         showUnitsToggle={unitsMode !== 'hidden'}
         unitsField={

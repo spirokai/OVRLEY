@@ -3,7 +3,7 @@ import { SlidersHorizontal, Type } from 'lucide-react'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { buildUniformResizeUpdate } from '../../utils/widgetSize'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
-import { ColorField, SizeSlider, SliderField } from '../widgetFormControls'
+import { ColorField, SliderField } from '../widgetFormControls'
 import TrackStyleSection from './TrackStyleSection'
 import FontSelectField from '@/components/ui/font-select-field'
 import { useAvailableFonts } from '@/hooks/useFonts'
@@ -17,11 +17,11 @@ import { useTranslation } from 'react-i18next'
  * @param {Function} props.updateWidgetData - Updates widget data.
  * @returns {JSX.Element}
  */
-export default function LeanAngleDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function LeanAngleDisplaySection({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const leanVariant = useMemo(() => widget.data.display_variants?.lean_angle ?? {}, [widget.data.display_variants?.lean_angle])
   const updateLean = useDisplayVariantUpdater(widget, 'lean_angle', updateWidgetData)
-  const updateLeanSize = useDisplayVariantUpdater(widget, 'lean_angle', updateWidgetSize)
+  const updateLeanDraft = useDisplayVariantUpdater(widget, 'lean_angle', updateWidgetDraft)
 
   const diameter = leanVariant.diameter
   const trackThicknessMax = Math.floor((diameter - 1) / 2)
@@ -30,7 +30,7 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
 
   const handleDiameterChange = (nextDiameter) => {
     const update = buildUniformResizeUpdate(widget, nextDiameter)
-    updateWidgetSize(widget.id, update)
+    updateWidgetDraft(widget.id, update)
   }
 
   return (
@@ -38,7 +38,9 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
       <div className="space-y-4">
         <SectionHeading icon={SlidersHorizontal} title={t('widget-editor.angleTrack', 'Angle Track')} />
         <div className="grid grid-cols-2 gap-4">
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.size', 'Size')}
             value={diameter}
             min={30}
@@ -46,8 +48,8 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             step={1}
             valueDisplay={`${Math.round(diameter)}`}
             suffix="px"
-            onChange={handleDiameterChange}
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={handleDiameterChange}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -59,16 +61,16 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             integerDisplay
             valueDisplay={`${leanVariant.track_thickness}`}
             suffix="px"
-            onSliderChange={(track_thickness) => updateLeanSize({ track_thickness })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(track_thickness) => updateLeanDraft({ track_thickness })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
       </div>
       <TrackStyleSection
         data={leanVariant}
         updateVariant={updateLean}
-        updateVariantSize={updateLeanSize}
-        onCommit={() => commitWidgetSize(widget.id)}
+        updateVariantDraft={updateLeanDraft}
+        onCommit={() => commitWidgetDraft(widget.id)}
         borderMax={borderThicknessMax}
       />
       <div className="space-y-4">
@@ -83,15 +85,17 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             triggerClassName="h-9 border-border/70 bg-surface text-xs"
             labelClassName="text-[0.667rem] text-muted-foreground uppercase font-bold"
           />
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.fontSize', 'Font Size')}
             value={widget.data.font_size}
             min={6}
             max={200}
             valueDisplay={`${widget.data.font_size}`}
             suffix="px"
-            onChange={(font_size) => updateWidgetSize(widget.id, { font_size })}
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(font_size) => updateWidgetDraft(widget.id, { font_size })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -117,8 +121,8 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             integerDisplay
             valueDisplay={`${leanVariant.value_offset_x}`}
             suffix="px"
-            onSliderChange={(value_offset_x) => updateLeanSize({ value_offset_x })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(value_offset_x) => updateLeanDraft({ value_offset_x })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -130,8 +134,8 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             integerDisplay
             valueDisplay={`${leanVariant.value_offset_y}`}
             suffix="px"
-            onSliderChange={(value_offset_y) => updateLeanSize({ value_offset_y })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(value_offset_y) => updateLeanDraft({ value_offset_y })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
       </div>

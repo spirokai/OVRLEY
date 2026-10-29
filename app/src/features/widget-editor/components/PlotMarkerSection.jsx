@@ -6,7 +6,7 @@ import { Map } from 'lucide-react'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { translateOptions } from '@/i18n'
 import { useTranslation } from 'react-i18next'
-import { ColorField, SelectField, SizeSlider, SliderField } from './widgetFormControls'
+import { ColorField, SelectField, SliderField } from './widgetFormControls'
 
 const MARKER_VARIANT_OPTIONS = [
   { value: 'single', labelKey: 'widget-editor.singleCircle', defaultLabel: 'Single Circle' },
@@ -20,8 +20,8 @@ const MARKER_VARIANT_OPTIONS = [
  * @param {object} props - Component props.
  * @param {object} props.widget - Plot widget with `marker_*` fields.
  * @param {Function} props.updateWidgetData - Updates widget data.
- * @param {Function} props.updateWidgetSize - Applies live size changes.
- * @param {Function} props.commitWidgetSize - Commits live size changes.
+ * @param {Function} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
+ * @param {Function} props.commitWidgetDraft - Commits the live widget draft.
  * @param {boolean} [props.showColor=true] - Whether the plot has one marker color; charts color markers per series.
  * @param {boolean} [props.disabled=false] - Whether the marker is hidden.
  * @param {React.ReactNode} [props.trailing=null] - Optional heading control.
@@ -30,15 +30,15 @@ const MARKER_VARIANT_OPTIONS = [
 export default function PlotMarkerSection({
   widget,
   updateWidgetData,
-  updateWidgetSize,
-  commitWidgetSize,
+  updateWidgetDraft,
+  commitWidgetDraft,
   showColor = true,
   disabled = false,
   trailing = null,
 }) {
   const { t } = useTranslation()
   const { marker_variant: variant, marker_size: size, marker_opacity: opacity, marker_variant_diameter: diameter } = widget.data
-  const commit = () => commitWidgetSize(widget.id)
+  const commit = () => commitWidgetDraft(widget.id)
 
   return (
     <div className="space-y-4">
@@ -51,7 +51,9 @@ export default function PlotMarkerSection({
           disabled={disabled}
           onValueChange={(marker_variant) => updateWidgetData(widget.id, { marker_variant })}
         />
-        <SizeSlider
+        <SliderField
+          editable
+          integerDisplay
           label={t('widget-editor.size', 'Size')}
           value={size}
           min={1}
@@ -60,8 +62,8 @@ export default function PlotMarkerSection({
           disabled={disabled}
           valueDisplay={`${size}`}
           suffix="px"
-          onChange={(marker_size) => updateWidgetSize(widget.id, { marker_size })}
-          onCommit={commit}
+          onSliderChange={(marker_size) => updateWidgetDraft(widget.id, { marker_size })}
+          onSliderCommit={commit}
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
@@ -82,11 +84,13 @@ export default function PlotMarkerSection({
           disabled={disabled}
           valueDisplay={`${opacity}`}
           suffix="%"
-          onSliderChange={(marker_opacity) => updateWidgetSize(widget.id, { marker_opacity })}
+          onSliderChange={(marker_opacity) => updateWidgetDraft(widget.id, { marker_opacity })}
           onSliderCommit={commit}
         />
         {variant !== 'single' ? (
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={variant === 'ring' ? t('widget-editor.ringDiameter', 'Ring Diameter') : t('widget-editor.haloDiameter', 'Halo Diameter')}
             value={diameter}
             min={Math.max(Math.round(size * 2), 4)}
@@ -95,8 +99,8 @@ export default function PlotMarkerSection({
             disabled={disabled}
             valueDisplay={`${diameter}`}
             suffix="px"
-            onChange={(marker_variant_diameter) => updateWidgetSize(widget.id, { marker_variant_diameter })}
-            onCommit={commit}
+            onSliderChange={(marker_variant_diameter) => updateWidgetDraft(widget.id, { marker_variant_diameter })}
+            onSliderCommit={commit}
           />
         ) : null}
       </div>

@@ -7,7 +7,7 @@ import { SectionHeading } from '@/components/ui/section-heading'
 import { useAvailableFonts } from '@/hooks/useFonts'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { FontSection, UnitsControlRow } from '../widgetEditorSections'
-import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from '../widgetFormControls'
+import { ColorField, SelectField, SliderField, ToggleField } from '../widgetFormControls'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
 import TrackStyleSection from './TrackStyleSection'
 import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry, getArcTrackDimensions } from '../../utils/gaugeGeometry'
@@ -44,14 +44,14 @@ function getArcCornerRadiusMax(data, displayType) {
  * shared top-level metric data. Icons are deliberately absent because gauges do not
  * render them.
  */
-export default function ArcDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function ArcDisplaySection({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const displayType = widget.data.display_type
   const isCornerGauge = displayType === 'corner'
   const isGtGauge = displayType === 'gt_gauge'
   const arcData = useMemo(() => widget.data.display_variants?.[displayType] ?? {}, [displayType, widget.data.display_variants])
   const updateArc = useDisplayVariantUpdater(widget, displayType, updateWidgetData)
-  const updateArcSize = useDisplayVariantUpdater(widget, displayType, updateWidgetSize)
+  const updateArcDraft = useDisplayVariantUpdater(widget, displayType, updateWidgetDraft)
   const availableFonts = useAvailableFonts()
   const definition = WIDGET_TYPE_DEFINITIONS[widget.type]
   const unitOptions = definition.supportedDisplayUnits
@@ -69,7 +69,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
 
   const handleSizeChange = (nextSize) => {
     const update = buildUniformResizeUpdate(widget, nextSize)
-    updateWidgetSize(widget.id, update)
+    updateWidgetDraft(widget.id, update)
   }
 
   return (
@@ -80,7 +80,9 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           title={isCornerGauge ? t('widget-editor.cornerTrack', 'Corner Track') : t('widget-editor.arcTrack', 'Arc Track')}
         />
         <div className="grid grid-cols-1 gap-4">
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.size', 'Size')}
             value={size}
             min={30}
@@ -88,8 +90,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             step={1}
             valueDisplay={`${Math.round(size)}`}
             suffix="px"
-            onChange={handleSizeChange}
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={handleSizeChange}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4 pt-2">
@@ -111,8 +113,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
               integerDisplay
               valueDisplay={`${arcData.tick_length}`}
               suffix="px"
-              onSliderChange={(tick_length) => updateArcSize({ tick_length })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(tick_length) => updateArcDraft({ tick_length })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           ) : (
             <SliderField
@@ -124,8 +126,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
               step={5}
               valueDisplay={`${arcData.arc_angle}`}
               suffix="°"
-              onSliderChange={(arc_angle) => updateArcSize({ arc_angle })}
-              onSliderCommit={() => commitWidgetSize(widget.id)}
+              onSliderChange={(arc_angle) => updateArcDraft({ arc_angle })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           )}
           <SliderField
@@ -139,12 +141,12 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             valueDisplay={`${arcData.track_thickness}`}
             suffix="px"
             onSliderChange={(track_thickness) =>
-              updateArcSize({
+              updateArcDraft({
                 track_thickness,
                 track_corner_radius: Math.min(arcData.track_corner_radius, getArcCornerRadiusMax({ ...arcData, track_thickness }, displayType)),
               })
             }
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -164,16 +166,16 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             integerDisplay
             valueDisplay={`${arcData.track_corner_radius}`}
             suffix="px"
-            onSliderChange={(track_corner_radius) => updateArcSize({ track_corner_radius })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(track_corner_radius) => updateArcDraft({ track_corner_radius })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <BarFillStyleDetails
             data={arcData}
             barGapMax={barGapMax}
             getCornerRadiusMax={getArcCornerRadiusMax}
             updateVariant={updateArc}
-            updateVariantSize={updateArcSize}
-            commitWidgetSize={commitWidgetSize}
+            updateVariantDraft={updateArcDraft}
+            commitWidgetDraft={commitWidgetDraft}
             widgetId={widget.id}
           />
           {isGtGauge ? (
@@ -187,7 +189,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
               valueScale={100}
               valueDisplay={`${Math.round(arcData.glow * 100)}`}
               suffix="%"
-              onSliderChange={(glow) => updateArc({ glow })}
+              onSliderChange={(glow) => updateArcDraft({ glow })}
+              onSliderCommit={() => commitWidgetDraft(widget.id)}
             />
           ) : null}
         </div>
@@ -196,8 +199,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
       <TrackStyleSection
         data={arcData}
         updateVariant={updateArc}
-        updateVariantSize={updateArcSize}
-        onCommit={() => commitWidgetSize(widget.id)}
+        updateVariantDraft={updateArcDraft}
+        onCommit={() => commitWidgetDraft(widget.id)}
         borderMax={6}
         supportsGradient={!isGtGauge}
       />
@@ -206,8 +209,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
         <FontSection
           widget={widget}
           updateWidgetData={updateWidgetData}
-          updateWidgetSize={updateWidgetSize}
-          commitWidgetSize={commitWidgetSize}
+          updateWidgetDraft={updateWidgetDraft}
+          commitWidgetDraft={commitWidgetDraft}
           title={t('widget-editor.label', 'Label')}
           fontSizeLabel={t('widget-editor.fontSize', 'Font Size')}
         />
@@ -222,8 +225,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             integerDisplay
             valueDisplay={`${arcData.inner_widget_offset_x}`}
             suffix="px"
-            onSliderChange={(value) => updateBoundedNumber(updateArcSize, 'inner_widget_offset_x', value, -10_000, 10_000)}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(value) => updateBoundedNumber(updateArcDraft, 'inner_widget_offset_x', value, -10_000, 10_000)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -235,8 +238,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             integerDisplay
             valueDisplay={`${arcData.inner_widget_offset_y}`}
             suffix="px"
-            onSliderChange={(value) => updateBoundedNumber(updateArcSize, 'inner_widget_offset_y', value, -10_000, 10_000)}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(value) => updateBoundedNumber(updateArcDraft, 'inner_widget_offset_y', value, -10_000, 10_000)}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
       </div>
@@ -250,7 +253,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             max={definition.maxDecimals}
             step={1}
             valueDisplay={String(widget.data.decimals)}
-            onSliderChange={(value) => updateWidgetData(widget.id, { decimals: value })}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { decimals: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
       ) : null}
@@ -290,7 +294,9 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             triggerClassName="h-9 border-border/70 bg-surface text-xs"
             labelClassName="text-[0.667rem] text-muted-foreground uppercase font-bold"
           />
-          <SizeSlider
+          <SliderField
+            editable
+            integerDisplay
             label={t('widget-editor.fontSize', 'Font Size')}
             disabled={!arcData.show_min_max_labels}
             value={arcData.min_max_label_font_size}
@@ -299,8 +305,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             step={1}
             valueDisplay={`${arcData.min_max_label_font_size}`}
             suffix="px"
-            onChange={(min_max_label_font_size) => updateArcSize({ min_max_label_font_size })}
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(min_max_label_font_size) => updateArcDraft({ min_max_label_font_size })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         <ColorField

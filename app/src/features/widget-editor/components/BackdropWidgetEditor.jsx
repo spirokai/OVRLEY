@@ -98,7 +98,7 @@ function ShapeGrid({ rectangleData, onToggleCorner, onToggleEdge }) {
   )
 }
 
-export default function BackdropWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+export default function BackdropWidgetEditor({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft }) {
   const { t } = useTranslation()
   const displayType = widget.data.display_type
   const displayOptions = useMemo(() => getWidgetDisplayTypeOptions('backdrop', t), [t])
@@ -126,11 +126,11 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
     [buildActiveVariantUpdate, updateWidgetData, widget.id],
   )
 
-  const updateActiveVariantSize = useCallback(
+  const updateActiveVariantDraft = useCallback(
     (updates) => {
-      updateWidgetSize(widget.id, buildActiveVariantUpdate(updates))
+      updateWidgetDraft(widget.id, buildActiveVariantUpdate(updates))
     },
-    [buildActiveVariantUpdate, updateWidgetSize, widget.id],
+    [buildActiveVariantUpdate, updateWidgetDraft, widget.id],
   )
 
   const handleDisplayTypeChange = useCallback(
@@ -216,8 +216,8 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
                 integerDisplay
                 valueDisplay={`${widget.data.border_thickness ?? 0}`}
                 suffix="px"
-                onSliderChange={(value) => updateWidgetSize(widget.id, { border_thickness: value })}
-                onSliderCommit={() => commitWidgetSize(widget.id)}
+                onSliderChange={(value) => updateWidgetDraft(widget.id, { border_thickness: value })}
+                onSliderCommit={() => commitWidgetDraft(widget.id)}
               />
             </div>
             <div className="min-h-0">
@@ -231,8 +231,8 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
                 integerDisplay
                 valueDisplay={`${cornerRadius}`}
                 suffix="px"
-                onSliderChange={(value) => updateActiveVariantSize({ corner_radius: Math.min(Math.max(0, value), radiusMax) })}
-                onSliderCommit={() => commitWidgetSize(widget.id)}
+                onSliderChange={(value) => updateActiveVariantDraft({ corner_radius: Math.min(Math.max(0, value), radiusMax) })}
+                onSliderCommit={() => commitWidgetDraft(widget.id)}
               />
             </div>
           </div>
@@ -248,8 +248,8 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
             integerDisplay
             valueDisplay={`${activeData.edge_strip_thickness}`}
             suffix="px"
-            onSliderChange={(value) => updateActiveVariantSize({ edge_strip_thickness: Math.min(value, stripMax) })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(value) => updateActiveVariantDraft({ edge_strip_thickness: Math.min(value, stripMax) })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <ColorField
             label={t('widget-editor.stripColor', 'Strip Color')}
@@ -298,7 +298,8 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
             valueScale={100}
             valueDisplay={`${Math.round((widget.data.fill_opacity ?? 0) * 100)}`}
             suffix="%"
-            onSliderChange={(value) => updateWidgetData(widget.id, { fill_opacity: value })}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { fill_opacity: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
           <SliderField
             editable
@@ -310,7 +311,8 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
             valueScale={100}
             valueDisplay={`${Math.round((widget.data.border_opacity ?? 0) * 100)}`}
             suffix="%"
-            onSliderChange={(value) => updateWidgetData(widget.id, { border_opacity: value })}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { border_opacity: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         </div>
         {displayType === 'circle' ? (
@@ -324,8 +326,8 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
             integerDisplay
             valueDisplay={`${widget.data.border_thickness ?? 0}`}
             suffix="px"
-            onSliderChange={(value) => updateWidgetSize(widget.id, { border_thickness: value })}
-            onSliderCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(value) => updateWidgetDraft(widget.id, { border_thickness: value })}
+            onSliderCommit={() => commitWidgetDraft(widget.id)}
           />
         ) : null}
       </div>
