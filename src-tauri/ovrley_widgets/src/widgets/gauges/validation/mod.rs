@@ -21,6 +21,9 @@ use crate::{
     widgets::value::{config::ValueConfig, format::format_metric_parts},
 };
 
+// Built once per gauge widget at validation and never stored in bulk, so the
+// inline size of the larger Arc variant costs nothing worth boxing for.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum ValidatedGauge {
     Linear(ValidatedLinearGaugeWidget),

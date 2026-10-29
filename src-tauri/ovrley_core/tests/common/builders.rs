@@ -134,7 +134,7 @@ pub fn video_batch_request(
         template,
         encoding,
         activity: BatchActivity::ExternalActivity {
-            activity,
+            activity: Box::new(activity),
             timezone_mode: VideoSyncTimezoneMode::Utc,
             reference: None,
             automatic_offsets: [(source.source_id.clone(), offset)].into(),

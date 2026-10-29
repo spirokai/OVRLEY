@@ -123,7 +123,7 @@ impl Fixture {
             encoding,
             activity: if external {
                 BatchActivity::ExternalActivity {
-                    activity: activity(),
+                    activity: Box::new(activity()),
                     timezone_mode: VideoSyncTimezoneMode::Utc,
                     reference: None,
                     automatic_offsets: sources

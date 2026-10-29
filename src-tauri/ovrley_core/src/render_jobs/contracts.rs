@@ -69,7 +69,7 @@ pub struct BatchCalibrationReference {
 pub enum BatchActivity {
     EmbeddedActivity {},
     ExternalActivity {
-        activity: ParsedActivity,
+        activity: Box<ParsedActivity>,
         timezone_mode: VideoSyncTimezoneMode,
         reference: Option<BatchCalibrationReference>,
         /// Automatic baselines keyed by the queued source identities. The backend

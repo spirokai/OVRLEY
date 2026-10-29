@@ -83,7 +83,7 @@ pub(super) fn accept_batch(
             disabled_laps,
             ..
         } => {
-            let activity = crate::activity::normalize_parsed_activity(activity)?;
+            let activity = crate::activity::normalize_parsed_activity(*activity)?;
             let end = validate_render_activity(&activity)?;
             let disabled_laps =
                 crate::normalize::validate_disabled_laps(disabled_laps, "activity.disabledLaps")?;
