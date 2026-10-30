@@ -6,6 +6,7 @@
 
 /// Web Mercator projection helpers.
 pub mod mercator;
+mod source;
 mod spec;
 
 #[cfg(feature = "raster")]
@@ -13,7 +14,8 @@ pub mod raster;
 #[cfg(feature = "raster")]
 pub mod style;
 
+pub use source::{MapDataSource, MapSprite};
 pub use spec::{
     tile_pixels, MapLayers, MapStyle, MapStyleSpec, TileKey, MAX_RATIO_MILLI, MAX_TILE_ZOOM,
-    MIN_RATIO_MILLI, TILE_SIZE,
+    MIN_RATIO_MILLI, TILE_SIZE, VECTOR_SOURCE,
 };

@@ -1,7 +1,7 @@
 //! Rasterizes map tiles with ezu. All use of ezu's renderer stays in this module.
 
-use crate::style::{translate, FONT_BOLD_URL, FONT_ITALIC_URL, FONT_REGULAR_URL, VECTOR_SOURCE};
-use crate::{MapStyle, MapStyleSpec, TileKey, TILE_SIZE};
+use crate::style::{translate, FONT_BOLD_URL, FONT_ITALIC_URL, FONT_REGULAR_URL};
+use crate::{MapDataSource, MapStyle, MapStyleSpec, TileKey, TILE_SIZE, VECTOR_SOURCE};
 use ezu::renderer::{
     BindOptions, OutputFormat, RenderOptions, Renderer, SourceData, SourceKind, SourceSet,
 };
@@ -16,21 +16,6 @@ const RENDERER_CAPACITY: usize = 4;
 const DECODED_TILE_CAPACITY: usize = 16;
 /// Finished textures are cached by the hosts, so ezu keeps only a small intermediate cache.
 const RENDER_CACHE_BYTES: usize = 4 * 1024 * 1024;
-
-/// Where map bytes come from. The shell owns the network and disk cache.
-pub trait MapDataSource: Send + Sync {
-    /// The raw style JSON, without any URL rewriting.
-    fn style(&self, style: MapStyle) -> Result<Vec<u8>, String>;
-    fn sprite(&self, style: MapStyle) -> Result<MapSprite, String>;
-    /// The vector tile at `z/x/y`, with `z` at most 14.
-    fn tile(&self, z: u8, x: u32, y: u32) -> Result<Vec<u8>, String>;
-}
-
-/// A sprite sheet: its index document and atlas image, drawn at pixel ratio 2.
-pub struct MapSprite {
-    pub index_json: String,
-    pub atlas_png: Vec<u8>,
-}
 
 /// A finished tile texture.
 pub struct RasterizedTile {

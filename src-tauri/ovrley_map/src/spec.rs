@@ -4,6 +4,8 @@
 pub const TILE_SIZE: u32 = 512;
 /// Deepest tile the widget renders. Data stops at z14 and overzooms from there.
 pub const MAX_TILE_ZOOM: u8 = 18;
+/// The vector source every OpenFreeMap style draws from.
+pub const VECTOR_SOURCE: &str = "openmaptiles";
 /// Pixel ratio bounds in thousandths, matching what ezu accepts.
 pub const MIN_RATIO_MILLI: u16 = 1000;
 pub const MAX_RATIO_MILLI: u16 = 4000;
@@ -61,6 +63,22 @@ impl MapLayers {
         buildings: true,
         labels: true,
     };
+
+    /// Whether these toggles hide a style layer, from its `type`, `source-layer` and `id`.
+    pub fn hides_layer(self, layer_type: &str, source_layer: Option<&str>, id: &str) -> bool {
+        if !self.labels && layer_type == "symbol" {
+            return true;
+        }
+        match source_layer {
+            Some("transportation") if id.contains("path") || id.contains("pedestrian") => {
+                !self.paths
+            }
+            Some("transportation" | "aeroway") => !self.roads,
+            Some("water" | "waterway") => !self.water,
+            Some("building") => !self.buildings,
+            _ => false,
+        }
+    }
 }
 
 /// One translated style: a preset with its layer toggles applied.

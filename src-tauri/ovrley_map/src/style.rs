@@ -1,12 +1,10 @@
 //! Translates an OpenFreeMap MapLibre style into an ezu recipe, once per spec.
 
-use crate::{MapLayers, TILE_SIZE};
+use crate::{MapLayers, TILE_SIZE, VECTOR_SOURCE};
 use ezu::translate::maplibre::{convert, ConvertOptions};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-/// The vector source every OpenFreeMap style draws from.
-pub(crate) const VECTOR_SOURCE: &str = "openmaptiles";
 /// Raster relief below z7, which the widget's zoom range never reaches.
 const RELIEF_SOURCE: &str = "ne2_shaded";
 const VECTOR_MAX_ZOOM: u8 = 14;
@@ -97,22 +95,11 @@ fn convert_options() -> ConvertOptions {
 }
 
 fn is_hidden(layer: &Value, layers: MapLayers) -> bool {
-    if !layers.labels && layer["type"] == "symbol" {
-        return true;
-    }
-    match layer["source-layer"].as_str() {
-        Some("transportation") if is_path_layer(layer) => !layers.paths,
-        Some("transportation" | "aeroway") => !layers.roads,
-        Some("water" | "waterway") => !layers.water,
-        Some("building") => !layers.buildings,
-        _ => false,
-    }
-}
-
-fn is_path_layer(layer: &Value) -> bool {
-    layer["id"]
-        .as_str()
-        .is_some_and(|id| id.contains("path") || id.contains("pedestrian"))
+    layers.hides_layer(
+        layer["type"].as_str().unwrap_or_default(),
+        layer["source-layer"].as_str(),
+        layer["id"].as_str().unwrap_or_default(),
+    )
 }
 
 /// Labels draw from the bundled Latin font, so stacked non-Latin names are dropped.
