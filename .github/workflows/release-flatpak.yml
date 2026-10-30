@@ -99,6 +99,8 @@ jobs:
           set -euo pipefail
           test -f packaging/flatpak/wasm/wasm_bindings.js
           test -f packaging/flatpak/wasm/wasm_bindings.wasm
+          test -f packaging/flatpak/wasm/wasm_map_bindings.js
+          test -f packaging/flatpak/wasm/wasm_map_bindings_bg.wasm
           sed -i "s/^        OVRLEY_VERSION: .*/        OVRLEY_VERSION: $RELEASE_VERSION/" packaging/flatpak/cc.ovrley.OVRLEY.yml
           grep -q "OVRLEY_VERSION: $RELEASE_VERSION\$" packaging/flatpak/cc.ovrley.OVRLEY.yml
           # Signed, because a bundle that carries a key only installs if its commit is signed by that key

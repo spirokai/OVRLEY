@@ -22,7 +22,7 @@ use surface::{wrap_native_surface, write_surface_png};
 
 pub use atlas::{AtlasPlan, AtlasSlot, SlotPlacement};
 pub use engine::{ExportWidgets, PreparedAtlas, WorkerWidgets};
-pub use map_export::ExportMapJob;
+pub use map_export::{download_preview_tiles, ExportMapJob};
 
 /// Canonical dimensions for a rendered video frame.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

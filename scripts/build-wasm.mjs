@@ -17,7 +17,11 @@ export const archivePathFor = (sha256) => {
   return join(vendorDir, `skia-binaries-${sha256}.tar.gz`)
 }
 export const artifactDir = join(root, 'src-tauri', 'target', 'wasm-bindings', target, 'wasm')
-export const artifactNames = ['wasm_bindings.js', 'wasm_bindings.wasm']
+export const artifactNames = ['wasm_bindings.js', 'wasm_bindings.wasm', 'wasm_map_bindings.js', 'wasm_map_bindings_bg.wasm']
+export const mapCrateDir = join(root, 'src-tauri', 'wasm-map-bindings')
+const mapTarget = 'wasm32-unknown-unknown'
+/** Must equal the `wasm-bindgen` version `wasm-map-bindings` pins. */
+const wasmBindgenVersion = '0.2.130'
 
 /** Load and validate the SDK boundary once for both compilation commands. */
 export function toolchainEnvironment() {
@@ -84,6 +88,28 @@ function buildWasm() {
   env.SKIA_BINARIES_URL = `file://${archivePath.replaceAll('\\', '/')}`
   env.FORCE_SKIA_BINARIES_DOWNLOAD = '1'
   cargoBuild(env, ['--features', 'skia-safe/no-compile'])
+  buildMapBindings()
+}
+
+/** The map preview: `ovrley_map::gpu` on WebGL2, as its own module beside the widget module. */
+function buildMapBindings() {
+  const targetDir = join(root, 'src-tauri', 'target', 'wasm-map-bindings')
+  const env = { ...process.env, CARGO_TARGET_DIR: targetDir }
+  execFileSync('rustup', ['target', 'add', '--toolchain', rustVersion, mapTarget], { env, stdio: 'inherit' })
+  execFileSync('cargo', [`+${rustVersion}`, 'build', '--locked', '--release', '--target', mapTarget], { cwd: mapCrateDir, env, stdio: 'inherit' })
+  const bindgenRoot = join(root, 'vendor', 'wasm-bindgen', wasmBindgenVersion)
+  const bindgen = join(bindgenRoot, 'bin', `wasm-bindgen${process.platform === 'win32' ? '.exe' : ''}`)
+  if (!existsSync(bindgen)) {
+    execFileSync('cargo', [`+${rustVersion}`, 'install', 'wasm-bindgen-cli', '--version', wasmBindgenVersion, '--locked', '--root', bindgenRoot], {
+      env,
+      stdio: 'inherit',
+    })
+  }
+  execFileSync(
+    bindgen,
+    [join(targetDir, mapTarget, 'release', 'wasm_map_bindings.wasm'), '--target', 'web', '--no-typescript', '--out-dir', artifactDir],
+    { stdio: 'inherit' },
+  )
 }
 
 // Source compilation and Vite reuse the build contract without invoking Cargo.

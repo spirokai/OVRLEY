@@ -1,6 +1,6 @@
 //! Tile identities and view regions, ported from maplibre-rs `coords.rs`.
 
-use crate::camera::{MapCamera, MapViewport, ViewPadding, ViewState};
+use crate::camera::{MapCamera, MapViewport, ViewState};
 
 /// Tiles stop at this level upstream. Deeper views draw these tiles scaled.
 const MAX_DATA_LEVEL: u8 = 14;
@@ -35,21 +35,20 @@ pub fn data_level(zoom: f64) -> u8 {
 }
 
 /// The on-grid tiles a camera sees on a viewport.
-pub fn view_tiles(camera: &MapCamera, viewport: MapViewport, padding: ViewPadding) -> Vec<TileId> {
+pub fn view_tiles(camera: &MapCamera, viewport: MapViewport) -> Vec<TileId> {
     let view = ViewState::new(camera, viewport);
-    view.create_view_region(data_level(view.zoom()), padding)
+    view.create_view_region(data_level(view.zoom()))
         .map(|region| region.iter().collect())
         .unwrap_or_default()
 }
 
-/// A bounding box of tiles at one level, with a padding, optionally cut to the frustum's footprint.
+/// A bounding box of tiles at one level, cut to the frustum's footprint.
 pub struct ViewRegion {
     min_tile: TileId,
     max_tile: TileId,
-    padding: i32,
     /// The footprint's corners in order, in tile units at this level. A pitched, rotated view's
     /// footprint fills well under half of its bounding box.
-    footprint: Option<[(f64, f64); 4]>,
+    footprint: [(f64, f64); 4],
     max_n_tiles: usize,
 }
 
@@ -57,14 +56,12 @@ impl ViewRegion {
     pub(crate) fn new(
         min_tile: TileId,
         max_tile: TileId,
-        padding: i32,
-        footprint: Option<[(f64, f64); 4]>,
+        footprint: [(f64, f64); 4],
         max_n_tiles: usize,
     ) -> Self {
         Self {
             min_tile,
             max_tile,
-            padding,
             footprint,
             max_n_tiles,
         }
@@ -72,16 +69,10 @@ impl ViewRegion {
 
     pub fn iter(&self) -> impl Iterator<Item = TileId> + '_ {
         let z = self.min_tile.z;
-        (self.min_tile.x - self.padding..=self.max_tile.x + self.padding)
-            .flat_map(move |x| {
-                (self.min_tile.y - self.padding..=self.max_tile.y + self.padding)
-                    .map(move |y| TileId::new(z, x, y))
-            })
+        (self.min_tile.x..=self.max_tile.x)
+            .flat_map(move |x| (self.min_tile.y..=self.max_tile.y).map(move |y| TileId::new(z, x, y)))
             .filter(|tile| tile.is_on_grid())
-            .filter(|tile| {
-                self.footprint
-                    .is_none_or(|footprint| footprint_touches(&footprint, *tile))
-            })
+            .filter(|tile| footprint_touches(&self.footprint, *tile))
             .take(self.max_n_tiles)
     }
 }

@@ -1,6 +1,6 @@
 # Map tile widget — implementation plan
 
-Status: Phases 1, 2 and 3 built. Video exports with a map work and passed the Phase 3 gate on Windows. Phase 4 not started.
+Status: Phases 1, 2 and 3 built. Video exports with a map work and passed the Phase 3 gate on Windows. Phase 4: built, with the route download added after the gate results below, so it has not been run. Remaining gate checks are manual. The app can't add a map until Phase 5.
 Updated 2026-10-30.
 Builds on `map-tile-widget-research.md`.
 
@@ -9,27 +9,27 @@ re-measure a baseline before judging any target. Anything needed has to be downl
 `E:\mlrs` or `debug/` is in git: the maplibre-rs reference, the Native reference tool, the scratch tile cache with its
 live styles, and the activity fixtures the gates use, including `Evening_Ride-parse-debug.json`.
 
-**The renderer changed.** The widget now uses the GPU renderer in `src-tauri/ovrley_map_gpu`, which draws
+**The renderer changed.** The widget now uses the GPU renderer in `ovrley_map::gpu`, which draws
 one finished map frame per camera, including real 3D buildings that flat tiles cannot produce. Its gate results
-are in the Phase 2 handoff. Phase 1's ezu rasterizer stays in the tree as the comparison and is not used by the
-widget. Phases 2–5 below are revised for this. Phases 3 and 4 still have open design questions, marked there.
+are in the Phase 2 handoff. Phase 1's ezu rasterizer, its fonts and sprites, and the gate binaries are removed, and remain
+in git history. Commands below that name `map_gpu_gate` or `map_tile_gate` record how results were produced.
 
 ## Decisions
 
-| Topic                    | Decision                                                                                                        |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| Map rendering            | `ovrley_map_gpu` (wgpu), native only, one frame per camera. Replaces ezu for this widget                        |
-| Preview topology         | **Open.** The WASM preview cannot run the renderer. Loopback frames or WebGL2, decided at Phase 4               |
-| Labels                   | **None for now.** The GPU renderer draws no labels. Needed before release, approach open                        |
-| Attribution              | Always drawn in the widget, not configurable                                                                    |
-| Tile pinning             | None. Keep `planet/latest` and the existing HTTP revalidation                                                   |
-| Map styling              | Style preset and layer toggles (roads, paths, water, buildings). No map colour overrides                        |
-| Route and marker styling | Same fields and controls as the route widget (see below)                                                        |
-| Route drawing            | A ground layer in `ovrley_map_gpu`: above roads, below buildings, so buildings hide it. The marker stays on top |
-| Camera                   | `fixed` (whole route, north-up, pitch 0) or `follow` (`north_up` / `rider_up`, pitch 0–60, `range_meters`)      |
-| Not in v1                | Speed-dependent range, terrain, raster layers, upright point labels, map matching, corner radius or border      |
-| Export without a GPU     | Fails before encoding. Software adapters are refused, so there is no CPU fallback                               |
-| Pool evictions           | Draw only tiles under the camera's trapezoid, size pools per job, and guarantee every tile in view is resident  |
+| Topic                    | Decision                                                                                                         |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Map rendering            | `ovrley_map::gpu` (wgpu), native for export and WebGL2 for preview. Replaces ezu for this widget                 |
+| Preview topology         | `ovrley_map::gpu` in its own WASM module on WebGL2, drawn under the Skia widget. Measured in Phase 4             |
+| Labels                   | **None for now.** The GPU renderer draws no labels. Needed before release, approach open                         |
+| Attribution              | Always drawn in the widget, not configurable                                                                     |
+| Tile pinning             | None. Keep `planet/latest` and the existing HTTP revalidation                                                    |
+| Map styling              | Style preset and layer toggles (roads, paths, water, buildings). No map colour overrides                         |
+| Route and marker styling | Same fields and controls as the route widget (see below)                                                         |
+| Route drawing            | A ground layer in `ovrley_map::gpu`: above roads, below buildings, so buildings hide it. The marker stays on top |
+| Camera                   | `fixed` (whole route, north-up, pitch 0) or `follow` (`north_up` / `rider_up`, pitch 0–60, `range_meters`)       |
+| Not in v1                | Speed-dependent range, terrain, raster layers, upright point labels, map matching, corner radius or border       |
+| Export without a GPU     | Fails before encoding. Software adapters are refused, so there is no CPU fallback                                |
+| Pool evictions           | Draw only tiles under the camera's trapezoid, size pools per job, and guarantee every tile in view is resident   |
 
 The map widget uses the route widget's field names and editor controls for its route and marker:
 
@@ -75,33 +75,31 @@ the ezu path and no longer drive the widget:
 MapTileService (app crate)         tile and style bytes; disk cache
       │ implements ovrley_map::MapDataSource
       ▼
-ovrley_map_gpu                     tile and route tessellation + wgpu → RGBA frame        native only
+ovrley_map::gpu                    tile and route tessellation + wgpu → RGBA frame        native only
       │                       │
-      │ in process            │ preview delivery: open (Phase 4)
+      │ in process            │ same code, WebGL2, own WASM module (`src-tauri/wasm-map-bindings`)
       ▼                       ▼
-export provider (Phase 3)     preview provider (Phase 4)
-      └──────────┬────────────┘
-                 ▼ impl MapFrameProvider
+export provider (Phase 3)     map canvas under the widget (Phase 4)
+      │ impl MapFrameProvider ▲ view and route line through the ABI
+      ▼                       │
 ovrley_widgets::widgets::map       camera, route line, frame image, marker, attribution
 
 ovrley_map (featureless)           shared vocabulary and the camera matrix, used by both sides
 ```
 
-**`src-tauri/ovrley_map`** owns the shared vocabulary.
+**`src-tauri/ovrley_map`** owns the shared vocabulary and the renderers.
 
 - Without features it has no Skia, no ezu and no wgpu: `MapStyle`, `MapLayers`, `MapStyleSpec`, `MapDataSource`,
   Mercator math, and, from Phase 2, `MapCamera` and the view matrix. `ovrley_widgets` depends on this, so WASM never
   compiles a renderer. The route and the map must use the same matrix, or the route drifts off the road.
-- Feature `raster` adds the ezu comparison path.
 
-**`src-tauri/ovrley_map_gpu`** holds the renderer. `ovrley_widgets` must never depend on it. `wasm-bindings` is an
-isolated workspace, so feature unification cannot pull it into WASM. `ovrley_core` depends on it for export, so ordinary
+**`ovrley_map::gpu`**, behind the `gpu` feature, holds the renderer. `ovrley_widgets` must never enable it. `wasm-bindings` and
+`wasm-map-bindings` are isolated workspaces, so the Skia module never links `wgpu`. `ovrley_core` depends on it for export, so ordinary
 app builds include `wgpu`.
 
 ## Phase 1 — Tile rasterizer and style adapter
 
-**Built, on commit `bc7c49fe`, and superseded for the widget.** It stays as the comparison. The rest of this section
-records what was built.
+**Built, on commit `bc7c49fe`, then superseded and removed.** The rest of this section records what was built.
 
 Deliverable: `render_tile(TileKey, data source) → RGBA` for all five styles, with no widget yet.
 
@@ -345,34 +343,131 @@ which needs approval. `ovrley_widgets` changed, but nothing in `wasm-bindings` c
 
 Deliverable: live preview with the map following the playhead while playing and scrubbing.
 
-**To decide first: how frames reach the preview.** WASM cannot run the native renderer. The candidates are native frames
-over loopback, or a WebGL2 renderer in the browser, and neither has been measured. The steps below assume loopback and
-need rewriting if WebGL2 wins. The widget's `Ready`/`Pending` provider suits either.
+**Decided: the same renderer in its own WASM module, on WebGL2.** The numbers are under Delivery measurements below. An
+integrated GPU and a Mac are still unchecked.
 
-- **Loopback endpoint** in `video_server.rs`: a frame route keyed by spec, camera, size, ratio and the route's style and
-  travelled distance, parsed strictly like `parse_tile_path`. The route is in the frame, so native also needs the line:
-  build it there from the activity, with the widget's window and tolerance, rather than sending vertices per request.
-  It returns raw premultiplied RGBA with `no-store`. A 500 px frame is 1 MB, so 30 fps is about 30 MB/s, which is the
-  number to check first. A fixed camera needs frames at this rate too, because progress changes them.
-- **Worker capacity:** requests share the server's 4 workers with video range requests (`video_server.rs:40`). Decide
-  the count from measurements.
-- **WASM ABI** (`widget_abi.rs`):
-  - `ovrley_preview_map_frame(session, width, height, ptr, len)` uploads a frame, keyed by output size. Phase 2 built it
-    for the benchmark. Extend the key to the full request, or a frame could land under the wrong camera.
-  - `ovrley_preview_map_wanted_ptr/len` returns the frames the last render missed, the current one first.
-- **`UploadedMapFrames`** in `PreviewSession`, extended with the want list. It stays `Pending` until frames arrive.
-- **`app/src/features/wasm-widgets/utils/mapFrameLoader.js`:** a queue with no React in it. The latest request wins, since
-  a frame for a past camera is no use. Errors reach `onError`.
-- **`previewSession.js`:** `render()` reads the want list after `_ovrley_preview_render`. A frame's arrival calls
-  `schedule()`.
-- **Stacking:** `WasmWidgetCanvas.jsx:20` becomes backdrop 1, map 2, raster 3, course/elevation/diving 4,
-  others 10, matching Phase 3.
-- **Route download:** `backend_map_prepare` shares the export's prepare code. It runs in the background
-  after an activity loads and emits needed, downloading, ready or failed, so scrubbing mostly hits the
-  disk cache.
+### Delivery measurements
+
+`map_preview_bench` (uncommitted, throwaway) opens real WebView2 with the app's browser args on an RTX 4070 and Ryzen 5 5600X.
+Every candidate draws the requests the real widget makes, on `Evening_Ride(4)`, Liberty, follow, rider-up, pitch 60, MSAA 4. The
+WASM renderer is a patched copy of `ovrley_map::gpu` under `debug/map-preview-spike`, which is not in git. It compiled and ran
+with changes only to device setup, tile threads and output: the shaders and draw code are unchanged. Its frames match native
+at SSIM 0.999999 or better in all three scenarios.
+
+Playback against the clock at 30 fps, 180 frames, the latest request winning, at 1000 px, stacked over a 4K HEVC video. Ranges
+span the 400 m and 2 km scenarios:
+
+| Path                     | Frames shown   | Latency p50 (ms) | Latency p95 (ms) | Main thread per frame (ms) |
+| ------------------------ | -------------- | ---------------- | ---------------- | -------------------------- |
+| Native frames, Tauri IPC | 88–111 of 180  | 50–60            | 58–76            | about 3, plus the wait     |
+| Native frames, HTTP      | 174–180 of 180 | 14–23            | 19–38            | about 3                    |
+| WASM on WebGL2           | 180 of 180     | 2.8–4.7          | 3.1–5.4          | 2.5–4.3                    |
+
+No path hurt the video: at most 1 dropped frame in any run. Sending frames through Skia instead of straight to a canvas costs
+under 0.5 ms at 1000 px, so a direct path isn't worth having.
+
+As fast as each path can go, in frames per second, waiting for the GPU:
+
+| Path                     | 400 m, 500 px | 400 m, 1000 px | 2 km, 1000 px |
+| ------------------------ | ------------- | -------------- | ------------- |
+| Native frames, Tauri IPC | 74            | 19             | 18            |
+| Native frames, HTTP      | 208           | 81             | 80            |
+| WASM on WebGL2           | 556           | 256            | 156           |
+| WASM on WebGPU           | 1111          | 59             | 59            |
+
+IPC really used its binary path (`ipc.localhost`, no fallback warning) and moves about 80 MB/s, so it cannot hold 30 fps at
+1000 px. WebGPU's 15 ms wait at 1000 px is unexplained; its playback was fine at 2–2.4 ms on the main thread.
+
+Scrubbing from a cold renderer, 30 jumps across the route, at 1000 px:
+
+| Path                | Until on canvas, p50 / p95 (ms)    | Main-thread tasks over 50 ms | Longest tile block (ms) |
+| ------------------- | ---------------------------------- | ---------------------------- | ----------------------- |
+| Native frames, HTTP | 26 / 59 (400 m), 49 / 108 (2 km)   | 0                            | none, off the page      |
+| WASM on WebGL2      | 41 / 136 (400 m), 108 / 425 (2 km) | 9 (400 m), 28 (2 km)         | 93 (400 m), 174 (2 km)  |
+
+The WASM spike decodes tiles on the page's thread, about 5–6 ms per tile and up to 30 ms for one. A worker would take this off
+the UI, but has not been built or measured.
+
+**Without a GPU in the webview** (`--disable-gpu` and `--use-angle=d3d11-warp`, with the native renderer still on the RTX, so
+not a real GPU-less PC): existing Skia drawing keeps working. WebGPU finds no adapter and fails cleanly. WebGL2 silently runs on
+the CPU through Microsoft Basic Render Driver and showed 180 of 180 frames on this 12-thread CPU, but Skia's time in the same
+page rose from about 1.1 to 6.6–8 ms at 1000 px. wgpu reports this adapter as `Other`, so the `DeviceType::Cpu` refusal would
+not catch it. Export refuses to run there, so the preview would show a map that can't be exported, unless WebGL2 also refuses.
+Detecting it means matching the renderer string.
+
+**Keep failures to the map.** `PreviewSession::render` stops at the first widget's error (`preview.rs:521`), and `onError` is
+session-wide, so neither may carry map delivery failures. A trap in the widget module ends every widget until restart, which
+is a reason to keep WebGL2's renderer in its own module, loaded only when a project has a map.
+
+**Not tested:** an integrated GPU, macOS, Linux, repeated runs (one or two per cell), maps over 1000 px, several maps at once,
+a WebGL context loss, and linking `wgpu` into the emscripten module instead of adding a second WASM module of 4.7 MB. HTTP
+transfer also spikes by 10–20 ms on some frames, with no cause found.
+
+- **Renderer:** `ovrley_map::gpu` compiles for `wasm32-unknown-unknown`. One draw path, with target-specific output: export
+  reads back from a texture, preview presents to a canvas. WASM opens its device asynchronously and refuses software WebGL by
+  renderer name, because wgpu reports it as `Other`.
+- **`src-tauri/wasm-map-bindings`** (isolated workspace, like `wasm-bindings`): the wasm-bindgen module, `wasm_map_bindings`. `MapLayer` owns
+  one canvas's renderer. `TileDecoder` runs in workers. `scripts/build-wasm.mjs` builds it next to the widget module, so dev
+  rebuilds, CI artifacts and packaging treat both alike. It loads only when a project has a map, and a crash in it can't end
+  other widgets.
+- **Widget:** `PreviewMap` still owns the camera, marker and attribution. Once its layer is ready it leaves the frame clear, and
+  exposes the view to draw and the route line through the ABI (`ovrley_preview_map_view_*`, `ovrley_preview_map_route_*`,
+  `ovrley_preview_map_layer_ready`). Until then it draws the flat placeholder, which also covers no WebGL2, no GPU and a lost
+  context. The frame upload ABI and `UploadedMapFrames` are removed.
+- **`utils/mapLayers.js`:** no React. Draws in the same animation frame as the widgets, so map and marker can't disagree.
+  Replaces a renderer when its style, layers, size or zoom change, and shows the new canvas only once it's ready. Its failures
+  stay on the map and never reach `onError` or `PreviewSession::render`.
+- **Tiles:** two workers fetch through the existing `/tiles` route, decode and tessellate, and transfer the geometry back, so
+  the UI thread only uploads. The latest view replaces the queue. A view draws with what is resident, and missing tiles
+  show the style's background until they arrive, so the preview never blocks. Pools start at the default and double if a view
+  evicts its own tiles.
+- **Stacking:** backdrop 1, map 2, raster 3, course/elevation/diving 4, others 10, matching Phase 3.
+- **Route download:** `backend_map_prepare` shares the export's walk and fetch (`download_preview_tiles`), one second apart over the
+  whole activity. It runs in the background once an activity and a map exist, after edits settle for 500 ms, and a newer request
+  cancels the last. Only fields that change which tiles are needed restart it. It emits `map-prepare` events (needed, downloading,
+  ready, failed) for the status Phase 5 shows, and stops at the first failed tile, since the preview still fetches on demand.
 
 **Gate:** in the app, play, scrub across the route, and resize. Confirm no stalls and that video preview
 stays smooth during frame loads. Compare the same second in preview and export.
+
+### Gate results
+
+Run in the real app on the RTX 4070, driven over the WebView2 debugging port, with the Phase 5 manifest entry applied temporarily
+and removed afterwards. The ride was `Evening_Ride(4)` as a GPX, in the default HUD at a 1000 px map (552 px after the preview's
+raster scale).
+
+| Check                                             | Result                                                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Playback, 8 s                                     | 16.7 ms median frame and no main-thread task over 50 ms. One frame hit 33 ms, and one run had an 83 ms frame |
+| Scrub, 20 jumps                                   | No main-thread task over 50 ms, so tile decoding stays off the UI                                            |
+| Marker and attribution over the map               | Correct, drawn by the Skia widget on a clear background                                                      |
+| Style and size change                             | Replaces the renderer: Dark at 700×400 drew correctly                                                        |
+| Removing the map                                  | Its canvas goes, with no error                                                                               |
+| Native renderer after the split                   | `widget-smoke`: 0.59 ms at 500 px and 1.62 ms at 1000 px, no evictions                                       |
+| Frontend tests, lint, `wasm_widget_preview_tests` | Pass, without the manifest entry                                                                             |
+
+A context-lost bug showed up in the first run and is fixed: releasing a replaced renderer loses its context on purpose.
+
+**Not checked:**
+
+- The resize gesture: it fails with `map resize size is required`, because size-based resize is the Phase 5
+  `widgetGestureGeometry.js` work. The transient path that rescales during a drag has therefore never run.
+- A video playing under the map in the app. The Delivery measurements cover it for the spike only.
+- The same second in preview and export. The spike matched at the same size, but the wired preview has not been compared.
+- Pool growth and a real context loss, which no run triggered.
+- An integrated GPU, macOS, Linux, the CI and Flatpak changes, and third-party notices for the WASM module's crates.
+
+### Without a GPU
+
+Run with `--disable-gpu`, so the webview had no GPU while the rest of the PC did. A PC with no GPU has not been tested.
+
+- **The map refuses and shows its placeholder**, with the marker and attribution. The software check in `web.rs` caught Microsoft
+  Basic Render Driver.
+- **The whole editor runs at about 7 fps there, with or without a map.** A trace shows the time in Chromium's software compositor:
+  139 ms per draw with no map and 142 ms with a refused one, over about 200 quads on a 3347×1440 window. The map's cost is too small
+  to measure. Only this one template and window size were measured.
+- **Later work:** a simplified CPU renderer for PCs without a GPU, for example without buildings, is an option for after this phase.
+  Native `DeviceType::Cpu` refusal would then need revisiting too, since export has no map on those PCs either.
 
 ## Phase 5 — Editor and release readiness
 
@@ -405,18 +500,17 @@ with a map. Full export on both platforms.
 | Pool eviction draws blank patches                                 | Solved in Phase 3: a view is resident before drawing, or fails    |
 | No usable GPU, or device loss during an export                    | No GPU fails before encoding. Device loss fails the job, untested |
 | Larger pools on an integrated GPU                                 | Up to about 320 MB seen; untested on one                          |
-| Preview delivery may not hold 30 fps                              | Measured first in Phase 4                                         |
+| Preview delivery may not hold 30 fps                              | Measured on an RTX 4070; integrated GPU, macOS and Linux untested |
 | Far roads look heavier than Native, buildings heavier at 0.8      | Known visual gaps; line width fix awaits your decision            |
 | GPS offset of ±3–5 m is 15–25 px at z18                           | Accepted; map matching is a separate feature                      |
 
 ## Open decisions and recommendations
 
-| Decision            | When             | Recommendation                                                                                                                                            |
-| ------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Labels              | Before release   | None yet. The idea of ezu-baked, label-only tiles draped on the ground has not been measured                                                              |
-| Preview delivery    | Start of Phase 4 | None yet. Measure loopback first (about 30 MB/s at 500 px and 30 fps), then compare WebGL2                                                                |
-| Far road line width | Any time         | Fix it. Lines keep a constant pixel width with distance, as upstream does, while Native narrows them. It is a line vertex shader change, not yet measured |
-| MSAA                | Settled for now  | 4 by default, chosen by the host rather than widget config. Costs about 1.7–2×, about 5 ms at 1000 px, and fill and building edges are jagged without it  |
+| Decision            | When            | Recommendation                                                                                                                                            |
+| ------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Labels              | Before release  | None yet. The idea of ezu-baked, label-only tiles draped on the ground has not been measured                                                              |
+| Far road line width | Any time        | Fix it. Lines keep a constant pixel width with distance, as upstream does, while Native narrows them. It is a line vertex shader change, not yet measured |
+| MSAA                | Settled for now | 4 by default, chosen by the host rather than widget config. Costs about 1.7–2×, about 5 ms at 1000 px, and fill and building edges are jagged without it  |
 
 ## Known visual gaps against MapLibre Native
 
@@ -437,7 +531,7 @@ them matter is judged once the widget can be seen in a clip.
 
 ## Working rules
 
-- Compile checks only while iterating (`cargo check -p ovrley_map`, `-p ovrley_widgets`, `-p ovrley_map_gpu`).
+- Compile checks only while iterating (`cargo check -p ovrley_map`, `-p ovrley_widgets`, `-p ovrley_map::gpu`).
 - WASM builds, benchmark builds and `pnpm build` run only with your approval, at the gates above.
 - No new tests unless requested. The two with the highest value would be camera math, and
   preview-versus-export pixel parity.

@@ -2,10 +2,10 @@
 //! `vector/resource/buffer_pool.rs`: one large buffer each for vertices, indices, layer metadata
 //! and feature metadata. Draws bind slices of them, and the oldest layers are evicted for space.
 
-use crate::pipelines::{FillShaderFeatureMetadata, ShaderLayerMetadata};
-use crate::tile::LayerKind;
+use super::pipelines::{FillShaderFeatureMetadata, ShaderLayerMetadata};
+use super::tile::LayerKind;
 use bytemuck::Pod;
-use ovrley_map::TileId;
+use crate::TileId;
 use std::collections::{btree_map, BTreeMap, VecDeque};
 use std::marker::PhantomData;
 use std::mem::size_of;
@@ -143,6 +143,7 @@ impl<V: Pod> BufferPool<V> {
 
     /// Forgets every layer, so the next ones fill the buffers from the start. Frames recorded after
     /// this draw only what is uploaded after it.
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn clear(&mut self) {
         self.index.tree_index.clear();
         self.index.linear_index.clear();

@@ -1,6 +1,8 @@
 import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import { previewActivity, previewFont, previewSplitTable, rasterPreviewPng } from '@/api/backend'
 import { isPreviewPerfEnabled, recordPreviewPerfDuration, setPreviewPerfValue } from '@/lib/preview-perf'
+import { createMapDownload } from './mapDownload'
+import { createMapLayers } from './mapLayers'
 import { createWidgetInteraction, registerWidgetInteraction, unregisterWidgetInteraction } from './widgetInteraction'
 import { presentWidgetGeometry } from './widgetPresentation'
 
@@ -111,6 +113,14 @@ export function createPreviewSession(module, onError) {
   let disposed = false
   let frame = null
   let renderError = null
+  const mapDownload = createMapDownload()
+  const mapLayers = createMapLayers({
+    schedule,
+    setReady(id, ready) {
+      const widget = widgets.get(id)
+      if (widget) module._ovrley_preview_map_layer_ready(handle, widget.handle, ready ? 1 : 0)
+    },
+  })
   const interaction = createWidgetInteraction({
     schedule,
     flush() {
@@ -135,6 +145,13 @@ export function createPreviewSession(module, onError) {
   }
   function check(status) {
     if (status !== 0) fail()
+  }
+  function presentMapLayer(id, widget) {
+    const view = read(module._ovrley_preview_map_view_ptr(handle, widget.handle), module._ovrley_preview_map_view_len(handle, widget.handle))
+    mapLayers.present(id, view, () => {
+      const ptr = module._ovrley_preview_map_route_ptr(handle, widget.handle)
+      return new Float64Array(module.HEAPU8.buffer, ptr, module._ovrley_preview_map_route_len(handle, widget.handle)).slice()
+    })
   }
   function upload(bytes, call) {
     const ptr = module._ovrley_alloc(bytes.byteLength)
@@ -217,6 +234,7 @@ export function createPreviewSession(module, onError) {
       const active = new Set(snapshot.widgets.map((widget) => widget.id))
       for (const [id, widget] of widgets) {
         if (!active.has(id)) {
+          if (widget.type === 'map') mapLayers.remove(id)
           module._ovrley_preview_widget_destroy(handle, widget.handle)
           widgets.delete(id)
         }
@@ -224,7 +242,8 @@ export function createPreviewSession(module, onError) {
       for (const widget of interaction.resolve(snapshot)) {
         let instance = widgets.get(widget.id)
         const transient =
-          interaction.isDragging(widget.id) || (['course', 'elevation', 'diving_profile'].includes(widget.type) && interaction.isResizing(widget.id))
+          interaction.isDragging(widget.id) ||
+          (['course', 'elevation', 'diving_profile', 'map'].includes(widget.type) && interaction.isResizing(widget.id))
         if (instance?.data === widget.data && instance.scene === snapshot.scene && instance.transient === transient) continue
         const resource = widget.type === 'raster' && images.get(widget.data.resourceId)
         if (resource?.error) throw resource.error
@@ -272,6 +291,7 @@ export function createPreviewSession(module, onError) {
         if (WIDGET_TYPE_DEFINITIONS[widget.type].timeDependent && !activityReady) continue
         const canvas = canvases.get(id)
         if (!canvas) continue
+        if (widget.type === 'map') presentMapLayer(id, widget)
         const revision = module._ovrley_preview_revision(handle, widget.handle)
         if (widget.revision === revision) continue
         const geometryJson = read(
@@ -340,6 +360,7 @@ export function createPreviewSession(module, onError) {
         !next.widgets.some(isTimeDependentWidget)
       )
         return
+      if (previous?.widgets !== next.widgets || previous?.scene !== next.scene || previous?.activityId !== next.activityId) mapDownload.update(next)
       if (previous?.defaultFont !== next.defaultFont) loadFont({ font: next.defaultFont })
       if (previous?.widgets !== next.widgets) {
         for (const widget of next.widgets) {
@@ -408,9 +429,15 @@ export function createPreviewSession(module, onError) {
       }
       schedule()
     },
+    attachMapLayer(id, holder) {
+      mapLayers.attach(id, holder)
+      schedule()
+    },
     dispose() {
       disposed = true
       if (frame !== null) cancelAnimationFrame(frame)
+      mapLayers.dispose()
+      mapDownload.dispose()
       interaction.dispose()
       // Wrappers stay hidden until a session presents them again, so nothing reads their geometry.
       for (const target of targets.values()) {

@@ -6,7 +6,7 @@
 use maplibre_expr::{
     evaluate, parse_filter, parse_property, typecheck, EvaluationContext, Expr, Type, Value,
 };
-use ovrley_map::{MapLayers, MapStyle, VECTOR_SOURCE};
+use crate::{MapLayers, MapStyle, VECTOR_SOURCE};
 use serde_json::Value as Json;
 
 /// Which 3D buildings a renderer draws.

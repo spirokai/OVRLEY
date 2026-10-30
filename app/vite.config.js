@@ -104,6 +104,10 @@ export default defineConfig({
       allow: [path.resolve(__dirname, '..')],
     },
   },
+  // The map tile worker imports the map module at runtime, which an IIFE worker can't rely on.
+  worker: {
+    format: 'es',
+  },
   build: {
     target: 'es2020',
     modulePreload: {

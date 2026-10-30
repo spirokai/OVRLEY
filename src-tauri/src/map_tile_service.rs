@@ -5,7 +5,7 @@
 //! matching requests here and turns the result into a local HTTP response.
 
 use http_cache_semantics::{AfterResponse, BeforeRequest, CachePolicy};
-use ovrley_core::{MapDataSource, MapSprite};
+use ovrley_core::MapDataSource;
 use ovrley_map::MapStyle;
 use reqwest::blocking::Client;
 use reqwest::header::CONTENT_TYPE;
@@ -23,8 +23,6 @@ pub(crate) const OPENFREEMAP_TILE_URL: &str =
 pub(crate) const OPENFREEMAP_CACHE_NAMESPACE: &str = "openfreemap-planet";
 pub(crate) const OPENFREEMAP_STYLE_URL: &str = "https://tiles.openfreemap.org/styles/{style}";
 pub(crate) const OPENFREEMAP_STYLE_CACHE_NAMESPACE: &str = "openfreemap-styles";
-/// Sprites live under the styles namespace, which cache maintenance leaves alone.
-const OPENFREEMAP_SPRITE_CACHE_DIRECTORY: &str = "sprites";
 const TILE_CACHE_LIMIT: u64 = 500 * 1024 * 1024;
 /// How long a cached style is trusted. Styles change with the tile schema they read.
 const STYLE_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
@@ -344,81 +342,6 @@ impl MapTileService {
                 cache_path.display()
             )),
         }
-    }
-
-    /// The style's sprite sheet at pixel ratio 2. Sprite URLs are versioned, so
-    /// a cached file stays valid for as long as a style names that version.
-    fn resolve_sprite(&self, style: MapStyle) -> Result<MapSprite, String> {
-        let _style_access = self.style_gate.lock().map_err(|error| error.to_string())?;
-        let (payload, _) = self.read_style(style)?;
-        let base_url = sprite_base_url(&payload)?;
-        let directory = self
-            .cache_root
-            .join(OPENFREEMAP_STYLE_CACHE_NAMESPACE)
-            .join(OPENFREEMAP_SPRITE_CACHE_DIRECTORY);
-        let cache_name = sprite_cache_name(&base_url)?;
-
-        let index = self.read_sprite_file(
-            &format!("{base_url}@2x.json"),
-            &directory,
-            &format!("{cache_name}@2x.json"),
-            is_json_response,
-            validate_sprite_index,
-        )?;
-        let atlas_png = self.read_sprite_file(
-            &format!("{base_url}@2x.png"),
-            &directory,
-            &format!("{cache_name}@2x.png"),
-            is_png_response,
-            validate_sprite_atlas,
-        )?;
-        Ok(MapSprite {
-            index_json: String::from_utf8(index)
-                .map_err(|error| format!("Map sprite index is not UTF-8: {error}"))?,
-            atlas_png,
-        })
-    }
-
-    fn read_sprite_file(
-        &self,
-        upstream_url: &str,
-        directory: &Path,
-        file_name: &str,
-        is_expected_response: fn(&reqwest::header::HeaderMap) -> bool,
-        validate: fn(&[u8]) -> Result<(), String>,
-    ) -> Result<Vec<u8>, String> {
-        let cache_path = directory.join(file_name);
-        match fs::read(&cache_path) {
-            Ok(payload) if validate(&payload).is_ok() => return Ok(payload),
-            Ok(_) => remove_if_present(&cache_path)?,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(format!(
-                    "Failed to read cached map sprite {}: {error}",
-                    cache_path.display()
-                ));
-            }
-        }
-
-        let response = self
-            .client
-            .get(upstream_url)
-            .send()
-            .map_err(|error| format!("Map sprite upstream request failed: {error}"))?;
-        if response.status() != reqwest::StatusCode::OK || !is_expected_response(response.headers())
-        {
-            return Err(format!(
-                "Map sprite upstream returned invalid HTTP response {}",
-                response.status().as_u16()
-            ));
-        }
-        let payload = response
-            .bytes()
-            .map_err(|error| format!("Failed to read map sprite upstream response: {error}"))?
-            .to_vec();
-        validate(&payload)?;
-        promote_style_asset(directory, &cache_path, &payload)?;
-        Ok(payload)
     }
 
     fn fetch_style(
@@ -851,10 +774,6 @@ impl MapDataSource for MapTileService {
         self.raw_style(style)
     }
 
-    fn sprite(&self, style: MapStyle) -> Result<MapSprite, String> {
-        self.resolve_sprite(style)
-    }
-
     fn tile(&self, z: u8, x: u32, y: u32) -> Result<Vec<u8>, String> {
         self.resolve(TileCoordinates { zoom: z, x, y })
             .map(|payload| payload.bytes)
@@ -1120,14 +1039,6 @@ fn is_json_response(headers: &reqwest::header::HeaderMap) -> bool {
         .is_some_and(|media_type| media_type.trim().eq_ignore_ascii_case("application/json"))
 }
 
-fn is_png_response(headers: &reqwest::header::HeaderMap) -> bool {
-    headers
-        .get(CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(';').next())
-        .is_some_and(|media_type| media_type.trim().eq_ignore_ascii_case("image/png"))
-}
-
 fn is_style_stale(cache_path: &Path) -> bool {
     fs::metadata(cache_path)
         .and_then(|metadata| metadata.modified())
@@ -1153,50 +1064,6 @@ fn validate_style(payload: &[u8]) -> Result<(), String> {
         return Err("OpenFreeMap style openmaptiles source must be vector tiles".to_string());
     }
     Ok(())
-}
-
-fn validate_sprite_index(payload: &[u8]) -> Result<(), String> {
-    let index: serde_json::Value = serde_json::from_slice(payload)
-        .map_err(|error| format!("Map sprite index is not valid JSON: {error}"))?;
-    if !index.is_object() {
-        return Err("Map sprite index must be a JSON object".to_string());
-    }
-    Ok(())
-}
-
-fn validate_sprite_atlas(payload: &[u8]) -> Result<(), String> {
-    const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
-    if !payload.starts_with(PNG_SIGNATURE) {
-        return Err("Map sprite atlas is not a PNG".to_string());
-    }
-    Ok(())
-}
-
-fn sprite_base_url(style: &[u8]) -> Result<String, String> {
-    let style: serde_json::Value = serde_json::from_slice(style)
-        .map_err(|error| format!("Cached OpenFreeMap style is not valid JSON: {error}"))?;
-    style
-        .get("sprite")
-        .and_then(serde_json::Value::as_str)
-        .map(str::to_string)
-        .ok_or_else(|| "OpenFreeMap style is missing its sprite URL".to_string())
-}
-
-/// A file name for a sprite URL's path, which carries the sprite version.
-fn sprite_cache_name(base_url: &str) -> Result<String, String> {
-    let url = reqwest::Url::parse(base_url)
-        .map_err(|error| format!("OpenFreeMap sprite URL is invalid: {error}"))?;
-    let name = url.path().trim_matches('/').replace('/', "-");
-    if name.is_empty()
-        || !name
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
-    {
-        return Err(format!(
-            "OpenFreeMap sprite URL {base_url} has an unusable path"
-        ));
-    }
-    Ok(name)
 }
 
 fn promote_style_asset(directory: &Path, cache_path: &Path, payload: &[u8]) -> Result<(), String> {

@@ -5,9 +5,9 @@
 //! dropped, so nothing here panics on it. geozero's reader indexes the geometry without bounds
 //! checks, so every feature is walked once here before geozero sees it.
 
-use crate::extrusion::{tessellate_extrusions, ExtrusionVertex};
-use crate::pipelines::{FillShaderFeatureMetadata, ShaderLayerMetadata, ShaderVertex};
-use crate::style::{evaluate_color, evaluate_number, passes_filter, ParsedStyle, VectorPaint};
+use super::extrusion::{tessellate_extrusions, ExtrusionVertex};
+use super::pipelines::{FillShaderFeatureMetadata, ShaderLayerMetadata, ShaderVertex};
+use super::style::{evaluate_color, evaluate_number, passes_filter, ParsedStyle, VectorPaint};
 use geozero::mvt::{tile, Message, Tile};
 use geozero::{error::GeozeroError, GeomProcessor, GeozeroGeometry};
 use lyon::geom::point;

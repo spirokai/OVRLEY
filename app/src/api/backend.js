@@ -178,6 +178,18 @@ export async function finalizeActivity(rawActivity) {
   })
 }
 
+/**
+ * Downloads the tiles a project's maps will show in the background, replacing any earlier download.
+ * Progress arrives as `map-prepare` events.
+ * @param {string} activityId Native snapshot identity.
+ * @param {object[]} widgets Effective map widgets. None just stops the last download.
+ * @param {object} scene Effective scene.
+ * @returns {Promise<void>} Settles when this download ends, rejecting if a tile failed.
+ */
+export function prepareMapTiles(activityId, widgets, scene) {
+  return invokeCommand('backend_map_prepare', { activityId, widgets, scene })
+}
+
 /** @param {string} activityId Native snapshot identity. @returns {Promise<ArrayBuffer>} Original-density activity bytes. */
 export function previewActivity(activityId) {
   return invokeCommand('backend_preview_activity', { activityId })

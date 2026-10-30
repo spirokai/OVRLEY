@@ -11,6 +11,7 @@ import { createPreviewSession, loadWidgetModule } from '../utils/previewSession'
 export function useWasmWidgets({ widgets, scene, activity, disabledLaps, defaultFont }) {
   const session = useRef(null)
   const canvases = useRef(new Map())
+  const mapLayers = useRef(new Map())
   const latest = useRef(null)
   const [error, setError] = useState(null)
   useEffect(() => {
@@ -42,6 +43,7 @@ export function useWasmWidgets({ widgets, scene, activity, disabledLaps, default
         const current = createPreviewSession(module, setError)
         session.current = current
         for (const [id, { canvas, target }] of canvases.current) current.attach(id, canvas, target)
+        for (const [id, holder] of mapLayers.current) current.attachMapLayer(id, holder)
         current.setSnapshot(latest.current)
       })
       .catch((cause) => {
@@ -58,5 +60,10 @@ export function useWasmWidgets({ widgets, scene, activity, disabledLaps, default
     else canvases.current.delete(id)
     session.current?.attach(id, canvas, target)
   }, [])
-  return { attach, error }
+  const attachMapLayer = useCallback((id, holder) => {
+    if (holder) mapLayers.current.set(id, holder)
+    else mapLayers.current.delete(id)
+    session.current?.attachMapLayer(id, holder)
+  }, [])
+  return { attach, attachMapLayer, error }
 }

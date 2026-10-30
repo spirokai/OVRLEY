@@ -41,7 +41,7 @@ modules:
       - mkdir -p tools/bin && ln -s "$PWD/pnpm/bin/pnpm.cjs" tools/bin/pnpm
       - timeout 900 pnpm install --frozen-lockfile
       - mkdir -p src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm
-      - cp wasm_bindings.js wasm_bindings.wasm src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm/
+      - cp wasm_bindings.js wasm_bindings.wasm wasm_map_bindings.js wasm_map_bindings_bg.wasm src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm/
       # Same version stamping as the other release builds
       - node scripts/set-release-version.mjs "$OVRLEY_VERSION" && VITE_OVRLEY_VERSION="$OVRLEY_VERSION" pnpm --dir app build
       # Backend; the Tauri CLI is not used, so enable the embedded frontend explicitly
@@ -85,3 +85,7 @@ modules:
         path: wasm/wasm_bindings.js
       - type: file
         path: wasm/wasm_bindings.wasm
+      - type: file
+        path: wasm/wasm_map_bindings.js
+      - type: file
+        path: wasm/wasm_map_bindings_bg.wasm

@@ -3,7 +3,8 @@
 use ovrley_widgets::{
     error::{WidgetError, WidgetResult},
     preview::PreviewSession,
-    preview_widget::WidgetRequest,
+    preview_widget::{PreviewWidget, WidgetRequest},
+    widgets::map::preview::PreviewMap,
 };
 use std::sync::{Once, OnceLock};
 
@@ -150,18 +151,39 @@ pub unsafe extern "C" fn ovrley_preview_image(
     session.status(result)
 }
 
-/// A finished map frame as straight RGBA pixels, for widgets of this output size.
+/// A map handle's family state. Only the JS map layer calls these, and only with map handles.
+unsafe fn map_widget<'a>(session: *mut Session, id: u32) -> &'a mut PreviewMap {
+    match &mut (*session).preview.widgets.get_mut(&id).expect("live widget handle").widget {
+        PreviewWidget::Map(map) => map,
+        _ => panic!("widget {id} is not a map"),
+    }
+}
+
+/// Whether the map canvas is showing under this widget. Until it is, the widget draws its placeholder.
 #[no_mangle]
-pub unsafe extern "C" fn ovrley_preview_map_frame(
-    session: *mut Session,
-    width: u32,
-    height: u32,
-    ptr: *const u8,
-    len: usize,
-) -> u32 {
-    let session = &mut *session;
-    let result = bytes(ptr, len).and_then(|b| session.preview.map_frames.upload(width, height, b));
-    session.status(result)
+pub unsafe extern "C" fn ovrley_preview_map_layer_ready(session: *mut Session, id: u32, ready: u32) {
+    map_widget(session, id).set_layer_ready(ready != 0);
+}
+
+/// JSON of what the map canvas should draw at the last render. Empty when it should draw nothing.
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_map_view_ptr(session: *mut Session, id: u32) -> *const u8 {
+    map_widget(session, id).view.as_ptr()
+}
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_map_view_len(session: *mut Session, id: u32) -> usize {
+    map_widget(session, id).view.len()
+}
+
+/// The view's route line as `f64` triples of `world_x, world_y, along_metres`.
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_map_route_ptr(session: *mut Session, id: u32) -> *const f64 {
+    map_widget(session, id).route_points.as_ptr()
+}
+/// In `f64` values, not bytes.
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_map_route_len(session: *mut Session, id: u32) -> usize {
+    map_widget(session, id).route_points.len()
 }
 
 #[no_mangle]

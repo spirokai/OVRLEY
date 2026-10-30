@@ -5,7 +5,7 @@ use crate::{
     preview_instance::PreviewInstance,
     preview_widget::{PreviewWidget, ResizeRequest, ResizeUpdate, WidgetRequest},
     render::text::FontResolver,
-    widgets::map::frame_provider::UploadedMapFrames,
+    widgets::map::frame_provider::PreviewMapFrames,
 };
 use skia_safe::{FontMgr, Typeface};
 use std::collections::BTreeMap;
@@ -71,8 +71,8 @@ impl FontResolver for PreviewFonts {
 pub struct PreviewSession {
     pub fonts: PreviewFonts,
     pub images: crate::widgets::raster::preview::PreviewImages,
-    /// Finished map frames the host delivered. Until it does, map widgets stay pending.
-    pub map_frames: Arc<UploadedMapFrames>,
+    /// Maps are a canvas under the widget, so no frame ever arrives through this.
+    pub map_frames: Arc<PreviewMapFrames>,
     activity: Option<ActivitySampler>,
     /// The editor's disabled laps, applied to every activity this session samples.
     disabled_laps: Vec<usize>,

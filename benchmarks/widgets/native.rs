@@ -36,8 +36,8 @@ struct Case {
     dynamic: bool,
     request: Option<Value>,
     split_table: Option<String>,
-    /// Edge length of the finished map frame a preview backend receives.
-    map_frame: Option<u32>,
+    /// Whether a preview backend's map canvas shows under the widget.
+    map_layer: bool,
 }
 
 fn main() -> Result<(), String> {
@@ -120,8 +120,8 @@ fn main() -> Result<(), String> {
     }
     let mut results = Vec::new();
     for (case, config) in plan.cases.iter().zip(configs) {
-        // Export can't draw maps until Phase 3, so this would only time an empty scene.
-        if case.map_frame.is_some() {
+        // Export would need a map source, and this benchmark has none.
+        if case.map_layer {
             continue;
         }
         eprintln!("[native] {}", case.id);

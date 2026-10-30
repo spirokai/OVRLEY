@@ -3,10 +3,10 @@
 //! A view that outgrows a pool would evict its own tiles and draw blank patches, and which views do
 //! depends on the area and style, not on zoom or pitch alone. So a host measures its tiles first.
 
-use crate::pool::PoolEntries;
-use crate::style::{parse_style, Buildings, ParsedStyle};
-use crate::tile::{prepare_tile, PreparedLayer};
-use ovrley_map::{MapDataSource, MapStyleSpec, MapViewport, TileId};
+use super::pool::PoolEntries;
+use super::style::{parse_style, Buildings, ParsedStyle};
+use super::tile::{prepare_tile, PreparedLayer};
+use crate::{MapDataSource, MapStyleSpec, MapViewport, TileId};
 use std::collections::HashMap;
 
 /// Entries per geometry pool when a host has not measured: 73 MB of ground buffers. Upstream's

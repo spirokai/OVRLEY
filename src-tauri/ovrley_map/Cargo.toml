@@ -1,6 +1,6 @@
 [package]
-# Map vocabulary shared by native and WASM. The `raster` feature adds the style
-# adapter and the ezu tile renderer, which are native only.
+# Map vocabulary shared by native and WASM. The `gpu` feature adds the wgpu renderer, whose
+# method is ported from maplibre-rs (see src/gpu/LICENSE-MIT).
 name = "ovrley_map"
 version = "0.1.0"
 edition = "2021"
@@ -8,10 +8,22 @@ publish = false
 license = "GPL-3.0-or-later"
 
 [features]
-raster = ["dep:ezu", "dep:log", "dep:serde_json"]
+gpu = ["dep:bytemuck", "dep:geozero", "dep:log", "dep:lyon", "dep:maplibre-expr", "dep:pollster", "dep:serde_json", "dep:web-sys", "dep:wgpu"]
 
 [dependencies]
+bytemuck = { version = "1", features = ["derive"], optional = true }
 cgmath = "0.18"
-ezu = { version = "=0.13.1", default-features = false, features = ["renderer", "translate"], optional = true }
+geozero = { version = "0.15", default-features = false, features = ["with-mvt"], optional = true }
 log = { version = "0.4", optional = true }
+lyon = { version = "1", optional = true }
+maplibre-expr = { version = "0.5", default-features = false, optional = true }
 serde_json = { version = "1", optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+pollster = { version = "0.4", optional = true }
+wgpu = { version = "30", optional = true }
+
+# The editor preview: WebGL2 in a canvas.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version = "0.3", features = ["HtmlCanvasElement"], optional = true }
+wgpu = { version = "30", features = ["webgl"], optional = true }

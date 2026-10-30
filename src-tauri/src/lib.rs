@@ -70,6 +70,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(video_server)
         .manage(widget_preview::PreviewActivities::default())
+        .manage(widget_preview::MapDownload::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -83,6 +84,7 @@ pub fn run() {
             tauri_commands::backend_font_capabilities,
             tauri_commands::backend_font_data,
             widget_preview::backend_preview_activity,
+            widget_preview::backend_map_prepare,
             widget_preview::backend_preview_split_table,
             widget_preview::backend_release_preview_activity,
             widget_preview::backend_preview_font,

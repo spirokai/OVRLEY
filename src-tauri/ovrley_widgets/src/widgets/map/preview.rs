@@ -22,9 +22,18 @@ use crate::{
         value::preview::{ContentBounds, TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
     },
 };
-use ovrley_map::{MapCamera, MapRouteDraw, ViewState};
+use ovrley_map::{MapCamera, MapRouteDraw, MapRouteLine, ViewState};
+use serde_json::json;
 use skia_safe::{Canvas, Image, Point, Rect, Surface};
 use std::sync::Arc;
+
+/// What is behind the marker and attribution.
+enum MapBacking {
+    Image(Image),
+    /// The host's map canvas shows through, so the widget leaves the frame clear.
+    Layer,
+    Placeholder,
+}
 
 /// What the frame at one second depends on: a camera when GPS exists, and the marker's progress.
 /// With a camera that's travelled metres; without one, the placeholder's share of its route.
@@ -49,6 +58,16 @@ pub struct PreviewMap {
     /// The last frame by request, so an unchanged request asks the provider once.
     last_frame: Option<(MapFrameRequest, Image)>,
     last_render: Option<(MapFrameState, bool)>,
+    /// Whether the host's map canvas is showing under this widget.
+    layer_ready: bool,
+    /// JSON of what the map canvas should draw. Empty when it should draw nothing.
+    pub view: Vec<u8>,
+    /// The camera of `view`. A live resize keeps it, so the marker stays where the canvas put the road.
+    view_camera: Option<MapCamera>,
+    view_line: Option<Arc<MapRouteLine>>,
+    /// `world_x, world_y, along_metres` per vertex of `view_line`. `route_id` changes with it.
+    pub route_points: Vec<f64>,
+    route_id: u32,
     geometry_stale: bool,
     surface: Option<Surface>,
     pub pixels: Vec<u8>,
@@ -111,6 +130,12 @@ impl PreviewMap {
             transient: false,
             last_frame: None,
             last_render: None,
+            layer_ready: false,
+            view: Vec::new(),
+            view_camera: None,
+            view_line: None,
+            route_points: Vec::new(),
+            route_id: 0,
             geometry_stale: true,
             surface: None,
             pixels: Vec::new(),
@@ -192,23 +217,88 @@ impl PreviewMap {
         }
     }
 
-    /// The camera and image to draw. During a live resize that's the last frame and its own camera,
-    /// so the marker stays where the frame put the road, and nothing is requested.
+    /// Tells the widget whether the host's map canvas is showing. Until it is, the placeholder shows.
+    pub fn set_layer_ready(&mut self, ready: bool) {
+        if self.layer_ready != ready {
+            self.layer_ready = ready;
+            self.last_render = None;
+        }
+    }
+
+    /// Publishes what the host's map canvas should draw at this state. During a live resize the
+    /// canvas keeps its last frame, rescaled, and nothing is asked of it.
+    fn publish_view(&mut self, state: &MapFrameState) -> WidgetResult<()> {
+        if self.transient {
+            return Ok(());
+        }
+        let (Some(camera), Some(MapContent::Activity(map))) = (state.camera, &self.content) else {
+            self.view.clear();
+            self.view_camera = None;
+            return Ok(());
+        };
+        if !self
+            .view_line
+            .as_ref()
+            .is_some_and(|line| Arc::ptr_eq(line, &map.line))
+        {
+            self.route_points = map
+                .line
+                .points()
+                .iter()
+                .flat_map(|point| [point.world_x, point.world_y, f64::from(point.along_metres)])
+                .collect();
+            self.route_id = self.route_id.wrapping_add(1);
+            self.view_line = Some(map.line.clone());
+        }
+        let layers = self.config.spec.layers;
+        let viewport = map.viewport;
+        let style = self.layout.route_style;
+        let [c0, c1, c2, c3] = style.completed_color;
+        let [r0, r1, r2, r3] = style.remaining_color;
+        self.view = serde_json::to_vec(&json!({
+            "renderer": {
+                "style": self.config.spec.style.name(),
+                "roads": layers.roads,
+                "paths": layers.paths,
+                "water": layers.water,
+                "buildings": layers.buildings,
+                "width": viewport.width_px(),
+                "height": viewport.height_px(),
+                "pixel_ratio": viewport.pixel_ratio(),
+                "zoom": camera.zoom(),
+            },
+            "camera": camera.values(),
+            "route_id": self.route_id,
+            "route_style": [
+                c0, c1, c2, c3, style.completed_width_px,
+                r0, r1, r2, r3, style.remaining_width_px,
+            ],
+            "travelled_metres": state.progress,
+        }))
+        .map_err(|error| WidgetError::Render(error.to_string()))?;
+        self.view_camera = Some(camera);
+        Ok(())
+    }
+
+    /// The camera and backing to draw. A map layer's camera is the one it last drew.
     fn resolve_frame(
         &mut self,
         state: &MapFrameState,
-    ) -> WidgetResult<Option<(MapCamera, Option<Image>)>> {
+    ) -> WidgetResult<Option<(MapCamera, MapBacking)>> {
         let Some(camera) = state.camera else {
             return Ok(None);
         };
         let Some(MapContent::Activity(map)) = &self.content else {
             return Ok(None);
         };
-        if self.transient {
-            return Ok(Some(self.last_frame.as_ref().map_or(
-                (camera, None),
-                |(request, image)| (request.camera, Some(image.clone())),
+        if self.layer_ready {
+            return Ok(Some((
+                self.view_camera.unwrap_or(camera),
+                MapBacking::Layer,
             )));
+        }
+        if self.transient {
+            return Ok(Some((camera, MapBacking::Placeholder)));
         }
         let request = MapFrameRequest {
             spec: self.config.spec,
@@ -222,15 +312,15 @@ impl PreviewMap {
         };
         if let Some((cached, image)) = &self.last_frame {
             if *cached == request {
-                return Ok(Some((camera, Some(image.clone()))));
+                return Ok(Some((camera, MapBacking::Image(image.clone()))));
             }
         }
         match self.frames.frame(&request)? {
             MapFrame::Ready(image) => {
                 self.last_frame = Some((request, image.clone()));
-                Ok(Some((camera, Some(image))))
+                Ok(Some((camera, MapBacking::Image(image))))
             }
-            MapFrame::Pending => Ok(Some((camera, None))),
+            MapFrame::Pending => Ok(Some((camera, MapBacking::Placeholder))),
         }
     }
 
@@ -258,13 +348,14 @@ impl PreviewMap {
         canvas: &Canvas,
         progress: f32,
         marker: Option<Point>,
-        resolved: Option<&(MapCamera, Option<Image>)>,
+        resolved: Option<&(MapCamera, MapBacking)>,
     ) {
         canvas.save();
         canvas.clip_rect(layout.frame, None, true);
         match resolved {
-            Some((_, Some(image))) => layout.draw_image(canvas, image),
-            Some((_, None)) => layout.draw_placeholder(canvas),
+            Some((_, MapBacking::Image(image))) => layout.draw_image(canvas, image),
+            Some((_, MapBacking::Layer)) => {}
+            Some((_, MapBacking::Placeholder)) => layout.draw_placeholder(canvas),
             None => {
                 layout.draw_placeholder(canvas);
                 let split = layout.draw_placeholder_route(canvas, progress);
@@ -306,10 +397,11 @@ impl PreviewMap {
 
     pub fn render(&mut self, activity: Option<&ActivitySampler>, second: f64) -> WidgetResult<()> {
         let state = self.frame_state(activity, second)?;
+        self.publish_view(&state)?;
         let resolved = self.resolve_frame(&state)?;
         let has_frame = resolved
             .as_ref()
-            .is_some_and(|(_, image)| image.is_some());
+            .is_some_and(|(_, backing)| !matches!(backing, MapBacking::Placeholder));
         // A pending frame may have arrived, so this compares more than the sampled state.
         if self.last_render == Some((state, has_frame)) {
             return Ok(());

@@ -1,8 +1,8 @@
 //! The per-frame tile matrices, ported from maplibre-rs `render/tile_view_pattern/`.
 
-use crate::pipelines::ShaderTileMetadata;
+use super::pipelines::ShaderTileMetadata;
 use cgmath::{Matrix4, Vector3};
-use ovrley_map::{data_level, TileId, ViewPadding, ViewState, MAX_VIEW_TILES};
+use crate::{data_level, TileId, ViewState, MAX_VIEW_TILES};
 use std::collections::HashSet;
 use std::mem::size_of;
 use std::ops::Range;
@@ -90,7 +90,7 @@ impl TileViewPattern {
     pub(crate) fn generate(&mut self, view: &ViewState, has_tile: impl Fn(TileId) -> bool) {
         self.shapes.clear();
         self.seen.clear();
-        let Some(region) = view.create_view_region(data_level(view.zoom()), ViewPadding::Tight)
+        let Some(region) = view.create_view_region(data_level(view.zoom()))
         else {
             return;
         };

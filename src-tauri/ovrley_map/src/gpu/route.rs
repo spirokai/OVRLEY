@@ -5,8 +5,8 @@
 //! the split. So it keeps its own buffers: the line is cut into sections, each with its own origin
 //! and matrix, which keeps `f32` precision on long routes and lets far sections be culled per frame.
 
-use crate::pipelines::{RouteInstance, RouteVertex};
-use crate::tile::DEFAULT_TOLERANCE;
+use super::pipelines::{RouteInstance, RouteVertex};
+use super::tile::DEFAULT_TOLERANCE;
 use cgmath::{Matrix4, Vector3};
 use lyon::geom::point;
 use lyon::path::Path;
@@ -14,7 +14,7 @@ use lyon::tessellation::{
     BuffersBuilder, LineCap, LineJoin, StrokeOptions, StrokeTessellator, StrokeVertex,
     VertexBuffers,
 };
-use ovrley_map::{MapRouteDraw, MapRouteLine, MapRoutePoint, MapViewport, ViewState};
+use crate::{MapRouteDraw, MapRouteLine, MapRoutePoint, MapViewport, ViewState};
 use std::mem::size_of;
 use std::ops::Range;
 use std::sync::Arc;

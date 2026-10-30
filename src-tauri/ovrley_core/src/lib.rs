@@ -9,7 +9,7 @@
 //! command layer can stay thin while the testable business logic remains here.
 #![recursion_limit = "256"]
 
-pub use ovrley_map::{MapDataSource, MapSprite};
+pub use ovrley_map::MapDataSource;
 
 /// Activity JSON contracts plus trim and interpolation utilities.
 pub mod activity;

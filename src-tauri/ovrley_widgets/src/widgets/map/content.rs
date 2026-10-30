@@ -14,9 +14,7 @@ use crate::{
     render::preview::PreviewRasterScale,
     widgets::route::sampling::RouteWindow,
 };
-use ovrley_map::{
-    view_tiles, MapCamera, MapRouteLine, MapViewport, TileId, ViewPadding, MAX_VIEW_TILES,
-};
+use ovrley_map::{view_tiles, MapCamera, MapRouteLine, MapViewport, TileId, MAX_VIEW_TILES};
 use std::sync::Arc;
 
 /// The inputs a widget's content is built from, so unrelated edits keep it.
@@ -72,13 +70,18 @@ impl ActivityMap {
         self.camera.zoom()
     }
 
+    /// The whole activity, one second apart. Views change far slower than this needs to catch them.
+    pub fn activity_seconds(&self) -> impl Iterator<Item = f64> {
+        (0..=self.activity_end.floor() as u64).map(|second| second as f64)
+    }
+
     /// The tiles each of `seconds` sees, with consecutive equal views merged. A view at the tile
     /// limit may be missing tiles, so it fails instead of drawing a blank patch.
     pub fn views(&self, seconds: impl Iterator<Item = f64>) -> WidgetResult<Vec<Vec<TileId>>> {
         let mut views: Vec<Vec<TileId>> = Vec::new();
         for second in seconds.filter(|second| self.covers(*second)) {
             let camera = self.camera_at(&self.track.position_at(second))?;
-            let tiles = view_tiles(&camera, self.viewport, ViewPadding::Tight);
+            let tiles = view_tiles(&camera, self.viewport);
             if tiles.len() >= MAX_VIEW_TILES {
                 return Err(WidgetError::Config(format!(
                     "map: this camera sees at least {MAX_VIEW_TILES} tiles at {second:.1} s. Reduce its range or pitch."

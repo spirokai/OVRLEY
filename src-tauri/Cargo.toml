@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "ovrley_core", "ovrley_map", "ovrley_map_gpu", "ovrley_widgets"]
+members = [".", "ovrley_core", "ovrley_map", "ovrley_widgets"]
 
 [package]
 name = "app"
@@ -18,15 +18,6 @@ default-run = "app"
 name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
-[features]
-# GPU map gate only (src/bin/map_gpu_gate.rs).
-map-gpu-gate = ["dep:ovrley_map_gpu", "dep:skia-safe"]
-
-[[bin]]
-name = "map_gpu_gate"
-path = "src/bin/map_gpu_gate.rs"
-required-features = ["map-gpu-gate"]
-
 [build-dependencies]
 tauri-build = { version = "2.5.3", features = [] }
 
@@ -44,12 +35,8 @@ tauri-plugin-updater = "=2.9.0"
 base64 = "0.22"
 open = "5"
 ovrley_core = { path = "ovrley_core" }
-ovrley_map = { path = "ovrley_map", features = ["raster"] }
-ovrley_map_gpu = { path = "ovrley_map_gpu", optional = true }
+ovrley_map = { path = "ovrley_map" }
 ovrley_widgets = { path = "ovrley_widgets" }
-skia-safe = { git = "https://github.com/rust-skia/rust-skia", rev = "b7f043e0b1e2a850e702245de811f01df1f6b0ff", version = "=0.153.3", features = [
-  "binary-cache",
-], optional = true }
 tiny_http = "0.12"
 uuid = { version = "1", features = ["v4"] }
 zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }
@@ -57,8 +44,6 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 reqwest = { version = "0.12.28", default-features = false, features = ["blocking", "rustls-tls"] }
 http = "1.4"
 http-cache-semantics = "=2.1.0"
-# Phase 1 map gate only (src/bin/map_tile_gate.rs). Remove with that binary.
-image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3", default-features = false, features = [

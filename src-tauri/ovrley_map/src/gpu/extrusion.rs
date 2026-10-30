@@ -3,10 +3,10 @@
 //! Geometry rules follow MapLibre's fill-extrusion bucket. Its lighting is anchored to the viewport,
 //! so it is evaluated per frame in `shaders/extrusion.vertex.wgsl` from the normal stored here.
 
-use crate::pattern::EXTENT;
-use crate::pipelines::{FillShaderFeatureMetadata, ShaderLayerMetadata};
-use crate::style::{evaluate_color, evaluate_number, VectorLayer};
-use crate::tile::{
+use super::pattern::EXTENT;
+use super::pipelines::{FillShaderFeatureMetadata, ShaderLayerMetadata};
+use super::style::{evaluate_color, evaluate_number, VectorLayer};
+use super::tile::{
     for_each_passing, DecodedFeature, GeometryKind, LayerKind, PreparedLayer, DEFAULT_TOLERANCE,
 };
 use bytemuck::{Pod, Zeroable};

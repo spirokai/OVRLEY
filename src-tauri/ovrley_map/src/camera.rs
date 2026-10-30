@@ -19,7 +19,6 @@ const EARTH_RADIUS: f64 = 6371008.8;
 /// MapLibre's default light `position: [1.15, 210, 30]` on the ground plane, at bearing 0.
 const LIGHT_XY: (f64, f64) = (0.2875, -0.498);
 
-const VIEW_REGION_PADDING: i32 = 1;
 /// The most tiles one view draws. A view that reaches this may be missing some.
 pub const MAX_VIEW_TILES: usize = 512;
 
@@ -96,6 +95,18 @@ impl MapCamera {
     pub const fn zoom(self) -> f64 {
         self.zoom
     }
+
+    /// `lon, lat, zoom, pitch, bearing, top padding`, for a renderer in another WASM module.
+    pub const fn values(self) -> [f64; 6] {
+        [
+            self.lon,
+            self.lat,
+            self.zoom,
+            self.pitch_deg,
+            self.bearing_deg,
+            self.top_padding_ratio,
+        ]
+    }
 }
 
 /// The output a camera draws to. One world unit is one device pixel at pixel ratio 1, so a higher
@@ -135,15 +146,6 @@ impl MapViewport {
     pub const fn pixel_ratio(self) -> f32 {
         self.pixel_ratio
     }
-}
-
-/// How far past the visible tiles a view region reaches.
-#[derive(Clone, Copy, Debug)]
-pub enum ViewPadding {
-    /// One extra ring of tiles, for loading ahead of the camera.
-    Loose,
-    /// Exactly the tiles under the frustum's footprint, for drawing.
-    Tight,
 }
 
 /// A ground point in clip space, before the perspective divide.
@@ -356,24 +358,16 @@ impl ViewState {
 
     /// The tiles at `level` under the frustum's footprint on the ground. `None` when the ground
     /// is not in view.
-    pub fn create_view_region(&self, level: u8, padding: ViewPadding) -> Option<ViewRegion> {
+    pub fn create_view_region(&self, level: u8) -> Option<ViewRegion> {
         let (min, max) = self.ground_footprint()?;
         let tile_scale = 2_f64.powi(i32::from(level)) / self.world_size();
         let to_tile = |value: f64| (value * tile_scale) as i32;
-        let (padding, footprint) = match padding {
-            ViewPadding::Loose => (VIEW_REGION_PADDING, None),
-            ViewPadding::Tight => (
-                0,
-                Some(
-                    self.ground_corners()?
-                        .map(|corner| (corner.0 * tile_scale, corner.1 * tile_scale)),
-                ),
-            ),
-        };
+        let footprint = self
+            .ground_corners()?
+            .map(|corner| (corner.0 * tile_scale, corner.1 * tile_scale));
         Some(ViewRegion::new(
             TileId::new(level, to_tile(min.0), to_tile(min.1)),
             TileId::new(level, to_tile(max.0), to_tile(max.1)),
-            padding,
             footprint,
             MAX_VIEW_TILES,
         ))

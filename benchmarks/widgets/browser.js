@@ -263,9 +263,9 @@ export function createCases({ activities, template, image, frames, warmup, fps, 
     }
     // The native resource step derives the table core would hand the editor for this split length.
     const split_table = type === 'splits_run' ? `split-table-${id}.json` : null
-    // WASM has no GPU renderer: both preview backends receive one finished frame of this edge length.
-    const map_frame = type === 'map' ? overrides.size : null
-    result.push({ id, activity, start_frame, dynamic, config: effective, request, fonts, split_table, map_frame })
+    // The map itself is a WebGL2 canvas: both preview backends time the widget drawn over it.
+    const map_layer = type === 'map'
+    result.push({ id, activity, start_frame, dynamic, config: effective, request, fonts, split_table, map_layer })
   }
   return result
 }
@@ -323,12 +323,9 @@ export async function play({ entry, frames, warmup, fps, fonts }) {
         upload(png, (ptr, len) => check(module._ovrley_preview_image(session, id, idLen, ptr, len))),
       )
     }
-    if (entry.map_frame !== null) {
-      const pixels = new Uint8Array(entry.map_frame * entry.map_frame * 4).fill(255)
-      upload(pixels, (ptr, len) => check(module._ovrley_preview_map_frame(session, entry.map_frame, entry.map_frame, ptr, len)))
-    }
     const widget = entry.request === null ? 0 : send(entry.request, (ptr, len) => module._ovrley_preview_widget_create(session, ptr, len))
     if (entry.request !== null && widget === 0) fail()
+    if (entry.map_layer) module._ovrley_preview_map_layer_ready(session, widget, 1)
     const step = (index, measured) => {
       if (widget === 0 || (!entry.dynamic && lastRevision !== -1)) return false
       let mark = performance.now()

@@ -1,8 +1,8 @@
 //! Shader data layouts and render pipelines, ported from maplibre-rs `render/shaders/mod.rs` and
 //! `render/resource/tile_pipeline.rs`.
 
-use crate::extrusion::ExtrusionVertex;
-use crate::tile::LayerKind;
+use super::extrusion::ExtrusionVertex;
+use super::tile::LayerKind;
 use bytemuck::{Pod, Zeroable};
 use std::mem::size_of;
 

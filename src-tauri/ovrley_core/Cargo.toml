@@ -8,8 +8,7 @@ edition = "2021"
 rust-version = "1.95"
 
 [dependencies]
-ovrley_map = { path = "../ovrley_map", features = ["raster"] }
-ovrley_map_gpu = { path = "../ovrley_map_gpu" }
+ovrley_map = { path = "../ovrley_map", features = ["gpu"] }
 ovrley_widgets = { path = "../ovrley_widgets" }
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"

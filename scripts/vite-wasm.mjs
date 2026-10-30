@@ -1,12 +1,12 @@
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
-import { artifactDir, artifactNames, crateDir, root, vendorDir } from './build-wasm.mjs'
+import { artifactDir, artifactNames, crateDir, mapCrateDir, root, vendorDir } from './build-wasm.mjs'
 
 /** Production assets and serialized development rebuilds of the portable renderer. */
 export function wasmBindingsPlugin() {
   const buildScript = join(root, 'scripts', 'build-wasm.mjs')
-  const sharedDir = join(root, 'src-tauri', 'ovrley_widgets')
+  const sharedDirs = ['ovrley_widgets', 'ovrley_map'].map((name) => join(root, 'src-tauri', name))
   const widgetAssets = join(root, 'assets')
   const assets = new Map(
     artifactNames.map((name) => [
@@ -73,13 +73,13 @@ export function wasmBindingsPlugin() {
         const absolute = resolve(file)
         const crateRelative = relative(crateDir, absolute)
         const vendorRelative = relative(vendorDir, absolute)
-        const isCrate = !crateRelative.startsWith('..') && /\.(rs|toml|lock)$/.test(file)
+        const isCrate = [crateRelative, relative(mapCrateDir, absolute)].some((path) => !path.startsWith('..')) && /\.(rs|toml|lock)$/.test(file)
         const isBundle = !vendorRelative.startsWith('..') && /(?:manifest\.json|\.tar\.gz)$/.test(file)
-        const isShared = [sharedDir, widgetAssets].some((directory) => !relative(directory, absolute).startsWith('..'))
+        const isShared = [...sharedDirs, widgetAssets].some((directory) => !relative(directory, absolute).startsWith('..'))
         if (started && (isCrate || isBundle || isShared || absolute === buildScript || absolute === join(root, '.env.local'))) rebuild()
       }
 
-      server.watcher.add([crateDir, sharedDir, widgetAssets, vendorDir, buildScript, join(root, '.env.local')])
+      server.watcher.add([crateDir, mapCrateDir, ...sharedDirs, widgetAssets, vendorDir, buildScript, join(root, '.env.local')])
       for (const event of ['add', 'change', 'unlink']) server.watcher.on(event, sourceChanged)
       server.httpServer?.once('close', () => {
         closed = true

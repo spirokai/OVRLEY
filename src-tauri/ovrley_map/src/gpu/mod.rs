@@ -1,11 +1,14 @@
 //! A native, GPU, per-frame map renderer: vector tiles and 3D buildings drawn from cached MVT.
 //!
 //! The rendering method is ported from maplibre-rs (`maplibre/maplibre-rs` at `96b50a09`, MIT OR
-//! Apache-2.0, see `LICENSE-MIT` beside the manifest). One render pass clears, draws every visible
+//! Apache-2.0, see `LICENSE-MIT` beside this file). One render pass clears, draws every visible
 //! tile's mask, draws layers × tiles in style order from slices of shared buffers, then buildings.
 //! Its ECS, render graph, schedule and HTTP layer are not ported: this is plain structs and calls.
 //!
-//! Depending on this crate is the opt-in. `ovrley_map` stays free of `wgpu` and never depends on it.
+//! Export reads frames back natively. The editor preview compiles this crate to WASM and presents to
+//! a canvas over WebGL2 (see `web`). Both share one draw path, so they draw the same map.
+//!
+//! The `gpu` feature is the opt-in: without it, `ovrley_map` stays free of `wgpu`.
 
 mod extrusion;
 mod pattern;
@@ -15,26 +18,38 @@ mod route;
 mod sizing;
 mod style;
 mod tile;
+#[cfg(target_arch = "wasm32")]
+mod web;
 
 pub use pool::PoolEntries;
 pub use sizing::{GpuPoolSizes, MapTileSizer, DEFAULT_POOL_ENTRIES};
 pub use style::Buildings;
+#[cfg(target_arch = "wasm32")]
+pub use web::MapTileDecoder;
 
 use extrusion::ExtrusionVertex;
-use ovrley_map::{
-    MapCamera, MapDataSource, MapRouteDraw, MapStyleSpec, MapViewport, TileId, ViewState,
-};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::MapDataSource;
+use crate::{MapCamera, MapRouteDraw, MapStyleSpec, MapViewport, TileId, ViewState};
 use pattern::{stencil_reference_value_3d, TileShape, TileViewPattern};
 use pipelines::{BackgroundLayerMetadata, Pipelines, ShaderVertex, COLOR_FORMAT, DEPTH_FORMAT};
 use pool::{BufferPool, IndexEntry, LayerGeometry};
 use route::RouteLayer;
 use std::collections::HashSet;
 use std::ops::Range;
+#[cfg(not(target_arch = "wasm32"))]
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{mpsc, Arc, Mutex};
-use std::time::Instant;
-use style::{parse_style, ParsedStyle};
-use tile::{prepare_tile, LayerKind, PreparedLayer, PreparedTile};
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
+#[cfg(not(target_arch = "wasm32"))]
+use style::parse_style;
+use style::ParsedStyle;
+#[cfg(not(target_arch = "wasm32"))]
+use tile::{prepare_tile, PreparedTile};
+use tile::{LayerKind, PreparedLayer};
+#[cfg(target_arch = "wasm32")]
+use web::Output;
 use wgpu::util::DeviceExt;
 
 const MASK_VERTICES: u32 = 6;
@@ -57,29 +72,12 @@ pub struct GpuMapConfig {
     pub buildings: Buildings,
 }
 
-/// What loading one tile cost and produced.
-#[derive(Clone, Debug)]
-pub struct TileLoadReport {
-    pub tile: TileId,
-    /// Reading from the source, off the GPU thread.
-    pub fetch_ms: f64,
-    /// Decoding and tessellating, off the GPU thread.
-    pub prepare_ms: f64,
-    /// Uploading to the pools.
-    pub upload_ms: f64,
-    pub ground_layers: usize,
-    pub ground_vertices: usize,
-    pub extrusion_vertices: usize,
-    /// Why the tile did not load, when it did not. Tile data is external, so this never fails a load.
-    pub error: Option<String>,
-}
-
-/// What one frame drew.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct FrameStats {
-    pub tiles: usize,
-    pub layer_draws: usize,
-    pub extrusion_draws: usize,
+/// One tile that finished loading, and why it failed if it did. Tile data is external, so a failure
+/// never fails a load by itself.
+#[cfg(not(target_arch = "wasm32"))]
+struct TileLoadReport {
+    tile: TileId,
+    error: Option<String>,
 }
 
 /// One layer of one tile in the frame's draw order.
@@ -115,14 +113,21 @@ enum BoundPipeline {
     Layer(LayerKind),
 }
 
+/// Targets every output draws through.
 struct Targets {
-    /// Present when multisampling. The resolve target is `color_view`.
+    /// Present when multisampling. It resolves to the output's colour view.
     multisampled: Option<wgpu::TextureView>,
+    depth: wgpu::TextureView,
+}
+
+/// Where export's frames go: a texture, read back to pixels.
+#[cfg(not(target_arch = "wasm32"))]
+struct Output {
     color: wgpu::Texture,
     color_view: wgpu::TextureView,
-    depth: wgpu::TextureView,
     staging: wgpu::Buffer,
     padded_bytes_per_row: u32,
+    pixels: Vec<u8>,
 }
 
 /// Renders a map for one style on its own GPU device. See the crate docs for the method.
@@ -134,6 +139,7 @@ pub struct GpuMapRenderer {
     style: ParsedStyle,
     pipelines: Pipelines,
     targets: Targets,
+    output: Output,
     pattern: TileViewPattern,
     ground_pool: BufferPool<ShaderVertex>,
     extrusion_pool: BufferPool<ExtrusionVertex>,
@@ -145,34 +151,16 @@ pub struct GpuMapRenderer {
     masks: Vec<TileShape>,
     layer_items: Vec<LayerItem>,
     extrusion_items: Vec<ExtrusionItem>,
-    pixels: Vec<u8>,
     gpu_error: Arc<Mutex<Option<String>>>,
-    last_stats: FrameStats,
 }
 
 impl GpuMapRenderer {
     /// Opens a GPU device and reads the style. Fails loudly on invalid configuration, without a
     /// real GPU, or when the device cannot hold the pools. Software adapters are refused: nothing
     /// has measured them, and a map frame costs far more on them than an export should wait for.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(config: GpuMapConfig, source: &dyn MapDataSource) -> Result<Self, String> {
-        if config.sample_count != 1 && config.sample_count != 4 {
-            return Err(format!(
-                "Map sample count {} must be 1 or 4",
-                config.sample_count
-            ));
-        }
-        let has_empty_pool = [config.pools.ground, config.pools.extrusion]
-            .iter()
-            .any(|pool| pool.vertices == 0 || pool.indices == 0 || pool.layers == 0);
-        if has_empty_pool {
-            return Err("Map pools must not be empty".to_string());
-        }
-        if !config.style_zoom.is_finite() {
-            return Err(format!(
-                "Map style zoom {} is not finite",
-                config.style_zoom
-            ));
-        }
+        validate_config(&config)?;
         let style = parse_style(
             &source.style(config.spec.style)?,
             config.spec.layers,
@@ -196,16 +184,7 @@ impl GpuMapRenderer {
             ));
         }
         let max_buffer_size = adapter.limits().max_buffer_size;
-        let largest_buffer = BufferPool::<ShaderVertex>::largest_buffer(config.pools.ground)
-            .max(BufferPool::<ExtrusionVertex>::largest_buffer(
-                config.pools.extrusion,
-            ));
-        if largest_buffer > max_buffer_size {
-            return Err(format!(
-                "This map view needs a {largest_buffer} byte GPU buffer and {adapter_name} allows \
-                 {max_buffer_size}. Reduce the map's range or pitch."
-            ));
-        }
+        check_pool_sizes(config.pools, max_buffer_size, &adapter_name)?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             required_limits: wgpu::Limits {
                 max_buffer_size,
@@ -214,7 +193,19 @@ impl GpuMapRenderer {
             ..wgpu::DeviceDescriptor::default()
         }))
         .map_err(|error| format!("No GPU device for the map renderer: {error}"))?;
+        let output = Output::new(&device, config.viewport);
+        Self::assemble(config, style, device, queue, adapter_name, output)
+    }
 
+    /// Builds a renderer on an opened device.
+    fn assemble(
+        config: GpuMapConfig,
+        style: ParsedStyle,
+        device: wgpu::Device,
+        queue: wgpu::Queue,
+        adapter_name: String,
+        output: Output,
+    ) -> Result<Self, String> {
         let gpu_error = Arc::new(Mutex::new(None));
         let lost_error = Arc::clone(&gpu_error);
         device.set_device_lost_callback(move |reason, message| {
@@ -245,7 +236,6 @@ impl GpuMapRenderer {
                 usage: wgpu::BufferUsages::VERTEX,
             })
         });
-        let pixels = vec![0; width as usize * height as usize * 4];
 
         let renderer = Self {
             config,
@@ -255,6 +245,7 @@ impl GpuMapRenderer {
             style,
             pipelines,
             targets,
+            output,
             pattern,
             ground_pool,
             extrusion_pool,
@@ -265,9 +256,7 @@ impl GpuMapRenderer {
             masks: Vec::with_capacity(64),
             layer_items: Vec::with_capacity(1024),
             extrusion_items: Vec::with_capacity(64),
-            pixels,
             gpu_error,
-            last_stats: FrameStats::default(),
         };
         // An allocation the device refused is reported through the error callback.
         renderer.check_gpu()?;
@@ -289,176 +278,9 @@ impl GpuMapRenderer {
         self.ground_pool.index().evicted_layers() + self.extrusion_pool.index().evicted_layers()
     }
 
-    /// What the last frame drew.
-    pub const fn last_stats(&self) -> FrameStats {
-        self.last_stats
-    }
-
-    /// Puts every tile of one view on the GPU, or fails. The pools evict oldest first, so loading can
-    /// evict a tile this view still shows, which would leave a blank patch. When it does, the pools
-    /// start empty and take only this view, which always fits if the view fits at all. Costs a few
-    /// lookups when the tiles are already resident.
-    pub fn load_view(
-        &mut self,
-        tiles: &[TileId],
-        source: &dyn MapDataSource,
-    ) -> Result<(), String> {
-        if self.has_all(tiles) {
-            return Ok(());
-        }
-        self.load_or_fail(tiles, source)?;
-        if self.has_all(tiles) {
-            return Ok(());
-        }
-        self.ground_pool.clear();
-        self.extrusion_pool.clear();
-        self.loaded.clear();
-        self.pool_clears += 1;
-        self.load_or_fail(tiles, source)?;
-        if self.has_all(tiles) {
-            return Ok(());
-        }
-        Err(format!(
-            "A view of {} map tiles does not fit its {} byte pools",
-            tiles.len(),
-            self.pool_bytes()
-        ))
-    }
-
-    fn has_all(&self, tiles: &[TileId]) -> bool {
-        tiles.iter().all(|tile| self.loaded.contains(tile))
-    }
-
-    fn load_or_fail(&mut self, tiles: &[TileId], source: &dyn MapDataSource) -> Result<(), String> {
-        let reports = self.load_tiles(tiles, source)?;
-        match reports
-            .iter()
-            .find_map(|report| report.error.as_ref().map(|error| (report, error)))
-        {
-            Some((report, error)) => Err(format!(
-                "Map tile {}/{}/{} failed to load: {error}",
-                report.tile.z, report.tile.x, report.tile.y
-            )),
-            None => Ok(()),
-        }
-    }
-
-    /// How many times [`Self::load_view`] had to empty the pools. Each reloads one view.
+    /// How many times the pools were emptied to hold one view. Each reloads that view.
     pub const fn pool_clears(&self) -> u64 {
         self.pool_clears
-    }
-
-    /// Decodes and tessellates `tiles` on worker threads and uploads them. Blocks until they are
-    /// on the GPU. Tiles already loaded are skipped.
-    pub fn load_tiles(
-        &mut self,
-        tiles: &[TileId],
-        source: &dyn MapDataSource,
-    ) -> Result<Vec<TileLoadReport>, String> {
-        self.check_gpu()?;
-        if let Some(tile) = tiles.iter().find(|tile| !tile.is_on_grid()) {
-            return Err(format!(
-                "Map tile {}/{}/{} is off the tile grid",
-                tile.z, tile.x, tile.y
-            ));
-        }
-        let pending: Vec<TileId> = tiles
-            .iter()
-            .copied()
-            .filter(|tile| !self.loaded.contains(tile))
-            .collect();
-        let next = AtomicUsize::new(0);
-        let workers = std::thread::available_parallelism()
-            .map_or(1, usize::from)
-            .min(pending.len().max(1));
-        let (sender, receiver) = mpsc::channel();
-        let style = &self.style;
-        let mut reports = Vec::with_capacity(pending.len());
-
-        std::thread::scope(|scope| {
-            for _ in 0..workers {
-                let (sender, next, pending) = (sender.clone(), &next, &pending);
-                scope.spawn(move || {
-                    while let Some(&tile) = pending.get(next.fetch_add(1, Ordering::Relaxed)) {
-                        let prepared = fetch_and_prepare(tile, style, source);
-                        if sender.send(prepared).is_err() {
-                            return;
-                        }
-                    }
-                });
-            }
-            drop(sender);
-            for (mut report, prepared) in receiver {
-                if let Some(prepared) = prepared {
-                    let started = Instant::now();
-                    let uploaded = prepared
-                        .ground
-                        .iter()
-                        .try_for_each(|layer| {
-                            upload_layer(&mut self.ground_pool, &self.queue, report.tile, layer)
-                        })
-                        .and_then(|()| {
-                            prepared.extrusions.iter().try_for_each(|layer| {
-                                upload_layer(
-                                    &mut self.extrusion_pool,
-                                    &self.queue,
-                                    report.tile,
-                                    layer,
-                                )
-                            })
-                        });
-                    match uploaded {
-                        Ok(()) => {
-                            self.loaded.insert(report.tile);
-                        }
-                        Err(error) => {
-                            log::warn!(
-                                "Skipping map tile {}/{}/{}: {error}",
-                                report.tile.z,
-                                report.tile.x,
-                                report.tile.y
-                            );
-                            report.error = Some(error);
-                        }
-                    }
-                    report.upload_ms = started.elapsed().as_secs_f64() * 1000.0;
-                }
-                reports.push(report);
-            }
-        });
-
-        // A tile that lost a layer no longer counts as loaded. Reloading it restores what is missing.
-        for tile in self.ground_pool.drain_evicted_tiles() {
-            self.loaded.remove(&tile);
-        }
-        for tile in self.extrusion_pool.drain_evicted_tiles() {
-            self.loaded.remove(&tile);
-        }
-        self.queue.submit([]);
-        self.device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .map_err(|error| format!("GPU upload did not finish: {error}"))?;
-        self.check_gpu()?;
-        Ok(reports)
-    }
-
-    /// Draws one frame and returns its RGBA pixels, with a blocking readback. A route draws above
-    /// the roads and below the buildings. A new line is tessellated and uploaded on first use.
-    pub fn render(
-        &mut self,
-        camera: &MapCamera,
-        route: Option<&MapRouteDraw>,
-    ) -> Result<&[u8], String> {
-        self.draw_frame(camera, route)?;
-        self.read_back(true)?;
-        Ok(&self.pixels)
-    }
-
-    /// Draws one frame and maps its pixels without copying them out, as upstream's headless map
-    /// does. Exists so gate timings compare directly with its baselines.
-    pub fn render_without_copy(&mut self, camera: &MapCamera) -> Result<(), String> {
-        self.draw_frame(camera, None)?;
-        self.read_back(false)
     }
 
     fn check_gpu(&self) -> Result<(), String> {
@@ -468,7 +290,8 @@ impl GpuMapRenderer {
         }
     }
 
-    fn draw_frame(
+    /// Everything a frame needs before its pass is recorded.
+    fn prepare_frame(
         &mut self,
         camera: &MapCamera,
         route: Option<&MapRouteDraw>,
@@ -486,33 +309,6 @@ impl GpuMapRenderer {
         )?;
         self.prepare_route(&view, route)?;
         self.queue_items();
-
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        self.record_main_pass(&mut encoder);
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo {
-                texture: &self.targets.color,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::TexelCopyBufferInfo {
-                buffer: &self.targets.staging,
-                layout: wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(self.targets.padded_bytes_per_row),
-                    rows_per_image: None,
-                },
-            },
-            wgpu::Extent3d {
-                width: viewport.width_px(),
-                height: viewport.height_px(),
-                depth_or_array_layers: 1,
-            },
-        );
-        self.queue.submit([encoder.finish()]);
         Ok(())
     }
 
@@ -576,18 +372,12 @@ impl GpuMapRenderer {
         }
         self.layer_items.sort_by_key(|item| item.index);
         self.extrusion_items.sort_by_key(|item| item.entry.layer);
-        let backgrounds = self.style.backgrounds.len();
-        self.last_stats = FrameStats {
-            tiles: self.masks.len(),
-            layer_draws: self.layer_items.len() - backgrounds,
-            extrusion_draws: self.extrusion_items.len(),
-        };
     }
 
-    fn record_main_pass(&self, encoder: &mut wgpu::CommandEncoder) {
+    fn record_main_pass(&self, encoder: &mut wgpu::CommandEncoder, output: &wgpu::TextureView) {
         let (view, resolve_target) = match &self.targets.multisampled {
-            Some(multisampled) => (multisampled, Some(&self.targets.color_view)),
-            None => (&self.targets.color_view, None),
+            Some(multisampled) => (multisampled, Some(output)),
+            None => (output, None),
         };
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("main_pass"),
@@ -711,9 +501,203 @@ impl GpuMapRenderer {
         }
     }
 
-    /// Blocks until the frame is in the staging buffer, optionally copying it out.
-    fn read_back(&mut self, copy_pixels: bool) -> Result<(), String> {
-        let slice = self.targets.staging.slice(..);
+}
+
+/// Export: tile loading across threads, and frames read back to pixels.
+#[cfg(not(target_arch = "wasm32"))]
+impl GpuMapRenderer {
+    /// Puts every tile of one view on the GPU, or fails. The pools evict oldest first, so loading can
+    /// evict a tile this view still shows, which would leave a blank patch. When it does, the pools
+    /// start empty and take only this view, which always fits if the view fits at all. Costs a few
+    /// lookups when the tiles are already resident.
+    pub fn load_view(
+        &mut self,
+        tiles: &[TileId],
+        source: &dyn MapDataSource,
+    ) -> Result<(), String> {
+        if self.has_all(tiles) {
+            return Ok(());
+        }
+        self.load_or_fail(tiles, source)?;
+        if self.has_all(tiles) {
+            return Ok(());
+        }
+        self.ground_pool.clear();
+        self.extrusion_pool.clear();
+        self.loaded.clear();
+        self.pool_clears += 1;
+        self.load_or_fail(tiles, source)?;
+        if self.has_all(tiles) {
+            return Ok(());
+        }
+        Err(format!(
+            "A view of {} map tiles does not fit its {} byte pools",
+            tiles.len(),
+            self.pool_bytes()
+        ))
+    }
+
+    fn has_all(&self, tiles: &[TileId]) -> bool {
+        tiles.iter().all(|tile| self.loaded.contains(tile))
+    }
+
+    fn load_or_fail(&mut self, tiles: &[TileId], source: &dyn MapDataSource) -> Result<(), String> {
+        let reports = self.load_tiles(tiles, source)?;
+        match reports
+            .iter()
+            .find_map(|report| report.error.as_ref().map(|error| (report, error)))
+        {
+            Some((report, error)) => Err(format!(
+                "Map tile {}/{}/{} failed to load: {error}",
+                report.tile.z, report.tile.x, report.tile.y
+            )),
+            None => Ok(()),
+        }
+    }
+
+    /// Decodes and tessellates `tiles` on worker threads and uploads them. Blocks until they are
+    /// on the GPU. Tiles already loaded are skipped.
+    fn load_tiles(
+        &mut self,
+        tiles: &[TileId],
+        source: &dyn MapDataSource,
+    ) -> Result<Vec<TileLoadReport>, String> {
+        self.check_gpu()?;
+        if let Some(tile) = tiles.iter().find(|tile| !tile.is_on_grid()) {
+            return Err(format!(
+                "Map tile {}/{}/{} is off the tile grid",
+                tile.z, tile.x, tile.y
+            ));
+        }
+        let pending: Vec<TileId> = tiles
+            .iter()
+            .copied()
+            .filter(|tile| !self.loaded.contains(tile))
+            .collect();
+        let next = AtomicUsize::new(0);
+        let workers = std::thread::available_parallelism()
+            .map_or(1, usize::from)
+            .min(pending.len().max(1));
+        let (sender, receiver) = mpsc::channel();
+        let style = &self.style;
+        let mut reports = Vec::with_capacity(pending.len());
+
+        std::thread::scope(|scope| {
+            for _ in 0..workers {
+                let (sender, next, pending) = (sender.clone(), &next, &pending);
+                scope.spawn(move || {
+                    while let Some(&tile) = pending.get(next.fetch_add(1, Ordering::Relaxed)) {
+                        let prepared = fetch_and_prepare(tile, style, source);
+                        if sender.send(prepared).is_err() {
+                            return;
+                        }
+                    }
+                });
+            }
+            drop(sender);
+            for (mut report, prepared) in receiver {
+                if let Some(prepared) = prepared {
+                    let uploaded = prepared
+                        .ground
+                        .iter()
+                        .try_for_each(|layer| {
+                            upload_layer(&mut self.ground_pool, &self.queue, report.tile, layer)
+                        })
+                        .and_then(|()| {
+                            prepared.extrusions.iter().try_for_each(|layer| {
+                                upload_layer(
+                                    &mut self.extrusion_pool,
+                                    &self.queue,
+                                    report.tile,
+                                    layer,
+                                )
+                            })
+                        });
+                    match uploaded {
+                        Ok(()) => {
+                            self.loaded.insert(report.tile);
+                        }
+                        Err(error) => {
+                            log::warn!(
+                                "Skipping map tile {}/{}/{}: {error}",
+                                report.tile.z,
+                                report.tile.x,
+                                report.tile.y
+                            );
+                            report.error = Some(error);
+                        }
+                    }
+                }
+                reports.push(report);
+            }
+        });
+
+        // A tile that lost a layer no longer counts as loaded. Reloading it restores what is missing.
+        for tile in self.ground_pool.drain_evicted_tiles() {
+            self.loaded.remove(&tile);
+        }
+        for tile in self.extrusion_pool.drain_evicted_tiles() {
+            self.loaded.remove(&tile);
+        }
+        self.queue.submit([]);
+        self.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .map_err(|error| format!("GPU upload did not finish: {error}"))?;
+        self.check_gpu()?;
+        Ok(reports)
+    }
+
+    /// Draws one frame and returns its RGBA pixels, with a blocking readback. A route draws above
+    /// the roads and below the buildings. A new line is tessellated and uploaded on first use.
+    pub fn render(
+        &mut self,
+        camera: &MapCamera,
+        route: Option<&MapRouteDraw>,
+    ) -> Result<&[u8], String> {
+        self.draw_frame(camera, route)?;
+        self.read_back()?;
+        Ok(&self.output.pixels)
+    }
+
+    fn draw_frame(
+        &mut self,
+        camera: &MapCamera,
+        route: Option<&MapRouteDraw>,
+    ) -> Result<(), String> {
+        self.prepare_frame(camera, route)?;
+        let viewport = self.config.viewport;
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        self.record_main_pass(&mut encoder, &self.output.color_view);
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture: &self.output.color,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &self.output.staging,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(self.output.padded_bytes_per_row),
+                    rows_per_image: None,
+                },
+            },
+            wgpu::Extent3d {
+                width: viewport.width_px(),
+                height: viewport.height_px(),
+                depth_or_array_layers: 1,
+            },
+        );
+        self.queue.submit([encoder.finish()]);
+        Ok(())
+    }
+
+    /// Blocks until the frame is in the staging buffer, and copies it out.
+    fn read_back(&mut self) -> Result<(), String> {
+        let slice = self.output.staging.slice(..);
         let (sender, receiver) = mpsc::channel();
         slice.map_async(wgpu::MapMode::Read, move |result| {
             // The receiver below outlives the poll that runs this.
@@ -730,19 +714,18 @@ impl GpuMapRenderer {
             let mapped = slice
                 .get_mapped_range()
                 .map_err(|error| format!("GPU readback range failed: {error}"))?;
-            if copy_pixels {
-                let row = self.config.viewport.width_px() as usize * 4;
-                let stride = self.targets.padded_bytes_per_row as usize;
-                for (to, from) in self
-                    .pixels
-                    .chunks_exact_mut(row)
-                    .zip(mapped.chunks_exact(stride))
-                {
-                    to.copy_from_slice(&from[..row]);
-                }
+            let row = self.config.viewport.width_px() as usize * 4;
+            let stride = self.output.padded_bytes_per_row as usize;
+            for (to, from) in self
+                .output
+                .pixels
+                .chunks_exact_mut(row)
+                .zip(mapped.chunks_exact(stride))
+            {
+                to.copy_from_slice(&from[..row]);
             }
         }
-        self.targets.staging.unmap();
+        self.output.staging.unmap();
         self.check_gpu()
     }
 }
@@ -754,7 +737,7 @@ impl Targets {
             height,
             depth_or_array_layers: 1,
         };
-        let texture = |label, format, samples, usage| {
+        let texture = |label, format, samples| {
             device.create_texture(&wgpu::TextureDescriptor {
                 label: Some(label),
                 size,
@@ -762,32 +745,38 @@ impl Targets {
                 sample_count: samples,
                 dimension: wgpu::TextureDimension::D2,
                 format,
-                usage,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 view_formats: &[],
             })
         };
-        let color = texture(
-            "map color",
-            COLOR_FORMAT,
-            1,
-            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        );
         let multisampled = (sample_count > 1).then(|| {
-            texture(
-                "map multisampled color",
-                COLOR_FORMAT,
-                sample_count,
-                wgpu::TextureUsages::RENDER_ATTACHMENT,
-            )
-            .create_view(&wgpu::TextureViewDescriptor::default())
+            texture("map multisampled color", COLOR_FORMAT, sample_count)
+                .create_view(&wgpu::TextureViewDescriptor::default())
         });
-        let depth = texture(
-            "map depth stencil",
-            DEPTH_FORMAT,
-            sample_count,
-            wgpu::TextureUsages::RENDER_ATTACHMENT,
-        )
-        .create_view(&wgpu::TextureViewDescriptor::default());
+        let depth = texture("map depth stencil", DEPTH_FORMAT, sample_count)
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        Self { multisampled, depth }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Output {
+    fn new(device: &wgpu::Device, viewport: MapViewport) -> Self {
+        let (width, height) = (viewport.width_px(), viewport.height_px());
+        let color = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("map color"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: COLOR_FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
         let padded_bytes_per_row = (width * 4).div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT)
             * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
         let staging = device.create_buffer(&wgpu::BufferDescriptor {
@@ -796,55 +785,68 @@ impl Targets {
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: false,
         });
-        let color_view = color.create_view(&wgpu::TextureViewDescriptor::default());
         Self {
-            multisampled,
+            color_view: color.create_view(&wgpu::TextureViewDescriptor::default()),
             color,
-            color_view,
-            depth,
             staging,
             padded_bytes_per_row,
+            pixels: vec![0; width as usize * height as usize * 4],
         }
     }
 }
 
+/// Fails on configuration no device could use.
+fn validate_config(config: &GpuMapConfig) -> Result<(), String> {
+    if config.sample_count != 1 && config.sample_count != 4 {
+        return Err(format!(
+            "Map sample count {} must be 1 or 4",
+            config.sample_count
+        ));
+    }
+    let has_empty_pool = [config.pools.ground, config.pools.extrusion]
+        .iter()
+        .any(|pool| pool.vertices == 0 || pool.indices == 0 || pool.layers == 0);
+    if has_empty_pool {
+        return Err("Map pools must not be empty".to_string());
+    }
+    if !config.style_zoom.is_finite() {
+        return Err(format!(
+            "Map style zoom {} is not finite",
+            config.style_zoom
+        ));
+    }
+    Ok(())
+}
+
+/// Fails when a pool needs a larger buffer than the device allows.
+fn check_pool_sizes(
+    pools: GpuPoolSizes,
+    max_buffer_size: u64,
+    adapter_name: &str,
+) -> Result<(), String> {
+    let largest_buffer = BufferPool::<ShaderVertex>::largest_buffer(pools.ground)
+        .max(BufferPool::<ExtrusionVertex>::largest_buffer(pools.extrusion));
+    if largest_buffer > max_buffer_size {
+        return Err(format!(
+            "This map view needs a {largest_buffer} byte GPU buffer and {adapter_name} allows \
+             {max_buffer_size}. Reduce the map's range or pitch."
+        ));
+    }
+    Ok(())
+}
+
 /// A worker's job: one tile from source bytes to tessellated layers.
+#[cfg(not(target_arch = "wasm32"))]
 fn fetch_and_prepare(
     tile: TileId,
     style: &ParsedStyle,
     source: &dyn MapDataSource,
 ) -> (TileLoadReport, Option<PreparedTile>) {
-    let mut report = TileLoadReport {
-        tile,
-        fetch_ms: 0.0,
-        prepare_ms: 0.0,
-        upload_ms: 0.0,
-        ground_layers: 0,
-        ground_vertices: 0,
-        extrusion_vertices: 0,
-        error: None,
-    };
-    let started = Instant::now();
-    let bytes = source.tile(tile.z, tile.x as u32, tile.y as u32);
-    report.fetch_ms = started.elapsed().as_secs_f64() * 1000.0;
-    let started = Instant::now();
-    let prepared = bytes.and_then(|bytes| prepare_tile(&bytes, style));
-    report.prepare_ms = started.elapsed().as_secs_f64() * 1000.0;
+    let prepared = source
+        .tile(tile.z, tile.x as u32, tile.y as u32)
+        .and_then(|bytes| prepare_tile(&bytes, style));
     match prepared {
-        Ok(prepared) => {
-            report.ground_layers = prepared.ground.len();
-            report.ground_vertices = prepared
-                .ground
-                .iter()
-                .map(|layer| layer.vertices.len())
-                .sum();
-            report.extrusion_vertices = prepared
-                .extrusions
-                .iter()
-                .map(|layer| layer.vertices.len())
-                .sum();
-            (report, Some(prepared))
-        }
+        Ok(prepared) => (TileLoadReport { tile, error: None }, Some(prepared)),
         Err(error) => {
             log::warn!(
                 "Skipping map tile {}/{}/{}: {error}",
@@ -852,8 +854,13 @@ fn fetch_and_prepare(
                 tile.x,
                 tile.y
             );
-            report.error = Some(error);
-            (report, None)
+            (
+                TileLoadReport {
+                    tile,
+                    error: Some(error),
+                },
+                None,
+            )
         }
     }
 }

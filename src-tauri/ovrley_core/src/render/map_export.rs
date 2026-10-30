@@ -1,4 +1,5 @@
 //! What an export's maps need before encoding starts, and the one thread that draws their frames.
+//! The preview's background download walks and fetches the same way, without holding the bytes.
 //!
 //! Preparation walks the camera over every rendered frame, downloads the tiles those views see and
 //! holds their bytes for the job, so disk eviction or a lost connection cannot affect a running
@@ -15,12 +16,13 @@ use crate::{
     error::{CoreError, CoreResult},
     normalize::ValidatedRenderConfig,
 };
-use ovrley_map::{view_tiles, MapDataSource, MapSprite, MapStyle, TileId, ViewPadding};
-use ovrley_map_gpu::{Buildings, GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileSizer};
+use ovrley_map::gpu::{Buildings, GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileSizer};
+use ovrley_map::{view_tiles, MapDataSource, MapStyle, TileId};
 use ovrley_widgets::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
     host::WidgetHost,
+    model::scene::ValidatedScenePresentation,
     preview_widget::ValidatedWidget,
     widgets::map::{
         content::{ActivityMap, MapContent},
@@ -60,6 +62,38 @@ struct ExportMap {
     frames: Arc<dyn MapFrameProvider>,
 }
 
+/// Downloads every tile `widgets` will show over the activity into `source`'s cache, so scrubbing
+/// mostly hits the disk. `progress` hears how many of how many, first with none done. Stops at the
+/// first tile that fails: the preview still fetches on demand, so nothing depends on this finishing.
+pub fn download_preview_tiles(
+    widgets: &[ValidatedMapWidget],
+    scene: &ValidatedScenePresentation,
+    host: &WidgetHost,
+    activity: &ActivitySampler,
+    source: &dyn MapDataSource,
+    cancelled: &AtomicBool,
+    progress: &(dyn Fn(usize, usize) + Sync),
+) -> CoreResult<()> {
+    let mut tiles = BTreeSet::new();
+    for widget in widgets {
+        if let MapContent::Activity(map) = MapContent::for_host(widget, scene, host, Some(activity))? {
+            let seconds: Vec<f64> = map.activity_seconds().collect();
+            tiles.extend(walk_views(&map, &seconds, cancelled)?.into_iter().flatten());
+        }
+    }
+    let tiles: Vec<TileId> = tiles.into_iter().collect();
+    let total = tiles.len();
+    progress(0, total);
+    for_each_parallel(
+        &tiles,
+        FETCH_THREADS,
+        cancelled,
+        |finished| progress(finished, total),
+        |tile| fetch_tile(source, *tile).map(drop),
+    )?;
+    Ok(())
+}
+
 /// One entry per config map. `widgets` holds the senders, so it drops first and ends the thread.
 #[derive(Default)]
 pub(super) struct ExportMaps {
@@ -90,7 +124,7 @@ impl ExportMaps {
             contents
                 .iter()
                 .map(|content| match content {
-                    MapContent::Activity(map) => walk_views(map, seconds, job.controller),
+                    MapContent::Activity(map) => walk_views(map, seconds, &job.controller.cancel_flag()),
                     MapContent::NoGps => Ok(Vec::new()),
                 })
                 .collect::<CoreResult<Vec<_>>>()
@@ -177,11 +211,11 @@ impl MapFrameProvider for NoMapFrames {
 fn walk_views(
     map: &ActivityMap,
     seconds: &[f64],
-    controller: &RenderController,
+    cancelled: &AtomicBool,
 ) -> CoreResult<Vec<Vec<TileId>>> {
     let threads = thread::available_parallelism().map_or(1, NonZeroUsize::get);
     let chunks: Vec<&[f64]> = seconds.chunks(seconds.len().div_ceil(threads).max(1)).collect();
-    let walked = for_each_parallel(&chunks, threads, controller, |_| {}, |chunk| {
+    let walked = for_each_parallel(&chunks, threads, cancelled, |_| {}, |chunk| {
         Ok(map.views(chunk.iter().copied())?)
     })?;
     let mut views: Vec<Vec<TileId>> = Vec::new();
@@ -198,7 +232,7 @@ fn walk_views(
 fn for_each_parallel<T: Sync, R: Send>(
     items: &[T],
     threads: usize,
-    controller: &RenderController,
+    cancelled: &AtomicBool,
     done: impl Fn(usize) + Sync,
     work: impl Fn(&T) -> CoreResult<R> + Sync,
 ) -> CoreResult<Vec<R>> {
@@ -215,7 +249,11 @@ fn for_each_parallel<T: Sync, R: Send>(
                     let Some(item) = items.get(index) else {
                         return;
                     };
-                    let result = controller.check_cancelled().and_then(|()| work(item));
+                    let result = if cancelled.load(Ordering::SeqCst) {
+                        Err(CoreError::Cancelled)
+                    } else {
+                        work(item)
+                    };
                     match result {
                         Ok(result) => {
                             results
@@ -283,23 +321,13 @@ impl JobMapData {
         let fetched = for_each_parallel(
             &tiles,
             FETCH_THREADS,
-            controller,
+            &controller.cancel_flag(),
             |finished| {
                 controller.set_preparing_message(format!(
                     "{PREPARING_MESSAGE} map tiles {finished} of {total}"
                 ));
             },
-            |tile| {
-                source
-                    .tile(tile.z, tile.x as u32, tile.y as u32)
-                    .map(|bytes| (*tile, bytes))
-                    .map_err(|error| {
-                        CoreError::Render(format!(
-                            "Map tile {}/{}/{} is unavailable: {error}",
-                            tile.z, tile.x, tile.y
-                        ))
-                    })
-            },
+            |tile| fetch_tile(source, *tile).map(|bytes| (*tile, bytes)),
         )?;
         controller.set_preparing_message(PREPARING_MESSAGE.to_string());
         let tiles: HashMap<TileId, Vec<u8>> = fetched.into_iter().collect();
@@ -312,19 +340,23 @@ impl JobMapData {
     }
 }
 
+fn fetch_tile(source: &dyn MapDataSource, tile: TileId) -> CoreResult<Vec<u8>> {
+    source
+        .tile(tile.z, tile.x as u32, tile.y as u32)
+        .map_err(|error| {
+            CoreError::Render(format!(
+                "Map tile {}/{}/{} is unavailable: {error}",
+                tile.z, tile.x, tile.y
+            ))
+        })
+}
+
 impl MapDataSource for JobMapData {
     fn style(&self, style: MapStyle) -> Result<Vec<u8>, String> {
         self.styles
             .get(&style)
             .cloned()
             .ok_or_else(|| format!("Map style {} was not prepared", style.name()))
-    }
-
-    fn sprite(&self, style: MapStyle) -> Result<MapSprite, String> {
-        Err(format!(
-            "The export renderer draws no sprites, so {} has none prepared",
-            style.name()
-        ))
     }
 
     fn tile(&self, z: u8, x: u32, y: u32) -> Result<Vec<u8>, String> {
@@ -370,7 +402,7 @@ impl ExportRenderer {
             .collect();
         let threads = thread::available_parallelism().map_or(1, NonZeroUsize::get);
         let sizes: HashMap<TileId, GpuPoolSizes> =
-            for_each_parallel(&tiles, threads, controller, |_| {}, |tile| {
+            for_each_parallel(&tiles, threads, &controller.cancel_flag(), |_| {}, |tile| {
                 let bytes = data
                     .tile(tile.z, tile.x as u32, tile.y as u32)
                     .map_err(CoreError::Render)?;
@@ -413,7 +445,7 @@ impl ExportRenderer {
     }
 
     fn frame(&mut self, request: &MapFrameRequest, data: &JobMapData) -> Result<Image, String> {
-        let tiles = view_tiles(&request.camera, request.viewport, ViewPadding::Tight);
+        let tiles = view_tiles(&request.camera, request.viewport);
         let started = Instant::now();
         self.renderer.load_view(&tiles, data)?;
         self.load_ms += started.elapsed().as_secs_f64() * 1000.0;

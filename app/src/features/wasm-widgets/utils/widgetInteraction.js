@@ -96,7 +96,7 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
     if (!active) return null
     for (const widget of active.widgets.values()) {
       widget.committing =
-        widget.intent?.type === 'drag' || (['course', 'elevation', 'diving_profile'].includes(widget.type) && widget.intent?.type === 'resize')
+        widget.intent?.type === 'drag' || (['course', 'elevation', 'diving_profile', 'map'].includes(widget.type) && widget.intent?.type === 'resize')
     }
     flush() // Mouseup can precede the pending animation frame.
     const patches = [...active.widgets].filter(([, widget]) => widget.patch !== null).map(([id, widget]) => [id, widget.patch])

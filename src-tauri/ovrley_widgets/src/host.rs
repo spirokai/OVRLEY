@@ -34,7 +34,7 @@ impl WidgetHost {
     }
 
     /// Preview extras are optional per family; a present extra must be well formed.
-    pub(crate) fn from_scene(scene: &ScenePresentationConfig) -> WidgetResult<Self> {
+    pub fn from_scene(scene: &ScenePresentationConfig) -> WidgetResult<Self> {
         let finite = |field: &str| {
             scene
                 .extra
