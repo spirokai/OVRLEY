@@ -1,6 +1,6 @@
 //! Throwaway gate for the GPU map renderer (`ovrley_map_gpu`). Delete it once judged.
 //!
-//! Usage: `map_gpu_gate <cache_dir> <output_dir> <all|timings|stills|clip|fuzz|trace|gaps|widget|widget-smoke> [runs] [frames]`
+//! Usage: `map_gpu_gate <cache_dir> <output_dir> <all|timings|stills|clip|fuzz|trace|gaps|gaps-evict|widget|widget-smoke|export|export-route|export-hardware> [runs] [frames]`
 //! Build: `cargo build --release -p app --bin map_gpu_gate --features map-gpu-gate`
 //! Timings from a debug build mean nothing. Check other load before trusting them, and look at
 //! the stills: a blank frame reads as very fast.
@@ -17,9 +17,22 @@ use ovrley_map::{
     MapViewport, TileId, ViewPadding, ViewState,
 };
 use ovrley_map_gpu::{
-    Buildings, FrameStats, GpuMapConfig, GpuMapRenderer, TileLoadReport, DEFAULT_POOL_ENTRIES,
+    Buildings, FrameStats, GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileSizer, PoolEntries,
+    TileLoadReport, DEFAULT_POOL_ENTRIES,
 };
-use ovrley_core::fonts::preview_font_resource;
+use ovrley_core::{
+    activity::{parse_activity_json, schema::ParsedActivity, validate_render_activity},
+    debug::RenderProgress,
+    encode::{
+        progress::ProgressSink,
+        quality::QualityType,
+    },
+    fonts::preview_font_resource,
+    normalize::{parse_template_value, RenderConfig},
+    output::{RenderOutputKind, RenderOutputTarget},
+    paths::AppPaths,
+    render_jobs::{execution::RenderExecutionService, planning::plan_single_render},
+};
 use ovrley_widgets::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
@@ -33,6 +46,7 @@ use ovrley_widgets::{
     render::pixels::read_surface_rgba,
     widgets::map::{
         config::MapConfig,
+        content::MapContent,
         frame_provider::{
             map_frame_image, MapFrame, MapFrameProvider, MapFrameRequest, UploadedMapFrames,
         },
@@ -40,7 +54,7 @@ use ovrley_widgets::{
     },
 };
 use skia_safe::{surfaces, Color, Image, Surface};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write as _;
 use std::fs;
 use std::io::Write as _;
@@ -115,7 +129,19 @@ fn main() -> Result<(), String> {
     if mode == "gaps" {
         padding_check()?;
         pixel_ratio_check(&service, &output_dir)?;
-        coverage(&service, &output_dir)?;
+        coverage(&service, &output_dir, false)?;
+    }
+    if mode == "gaps-evict" {
+        coverage(&service, &output_dir, true)?;
+    }
+    if mode == "export" {
+        export_gate(&service, &output_dir, ExportScope::All)?;
+    }
+    if mode == "export-route" {
+        export_gate(&service, &output_dir, ExportScope::Route)?;
+    }
+    if mode == "export-hardware" {
+        export_gate(&service, &output_dir, ExportScope::Hardware)?;
     }
     Ok(())
 }
@@ -162,7 +188,7 @@ fn renderer_for(
             viewport,
             sample_count: 4,
             style_zoom: camera.zoom(),
-            pool_entries: DEFAULT_POOL_ENTRIES,
+            pools: GpuPoolSizes::uniform(DEFAULT_POOL_ENTRIES),
             buildings: Buildings::for_style(style),
         },
         &tiles,
@@ -244,8 +270,9 @@ fn save_rgba(path: &Path, pixels: &[u8], width: u32, height: u32) -> Result<(), 
         .map_err(|error| error.to_string())
 }
 
-/// Gap 3: what nothing has rendered yet. Every view must load without eviction.
-fn coverage(service: &MapTileService, output_dir: &Path) -> Result<(), String> {
+/// Gap 3: what nothing has rendered yet. Every view must load without eviction. `evicting_only`
+/// keeps the kinds of view that evicted with fixed pools, on the styles that evicted most.
+fn coverage(service: &MapTileService, output_dir: &Path, evicting_only: bool) -> Result<(), String> {
     /// Dense Zurich, and rural farmland and forest in the Emmental.
     const PLACES: [(&str, f64, f64); 2] = [("zurich", 47.3722, 8.5388), ("rural", 46.95, 7.78)];
     const ZOOMS: [f64; 6] = [10.0, 12.0, 14.0, 15.5, 17.0, 18.0];
@@ -267,8 +294,16 @@ fn coverage(service: &MapTileService, output_dir: &Path) -> Result<(), String> {
             }
         }
     }
+    if evicting_only {
+        views.retain(|(zoom, _, pitch, _)| *pitch > 0.0 && *zoom <= 15.5);
+    }
+    let styles: &[MapStyle] = if evicting_only {
+        &[MapStyle::Liberty, MapStyle::Bright]
+    } else {
+        &MapStyle::ALL
+    };
     for (place, lat, lon) in PLACES {
-        for style in MapStyle::ALL {
+        for &style in styles {
             for &view in &views {
                 if let Err(error) = coverage_view(service, &dir, place, lat, lon, style, view) {
                     println!(
@@ -299,22 +334,55 @@ fn coverage_view(
     let camera = MapCamera::new(lon, lat, zoom, pitch, 30.0, padding)?;
     let viewport = MapViewport::new(width, height, 1.0)?;
     let tiles = view_tiles(&camera, viewport, ViewPadding::Tight);
+    let spec = MapStyleSpec {
+        style,
+        layers: MapLayers::ALL,
+    };
+    let buildings = Buildings::for_style(style);
+    // What the default pools would have held, in the export's terms.
+    let sizer = MapTileSizer::new(spec, viewport, zoom, &buildings, service)?;
+    let mut sizes = HashMap::new();
+    for tile in &tiles {
+        let bytes = service.tile(tile.z, tile.x as u32, tile.y as u32)?;
+        sizes.insert(*tile, sizer.measure(&bytes)?);
+    }
+    let total = |read: fn(&GpuPoolSizes) -> PoolEntries| {
+        sizes.values().map(read).fold(PoolEntries::default(), |all, size| PoolEntries {
+            vertices: all.vertices + size.vertices,
+            indices: all.indices + size.indices,
+            layers: all.layers + size.layers,
+        })
+    };
+    let (ground, extrusion) = (total(|size| size.ground), total(|size| size.extrusion));
+    let default_pool = GpuPoolSizes::uniform(DEFAULT_POOL_ENTRIES).ground;
+    let over = |needed: &PoolEntries| {
+        let mut names = Vec::new();
+        if needed.vertices > default_pool.vertices {
+            names.push("v");
+        }
+        if needed.indices > default_pool.indices {
+            names.push("i");
+        }
+        if needed.layers > default_pool.layers {
+            names.push("l");
+        }
+        names.join("")
+    };
+    let pools = GpuPoolSizes::for_views(&sizes, std::slice::from_ref(&tiles));
     let started = Instant::now();
     let mut renderer = GpuMapRenderer::new(
         GpuMapConfig {
-            spec: MapStyleSpec {
-                style,
-                layers: MapLayers::ALL,
-            },
+            spec,
             viewport,
             sample_count: 4,
             style_zoom: zoom,
-            pool_entries: DEFAULT_POOL_ENTRIES,
-            buildings: Buildings::for_style(style),
+            pools,
+            buildings,
         },
         service,
     )?;
     let reports = renderer.load_tiles(&tiles, service)?;
+    renderer.load_view(&tiles, service)?;
     let load_ms = started.elapsed().as_secs_f64() * 1000.0;
     renderer.render(&camera, None)?;
     let started = Instant::now();
@@ -330,12 +398,15 @@ fn coverage_view(
         .filter(|report| report.error.is_some())
         .count();
     println!(
-        "{place} {} z{zoom} {shape} p{pitch} pad{padding} | {} {} {failed} {load_ms:.0} {frame_ms:.2} {vertices} {}+{}",
+        "{place} {} z{zoom} {shape} p{pitch} pad{padding} | {} {} {failed} {load_ms:.0} {frame_ms:.2} {vertices} {}+{} | ground {ground:?} over[{}] extrusion {extrusion:?} over[{}] pools {} MB",
         style.name(),
         tiles.len(),
         renderer.evicted_layers(),
         stats.layer_draws,
         stats.extrusion_draws,
+        over(&ground),
+        over(&extrusion),
+        renderer.pool_bytes() / 1_000_000,
     );
     save_rgba(
         &dir.join(format!(
@@ -350,7 +421,7 @@ fn coverage_view(
 
 const WIDGET_ACTIVITY: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../debug/activities/Evening_Ride-parse-debug.json"
+    "/../debug/activities/Evening_Ride(4)-parse-debug.json"
 );
 const WIDGET_FONT: &str = "Inter.ttf";
 const WIDGET_FONT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../fonts");
@@ -406,7 +477,7 @@ impl GateFrames {
                 viewport: request.viewport,
                 sample_count: 4,
                 style_zoom: request.camera.zoom(),
-                pool_entries: DEFAULT_POOL_ENTRIES,
+                pools: GpuPoolSizes::uniform(DEFAULT_POOL_ENTRIES),
                 buildings: Buildings::for_style(request.spec.style),
             };
             let renderer = GpuMapRenderer::new(config.clone(), &self.service)?;
@@ -493,17 +564,23 @@ impl WidgetRun<'_> {
         config: &serde_json::Value,
         scale: f32,
         frames: Arc<dyn MapFrameProvider>,
+        activity: Option<&ActivitySampler>,
     ) -> Result<(PreviewWidget, Surface), String> {
         let config: MapConfig =
             serde_json::from_value(config.clone()).map_err(|error| error.to_string())?;
         let validated = validate_map_widget(&config, 0).map_err(|error| error.to_string())?;
+        let scene = widget_scene(scale)?;
+        let host = WidgetHost::export(None, self.duration, 0.0);
+        let content = MapContent::for_host(&validated, &scene, &host, activity)
+            .map_err(|error| error.to_string())?;
         let widget = PreviewWidget::from_validated(
             ValidatedWidget::Map {
                 widget: &validated,
                 frames,
+                content,
             },
-            &widget_scene(scale)?,
-            &WidgetHost::export(None, self.duration, 0.0),
+            &scene,
+            &host,
             self.fonts,
         )
         .map_err(|error| error.to_string())?;
@@ -571,12 +648,12 @@ fn widget_gate(service: &MapTileService, output_dir: &Path, smoke: bool) -> Resu
     // The two states without a frame.
     let pending: Arc<dyn MapFrameProvider> = Arc::new(UploadedMapFrames::default());
     let config = widget_config(MapStyle::Fiord, "follow", "rider_up", 40.0);
-    let (mut widget, mut surface) = run.build(&config, 1.0, pending)?;
+    let (mut widget, mut surface) = run.build(&config, 1.0, pending, Some(run.activity))?;
     let mut pixels = vec![0; (WIDGET_WIDTH * WIDGET_WIDTH * 4.0) as usize];
     run.draw(&mut widget, &mut surface, Some(run.activity), WIDGET_START_SECOND, &mut pixels)?;
     save_rgba(&dir.join("state_pending_fiord.png"), &pixels, WIDGET_WIDTH as u32, WIDGET_WIDTH as u32)?;
     let pending: Arc<dyn MapFrameProvider> = Arc::new(UploadedMapFrames::default());
-    let (mut widget, mut surface) = run.build(&config, 1.0, pending)?;
+    let (mut widget, mut surface) = run.build(&config, 1.0, pending, None)?;
     run.draw(&mut widget, &mut surface, None, 30.0, &mut pixels)?;
     save_rgba(&dir.join("state_no_activity_fiord.png"), &pixels, WIDGET_WIDTH as u32, WIDGET_WIDTH as u32)?;
 
@@ -614,7 +691,7 @@ fn widget_gate(service: &MapTileService, output_dir: &Path, smoke: bool) -> Resu
                 let mut config = base.clone();
                 config["map_style"] = serde_json::json!(style.name());
                 let frames = Arc::new(GateFrames::new(service));
-                let (mut widget, mut surface) = run.build(&config, scale, frames.clone())?;
+                let (mut widget, mut surface) = run.build(&config, scale, frames.clone(), Some(run.activity))?;
                 let stem = format!("{}_{size}_{name}", style.name());
                 let mut ffmpeg = Command::new("ffmpeg")
                     .args(["-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgba", "-s"])
@@ -671,6 +748,564 @@ fn widget_gate(service: &MapTileService, output_dir: &Path, smoke: bool) -> Resu
                 );
             }
         }
+    }
+    Ok(())
+}
+
+const EXPORT_TEMPLATE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/ovrley_core/tests/fixtures/config/test-template-4k.json"
+);
+const EXPORT_VIDEO: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/ovrley_core/tests/fixtures/video/test-1080p.mp4"
+);
+const REPO_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
+/// Long enough to cross tile boundaries. Most of an export's time here is encoding the 4K template.
+const EXPORT_SECONDS: f64 = 3.0;
+const ROUTE_SECONDS: f64 = 600.0;
+/// Moves the ride's start from Oerlikon to the centre of Zurich, the area that evicted in Phase 2.
+const CENTRAL_ZURICH_SHIFT: (f64, f64) = (47.3769 - 47.403731, 8.5395 - 8.557802);
+
+#[derive(Clone, Copy)]
+enum ExportScope {
+    All,
+    Route,
+    Hardware,
+}
+
+struct GateLogger;
+
+impl log::Log for GateLogger {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        metadata.target().starts_with("ovrley")
+    }
+
+    fn log(&self, record: &log::Record) {
+        if self.enabled(record.metadata()) {
+            println!("  [{}] {}", record.level(), record.args());
+        }
+    }
+
+    fn flush(&self) {}
+}
+
+static GATE_LOGGER: GateLogger = GateLogger;
+
+/// What a render published, to tell whether encoding ever began.
+#[derive(Default)]
+struct ExportSink(Mutex<Vec<String>>);
+
+impl ProgressSink for ExportSink {
+    fn emit_progress(&self, progress: &RenderProgress) {
+        let mut statuses = self.0.lock().expect("gate sink poisoned");
+        if statuses.last() != Some(&progress.status) {
+            statuses.push(progress.status.clone());
+        }
+    }
+}
+
+struct ExportRun {
+    seconds: f64,
+    frames: u32,
+    statuses: Vec<String>,
+    output: PathBuf,
+    result: Result<String, String>,
+}
+
+impl ExportRun {
+    fn report(&self, name: &str) {
+        println!(
+            "{name}: {} in {:.2} s, {} frames, {:.1} fps, statuses {:?}",
+            match &self.result {
+                Ok(_) => "ok".to_string(),
+                Err(error) => format!("FAILED [{error}]"),
+            },
+            self.seconds,
+            self.frames,
+            f64::from(self.frames) / self.seconds,
+            self.statuses,
+        );
+    }
+
+    fn began_encoding(&self) -> bool {
+        self.statuses.iter().any(|status| status == "rendering")
+    }
+}
+
+struct ExportGate {
+    dir: PathBuf,
+    paths: AppPaths,
+    raster: PathBuf,
+    activity: ParsedActivity,
+    source: Arc<dyn MapDataSource>,
+}
+
+impl ExportGate {
+    /// The 4K test template with a label and a raster on top of the map's place.
+    fn config(&self, map: Option<serde_json::Value>) -> Result<RenderConfig, String> {
+        let mut template: serde_json::Value =
+            serde_json::from_slice(&fs::read(EXPORT_TEMPLATE).map_err(|error| error.to_string())?)
+                .map_err(|error| error.to_string())?;
+        let body = &mut template["config"];
+        let mut label = body["labels"][0].clone();
+        label["id"] = serde_json::json!("over-map");
+        label["x"] = serde_json::json!(400);
+        label["y"] = serde_json::json!(500);
+        label["font_size"] = serde_json::json!(60);
+        label["text"] = serde_json::json!("OVER MAP");
+        body["labels"]
+            .as_array_mut()
+            .ok_or("Template has no labels")?
+            .push(label);
+        body["rasters"]
+            .as_array_mut()
+            .ok_or("Template has no rasters")?
+            .push(serde_json::json!({
+                "id": "over-map-raster", "x": 900, "y": 900, "width": 600, "height": 400,
+                "rotation": 0, "opacity": 1, "path": self.raster,
+            }));
+        if let Some(map) = map {
+            body["plots"]
+                .as_array_mut()
+                .ok_or("Template has no plots")?
+                .push(map);
+        }
+        parse_template_value(&template).map_err(|error| error.to_string())
+    }
+
+    fn transparent(
+        &self,
+        map: Option<serde_json::Value>,
+        start: f64,
+        seconds: f64,
+        fps: f64,
+    ) -> Result<RenderConfig, String> {
+        let mut config = self.config(map)?;
+        let scene = &mut config.scene;
+        scene.ffmpeg = serde_json::json!({"codec": "qtrle"});
+        scene.start = start;
+        scene.end = start + seconds;
+        scene.fps = fps;
+        Ok(config)
+    }
+
+    /// Exports a composite over the test video, ending after the activity does.
+    fn composite(
+        &self,
+        map: Option<serde_json::Value>,
+        activity_end: f64,
+    ) -> Result<RenderConfig, String> {
+        const SECONDS: f64 = 2.0;
+        const UNCOVERED: f64 = 0.8;
+        let mut config = self.config(map)?;
+        let sync_offset = activity_end - (SECONDS - UNCOVERED);
+        let scene = &mut config.scene;
+        scene.presentation.width = Some(1920);
+        scene.presentation.height = Some(1080);
+        scene.ffmpeg = serde_json::json!({"codec": "libx264"});
+        scene.start = sync_offset;
+        scene.end = sync_offset + SECONDS;
+        scene.fps = 30.0;
+        scene.composite_video_path = Some(EXPORT_VIDEO.to_string());
+        scene.quality_type = Some(QualityType::Quality);
+        scene.quality_value = Some(1.0);
+        scene.composite_sync_offset = Some(sync_offset);
+        scene.composite_video_fps_num = Some(30000);
+        scene.composite_video_fps_den = Some(1001);
+        scene.composite_video_duration = Some(20.0);
+        scene.composite_render_duration = Some(SECONDS);
+        scene.composite_video_trim_start = Some(0.0);
+        scene.composite_widget_update_rate = Some(1);
+        Ok(config)
+    }
+
+    fn run(
+        &self,
+        name: &str,
+        config: RenderConfig,
+        activity: &ParsedActivity,
+        source: Option<Arc<dyn MapDataSource>>,
+    ) -> Result<ExportRun, String> {
+        let (kind, extension) = if config.scene.composite_video_path.is_some() {
+            (RenderOutputKind::Composite, "mp4")
+        } else {
+            (RenderOutputKind::Transparent, "mov")
+        };
+        let output = self.dir.join(format!("{name}.{extension}"));
+        let target = RenderOutputTarget::validate(
+            output.to_str().ok_or("Output path is not Unicode")?,
+            kind,
+            true,
+        )
+        .map_err(|error| error.to_string())?;
+        let end = validate_render_activity(activity).map_err(|error| error.to_string())?;
+        let plan =
+            plan_single_render(config, end, None, source).map_err(|error| error.to_string())?;
+        let frames = plan.planned_frames();
+        let sink = Arc::new(ExportSink::default());
+        let service = RenderExecutionService::with_sink(sink.clone());
+        let started = Instant::now();
+        let result = service
+            .render(&self.paths, plan, activity, &target)
+            .map_err(|error| error.to_string());
+        let seconds = started.elapsed().as_secs_f64();
+        let statuses = sink.0.lock().map_err(|error| error.to_string())?.clone();
+        Ok(ExportRun {
+            seconds,
+            frames,
+            statuses,
+            output,
+            result,
+        })
+    }
+
+    fn ffmpeg(&self) -> PathBuf {
+        Path::new(REPO_ROOT)
+            .join("vendor/ffmpeg/bin/ffmpeg")
+            .with_extension(std::env::consts::EXE_EXTENSION)
+    }
+
+    /// One line per decoded frame.
+    fn frame_hashes(&self, video: &Path) -> Result<Vec<String>, String> {
+        let output = Command::new(self.ffmpeg())
+            .args(["-v", "error", "-i"])
+            .arg(video)
+            .args(["-map", "0:v", "-f", "framemd5", "-"])
+            .output()
+            .map_err(|error| error.to_string())?;
+        if !output.status.success() {
+            return Err(String::from_utf8_lossy(&output.stderr).into_owned());
+        }
+        Ok(String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter(|line| !line.starts_with('#'))
+            .map(str::to_string)
+            .collect())
+    }
+
+    fn stills(&self, video: &Path, name: &str, seconds: &[f64]) -> Result<(), String> {
+        for second in seconds {
+            let path = self.dir.join(format!("{name}_{second:.1}s.png"));
+            let status = Command::new(self.ffmpeg())
+                .args(["-v", "error", "-y", "-ss", &second.to_string(), "-i"])
+                .arg(video)
+                .args(["-frames:v", "1"])
+                .arg(&path)
+                .status()
+                .map_err(|error| error.to_string())?;
+            if !status.success() {
+                return Err(format!("Could not extract {}", path.display()));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The ride with its track moved by `shift`. It leaves the roads, which an eviction test can ignore.
+fn shifted_activity(document: &serde_json::Value, shift: (f64, f64)) -> Result<ParsedActivity, String> {
+    let mut parsed = document["parsed_activity"].clone();
+    for field in ["sample_course_points", "course"] {
+        for point in parsed[field].as_array_mut().ok_or("Activity has no track")? {
+            if let (Some(lat), Some(lon)) = (point[0].as_f64(), point[1].as_f64()) {
+                point[0] = serde_json::json!(lat + shift.0);
+                point[1] = serde_json::json!(lon + shift.1);
+            }
+        }
+    }
+    parse_activity_json(&parsed.to_string()).map_err(|error| error.to_string())
+}
+
+/// The range that puts a widget of `width` scene units at `zoom`, at this latitude.
+fn range_for_zoom(zoom: f64, width: f64, latitude: f64) -> f64 {
+    width * latitude.to_radians().cos() * 40_075_016.69 / (512.0 * 2_f64.powf(zoom))
+}
+
+fn map_at(
+    style: MapStyle,
+    camera: &str,
+    pitch: f32,
+    width: f64,
+    height: f64,
+    range: f64,
+) -> serde_json::Value {
+    let mut map = widget_config(style, camera, "rider_up", pitch);
+    map["x"] = serde_json::json!(200);
+    map["y"] = serde_json::json!(40);
+    map["width"] = serde_json::json!(width);
+    map["height"] = serde_json::json!(height);
+    map["range_meters"] = serde_json::json!(range);
+    map
+}
+
+/// The Phase 3 gate: real exports through the real pipeline, with the app's data source.
+fn export_gate(service: &MapTileService, output_dir: &Path, scope: ExportScope) -> Result<(), String> {
+    log::set_logger(&GATE_LOGGER).map_err(|error| error.to_string())?;
+    log::set_max_level(log::LevelFilter::Info);
+    let dir = output_dir.join("export");
+    let root = Path::new(REPO_ROOT);
+    let paths = AppPaths {
+        repo_root: root.to_path_buf(),
+        font_dirs: vec![root.join("fonts")],
+        debug_render_dir: dir.join("debug_render"),
+        temp_dir: dir.join("tmp"),
+        bundled_templates_dirs: vec![root.join("templates")],
+        user_templates_dir: dir.join("templates"),
+        downloads_dir: dir.join("downloads"),
+    };
+    for directory in [&dir, &paths.debug_render_dir, &paths.temp_dir, &paths.downloads_dir] {
+        fs::create_dir_all(directory).map_err(|error| error.to_string())?;
+    }
+    let raster = fs::canonicalize(&dir)
+        .map_err(|error| error.to_string())?
+        .join("over-map-raster.png");
+    let stripes: Vec<u8> = (0..300 * 400)
+        .flat_map(|pixel: u32| {
+            let on = (pixel / 40 + pixel % 400 / 40).is_multiple_of(2);
+            if on { [230, 30, 160, 255] } else { [30, 230, 160, 120] }
+        })
+        .collect();
+    save_rgba(&raster, &stripes, 400, 300)?;
+    let document: serde_json::Value = serde_json::from_slice(
+        &fs::read(WIDGET_ACTIVITY).map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())?;
+    let activity = shifted_activity(&document, (0.0, 0.0))?;
+    let activity_end = validate_render_activity(&activity).map_err(|error| error.to_string())?;
+    let gate = ExportGate {
+        dir,
+        paths,
+        raster,
+        activity,
+        source: Arc::new(service.clone()),
+    };
+    let source = || Some(gate.source.clone());
+    let follow = map_at(MapStyle::Liberty, "follow", 60.0, 500.0, 500.0, 400.0);
+    match scope {
+        ExportScope::All => {}
+        ExportScope::Route => return route_runs(&gate, &follow),
+        ExportScope::Hardware => return hardware_run(&gate, &follow),
+    }
+
+    println!("\n== Determinism and speed: 3 s, 4K template, 1000 px map");
+    let first = gate.run(
+        "repeat_a",
+        gate.transparent(Some(follow.clone()), WIDGET_START_SECOND, EXPORT_SECONDS, 30.0)?,
+        &gate.activity,
+        source(),
+    )?;
+    first.report("first export, including downloads");
+    let second = gate.run(
+        "repeat_b",
+        gate.transparent(Some(follow.clone()), WIDGET_START_SECOND, EXPORT_SECONDS, 30.0)?,
+        &gate.activity,
+        source(),
+    )?;
+    second.report("second export");
+    let (a, b) = (gate.frame_hashes(&first.output)?, gate.frame_hashes(&second.output)?);
+    println!(
+        "frames {} and {}, identical {}",
+        a.len(),
+        b.len(),
+        a.iter().zip(&b).filter(|(a, b)| a == b).count()
+    );
+    gate.stills(&first.output, "repeat", &[0.5, 2.5])?;
+    let plain = gate.run(
+        "no_map",
+        gate.transparent(None, WIDGET_START_SECOND, EXPORT_SECONDS, 30.0)?,
+        &gate.activity,
+        None,
+    )?;
+    plain.report("same scene without a map");
+
+    println!("\n== Tiles unavailable: an empty cache and no tile server");
+    let offline_cache = gate.dir.join("offline-cache");
+    if offline_cache.exists() {
+        fs::remove_dir_all(&offline_cache).map_err(|error| error.to_string())?;
+    }
+    let offline = MapTileService::new(
+        offline_cache,
+        "http://127.0.0.1:9/{z}/{x}/{y}.pbf".to_string(),
+        "gate".to_string(),
+    )?;
+    let run = gate.run(
+        "offline",
+        gate.transparent(Some(follow.clone()), WIDGET_START_SECOND, EXPORT_SECONDS, 30.0)?,
+        &gate.activity,
+        Some(Arc::new(offline)),
+    )?;
+    run.report("offline");
+    println!(
+        "encoding began: {}, output exists: {}",
+        run.began_encoding(),
+        run.output.exists()
+    );
+
+    println!("\n== No usable GPU: no adapter on any backend");
+    std::env::set_var("WGPU_BACKEND", "metal");
+    let run = gate.run(
+        "no_gpu",
+        gate.transparent(Some(follow.clone()), WIDGET_START_SECOND, 2.0, 30.0)?,
+        &gate.activity,
+        source(),
+    )?;
+    std::env::remove_var("WGPU_BACKEND");
+    run.report("no gpu");
+    println!(
+        "encoding began: {}, output exists: {}",
+        run.began_encoding(),
+        run.output.exists()
+    );
+
+    println!("\n== No data source: a native tool");
+    let run = gate.run(
+        "no_source",
+        gate.transparent(Some(follow.clone()), WIDGET_START_SECOND, 2.0, 30.0)?,
+        &gate.activity,
+        None,
+    )?;
+    run.report("no source");
+
+    println!("\n== Views that evicted in Phase 2, central Zurich");
+    let central = shifted_activity(&document, CENTRAL_ZURICH_SHIFT)?;
+    for (name, style, zoom, width, height) in [
+        ("zurich_z15_5_square_liberty", MapStyle::Liberty, 15.5, 500.0, 500.0),
+        ("zurich_z15_5_tall_bright", MapStyle::Bright, 15.5, 400.0, 1000.0),
+        ("zurich_z14_square_liberty", MapStyle::Liberty, 14.0, 500.0, 500.0),
+        ("zurich_z14_tall_bright", MapStyle::Bright, 14.0, 400.0, 1000.0),
+    ] {
+        let range = range_for_zoom(zoom, width, 47.3769);
+        let map = map_at(style, "follow", 60.0, width, height, range);
+        let run = gate.run(name, gate.transparent(Some(map), 0.0, EXPORT_SECONDS, 30.0)?, &central, source())?;
+        run.report(name);
+        if run.result.is_ok() {
+            gate.stills(&run.output, name, &[0.5, 2.5])?;
+        }
+    }
+
+    println!("\n== A view too large for its pools fails instead of drawing blank patches");
+    let camera = MapCamera::new(8.5395, 47.3769, 15.5, 60.0, 30.0, 0.45)?;
+    let viewport = MapViewport::new(1000, 1000, 2.0)?;
+    let tiles = view_tiles(&camera, viewport, ViewPadding::Tight);
+    let mut small = GpuMapRenderer::new(
+        GpuMapConfig {
+            spec: MapStyleSpec {
+                style: MapStyle::Liberty,
+                layers: MapLayers::ALL,
+            },
+            viewport,
+            sample_count: 4,
+            style_zoom: camera.zoom(),
+            pools: GpuPoolSizes::uniform(200_000),
+            buildings: Buildings::for_style(MapStyle::Liberty),
+        },
+        service,
+    )?;
+    println!("load_view of {} tiles: {:?}", tiles.len(), small.load_view(&tiles, service));
+    drop(small);
+
+    println!("\n== Other cameras, 3 s");
+    for (name, map) in [
+        ("fixed_whole_route", map_at(MapStyle::Liberty, "fixed", 0.0, 500.0, 500.0, 400.0)),
+        ("north_flat_positron", {
+            let mut map = map_at(MapStyle::Positron, "follow", 0.0, 500.0, 500.0, 400.0);
+            map["orientation"] = serde_json::json!("north_up");
+            map
+        }),
+    ] {
+        let run = gate.run(
+            name,
+            gate.transparent(Some(map), WIDGET_START_SECOND, EXPORT_SECONDS, 30.0)?,
+            &gate.activity,
+            source(),
+        )?;
+        run.report(name);
+        if run.result.is_ok() {
+            gate.stills(&run.output, name, &[1.5])?;
+        }
+    }
+
+    println!("\n== Composite that outlasts the activity: the raster stays, the map goes");
+    let map = map_at(MapStyle::Dark, "follow", 40.0, 500.0, 500.0, 400.0);
+    let run = gate.run("composite", gate.composite(Some(map), activity_end)?, &gate.activity, source())?;
+    run.report("composite");
+    if run.result.is_ok() {
+        gate.stills(&run.output, "composite", &[0.5, 1.6])?;
+    }
+    let run = gate.run("composite_no_map", gate.composite(None, activity_end)?, &gate.activity, None)?;
+    run.report("same composite without a map");
+
+    route_runs(&gate, &follow)
+}
+
+/// One hardware export the way the app runs it: decode, overlay and encode all on the GPU, with a
+/// map on every frame. The video comes from `OVRLEY_GATE_VIDEO`, and needn't match the activity.
+fn hardware_run(gate: &ExportGate, follow: &serde_json::Value) -> Result<(), String> {
+    const SYNC_OFFSET: f64 = WIDGET_START_SECOND;
+    const SECONDS: f64 = 60.0;
+    const QUALITY: f64 = 23.0;
+    let video = std::env::var("OVRLEY_GATE_VIDEO").map_err(|error| format!("OVRLEY_GATE_VIDEO: {error}"))?;
+    let mut config = gate.config(Some(follow.clone()))?;
+    let scene = &mut config.scene;
+    scene.ffmpeg = serde_json::json!({"codec": "nnvgpu_hevc"});
+    scene.start = SYNC_OFFSET;
+    scene.end = SYNC_OFFSET + SECONDS;
+    scene.fps = 30.0;
+    scene.composite_video_path = Some(video);
+    scene.quality_type = Some(QualityType::Quality);
+    scene.quality_value = Some(QUALITY);
+    scene.composite_sync_offset = Some(SYNC_OFFSET);
+    scene.composite_video_fps_num = Some(30000);
+    scene.composite_video_fps_den = Some(1001);
+    scene.composite_video_duration = Some(89.322567);
+    scene.composite_render_duration = Some(SECONDS);
+    scene.composite_video_trim_start = Some(0.0);
+    scene.composite_widget_update_rate = Some(1);
+    let run = gate.run("nvenc_cuda", config, &gate.activity, Some(gate.source.clone()))?;
+    run.report("nvenc_cuda");
+    if run.result.is_ok() {
+        gate.stills(&run.output, "nvenc_cuda", &[5.0, 30.0, 55.0])?;
+    }
+    Ok(())
+}
+
+/// A stretch of the ride with only the map on screen, so nearly all the time is the map's.
+fn route_runs(gate: &ExportGate, follow: &serde_json::Value) -> Result<(), String> {
+    println!("\n== 10 minutes of the ride at 1 fps with only the map: more tiles than the pools hold");
+    for (name, map) in [
+        ("route_400m", follow.clone()),
+        (
+            "route_z14",
+            map_at(
+                MapStyle::Liberty,
+                "follow",
+                60.0,
+                500.0,
+                500.0,
+                range_for_zoom(14.0, 500.0, 47.37),
+            ),
+        ),
+        (
+            "route_z14_tall_bright",
+            map_at(
+                MapStyle::Bright,
+                "follow",
+                60.0,
+                400.0,
+                500.0,
+                range_for_zoom(14.0, 400.0, 47.37),
+            ),
+        ),
+    ] {
+        let mut config = gate.transparent(Some(map), WIDGET_START_SECOND, ROUTE_SECONDS, 1.0)?;
+        config.labels.clear();
+        config.values.clear();
+        config.rasters.clear();
+        if let Some(plots) = config.plots.as_array_mut() {
+            plots.retain(|plot| plot["value"] == "map");
+        }
+        let run = gate.run(name, config, &gate.activity, Some(gate.source.clone()))?;
+        run.report(name);
     }
     Ok(())
 }
@@ -744,7 +1379,7 @@ fn config(style: MapStyle, size: u32, samples: u32, buildings: bool) -> GpuMapCo
         viewport: MapViewport::new(size, size, 1.0).expect("gate sizes are valid"),
         sample_count: samples,
         style_zoom: ZOOM,
-        pool_entries: DEFAULT_POOL_ENTRIES,
+        pools: GpuPoolSizes::uniform(DEFAULT_POOL_ENTRIES),
         buildings: if buildings {
             Buildings::for_style(style)
         } else {

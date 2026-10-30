@@ -1,11 +1,9 @@
 //! A map handle retains the track and the last frame across config edits and live resize drafts.
 use super::{
-    camera::WidgetCamera,
     config::MapConfig,
+    content::{ContentKey, MapContent},
     frame_provider::{MapFrame, MapFrameProvider, MapFrameRequest},
     layout::MapLayout,
-    route::route_line,
-    track::MapTrack,
     validation::{validate_map_widget, ValidatedMapWidget},
 };
 use crate::{
@@ -24,7 +22,7 @@ use crate::{
         value::preview::{ContentBounds, TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
     },
 };
-use ovrley_map::{MapCamera, MapRouteDraw, MapRouteLine, MapViewport, ViewState};
+use ovrley_map::{MapCamera, MapRouteDraw, ViewState};
 use skia_safe::{Canvas, Image, Point, Rect, Surface};
 use std::sync::Arc;
 
@@ -34,29 +32,6 @@ use std::sync::Arc;
 pub struct MapFrameState {
     pub camera: Option<MapCamera>,
     pub progress: f32,
-}
-
-/// What one activity and window resolve to at the widget's constant zoom and size.
-struct ActivityMap {
-    track: MapTrack,
-    line: Arc<MapRouteLine>,
-    camera: WidgetCamera,
-    viewport: MapViewport,
-}
-
-enum MapContent {
-    NoGps,
-    Activity(Box<ActivityMap>),
-}
-
-/// The inputs `MapContent` was built from, so unrelated edits keep it.
-#[derive(Clone, Copy, PartialEq)]
-struct ContentKey {
-    camera: super::validation::MapCameraMode,
-    width: f32,
-    height: f32,
-    tolerance: f32,
-    pixel_ratio: f32,
 }
 
 pub struct PreviewMap {
@@ -83,20 +58,6 @@ pub struct PreviewMap {
     pub revision: u32,
 }
 
-fn content_key(
-    config: &ValidatedMapWidget,
-    scene: &ValidatedScenePresentation,
-    raster_scale: PreviewRasterScale,
-) -> ContentKey {
-    ContentKey {
-        camera: config.camera,
-        width: config.width,
-        height: config.height,
-        tolerance: config.simplify_tolerance_px,
-        pixel_ratio: scene.scale * raster_scale.value(),
-    }
-}
-
 impl PreviewMap {
     pub fn new(
         widget: MapConfig,
@@ -106,33 +67,47 @@ impl PreviewMap {
     ) -> WidgetResult<Self> {
         let config = validate_map_widget(&widget, 0)?;
         let host = WidgetHost::from_scene(&scene)?;
-        Self::from_validated(
+        Self::with_content(
             config,
             validate_scene_presentation(scene)?,
             &host,
             frames,
+            None,
             fonts,
         )
     }
 
+    /// `content` is what the host resolved for this widget, from [`MapContent::for_host`].
     pub fn from_validated(
         config: ValidatedMapWidget,
         scene: ValidatedScenePresentation,
         host: &WidgetHost,
         frames: Arc<dyn MapFrameProvider>,
+        content: MapContent,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<Self> {
+        Self::with_content(config, scene, host, frames, Some(content), fonts)
+    }
+
+    fn with_content(
+        config: ValidatedMapWidget,
+        scene: ValidatedScenePresentation,
+        host: &WidgetHost,
+        frames: Arc<dyn MapFrameProvider>,
+        content: Option<MapContent>,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
         let raster_scale = host.raster_scale;
         Ok(Self {
             layout: MapLayout::new(&config, &scene, raster_scale, fonts)?,
-            content_key: content_key(&config, &scene, raster_scale),
+            content_key: ContentKey::new(&config, &scene, raster_scale),
             window: host.plot_window(config.show_full_activity),
             preview_duration: host.placeholder_duration()?,
             raster_scale,
             config,
             scene,
             frames,
-            content: None,
+            content,
             transient: false,
             last_frame: None,
             last_render: None,
@@ -163,7 +138,7 @@ impl PreviewMap {
         }
         // A live resize keeps the committed zoom and viewport; its commit recomputes them.
         if !transient {
-            let key = content_key(&config, &scene, raster_scale);
+            let key = ContentKey::new(&config, &scene, raster_scale);
             if key != self.content_key {
                 self.content = None;
                 self.content_key = key;
@@ -191,34 +166,7 @@ impl PreviewMap {
         if self.content.is_some() {
             return Ok(());
         }
-        let track = activity
-            .map(|activity| activity.route.track_samples(self.window))
-            .and_then(MapTrack::new);
-        self.content = Some(match track {
-            None => MapContent::NoGps,
-            Some(track) => {
-                let camera = WidgetCamera::new(
-                    self.config.camera,
-                    &track,
-                    self.content_key.width,
-                    self.content_key.height,
-                )?;
-                let ratio = self.content_key.pixel_ratio;
-                let viewport = MapViewport::new(
-                    (self.content_key.width * ratio).round().max(1.0) as u32,
-                    (self.content_key.height * ratio).round().max(1.0) as u32,
-                    ratio,
-                )
-                .map_err(WidgetError::Render)?;
-                let line = route_line(&track, camera.zoom(), self.content_key.tolerance)?;
-                MapContent::Activity(Box::new(ActivityMap {
-                    line: Arc::new(line),
-                    track,
-                    camera,
-                    viewport,
-                }))
-            }
-        });
+        self.content = Some(MapContent::build(self.content_key, self.window, activity)?);
         Ok(())
     }
 
@@ -229,13 +177,11 @@ impl PreviewMap {
         second: f64,
     ) -> WidgetResult<MapFrameState> {
         self.prepare(activity)?;
-        let in_activity =
-            activity.is_some_and(|activity| second >= 0.0 && second <= activity.route.end);
         match self.content.as_ref().expect("map content prepared") {
-            MapContent::Activity(map) if in_activity => {
+            MapContent::Activity(map) if activity.is_some() && map.covers(second) => {
                 let position = map.track.position_at(second);
                 Ok(MapFrameState {
-                    camera: Some(map.camera.at(&map.track, &position)?),
+                    camera: Some(map.camera_at(&position)?),
                     progress: position.distance_meters as f32,
                 })
             }

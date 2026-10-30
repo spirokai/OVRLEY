@@ -15,6 +15,7 @@ use ovrley_widgets::widgets::{
     diving_profile::validation::ValidatedDivingProfile,
     rolling_chart::validation::ValidatedRollingChart,
     g_force::validation::GForceAxis, label::validation::ValidatedLabel,
+    map::validation::ValidatedMapWidget,
     route::validation::ValidatedRoutePlot, value::validation::ValidatedValue,
 };
 use widgets::validate_render_contents;
@@ -117,7 +118,8 @@ impl ValidatedRenderConfig {
                 _ => requirements.include_widget(value.metric_kind().as_str()),
             }
         }
-        if !self.course_plots.is_empty() {
+        // A map reads the same columns as a route. Its own manifest entry arrives with its editor.
+        if !self.course_plots.is_empty() || !self.maps.is_empty() {
             requirements.include_widget("course");
         }
         if !self.elevation_plots.is_empty() {
@@ -144,6 +146,7 @@ pub struct ValidatedRenderConfig<S = ValidatedSceneConfig> {
     pub labels: Vec<ValidatedLabel>,
     pub values: Vec<ValidatedValue>,
     pub course_plots: Vec<ValidatedRoutePlot>,
+    pub maps: Vec<ValidatedMapWidget>,
     pub elevation_plots: Vec<ValidatedElevationPlot>,
     pub diving_profiles: Vec<ValidatedDivingProfile>,
     pub rolling_charts: Vec<ValidatedRollingChart>,
@@ -185,6 +188,7 @@ impl<S> ValidatedRenderConfig<S> {
             labels: self.labels,
             values: self.values,
             course_plots: self.course_plots,
+            maps: self.maps,
             elevation_plots: self.elevation_plots,
             diving_profiles: self.diving_profiles,
             rolling_charts: self.rolling_charts,

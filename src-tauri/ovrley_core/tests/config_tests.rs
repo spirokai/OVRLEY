@@ -48,7 +48,7 @@ fn composite_settings_are_normalized_into_the_render_plan() {
     config["scene"]["composite_video_trim_start"] = json!(0.0);
     config["scene"]["composite_widget_update_rate"] = json!(2);
 
-    let plan = plan_single_render(parse_config_value(&config).unwrap(), 600.0, None).unwrap();
+    let plan = plan_single_render(parse_config_value(&config).unwrap(), 600.0, None, None).unwrap();
     let VideoRenderModePlan::Composite { render, .. } = plan.mode() else {
         panic!("composite plan")
     };
@@ -97,7 +97,7 @@ fn rejects_zero_composite_widget_update_rate() {
         }"##,
     )
     .unwrap();
-    let error = plan_single_render(raw, 120.0, None).err().unwrap();
+    let error = plan_single_render(raw, 120.0, None, None).err().unwrap();
 
     let error_msg = error.to_string();
     assert!(

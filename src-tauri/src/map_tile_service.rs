@@ -26,6 +26,8 @@ pub(crate) const OPENFREEMAP_STYLE_CACHE_NAMESPACE: &str = "openfreemap-styles";
 /// Sprites live under the styles namespace, which cache maintenance leaves alone.
 const OPENFREEMAP_SPRITE_CACHE_DIRECTORY: &str = "sprites";
 const TILE_CACHE_LIMIT: u64 = 500 * 1024 * 1024;
+/// How long a cached style is trusted. Styles change with the tile schema they read.
+const STYLE_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
 
 #[derive(Clone)]
 pub(crate) struct MapTileService {
@@ -313,7 +315,19 @@ impl MapTileService {
         let cache_path = directory.join(format!("{style}.json"));
 
         match fs::read(&cache_path) {
-            Ok(payload) if validate_style(&payload).is_ok() => Ok((payload, TileCacheStatus::Hit)),
+            Ok(payload) if validate_style(&payload).is_ok() => {
+                if !is_style_stale(&cache_path) {
+                    return Ok((payload, TileCacheStatus::Hit));
+                }
+                match self.fetch_style(style, &directory, &cache_path) {
+                    Ok(fresh) => Ok((fresh, TileCacheStatus::Refreshed)),
+                    // The cached style still draws a map, so going offline must not lose it.
+                    Err(error) => {
+                        log::warn!("Keeping cached map style {style}: {error}");
+                        Ok((payload, TileCacheStatus::Hit))
+                    }
+                }
+            }
             Ok(_) => {
                 remove_if_present(&cache_path)?;
                 Ok((
@@ -1112,6 +1126,14 @@ fn is_png_response(headers: &reqwest::header::HeaderMap) -> bool {
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.split(';').next())
         .is_some_and(|media_type| media_type.trim().eq_ignore_ascii_case("image/png"))
+}
+
+fn is_style_stale(cache_path: &Path) -> bool {
+    fs::metadata(cache_path)
+        .and_then(|metadata| metadata.modified())
+        .ok()
+        .and_then(|modified| modified.elapsed().ok())
+        .is_some_and(|age| age >= STYLE_MAX_AGE)
 }
 
 fn validate_style(payload: &[u8]) -> Result<(), String> {

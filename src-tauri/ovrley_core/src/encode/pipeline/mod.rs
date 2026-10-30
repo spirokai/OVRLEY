@@ -42,7 +42,7 @@ use crate::normalize::ValidatedRenderConfig;
 use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
 use crate::debug::RenderProfiler;
-use crate::render::{ExportWidgets, FrameSize, PreparedAtlas, SlotPlacement};
+use crate::render::{ExportMapJob, ExportWidgets, FrameSize, PreparedAtlas, SlotPlacement};
 use crate::render_jobs::inspection::CompositeSourceMetadata;
 
 /// Encoding inputs fixed by job planning. Source probing and activity timing
@@ -134,6 +134,7 @@ pub(crate) fn encode_video(
     controller: &RenderController,
     target: &RenderOutputTarget,
     request: VideoEncodingRequest,
+    map_source: Option<&dyn ovrley_map::MapDataSource>,
 ) -> CoreResult<String> {
     controller.check_cancelled()?;
     let size = FrameSize {
@@ -153,6 +154,10 @@ pub(crate) fn encode_video(
         VideoEncodingRequest::Composite { render, .. } => &render.coverage,
         VideoEncodingRequest::Transparent(plan) => &plan.coverage,
     };
+    let frame_indices = match &request {
+        VideoEncodingRequest::Composite { render, .. } => render.frames.dense_frame_indices(),
+        VideoEncodingRequest::Transparent(plan) => plan.frames.dense_frame_indices(),
+    };
     let mut prepare_profiler = RenderProfiler::default();
     let prepare_started = Instant::now();
     let export = ExportWidgets::prepare(
@@ -162,6 +167,11 @@ pub(crate) fn encode_video(
         dense,
         size,
         coverage.blank_leading_frame_count,
+        ExportMapJob {
+            source: map_source,
+            frame_indices: &frame_indices,
+            controller,
+        },
         &mut prepare_profiler,
     )?;
     let (encoding, atlas) = match request {
@@ -169,7 +179,7 @@ pub(crate) fn encode_video(
         // placement its filter stack plans.
         VideoEncodingRequest::Composite { render, source } => {
             let atlas = export.plan_atlas(
-                &render.frames.dense_frame_indices(),
+                &frame_indices,
                 render.requested_codec_id.metadata().filter_stack_kind.slot_placement(),
                 &mut prepare_profiler,
             )?;
@@ -188,7 +198,7 @@ pub(crate) fn encode_video(
         // FFmpeg copies the planned atlas slots back onto the transparent full frame.
         VideoEncodingRequest::Transparent(plan) => {
             let atlas = export.plan_atlas(
-                &plan.frames.dense_frame_indices(),
+                &frame_indices,
                 SlotPlacement::Copy,
                 &mut prepare_profiler,
             )?;

@@ -13,6 +13,7 @@
 //!       from any shell module).
 
 use crate::distribution::DistributionKind;
+use crate::map_tile_service::MapTileService;
 use crate::preview_import::{content_type_for_path, preview_warnings_for_metadata};
 use crate::runtime_paths;
 use crate::video_server::VideoServerHandle;
@@ -27,8 +28,10 @@ use ovrley_core::render_jobs::{
     contracts::{BatchAcceptance, BatchEncodingSettings, BatchRenderRequest, BatchSnapshot},
     planning::plan_batch_configuration,
 };
+use ovrley_map::MapDataSource;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tauri::AppHandle;
 
 const WINDOWS_HEVC_EXTENSION_URL: &str = "https://apps.microsoft.com/detail/9nmzlz57r3t7";
@@ -40,15 +43,23 @@ pub(crate) async fn backend_submit_batch(
     app: AppHandle,
     state: tauri::State<'_, BackendState>,
     raster_resources: tauri::State<'_, crate::raster_resources::RasterResources>,
+    map_tiles: tauri::State<'_, MapTileService>,
     request: BatchRenderRequest,
 ) -> Result<BatchAcceptance, BatchServiceError> {
     let paths = runtime_paths::app_paths(&app)
         .map_err(|message| BatchServiceError::InvalidRequest { message })?;
     let resources = raster_resources.inner().clone();
+    let map_source: Arc<dyn MapDataSource> = Arc::new(map_tiles.inner().clone());
     let service = state.render_execution.clone();
     let inspection = state.video_inspection.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        service.submit_batch(&paths, &inspection, request, Some(&resources))
+        service.submit_batch(
+            &paths,
+            &inspection,
+            request,
+            Some(&resources),
+            Some(map_source),
+        )
     })
     .await
     .map_err(|error| BatchServiceError::DispatchFailed {
@@ -179,6 +190,7 @@ pub(crate) async fn backend_render(
     app: AppHandle,
     state: tauri::State<'_, BackendState>,
     raster_resources: tauri::State<'_, crate::raster_resources::RasterResources>,
+    map_tiles: tauri::State<'_, MapTileService>,
     config_json: String,
     parsed_activity_json: String,
     output_path: String,
@@ -195,6 +207,7 @@ pub(crate) async fn backend_render(
             &output_path,
             overwrite,
             Some(&*raster_resources),
+            Some(Arc::new(map_tiles.inner().clone())),
         )
         .map_err(BackendRenderError::from_core)?;
     serialize_command_result(&result).map_err(|message| BackendRenderError::RenderError { message })

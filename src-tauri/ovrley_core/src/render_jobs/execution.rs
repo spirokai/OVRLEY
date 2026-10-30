@@ -23,6 +23,7 @@ use crate::normalize::parse_config_json;
 use crate::output::{RenderOutputKind, RenderOutputTarget};
 use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
+use ovrley_map::MapDataSource;
 
 /// Existing single-render acceptance shape, serialized directly by the shell.
 #[derive(Debug, Serialize)]
@@ -125,6 +126,7 @@ impl RenderExecutionService {
         output_path: &str,
         overwrite: bool,
         resources: Option<&dyn RasterResourceResolver>,
+        map_source: Option<Arc<dyn MapDataSource>>,
     ) -> CoreResult<RenderAccepted> {
         let config = parse_config_json(config_json)?;
         let kind = if config.scene.composite_video_path.is_some() {
@@ -135,7 +137,7 @@ impl RenderExecutionService {
         let target = RenderOutputTarget::validate(output_path, kind, overwrite)?;
         let activity = parse_activity_json(parsed_activity_json)?;
         let end = validate_render_activity(&activity)?;
-        let plan = plan_single_render(config, end, resources)?;
+        let plan = plan_single_render(config, end, resources, map_source)?;
         let reservation = self.reserve()?;
         let accepted = RenderAccepted {
             started: true,
@@ -283,6 +285,7 @@ pub(crate) fn execute_render(
     session.check_cancelled()?;
     let dense = plan.prepare_activity(activity)?;
     session.check_cancelled()?;
+    let map_source = plan.map_source;
     let request = match plan.mode {
         VideoRenderModePlan::Composite {
             render,
@@ -310,5 +313,6 @@ pub(crate) fn execute_render(
         session.controller(),
         target,
         request,
+        map_source.as_deref(),
     )
 }

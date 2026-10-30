@@ -17,7 +17,9 @@ pub mod raster;
 #[cfg(feature = "raster")]
 pub mod style;
 
-pub use camera::{ClipPoint, GroundProjection, MapCamera, MapViewport, ViewPadding, ViewState};
+pub use camera::{
+    ClipPoint, GroundProjection, MapCamera, MapViewport, ViewPadding, ViewState, MAX_VIEW_TILES,
+};
 pub use route::{MapRouteDraw, MapRouteLine, MapRoutePoint, MapRouteStyle};
 pub use source::{MapDataSource, MapSprite};
 pub use spec::{

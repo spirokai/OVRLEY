@@ -8,8 +8,8 @@ use crate::widgets::{
     gauges::{metric::GaugeFrameState, validation::ValidatedGauge},
     lap_timer::format::LapTimerContent,
     map::{
-        config::MapConfig, frame_provider::MapFrameProvider, preview::PreviewMap,
-        validation::ValidatedMapWidget,
+        config::MapConfig, content::MapContent, frame_provider::MapFrameProvider,
+        preview::PreviewMap, validation::ValidatedMapWidget,
     },
     raster::validation::RasterGeometry,
     route::validation::ValidatedRoutePlot,
@@ -67,10 +67,12 @@ pub enum ValidatedWidget<'a> {
     RollingChart(&'a ValidatedRollingChart),
     Elevation(&'a ValidatedElevationPlot),
     Route(&'a ValidatedRoutePlot),
-    /// Maps carry the frames their host renders.
+    /// Maps carry the frames their host renders and the content it resolved, so that every
+    /// instance of one widget shares one route line.
     Map {
         widget: &'a ValidatedMapWidget,
         frames: Arc<dyn MapFrameProvider>,
+        content: MapContent,
     },
     Raster {
         geometry: &'a RasterGeometry,
@@ -402,11 +404,16 @@ impl PreviewWidget {
                 scene.clone(),
                 host,
             )?),
-            ValidatedWidget::Map { widget, frames } => Self::Map(PreviewMap::from_validated(
+            ValidatedWidget::Map {
+                widget,
+                frames,
+                content,
+            } => Self::Map(PreviewMap::from_validated(
                 widget.clone(),
                 scene.clone(),
                 host,
                 frames,
+                content,
                 fonts,
             )?),
             ValidatedWidget::Raster {

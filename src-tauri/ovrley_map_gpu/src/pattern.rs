@@ -2,7 +2,7 @@
 
 use crate::pipelines::ShaderTileMetadata;
 use cgmath::{Matrix4, Vector3};
-use ovrley_map::{data_level, TileId, ViewPadding, ViewState};
+use ovrley_map::{data_level, TileId, ViewPadding, ViewState, MAX_VIEW_TILES};
 use std::collections::HashSet;
 use std::mem::size_of;
 use std::ops::Range;
@@ -10,7 +10,7 @@ use std::ops::Range;
 /// MVT coordinate units along one tile edge.
 pub(crate) const EXTENT: f64 = 4096.0;
 /// How many tile metadata entries one frame can upload.
-pub(crate) const PATTERN_CAPACITY: u64 = 512;
+pub(crate) const PATTERN_CAPACITY: u64 = MAX_VIEW_TILES as u64;
 
 /// Neighbouring tiles never share a value, and tiles from different levels never do.
 pub(crate) const fn stencil_reference_value_3d(tile: TileId) -> u32 {

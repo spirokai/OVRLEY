@@ -20,7 +20,8 @@ const EARTH_RADIUS: f64 = 6371008.8;
 const LIGHT_XY: (f64, f64) = (0.2875, -0.498);
 
 const VIEW_REGION_PADDING: i32 = 1;
-const MAX_N_TILES: usize = 512;
+/// The most tiles one view draws. A view that reaches this may be missing some.
+pub const MAX_VIEW_TILES: usize = 512;
 
 #[rustfmt::skip]
 const OPENGL_TO_WGPU_MATRIX: Matrix4<f64> = Matrix4::new(
@@ -141,7 +142,7 @@ impl MapViewport {
 pub enum ViewPadding {
     /// One extra ring of tiles, for loading ahead of the camera.
     Loose,
-    /// Exactly the visible tiles, for drawing.
+    /// Exactly the tiles under the frustum's footprint, for drawing.
     Tight,
 }
 
@@ -314,23 +315,36 @@ impl ViewState {
         }
     }
 
-    /// The frustum's footprint on the ground as `(min, max)`, in world pixels. `None` when the
-    /// ground is not in view.
-    fn ground_footprint(&self) -> Option<((f64, f64), (f64, f64))> {
+    /// The window's corners on the ground, in order, in world pixels. `None` when the ground is
+    /// not in view.
+    fn ground_corners(&self) -> Option<[(f64, f64); 4]> {
         let inverse = self.view_projection().invert()?;
-        let (mut min, mut max) = ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN));
-        for (x, y) in [
+        let corners = [
             (0.0, 0.0),
             (self.width, 0.0),
             (self.width, self.height),
             (0.0, self.height),
-        ] {
-            let (ground_x, ground_y) = self.window_to_world_at_ground(x, y, &inverse);
-            min = (min.0.min(ground_x), min.1.min(ground_y));
-            max = (max.0.max(ground_x), max.1.max(ground_y));
-        }
-        (min.0.is_finite() && min.1.is_finite() && max.0.is_finite() && max.1.is_finite())
-            .then_some((min, max))
+        ]
+        .map(|(x, y)| self.window_to_world_at_ground(x, y, &inverse));
+        corners
+            .iter()
+            .all(|corner| corner.0.is_finite() && corner.1.is_finite())
+            .then_some(corners)
+    }
+
+    /// The frustum's footprint on the ground as `(min, max)`, in world pixels. `None` when the
+    /// ground is not in view.
+    fn ground_footprint(&self) -> Option<((f64, f64), (f64, f64))> {
+        let corners = self.ground_corners()?;
+        Some(corners.iter().fold(
+            ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN)),
+            |(min, max), corner| {
+                (
+                    (min.0.min(corner.0), min.1.min(corner.1)),
+                    (max.0.max(corner.0), max.1.max(corner.1)),
+                )
+            },
+        ))
     }
 
     /// The frustum's footprint on the ground as `(min, max)`, in Mercator world coordinates.
@@ -346,14 +360,22 @@ impl ViewState {
         let (min, max) = self.ground_footprint()?;
         let tile_scale = 2_f64.powi(i32::from(level)) / self.world_size();
         let to_tile = |value: f64| (value * tile_scale) as i32;
+        let (padding, footprint) = match padding {
+            ViewPadding::Loose => (VIEW_REGION_PADDING, None),
+            ViewPadding::Tight => (
+                0,
+                Some(
+                    self.ground_corners()?
+                        .map(|corner| (corner.0 * tile_scale, corner.1 * tile_scale)),
+                ),
+            ),
+        };
         Some(ViewRegion::new(
             TileId::new(level, to_tile(min.0), to_tile(min.1)),
             TileId::new(level, to_tile(max.0), to_tile(max.1)),
-            match padding {
-                ViewPadding::Loose => VIEW_REGION_PADDING,
-                ViewPadding::Tight => 0,
-            },
-            MAX_N_TILES,
+            padding,
+            footprint,
+            MAX_VIEW_TILES,
         ))
     }
 

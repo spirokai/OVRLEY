@@ -1,8 +1,11 @@
 //! Export host of the shared widget engine.
 //!
 //! Every widget draws through the same engine as the editor preview, in the
-//! export's layer order: backdrops, rasters and labels (the static layer), then
-//! intrinsic values, boxed values, routes, elevation plots, diving profiles and rolling charts.
+//! export's layer order: backdrops, maps, rasters and labels, then intrinsic
+//! values, boxed values, routes, elevation plots, diving profiles and rolling charts.
+//!
+//! Backdrops, rasters and labels are static, but a map is opaque and redrawn every
+//! frame, so a raster or label on top of one draws after it every frame instead.
 //!
 //! Widgets sample the activity like the preview does: at the activity second of
 //! each dense frame. Export planning keeps ownership of update-rate decimation
@@ -19,7 +22,12 @@
 //! Widget instances hold Skia surfaces and caches, so each frame worker builds
 //! its own set from the shared, immutable [`ExportWidgets`].
 
-use super::{atlas::{AtlasPlan, SlotPlacement}, surface::wrap_native_surface, FrameSize};
+use super::{
+    atlas::{AtlasPlan, SlotPlacement},
+    map_export::{ExportMapJob, ExportMaps},
+    surface::wrap_native_surface,
+    FrameSize,
+};
 use crate::{
     activity::{
         schema::{DenseActivityReport, ParsedActivity},
@@ -53,6 +61,11 @@ pub struct ExportWidgets<'a> {
     activity: ActivitySampler,
     /// Raster sources resampled to their export size, in config order.
     rasters: Vec<RasterImage>,
+    /// Map frames and shared content, in config order. Holds the thread that draws them.
+    maps: ExportMaps,
+    /// Which rasters and labels, in config order, a map would hide if they stayed in a base.
+    rasters_over_map: Vec<bool>,
+    labels_over_map: Vec<bool>,
     host: WidgetHost,
     frame_size: FrameSize,
     blank_leading_frame_count: usize,
@@ -63,10 +76,27 @@ pub struct ExportWidgets<'a> {
 enum Layer {
     /// Backdrops and labels: drawn once into the covered base.
     Static,
-    /// Drawn once into both bases; the only layer shown outside the coverage.
+    /// Drawn once into both bases; shown outside the coverage.
     Raster,
+    /// A raster on a map: shown outside the coverage from the uncovered base, and drawn after
+    /// the map every covered frame.
+    RasterOverMap,
     /// Drawn every covered frame.
     Dynamic,
+}
+
+impl Layer {
+    fn in_covered_base(self) -> bool {
+        matches!(self, Self::Static | Self::Raster)
+    }
+
+    fn in_uncovered_base(self) -> bool {
+        matches!(self, Self::Raster | Self::RasterOverMap)
+    }
+
+    fn draws_every_frame(self) -> bool {
+        matches!(self, Self::RasterOverMap | Self::Dynamic)
+    }
 }
 
 /// An atlas plan with its static layers drawn into straight-alpha RGBA atlas bases.
@@ -92,6 +122,7 @@ impl<'a> ExportWidgets<'a> {
         dense: &'a DenseActivityReport,
         frame_size: FrameSize,
         blank_leading_frame_count: u64,
+        map_job: ExportMapJob<'_>,
         profiler: &mut RenderProfiler,
     ) -> CoreResult<Self> {
         let scene = &config.scene;
@@ -132,17 +163,69 @@ impl<'a> ExportWidgets<'a> {
                 .map(|raster| export_raster(raster, scene.presentation.scale))
                 .collect::<CoreResult<Vec<_>>>()
         })?;
-        Ok(Self {
+        let mut export = Self {
             config,
             dense,
             font_dirs,
             activity,
             rasters,
+            maps: ExportMaps::default(),
+            rasters_over_map: vec![false; config.rasters.len()],
+            labels_over_map: vec![false; config.labels.len()],
             // Plots drawn without activity samples advance over the scene's activity seconds.
             host: WidgetHost::export(scene.plot_window(false), scene.end, scene.export_start_seconds),
             frame_size,
             blank_leading_frame_count,
-        })
+        };
+        if !config.maps.is_empty() {
+            let seconds: Vec<f64> = map_job
+                .frame_indices
+                .iter()
+                .filter_map(|frame| export.frame_second(*frame))
+                .collect();
+            export.maps = ExportMaps::prepare(config, &export.activity, &export.host, &seconds, &map_job, profiler)?;
+            export.stack_over_maps()?;
+        }
+        Ok(export)
+    }
+
+    /// Moves rasters and labels whose rectangle meets a map out of the covered base.
+    fn stack_over_maps(&mut self) -> CoreResult<()> {
+        let config = self.config;
+        let maps = config
+            .maps
+            .iter()
+            .enumerate()
+            .map(|(index, widget)| self.scene_rect(self.maps.widget(index, widget)))
+            .collect::<CoreResult<Vec<_>>>()?;
+        let over_map = |rect: Option<IRect>| {
+            rect.is_some_and(|rect| {
+                maps.iter()
+                    .flatten()
+                    .any(|map| IRect::intersect(map, &rect).is_some())
+            })
+        };
+        self.rasters_over_map = config
+            .rasters
+            .iter()
+            .zip(&self.rasters)
+            .map(|(raster, image)| Ok(over_map(self.scene_rect(raster_widget(raster, image))?)))
+            .collect::<CoreResult<_>>()?;
+        self.labels_over_map = config
+            .labels
+            .iter()
+            .map(|label| Ok(over_map(self.scene_rect(ValidatedWidget::Label(label))?)))
+            .collect::<CoreResult<_>>()?;
+        Ok(())
+    }
+
+    /// Whole pixels a static or map widget draws into, from layout alone.
+    fn scene_rect(&self, widget: ValidatedWidget<'_>) -> CoreResult<Option<IRect>> {
+        let scene = &self.config.scene;
+        let fonts = NativeFonts(self.font_dirs);
+        let mut widget = PreviewWidget::from_validated(widget, &scene.presentation, &self.host, &fonts)?;
+        let bounds = widget.layout_bounds(Some(&self.activity), scene.start, &fonts)?;
+        Ok(pixel_rect(bounds, self.frame_rect()))
     }
 
     /// Builds one worker's widget instances in layer order.
@@ -182,9 +265,9 @@ impl<'a> ExportWidgets<'a> {
             let mut worker = self.worker()?;
             let start = self.config.scene.start;
             let mut covered = vec![0; plan.size().rgba_len()?];
-            worker.draw_slots(&plan, &mut covered, start, |layer| layer != Layer::Dynamic)?;
+            worker.draw_slots(&plan, &mut covered, start, Layer::in_covered_base)?;
             let mut uncovered = vec![0; covered.len()];
-            worker.draw_slots(&plan, &mut uncovered, start, |layer| layer == Layer::Raster)?;
+            worker.draw_slots(&plan, &mut uncovered, start, Layer::in_uncovered_base)?;
             Ok(PreparedAtlas {
                 plan,
                 covered,
@@ -248,17 +331,23 @@ impl<'a> ExportWidgets<'a> {
         let config = self.config;
         let mut layers = Vec::new();
         layers.extend(config.backdrops.iter().map(|widget| (ValidatedWidget::Backdrop(widget), Layer::Static)));
-        layers.extend(config.rasters.iter().zip(&self.rasters).map(|(raster, image)| {
-            (
-                ValidatedWidget::Raster {
-                    geometry: &raster.geometry,
-                    source_id: raster.id.clone(),
-                    image: image.clone(),
-                },
-                Layer::Raster,
-            )
+        layers.extend(
+            config
+                .maps
+                .iter()
+                .enumerate()
+                .map(|(index, widget)| (self.maps.widget(index, widget), Layer::Dynamic)),
+        );
+        layers.extend(config.rasters.iter().zip(&self.rasters).zip(&self.rasters_over_map).map(
+            |((raster, image), over_map)| {
+                let layer = if *over_map { Layer::RasterOverMap } else { Layer::Raster };
+                (raster_widget(raster, image), layer)
+            },
+        ));
+        layers.extend(config.labels.iter().zip(&self.labels_over_map).map(|(widget, over_map)| {
+            let layer = if *over_map { Layer::Dynamic } else { Layer::Static };
+            (ValidatedWidget::Label(widget), layer)
         }));
-        layers.extend(config.labels.iter().map(|widget| (ValidatedWidget::Label(widget), Layer::Static)));
         for mode in [DisplayTypeLayoutMode::Intrinsic, DisplayTypeLayoutMode::Boxed] {
             layers.extend(
                 config
@@ -321,7 +410,7 @@ impl WorkerWidgets<'_> {
         profiler.measure("frame.base", || pixels.copy_from_slice(base));
         let started = Instant::now();
         if let Some(second) = second {
-            self.draw_slots(&atlas.plan, pixels, second, |layer| layer == Layer::Dynamic)?;
+            self.draw_slots(&atlas.plan, pixels, second, Layer::draws_every_frame)?;
         }
         profiler.record_ms("frame.draw", started.elapsed().as_secs_f64() * 1000.0);
         Ok(())
@@ -337,7 +426,7 @@ impl WorkerWidgets<'_> {
         self.widgets
             .iter_mut()
             .map(|widget| {
-                if second.is_none() && widget.layer != Layer::Raster {
+                if second.is_none() && !widget.layer.in_uncovered_base() {
                     return Ok(None);
                 }
                 widget.layout_rect(&export.activity, second.unwrap_or(export.config.scene.start), &fonts, frame)
@@ -378,6 +467,14 @@ impl WorkerWidgets<'_> {
             result?;
         }
         Ok(())
+    }
+}
+
+fn raster_widget<'a>(raster: &'a ValidatedRaster, image: &RasterImage) -> ValidatedWidget<'a> {
+    ValidatedWidget::Raster {
+        geometry: &raster.geometry,
+        source_id: raster.id.clone(),
+        image: image.clone(),
     }
 }
 

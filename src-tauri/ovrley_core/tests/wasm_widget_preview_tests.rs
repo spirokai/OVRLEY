@@ -417,7 +417,7 @@ fn assert_atlas_frames_match_the_full_frame(
     let dense = build_dense_activity_report_validated(activity, config).unwrap();
     let size = FrameSize { width: config.scene.presentation.width, height: config.scene.presentation.height };
     let mut profiler = RenderProfiler::default();
-    let export = ExportWidgets::prepare(&paths.font_dirs, config, activity, &dense, size, BLANK_LEADING_FRAMES as u64, &mut profiler).unwrap();
+    let export = ExportWidgets::prepare(&paths.font_dirs, config, activity, &dense, size, BLANK_LEADING_FRAMES as u64, ovrley_core::render::ExportMapJob { source: None, frame_indices: &[], controller: &ovrley_core::encode::progress::RenderController::default() }, &mut profiler).unwrap();
     let full_frame = export.prepare_atlas(export.full_frame_atlas(), &mut profiler).unwrap();
     let frame_count = BLANK_LEADING_FRAMES + dense.frame_count + 2;
     let mut in_order = export.worker().unwrap();
@@ -612,7 +612,7 @@ fn atlas_planning_of_a_ten_minute_export_runs_layout_only_within_seconds() {
     assert!(dense.frame_count >= 36_000, "a 10-minute export at 60 fps, got {} frames", dense.frame_count);
     let size = FrameSize { width: config.scene.presentation.width, height: config.scene.presentation.height };
     let mut profiler = RenderProfiler::default();
-    let export = ExportWidgets::prepare(&paths.font_dirs, &config, &activity, &dense, size, 0, &mut profiler).unwrap();
+    let export = ExportWidgets::prepare(&paths.font_dirs, &config, &activity, &dense, size, 0, ovrley_core::render::ExportMapJob { source: None, frame_indices: &[], controller: &ovrley_core::encode::progress::RenderController::default() }, &mut profiler).unwrap();
     let frames: Vec<usize> = (0..dense.frame_count).collect();
     let atlas = export.plan_atlas(&frames, ovrley_core::render::SlotPlacement::Overlay, &mut profiler).unwrap();
     let planning = &profiler.summary()["atlas.plan"];

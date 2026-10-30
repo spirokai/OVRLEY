@@ -19,7 +19,7 @@ name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
-# GPU map gate only (src/bin/map_gpu_gate.rs). Keeps wgpu out of ordinary app builds.
+# GPU map gate only (src/bin/map_gpu_gate.rs).
 map-gpu-gate = ["dep:ovrley_map_gpu", "dep:skia-safe"]
 
 [[bin]]

@@ -331,6 +331,7 @@ fn sequential_mixed_results_settle_frame_weights_and_preserve_completed_outputs(
             &fixture.inspection,
             malformed,
             None,
+            None,
             executor.clone()
         ),
         Err(BatchServiceError::InvalidRequest { .. })
@@ -343,6 +344,7 @@ fn sequential_mixed_results_settle_frame_weights_and_preserve_completed_outputs(
             &fixture.paths,
             &fixture.inspection,
             request.clone(),
+            None,
             None,
             executor.clone(),
         )
@@ -394,6 +396,7 @@ fn sequential_mixed_results_settle_frame_weights_and_preserve_completed_outputs(
             &fixture.paths,
             &fixture.inspection,
             request.clone(),
+            None,
             None,
             executor.clone()
         ),
@@ -448,7 +451,7 @@ fn sequential_mixed_results_settle_frame_weights_and_preserve_completed_outputs(
         .all(|pair| pair[1].revision > pair[0].revision));
     drop(snapshots);
     let stale = service
-        .submit_batch(&fixture.paths, &fixture.inspection, request, None)
+        .submit_batch(&fixture.paths, &fixture.inspection, request, None, None)
         .unwrap_err();
     let stale = serde_json::to_value(stale).unwrap();
     assert_eq!(stale["code"], "reinspectionRequired");
@@ -478,6 +481,7 @@ fn embedded_failures_continue_and_all_item_failure_has_a_terminal_snapshot() {
             &fixture.paths,
             &fixture.inspection,
             request,
+            None,
             None,
             executor.clone(),
         )
@@ -525,7 +529,7 @@ fn cancellation_waits_for_cleanup_retains_success_and_never_launches_later_jobs(
     let (release_tx, release_rx) = mpsc::channel();
     let (executor, entered, resume) = executor(Some((cleanup_tx, Mutex::new(release_rx))));
     let accepted = service
-        .submit_batch_with_executor(&fixture.paths, &fixture.inspection, request, None, executor)
+        .submit_batch_with_executor(&fixture.paths, &fixture.inspection, request, None, None, executor)
         .unwrap();
     entered.recv_timeout(WAIT).unwrap();
     resume.send(()).unwrap();
@@ -599,6 +603,7 @@ fn batch_calibration_applies_one_correction_to_each_automatic_baseline() {
             &fixture.inspection,
             request,
             None,
+            None,
             executor.clone(),
         )
         .unwrap();
@@ -655,6 +660,7 @@ fn invalid_calibration_and_missing_baselines_reject_before_reserving_the_rendere
                     &fixture.paths,
                     &fixture.inspection,
                     malformed,
+                    None,
                     None,
                     executor.clone(),
                 ),

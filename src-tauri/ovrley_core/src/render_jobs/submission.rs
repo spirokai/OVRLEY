@@ -10,6 +10,7 @@ use crate::activity::schema::ParsedActivity;
 use crate::activity::validate_render_activity;
 use crate::error::{CoreError, CoreResult};
 use crate::raster::RasterResourceResolver;
+use ovrley_map::MapDataSource;
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
@@ -34,6 +35,7 @@ pub(super) fn accept_batch(
     inspection: &VideoInspectionService,
     request: BatchRenderRequest,
     resources: Option<&dyn RasterResourceResolver>,
+    map_source: Option<Arc<dyn MapDataSource>>,
 ) -> Result<AcceptedBatch, BatchServiceError> {
     if request.jobs.is_empty() || request.jobs.len() > u32::MAX as usize {
         return Err(
@@ -75,7 +77,7 @@ pub(super) fn accept_batch(
     };
     let encoding = validate_batch_encoding(&request.encoding)?;
     let outputs = encoding.plan_outputs(&owned, Path::new(&request.output_directory))?;
-    let template = validate_batch_template(request.template, encoding, resources)?;
+    let template = validate_batch_template(request.template, encoding, resources, map_source)?;
     let external_activity = match request.activity {
         BatchActivity::EmbeddedActivity {} => None,
         BatchActivity::ExternalActivity {

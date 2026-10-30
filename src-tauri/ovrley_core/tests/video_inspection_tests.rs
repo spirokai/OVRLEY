@@ -211,6 +211,7 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
                 &dense,
                 frame_size,
                 coverage.blank_leading_frame_count,
+                ovrley_core::render::ExportMapJob { source: None, frame_indices: &[], controller: &ovrley_core::encode::progress::RenderController::default() },
                 &mut profiler,
             )
             .unwrap();

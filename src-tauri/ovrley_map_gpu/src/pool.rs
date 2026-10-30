@@ -11,8 +11,14 @@ use std::marker::PhantomData;
 use std::mem::size_of;
 use std::ops::Range;
 
-/// One layer per tile uses one metadata entry, so this is far more than the geometry can reach.
-const LAYER_METADATA_SIZE: wgpu::BufferAddress = 10 * 1024;
+/// What one pool holds, or what one tile asks of it. A layer of a tile uses one metadata entry and
+/// a vertex uses one feature metadata entry.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PoolEntries {
+    pub vertices: u64,
+    pub indices: u64,
+    pub layers: u64,
+}
 
 /// Geometry for one layer of one tile, ready to upload.
 pub(crate) struct LayerGeometry<'a, V> {
@@ -47,8 +53,20 @@ pub(crate) struct BufferPool<V> {
 }
 
 impl<V: Pod> BufferPool<V> {
-    /// `entries` sizes the vertex, index and feature metadata buffers.
-    pub(crate) fn new(device: &wgpu::Device, label: &str, entries: u64) -> Self {
+    /// The largest buffer `entries` would need, in bytes.
+    pub(crate) fn largest_buffer(entries: PoolEntries) -> u64 {
+        [
+            size_of::<V>() as u64 * entries.vertices,
+            size_of::<u32>() as u64 * entries.indices,
+            size_of::<ShaderLayerMetadata>() as u64 * entries.layers,
+            size_of::<FillShaderFeatureMetadata>() as u64 * entries.vertices,
+        ]
+        .into_iter()
+        .max()
+        .unwrap_or(0)
+    }
+
+    pub(crate) fn new(device: &wgpu::Device, label: &str, entries: PoolEntries) -> Self {
         let names = [
             format!("{label} vertices"),
             format!("{label} indices"),
@@ -71,25 +89,25 @@ impl<V: Pod> BufferPool<V> {
         Self {
             vertices: buffer(
                 &names[0],
-                size_of::<V>() as u64 * entries,
+                size_of::<V>() as u64 * entries.vertices,
                 wgpu::BufferUsages::VERTEX,
                 BackingBufferType::Vertices,
             ),
             indices: buffer(
                 &names[1],
-                size_of::<u32>() as u64 * entries,
+                size_of::<u32>() as u64 * entries.indices,
                 wgpu::BufferUsages::INDEX,
                 BackingBufferType::Indices,
             ),
             layer_metadata: buffer(
                 &names[2],
-                size_of::<ShaderLayerMetadata>() as u64 * LAYER_METADATA_SIZE,
+                size_of::<ShaderLayerMetadata>() as u64 * entries.layers,
                 wgpu::BufferUsages::VERTEX,
                 BackingBufferType::Metadata,
             ),
             feature_metadata: buffer(
                 &names[3],
-                size_of::<FillShaderFeatureMetadata>() as u64 * entries,
+                size_of::<FillShaderFeatureMetadata>() as u64 * entries.vertices,
                 wgpu::BufferUsages::VERTEX,
                 BackingBufferType::FeatureMetadata,
             ),
@@ -121,6 +139,14 @@ impl<V: Pod> BufferPool<V> {
     /// Tiles that lost a layer since the last call.
     pub(crate) fn drain_evicted_tiles(&mut self) -> std::vec::Drain<'_, TileId> {
         self.index.evicted_tiles.drain(..)
+    }
+
+    /// Forgets every layer, so the next ones fill the buffers from the start. Frames recorded after
+    /// this draw only what is uploaded after it.
+    pub(crate) fn clear(&mut self) {
+        self.index.tree_index.clear();
+        self.index.linear_index.clear();
+        self.index.evicted_tiles.clear();
     }
 
     /// Total bytes across this pool's buffers.

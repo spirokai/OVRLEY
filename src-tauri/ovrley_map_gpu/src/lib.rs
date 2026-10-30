@@ -12,9 +12,12 @@ mod pattern;
 mod pipelines;
 mod pool;
 mod route;
+mod sizing;
 mod style;
 mod tile;
 
+pub use pool::PoolEntries;
+pub use sizing::{GpuPoolSizes, MapTileSizer, DEFAULT_POOL_ENTRIES};
 pub use style::Buildings;
 
 use extrusion::ExtrusionVertex;
@@ -34,9 +37,6 @@ use style::{parse_style, ParsedStyle};
 use tile::{prepare_tile, LayerKind, PreparedLayer, PreparedTile};
 use wgpu::util::DeviceExt;
 
-/// Entries per geometry pool: 73 MB of ground buffers. Upstream's 10 million lost the device on a
-/// 512 MB integrated GPU in 3 of 8 runs.
-pub const DEFAULT_POOL_ENTRIES: u64 = 2_000_000;
 const MASK_VERTICES: u32 = 6;
 /// Marks route samples. Tile masks use at most `3 + 14 * 4`, and never run after the route.
 const ROUTE_STENCIL: u32 = 0xff;
@@ -52,8 +52,8 @@ pub struct GpuMapConfig {
     pub sample_count: u32,
     /// Zoom that style values are evaluated at when tiles load, as upstream does at upload.
     pub style_zoom: f64,
-    /// Sizes each geometry pool. See [`DEFAULT_POOL_ENTRIES`].
-    pub pool_entries: u64,
+    /// Sizes each geometry pool. See [`GpuPoolSizes::for_views`].
+    pub pools: GpuPoolSizes,
     pub buildings: Buildings,
 }
 
@@ -141,6 +141,7 @@ pub struct GpuMapRenderer {
     route: Option<RouteLayer>,
     /// Tiles that finished loading. Eviction removes them again.
     loaded: HashSet<TileId>,
+    pool_clears: u64,
     masks: Vec<TileShape>,
     layer_items: Vec<LayerItem>,
     extrusion_items: Vec<ExtrusionItem>,
@@ -150,7 +151,9 @@ pub struct GpuMapRenderer {
 }
 
 impl GpuMapRenderer {
-    /// Opens a GPU device and reads the style. Fails loudly on invalid configuration.
+    /// Opens a GPU device and reads the style. Fails loudly on invalid configuration, without a
+    /// real GPU, or when the device cannot hold the pools. Software adapters are refused: nothing
+    /// has measured them, and a map frame costs far more on them than an export should wait for.
     pub fn new(config: GpuMapConfig, source: &dyn MapDataSource) -> Result<Self, String> {
         if config.sample_count != 1 && config.sample_count != 4 {
             return Err(format!(
@@ -158,8 +161,11 @@ impl GpuMapRenderer {
                 config.sample_count
             ));
         }
-        if config.pool_entries == 0 {
-            return Err("Map pool entries must not be zero".to_string());
+        let has_empty_pool = [config.pools.ground, config.pools.extrusion]
+            .iter()
+            .any(|pool| pool.vertices == 0 || pool.indices == 0 || pool.layers == 0);
+        if has_empty_pool {
+            return Err("Map pools must not be empty".to_string());
         }
         if !config.style_zoom.is_finite() {
             return Err(format!(
@@ -184,9 +190,30 @@ impl GpuMapRenderer {
         .map_err(|error| format!("No GPU adapter for the map renderer: {error}"))?;
         let info = adapter.get_info();
         let adapter_name = format!("{} ({:?}, {:?})", info.name, info.backend, info.device_type);
-        let (device, queue) =
-            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
-                .map_err(|error| format!("No GPU device for the map renderer: {error}"))?;
+        if info.device_type == wgpu::DeviceType::Cpu {
+            return Err(format!(
+                "The map renderer needs a GPU; the only adapter is software: {adapter_name}"
+            ));
+        }
+        let max_buffer_size = adapter.limits().max_buffer_size;
+        let largest_buffer = BufferPool::<ShaderVertex>::largest_buffer(config.pools.ground)
+            .max(BufferPool::<ExtrusionVertex>::largest_buffer(
+                config.pools.extrusion,
+            ));
+        if largest_buffer > max_buffer_size {
+            return Err(format!(
+                "This map view needs a {largest_buffer} byte GPU buffer and {adapter_name} allows \
+                 {max_buffer_size}. Reduce the map's range or pitch."
+            ));
+        }
+        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+            required_limits: wgpu::Limits {
+                max_buffer_size,
+                ..wgpu::Limits::default()
+            },
+            ..wgpu::DeviceDescriptor::default()
+        }))
+        .map_err(|error| format!("No GPU device for the map renderer: {error}"))?;
 
         let gpu_error = Arc::new(Mutex::new(None));
         let lost_error = Arc::clone(&gpu_error);
@@ -204,8 +231,8 @@ impl GpuMapRenderer {
         let (width, height) = (config.viewport.width_px(), config.viewport.height_px());
         let targets = Targets::new(&device, width, height, config.sample_count);
         let pattern = TileViewPattern::new(&device);
-        let ground_pool = BufferPool::new(&device, "ground", config.pool_entries);
-        let extrusion_pool = BufferPool::new(&device, "extrusion", config.pool_entries);
+        let ground_pool = BufferPool::new(&device, "ground", config.pools.ground);
+        let extrusion_pool = BufferPool::new(&device, "extrusion", config.pools.extrusion);
         let background_buffer = (!style.backgrounds.is_empty()).then(|| {
             let metadata: Vec<_> = style
                 .backgrounds
@@ -220,7 +247,7 @@ impl GpuMapRenderer {
         });
         let pixels = vec![0; width as usize * height as usize * 4];
 
-        Ok(Self {
+        let renderer = Self {
             config,
             device,
             queue,
@@ -234,13 +261,17 @@ impl GpuMapRenderer {
             background_buffer,
             route: None,
             loaded: HashSet::new(),
+            pool_clears: 0,
             masks: Vec::with_capacity(64),
             layer_items: Vec::with_capacity(1024),
             extrusion_items: Vec::with_capacity(64),
             pixels,
             gpu_error,
             last_stats: FrameStats::default(),
-        })
+        };
+        // An allocation the device refused is reported through the error callback.
+        renderer.check_gpu()?;
+        Ok(renderer)
     }
 
     pub fn adapter_name(&self) -> &str {
@@ -261,6 +292,60 @@ impl GpuMapRenderer {
     /// What the last frame drew.
     pub const fn last_stats(&self) -> FrameStats {
         self.last_stats
+    }
+
+    /// Puts every tile of one view on the GPU, or fails. The pools evict oldest first, so loading can
+    /// evict a tile this view still shows, which would leave a blank patch. When it does, the pools
+    /// start empty and take only this view, which always fits if the view fits at all. Costs a few
+    /// lookups when the tiles are already resident.
+    pub fn load_view(
+        &mut self,
+        tiles: &[TileId],
+        source: &dyn MapDataSource,
+    ) -> Result<(), String> {
+        if self.has_all(tiles) {
+            return Ok(());
+        }
+        self.load_or_fail(tiles, source)?;
+        if self.has_all(tiles) {
+            return Ok(());
+        }
+        self.ground_pool.clear();
+        self.extrusion_pool.clear();
+        self.loaded.clear();
+        self.pool_clears += 1;
+        self.load_or_fail(tiles, source)?;
+        if self.has_all(tiles) {
+            return Ok(());
+        }
+        Err(format!(
+            "A view of {} map tiles does not fit its {} byte pools",
+            tiles.len(),
+            self.pool_bytes()
+        ))
+    }
+
+    fn has_all(&self, tiles: &[TileId]) -> bool {
+        tiles.iter().all(|tile| self.loaded.contains(tile))
+    }
+
+    fn load_or_fail(&mut self, tiles: &[TileId], source: &dyn MapDataSource) -> Result<(), String> {
+        let reports = self.load_tiles(tiles, source)?;
+        match reports
+            .iter()
+            .find_map(|report| report.error.as_ref().map(|error| (report, error)))
+        {
+            Some((report, error)) => Err(format!(
+                "Map tile {}/{}/{} failed to load: {error}",
+                report.tile.z, report.tile.x, report.tile.y
+            )),
+            None => Ok(()),
+        }
+    }
+
+    /// How many times [`Self::load_view`] had to empty the pools. Each reloads one view.
+    pub const fn pool_clears(&self) -> u64 {
+        self.pool_clears
     }
 
     /// Decodes and tessellates `tiles` on worker threads and uploads them. Blocks until they are
@@ -306,13 +391,36 @@ impl GpuMapRenderer {
             for (mut report, prepared) in receiver {
                 if let Some(prepared) = prepared {
                     let started = Instant::now();
-                    for layer in &prepared.ground {
-                        upload_layer(&mut self.ground_pool, &self.queue, report.tile, layer);
+                    let uploaded = prepared
+                        .ground
+                        .iter()
+                        .try_for_each(|layer| {
+                            upload_layer(&mut self.ground_pool, &self.queue, report.tile, layer)
+                        })
+                        .and_then(|()| {
+                            prepared.extrusions.iter().try_for_each(|layer| {
+                                upload_layer(
+                                    &mut self.extrusion_pool,
+                                    &self.queue,
+                                    report.tile,
+                                    layer,
+                                )
+                            })
+                        });
+                    match uploaded {
+                        Ok(()) => {
+                            self.loaded.insert(report.tile);
+                        }
+                        Err(error) => {
+                            log::warn!(
+                                "Skipping map tile {}/{}/{}: {error}",
+                                report.tile.z,
+                                report.tile.x,
+                                report.tile.y
+                            );
+                            report.error = Some(error);
+                        }
                     }
-                    for layer in &prepared.extrusions {
-                        upload_layer(&mut self.extrusion_pool, &self.queue, report.tile, layer);
-                    }
-                    self.loaded.insert(report.tile);
                     report.upload_ms = started.elapsed().as_secs_f64() * 1000.0;
                 }
                 reports.push(report);
@@ -750,20 +858,19 @@ fn fetch_and_prepare(
     }
 }
 
-/// Uploads one layer, unless it survived an earlier eviction of its tile. One that cannot fit is
-/// logged and skipped.
+/// Uploads one layer, unless it survived an earlier eviction of its tile. Fails when it cannot fit.
 fn upload_layer<V: bytemuck::Pod>(
     pool: &mut BufferPool<V>,
     queue: &wgpu::Queue,
     tile: TileId,
     layer: &PreparedLayer<V>,
-) {
+) -> Result<(), String> {
     let is_resident = pool
         .index()
         .get_layers(tile)
         .is_some_and(|entries| entries.iter().any(|entry| entry.layer == layer.index));
     if is_resident {
-        return;
+        return Ok(());
     }
     let geometry = LayerGeometry {
         vertices: &layer.vertices,
@@ -771,16 +878,7 @@ fn upload_layer<V: bytemuck::Pod>(
         feature_metadata: &layer.feature_metadata,
         layer_metadata: layer.layer_metadata,
     };
-    if let Err(error) =
-        pool.allocate_layer_geometry(queue, tile, layer.index, layer.kind, &geometry)
-    {
-        log::warn!(
-            "Skipping a layer of map tile {}/{}/{}: {error}",
-            tile.z,
-            tile.x,
-            tile.y
-        );
-    }
+    pool.allocate_layer_geometry(queue, tile, layer.index, layer.kind, &geometry)
 }
 
 fn record_gpu_error(slot: &Mutex<Option<String>>, message: String) {

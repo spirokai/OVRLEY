@@ -1,6 +1,6 @@
 # Map tile widget — implementation plan
 
-Status: Phases 1 and 2 built, and the user judged the route on its road in every Phase 2 clip. Phase 3 not started.
+Status: Phases 1, 2 and 3 built. Video exports with a map work and passed the Phase 3 gate on Windows. Phase 4 not started.
 Updated 2026-10-30.
 Builds on `map-tile-widget-research.md`.
 
@@ -28,6 +28,8 @@ widget. Phases 2–5 below are revised for this. Phases 3 and 4 still have open 
 | Route drawing            | A ground layer in `ovrley_map_gpu`: above roads, below buildings, so buildings hide it. The marker stays on top |
 | Camera                   | `fixed` (whole route, north-up, pitch 0) or `follow` (`north_up` / `rider_up`, pitch 0–60, `range_meters`)      |
 | Not in v1                | Speed-dependent range, terrain, raster layers, upright point labels, map matching, corner radius or border      |
+| Export without a GPU     | Fails before encoding. Software adapters are refused, so there is no CPU fallback                               |
+| Pool evictions           | Draw only tiles under the camera's trapezoid, size pools per job, and guarantee every tile in view is resident  |
 
 The map widget uses the route widget's field names and editor controls for its route and marker:
 
@@ -93,8 +95,8 @@ ovrley_map (featureless)           shared vocabulary and the camera matrix, used
 - Feature `raster` adds the ezu comparison path.
 
 **`src-tauri/ovrley_map_gpu`** holds the renderer. `ovrley_widgets` must never depend on it. `wasm-bindings` is an
-isolated workspace, so feature unification cannot pull it into WASM. Until Phase 3, only the gate depends on it, so
-ordinary app builds skip `wgpu`.
+isolated workspace, so feature unification cannot pull it into WASM. `ovrley_core` depends on it for export, so ordinary
+app builds include `wgpu`.
 
 ## Phase 1 — Tile rasterizer and style adapter
 
@@ -238,55 +240,106 @@ network requests.
 
 ## Phase 3 — Export pipeline
 
-Deliverable: a video export with a map, failing before encoding if any tile is unavailable.
+**Built and through its gate on Windows.** A video export can draw a map, and fails before encoding if any tile is
+unavailable. Nothing in the app can add a map yet, because the widget reaches the editor in Phase 5.
 
-**To design first:** how parallel export workers share a GPU. A renderer owns one device and renders one frame at a time,
-so the direction is one shared GPU thread that workers send requests to. This phase also makes `wgpu` a dependency of
-ordinary app builds, so check binary size and what happens on a machine with no usable GPU. No gate has tested either.
+**Ingress.** `ValidatedRenderConfig.maps`, filled by `validate_map_widgets` in `normalize/widgets.rs`. The data source is
+passed beside `resources` through `submit_single`, batch submission and `plan_single_render`. A native tool has none, and
+fails with a config error as soon as a map needs tiles.
 
-Three things from Phase 2 shape this design:
+**Prepare (`render/map_export.rs`, inside `ExportWidgets::prepare`, before FFmpeg starts):**
 
-- **Throughput:** one GPU thread makes map frames serial however many workers export. At 1000 px that's 4–8 ms per frame
-  (pitch 60 is the slow end), so about 130–250 frames per second at best, before any delivery to the workers.
-- **No usable GPU:** the route is now inside the frame, so there is no way to export a route without the GPU. The job
-  must fail loudly before encoding.
-- **Evictions must be solved here, not only measured.** A view that outgrows the pools draws blank patches, and in an
-  export they are permanent. The prepare step's failure guarantee doesn't catch this, because the tiles did download.
-  Phase 2 coverage: 50 of 360 views evicted, all with the follow camera's 0.45 top padding: every z14 view at pitch 60
-  (154–315 tiles), Zurich at z15.5 and pitch 60 (30–54 tiles), and some Zurich views at z14 and pitch 40. No clean view
-  loaded more than 1.69M vertices, and the smallest evicting one loaded 1.39M, so vertex count alone doesn't predict it.
-  Choose between larger pools, sized per job, and limiting how far the camera reaches, then detect any remaining
-  eviction during export and fail. Re-run with `map_gpu_gate <cache> <out> gaps`.
+1. Walk the camera over every rendered dense frame. `ActivityMap::views` in `widgets::map` owns this, since the widget
+   owns the camera and viewport.
+2. Fetch the style and every tile on 8 threads, checking cancellation and reporting progress on the preparing message.
+   Bytes are held for the job, so disk eviction or a lost connection can't affect a running export.
+3. Tessellate each tile once to count its geometry, which also rejects tiles that don't decode, then size the pools.
+4. Open the renderer. No adapter, a software adapter, or a buffer the device doesn't allow fails here.
 
-- **Ingress:** `ValidatedRenderConfig.maps`, `validate_map_widgets` in `normalize/widgets.rs` over the existing
-  `validate_map_widget`, and `requirements.include_widget("map")`. `ValidatedWidget::Map` already exists.
-- **Data source plumbing:** pass `Arc<dyn MapDataSource>` beside `resources` through `submit_single`
-  (`execution.rs:127`), batch submission and `plan_single_render`. A map widget with no source (the
-  native CLI tools) is a loud config error.
-- **Prepare step**, inside `ExportWidgets::prepare` (`engine.rs:88`), which runs before ffmpeg starts:
-  1. Walk the camera over every rendered dense frame to get the set of visible tiles with `view_tiles`. The widget owns
-     the camera (`WidgetCamera`, `MapTrack`) and the viewport, so expose the walk from `widgets::map` instead of
-     recomputing them in core.
-  2. Fetch through `MapDataSource` with bounded parallelism, checking cancellation, and report progress
-     on the existing "Preparing video assets..." item.
-  3. Hold all bytes in `Arc`s for the job (5–20 MB for 30 km), so disk eviction cannot affect a running
-     export. Any failure fails the job here.
-- **Export provider:** implements `MapFrameProvider` over the shared GPU thread. It never returns `Pending`, and uses
-  MSAA 4. Tiles tessellate on demand or ahead of the camera, and the pools evict the oldest. A route longer than the
-  pools hold is the case to measure. It is built once and handed to each worker's widget instance.
-- **One route line per job.** Each worker builds its own widget, and each `PreviewMap` builds its own
-  `Arc<MapRouteLine>`. The renderer recognises a line by `Arc` identity, so workers sharing one renderer would make it
-  re-tessellate and re-upload the route on nearly every frame. Build the line once in the prepare step and hand it to
-  every worker's widget, through `ValidatedWidget::Map`. The renderer needs one route per map widget.
-- **Stacking** (`engine.rs:247`): order becomes backdrops, maps, rasters, labels, values, and the rest.
-  Maps are `Layer::Dynamic` and draw first among dynamic layers. A label or raster whose rectangle
-  intersects a map moves out of the covered base and draws after the map each frame. A moved raster
-  stays in the uncovered base so it still shows outside activity coverage. Scenes without a map produce
-  identical output to today.
+**One route line per job.** `MapContent` holds the track, camera, viewport and line. It is built once and handed to every
+worker's widget through `ValidatedWidget::Map`, because the renderer recognises a line by `Arc` identity.
 
-**Gate:** export the same project twice and compare frames, then export once offline with an uncached
-route and confirm it fails before encoding starts. Also export a view that used to evict (z15.5, pitch 60, central
-Zurich) and confirm it has no blank patches or fails loudly, and report export speed against a scene without a map.
+**One GPU thread.** Workers send requests and wait, and the thread owns one renderer per map widget, each on its own
+device. Tiles load on demand. A worker gets its frame or an error, and an error fails the job through the normal pipeline
+shutdown, which also removes the partial output.
+
+**Evictions.** The answer is per-job pools plus drawing fewer tiles. A fixed zoom and pitch limit predicts this badly, since
+the same view evicts in a city and not in farmland. VRAM isn't used either: wgpu doesn't report it reliably, and output must
+not depend on the machine.
+
+- **Indices fill first, not vertices.** Of the 48 eviction-prone views re-measured after the culling below, 9 still exceed
+  the old 2M limit: all on indices, 4 on vertices too, none on the layer table. That fits rural z14 evicting at 1.39M
+  vertices, and vertex count not predicting eviction.
+- **Most of the tiles were never visible.** Views selected the bounding box of the camera's trapezoid. Testing the
+  trapezoid itself takes central Zurich from 168 to 86 tiles (z14, square), 315 to 95 (z14, tall) and 54 to 21 (z15.5,
+  tall). `view_tiles` and drawing share the region, so they cannot disagree.
+- **Pools are sized per job** by `GpuPoolSizes::for_views`: 1.5× the largest view, at least the old default, and never
+  more than the job's whole geometry. Vertices, indices and layers are sized separately.
+- **Every tile in view is resident before drawing.** `GpuMapRenderer::load_view` loads the view, and if that evicted a tile
+  the view still shows, it empties the pools and reloads only that view. An empty ring holds any view that fits, so a
+  failure there means the view really doesn't fit, and the job fails with an error instead of drawing a blank patch.
+- **A view at the 512 tile limit fails during the walk**, before encoding, instead of silently losing tiles.
+
+**Stacking (`engine.rs`).** Order is backdrops, maps, rasters, labels, values and the rest. A label or raster whose
+rectangle meets a map draws after it every covered frame, and such a raster also stays in the uncovered base, so it still
+shows outside activity coverage.
+
+**Style cache.** A cached style is now refreshed after a day, keeping the cached copy if that fails. The handoff's stale
+`liberty.json` lacked the `hide_3d` filter, and the old cache never revalidated.
+
+**Different from the plan:**
+
+- `render_data_requirements` uses `include_widget("course")`, since a map reads the same columns. `"map"` has no manifest
+  entry until Phase 5, and looking it up would panic. Switch to it there.
+- The missing-source check runs in prepare, not at submission, so it is one check that also covers the debug preview path.
+- `upload_layer` now reports a layer that can't fit through `TileLoadReport.error`, instead of logging and skipping it.
+
+### Gate results
+
+RTX 4070 on Vulkan, Ryzen 5 5600X, `Evening_Ride(4)-parse-debug.json`. Run with
+`map_gpu_gate <cache> <absolute out> export`, about 2.5 minutes, or `export-route` and `gaps-evict` for parts. Building the
+gate needs `TAURI_CONFIG={"bundle":{"resources":{"../THIRD_PARTY_NOTICES.txt":null}}}`, because that file is generated by
+packaging.
+
+| Check                                       | Result                                                                       |
+| ------------------------------------------- | ---------------------------------------------------------------------------- |
+| Same project exported twice                 | All frames identical: 300 of 300, then 90 of 90 on the final code            |
+| Offline, uncached route                     | Fails before encoding, no output file                                        |
+| No GPU adapter (`WGPU_BACKEND=metal`)       | Fails before encoding, no output file                                        |
+| Views that evicted in Phase 2               | 0 evictions, no blank patches in the stills, including z14, pitch 60, tall   |
+| Pools too small for a view                  | `load_view` fails loudly                                                     |
+| Route longer than the pools (z14, pitch 60) | 5–6 pool clears over 600 frames, costing about 1.3 s of load in total        |
+| Composite outlasting the activity           | Map disappears, raster over it stays                                         |
+| Scene without a map, old and new binary     | All 60 frames identical (1080p, transparent)                                 |
+| `ovrley_core`, map tile service, map crates | 242 pass, 1 ignored. The other `ovrley_core` integration suites compile only |
+| Binary size                                 | `render_video` 20.3 → 27.4 MB, so `wgpu` and the renderer add about 7 MB     |
+
+**Speed.** With maps up to 1000 px wide the GPU thread spends about 4–12 ms per frame on tile upload, drawing, readback and
+wrapping the image, the slow end being z14 at pitch 60 in the city. That caps exports near 85–250 fps, above what the encoders
+reached here:
+
+| Scene                                  | With map | Without  |
+| -------------------------------------- | -------- | -------- |
+| 1080p composite, libx264 near lossless | 38.8 fps | 47.9 fps |
+| 4K transparent, qtrle                  | 13.9 fps | 22.4 fps |
+
+In the 4K case that is about 27 ms per frame more, of which the GPU thread is about 4 ms. The rest wasn't measured separately.
+Encoding the map's detail in qtrle is the likely cause, along with drawing it into the frame. Both codecs are from existing
+tests that need near-lossless frames, and the composite clip shows the map on only 36 of its 60 frames, so these say little
+about real exports.
+
+**Hardware export (`export-hardware`).** One 60 s run of `nnvgpu_hevc` (CUDA overlay, NVENC) at quality 23 over a 4K HEVC
+video, with the 4K template and a 1000 px map on every frame: **47.9 fps**, 1799 frames in 37.5 s, with no evictions. Worker
+time per frame was about 60 ms across about 3 workers: 32 ms drawing all widgets, 23 ms converting to `yuva420p` and 5 ms
+copying the base. The GPU thread took about 3.9 ms per frame of that. GPU use stayed around 20 %, encoder 30–57 %, and memory
+rose by about 1.2 GB. There is no run without a map to compare with on this path.
+
+**Baseline on this machine:** 0.2–2.4 ms per frame with readback on the renderer's own gate, against 4–8 ms on the AMD
+integrated GPU, and 51 of 361 views evicted with the old pools and bounding boxes.
+
+**Not tested:** a real software adapter, so the refusal has only been compiled, device loss during an export, an
+integrated GPU with the larger pools (up to about 320 MB for the worst view seen), Linux and macOS, and the WASM build,
+which needs approval. `ovrley_widgets` changed, but nothing in `wasm-bindings` calls the changed functions.
 
 ## Phase 4 — Preview wiring
 
@@ -345,25 +398,25 @@ with a map. Full export on both platforms.
 
 ## Risks
 
-| Risk                                                              | Handling                                                      |
-| ----------------------------------------------------------------- | ------------------------------------------------------------- |
-| Route drifts off the road if map and route use different matrices | One shared camera in `ovrley_map`; judged at the Phase 2 gate |
-| Renderer only tested at z17, pitch 60, one dense area, on Windows | Phase 2 coverage check; Linux and macOS still untested        |
-| Pool eviction at pitch 60 with top padding draws blank patches    | Measured in Phase 2; must be solved in Phase 3 (see there)    |
-| No usable GPU, or device loss during an export                    | Not designed yet; Phase 3                                     |
-| Preview delivery may not hold 30 fps                              | Measured first in Phase 4                                     |
-| Far roads look heavier than Native, buildings heavier at 0.8      | Known visual gaps; line width fix awaits your decision        |
-| GPS offset of ±3–5 m is 15–25 px at z18                           | Accepted; map matching is a separate feature                  |
+| Risk                                                              | Handling                                                          |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Route drifts off the road if map and route use different matrices | One shared camera in `ovrley_map`; judged at the Phase 2 gate     |
+| Renderer only tested at z17, pitch 60, one dense area, on Windows | Phase 2 coverage check; Linux and macOS still untested            |
+| Pool eviction draws blank patches                                 | Solved in Phase 3: a view is resident before drawing, or fails    |
+| No usable GPU, or device loss during an export                    | No GPU fails before encoding. Device loss fails the job, untested |
+| Larger pools on an integrated GPU                                 | Up to about 320 MB seen; untested on one                          |
+| Preview delivery may not hold 30 fps                              | Measured first in Phase 4                                         |
+| Far roads look heavier than Native, buildings heavier at 0.8      | Known visual gaps; line width fix awaits your decision            |
+| GPS offset of ±3–5 m is 15–25 px at z18                           | Accepted; map matching is a separate feature                      |
 
 ## Open decisions and recommendations
 
-| Decision                  | When             | Recommendation                                                                                                                                            |
-| ------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Labels                    | Before release   | None yet. The idea of ezu-baked, label-only tiles draped on the ground has not been measured                                                              |
-| Preview delivery          | Start of Phase 4 | None yet. Measure loopback first (about 30 MB/s at 500 px and 30 fps), then compare WebGL2                                                                |
-| Export with no usable GPU | Phase 3          | None yet. Not designed                                                                                                                                    |
-| Far road line width       | Any time         | Fix it. Lines keep a constant pixel width with distance, as upstream does, while Native narrows them. It is a line vertex shader change, not yet measured |
-| MSAA                      | Settled for now  | 4 by default, chosen by the host rather than widget config. Costs about 1.7–2×, about 5 ms at 1000 px, and fill and building edges are jagged without it  |
+| Decision            | When             | Recommendation                                                                                                                                            |
+| ------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Labels              | Before release   | None yet. The idea of ezu-baked, label-only tiles draped on the ground has not been measured                                                              |
+| Preview delivery    | Start of Phase 4 | None yet. Measure loopback first (about 30 MB/s at 500 px and 30 fps), then compare WebGL2                                                                |
+| Far road line width | Any time         | Fix it. Lines keep a constant pixel width with distance, as upstream does, while Native narrows them. It is a line vertex shader change, not yet measured |
+| MSAA                | Settled for now  | 4 by default, chosen by the host rather than widget config. Costs about 1.7–2×, about 5 ms at 1000 px, and fill and building edges are jagged without it  |
 
 ## Known visual gaps against MapLibre Native
 

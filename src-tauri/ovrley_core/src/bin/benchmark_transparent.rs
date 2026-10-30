@@ -246,6 +246,7 @@ fn main() -> Result<(), String> {
                 parse_config_value(&run_config_value).map_err(|e| e.to_string())?,
                 validate_render_activity(&activity).map_err(|e| e.to_string())?,
                 None,
+                None,
             )
             .map_err(|e| e.to_string())?;
             let update_rate = plan.config().widget_update_rate();

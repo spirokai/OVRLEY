@@ -73,7 +73,7 @@ fn native_cancellation_and_coordinator_panic_clean_output_before_renderer_reuse(
             }))
             .unwrap(),
         );
-        plan_single_render(serde_json::from_value(config).unwrap(), 100.0, None).unwrap()
+        plan_single_render(serde_json::from_value(config).unwrap(), 100.0, None, None).unwrap()
     };
     for panic in [false, true] {
         let sink = Arc::new(Interrupt {
@@ -206,6 +206,7 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
                     .unwrap(),
                 true,
                 None,
+                None,
             )
             .unwrap();
         drop(service);
@@ -241,7 +242,7 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
         let service = RenderExecutionService::with_sink(observed.clone());
         let started = Instant::now();
         service
-            .submit_batch(&paths, &inspection, request, None)
+            .submit_batch(&paths, &inspection, request, None, None)
             .unwrap();
         drop(service);
         let batch_seconds = started.elapsed().as_secs_f64();

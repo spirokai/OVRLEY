@@ -3797,6 +3797,7 @@ dependencies = [
  "objc2-foundation",
  "open",
  "ovrley_map",
+ "ovrley_map_gpu",
  "ovrley_widgets",
  "roxmltree 0.21.1",
  "same-file",

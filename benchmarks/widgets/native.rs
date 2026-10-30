@@ -161,6 +161,7 @@ fn main() -> Result<(), String> {
             &dense,
             size,
             0,
+            ovrley_core::render::ExportMapJob { source: None, frame_indices: &[], controller: &ovrley_core::encode::progress::RenderController::default() },
             &mut prepare_profiler,
         )
         .map_err(|e| e.to_string())?;

@@ -120,6 +120,7 @@ fn app_render_retains_raster_until_worker_cleanup() {
             output_path.to_str().unwrap(),
             false,
             Some(&*resources),
+            None,
         )
         .unwrap();
     assert!(accepted.started);
@@ -180,6 +181,7 @@ fn app_render_rejects_a_raster_without_its_loaded_resource() {
                 .unwrap(),
             false,
             Some(&EmptyRasterResources),
+            None,
         )
         .unwrap_err();
     assert!(
@@ -218,6 +220,7 @@ fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
             &render_output_path("branch"),
             false,
             None,
+            None,
         )
         .unwrap();
 
@@ -245,6 +248,7 @@ fn output_rejection_precedes_malformed_activity_processing() {
             "not json",
             output_path.to_str().unwrap(),
             false,
+            None,
             None,
         )
         .unwrap_err();
@@ -277,6 +281,7 @@ fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
             &short_fractional_activity_json(),
             &render_output_path("clamp"),
             false,
+            None,
             None,
         )
         .unwrap();
@@ -326,6 +331,7 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
             &render_output_path("pipeline"),
             false,
             None,
+            None,
         )
         .unwrap();
 
@@ -355,7 +361,7 @@ fn test_3_3_missing_quality_validation() {
             "composite_widget_update_rate": 1
             "#,
     );
-    let error = plan_single_render(config, 120.0, None).err().unwrap();
+    let error = plan_single_render(config, 120.0, None, None).err().unwrap();
 
     assert_eq!(
         error.to_string(),
@@ -391,14 +397,14 @@ fn test_3_4_missing_fps_validation() {
     );
 
     assert_eq!(
-        plan_single_render(missing_num, 120.0, None)
+        plan_single_render(missing_num, 120.0, None, None)
             .err()
             .unwrap()
             .to_string(),
         "Invalid configuration: scene.composite_video_fps_num required for composite render"
     );
     assert_eq!(
-        plan_single_render(missing_den, 120.0, None)
+        plan_single_render(missing_den, 120.0, None, None)
             .err()
             .unwrap()
             .to_string(),
@@ -431,7 +437,7 @@ fn test_3_5_dense_report_timing_for_sync_offset() {
             "composite_widget_update_rate": 1
             "#,
     );
-    let plan = plan_single_render(config, 600.0, None).unwrap();
+    let plan = plan_single_render(config, 600.0, None, None).unwrap();
     let validated = plan.config();
     let dense = plan.prepare_activity(&synthetic_activity()).unwrap();
 
@@ -466,7 +472,7 @@ fn test_3_6_dense_report_timing_for_lower_overlay_update_rate() {
             "composite_widget_update_rate": 2
             "#,
     );
-    let plan = plan_single_render(config, 600.0, None).unwrap();
+    let plan = plan_single_render(config, 600.0, None, None).unwrap();
     let validated = plan.config();
     let dense = plan.prepare_activity(&synthetic_activity()).unwrap();
 
@@ -492,7 +498,7 @@ fn test_3_7_render_duration_defaults_to_remaining_video_after_trim() {
             "#,
     );
 
-    let plan = plan_single_render(config, 120.0, None).unwrap();
+    let plan = plan_single_render(config, 120.0, None, None).unwrap();
     assert_eq!(plan.config().scene.end - plan.config().scene.start, 50.0);
     assert!(matches!(plan.mode(), VideoRenderModePlan::Composite { .. }));
 }
@@ -514,7 +520,7 @@ fn test_3_8_rejects_impossible_trim() {
             "#,
     );
 
-    let error = plan_single_render(config, 120.0, None).err().unwrap();
+    let error = plan_single_render(config, 120.0, None, None).err().unwrap();
 
     assert_eq!(
         error.to_string(),

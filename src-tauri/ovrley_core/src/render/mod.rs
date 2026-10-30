@@ -2,11 +2,13 @@
 //! widget engine, for video frames and for preview PNGs alike.
 mod atlas;
 mod engine;
+mod map_export;
 pub mod surface;
 
 use crate::{
     activity::schema::{DenseActivityReport, ParsedActivity},
     debug::{RenderProfiler, TimingBucket},
+    encode::progress::RenderController,
     error::{CoreError, CoreResult},
     normalize::{ValidatedRenderConfig, ValidatedSceneConfig},
     paths::AppPaths,
@@ -20,6 +22,7 @@ use surface::{wrap_native_surface, write_surface_png};
 
 pub use atlas::{AtlasPlan, AtlasSlot, SlotPlacement};
 pub use engine::{ExportWidgets, PreparedAtlas, WorkerWidgets};
+pub use map_export::ExportMapJob;
 
 /// Canonical dimensions for a rendered video frame.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -66,7 +69,13 @@ pub fn render_full_frames(
         width: config.scene.presentation.width,
         height: config.scene.presentation.height,
     };
-    let export = ExportWidgets::prepare(font_dirs, config, activity, dense, size, 0, profiler)?;
+    let controller = RenderController::default();
+    let maps = ExportMapJob {
+        source: None,
+        frame_indices: dense_indices,
+        controller: &controller,
+    };
+    let export = ExportWidgets::prepare(font_dirs, config, activity, dense, size, 0, maps, profiler)?;
     let atlas = export.prepare_atlas(export.full_frame_atlas(), profiler)?;
     let mut worker = export.worker()?;
     dense_indices

@@ -249,6 +249,7 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
         parse_config_value(&config_value)?,
         validate_render_activity(&activity)?,
         None,
+        None,
     )?;
     let validated = plan.config().clone();
     let controller = RenderController::default();
@@ -364,6 +365,7 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     let plan = plan_single_render(
         parse_config_value(&config_value)?,
         validate_render_activity(&activity)?,
+        None,
         None,
     )?;
     let validated = plan.config().clone();

@@ -35,7 +35,9 @@ use crate::normalize::{
 };
 use crate::output::{plan_batch_output_targets, RenderOutputKind};
 use crate::raster::RasterResourceResolver;
+use ovrley_map::MapDataSource;
 use ovrley_widgets::model::scene::{ScenePresentationConfig, ValidatedScenePresentation};
+use std::sync::Arc;
 
 /// Validated once at configuration/acceptance ingress; private fields keep
 /// consumers from substituting malformed settings after validation.
@@ -181,6 +183,7 @@ pub fn plan_batch_configuration(
 pub(crate) struct ValidatedBatchTemplate {
     config: ValidatedRenderConfig<ValidatedScenePresentation>,
     encoding: ValidatedBatchEncoding,
+    map_source: Option<Arc<dyn MapDataSource>>,
 }
 
 /// Reviewed and accepted jobs share the same output contract.
@@ -233,6 +236,7 @@ pub(crate) fn validate_batch_template(
     template: RenderConfig<ScenePresentationConfig>,
     encoding: ValidatedBatchEncoding,
     resources: Option<&dyn RasterResourceResolver>,
+    map_source: Option<Arc<dyn MapDataSource>>,
 ) -> CoreResult<ValidatedBatchTemplate> {
     if !template.extra.is_empty() || !template.scene.extra.is_empty() {
         return Err(CoreError::Config(
@@ -242,6 +246,7 @@ pub(crate) fn validate_batch_template(
     Ok(ValidatedBatchTemplate {
         config: validate_render_presentation(template, resources)?,
         encoding,
+        map_source,
     })
 }
 
@@ -258,6 +263,8 @@ pub enum VideoRenderModePlan {
 pub struct PlannedVideoRender {
     pub(crate) config: ValidatedRenderConfig,
     pub(crate) mode: VideoRenderModePlan,
+    /// Where a map's bytes come from. The native tools have none, and fail on a map.
+    pub(crate) map_source: Option<Arc<dyn MapDataSource>>,
     sampling_fps: Fps,
     activity_offset: f64,
 }
@@ -298,6 +305,7 @@ pub fn plan_single_render(
     raw: RenderConfig,
     activity_end: f64,
     resources: Option<&dyn RasterResourceResolver>,
+    map_source: Option<Arc<dyn MapDataSource>>,
 ) -> CoreResult<PlannedVideoRender> {
     let raw_scene = raw.scene.clone();
     let mut config = validate_render_config_with_resources(raw, resources)?;
@@ -341,6 +349,7 @@ pub fn plan_single_render(
     Ok(PlannedVideoRender {
         config,
         mode,
+        map_source,
         sampling_fps,
         activity_offset,
     })
@@ -401,6 +410,7 @@ pub(crate) fn plan_batch_item(
         config.labels.clear();
         config.values.clear();
         config.course_plots.clear();
+        config.maps.clear();
         config.elevation_plots.clear();
         config.diving_profiles.clear();
         config.rolling_charts.clear();
@@ -439,6 +449,7 @@ pub(crate) fn plan_batch_item(
     Ok(PlannedVideoRender {
         config,
         mode,
+        map_source: template.map_source.clone(),
         sampling_fps,
         activity_offset: offset,
     })

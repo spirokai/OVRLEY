@@ -651,7 +651,7 @@ fn test_6_4_unknown_codec_fails_at_ingress() {
     let mut config = mutable_recent_template_config(1920, 1080);
     config.scene.ffmpeg = serde_json::json!({"codec": "definitely_not_a_codec"});
 
-    let error = match plan_single_render(config, 120.0, None) {
+    let error = match plan_single_render(config, 120.0, None, None) {
         Ok(_) => panic!("unknown codec unexpectedly validated"),
         Err(error) => error,
     };
@@ -852,7 +852,7 @@ fn test_frame_workers_render_short_composite_in_order() {
     let config = composite_test_config(0.2, &video_path, 0.0);
     let activity = fixture_activity();
     let plan =
-        plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
+        plan_single_render(config, validate_render_activity(&activity).unwrap(), None, None).unwrap();
     let controller = RenderController::default();
     let execution = RenderExecutionService::with_controller(controller.clone());
     let output_target = custom_output_target(
@@ -902,7 +902,7 @@ fn test_frame_worker_composite_render() {
     let config = composite_test_config(5.0, &video_path, 0.0);
     let activity = fixture_activity();
     let plan =
-        plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
+        plan_single_render(config, validate_render_activity(&activity).unwrap(), None, None).unwrap();
     let controller = RenderController::default();
     let execution = RenderExecutionService::with_controller(controller.clone());
 
@@ -940,7 +940,7 @@ fn test_frame_worker_composite_render_with_audio() {
     let config = composite_test_config(5.0, &video_path, 15.0);
     let activity = fixture_activity();
     let plan =
-        plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
+        plan_single_render(config, validate_render_activity(&activity).unwrap(), None, None).unwrap();
     let controller = RenderController::default();
     let execution = RenderExecutionService::with_controller(controller.clone());
 

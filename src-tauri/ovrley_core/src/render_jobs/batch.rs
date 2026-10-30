@@ -19,6 +19,7 @@ use crate::media::prepared_video::check_source_freshness;
 use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
+use ovrley_map::MapDataSource;
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "code", rename_all = "camelCase")]
@@ -113,12 +114,14 @@ impl RenderExecutionService {
         inspection: &VideoInspectionService,
         request: BatchRenderRequest,
         resources: Option<&dyn RasterResourceResolver>,
+        map_source: Option<Arc<dyn MapDataSource>>,
     ) -> Result<BatchAcceptance, BatchServiceError> {
         self.submit_batch_with_executor(
             paths,
             inspection,
             request,
             resources,
+            map_source,
             Arc::new(NativeBatchExecutor),
         )
     }
@@ -129,6 +132,7 @@ impl RenderExecutionService {
         inspection: &VideoInspectionService,
         request: BatchRenderRequest,
         resources: Option<&dyn RasterResourceResolver>,
+        map_source: Option<Arc<dyn MapDataSource>>,
         executor: Arc<dyn BatchJobExecutor>,
     ) -> Result<BatchAcceptance, BatchServiceError> {
         let reservation = self
@@ -136,7 +140,7 @@ impl RenderExecutionService {
             .map_err(|error| BatchServiceError::RendererBusy {
                 message: error.to_string(),
             })?;
-        let accepted = accept_batch(inspection, request, resources)?;
+        let accepted = accept_batch(inspection, request, resources, map_source)?;
         let batch_id = format!("batch-{}", reservation.render_id());
         let snapshot = self
             .batch
