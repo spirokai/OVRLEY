@@ -26,6 +26,47 @@ export const fixtures = {
   flight: ['Jul-14th-2026-12-45PM-Flight-Airdata-parse-debug.json', 100],
 }
 
+/**
+ * The map has no manifest entry until Phase 5, so its effective config is written out here.
+ * @param {number} size Output pixels along each edge.
+ * @param {number} pitch Camera pitch in degrees.
+ * @param {number} scale Scene scale.
+ * @returns {object} Effective map widget.
+ */
+function mapWidget(size, pitch, scale) {
+  return {
+    id: `map-p${pitch}-${size}`,
+    value: 'map',
+    x: 200,
+    y: 200,
+    width: size / scale,
+    height: size / scale,
+    font: 'Inter.ttf',
+    map_style: 'liberty',
+    show_roads: true,
+    show_paths: true,
+    show_water: true,
+    show_buildings: true,
+    camera_mode: 'follow',
+    orientation: 'rider_up',
+    pitch,
+    range_meters: 400,
+    simplify_tolerance_px: 0.5,
+    show_full_activity: true,
+    completed_line_width: 5,
+    completed_line_color: '#ff4d1f',
+    completed_line_opacity: 1,
+    remaining_line_width: 4,
+    remaining_line_color: '#1f7bff',
+    remaining_line_opacity: 0.9,
+    marker_variant: 'halo',
+    marker_variant_diameter: 22,
+    marker_size: 6,
+    marker_color: '#ff4d1f',
+    marker_opacity: 1,
+  }
+}
+
 /** @param {object} input Activity payloads, HUD template, image path, frame counts, and an optional single case. @returns {object[]} Fixed cases; no rendering occurs. */
 export function createCases({ activities, template, image, frames, warmup, fps, only }) {
   const specs = [
@@ -159,6 +200,7 @@ export function createCases({ activities, template, image, frames, warmup, fps, 
   for (const mode of ['current_lap', 'best_lap', 'delta', 'lap_log'])
     specs.push([`lap-${mode}`, 'lap_timer', 'racebox', { displayType: 'lap_timer', lapTimerMode: mode }, {}])
   specs.push(['splits-run', 'splits_run', 'splits', { displayType: 'splits_run' }, {}])
+  for (const size of [500, 1000]) for (const pitch of [0, 40, 60]) specs.push([`map-p${pitch}-${size}`, 'map', 'ride', {}, { size, pitch }])
   const globals = { ...DEFAULT_GLOBAL_DEFAULTS, ...template.settings.globalDefaults }
   const result = []
   const selected = [['empty', null, 'ride', {}, {}], ...specs].filter(([id]) => only === undefined || id === 'empty' || id === only)
@@ -190,6 +232,7 @@ export function createCases({ activities, template, image, frames, warmup, fps, 
       gradient: ['gradient'],
       lap_timer: ['lap_time_seconds', 'delta_to_best_lap_seconds'],
       splits_run: ['distance'],
+      map: ['sample_course_points'],
     }
     for (const field of required[type] ?? [])
       if (
@@ -200,7 +243,8 @@ export function createCases({ activities, template, image, frames, warmup, fps, 
         throw new Error(`${id}: no ${field} telemetry in playback window`)
     const config = { scene, ...Object.fromEntries(Object.keys(WIDGET_COLLECTIONS).map((key) => [key, []])) }
     let dynamic = false
-    if (type !== null) {
+    if (type === 'map') dynamic = true
+    else if (type !== null) {
       const definition = requireWidgetTypeDefinition(type)
       const widget = createWidgetDefaults({ type, ...selection }, globals, { coursePoints: data.sample_course_points, sceneFontSize: 19.5 })
       config[definition.collection].push(mergeWidgetData(widget, { ...overrides, id, x: 200, y: 200 }))
@@ -209,14 +253,19 @@ export function createCases({ activities, template, image, frames, warmup, fps, 
     const effective = createEditorEffectiveConfig({ config, globalDefaults: globals, language: i18n.resolvedLanguage })
     let request = null
     let fonts = []
-    if (type !== null) {
+    if (type === 'map') {
+      request = { type, widget: mapWidget(overrides.size, overrides.pitch, effective.scene.scale), scene: effective.scene }
+      fonts = widgetFonts({ type, data: request.widget })
+    } else if (type !== null) {
       const widget = resolveActiveWidgetData(effective[requireWidgetTypeDefinition(type).collection][0])
       request = { type, widget: type === 'raster' ? { ...widget, resourceId: 'benchmark-image' } : widget, scene: effective.scene }
       fonts = widgetFonts({ type, data: request.widget })
     }
     // The native resource step derives the table core would hand the editor for this split length.
     const split_table = type === 'splits_run' ? `split-table-${id}.json` : null
-    result.push({ id, activity, start_frame, dynamic, config: effective, request, fonts, split_table })
+    // WASM has no GPU renderer: both preview backends receive one finished frame of this edge length.
+    const map_frame = type === 'map' ? overrides.size : null
+    result.push({ id, activity, start_frame, dynamic, config: effective, request, fonts, split_table, map_frame })
   }
   return result
 }
@@ -273,6 +322,10 @@ export async function play({ entry, frames, warmup, fps, fonts }) {
       upload(encoder.encode('benchmark-image'), (id, idLen) =>
         upload(png, (ptr, len) => check(module._ovrley_preview_image(session, id, idLen, ptr, len))),
       )
+    }
+    if (entry.map_frame !== null) {
+      const pixels = new Uint8Array(entry.map_frame * entry.map_frame * 4).fill(255)
+      upload(pixels, (ptr, len) => check(module._ovrley_preview_map_frame(session, entry.map_frame, entry.map_frame, ptr, len)))
     }
     const widget = entry.request === null ? 0 : send(entry.request, (ptr, len) => module._ovrley_preview_widget_create(session, ptr, len))
     if (entry.request !== null && widget === 0) fail()

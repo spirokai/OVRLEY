@@ -7,6 +7,10 @@ use crate::widgets::{
     g_force::format::GForceSample,
     gauges::{metric::GaugeFrameState, validation::ValidatedGauge},
     lap_timer::format::LapTimerContent,
+    map::{
+        config::MapConfig, frame_provider::MapFrameProvider, preview::PreviewMap,
+        validation::ValidatedMapWidget,
+    },
     raster::validation::RasterGeometry,
     route::validation::ValidatedRoutePlot,
 };
@@ -33,8 +37,10 @@ use crate::{
         },
     },
 };
+use ovrley_map::MapCamera;
 use serde::{Deserialize, Deserializer, Serialize};
 use skia_safe::Canvas;
+use std::sync::Arc;
 
 use crate::widgets::diving_profile::{config::DivingProfileConfig, preview::PreviewDivingProfile};
 use crate::widgets::elevation::{config::ElevationPlotConfig, preview::PreviewElevation};
@@ -61,6 +67,11 @@ pub enum ValidatedWidget<'a> {
     RollingChart(&'a ValidatedRollingChart),
     Elevation(&'a ValidatedElevationPlot),
     Route(&'a ValidatedRoutePlot),
+    /// Maps carry the frames their host renders.
+    Map {
+        widget: &'a ValidatedMapWidget,
+        frames: Arc<dyn MapFrameProvider>,
+    },
     Raster {
         geometry: &'a RasterGeometry,
         source_id: String,
@@ -85,6 +96,11 @@ pub enum FrameKey {
     Parts(MetricDisplayParts),
     /// Retained geometry identity and marker progress.
     Route(usize, f32),
+    /// The camera, when GPS exists, and the marker's progress.
+    Map {
+        camera: Option<MapCamera>,
+        progress: f32,
+    },
     /// Retained geometry identity and frame state.
     Elevation(usize, ElevationFrameState),
     DivingProfile(DivingFrameState),
@@ -111,6 +127,11 @@ pub enum WidgetRequest {
     },
     Route {
         widget: CoursePlotConfig,
+        scene: ScenePresentationConfig,
+        transient: bool,
+    },
+    Map {
+        widget: MapConfig,
         scene: ScenePresentationConfig,
         transient: bool,
     },
@@ -168,6 +189,12 @@ impl<'de> Deserialize<'de> for WidgetRequest {
             })
         } else if input.r#type == "course" {
             Ok(Self::Route {
+                widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?,
+                scene: input.scene,
+                transient: input.transient,
+            })
+        } else if input.r#type == "map" {
+            Ok(Self::Map {
                 widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?,
                 scene: input.scene,
                 transient: input.transient,
@@ -261,6 +288,7 @@ pub enum PreviewWidget {
     RollingChart(PreviewRollingChart),
     Elevation(PreviewElevation),
     Route(PreviewRoute),
+    Map(PreviewMap),
     Raster(PreviewRaster),
     Backdrop(PreviewBackdrop),
     Label(PreviewLabel),
@@ -282,6 +310,7 @@ impl PreviewWidget {
         request: WidgetRequest,
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
+        map_frames: Arc<dyn MapFrameProvider>,
     ) -> WidgetResult<Self> {
         match request {
             WidgetRequest::DivingProfile { widget, scene, .. } => Ok(Self::DivingProfile(
@@ -296,6 +325,9 @@ impl PreviewWidget {
             WidgetRequest::Route { widget, scene, .. } => {
                 Ok(Self::Route(PreviewRoute::new(widget, scene)?))
             }
+            WidgetRequest::Map { widget, scene, .. } => Ok(Self::Map(PreviewMap::new(
+                widget, scene, map_frames, fonts,
+            )?)),
             WidgetRequest::Raster { widget, scene, .. } => {
                 Ok(Self::Raster(PreviewRaster::new(widget, scene, images)?))
             }
@@ -369,6 +401,13 @@ impl PreviewWidget {
                 widget.clone(),
                 scene.clone(),
                 host,
+            )?),
+            ValidatedWidget::Map { widget, frames } => Self::Map(PreviewMap::from_validated(
+                widget.clone(),
+                scene.clone(),
+                host,
+                frames,
+                fonts,
             )?),
             ValidatedWidget::Raster {
                 geometry,
@@ -459,6 +498,13 @@ impl PreviewWidget {
                 let (geometry, progress) = widget.frame_key(activity, second)?;
                 FrameKey::Route(geometry, progress)
             }
+            Self::Map(widget) => {
+                let state = widget.frame_state(activity, second)?;
+                FrameKey::Map {
+                    camera: state.camera,
+                    progress: state.progress,
+                }
+            }
             Self::Raster(_) | Self::Backdrop(_) | Self::Label(_) => FrameKey::Static,
             Self::Gradient(widget) => FrameKey::Sample(widget.frame_key(activity, second)),
             Self::LeanAngle(widget) => FrameKey::Sample(widget.frame_key(activity, second)),
@@ -481,6 +527,7 @@ impl PreviewWidget {
             Self::RollingChart(widget) => &widget.pixels,
             Self::Elevation(widget) => &widget.pixels,
             Self::Route(widget) => &widget.pixels,
+            Self::Map(widget) => &widget.pixels,
             Self::Raster(widget) => &widget.pixels,
             Self::Backdrop(widget) => &widget.pixels,
             Self::Label(widget) => &widget.pixels,
@@ -503,6 +550,7 @@ impl PreviewWidget {
             Self::RollingChart(widget) => &widget.geometry,
             Self::Elevation(widget) => &widget.geometry,
             Self::Route(widget) => &widget.geometry,
+            Self::Map(widget) => &widget.geometry,
             Self::Raster(widget) => &widget.geometry,
             Self::Backdrop(widget) => &widget.geometry,
             Self::Label(widget) => &widget.geometry,
@@ -532,6 +580,7 @@ impl PreviewWidget {
             Self::RollingChart(widget) => Ok(widget.layout_bounds()),
             Self::Elevation(widget) => widget.layout_bounds(activity, second, fonts),
             Self::Route(widget) => widget.layout_bounds(activity, second),
+            Self::Map(widget) => Ok(widget.layout_bounds()),
             Self::Raster(widget) => Ok(widget.layout_bounds()),
             Self::Backdrop(widget) => Ok(widget.layout_bounds()),
             Self::Label(widget) => Ok(widget.layout_bounds()),
@@ -562,6 +611,7 @@ impl PreviewWidget {
             Self::RollingChart(widget) => Ok(widget.draw(canvas, activity, second)),
             Self::Elevation(widget) => widget.draw(canvas, activity, second, fonts),
             Self::Route(widget) => widget.draw(canvas, activity, second),
+            Self::Map(widget) => widget.draw(canvas, activity, second),
             Self::Raster(widget) => widget.draw(canvas),
             Self::Backdrop(widget) => Ok(widget.draw(canvas)),
             Self::Label(widget) => widget.draw(canvas),
@@ -586,6 +636,7 @@ impl PreviewWidget {
             Self::RollingChart(widget) => widget.bounds,
             Self::Elevation(widget) => widget.bounds,
             Self::Route(widget) => widget.bounds,
+            Self::Map(widget) => widget.bounds,
             Self::Raster(widget) => Some(widget.bounds),
             Self::Backdrop(widget) => Some(widget.bounds),
             Self::Label(widget) => Some(widget.bounds),
@@ -608,6 +659,7 @@ impl PreviewWidget {
             Self::RollingChart(widget) => widget.revision,
             Self::Elevation(widget) => widget.revision,
             Self::Route(widget) => widget.revision,
+            Self::Map(widget) => widget.revision,
             Self::Raster(widget) => widget.revision,
             Self::Backdrop(widget) => widget.revision,
             Self::Label(widget) => widget.revision,
@@ -651,6 +703,7 @@ pub enum ResizeUpdate {
     RollingChart(crate::widgets::rolling_chart::interaction::ResizeUpdate),
     Elevation(crate::widgets::elevation::interaction::ResizeUpdate),
     Route(crate::widgets::route::interaction::ResizeUpdate),
+    Map(crate::widgets::map::interaction::ResizeUpdate),
     Raster(crate::widgets::raster::interaction::ResizeUpdate),
     Backdrop(crate::widgets::backdrop::interaction::ResizeUpdate),
     Label(crate::widgets::label::interaction::ResizeUpdate),

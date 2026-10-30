@@ -2,10 +2,10 @@
 //! `vector/resource/buffer_pool.rs`: one large buffer each for vertices, indices, layer metadata
 //! and feature metadata. Draws bind slices of them, and the oldest layers are evicted for space.
 
-use crate::pattern::TileId;
 use crate::pipelines::{FillShaderFeatureMetadata, ShaderLayerMetadata};
 use crate::tile::LayerKind;
 use bytemuck::Pod;
+use ovrley_map::TileId;
 use std::collections::{btree_map, BTreeMap, VecDeque};
 use std::marker::PhantomData;
 use std::mem::size_of;

@@ -36,6 +36,8 @@ struct Case {
     dynamic: bool,
     request: Option<Value>,
     split_table: Option<String>,
+    /// Edge length of the finished map frame a preview backend receives.
+    map_frame: Option<u32>,
 }
 
 fn main() -> Result<(), String> {
@@ -118,6 +120,10 @@ fn main() -> Result<(), String> {
     }
     let mut results = Vec::new();
     for (case, config) in plan.cases.iter().zip(configs) {
+        // Export can't draw maps until Phase 3, so this would only time an empty scene.
+        if case.map_frame.is_some() {
+            continue;
+        }
         eprintln!("[native] {}", case.id);
         let setup = Instant::now();
         let activity_path = plan

@@ -1,7 +1,13 @@
 # Map tile widget — implementation plan
 
-Status: Phase 1 built. Phase 2 not started, see `map-widget-phase2-handoff.md`. Updated 2026-10-30.
+Status: Phases 1 and 2 built, and the user judged the route on its road in every Phase 2 clip. Phase 3 not started.
+Updated 2026-10-30.
 Builds on `map-tile-widget-research.md`.
+
+**Phases 3–5 run on a different machine.** Timings here came from an AMD integrated GPU and aren't comparable there, so
+re-measure a baseline before judging any target. Anything needed has to be downloaded there too, because nothing under
+`E:\mlrs` or `debug/` is in git: the maplibre-rs reference, the Native reference tool, the scratch tile cache with its
+live styles, and the activity fixtures the gates use, including `Evening_Ride-parse-debug.json`.
 
 **The renderer changed.** The widget now uses the GPU renderer in `src-tauri/ovrley_map_gpu`, which draws
 one finished map frame per camera, including real 3D buildings that flat tiles cannot produce. Its gate results
@@ -10,17 +16,18 @@ widget. Phases 2–5 below are revised for this. Phases 3 and 4 still have open 
 
 ## Decisions
 
-| Topic                    | Decision                                                                                                   |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| Map rendering            | `ovrley_map_gpu` (wgpu), native only, one frame per camera. Replaces ezu for this widget                   |
-| Preview topology         | **Open.** The WASM preview cannot run the renderer. Loopback frames or WebGL2, decided at Phase 4          |
-| Labels                   | **None for now.** The GPU renderer draws no labels. Needed before release, approach open                   |
-| Attribution              | Always drawn in the widget, not configurable                                                               |
-| Tile pinning             | None. Keep `planet/latest` and the existing HTTP revalidation                                              |
-| Map styling              | Style preset and layer toggles (roads, paths, water, buildings). No map colour overrides                   |
-| Route and marker styling | Same fields and controls as the route widget (see below)                                                   |
-| Camera                   | `fixed` (whole route, north-up, pitch 0) or `follow` (`north_up` / `rider_up`, pitch 0–60, `range_meters`) |
-| Not in v1                | Speed-dependent range, terrain, raster layers, upright point labels, map matching, corner radius or border |
+| Topic                    | Decision                                                                                                        |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| Map rendering            | `ovrley_map_gpu` (wgpu), native only, one frame per camera. Replaces ezu for this widget                        |
+| Preview topology         | **Open.** The WASM preview cannot run the renderer. Loopback frames or WebGL2, decided at Phase 4               |
+| Labels                   | **None for now.** The GPU renderer draws no labels. Needed before release, approach open                        |
+| Attribution              | Always drawn in the widget, not configurable                                                                    |
+| Tile pinning             | None. Keep `planet/latest` and the existing HTTP revalidation                                                   |
+| Map styling              | Style preset and layer toggles (roads, paths, water, buildings). No map colour overrides                        |
+| Route and marker styling | Same fields and controls as the route widget (see below)                                                        |
+| Route drawing            | A ground layer in `ovrley_map_gpu`: above roads, below buildings, so buildings hide it. The marker stays on top |
+| Camera                   | `fixed` (whole route, north-up, pitch 0) or `follow` (`north_up` / `rider_up`, pitch 0–60, `range_meters`)      |
+| Not in v1                | Speed-dependent range, terrain, raster layers, upright point labels, map matching, corner radius or border      |
 
 The map widget uses the route widget's field names and editor controls for its route and marker:
 
@@ -66,14 +73,14 @@ the ezu path and no longer drive the widget:
 MapTileService (app crate)         tile and style bytes; disk cache
       │ implements ovrley_map::MapDataSource
       ▼
-ovrley_map_gpu                     tile tessellation + wgpu → RGBA frame        native only
+ovrley_map_gpu                     tile and route tessellation + wgpu → RGBA frame        native only
       │                       │
       │ in process            │ preview delivery: open (Phase 4)
       ▼                       ▼
 export provider (Phase 3)     preview provider (Phase 4)
       └──────────┬────────────┘
                  ▼ impl MapFrameProvider
-ovrley_widgets::widgets::map       camera, frame image, route, marker, attribution
+ovrley_widgets::widgets::map       camera, route line, frame image, marker, attribution
 
 ovrley_map (featureless)           shared vocabulary and the camera matrix, used by both sides
 ```
@@ -155,8 +162,8 @@ and coverage nothing has tested yet (pitch 0, zooms 10–18, non-square viewport
 **Shared camera.** Move `MapCamera` and the view matrix to featureless `ovrley_map`. The widget projects the route with
 the same matrix the renderer draws with.
 
-**Provider.** `MapFrameProvider::frame(request) → Ready(Image) | Pending`, where the request holds spec, camera, size and
-pixel ratio. It never blocks on the network. Export's provider never returns `Pending`.
+**Provider.** `MapFrameProvider::frame(request) → Ready(Image) | Pending`, where the request holds spec, camera, viewport
+and the route to draw. It never blocks on the network. Export's provider never returns `Pending`.
 
 **Config (`widgets/map/{config,validation}.rs`)** in the `plots` collection with `value: "map"`.
 Every field is required and parsed once into a `ValidatedMapWidget` whose `camera` is an enum, so
@@ -183,20 +190,24 @@ Mercator points, cumulative distance, and prefix sums of unit headings.
 
 - The widget draws the provider's image over its bounds. Tile selection belongs to the renderer, so there is no cover
   and no compositor.
-- A fixed camera asks the provider once, by caching the last frame per request.
-- On `Pending`, fill with the preset's flat placeholder colour. Never draw a stale frame: its camera differs, so the
-  route would sit off the road.
+- The last frame is cached per request. The route is in the frame, so a request changes whenever progress does, and a
+  fixed camera asks again as progress moves. A frame is only ever drawn for the visible position.
+- On `Pending`, fill with the preset's flat placeholder colour, then the marker and attribution. Never draw a stale
+  frame: its camera differs. The route is not shown until the frame arrives.
 
 **Route and marker**
 
-- Project the visible route vertices to screen on the CPU with the shared matrix, clip at the near plane, stroke in
-  screen space at constant width, and split travelled from remaining by progress. The route draws over buildings.
-- Stroking through the matrix would change line width with depth and needs no less clipping.
-- Use a coarse spatial index so long activities stay cheap.
+- The route is one more ground layer in the renderer, drawn after all other ground layers and before the buildings, so
+  buildings hide it exactly as they hide roads. It's tessellated like a road, at constant screen width, with the same
+  matrix as the map, so it can't drift off the road.
+- The widget builds the simplified line, with travelled distance on each vertex, and sends it with the style and current
+  distance. The fragment shader splits travelled from remaining at that distance.
+- A stencil paints each sample once, so crossings and section seams don't double the opacity. Edges rely on MSAA.
+- The line is cut into sections, each with its own origin and matrix, for `f32` precision and to cull far sections.
 - `simplify_tolerance_px` applies at the widget's constant view zoom, using the route widget's
   simplification helper.
 - `show_full_activity` selects the route window through `host.plot_window`, as the route widget does.
-- Marker drawn in screen space with `plot_marker`, with every variant available.
+- Marker drawn over the finished frame with `plot_marker`, with every variant available, so it is always visible.
 - Validation of the shared line and marker fields moves into one helper used by both families, so the
   two widgets cannot drift apart.
 
@@ -213,7 +224,7 @@ this phase, because a font the preview did not request fails it.
 - Resize is `size`-based. During a `transient` drag, the last frame is rescaled and nothing is requested;
   the commit recomputes zoom.
 
-**No activity or no GPS.** Flat placeholder colour, placeholder route, and attribution, with no
+**No activity or no GPS.** Flat placeholder colour, placeholder route drawn in Skia, and attribution, with no
 network requests.
 
 **Gate**
@@ -222,7 +233,8 @@ network requests.
   You judge whether the route stays on its road while the camera moves.
 - **WASM (needs your approval for `pnpm benchmark:widgets:build` and the run):** a `map` benchmark case with a
   pre-rendered frame at pitch 0, 40 and 60, at 500 and 1000 px. Target: under ~8 ms/frame at 500 px. This measures
-  the image blit, route, marker and attribution, because WASM has no GPU renderer.
+  the camera, image blit, marker and attribution. The route is in the frame, so its cost shows up in the renderer's
+  frame time at the native gate.
 
 ## Phase 3 — Export pipeline
 
@@ -232,20 +244,40 @@ Deliverable: a video export with a map, failing before encoding if any tile is u
 so the direction is one shared GPU thread that workers send requests to. This phase also makes `wgpu` a dependency of
 ordinary app builds, so check binary size and what happens on a machine with no usable GPU. No gate has tested either.
 
-- **Ingress:** `ValidatedRenderConfig.maps`, `validate_map_widgets` in `normalize/widgets.rs`,
-  `requirements.include_widget("map")`, and `ValidatedWidget::Map`.
+Three things from Phase 2 shape this design:
+
+- **Throughput:** one GPU thread makes map frames serial however many workers export. At 1000 px that's 4–8 ms per frame
+  (pitch 60 is the slow end), so about 130–250 frames per second at best, before any delivery to the workers.
+- **No usable GPU:** the route is now inside the frame, so there is no way to export a route without the GPU. The job
+  must fail loudly before encoding.
+- **Evictions must be solved here, not only measured.** A view that outgrows the pools draws blank patches, and in an
+  export they are permanent. The prepare step's failure guarantee doesn't catch this, because the tiles did download.
+  Phase 2 coverage: 50 of 360 views evicted, all with the follow camera's 0.45 top padding: every z14 view at pitch 60
+  (154–315 tiles), Zurich at z15.5 and pitch 60 (30–54 tiles), and some Zurich views at z14 and pitch 40. No clean view
+  loaded more than 1.69M vertices, and the smallest evicting one loaded 1.39M, so vertex count alone doesn't predict it.
+  Choose between larger pools, sized per job, and limiting how far the camera reaches, then detect any remaining
+  eviction during export and fail. Re-run with `map_gpu_gate <cache> <out> gaps`.
+
+- **Ingress:** `ValidatedRenderConfig.maps`, `validate_map_widgets` in `normalize/widgets.rs` over the existing
+  `validate_map_widget`, and `requirements.include_widget("map")`. `ValidatedWidget::Map` already exists.
 - **Data source plumbing:** pass `Arc<dyn MapDataSource>` beside `resources` through `submit_single`
   (`execution.rs:127`), batch submission and `plan_single_render`. A map widget with no source (the
   native CLI tools) is a loud config error.
 - **Prepare step**, inside `ExportWidgets::prepare` (`engine.rs:88`), which runs before ffmpeg starts:
-  1. Walk the camera over every rendered dense frame to get the set of visible tiles with `view_tiles`.
+  1. Walk the camera over every rendered dense frame to get the set of visible tiles with `view_tiles`. The widget owns
+     the camera (`WidgetCamera`, `MapTrack`) and the viewport, so expose the walk from `widgets::map` instead of
+     recomputing them in core.
   2. Fetch through `MapDataSource` with bounded parallelism, checking cancellation, and report progress
      on the existing "Preparing video assets..." item.
   3. Hold all bytes in `Arc`s for the job (5–20 MB for 30 km), so disk eviction cannot affect a running
      export. Any failure fails the job here.
-- **Export provider:** implements `MapFrameProvider` over the shared GPU thread. It never returns `Pending`. Tiles
-  tessellate on demand or ahead of the camera, and the pools evict the oldest. A route longer than the pools hold is
-  the case to measure. It is built once and handed to each worker's widget instance.
+- **Export provider:** implements `MapFrameProvider` over the shared GPU thread. It never returns `Pending`, and uses
+  MSAA 4. Tiles tessellate on demand or ahead of the camera, and the pools evict the oldest. A route longer than the
+  pools hold is the case to measure. It is built once and handed to each worker's widget instance.
+- **One route line per job.** Each worker builds its own widget, and each `PreviewMap` builds its own
+  `Arc<MapRouteLine>`. The renderer recognises a line by `Arc` identity, so workers sharing one renderer would make it
+  re-tessellate and re-upload the route on nearly every frame. Build the line once in the prepare step and hand it to
+  every worker's widget, through `ValidatedWidget::Map`. The renderer needs one route per map widget.
 - **Stacking** (`engine.rs:247`): order becomes backdrops, maps, rasters, labels, values, and the rest.
   Maps are `Layer::Dynamic` and draw first among dynamic layers. A label or raster whose rectangle
   intersects a map moves out of the covered base and draws after the map each frame. A moved raster
@@ -253,7 +285,8 @@ ordinary app builds, so check binary size and what happens on a machine with no 
   identical output to today.
 
 **Gate:** export the same project twice and compare frames, then export once offline with an uncached
-route and confirm it fails before encoding starts.
+route and confirm it fails before encoding starts. Also export a view that used to evict (z15.5, pitch 60, central
+Zurich) and confirm it has no blank patches or fails loudly, and report export speed against a scene without a map.
 
 ## Phase 4 — Preview wiring
 
@@ -263,15 +296,18 @@ Deliverable: live preview with the map following the playhead while playing and 
 over loopback, or a WebGL2 renderer in the browser, and neither has been measured. The steps below assume loopback and
 need rewriting if WebGL2 wins. The widget's `Ready`/`Pending` provider suits either.
 
-- **Loopback endpoint** in `video_server.rs`: a frame route keyed by spec, camera, size and ratio, parsed strictly like
-  `parse_tile_path`. It returns raw premultiplied RGBA with `no-store`. A 500 px frame is 1 MB, so 30 fps is about
-  30 MB/s, which is the number to check first.
+- **Loopback endpoint** in `video_server.rs`: a frame route keyed by spec, camera, size, ratio and the route's style and
+  travelled distance, parsed strictly like `parse_tile_path`. The route is in the frame, so native also needs the line:
+  build it there from the activity, with the widget's window and tolerance, rather than sending vertices per request.
+  It returns raw premultiplied RGBA with `no-store`. A 500 px frame is 1 MB, so 30 fps is about 30 MB/s, which is the
+  number to check first. A fixed camera needs frames at this rate too, because progress changes them.
 - **Worker capacity:** requests share the server's 4 workers with video range requests (`video_server.rs:40`). Decide
   the count from measurements.
 - **WASM ABI** (`widget_abi.rs`):
-  - `ovrley_preview_map_frame(session, key, pixels)` uploads a frame. The Phase 2 benchmark introduces it.
+  - `ovrley_preview_map_frame(session, width, height, ptr, len)` uploads a frame, keyed by output size. Phase 2 built it
+    for the benchmark. Extend the key to the full request, or a frame could land under the wrong camera.
   - `ovrley_preview_map_wanted_ptr/len` returns the frames the last render missed, the current one first.
-- **`PreviewMapFrames`** in `PreviewSession`, replacing the always-`Pending` provider from Phase 2.
+- **`UploadedMapFrames`** in `PreviewSession`, extended with the want list. It stays `Pending` until frames arrive.
 - **`app/src/features/wasm-widgets/utils/mapFrameLoader.js`:** a queue with no React in it. The latest request wins, since
   a frame for a past camera is no use. Errors reach `onError`.
 - **`previewSession.js`:** `render()` reads the want list after `_ovrley_preview_render`. A frame's arrival calls
@@ -313,7 +349,7 @@ with a map. Full export on both platforms.
 | ----------------------------------------------------------------- | ------------------------------------------------------------- |
 | Route drifts off the road if map and route use different matrices | One shared camera in `ovrley_map`; judged at the Phase 2 gate |
 | Renderer only tested at z17, pitch 60, one dense area, on Windows | Phase 2 coverage check; Linux and macOS still untested        |
-| Pool eviction on long routes or low zooms                         | Phase 2 and 3 measure it; report before resizing the pools    |
+| Pool eviction at pitch 60 with top padding draws blank patches    | Measured in Phase 2; must be solved in Phase 3 (see there)    |
 | No usable GPU, or device loss during an export                    | Not designed yet; Phase 3                                     |
 | Preview delivery may not hold 30 fps                              | Measured first in Phase 4                                     |
 | Far roads look heavier than Native, buildings heavier at 0.8      | Known visual gaps; line width fix awaits your decision        |

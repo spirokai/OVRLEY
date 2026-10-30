@@ -16,6 +16,8 @@ function isTimeDependentWidget(widget) {
 /** @param {object} widget Effective widget. @returns {object[]} Required native font resource requests. */
 export function widgetFonts(widget) {
   if (widget.type === 'backdrop' || widget.type === 'raster' || widget.type === 'course') return []
+  // The attribution is always drawn.
+  if (widget.type === 'map') return [{ font: widget.data.font }]
   if (widget.type === 'diving_profile') {
     return widget.data.show_depth_metric || widget.data.show_depth_imperial ? [{ font: widget.data.point_label.font }] : []
   }

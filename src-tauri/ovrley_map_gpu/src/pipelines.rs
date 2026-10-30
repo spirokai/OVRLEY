@@ -42,6 +42,27 @@ pub(crate) struct ShaderTileMetadata {
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
+pub(crate) struct RouteVertex {
+    pub(crate) position: [f32; 2],
+    pub(crate) normal: [f32; 2],
+    pub(crate) along_metres: f32,
+}
+
+/// One route section on one side of the split.
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub(crate) struct RouteInstance {
+    pub(crate) transform: [[f32; 4]; 4],
+    pub(crate) color: [f32; 4],
+    pub(crate) viewport_width: f32,
+    pub(crate) viewport_height: f32,
+    pub(crate) line_width: f32,
+    pub(crate) travelled_metres: f32,
+    pub(crate) keep_side: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
 pub(crate) struct BackgroundLayerMetadata {
     pub(crate) color: [f32; 4],
 }
@@ -102,6 +123,24 @@ const BACKGROUND_ATTRIBUTES: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_arra
     0 => Float32x4, // color
 ];
 
+const ROUTE_VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+    0 => Float32x2, // position
+    1 => Float32x2, // normal
+    2 => Float32, // along_metres
+];
+const ROUTE_INSTANCE_ATTRIBUTES: [wgpu::VertexAttribute; 10] = wgpu::vertex_attr_array![
+    4 => Float32x4, // translate
+    5 => Float32x4,
+    6 => Float32x4,
+    7 => Float32x4,
+    8 => Float32x4, // color
+    9 => Float32, // viewport_width
+    10 => Float32, // viewport_height
+    11 => Float32, // line_width
+    12 => Float32, // travelled_metres
+    13 => Float32, // keep_side
+];
+
 const fn instance_layout<'a, T>(
     attributes: &'a [wgpu::VertexAttribute],
 ) -> wgpu::VertexBufferLayout<'a> {
@@ -145,6 +184,8 @@ enum StencilUse {
     Test,
     /// Ignores the stencil: the background.
     Ignore,
+    /// Draws each sample once and marks it, so crossings and section seams don't double the opacity.
+    Once,
 }
 
 impl StencilUse {
@@ -156,6 +197,10 @@ impl StencilUse {
             ),
             Self::Test => (wgpu::CompareFunction::Equal, wgpu::StencilOperation::Keep),
             Self::Ignore => (wgpu::CompareFunction::Always, wgpu::StencilOperation::Keep),
+            Self::Once => (
+                wgpu::CompareFunction::NotEqual,
+                wgpu::StencilOperation::Replace,
+            ),
         };
         let face = wgpu::StencilFaceState {
             compare,
@@ -176,6 +221,7 @@ impl StencilUse {
 pub(crate) struct Pipelines {
     pub(crate) mask: wgpu::RenderPipeline,
     pub(crate) background: wgpu::RenderPipeline,
+    pub(crate) route: wgpu::RenderPipeline,
     fill: wgpu::RenderPipeline,
     line: wgpu::RenderPipeline,
     extrusion: wgpu::RenderPipeline,
@@ -319,8 +365,19 @@ impl Pipelines {
                     &FEATURE_ATTRIBUTES,
                 )),
             ],
-            blended,
+            blended.clone(),
             ground_depth(StencilUse::Test),
+        );
+        let route = builder.tile_pipeline(
+            "route pipeline",
+            wgpu::include_wgsl!("shaders/route.vertex.wgsl"),
+            wgpu::include_wgsl!("shaders/route.fragment.wgsl"),
+            &[
+                Some(vertex_layout::<RouteVertex>(&ROUTE_VERTEX_ATTRIBUTES)),
+                Some(instance_layout::<RouteInstance>(&ROUTE_INSTANCE_ATTRIBUTES)),
+            ],
+            blended,
+            ground_depth(StencilUse::Once),
         );
         let background = builder.tile_pipeline(
             "background pipeline",
@@ -363,6 +420,7 @@ impl Pipelines {
             fill,
             line,
             background,
+            route,
             extrusion,
         }
     }

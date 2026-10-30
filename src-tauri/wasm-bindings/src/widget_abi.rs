@@ -150,6 +150,20 @@ pub unsafe extern "C" fn ovrley_preview_image(
     session.status(result)
 }
 
+/// A finished map frame as straight RGBA pixels, for widgets of this output size.
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_map_frame(
+    session: *mut Session,
+    width: u32,
+    height: u32,
+    ptr: *const u8,
+    len: usize,
+) -> u32 {
+    let session = &mut *session;
+    let result = bytes(ptr, len).and_then(|b| session.preview.map_frames.upload(width, height, b));
+    session.status(result)
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn ovrley_preview_widget_create(
     session: *mut Session,

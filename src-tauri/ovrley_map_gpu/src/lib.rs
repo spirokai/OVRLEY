@@ -7,24 +7,24 @@
 //!
 //! Depending on this crate is the opt-in. `ovrley_map` stays free of `wgpu` and never depends on it.
 
-mod camera;
 mod extrusion;
 mod pattern;
 mod pipelines;
 mod pool;
+mod route;
 mod style;
 mod tile;
 
-pub use camera::{MapCamera, ViewPadding};
-pub use pattern::{view_tiles, TileId};
 pub use style::Buildings;
 
-use camera::ViewState;
 use extrusion::ExtrusionVertex;
-use ovrley_map::{MapDataSource, MapStyleSpec};
-use pattern::{TileShape, TileViewPattern};
+use ovrley_map::{
+    MapCamera, MapDataSource, MapRouteDraw, MapStyleSpec, MapViewport, TileId, ViewState,
+};
+use pattern::{stencil_reference_value_3d, TileShape, TileViewPattern};
 use pipelines::{BackgroundLayerMetadata, Pipelines, ShaderVertex, COLOR_FORMAT, DEPTH_FORMAT};
 use pool::{BufferPool, IndexEntry, LayerGeometry};
+use route::RouteLayer;
 use std::collections::HashSet;
 use std::ops::Range;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -38,13 +38,16 @@ use wgpu::util::DeviceExt;
 /// 512 MB integrated GPU in 3 of 8 runs.
 pub const DEFAULT_POOL_ENTRIES: u64 = 2_000_000;
 const MASK_VERTICES: u32 = 6;
+/// Marks route samples. Tile masks use at most `3 + 14 * 4`, and never run after the route.
+const ROUTE_STENCIL: u32 = 0xff;
 
 /// Everything fixed for one renderer's lifetime.
 #[derive(Clone, Debug)]
 pub struct GpuMapConfig {
     pub spec: MapStyleSpec,
-    pub width: u32,
-    pub height: u32,
+    /// Output size and pixel ratio. A higher ratio draws the same map sharper: world size, tile
+    /// scale and line widths multiply by it, while tile levels and style values stay on the view zoom.
+    pub viewport: MapViewport,
     /// MSAA samples, 1 or 4.
     pub sample_count: u32,
     /// Zoom that style values are evaluated at when tiles load, as upstream does at upload.
@@ -135,6 +138,7 @@ pub struct GpuMapRenderer {
     ground_pool: BufferPool<ShaderVertex>,
     extrusion_pool: BufferPool<ExtrusionVertex>,
     background_buffer: Option<wgpu::Buffer>,
+    route: Option<RouteLayer>,
     /// Tiles that finished loading. Eviction removes them again.
     loaded: HashSet<TileId>,
     masks: Vec<TileShape>,
@@ -148,12 +152,6 @@ pub struct GpuMapRenderer {
 impl GpuMapRenderer {
     /// Opens a GPU device and reads the style. Fails loudly on invalid configuration.
     pub fn new(config: GpuMapConfig, source: &dyn MapDataSource) -> Result<Self, String> {
-        if config.width == 0 || config.height == 0 {
-            return Err(format!(
-                "Map size {}x{} must not be empty",
-                config.width, config.height
-            ));
-        }
         if config.sample_count != 1 && config.sample_count != 4 {
             return Err(format!(
                 "Map sample count {} must be 1 or 4",
@@ -173,6 +171,7 @@ impl GpuMapRenderer {
             &source.style(config.spec.style)?,
             config.spec.layers,
             config.style_zoom,
+            config.viewport.pixel_ratio(),
             &config.buildings,
         )?;
 
@@ -202,7 +201,8 @@ impl GpuMapRenderer {
         }));
 
         let pipelines = Pipelines::new(&device, config.sample_count);
-        let targets = Targets::new(&device, config.width, config.height, config.sample_count);
+        let (width, height) = (config.viewport.width_px(), config.viewport.height_px());
+        let targets = Targets::new(&device, width, height, config.sample_count);
         let pattern = TileViewPattern::new(&device);
         let ground_pool = BufferPool::new(&device, "ground", config.pool_entries);
         let extrusion_pool = BufferPool::new(&device, "extrusion", config.pool_entries);
@@ -218,7 +218,7 @@ impl GpuMapRenderer {
                 usage: wgpu::BufferUsages::VERTEX,
             })
         });
-        let pixels = vec![0; config.width as usize * config.height as usize * 4];
+        let pixels = vec![0; width as usize * height as usize * 4];
 
         Ok(Self {
             config,
@@ -232,6 +232,7 @@ impl GpuMapRenderer {
             ground_pool,
             extrusion_pool,
             background_buffer,
+            route: None,
             loaded: HashSet::new(),
             masks: Vec::with_capacity(64),
             layer_items: Vec::with_capacity(1024),
@@ -333,9 +334,14 @@ impl GpuMapRenderer {
         Ok(reports)
     }
 
-    /// Draws one frame and returns its RGBA pixels, with a blocking readback.
-    pub fn render(&mut self, camera: &MapCamera) -> Result<&[u8], String> {
-        self.draw_frame(camera)?;
+    /// Draws one frame and returns its RGBA pixels, with a blocking readback. A route draws above
+    /// the roads and below the buildings. A new line is tessellated and uploaded on first use.
+    pub fn render(
+        &mut self,
+        camera: &MapCamera,
+        route: Option<&MapRouteDraw>,
+    ) -> Result<&[u8], String> {
+        self.draw_frame(camera, route)?;
         self.read_back(true)?;
         Ok(&self.pixels)
     }
@@ -343,7 +349,7 @@ impl GpuMapRenderer {
     /// Draws one frame and maps its pixels without copying them out, as upstream's headless map
     /// does. Exists so gate timings compare directly with its baselines.
     pub fn render_without_copy(&mut self, camera: &MapCamera) -> Result<(), String> {
-        self.draw_frame(camera)?;
+        self.draw_frame(camera, None)?;
         self.read_back(false)
     }
 
@@ -354,17 +360,23 @@ impl GpuMapRenderer {
         }
     }
 
-    fn draw_frame(&mut self, camera: &MapCamera) -> Result<(), String> {
+    fn draw_frame(
+        &mut self,
+        camera: &MapCamera,
+        route: Option<&MapRouteDraw>,
+    ) -> Result<(), String> {
         self.check_gpu()?;
-        let view = ViewState::new(camera, self.config.width, self.config.height);
+        let viewport = self.config.viewport;
+        let view = ViewState::new(camera, viewport);
         let loaded = &self.loaded;
         self.pattern.generate(&view, |tile| loaded.contains(&tile));
         self.pattern.upload(
             &self.queue,
             &view,
-            self.config.width as f32,
-            self.config.height as f32,
+            viewport.width_px() as f32,
+            viewport.height_px() as f32,
         )?;
+        self.prepare_route(&view, route)?;
         self.queue_items();
 
         let mut encoder = self
@@ -387,13 +399,33 @@ impl GpuMapRenderer {
                 },
             },
             wgpu::Extent3d {
-                width: self.config.width,
-                height: self.config.height,
+                width: viewport.width_px(),
+                height: viewport.height_px(),
                 depth_or_array_layers: 1,
             },
         );
         self.queue.submit([encoder.finish()]);
         Ok(())
+    }
+
+    /// Uploads a line the renderer has not drawn yet, then this frame's route draws.
+    fn prepare_route(
+        &mut self,
+        view: &ViewState,
+        route: Option<&MapRouteDraw>,
+    ) -> Result<(), String> {
+        let Some(route) = route else {
+            if let Some(layer) = &mut self.route {
+                layer.clear();
+            }
+            return Ok(());
+        };
+        let device = &self.device;
+        let layer = match &mut self.route {
+            Some(layer) if layer.draws_line(&route.line) => layer,
+            slot => slot.insert(RouteLayer::new(device, route.line.clone())),
+        };
+        layer.prepare(&self.queue, view, self.config.viewport, route)
     }
 
     /// Collects this frame's draws: every mask, then layers × tiles sorted by style layer.
@@ -412,7 +444,7 @@ impl GpuMapRenderer {
         for shape in self.pattern.shapes() {
             self.masks.push(*shape);
             let tile_range = shape.buffer_range();
-            let stencil_reference = shape.coords.stencil_reference_value_3d();
+            let stencil_reference = stencil_reference_value_3d(shape.coords);
             if let Some(entries) = self.ground_pool.index().get_layers(shape.coords) {
                 for entry in entries {
                     self.layer_items.push(LayerItem {
@@ -479,7 +511,7 @@ impl GpuMapRenderer {
 
         pass.set_pipeline(&self.pipelines.mask);
         for shape in &self.masks {
-            pass.set_stencil_reference(shape.coords.stencil_reference_value_3d());
+            pass.set_stencil_reference(stencil_reference_value_3d(shape.coords));
             pass.set_vertex_buffer(0, self.pattern.buffer().slice(shape.buffer_range()));
             pass.draw(0..MASK_VERTICES, 0..1);
         }
@@ -537,6 +569,12 @@ impl GpuMapRenderer {
             }
         }
 
+        if let Some(route) = self.route.as_ref().filter(|route| route.has_draws()) {
+            pass.set_pipeline(&self.pipelines.route);
+            pass.set_stencil_reference(ROUTE_STENCIL);
+            route.record(&mut pass);
+        }
+
         if !self.extrusion_items.is_empty() {
             pass.set_pipeline(self.pipelines.layer(LayerKind::Extrusion));
             for item in &self.extrusion_items {
@@ -585,7 +623,7 @@ impl GpuMapRenderer {
                 .get_mapped_range()
                 .map_err(|error| format!("GPU readback range failed: {error}"))?;
             if copy_pixels {
-                let row = self.config.width as usize * 4;
+                let row = self.config.viewport.width_px() as usize * 4;
                 let stride = self.targets.padded_bytes_per_row as usize;
                 for (to, from) in self
                     .pixels

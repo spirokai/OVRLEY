@@ -5,9 +5,11 @@ use crate::{
     preview_instance::PreviewInstance,
     preview_widget::{PreviewWidget, ResizeRequest, ResizeUpdate, WidgetRequest},
     render::text::FontResolver,
+    widgets::map::frame_provider::UploadedMapFrames,
 };
 use skia_safe::{FontMgr, Typeface};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct PreviewFonts {
@@ -69,6 +71,8 @@ impl FontResolver for PreviewFonts {
 pub struct PreviewSession {
     pub fonts: PreviewFonts,
     pub images: crate::widgets::raster::preview::PreviewImages,
+    /// Finished map frames the host delivered. Until it does, map widgets stay pending.
+    pub map_frames: Arc<UploadedMapFrames>,
     activity: Option<ActivitySampler>,
     /// The editor's disabled laps, applied to every activity this session samples.
     disabled_laps: Vec<usize>,
@@ -128,6 +132,20 @@ impl PreviewSession {
                 .ok_or_else(|| WidgetError::Config("raster resize size is required".into()))?;
             return Ok(ResizeUpdate::Raster(
                 crate::widgets::raster::interaction::resize_raster(
+                    widget,
+                    scene,
+                    size,
+                    request.fixed,
+                    request.point,
+                )?,
+            ));
+        }
+        if let WidgetRequest::Map { widget, scene, .. } = request.origin {
+            let size = request
+                .size
+                .ok_or_else(|| WidgetError::Config("map resize size is required".into()))?;
+            return Ok(ResizeUpdate::Map(
+                crate::widgets::map::interaction::resize_map(
                     widget,
                     scene,
                     size,
@@ -293,6 +311,7 @@ impl PreviewSession {
                 )?))
             }
             WidgetRequest::DivingProfile { .. }
+            | WidgetRequest::Map { .. }
             | WidgetRequest::RollingChart { .. }
             | WidgetRequest::Elevation { .. }
             | WidgetRequest::Backdrop { .. }
@@ -423,6 +442,9 @@ impl PreviewSession {
             if let PreviewWidget::Route(widget) = widget {
                 widget.invalidate_activity();
             }
+            if let PreviewWidget::Map(widget) = widget {
+                widget.invalidate_activity();
+            }
             if let PreviewWidget::LapTimer(widget) = widget {
                 widget.invalidate_activity();
             }
@@ -464,7 +486,8 @@ impl PreviewSession {
         Ok(())
     }
     pub fn create_widget(&mut self, request: WidgetRequest) -> WidgetResult<u32> {
-        let widget = PreviewInstance::new(request, &self.fonts, &self.images)?;
+        let widget =
+            PreviewInstance::new(request, &self.fonts, &self.images, self.map_frames.clone())?;
         self.next_id = self
             .next_id
             .checked_add(1)
@@ -476,7 +499,7 @@ impl PreviewSession {
         self.widgets
             .get_mut(&id)
             .ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?
-            .update(request, &self.fonts, &self.images)
+            .update(request, &self.fonts, &self.images, self.map_frames.clone())
     }
     pub fn render(&mut self, second: f64) -> WidgetResult<()> {
         if !second.is_finite() {
@@ -495,6 +518,7 @@ impl PreviewSession {
                     widget.render(self.activity.as_ref(), second, &self.fonts)?
                 }
                 PreviewWidget::Route(widget) => widget.render(self.activity.as_ref(), second)?,
+                PreviewWidget::Map(widget) => widget.render(self.activity.as_ref(), second)?,
                 PreviewWidget::Value(widget) => {
                     widget.render(self.activity.as_ref(), second, &self.fonts)?
                 }

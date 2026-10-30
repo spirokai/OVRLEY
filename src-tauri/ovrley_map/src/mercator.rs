@@ -12,6 +12,12 @@ pub fn lon_lat_to_world(lon: f64, lat: f64) -> (f64, f64) {
     )
 }
 
+/// World coordinates in `0.0..=1.0` back to longitude and latitude in degrees.
+pub fn world_to_lon_lat(world_x: f64, world_y: f64) -> (f64, f64) {
+    let lat = (PI * (1.0 - 2.0 * world_y)).sinh().atan();
+    (world_x * 360.0 - 180.0, lat.to_degrees())
+}
+
 /// The tile containing a world coordinate at a zoom.
 pub fn world_to_tile(world_x: f64, world_y: f64, z: u8) -> (u32, u32) {
     let tiles = 1_u32 << z;

@@ -112,6 +112,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "skia-safe",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -3812,6 +3813,7 @@ dependencies = [
 name = "ovrley_map"
 version = "0.1.0"
 dependencies = [
+ "cgmath",
  "ezu",
  "log",
  "serde_json",
@@ -3840,6 +3842,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "image",
+ "ovrley_map",
  "serde",
  "serde_json",
  "skia-safe",

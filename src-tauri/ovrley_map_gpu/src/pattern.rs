@@ -1,125 +1,44 @@
-//! Tile identities, view regions and the per-frame tile matrices, ported from maplibre-rs
-//! `coords.rs` and `render/tile_view_pattern/`.
+//! The per-frame tile matrices, ported from maplibre-rs `render/tile_view_pattern/`.
 
-use crate::camera::{MapCamera, ViewPadding, ViewState};
 use crate::pipelines::ShaderTileMetadata;
 use cgmath::{Matrix4, Vector3};
-use ovrley_map::TILE_SIZE;
+use ovrley_map::{data_level, TileId, ViewPadding, ViewState};
 use std::collections::HashSet;
 use std::mem::size_of;
 use std::ops::Range;
 
 /// MVT coordinate units along one tile edge.
 pub(crate) const EXTENT: f64 = 4096.0;
-/// Tiles stop at this level upstream. Deeper views draw these tiles scaled.
-const MAX_DATA_LEVEL: u8 = 14;
 /// How many tile metadata entries one frame can upload.
 pub(crate) const PATTERN_CAPACITY: u64 = 512;
 
-/// A position in the tile pyramid.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct TileId {
-    pub z: u8,
-    pub x: i32,
-    pub y: i32,
-}
-
-impl TileId {
-    pub const fn new(z: u8, x: i32, y: i32) -> Self {
-        Self { z, x, y }
-    }
-
-    /// Whether this tile exists on the grid.
-    pub(crate) const fn is_on_grid(self) -> bool {
-        let bounds = 1_i32 << self.z;
-        self.x >= 0 && self.y >= 0 && self.x < bounds && self.y < bounds
-    }
-
-    fn parent(self) -> Option<Self> {
-        (self.z > 0).then(|| Self::new(self.z - 1, self.x >> 1, self.y >> 1))
-    }
-
-    /// Neighbouring tiles never share a value, and tiles from different levels never do.
-    pub(crate) const fn stencil_reference_value_3d(self) -> u32 {
-        const CASES: u32 = 4;
-        let z = self.z as u32;
-        match (self.x % 2 == 0, self.y % 2 == 0) {
-            (true, true) => z * CASES,
-            (true, false) => 1 + z * CASES,
-            (false, true) => 2 + z * CASES,
-            (false, false) => 3 + z * CASES,
-        }
-    }
-
-    /// Tile units to world pixels at `zoom`. The z axis carries metres for extrusions; ground
-    /// layers sit at `z = 0` and never see it.
-    fn transform_for_zoom(self, zoom: f64, metres_to_world: f64) -> Matrix4<f64> {
-        let tile_scale = f64::from(TILE_SIZE) * 2_f64.powf(zoom - f64::from(self.z));
-        let translate = Matrix4::from_translation(Vector3::new(
-            f64::from(self.x) * tile_scale,
-            f64::from(self.y) * tile_scale,
-            0.0,
-        ));
-        let normalize_and_scale = Matrix4::from_nonuniform_scale(
-            tile_scale / EXTENT,
-            tile_scale / EXTENT,
-            metres_to_world,
-        );
-        translate * normalize_and_scale
+/// Neighbouring tiles never share a value, and tiles from different levels never do.
+pub(crate) const fn stencil_reference_value_3d(tile: TileId) -> u32 {
+    const CASES: u32 = 4;
+    let z = tile.z as u32;
+    match (tile.x % 2 == 0, tile.y % 2 == 0) {
+        (true, true) => z * CASES,
+        (true, false) => 1 + z * CASES,
+        (false, true) => 2 + z * CASES,
+        (false, false) => 3 + z * CASES,
     }
 }
 
-/// The tile level drawn at a view zoom, capped so deeper views overzoom.
-fn data_level(zoom: f64) -> u8 {
-    (zoom.floor() as u8).min(MAX_DATA_LEVEL)
-}
-
-/// The on-grid tiles a camera sees on a viewport, for `GpuMapRenderer::load_tiles`.
-pub fn view_tiles(
-    camera: &MapCamera,
-    width: u32,
-    height: u32,
-    padding: ViewPadding,
-) -> Vec<TileId> {
-    let view = ViewState::new(camera, width, height);
-    view.create_view_region(data_level(view.zoom()), padding)
-        .map(|region| region.iter().collect())
-        .unwrap_or_default()
-}
-
-/// A bounding box of tiles at one level, with a padding.
-pub(crate) struct ViewRegion {
-    min_tile: TileId,
-    max_tile: TileId,
-    padding: i32,
-    max_n_tiles: usize,
-}
-
-impl ViewRegion {
-    pub(crate) fn new(
-        min_tile: TileId,
-        max_tile: TileId,
-        padding: i32,
-        max_n_tiles: usize,
-    ) -> Self {
-        Self {
-            min_tile,
-            max_tile,
-            padding,
-            max_n_tiles,
-        }
-    }
-
-    fn iter(&self) -> impl Iterator<Item = TileId> + '_ {
-        let z = self.min_tile.z;
-        (self.min_tile.x - self.padding..=self.max_tile.x + self.padding)
-            .flat_map(move |x| {
-                (self.min_tile.y - self.padding..=self.max_tile.y + self.padding)
-                    .map(move |y| TileId::new(z, x, y))
-            })
-            .filter(|tile| tile.is_on_grid())
-            .take(self.max_n_tiles)
-    }
+/// Tile units to world pixels on this view. The z axis carries metres for extrusions; ground
+/// layers sit at `z = 0` and never see it.
+fn tile_transform(tile: TileId, view: &ViewState) -> Matrix4<f64> {
+    let tile_scale = view.world_size() / 2_f64.powi(i32::from(tile.z));
+    let translate = Matrix4::from_translation(Vector3::new(
+        f64::from(tile.x) * tile_scale,
+        f64::from(tile.y) * tile_scale,
+        0.0,
+    ));
+    let normalize_and_scale = Matrix4::from_nonuniform_scale(
+        tile_scale / EXTENT,
+        tile_scale / EXTENT,
+        view.metres_to_world(),
+    );
+    translate * normalize_and_scale
 }
 
 /// Where one tile is drawn this frame and which slice of the pattern buffer holds its matrix.
@@ -206,14 +125,10 @@ impl TileViewPattern {
             ));
         }
         let view_projection = view.view_projection();
-        let metres_to_world = view.metres_to_world();
         let light_xy = view.light_xy();
         self.metadata.clear();
         for shape in &self.shapes {
-            let transform = view_projection
-                * shape
-                    .coords
-                    .transform_for_zoom(view.zoom(), metres_to_world);
+            let transform = view_projection * tile_transform(shape.coords, view);
             let transform = transform
                 .cast::<f32>()
                 .ok_or("Tile matrix does not fit in f32")?;

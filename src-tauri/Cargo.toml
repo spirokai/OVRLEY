@@ -20,7 +20,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
 # GPU map gate only (src/bin/map_gpu_gate.rs). Keeps wgpu out of ordinary app builds.
-map-gpu-gate = ["dep:ovrley_map_gpu"]
+map-gpu-gate = ["dep:ovrley_map_gpu", "dep:skia-safe"]
 
 [[bin]]
 name = "map_gpu_gate"
@@ -47,6 +47,9 @@ ovrley_core = { path = "ovrley_core" }
 ovrley_map = { path = "ovrley_map", features = ["raster"] }
 ovrley_map_gpu = { path = "ovrley_map_gpu", optional = true }
 ovrley_widgets = { path = "ovrley_widgets" }
+skia-safe = { git = "https://github.com/rust-skia/rust-skia", rev = "b7f043e0b1e2a850e702245de811f01df1f6b0ff", version = "=0.153.3", features = [
+  "binary-cache",
+], optional = true }
 tiny_http = "0.12"
 uuid = { version = "1", features = ["v4"] }
 zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }

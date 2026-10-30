@@ -5,7 +5,7 @@
 //! render-affecting defaults. The frontend must materialise all defaults
 //! before sending the config.
 
-use super::config::CoursePlotConfig;
+use super::config::{CoursePlotConfig, RoutePathConfig};
 use crate::error::{WidgetError, WidgetResult};
 use crate::model::validation::{
     require_f32, require_hex_color, require_non_negative_f32, require_opacity, require_positive_f32,
@@ -21,6 +21,12 @@ pub struct ValidatedRoutePlot {
     pub rotation: f32,
     pub simplify_tolerance_px: f32,
     pub target_density: f32,
+    pub path: ValidatedRoutePath,
+    pub show_full_activity: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ValidatedRoutePath {
     pub completed_line_width: f32,
     pub completed_line_color: String,
     pub completed_line_opacity: f32,
@@ -32,7 +38,6 @@ pub struct ValidatedRoutePlot {
     pub marker_size: f32,
     pub marker_color: String,
     pub marker_opacity: f32,
-    pub show_full_activity: bool,
 }
 
 pub fn validate_route_plot(
@@ -60,33 +65,6 @@ pub fn validate_route_plot(
         )));
     }
 
-    let completed_line_width =
-        require_positive_f32(Some(plot.completed_line_width), &p("completed_line_width"))?;
-    let completed_line_color =
-        require_hex_color(Some(&plot.completed_line_color), &p("completed_line_color"))?;
-    let completed_line_opacity = require_opacity(
-        Some(plot.completed_line_opacity),
-        &p("completed_line_opacity"),
-    )?;
-
-    let remaining_line_width =
-        require_positive_f32(Some(plot.remaining_line_width), &p("remaining_line_width"))?;
-    let remaining_line_color =
-        require_hex_color(Some(&plot.remaining_line_color), &p("remaining_line_color"))?;
-    let remaining_line_opacity = require_opacity(
-        Some(plot.remaining_line_opacity),
-        &p("remaining_line_opacity"),
-    )?;
-
-    let marker_size = require_positive_f32(Some(plot.marker_size), &p("marker_size"))?;
-    let marker_color = require_hex_color(Some(&plot.marker_color), &p("marker_color"))?;
-    let marker_opacity = require_opacity(Some(plot.marker_opacity), &p("marker_opacity"))?;
-    let marker_variant = MarkerVariant::parse(&plot.marker_variant, &p("marker_variant"))?;
-    let marker_variant_diameter = require_positive_f32(
-        Some(plot.marker_variant_diameter),
-        &p("marker_variant_diameter"),
-    )?;
-
     Ok(ValidatedRoutePlot {
         x: require_f32(Some(plot.x), &p("x"))?,
         y: require_f32(Some(plot.y), &p("y"))?,
@@ -95,17 +73,48 @@ pub fn validate_route_plot(
         rotation: require_f32(Some(plot.rotation), &p("rotation"))?,
         simplify_tolerance_px,
         target_density,
-        completed_line_width,
-        completed_line_color,
-        completed_line_opacity,
-        remaining_line_width,
-        remaining_line_color,
-        remaining_line_opacity,
-        marker_variant,
-        marker_variant_diameter,
-        marker_size,
-        marker_color,
-        marker_opacity,
+        path: validate_route_path(&plot.path, &p)?,
         show_full_activity: plot.show_full_activity,
+    })
+}
+
+/// The one validation of the fields every route-drawing family shares.
+pub fn validate_route_path(
+    path: &RoutePathConfig,
+    p: &dyn Fn(&str) -> String,
+) -> WidgetResult<ValidatedRoutePath> {
+    Ok(ValidatedRoutePath {
+        completed_line_width: require_positive_f32(
+            Some(path.completed_line_width),
+            &p("completed_line_width"),
+        )?,
+        completed_line_color: require_hex_color(
+            Some(&path.completed_line_color),
+            &p("completed_line_color"),
+        )?,
+        completed_line_opacity: require_opacity(
+            Some(path.completed_line_opacity),
+            &p("completed_line_opacity"),
+        )?,
+        remaining_line_width: require_positive_f32(
+            Some(path.remaining_line_width),
+            &p("remaining_line_width"),
+        )?,
+        remaining_line_color: require_hex_color(
+            Some(&path.remaining_line_color),
+            &p("remaining_line_color"),
+        )?,
+        remaining_line_opacity: require_opacity(
+            Some(path.remaining_line_opacity),
+            &p("remaining_line_opacity"),
+        )?,
+        marker_variant: MarkerVariant::parse(&path.marker_variant, &p("marker_variant"))?,
+        marker_variant_diameter: require_positive_f32(
+            Some(path.marker_variant_diameter),
+            &p("marker_variant_diameter"),
+        )?,
+        marker_size: require_positive_f32(Some(path.marker_size), &p("marker_size"))?,
+        marker_color: require_hex_color(Some(&path.marker_color), &p("marker_color"))?,
+        marker_opacity: require_opacity(Some(path.marker_opacity), &p("marker_opacity"))?,
     })
 }

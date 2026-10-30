@@ -6,7 +6,7 @@
 use maplibre_expr::{
     evaluate, parse_filter, parse_property, typecheck, EvaluationContext, Expr, Type, Value,
 };
-use ovrley_map::{MapLayers, VECTOR_SOURCE};
+use ovrley_map::{MapLayers, MapStyle, VECTOR_SOURCE};
 use serde_json::Value as Json;
 
 /// Which 3D buildings a renderer draws.
@@ -18,6 +18,33 @@ pub enum Buildings {
     FromStyle,
     /// One `fill-extrusion` style layer, for styles without one. Replaces the style's own.
     Fixed(Json),
+}
+
+impl Buildings {
+    /// Real 3D buildings for a preset: Liberty has its own, the others get the `building` source
+    /// layer with a fixed extrusion, without touching the styles.
+    pub fn for_style(style: MapStyle) -> Self {
+        let color = match style {
+            MapStyle::Liberty => return Self::FromStyle,
+            MapStyle::Positron => "rgb(228,228,222)",
+            MapStyle::Bright => "hsl(35,8%,85%)",
+            MapStyle::Dark => "rgb(44,44,47)",
+            MapStyle::Fiord => "hsl(222,23%,30%)",
+        };
+        Self::Fixed(serde_json::json!({
+            "id": "fixed-building-3d",
+            "type": "fill-extrusion",
+            "source": VECTOR_SOURCE,
+            "source-layer": "building",
+            "minzoom": 14,
+            "filter": ["!", ["has", "hide_3d"]],
+            "paint": {
+                "fill-extrusion-color": color,
+                "fill-extrusion-height": ["get", "render_height"],
+                "fill-extrusion-base": ["get", "render_min_height"],
+            },
+        }))
+    }
 }
 
 /// The drawable part of one style, with zoom-dependent layer values evaluated at `zoom`.
@@ -50,7 +77,8 @@ pub(crate) enum VectorPaint {
     Line {
         color: Expr,
         opacity: Option<Expr>,
-        /// Screen pixels. Per layer, as the line shader takes it.
+        /// Output pixels: the style width at the view zoom times the pixel ratio. Per layer, as the
+        /// line shader takes it.
         width: f32,
     },
     Extrusion {
@@ -65,6 +93,7 @@ pub(crate) fn parse_style(
     style_json: &[u8],
     toggles: MapLayers,
     zoom: f64,
+    pixel_ratio: f32,
     buildings: &Buildings,
 ) -> Result<ParsedStyle, String> {
     let style: Json = serde_json::from_slice(style_json)
@@ -95,7 +124,7 @@ pub(crate) fn parse_style(
                 parsed.backgrounds.push(background);
             })
         } else {
-            parse_vector_layer(layer, id, zoom, next_index).map(|vector_layer| {
+            parse_vector_layer(layer, id, zoom, pixel_ratio, next_index).map(|vector_layer| {
                 parsed.vector_layers.push(vector_layer);
             })
         };
@@ -105,7 +134,7 @@ pub(crate) fn parse_style(
         }
     }
     if let Buildings::Fixed(layer) = buildings {
-        push_fixed_layer(&mut parsed, layer, toggles, next_index)?;
+        push_fixed_layer(&mut parsed, layer, toggles, pixel_ratio, next_index)?;
     }
     Ok(parsed)
 }
@@ -115,6 +144,7 @@ fn push_fixed_layer(
     parsed: &mut ParsedStyle,
     layer: &Json,
     toggles: MapLayers,
+    pixel_ratio: f32,
     index: u32,
 ) -> Result<(), String> {
     let id = layer["id"].as_str().unwrap_or("<unnamed>");
@@ -124,7 +154,7 @@ fn push_fixed_layer(
         ));
     }
     if is_drawable(layer, toggles, parsed.zoom) {
-        let vector_layer = parse_vector_layer(layer, id, parsed.zoom, index)
+        let vector_layer = parse_vector_layer(layer, id, parsed.zoom, pixel_ratio, index)
             .map_err(|error| format!("Fixed building layer {id}: {error}"))?;
         parsed.vector_layers.push(vector_layer);
     }
@@ -167,6 +197,7 @@ fn parse_vector_layer(
     layer: &Json,
     id: &str,
     zoom: f64,
+    pixel_ratio: f32,
     index: u32,
 ) -> Result<VectorLayer, String> {
     let source_layer = layer["source-layer"]
@@ -185,7 +216,7 @@ fn parse_vector_layer(
         Some("line") => VectorPaint::Line {
             color: required_color(layer, "line-color")?,
             opacity: number_property(layer, "line-opacity")?,
-            width: line_width(layer, zoom)?,
+            width: line_width(layer, zoom)? * pixel_ratio,
         },
         Some("fill-extrusion") => VectorPaint::Extrusion {
             color: required_color(layer, "fill-extrusion-color")?,

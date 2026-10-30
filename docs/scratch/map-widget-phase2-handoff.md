@@ -1,6 +1,9 @@
 # Handoff: connect the GPU map renderer and execute Phase 2
 
-Status: not started. Date: 2026-10-30. Branch: `rust-map-tiles`.
+Status: in progress, see the plan's Phase 2. Date: 2026-10-30. Branch: `rust-map-tiles`.
+
+**Changed during execution: the route is a ground layer in `ovrley_map_gpu`, not a Skia stroke over the frame.** Where
+this document says the route is projected or stroked by the widget, that no longer applies. The plan's Phase 2 is current.
 
 Read `AGENTS.md` first. Its code rules apply to everything here. Then read Phase 2 of
 `docs/scratch/map-tile-widget-plan.md`, which has been revised for the GPU renderer. This document adds the execution
@@ -59,15 +62,16 @@ Build on these. Report a problem with one rather than quietly changing it.
 
 1. **Labels:** the GPU renderer draws none, so the Phase 2 config has no `labels` field. A toggle that does
    nothing would break the code rules. Build `MapLayers` with `labels: false`. Add the field when labels exist.
-2. **Route over buildings:** the route and marker are drawn over the finished frame, so a route passing behind
-   a tall building shows on top of it. This matches the plan's screen-space stroking.
+2. **Route behind buildings (changed):** the route is a ground layer, so buildings hide it as they hide roads. Only
+   the marker is drawn over the finished frame. The user chose this over Skia strokes and over an alpha-mask approach:
+   frames render as playback reaches them, so a style edit only ever redraws the visible frame.
 3. **Buildings:** the `buildings` toggle maps to `Buildings::FromStyle` for Liberty and a fixed extrusion for the
    others. Move that table out of the gate, into `ovrley_map_gpu` as the owner, for example
    `Buildings::for_style`. Fiord needs a colour. It is in no gate so far, and the gate's table gives it a colour
    meant for light styles.
 4. **MSAA:** the host chooses it, not widget config. Default to 4 in the gate.
-5. **Pending frames:** `Pending` draws the preset's flat placeholder colour, then the route and attribution. Do
-   not draw a stale frame: its camera differs, so the route would sit off the road.
+5. **Pending frames:** `Pending` draws the preset's flat placeholder colour, then the marker and attribution. Do
+   not draw a stale frame: its camera differs. The route waits for its frame.
 
 ## The connection
 

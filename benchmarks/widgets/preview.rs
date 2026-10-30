@@ -63,6 +63,12 @@ pub(super) fn run(plan: &Plan, directory: &Path) -> Result<(), String> {
                 )
                 .map_err(|error| error.to_string())?;
         }
+        if let Some(size) = case.map_frame {
+            session
+                .map_frames
+                .upload(size, size, &vec![255; size as usize * size as usize * 4])
+                .map_err(|error| error.to_string())?;
+        }
         let handle = case
             .request
             .as_ref()
