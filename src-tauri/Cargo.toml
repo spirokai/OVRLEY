@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "ovrley_core", "ovrley_widgets"]
+members = [".", "ovrley_core", "ovrley_map", "ovrley_widgets"]
 
 [package]
 name = "app"
@@ -35,6 +35,7 @@ tauri-plugin-updater = "=2.9.0"
 base64 = "0.22"
 open = "5"
 ovrley_core = { path = "ovrley_core" }
+ovrley_map = { path = "ovrley_map", features = ["raster"] }
 ovrley_widgets = { path = "ovrley_widgets" }
 tiny_http = "0.12"
 uuid = { version = "1", features = ["v4"] }
@@ -43,6 +44,8 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 reqwest = { version = "0.12.28", default-features = false, features = ["blocking", "rustls-tls"] }
 http = "1.4"
 http-cache-semantics = "=2.1.0"
+# Phase 1 map gate only (src/bin/map_tile_gate.rs). Remove with that binary.
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3", default-features = false, features = [

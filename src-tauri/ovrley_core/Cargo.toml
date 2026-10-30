@@ -8,6 +8,7 @@ edition = "2021"
 rust-version = "1.95"
 
 [dependencies]
+ovrley_map = { path = "../ovrley_map", features = ["raster"] }
 ovrley_widgets = { path = "../ovrley_widgets" }
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
@@ -20,7 +21,7 @@ thiserror = "2"
 log = "0.4"
 same-file = "1"
 open = "5"
-image = { version = "=0.25.5", default-features = false, features = ["png", "jpeg", "bmp", "tiff"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "tiff"] }
 skia-safe = { git = "https://github.com/rust-skia/rust-skia", rev = "b7f043e0b1e2a850e702245de811f01df1f6b0ff", version = "=0.153.3", features = [
   "binary-cache",
   "no-compile",

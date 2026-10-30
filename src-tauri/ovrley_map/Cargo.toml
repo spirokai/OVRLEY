@@ -1,0 +1,16 @@
+[package]
+# Map vocabulary shared by native and WASM. The `raster` feature adds the style
+# adapter and the ezu tile renderer, which are native only.
+name = "ovrley_map"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-or-later"
+
+[features]
+raster = ["dep:ezu", "dep:log", "dep:serde_json"]
+
+[dependencies]
+ezu = { version = "=0.13.1", default-features = false, features = ["renderer", "translate"], optional = true }
+log = { version = "0.4", optional = true }
+serde_json = { version = "1", optional = true }

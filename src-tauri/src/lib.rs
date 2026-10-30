@@ -161,6 +161,7 @@ pub fn run() {
                     .app_cache_dir()
                     .map_err(|error| error.to_string())?,
             )?;
+            app.manage(map_tile_service.clone());
             app.state::<video_server::VideoServerHandle>()
                 .start_with_map_tile_service(map_tile_service)?;
 
