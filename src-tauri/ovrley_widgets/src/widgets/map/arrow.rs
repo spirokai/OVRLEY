@@ -1,35 +1,94 @@
-//! The caret on a real map: a small solid hovering over the road, seen through the map's own camera
-//! and lit by the buildings' light, with a soft shadow on the ground beneath it.
+//! The caret on a real map: a small extruded solid with a flat top, standing on the road with its tip
+//! at the rider, seen through the map's own camera and lit by the buildings' light, with a soft shadow
+//! on the ground beneath it.
 //!
 //! It draws in Skia over the finished frame, so preview and export share it and buildings never hide it.
 use crate::render::text::parse_color;
 use ovrley_map::{MapCamera, MapViewport, ViewState, LIGHT_XY};
 use skia_safe::{paint::Style, BlurStyle, Canvas, Color, MaskFilter, Paint, PathBuilder, Point, Rect};
+use std::sync::LazyLock;
 
 /// Scene pixels each axis is measured over: long enough to survive rounding, short enough to stay
 /// straight under perspective.
 const AXIS_STEP_PX: f64 = 8.0;
 
-/// The solid at radius 1: `x` right, `y` forward, `z` up. Its flat underside hovers at [`HOVER`] and a
-/// ridge climbs from the tip to the notch.
-const HOVER: f32 = 0.2;
-const TIP: [f32; 3] = [0.0, 1.35, HOVER];
-const RIGHT: [f32; 3] = [0.95, -1.0, HOVER];
-const LEFT: [f32; 3] = [-0.95, -1.0, HOVER];
-const NOTCH: [f32; 3] = [0.0, -0.5, HOVER];
-const RIDGE: [f32; 3] = [0.0, -0.5, HOVER + 0.3];
-/// Each facet winds counter-clockwise seen from outside. The underside always faces away from a camera
-/// above the ground, so it has none.
-const FACETS: [[[f32; 3]; 3]; 4] = [
-    [TIP, RIDGE, RIGHT],
-    [TIP, LEFT, RIDGE],
-    [RIGHT, RIDGE, NOTCH],
-    [LEFT, NOTCH, RIDGE],
-];
-const FOOTPRINT: [[f32; 3]; 4] = [TIP, RIGHT, NOTCH, LEFT];
+/// The solid at radius 1: `x` right, `y` forward, `z` up. Walls rise from the ground to [`TOP`]. The
+/// underside always faces away from a camera above the ground, so it isn't drawn.
+const TOP: f32 = 0.4;
+/// The outline's corners, clockwise seen from above: tip, right, notch, left. The origin is the rider
+/// and the rounded tip reaches it, so the tip stays on the route through any turn and the body trails
+/// behind. The sharp corner sits past the origin by what [`CORNER_ROUNDING`] takes off it.
+const CORNERS: [[f32; 2]; 4] = [[0.0, 0.14], [0.95, -2.21], [0.0, -1.71], [-0.95, -2.21]];
+/// How far along its edges each corner's rounding starts.
+const CORNER_ROUNDING: f32 = 0.3;
+/// Segments each rounded corner is drawn with.
+const CORNER_SEGMENTS: usize = 6;
 
-/// The building shader's light, so the arrow's facets turn as its walls do. MapLibre's light is longer
-/// than 1, which saturates anything facing up; [`LIGHT_LENGTH`] keeps the ridge visible from above.
+/// One flat side of the extrusion.
+struct Wall {
+    quad: [[f32; 3]; 4],
+    /// Outward and unit length.
+    normal: [f32; 3],
+}
+
+struct ArrowSolid {
+    outline: Vec<[f32; 2]>,
+    walls: Vec<Wall>,
+}
+
+/// The same shape for every arrow, so it's built once.
+static SOLID: LazyLock<ArrowSolid> = LazyLock::new(|| {
+    let outline = rounded_outline();
+    let walls = (0..outline.len())
+        .map(|index| {
+            let (a, b) = (outline[index], outline[(index + 1) % outline.len()]);
+            let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+            let length = dx.hypot(dy);
+            Wall {
+                quad: [
+                    [a[0], a[1], 0.0],
+                    [b[0], b[1], 0.0],
+                    [b[0], b[1], TOP],
+                    [a[0], a[1], TOP],
+                ],
+                // A clockwise outline has the outside on its left.
+                normal: [-dy / length, dx / length, 0.0],
+            }
+        })
+        .collect();
+    ArrowSolid { outline, walls }
+});
+
+/// [`CORNERS`] with each corner replaced by a quadratic curve between its two edges.
+fn rounded_outline() -> Vec<[f32; 2]> {
+    let count = CORNERS.len();
+    let toward = |from: [f32; 2], to: [f32; 2]| {
+        let (dx, dy) = (to[0] - from[0], to[1] - from[1]);
+        let length = dx.hypot(dy);
+        [
+            from[0] + dx / length * CORNER_ROUNDING,
+            from[1] + dy / length * CORNER_ROUNDING,
+        ]
+    };
+    let mut outline = Vec::with_capacity(count * (CORNER_SEGMENTS + 1));
+    for index in 0..count {
+        let corner = CORNERS[index];
+        let start = toward(corner, CORNERS[(index + count - 1) % count]);
+        let end = toward(corner, CORNERS[(index + 1) % count]);
+        for step in 0..=CORNER_SEGMENTS {
+            let t = step as f32 / CORNER_SEGMENTS as f32;
+            let (from_start, from_corner, from_end) = ((1.0 - t) * (1.0 - t), 2.0 * t * (1.0 - t), t * t);
+            outline.push([
+                from_start * start[0] + from_corner * corner[0] + from_end * end[0],
+                from_start * start[1] + from_corner * corner[1] + from_end * end[1],
+            ]);
+        }
+    }
+    outline
+}
+
+/// The building shader's light, so the arrow's walls turn as a building's do. MapLibre's light is longer
+/// than 1, which saturates anything facing up; [`LIGHT_LENGTH`] keeps the top from washing out.
 const LIGHT_Z: f32 = 0.996;
 const LIGHT_LENGTH: f32 = 1.15;
 const LIGHT_INTENSITY: f32 = 0.5;
@@ -40,7 +99,7 @@ const SHADOW_OPACITY: f32 = 0.45;
 const SHADOW_BLUR: f32 = 0.16;
 /// How far the light pushes the shadow from under the arrow, as a share of the radius.
 const SHADOW_SHIFT: f32 = 0.2;
-/// Facets grow by this stroke in scene pixels, so antialiased edges leave no seam between them.
+/// Faces grow by this stroke in scene pixels, so antialiased edges leave no seam between them.
 const SEAM_STROKE: f32 = 0.6;
 
 fn add(a: Point, b: Point) -> Point {
@@ -61,17 +120,6 @@ fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
 
 fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-fn minus(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
-/// The facet's outward unit normal.
-fn facet_normal([a, b, c]: &[[f32; 3]; 3]) -> [f32; 3] {
-    let normal = cross(minus(*b, *a), minus(*c, *a));
-    let length = dot(normal, normal).sqrt();
-    normal.map(|axis| axis / length)
 }
 
 /// `extrusion.vertex.wgsl`'s lighting of one surface, with its light at unit length.
@@ -184,16 +232,17 @@ impl MarkerPose {
         }
     }
 
-    /// The facets the camera sees, far to near, so nearer ones paint over.
-    fn visible_facets(&self) -> Vec<&'static [[f32; 3]; 3]> {
+    /// The walls the camera sees, far to near, so nearer ones paint over. The top paints over them all.
+    fn visible_walls(&self) -> Vec<&'static Wall> {
         let toward = self.toward_camera();
-        let mut facets: Vec<_> = FACETS
+        let mut walls: Vec<_> = SOLID
+            .walls
             .iter()
-            .filter(|facet| dot(facet_normal(facet), toward) > 0.0)
+            .filter(|wall| dot(wall.normal, toward) > 0.0)
             .collect();
-        let depth = |[a, b, c]: &[[f32; 3]; 3]| dot([a[0] + b[0] + c[0], a[1] + b[1] + c[1], a[2] + b[2] + c[2]], toward);
-        facets.sort_by(|a, b| depth(a).total_cmp(&depth(b)));
-        facets
+        let depth = |wall: &Wall| dot(wall.quad[0], toward) + dot(wall.quad[1], toward);
+        walls.sort_by(|a, b| depth(a).total_cmp(&depth(b)));
+        walls
     }
 }
 
@@ -228,24 +277,26 @@ impl MapArrow {
 
     pub fn draw(&self, canvas: &Canvas, pose: &MarkerPose) {
         self.draw_shadow(canvas, pose);
-        // Facets overlap by their seam stroke, so opacity applies to the finished solid.
+        // Faces overlap by their seam stroke, so opacity applies to the finished solid.
         if self.opacity < 1.0 {
             canvas.save_layer_alpha_f(None, self.opacity);
         }
-        for facet in pose.visible_facets() {
-            let [a, b, c] = facet.map(|vertex| pose.place(vertex, self.radius));
+        let face = |points: &mut dyn Iterator<Item = [f32; 3]>, normal: [f32; 3]| {
             let mut paint = Paint::default();
             paint.set_anti_alias(true);
             paint.set_style(Style::StrokeAndFill);
             paint.set_stroke_width(SEAM_STROKE);
-            paint.set_color(shaded(self.color, facet_normal(facet), pose.light));
-            let mut path = PathBuilder::new();
-            path.move_to(a);
-            path.line_to(b);
-            path.line_to(c);
-            path.close();
-            canvas.draw_path(&path.detach(), &paint);
+            paint.set_color(shaded(self.color, normal, pose.light));
+            let scene = points.map(|point| pose.place(point, self.radius));
+            canvas.draw_path(&closed_path(scene), &paint);
+        };
+        for wall in pose.visible_walls() {
+            face(&mut wall.quad.iter().copied(), wall.normal);
         }
+        face(
+            &mut SOLID.outline.iter().map(|[x, y]| [*x, *y, TOP]),
+            [0.0, 0.0, 1.0],
+        );
         if self.opacity < 1.0 {
             canvas.restore();
         }
@@ -257,15 +308,24 @@ impl MapArrow {
             -pose.light[0] * SHADOW_SHIFT,
             -pose.light[1] * SHADOW_SHIFT,
         ];
-        let ground = |[x, y, _]: [f32; 3]| pose.place([x + shift[0], y + shift[1], 0.0], self.radius);
-        let mut path = PathBuilder::new();
-        path.move_to(ground(FOOTPRINT[0]));
-        for vertex in &FOOTPRINT[1..] {
-            path.line_to(ground(*vertex));
-        }
-        path.close();
-        canvas.draw_path(&path.detach(), &self.shadow);
+        let ground = SOLID
+            .outline
+            .iter()
+            .map(|[x, y]| pose.place([x + shift[0], y + shift[1], 0.0], self.radius));
+        canvas.draw_path(&closed_path(ground), &self.shadow);
     }
+}
+
+fn closed_path(mut points: impl Iterator<Item = Point>) -> skia_safe::Path {
+    let mut path = PathBuilder::new();
+    if let Some(first) = points.next() {
+        path.move_to(first);
+    }
+    for point in points {
+        path.line_to(point);
+    }
+    path.close();
+    path.detach()
 }
 
 #[cfg(test)]
@@ -320,14 +380,29 @@ mod tests {
 
     #[test]
     fn a_follow_camera_sees_the_rear_walls_and_a_top_view_does_not() {
-        let walls = |pose: &MarkerPose| {
-            pose.visible_facets()
-                .iter()
-                .filter(|facet| facet.contains(&NOTCH))
-                .count()
-        };
-        assert_eq!(walls(&pose(60.0, 0.0, 0.0)), 2);
-        assert_eq!(walls(&pose(0.0, 0.0, 0.0)), 0);
+        let behind = pose(60.0, 0.0, 0.0);
+        let walls = behind.visible_walls();
+        assert!(!walls.is_empty());
+        assert!(walls.iter().all(|wall| wall.normal[1] < 0.0));
+        assert!(pose(0.0, 0.0, 0.0).visible_walls().is_empty());
+    }
+
+    #[test]
+    fn the_top_is_flat_and_every_corner_is_rounded() {
+        for wall in &SOLID.walls {
+            assert_eq!([wall.quad[2][2], wall.quad[3][2]], [TOP, TOP]);
+        }
+        for corner in CORNERS {
+            assert!(!SOLID.outline.contains(&corner), "{corner:?} stayed sharp");
+        }
+    }
+
+    #[test]
+    fn the_rounded_tip_reaches_the_rider_and_the_body_trails_behind() {
+        let tip = SOLID.outline.iter().map(|point| point[1]).fold(f32::MIN, f32::max);
+        assert!(tip.abs() < 0.01, "{tip}");
+        let middle = SOLID.outline.iter().position(|point| point[1] == tip).unwrap();
+        assert!(SOLID.outline[middle][0].abs() < 0.01);
     }
 
     #[test]
