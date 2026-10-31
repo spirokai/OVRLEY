@@ -798,8 +798,14 @@ fn quality_mode_selects_encoder_specific_args() {
         assert!(!has_argument_pair(&built.output_args, "-b:v", "60M"));
         assert!(!built.output_args.iter().any(|arg| matches!(
             arg.as_str(),
-            "VBR" | "vbr_peak" | "-mbbrc" | "-maxrate" | "-bufsize"
+            "VBR" | "vbr_peak" | "-mbbrc" | "-bufsize"
         )));
+        // NVENC otherwise applies a low implicit cap that stops CQ changing the bitrate.
+        if flag == "-cq:v" {
+            assert_argument_pair(&built.output_args, "-maxrate", "150M");
+        } else {
+            assert!(!built.output_args.iter().any(|arg| arg == "-maxrate"));
+        }
         if codec == "hevc_amf" {
             assert!(!built.output_args.iter().any(|arg| arg == "-qp_b"));
         }

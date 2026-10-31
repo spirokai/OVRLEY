@@ -1,0 +1,6 @@
+[v1]
+"wasm-bindgen-cli 0.2.130 (registry+https://github.com/rust-lang/crates.io-index)" = [
+  "wasm-bindgen-test-runner.exe",
+  "wasm-bindgen.exe",
+  "wasm2es6js.exe",
+]
