@@ -98,26 +98,39 @@ pub(crate) fn prepare_tile(bytes: &[u8], style: &ParsedStyle) -> Result<Prepared
             .entry(layer.source_layer.as_str())
             .or_insert_with(|| (decode_features(source), 4096.0 / extent(source)));
 
-        let (line_width, line_blur, line_gap_width, translate, dash) = match layer.paint {
-            VectorPaint::Line {
-                width,
-                blur,
-                gap_width,
-                translate,
-                dash,
-                ..
-            } => (width, blur, gap_width, translate, dash),
-            VectorPaint::Fill { translate, .. } => {
-                (1.0, 0.0, 0.0, translate, ShaderDash::default())
-            }
-            VectorPaint::Extrusion { .. } => (1.0, 0.0, 0.0, [0.0, 0.0], ShaderDash::default()),
-        };
+        let (line_width, line_blur, line_gap_width, translate, dash, narrows_with_distance) =
+            match layer.paint {
+                // A fill's outline is a hairline, which MapLibre keeps at one pixel everywhere.
+                VectorPaint::Line {
+                    width,
+                    blur,
+                    gap_width,
+                    translate,
+                    dash,
+                    polygons_only,
+                    ..
+                } => (
+                    width,
+                    blur,
+                    gap_width,
+                    translate,
+                    dash,
+                    if polygons_only { 0.0 } else { 1.0 },
+                ),
+                VectorPaint::Fill { translate, .. } => {
+                    (1.0, 0.0, 0.0, translate, ShaderDash::default(), 0.0)
+                }
+                VectorPaint::Extrusion { .. } => {
+                    (1.0, 0.0, 0.0, [0.0, 0.0], ShaderDash::default(), 0.0)
+                }
+            };
         let metadata = ShaderLayerMetadata {
             z_index: layer.index as f32,
             line_width,
             line_blur,
             line_gap_width,
             translate,
+            narrows_with_distance,
             dash,
         };
         match &layer.paint {

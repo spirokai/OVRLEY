@@ -135,6 +135,7 @@ impl TileViewPattern {
         }
         let view_projection = view.view_projection();
         let light_xy = view.light_xy();
+        let centre_w = view.centre_clip_w() as f32;
         self.metadata.clear();
         for shape in &self.shapes {
             let transform = view_projection * tile_transform(shape.coords, view);
@@ -148,6 +149,7 @@ impl TileViewPattern {
                 viewport_height,
                 light_xy,
                 pattern_origin: pattern_origin(shape.coords, view),
+                centre_w,
             });
         }
         if !self.metadata.is_empty() {

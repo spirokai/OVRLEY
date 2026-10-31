@@ -544,16 +544,15 @@ The `map-prepare` events have no listener now that the inspector status is out o
 | No usable GPU, or device loss during an export                    | No GPU fails before encoding. Device loss fails the job, untested |
 | Larger pools on an integrated GPU                                 | Up to about 320 MB seen; untested on one                          |
 | Preview delivery may not hold 30 fps                              | Measured on an RTX 4070; integrated GPU, macOS and Linux untested |
-| Far roads look heavier than Native, buildings heavier at 0.8      | Known visual gaps; line width fix awaits your decision            |
+| Buildings heavier than Native at 0.8                              | Known visual gap, kept by decision                                |
 | GPS offset of ±3–5 m is 15–25 px at z18                           | Accepted; map matching is a separate feature                      |
 
 ## Open decisions and recommendations
 
-| Decision            | When            | Recommendation                                                                                                                                            |
-| ------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Labels              | Before release  | None yet. The idea of ezu-baked, label-only tiles draped on the ground has not been measured                                                              |
-| Far road line width | Any time        | Fix it. Lines keep a constant pixel width with distance, as upstream does, while Native narrows them. It is a line vertex shader change, not yet measured |
-| MSAA                | Settled for now | 4 by default, set per widget (`msaa_samples`, 1 or 4). Costs about 1.7–2×, about 5 ms at 1000 px, and fill and building edges are jagged without it       |
+| Decision | When            | Recommendation                                                                                                                                      |
+| -------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Labels   | Before release  | None yet. The idea of ezu-baked, label-only tiles draped on the ground has not been measured                                                        |
+| MSAA     | Settled for now | 4 by default, set per widget (`msaa_samples`, 1 or 4). Costs about 1.7–2×, about 5 ms at 1000 px, and fill and building edges are jagged without it |
 
 ## Known visual gaps against MapLibre Native
 
@@ -563,6 +562,9 @@ Not drawn or not applied in the GPU renderer:
 
 Applied, with these differences from MapLibre:
 
+- **Line width with distance:** lines have their nominal width at the map centre and narrow or widen with depth only, so a
+  road crossing the view isn't also thinned by pitch as it is in Native. Fill outlines stay one pixel, as in Native. The
+  route keeps a constant width, so it looks wider than a far road under it.
 - **Dashes:** drawn analytically in the line shader from a dash and a gap, which is all the presets use. A longer pattern
   logs and skips its layer. No zoom crossfade, because a renderer's style zoom is fixed.
 - **Patterns:** the two images in use are bundled (`gpu/patterns/`), so no sprite is downloaded. A pattern that isn't

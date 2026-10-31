@@ -33,6 +33,8 @@ pub(crate) struct ShaderLayerMetadata {
     pub(crate) line_gap_width: f32,
     /// Style pixels on the map plane.
     pub(crate) translate: [f32; 2],
+    /// 1 when a line's width falls with distance, 0 when it holds its pixels.
+    pub(crate) narrows_with_distance: f32,
     pub(crate) dash: ShaderDash,
 }
 
@@ -57,6 +59,8 @@ pub(crate) struct ShaderTileMetadata {
     pub(crate) light_xy: [f32; 2],
     /// This tile's corner in style pixels from the world's, wrapped where every pattern repeats.
     pub(crate) pattern_origin: [f32; 2],
+    /// Clip-space w of the map centre, where a line has its nominal width.
+    pub(crate) centre_w: f32,
 }
 
 #[repr(C)]
@@ -133,14 +137,27 @@ const FILL_TILE_ATTRIBUTES: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array
     7 => Float32x4,
     9 => Float32, // zoom_factor
 ];
-const LINE_TILE_ATTRIBUTES: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array![
-    4 => Float32x4, // translate
-    5 => Float32x4,
-    6 => Float32x4,
-    7 => Float32x4,
-    9 => Float32, // zoom_factor
-    11 => Float32, // viewport_width
-    12 => Float32, // viewport_height
+const LINE_TILE_ATTRIBUTES: [wgpu::VertexAttribute; 8] = [
+    FILL_TILE_ATTRIBUTES[0],
+    FILL_TILE_ATTRIBUTES[1],
+    FILL_TILE_ATTRIBUTES[2],
+    FILL_TILE_ATTRIBUTES[3],
+    FILL_TILE_ATTRIBUTES[4],
+    wgpu::VertexAttribute {
+        format: wgpu::VertexFormat::Float32,
+        offset: std::mem::offset_of!(ShaderTileMetadata, viewport_width) as u64,
+        shader_location: 11,
+    },
+    wgpu::VertexAttribute {
+        format: wgpu::VertexFormat::Float32,
+        offset: std::mem::offset_of!(ShaderTileMetadata, viewport_height) as u64,
+        shader_location: 12,
+    },
+    wgpu::VertexAttribute {
+        format: wgpu::VertexFormat::Float32,
+        offset: std::mem::offset_of!(ShaderTileMetadata, centre_w) as u64,
+        shader_location: 3,
+    },
 ];
 const PATTERN_TILE_ATTRIBUTES: [wgpu::VertexAttribute; 6] = [
     FILL_TILE_ATTRIBUTES[0],
@@ -168,7 +185,7 @@ const FILL_LAYER_ATTRIBUTES: [wgpu::VertexAttribute; 2] = [
 ];
 const LINE_LAYER_ATTRIBUTES: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
     10 => Float32x4, // z_index, line_width, line_blur, line_gap_width
-    13 => Float32x2, // translate
+    13 => Float32x3, // translate, narrows_with_distance
     14 => Float32x3, // dash on, off, cap_radius
 ];
 const FEATURE_ATTRIBUTES: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![

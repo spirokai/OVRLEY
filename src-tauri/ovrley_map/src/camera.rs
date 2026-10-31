@@ -258,6 +258,11 @@ impl ViewState {
         ]
     }
 
+    /// Clip-space w of the map centre: how far it is from the camera along the view axis.
+    pub fn centre_clip_w(&self) -> f64 {
+        (self.view_projection() * Vector4::new(self.position.0, self.position.1, 0.0, 1.0)).w
+    }
+
     fn camera_to_center_distance(&self) -> f64 {
         (self.height / 2.0) / self.y_tan
     }
