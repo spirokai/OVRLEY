@@ -98,6 +98,7 @@
         "gradient",
         "heartrate",
         "engine_power",
+        "map",
         "power",
         "speed",
         "time",

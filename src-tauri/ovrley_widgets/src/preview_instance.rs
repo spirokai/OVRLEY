@@ -256,12 +256,8 @@ impl PreviewInstance {
             ) => route.update(widget, scene, transient)?,
             (
                 PreviewWidget::Map(map),
-                WidgetRequest::Map {
-                    widget,
-                    scene,
-                    transient,
-                },
-            ) => map.update(widget, scene, transient, fonts)?,
+                WidgetRequest::Map { widget, scene, .. },
+            ) => map.update(widget, scene, fonts)?,
             (PreviewWidget::Raster(raster), WidgetRequest::Raster { widget, scene, .. }) => {
                 raster.update(widget, scene, images)?
             }

@@ -6,12 +6,13 @@ use super::{
 use crate::error::{WidgetError, WidgetResult};
 use ovrley_map::{mercator::world_to_lon_lat, MapCamera, MAX_TILE_ZOOM, TILE_SIZE};
 
-/// Equatorial circumference, in metres.
-const EARTH_CIRCUMFERENCE_METERS: f64 = 40_075_016.69;
 /// A follow camera sits low in the frame, showing more road ahead, as `NavigationMapController` does.
 const FOLLOW_TOP_PADDING: f64 = 0.45;
 /// Empty share of a fixed camera's frame on each side of the route.
 const FIXED_MARGIN: f64 = 0.08;
+/// The frame a fixed camera fits the route into at zoom offset 0, in scene units: the default widget's.
+/// It doesn't follow the widget's size, so resizing crops the map instead of rescaling it.
+const FIXED_FIT_FRAME: f64 = 500.0;
 
 /// One widget's camera with its constant parts resolved.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -25,29 +26,20 @@ pub enum WidgetCamera {
 }
 
 impl WidgetCamera {
-    /// `width` and `height` are in scene units, so a scaled scene is a sharper version of one map.
-    pub fn new(
-        mode: MapCameraMode,
-        track: &MapTrack,
-        width: f32,
-        height: f32,
-    ) -> WidgetResult<Self> {
+    /// Never depends on the widget's size, so a size edit shows more or less of the same map.
+    pub fn new(mode: MapCameraMode, track: &MapTrack) -> WidgetResult<Self> {
         Ok(match mode {
-            MapCameraMode::Fixed => Self::Fixed(fixed_camera(
+            MapCameraMode::Fixed { zoom_offset, pan } => Self::Fixed(fixed_camera(
                 track,
-                f64::from(width),
-                f64::from(height),
+                f64::from(zoom_offset),
+                pan.map(f64::from),
             )?),
             MapCameraMode::Follow {
                 orientation,
                 pitch_deg,
-                range_meters,
+                zoom,
             } => Self::Follow {
-                zoom: follow_zoom(
-                    track.mean_latitude(),
-                    f64::from(range_meters),
-                    f64::from(width),
-                ),
+                zoom: f64::from(zoom),
                 pitch_deg: f64::from(pitch_deg),
                 orientation,
             },
@@ -91,18 +83,10 @@ fn clamp_zoom(zoom: f64) -> f64 {
     zoom.clamp(0.0, f64::from(MAX_TILE_ZOOM))
 }
 
-/// The zoom whose `width` scene units span `range_meters` of ground at this latitude.
-fn follow_zoom(mean_latitude: f64, range_meters: f64, width: f64) -> f64 {
-    let meters_per_unit = range_meters / width;
-    clamp_zoom(
-        (mean_latitude.to_radians().cos() * EARTH_CIRCUMFERENCE_METERS
-            / (f64::from(TILE_SIZE) * meters_per_unit))
-            .log2(),
-    )
-}
-
-/// The whole route, north up, pitch 0.
-fn fixed_camera(track: &MapTrack, width: f64, height: f64) -> WidgetResult<MapCamera> {
+/// North up, pitch 0. `zoom_offset` counts levels past the zoom that fits the whole route, and a
+/// positive `pan` moves the route right and down in the frame, as a share of its longest side. Both
+/// are relative to the route, so a project's framing carries over to another activity.
+fn fixed_camera(track: &MapTrack, zoom_offset: f64, pan: [f64; 2]) -> WidgetResult<MapCamera> {
     let (mut min, mut max) = ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN));
     for point in track.world() {
         min = (min.0.min(point.0), min.1.min(point.1));
@@ -110,9 +94,12 @@ fn fixed_camera(track: &MapTrack, width: f64, height: f64) -> WidgetResult<MapCa
     }
     let usable = 1.0 - FIXED_MARGIN * 2.0;
     let tile = f64::from(TILE_SIZE);
-    let fit = |extent: f64, span: f64| (extent * usable / (span * tile)).log2();
+    let longest = (max.0 - min.0).max(max.1 - min.1);
     // A span of zero fits at any zoom, and the clamp takes it to the deepest one.
-    let zoom = clamp_zoom(fit(width, max.0 - min.0).min(fit(height, max.1 - min.1)));
-    let (lon, lat) = world_to_lon_lat((min.0 + max.0) / 2.0, (min.1 + max.1) / 2.0);
+    let zoom = clamp_zoom((FIXED_FIT_FRAME * usable / (longest * tile)).log2() + zoom_offset);
+    let (lon, lat) = world_to_lon_lat(
+        (min.0 + max.0) / 2.0 - pan[0] * longest,
+        (min.1 + max.1) / 2.0 - pan[1] * longest,
+    );
     MapCamera::new(lon, lat, zoom, 0.0, 0.0, 0.0).map_err(WidgetError::Render)
 }

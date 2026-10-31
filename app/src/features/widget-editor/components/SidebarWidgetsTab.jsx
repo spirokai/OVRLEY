@@ -16,6 +16,7 @@ import ElevationWidgetEditor from './ElevationWidgetEditor'
 import DivingProfileWidgetEditor from './DivingProfileWidgetEditor'
 import RollingChartWidgetEditor from './RollingChartWidgetEditor'
 import GradientWidgetEditor from './GradientWidgetEditor'
+import MapWidgetEditor from './MapWidgetEditor'
 import MetricWidgetEditor from './metricWidget/MetricWidgetEditor'
 import RouteMapWidgetEditor from './RouteMapWidgetEditor'
 import TextWidgetEditor from './TextWidgetEditor'
@@ -40,6 +41,7 @@ const WIDGET_EDITOR_MAP = {
   time: TimeWidgetEditor,
   gradient: GradientWidgetEditor,
   course: RouteMapWidgetEditor,
+  map: MapWidgetEditor,
   elevation: ElevationWidgetEditor,
   diving_profile: DivingProfileWidgetEditor,
   rolling_chart: RollingChartWidgetEditor,

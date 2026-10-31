@@ -3,7 +3,7 @@
 /// Style pixels along one tile edge at pixel ratio 1.
 pub const TILE_SIZE: u32 = 512;
 /// Deepest tile the widget renders. Data stops at z14 and overzooms from there.
-pub const MAX_TILE_ZOOM: u8 = 18;
+pub const MAX_TILE_ZOOM: u8 = 19;
 /// The vector source every OpenFreeMap style draws from.
 pub const VECTOR_SOURCE: &str = "openmaptiles";
 
@@ -45,28 +45,14 @@ impl MapStyle {
 /// Which groups of map layers are drawn.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct MapLayers {
-    pub roads: bool,
-    pub paths: bool,
-    pub water: bool,
     pub buildings: bool,
     pub labels: bool,
 }
 
 impl MapLayers {
-    /// Whether these toggles hide a style layer, from its `type`, `source-layer` and `id`.
-    pub fn hides_layer(self, layer_type: &str, source_layer: Option<&str>, id: &str) -> bool {
-        if !self.labels && layer_type == "symbol" {
-            return true;
-        }
-        match source_layer {
-            Some("transportation") if id.contains("path") || id.contains("pedestrian") => {
-                !self.paths
-            }
-            Some("transportation" | "aeroway") => !self.roads,
-            Some("water" | "waterway") => !self.water,
-            Some("building") => !self.buildings,
-            _ => false,
-        }
+    /// Whether these toggles hide a style layer, from its `type` and `source-layer`.
+    pub fn hides_layer(self, layer_type: &str, source_layer: Option<&str>) -> bool {
+        (!self.labels && layer_type == "symbol") || (!self.buildings && source_layer == Some("building"))
     }
 }
 

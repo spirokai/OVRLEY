@@ -41,10 +41,13 @@ export function getWidgetResizeOptions(widget, isGroupSelection) {
   return {
     canResizeSelected: true,
     canRotateSelected: widget.type === 'course' || widget.type === 'raster',
-    showEdgeResizeHandles: ['raster', 'elevation', 'diving_profile', 'rolling_chart'].includes(widget.type),
+    showEdgeResizeHandles:
+      ['raster', 'elevation', 'diving_profile', 'rolling_chart'].includes(widget.type) ||
+      (widget.type === 'map' && widget.data.shape === 'rectangle'),
     maintainAspectRatio:
       ['arc', 'corner', 'gt_gauge', 'lean_angle', 'heading_compass', 'g_force'].includes(widget.data.display_type) ||
       (widget.type === 'backdrop' && widget.data.display_type === 'circle') ||
+      (widget.type === 'map' && widget.data.shape === 'circle') ||
       widget.type === 'course' ||
       !isFramedWidget(widget),
   }

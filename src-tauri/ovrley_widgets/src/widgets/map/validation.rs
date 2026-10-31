@@ -3,13 +3,23 @@
 use super::config::MapConfig;
 use crate::{
     error::{WidgetError, WidgetResult},
-    model::validation::{require_f32, require_non_negative_f32, require_positive_f32},
+    model::validation::{
+        require_f32, require_hex_color, require_non_negative_f32, require_positive_f32,
+        require_unit_opacity,
+    },
     widgets::route::validation::{validate_route_path, ValidatedRoutePath},
 };
-use ovrley_map::{MapLayers, MapStyle, MapStyleSpec};
+use ovrley_map::{MapLayers, MapStyle, MapStyleSpec, MAX_TILE_ZOOM};
+use std::ops::RangeInclusive;
 
-/// Steeper than this, a follow camera with its top padding looks past the horizon.
-const MAX_PITCH_DEG: f32 = 60.0;
+const MAX_PITCH_DEG: f32 = 70.0;
+/// Further out, a follow camera's pitched view takes in too many tiles.
+const MIN_FOLLOW_ZOOM: f32 = 14.0;
+/// Top-down zoom levels around the zoom that fits the whole route.
+const FIXED_ZOOM_RANGE: RangeInclusive<f32> = -4.0..=8.0;
+const FIXED_PAN_RANGE: RangeInclusive<f32> = -1.0..=1.0;
+/// The sample counts every GPU supports, so a project draws the same on any machine.
+const MSAA_SAMPLES: [u32; 2] = [1, 4];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MapOrientation {
@@ -19,13 +29,26 @@ pub enum MapOrientation {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MapCameraMode {
-    /// The whole route, north up, pitch 0.
-    Fixed,
+    /// North up and pitch 0. The tiles never move: only the marker and the route's split do.
+    Fixed { zoom_offset: f32, pan: [f32; 2] },
     Follow {
         orientation: MapOrientation,
         pitch_deg: f32,
-        range_meters: f32,
+        zoom: f32,
     },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum MapShape {
+    Rectangle { corner_radius: f32 },
+    Circle,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct MapBorder {
+    pub color: String,
+    pub thickness: f32,
+    pub opacity: f32,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -34,9 +57,13 @@ pub struct ValidatedMapWidget {
     pub y: f32,
     pub width: f32,
     pub height: f32,
+    pub opacity: f32,
     pub font: String,
     pub spec: MapStyleSpec,
     pub camera: MapCameraMode,
+    pub msaa_samples: u32,
+    pub shape: MapShape,
+    pub border: MapBorder,
     pub simplify_tolerance_px: f32,
     pub show_full_activity: bool,
     pub path: ValidatedRoutePath,
@@ -47,6 +74,17 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
     let invalid = |field: &str, message: &str| {
         WidgetError::Config(format!("{}: {message}", p(field)))
     };
+    let in_range = |value: f32, field: &str, range: RangeInclusive<f32>| -> WidgetResult<f32> {
+        let value = require_f32(Some(value), &p(field))?;
+        if range.contains(&value) {
+            Ok(value)
+        } else {
+            Err(invalid(
+                field,
+                &format!("must be between {} and {}", range.start(), range.end()),
+            ))
+        }
+    };
     if map.value != "map" {
         return Err(invalid("value", "must be map"));
     }
@@ -56,24 +94,43 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
     let style = MapStyle::from_name(&map.map_style)
         .ok_or_else(|| invalid("map_style", "unsupported map style"))?;
     let camera = match map.camera_mode.as_str() {
-        "fixed" => MapCameraMode::Fixed,
-        "follow" => {
-            let orientation = match map.orientation.as_str() {
+        "fixed" => MapCameraMode::Fixed {
+            zoom_offset: in_range(map.fixed_zoom, "fixed_zoom", FIXED_ZOOM_RANGE)?,
+            pan: [
+                in_range(map.fixed_pan_x, "fixed_pan_x", FIXED_PAN_RANGE)?,
+                in_range(map.fixed_pan_y, "fixed_pan_y", FIXED_PAN_RANGE)?,
+            ],
+        },
+        "follow" => MapCameraMode::Follow {
+            orientation: match map.orientation.as_str() {
                 "north_up" => MapOrientation::NorthUp,
                 "rider_up" => MapOrientation::RiderUp,
                 _ => return Err(invalid("orientation", "unsupported orientation")),
-            };
-            let pitch_deg = require_f32(Some(map.pitch), &p("pitch"))?;
-            if !(0.0..=MAX_PITCH_DEG).contains(&pitch_deg) {
-                return Err(invalid("pitch", "must be between 0 and 60"));
-            }
-            MapCameraMode::Follow {
-                orientation,
-                pitch_deg,
-                range_meters: require_positive_f32(Some(map.range_meters), &p("range_meters"))?,
-            }
-        }
+            },
+            pitch_deg: in_range(map.pitch, "pitch", 0.0..=MAX_PITCH_DEG)?,
+            zoom: in_range(
+                map.follow_zoom,
+                "follow_zoom",
+                MIN_FOLLOW_ZOOM..=f32::from(MAX_TILE_ZOOM),
+            )?,
+        },
         _ => return Err(invalid("camera_mode", "unsupported camera mode")),
+    };
+    // Seen from straight above, a building is only its roof, so the toggle needs a pitched camera.
+    let buildings = map.show_buildings
+        && matches!(camera, MapCameraMode::Follow { pitch_deg, .. } if pitch_deg > 0.0);
+    if !MSAA_SAMPLES.contains(&map.msaa_samples) {
+        return Err(invalid("msaa_samples", "must be 1 or 4"));
+    }
+    let width = require_positive_f32(Some(map.width), &p("width"))?;
+    let height = require_positive_f32(Some(map.height), &p("height"))?;
+    let shape = match map.shape.as_str() {
+        "rectangle" => MapShape::Rectangle {
+            corner_radius: require_non_negative_f32(map.corner_radius, &p("corner_radius"))?,
+        },
+        "circle" if width == height => MapShape::Circle,
+        "circle" => return Err(invalid("shape", "a circular map must be square")),
+        _ => return Err(invalid("shape", "unsupported shape")),
     };
     let simplify_tolerance_px =
         require_f32(Some(map.simplify_tolerance_px), &p("simplify_tolerance_px"))?;
@@ -82,21 +139,26 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
     Ok(ValidatedMapWidget {
         x: require_f32(Some(map.x), &p("x"))?,
         y: require_f32(Some(map.y), &p("y"))?,
-        width: require_positive_f32(Some(map.width), &p("width"))?,
-        height: require_positive_f32(Some(map.height), &p("height"))?,
+        width,
+        height,
+        opacity: require_unit_opacity(Some(map.opacity), &p("opacity"))?,
         font: map.font.clone(),
         spec: MapStyleSpec {
             style,
             // The GPU renderer draws no labels, so the config has no toggle for them.
             layers: MapLayers {
-                roads: map.show_roads,
-                paths: map.show_paths,
-                water: map.show_water,
-                buildings: map.show_buildings,
+                buildings,
                 labels: false,
             },
         },
         camera,
+        msaa_samples: map.msaa_samples,
+        shape,
+        border: MapBorder {
+            color: require_hex_color(Some(&map.border_color), &p("border_color"))?,
+            thickness: require_non_negative_f32(map.border_thickness, &p("border_thickness"))?,
+            opacity: require_unit_opacity(Some(map.border_opacity), &p("border_opacity"))?,
+        },
         simplify_tolerance_px,
         show_full_activity: map.show_full_activity,
         path: validate_route_path(&map.path, &p)?,

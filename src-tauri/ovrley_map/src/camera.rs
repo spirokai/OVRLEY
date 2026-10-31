@@ -10,10 +10,15 @@ use crate::{MAX_TILE_ZOOM, TILE_SIZE};
 use cgmath::{frustum, Deg, InnerSpace, Matrix4, Rad, SquareMatrix, Vector3, Vector4};
 use std::f64::consts::PI;
 
-/// MapLibre's vertical field of view: `2 * atan(0.75 / 1.5)` in the transform it descends from.
-const FOVY: f64 = 0.6435011087932844;
+/// The widest vertical field of view, 50 degrees, wider than MapLibre's 37. For one map scale a wider
+/// lens sits lower, so the road rushes past and buildings stand up more.
+const FOVY: f64 = 0.8726646259971648;
 /// Steeper than this, the top of the frustum no longer meets the ground in the view region.
 const MAX_PITCH_DEG: f64 = 85.0;
+/// The steepest the frame's top edge looks, from straight down. Past this the lens narrows, and past
+/// 90 the edge would miss the ground. Where the view reaches depends only on this angle, so a higher
+/// or lower camera can't change it. A follow camera keeps the full lens to about pitch 52.
+const MAX_TOP_EDGE_DEG: f64 = 85.8;
 /// MapLibre's mean earth radius, in metres.
 const EARTH_RADIUS: f64 = 6371008.8;
 /// MapLibre's default light `position: [1.15, 210, 30]` on the ground plane, at bearing 0.
@@ -192,6 +197,15 @@ pub struct ViewState {
     height: f64,
     pixel_ratio: f64,
     top_padding_ratio: f64,
+    /// Tangent of half the vertical field of view.
+    y_tan: f64,
+}
+
+/// The lens, narrowed when the frame's top edge would look past [`MAX_TOP_EDGE_DEG`]. The
+/// camera moves back as it narrows, so the centre keeps its scale and tiles in view stay level.
+fn lens_y_tan(pitch_deg: f64, top_padding_ratio: f64) -> f64 {
+    let widest = (MAX_TOP_EDGE_DEG - pitch_deg).to_radians().tan() / (1.0 + top_padding_ratio);
+    (FOVY / 2.0).tan().min(widest)
 }
 
 impl ViewState {
@@ -210,6 +224,7 @@ impl ViewState {
             height: f64::from(viewport.height_px),
             pixel_ratio,
             top_padding_ratio: camera.top_padding_ratio,
+            y_tan: lens_y_tan(camera.pitch_deg, camera.top_padding_ratio),
         }
     }
 
@@ -239,11 +254,11 @@ impl ViewState {
     }
 
     fn camera_to_center_distance(&self) -> f64 {
-        (self.height / 2.0) / (FOVY / 2.0).tan()
+        (self.height / 2.0) / self.y_tan
     }
 
-    fn y_tan(&self) -> f64 {
-        (FOVY / 2.0).tan()
+    const fn y_tan(&self) -> f64 {
+        self.y_tan
     }
 
     fn x_tan(&self) -> f64 {

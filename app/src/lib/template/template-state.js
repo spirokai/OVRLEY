@@ -200,6 +200,7 @@ export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null, 
       if ((plot.value === 'elevation' || plot.value === 'diving_profile') && shouldApply('font_values')) {
         plot.point_label = { ...(plot.point_label || {}), ...createFontSelection(globals.font_values) }
       }
+      if (plot.value === 'map' && shouldApply('font_text')) plot.font = globals.font_text
       if (plot.value === 'rolling_chart') {
         if (shouldApply('font_values')) plot.legend_font = globals.font_values
         if (shouldApply('color_values')) plot.legend_color = globals.color_values

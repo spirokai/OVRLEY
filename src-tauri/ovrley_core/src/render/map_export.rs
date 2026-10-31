@@ -44,8 +44,6 @@ use std::{
 
 /// Connections to the tile server at once.
 const FETCH_THREADS: usize = 8;
-/// Fill and building edges are jagged without it.
-const SAMPLE_COUNT: u32 = 4;
 const PREPARING_MESSAGE: &str = "Preparing video assets...";
 
 /// What a job's maps are prepared from.
@@ -421,7 +419,7 @@ impl ExportRenderer {
             GpuMapConfig {
                 spec: widget.spec,
                 viewport: map.viewport(),
-                sample_count: SAMPLE_COUNT,
+                sample_count: widget.msaa_samples,
                 style_zoom: map.zoom(),
                 pools,
                 buildings,
@@ -450,7 +448,11 @@ impl ExportRenderer {
         self.renderer.load_view(&tiles, data)?;
         self.load_ms += started.elapsed().as_secs_f64() * 1000.0;
         let started = Instant::now();
-        let pixels = self.renderer.render(&request.camera, Some(&request.route))?;
+        let pixels = self.renderer.render(
+            &request.camera,
+            Some(&request.route),
+            request.corner_radius_px,
+        )?;
         let image = map_frame_image(
             request.viewport.width_px(),
             request.viewport.height_px(),

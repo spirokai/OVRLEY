@@ -64,6 +64,8 @@ pub struct RouteFrameState {
     pub progress01: f32,
     pub marker_x: f32,
     pub marker_y: f32,
+    /// The route's direction at the marker, along the segment it's on.
+    pub marker_direction: (f32, f32),
     pub segment_index: usize,
 }
 
@@ -173,6 +175,7 @@ impl RouteGeometry {
             progress01: target,
             marker_x: a.0 + (b.0 - a.0) * mix,
             marker_y: a.1 + (b.1 - a.1) * mix,
+            marker_direction: (b.0 - a.0, b.1 - a.1),
             segment_index: index,
         }
     }

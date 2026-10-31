@@ -32,10 +32,13 @@ use extrusion::ExtrusionVertex;
 use crate::MapDataSource;
 use crate::{MapCamera, MapRouteDraw, MapStyleSpec, MapViewport, TileId, ViewState};
 use pattern::{stencil_reference_value_3d, TileShape, TileViewPattern};
-use pipelines::{BackgroundLayerMetadata, Pipelines, ShaderVertex, COLOR_FORMAT, DEPTH_FORMAT};
+use pipelines::{
+    BackgroundLayerMetadata, Pipelines, ShaderVertex, ShapeMaskInstance, COLOR_FORMAT, DEPTH_FORMAT,
+};
 use pool::{BufferPool, IndexEntry, LayerGeometry};
 use route::RouteLayer;
 use std::collections::HashSet;
+use std::mem::size_of;
 use std::ops::Range;
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -145,6 +148,9 @@ pub struct GpuMapRenderer {
     extrusion_pool: BufferPool<ExtrusionVertex>,
     background_buffer: Option<wgpu::Buffer>,
     route: Option<RouteLayer>,
+    shape_buffer: wgpu::Buffer,
+    /// Whether this frame's corners are rounded, so its shape mask draws.
+    rounded: bool,
     /// Tiles that finished loading. Eviction removes them again.
     loaded: HashSet<TileId>,
     pool_clears: u64,
@@ -237,6 +243,13 @@ impl GpuMapRenderer {
             })
         });
 
+        let shape_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("shape mask buffer"),
+            size: size_of::<ShapeMaskInstance>() as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         let renderer = Self {
             config,
             device,
@@ -251,6 +264,8 @@ impl GpuMapRenderer {
             extrusion_pool,
             background_buffer,
             route: None,
+            shape_buffer,
+            rounded: false,
             loaded: HashSet::new(),
             pool_clears: 0,
             masks: Vec::with_capacity(64),
@@ -290,13 +305,30 @@ impl GpuMapRenderer {
         }
     }
 
-    /// Everything a frame needs before its pass is recorded.
+    /// Everything a frame needs before its pass is recorded. Corners round in here rather than in each
+    /// host, so preview and export crop the map the same way.
     fn prepare_frame(
         &mut self,
         camera: &MapCamera,
         route: Option<&MapRouteDraw>,
+        corner_radius_px: f32,
     ) -> Result<(), String> {
         self.check_gpu()?;
+        self.rounded = corner_radius_px > 0.0;
+        if self.rounded {
+            let viewport = self.config.viewport;
+            self.queue.write_buffer(
+                &self.shape_buffer,
+                0,
+                bytemuck::bytes_of(&ShapeMaskInstance {
+                    half_size: [
+                        viewport.width_px() as f32 / 2.0,
+                        viewport.height_px() as f32 / 2.0,
+                    ],
+                    radius: corner_radius_px,
+                }),
+            );
+        }
         let viewport = self.config.viewport;
         let view = ViewState::new(camera, viewport);
         let loaded = &self.loaded;
@@ -499,6 +531,12 @@ impl GpuMapRenderer {
                 pass.draw_indexed(entry.indices_range(), 0, 0..1);
             }
         }
+
+        if self.rounded {
+            pass.set_pipeline(&self.pipelines.shape_mask);
+            pass.set_vertex_buffer(0, self.shape_buffer.slice(..));
+            pass.draw(0..MASK_VERTICES, 0..1);
+        }
     }
 
 }
@@ -649,12 +687,14 @@ impl GpuMapRenderer {
 
     /// Draws one frame and returns its RGBA pixels, with a blocking readback. A route draws above
     /// the roads and below the buildings. A new line is tessellated and uploaded on first use.
+    /// Pixels outside corners of `corner_radius_px` are transparent.
     pub fn render(
         &mut self,
         camera: &MapCamera,
         route: Option<&MapRouteDraw>,
+        corner_radius_px: f32,
     ) -> Result<&[u8], String> {
-        self.draw_frame(camera, route)?;
+        self.draw_frame(camera, route, corner_radius_px)?;
         self.read_back()?;
         Ok(&self.output.pixels)
     }
@@ -663,8 +703,9 @@ impl GpuMapRenderer {
         &mut self,
         camera: &MapCamera,
         route: Option<&MapRouteDraw>,
+        corner_radius_px: f32,
     ) -> Result<(), String> {
-        self.prepare_frame(camera, route)?;
+        self.prepare_frame(camera, route, corner_radius_px)?;
         let viewport = self.config.viewport;
         let mut encoder = self
             .device
@@ -829,7 +870,7 @@ fn check_pool_sizes(
     if largest_buffer > max_buffer_size {
         return Err(format!(
             "This map view needs a {largest_buffer} byte GPU buffer and {adapter_name} allows \
-             {max_buffer_size}. Reduce the map's range or pitch."
+             {max_buffer_size}. Raise the map's zoom or lower its pitch."
         ));
     }
     Ok(())

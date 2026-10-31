@@ -1,5 +1,8 @@
 //! Framed resize: the map keeps its route styling and the opposite corner stays fixed.
-use super::{config::MapConfig, validation::validate_map_widget};
+use super::{
+    config::MapConfig,
+    validation::{validate_map_widget, MapShape},
+};
 use crate::{
     error::{WidgetError, WidgetResult},
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
@@ -26,10 +29,13 @@ pub fn resize_map(
     if size.iter().any(|value| !value.is_finite() || *value <= 0.0) {
         return Err(WidgetError::Config("invalid map resize size".into()));
     }
-    validate_map_widget(&widget, 0)?;
+    let shape = validate_map_widget(&widget, 0)?.shape;
     let scene = validate_scene_presentation(scene)?;
     let width = (size[0] / scene.scale).max(MIN_EDGE);
-    let height = (size[1] / scene.scale).max(MIN_EDGE);
+    let height = match shape {
+        MapShape::Circle => width,
+        MapShape::Rectangle { .. } => (size[1] / scene.scale).max(MIN_EDGE),
+    };
     Ok(ResizeUpdate {
         x: point[0] - width * scene.scale * fixed[0],
         y: point[1] - height * scene.scale * fixed[1],

@@ -15,18 +15,14 @@ use wasm_bindgen::prelude::*;
 #[derive(Deserialize)]
 struct RendererConfig {
     style: String,
-    roads: bool,
-    paths: bool,
-    water: bool,
     buildings: bool,
     width: u32,
     height: u32,
     pixel_ratio: f32,
+    msaa_samples: u32,
     zoom: f64,
 }
 
-/// Fill and building edges are jagged without it.
-const SAMPLE_COUNT: u32 = 4;
 /// `lon, lat, zoom, pitch, bearing, top padding`, from the widget's view.
 const CAMERA_VALUES: usize = 6;
 /// Completed rgba and width, then remaining rgba and width.
@@ -46,15 +42,12 @@ fn parse_config(json: &str) -> Result<GpuMapConfig, String> {
         spec: MapStyleSpec {
             style,
             layers: MapLayers {
-                roads: config.roads,
-                paths: config.paths,
-                water: config.water,
                 buildings: config.buildings,
                 labels: false,
             },
         },
         viewport: MapViewport::new(config.width, config.height, config.pixel_ratio)?,
-        sample_count: SAMPLE_COUNT,
+        sample_count: config.msaa_samples,
         style_zoom: config.zoom,
         pools: GpuPoolSizes::uniform(DEFAULT_POOL_ENTRIES),
         buildings: Buildings::for_style(style),
@@ -133,11 +126,17 @@ impl MapLayer {
             .map_err(js_error)
     }
 
+    /// Draws at a new size from the next frame, keeping every tile.
+    pub fn resize(&mut self, width: u32, height: u32) -> Result<(), JsValue> {
+        self.renderer.resize(width, height).map_err(js_error)
+    }
+
     pub fn draw(
         &mut self,
         camera: &[f64],
         route_style: &[f32],
         travelled_metres: f32,
+        corner_radius_px: f32,
     ) -> Result<(), JsValue> {
         let camera = parse_camera(camera).map_err(js_error)?;
         let line = self
@@ -171,7 +170,7 @@ impl MapLayer {
             travelled_metres,
         };
         self.renderer
-            .present(&camera, Some(&route))
+            .present(&camera, Some(&route), corner_radius_px)
             .map_err(js_error)
     }
 }

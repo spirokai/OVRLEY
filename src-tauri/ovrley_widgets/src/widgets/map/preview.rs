@@ -1,4 +1,5 @@
-//! A map handle retains the track and the last frame across config edits and live resize drafts.
+//! A map handle retains the track and the last frame across config edits. Every edit draws at its own
+//! size and camera straight away, so a resize shows more or less of the map and never stretches it.
 use super::{
     config::MapConfig,
     content::{ContentKey, MapContent},
@@ -27,6 +28,9 @@ use serde_json::json;
 use skia_safe::{Canvas, Image, Point, Rect, Surface};
 use std::sync::Arc;
 
+/// A few metres along the road, in Mercator world units: enough to fix a direction, too short to curve.
+const MARKER_HEADING_STEP: f64 = 1e-7;
+
 /// What is behind the marker and attribution.
 enum MapBacking {
     Image(Image),
@@ -52,9 +56,8 @@ pub struct PreviewMap {
     frames: Arc<dyn MapFrameProvider>,
     layout: MapLayout,
     content: Option<MapContent>,
-    /// The inputs of `content`, committed sizes only: a live resize rescales and asks for nothing.
+    /// The inputs of `content`.
     content_key: ContentKey,
-    transient: bool,
     /// The last frame by request, so an unchanged request asks the provider once.
     last_frame: Option<(MapFrameRequest, Image)>,
     last_render: Option<(MapFrameState, bool)>,
@@ -62,8 +65,6 @@ pub struct PreviewMap {
     layer_ready: bool,
     /// JSON of what the map canvas should draw. Empty when it should draw nothing.
     pub view: Vec<u8>,
-    /// The camera of `view`. A live resize keeps it, so the marker stays where the canvas put the road.
-    view_camera: Option<MapCamera>,
     view_line: Option<Arc<MapRouteLine>>,
     /// `world_x, world_y, along_metres` per vertex of `view_line`. `route_id` changes with it.
     pub route_points: Vec<f64>,
@@ -127,12 +128,10 @@ impl PreviewMap {
             scene,
             frames,
             content,
-            transient: false,
             last_frame: None,
             last_render: None,
             layer_ready: false,
             view: Vec::new(),
-            view_camera: None,
             view_line: None,
             route_points: Vec::new(),
             route_id: 0,
@@ -149,7 +148,6 @@ impl PreviewMap {
         &mut self,
         widget: MapConfig,
         scene: ScenePresentationConfig,
-        transient: bool,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<()> {
         let config = validate_map_widget(&widget, 0)?;
@@ -161,13 +159,14 @@ impl PreviewMap {
         if window != self.window {
             self.invalidate_activity();
         }
-        // A live resize keeps the committed zoom and viewport; its commit recomputes them.
-        if !transient {
-            let key = ContentKey::new(&config, &scene, raster_scale);
-            if key != self.content_key {
-                self.content = None;
-                self.content_key = key;
-            }
+        let key = ContentKey::new(&config, &scene, raster_scale);
+        if key != self.content_key {
+            self.content = self
+                .content
+                .take()
+                .map(|content| content.rekeyed(key))
+                .transpose()?;
+            self.content_key = key;
         }
         self.layout = MapLayout::new(&config, &scene, raster_scale, fonts)?;
         self.config = config;
@@ -175,7 +174,6 @@ impl PreviewMap {
         self.window = window;
         self.preview_duration = preview_duration;
         self.raster_scale = raster_scale;
-        self.transient = transient;
         self.last_render = None;
         self.geometry_stale = true;
         Ok(())
@@ -225,15 +223,10 @@ impl PreviewMap {
         }
     }
 
-    /// Publishes what the host's map canvas should draw at this state. During a live resize the
-    /// canvas keeps its last frame, rescaled, and nothing is asked of it.
+    /// Publishes what the host's map canvas should draw at this state.
     fn publish_view(&mut self, state: &MapFrameState) -> WidgetResult<()> {
-        if self.transient {
-            return Ok(());
-        }
         let (Some(camera), Some(MapContent::Activity(map))) = (state.camera, &self.content) else {
             self.view.clear();
-            self.view_camera = None;
             return Ok(());
         };
         if !self
@@ -250,7 +243,6 @@ impl PreviewMap {
             self.route_id = self.route_id.wrapping_add(1);
             self.view_line = Some(map.line.clone());
         }
-        let layers = self.config.spec.layers;
         let viewport = map.viewport;
         let style = self.layout.route_style;
         let [c0, c1, c2, c3] = style.completed_color;
@@ -258,15 +250,15 @@ impl PreviewMap {
         self.view = serde_json::to_vec(&json!({
             "renderer": {
                 "style": self.config.spec.style.name(),
-                "roads": layers.roads,
-                "paths": layers.paths,
-                "water": layers.water,
-                "buildings": layers.buildings,
-                "width": viewport.width_px(),
-                "height": viewport.height_px(),
+                "buildings": self.config.spec.layers.buildings,
                 "pixel_ratio": viewport.pixel_ratio(),
-                "zoom": camera.zoom(),
+                "msaa_samples": self.config.msaa_samples,
             },
+            "width": viewport.width_px(),
+            "height": viewport.height_px(),
+            "style_zoom": camera.zoom(),
+            "opacity": self.layout.opacity,
+            "corner_radius_px": self.layout.corner_radius_px,
             "camera": camera.values(),
             "route_id": self.route_id,
             "route_style": [
@@ -276,11 +268,10 @@ impl PreviewMap {
             "travelled_metres": state.progress,
         }))
         .map_err(|error| WidgetError::Render(error.to_string()))?;
-        self.view_camera = Some(camera);
         Ok(())
     }
 
-    /// The camera and backing to draw. A map layer's camera is the one it last drew.
+    /// The camera and backing to draw.
     fn resolve_frame(
         &mut self,
         state: &MapFrameState,
@@ -292,13 +283,7 @@ impl PreviewMap {
             return Ok(None);
         };
         if self.layer_ready {
-            return Ok(Some((
-                self.view_camera.unwrap_or(camera),
-                MapBacking::Layer,
-            )));
-        }
-        if self.transient {
-            return Ok(Some((camera, MapBacking::Placeholder)));
+            return Ok(Some((camera, MapBacking::Layer)));
         }
         let request = MapFrameRequest {
             spec: self.config.spec,
@@ -309,6 +294,7 @@ impl PreviewMap {
                 style: self.layout.route_style,
                 travelled_metres: state.progress,
             },
+            corner_radius_px: self.layout.corner_radius_px,
         };
         if let Some((cached, image)) = &self.last_frame {
             if *cached == request {
@@ -324,48 +310,60 @@ impl PreviewMap {
         }
     }
 
-    /// Scene pixel under the marker. Follow cameras keep it on their centre; a fixed one moves it.
-    fn marker_point(&self, camera: &MapCamera, second: f64) -> Option<Point> {
+    /// Scene pixel under the marker, and its heading on screen in degrees clockwise from up. Follow
+    /// cameras keep it on their centre; a fixed one moves it. The heading comes from projecting a step
+    /// along the road, so pitch foreshortens it as it does the road.
+    fn marker_point(&self, camera: &MapCamera, second: f64) -> Option<(Point, f32)> {
         let Some(MapContent::Activity(map)) = &self.content else {
             return None;
         };
         let position = map.track.position_at(second);
         let (world_x, world_y) = ovrley_map::mercator::lon_lat_to_world(position.lon, position.lat);
-        let clip = ViewState::new(camera, map.viewport)
-            .ground_projection()
-            .clip(world_x, world_y);
+        let projection = ViewState::new(camera, map.viewport).ground_projection();
         let frame = self.layout.frame;
-        (clip.z >= 0.0).then(|| {
-            Point::new(
-                frame.left + ((clip.x / clip.w * 0.5 + 0.5) as f32) * frame.width(),
-                frame.top + ((0.5 - clip.y / clip.w * 0.5) as f32) * frame.height(),
-            )
-        })
+        let project = |x: f64, y: f64| {
+            let clip = projection.clip(x, y);
+            (clip.z >= 0.0).then(|| {
+                Point::new(
+                    frame.left + ((clip.x / clip.w * 0.5 + 0.5) as f32) * frame.width(),
+                    frame.top + ((0.5 - clip.y / clip.w * 0.5) as f32) * frame.height(),
+                )
+            })
+        };
+        let center = project(world_x, world_y)?;
+        let bearing = map.track.bearing_at(position.distance_meters).to_radians();
+        // World y runs south.
+        let ahead = project(
+            world_x + bearing.sin() * MARKER_HEADING_STEP,
+            world_y - bearing.cos() * MARKER_HEADING_STEP,
+        )?;
+        Some((center, (ahead.x - center.x).atan2(center.y - ahead.y).to_degrees()))
     }
 
     fn paint(
         layout: &MapLayout,
         canvas: &Canvas,
         progress: f32,
-        marker: Option<Point>,
+        marker: Option<(Point, f32)>,
         resolved: Option<&(MapCamera, MapBacking)>,
     ) {
         canvas.save();
-        canvas.clip_rect(layout.frame, None, true);
+        layout.clip_shape(canvas);
         match resolved {
             Some((_, MapBacking::Image(image))) => layout.draw_image(canvas, image),
             Some((_, MapBacking::Layer)) => {}
             Some((_, MapBacking::Placeholder)) => layout.draw_placeholder(canvas),
             None => {
                 layout.draw_placeholder(canvas);
-                let split = layout.draw_placeholder_route(canvas, progress);
-                layout.draw_marker(canvas, split);
+                let (split, heading) = layout.draw_placeholder_route(canvas, progress);
+                layout.draw_marker(canvas, split, heading);
             }
         }
-        if let Some(marker) = marker {
-            layout.draw_marker(canvas, marker);
+        if let Some((center, heading)) = marker {
+            layout.draw_marker(canvas, center, heading);
         }
         layout.draw_attribution(canvas);
+        layout.draw_border(canvas);
         canvas.restore();
     }
 

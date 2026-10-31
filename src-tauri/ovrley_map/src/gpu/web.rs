@@ -12,10 +12,10 @@ use super::style::{parse_style, ParsedStyle};
 use super::tile::{prepare_tile, LayerKind, PreparedLayer, PreparedTile};
 use super::{
     check_pool_sizes, upload_layer, validate_config, BufferPool, GpuMapConfig, GpuMapRenderer,
-    GpuPoolSizes,
+    GpuPoolSizes, Targets,
 };
 use bytemuck::Pod;
-use crate::{view_tiles, MapCamera, MapRouteDraw, TileId};
+use crate::{view_tiles, MapCamera, MapRouteDraw, MapViewport, TileId};
 use std::collections::HashSet;
 use std::mem::size_of;
 
@@ -31,6 +31,7 @@ const SOFTWARE_RENDERERS: [&str; 5] = [
 
 pub(crate) struct Output {
     surface: wgpu::Surface<'static>,
+    surface_config: wgpu::SurfaceConfiguration,
     /// The tiles of the last asked view, to recognise when a view evicts itself.
     view: HashSet<TileId>,
 }
@@ -92,9 +93,23 @@ impl GpuMapRenderer {
         surface.configure(&device, &surface_config);
         let output = Output {
             surface,
+            surface_config,
             view: HashSet::new(),
         };
         Self::assemble(config, parsed, device, queue, adapter_name, output)
+    }
+
+    /// Draws at a new size from the next frame. Only the output changes: tiles stay resident, and the
+    /// map keeps its scale, so a size edit shows more or less of it.
+    pub fn resize(&mut self, width: u32, height: u32) -> Result<(), String> {
+        self.config.viewport = MapViewport::new(width, height, self.config.viewport.pixel_ratio())?;
+        self.targets = Targets::new(&self.device, width, height, self.config.sample_count);
+        self.output.surface_config.width = width;
+        self.output.surface_config.height = height;
+        self.output
+            .surface
+            .configure(&self.device, &self.output.surface_config);
+        self.check_gpu()
     }
 
     /// The tiles `camera` sees that are not on the GPU. Remembers the view for [`Self::upload_tile`].
@@ -170,8 +185,9 @@ impl GpuMapRenderer {
         &mut self,
         camera: &MapCamera,
         route: Option<&MapRouteDraw>,
+        corner_radius_px: f32,
     ) -> Result<(), String> {
-        self.prepare_frame(camera, route)?;
+        self.prepare_frame(camera, route, corner_radius_px)?;
         let frame = match self.output.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,

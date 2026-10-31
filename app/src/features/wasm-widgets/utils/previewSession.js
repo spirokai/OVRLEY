@@ -242,8 +242,7 @@ export function createPreviewSession(module, onError) {
       for (const widget of interaction.resolve(snapshot)) {
         let instance = widgets.get(widget.id)
         const transient =
-          interaction.isDragging(widget.id) ||
-          (['course', 'elevation', 'diving_profile', 'map'].includes(widget.type) && interaction.isResizing(widget.id))
+          interaction.isDragging(widget.id) || (['course', 'elevation', 'diving_profile'].includes(widget.type) && interaction.isResizing(widget.id))
         if (instance?.data === widget.data && instance.scene === snapshot.scene && instance.transient === transient) continue
         const resource = widget.type === 'raster' && images.get(widget.data.resourceId)
         if (resource?.error) throw resource.error

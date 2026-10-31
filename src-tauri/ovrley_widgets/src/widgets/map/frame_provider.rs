@@ -11,6 +11,8 @@ pub struct MapFrameRequest {
     pub camera: MapCamera,
     pub viewport: MapViewport,
     pub route: MapRouteDraw,
+    /// The renderer crops the frame to this, in output pixels. A circle's is half its width.
+    pub corner_radius_px: f32,
 }
 
 pub enum MapFrame {

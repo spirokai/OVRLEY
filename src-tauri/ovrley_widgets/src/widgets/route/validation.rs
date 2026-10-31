@@ -108,7 +108,7 @@ pub fn validate_route_path(
             Some(path.remaining_line_opacity),
             &p("remaining_line_opacity"),
         )?,
-        marker_variant: MarkerVariant::parse(&path.marker_variant, &p("marker_variant"))?,
+        marker_variant: MarkerVariant::parse_on_route(&path.marker_variant, &p("marker_variant"))?,
         marker_variant_diameter: require_positive_f32(
             Some(path.marker_variant_diameter),
             &p("marker_variant_diameter"),

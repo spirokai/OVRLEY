@@ -6,10 +6,12 @@ use ovrley_map::mercator::lon_lat_to_world;
 const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
 /// GPS wanders while stationary. Movement under this adds neither distance nor heading.
 const MIN_MOVE_METERS: f64 = 3.0;
-/// How far ahead the bearing looks, as `getCourseNavigationCamera` does.
-const LOOKAHEAD_METERS: f64 = 15.0;
-/// How far behind the bearing also looks, which smooths GPS noise out of the rotating map.
-const SMOOTHING_METERS: f64 = 30.0;
+/// How far ahead the bearing looks. More of the window is ahead than behind, so the camera is already
+/// turning when the rider reaches a corner. The whole route is known, so looking ahead costs nothing.
+const LOOKAHEAD_METERS: f64 = 30.0;
+/// How far behind the bearing also looks. The window's length smooths GPS noise out of the rotating
+/// map, and its centre sets how early the camera turns.
+const SMOOTHING_METERS: f64 = 15.0;
 
 /// Where the activity is at one second.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -25,7 +27,6 @@ pub struct MapTrack {
     distance: Vec<f64>,
     /// Distance-weighted sum of unit headings up to each sample, as (east, north).
     heading_sum: Vec<(f64, f64)>,
-    mean_latitude: f64,
 }
 
 impl MapTrack {
@@ -60,19 +61,12 @@ impl MapTrack {
             distance.push(total);
             heading_sum.push(sum);
         }
-        let mean_latitude =
-            samples.iter().map(|sample| sample.lat).sum::<f64>() / samples.len() as f64;
         Some(Self {
             samples,
             world,
             distance,
             heading_sum,
-            mean_latitude,
         })
-    }
-
-    pub fn mean_latitude(&self) -> f64 {
-        self.mean_latitude
     }
 
     pub fn world(&self) -> &[(f64, f64)] {

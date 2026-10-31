@@ -1,7 +1,18 @@
 import { prepareMapTiles } from '@/api/backend'
 
 /** The map fields that decide which tiles a route needs. Colours and styles share the same tiles. */
-const TILE_FIELDS = ['width', 'height', 'camera_mode', 'orientation', 'pitch', 'range_meters', 'show_full_activity']
+const TILE_FIELDS = [
+  'width',
+  'height',
+  'camera_mode',
+  'orientation',
+  'pitch',
+  'follow_zoom',
+  'fixed_zoom',
+  'fixed_pan_x',
+  'fixed_pan_y',
+  'show_full_activity',
+]
 /** A resize or a run of slider edits only downloads what it settles on. */
 const SETTLE_MS = 500
 

@@ -118,9 +118,11 @@ impl ValidatedRenderConfig {
                 _ => requirements.include_widget(value.metric_kind().as_str()),
             }
         }
-        // A map reads the same columns as a route. Its own manifest entry arrives with its editor.
-        if !self.course_plots.is_empty() || !self.maps.is_empty() {
+        if !self.course_plots.is_empty() {
             requirements.include_widget("course");
+        }
+        if !self.maps.is_empty() {
+            requirements.include_widget("map");
         }
         if !self.elevation_plots.is_empty() {
             requirements.include_widget("elevation");

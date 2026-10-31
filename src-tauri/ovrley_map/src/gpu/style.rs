@@ -165,7 +165,6 @@ fn push_fixed_layer(
 fn is_drawable(layer: &Json, toggles: MapLayers, zoom: f64) -> bool {
     let layer_type = layer["type"].as_str().unwrap_or_default();
     let source_layer = layer["source-layer"].as_str();
-    let id = layer["id"].as_str().unwrap_or_default();
     let supported = match layer_type {
         "background" => true,
         // Patterns are out of scope, and a solid fill in their place would be wrong.
@@ -176,7 +175,7 @@ fn is_drawable(layer: &Json, toggles: MapLayers, zoom: f64) -> bool {
     supported
         && (layer_type == "background" || layer["source"] == VECTOR_SOURCE)
         && layer["layout"]["visibility"] != "none"
-        && !toggles.hides_layer(layer_type, source_layer, id)
+        && !toggles.hides_layer(layer_type, source_layer)
         && layer["minzoom"]
             .as_f64()
             .is_none_or(|minzoom| zoom >= minzoom)

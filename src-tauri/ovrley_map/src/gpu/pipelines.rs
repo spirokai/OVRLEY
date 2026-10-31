@@ -67,6 +67,19 @@ pub(crate) struct BackgroundLayerMetadata {
     pub(crate) color: [f32; 4],
 }
 
+/// One frame's rounded shape, in output pixels.
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub(crate) struct ShapeMaskInstance {
+    pub(crate) half_size: [f32; 2],
+    pub(crate) radius: f32,
+}
+
+const SHAPE_MASK_ATTRIBUTES: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![
+    0 => Float32x2, // half_size
+    1 => Float32, // radius
+];
+
 const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![
     0 => Float32x2, // position
     1 => Float32x2, // normal
@@ -175,6 +188,20 @@ const LAYER_BLEND: wgpu::BlendState = wgpu::BlendState {
     },
 };
 
+/// Multiplies what's already drawn by the fragment's alpha, which leaves it premultiplied.
+const SHAPE_MASK_BLEND: wgpu::BlendState = wgpu::BlendState {
+    color: wgpu::BlendComponent {
+        src_factor: wgpu::BlendFactor::Zero,
+        dst_factor: wgpu::BlendFactor::SrcAlpha,
+        operation: wgpu::BlendOperation::Add,
+    },
+    alpha: wgpu::BlendComponent {
+        src_factor: wgpu::BlendFactor::Zero,
+        dst_factor: wgpu::BlendFactor::SrcAlpha,
+        operation: wgpu::BlendOperation::Add,
+    },
+};
+
 /// How a tile pipeline uses the stencil.
 #[derive(Clone, Copy)]
 enum StencilUse {
@@ -222,6 +249,7 @@ pub(crate) struct Pipelines {
     pub(crate) mask: wgpu::RenderPipeline,
     pub(crate) background: wgpu::RenderPipeline,
     pub(crate) route: wgpu::RenderPipeline,
+    pub(crate) shape_mask: wgpu::RenderPipeline,
     fill: wgpu::RenderPipeline,
     line: wgpu::RenderPipeline,
     extrusion: wgpu::RenderPipeline,
@@ -389,6 +417,19 @@ impl Pipelines {
             opaque.clone(),
             ground_depth(StencilUse::Ignore),
         );
+        let shape_mask = builder.tile_pipeline(
+            "shape mask pipeline",
+            wgpu::include_wgsl!("shaders/shape_mask.vertex.wgsl"),
+            wgpu::include_wgsl!("shaders/shape_mask.fragment.wgsl"),
+            &[Some(instance_layout::<ShapeMaskInstance>(
+                &SHAPE_MASK_ATTRIBUTES,
+            ))],
+            wgpu::ColorTargetState {
+                blend: Some(SHAPE_MASK_BLEND),
+                ..opaque.clone()
+            },
+            ground_depth(StencilUse::Ignore),
+        );
         let extrusion = builder.tile_pipeline(
             "extrusion pipeline",
             wgpu::include_wgsl!("shaders/extrusion.vertex.wgsl"),
@@ -421,6 +462,7 @@ impl Pipelines {
             line,
             background,
             route,
+            shape_mask,
             extrusion,
         }
     }

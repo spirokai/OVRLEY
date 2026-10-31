@@ -43,15 +43,57 @@ impl ContentKey {
     }
 }
 
+/// What a route line is simplified for. Tolerances apply at the next whole zoom, so a run of zoom
+/// edits uploads a new line only when it crosses a level.
+#[derive(Clone, Copy, PartialEq)]
+struct LineKey {
+    zoom: f64,
+    tolerance: f32,
+}
+
 pub struct ActivityMap {
-    pub(super) track: MapTrack,
+    pub(super) track: Arc<MapTrack>,
     pub(super) line: Arc<MapRouteLine>,
+    line_key: LineKey,
     camera: WidgetCamera,
     pub(super) viewport: MapViewport,
     activity_end: f64,
 }
 
 impl ActivityMap {
+    /// Resolves `key` over a track. Only a line that `key` changes is simplified again.
+    fn new(
+        track: Arc<MapTrack>,
+        key: ContentKey,
+        activity_end: f64,
+        previous: Option<&Self>,
+    ) -> WidgetResult<Self> {
+        let camera = WidgetCamera::new(key.camera, &track)?;
+        let ratio = key.pixel_ratio;
+        let viewport = MapViewport::new(
+            (key.width * ratio).round().max(1.0) as u32,
+            (key.height * ratio).round().max(1.0) as u32,
+            ratio,
+        )
+        .map_err(WidgetError::Render)?;
+        let line_key = LineKey {
+            zoom: camera.zoom().ceil(),
+            tolerance: key.tolerance,
+        };
+        let line = match previous.filter(|previous| previous.line_key == line_key) {
+            Some(previous) => previous.line.clone(),
+            None => Arc::new(route_line(&track, line_key.zoom, line_key.tolerance)?),
+        };
+        Ok(Self {
+            track,
+            line,
+            line_key,
+            camera,
+            viewport,
+            activity_end,
+        })
+    }
+
     /// Whether the activity is playing at `second`. Outside it the placeholder plays.
     pub(super) fn covers(&self, second: f64) -> bool {
         second >= 0.0 && second <= self.activity_end
@@ -84,7 +126,7 @@ impl ActivityMap {
             let tiles = view_tiles(&camera, self.viewport);
             if tiles.len() >= MAX_VIEW_TILES {
                 return Err(WidgetError::Config(format!(
-                    "map: this camera sees at least {MAX_VIEW_TILES} tiles at {second:.1} s. Reduce its range or pitch."
+                    "map: this camera sees at least {MAX_VIEW_TILES} tiles at {second:.1} s. Raise its zoom or lower its pitch."
                 )));
             }
             if views.last() != Some(&tiles) {
@@ -128,21 +170,24 @@ impl MapContent {
         let (Some(track), Some(activity)) = (track, activity) else {
             return Ok(Self::NoGps);
         };
-        let camera = WidgetCamera::new(key.camera, &track, key.width, key.height)?;
-        let ratio = key.pixel_ratio;
-        let viewport = MapViewport::new(
-            (key.width * ratio).round().max(1.0) as u32,
-            (key.height * ratio).round().max(1.0) as u32,
-            ratio,
-        )
-        .map_err(WidgetError::Render)?;
-        let line = route_line(&track, camera.zoom(), key.tolerance)?;
-        Ok(Self::Activity(Arc::new(ActivityMap {
-            line: Arc::new(line),
-            track,
-            camera,
-            viewport,
-            activity_end: activity.route.end,
-        })))
+        Ok(Self::Activity(Arc::new(ActivityMap::new(
+            Arc::new(track),
+            key,
+            activity.route.end,
+            None,
+        )?)))
+    }
+
+    /// The same activity under a new key, which keeps the track and, when it can, the line.
+    pub(super) fn rekeyed(&self, key: ContentKey) -> WidgetResult<Self> {
+        Ok(match self {
+            Self::NoGps => Self::NoGps,
+            Self::Activity(map) => Self::Activity(Arc::new(ActivityMap::new(
+                map.track.clone(),
+                key,
+                map.activity_end,
+                Some(map),
+            )?)),
+        })
     }
 }

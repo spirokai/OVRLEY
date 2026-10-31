@@ -11,10 +11,11 @@ const RETRY_MS = 5000
  * @param {Uint8Array} options.style Style document.
  * @param {string} options.tileUrl Tile URL template.
  * @param {Function} options.onTile Receives `z, x, y` and the decoded geometry.
+ * @param {Function} options.onFailed Hears that a tile failed, and it won't be asked for until the retry.
  * @param {Function} options.onFatal Receives the error when decoding can't work at all.
  * @returns {{want: Function, dispose: Function}} Worker pool of one renderer.
  */
-export function createMapTileWorkers({ config, style, tileUrl, onTile, onFatal }) {
+export function createMapTileWorkers({ config, style, tileUrl, onTile, onFailed, onFatal }) {
   const inFlight = new Set()
   const failed = new Map()
   let queue = []
@@ -42,6 +43,7 @@ export function createMapTileWorkers({ config, style, tileUrl, onTile, onFatal }
       if (data.error) {
         console.warn(`Map tile ${key}: ${data.error}`)
         failed.set(key, performance.now())
+        onFailed()
       } else {
         failed.delete(key)
         onTile(data.z, data.x, data.y, data.tile)
@@ -55,7 +57,10 @@ export function createMapTileWorkers({ config, style, tileUrl, onTile, onFatal }
   })
 
   return {
-    /** @param {Uint32Array} tiles `z, x, y` of each tile the view is missing. */
+    /**
+     * @param {Uint32Array} tiles `z, x, y` of each tile the view is missing.
+     * @returns {number} Tiles still on their way, which leaves out those waiting to retry.
+     */
     want(tiles) {
       const now = performance.now()
       queue = []
@@ -67,6 +72,7 @@ export function createMapTileWorkers({ config, style, tileUrl, onTile, onFatal }
         queue.push([tiles[at], tiles[at + 1], tiles[at + 2]])
       }
       pump()
+      return inFlight.size + queue.length
     },
     dispose() {
       queue = []

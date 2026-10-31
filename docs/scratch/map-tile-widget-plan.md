@@ -1,7 +1,7 @@
 # Map tile widget — implementation plan
 
-Status: Phases 1, 2 and 3 built. Video exports with a map work and passed the Phase 3 gate on Windows. Phase 4: built, with the route download added after the gate results below, so it has not been run. Remaining gate checks are manual. The app can't add a map until Phase 5.
-Updated 2026-10-30.
+Status: Phases 1 to 5 built. Video exports with a map work and passed the Phase 3 gate on Windows. Phase 4: built, with the route download added after the gate results below, so it has not been run. Phase 5's automated gate has run, and its manual test is next.
+Updated 2026-10-31.
 Builds on `map-tile-widget-research.md`.
 
 **Phases 3–5 run on a different machine.** Timings here came from an AMD integrated GPU and aren't comparable there, so
@@ -16,20 +16,21 @@ in git history. Commands below that name `map_gpu_gate` or `map_tile_gate` recor
 
 ## Decisions
 
-| Topic                    | Decision                                                                                                         |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| Map rendering            | `ovrley_map::gpu` (wgpu), native for export and WebGL2 for preview. Replaces ezu for this widget                 |
-| Preview topology         | `ovrley_map::gpu` in its own WASM module on WebGL2, drawn under the Skia widget. Measured in Phase 4             |
-| Labels                   | **None for now.** The GPU renderer draws no labels. Needed before release, approach open                         |
-| Attribution              | Always drawn in the widget, not configurable                                                                     |
-| Tile pinning             | None. Keep `planet/latest` and the existing HTTP revalidation                                                    |
-| Map styling              | Style preset and layer toggles (roads, paths, water, buildings). No map colour overrides                         |
-| Route and marker styling | Same fields and controls as the route widget (see below)                                                         |
-| Route drawing            | A ground layer in `ovrley_map::gpu`: above roads, below buildings, so buildings hide it. The marker stays on top |
-| Camera                   | `fixed` (whole route, north-up, pitch 0) or `follow` (`north_up` / `rider_up`, pitch 0–60, `range_meters`)       |
-| Not in v1                | Speed-dependent range, terrain, raster layers, upright point labels, map matching, corner radius or border       |
-| Export without a GPU     | Fails before encoding. Software adapters are refused, so there is no CPU fallback                                |
-| Pool evictions           | Draw only tiles under the camera's trapezoid, size pools per job, and guarantee every tile in view is resident   |
+| Topic                    | Decision                                                                                                                                                                   |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Map rendering            | `ovrley_map::gpu` (wgpu), native for export and WebGL2 for preview. Replaces ezu for this widget                                                                           |
+| Preview topology         | `ovrley_map::gpu` in its own WASM module on WebGL2, drawn under the Skia widget. Measured in Phase 4                                                                       |
+| Labels                   | **None for now.** The GPU renderer draws no labels. Needed before release, approach open                                                                                   |
+| Attribution              | Always drawn in the widget, not configurable                                                                                                                               |
+| Tile pinning             | None. Keep `planet/latest` and the existing HTTP revalidation                                                                                                              |
+| Map styling              | Style preset and a buildings toggle. No map colour overrides or other layer toggles                                                                                        |
+| Route and marker styling | Same fields and controls as the route widget (see below)                                                                                                                   |
+| Route drawing            | A ground layer in `ovrley_map::gpu`: above roads, below buildings, so buildings hide it. The marker stays on top                                                           |
+| Camera                   | `fixed` (top down: `fixed_zoom`, `fixed_pan_x/y`, tiles never move) or `follow` (chase: `north_up` / `rider_up`, pitch 0–70, `follow_zoom` 14–19). Replaces `range_meters` |
+| Shape                    | Rectangle with corner radius, or circle. The renderer crops the frame in both hosts, and the widget draws the border over it                                               |
+| Not in v1                | Speed-dependent range, terrain, raster layers, upright point labels, map matching                                                                                          |
+| Export without a GPU     | Fails before encoding. Software adapters are refused, so there is no CPU fallback                                                                                          |
+| Pool evictions           | Draw only tiles under the camera's trapezoid, size pools per job, and guarantee every tile in view is resident                                                             |
 
 The map widget uses the route widget's field names and editor controls for its route and marker:
 
@@ -415,7 +416,7 @@ transfer also spikes by 10–20 ms on some frames, with no cause found.
   `ovrley_preview_map_layer_ready`). Until then it draws the flat placeholder, which also covers no WebGL2, no GPU and a lost
   context. The frame upload ABI and `UploadedMapFrames` are removed.
 - **`utils/mapLayers.js`:** no React. Draws in the same animation frame as the widgets, so map and marker can't disagree.
-  Replaces a renderer when its style, layers, size or zoom change, and shows the new canvas only once it's ready. Its failures
+  Replaces a renderer when its style, buildings, density, MSAA or settled zoom change, and shows the new canvas only once it's ready. A size change resizes the same renderer. Its failures
   stay on the map and never reach `onError` or `PreviewSession::render`.
 - **Tiles:** two workers fetch through the existing `/tiles` route, decode and tessellate, and transfer the geometry back, so
   the UI thread only uploads. The latest view replaces the queue. A view draws with what is resident, and missing tiles
@@ -475,21 +476,63 @@ Deliverable: the widget available to users.
 
 - `assets/standard-widgets.json`: a `map` entry (collection `plots`, `timeDependent`, GPS requirements,
   all defaults) plus an icon in `assets/widget-icons/`.
-- `MapWidgetEditor.jsx` in `WIDGET_EDITOR_MAP`, presentational: style preset, layer toggles, camera mode,
-  orientation, pitch, range, then the route widget's line styling (thickness, smoothing, finished and
+- `MapWidgetEditor.jsx` in `WIDGET_EDITOR_MAP`, presentational: style preset, buildings toggle, camera mode,
+  orientation, pitch, zoom, then the route widget's line styling (thickness, smoothing, finished and
   remaining colour and opacity, show full activity) and `PlotMarkerSection`. Extract the line styling
   from `RouteMapWidgetEditor.jsx:50` into a shared section rather than copying it. State and edits go in
   hooks and `features/widget-editor/utils/`.
 - `overlayEditorUtils.js` and `widgetGestureGeometry.js`: free-aspect, size-based resize, no rotation
   handle.
 - Translations in `app/src/i18n/locales/*-translation.json`.
-- A visible download or failure status for the route download in the inspector.
-- Labels must exist before release, or you decide to ship without them. Add the `labels` toggle when they do.
-- Check packaging: `scripts/package-portable.mjs`, and binary size with `wgpu` on Windows and macOS. Check the bundled font
-  licence if labels use the bundled fonts.
+- skill /add-widget describes how to add and wire a new widget from manifest
 
-**Gate:** `pnpm check`, `pnpm test`, and `cargo test` for `ovrley_core`. Save, reload and undo a project
-with a map. Full export on both platforms.
+**Gate:** `pnpm check`, `pnpm test`, and `cargo test` for `ovrley_core`. Manual test by the user.
+
+### What was built
+
+- **Zoom replaces range.** `follow_zoom` is an absolute level, 14–19. `fixed_zoom` counts levels past the zoom that fits the whole
+  route into 500 scene units, -4 to +8, and `fixed_pan_x/y` move the route by a share of its longest side, -1 to 1. Both top-down
+  fields are relative to the route, so a template's framing still makes sense on another activity.
+- **Size is a crop.** Zoom never depends on the widget's size, and the renderer resizes in place (`GpuMapRenderer::resize`), keeping
+  its tiles. Every frame of a drag draws at exactly the requested size, so nothing stretches. The map stays centred on the widget.
+- **Bearing window.** 30 m ahead and 15 m behind, replacing 15 m ahead and 30 m behind, which reached a corner's midpoint 7.5 m late.
+  Its length, and so its smoothing, is unchanged. The camera now reaches that midpoint 7.5 m before the corner.
+- **Pitch to 70, lens up to 50°.** Whether the frame's top reaches the horizon depends on angles, not camera height. The lens is 50°
+  up to about pitch 52, then narrows so the top edge stays 85.8° from straight down, moving the camera back to keep the scale: 37° at
+  pitch 60 and 22° at pitch 70. Computed from the camera formulas, not measured, at z14 and 1000 px: 151 tiles at pitch 60 and 133 at
+  pitch 70. An unchanged 37° lens would have meant about 1300 tiles at 63° and no ground at 65°.
+- **Camera height** is `(frame height / 2) / tan(lens / 2) × metres per pixel × cos(pitch)`, so zoom moves it physically and a taller
+  widget raises it. At latitude 48° and z19, a 254 px widget's camera is about 17 m up at pitch 52, the lowest this lens gets it.
+  Below roof height it can sit inside or behind a building, and a true street-level view would need a sky and a tile distance limit.
+- **Arrow marker.** `caret` is only for the map and route widgets, which point it along the route. Charts and profiles have no direction
+  of travel: their editors don't offer it, and their validation rejects it.
+- **One crop for both hosts.** The renderer multiplies a rounded shape's coverage into the frame as its last draw (`shape_mask`), so
+  preview and export run the same shader. It's a per-frame value, so a radius drag doesn't rebuild, and a square frame skips it.
+  Skia still clips what the widget draws on top, in both hosts. The preview now relies on the WebGL canvas compositing its alpha,
+  which no earlier frame needed: wgpu declares that surface opaque but leaves the context's alpha on, and this is unconfirmed until
+  it's seen in the app. A circle must be square: choosing one crops to the shorter side, and its resize keeps the sides equal.
+- **Attribution follows the shape.** It draws under the clip at 8 px. With room on the straight bottom edge it sits bottom right, its
+  text clear of the corner and its backing flush, so the clip gives the backing the map's own corner. Without room, as in a circle,
+  the text and its backing band follow the edge, centred along the bottom, and fill at most 90 % of that curve.
+- **Buildings** resolve once at validation: `show_buildings` and a pitch above 0 on a follow camera. The stored toggle survives,
+  so raising the pitch again restores it. Flat footprints are hidden with the 3D buildings, since both are the `building` layer.
+- **`msaa_samples`** is 1 or 4, the two counts WebGPU guarantees, so a project can't fail on another machine. It's per widget now,
+  not chosen by the host.
+- **`opacity`** multiplies scene opacity over the whole map, and reaches the preview's map canvas through CSS.
+- **Live slider edits.** Style zoom is fixed for a renderer's life, but its camera isn't. A zoom edit draws straight away on the
+  current renderer, and the replacement starts 300 ms after the value settles, so preview ends at export's style zoom. Line widths
+  stay at the old zoom until then. Pitch and pan never rebuild, and the pitch crossing 0 rebuilds once, because buildings change.
+- **A replacement shows once it has its tiles**, or after 1.5 s, so an edit doesn't flash an empty map.
+- **Route line.** A zoom edit keeps the track. The line is simplified at the next whole zoom, so it uploads again only when a drag
+  crosses a level, and pitch and pan edits keep it.
+
+**Saved projects.** `font` is declared in the manifest's defaults, because saving keeps only those keys and it used to be lost.
+
+**Not checked:** everything visual, and any of this in the app, since the WASM build needs approval. Both WASM crates compile.
+Zooming out across a level shows the style's background until the new tiles arrive, because the renderer falls back to parents only.
+The `map-prepare` events have no listener now that the inspector status is out of Phase 5.
+
+**Failing before and after this work:** `activity_tests` (1) and `csv_activity` (4) in `ovrley_core`, identical on a clean `9975f581`.
 
 ## Risks
 
@@ -510,7 +553,7 @@ with a map. Full export on both platforms.
 | ------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Labels              | Before release  | None yet. The idea of ezu-baked, label-only tiles draped on the ground has not been measured                                                              |
 | Far road line width | Any time        | Fix it. Lines keep a constant pixel width with distance, as upstream does, while Native narrows them. It is a line vertex shader change, not yet measured |
-| MSAA                | Settled for now | 4 by default, chosen by the host rather than widget config. Costs about 1.7–2×, about 5 ms at 1000 px, and fill and building edges are jagged without it  |
+| MSAA                | Settled for now | 4 by default, set per widget (`msaa_samples`, 1 or 4). Costs about 1.7–2×, about 5 ms at 1000 px, and fill and building edges are jagged without it       |
 
 ## Known visual gaps against MapLibre Native
 

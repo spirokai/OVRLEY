@@ -283,7 +283,9 @@ impl RouteLayout {
             frame.state.marker_x * scale[0],
             frame.state.marker_y * scale[1],
         );
-        self.marker.draw(canvas, point);
+        let (x, y) = frame.state.marker_direction;
+        let heading = (x * scale[0]).atan2(-y * scale[1]).to_degrees();
+        self.marker.draw_heading(canvas, point, heading);
         canvas.restore();
     }
 }
