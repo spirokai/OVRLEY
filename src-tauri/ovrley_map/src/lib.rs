@@ -15,7 +15,9 @@ mod view_region;
 #[cfg(feature = "gpu")]
 pub mod gpu;
 
-pub use camera::{ClipPoint, GroundProjection, MapCamera, MapViewport, ViewState, MAX_VIEW_TILES};
+pub use camera::{
+    ClipPoint, GroundProjection, MapCamera, MapViewport, ViewState, LIGHT_XY, MAX_VIEW_TILES,
+};
 pub use route::{MapRouteDraw, MapRouteLine, MapRoutePoint, MapRouteStyle};
 pub use source::MapDataSource;
 pub use spec::{MapLayers, MapStyle, MapStyleSpec, MAX_TILE_ZOOM, TILE_SIZE, VECTOR_SOURCE};

@@ -66,6 +66,11 @@ impl MarkerVariant {
     }
 }
 
+/// A marker's scene-pixel radius from its unscaled config size.
+pub fn plot_marker_radius(size: f32, scale: f32) -> f32 {
+    (size * scale).max(MIN_RADIUS)
+}
+
 /// Prepared paints and scene-pixel radii of one marker style.
 #[derive(Clone, Debug)]
 pub struct PlotMarker {
@@ -105,7 +110,7 @@ impl PlotMarker {
         };
         Self {
             variant,
-            radius: (size * scale).max(MIN_RADIUS),
+            radius: plot_marker_radius(size, scale),
             variant_radius: variant_diameter * scale * 0.5,
             marker,
             surround,

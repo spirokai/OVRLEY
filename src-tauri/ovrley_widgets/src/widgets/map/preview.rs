@@ -1,6 +1,7 @@
 //! A map handle retains the track and the last frame across config edits. Every edit draws at its own
 //! size and camera straight away, so a resize shows more or less of the map and never stretches it.
 use super::{
+    arrow::MarkerPose,
     config::MapConfig,
     content::{ContentKey, MapContent},
     frame_provider::{MapFrame, MapFrameProvider, MapFrameRequest},
@@ -23,13 +24,10 @@ use crate::{
         value::preview::{ContentBounds, TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
     },
 };
-use ovrley_map::{MapCamera, MapRouteDraw, MapRouteLine, ViewState};
+use ovrley_map::{MapCamera, MapRouteDraw, MapRouteLine};
 use serde_json::json;
-use skia_safe::{Canvas, Image, Point, Rect, Surface};
+use skia_safe::{Canvas, Image, Rect, Surface};
 use std::sync::Arc;
-
-/// A few metres along the road, in Mercator world units: enough to fix a direction, too short to curve.
-const MARKER_HEADING_STEP: f64 = 1e-7;
 
 /// What is behind the marker and attribution.
 enum MapBacking {
@@ -310,41 +308,26 @@ impl PreviewMap {
         }
     }
 
-    /// Scene pixel under the marker, and its heading on screen in degrees clockwise from up. Follow
-    /// cameras keep it on their centre; a fixed one moves it. The heading comes from projecting a step
-    /// along the road, so pitch foreshortens it as it does the road.
-    fn marker_point(&self, camera: &MapCamera, second: f64) -> Option<(Point, f32)> {
+    /// How the frame sees the marker. Follow cameras keep it on their centre; a fixed one moves it.
+    fn marker_pose(&self, camera: &MapCamera, second: f64) -> Option<MarkerPose> {
         let Some(MapContent::Activity(map)) = &self.content else {
             return None;
         };
         let position = map.track.position_at(second);
-        let (world_x, world_y) = ovrley_map::mercator::lon_lat_to_world(position.lon, position.lat);
-        let projection = ViewState::new(camera, map.viewport).ground_projection();
-        let frame = self.layout.frame;
-        let project = |x: f64, y: f64| {
-            let clip = projection.clip(x, y);
-            (clip.z >= 0.0).then(|| {
-                Point::new(
-                    frame.left + ((clip.x / clip.w * 0.5 + 0.5) as f32) * frame.width(),
-                    frame.top + ((0.5 - clip.y / clip.w * 0.5) as f32) * frame.height(),
-                )
-            })
-        };
-        let center = project(world_x, world_y)?;
-        let bearing = map.track.bearing_at(position.distance_meters).to_radians();
-        // World y runs south.
-        let ahead = project(
-            world_x + bearing.sin() * MARKER_HEADING_STEP,
-            world_y - bearing.cos() * MARKER_HEADING_STEP,
-        )?;
-        Some((center, (ahead.x - center.x).atan2(center.y - ahead.y).to_degrees()))
+        MarkerPose::on_camera(
+            camera,
+            map.viewport,
+            self.layout.frame,
+            ovrley_map::mercator::lon_lat_to_world(position.lon, position.lat),
+            map.track.bearing_at(&position),
+        )
     }
 
     fn paint(
         layout: &MapLayout,
         canvas: &Canvas,
         progress: f32,
-        marker: Option<(Point, f32)>,
+        marker: Option<MarkerPose>,
         resolved: Option<&(MapCamera, MapBacking)>,
     ) {
         canvas.save();
@@ -356,11 +339,11 @@ impl PreviewMap {
             None => {
                 layout.draw_placeholder(canvas);
                 let (split, heading) = layout.draw_placeholder_route(canvas, progress);
-                layout.draw_marker(canvas, split, heading);
+                layout.draw_marker(canvas, &MarkerPose::top_down(split, heading));
             }
         }
-        if let Some((center, heading)) = marker {
-            layout.draw_marker(canvas, center, heading);
+        if let Some(pose) = &marker {
+            layout.draw_marker(canvas, pose);
         }
         layout.draw_attribution(canvas);
         layout.draw_border(canvas);
@@ -382,7 +365,7 @@ impl PreviewMap {
         let resolved = self.resolve_frame(&state)?;
         let marker = resolved
             .as_ref()
-            .and_then(|(camera, _)| self.marker_point(camera, second));
+            .and_then(|(camera, _)| self.marker_pose(camera, second));
         Self::paint(
             &self.layout,
             canvas,
@@ -406,7 +389,7 @@ impl PreviewMap {
         }
         let marker = resolved
             .as_ref()
-            .and_then(|(camera, _)| self.marker_point(camera, second));
+            .and_then(|(camera, _)| self.marker_pose(camera, second));
         let layout = &self.layout;
         let bounds: Rect = outward(layout.frame);
         let (width, height, bounds) = render_tile(

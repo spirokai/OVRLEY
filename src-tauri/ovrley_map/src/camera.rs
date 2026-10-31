@@ -22,7 +22,7 @@ const MAX_TOP_EDGE_DEG: f64 = 85.8;
 /// MapLibre's mean earth radius, in metres.
 const EARTH_RADIUS: f64 = 6371008.8;
 /// MapLibre's default light `position: [1.15, 210, 30]` on the ground plane, at bearing 0.
-const LIGHT_XY: (f64, f64) = (0.2875, -0.498);
+pub const LIGHT_XY: (f64, f64) = (0.2875, -0.498);
 
 /// The most tiles one view draws. A view that reaches this may be missing some.
 pub const MAX_VIEW_TILES: usize = 512;
@@ -153,7 +153,7 @@ impl MapViewport {
     }
 }
 
-/// A ground point in clip space, before the perspective divide.
+/// A point in clip space, before the perspective divide.
 #[derive(Clone, Copy, Debug)]
 pub struct ClipPoint {
     pub x: f64,
@@ -166,16 +166,21 @@ pub struct ClipPoint {
 /// of the near plane; points behind it must be clipped before dividing by `w`.
 #[derive(Clone, Copy, Debug)]
 pub struct GroundProjection {
-    x: [f64; 3],
-    y: [f64; 3],
-    z: [f64; 3],
-    w: [f64; 3],
+    x: [f64; 4],
+    y: [f64; 4],
+    z: [f64; 4],
+    w: [f64; 4],
 }
 
 impl GroundProjection {
     /// `world_x` and `world_y` are Mercator world coordinates in `0.0..=1.0`.
     pub fn clip(&self, world_x: f64, world_y: f64) -> ClipPoint {
-        let row = |row: &[f64; 3]| row[0] * world_x + row[1] * world_y + row[2];
+        self.clip_above(world_x, world_y, 0.0)
+    }
+
+    /// As [`Self::clip`], `height` world pixels above the ground.
+    pub fn clip_above(&self, world_x: f64, world_y: f64, height: f64) -> ClipPoint {
+        let row = |row: &[f64; 4]| row[0] * world_x + row[1] * world_y + row[2] + row[3] * height;
         ClipPoint {
             x: row(&self.x),
             y: row(&self.y),
@@ -322,6 +327,7 @@ impl ViewState {
                 matrix.x[index] * world_size,
                 matrix.y[index] * world_size,
                 matrix.w[index],
+                matrix.z[index],
             ]
         };
         GroundProjection {

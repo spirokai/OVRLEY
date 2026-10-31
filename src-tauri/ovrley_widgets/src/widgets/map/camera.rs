@@ -63,7 +63,7 @@ impl WidgetCamera {
             } => {
                 let bearing = match orientation {
                     MapOrientation::NorthUp => 0.0,
-                    MapOrientation::RiderUp => track.bearing_at(position.distance_meters),
+                    MapOrientation::RiderUp => track.bearing_at(position),
                 };
                 MapCamera::new(
                     position.lon,

@@ -3,7 +3,10 @@
 //!
 //! The renderer crops the map to the shape, so preview and export crop it the same way. This clips
 //! what the widget draws over it to that shape.
-use super::validation::{MapShape, ValidatedMapWidget};
+use super::{
+    arrow::{MapArrow, MarkerPose},
+    validation::{MapShape, ValidatedMapWidget},
+};
 use crate::{
     error::{WidgetError, WidgetResult},
     model::scene::ValidatedScenePresentation,
@@ -12,7 +15,7 @@ use crate::{
         text::{parse_color, resolve_font, FontResolver},
     },
     widgets::{
-        plot_marker::PlotMarker,
+        plot_marker::{plot_marker_radius, MarkerVariant, PlotMarker},
         route::{geometry::PLACEHOLDER_ROUTE, layout::stroke_paint},
     },
 };
@@ -185,6 +188,12 @@ impl Attribution {
     }
 }
 
+/// The caret stands in the scene. The circles mark a point, so they stay flat on the frame.
+enum MapMarker {
+    Arrow(MapArrow),
+    Flat(PlotMarker),
+}
+
 /// One widget's scene geometry and paints, rebuilt on any config change.
 pub struct MapLayout {
     /// The frame in scene pixels.
@@ -201,7 +210,7 @@ pub struct MapLayout {
     image_paint: Paint,
     completed_paint: Paint,
     remaining_paint: Paint,
-    marker: PlotMarker,
+    marker: MapMarker,
     attribution: Attribution,
 }
 
@@ -283,14 +292,21 @@ impl MapLayout {
                 remaining_width,
                 path.remaining_line_opacity * opacity,
             ),
-            marker: PlotMarker::new(
-                path.marker_variant,
-                path.marker_size,
-                path.marker_variant_diameter,
-                &path.marker_color,
-                path.marker_opacity * opacity,
-                scene.scale,
-            ),
+            marker: match path.marker_variant {
+                MarkerVariant::Caret => MapMarker::Arrow(MapArrow::new(
+                    plot_marker_radius(path.marker_size, scene.scale),
+                    &path.marker_color,
+                    path.marker_opacity * opacity,
+                )),
+                variant => MapMarker::Flat(PlotMarker::new(
+                    variant,
+                    path.marker_size,
+                    path.marker_variant_diameter,
+                    &path.marker_color,
+                    path.marker_opacity * opacity,
+                    scene.scale,
+                )),
+            },
             attribution: Attribution::new(
                 config,
                 scene,
@@ -361,8 +377,11 @@ impl MapLayout {
         (split, (b.x - a.x).atan2(a.y - b.y).to_degrees())
     }
 
-    pub fn draw_marker(&self, canvas: &Canvas, center: Point, heading_deg: f32) {
-        self.marker.draw_heading(canvas, center, heading_deg);
+    pub fn draw_marker(&self, canvas: &Canvas, pose: &MarkerPose) {
+        match &self.marker {
+            MapMarker::Arrow(arrow) => arrow.draw(canvas, pose),
+            MapMarker::Flat(marker) => marker.draw(canvas, pose.center),
+        }
     }
 
     pub fn draw_attribution(&self, canvas: &Canvas) {

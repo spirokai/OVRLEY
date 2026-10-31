@@ -1,17 +1,13 @@
-//! The activity's GPS track for one window: Mercator points, travelled distance, and prefix sums of
-//! unit headings. Built once, so every frame is a pure function of the activity second.
+//! The activity's GPS track for one window: Mercator points and travelled distance. Built once, so
+//! every frame is a pure function of the activity second.
 use crate::widgets::route::sampling::TrackSample;
 use ovrley_map::mercator::lon_lat_to_world;
 
 const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
-/// GPS wanders while stationary. Movement under this adds neither distance nor heading.
+/// GPS wanders while stationary. Movement under this adds no distance.
 const MIN_MOVE_METERS: f64 = 3.0;
-/// How far ahead the bearing looks. More of the window is ahead than behind, so the camera is already
-/// turning when the rider reaches a corner. The whole route is known, so looking ahead costs nothing.
-const LOOKAHEAD_METERS: f64 = 30.0;
-/// How far behind the bearing also looks. The window's length smooths GPS noise out of the rotating
-/// map, and its centre sets how early the camera turns.
-const SMOOTHING_METERS: f64 = 15.0;
+/// How far along the route the bearing aims, as the Video Sync navigation map does.
+const BEARING_LOOKAHEAD_METERS: f64 = 15.0;
 
 /// Where the activity is at one second.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -19,14 +15,14 @@ pub struct TrackPosition {
     pub lon: f64,
     pub lat: f64,
     pub distance_meters: f64,
+    /// The first sample after this position.
+    next_sample: usize,
 }
 
 pub struct MapTrack {
     samples: Vec<TrackSample>,
     world: Vec<(f64, f64)>,
     distance: Vec<f64>,
-    /// Distance-weighted sum of unit headings up to each sample, as (east, north).
-    heading_sum: Vec<(f64, f64)>,
 }
 
 impl MapTrack {
@@ -40,32 +36,19 @@ impl MapTrack {
             .map(|sample| lon_lat_to_world(sample.lon, sample.lat))
             .collect();
         let mut distance = Vec::with_capacity(samples.len());
-        let mut heading_sum = Vec::with_capacity(samples.len());
-        let (mut total, mut sum, mut anchor) = (0.0, (0.0, 0.0), 0);
+        let (mut total, mut anchor) = (0.0, 0);
         for index in 0..samples.len() {
-            let moved = distance_meters(&samples[anchor], &samples[index]);
+            let moved = distance_meters(coordinate(&samples[anchor]), coordinate(&samples[index]));
             if moved >= MIN_MOVE_METERS {
-                // Mercator is conformal, so its direction is the true bearing. World y runs south.
-                let (east, south) = (
-                    world[index].0 - world[anchor].0,
-                    world[index].1 - world[anchor].1,
-                );
-                let length = east.hypot(south);
                 total += moved;
-                sum = (
-                    sum.0 + east / length * moved,
-                    sum.1 - south / length * moved,
-                );
                 anchor = index;
             }
             distance.push(total);
-            heading_sum.push(sum);
         }
         Some(Self {
             samples,
             world,
             distance,
-            heading_sum,
         })
     }
 
@@ -93,60 +76,124 @@ impl MapTrack {
             lat: a.lat + (b.lat - a.lat) * mix,
             distance_meters: self.distance[right - 1]
                 + (self.distance[right] - self.distance[right - 1]) * mix,
+            next_sample: right,
         }
     }
 
-    /// Clockwise from north, as the mean heading of the road around `distance`. A pure function of
-    /// distance, so a stationary rider keeps the last bearing without any state.
-    pub fn bearing_at(&self, distance: f64) -> f64 {
-        let ahead = self.heading_sum_at(distance + LOOKAHEAD_METERS);
-        let behind = self.heading_sum_at(distance - SMOOTHING_METERS);
-        let (east, north) = (ahead.0 - behind.0, ahead.1 - behind.1);
-        if east.hypot(north) > f64::EPSILON {
-            east.atan2(north).to_degrees()
-        } else {
-            self.nearest_heading(distance)
+    /// Clockwise from north, toward the point [`BEARING_LOOKAHEAD_METERS`] further along the route, as
+    /// `getCourseNavigationCamera` in `mapPreviewGeometry.js`. The camera and the marker share it, so
+    /// they turn together.
+    pub fn bearing_at(&self, position: &TrackPosition) -> f64 {
+        let center = (position.lon, position.lat);
+        let mut remaining = BEARING_LOOKAHEAD_METERS;
+        let mut cursor = center;
+        for sample in &self.samples[position.next_sample..] {
+            let target = coordinate(sample);
+            let distance = distance_meters(cursor, target);
+            if distance >= remaining && distance > 0.0 {
+                let progress = remaining / distance;
+                return coordinate_bearing(
+                    center,
+                    (
+                        cursor.0 + progress * (target.0 - cursor.0),
+                        cursor.1 + progress * (target.1 - cursor.1),
+                    ),
+                );
+            }
+            remaining -= distance;
+            cursor = target;
         }
+        if cursor != center {
+            return coordinate_bearing(center, cursor);
+        }
+        self.bearing_into(position.next_sample)
     }
 
-    fn heading_sum_at(&self, distance: f64) -> (f64, f64) {
-        let total = self.distance[self.distance.len() - 1];
-        let distance = distance.clamp(0.0, total);
-        let right = self
-            .distance
-            .partition_point(|value| *value <= distance)
-            .clamp(1, self.distance.len() - 1);
-        let (a, b) = (self.distance[right - 1], self.distance[right]);
-        let mix = if b > a { (distance - a) / (b - a) } else { 0.0 };
-        let (from, to) = (self.heading_sum[right - 1], self.heading_sum[right]);
-        (
-            from.0 + (to.0 - from.0) * mix,
-            from.1 + (to.1 - from.1) * mix,
-        )
-    }
-
-    /// When the window nets out to nothing: the last heading before `distance`, or else the first
-    /// after it. North when the rider never moved.
-    fn nearest_heading(&self, distance: f64) -> f64 {
-        let at = self.distance.partition_point(|value| *value <= distance);
-        let heading_of = |index: usize| {
-            let (a, b) = (self.heading_sum[index - 1], self.heading_sum[index]);
-            ((b.0 - a.0) != 0.0 || (b.1 - a.1) != 0.0)
-                .then(|| (b.0 - a.0).atan2(b.1 - a.1).to_degrees())
-        };
-        (1..at.min(self.distance.len()))
+    /// At the very end there is nothing ahead: the last direction travelled. North if none.
+    fn bearing_into(&self, end: usize) -> f64 {
+        let last = coordinate(&self.samples[end]);
+        self.samples[..end]
+            .iter()
             .rev()
-            .chain(at.max(1)..self.distance.len())
-            .find_map(heading_of)
-            .unwrap_or(0.0)
+            .map(coordinate)
+            .find(|sample| *sample != last)
+            .map_or(0.0, |sample| coordinate_bearing(sample, last))
     }
 }
 
+/// `(lon, lat)` in degrees.
+fn coordinate(sample: &TrackSample) -> (f64, f64) {
+    (sample.lon, sample.lat)
+}
+
+/// As `coordinateBearing` in `mapPreviewGeometry.js`.
+fn coordinate_bearing(start: (f64, f64), end: (f64, f64)) -> f64 {
+    let (start_lat, end_lat) = (start.1.to_radians(), end.1.to_radians());
+    let delta_lon = (end.0 - start.0).to_radians();
+    let y = delta_lon.sin() * end_lat.cos();
+    let x = start_lat.cos() * end_lat.sin() - start_lat.sin() * end_lat.cos() * delta_lon.cos();
+    y.atan2(x).to_degrees()
+}
+
 /// Haversine, as `coordinateDistanceMeters` in `mapPreviewGeometry.js`.
-fn distance_meters(a: &TrackSample, b: &TrackSample) -> f64 {
-    let (a_lat, b_lat) = (a.lat.to_radians(), b.lat.to_radians());
+fn distance_meters(a: (f64, f64), b: (f64, f64)) -> f64 {
+    let (a_lat, b_lat) = (a.1.to_radians(), b.1.to_radians());
     let half_lat = (b_lat - a_lat) / 2.0;
-    let half_lon = (b.lon - a.lon).to_radians() / 2.0;
+    let half_lon = (b.0 - a.0).to_radians() / 2.0;
     let haversine = half_lat.sin().powi(2) + a_lat.cos() * b_lat.cos() * half_lon.sin().powi(2);
     2.0 * EARTH_RADIUS_METERS * haversine.sqrt().atan2((1.0 - haversine).sqrt())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SAMPLE_METERS: f64 = 5.0;
+    const LEG_SAMPLES: usize = 40;
+
+    /// North along a meridian on the equator, then a right angle east along it.
+    fn corner() -> (MapTrack, f64) {
+        let step = (SAMPLE_METERS / EARTH_RADIUS_METERS).to_degrees();
+        let samples = (0..=LEG_SAMPLES * 2)
+            .map(|index| {
+                let (north, east) = (index.min(LEG_SAMPLES), index.saturating_sub(LEG_SAMPLES));
+                TrackSample {
+                    second: index as f64,
+                    lat: north as f64 * step,
+                    lon: east as f64 * step,
+                }
+            })
+            .collect();
+        let track = MapTrack::new(samples).unwrap();
+        let at_corner = track.distance()[LEG_SAMPLES];
+        (track, at_corner)
+    }
+
+    /// The bearing with the rider `metres` past the corner, negative before it.
+    fn bearing_around_corner(track: &MapTrack, metres: f64) -> f64 {
+        let second = LEG_SAMPLES as f64 + metres / SAMPLE_METERS;
+        track.bearing_at(&track.position_at(second))
+    }
+
+    #[test]
+    fn the_bearing_starts_turning_when_the_lookahead_reaches_the_corner() {
+        let (track, _) = corner();
+        assert!(bearing_around_corner(&track, -16.0).abs() < 0.1);
+        assert!(bearing_around_corner(&track, -14.0) > 1.0);
+    }
+
+    #[test]
+    fn the_bearing_has_aimed_down_the_new_road_by_the_corner() {
+        let (track, _) = corner();
+        let halfway = bearing_around_corner(&track, -7.5);
+        assert!((halfway - 45.0).abs() < 1.0, "{halfway}");
+        assert!((bearing_around_corner(&track, 0.0) - 90.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn the_end_of_the_track_keeps_the_last_direction() {
+        let (track, _) = corner();
+        let end = track.position_at(f64::MAX);
+        assert!((track.bearing_at(&end) - 90.0).abs() < 0.1);
+    }
 }
