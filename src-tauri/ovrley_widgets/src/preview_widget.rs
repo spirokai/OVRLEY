@@ -604,6 +604,23 @@ impl PreviewWidget {
             Self::Value(widget) => widget.layout_bounds(activity, second, fonts),
         }
     }
+    /// Starts any frame drawn outside this thread for `second`, so `draw` need not wait for all of it.
+    pub fn start_frame(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+    ) -> WidgetResult<()> {
+        match self {
+            Self::Map(widget) => widget.start_frame(activity, second),
+            _ => Ok(()),
+        }
+    }
+
+    /// Whether `draw` may wait on a frame `start_frame` began.
+    pub fn draws_a_started_frame(&self) -> bool {
+        matches!(self, Self::Map(_))
+    }
+
     /// Draws the frame at `second` onto a host canvas in scene coordinates at raster scale 1,
     /// returning the rectangle it drew into, which equals `layout_bounds`.
     pub fn draw(

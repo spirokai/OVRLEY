@@ -4,7 +4,7 @@ use super::{
     arrow::MarkerPose,
     config::MapConfig,
     content::{ContentKey, MapContent},
-    frame_provider::{MapFrame, MapFrameProvider, MapFrameRequest},
+    frame_provider::{MapFrame, MapFramePixels, MapFrameProvider, MapFrameRequest},
     layout::MapLayout,
     validation::{validate_map_widget, ValidatedMapWidget},
 };
@@ -26,12 +26,12 @@ use crate::{
 };
 use ovrley_map::{MapCamera, MapRouteDraw, MapRouteLine};
 use serde_json::json;
-use skia_safe::{Canvas, Image, Rect, Surface};
-use std::sync::Arc;
+use skia_safe::{Canvas, Rect, Surface};
+use std::sync::{mpsc::Receiver, Arc};
 
 /// What is behind the marker and attribution.
 enum MapBacking {
-    Image(Image),
+    Image(MapFramePixels),
     /// The host's map canvas shows through, so the widget leaves the frame clear.
     Layer,
     Placeholder,
@@ -57,7 +57,9 @@ pub struct PreviewMap {
     /// The inputs of `content`.
     content_key: ContentKey,
     /// The last frame by request, so an unchanged request asks the provider once.
-    last_frame: Option<(MapFrameRequest, Image)>,
+    last_frame: Option<(MapFrameRequest, MapFramePixels)>,
+    /// The frame the provider is drawing.
+    drawing: Option<(MapFrameRequest, Receiver<Result<MapFramePixels, String>>)>,
     last_render: Option<(MapFrameState, bool)>,
     /// Whether the host's map canvas is showing under this widget.
     layer_ready: bool,
@@ -127,6 +129,7 @@ impl PreviewMap {
             frames,
             content,
             last_frame: None,
+            drawing: None,
             last_render: None,
             layer_ready: false,
             view: Vec::new(),
@@ -180,6 +183,7 @@ impl PreviewMap {
     pub fn invalidate_activity(&mut self) {
         self.content = None;
         self.last_frame = None;
+        self.drawing = None;
         self.last_render = None;
     }
 
@@ -269,21 +273,13 @@ impl PreviewMap {
         Ok(())
     }
 
-    /// The camera and backing to draw.
-    fn resolve_frame(
-        &mut self,
-        state: &MapFrameState,
-    ) -> WidgetResult<Option<(MapCamera, MapBacking)>> {
-        let Some(camera) = state.camera else {
-            return Ok(None);
-        };
+    /// What the renderer must draw at this state; none without a camera over the activity.
+    fn frame_request(&self, state: &MapFrameState) -> Option<MapFrameRequest> {
+        let camera = state.camera?;
         let Some(MapContent::Activity(map)) = &self.content else {
-            return Ok(None);
+            return None;
         };
-        if self.layer_ready {
-            return Ok(Some((camera, MapBacking::Layer)));
-        }
-        let request = MapFrameRequest {
+        Some(MapFrameRequest {
             spec: self.config.spec,
             camera,
             viewport: map.viewport,
@@ -293,19 +289,70 @@ impl PreviewMap {
                 travelled_metres: state.progress,
             },
             corner_radius_px: self.layout.corner_radius_px,
+        })
+    }
+
+    /// Asks for a frame neither held nor being drawn, handing it the last frame's buffer.
+    fn start_request(&mut self, request: &MapFrameRequest) -> WidgetResult<()> {
+        let held = |frame: Option<&MapFrameRequest>| frame == Some(request);
+        if held(self.last_frame.as_ref().map(|(frame, _)| frame))
+            || held(self.drawing.as_ref().map(|(frame, _)| frame))
+        {
+            return Ok(());
+        }
+        // Performance: the previous frame's buffer is reused, so a frame allocates nothing.
+        let spare = self
+            .last_frame
+            .take()
+            .and_then(|(_, frame)| frame.into_pixels());
+        self.drawing = match self.frames.frame(request, spare)? {
+            MapFrame::Drawing(answer) => Some((request.clone(), answer)),
+            MapFrame::Pending => None,
         };
-        if let Some((cached, image)) = &self.last_frame {
-            if *cached == request {
-                return Ok(Some((camera, MapBacking::Image(image.clone()))));
-            }
+        Ok(())
+    }
+
+    /// Starts the frame `draw` will show at `second`, so a host with other work to do first does not
+    /// wait for it. `draw` collects it.
+    pub fn start_frame(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+    ) -> WidgetResult<()> {
+        let state = self.frame_state(activity, second)?;
+        match self.frame_request(&state) {
+            Some(request) if !self.layer_ready => self.start_request(&request),
+            _ => Ok(()),
         }
-        match self.frames.frame(&request)? {
-            MapFrame::Ready(image) => {
-                self.last_frame = Some((request, image.clone()));
-                Ok(Some((camera, MapBacking::Image(image))))
-            }
-            MapFrame::Pending => Ok(Some((camera, MapBacking::Placeholder))),
+    }
+
+    /// The camera and backing to draw.
+    fn resolve_frame(
+        &mut self,
+        state: &MapFrameState,
+    ) -> WidgetResult<Option<(MapCamera, MapBacking)>> {
+        let Some(request) = self.frame_request(state) else {
+            return Ok(None);
+        };
+        let camera = request.camera;
+        if self.layer_ready {
+            return Ok(Some((camera, MapBacking::Layer)));
         }
+        self.start_request(&request)?;
+        if let Some((_, answer)) = self.drawing.take() {
+            let frame = answer
+                .recv()
+                .map_err(|_| WidgetError::Render("The map renderer stopped mid-frame".into()))?
+                .map_err(WidgetError::Render)?;
+            self.last_frame = Some((request, frame));
+        }
+        Ok(Some((
+            camera,
+            match &self.last_frame {
+                Some((_, frame)) => MapBacking::Image(frame.clone()),
+                None => MapBacking::Placeholder,
+            },
+        )))
     }
 
     /// How the frame sees the marker. Follow cameras keep it on their centre; a fixed one moves it.
@@ -333,7 +380,7 @@ impl PreviewMap {
         canvas.save();
         layout.clip_shape(canvas);
         match resolved {
-            Some((_, MapBacking::Image(image))) => layout.draw_image(canvas, image),
+            Some((_, MapBacking::Image(frame))) => layout.draw_image(canvas, frame.image()),
             Some((_, MapBacking::Layer)) => {}
             Some((_, MapBacking::Placeholder)) => layout.draw_placeholder(canvas),
             None => {

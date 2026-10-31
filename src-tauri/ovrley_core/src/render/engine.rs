@@ -406,6 +406,11 @@ impl WorkerWidgets<'_> {
             )));
         }
         let second = self.export.frame_second(frame_index);
+        // Performance: start before the base copy, so the map thread works while this worker does.
+        // Asking only at draw time left workers waiting about 8 ms per frame on the 4K benchmark.
+        if let Some(second) = second {
+            self.start_frames(&atlas.plan, second)?;
+        }
         let base = if second.is_some() { &atlas.covered } else { &atlas.uncovered };
         profiler.measure("frame.base", || pixels.copy_from_slice(base));
         let started = Instant::now();
@@ -434,8 +439,18 @@ impl WorkerWidgets<'_> {
             .collect()
     }
 
+    /// Starts the frames drawn off this thread, for the slots that will show them.
+    fn start_frames(&mut self, plan: &AtlasPlan, second: f64) -> CoreResult<()> {
+        let export = self.export;
+        for layer in plan.slots().iter().flat_map(|slot| &slot.layers) {
+            self.widgets[*layer].widget.start_frame(Some(&export.activity), second)?;
+        }
+        Ok(())
+    }
+
     /// Draws the `drawn` layers of every slot at `second` onto the atlas `pixels`, each
-    /// slot showing its frame-clipped scene rectangle.
+    /// slot showing its frame-clipped scene rectangle. Atlas slots never overlap, so their order
+    /// is free: those waiting on a started frame go last, when it has most likely finished.
     fn draw_slots(
         &mut self,
         plan: &AtlasPlan,
@@ -448,7 +463,12 @@ impl WorkerWidgets<'_> {
         let mut surface = wrap_native_surface(width, height, pixels)?;
         let canvas = surface.canvas();
         let fonts = NativeFonts(export.font_dirs);
-        for slot in plan.slots() {
+        // Performance: keep these slots last. In plan order, a worker can block on its map frame with
+        // other widgets still to draw. Only drawing is reordered: FFmpeg's overlay order is the plan's.
+        let (waiting, ready): (Vec<_>, Vec<_>) = plan.slots().iter().partition(|slot| {
+            slot.layers.iter().any(|layer| self.widgets[*layer].widget.draws_a_started_frame())
+        });
+        for slot in ready.into_iter().chain(waiting) {
             let Some(visible) = IRect::intersect(&slot.scene, &export.frame_rect()) else {
                 continue;
             };

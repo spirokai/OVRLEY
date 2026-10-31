@@ -7,8 +7,8 @@
 //! failure here fails the job before FFmpeg starts.
 //!
 //! A renderer owns one device and draws one frame at a time, so frame workers send their requests
-//! to one thread and wait. A request whose tiles cannot all be resident fails the job rather than
-//! drawing a blank patch.
+//! to one thread and collect the answers when they reach the map. A request whose tiles cannot all be
+//! resident fails the job rather than drawing a blank patch.
 
 use crate::{
     debug::RenderProfiler,
@@ -26,11 +26,10 @@ use ovrley_widgets::{
     preview_widget::ValidatedWidget,
     widgets::map::{
         content::{ActivityMap, MapContent},
-        frame_provider::{map_frame_image, MapFrame, MapFrameProvider, MapFrameRequest},
+        frame_provider::{MapFrame, MapFramePixels, MapFrameProvider, MapFrameRequest},
         validation::ValidatedMapWidget,
     },
 };
-use skia_safe::Image;
 use std::{
     collections::{BTreeSet, HashMap},
     num::NonZeroUsize,
@@ -198,7 +197,7 @@ impl ExportMaps {
 struct NoMapFrames;
 
 impl MapFrameProvider for NoMapFrames {
-    fn frame(&self, _request: &MapFrameRequest) -> WidgetResult<MapFrame> {
+    fn frame(&self, _request: &MapFrameRequest, _spare: Option<Vec<u8>>) -> WidgetResult<MapFrame> {
         Err(WidgetError::Render(
             "A map asked for a frame that its export did not prepare".into(),
         ))
@@ -442,18 +441,25 @@ impl ExportRenderer {
         })
     }
 
-    fn frame(&mut self, request: &MapFrameRequest, data: &JobMapData) -> Result<Image, String> {
+    fn frame(
+        &mut self,
+        request: &MapFrameRequest,
+        spare: Option<Vec<u8>>,
+        data: &JobMapData,
+    ) -> Result<MapFramePixels, String> {
         let tiles = view_tiles(&request.camera, request.viewport);
         let started = Instant::now();
         self.renderer.load_view(&tiles, data)?;
         self.load_ms += started.elapsed().as_secs_f64() * 1000.0;
         let started = Instant::now();
-        let pixels = self.renderer.render(
+        let mut pixels = spare.unwrap_or_default();
+        self.renderer.render(
             &request.camera,
             Some(&request.route),
             request.corner_radius_px,
+            &mut pixels,
         )?;
-        let image = map_frame_image(
+        let frame = MapFramePixels::new(
             request.viewport.width_px(),
             request.viewport.height_px(),
             pixels,
@@ -461,37 +467,36 @@ impl ExportRenderer {
         .map_err(|error| error.to_string())?;
         self.render_ms += started.elapsed().as_secs_f64() * 1000.0;
         self.frames += 1;
-        Ok(image)
+        Ok(frame)
     }
 }
 
 struct FrameJob {
     renderer: usize,
     request: MapFrameRequest,
-    reply: mpsc::Sender<Result<Image, String>>,
+    spare: Option<Vec<u8>>,
+    reply: mpsc::Sender<Result<MapFramePixels, String>>,
 }
 
-/// A worker's view of the frame thread. It never returns `Pending`.
+/// A worker's view of the frame thread. It never returns `Pending`. Performance: `frame` only queues
+/// the job, and the worker collects the reply when it reaches the map. Do not wait for it here.
 struct ExportMapFrames {
     renderer: usize,
     sender: mpsc::Sender<FrameJob>,
 }
 
 impl MapFrameProvider for ExportMapFrames {
-    fn frame(&self, request: &MapFrameRequest) -> WidgetResult<MapFrame> {
+    fn frame(&self, request: &MapFrameRequest, spare: Option<Vec<u8>>) -> WidgetResult<MapFrame> {
         let (reply, answer) = mpsc::channel();
         self.sender
             .send(FrameJob {
                 renderer: self.renderer,
                 request: request.clone(),
+                spare,
                 reply,
             })
             .map_err(|_| WidgetError::Render("The map frame thread has stopped".into()))?;
-        answer
-            .recv()
-            .map_err(|_| WidgetError::Render("The map frame thread stopped mid-frame".into()))?
-            .map(MapFrame::Ready)
-            .map_err(WidgetError::Render)
+        Ok(MapFrame::Drawing(answer))
     }
 }
 
@@ -508,7 +513,7 @@ impl MapFrameThread {
             .name("map-frames".into())
             .spawn(move || {
                 for job in receiver {
-                    let result = renderers[job.renderer].frame(&job.request, &data);
+                    let result = renderers[job.renderer].frame(&job.request, job.spare, &data);
                     // A worker that stopped waiting has already failed the job.
                     let _ = job.reply.send(result);
                 }

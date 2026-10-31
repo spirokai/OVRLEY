@@ -130,7 +130,6 @@ struct Output {
     color_view: wgpu::TextureView,
     staging: wgpu::Buffer,
     padded_bytes_per_row: u32,
-    pixels: Vec<u8>,
 }
 
 /// Renders a map for one style on its own GPU device. See the crate docs for the method.
@@ -685,18 +684,20 @@ impl GpuMapRenderer {
         Ok(reports)
     }
 
-    /// Draws one frame and returns its RGBA pixels, with a blocking readback. A route draws above
-    /// the roads and below the buildings. A new line is tessellated and uploaded on first use.
-    /// Pixels outside corners of `corner_radius_px` are transparent.
+    /// Draws one frame into `pixels` as RGBA, with a blocking readback, sizing it on first use so a
+    /// reused buffer costs no allocation. A route draws above the roads and below the buildings. A
+    /// new line is tessellated and uploaded on first use. Pixels outside corners of
+    /// `corner_radius_px` are transparent. Performance: staging is copied straight into `pixels`, so
+    /// do not add a buffer of the renderer's own in between.
     pub fn render(
         &mut self,
         camera: &MapCamera,
         route: Option<&MapRouteDraw>,
         corner_radius_px: f32,
-    ) -> Result<&[u8], String> {
+        pixels: &mut Vec<u8>,
+    ) -> Result<(), String> {
         self.draw_frame(camera, route, corner_radius_px)?;
-        self.read_back()?;
-        Ok(&self.output.pixels)
+        self.read_back(pixels)
     }
 
     fn draw_frame(
@@ -737,7 +738,7 @@ impl GpuMapRenderer {
     }
 
     /// Blocks until the frame is in the staging buffer, and copies it out.
-    fn read_back(&mut self) -> Result<(), String> {
+    fn read_back(&mut self, pixels: &mut Vec<u8>) -> Result<(), String> {
         let slice = self.output.staging.slice(..);
         let (sender, receiver) = mpsc::channel();
         slice.map_async(wgpu::MapMode::Read, move |result| {
@@ -755,14 +756,11 @@ impl GpuMapRenderer {
             let mapped = slice
                 .get_mapped_range()
                 .map_err(|error| format!("GPU readback range failed: {error}"))?;
-            let row = self.config.viewport.width_px() as usize * 4;
+            let viewport = self.config.viewport;
+            let row = viewport.width_px() as usize * 4;
             let stride = self.output.padded_bytes_per_row as usize;
-            for (to, from) in self
-                .output
-                .pixels
-                .chunks_exact_mut(row)
-                .zip(mapped.chunks_exact(stride))
-            {
+            pixels.resize(row * viewport.height_px() as usize, 0);
+            for (to, from) in pixels.chunks_exact_mut(row).zip(mapped.chunks_exact(stride)) {
                 to.copy_from_slice(&from[..row]);
             }
         }
@@ -831,7 +829,6 @@ impl Output {
             color,
             staging,
             padded_bytes_per_row,
-            pixels: vec![0; width as usize * height as usize * 4],
         }
     }
 }
