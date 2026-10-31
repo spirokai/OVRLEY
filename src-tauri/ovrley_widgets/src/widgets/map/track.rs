@@ -7,8 +7,8 @@ use ovrley_map::mercator::lon_lat_to_world;
 const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
 /// GPS wanders while stationary. Movement under this adds no distance.
 const MIN_MOVE_METERS: f64 = 3.0;
-/// How far along the route the bearing aims.
-const BEARING_LOOKAHEAD_METERS: f64 = 15.0;
+/// How far behind and ahead of the rider the bearing's chord reaches along the route.
+const BEARING_REACH_METERS: f64 = 10.0;
 /// Spacing of the line before smoothing. Samples are too far apart to round a corner.
 const RESAMPLE_METERS: f64 = 2.0;
 /// Where the Gaussian kernel ends, in sigmas.
@@ -102,24 +102,14 @@ impl MapTrack {
         }
     }
 
-    /// Clockwise from north, toward the point [`BEARING_LOOKAHEAD_METERS`] further along the line. The
-    /// camera and the marker share it, so they turn together.
+    /// Clockwise from north, along the chord [`BEARING_REACH_METERS`] either side of the rider, so a
+    /// turn is centred on its corner. The chord holds at the line's ends and a track that never moved
+    /// faces north. The camera and the marker share it, so they turn together.
     pub fn bearing_at(&self, position: &TrackPosition) -> f64 {
-        let target = self.world_at(position.distance_meters + BEARING_LOOKAHEAD_METERS);
-        if target != position.world {
-            return world_bearing(position.world, target);
-        }
-        self.last_bearing()
-    }
-
-    /// At the very end there is nothing ahead: the last direction travelled. North if none.
-    fn last_bearing(&self) -> f64 {
-        let last = self.world[self.world.len() - 1];
-        self.world
-            .iter()
-            .rev()
-            .find(|point| **point != last)
-            .map_or(0.0, |point| world_bearing(*point, last))
+        world_bearing(
+            self.world_at(position.distance_meters - BEARING_REACH_METERS),
+            self.world_at(position.distance_meters + BEARING_REACH_METERS),
+        )
     }
 
     /// The line's point at a travelled distance, held at its ends.
@@ -289,6 +279,14 @@ mod tests {
         let track = corner();
         assert!(bearing_around_corner(&track, -45.0).abs() < 0.1);
         assert!((bearing_around_corner(&track, 45.0) - 90.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn the_turn_is_centred_on_the_corner() {
+        let track = corner();
+        assert!((bearing_around_corner(&track, 0.0) - 45.0).abs() < 1.0);
+        assert!(bearing_around_corner(&track, -8.0) < 30.0);
+        assert!(bearing_around_corner(&track, 8.0) > 60.0);
     }
 
     #[test]
