@@ -6,7 +6,16 @@ struct VertexOutput {
     @location(3) @interpolate(flat) v_keep_side: f32,
 };
 
-// The road line shader's offset in clip space, at the route's own width. Output pixels throughout.
+// A ground direction as output pixels on screen, up to a scale that is the same for every direction
+// at one vertex. The perspective divide's derivative, with its shared division by `w * w` dropped.
+fn screen_direction(ground: vec2<f32>, center: vec4<f32>, transform: mat4x4<f32>, viewport: vec2<f32>) -> vec2<f32> {
+    let clip = transform * vec4<f32>(ground, 0.0, 0.0);
+    return (clip.xy * center.w - center.xy * clip.w) * viewport;
+}
+
+// Offsets along the line's normal on screen, so a pitched camera keeps its width in every direction.
+// A ground normal does not project to that: normals carry through the projection by its cofactor,
+// which is the ground tangent's projection turned a quarter. The projected normal only picks the side.
 @vertex
 fn main(
     @location(0) position: vec2<f32>,
@@ -25,8 +34,12 @@ fn main(
 ) -> VertexOutput {
     let transform = mat4x4<f32>(translate1, translate2, translate3, translate4);
     let center = transform * vec4<f32>(position, 0.0, 1.0);
-    let normal_clip = transform * vec4<f32>(normal, 0.0, 0.0);
-    let dir = normalize(normal_clip.xy);
+    let viewport = vec2<f32>(viewport_width, viewport_height);
+    let tangent = screen_direction(vec2<f32>(-normal.y, normal.x), center, transform, viewport);
+    let projected_normal = screen_direction(normal, center, transform, viewport);
+    let screen_normal = vec2<f32>(-tangent.y, tangent.x);
+    let side = select(1.0, -1.0, dot(screen_normal, projected_normal) < 0.0);
+    let dir = normalize(screen_normal) * side;
 
     let halfwidth = line_width * 0.5;
     let offset = vec2<f32>(
