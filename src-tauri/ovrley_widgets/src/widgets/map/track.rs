@@ -5,7 +5,8 @@ use crate::widgets::route::sampling::TrackSample;
 use ovrley_map::mercator::lon_lat_to_world;
 
 const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
-/// GPS wanders while stationary. Movement under this adds no distance.
+/// GPS wanders while stationary. Movement under this doesn't shape the line, and can only carry the
+/// rider this far along it.
 const MIN_MOVE_METERS: f64 = 3.0;
 /// How far behind and ahead of the rider the bearing's chord reaches along the route.
 const BEARING_REACH_METERS: f64 = 10.0;
@@ -42,18 +43,31 @@ impl MapTrack {
             world: lon_lat_to_world(samples[0].lon, samples[0].lat),
             distance: 0.0,
         }];
-        let (mut total, mut anchor) = (0.0, 0);
+        let (mut total, mut anchor, mut reached) = (0.0, 0, 0.0_f64);
         for index in 0..samples.len() {
             let moved = distance_meters(coordinate(&samples[anchor]), coordinate(&samples[index]));
-            if moved >= MIN_MOVE_METERS {
+            let past_anchor = if moved >= MIN_MOVE_METERS {
                 total += moved;
                 anchor = index;
                 anchors.push(Anchor {
                     world: lon_lat_to_world(samples[index].lon, samples[index].lat),
                     distance: total,
                 });
-            }
-            sample_distance.push(total);
+                0.0
+            } else {
+                moved
+            };
+            // Slow movement still carries the rider, so the marker rolls to a stop with the activity.
+            reached = reached.max(total + past_anchor);
+            sample_distance.push(reached);
+        }
+        // A track that moved ends where the activity does. One that never moved stays one place.
+        if anchors.len() > 1 && reached > total {
+            let last = &samples[samples.len() - 1];
+            anchors.push(Anchor {
+                world: lon_lat_to_world(last.lon, last.lat),
+                distance: reached,
+            });
         }
         let line = EvenLine::new(&anchors);
         Some(Self {
@@ -370,6 +384,52 @@ mod tests {
                 + (position.world.0 - b.0).hypot(position.world.1 - b.1);
             assert!(away - span < 1e-10);
         }
+    }
+
+    /// North along a meridian, one sample a second, at each of `steps` metres.
+    fn ridden(steps: &[f64]) -> MapTrack {
+        let mut north = 0.0;
+        let mut samples = vec![TrackSample {
+            second: 0.0,
+            lat: 0.0,
+            lon: 0.0,
+        }];
+        for (index, step) in steps.iter().enumerate() {
+            north += step;
+            samples.push(TrackSample {
+                second: (index + 1) as f64,
+                lat: degrees(north),
+                lon: 0.0,
+            });
+        }
+        MapTrack::new(samples, SMOOTHING_METERS).unwrap()
+    }
+
+    #[test]
+    fn the_marker_keeps_moving_until_the_rider_stops() {
+        let mut steps = vec![5.0; 20];
+        steps.extend([2.0, 1.5, 1.0, 0.5, 0.0, 0.0]);
+        let track = ridden(&steps);
+        let at = |second: usize| track.position_at(second as f64).distance_meters;
+        for second in 20..24 {
+            assert!(at(second + 1) > at(second), "stalled at {second} s");
+        }
+        assert!((at(24) - 105.0).abs() < 0.01, "{}", at(24));
+        assert_eq!(at(26), at(24));
+        assert_eq!(track.position_at(26.0).world, track.world()[track.world().len() - 1]);
+    }
+
+    #[test]
+    fn wander_while_stopped_carries_the_marker_less_than_the_dead_band() {
+        let mut steps = vec![5.0; 20];
+        steps.extend([1.0, -1.0, 1.5, -1.5, 1.0, -1.0]);
+        steps.extend(vec![5.0; 20]);
+        let track = ridden(&steps);
+        let at = |second: usize| track.position_at(second as f64).distance_meters;
+        for second in 20..26 {
+            assert!(at(second + 1) >= at(second));
+        }
+        assert!(at(26) - at(20) < MIN_MOVE_METERS);
     }
 
     #[test]
