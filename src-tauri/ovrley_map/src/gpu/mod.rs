@@ -11,6 +11,7 @@
 //! The `gpu` feature is the opt-in: without it, `ovrley_map` stays free of `wgpu`.
 
 mod extrusion;
+mod fill_patterns;
 mod pattern;
 mod pipelines;
 mod pool;
@@ -28,6 +29,7 @@ pub use style::Buildings;
 pub use web::MapTileDecoder;
 
 use extrusion::ExtrusionVertex;
+use fill_patterns::pattern_bind_groups;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::MapDataSource;
 use crate::{MapCamera, MapRouteDraw, MapStyleSpec, MapViewport, TileId, ViewState};
@@ -140,6 +142,8 @@ pub struct GpuMapRenderer {
     adapter_name: String,
     style: ParsedStyle,
     pipelines: Pipelines,
+    /// One per bundled fill pattern.
+    pattern_bind_groups: Vec<wgpu::BindGroup>,
     targets: Targets,
     output: Output,
     pattern: TileViewPattern,
@@ -224,6 +228,8 @@ impl GpuMapRenderer {
         }));
 
         let pipelines = Pipelines::new(&device, config.sample_count);
+        let pattern_bind_groups =
+            pattern_bind_groups(&device, &queue, &pipelines.pattern_bind_group_layout);
         let (width, height) = (config.viewport.width_px(), config.viewport.height_px());
         let targets = Targets::new(&device, width, height, config.sample_count);
         let pattern = TileViewPattern::new(&device);
@@ -256,6 +262,7 @@ impl GpuMapRenderer {
             adapter_name,
             style,
             pipelines,
+            pattern_bind_groups,
             targets,
             output,
             pattern,
@@ -462,6 +469,13 @@ impl GpuMapRenderer {
                     let entry = &ground.entry;
                     if bound != BoundPipeline::Layer(entry.kind) {
                         pass.set_pipeline(self.pipelines.layer(entry.kind));
+                        if let LayerKind::FillPattern(pattern) = entry.kind {
+                            pass.set_bind_group(
+                                0,
+                                &self.pattern_bind_groups[usize::from(pattern)],
+                                &[],
+                            );
+                        }
                         bound = BoundPipeline::Layer(entry.kind);
                     }
                     pass.set_stencil_reference(ground.stencil_reference);

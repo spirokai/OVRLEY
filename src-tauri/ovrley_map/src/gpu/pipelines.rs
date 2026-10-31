@@ -14,6 +14,8 @@ pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth2
 pub(crate) struct ShaderVertex {
     pub(crate) position: [f32; 2],
     pub(crate) normal: [f32; 2],
+    /// Tile units along the line, which dashes read. Fills leave it at zero.
+    pub(crate) line_distance: f32,
 }
 
 #[repr(C)]
@@ -27,6 +29,21 @@ pub(crate) struct FillShaderFeatureMetadata {
 pub(crate) struct ShaderLayerMetadata {
     pub(crate) z_index: f32,
     pub(crate) line_width: f32,
+    pub(crate) line_blur: f32,
+    pub(crate) line_gap_width: f32,
+    /// Style pixels on the map plane.
+    pub(crate) translate: [f32; 2],
+    pub(crate) dash: ShaderDash,
+}
+
+/// A line's dashes, in style pixels on the map plane. A solid line has none of these.
+#[repr(C)]
+#[derive(Clone, Copy, Default, Pod, Zeroable)]
+pub(crate) struct ShaderDash {
+    pub(crate) on: f32,
+    pub(crate) off: f32,
+    /// How far a round cap reaches past each end of a dash.
+    pub(crate) cap_radius: f32,
 }
 
 #[repr(C)]
@@ -38,6 +55,8 @@ pub(crate) struct ShaderTileMetadata {
     pub(crate) viewport_height: f32,
     /// The viewport-anchored light for this frame, on the ground plane in tile axes.
     pub(crate) light_xy: [f32; 2],
+    /// This tile's corner in style pixels from the world's, wrapped where every pattern repeats.
+    pub(crate) pattern_origin: [f32; 2],
 }
 
 #[repr(C)]
@@ -80,9 +99,10 @@ const SHAPE_MASK_ATTRIBUTES: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_arra
     1 => Float32, // radius
 ];
 
-const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![
+const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
     0 => Float32x2, // position
     1 => Float32x2, // normal
+    2 => Float32, // line_distance
 ];
 const EXTRUSION_VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
     0 => Float32x3, // position, with metres on z
@@ -122,12 +142,34 @@ const LINE_TILE_ATTRIBUTES: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array
     11 => Float32, // viewport_width
     12 => Float32, // viewport_height
 ];
-const FILL_LAYER_ATTRIBUTES: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![
-    10 => Float32, // z_index
+const PATTERN_TILE_ATTRIBUTES: [wgpu::VertexAttribute; 6] = [
+    FILL_TILE_ATTRIBUTES[0],
+    FILL_TILE_ATTRIBUTES[1],
+    FILL_TILE_ATTRIBUTES[2],
+    FILL_TILE_ATTRIBUTES[3],
+    FILL_TILE_ATTRIBUTES[4],
+    wgpu::VertexAttribute {
+        format: wgpu::VertexFormat::Float32x2,
+        offset: std::mem::offset_of!(ShaderTileMetadata, pattern_origin) as u64,
+        shader_location: 12,
+    },
 ];
-const LINE_LAYER_ATTRIBUTES: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![
-    10 => Float32, // z_index
-    13 => Float32, // line_width
+const FILL_LAYER_ATTRIBUTES: [wgpu::VertexAttribute; 2] = [
+    wgpu::VertexAttribute {
+        format: wgpu::VertexFormat::Float32,
+        offset: std::mem::offset_of!(ShaderLayerMetadata, z_index) as u64,
+        shader_location: 10,
+    },
+    wgpu::VertexAttribute {
+        format: wgpu::VertexFormat::Float32x2,
+        offset: std::mem::offset_of!(ShaderLayerMetadata, translate) as u64,
+        shader_location: 11,
+    },
+];
+const LINE_LAYER_ATTRIBUTES: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+    10 => Float32x4, // z_index, line_width, line_blur, line_gap_width
+    13 => Float32x2, // translate
+    14 => Float32x3, // dash on, off, cap_radius
 ];
 const FEATURE_ATTRIBUTES: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![
     8 => Float32x4, // color
@@ -250,7 +292,10 @@ pub(crate) struct Pipelines {
     pub(crate) background: wgpu::RenderPipeline,
     pub(crate) route: wgpu::RenderPipeline,
     pub(crate) shape_mask: wgpu::RenderPipeline,
+    /// What a fill pattern's bind group is made for.
+    pub(crate) pattern_bind_group_layout: wgpu::BindGroupLayout,
     fill: wgpu::RenderPipeline,
+    fill_pattern: wgpu::RenderPipeline,
     line: wgpu::RenderPipeline,
     extrusion: wgpu::RenderPipeline,
 }
@@ -323,6 +368,7 @@ impl Pipelines {
     pub(crate) const fn layer(&self, kind: LayerKind) -> &wgpu::RenderPipeline {
         match kind {
             LayerKind::Fill => &self.fill,
+            LayerKind::FillPattern(_) => &self.fill_pattern,
             LayerKind::Line => &self.line,
             LayerKind::Extrusion => &self.extrusion,
         }
@@ -369,6 +415,56 @@ impl Pipelines {
             &[
                 Some(vertex_layout::<ShaderVertex>(&VERTEX_ATTRIBUTES)),
                 Some(instance_layout::<ShaderTileMetadata>(&FILL_TILE_ATTRIBUTES)),
+                Some(instance_layout::<ShaderLayerMetadata>(
+                    &FILL_LAYER_ATTRIBUTES,
+                )),
+                Some(vertex_layout::<FillShaderFeatureMetadata>(
+                    &FEATURE_ATTRIBUTES,
+                )),
+            ],
+            blended.clone(),
+            ground_depth(StencilUse::Test),
+        );
+        let pattern_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("fill pattern bind group layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
+        let pattern_builder = PipelineBuilder {
+            device,
+            layout: device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("fill pattern pipeline layout"),
+                bind_group_layouts: &[Some(&pattern_bind_group_layout)],
+                immediate_size: 0,
+            }),
+            sample_count,
+        };
+        let fill_pattern = pattern_builder.tile_pipeline(
+            "fill pattern pipeline",
+            wgpu::include_wgsl!("shaders/fill_pattern.vertex.wgsl"),
+            wgpu::include_wgsl!("shaders/fill_pattern.fragment.wgsl"),
+            &[
+                Some(vertex_layout::<ShaderVertex>(&VERTEX_ATTRIBUTES)),
+                Some(instance_layout::<ShaderTileMetadata>(
+                    &PATTERN_TILE_ATTRIBUTES,
+                )),
                 Some(instance_layout::<ShaderLayerMetadata>(
                     &FILL_LAYER_ATTRIBUTES,
                 )),
@@ -458,7 +554,9 @@ impl Pipelines {
         );
         Self {
             mask,
+            pattern_bind_group_layout,
             fill,
+            fill_pattern,
             line,
             background,
             route,

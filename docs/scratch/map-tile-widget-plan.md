@@ -559,18 +559,23 @@ The `map-prepare` events have no listener now that the inspector status is out o
 
 Not drawn or not applied in the GPU renderer:
 
-- **Dashes:** 62 `line-dasharray` uses across the five styles draw as solid lines. Rail and tunnels show it most.
-- **Patterns:** `fill-pattern` layers are skipped entirely, because a solid fill in their place would be wrong.
-- **`fill-translate`:** ignored. `bright`'s `building-top` layer uses it for a raised look.
-- **`line-gap-width`:** ignored. One layer uses it, `waterway_tunnel` in `liberty`.
-- **`line-blur`:** ignored. Four layers use it, in `dark`'s boundary layers and one other style.
-- **Custom caps and joins:** `line-cap` and `line-join` are not applied, as upstream does not apply them.
-- **Building opacity:** `liberty`'s 0.8 `fill-extrusion-opacity` is not applied, so buildings look heavier and hide the
-  roads behind them. It needs an offscreen composite, whose cost has not been measured.
-- **`fill-outline-color`, `fill-antialias`:** ignored, as upstream ignores them.
+- **Building opacity:** `liberty`'s 0.8 `fill-extrusion-opacity` is not applied, by decision: buildings stay solid.
 
-Dashes, patterns, caps and joins were out of scope for the renderer work, so none of these is a defect in it. Which of
-them matter is judged once the widget can be seen in a clip.
+Applied, with these differences from MapLibre:
+
+- **Dashes:** drawn analytically in the line shader from a dash and a gap, which is all the presets use. A longer pattern
+  logs and skips its layer. No zoom crossfade, because a renderer's style zoom is fixed.
+- **Patterns:** the two images in use are bundled (`gpu/patterns/`), so no sprite is downloaded. A pattern that isn't
+  bundled logs and skips its layer. That includes `dark`'s `wood-pattern`, which its sprite lacks.
+- **`fill-outline-color`, `fill-antialias`:** only an explicit outline colour draws. MapLibre also outlines every other
+  fill in its own colour to smooth edges, which MSAA does here, and that measured +57 % vertices and +0.18 ms in `bright`.
+  Flat buildings under fixed extrusions get no outline, which would be hidden and cost about 30 % more vertices.
+- **`fill-translate`:** always anchored to the map, as in every preset. In `bright` it only shows at the feet of buildings,
+  since this renderer extrudes them.
+- **Caps:** a line's own ends stay butt, by decision: round ends added 8–15 % more vertices for a difference nobody could
+  see. `line-cap` only rounds the ends of dashes, which costs no geometry.
+- **Joins:** a round join strays up to 0.25 px from its circle. `line-miter-limit` and `line-round-limit` aren't read, as no
+  preset sets them, so shallow round joins stay round rather than becoming miters.
 
 ## Working rules
 

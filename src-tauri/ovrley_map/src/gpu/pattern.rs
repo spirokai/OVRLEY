@@ -1,8 +1,9 @@
 //! The per-frame tile matrices, ported from maplibre-rs `render/tile_view_pattern/`.
 
+use super::fill_patterns::PATTERN_PERIOD_PX;
 use super::pipelines::ShaderTileMetadata;
 use cgmath::{Matrix4, Vector3};
-use crate::{data_level, TileId, ViewState, MAX_VIEW_TILES};
+use crate::{data_level, TileId, ViewState, MAX_VIEW_TILES, TILE_SIZE};
 use std::collections::HashSet;
 use std::mem::size_of;
 use std::ops::Range;
@@ -39,6 +40,14 @@ fn tile_transform(tile: TileId, view: &ViewState) -> Matrix4<f64> {
         view.metres_to_world(),
     );
     translate * normalize_and_scale
+}
+
+/// A tile's corner in style pixels at the view zoom, wrapped where every fill pattern repeats.
+fn pattern_origin(tile: TileId, view: &ViewState) -> [f32; 2] {
+    let tile_pixels = f64::from(TILE_SIZE) * 2_f64.powf(view.zoom() - f64::from(tile.z));
+    [tile.x, tile.y].map(|index| {
+        (f64::from(index) * tile_pixels).rem_euclid(PATTERN_PERIOD_PX) as f32
+    })
 }
 
 /// Where one tile is drawn this frame and which slice of the pattern buffer holds its matrix.
@@ -138,6 +147,7 @@ impl TileViewPattern {
                 viewport_width,
                 viewport_height,
                 light_xy,
+                pattern_origin: pattern_origin(shape.coords, view),
             });
         }
         if !self.metadata.is_empty() {

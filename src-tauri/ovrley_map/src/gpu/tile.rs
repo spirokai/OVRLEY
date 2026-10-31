@@ -6,7 +6,7 @@
 //! checks, so every feature is walked once here before geozero sees it.
 
 use super::extrusion::{tessellate_extrusions, ExtrusionVertex};
-use super::pipelines::{FillShaderFeatureMetadata, ShaderLayerMetadata, ShaderVertex};
+use super::pipelines::{FillShaderFeatureMetadata, ShaderDash, ShaderLayerMetadata, ShaderVertex};
 use super::style::{evaluate_color, evaluate_number, passes_filter, ParsedStyle, VectorPaint};
 use geozero::mvt::{tile, Message, Tile};
 use geozero::{error::GeozeroError, GeomProcessor, GeozeroGeometry};
@@ -22,6 +22,13 @@ use std::collections::{BTreeMap, HashMap};
 
 /// Curve flattening tolerance, in tile units.
 pub(crate) const DEFAULT_TOLERANCE: f32 = 0.02;
+/// Lyon bevels a miter longer than twice this, in half line widths. MapLibre's default
+/// `line-miter-limit` of 2 bevels past 2. No preset sets another, so the property isn't read.
+const MITER_LIMIT: f32 = 1.0;
+/// How far a round join may stray from its circle.
+const MAX_ARC_ERROR_PX: f32 = 0.25;
+/// The coarsest arc for the thinnest lines: four segments to a half circle.
+const MAX_ARC_TOLERANCE: f32 = 0.25;
 /// Coordinates beyond this many tile units are not map data.
 const MAX_COORDINATE: i64 = 1 << 20;
 const COMMAND_MOVE_TO: u32 = 1;
@@ -49,6 +56,8 @@ pub(crate) struct PreparedLayer<V> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum LayerKind {
     Fill,
+    /// A fill drawn with this bundled image.
+    FillPattern(u8),
     Line,
     Extrusion,
 }
@@ -89,22 +98,55 @@ pub(crate) fn prepare_tile(bytes: &[u8], style: &ParsedStyle) -> Result<Prepared
             .entry(layer.source_layer.as_str())
             .or_insert_with(|| (decode_features(source), 4096.0 / extent(source)));
 
+        let (line_width, line_blur, line_gap_width, translate, dash) = match layer.paint {
+            VectorPaint::Line {
+                width,
+                blur,
+                gap_width,
+                translate,
+                dash,
+                ..
+            } => (width, blur, gap_width, translate, dash),
+            VectorPaint::Fill { translate, .. } => {
+                (1.0, 0.0, 0.0, translate, ShaderDash::default())
+            }
+            VectorPaint::Extrusion { .. } => (1.0, 0.0, 0.0, [0.0, 0.0], ShaderDash::default()),
+        };
         let metadata = ShaderLayerMetadata {
             z_index: layer.index as f32,
-            line_width: match layer.paint {
-                VectorPaint::Line { width, .. } => width,
-                VectorPaint::Fill { .. } | VectorPaint::Extrusion { .. } => 1.0,
-            },
+            line_width,
+            line_blur,
+            line_gap_width,
+            translate,
+            dash,
         };
         match &layer.paint {
-            VectorPaint::Fill { color, opacity } | VectorPaint::Line { color, opacity, .. } => {
-                let (kind, is_line_layer) = match layer.paint {
-                    VectorPaint::Line { .. } => (LayerKind::Line, true),
-                    VectorPaint::Fill { .. } | VectorPaint::Extrusion { .. } => {
-                        (LayerKind::Fill, false)
+            VectorPaint::Fill { color, opacity, .. } | VectorPaint::Line { color, opacity, .. } => {
+                let (kind, is_line_layer, draws_lines, stroke) = match layer.paint {
+                    VectorPaint::Line {
+                        width,
+                        polygons_only,
+                        join,
+                        ..
+                    } => (
+                        LayerKind::Line,
+                        true,
+                        !polygons_only,
+                        StrokeOptions::tolerance(arc_tolerance(width))
+                            .with_line_join(join)
+                            .with_miter_limit(MITER_LIMIT),
+                    ),
+                    VectorPaint::Fill { pattern, .. } => (
+                        pattern.map_or(LayerKind::Fill, LayerKind::FillPattern),
+                        false,
+                        false,
+                        StrokeOptions::default(),
+                    ),
+                    VectorPaint::Extrusion { .. } => {
+                        (LayerKind::Fill, false, false, StrokeOptions::default())
                     }
                 };
-                ground_tessellator.begin_layer(is_line_layer, *scale);
+                ground_tessellator.begin_layer(is_line_layer, *scale, stroke);
                 let mut feature_metadata = Vec::new();
                 for_each_passing(
                     features,
@@ -113,7 +155,7 @@ pub(crate) fn prepare_tile(bytes: &[u8], style: &ParsedStyle) -> Result<Prepared
                     |feature, ctx| {
                         let draws = match feature.kind {
                             GeometryKind::Polygon => true,
-                            GeometryKind::Line => is_line_layer,
+                            GeometryKind::Line => draws_lines,
                             GeometryKind::Point => false,
                         };
                         if !draws {
@@ -166,6 +208,13 @@ pub(crate) fn prepare_tile(bytes: &[u8], style: &ParsedStyle) -> Result<Prepared
         }
     }
     Ok(prepared)
+}
+
+/// The stroke tessellator's tolerance for round joins on a line `width` output pixels wide.
+/// It strokes at width 1 and the shader scales that, so its error grows with the line, and a thin
+/// line's arcs can be far coarser than a wide road's.
+fn arc_tolerance(width: f32) -> f32 {
+    (MAX_ARC_ERROR_PX / width.max(f32::MIN_POSITIVE)).min(MAX_ARC_TOLERANCE)
 }
 
 /// Calls `visit` with every feature passing `filter`, with `context` set to that feature.
@@ -346,6 +395,7 @@ impl FillVertexConstructor<ShaderVertex> for VertexConstructor {
         ShaderVertex {
             position: vertex.position().to_array(),
             normal: [0.0, 0.0],
+            line_distance: 0.0,
         }
     }
 }
@@ -355,6 +405,7 @@ impl StrokeVertexConstructor<ShaderVertex> for VertexConstructor {
         ShaderVertex {
             position: vertex.position_on_path().to_array(),
             normal: vertex.normal().to_array(),
+            line_distance: vertex.advancement(),
         }
     }
 }
@@ -367,6 +418,7 @@ struct ZeroTessellator {
     /// Polygon geometry draws as outlines when a line layer reads it.
     is_line_layer: bool,
     scale: f32,
+    stroke_options: StrokeOptions,
     fill: FillTessellator,
     stroke: StrokeTessellator,
     buffer: VertexBuffers<ShaderVertex, u32>,
@@ -380,6 +432,7 @@ impl Default for ZeroTessellator {
             is_point: false,
             is_line_layer: false,
             scale: 1.0,
+            stroke_options: StrokeOptions::default(),
             fill: FillTessellator::new(),
             stroke: StrokeTessellator::new(),
             buffer: VertexBuffers::new(),
@@ -388,9 +441,10 @@ impl Default for ZeroTessellator {
 }
 
 impl ZeroTessellator {
-    fn begin_layer(&mut self, is_line_layer: bool, scale: f32) {
+    fn begin_layer(&mut self, is_line_layer: bool, scale: f32, stroke_options: StrokeOptions) {
         self.is_line_layer = is_line_layer;
         self.scale = scale;
+        self.stroke_options = stroke_options;
     }
 
     /// Appends one feature, returning how many vertices it added. On failure nothing is kept.
@@ -424,7 +478,7 @@ impl ZeroTessellator {
         self.stroke
             .tessellate_path(
                 &path,
-                &StrokeOptions::tolerance(DEFAULT_TOLERANCE),
+                &self.stroke_options,
                 &mut BuffersBuilder::new(&mut self.buffer, VertexConstructor),
             )
             .map(|_| ())

@@ -6,6 +6,7 @@
 //! when a view evicts its own tiles.
 
 use super::extrusion::ExtrusionVertex;
+use super::fill_patterns::PATTERN_COUNT;
 use super::pipelines::{FillShaderFeatureMetadata, ShaderLayerMetadata, ShaderVertex, COLOR_FORMAT};
 use super::pool::PoolEntries;
 use super::style::{parse_style, ParsedStyle};
@@ -18,6 +19,9 @@ use bytemuck::Pod;
 use crate::{view_tiles, MapCamera, MapRouteDraw, MapViewport, TileId};
 use std::collections::HashSet;
 use std::mem::size_of;
+
+/// Decoded layer kinds from here up are fill patterns, by image.
+const FILL_PATTERN_KINDS: u32 = 3;
 
 /// Renderer names of software WebGL. wgpu reports these adapters as `Other`, so a name is all there
 /// is. A map drawn on the CPU would slow every other widget and show what export refuses to draw.
@@ -238,6 +242,7 @@ fn encode_prepared(tile: &PreparedTile) -> Vec<u8> {
             LayerKind::Fill => 0,
             LayerKind::Line => 1,
             LayerKind::Extrusion => 2,
+            LayerKind::FillPattern(pattern) => FILL_PATTERN_KINDS + u32::from(pattern),
         };
         let header = [
             layer.index,
@@ -284,7 +289,13 @@ impl Reader<'_> {
             0 => LayerKind::Fill,
             1 => LayerKind::Line,
             2 => LayerKind::Extrusion,
-            other => return Err(format!("A decoded map tile has layer kind {other}")),
+            other => LayerKind::FillPattern(
+                other
+                    .checked_sub(FILL_PATTERN_KINDS)
+                    .and_then(|pattern| u8::try_from(pattern).ok())
+                    .filter(|pattern| usize::from(*pattern) < PATTERN_COUNT)
+                    .ok_or_else(|| format!("A decoded map tile has layer kind {other}"))?,
+            ),
         };
         let metadata: Vec<ShaderLayerMetadata> = self.take(1)?;
         Ok(PreparedLayer {
