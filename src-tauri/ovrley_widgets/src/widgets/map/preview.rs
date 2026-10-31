@@ -365,7 +365,7 @@ impl PreviewMap {
             camera,
             map.viewport,
             self.layout.frame,
-            ovrley_map::mercator::lon_lat_to_world(position.lon, position.lat),
+            position.world,
             map.track.bearing_at(&position),
         )
     }

@@ -65,9 +65,10 @@ impl WidgetCamera {
                     MapOrientation::NorthUp => 0.0,
                     MapOrientation::RiderUp => track.bearing_at(position),
                 };
+                let (lon, lat) = world_to_lon_lat(position.world.0, position.world.1);
                 MapCamera::new(
-                    position.lon,
-                    position.lat,
+                    lon,
+                    lat,
                     zoom,
                     pitch_deg,
                     bearing,

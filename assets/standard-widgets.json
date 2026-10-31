@@ -505,7 +505,7 @@
         "border_color": "#ffffff",
         "border_thickness": 0,
         "border_opacity": 1,
-        "simplify_tolerance_px": 0.3,
+        "route_smoothing_m": 8,
         "show_full_activity": true,
         "completed_line_width": 6,
         "remaining_line_width": 6,

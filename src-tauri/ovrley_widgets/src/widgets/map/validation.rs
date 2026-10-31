@@ -18,6 +18,8 @@ const MIN_FOLLOW_ZOOM: f32 = 14.0;
 /// Top-down zoom levels around the zoom that fits the whole route.
 const FIXED_ZOOM_RANGE: RangeInclusive<f32> = -4.0..=8.0;
 const FIXED_PAN_RANGE: RangeInclusive<f32> = -1.0..=1.0;
+/// Metres. The low end looks almost raw, and past the high end a road's own bends start to go.
+const ROUTE_SMOOTHING_RANGE: RangeInclusive<f32> = 1.0..=20.0;
 /// The sample counts every GPU supports, so a project draws the same on any machine.
 const MSAA_SAMPLES: [u32; 2] = [1, 4];
 
@@ -64,7 +66,7 @@ pub struct ValidatedMapWidget {
     pub msaa_samples: u32,
     pub shape: MapShape,
     pub border: MapBorder,
-    pub simplify_tolerance_px: f32,
+    pub route_smoothing_m: f32,
     pub show_full_activity: bool,
     pub path: ValidatedRoutePath,
 }
@@ -132,9 +134,6 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
         "circle" => return Err(invalid("shape", "a circular map must be square")),
         _ => return Err(invalid("shape", "unsupported shape")),
     };
-    let simplify_tolerance_px =
-        require_f32(Some(map.simplify_tolerance_px), &p("simplify_tolerance_px"))?;
-    require_non_negative_f32(simplify_tolerance_px, &p("simplify_tolerance_px"))?;
 
     Ok(ValidatedMapWidget {
         x: require_f32(Some(map.x), &p("x"))?,
@@ -159,7 +158,11 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
             thickness: require_non_negative_f32(map.border_thickness, &p("border_thickness"))?,
             opacity: require_unit_opacity(Some(map.border_opacity), &p("border_opacity"))?,
         },
-        simplify_tolerance_px,
+        route_smoothing_m: in_range(
+            map.route_smoothing_m,
+            "route_smoothing_m",
+            ROUTE_SMOOTHING_RANGE,
+        )?,
         show_full_activity: map.show_full_activity,
         path: validate_route_path(&map.path, &p)?,
     })

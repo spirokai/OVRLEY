@@ -253,6 +253,20 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
         updateWidgetDraft={updateWidgetDraft}
         commitWidgetDraft={commitWidgetDraft}
         separateThickness
+        smoothing={
+          <SliderField
+            editable
+            label={t('widget-editor.smoothing', 'Smoothing')}
+            value={data.route_smoothing_m}
+            min={1}
+            max={20}
+            step={0.5}
+            valueDisplay={data.route_smoothing_m.toFixed(1)}
+            suffix="m"
+            onSliderChange={(route_smoothing_m) => updateWidgetDraft(widget.id, { route_smoothing_m })}
+            onSliderCommit={commit}
+          />
+        }
       />
       <PlotMarkerSection
         showArrow

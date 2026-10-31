@@ -22,7 +22,7 @@ fn layout(x: f32, radius: f32, opacity: f32) -> MapLayout {
         "map_style": "liberty", "show_buildings": true, "camera_mode": "follow", "orientation": "rider_up", "pitch": 45,
         "follow_zoom": 16, "fixed_zoom": 0, "fixed_pan_x": 0, "fixed_pan_y": 0, "msaa_samples": 4, "shape": "rectangle",
         "corner_radius": radius, "border_color": "#ffffff", "border_thickness": 0, "border_opacity": 1,
-        "simplify_tolerance_px": 0.3, "show_full_activity": true, "completed_line_width": 6, "remaining_line_width": 6,
+        "route_smoothing_m": 8, "show_full_activity": true, "completed_line_width": 6, "remaining_line_width": 6,
         "completed_line_opacity": 100, "remaining_line_opacity": 60, "completed_line_color": "#ff4d1f",
         "remaining_line_color": "#1f7bff", "marker_variant": "single", "marker_variant_diameter": 44, "marker_size": 10,
         "marker_opacity": 100, "marker_color": "#ffffff"

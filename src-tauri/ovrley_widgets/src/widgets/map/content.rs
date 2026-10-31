@@ -23,7 +23,7 @@ pub(super) struct ContentKey {
     camera: MapCameraMode,
     width: f32,
     height: f32,
-    tolerance: f32,
+    route_smoothing_m: f32,
     pixel_ratio: f32,
 }
 
@@ -37,18 +37,18 @@ impl ContentKey {
             camera: config.camera,
             width: config.width,
             height: config.height,
-            tolerance: config.simplify_tolerance_px,
+            route_smoothing_m: config.route_smoothing_m,
             pixel_ratio: scene.scale * raster_scale.value(),
         }
     }
 }
 
-/// What a route line is simplified for. Tolerances apply at the next whole zoom, so a run of zoom
-/// edits uploads a new line only when it crosses a level.
+/// What a route line is built for. Reduction applies at the next whole zoom, so a run of zoom edits
+/// uploads a new line only when it crosses a level.
 #[derive(Clone, Copy, PartialEq)]
 struct LineKey {
     zoom: f64,
-    tolerance: f32,
+    route_smoothing_m: f32,
 }
 
 pub struct ActivityMap {
@@ -78,11 +78,11 @@ impl ActivityMap {
         .map_err(WidgetError::Render)?;
         let line_key = LineKey {
             zoom: camera.zoom().ceil(),
-            tolerance: key.tolerance,
+            route_smoothing_m: key.route_smoothing_m,
         };
         let line = match previous.filter(|previous| previous.line_key == line_key) {
             Some(previous) => previous.line.clone(),
-            None => Arc::new(route_line(&track, line_key.zoom, line_key.tolerance)?),
+            None => Arc::new(route_line(&track, line_key.zoom)?),
         };
         Ok(Self {
             track,
@@ -166,7 +166,7 @@ impl MapContent {
     ) -> WidgetResult<Self> {
         let track = activity
             .map(|activity| activity.route.track_samples(window))
-            .and_then(MapTrack::new);
+            .and_then(|samples| MapTrack::new(samples, f64::from(key.route_smoothing_m)));
         let (Some(track), Some(activity)) = (track, activity) else {
             return Ok(Self::NoGps);
         };
@@ -178,16 +178,23 @@ impl MapContent {
         )?)))
     }
 
-    /// The same activity under a new key, which keeps the track and, when it can, the line.
+    /// The same activity under a new key, which keeps the track and the line when it can.
     pub(super) fn rekeyed(&self, key: ContentKey) -> WidgetResult<Self> {
         Ok(match self {
             Self::NoGps => Self::NoGps,
-            Self::Activity(map) => Self::Activity(Arc::new(ActivityMap::new(
-                map.track.clone(),
-                key,
-                map.activity_end,
-                Some(map),
-            )?)),
+            Self::Activity(map) => {
+                let track = if map.line_key.route_smoothing_m == key.route_smoothing_m {
+                    map.track.clone()
+                } else {
+                    Arc::new(map.track.smoothed(f64::from(key.route_smoothing_m)))
+                };
+                Self::Activity(Arc::new(ActivityMap::new(
+                    track,
+                    key,
+                    map.activity_end,
+                    Some(map),
+                )?))
+            }
         })
     }
 }

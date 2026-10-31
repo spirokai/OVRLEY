@@ -17,6 +17,7 @@ import { ColorField, SliderField, ToggleField } from './widgetFormControls'
  * @param {Function} props.commitWidgetDraft - Commits the live widget draft.
  * @param {boolean} [props.separateThickness=false] - Whether finished and remaining line have their own thickness.
  * @param {React.ReactNode} [props.detail=null] - Control beside smoothing.
+ * @param {React.ReactNode} [props.smoothing=null] - Replaces the simplification slider for a widget that smooths its own way.
  * @returns {JSX.Element} Rendered component output.
  */
 export default function RouteLineSection({
@@ -26,12 +27,12 @@ export default function RouteLineSection({
   commitWidgetDraft,
   separateThickness = false,
   detail = null,
+  smoothing = null,
 }) {
   const { t } = useTranslation()
   const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width
   const completedLineOpacity = widget.data.completed_line_opacity
   const remainingLineOpacity = widget.data.remaining_line_opacity
-  const simplifyTolerance = widget.data.simplify_tolerance_px
   const commit = () => commitWidgetDraft(widget.id)
 
   return (
@@ -85,22 +86,24 @@ export default function RouteLineSection({
         />
       )}
       <div className="grid grid-cols-2 gap-4">
-        <SliderField
-          editable
-          label={t('widget-editor.smoothing', 'Smoothing')}
-          value={simplifyTolerance}
-          min={0}
-          max={4}
-          step={0.05}
-          valueDisplay={`${simplifyTolerance.toFixed(2)}`}
-          suffix="px"
-          onSliderChange={(value) =>
-            updateWidgetDraft(widget.id, {
-              simplify_tolerance_px: Number(value.toFixed(2)),
-            })
-          }
-          onSliderCommit={commit}
-        />
+        {smoothing ?? (
+          <SliderField
+            editable
+            label={t('widget-editor.smoothing', 'Smoothing')}
+            value={widget.data.simplify_tolerance_px}
+            min={0}
+            max={4}
+            step={0.05}
+            valueDisplay={`${widget.data.simplify_tolerance_px.toFixed(2)}`}
+            suffix="px"
+            onSliderChange={(value) =>
+              updateWidgetDraft(widget.id, {
+                simplify_tolerance_px: Number(value.toFixed(2)),
+              })
+            }
+            onSliderCommit={commit}
+          />
+        )}
         {detail}
       </div>
       <div className="grid grid-cols-2 gap-4">

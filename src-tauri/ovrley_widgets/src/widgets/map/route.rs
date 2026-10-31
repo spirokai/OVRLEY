@@ -1,4 +1,5 @@
-//! The route line the renderer draws, simplified once at the widget's constant view zoom.
+//! The route line the renderer draws: the track's smoothed line, reduced once at the widget's
+//! constant view zoom. Reduction only drops vertices, so the smoothing comes from [`MapTrack`].
 use super::track::MapTrack;
 use crate::{
     error::{WidgetError, WidgetResult},
@@ -6,15 +7,18 @@ use crate::{
 };
 use ovrley_map::{MapRouteLine, MapRoutePoint, TILE_SIZE};
 
-/// `simplify_tolerance_px` applies in scene units at `zoom`, as the route widget's tolerance does.
-pub fn route_line(track: &MapTrack, zoom: f64, tolerance_px: f32) -> WidgetResult<MapRouteLine> {
+/// How far a reduced line may leave the smoothed one, in scene units at the view zoom. Under a pixel,
+/// so a curve never shows its facets.
+const REDUCTION_TOLERANCE_PX: f64 = 0.3;
+
+pub fn route_line(track: &MapTrack, zoom: f64) -> WidgetResult<MapRouteLine> {
     let scene_units = f64::from(TILE_SIZE) * 2_f64.powf(zoom);
     let scaled: Vec<(f64, f64)> = track
         .world()
         .iter()
         .map(|point| (point.0 * scene_units, point.1 * scene_units))
         .collect();
-    let kept = simplify_rdp_indices_f64(&scaled, f64::from(tolerance_px.max(0.05)));
+    let kept = simplify_rdp_indices_f64(&scaled, REDUCTION_TOLERANCE_PX);
     MapRouteLine::new(
         kept.into_iter()
             .map(|index| MapRoutePoint {

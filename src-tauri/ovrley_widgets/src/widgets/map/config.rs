@@ -30,7 +30,8 @@ pub struct MapConfig {
     pub border_color: String,
     pub border_thickness: f32,
     pub border_opacity: f32,
-    pub simplify_tolerance_px: f32,
+    /// How strongly GPS noise is smoothed out of the route, in metres.
+    pub route_smoothing_m: f32,
     pub show_full_activity: bool,
     #[serde(flatten)]
     pub path: RoutePathConfig,
