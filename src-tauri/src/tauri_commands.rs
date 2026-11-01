@@ -256,6 +256,19 @@ pub(crate) async fn backend_parse_tcx_activity(
     )
 }
 
+/// Parses a native GPX path through the shared activity finalizer.
+#[tauri::command]
+pub(crate) async fn backend_parse_gpx_activity(
+    app: AppHandle,
+    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    path: String,
+) -> Result<FinalizeActivityResponse, String> {
+    previews.retain(
+        commands::backend_parse_gpx_activity(&runtime_paths::app_paths(&app)?, &path)
+            .map_err(|error| error.to_string())?,
+    )
+}
+
 /// Parses a native UDDF dive through the shared activity finalizer.
 #[tauri::command]
 pub(crate) async fn backend_parse_uddf_activity(

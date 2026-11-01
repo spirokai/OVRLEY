@@ -16,8 +16,8 @@
 //!       decide which series are needed).
 //!
 //! ## Serde Contract
-//! The frontend parser normalizes GPX/FIT input into these shapes before Rust
-//! receives it. Optional telemetry values use `Option<T>` so missing sensor
+//! Format parsers normalize their input into these shapes before finalization.
+//! Optional telemetry values use `Option<T>` so missing sensor
 //! samples remain distinguishable from real zero values during trimming,
 //! interpolation, and widget rendering.
 //!

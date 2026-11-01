@@ -5,8 +5,8 @@
 use super::dive_xml::{
     self, children, gas_fractions, mean, number, single_dive, start_time, timestamp,
 };
-use super::finalize::FinalizeActivityResponse;
-use super::schema::{LapMarkers, RawActivity, RawActivityOptions, RawSample};
+use crate::activity::finalize::FinalizeActivityResponse;
+use crate::activity::schema::{LapMarkers, RawActivity, RawActivityOptions, RawSample};
 use crate::error::{CoreError, CoreResult};
 use roxmltree::{Document, Node};
 use serde_json::json;

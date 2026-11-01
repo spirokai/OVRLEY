@@ -232,6 +232,15 @@ export async function parseTcxActivity(path) {
 }
 
 /**
+ * Parses and finalizes a native GPX activity using the Rust parser.
+ * @param {string} path - Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseGpxActivity(path) {
+  return invokeCommand('backend_parse_gpx_activity', { path })
+}
+
+/**
  * Parses and finalizes a native UDDF dive using the Rust parser.
  * @param {string} path Absolute path returned by the native file picker.
  * @returns {Promise<object>} Finalized activity response.

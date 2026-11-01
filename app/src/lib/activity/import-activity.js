@@ -9,7 +9,6 @@ import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import useStore from '@/store/useStore'
 import { syncSceneTimingToConfig } from '@/store/store-utils'
 import parseFitActivityFile from './fit-parser.js'
-import { parseGpxActivityFile } from './gpx-parser.js'
 import { parseIgcActivityFile } from './igc-parser.js'
 import { parseSrtActivityFile } from './srt-parser.js'
 
@@ -24,7 +23,6 @@ export async function parseActivityFile(file) {
   let rawActivity
   if (lowerName.endsWith('.fit')) rawActivity = await parseFitActivityFile(file)
   else if (lowerName.endsWith('.srt')) rawActivity = parseSrtActivityFile(await file.text(), file.name)
-  else if (lowerName.endsWith('.gpx')) rawActivity = parseGpxActivityFile(file, await file.text())
   else if (lowerName.endsWith('.igc')) rawActivity = await parseIgcActivityFile(file)
   else throw new Error(`Unsupported activity file format: ${file.name}`)
 
@@ -134,6 +132,7 @@ export async function parseActivityPath(path) {
   if (lowerPath.endsWith('.csv')) parsedActivity = (await backend.parseCsvActivity(path)).parsed_activity
   else if (lowerPath.endsWith('.vbo')) parsedActivity = (await backend.parseVboActivity(path)).parsed_activity
   else if (lowerPath.endsWith('.tcx')) parsedActivity = (await backend.parseTcxActivity(path)).parsed_activity
+  else if (lowerPath.endsWith('.gpx')) parsedActivity = (await backend.parseGpxActivity(path)).parsed_activity
   else if (lowerPath.endsWith('.uddf')) parsedActivity = (await backend.parseUddfActivity(path)).parsed_activity
   else if (lowerPath.endsWith('.ssrf') || lowerPath.endsWith('.xml')) parsedActivity = (await backend.parseSubsurfaceActivity(path)).parsed_activity
   else {
@@ -146,7 +145,7 @@ export async function parseActivityPath(path) {
 /**
  * Handles save file.
  *
- * @param {File} file - Browser File containing a GPX, FIT, SRT, or IGC activity.
+ * @param {File} file - Browser File containing a FIT, SRT, or IGC activity.
  * @param {object} storeActions - Injected store actions.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */

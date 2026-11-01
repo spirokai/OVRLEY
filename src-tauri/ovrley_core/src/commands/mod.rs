@@ -90,8 +90,23 @@ pub fn backend_parse_tcx_activity(
     paths: &AppPaths,
     path: &str,
 ) -> CoreResult<FinalizeActivityResponse> {
-    let mut response =
-        crate::activity::tcx::parse_tcx_activity_path(Path::new(path), Some(&paths.repo_root))?;
+    let mut response = crate::activity::parsers::tcx::parse_tcx_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
+/// Parses and finalizes a native GPX activity through the shared raw-sample pipeline.
+pub fn backend_parse_gpx_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response = crate::activity::parsers::gpx::parse_gpx_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?;
     response.debug_payload = None;
     Ok(response)
 }
@@ -101,8 +116,10 @@ pub fn backend_parse_uddf_activity(
     paths: &AppPaths,
     path: &str,
 ) -> CoreResult<FinalizeActivityResponse> {
-    let mut response =
-        crate::activity::uddf::parse_uddf_activity_path(Path::new(path), Some(&paths.repo_root))?;
+    let mut response = crate::activity::parsers::uddf::parse_uddf_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?;
     response.debug_payload = None;
     Ok(response)
 }
@@ -112,7 +129,7 @@ pub fn backend_parse_subsurface_activity(
     paths: &AppPaths,
     path: &str,
 ) -> CoreResult<FinalizeActivityResponse> {
-    let mut response = crate::activity::subsurface::parse_subsurface_activity_path(
+    let mut response = crate::activity::parsers::subsurface::parse_subsurface_activity_path(
         Path::new(path),
         Some(&paths.repo_root),
     )?;

@@ -1,6 +1,6 @@
 use ovrley_core::activity::{
-    schema::ParsedActivity, subsurface::parse_subsurface_activity_reader,
-    uddf::parse_uddf_activity_reader,
+    parsers::subsurface::parse_subsurface_activity_reader,
+    parsers::uddf::parse_uddf_activity_reader, schema::ParsedActivity,
 };
 
 fn uddf(text: &str) -> ParsedActivity {

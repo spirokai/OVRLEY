@@ -7,6 +7,7 @@ const finalizeActivity = vi.hoisted(() => vi.fn())
 const parseCsvActivity = vi.hoisted(() => vi.fn())
 const parseVboActivity = vi.hoisted(() => vi.fn())
 const parseTcxActivity = vi.hoisted(() => vi.fn())
+const parseGpxActivity = vi.hoisted(() => vi.fn())
 const parseUddfActivity = vi.hoisted(() => vi.fn())
 const parseSubsurfaceActivity = vi.hoisted(() => vi.fn())
 
@@ -15,6 +16,7 @@ vi.mock('@/api/backend', () => ({
   parseCsvActivity,
   parseVboActivity,
   parseTcxActivity,
+  parseGpxActivity,
   parseUddfActivity,
   parseSubsurfaceActivity,
   writeParseDebugFile: vi.fn().mockResolvedValue('debug-path.json'),
@@ -22,7 +24,6 @@ vi.mock('@/api/backend', () => ({
 }))
 
 const fixtureDir = path.resolve('../src-tauri/ovrley_core/tests/fixtures/activity')
-const minimalGpx = '<gpx><trk><trkseg><trkpt lat="47.1" lon="8.1"><ele>500</ele><time>2026-01-01T00:00:00Z</time></trkpt></trkseg></trk></gpx>'
 const minimalSrt = ['1', '00:00:01,000 --> 00:00:01,033', '2025-07-23 10:21:40.000', '[latitude: 47.1] [longitude: 8.1]', ''].join('\n')
 
 function storeActions() {
@@ -44,6 +45,7 @@ describe('import-activity store boundary', () => {
     parseCsvActivity.mockReset()
     parseVboActivity.mockReset()
     parseTcxActivity.mockReset()
+    parseGpxActivity.mockReset()
     parseUddfActivity.mockReset()
     parseSubsurfaceActivity.mockReset()
     finalizeActivity.mockResolvedValue({
@@ -98,7 +100,6 @@ describe('import-activity store boundary', () => {
   })
 
   test.each([
-    ['gpx', async () => new File([minimalGpx], 'activity.gpx')],
     ['fit', async () => new File([await readFile(path.join(fixtureDir, 'test-ride.fit'))], 'activity.fit')],
     ['srt', async () => new File([minimalSrt], 'activity.srt')],
   ])('keeps %s imports on the existing RawActivity finalizer route', async (format, createFile) => {
@@ -152,6 +153,20 @@ describe('import-activity store boundary', () => {
     expect(finalizeActivity).not.toHaveBeenCalled()
     expect(store.activateActivityFile).toHaveBeenCalledWith(parsedActivity)
     expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\ride.TCX' })
+  })
+
+  test('imports a native GPX path and activates the Rust-finalized activity', async () => {
+    const { importActivityPath } = await import('@/lib/activity/import-activity')
+    const store = storeActions()
+    const parsedActivity = { metadata: { duration_seconds: 5 } }
+    parseGpxActivity.mockResolvedValue({ parsed_activity: parsedActivity })
+
+    await importActivityPath('C:\\activities\\ride.GPX', store)
+
+    expect(parseGpxActivity).toHaveBeenCalledWith('C:\\activities\\ride.GPX')
+    expect(finalizeActivity).not.toHaveBeenCalled()
+    expect(store.activateActivityFile).toHaveBeenCalledWith(parsedActivity)
+    expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\ride.GPX' })
   })
 
   test.each([
