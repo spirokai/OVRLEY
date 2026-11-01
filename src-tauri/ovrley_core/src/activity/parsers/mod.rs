@@ -5,6 +5,8 @@ use std::borrow::Cow;
 use std::path::Path;
 
 mod dive_xml;
+/// Native FIT extraction.
+pub mod fit;
 /// Native GPX extraction.
 pub mod gpx;
 /// Native IGC flight-log extraction.

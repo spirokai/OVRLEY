@@ -35,7 +35,7 @@ function MetricGrid({ metrics, emptyLabel }) {
  * @param {string|null} props.filename - Imported activity filename, when a standalone activity file is loaded.
  * @param {() => void} props.onBrowseActivity - Opens the activity file picker.
  * @param {(() => void)|null} props.onDeleteActivity - Deletes a standalone imported activity when present.
- * @param {(selections: Array<File|string>) => void} props.onDropActivityFiles - Imports dropped activity files or native paths.
+ * @param {(paths: string[]) => void} props.onDropActivityFiles - Imports dropped native activity paths.
  * @param {(lapId: number, enabled: boolean) => void} props.onLapEnabledChange - Includes or excludes a lap from lap widgets.
  * @returns {JSX.Element} Rendered drawer content.
  */

@@ -15,21 +15,50 @@
 use std::path::Path;
 use std::process::Command;
 
+/// Applies the fitparser patch to cargo's registry copy, failing the build if it cannot.
+fn patch_fitparser(manifest_dir: &Path, cargo_home: &str) {
+    const PATCH: &str = "patches/fitparser-undeclared-developer-fields.patch";
+    println!("cargo:rerun-if-changed={PATCH}");
+    let patch_path = manifest_dir.join(PATCH);
+    let registry = Path::new(cargo_home).join("registry/src");
+    for index in std::fs::read_dir(registry).into_iter().flatten().flatten() {
+        let source = index.path().join("fitparser-0.11.0");
+        if !source.exists() {
+            continue;
+        }
+        let git_apply = |args: &[&str]| {
+            Command::new("git")
+                .arg("apply")
+                .args(args)
+                .arg(&patch_path)
+                .current_dir(&source)
+                .output()
+                .is_ok_and(|output| output.status.success())
+        };
+        assert!(
+            git_apply(&["--reverse", "--check"]) || git_apply(&[]),
+            "{PATCH} does not apply to {}",
+            source.display()
+        );
+    }
+}
+
 fn main() {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let patch_path = manifest_dir.join("patches/telemetry-parser-dji-camera-metadata.patch");
-    if !patch_path.exists() {
-        return; // Patch removed or build outside repo — nothing to do.
-    }
-
-    // Locate cargo's git checkout of telemetry-parser inside CARGO_HOME.
     let cargo_home =
         std::env::var("CARGO_HOME").unwrap_or_else(|_| {
             format!("{}/.cargo", std::env::var("HOME")
             .unwrap_or_else(|_| std::env::var("USERPROFILE")
             .unwrap_or_else(|_| ".".into())))
         });
+    patch_fitparser(manifest_dir, &cargo_home);
 
+    let patch_path = manifest_dir.join("patches/telemetry-parser-dji-camera-metadata.patch");
+    if !patch_path.exists() {
+        return; // Patch removed or build outside repo — nothing to do.
+    }
+
+    // Locate cargo's git checkout of telemetry-parser inside CARGO_HOME.
     let checkouts_dir = Path::new(&cargo_home).join("git/checkouts");
     let Ok(entries) = std::fs::read_dir(&checkouts_dir) else {
         return;

@@ -494,7 +494,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6fac387a98bb7c37292057cffc56d62ecb629900026402633ae9160df93a8766"
 dependencies = [
- "nom",
+ "nom 7.1.3",
 ]
 
 [[package]]
@@ -1038,7 +1038,7 @@ dependencies = [
  "chrono",
  "integer-encoding",
  "itertools 0.10.5",
- "nom",
+ "nom 7.1.3",
  "num-rational",
  "num-traits",
  "thiserror 1.0.69",
@@ -1088,6 +1088,17 @@ name = "find-msvc-tools"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "645cbb3a84e60b7531617d5ae4e57f7e27308f6445f5abf653209ea76dec8dff"
+
+[[package]]
+name = "fitparser"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56a834aed7c01a500afb06ebcfde59a4dcfd1de7ce15ae501462934d59655376"
+dependencies = [
+ "chrono",
+ "nom 8.0.0",
+ "serde",
+]
 
 [[package]]
 name = "fixedbitset"
@@ -2484,6 +2495,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nom"
+version = "8.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df9761775871bdef83bee530e60050f7e54b1105350d6884eb0fb4f46c2f9405"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2828,6 +2848,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "csv",
+ "fitparser",
  "image",
  "log",
  "objc2",

@@ -1,12 +1,11 @@
 /**
- * Activity import - native and browser activity file selection and import.
+ * Activity import - native activity file selection and import.
  */
 
 import { useCallback } from 'react'
-import { hasTauriRuntime } from '@/api/backend'
 import { useActivityStore } from '@/hooks/useAppStoreSelectors'
-import importActivityFile, { importActivityPath, parseActivityPath } from '@/lib/activity/import-activity'
-import { openSinglePath, selectBrowserFile } from '@/lib/file-dialog'
+import { importActivityPath, parseActivityPath } from '@/lib/import-activity'
+import { openSinglePath } from '@/lib/file-dialog'
 import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import useStore from '@/store/useStore'
 
@@ -24,18 +23,10 @@ export default function useActivityImport() {
   } = useActivityStore()
 
   const loadActivitySelection = useCallback(
-    async (selection) => {
-      let runImport
-      if (typeof selection === 'string') {
-        runImport = () => importActivityPath(selection, useStore.getState())
-      } else if (selection instanceof File) {
-        runImport = () => importActivityFile(selection, useStore.getState())
-      } else {
-        throw new Error('Activity import requires one file.')
-      }
+    async (path) => {
       setProcessing(true)
       try {
-        await runWithoutEditorHistory(useStore, runImport)
+        await runWithoutEditorHistory(useStore, () => importActivityPath(path, useStore.getState()))
       } finally {
         setProcessing(false)
       }
@@ -57,22 +48,13 @@ export default function useActivityImport() {
 
   const handleActivityFileOpen = useCallback(async () => {
     try {
-      let selection = null
-
-      if (hasTauriRuntime()) {
-        const selectedPath = await openSinglePath(
-          [{ name: 'Activity', extensions: ['gpx', 'fit', 'tcx', 'srt', 'igc', 'csv', 'vbo', 'uddf', 'ssrf', 'xml'] }],
-          {
-            lastDirectoryKey: 'last-activity-import-dir',
-          },
-        )
-        if (typeof selectedPath === 'string') selection = selectedPath
-      } else {
-        const selectedFile = await selectBrowserFile('.fit')
-        if (selectedFile) selection = selectedFile
-      }
-
-      if (selection) await importSelection(selection)
+      const selectedPath = await openSinglePath(
+        [{ name: 'Activity', extensions: ['gpx', 'fit', 'tcx', 'srt', 'igc', 'csv', 'vbo', 'uddf', 'ssrf', 'xml'] }],
+        {
+          lastDirectoryKey: 'last-activity-import-dir',
+        },
+      )
+      if (typeof selectedPath === 'string') await importSelection(selectedPath)
     } catch (error) {
       console.error('Activity selection failed:', error)
       setErrorMessage(`Activity selection failed: ${error.message}`)

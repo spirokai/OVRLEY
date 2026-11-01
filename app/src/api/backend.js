@@ -166,18 +166,6 @@ export async function suggestRenderOutputPath(outputKind, rememberedDirectory) {
   })
 }
 
-/**
- * Finalizes extracted raw activity samples through the Rust backend pipeline.
- *
- * @param {object} rawActivity - RawActivity contract produced by format parsers.
- * @returns {Promise<object>} Promise resolving to parsed activity and debug payload.
- */
-export async function finalizeActivity(rawActivity) {
-  return apiCall('backend_finalize_activity', {
-    rawActivityJson: safeJsonStringify(rawActivity),
-  })
-}
-
 /** @param {string} activityId Native snapshot identity. @returns {Promise<ArrayBuffer>} Original-density activity bytes. */
 export function previewActivity(activityId) {
   return invokeCommand('backend_preview_activity', { activityId })
@@ -238,6 +226,15 @@ export async function parseTcxActivity(path) {
  */
 export async function parseGpxActivity(path) {
   return invokeCommand('backend_parse_gpx_activity', { path })
+}
+
+/**
+ * Parses and finalizes a native FIT activity using the Rust parser.
+ * @param {string} path - Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseFitActivity(path) {
+  return invokeCommand('backend_parse_fit_activity', { path })
 }
 
 /**
