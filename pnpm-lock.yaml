@@ -161,9 +161,6 @@ importers:
       i18next:
         specifier: ^26.4.1
         version: 26.4.1
-      igc-parser:
-        specifier: git+https://github.com/Turbo87/igc-parser.git#29672f82c87b93cc2c44b567421a97c05383ea4c
-        version: https://codeload.github.com/Turbo87/igc-parser/tar.gz/29672f82c87b93cc2c44b567421a97c05383ea4c
       immer:
         specifier: ^11.1.4
         version: 11.1.4
@@ -2974,10 +2971,6 @@ packages:
   flatted@3.4.4:
     resolution: {integrity: sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q==}
 
-  flight-recorder-manufacturers@2.0.0:
-    resolution: {integrity: sha512-FhSY7XslPkhYGdBBVRLLExoKqiLWbKuxPEx3O3a443hp8VOrcvE+ibibigVplQbaNipVG3pSPTZPTFJPIfcO8Q==}
-    engines: {node: '>=12'}
-
   flru@1.0.2:
     resolution: {integrity: sha512-kWyh8ADvHBFz6ua5xYOPnUroZTT/bwWfrCeL0Wj1dzG4/YOmOcfJ99W8dOVyyynJN35rZ9aCOtHChqQovV7yog==}
     engines: {node: '>=6'}
@@ -3176,11 +3169,6 @@ packages:
 
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
-
-  igc-parser@https://codeload.github.com/Turbo87/igc-parser/tar.gz/29672f82c87b93cc2c44b567421a97c05383ea4c:
-    resolution: {tarball: https://codeload.github.com/Turbo87/igc-parser/tar.gz/29672f82c87b93cc2c44b567421a97c05383ea4c}
-    version: 2.0.0
-    engines: {node: '>=12'}
 
   ignore@5.3.2:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
@@ -7582,8 +7570,6 @@ snapshots:
 
   flatted@3.4.4: {}
 
-  flight-recorder-manufacturers@2.0.0: {}
-
   flru@1.0.2: {}
 
   for-each@0.3.5:
@@ -7769,10 +7755,6 @@ snapshots:
   i18next@26.4.1: {}
 
   ieee754@1.2.1: {}
-
-  igc-parser@https://codeload.github.com/Turbo87/igc-parser/tar.gz/29672f82c87b93cc2c44b567421a97c05383ea4c:
-    dependencies:
-      flight-recorder-manufacturers: 2.0.0
 
   ignore@5.3.2: {}
 

@@ -68,7 +68,7 @@ export default function useActivityImport() {
         )
         if (typeof selectedPath === 'string') selection = selectedPath
       } else {
-        const selectedFile = await selectBrowserFile('.fit,.srt,.igc')
+        const selectedFile = await selectBrowserFile('.fit,.srt')
         if (selectedFile) selection = selectedFile
       }
 

@@ -8,6 +8,7 @@ const parseCsvActivity = vi.hoisted(() => vi.fn())
 const parseVboActivity = vi.hoisted(() => vi.fn())
 const parseTcxActivity = vi.hoisted(() => vi.fn())
 const parseGpxActivity = vi.hoisted(() => vi.fn())
+const parseIgcActivity = vi.hoisted(() => vi.fn())
 const parseUddfActivity = vi.hoisted(() => vi.fn())
 const parseSubsurfaceActivity = vi.hoisted(() => vi.fn())
 
@@ -17,6 +18,7 @@ vi.mock('@/api/backend', () => ({
   parseVboActivity,
   parseTcxActivity,
   parseGpxActivity,
+  parseIgcActivity,
   parseUddfActivity,
   parseSubsurfaceActivity,
   writeParseDebugFile: vi.fn().mockResolvedValue('debug-path.json'),
@@ -46,6 +48,7 @@ describe('import-activity store boundary', () => {
     parseVboActivity.mockReset()
     parseTcxActivity.mockReset()
     parseGpxActivity.mockReset()
+    parseIgcActivity.mockReset()
     parseUddfActivity.mockReset()
     parseSubsurfaceActivity.mockReset()
     finalizeActivity.mockResolvedValue({
@@ -77,26 +80,18 @@ describe('import-activity store boundary', () => {
     expect(saveFile.length).toBe(2) // fileOrPath + optional storeActions
   })
 
-  test('imports IGC files through the shared finalizer boundary', async () => {
-    const { default: saveFile } = await import('@/lib/activity/import-activity')
-    const text = await readFile(path.join(fixtureDir, '654G6NG1.IGC'), 'utf8')
-    const file = new File([text], '654G6NG1.IGC')
+  test('imports a native IGC path and activates the Rust-finalized activity', async () => {
+    const { importActivityPath } = await import('@/lib/activity/import-activity')
     const store = storeActions()
+    const parsedActivity = { metadata: { duration_seconds: 5 } }
+    parseIgcActivity.mockResolvedValue({ parsed_activity: parsedActivity })
 
-    await saveFile(file, store)
+    await importActivityPath('C:\\activities\\flight.IGC', store)
 
-    expect(finalizeActivity).toHaveBeenCalledTimes(1)
-    const rawActivity = finalizeActivity.mock.calls[0][0]
-    expect(rawActivity.file_name).toBe('654G6NG1.IGC')
-    expect(rawActivity.file_format).toBe('igc')
-    expect(rawActivity.raw_samples.length).toBeGreaterThan(0)
-    expect(parseCsvActivity).not.toHaveBeenCalled()
-    expect(store.setActivitySource).toHaveBeenCalledWith(null)
-    expect(store.activateActivityFile).toHaveBeenCalledWith({
-      metadata: {
-        duration_seconds: 0,
-      },
-    })
+    expect(parseIgcActivity).toHaveBeenCalledWith('C:\\activities\\flight.IGC')
+    expect(finalizeActivity).not.toHaveBeenCalled()
+    expect(store.activateActivityFile).toHaveBeenCalledWith(parsedActivity)
+    expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\flight.IGC' })
   })
 
   test.each([

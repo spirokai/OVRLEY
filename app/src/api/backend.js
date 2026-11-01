@@ -241,6 +241,15 @@ export async function parseGpxActivity(path) {
 }
 
 /**
+ * Parses and finalizes a native IGC flight log using the Rust parser.
+ * @param {string} path - Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseIgcActivity(path) {
+  return invokeCommand('backend_parse_igc_activity', { path })
+}
+
+/**
  * Parses and finalizes a native UDDF dive using the Rust parser.
  * @param {string} path Absolute path returned by the native file picker.
  * @returns {Promise<object>} Finalized activity response.

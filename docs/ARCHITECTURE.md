@@ -8,7 +8,7 @@
 
 - 10+ widget types: metric values (speed, HR, power, cadence, temperature, time, gradient), text labels, route map, elevation profile
 - Widget editing: drag, resize, rotate, grid snap via `react-moveable`
-- Activity extraction: FIT (via `fit-file-parser` JS library), SRT (text parser), and GPX (native Rust parser), with shared Rust finalization
+- Activity extraction: FIT (via `fit-file-parser` JS library), SRT (text parser), plus GPX and IGC (native Rust parsers), with shared Rust finalization
 - Transparent overlay export (ProRes/QTRLE) for external compositing
 - Direct MP4 compositing: overlay rendered over imported source video
 - 100% offline, no cloud dependencies

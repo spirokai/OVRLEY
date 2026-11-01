@@ -9,6 +9,7 @@ use crate::activity::finalize::{finalize_raw_activity, FinalizeActivityResponse}
 use crate::activity::parsers::raw_values::{
     is_js_whitespace, js_trim, safe_gear_value, safe_number,
 };
+use crate::activity::parsers::{decode_file_text, read_activity_file};
 use crate::activity::schema::{RawActivity, RawActivityOptions, RawSample, SmoothingOption};
 use crate::error::{CoreError, CoreResult};
 use roxmltree::{Document, Node, ParsingOptions};
@@ -25,37 +26,20 @@ pub fn parse_gpx_activity_path(
     path: &Path,
     repo_root: Option<&Path>,
 ) -> CoreResult<FinalizeActivityResponse> {
-    let bytes = std::fs::read(path).map_err(|source| CoreError::Io {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    let file_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| {
-            CoreError::Activity(format!(
-                "GPX path has no valid UTF-8 filename: {}",
-                path.display()
-            ))
-        })?;
-    finalize_raw_activity(
-        &extract_gpx_activity(bytes.as_slice(), file_name)?,
-        repo_root,
-    )
+    let (bytes, file_name) = read_activity_file(path, "GPX")?;
+    finalize_raw_activity(&extract_gpx_activity(&bytes, file_name)?, repo_root)
 }
 
 /// Extracts one canonical raw sample per `trkpt` from GPX file bytes.
 ///
-/// Bytes are always decoded as UTF-8 with replacement, whatever the XML declaration
-/// says, and a leading byte order mark is dropped.
+/// Bytes are always decoded as UTF-8, whatever the XML declaration says.
 pub fn extract_gpx_activity(bytes: &[u8], file_name: &str) -> CoreResult<RawActivity> {
-    let decoded = String::from_utf8_lossy(bytes);
-    let text = decoded.strip_prefix('\u{FEFF}').unwrap_or(&decoded);
+    let text = decode_file_text(bytes);
     let options = ParsingOptions {
         allow_dtd: true,
         ..ParsingOptions::default()
     };
-    let document = Document::parse_with_options(text, options)
+    let document = Document::parse_with_options(&text, options)
         .map_err(|_| CoreError::Activity("The GPX file could not be parsed.".into()))?;
     let document_node = document.root();
     if first_descendant(document_node, "parsererror").is_some() {
