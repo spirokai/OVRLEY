@@ -334,7 +334,12 @@
     "timelineClipNudge": "Nudge selected clip synchronization",
     "timelineClipRemove": "Remove selected video",
     "timelineClipNudgeTenthSecond": "Nudge selected clip sync offset by 0.1 seconds",
-    "timelineClipNudgeSecond": "Nudge selected clip sync offset by 1 second"
+    "timelineClipNudgeSecond": "Nudge selected clip sync offset by 1 second",
+    "timeFields": "Time fields",
+    "secondsInputStep": "Change the focused time",
+    "secondsInputStepSecond": "Change the focused time by 1 second",
+    "secondsInputStepTenSeconds": "Change the focused time by 10 seconds",
+    "secondsInputStepFrame": "Change the focused time by one frame"
   },
   "scene-settings": {
     "portrait": "Portrait (4:3)",

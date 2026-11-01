@@ -4,15 +4,17 @@
 
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { arrowStepSeconds, formatSecondsText, normalizeSecondsDraft, parseSecondsDraft, snapSeconds } from '@/lib/seconds-input'
+import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
+import { bindingStepSeconds, formatSecondsText, normalizeSecondsDraft, parseSecondsDraft, snapSeconds } from '@/lib/seconds-input'
 import { formatSecondsClock } from '@/lib/time-format'
 
 /**
  * Keeps the typed draft until it is committed (Enter or leaving the field). The
  * field shows the value as a clock; while a complete draft is typed, the preview
  * reads it as a clock and in seconds. A committed value is snapped to the frame
- * grid right away; the field then shows the stored value again. Up and Down
- * commit the value moved by `arrowStepSeconds`.
+ * grid right away; the field then shows the stored value again. The
+ * `secondsInput.step` shortcut moves the draft and commits once when its key is
+ * released, so holding it adds one undo step.
  * @param {object} options Input options.
  * @param {number} options.value Stored value in seconds.
  * @param {(seconds: number) => string|null|undefined} options.onCommit Stores a snapped value; returns a message when it is rejected.
@@ -22,21 +24,25 @@ import { formatSecondsClock } from '@/lib/time-format'
  * @param {number|null} options.step Seconds the step buttons add or remove, or null without step buttons.
  * @param {(() => void)|null} options.onReset Resets the stored value, or null without a reset button. A reset discards the draft.
  * @returns {{text: string, preview: string|null, error: string|null, onChange: function, onBlur: function, onKeyDown: function,
- *   onStep: function|null, onReset: function|null}} Field model.
+ *   onKeyUp: function, onStep: function|null, onReset: function|null}} Field model.
  */
 export function useSecondsInput({ value, onCommit, fps, mode, signed, step, onReset }) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState(null)
   const [error, setError] = useState(null)
+  const [steppingKey, setSteppingKey] = useState(null)
   const draftSeconds = draft === null ? null : parseSecondsDraft(draft)
 
+  const rejectionOf = (seconds) => {
+    if (mode === 'duration' && seconds <= 0) return t('components.secondsAboveZero', 'Enter a duration above 0 seconds')
+    if (!signed && seconds < 0) return t('components.secondsNotNegative', 'Enter a time of 0 seconds or more')
+    return null
+  }
+
   const store = (seconds) => {
-    if (mode === 'duration' && seconds <= 0) {
-      setError(t('components.secondsAboveZero', 'Enter a duration above 0 seconds'))
-      return
-    }
-    if (!signed && seconds < 0) {
-      setError(t('components.secondsNotNegative', 'Enter a time of 0 seconds or more'))
+    const rejection = rejectionOf(seconds)
+    if (rejection !== null) {
+      setError(rejection)
       return
     }
     const snapped = snapSeconds(seconds, fps, mode)
@@ -54,12 +60,17 @@ export function useSecondsInput({ value, onCommit, fps, mode, signed, step, onRe
     store(draftSeconds)
   }
 
-  const moveBy = (seconds) => store((draftSeconds ?? value) + seconds)
+  const stepDraft = (seconds) => {
+    const next = (draftSeconds ?? value) + seconds
+    const rejection = rejectionOf(next)
+    setError(rejection)
+    if (rejection === null) setDraft(formatSecondsClock(snapSeconds(next, fps, mode)))
+  }
 
   return {
     text: draft ?? formatSecondsClock(value),
     preview:
-      draftSeconds === null
+      draftSeconds === null || steppingKey !== null
         ? null
         : t('components.secondsPreview', {
             defaultValue: '= {{clock}} ({{seconds}} s)',
@@ -73,21 +84,31 @@ export function useSecondsInput({ value, onCommit, fps, mode, signed, step, onRe
       setDraft(next)
       setError(null)
     },
-    onBlur: commit,
+    onBlur: () => {
+      setSteppingKey(null)
+      commit()
+    },
     onKeyDown: (event) => {
       if (event.key === 'Enter') commit()
       if (event.key === 'Escape') {
         setDraft(null)
         setError(null)
       }
-      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-        const arrowStep = arrowStepSeconds(event, fps)
-        if (arrowStep === null) return
-        event.preventDefault()
-        moveBy(event.key === 'ArrowUp' ? arrowStep : -arrowStep)
-      }
+      const match = matchKeyboardShortcut(event, 'seconds-input')
+      if (match?.commandId !== 'secondsInput.step') return
+      const seconds = bindingStepSeconds(match.binding, fps)
+      if (seconds === null) return
+      event.preventDefault()
+      setSteppingKey(event.key)
+      stepDraft(seconds)
     },
-    onStep: step === null ? null : (direction) => moveBy(direction * step),
+    // Matched by key alone: a modifier may be released before the key it stepped with.
+    onKeyUp: (event) => {
+      if (event.key !== steppingKey) return
+      setSteppingKey(null)
+      commit()
+    },
+    onStep: step === null ? null : (direction) => store((draftSeconds ?? value) + direction * step),
     onReset:
       onReset === null
         ? null

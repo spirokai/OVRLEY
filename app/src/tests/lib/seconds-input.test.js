@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vite-plus/test'
-import { arrowStepSeconds, formatSecondsText, normalizeSecondsDraft, parseSecondsDraft, snapSeconds } from '@/lib/seconds-input'
+import { bindingStepSeconds, formatSecondsText, normalizeSecondsDraft, parseSecondsDraft, snapSeconds } from '@/lib/seconds-input'
 import { formatSecondsClock } from '@/lib/time-format'
 
 const PAL = { num: 25, den: 1 }
@@ -45,13 +45,10 @@ describe('seconds input helpers', () => {
     for (const draft of ['5+', '5-', '5+-3', '5--3', '5+5:75']) expect(parseSecondsDraft(draft)).toBeNull()
   })
 
-  test('step arrows by 1 s, 10 s with Shift, one frame with Alt, and leave other combinations alone', () => {
-    const keys = (held) => ({ shiftKey: false, altKey: false, ctrlKey: false, metaKey: false, ...held })
-    expect(arrowStepSeconds(keys({}), PAL)).toBe(1)
-    expect(arrowStepSeconds(keys({ shiftKey: true }), PAL)).toBe(10)
-    expect(arrowStepSeconds(keys({ altKey: true }), PAL)).toBe(0.04)
-    expect(arrowStepSeconds(keys({ altKey: true }), null)).toBeNull()
-    for (const held of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true, altKey: true }]) expect(arrowStepSeconds(keys(held), PAL)).toBeNull()
+  test('resolve a step binding to signed seconds, with frame steps only on a frame grid', () => {
+    expect(bindingStepSeconds({ seconds: -10 }, null)).toBe(-10)
+    expect(bindingStepSeconds({ frames: -1 }, PAL)).toBe(-0.04)
+    expect(bindingStepSeconds({ frames: 1 }, null)).toBeNull()
   })
 
   test('show up to three decimals without trailing zeros', () => {

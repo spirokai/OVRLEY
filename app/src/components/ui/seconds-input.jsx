@@ -13,8 +13,8 @@ import { useTranslation } from 'react-i18next'
 
 /**
  * Renders a seconds input. Typed text is kept until Enter or leaving the field,
- * then snapped to the frame grid and committed; Escape discards it. Up and Down
- * move the value by 1 s, 10 s with Shift, or one frame with Alt.
+ * then snapped to the frame grid and committed; Escape discards it. The arrow keys
+ * step the value (`secondsInput.step` in the shortcut manifest).
  *
  * @param {object} props - Component props.
  * @param {number} props.value - Stored value in seconds.
@@ -43,6 +43,7 @@ export function SecondsInput({ value, onCommit, fps, mode = 'time', signed = fal
           onChange={field.onChange}
           onBlur={field.onBlur}
           onKeyDown={field.onKeyDown}
+          onKeyUp={field.onKeyUp}
           aria-invalid={field.error !== null}
           aria-describedby={field.error !== null || field.preview !== null ? messageId : undefined}
           className={cn(

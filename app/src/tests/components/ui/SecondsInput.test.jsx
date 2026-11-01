@@ -65,6 +65,14 @@ describe('SecondsInput', () => {
 
     await user.keyboard('{Control>}{ArrowUp}{/Control}')
     expect(onCommit).toHaveBeenCalledTimes(3)
+
+    // Holding moves the shown value and commits once on release.
+    await user.keyboard('{ArrowUp>3}')
+    expect(input).toHaveValue('00:13')
+    expect(onCommit).toHaveBeenCalledTimes(3)
+    await user.keyboard('{/ArrowUp}')
+    expect(onCommit).toHaveBeenCalledTimes(4)
+    expect(onCommit).toHaveBeenLastCalledWith(13)
   })
 
   test('commits on Enter or leaving the field, snapped to the nearest frame', async () => {

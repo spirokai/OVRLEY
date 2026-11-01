@@ -71,15 +71,14 @@ export function formatSecondsText(seconds) {
 }
 
 /**
- * Seconds one arrow key press adds or removes: 1, 10 with Shift, one frame with Alt.
- * @param {{shiftKey: boolean, altKey: boolean, ctrlKey: boolean, metaKey: boolean}} modifiers Modifier keys held.
+ * Resolves a `secondsInput.step` shortcut binding to the seconds it moves a value.
+ * @param {{seconds?: number, frames?: number}} binding Manifest binding, declaring either seconds or frames.
  * @param {{num: number, den: number}|null} fps Frame grid of the value, or null.
- * @returns {number|null} Step, or null when the keys keep their usual meaning (Ctrl, Cmd, Shift+Alt, Alt without a frame grid).
+ * @returns {number|null} Signed step, or null for a frame step on a value without a frame grid.
  */
-export function arrowStepSeconds({ shiftKey, altKey, ctrlKey, metaKey }, fps) {
-  if (ctrlKey || metaKey || (shiftKey && altKey)) return null
-  if (altKey) return fps === null ? null : framesToSeconds(1, fps)
-  return shiftKey ? 10 : 1
+export function bindingStepSeconds({ seconds, frames }, fps) {
+  if (frames === undefined) return seconds
+  return fps === null ? null : framesToSeconds(frames, fps)
 }
 
 /**
