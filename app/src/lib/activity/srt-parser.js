@@ -46,16 +46,30 @@ function parseShutter(raw) {
 
 /**
  * Extract the first timestamp-like line from the body text (Format A).
- * Format A has a standalone line like `2025-07-23 10:21:41.694`.
+ * Format A has a standalone line like `2025-07-23 10:21:41.694`, or
+ * `2026-05-28 16:25:02,708,734` with comma-separated milliseconds and microseconds.
  * @param {string[]} bodyLines
  * @returns {string|null}
  */
 function extractFormatATimestamp(bodyLines) {
   for (const line of bodyLines) {
-    const match = line.match(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})/)
-    if (match) return match[1]
+    const match = line.match(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})[.,](\d{3})/)
+    if (match) return `${match[1]}.${match[2]}`
   }
   return null
+}
+
+/**
+ * Parse an optics value that some cameras store as a scaled integer
+ * (`[fnum : 280]` is f/2.8, `[focal_len : 224]` is 22.4 mm). Values written with
+ * a decimal point (`[fnum: 1.7]`, `[focal_len: 24.00]`) are already in real units.
+ * @param {string|undefined} raw — the field string from the SRT
+ * @param {number} scale — divisor applied to scaled integer values
+ * @returns {number|null}
+ */
+function parseOpticsValue(raw, scale) {
+  const value = parseFloat(raw) || null
+  return /^\d{3,}$/.test(raw) ? value / scale : value
 }
 
 /**
@@ -126,11 +140,11 @@ function parseFormatACue(bodyLines, elapsedSeconds) {
     timestamp: toIsoTimestamp(timestampLine),
     latitude: parseFloat(fields.latitude) || null,
     longitude: parseFloat(fields.longitude) || null,
-    elevation: parseFloat(fields.abs_alt) || null,
+    elevation: parseFloat(fields.abs_alt ?? fields.altitude) || null,
     iso: parseFloat(fields.iso) || null,
-    aperture: parseFloat(fields.fnum) || null,
+    aperture: parseOpticsValue(fields.fnum, 100),
     shutter_speed: parseShutter(fields.shutter),
-    focal_length: parseFloat(fields.focal_len) || null,
+    focal_length: parseOpticsValue(fields.focal_len, 10),
     ev: fields.ev !== undefined ? parseFloat(fields.ev) || 0 : null,
     color_temperature: parseFloat(fields.ct) || null,
   }
