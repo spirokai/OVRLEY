@@ -4,7 +4,7 @@ import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-cata
 import { deriveVideoWarnings } from '@/lib/video-program/video-warnings'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
-function warningsFor(videos, offsets) {
+function warningsFor(videos, offsets, activityDurationSeconds = null) {
   const { importedVideos, videoEdits } = videoStoreState(videos, offsets)
   const { clips, program } = buildTimelineProgram({
     videos: importedVideos,
@@ -12,7 +12,7 @@ function warningsFor(videos, offsets) {
     dragPreview: null,
     transitionDefaults: DEFAULT_TRANSITION_SETTINGS,
   })
-  return Object.fromEntries(deriveVideoWarnings(clips, program))
+  return Object.fromEntries(deriveVideoWarnings(clips, program, activityDurationSeconds))
 }
 
 describe('deriveVideoWarnings', () => {
@@ -38,6 +38,24 @@ describe('deriveVideoWarnings', () => {
       ],
       outside: [{ kind: 'sync', message: 'Video is outside the activity' }],
     })
+  })
+
+  test('warns when a clip without a sync warning starts more than an hour before or after the activity', () => {
+    const far = { kind: 'far', message: 'Starts more than an hour before or after the activity' }
+    const clip = (id, importOrder) => createTestVideo({ id, path: `/videos/${id}.mp4`, durationSeconds: 0.5, importOrder })
+    const synced = { ...clip('synced', 4), syncWarning: 'Video is outside the activity' }
+    const offsets = { early: -3601, edgeBefore: -3600, edgeAfter: 1000 + 3600, late: 1000 + 3601, synced: -5000 }
+    const videos = [clip('early', 0), clip('edgeBefore', 1), clip('edgeAfter', 2), clip('late', 3), synced]
+
+    expect(warningsFor(videos, offsets, 1000)).toEqual({
+      early: [far],
+      edgeBefore: [],
+      edgeAfter: [],
+      late: [far],
+      synced: [{ kind: 'sync', message: 'Video is outside the activity' }],
+    })
+    // Without an activity there is nothing to be far from.
+    expect(warningsFor(videos, offsets).early).toEqual([])
   })
 
   test('gives every clip an entry, empty when nothing is wrong', () => {

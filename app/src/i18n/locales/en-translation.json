@@ -566,6 +566,7 @@
     "unsupportedVideoFile": "Not a supported video file (MP4, MOV, MKV).",
     "videoCount": "{{count}} videos",
     "videoOrImage": "Video or Image",
+    "warningFarFromActivity": "Starts more than an hour before or after the activity",
     "warningIncompatible": "Different resolution or frame rate than the other videos",
     "warningOverlap": "Overlaps {{name}}",
     "videoPreviewLoadingWasAborted": "Video preview loading was aborted.",
