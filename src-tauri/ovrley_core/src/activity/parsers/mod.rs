@@ -11,6 +11,8 @@ pub mod gpx;
 pub mod igc;
 /// Lenient readers for sensor values in external activity files.
 pub mod raw_values;
+/// Native DJI SRT telemetry extraction.
+pub mod srt;
 /// Native Subsurface XML dive extraction.
 pub mod subsurface;
 /// Native Garmin TCX extraction into canonical raw activity samples.

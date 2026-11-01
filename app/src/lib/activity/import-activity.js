@@ -9,7 +9,6 @@ import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import useStore from '@/store/useStore'
 import { syncSceneTimingToConfig } from '@/store/store-utils'
 import parseFitActivityFile from './fit-parser.js'
-import { parseSrtActivityFile } from './srt-parser.js'
 
 /**
  * Parses activity file.
@@ -21,7 +20,6 @@ export async function parseActivityFile(file) {
   const lowerName = file.name.toLowerCase()
   let rawActivity
   if (lowerName.endsWith('.fit')) rawActivity = await parseFitActivityFile(file)
-  else if (lowerName.endsWith('.srt')) rawActivity = parseSrtActivityFile(await file.text(), file.name)
   else throw new Error(`Unsupported activity file format: ${file.name}`)
 
   const finalized = await backend.finalizeActivity(rawActivity)
@@ -132,6 +130,7 @@ export async function parseActivityPath(path) {
   else if (lowerPath.endsWith('.tcx')) parsedActivity = (await backend.parseTcxActivity(path)).parsed_activity
   else if (lowerPath.endsWith('.gpx')) parsedActivity = (await backend.parseGpxActivity(path)).parsed_activity
   else if (lowerPath.endsWith('.igc')) parsedActivity = (await backend.parseIgcActivity(path)).parsed_activity
+  else if (lowerPath.endsWith('.srt')) parsedActivity = (await backend.parseSrtActivity(path)).parsed_activity
   else if (lowerPath.endsWith('.uddf')) parsedActivity = (await backend.parseUddfActivity(path)).parsed_activity
   else if (lowerPath.endsWith('.ssrf') || lowerPath.endsWith('.xml')) parsedActivity = (await backend.parseSubsurfaceActivity(path)).parsed_activity
   else {
@@ -144,7 +143,7 @@ export async function parseActivityPath(path) {
 /**
  * Handles save file.
  *
- * @param {File} file - Browser File containing a FIT or SRT activity.
+ * @param {File} file - Browser File containing a FIT activity.
  * @param {object} storeActions - Injected store actions.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */

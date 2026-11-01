@@ -19,6 +19,7 @@ unicode-segmentation = "=1.12.0"
 thiserror = "2"
 log = "0.4"
 same-file = "1"
+regex = "1"
 open = "5"
 image = { version = "=0.25.5", default-features = false, features = ["png", "jpeg", "bmp", "tiff"] }
 skia-safe = { git = "https://github.com/rust-skia/rust-skia", rev = "b7f043e0b1e2a850e702245de811f01df1f6b0ff", version = "=0.153.3", features = [

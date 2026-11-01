@@ -9,6 +9,7 @@ const parseVboActivity = vi.hoisted(() => vi.fn())
 const parseTcxActivity = vi.hoisted(() => vi.fn())
 const parseGpxActivity = vi.hoisted(() => vi.fn())
 const parseIgcActivity = vi.hoisted(() => vi.fn())
+const parseSrtActivity = vi.hoisted(() => vi.fn())
 const parseUddfActivity = vi.hoisted(() => vi.fn())
 const parseSubsurfaceActivity = vi.hoisted(() => vi.fn())
 
@@ -19,6 +20,7 @@ vi.mock('@/api/backend', () => ({
   parseTcxActivity,
   parseGpxActivity,
   parseIgcActivity,
+  parseSrtActivity,
   parseUddfActivity,
   parseSubsurfaceActivity,
   writeParseDebugFile: vi.fn().mockResolvedValue('debug-path.json'),
@@ -26,7 +28,6 @@ vi.mock('@/api/backend', () => ({
 }))
 
 const fixtureDir = path.resolve('../src-tauri/ovrley_core/tests/fixtures/activity')
-const minimalSrt = ['1', '00:00:01,000 --> 00:00:01,033', '2025-07-23 10:21:40.000', '[latitude: 47.1] [longitude: 8.1]', ''].join('\n')
 
 function storeActions() {
   return {
@@ -49,6 +50,7 @@ describe('import-activity store boundary', () => {
     parseTcxActivity.mockReset()
     parseGpxActivity.mockReset()
     parseIgcActivity.mockReset()
+    parseSrtActivity.mockReset()
     parseUddfActivity.mockReset()
     parseSubsurfaceActivity.mockReset()
     finalizeActivity.mockResolvedValue({
@@ -94,15 +96,27 @@ describe('import-activity store boundary', () => {
     expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\flight.IGC' })
   })
 
-  test.each([
-    ['fit', async () => new File([await readFile(path.join(fixtureDir, 'test-ride.fit'))], 'activity.fit')],
-    ['srt', async () => new File([minimalSrt], 'activity.srt')],
-  ])('keeps %s imports on the existing RawActivity finalizer route', async (format, createFile) => {
+  test('imports a native SRT path and activates the Rust-finalized activity', async () => {
+    const { importActivityPath } = await import('@/lib/activity/import-activity')
+    const store = storeActions()
+    const parsedActivity = { metadata: { duration_seconds: 5 } }
+    parseSrtActivity.mockResolvedValue({ parsed_activity: parsedActivity })
+
+    await importActivityPath('C:\\activities\\flight.SRT', store)
+
+    expect(parseSrtActivity).toHaveBeenCalledWith('C:\\activities\\flight.SRT')
+    expect(finalizeActivity).not.toHaveBeenCalled()
+    expect(store.activateActivityFile).toHaveBeenCalledWith(parsedActivity)
+    expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\flight.SRT' })
+  })
+
+  test('keeps fit imports on the existing RawActivity finalizer route', async () => {
     const { default: saveFile } = await import('@/lib/activity/import-activity')
+    const file = new File([await readFile(path.join(fixtureDir, 'test-ride.fit'))], 'activity.fit')
 
-    await saveFile(await createFile(), storeActions())
+    await saveFile(file, storeActions())
 
-    expect(finalizeActivity.mock.calls[0][0].file_format).toBe(format)
+    expect(finalizeActivity.mock.calls[0][0].file_format).toBe('fit')
     expect(parseCsvActivity).not.toHaveBeenCalled()
   })
 

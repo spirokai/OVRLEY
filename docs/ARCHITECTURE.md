@@ -8,7 +8,7 @@
 
 - 10+ widget types: metric values (speed, HR, power, cadence, temperature, time, gradient), text labels, route map, elevation profile
 - Widget editing: drag, resize, rotate, grid snap via `react-moveable`
-- Activity extraction: FIT (via `fit-file-parser` JS library), SRT (text parser), plus GPX and IGC (native Rust parsers), with shared Rust finalization
+- Activity extraction: FIT (via `fit-file-parser` JS library), plus GPX, IGC, and DJI SRT (native Rust parsers), with shared Rust finalization
 - Transparent overlay export (ProRes/QTRLE) for external compositing
 - Direct MP4 compositing: overlay rendered over imported source video
 - 100% offline, no cloud dependencies
@@ -418,13 +418,12 @@ Per-frame operations (marker interpolation, completed segment splitting, SVG pat
 ### 5.5 Activity Import Pipeline
 
 ```
-.fit/.srt file (.gpx is parsed natively: activity/parsers/gpx.rs)
+.fit file (.gpx, .igc, and .srt are parsed natively: activity/parsers/)
     │
     ▼
 import-activity.js                        # File type detection + parser dispatch
     │
-    ├── .fit → fit-parser.js              # fit-file-parser library
-    └── .srt → srt-parser.js              # DJI subtitle telemetry
+    └── .fit → fit-parser.js              # fit-file-parser library
     │
     ▼
 RawActivity                               # file_name, file_format, metadata, raw_samples, options
@@ -446,7 +445,7 @@ Rust activity::finalize                   # shared post-processing
 Zustand (activitySummary, parsedActivity)
 ```
 
-The frontend owns browser-visible FIT/SRT extraction into `RawActivity`. MP4 telemetry is extracted in Rust by `media/mp4_telemetry/`, smoothed at native cadence where required, aligned into `ActivityColumns`, and sent directly into the same shared finalizer core. Rust owns canonical finalization from optional idle-gap fill through derived metrics, opt-in smoothing, `sync_time` metadata, debug payload generation, and final `ParsedActivity` assembly. The `importActivityFile()` function accepts `storeActions` as a required parameter (no implicit `useStore.getState()` fallback).
+The frontend owns browser-visible FIT extraction into `RawActivity`. MP4 telemetry is extracted in Rust by `media/mp4_telemetry/`, smoothed at native cadence where required, aligned into `ActivityColumns`, and sent directly into the same shared finalizer core. Rust owns canonical finalization from optional idle-gap fill through derived metrics, opt-in smoothing, `sync_time` metadata, debug payload generation, and final `ParsedActivity` assembly. The `importActivityFile()` function accepts `storeActions` as a required parameter (no implicit `useStore.getState()` fallback).
 
 ### 5.6 Video Preview System
 
@@ -646,9 +645,9 @@ Geometry IPC Commands (used by frontend preview):
 
 ### 6.5 Activity Processing (Rust Side)
 
-All activity sources converge on the shared Rust finalizer before preview or render. Frontend FIT/SRT parsers send `RawActivity` to `backend_finalize_activity`; MP4 telemetry is extracted in Rust, converted to `ActivityColumns`, and finalized through the same core path.
+All activity sources converge on the shared Rust finalizer before preview or render. The frontend FIT parser sends `RawActivity` to `backend_finalize_activity`; MP4 telemetry is extracted in Rust, converted to `ActivityColumns`, and finalized through the same core path.
 
-1. **Frontend raw activity input** (`activity/schema.rs`): `RawActivity` carries `file_name`, `file_format`, `metadata`, `raw_samples`, and parser-selected options. FIT/SRT parsers emit canonical units and can request per-metric smoothing.
+1. **Frontend raw activity input** (`activity/schema.rs`): `RawActivity` carries `file_name`, `file_format`, `metadata`, `raw_samples`, and parser-selected options. Format parsers emit canonical units and can request per-metric smoothing.
 2. **Backend MP4 column input** (`media/mp4_telemetry/`): MP4 extraction produces `NativeSample` rows, preserves MP4-specific pre-cull smoothing for continuous streams, aligns GPS/IMU/camera cadences into `ActivityColumns`, and sets `skip_idle_gap_fill: true` because MP4 uses a video-derived or GPS-derived cadence.
 3. **Finalize** (`activity/finalize.rs`): `RawActivity` is gap-filled first when requested, then converted to `ActivityColumns`. `ActivityColumns` input goes directly into the same finalizer core. The finalizer builds elapsed/time/course/distance/progress series, derives missing metrics, applies opt-in per-metric smoothing after derivation, enriches metadata, and assembles `ParsedActivity`.
 4. **Sync naming** (`activity/schema.rs`): `sync_time` is the canonical activity start/sync field. `source_start_time` is retired, and `metadata.start_time` is stripped during finalization.
@@ -925,7 +924,7 @@ Templates are JSON files following the `ovrley-template` format (v2):
 ### Data Formats
 
 - **Templates** — JSON `ovrley-template` v1 format
-- **Activity** — FIT/SRT frontend parsers emit `RawActivity`; MP4 Rust extraction emits `ActivityColumns`; Rust finalizes both to `ParsedActivity`, then trims + densifies
+- **Activity** — The FIT frontend parser and native Rust parsers emit `RawActivity`; MP4 Rust extraction emits `ActivityColumns`; Rust finalizes both to `ParsedActivity`, then trims + densifies
 - **Frames** — raw RGBA (u8, 4 bytes/pixel) between Rust and FFmpeg
 - **Preview** — PNG via Skia encode, returned as base64 over IPC
 

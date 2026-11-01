@@ -124,6 +124,19 @@ pub fn backend_parse_igc_activity(
     Ok(response)
 }
 
+/// Parses and finalizes a native DJI SRT file through the shared raw-sample pipeline.
+pub fn backend_parse_srt_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response = crate::activity::parsers::srt::parse_srt_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
 /// Parses and finalizes a native UDDF dive.
 pub fn backend_parse_uddf_activity(
     paths: &AppPaths,

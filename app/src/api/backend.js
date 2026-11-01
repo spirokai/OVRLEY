@@ -250,6 +250,15 @@ export async function parseIgcActivity(path) {
 }
 
 /**
+ * Parses and finalizes a native DJI SRT file using the Rust parser.
+ * @param {string} path - Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseSrtActivity(path) {
+  return invokeCommand('backend_parse_srt_activity', { path })
+}
+
+/**
  * Parses and finalizes a native UDDF dive using the Rust parser.
  * @param {string} path Absolute path returned by the native file picker.
  * @returns {Promise<object>} Finalized activity response.
