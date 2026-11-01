@@ -13,19 +13,22 @@
 //! - GSP centi-km/h becomes `speed` m/s, TRT degrees `heading`, VAT centi-m/s
 //!   `vertical_speed` m/s, and OAT `temperature` with a file-level scale.
 
-use crate::activity::finalize::{finalize_raw_activity, FinalizeActivityResponse};
-use crate::activity::parsers::raw_values::{is_js_whitespace, js_trim, safe_number};
-use crate::activity::parsers::{decode_file_text, read_activity_file};
-use crate::activity::schema::{RawActivity, RawActivityOptions, RawSample, SmoothingOption};
+use crate::activity::finalize::FinalizeActivityResponse;
+use crate::activity::parsers::helpers::{
+    all_digits, js_parse_int, js_slice, js_trim, safe_number, MAX_SAFE_INTEGER,
+};
+use crate::activity::parsers::{
+    decode_file_text, format_timestamp, parse_bytes_path, smoothing_options,
+};
+use crate::activity::schema::{RawActivity, RawActivityOptions, RawSample};
 use crate::error::{CoreError, CoreResult};
-use chrono::{DateTime, Days, NaiveDate, SecondsFormat};
+use chrono::{DateTime, Days, NaiveDate};
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::path::Path;
 
 const ONE_HOUR_MS: i64 = 60 * 60 * 1000;
 const ONE_DAY_MS: i64 = 24 * ONE_HOUR_MS;
-const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
 const INVALID_TIME: &str = "Invalid time value";
 
 const MANUFACTURERS: [(&str, &str); 35] = [
@@ -120,8 +123,7 @@ pub fn parse_igc_activity_path(
     path: &Path,
     repo_root: Option<&Path>,
 ) -> CoreResult<FinalizeActivityResponse> {
-    let (bytes, file_name) = read_activity_file(path, "IGC")?;
-    finalize_raw_activity(&extract_igc_activity(&bytes, file_name)?, repo_root)
+    parse_bytes_path(path, repo_root, "IGC", extract_igc_activity)
 }
 
 /// Extracts one canonical raw sample per B-record fix from IGC file bytes.
@@ -176,23 +178,9 @@ pub fn extract_igc_activity(bytes: &[u8], file_name: &str) -> CoreResult<RawActi
         raw_samples,
         options: RawActivityOptions {
             skip_idle_gap_fill: false,
-            smoothing: BTreeMap::from([
-                (
-                    "pace".to_string(),
-                    SmoothingOption {
-                        enabled: true,
-                        method: "zero_phase_ma".to_string(),
-                        window_seconds: 5.0,
-                    },
-                ),
-                (
-                    "heading".to_string(),
-                    SmoothingOption {
-                        enabled: true,
-                        method: "circular_ema".to_string(),
-                        window_seconds: 0.5,
-                    },
-                ),
+            smoothing: smoothing_options(&[
+                ("pace", "zero_phase_ma", 5.0),
+                ("heading", "circular_ema", 0.5),
             ]),
         },
     })
@@ -238,9 +226,8 @@ fn extension_number(fix: &Fix, code: &str) -> Option<f64> {
 
 fn raw_sample_from_fix(fix: &Fix, first_timestamp: i64, oat_divisor: f64) -> CoreResult<RawSample> {
     let timestamp = fix.timestamp.ok_or_else(invalid_time)?;
-    let timestamp_iso = DateTime::from_timestamp_millis(timestamp)
-        .ok_or_else(invalid_time)?
-        .to_rfc3339_opts(SecondsFormat::Millis, true);
+    let timestamp_iso =
+        format_timestamp(DateTime::from_timestamp_millis(timestamp).ok_or_else(invalid_time)?);
     Ok(RawSample {
         timestamp: Some(timestamp_iso),
         elapsed_seconds: Some((timestamp - first_timestamp) as f64 / 1000.0),
@@ -364,7 +351,7 @@ impl IgcLog {
         let bytes = line.as_bytes();
         if !self.has_task {
             let declaration_valid = bytes.len() >= 25
-                && all_digit_bytes(&bytes[1..23])
+                && all_digits(&bytes[1..23])
                 && bytes[23..25]
                     .iter()
                     .all(|byte| byte.is_ascii_digit() || *byte == b'-');
@@ -375,9 +362,9 @@ impl IgcLog {
             return Ok(());
         }
         let point_valid = bytes.len() >= 18
-            && all_digit_bytes(&bytes[1..8])
+            && all_digits(&bytes[1..8])
             && matches!(bytes[8], b'N' | b'S')
-            && all_digit_bytes(&bytes[9..17])
+            && all_digits(&bytes[9..17])
             && matches!(bytes[17], b'E' | b'W');
         if !point_valid {
             return Err(self.invalid("task point declaration", line));
@@ -452,7 +439,7 @@ impl IgcLog {
         let invalid = || self.invalid(&format!("{record} record"), line);
         let bytes = line.as_bytes();
         let shape_valid = bytes.len() >= 10
-            && all_digit_bytes(&bytes[1..7])
+            && all_digits(&bytes[1..7])
             && bytes[7..10].iter().all(u8::is_ascii_uppercase);
         if !shape_valid {
             return Err(invalid());
@@ -517,11 +504,11 @@ fn header_rest(line: &str) -> Option<&str> {
 
 fn is_b_record(bytes: &[u8]) -> bool {
     let altitude =
-        |field: &[u8]| all_digit_bytes(field) || (field[0] == b'-' && all_digit_bytes(&field[1..]));
+        |field: &[u8]| all_digits(field) || (field[0] == b'-' && all_digits(&field[1..]));
     bytes.len() >= 35
-        && all_digit_bytes(&bytes[1..14])
+        && all_digits(&bytes[1..14])
         && matches!(bytes[14], b'N' | b'S')
-        && all_digit_bytes(&bytes[15..23])
+        && all_digits(&bytes[15..23])
         && matches!(bytes[23], b'E' | b'W')
         && matches!(bytes[24], b'A' | b'V')
         && altitude(&bytes[25..30])
@@ -545,44 +532,6 @@ fn is_word_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
-fn all_digit_bytes(bytes: &[u8]) -> bool {
-    bytes.iter().all(u8::is_ascii_digit)
-}
-
-fn all_digits(text: &str) -> bool {
-    all_digit_bytes(text.as_bytes())
-}
-
 fn has_line_terminator(text: &str) -> bool {
     text.contains(['\n', '\r', '\u{2028}', '\u{2029}'])
-}
-
-/// Slices by UTF-16 column, with negative indices counting from the end, as ECMAScript does.
-fn js_slice(text: &str, start: i64, end: i64) -> String {
-    let units: Vec<u16> = text.encode_utf16().collect();
-    let resolve = |index: i64| {
-        let length = units.len() as i64;
-        let column = if index < 0 { length + index } else { index };
-        column.clamp(0, length) as usize
-    };
-    let (start, end) = (resolve(start), resolve(end));
-    if start < end {
-        String::from_utf16_lossy(&units[start..end])
-    } else {
-        String::new()
-    }
-}
-
-/// Reads the leading integer of a short column field, as ECMAScript `parseInt` does.
-fn js_parse_int(text: &str) -> Option<i64> {
-    let text = text.trim_start_matches(is_js_whitespace);
-    let (negative, unsigned) = match text.strip_prefix('-') {
-        Some(unsigned) => (true, unsigned),
-        None => (false, text.strip_prefix('+').unwrap_or(text)),
-    };
-    let end = unsigned
-        .find(|character: char| !character.is_ascii_digit())
-        .unwrap_or(unsigned.len());
-    let value: i64 = unsigned[..end].parse().ok()?;
-    Some(if negative { -value } else { value })
 }

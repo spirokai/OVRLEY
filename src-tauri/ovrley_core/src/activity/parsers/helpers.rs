@@ -1,11 +1,17 @@
-//! Lenient readers for sensor values in external activity files.
+//! Helpers shared by the activity format parsers: lenient readers for sensor values in
+//! external files, and element lookups for the XML formats.
 //!
-//! The rules follow ECMAScript `Number()`, `String(number)`, and `trim()` so GPX
-//! imports keep the values established by the WebView parser they replaced:
+//! The `js_*` and `safe_*` rules follow ECMAScript `Number()`, `String(number)`, and
+//! `trim()` so imports keep the values established by the WebView parsers they replaced:
 //! whitespace-only text reads as zero and `0x`/`0o`/`0b` literals are numbers.
 
+use crate::error::{CoreError, CoreResult};
+use roxmltree::{Document, Node};
+
+pub(super) const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
+
 /// Whitespace as defined by ECMAScript. `str::trim` differs: it keeps U+FEFF and strips U+0085.
-pub fn is_js_whitespace(character: char) -> bool {
+pub(super) fn is_js_whitespace(character: char) -> bool {
     matches!(
         character,
         '\t' | '\n' | '\u{B}' | '\u{C}' | '\r' | ' ' | '\u{A0}' | '\u{1680}' | '\u{2000}'
@@ -19,14 +25,24 @@ pub fn is_js_whitespace(character: char) -> bool {
     )
 }
 
+/// Returns whether every byte is an ASCII digit, which empty input satisfies.
+pub(super) fn all_digits(text: impl AsRef<[u8]>) -> bool {
+    text.as_ref().iter().all(u8::is_ascii_digit)
+}
+
+/// Reads a Rust float literal for formats without the WebView parsers' `Number()` rules.
+pub(super) fn finite_number(text: &str) -> Option<f64> {
+    text.parse().ok().filter(|value: &f64| value.is_finite())
+}
+
 /// Removes leading and trailing ECMAScript whitespace.
-pub fn js_trim(text: &str) -> &str {
+pub(super) fn js_trim(text: &str) -> &str {
     text.trim_matches(is_js_whitespace)
 }
 
 /// Reads a finite number, or `None` for empty, malformed, and non-finite text.
 /// Negative zero reads as zero because raw activity values are never signed zeros.
-pub fn safe_number(text: &str) -> Option<f64> {
+pub(super) fn safe_number(text: &str) -> Option<f64> {
     if text.is_empty() {
         return None;
     }
@@ -45,7 +61,7 @@ pub fn safe_number(text: &str) -> Option<f64> {
 }
 
 /// Reads a gear label: numeric text takes its canonical number form, other text is kept trimmed.
-pub fn safe_gear_value(text: &str) -> Option<String> {
+pub(super) fn safe_gear_value(text: &str) -> Option<String> {
     let label = js_trim(text);
     if label.is_empty() || matches!(label.to_lowercase().as_str(), "n/a" | "na" | "null") {
         return None;
@@ -59,7 +75,7 @@ pub fn safe_gear_value(text: &str) -> Option<String> {
 }
 
 /// Formats a finite number as ECMAScript `String(number)` does.
-pub fn js_number_to_string(value: f64) -> String {
+pub(super) fn js_number_to_string(value: f64) -> String {
     if value == 0.0 {
         return "0".to_string();
     }
@@ -95,7 +111,6 @@ pub fn js_number_to_string(value: f64) -> String {
 }
 
 fn is_decimal_literal(text: &str) -> bool {
-    let all_digits = |part: &str| part.bytes().all(|byte| byte.is_ascii_digit());
     let unsigned = text.strip_prefix(['+', '-']).unwrap_or(text);
     let (mantissa, exponent) = match unsigned.split_once(['e', 'E']) {
         Some((mantissa, exponent)) => (mantissa, Some(exponent)),
@@ -155,4 +170,69 @@ fn parse_radix_digits(digits: &str, bits_per_digit: u32) -> Option<f64> {
         }
     }
     Some(significand as f64 * 2_f64.powi(exponent))
+}
+
+/// Slices by UTF-16 column, with negative indices counting from the end, as ECMAScript does.
+pub(super) fn js_slice(text: &str, start: i64, end: i64) -> String {
+    let units: Vec<u16> = text.encode_utf16().collect();
+    let resolve = |index: i64| {
+        let length = units.len() as i64;
+        let column = if index < 0 { length + index } else { index };
+        column.clamp(0, length) as usize
+    };
+    let (start, end) = (resolve(start), resolve(end));
+    if start < end {
+        String::from_utf16_lossy(&units[start..end])
+    } else {
+        String::new()
+    }
+}
+
+/// Reads the leading integer of a short column field, as ECMAScript `parseInt` does.
+pub(super) fn js_parse_int(text: &str) -> Option<i64> {
+    let text = text.trim_start_matches(is_js_whitespace);
+    let (negative, unsigned) = match text.strip_prefix('-') {
+        Some(unsigned) => (true, unsigned),
+        None => (false, text.strip_prefix('+').unwrap_or(text)),
+    };
+    let end = unsigned
+        .find(|character: char| !character.is_ascii_digit())
+        .unwrap_or(unsigned.len());
+    let value: i64 = unsigned[..end].parse().ok()?;
+    Some(if negative { -value } else { value })
+}
+
+/// Parses a document, naming the format in the error.
+pub(super) fn parse_document<'input>(
+    text: &'input str,
+    format: &str,
+) -> CoreResult<Document<'input>> {
+    Document::parse(text).map_err(|error| {
+        CoreError::Activity(format!("The {format} file could not be parsed: {error}"))
+    })
+}
+
+pub(super) fn children<'a, 'input>(
+    node: Node<'a, 'input>,
+    name: &'a str,
+    namespace: Option<&'a str>,
+) -> impl Iterator<Item = Node<'a, 'input>> {
+    node.children().filter(move |child| {
+        child.is_element()
+            && child.tag_name().name() == name
+            && child.tag_name().namespace() == namespace
+    })
+}
+
+/// Returns the first matching child's trimmed text, when it has any.
+pub(super) fn child_text<'a>(
+    node: Node<'a, '_>,
+    name: &'a str,
+    namespace: Option<&'a str>,
+) -> Option<&'a str> {
+    children(node, name, namespace)
+        .next()?
+        .text()
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
 }

@@ -5,19 +5,19 @@
 //! Most unreadable sensor values stay absent; unreadable `barometric_altitude`,
 //! `calories`, and `lap_number` extensions fail the import.
 
-use crate::activity::finalize::{finalize_raw_activity, FinalizeActivityResponse};
-use crate::activity::parsers::raw_values::{
-    is_js_whitespace, js_trim, safe_gear_value, safe_number,
+use crate::activity::finalize::FinalizeActivityResponse;
+use crate::activity::parsers::helpers::{
+    is_js_whitespace, js_trim, safe_gear_value, safe_number, MAX_SAFE_INTEGER,
 };
-use crate::activity::parsers::{decode_file_text, read_activity_file};
-use crate::activity::schema::{RawActivity, RawActivityOptions, RawSample, SmoothingOption};
+use crate::activity::parsers::{
+    decode_file_text, parse_bytes_path, smoothing_options, TRACK_SMOOTHING,
+};
+use crate::activity::schema::{RawActivity, RawActivityOptions, RawSample};
 use crate::error::{CoreError, CoreResult};
 use roxmltree::{Document, Node, ParsingOptions};
 use serde_json::json;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::path::Path;
-
-const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
 
 type ExtensionValues = HashMap<String, String>;
 
@@ -26,8 +26,7 @@ pub fn parse_gpx_activity_path(
     path: &Path,
     repo_root: Option<&Path>,
 ) -> CoreResult<FinalizeActivityResponse> {
-    let (bytes, file_name) = read_activity_file(path, "GPX")?;
-    finalize_raw_activity(&extract_gpx_activity(&bytes, file_name)?, repo_root)
+    parse_bytes_path(path, repo_root, "GPX", extract_gpx_activity)
 }
 
 /// Extracts one canonical raw sample per `trkpt` from GPX file bytes.
@@ -76,24 +75,7 @@ pub fn extract_gpx_activity(bytes: &[u8], file_name: &str) -> CoreResult<RawActi
         raw_samples,
         options: RawActivityOptions {
             skip_idle_gap_fill: false,
-            smoothing: BTreeMap::from([
-                (
-                    "pace".to_string(),
-                    SmoothingOption {
-                        enabled: true,
-                        method: "zero_phase_ma".to_string(),
-                        window_seconds: 5.0,
-                    },
-                ),
-                (
-                    "heading".to_string(),
-                    SmoothingOption {
-                        enabled: true,
-                        method: "circular_ema".to_string(),
-                        window_seconds: 3.0,
-                    },
-                ),
-            ]),
+            smoothing: smoothing_options(&TRACK_SMOOTHING),
         },
     })
 }

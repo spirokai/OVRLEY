@@ -19,15 +19,15 @@
 //!   the distance from home, not distance travelled, so it is not read.
 
 use crate::activity::finalize::smoothing::{smoothing_window_for_seconds, zero_phase_smooth};
-use crate::activity::finalize::{finalize_raw_activity, FinalizeActivityResponse};
-use crate::activity::parsers::raw_values::{js_trim, safe_number};
-use crate::activity::parsers::{decode_file_text, read_activity_file};
-use crate::activity::schema::{RawActivity, RawActivityOptions, RawSample, SmoothingOption};
+use crate::activity::finalize::FinalizeActivityResponse;
+use crate::activity::parsers::helpers::{all_digits, js_trim, safe_number};
+use crate::activity::parsers::{decode_file_text, parse_bytes_path, smoothing_options};
+use crate::activity::schema::{RawActivity, RawActivityOptions, RawSample};
 use crate::error::{CoreError, CoreResult};
 use chrono::NaiveDate;
 use regex::{Captures, Regex};
 use serde_json::json;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::f64::consts::{FRAC_PI_2, PI};
 use std::path::Path;
 use std::sync::LazyLock;
@@ -84,8 +84,7 @@ pub fn parse_srt_activity_path(
     path: &Path,
     repo_root: Option<&Path>,
 ) -> CoreResult<FinalizeActivityResponse> {
-    let (bytes, file_name) = read_activity_file(path, "SRT")?;
-    finalize_raw_activity(&extract_srt_activity(&bytes, file_name)?, repo_root)
+    parse_bytes_path(path, repo_root, "SRT", extract_srt_activity)
 }
 
 /// Extracts one canonical raw sample per telemetry cue from SRT file bytes.
@@ -118,11 +117,11 @@ pub fn extract_srt_activity(bytes: &[u8], file_name: &str) -> CoreResult<RawActi
         raw_samples,
         options: RawActivityOptions {
             skip_idle_gap_fill: true,
-            smoothing: BTreeMap::from([
-                smoothing("pace", "zero_phase_ma", 5.0),
-                smoothing("speed", "zero_phase_ma", 0.5),
-                smoothing("vertical_speed", "zero_phase_ma", 1.0),
-                smoothing("heading", "circular_ema", 0.5),
+            smoothing: smoothing_options(&[
+                ("pace", "zero_phase_ma", 5.0),
+                ("speed", "zero_phase_ma", 0.5),
+                ("vertical_speed", "zero_phase_ma", 1.0),
+                ("heading", "circular_ema", 0.5),
             ]),
         },
     })
@@ -160,23 +159,12 @@ fn smooth_coordinates(samples: &mut [RawSample]) {
     }
 }
 
-fn smoothing(metric: &str, method: &str, window_seconds: f64) -> (String, SmoothingOption) {
-    (
-        metric.to_string(),
-        SmoothingOption {
-            enabled: true,
-            method: method.to_string(),
-            window_seconds,
-        },
-    )
-}
-
 /// Reads cues line by line, because some formats omit the cue time or the blank separators.
 /// Cues without any telemetry are dropped, which DJI files often end with.
 fn parse_packets(text: &str) -> Vec<Packet> {
     let mut packets: Vec<Packet> = Vec::new();
     for line in text.split(['\n', '\r']).map(js_trim) {
-        if !line.is_empty() && line.bytes().all(|byte| byte.is_ascii_digit()) {
+        if !line.is_empty() && all_digits(line) {
             packets.push(Packet::default());
         } else if let Some(packet) = packets.last_mut() {
             if line.contains("-->") {
@@ -411,7 +399,7 @@ impl Packet {
     fn focal_length(&self) -> Option<f64> {
         let raw = self.field("FOCAL_LEN")?;
         let value = positive(safe_number(raw))?;
-        let is_scaled = raw.len() >= 3 && raw.bytes().all(|byte| byte.is_ascii_digit());
+        let is_scaled = raw.len() >= 3 && all_digits(raw);
         Some(if is_scaled { value / 10.0 } else { value })
     }
 

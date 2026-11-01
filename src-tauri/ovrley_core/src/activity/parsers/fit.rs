@@ -17,19 +17,19 @@
 //! Diving extraction is based on Unabara by Arnaud Dupuis (GPL-2.0):
 //! <https://github.com/arnauddupuis/unabara/blob/main/src/core/format_parsers/fit_parser.cpp>
 
-use crate::activity::finalize::{finalize_raw_activity, FinalizeActivityResponse};
-use crate::activity::parsers::raw_values::{js_number_to_string, safe_gear_value, safe_number};
-use crate::activity::parsers::read_activity_file;
-use crate::activity::schema::{
-    LapMarkers, RawActivity, RawActivityOptions, RawSample, SmoothingOption,
+use crate::activity::finalize::FinalizeActivityResponse;
+use crate::activity::parsers::helpers::{js_number_to_string, safe_gear_value, safe_number};
+use crate::activity::parsers::{
+    format_timestamp, parse_bytes_path, seconds_between, smoothing_options, BAR_PER_ATMOSPHERE,
+    TRACK_SMOOTHING,
 };
+use crate::activity::schema::{LapMarkers, RawActivity, RawActivityOptions, RawSample};
 use crate::error::{CoreError, CoreResult};
-use chrono::{DateTime, SecondsFormat, Utc};
+use chrono::{DateTime, Utc};
 use fitparser::de::{DecodeOption, FitObject, FitStreamProcessor};
 use fitparser::profile::MesgNum;
 use fitparser::{FitDataRecord, Value};
 use serde_json::json;
-use std::collections::BTreeMap;
 use std::path::Path;
 
 const DIVE_SUB_SPORTS: [&str; 6] = [
@@ -41,7 +41,6 @@ const DIVE_SUB_SPORTS: [&str; 6] = [
     "ccr_diving",
 ];
 const CCR_DILUENT: &str = "closed_circuit_diluent";
-const BAR_PER_ATMOSPHERE: f64 = 1.01325;
 /// FIT stores positions as signed 32-bit fractions of a half circle.
 const DEGREES_PER_SEMICIRCLE: f64 = 180.0 / 2_147_483_648.0;
 /// Bit-flag fields hold their numeric payload below these masks.
@@ -71,8 +70,7 @@ pub fn parse_fit_activity_path(
     path: &Path,
     repo_root: Option<&Path>,
 ) -> CoreResult<FinalizeActivityResponse> {
-    let (bytes, file_name) = read_activity_file(path, "FIT")?;
-    finalize_raw_activity(&extract_fit_activity(&bytes, file_name)?, repo_root)
+    parse_bytes_path(path, repo_root, "FIT", extract_fit_activity)
 }
 
 /// Extracts one canonical raw sample per `record` message from FIT file bytes.
@@ -152,24 +150,7 @@ pub fn extract_fit_activity(bytes: &[u8], file_name: &str) -> CoreResult<RawActi
         raw_samples,
         options: RawActivityOptions {
             skip_idle_gap_fill: is_dive,
-            smoothing: BTreeMap::from([
-                (
-                    "pace".to_string(),
-                    SmoothingOption {
-                        enabled: true,
-                        method: "zero_phase_ma".to_string(),
-                        window_seconds: 5.0,
-                    },
-                ),
-                (
-                    "heading".to_string(),
-                    SmoothingOption {
-                        enabled: true,
-                        method: "circular_ema".to_string(),
-                        window_seconds: 3.0,
-                    },
-                ),
-            ]),
+            smoothing: smoothing_options(&TRACK_SMOOTHING),
         },
     })
 }
@@ -502,12 +483,4 @@ fn enum_json(value: &Value) -> Option<serde_json::Value> {
             .filter(|number| *number != 0.0)
             .map(|number| json!(number as i64)),
     }
-}
-
-fn seconds_between(start: DateTime<Utc>, end: DateTime<Utc>) -> f64 {
-    (end - start).num_milliseconds() as f64 / 1000.0
-}
-
-fn format_timestamp(timestamp: DateTime<Utc>) -> String {
-    timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
