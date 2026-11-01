@@ -6,7 +6,7 @@
  * Pure presentational - all logic is in useVideoImportReview.
  */
 
-import { AlertTriangle, ArrowDown, ArrowUp, Blend, Download, Loader2, RotateCcw } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, Blend, Download, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -116,25 +116,18 @@ function VideoImportRow({ row, windowKind, resolutionLabel }) {
         fps={row.fps}
         signed
         onCommit={row.onOffsetCommit}
+        reset={{
+          isManual: row.isManual,
+          onReset: row.onOffsetReset,
+          label: t('toolbar.resetVideoStart', { defaultValue: 'Place {{name}} automatically again', name: row.filename }),
+          manualHint: t('toolbar.resetVideoStartHint', 'Set by hand. Click to place it by its recording time again.'),
+          autoHint: t('toolbar.videoStartAutoHint', 'Placed automatically. Type a time to set it by hand.'),
+        }}
         disabled={!row.isIncluded}
         className="h-8 text-xs"
         aria-label={t('video-preview.importSyncOf', { defaultValue: 'Sync of {{name}}', name: row.filename })}
       />
       <div className="flex flex-wrap items-center justify-end">
-        {row.isManual ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={ICON_BUTTON_CLASS}
-            onClick={row.onOffsetReset}
-            disabled={!row.isIncluded}
-            aria-label={t('toolbar.resetVideoStart', { defaultValue: 'Place {{name}} automatically again', name: row.filename })}
-            title={t('toolbar.resetVideoStartHint', 'Set by hand. Click to place it by its recording time again.')}
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </Button>
-        ) : null}
         {row.isPositioned ? (
           <>
             <Button

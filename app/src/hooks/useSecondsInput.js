@@ -1,17 +1,18 @@
 /**
- * Draft, readout and commit of one seconds input (see `components/ui/seconds-input`).
+ * Draft, preview and commit of one seconds input (see `components/ui/seconds-input`).
  */
 
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { formatSecondsText, normalizeSecondsDraft, parseSecondsDraft, snapSeconds } from '@/lib/seconds-input'
+import { arrowStepSeconds, formatSecondsText, normalizeSecondsDraft, parseSecondsDraft, snapSeconds } from '@/lib/seconds-input'
 import { formatSecondsClock } from '@/lib/time-format'
 
 /**
  * Keeps the typed draft until it is committed (Enter or leaving the field). The
- * field shows the value as a clock and the readout as plain seconds. A committed
- * value is snapped to the frame grid right away; the field then shows the stored
- * value again.
+ * field shows the value as a clock; while a complete draft is typed, the preview
+ * reads it as a clock and in seconds. A committed value is snapped to the frame
+ * grid right away; the field then shows the stored value again. Up and Down
+ * commit the value moved by `arrowStepSeconds`.
  * @param {object} options Input options.
  * @param {number} options.value Stored value in seconds.
  * @param {(seconds: number) => string|null|undefined} options.onCommit Stores a snapped value; returns a message when it is rejected.
@@ -19,10 +20,11 @@ import { formatSecondsClock } from '@/lib/time-format'
  * @param {'time'|'duration'} options.mode A time snaps to the nearest frame; a duration is above 0 and at least one frame.
  * @param {boolean} options.signed Whether negative values are allowed.
  * @param {number|null} options.step Seconds the step buttons add or remove, or null without step buttons.
- * @returns {{text: string, readout: string, error: string|null, onChange: function, onBlur: function, onKeyDown: function, onStep: function|null}}
- *   Field model.
+ * @param {(() => void)|null} options.onReset Resets the stored value, or null without a reset button. A reset discards the draft.
+ * @returns {{text: string, preview: string|null, error: string|null, onChange: function, onBlur: function, onKeyDown: function,
+ *   onStep: function|null, onReset: function|null}} Field model.
  */
-export function useSecondsInput({ value, onCommit, fps, mode, signed, step }) {
+export function useSecondsInput({ value, onCommit, fps, mode, signed, step, onReset }) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState(null)
   const [error, setError] = useState(null)
@@ -31,6 +33,10 @@ export function useSecondsInput({ value, onCommit, fps, mode, signed, step }) {
   const store = (seconds) => {
     if (mode === 'duration' && seconds <= 0) {
       setError(t('components.secondsAboveZero', 'Enter a duration above 0 seconds'))
+      return
+    }
+    if (!signed && seconds < 0) {
+      setError(t('components.secondsNotNegative', 'Enter a time of 0 seconds or more'))
       return
     }
     const snapped = snapSeconds(seconds, fps, mode)
@@ -42,15 +48,24 @@ export function useSecondsInput({ value, onCommit, fps, mode, signed, step }) {
   const commit = () => {
     if (draft === null) return
     if (draftSeconds === null) {
-      setError(t('components.secondsInvalid', 'Enter a time like 05:30 or a number of seconds'))
+      setError(t('components.secondsInvalid', 'Enter a time like 05:30, a number of seconds, or a sum like 05:30+10'))
       return
     }
     store(draftSeconds)
   }
 
+  const moveBy = (seconds) => store((draftSeconds ?? value) + seconds)
+
   return {
     text: draft ?? formatSecondsClock(value),
-    readout: t('components.secondsReadout', { defaultValue: '{{seconds}} s', seconds: formatSecondsText(draftSeconds ?? value) }),
+    preview:
+      draftSeconds === null
+        ? null
+        : t('components.secondsPreview', {
+            defaultValue: '= {{clock}} ({{seconds}} s)',
+            clock: formatSecondsClock(draftSeconds),
+            seconds: formatSecondsText(draftSeconds),
+          }),
     error,
     onChange: (event) => {
       const next = normalizeSecondsDraft(event.target.value, signed)
@@ -65,7 +80,21 @@ export function useSecondsInput({ value, onCommit, fps, mode, signed, step }) {
         setDraft(null)
         setError(null)
       }
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        const arrowStep = arrowStepSeconds(event, fps)
+        if (arrowStep === null) return
+        event.preventDefault()
+        moveBy(event.key === 'ArrowUp' ? arrowStep : -arrowStep)
+      }
     },
-    onStep: step === null ? null : (direction) => store((draftSeconds ?? value) + direction * step),
+    onStep: step === null ? null : (direction) => moveBy(direction * step),
+    onReset:
+      onReset === null
+        ? null
+        : () => {
+            setDraft(null)
+            setError(null)
+            onReset()
+          },
   }
 }

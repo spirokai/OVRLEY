@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vite-plus/test'
-import { formatSecondsText, normalizeSecondsDraft, parseSecondsDraft, snapSeconds } from '@/lib/seconds-input'
+import { arrowStepSeconds, formatSecondsText, normalizeSecondsDraft, parseSecondsDraft, snapSeconds } from '@/lib/seconds-input'
 import { formatSecondsClock } from '@/lib/time-format'
 
 const PAL = { num: 25, den: 1 }
@@ -12,7 +12,16 @@ describe('seconds input helpers', () => {
     for (const text of ['1:2:3:4', '5.5:30', '5garbage', 'abc', '1.2.3', '-5', '1e3', ' 5']) expect(normalizeSecondsDraft(text, false)).toBeNull()
     expect(normalizeSecondsDraft('-', true)).toBe('-')
     expect(normalizeSecondsDraft('-05:30', true)).toBe('-05:30')
-    expect(normalizeSecondsDraft('1-2', true)).toBeNull()
+  })
+
+  test('accept sums and differences of times being typed, with spaces around the operators', () => {
+    for (const draft of ['1:39:25+', '1:39:25+3:45', '1:39:25 + 3:45', '5965-225', '5965 -', '1:00 ', '1-2']) {
+      expect(normalizeSecondsDraft(draft, false)).toBe(draft)
+    }
+    expect(normalizeSecondsDraft('1,5+2,5', false)).toBe('1.5+2.5')
+    expect(normalizeSecondsDraft('-5+3', true)).toBe('-5+3')
+    for (const text of ['-5+3', '+5', '5*2', '5 5', '5+3:1:2:4']) expect(normalizeSecondsDraft(text, false)).toBeNull()
+    for (const text of ['+5', '- 5']) expect(normalizeSecondsDraft(text, true)).toBeNull()
   })
 
   test('parse a complete clock or plain seconds', () => {
@@ -24,6 +33,25 @@ describe('seconds input helpers', () => {
     expect(parseSecondsDraft('330.')).toBe(330)
     expect(parseSecondsDraft('.5')).toBe(0.5)
     for (const draft of ['', '-', '.', '-.', '5:', ':30', '5:60', '1:60:00', '1::30']) expect(parseSecondsDraft(draft)).toBeNull()
+  })
+
+  test('parse a sum or difference of clocks and plain seconds', () => {
+    expect(parseSecondsDraft('1:39:25+3:45')).toBe(5965 + 225)
+    expect(parseSecondsDraft('1:39:25 - 3:45')).toBe(5965 - 225)
+    expect(parseSecondsDraft('5965-225+0.5')).toBe(5740.5)
+    expect(parseSecondsDraft('-1:00+30')).toBe(-30)
+    expect(parseSecondsDraft('10-30')).toBe(-20)
+    expect(parseSecondsDraft('1:00 ')).toBe(60)
+    for (const draft of ['5+', '5-', '5+-3', '5--3', '5+5:75']) expect(parseSecondsDraft(draft)).toBeNull()
+  })
+
+  test('step arrows by 1 s, 10 s with Shift, one frame with Alt, and leave other combinations alone', () => {
+    const keys = (held) => ({ shiftKey: false, altKey: false, ctrlKey: false, metaKey: false, ...held })
+    expect(arrowStepSeconds(keys({}), PAL)).toBe(1)
+    expect(arrowStepSeconds(keys({ shiftKey: true }), PAL)).toBe(10)
+    expect(arrowStepSeconds(keys({ altKey: true }), PAL)).toBe(0.04)
+    expect(arrowStepSeconds(keys({ altKey: true }), null)).toBeNull()
+    for (const held of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true, altKey: true }]) expect(arrowStepSeconds(keys(held), PAL)).toBeNull()
   })
 
   test('show up to three decimals without trailing zeros', () => {

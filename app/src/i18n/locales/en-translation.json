@@ -91,8 +91,9 @@
     "redColorComponent0255": "Red color component (0-255)",
     "saturationPercentage0100": "Saturation percentage (0-100)",
     "secondsAboveZero": "Enter a duration above 0 seconds",
-    "secondsInvalid": "Enter a time like 05:30 or a number of seconds",
-    "secondsReadout": "{{seconds}} s",
+    "secondsInvalid": "Enter a time like 05:30, a number of seconds, or a sum like 05:30+10",
+    "secondsNotNegative": "Enter a time of 0 seconds or more",
+    "secondsPreview": "= {{clock}} ({{seconds}} s)",
     "system": "System"
   },
   "overlay-editor": {
@@ -427,6 +428,7 @@
     "telemetryPending": "Reading…",
     "telemetryReady": "Available",
     "videoStart": "Start on timeline",
+    "videoStartAutoHint": "Placed automatically. Type a time to set it by hand.",
     "distance": "Distance",
     "dropActivityFile": "Drop activity file",
     "dropVideoFile": "Drop video files",
