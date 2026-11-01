@@ -44,7 +44,8 @@ export function useVideoTimeline() {
  */
 export function useVideoWarnings() {
   const { clips, program } = useVideoTimeline()
-  return useMemo(() => deriveVideoWarnings(clips, program), [clips, program])
+  const activityDurationSeconds = useStore((state) => (state.parsedActivity === null ? null : state.activitySummary.durationSeconds))
+  return useMemo(() => deriveVideoWarnings(clips, program, activityDurationSeconds), [activityDurationSeconds, clips, program])
 }
 
 /**

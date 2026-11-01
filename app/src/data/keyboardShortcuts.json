@@ -451,6 +451,25 @@
           ]
         }
       ]
+    },
+    {
+      "nameKey": "keyboard-shortcuts.timeFields",
+      "commands": [
+        {
+          "id": "secondsInput.step",
+          "display": true,
+          "scope": "seconds-input",
+          "descriptionKey": "keyboard-shortcuts.secondsInputStep",
+          "bindings": [
+            { "key": "arrowup", "modifiers": [], "seconds": 1, "descriptionKey": "keyboard-shortcuts.secondsInputStepSecond" },
+            { "key": "arrowdown", "modifiers": [], "seconds": -1, "descriptionKey": "keyboard-shortcuts.secondsInputStepSecond" },
+            { "key": "arrowup", "modifiers": ["shift"], "seconds": 10, "descriptionKey": "keyboard-shortcuts.secondsInputStepTenSeconds" },
+            { "key": "arrowdown", "modifiers": ["shift"], "seconds": -10, "descriptionKey": "keyboard-shortcuts.secondsInputStepTenSeconds" },
+            { "key": "arrowup", "modifiers": ["alt"], "frames": 1, "descriptionKey": "keyboard-shortcuts.secondsInputStepFrame" },
+            { "key": "arrowdown", "modifiers": ["alt"], "frames": -1, "descriptionKey": "keyboard-shortcuts.secondsInputStepFrame" }
+          ]
+        }
+      ]
     }
   ]
 }

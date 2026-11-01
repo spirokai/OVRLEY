@@ -1,21 +1,20 @@
 /**
- * The one input for times and durations: the value is typed as a clock (`05:30`)
- * or as plain seconds, with a read-only seconds readout inside the field (`330 s`).
+ * The one input for times and durations: the value is typed as a clock (`05:30`),
+ * as plain seconds, or as a sum of both (`05:30+10`). While a complete draft is
+ * typed, a preview below the field reads it as a clock and in seconds.
  */
 
 import { useId } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, Clock, RotateCcw } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { useSecondsInput } from '@/hooks/useSecondsInput'
 import { cn } from '@/lib/utils'
 import { useTranslation } from 'react-i18next'
 
-// Width of one tabular readout character (0.65rem text) in rem; the field keeps that much room on its right.
-const READOUT_CHARACTER_REM = 0.65 * 0.6
-
 /**
  * Renders a seconds input. Typed text is kept until Enter or leaving the field,
- * then snapped to the frame grid and committed; Escape discards it.
+ * then snapped to the frame grid and committed; Escape discards it. The arrow keys
+ * step the value (`secondsInput.step` in the shortcut manifest).
  *
  * @param {object} props - Component props.
  * @param {number} props.value - Stored value in seconds.
@@ -24,13 +23,16 @@ const READOUT_CHARACTER_REM = 0.65 * 0.6
  * @param {'time'|'duration'} [props.mode='time'] - A duration is above 0 and at least one frame.
  * @param {boolean} [props.signed=false] - Whether negative values are allowed.
  * @param {number|null} [props.step=null] - Seconds the step buttons add or remove; null hides them.
+ * @param {{isManual: boolean, onReset: function, label: string, manualHint: string, autoHint: string}|null} [props.reset=null] - Placement
+ *   slot inside the field: a reset button for a value set by hand, a clock for an automatic one; null hides it.
  * @param {string} [props.className] - Classes of the input element.
  * @returns {JSX.Element} Rendered input.
  */
-export function SecondsInput({ value, onCommit, fps, mode = 'time', signed = false, step = null, className, ...props }) {
+export function SecondsInput({ value, onCommit, fps, mode = 'time', signed = false, step = null, reset = null, className, ...props }) {
   const { t } = useTranslation()
-  const readoutId = useId()
-  const field = useSecondsInput({ value, onCommit, fps, mode, signed, step })
+  const messageId = useId()
+  const field = useSecondsInput({ value, onCommit, fps, mode, signed, step, onReset: reset !== null && reset.isManual ? reset.onReset : null })
+  const slotPosition = field.onStep === null ? 'right-1' : 'right-7'
   return (
     <div className="space-y-1">
       <div className="relative">
@@ -41,20 +43,15 @@ export function SecondsInput({ value, onCommit, fps, mode = 'time', signed = fal
           onChange={field.onChange}
           onBlur={field.onBlur}
           onKeyDown={field.onKeyDown}
+          onKeyUp={field.onKeyUp}
           aria-invalid={field.error !== null}
-          aria-describedby={readoutId}
-          className={cn('border-border/70 tabular-nums transition-colors', className)}
-          style={{ paddingRight: `${field.readout.length * READOUT_CHARACTER_REM + (field.onStep === null ? 0.75 : 2.25)}rem` }}
-        />
-        <span
-          id={readoutId}
+          aria-describedby={field.error !== null || field.preview !== null ? messageId : undefined}
           className={cn(
-            'pointer-events-none absolute inset-y-0 flex items-center text-[0.65rem] text-muted-foreground tabular-nums',
-            field.onStep === null ? 'right-2' : 'right-8',
+            'border-border/70 tabular-nums transition-colors',
+            className,
+            field.onStep !== null && reset !== null ? 'pr-13' : (field.onStep !== null || reset !== null) && 'pr-7',
           )}
-        >
-          {field.readout}
-        </span>
+        />
         {field.onStep !== null ? (
           <div className="absolute inset-y-1 right-1 flex w-5 flex-col overflow-hidden rounded bg-surface-strong">
             <button
@@ -80,10 +77,43 @@ export function SecondsInput({ value, onCommit, fps, mode = 'time', signed = fal
             </button>
           </div>
         ) : null}
+        {field.onReset !== null ? (
+          <button
+            type="button"
+            className={cn(
+              'absolute inset-y-1 flex w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50',
+              slotPosition,
+            )}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={field.onReset}
+            disabled={props.disabled}
+            aria-label={reset.label}
+            title={reset.manualHint}
+          >
+            <RotateCcw className="h-3 w-3" />
+          </button>
+        ) : reset !== null ? (
+          <span
+            role="img"
+            className={cn(
+              'absolute inset-y-1 flex w-5 items-center justify-center text-muted-foreground/50',
+              slotPosition,
+              props.disabled && 'opacity-50',
+            )}
+            aria-label={reset.autoHint}
+            title={reset.autoHint}
+          >
+            <Clock className="h-3 w-3" />
+          </span>
+        ) : null}
       </div>
       {field.error !== null ? (
-        <p role="alert" className="text-[0.65rem] text-destructive">
+        <p id={messageId} role="alert" className="text-[0.65rem] text-destructive">
           {field.error}
+        </p>
+      ) : field.preview !== null ? (
+        <p id={messageId} className="text-[0.65rem] text-muted-foreground tabular-nums">
+          {field.preview}
         </p>
       ) : null}
     </div>

@@ -96,7 +96,6 @@ describe('RenderVideoDialog', () => {
     expect(screen.getByRole('button', { name: /use video range/i })).toBeInTheDocument()
     expect(screen.getByLabelText('From')).toHaveValue('00:05')
     expect(screen.getByLabelText('To')).toHaveValue('00:17')
-    expect(screen.getByText('17 s')).toBeInTheDocument()
   })
 
   test('preserves export markers when switching an imported-video dialog to transparent export', async () => {

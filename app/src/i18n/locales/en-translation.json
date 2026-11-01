@@ -91,8 +91,9 @@
     "redColorComponent0255": "Red color component (0-255)",
     "saturationPercentage0100": "Saturation percentage (0-100)",
     "secondsAboveZero": "Enter a duration above 0 seconds",
-    "secondsInvalid": "Enter a time like 05:30 or a number of seconds",
-    "secondsReadout": "{{seconds}} s",
+    "secondsInvalid": "Enter a time like 05:30, a number of seconds, or a sum like 05:30+10",
+    "secondsNotNegative": "Enter a time of 0 seconds or more",
+    "secondsPreview": "= {{clock}} ({{seconds}} s)",
     "system": "System"
   },
   "overlay-editor": {
@@ -333,7 +334,12 @@
     "timelineClipNudge": "Nudge selected clip synchronization",
     "timelineClipRemove": "Remove selected video",
     "timelineClipNudgeTenthSecond": "Nudge selected clip sync offset by 0.1 seconds",
-    "timelineClipNudgeSecond": "Nudge selected clip sync offset by 1 second"
+    "timelineClipNudgeSecond": "Nudge selected clip sync offset by 1 second",
+    "timeFields": "Time fields",
+    "secondsInputStep": "Change the focused time",
+    "secondsInputStepSecond": "Change the focused time by 1 second",
+    "secondsInputStepTenSeconds": "Change the focused time by 10 seconds",
+    "secondsInputStepFrame": "Change the focused time by one frame"
   },
   "scene-settings": {
     "portrait": "Portrait (4:3)",
@@ -427,6 +433,7 @@
     "telemetryPending": "Reading…",
     "telemetryReady": "Available",
     "videoStart": "Start on timeline",
+    "videoStartAutoHint": "Placed automatically. Type a time to set it by hand.",
     "distance": "Distance",
     "dropActivityFile": "Drop activity file",
     "dropVideoFile": "Drop video files",
@@ -564,6 +571,7 @@
     "unsupportedVideoFile": "Not a supported video file (MP4, MOV, MKV).",
     "videoCount": "{{count}} videos",
     "videoOrImage": "Video or Image",
+    "warningFarFromActivity": "Starts more than an hour before or after the activity",
     "warningIncompatible": "Different resolution or frame rate than the other videos",
     "warningOverlap": "Overlaps {{name}}",
     "videoPreviewLoadingWasAborted": "Video preview loading was aborted.",

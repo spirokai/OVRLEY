@@ -16,12 +16,11 @@ import {
 } from '@/lib/video-program/collection-edits'
 import { findCombinedExportIssues } from '@/lib/video-program/combined-export'
 import { buildProgram } from '@/lib/video-program/program'
+import { startsOutsideWindow } from '@/lib/video-program/start-window'
 import { FULL_EXPORT_RANGE } from '@/lib/video-program/timeline'
 import { joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import { produce } from 'immer'
 
-/** How far before the activity (or the videos already imported) a video may start. */
-export const IMPORT_WINDOW_SECONDS = 3600
 /** Without an activity or videos already imported, the videos of an import should start within this span. */
 export const FRESH_IMPORT_SPAN_SECONDS = 12 * 3600
 
@@ -46,9 +45,10 @@ export function findLargestStartGroup(clips, spanSeconds) {
 /**
  * Finds the clips that start far from the reference of the import. Only the start of a
  * video counts, and a new video whose time cannot be determined counts once the user placed it:
- * - with an activity, a video starts more than an hour before the activity start or after its end;
- * - without one, a new video starts more than an hour before the first switched-on video already
- *   in the collection or after the end of the last one;
+ * - with an activity, a video starts outside the start window (`VIDEO_START_WINDOW_SECONDS`)
+ *   around the activity;
+ * - without one, a new video starts outside the start window around the switched-on videos
+ *   already in the collection, from the start of the first to the end of the last;
  * - without either, a video starts more than 12 hours away from the largest group of switched-on
  *   videos that start within 12 hours of each other.
  * @param {object} options Review inputs.
@@ -61,17 +61,17 @@ export function findLargestStartGroup(clips, spanSeconds) {
  */
 export function findFarVideos({ clips, newIds, includedIds, unplacedIds, activityDurationSeconds }) {
   const placed = clips.filter((clip) => !unplacedIds.has(clip.id))
-  const startsOutside = (from, to) => (clip) => clip.offsetSeconds < from || clip.offsetSeconds > to
   if (activityDurationSeconds !== null) {
-    const outside = startsOutside(-IMPORT_WINDOW_SECONDS, activityDurationSeconds + IMPORT_WINDOW_SECONDS)
+    const outside = (clip) => startsOutsideWindow(clip.offsetSeconds, { from: 0, to: activityDurationSeconds })
     return { kind: 'activity', farIds: new Set(placed.filter(outside).map((clip) => clip.id)) }
   }
   const reference = clips.filter((clip) => !newIds.has(clip.id) && includedIds.has(clip.id))
   if (reference.length > 0) {
-    const outside = startsOutside(
-      Math.min(...reference.map((clip) => clip.offsetSeconds)) - IMPORT_WINDOW_SECONDS,
-      Math.max(...reference.map((clip) => clip.offsetSeconds + clip.durationSeconds)) + IMPORT_WINDOW_SECONDS,
-    )
+    const span = {
+      from: Math.min(...reference.map((clip) => clip.offsetSeconds)),
+      to: Math.max(...reference.map((clip) => clip.offsetSeconds + clip.durationSeconds)),
+    }
+    const outside = (clip) => startsOutsideWindow(clip.offsetSeconds, span)
     return { kind: 'videos', farIds: new Set(placed.filter((clip) => newIds.has(clip.id) && outside(clip)).map((clip) => clip.id)) }
   }
   const group = findLargestStartGroup(

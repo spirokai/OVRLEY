@@ -100,16 +100,6 @@ export function createMediaSlice(set, get) {
       })
     },
 
-    setActivitySummary: (activity, { computeVideoSync = true } = {}) => {
-      set((state) => {
-        state.activitySummary = activity ? createActivitySummary(activity) : null
-      })
-
-      if (computeVideoSync) {
-        get().computeVideoSync()
-      }
-    },
-
     clearActivitySummary: () => {
       get().clearActivityFile({ clearFilename: false })
     },
@@ -117,11 +107,12 @@ export function createMediaSlice(set, get) {
     activateActivityFile: (activity) => {
       set((state) => {
         state.parsedActivity = activity
+        state.activitySummary = createActivitySummary(activity)
         // Lap IDs belong to one activity; any replacement purges the selection.
         state.disabledLaps = []
       })
       get().clearVideoSyncForActivity()
-      get().setActivitySummary(activity)
+      get().computeVideoSync()
     },
 
     /** Removes the external activity; clips fall back to their own embedded telemetry and detected-time placement. */

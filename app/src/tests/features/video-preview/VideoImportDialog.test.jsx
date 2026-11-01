@@ -94,7 +94,6 @@ describe('VideoImportDialog', () => {
     expect(within(ride).getByText('New')).toBeInTheDocument()
     expect(within(ride).getByText('Will be imported')).toBeInTheDocument()
     expect(within(ride).getByRole('textbox', { name: 'Sync of ride.mp4' })).toHaveValue('05:30')
-    expect(within(ride).getByText('330 s')).toBeInTheDocument()
     fireEvent.click(within(ride).getByRole('switch', { name: 'Import ride.mp4' }))
     expect(props.rows[0].onIncludedChange).toHaveBeenCalledExactlyOnceWith(false)
 

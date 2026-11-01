@@ -1,6 +1,6 @@
 /**
- * Behavior tests for the shared seconds input: clock entry, the seconds readout,
- * frame snapping on commit, and validation.
+ * Behavior tests for the shared seconds input: clock and sum entry, the draft
+ * preview, frame snapping on commit, arrow keys, and validation.
  */
 
 import { fireEvent, render, screen } from '@testing-library/react'
@@ -17,20 +17,62 @@ function renderInput(props) {
 }
 
 describe('SecondsInput', () => {
-  test('shows the value as a clock, ignores anything but a time, and reads the draft in seconds', async () => {
+  test('shows the value as a clock, ignores anything but a time, and previews a complete draft', async () => {
     const user = userEvent.setup()
     const { input } = renderInput({ value: 3700 })
     expect(input).toHaveValue('01:01:40')
-    expect(screen.getByText('3700 s')).toBeInTheDocument()
+    expect(screen.queryByText(/^= /)).not.toBeInTheDocument()
 
     await user.clear(input)
     await user.type(input, '5a:3x0')
     expect(input).toHaveValue('5:30')
-    expect(screen.getByText('330 s')).toBeInTheDocument()
+    expect(screen.getByText('= 05:30 (330 s)')).toBeInTheDocument()
 
     await user.clear(input)
     await user.type(input, '330')
-    expect(screen.getByText('330 s')).toBeInTheDocument()
+    expect(screen.getByText('= 05:30 (330 s)')).toBeInTheDocument()
+    await user.type(input, '+')
+    expect(screen.queryByText(/^= /)).not.toBeInTheDocument()
+  })
+
+  test('commits a sum or difference typed after the shown value', async () => {
+    const user = userEvent.setup()
+    const { input, onCommit } = renderInput({ value: 5965, signed: true })
+
+    await user.type(input, '+3:45')
+    expect(input).toHaveValue('01:39:25+3:45')
+    expect(screen.getByText('= 01:43:10 (6190 s)')).toBeInTheDocument()
+    await user.keyboard('{Enter}')
+    expect(onCommit).toHaveBeenLastCalledWith(6190)
+
+    await user.clear(input)
+    await user.type(input, '5965 - 225{Enter}')
+    expect(onCommit).toHaveBeenLastCalledWith(5740)
+  })
+
+  test('moves the value by 1 s, 10 s with Shift, and one frame with Alt on Up and Down', async () => {
+    const user = userEvent.setup()
+    const { input, onCommit } = renderInput({ value: 10, signed: true })
+
+    await user.click(input)
+    await user.keyboard('{ArrowUp}')
+    expect(onCommit).toHaveBeenLastCalledWith(11)
+    await user.keyboard('{Shift>}{ArrowDown}{/Shift}')
+    expect(onCommit).toHaveBeenLastCalledWith(0)
+    await user.keyboard('{Alt>}{ArrowUp}{/Alt}')
+    expect(onCommit).toHaveBeenLastCalledWith(10.04)
+    expect(onCommit).toHaveBeenCalledTimes(3)
+
+    await user.keyboard('{Control>}{ArrowUp}{/Control}')
+    expect(onCommit).toHaveBeenCalledTimes(3)
+
+    // Holding moves the shown value and commits once on release.
+    await user.keyboard('{ArrowUp>3}')
+    expect(input).toHaveValue('00:13')
+    expect(onCommit).toHaveBeenCalledTimes(3)
+    await user.keyboard('{/ArrowUp}')
+    expect(onCommit).toHaveBeenCalledTimes(4)
+    expect(onCommit).toHaveBeenLastCalledWith(13)
   })
 
   test('commits on Enter or leaving the field, snapped to the nearest frame', async () => {
@@ -74,11 +116,14 @@ describe('SecondsInput', () => {
     await user.clear(input)
     await user.type(input, '-.{Enter}')
     expect(input).toHaveValue('.')
-    expect(screen.getByRole('alert')).toHaveTextContent('Enter a time like 05:30 or a number of seconds')
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a time like 05:30, a number of seconds, or a sum like 05:30+10')
     expect(input).toHaveAttribute('aria-invalid', 'true')
     await user.clear(input)
     await user.type(input, '5:75{Enter}')
-    expect(screen.getByRole('alert')).toHaveTextContent('Enter a time like 05:30 or a number of seconds')
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a time like 05:30, a number of seconds, or a sum like 05:30+10')
+    await user.clear(input)
+    await user.type(input, '3-5{Enter}')
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a time of 0 seconds or more')
     unmount()
 
     const signed = renderInput({ value: 5, signed: true })
@@ -115,5 +160,25 @@ describe('SecondsInput', () => {
     expect(onCommit).toHaveBeenLastCalledWith(10.12)
     await user.click(screen.getByRole('button', { name: 'Decrease value' }))
     expect(onCommit).toHaveBeenLastCalledWith(9.92)
+  })
+
+  test('shows a reset button for a value set by hand, discarding the draft, and a clock for an automatic one', async () => {
+    const user = userEvent.setup()
+    const onReset = vi.fn()
+    const reset = { isManual: true, onReset, label: 'Reset start', manualHint: 'Set by hand', autoHint: 'Placed automatically' }
+    const { input, onCommit, rerender } = renderInput({ value: 10, reset })
+    expect(screen.queryByRole('img', { name: 'Placed automatically' })).not.toBeInTheDocument()
+
+    await user.clear(input)
+    await user.type(input, '42')
+    await user.click(screen.getByRole('button', { name: 'Reset start' }))
+    expect(onReset).toHaveBeenCalledOnce()
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(input).toHaveValue('00:10')
+
+    // An automatic value shows a clock in the same place instead of the button.
+    rerender(<SecondsInput aria-label="Start" value={10} fps={PAL} onCommit={onCommit} reset={{ ...reset, isManual: false }} />)
+    expect(screen.queryByRole('button', { name: 'Reset start' })).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Placed automatically' })).toHaveAttribute('title', 'Placed automatically')
   })
 })
