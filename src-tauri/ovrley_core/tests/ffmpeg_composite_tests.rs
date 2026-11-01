@@ -523,36 +523,6 @@ fn test_9_2_cuda_h264_full_profile_uses_overlay_cuda_when_available() {
         .contains("scale_cuda=w=3840:h=2160:format=yuv420p"));
     assert!(built.filter_complex.contains("overlay_cuda"));
     assert_argument_pair(&built.output_args, "-c:v", "h264_nvenc");
-    assert_argument_pair(
-        &built.output_args,
-        "-bsf:v",
-        "h264_metadata=crop_right=0:crop_bottom=16",
-    );
-}
-
-#[test]
-fn test_9_2_1_cuda_h264_crops_32_pixel_frame_overhang_on_each_axis() {
-    let landscape = cuda_settings_for_dimensions("nnvgpu_h264", 1920, 1080);
-    let portrait = cuda_settings_for_dimensions("nnvgpu_h264", 1080, 1920);
-    let both_axes = cuda_settings_for_dimensions("nnvgpu_h264", 1918, 1078);
-    let aligned = cuda_settings_for_dimensions("nnvgpu_h264", 1920, 1920);
-
-    assert_argument_pair(
-        &landscape.output_args,
-        "-bsf:v",
-        "h264_metadata=crop_right=0:crop_bottom=8",
-    );
-    assert_argument_pair(
-        &portrait.output_args,
-        "-bsf:v",
-        "h264_metadata=crop_right=8:crop_bottom=0",
-    );
-    assert_argument_pair(
-        &both_axes.output_args,
-        "-bsf:v",
-        "h264_metadata=crop_right=2:crop_bottom=10",
-    );
-    assert!(!aligned.output_args.iter().any(|arg| arg == "-bsf:v"));
 }
 
 #[test]
@@ -578,28 +548,21 @@ fn test_9_3_cuda_hevc_full_profile_uses_overlay_cuda_when_available() {
         .contains("scale_cuda=w=3840:h=2160:format=yuv420p"));
     assert!(built.filter_complex.contains("overlay_cuda"));
     assert_argument_pair(&built.output_args, "-c:v", "hevc_nvenc");
-    assert_argument_pair(
-        &built.output_args,
-        "-bsf:v",
-        "hevc_metadata=width=3840:height=2160",
-    );
 }
 
 #[test]
-fn test_9_3_1_cuda_hevc_uses_display_oriented_output_dimensions() {
-    let landscape = cuda_settings_for_dimensions("nnvgpu_hevc", 1920, 1080);
-    let portrait = cuda_settings_for_dimensions("nnvgpu_hevc", 1080, 1920);
-
-    assert_argument_pair(
-        &landscape.output_args,
-        "-bsf:v",
-        "hevc_metadata=width=1920:height=1080",
-    );
-    assert_argument_pair(
-        &portrait.output_args,
-        "-bsf:v",
-        "hevc_metadata=width=1080:height=1920",
-    );
+/// `repeatlast=0` keeps `overlay_cuda` from sending 32-aligned padded copies of
+/// the main frame to NVENC, so the output needs no crop metadata at any size.
+fn test_9_3_1_cuda_profiles_encode_exact_frames_without_crop_metadata() {
+    for codec in ["nnvgpu_h264", "nnvgpu_hevc"] {
+        for (width, height) in [(1920, 1080), (1080, 1920), (2704, 1520), (1920, 1920)] {
+            let built = cuda_settings_for_dimensions(codec, width, height);
+            assert!(built
+                .filter_complex
+                .contains("eof_action=repeat:shortest=1:repeatlast=0"));
+            assert!(!built.output_args.iter().any(|arg| arg == "-bsf:v"));
+        }
+    }
 }
 
 #[test]
@@ -802,7 +765,7 @@ fn quality_mode_selects_encoder_specific_args() {
         )));
         // NVENC otherwise applies a low implicit cap that stops CQ changing the bitrate.
         if flag == "-cq:v" {
-            assert_argument_pair(&built.output_args, "-maxrate", "150M");
+            assert_argument_pair(&built.output_args, "-maxrate", "200M");
         } else {
             assert!(!built.output_args.iter().any(|arg| arg == "-maxrate"));
         }
