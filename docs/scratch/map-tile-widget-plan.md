@@ -29,7 +29,7 @@ in git history. Commands below that name `map_gpu_gate` or `map_tile_gate` recor
 | Camera                   | `fixed` (top down: `fixed_zoom`, `fixed_pan_x/y`, tiles never move) or `follow` (chase: `north_up` / `rider_up`, pitch 0–70, `follow_zoom` 14–19). Replaces `range_meters` |
 | Shape                    | Rectangle with corner radius, or circle. The renderer crops the frame in both hosts, and the widget draws the border over it                                               |
 | Not in v1                | Speed-dependent range, terrain, raster layers, upright point labels, map matching                                                                                          |
-| Export without a GPU     | Fails before encoding. Software adapters are refused, so there is no CPU fallback                                                                                          |
+| Export without a GPU     | Fails before encoding. Software adapters are refused for now, see CPU fallback                                                                                             |
 | Pool evictions           | Draw only tiles under the camera's trapezoid, size pools per job, and guarantee every tile in view is resident                                                             |
 
 The map widget uses the route widget's field names and editor controls for its route and marker:
@@ -467,8 +467,7 @@ Run with `--disable-gpu`, so the webview had no GPU while the rest of the PC did
 - **The whole editor runs at about 7 fps there, with or without a map.** A trace shows the time in Chromium's software compositor:
   139 ms per draw with no map and 142 ms with a refused one, over about 200 quads on a 3347×1440 window. The map's cost is too small
   to measure. Only this one template and window size were measured.
-- **Later work:** a simplified CPU renderer for PCs without a GPU, for example without buildings, is an option for after this phase.
-  Native `DeviceType::Cpu` refusal would then need revisiting too, since export has no map on those PCs either.
+- **Later work:** see CPU fallback below, which replaces the idea of a simplified CPU renderer.
 
 ## Phase 5 — Editor and release readiness
 
@@ -533,6 +532,18 @@ Zooming out across a level shows the style's background until the new tiles arri
 The `map-prepare` events have no listener now that the inspector status is out of Phase 5.
 
 **Failing before and after this work:** `activity_tests` (1) and `csv_activity` (4) in `ovrley_core`, identical on a clean `9975f581`.
+
+## CPU fallback (to do)
+
+PCs without a usable GPU should export a map through a software driver under wgpu, reusing this renderer rather than adding a
+separate CPU one. In `GpuMapRenderer::new`, remove the `DeviceType::Cpu` refusal, warn that export will be slower, and consider
+dropping MSAA there; the preview's software check in `web.rs` should be relaxed with it, because its reason was that such a map
+couldn't be exported. Windows gets WARP with the OS, and macOS shouldn't need a fallback, since supported Macs have Metal. Linux
+uses a Mesa driver (lavapipe or llvmpipe) if the system has one, and otherwise fails before encoding with a clear message.
+SwiftShader won't be bundled, by decision, because of its download size. On WARP with a Ryzen 5 5600X, a throwaway copy of the
+renderer took 56 ms per frame at 1000 px with MSAA 4, 38 ms without MSAA and 16 ms at 500 px, with 6 s to load the view, on an
+otherwise idle CPU and with its output not compared to the GPU's. Linux and macOS are untested. The editor's preview runs at
+about 7 fps without a GPU (see Without a GPU above), but that doesn't limit export.
 
 ## Risks
 
