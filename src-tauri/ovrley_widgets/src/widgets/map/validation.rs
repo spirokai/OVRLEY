@@ -149,6 +149,7 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
             layers: MapLayers {
                 buildings,
                 labels: false,
+                paths: map.show_paths,
             },
         },
         camera,

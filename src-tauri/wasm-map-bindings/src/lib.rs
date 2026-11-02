@@ -16,6 +16,7 @@ use wasm_bindgen::prelude::*;
 struct RendererConfig {
     style: String,
     buildings: bool,
+    paths: bool,
     width: u32,
     height: u32,
     pixel_ratio: f32,
@@ -44,6 +45,7 @@ fn parse_config(json: &str) -> Result<GpuMapConfig, String> {
             layers: MapLayers {
                 buildings: config.buildings,
                 labels: false,
+                paths: config.paths,
             },
         },
         viewport: MapViewport::new(config.width, config.height, config.pixel_ratio)?,

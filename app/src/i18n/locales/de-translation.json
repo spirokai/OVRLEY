@@ -557,6 +557,9 @@
       "delta": "Differenz",
       "lapLog": "Rundenprotokoll"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Karte", "route": "Route", "mapTiles": "Kartenkacheln", "route3d": "3D-Route" }
+    },
     "types": {
       "rolling_chart": { "name": "Diagramme", "shortName": "Diagramme" },
       "diving_profile": {
@@ -623,6 +626,9 @@
     "cameraMode": "Kameramodus",
     "chaseCamera": "Verfolgerkamera",
     "mapBuildings": "Gebäude",
+    "mapPaths": "Wege",
+    "mapWebgl2Unavailable": "WebGL2 ist auf diesem System nicht verfügbar, daher kann die Karte weder in der Vorschau angezeigt noch exportiert werden.",
+    "mapWebgl2Software": "Keine GPU gefunden. Die Kartenvorschau wird per Software gerendert und kann langsam sein, und die Karte kann nicht exportiert werden.",
     "mapStyle": "Kartenstil",
     "mapView": "Kartenansicht",
     "msaa": "Kantenglättung (MSAA)",

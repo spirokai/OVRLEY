@@ -557,6 +557,9 @@
       "delta": "差值",
       "lapLog": "圈记录"
     },
+    "drawerGroups": {
+      "map": { "shortName": "地图", "route": "路线", "mapTiles": "地图瓦片", "route3d": "3D 路线" }
+    },
     "types": {
       "rolling_chart": { "name": "图表", "shortName": "图表" },
       "diving_profile": {
@@ -623,6 +626,9 @@
     "cameraMode": "相机模式",
     "chaseCamera": "追踪相机",
     "mapBuildings": "建筑",
+    "mapPaths": "小路",
+    "mapWebgl2Unavailable": "此系统不支持 WebGL2，因此无法预览或导出地图。",
+    "mapWebgl2Software": "未找到 GPU。地图预览使用软件渲染，可能较慢，并且无法导出地图。",
     "mapStyle": "地图样式",
     "mapView": "地图视图",
     "msaa": "抗锯齿 (MSAA)",

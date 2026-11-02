@@ -253,6 +253,7 @@ impl PreviewMap {
             "renderer": {
                 "style": self.config.spec.style.name(),
                 "buildings": self.config.spec.layers.buildings,
+                "paths": self.config.spec.layers.paths,
                 "pixel_ratio": viewport.pixel_ratio(),
                 "msaa_samples": self.config.msaa_samples,
             },

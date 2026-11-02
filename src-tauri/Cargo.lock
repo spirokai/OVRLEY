@@ -119,6 +119,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tiny_http",
  "uuid",
+ "windows 0.61.3",
  "zip 2.4.2",
 ]
 

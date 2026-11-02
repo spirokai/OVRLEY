@@ -557,6 +557,9 @@
       "delta": "Delta",
       "lapLog": "Registro giri"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Mappa", "route": "Percorso", "mapTiles": "Tile della mappa", "route3d": "Percorso 3D" }
+    },
     "types": {
       "rolling_chart": { "name": "Grafici", "shortName": "Grafici" },
       "diving_profile": {
@@ -623,6 +626,9 @@
     "cameraMode": "Modalità telecamera",
     "chaseCamera": "Telecamera di inseguimento",
     "mapBuildings": "Edifici",
+    "mapPaths": "Sentieri",
+    "mapWebgl2Unavailable": "WebGL2 non è disponibile su questo sistema, quindi la mappa non può essere visualizzata in anteprima né esportata.",
+    "mapWebgl2Software": "Nessuna GPU trovata. L'anteprima della mappa viene renderizzata via software e potrebbe essere lenta, e la mappa non può essere esportata.",
     "mapStyle": "Stile mappa",
     "mapView": "Vista mappa",
     "msaa": "Antialiasing (MSAA)",

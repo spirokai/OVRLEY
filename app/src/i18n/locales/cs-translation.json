@@ -557,6 +557,9 @@
       "delta": "Rozdíl",
       "lapLog": "Přehled kol"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Mapa", "route": "Trasa", "mapTiles": "Mapové dlaždice", "route3d": "3D trasa" }
+    },
     "types": {
       "rolling_chart": { "name": "Grafy", "shortName": "Grafy" },
       "diving_profile": {
@@ -623,6 +626,9 @@
     "cameraMode": "Režim kamery",
     "chaseCamera": "Sledovací kamera",
     "mapBuildings": "Budovy",
+    "mapPaths": "Stezky",
+    "mapWebgl2Unavailable": "WebGL2 není v tomto systému k dispozici, takže mapu nelze zobrazit v náhledu ani exportovat.",
+    "mapWebgl2Software": "Nebyla nalezena žádná GPU. Náhled mapy se vykresluje softwarově a může být pomalý a mapu nelze exportovat.",
     "mapStyle": "Styl mapy",
     "mapView": "Zobrazení mapy",
     "msaa": "Vyhlazování (MSAA)",

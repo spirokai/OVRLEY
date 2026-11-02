@@ -557,6 +557,9 @@
       "delta": "Fark",
       "lapLog": "Tur günlüğü"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Harita", "route": "Rota", "mapTiles": "Harita döşemeleri", "route3d": "3D rota" }
+    },
     "types": {
       "rolling_chart": { "name": "Grafikler", "shortName": "Grafikler" },
       "diving_profile": {
@@ -623,6 +626,9 @@
     "cameraMode": "Kamera modu",
     "chaseCamera": "Takip kamerası",
     "mapBuildings": "Binalar",
+    "mapPaths": "Patikalar",
+    "mapWebgl2Unavailable": "Bu sistemde WebGL2 kullanılamıyor, bu yüzden harita önizlenemez veya dışa aktarılamaz.",
+    "mapWebgl2Software": "GPU bulunamadı. Harita önizlemesi yazılımla işlenir ve yavaş olabilir; harita dışa aktarılamaz.",
     "mapStyle": "Harita stili",
     "mapView": "Harita görünümü",
     "msaa": "Kenar yumuşatma (MSAA)",

@@ -47,6 +47,8 @@ impl MapStyle {
 pub struct MapLayers {
     pub buildings: bool,
     pub labels: bool,
+    /// Footways, cycleways, steps and bridleways: OpenMapTiles' `path` class of roads.
+    pub paths: bool,
 }
 
 impl MapLayers {

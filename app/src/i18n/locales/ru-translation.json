@@ -557,6 +557,9 @@
       "delta": "Дельта",
       "lapLog": "Журнал кругов"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Карта", "route": "Маршрут", "mapTiles": "Тайлы карты", "route3d": "3D-маршрут" }
+    },
     "types": {
       "rolling_chart": { "name": "Графики", "shortName": "Графики" },
       "diving_profile": {
@@ -623,6 +626,9 @@
     "cameraMode": "Режим камеры",
     "chaseCamera": "Камера слежения",
     "mapBuildings": "Здания",
+    "mapPaths": "Дорожки",
+    "mapWebgl2Unavailable": "WebGL2 недоступен в этой системе, поэтому карту нельзя просмотреть или экспортировать.",
+    "mapWebgl2Software": "GPU не найден. Предпросмотр карты отрисовывается программно и может работать медленно, а экспортировать карту нельзя.",
     "mapStyle": "Стиль карты",
     "mapView": "Вид карты",
     "msaa": "Сглаживание (MSAA)",

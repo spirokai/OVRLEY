@@ -11,7 +11,13 @@ use maplibre_expr::{
     Value,
 };
 use crate::{MapLayers, MapStyle, VECTOR_SOURCE};
-use serde_json::Value as Json;
+use serde_json::{json, Value as Json};
+use std::borrow::Cow;
+
+/// The source layer every road, path and track comes from.
+const TRANSPORTATION_LAYER: &str = "transportation";
+/// The class OpenMapTiles gives footways, cycleways, steps and bridleways.
+const PATH_CLASS: &str = "path";
 
 /// Which 3D buildings a renderer draws.
 #[derive(Clone, Debug)]
@@ -144,6 +150,7 @@ pub(crate) fn parse_style(
         if !is_drawable(layer, toggles, zoom) {
             continue;
         }
+        let layer = &*without_hidden_features(layer, toggles);
         let id = layer["id"].as_str().unwrap_or("<unnamed>");
         let result = if layer["type"] == "background" {
             parse_background(layer, zoom, next_index).map(|background| {
@@ -195,6 +202,22 @@ fn push_fixed_layer(
         parsed.vector_layers.push(vector_layer);
     }
     Ok(())
+}
+
+/// A layer narrowed to the features these toggles show. Hidden paths leave every transportation layer,
+/// including those that draw them with other roads, so the filter changes rather than the layer list.
+/// Every OpenFreeMap style writes its filters as expressions, so the narrowing is one too.
+fn without_hidden_features(layer: &Json, toggles: MapLayers) -> Cow<'_, Json> {
+    if toggles.paths || layer["source-layer"] != TRANSPORTATION_LAYER {
+        return Cow::Borrowed(layer);
+    }
+    let no_paths = json!(["!=", ["get", "class"], PATH_CLASS]);
+    let mut narrowed = layer.clone();
+    narrowed["filter"] = match layer.get("filter") {
+        Some(filter) => json!(["all", filter, no_paths]),
+        None => no_paths,
+    };
+    Cow::Owned(narrowed)
 }
 
 /// Whether this renderer draws a layer at `zoom` under these toggles.
@@ -508,4 +531,55 @@ pub(crate) fn evaluate_number(
 /// A filter passes only when it evaluates to `true`, as in MapLibre.
 pub(crate) fn passes_filter(filter: Option<&Expr>, context: &EvaluationContext) -> bool {
     filter.is_none_or(|filter| matches!(evaluate(filter, context), Ok(Value::Bool(true))))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use maplibre_expr::Feature;
+    use std::collections::BTreeMap;
+
+    const SHOWN: MapLayers = MapLayers {
+        buildings: true,
+        labels: false,
+        paths: true,
+    };
+    const HIDDEN: MapLayers = MapLayers {
+        paths: false,
+        ..SHOWN
+    };
+
+    fn passes(layer: &Json, class: &str) -> bool {
+        let filter = parse_filter(&layer["filter"]).unwrap();
+        let mut context = EvaluationContext::new().with_zoom(14.0);
+        context.feature = Feature {
+            properties: BTreeMap::from([("class".to_string(), Value::String(class.into()))]),
+            geometry_type: Some("LineString".into()),
+            ..Feature::default()
+        };
+        passes_filter(Some(&filter), &context)
+    }
+
+    #[test]
+    fn hidden_paths_leave_transportation_layers_that_keep_their_other_roads() {
+        let layer = json!({
+            "source-layer": "transportation",
+            "filter": ["match", ["get", "class"], ["minor", "path"], true, false],
+        });
+        let narrowed = without_hidden_features(&layer, HIDDEN);
+        assert!(passes(&narrowed, "minor"));
+        assert!(!passes(&narrowed, "path"));
+        assert!(passes(&without_hidden_features(&layer, SHOWN), "path"));
+
+        let unfiltered = json!({ "source-layer": "transportation" });
+        let unfiltered = without_hidden_features(&unfiltered, HIDDEN);
+        assert!(passes(&unfiltered, "track"));
+        assert!(!passes(&unfiltered, "path"));
+    }
+
+    #[test]
+    fn hidden_paths_leave_other_source_layers_alone() {
+        let water = json!({ "source-layer": "water", "filter": ["==", ["get", "class"], "path"] });
+        assert!(matches!(without_hidden_features(&water, HIDDEN), Cow::Borrowed(_)));
+    }
 }

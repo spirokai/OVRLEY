@@ -557,6 +557,9 @@
       "delta": "Delta",
       "lapLog": "Varvlogg"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Karta", "route": "Rutt", "mapTiles": "Kartrutor", "route3d": "3D-rutt" }
+    },
     "types": {
       "rolling_chart": { "name": "Diagram", "shortName": "Diagram" },
       "diving_profile": {
@@ -623,6 +626,9 @@
     "cameraMode": "Kameraläge",
     "chaseCamera": "Följekamera",
     "mapBuildings": "Byggnader",
+    "mapPaths": "Stigar",
+    "mapWebgl2Unavailable": "WebGL2 är inte tillgängligt på det här systemet, så kartan kan inte förhandsvisas eller exporteras.",
+    "mapWebgl2Software": "Ingen GPU hittades. Kartförhandsvisningen renderas i mjukvara och kan vara långsam, och kartan kan inte exporteras.",
     "mapStyle": "Kartstil",
     "mapView": "Kartvy",
     "msaa": "Kantutjämning (MSAA)",

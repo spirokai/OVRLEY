@@ -557,6 +557,9 @@
       "delta": "Delta",
       "lapLog": "Registro de voltas"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Mapa", "route": "Rota", "mapTiles": "Blocos de mapa", "route3d": "Rota 3D" }
+    },
     "types": {
       "rolling_chart": { "name": "Gráficos", "shortName": "Gráficos" },
       "diving_profile": {
@@ -623,6 +626,9 @@
     "cameraMode": "Modo de câmera",
     "chaseCamera": "Câmera de perseguição",
     "mapBuildings": "Edifícios",
+    "mapPaths": "Caminhos",
+    "mapWebgl2Unavailable": "O WebGL2 não está disponível neste sistema, então o mapa não pode ser visualizado nem exportado.",
+    "mapWebgl2Software": "Nenhuma GPU encontrada. A prévia do mapa é renderizada por software e pode ficar lenta, e o mapa não pode ser exportado.",
     "mapStyle": "Estilo do mapa",
     "mapView": "Visualização do mapa",
     "msaa": "Suavização (MSAA)",

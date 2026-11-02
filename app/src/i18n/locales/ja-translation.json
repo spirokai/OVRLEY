@@ -557,6 +557,9 @@
       "delta": "差分",
       "lapLog": "ラップログ"
     },
+    "drawerGroups": {
+      "map": { "shortName": "マップ", "route": "ルート", "mapTiles": "マップタイル", "route3d": "3D ルート" }
+    },
     "types": {
       "rolling_chart": { "name": "チャート", "shortName": "チャート" },
       "diving_profile": {
@@ -623,6 +626,9 @@
     "cameraMode": "カメラモード",
     "chaseCamera": "追尾カメラ",
     "mapBuildings": "建物",
+    "mapPaths": "小道",
+    "mapWebgl2Unavailable": "このシステムでは WebGL2 を利用できないため、マップのプレビューも書き出しもできません。",
+    "mapWebgl2Software": "GPU が見つかりません。マップのプレビューはソフトウェアで描画されるため遅くなる場合があり、マップは書き出せません。",
     "mapStyle": "地図スタイル",
     "mapView": "地図ビュー",
     "msaa": "アンチエイリアス (MSAA)",

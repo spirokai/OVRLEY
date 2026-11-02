@@ -2,8 +2,10 @@
  * The tile map's inspector. Sliders publish through live drafts, once per animation frame.
  */
 
-import { Map as MapIcon, Shapes } from 'lucide-react'
+import { Map as MapIcon, Shapes, TriangleAlert } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { SectionHeading } from '@/components/ui/section-heading'
+import { getWebGl2Support } from '@/features/wasm-widgets/utils/webgl2Support'
 import { Label } from '@/components/ui/label'
 import { translateOptions } from '@/i18n'
 import { useTranslation } from 'react-i18next'
@@ -55,6 +57,7 @@ function zoomOffsetDisplay(value) {
 export default function MapWidgetEditor({ widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft, setNumericField }) {
   const { t } = useTranslation()
   const { data } = widget
+  const webgl2 = getWebGl2Support()
   const isChase = data.camera_mode === 'follow'
   const isCircle = data.shape === 'circle'
   const buildingsAvailable = mapBuildingsAvailable(data)
@@ -63,6 +66,19 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
 
   return (
     <>
+      {webgl2 !== 'hardware' && (
+        <Alert variant="destructive">
+          <TriangleAlert />
+          <AlertDescription>
+            {webgl2 === 'unavailable'
+              ? t('widget-editor.mapWebgl2Unavailable', "WebGL2 isn't available on this system, so the map can't be previewed or exported.")
+              : t(
+                  'widget-editor.mapWebgl2Software',
+                  "No GPU found. The map preview runs in software and may be slow, and the map can't be exported.",
+                )}
+          </AlertDescription>
+        </Alert>
+      )}
       {isCircle ? (
         <div className="grid grid-cols-2 gap-4">
           <NumberField
@@ -177,6 +193,10 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
             disabled={!buildingsAvailable}
             onCheckedChange={(show_buildings) => updateWidgetData(widget.id, { show_buildings })}
           />
+        </div>
+        <div className="flex items-center justify-between gap-2 pl-1">
+          <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.mapPaths', 'Paths')}</Label>
+          <ToggleField checked={data.show_paths} onCheckedChange={(show_paths) => updateWidgetData(widget.id, { show_paths })} />
         </div>
         <SelectField
           label={t('widget-editor.msaa', 'Anti-aliasing (MSAA)')}

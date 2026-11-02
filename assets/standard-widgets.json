@@ -11,6 +11,46 @@
     "scuba_diving": "widgets.categories.scuba_diving",
     "other": "widgets.categories.other"
   },
+  "drawerGroups": {
+    "map": {
+      "category": "general",
+      "shortNameKey": "widgets.drawerGroups.map.shortName",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-course.svg"
+      },
+      "options": [
+        {
+          "value": "route",
+          "type": "course",
+          "labelKey": "widgets.drawerGroups.map.route",
+          "icon": {
+            "source": "custom",
+            "assetFile": "widget-course.svg"
+          }
+        },
+        {
+          "value": "map_tiles",
+          "type": "map",
+          "labelKey": "widgets.drawerGroups.map.mapTiles",
+          "icon": {
+            "source": "custom",
+            "assetFile": "widget-map.svg"
+          },
+          "preset": { "camera_mode": "fixed" }
+        },
+        {
+          "value": "route_3d",
+          "type": "map",
+          "labelKey": "widgets.drawerGroups.map.route3d",
+          "icon": {
+            "source": "lucide",
+            "name": "Navigation"
+          }
+        }
+      ]
+    }
+  },
   "collections": {
     "backdrops": {
       "type": "backdrop",
@@ -39,6 +79,7 @@
   },
   "widgetDefaults": {
     "current": true,
+    "drawerGroup": null,
     "plottable": false,
     "metric": false,
     "layoutMode": "intrinsic",
@@ -413,6 +454,7 @@
     },
     {
       "type": "course",
+      "drawerGroup": "map",
       "activity": {
         "column": {
           "specialized": true,
@@ -470,6 +512,7 @@
     },
     {
       "type": "map",
+      "drawerGroup": "map",
       "activity": {
         "coverageSource": "course",
         "sources": [],
@@ -492,9 +535,10 @@
         "height": 500,
         "map_style": "liberty",
         "show_buildings": true,
+        "show_paths": true,
         "camera_mode": "follow",
         "orientation": "rider_up",
-        "pitch": 45,
+        "pitch": 50,
         "follow_zoom": 16,
         "fixed_zoom": 0,
         "fixed_pan_x": 0,

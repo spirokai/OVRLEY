@@ -37,6 +37,8 @@ mod map_tile_service_tests;
 
 mod distribution;
 mod file_ops;
+#[cfg(not(target_os = "macos"))]
+mod main_window;
 mod preview_import;
 mod progress_sink;
 mod project_file;
@@ -168,11 +170,7 @@ pub fn run() {
                 .start_with_map_tile_service(map_tile_service)?;
 
             #[cfg(not(target_os = "macos"))]
-            {
-                if let Some(window) = app.get_webview_window("main") {
-                    window.set_decorations(false)?;
-                }
-            }
+            main_window::create(app)?.set_decorations(false)?;
 
             #[cfg(target_os = "macos")]
             {

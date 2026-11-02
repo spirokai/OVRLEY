@@ -76,6 +76,31 @@ function compileWidgetDefinitions() {
 /** Canonical defaults and capabilities for every widget. */
 export const WIDGET_TYPE_DEFINITIONS = compileWidgetDefinitions()
 
+/** Each group's options must offer its member widgets and preset only their defaults, or the manifest fails to load. */
+function compileDrawerGroups() {
+  const groups = {}
+  for (const [name, group] of Object.entries(widgetsManifest.drawerGroups)) {
+    if (!Object.hasOwn(WIDGET_CATEGORY_NAME_KEYS, group.category)) throw new Error(`Drawer group ${name} has unknown category ${group.category}`)
+    for (const option of group.options) {
+      const definition = requireWidgetTypeDefinition(option.type)
+      if (definition.drawerGroup !== name) throw new Error(`Drawer group ${name} offers ${option.type}, which is not one of its members`)
+      for (const field of Object.keys(option.preset ?? {})) {
+        if (!Object.hasOwn(definition.defaults, field)) throw new Error(`Drawer group ${name} presets unknown ${option.type} field ${field}`)
+      }
+    }
+    groups[name] = Object.freeze({ ...group, name })
+  }
+  for (const [type, definition] of Object.entries(WIDGET_TYPE_DEFINITIONS)) {
+    if (definition.drawerGroup === null) continue
+    if (!groups[definition.drawerGroup]?.options.some((option) => option.type === type))
+      throw new Error(`Widget ${type} names drawer group ${definition.drawerGroup}, which does not offer it`)
+  }
+  return Object.freeze(groups)
+}
+
+/** Drawer entries that offer several widget types, keyed by name. */
+export const WIDGET_DRAWER_GROUPS = compileDrawerGroups()
+
 /** @param {string} type Widget type selected at ingress. @returns {object} Required widget definition. */
 export function requireWidgetTypeDefinition(type) {
   if (!Object.hasOwn(WIDGET_TYPE_DEFINITIONS, type)) throw new Error(`Unknown widget type: ${type}`)

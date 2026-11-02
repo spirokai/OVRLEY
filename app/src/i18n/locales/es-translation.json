@@ -557,6 +557,9 @@
       "delta": "Diferencia",
       "lapLog": "Registro de vueltas"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Mapa", "route": "Ruta", "mapTiles": "Teselas de mapa", "route3d": "Ruta 3D" }
+    },
     "types": {
       "rolling_chart": { "name": "Gráficos", "shortName": "Gráficos" },
       "diving_profile": {
@@ -623,6 +626,9 @@
     "cameraMode": "Modo de cámara",
     "chaseCamera": "Cámara de seguimiento",
     "mapBuildings": "Edificios",
+    "mapPaths": "Senderos",
+    "mapWebgl2Unavailable": "WebGL2 no está disponible en este sistema, por lo que el mapa no se puede previsualizar ni exportar.",
+    "mapWebgl2Software": "No se encontró ninguna GPU. La vista previa del mapa se renderiza por software y puede ir lenta, y el mapa no se puede exportar.",
     "mapStyle": "Estilo de mapa",
     "mapView": "Vista del mapa",
     "msaa": "Suavizado (MSAA)",

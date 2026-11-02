@@ -557,6 +557,9 @@
       "delta": "Delta",
       "lapLog": "Rondeoverzicht"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Kaart", "route": "Route", "mapTiles": "Kaarttegels", "route3d": "3D-route" }
+    },
     "types": {
       "rolling_chart": { "name": "Grafieken", "shortName": "Grafieken" },
       "diving_profile": {
@@ -623,6 +626,9 @@
     "cameraMode": "Cameramodus",
     "chaseCamera": "Volgcamera",
     "mapBuildings": "Gebouwen",
+    "mapPaths": "Paden",
+    "mapWebgl2Unavailable": "WebGL2 is niet beschikbaar op dit systeem, dus de kaart kan niet worden bekeken of geëxporteerd.",
+    "mapWebgl2Software": "Geen GPU gevonden. Het kaartvoorbeeld wordt softwarematig weergegeven en kan traag zijn, en de kaart kan niet worden geëxporteerd.",
     "mapStyle": "Kaartstijl",
     "mapView": "Kaartweergave",
     "msaa": "Anti-aliasing (MSAA)",
