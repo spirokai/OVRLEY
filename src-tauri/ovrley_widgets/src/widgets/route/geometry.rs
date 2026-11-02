@@ -35,7 +35,7 @@ pub struct GeometryKey {
 
 impl GeometryKey {
     pub fn new(config: &ValidatedRoutePlot) -> Self {
-        let line_inset = config.path.remaining_line_width.max(config.path.completed_line_width) * 0.5;
+        let line_inset = config.remaining_line_width.max(config.completed_line_width) * 0.5;
         let marker_inset = config.path.marker_size.max(config.path.marker_variant_diameter * 0.5);
         Self {
             width: config.width,

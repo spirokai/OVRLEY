@@ -33,6 +33,8 @@ pub struct MapConfig {
     /// How strongly GPS noise is smoothed out of the route, in metres.
     pub route_smoothing_m: f32,
     pub show_full_activity: bool,
+    /// Both sides of the split draw at this width.
+    pub line_width: f32,
     #[serde(flatten)]
     pub path: RoutePathConfig,
 }

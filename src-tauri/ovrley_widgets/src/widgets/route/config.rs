@@ -14,19 +14,20 @@ pub struct CoursePlotConfig {
     pub simplify_tolerance_px: f32,
     pub target_density: f32,
     pub show_full_activity: bool,
+    pub completed_line_width: f32,
+    pub remaining_line_width: f32,
     #[serde(flatten)]
     pub path: RoutePathConfig,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
 
-/// The line and marker fields shared by every family that draws a route.
+/// The line colour and marker fields shared by every family that draws a route. Each family owns
+/// its line widths.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct RoutePathConfig {
-    pub completed_line_width: f32,
     pub completed_line_color: String,
     pub completed_line_opacity: f32,
-    pub remaining_line_width: f32,
     pub remaining_line_color: String,
     pub remaining_line_opacity: f32,
     pub marker_variant: String,

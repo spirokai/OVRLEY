@@ -252,7 +252,20 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
         updateWidgetData={updateWidgetData}
         updateWidgetDraft={updateWidgetDraft}
         commitWidgetDraft={commitWidgetDraft}
-        separateThickness
+        thickness={
+          <SliderField
+            editable
+            label={t('widget-editor.thickness', 'Thickness')}
+            value={data.line_width}
+            min={1}
+            max={20}
+            step={1}
+            integerDisplay
+            suffix="px"
+            onSliderChange={(line_width) => updateWidgetDraft(widget.id, { line_width })}
+            onSliderCommit={commit}
+          />
+        }
         smoothing={
           <SliderField
             editable

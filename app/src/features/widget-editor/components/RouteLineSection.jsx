@@ -15,7 +15,7 @@ import { ColorField, SliderField, ToggleField } from './widgetFormControls'
  * @param {Function} props.updateWidgetData - Updates widget data.
  * @param {Function} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
  * @param {Function} props.commitWidgetDraft - Commits the live widget draft.
- * @param {boolean} [props.separateThickness=false] - Whether finished and remaining line have their own thickness.
+ * @param {React.ReactNode} [props.thickness=null] - Replaces the thickness slider for a widget that stores its own width.
  * @param {React.ReactNode} [props.detail=null] - Control beside smoothing.
  * @param {React.ReactNode} [props.smoothing=null] - Replaces the simplification slider for a widget that smooths its own way.
  * @returns {JSX.Element} Rendered component output.
@@ -25,7 +25,7 @@ export default function RouteLineSection({
   updateWidgetData,
   updateWidgetDraft,
   commitWidgetDraft,
-  separateThickness = false,
+  thickness = null,
   detail = null,
   smoothing = null,
 }) {
@@ -38,34 +38,7 @@ export default function RouteLineSection({
   return (
     <div className="space-y-4">
       <SectionHeading icon={Palette} title={t('widget-editor.lineStyling', 'Line Styling')} />
-      {separateThickness ? (
-        <div className="grid grid-cols-2 gap-4">
-          <SliderField
-            editable
-            label={t('widget-editor.finishedThickness', 'Finished Thickness')}
-            value={widget.data.completed_line_width}
-            min={1}
-            max={20}
-            step={1}
-            integerDisplay
-            suffix="px"
-            onSliderChange={(completed_line_width) => updateWidgetDraft(widget.id, { completed_line_width })}
-            onSliderCommit={commit}
-          />
-          <SliderField
-            editable
-            label={t('widget-editor.remainingThickness', 'Remaining Thickness')}
-            value={widget.data.remaining_line_width}
-            min={1}
-            max={20}
-            step={1}
-            integerDisplay
-            suffix="px"
-            onSliderChange={(remaining_line_width) => updateWidgetDraft(widget.id, { remaining_line_width })}
-            onSliderCommit={commit}
-          />
-        </div>
-      ) : (
+      {thickness ?? (
         <SliderField
           editable
           label={t('widget-editor.thickness', 'Thickness')}

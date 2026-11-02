@@ -21,16 +21,16 @@ pub struct ValidatedRoutePlot {
     pub rotation: f32,
     pub simplify_tolerance_px: f32,
     pub target_density: f32,
+    pub completed_line_width: f32,
+    pub remaining_line_width: f32,
     pub path: ValidatedRoutePath,
     pub show_full_activity: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedRoutePath {
-    pub completed_line_width: f32,
     pub completed_line_color: String,
     pub completed_line_opacity: f32,
-    pub remaining_line_width: f32,
     pub remaining_line_color: String,
     pub remaining_line_opacity: f32,
     pub marker_variant: MarkerVariant,
@@ -73,6 +73,14 @@ pub fn validate_route_plot(
         rotation: require_f32(Some(plot.rotation), &p("rotation"))?,
         simplify_tolerance_px,
         target_density,
+        completed_line_width: require_positive_f32(
+            Some(plot.completed_line_width),
+            &p("completed_line_width"),
+        )?,
+        remaining_line_width: require_positive_f32(
+            Some(plot.remaining_line_width),
+            &p("remaining_line_width"),
+        )?,
         path: validate_route_path(&plot.path, &p)?,
         show_full_activity: plot.show_full_activity,
     })
@@ -84,10 +92,6 @@ pub fn validate_route_path(
     p: &dyn Fn(&str) -> String,
 ) -> WidgetResult<ValidatedRoutePath> {
     Ok(ValidatedRoutePath {
-        completed_line_width: require_positive_f32(
-            Some(path.completed_line_width),
-            &p("completed_line_width"),
-        )?,
         completed_line_color: require_hex_color(
             Some(&path.completed_line_color),
             &p("completed_line_color"),
@@ -95,10 +99,6 @@ pub fn validate_route_path(
         completed_line_opacity: require_opacity(
             Some(path.completed_line_opacity),
             &p("completed_line_opacity"),
-        )?,
-        remaining_line_width: require_positive_f32(
-            Some(path.remaining_line_width),
-            &p("remaining_line_width"),
         )?,
         remaining_line_color: require_hex_color(
             Some(&path.remaining_line_color),

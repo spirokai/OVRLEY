@@ -101,6 +101,10 @@ impl MapCamera {
         self.zoom
     }
 
+    pub const fn pitch_deg(self) -> f64 {
+        self.pitch_deg
+    }
+
     /// `lon, lat, zoom, pitch, bearing, top padding`, for a renderer in another WASM module.
     pub const fn values(self) -> [f64; 6] {
         [

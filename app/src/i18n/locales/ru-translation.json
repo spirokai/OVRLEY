@@ -622,7 +622,6 @@
   "widget-editor": {
     "cameraMode": "Режим камеры",
     "chaseCamera": "Камера слежения",
-    "finishedThickness": "Толщина пройденного",
     "mapBuildings": "Здания",
     "mapStyle": "Стиль карты",
     "mapView": "Вид карты",
@@ -630,7 +629,6 @@
     "msaaOff": "Выкл.",
     "northUp": "Север сверху",
     "pitch": "Наклон",
-    "remainingThickness": "Толщина оставшегося",
     "riderUp": "Направление движения сверху",
     "routeOffsetX": "Смещение маршрута X",
     "routeOffsetY": "Смещение маршрута Y",

@@ -263,10 +263,7 @@ impl PreviewMap {
             "corner_radius_px": self.layout.corner_radius_px,
             "camera": camera.values(),
             "route_id": self.route_id,
-            "route_style": [
-                c0, c1, c2, c3, style.completed_width_px,
-                r0, r1, r2, r3, style.remaining_width_px,
-            ],
+            "route_style": [c0, c1, c2, c3, r0, r1, r2, r3, style.width_px],
             "travelled_metres": state.progress,
         }))
         .map_err(|error| WidgetError::Render(error.to_string()))?;

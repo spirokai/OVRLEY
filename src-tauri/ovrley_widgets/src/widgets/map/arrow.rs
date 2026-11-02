@@ -1,6 +1,6 @@
-//! The caret on a real map: a small extruded solid with a flat top, standing on the road with its tip
-//! at the rider, seen through the map's own camera and lit by the buildings' light, with a soft shadow
-//! on the ground beneath it.
+//! The caret on a real map: a small extruded solid with a flat top, standing on the road at the rider,
+//! seen through the map's own camera and lit by the buildings' light, with a soft shadow on the ground
+//! beneath it.
 //!
 //! It draws in Skia over the finished frame, so preview and export share it and buildings never hide it.
 use crate::render::text::parse_color;
@@ -15,10 +15,14 @@ const AXIS_STEP_PX: f64 = 8.0;
 /// The solid at radius 1: `x` right, `y` forward, `z` up. Walls rise from the ground to [`TOP`]. The
 /// underside always faces away from a camera above the ground, so it isn't drawn.
 const TOP: f32 = 0.4;
-/// The outline's corners, clockwise seen from above: tip, right, notch, left. The origin is the rider
-/// and the rounded tip reaches it, so the tip stays on the route through any turn and the body trails
-/// behind. The sharp corner sits past the origin by what [`CORNER_ROUNDING`] takes off it.
+/// The outline's corners, clockwise seen from above: tip, right, notch, left. The rounded tip reaches
+/// the origin and the body trails behind. The sharp corner sits past the origin by what
+/// [`CORNER_ROUNDING`] takes off it.
 const CORNERS: [[f32; 2]; 4] = [[0.0, 0.14], [0.95, -2.21], [0.0, -1.71], [-0.95, -2.21]];
+/// From this pitch on, the tip sits on the rider. A pitched view looks along the road, where a solid
+/// centred on the rider would seem to run ahead of them. Straight down, its middle sits on the rider so
+/// it turns in place.
+const TIP_ANCHOR_PITCH_DEG: f32 = 60.0;
 /// How far along its edges each corner's rounding starts.
 const CORNER_ROUNDING: f32 = 0.3;
 /// Segments each rounded corner is drawn with.
@@ -34,6 +38,17 @@ struct Wall {
 struct ArrowSolid {
     outline: Vec<[f32; 2]>,
     walls: Vec<Wall>,
+    /// Forward extent of the rounded outline: its tip, and halfway from its tail to its tip.
+    tip: f32,
+    middle: f32,
+}
+
+impl ArrowSolid {
+    /// The forward position on the solid that sits on the rider at this camera pitch.
+    fn anchor_at(&self, pitch_deg: f32) -> f32 {
+        let toward_tip = (pitch_deg / TIP_ANCHOR_PITCH_DEG).min(1.0);
+        self.middle + (self.tip - self.middle) * toward_tip
+    }
 }
 
 /// The same shape for every arrow, so it's built once.
@@ -56,7 +71,17 @@ static SOLID: LazyLock<ArrowSolid> = LazyLock::new(|| {
             }
         })
         .collect();
-    ArrowSolid { outline, walls }
+    let (tail, tip) = outline
+        .iter()
+        .fold((f32::MAX, f32::MIN), |(tail, tip), point| {
+            (tail.min(point[1]), tip.max(point[1]))
+        });
+    ArrowSolid {
+        outline,
+        walls,
+        tip,
+        middle: (tail + tip) / 2.0,
+    }
 });
 
 /// [`CORNERS`] with each corner replaced by a quadratic curve between its two edges.
@@ -144,6 +169,8 @@ pub struct MarkerPose {
     up: Point,
     /// The ground part of the light, along `right` and `forward`.
     light: [f32; 2],
+    /// The solid's forward position that sits on `center`, from [`ArrowSolid::anchor_at`].
+    anchor: f32,
 }
 
 impl MarkerPose {
@@ -192,6 +219,7 @@ impl MarkerPose {
                 (light_x * cos + light_y * sin) as f32,
                 (light_x * sin - light_y * cos) as f32,
             ],
+            anchor: SOLID.anchor_at(camera.pitch_deg() as f32),
         })
     }
 
@@ -205,6 +233,7 @@ impl MarkerPose {
             forward: Point::new(sin, -cos),
             up: Point::new(0.0, 0.0),
             light: [light_x * cos + light_y * sin, light_x * sin - light_y * cos],
+            anchor: SOLID.middle,
         }
     }
 
@@ -213,7 +242,7 @@ impl MarkerPose {
         add(
             add(self.center, scaled(self.right, x * radius)),
             add(
-                scaled(self.forward, y * radius),
+                scaled(self.forward, (y - self.anchor) * radius),
                 scaled(self.up, z * radius),
             ),
         )
@@ -403,6 +432,22 @@ mod tests {
         assert!(tip.abs() < 0.01, "{tip}");
         let middle = SOLID.outline.iter().position(|point| point[1] == tip).unwrap();
         assert!(SOLID.outline[middle][0].abs() < 0.01);
+    }
+
+    #[test]
+    fn the_rider_holds_the_middle_from_above_and_the_tip_from_a_pitched_view() {
+        let on_rider = |pose: &MarkerPose, forward: f32| {
+            close(
+                pose.place([0.0, forward, 0.0], 10.0),
+                (pose.center.x, pose.center.y),
+            )
+        };
+        on_rider(&pose(0.0, 0.0, 0.0), SOLID.middle);
+        on_rider(&MarkerPose::top_down(Point::new(200.0, 150.0), 30.0), SOLID.middle);
+        on_rider(&pose(30.0, 0.0, 0.0), (SOLID.middle + SOLID.tip) / 2.0);
+        on_rider(&pose(60.0, 0.0, 0.0), SOLID.tip);
+        on_rider(&pose(70.0, 0.0, 0.0), SOLID.tip);
+        assert!(SOLID.middle < -0.9, "the middle trails the tip: {}", SOLID.middle);
     }
 
     #[test]

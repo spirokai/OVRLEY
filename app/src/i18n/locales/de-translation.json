@@ -622,7 +622,6 @@
   "widget-editor": {
     "cameraMode": "Kameramodus",
     "chaseCamera": "Verfolgerkamera",
-    "finishedThickness": "Stärke zurückgelegt",
     "mapBuildings": "Gebäude",
     "mapStyle": "Kartenstil",
     "mapView": "Kartenansicht",
@@ -630,7 +629,6 @@
     "msaaOff": "Aus",
     "northUp": "Norden oben",
     "pitch": "Neigung",
-    "remainingThickness": "Stärke verbleibend",
     "riderUp": "Fahrtrichtung oben",
     "routeOffsetX": "Routenversatz X",
     "routeOffsetY": "Routenversatz Y",

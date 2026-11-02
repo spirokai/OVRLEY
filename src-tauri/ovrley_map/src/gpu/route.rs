@@ -1,8 +1,7 @@
 //! The route as a ground layer. It draws after every other ground layer and before the buildings,
 //! so buildings hide it exactly as they hide roads.
 //!
-//! Unlike a road it comes from the activity, not from tiles, and its colour and width change with
-//! the split. So it keeps its own buffers: the line is cut into sections, each with its own origin
+//! Unlike a road it comes from the activity, not from tiles, and its colour changes with the split. So it keeps its own buffers: the line is cut into sections, each with its own origin
 //! and matrix, which keeps `f32` precision on long routes and lets far sections be culled per frame.
 
 use super::pipelines::{RouteInstance, RouteVertex};
@@ -173,17 +172,9 @@ impl RouteLayer {
             .map(|(index, _)| index)
             .collect();
         let style = route.style;
-        for (color, width, side) in [
-            (
-                style.completed_color,
-                style.completed_width_px,
-                KEEP_COMPLETED,
-            ),
-            (
-                style.remaining_color,
-                style.remaining_width_px,
-                KEEP_REMAINING,
-            ),
+        for (color, side) in [
+            (style.completed_color, KEEP_COMPLETED),
+            (style.remaining_color, KEEP_REMAINING),
         ] {
             for &index in &visible {
                 let section = &self.sections[index];
@@ -204,7 +195,7 @@ impl RouteLayer {
                     color,
                     viewport_width: viewport.width_px() as f32,
                     viewport_height: viewport.height_px() as f32,
-                    line_width: width,
+                    line_width: style.width_px,
                     travelled_metres: route.travelled_metres,
                     keep_side: side,
                 });

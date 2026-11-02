@@ -622,7 +622,6 @@
   "widget-editor": {
     "cameraMode": "Modo de cámara",
     "chaseCamera": "Cámara de seguimiento",
-    "finishedThickness": "Grosor recorrido",
     "mapBuildings": "Edificios",
     "mapStyle": "Estilo de mapa",
     "mapView": "Vista del mapa",
@@ -630,7 +629,6 @@
     "msaaOff": "Desactivado",
     "northUp": "Norte arriba",
     "pitch": "Inclinación",
-    "remainingThickness": "Grosor restante",
     "riderUp": "Dirección arriba",
     "routeOffsetX": "Desplazamiento de ruta X",
     "routeOffsetY": "Desplazamiento de ruta Y",

@@ -121,7 +121,7 @@ impl RouteLayout {
         geometry: &RouteGeometry,
     ) -> RemainingStroke {
         let scale = geometry.scale_to(config).map(|value| value * scene.scale);
-        let width = (config.path.remaining_line_width * scene.scale).max(1.0);
+        let width = (config.remaining_line_width * scene.scale).max(1.0);
         let line_bounds =
             scaled_rect(geometry.point_bounds, scale).with_outset((width * 0.5, width * 0.5));
         let mut bounds = line_bounds;
@@ -208,7 +208,7 @@ impl RouteLayout {
             Self::measure_bounds(&config, &scene, &geometry, remaining_bounds);
         let completed_paint = stroke_paint(
             &config.path.completed_line_color,
-            (config.path.completed_line_width * scene.scale).max(1.0) / scale[0],
+            (config.completed_line_width * scene.scale).max(1.0) / scale[0],
             config.path.completed_line_opacity * scene.opacity,
         );
         let marker = route_marker(&config, &scene);
@@ -233,7 +233,7 @@ impl RouteLayout {
     ) -> Rect {
         let scale = geometry.scale_to(config).map(|value| value * scene.scale);
         let half_stroke =
-            (config.path.completed_line_width.max(config.path.remaining_line_width) * scene.scale).max(1.0)
+            (config.completed_line_width.max(config.remaining_line_width) * scene.scale).max(1.0)
                 * 0.5;
         scaled_rect(geometry.point_bounds, scale).with_outset((half_stroke, half_stroke))
     }

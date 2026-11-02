@@ -622,7 +622,6 @@
   "widget-editor": {
     "cameraMode": "Kameraläge",
     "chaseCamera": "Följekamera",
-    "finishedThickness": "Tjocklek avklarad",
     "mapBuildings": "Byggnader",
     "mapStyle": "Kartstil",
     "mapView": "Kartvy",
@@ -630,7 +629,6 @@
     "msaaOff": "Av",
     "northUp": "Norr uppåt",
     "pitch": "Lutning",
-    "remainingThickness": "Tjocklek återstående",
     "riderUp": "Färdriktning uppåt",
     "routeOffsetX": "Ruttförskjutning X",
     "routeOffsetY": "Ruttförskjutning Y",

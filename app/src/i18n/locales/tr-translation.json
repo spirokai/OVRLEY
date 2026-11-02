@@ -622,7 +622,6 @@
   "widget-editor": {
     "cameraMode": "Kamera modu",
     "chaseCamera": "Takip kamerası",
-    "finishedThickness": "Tamamlanan kalınlık",
     "mapBuildings": "Binalar",
     "mapStyle": "Harita stili",
     "mapView": "Harita görünümü",
@@ -630,7 +629,6 @@
     "msaaOff": "Kapalı",
     "northUp": "Kuzey yukarıda",
     "pitch": "Eğim",
-    "remainingThickness": "Kalan kalınlık",
     "riderUp": "Gidiş yönü yukarıda",
     "routeOffsetX": "Rota kayması X",
     "routeOffsetY": "Rota kayması Y",

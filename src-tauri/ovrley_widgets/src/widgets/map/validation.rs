@@ -68,6 +68,7 @@ pub struct ValidatedMapWidget {
     pub border: MapBorder,
     pub route_smoothing_m: f32,
     pub show_full_activity: bool,
+    pub line_width: f32,
     pub path: ValidatedRoutePath,
 }
 
@@ -164,6 +165,7 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
             ROUTE_SMOOTHING_RANGE,
         )?,
         show_full_activity: map.show_full_activity,
+        line_width: require_positive_f32(Some(map.line_width), &p("line_width"))?,
         path: validate_route_path(&map.path, &p)?,
     })
 }

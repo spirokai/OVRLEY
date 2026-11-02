@@ -26,8 +26,8 @@ use skia_safe::{
 };
 use std::f32::consts::FRAC_1_SQRT_2;
 
-/// OpenFreeMap's required credit, as `map_tile_service.rs` serves it to MapLibre.
-const ATTRIBUTION: &str = "OpenFreeMap \u{a9} OpenMapTiles Data from OpenStreetMap";
+/// The map's sources by name: the tile host, the tile schema and the data.
+const ATTRIBUTION: &str = "OpenFreeMap \u{a9} OpenMapTiles \u{a9} OpenStreetMap";
 const ATTRIBUTION_FONT_SIZE: f32 = 8.0;
 const ATTRIBUTION_PADDING: f32 = 2.0;
 const ATTRIBUTION_TEXT_OPACITY: f32 = 0.8;
@@ -233,8 +233,7 @@ impl MapLayout {
             (config.height * scene.scale).round(),
         );
         let path = &config.path;
-        let completed_width = (path.completed_line_width * scene.scale).max(1.0);
-        let remaining_width = (path.remaining_line_width * scene.scale).max(1.0);
+        let line_width = (config.line_width * scene.scale).max(1.0);
         let opacity = config.opacity * scene.opacity;
         let corner_radius = match config.shape {
             MapShape::Rectangle { corner_radius } => {
@@ -279,23 +278,22 @@ impl MapLayout {
                     &path.completed_line_color,
                     path.completed_line_opacity,
                 ),
-                completed_width_px: completed_width * raster_scale.value(),
                 remaining_color: color_floats(
                     &path.remaining_line_color,
                     path.remaining_line_opacity,
                 ),
-                remaining_width_px: remaining_width * raster_scale.value(),
+                width_px: line_width * raster_scale.value(),
             },
             placeholder_paint,
             image_paint,
             completed_paint: stroke_paint(
                 &path.completed_line_color,
-                completed_width,
+                line_width,
                 path.completed_line_opacity * opacity,
             ),
             remaining_paint: stroke_paint(
                 &path.remaining_line_color,
-                remaining_width,
+                line_width,
                 path.remaining_line_opacity * opacity,
             ),
             marker: match path.marker_variant {

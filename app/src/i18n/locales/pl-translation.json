@@ -622,7 +622,6 @@
   "widget-editor": {
     "cameraMode": "Tryb kamery",
     "chaseCamera": "Kamera śledząca",
-    "finishedThickness": "Grubość przebytej części",
     "mapBuildings": "Budynki",
     "mapStyle": "Styl mapy",
     "mapView": "Widok mapy",
@@ -630,7 +629,6 @@
     "msaaOff": "Wył.",
     "northUp": "Północ u góry",
     "pitch": "Nachylenie",
-    "remainingThickness": "Grubość pozostałej części",
     "riderUp": "Kierunek jazdy u góry",
     "routeOffsetX": "Przesunięcie trasy X",
     "routeOffsetY": "Przesunięcie trasy Y",

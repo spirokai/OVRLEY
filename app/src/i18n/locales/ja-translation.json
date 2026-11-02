@@ -622,7 +622,6 @@
   "widget-editor": {
     "cameraMode": "カメラモード",
     "chaseCamera": "追尾カメラ",
-    "finishedThickness": "走行済みの太さ",
     "mapBuildings": "建物",
     "mapStyle": "地図スタイル",
     "mapView": "地図ビュー",
@@ -630,7 +629,6 @@
     "msaaOff": "オフ",
     "northUp": "北を上",
     "pitch": "傾き",
-    "remainingThickness": "残りの太さ",
     "riderUp": "進行方向を上",
     "routeOffsetX": "ルートオフセット X",
     "routeOffsetY": "ルートオフセット Y",

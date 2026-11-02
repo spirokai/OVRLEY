@@ -622,7 +622,6 @@
   "widget-editor": {
     "cameraMode": "Režim kamery",
     "chaseCamera": "Sledovací kamera",
-    "finishedThickness": "Tloušťka dokončené části",
     "mapBuildings": "Budovy",
     "mapStyle": "Styl mapy",
     "mapView": "Zobrazení mapy",
@@ -630,7 +629,6 @@
     "msaaOff": "Vypnuto",
     "northUp": "Sever nahoře",
     "pitch": "Sklon",
-    "remainingThickness": "Tloušťka zbývající části",
     "riderUp": "Směr jízdy nahoře",
     "routeOffsetX": "Posun trasy X",
     "routeOffsetY": "Posun trasy Y",

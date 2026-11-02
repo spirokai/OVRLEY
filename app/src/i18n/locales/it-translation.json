@@ -622,7 +622,6 @@
   "widget-editor": {
     "cameraMode": "Modalità telecamera",
     "chaseCamera": "Telecamera di inseguimento",
-    "finishedThickness": "Spessore percorso",
     "mapBuildings": "Edifici",
     "mapStyle": "Stile mappa",
     "mapView": "Vista mappa",
@@ -630,7 +629,6 @@
     "msaaOff": "Disattivato",
     "northUp": "Nord in alto",
     "pitch": "Inclinazione",
-    "remainingThickness": "Spessore rimanente",
     "riderUp": "Direzione in alto",
     "routeOffsetX": "Spostamento percorso X",
     "routeOffsetY": "Spostamento percorso Y",

@@ -622,7 +622,6 @@
   "widget-editor": {
     "cameraMode": "相机模式",
     "chaseCamera": "追踪相机",
-    "finishedThickness": "已完成线宽",
     "mapBuildings": "建筑",
     "mapStyle": "地图样式",
     "mapView": "地图视图",
@@ -630,7 +629,6 @@
     "msaaOff": "关闭",
     "northUp": "北向朝上",
     "pitch": "俯仰",
-    "remainingThickness": "剩余线宽",
     "riderUp": "行进方向朝上",
     "routeOffsetX": "路线偏移 X",
     "routeOffsetY": "路线偏移 Y",

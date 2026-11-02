@@ -200,10 +200,42 @@ fn finalizes_raw_activity_with_default_derived_speed_smoothing_when_map_is_empty
 
     assert_eq!(activity.speed[0], None);
     assert!(activity.speed.iter().flatten().all(|speed| *speed > 0.0 && *speed < 40.0));
-    // Stepped altitude differentiates into alternating 0/16 m/s; default smoothing recovers the 8 m/s climb.
-    assert_eq!(
-        activity.vertical_speed,
-        vec![None, Some(8.0), Some(8.0), Some(8.0), Some(8.0)]
+}
+
+#[test]
+fn ingress_altitude_smoothing_turns_a_stepped_climb_into_a_steady_vertical_speed() {
+    // 4 Hz altitude that climbs 4 m every half second differentiates into alternating 0/16 m/s.
+    let raw_samples: Vec<_> = (0..=20)
+        .map(|index| {
+            serde_json::json!({
+                "elapsed_seconds": f64::from(index) * 0.25,
+                "distance": f64::from(index) * 5.0,
+                "elevation": 100.0 + f64::from(index / 2) * 4.0,
+            })
+        })
+        .collect();
+    let raw_activity = serde_json::json!({
+        "file_name": "raw-stepped-climb.srt",
+        "file_format": "srt",
+        "raw_samples": raw_samples,
+        "options": {
+            "skip_idle_gap_fill": true,
+            "smoothing": {}
+        }
+    });
+
+    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
+        .unwrap()
+        .parsed_activity;
+
+    // The 1 s window is cut short within two passes of half a window from either end, which flattens
+    // the climb there. Everywhere else the smoothed altitude reads as the true 8 m/s.
+    let interior = &activity.vertical_speed[5..=16];
+    assert!(
+        interior
+            .iter()
+            .all(|speed| speed.is_some_and(|speed| (speed - 8.0).abs() < 0.5)),
+        "{interior:?}"
     );
 }
 

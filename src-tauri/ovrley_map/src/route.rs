@@ -36,13 +36,13 @@ impl MapRouteLine {
     }
 }
 
-/// How the two sides of the split draw. Colours are straight-alpha floats and widths are output pixels.
+/// How the two sides of the split draw. Colours are straight-alpha floats; both sides share one width
+/// in output pixels.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MapRouteStyle {
     pub completed_color: [f32; 4],
-    pub completed_width_px: f32,
     pub remaining_color: [f32; 4],
-    pub remaining_width_px: f32,
+    pub width_px: f32,
 }
 
 /// One frame's route: which line, how it looks, and where the split sits.

@@ -25,8 +25,8 @@ struct RendererConfig {
 
 /// `lon, lat, zoom, pitch, bearing, top padding`, from the widget's view.
 const CAMERA_VALUES: usize = 6;
-/// Completed rgba and width, then remaining rgba and width.
-const ROUTE_STYLE_VALUES: usize = 10;
+/// Completed rgba, remaining rgba, then the shared width.
+const ROUTE_STYLE_VALUES: usize = 9;
 /// `world_x, world_y, along_metres` per vertex.
 const ROUTE_POINT_VALUES: usize = 3;
 
@@ -158,14 +158,13 @@ impl MapLayer {
                     route_style[2],
                     route_style[3],
                 ],
-                completed_width_px: route_style[4],
                 remaining_color: [
+                    route_style[4],
                     route_style[5],
                     route_style[6],
                     route_style[7],
-                    route_style[8],
                 ],
-                remaining_width_px: route_style[9],
+                width_px: route_style[8],
             },
             travelled_metres,
         };
