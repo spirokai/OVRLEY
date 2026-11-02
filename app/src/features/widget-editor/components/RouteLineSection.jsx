@@ -15,7 +15,7 @@ import { ColorField, SliderField, ToggleField } from './widgetFormControls'
  * @param {Function} props.updateWidgetData - Updates widget data.
  * @param {Function} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
  * @param {Function} props.commitWidgetDraft - Commits the live widget draft.
- * @param {React.ReactNode} [props.thickness=null] - Replaces the thickness slider for a widget that stores its own width.
+ * @param {React.ReactNode} [props.thickness=null] - Replaces the thickness slider for a widget that stores its own width, beside smoothing.
  * @param {React.ReactNode} [props.detail=null] - Control beside smoothing.
  * @param {React.ReactNode} [props.smoothing=null] - Replaces the simplification slider for a widget that smooths its own way.
  * @returns {JSX.Element} Rendered component output.
@@ -38,7 +38,7 @@ export default function RouteLineSection({
   return (
     <div className="space-y-4">
       <SectionHeading icon={Palette} title={t('widget-editor.lineStyling', 'Line Styling')} />
-      {thickness ?? (
+      {thickness === null ? (
         <SliderField
           editable
           label={t('widget-editor.thickness', 'Thickness')}
@@ -57,8 +57,9 @@ export default function RouteLineSection({
           }
           onSliderCommit={commit}
         />
-      )}
+      ) : null}
       <div className="grid grid-cols-2 gap-4">
+        {thickness}
         {smoothing ?? (
           <SliderField
             editable

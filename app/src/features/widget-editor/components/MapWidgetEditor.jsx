@@ -63,6 +63,17 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
   const buildingsAvailable = mapBuildingsAvailable(data)
   const radiusMax = maxMapCornerRadius(data)
   const commit = () => commitWidgetDraft(widget.id)
+  const msaa = (
+    <SelectField
+      label={t('widget-editor.msaa', 'Anti-aliasing (MSAA)')}
+      value={String(data.msaa_samples)}
+      options={[
+        { value: '4', label: '4x' },
+        { value: '1', label: t('widget-editor.msaaOff', 'Off') },
+      ]}
+      onValueChange={(value) => updateWidgetData(widget.id, { msaa_samples: Number(value) })}
+    />
+  )
 
   return (
     <>
@@ -109,12 +120,15 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
         </div>
         {isChase ? (
           <>
-            <SelectField
-              label={t('widget-editor.orientation', 'Orientation')}
-              value={data.orientation}
-              options={translateOptions(ORIENTATION_OPTIONS, t)}
-              onValueChange={(orientation) => updateWidgetData(widget.id, { orientation })}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <SelectField
+                label={t('widget-editor.orientation', 'Orientation')}
+                value={data.orientation}
+                options={translateOptions(ORIENTATION_OPTIONS, t)}
+                onValueChange={(orientation) => updateWidgetData(widget.id, { orientation })}
+              />
+              {msaa}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <SliderField
                 editable
@@ -143,17 +157,20 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
           </>
         ) : (
           <>
-            <SliderField
-              editable
-              label={t('widget-editor.zoom', 'Zoom')}
-              value={data.fixed_zoom}
-              min={-4}
-              max={8}
-              step={0.1}
-              valueDisplay={zoomOffsetDisplay(data.fixed_zoom)}
-              onSliderChange={(value) => updateWidgetDraft(widget.id, { fixed_zoom: Number(value.toFixed(1)) })}
-              onSliderCommit={commit}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <SliderField
+                editable
+                label={t('widget-editor.zoom', 'Zoom')}
+                value={data.fixed_zoom}
+                min={-4}
+                max={8}
+                step={0.1}
+                valueDisplay={zoomOffsetDisplay(data.fixed_zoom)}
+                onSliderChange={(value) => updateWidgetDraft(widget.id, { fixed_zoom: Number(value.toFixed(1)) })}
+                onSliderCommit={commit}
+              />
+              {msaa}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <SliderField
                 editable
@@ -184,29 +201,22 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
             </div>
           </>
         )}
-        <div className="flex items-center justify-between gap-2 pl-1">
-          <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold" disabled={!buildingsAvailable}>
-            {t('widget-editor.mapBuildings', 'Buildings')}
-          </Label>
-          <ToggleField
-            checked={buildingsAvailable && data.show_buildings}
-            disabled={!buildingsAvailable}
-            onCheckedChange={(show_buildings) => updateWidgetData(widget.id, { show_buildings })}
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center justify-between gap-2 pl-1">
+            <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold" disabled={!buildingsAvailable}>
+              {t('widget-editor.mapBuildings', 'Buildings')}
+            </Label>
+            <ToggleField
+              checked={buildingsAvailable && data.show_buildings}
+              disabled={!buildingsAvailable}
+              onCheckedChange={(show_buildings) => updateWidgetData(widget.id, { show_buildings })}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2 pl-1">
+            <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.mapPaths', 'Paths')}</Label>
+            <ToggleField checked={data.show_paths} onCheckedChange={(show_paths) => updateWidgetData(widget.id, { show_paths })} />
+          </div>
         </div>
-        <div className="flex items-center justify-between gap-2 pl-1">
-          <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.mapPaths', 'Paths')}</Label>
-          <ToggleField checked={data.show_paths} onCheckedChange={(show_paths) => updateWidgetData(widget.id, { show_paths })} />
-        </div>
-        <SelectField
-          label={t('widget-editor.msaa', 'Anti-aliasing (MSAA)')}
-          value={String(data.msaa_samples)}
-          options={[
-            { value: '4', label: '4x' },
-            { value: '1', label: t('widget-editor.msaaOff', 'Off') },
-          ]}
-          onValueChange={(value) => updateWidgetData(widget.id, { msaa_samples: Number(value) })}
-        />
       </div>
 
       <div className="space-y-4">
@@ -252,19 +262,21 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
             onSliderCommit={commit}
           />
         </div>
-        <SliderField
-          editable
-          label={t('widget-editor.borderOpacity', 'Border Opacity')}
-          value={data.border_opacity}
-          min={0}
-          max={1}
-          step={0.05}
-          valueScale={100}
-          valueDisplay={`${Math.round(data.border_opacity * 100)}`}
-          suffix="%"
-          onSliderChange={(border_opacity) => updateWidgetDraft(widget.id, { border_opacity })}
-          onSliderCommit={commit}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <SliderField
+            editable
+            label={t('widget-editor.borderOpacity', 'Border Opacity')}
+            value={data.border_opacity}
+            min={0}
+            max={1}
+            step={0.05}
+            valueScale={100}
+            valueDisplay={`${Math.round(data.border_opacity * 100)}`}
+            suffix="%"
+            onSliderChange={(border_opacity) => updateWidgetDraft(widget.id, { border_opacity })}
+            onSliderCommit={commit}
+          />
+        </div>
       </div>
 
       <RouteLineSection
