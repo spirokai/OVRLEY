@@ -715,6 +715,8 @@ pub struct ResizeRequest {
     pub size: Option<[f32; 2]>,
     /// Heading inspector edits resize the frame to preserve tick lengths.
     pub label_offset: Option<f32>,
+    /// A map's view mode pans and zooms inside its frame.
+    pub map_view: Option<crate::widgets::map::interaction::MapViewGesture>,
     pub fixed: [f32; 2],
     pub point: [f32; 2],
     pub second: f64,
@@ -728,6 +730,7 @@ pub enum ResizeUpdate {
     Elevation(crate::widgets::elevation::interaction::ResizeUpdate),
     Route(crate::widgets::route::interaction::ResizeUpdate),
     Map(crate::widgets::map::interaction::ResizeUpdate),
+    MapView(crate::widgets::map::interaction::MapViewUpdate),
     Raster(crate::widgets::raster::interaction::ResizeUpdate),
     Backdrop(crate::widgets::backdrop::interaction::ResizeUpdate),
     Label(crate::widgets::label::interaction::ResizeUpdate),

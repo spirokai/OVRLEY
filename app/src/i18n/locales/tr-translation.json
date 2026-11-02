@@ -100,6 +100,8 @@
     "getHevcCodec": "HEVC kodeğini edin",
     "hevcVideoCannotBePlayed": "HEVC video oynatılamıyor",
     "installCodecForSystem": "Sisteminiz için doğru paketi yükleyin.",
+    "mapViewHint": "Kaydırmak ve yakınlaştırmak için çift tıklayın",
+    "mapViewZoomHint": "Yakınlaştırmak için çift tıklayın",
     "microsoftStoreHevcCodec": "HEVC kodeğini Microsoft Store'dan edinebilirsiniz.",
     "onUbuntu": "Ubuntu'da:",
     "overlayCanvasReady": "Kaplama tuvali hazır",

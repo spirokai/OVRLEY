@@ -30,15 +30,16 @@ export function getViewportContentSize(sceneSize, videoSyncMode) {
   return videoSyncMode ? { width: sceneSize.width * 2 + VIDEO_SYNC_PREVIEW_SCREEN_GAP, height: sceneSize.height } : sceneSize
 }
 
-/** @param {object|null} widget Primary selection. @param {boolean} isGroupSelection Whether multiple widgets are selected. @returns {object} Resize/rotation handle options. */
-export function getWidgetResizeOptions(widget, isGroupSelection) {
-  if (widget === null) {
-    return { canResizeSelected: false, canRotateSelected: false, maintainAspectRatio: false, showEdgeResizeHandles: false }
+/** @param {object|null} widget Primary selection. @param {boolean} isGroupSelection Whether multiple widgets are selected. @param {boolean} isMapView Whether drag and wheel adjust the selected map's view. @returns {object} Drag/resize/rotation handle options. */
+export function getWidgetResizeOptions(widget, isGroupSelection, isMapView) {
+  if (widget === null || isMapView) {
+    return { canDragSelected: false, canResizeSelected: false, canRotateSelected: false, maintainAspectRatio: false, showEdgeResizeHandles: false }
   }
   if (isGroupSelection) {
-    return { canResizeSelected: true, canRotateSelected: false, maintainAspectRatio: true, showEdgeResizeHandles: false }
+    return { canDragSelected: true, canResizeSelected: true, canRotateSelected: false, maintainAspectRatio: true, showEdgeResizeHandles: false }
   }
   return {
+    canDragSelected: true,
     canResizeSelected: true,
     canRotateSelected: widget.type === 'course' || widget.type === 'raster',
     showEdgeResizeHandles:

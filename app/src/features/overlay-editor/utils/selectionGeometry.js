@@ -91,12 +91,18 @@ export function buildWidgetBadges({
     // fractional coordinates. Shadows do not participate in badge placement.
     const left = geometry.content.left + originX - originX * cos + originY * sin
     const top = geometry.content.top + originY - originX * sin - originY * cos
+    const { width, height } = geometry.content
     badges.push({
       id,
       type: widgetMap[id].type,
       left: left * displayScale + 2 * cos + 20 * sin,
       top: Math.max(top * displayScale + 2 * sin - 20 * cos, 0),
       rotation: (Math.atan2(sin, cos) * 180) / Math.PI,
+      // The middle of the frame's bottom edge, for hints inside the widget.
+      bottomCenter: {
+        left: (left + (width / 2) * cos - height * sin) * displayScale,
+        top: (top + (width / 2) * sin + height * cos) * displayScale,
+      },
     })
   }
   return badges
@@ -110,6 +116,7 @@ export function areWidgetBadgesEqual(previous, next) {
     const right = next[index]
     if (left.id !== right.id || left.type !== right.type || left.left !== right.left || left.top !== right.top) return false
     if (left.rotation !== right.rotation) return false
+    if (left.bottomCenter.left !== right.bottomCenter.left || left.bottomCenter.top !== right.bottomCenter.top) return false
   }
   return true
 }

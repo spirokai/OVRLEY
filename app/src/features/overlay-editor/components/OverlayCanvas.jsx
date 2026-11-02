@@ -20,6 +20,7 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
     widgetRefCallbacks,
     handleCanvasMouseOver,
     handleCanvasMouseLeave,
+    mapViewWidgetId,
   } = state
   const { attach, attachMapLayer, error } = useWasmWidgets({
     widgets,
@@ -62,6 +63,7 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
             attach={attach}
             attachMapLayer={attachMapLayer}
             registerNode={widgetRefCallbacks[widget.id]}
+            isMapView={widget.id === mapViewWidgetId}
             handleWidgetMouseDown={handleWidgetMouseDown}
           />
         ))}

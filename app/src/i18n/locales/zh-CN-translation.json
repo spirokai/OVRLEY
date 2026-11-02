@@ -100,6 +100,8 @@
     "getHevcCodec": "获取 HEVC 编解码器",
     "hevcVideoCannotBePlayed": "无法播放 HEVC 视频",
     "installCodecForSystem": "请为您的系统安装正确的软件包。",
+    "mapViewHint": "双击以平移和缩放",
+    "mapViewZoomHint": "双击以缩放",
     "microsoftStoreHevcCodec": "您可以从 Microsoft Store 获取 HEVC 编解码器。",
     "onUbuntu": "在 Ubuntu 上:",
     "overlayCanvasReady": "叠加层画布已准备就绪",

@@ -112,6 +112,19 @@ impl PreviewSession {
                 )?,
             ));
         }
+        if let Some(gesture) = request.map_view {
+            if request.size.is_some() || request.factor.is_some() {
+                return Err(WidgetError::Config(
+                    "map_view cannot include size or factor".into(),
+                ));
+            }
+            let WidgetRequest::Map { widget, scene, .. } = request.origin else {
+                return Err(WidgetError::Config("map_view requires a map".into()));
+            };
+            return Ok(ResizeUpdate::MapView(
+                crate::widgets::map::interaction::adjust_map_view(widget, scene, gesture)?,
+            ));
+        }
         if let WidgetRequest::Backdrop { widget, scene, .. } = request.origin {
             let size = request
                 .size

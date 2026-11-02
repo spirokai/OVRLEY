@@ -100,6 +100,8 @@
     "getHevcCodec": "Pobierz kodek HEVC",
     "hevcVideoCannotBePlayed": "Nie można odtworzyć wideo HEVC",
     "installCodecForSystem": "Zainstaluj właściwy pakiet dla swojego systemu.",
+    "mapViewHint": "Kliknij dwukrotnie, aby przesuwać i powiększać",
+    "mapViewZoomHint": "Kliknij dwukrotnie, aby powiększać",
     "microsoftStoreHevcCodec": "Kodek HEVC możesz pobrać ze sklepu Microsoft Store.",
     "onUbuntu": "W systemie Ubuntu:",
     "overlayCanvasReady": "Płótno nakładki gotowe",

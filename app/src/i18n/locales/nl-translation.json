@@ -100,6 +100,8 @@
     "getHevcCodec": "HEVC-codec verkrijgen",
     "hevcVideoCannotBePlayed": "HEVC-video kan niet worden afgespeeld",
     "installCodecForSystem": "Installeer het juiste pakket voor uw systeem.",
+    "mapViewHint": "Dubbelklik om te verschuiven en te zoomen",
+    "mapViewZoomHint": "Dubbelklik om te zoomen",
     "microsoftStoreHevcCodec": "U kunt de HEVC-codec verkrijgen in de Microsoft Store.",
     "onUbuntu": "Op Ubuntu:",
     "overlayCanvasReady": "Overlaycanvas gereed",

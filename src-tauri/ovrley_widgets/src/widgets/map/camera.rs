@@ -14,6 +14,13 @@ const FIXED_MARGIN: f64 = 0.08;
 /// It doesn't follow the widget's size, so a side resize crops the map. A corner resize rescales it
 /// through the zoom offset instead.
 const FIXED_FIT_FRAME: f64 = 500.0;
+/// Scene units the route's longest side spans at zoom offset 0.
+const FIXED_ROUTE_SPAN: f64 = FIXED_FIT_FRAME * (1.0 - FIXED_MARGIN * 2.0);
+
+/// Widget units one unit of pan spans at `zoom_offset`: the route's longest side on screen.
+pub(super) fn fixed_route_span(zoom_offset: f64) -> f64 {
+    FIXED_ROUTE_SPAN * zoom_offset.exp2()
+}
 
 /// One widget's camera with its constant parts resolved.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -94,11 +101,10 @@ fn fixed_camera(track: &MapTrack, zoom_offset: f64, pan: [f64; 2]) -> WidgetResu
         min = (min.0.min(point.0), min.1.min(point.1));
         max = (max.0.max(point.0), max.1.max(point.1));
     }
-    let usable = 1.0 - FIXED_MARGIN * 2.0;
     let tile = f64::from(TILE_SIZE);
     let longest = (max.0 - min.0).max(max.1 - min.1);
     // A span of zero fits at any zoom, and the clamp takes it to the deepest one.
-    let zoom = clamp_zoom((FIXED_FIT_FRAME * usable / (longest * tile)).log2() + zoom_offset);
+    let zoom = clamp_zoom((FIXED_ROUTE_SPAN / (longest * tile)).log2() + zoom_offset);
     let (lon, lat) = world_to_lon_lat(
         (min.0 + max.0) / 2.0 - pan[0] * longest,
         (min.1 + max.1) / 2.0 - pan[1] * longest,

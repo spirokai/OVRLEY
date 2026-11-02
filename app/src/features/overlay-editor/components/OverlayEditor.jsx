@@ -38,6 +38,7 @@ function OverlayEditorContent(props) {
     selectionRect,
     videoSyncMarkControls,
     setStageElement,
+    handleSceneDoubleClick,
     handleSceneMouseDown,
     activity,
     previewSecond,
@@ -46,6 +47,7 @@ function OverlayEditorContent(props) {
     handleWidgetMouseDown,
     moveableProps,
     widgetBadges,
+    widgetMap,
   } = editor
   const { displayScale, viewportRef, scrollViewportRef, handleWheel } = viewport
   return (
@@ -86,6 +88,7 @@ function OverlayEditorContent(props) {
           data-testid="overlay-editor-stage"
           className="relative grid min-h-full min-w-full w-max place-items-center overflow-visible p-4"
           onMouseDown={videoSyncMode ? undefined : handleSceneMouseDown}
+          onDoubleClick={videoSyncMode ? undefined : handleSceneDoubleClick}
         >
           <div
             className="relative shrink-0"
@@ -141,6 +144,21 @@ function OverlayEditorContent(props) {
                     </div>
                   )
                 })}
+                {widgetBadges
+                  .filter((badge) => badge.type === 'map')
+                  .map((badge) => (
+                    <div
+                      key={`${badge.id}-view-hint`}
+                      data-map-view-hint={badge.id}
+                      className="absolute -mt-3 flex h-5 -translate-x-1/2 -translate-y-full items-center whitespace-nowrap rounded-xs border border-border/70 bg-card/90 px-2 text-[0.741rem] font-medium leading-none text-muted-foreground shadow-sm"
+                      style={{ left: badge.bottomCenter.left, top: badge.bottomCenter.top }}
+                    >
+                      {/* A chase camera follows the rider, so it only zooms. */}
+                      {widgetMap[badge.id].data.camera_mode === 'fixed'
+                        ? t('overlay-editor.mapViewHint', 'Double-click to pan & zoom')
+                        : t('overlay-editor.mapViewZoomHint', 'Double-click to zoom')}
+                    </div>
+                  ))}
               </div>
             ) : null}
             {videoSyncMode ? (

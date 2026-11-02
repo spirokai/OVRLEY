@@ -100,6 +100,8 @@
     "getHevcCodec": "HEVCコーデックを取得",
     "hevcVideoCannotBePlayed": "HEVC動画を再生できません",
     "installCodecForSystem": "システムに適したパッケージをインストールしてください。",
+    "mapViewHint": "ダブルクリックで移動・ズーム",
+    "mapViewZoomHint": "ダブルクリックでズーム",
     "microsoftStoreHevcCodec": "HEVCコーデックはMicrosoft Storeから入手できます。",
     "onUbuntu": "Ubuntuの場合:",
     "overlayCanvasReady": "オーバーレイキャンバスの準備完了",

@@ -18,7 +18,7 @@ const MIN_FOLLOW_ZOOM: f32 = 14.0;
 pub(super) const FOLLOW_ZOOM_RANGE: RangeInclusive<f32> = MIN_FOLLOW_ZOOM..=MAX_TILE_ZOOM as f32;
 /// Top-down zoom levels around the zoom that fits the whole route.
 pub(super) const FIXED_ZOOM_RANGE: RangeInclusive<f32> = -4.0..=8.0;
-const FIXED_PAN_RANGE: RangeInclusive<f32> = -1.0..=1.0;
+pub(super) const FIXED_PAN_RANGE: RangeInclusive<f32> = -1.0..=1.0;
 /// Metres. The low end looks almost raw, and past the high end a road's own bends start to go.
 const ROUTE_SMOOTHING_RANGE: RangeInclusive<f32> = 1.0..=20.0;
 /// The sample counts every GPU supports, so a project draws the same on any machine.

@@ -100,6 +100,8 @@
     "getHevcCodec": "Obter codec HEVC",
     "hevcVideoCannotBePlayed": "Não é possível reproduzir vídeo HEVC",
     "installCodecForSystem": "Instale o pacote correto para o seu sistema.",
+    "mapViewHint": "Clique duas vezes para mover e dar zoom",
+    "mapViewZoomHint": "Clique duas vezes para dar zoom",
     "microsoftStoreHevcCodec": "Você pode obter o codec HEVC na Microsoft Store.",
     "onUbuntu": "No Ubuntu:",
     "overlayCanvasReady": "Tela da sobreposição pronta",
