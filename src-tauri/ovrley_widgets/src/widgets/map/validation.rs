@@ -15,8 +15,9 @@ use std::ops::RangeInclusive;
 const MAX_PITCH_DEG: f32 = 70.0;
 /// Further out, a follow camera's pitched view takes in too many tiles.
 const MIN_FOLLOW_ZOOM: f32 = 14.0;
+pub(super) const FOLLOW_ZOOM_RANGE: RangeInclusive<f32> = MIN_FOLLOW_ZOOM..=MAX_TILE_ZOOM as f32;
 /// Top-down zoom levels around the zoom that fits the whole route.
-const FIXED_ZOOM_RANGE: RangeInclusive<f32> = -4.0..=8.0;
+pub(super) const FIXED_ZOOM_RANGE: RangeInclusive<f32> = -4.0..=8.0;
 const FIXED_PAN_RANGE: RangeInclusive<f32> = -1.0..=1.0;
 /// Metres. The low end looks almost raw, and past the high end a road's own bends start to go.
 const ROUTE_SMOOTHING_RANGE: RangeInclusive<f32> = 1.0..=20.0;
@@ -111,11 +112,7 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
                 _ => return Err(invalid("orientation", "unsupported orientation")),
             },
             pitch_deg: in_range(map.pitch, "pitch", 0.0..=MAX_PITCH_DEG)?,
-            zoom: in_range(
-                map.follow_zoom,
-                "follow_zoom",
-                MIN_FOLLOW_ZOOM..=f32::from(MAX_TILE_ZOOM),
-            )?,
+            zoom: in_range(map.follow_zoom, "follow_zoom", FOLLOW_ZOOM_RANGE)?,
         },
         _ => return Err(invalid("camera_mode", "unsupported camera mode")),
     };

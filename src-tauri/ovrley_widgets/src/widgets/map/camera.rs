@@ -11,7 +11,8 @@ const FOLLOW_TOP_PADDING: f64 = 0.45;
 /// Empty share of a fixed camera's frame on each side of the route.
 const FIXED_MARGIN: f64 = 0.08;
 /// The frame a fixed camera fits the route into at zoom offset 0, in scene units: the default widget's.
-/// It doesn't follow the widget's size, so resizing crops the map instead of rescaling it.
+/// It doesn't follow the widget's size, so a side resize crops the map. A corner resize rescales it
+/// through the zoom offset instead.
 const FIXED_FIT_FRAME: f64 = 500.0;
 
 /// One widget's camera with its constant parts resolved.
