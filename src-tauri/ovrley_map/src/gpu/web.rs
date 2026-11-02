@@ -23,16 +23,6 @@ use std::mem::size_of;
 /// Decoded layer kinds from here up are fill patterns, by image.
 const FILL_PATTERN_KINDS: u32 = 3;
 
-/// Renderer names of software WebGL. wgpu reports these adapters as `Other`, so a name is all there
-/// is. A map drawn on the CPU would slow every other widget and show what export refuses to draw.
-const SOFTWARE_RENDERERS: [&str; 5] = [
-    "basic render",
-    "swiftshader",
-    "llvmpipe",
-    "softpipe",
-    "software",
-];
-
 pub(crate) struct Output {
     surface: wgpu::Surface<'static>,
     surface_config: wgpu::SurfaceConfiguration,
@@ -41,8 +31,8 @@ pub(crate) struct Output {
 }
 
 impl GpuMapRenderer {
-    /// Opens WebGL2 on `canvas`. Fails without a hardware GPU or WebGL2, which leaves the widget's
-    /// placeholder showing. Other widgets are untouched.
+    /// Opens WebGL2 on `canvas`. Fails without WebGL2, which leaves the widget's placeholder showing.
+    /// Other widgets are untouched. Software WebGL2 draws the same map, only slower.
     pub async fn for_canvas(
         config: GpuMapConfig,
         style: &[u8],
@@ -71,13 +61,6 @@ impl GpuMapRenderer {
             .await
             .map_err(|error| format!("No WebGL2 adapter for the map: {error}"))?;
         let info = adapter.get_info();
-        let name = info.name.to_lowercase();
-        if SOFTWARE_RENDERERS.iter().any(|software| name.contains(software)) {
-            return Err(format!(
-                "The map preview needs a GPU; WebGL2 is software: {}",
-                info.name
-            ));
-        }
         let adapter_name = format!("{} ({:?}, {:?})", info.name, info.backend, info.device_type);
         let limits = adapter.limits();
         check_pool_sizes(config.pools, limits.max_buffer_size, &adapter_name)?;

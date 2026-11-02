@@ -16,7 +16,7 @@ function probe() {
 }
 
 /**
- * Export draws maps natively and needs a GPU, so anything but `hardware` means it cannot draw them.
+ * Without a GPU, preview and export both draw the map in software, only slower.
  * @returns {'hardware'|'software'|'unavailable'} How this webview draws WebGL2.
  */
 export function getWebGl2Support() {

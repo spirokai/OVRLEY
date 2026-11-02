@@ -164,9 +164,9 @@ pub struct GpuMapRenderer {
 }
 
 impl GpuMapRenderer {
-    /// Opens a GPU device and reads the style. Fails loudly on invalid configuration, without a
-    /// real GPU, or when the device cannot hold the pools. Software adapters are refused: nothing
-    /// has measured them, and a map frame costs far more on them than an export should wait for.
+    /// Opens a GPU device and reads the style. Fails loudly on invalid configuration, without any
+    /// adapter, or when the device cannot hold the pools. Without a GPU, a software rasterizer draws
+    /// the same map, only far slower: WARP on Windows, lavapipe on Linux when Mesa provides it.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn new(config: GpuMapConfig, source: &dyn MapDataSource) -> Result<Self, String> {
         validate_config(&config)?;
@@ -180,18 +180,19 @@ impl GpuMapRenderer {
 
         let instance =
             wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            ..Default::default()
-        }))
-        .map_err(|error| format!("No GPU adapter for the map renderer: {error}"))?;
+        let request = |force_fallback_adapter| {
+            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                force_fallback_adapter,
+                ..Default::default()
+            }))
+        };
+        // A GPU when there is one. Some backends only offer their software rasterizer when asked.
+        let adapter = request(false)
+            .or_else(|_| request(true))
+            .map_err(|error| format!("No adapter for the map renderer: {error}"))?;
         let info = adapter.get_info();
         let adapter_name = format!("{} ({:?}, {:?})", info.name, info.backend, info.device_type);
-        if info.device_type == wgpu::DeviceType::Cpu {
-            return Err(format!(
-                "The map renderer needs a GPU; the only adapter is software: {adapter_name}"
-            ));
-        }
         let max_buffer_size = adapter.limits().max_buffer_size;
         check_pool_sizes(config.pools, max_buffer_size, &adapter_name)?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
