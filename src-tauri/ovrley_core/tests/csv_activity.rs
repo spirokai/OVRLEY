@@ -155,7 +155,9 @@ fn racebox_reader_produces_canonical_activity_columns() {
             (Some(34.4889018), Some(-80.5974241)),
         ]
     );
-    assert_eq!(activity.elevation, vec![Some(147.8), Some(147.9)]);
+    assert_eq!(activity.elevation.len(), 2);
+    assert_altitude_close(activity.elevation[0], 147.8);
+    assert_altitude_close(activity.elevation[1], 147.9);
     assert_eq!(activity.speed, vec![Some(1.5166666666666666), Some(2.0)]);
 }
 
@@ -600,7 +602,7 @@ fn racebox_fixture_imports_through_the_path_entry_point() {
         Some(&(Some(34.4889022), Some(-80.5974243)))
     );
     assert_eq!(activity.speed.first(), Some(&Some(1.5166666666666666)));
-    assert_eq!(activity.elevation.first(), Some(&Some(147.8)));
+    assert_altitude_close(activity.elevation[0], 147.8);
     let closing_lap_index = activity
         .sample_elapsed_seconds
         .iter()
@@ -904,20 +906,20 @@ fn trackaddict_aim_lap_legend_and_racebox_fixtures_import_existing_metrics() {
 
     let trackaddict = parse_fixture("Amozoc - TrackAddict.csv");
     assert_close(trackaddict.speed[0], 24.9 / 3.6);
-    assert_close(trackaddict.elevation[0], 2297.6);
+    assert_altitude_close(trackaddict.elevation[0], 2297.6);
     assert_close(trackaddict.barometric_altitude[0], 0.0);
     assert_close(trackaddict.heading[0], 213.8);
     assert!(trackaddict.sync_time.is_some());
 
     let aim = parse_fixture("sample AiM.csv");
     assert_close(aim.speed[0], 0.01);
-    assert_close(aim.elevation[0], 122.8322);
+    assert_altitude_close(aim.elevation[0], 122.8322);
     assert_close(aim.distance[0], 0.0);
     assert_eq!(aim.gear_position[0].as_deref(), Some("0"));
 
     let lap_legend = parse_fixture("sample LapLegend.csv");
     assert_close(lap_legend.speed[0], 16.0 / 3.6);
-    assert_close(lap_legend.elevation[0], 1482.9);
+    assert_altitude_close(lap_legend.elevation[0], 1482.9);
     assert_close(lap_legend.heading[0], 170.6);
     assert_close(lap_legend.distance[0], 0.0);
     assert_close(lap_legend.g_force[0], 0.14);
@@ -962,7 +964,7 @@ fn racechrono_v1_and_v2_fixtures_import_with_strict_rebased_timelines() {
     let racechrono = parse_fixture("sample RaceChrono.csv");
     assert_eq!(racechrono.course[0], (Some(32.0854405), Some(-81.0744080)));
     assert_close(racechrono.speed[0], 0.0);
-    assert_close(racechrono.elevation[0], 8.962);
+    assert_altitude_close(racechrono.elevation[0], 8.962);
     assert_close(racechrono.heading[0], 81.941);
     assert_close(racechrono.rpm[0], 747.0);
     assert_close(racechrono.throttle_position[0], 15.3);
@@ -976,14 +978,20 @@ fn racechrono_v1_and_v2_fixtures_import_with_strict_rebased_timelines() {
     let v1 = parse_fixture("session_20260713_185859_v1.csv");
     assert_eq!(v1.course[0], (Some(47.3820367), Some(18.2202700)));
     assert_close(v1.speed[0], 0.81);
-    assert_close(v1.elevation[0], 225.10);
+    assert_altitude_close(v1.elevation[0], 225.10);
     assert_close(v1.heading[0], 223.21);
     assert!(v1.rpm.is_empty());
     assert!(v1.throttle_position.is_empty());
 
     assert_eq!(v2.course[0], (Some(47.3820034), Some(18.2202550)));
     assert_close(v2.speed[0], 0.975);
-    assert_close(v2.elevation[0], 219.611);
+    // The file climbs from 219.611 m to 222.35 m in its first 0.5 s, which the 1 s altitude
+    // smoothing averages into its first sample.
+    assert!(
+        v2.elevation[0].is_some_and(|altitude| (219.611..=222.35).contains(&altitude)),
+        "{:?}",
+        v2.elevation[0]
+    );
     assert_close(v2.heading[0], 246.450);
     assert_close(v2.g_force_x[0], 0.02173085923890625);
     assert_close(v2.g_force_y[0], 0.9001238351501731);
@@ -1123,6 +1131,16 @@ fn assert_close(actual: Option<f64>, expected: f64) {
     assert!(
         (actual - expected).abs() < 1e-9,
         "expected {expected}, got {actual}"
+    );
+}
+
+/// The finalizer smooths every source's altitude over 1 s, so an imported altitude
+/// reads within a fraction of a metre of the file's value.
+fn assert_altitude_close(actual: Option<f64>, expected: f64) {
+    let actual = actual.expect("expected an altitude value");
+    assert!(
+        (actual - expected).abs() < 0.1,
+        "expected altitude near {expected}, got {actual}"
     );
 }
 
