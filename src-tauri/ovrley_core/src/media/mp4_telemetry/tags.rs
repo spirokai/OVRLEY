@@ -68,6 +68,19 @@ pub(crate) fn extract_tag_u32x2_rational(map: &TagMap, id: &TagId) -> Option<f64
     }
 }
 
+/// Reads a `u32x2` (numerator, denominator) fraction, the shape of
+/// telemetry-parser's `ShutterSpeed` in seconds.
+pub(crate) fn extract_tag_u32x2_fraction(map: &TagMap, id: &TagId) -> Option<f64> {
+    let tag = map.get(id)?;
+    match &tag.value {
+        TagValue::u32x2(value) => {
+            let (numerator, denominator) = *value.get();
+            (denominator != 0).then(|| numerator as f64 / denominator as f64)
+        }
+        _ => None,
+    }
+}
+
 /// Reads integer vector companion tags such as GPMF `SCAL`.
 pub(crate) fn extract_tag_i32_vec<'a>(map: &'a TagMap, id: &TagId) -> Option<&'a [i32]> {
     let tag = map.get(id)?;
