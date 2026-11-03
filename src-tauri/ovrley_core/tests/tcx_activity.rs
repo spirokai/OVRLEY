@@ -1,4 +1,4 @@
-use ovrley_core::activity::tcx::parse_tcx_activity_reader;
+use ovrley_core::activity::parsers::tcx::parse_tcx_activity_reader;
 
 #[test]
 fn tcx_trackpoints_finalize_into_existing_activity_fields() {

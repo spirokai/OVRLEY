@@ -35,8 +35,8 @@ use crate::media::time::{
 
 use super::tags::{
     extract_f32_vec_all, extract_tag_f64, extract_tag_i32_vec, extract_tag_string,
-    extract_tag_u32x2_rational, extract_tag_u64, extract_u16_vec_all, gps5_fix_is_usable,
-    GOPRO_GPSU_TAG,
+    extract_tag_u32x2_fraction, extract_tag_u32x2_rational, extract_tag_u64, extract_u16_vec_all,
+    gps5_fix_is_usable, GOPRO_GPSU_TAG,
 };
 use super::vendor::{
     extract_camera_from_json_metadata, extract_insta360_ev, extract_insta360_iso,
@@ -398,6 +398,7 @@ pub(crate) fn append_camera_samples(
 
     let mut shutter_speed = if let Some(exposure) = tag_map.get(&GroupId::Exposure) {
         extract_tag_f64(exposure, &TagId::ShutterSpeed)
+            .or_else(|| extract_tag_u32x2_fraction(exposure, &TagId::ShutterSpeed))
             .or_else(|| extract_tag_f64(exposure, &TagId::ExposureTime))
             .map(|v| vec![v])
     } else {

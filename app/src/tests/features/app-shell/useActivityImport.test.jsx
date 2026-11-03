@@ -1,21 +1,18 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 
-const importActivityFile = vi.hoisted(() => vi.fn())
 const importActivityPath = vi.hoisted(() => vi.fn())
 const parseActivityPath = vi.hoisted(() => vi.fn())
 const openSinglePath = vi.hoisted(() => vi.fn())
 const setErrorMessage = vi.hoisted(() => vi.fn())
 const setProcessing = vi.hoisted(() => vi.fn())
 
-vi.mock('@/api/backend', () => ({ hasTauriRuntime: () => true }))
 vi.mock('@/hooks/useAppStoreSelectors', () => ({
   useActivityStore: () => ({ activityFilename: null, setErrorMessage, setProcessing }),
 }))
-vi.mock('@/lib/activity/import-activity', () => ({ default: importActivityFile, importActivityPath, parseActivityPath }))
+vi.mock('@/lib/import-activity', () => ({ importActivityPath, parseActivityPath }))
 vi.mock('@/lib/file-dialog', () => ({
   openSinglePath,
-  selectBrowserFile: vi.fn(),
 }))
 vi.mock('@/store/useStore', () => ({
   default: {
@@ -40,10 +37,9 @@ describe('useActivityImport native picker boundary', () => {
     await act(() => result.current.handleActivityFileOpen())
 
     expect(importActivityPath.mock.calls[0][0]).toBe('C:\\activities\\sample Racebox.csv')
-    expect(importActivityFile).not.toHaveBeenCalled()
   })
 
-  test('routes browser-parsed native paths through the canonical native activity loader', async () => {
+  test('routes a selected GPX path through the canonical native activity loader', async () => {
     openSinglePath.mockResolvedValue('C:\\activities\\activity.gpx')
     const { default: useActivityImport } = await import('@/features/app-shell/hooks/useActivityImport')
     const { result } = renderHook(() => useActivityImport())
@@ -51,7 +47,6 @@ describe('useActivityImport native picker boundary', () => {
     await act(() => result.current.handleActivityFileOpen())
 
     expect(importActivityPath).toHaveBeenCalledWith('C:\\activities\\activity.gpx', {})
-    expect(importActivityFile).not.toHaveBeenCalled()
   })
 
   test('passes a selected VBO path directly to the native activity importer', async () => {
@@ -62,7 +57,6 @@ describe('useActivityImport native picker boundary', () => {
     await act(() => result.current.handleActivityFileOpen())
 
     expect(importActivityPath.mock.calls[0][0]).toBe('C:\\activities\\session.vbo')
-    expect(importActivityFile).not.toHaveBeenCalled()
   })
 
   test('offers TCX in the native picker and imports its selected path', async () => {
@@ -94,6 +88,5 @@ describe('useActivityImport native picker boundary', () => {
     await act(() => result.current.handleActivityFilesDrop(['C:\\activities\\session.vbo']))
 
     expect(importActivityPath.mock.calls[0][0]).toBe('C:\\activities\\session.vbo')
-    expect(importActivityFile).not.toHaveBeenCalled()
   })
 })

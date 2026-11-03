@@ -2,7 +2,7 @@ import { clamp } from '@/lib/utils'
 import { clampToView } from '@/features/player/utils/timelineViewport'
 import { getTimelineMinimum } from '@/features/player/utils/playerTiming'
 import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlice'
-import { activateParsedActivity } from '@/lib/activity/import-activity'
+import { activateParsedActivity } from '@/lib/import-activity'
 
 // Laps belong to the activity file; one loaded as absent takes its lap selection with it.
 function resolveDisabledLaps(disabledLaps, { parsedActivity, parsedActivitySource }) {

@@ -178,16 +178,21 @@ fn finalizes_raw_activity_axis_g_force_and_lean_angle_samples() {
 
 #[test]
 fn finalizes_raw_activity_with_default_derived_speed_smoothing_when_map_is_empty() {
+    // A stepped 8 m/s climb over 4 s: distance and altitude advance every other 0.25 s sample.
+    let raw_samples: Vec<_> = (0..17)
+        .map(|index| {
+            let step = (index / 2) as f64;
+            serde_json::json!({
+                "elapsed_seconds": index as f64 * 0.25,
+                "distance": step * 10.0,
+                "elevation": 100.0 + step * 4.0,
+            })
+        })
+        .collect();
     let raw_activity = serde_json::json!({
         "file_name": "raw-no-smoothing.srt",
         "file_format": "srt",
-        "raw_samples": [
-            { "elapsed_seconds": 0.0, "distance": 0.0, "elevation": 100.0 },
-            { "elapsed_seconds": 0.25, "distance": 0.0, "elevation": 100.0 },
-            { "elapsed_seconds": 0.5, "distance": 10.0, "elevation": 104.0 },
-            { "elapsed_seconds": 0.75, "distance": 10.0, "elevation": 104.0 },
-            { "elapsed_seconds": 1.0, "distance": 20.0, "elevation": 108.0 }
-        ],
+        "raw_samples": raw_samples,
         "options": {
             "skip_idle_gap_fill": true,
             "smoothing": {}
@@ -200,10 +205,14 @@ fn finalizes_raw_activity_with_default_derived_speed_smoothing_when_map_is_empty
 
     assert_eq!(activity.speed[0], None);
     assert!(activity.speed.iter().flatten().all(|speed| *speed > 0.0 && *speed < 40.0));
-    // Stepped altitude differentiates into alternating 0/16 m/s; default smoothing recovers the 8 m/s climb.
-    assert_eq!(
-        activity.vertical_speed,
-        vec![None, Some(8.0), Some(8.0), Some(8.0), Some(8.0)]
+    // Stepped altitude differentiates into alternating 0/16 m/s. More than 1 s from either end,
+    // where the smoothing windows are cut short, it reads as the 8 m/s climb.
+    assert!(
+        activity.vertical_speed[5..12]
+            .iter()
+            .all(|rate| rate.is_some_and(|rate| (rate - 8.0).abs() < 0.5)),
+        "{:?}",
+        activity.vertical_speed
     );
 }
 

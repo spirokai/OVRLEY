@@ -54,18 +54,6 @@ pub fn backend_current_os() -> Value {
     })
 }
 
-/// Finalizes frontend-extracted raw activity samples into the canonical payload.
-///
-/// The core command owns JSON serialization at the framework-agnostic boundary
-/// so the Tauri layer can stay a thin string-in/string-out adapter while tests
-/// exercise the same backend finalization path.
-pub fn backend_finalize_activity(
-    paths: &AppPaths,
-    raw_activity_json: &str,
-) -> CoreResult<FinalizeActivityResponse> {
-    crate::activity::finalize::finalize_raw_activity_json(raw_activity_json, Some(&paths.repo_root))
-}
-
 /// Parses and finalizes a native CSV activity without a frontend RawActivity hop.
 pub fn backend_parse_csv_activity(
     paths: &AppPaths,
@@ -90,8 +78,62 @@ pub fn backend_parse_tcx_activity(
     paths: &AppPaths,
     path: &str,
 ) -> CoreResult<FinalizeActivityResponse> {
-    let mut response =
-        crate::activity::tcx::parse_tcx_activity_path(Path::new(path), Some(&paths.repo_root))?;
+    let mut response = crate::activity::parsers::tcx::parse_tcx_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
+/// Parses and finalizes a native FIT activity through the shared raw-sample pipeline.
+pub fn backend_parse_fit_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response = crate::activity::parsers::fit::parse_fit_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
+/// Parses and finalizes a native GPX activity through the shared raw-sample pipeline.
+pub fn backend_parse_gpx_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response = crate::activity::parsers::gpx::parse_gpx_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
+/// Parses and finalizes a native IGC flight log through the shared raw-sample pipeline.
+pub fn backend_parse_igc_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response = crate::activity::parsers::igc::parse_igc_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
+/// Parses and finalizes a native DJI SRT file through the shared raw-sample pipeline.
+pub fn backend_parse_srt_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response = crate::activity::parsers::srt::parse_srt_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?;
     response.debug_payload = None;
     Ok(response)
 }
@@ -101,8 +143,10 @@ pub fn backend_parse_uddf_activity(
     paths: &AppPaths,
     path: &str,
 ) -> CoreResult<FinalizeActivityResponse> {
-    let mut response =
-        crate::activity::uddf::parse_uddf_activity_path(Path::new(path), Some(&paths.repo_root))?;
+    let mut response = crate::activity::parsers::uddf::parse_uddf_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?;
     response.debug_payload = None;
     Ok(response)
 }
@@ -112,7 +156,7 @@ pub fn backend_parse_subsurface_activity(
     paths: &AppPaths,
     path: &str,
 ) -> CoreResult<FinalizeActivityResponse> {
-    let mut response = crate::activity::subsurface::parse_subsurface_activity_path(
+    let mut response = crate::activity::parsers::subsurface::parse_subsurface_activity_path(
         Path::new(path),
         Some(&paths.repo_root),
     )?;

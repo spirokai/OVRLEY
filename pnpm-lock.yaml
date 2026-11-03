@@ -155,15 +155,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
-      fit-file-parser:
-        specifier: ^6.2.2
-        version: 6.2.2
       i18next:
         specifier: ^26.4.1
         version: 26.4.1
-      igc-parser:
-        specifier: git+https://github.com/Turbo87/igc-parser.git#29672f82c87b93cc2c44b567421a97c05383ea4c
-        version: https://codeload.github.com/Turbo87/igc-parser/tar.gz/29672f82c87b93cc2c44b567421a97c05383ea4c
       immer:
         specifier: ^11.1.4
         version: 11.1.4
@@ -2485,9 +2479,6 @@ packages:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
 
-  base64-js@1.5.1:
-    resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
-
   baseline-browser-mapping@2.11.29:
     resolution: {integrity: sha512-YeesxhUmR4h5y5V8KF8iBCqJb8YFrBJ++XBTeGcWIaQOYXGN19JM0FoiOjAhwuDoln8owMgXcWBmgHtYSkky2w==}
     engines: {node: '>=6.0.0'}
@@ -2517,9 +2508,6 @@ packages:
     resolution: {integrity: sha512-1R4kiYKXGViqEN0CnoDrXc1StD9niAwu+j2dukWzrD4bJgsD4lDmEp0CRbc6E/vYJIfTHwPmwyaKtVSudICdPA==}
     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
     hasBin: true
-
-  buffer@6.0.3:
-    resolution: {integrity: sha512-FTiCpNxtwiZZHEZbcbTIcZjERVICn9yq/pDFkTl95/AxzD1naBctN7YO68riM/gLSDY7sdrMby8hofADYuuqOA==}
 
   call-bind-apply-helpers@1.0.2:
     resolution: {integrity: sha512-Sp1ablJ0ivDkSzjcaJdxEunN5/XvksFJ2sMBFfq6x0ryhQV/2b/KwFe21cMpmHtPOSij8K99/wSfoEuTObmuMQ==}
@@ -2964,19 +2952,12 @@ packages:
     resolution: {integrity: sha512-2kCCtc+JvcZ86IGAz3Z2Y0A1baIz9fL31pH/0S1IqZr9Iwnjq8izfPtrCyQKO6TLMPELLsQMre7VDqeIKCsHkA==}
     engines: {node: '>=18'}
 
-  fit-file-parser@6.2.2:
-    resolution: {integrity: sha512-L+IWg/coQ9X2BNxdXALwPCDlwkoIiCc1RaPyL95fO7hDAteN6sz5tKhkUMaRscQ0PV9wZcFTdZMSmrV4LQ51ww==}
-
   flat-cache@4.0.1:
     resolution: {integrity: sha512-f7ccFPK3SXFHpx15UIGyRJ/FJQctuKZ0zVuN3frBo4HnK3cay9VEW0R6yPYFHC0AgqhukPzKjq22t5DmAyqGyw==}
     engines: {node: '>=16'}
 
   flatted@3.4.4:
     resolution: {integrity: sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q==}
-
-  flight-recorder-manufacturers@2.0.0:
-    resolution: {integrity: sha512-FhSY7XslPkhYGdBBVRLLExoKqiLWbKuxPEx3O3a443hp8VOrcvE+ibibigVplQbaNipVG3pSPTZPTFJPIfcO8Q==}
-    engines: {node: '>=12'}
 
   flru@1.0.2:
     resolution: {integrity: sha512-kWyh8ADvHBFz6ua5xYOPnUroZTT/bwWfrCeL0Wj1dzG4/YOmOcfJ99W8dOVyyynJN35rZ9aCOtHChqQovV7yog==}
@@ -3173,14 +3154,6 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
-
-  ieee754@1.2.1:
-    resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
-
-  igc-parser@https://codeload.github.com/Turbo87/igc-parser/tar.gz/29672f82c87b93cc2c44b567421a97c05383ea4c:
-    resolution: {tarball: https://codeload.github.com/Turbo87/igc-parser/tar.gz/29672f82c87b93cc2c44b567421a97c05383ea4c}
-    version: 2.0.0
-    engines: {node: '>=12'}
 
   ignore@5.3.2:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
@@ -6956,8 +6929,6 @@ snapshots:
 
   balanced-match@4.0.4: {}
 
-  base64-js@1.5.1: {}
-
   baseline-browser-mapping@2.11.29: {}
 
   before-after-hook@4.0.0: {}
@@ -6987,11 +6958,6 @@ snapshots:
       electron-to-chromium: 1.5.458
       node-releases: 2.0.59
       update-browserslist-db: 1.3.4(browserslist@4.29.3)
-
-  buffer@6.0.3:
-    dependencies:
-      base64-js: 1.5.1
-      ieee754: 1.2.1
 
   call-bind-apply-helpers@1.0.2:
     dependencies:
@@ -7571,18 +7537,12 @@ snapshots:
       semver-regex: 4.0.5
       super-regex: 1.1.0
 
-  fit-file-parser@6.2.2:
-    dependencies:
-      buffer: 6.0.3
-
   flat-cache@4.0.1:
     dependencies:
       flatted: 3.4.4
       keyv: 4.5.4
 
   flatted@3.4.4: {}
-
-  flight-recorder-manufacturers@2.0.0: {}
 
   flru@1.0.2: {}
 
@@ -7767,12 +7727,6 @@ snapshots:
   human-signals@8.0.1: {}
 
   i18next@26.4.1: {}
-
-  ieee754@1.2.1: {}
-
-  igc-parser@https://codeload.github.com/Turbo87/igc-parser/tar.gz/29672f82c87b93cc2c44b567421a97c05383ea4c:
-    dependencies:
-      flight-recorder-manufacturers: 2.0.0
 
   ignore@5.3.2: {}
 

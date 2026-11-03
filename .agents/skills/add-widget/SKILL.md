@@ -65,8 +65,8 @@ referenced icons and translations exist.
 
 ## 3. Supply values
 
-For new extraction, update the relevant parser: frontend `lib/activity/{fit,gpx}-parser.js`,
-core `activity/{csv,vbo}/`, or `media/mp4_telemetry/`. Emit canonical source units. Implement
+For new extraction, update the relevant parser: core `activity/parsers/`,
+`activity/{csv,vbo}/`, or `media/mp4_telemetry/`. Emit canonical source units. Implement
 new derivation formulas/source precedence in `ovrley_core/src/activity/finalize/metrics.rs`.
 
 Cargo generates `MetricKind`, `ActivitySeries`, numeric fields, and input operations from

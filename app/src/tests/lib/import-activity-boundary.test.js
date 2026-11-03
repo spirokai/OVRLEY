@@ -1,29 +1,27 @@
-import { readFile } from 'node:fs/promises'
-import path from 'node:path'
-
 import { describe, expect, test, vi, beforeEach } from 'vite-plus/test'
 
-const finalizeActivity = vi.hoisted(() => vi.fn())
 const parseCsvActivity = vi.hoisted(() => vi.fn())
 const parseVboActivity = vi.hoisted(() => vi.fn())
 const parseTcxActivity = vi.hoisted(() => vi.fn())
+const parseFitActivity = vi.hoisted(() => vi.fn())
+const parseGpxActivity = vi.hoisted(() => vi.fn())
+const parseIgcActivity = vi.hoisted(() => vi.fn())
+const parseSrtActivity = vi.hoisted(() => vi.fn())
 const parseUddfActivity = vi.hoisted(() => vi.fn())
 const parseSubsurfaceActivity = vi.hoisted(() => vi.fn())
 
 vi.mock('@/api/backend', () => ({
-  finalizeActivity,
   parseCsvActivity,
   parseVboActivity,
   parseTcxActivity,
+  parseFitActivity,
+  parseGpxActivity,
+  parseIgcActivity,
+  parseSrtActivity,
   parseUddfActivity,
   parseSubsurfaceActivity,
-  writeParseDebugFile: vi.fn().mockResolvedValue('debug-path.json'),
   openVideo: vi.fn(),
 }))
-
-const fixtureDir = path.resolve('../src-tauri/ovrley_core/tests/fixtures/activity')
-const minimalGpx = '<gpx><trk><trkseg><trkpt lat="47.1" lon="8.1"><ele>500</ele><time>2026-01-01T00:00:00Z</time></trkpt></trkseg></trk></gpx>'
-const minimalSrt = ['1', '00:00:01,000 --> 00:00:01,033', '2025-07-23 10:21:40.000', '[latitude: 47.1] [longitude: 8.1]', ''].join('\n')
 
 function storeActions() {
   return {
@@ -40,19 +38,15 @@ function storeActions() {
 describe('import-activity store boundary', () => {
   beforeEach(() => {
     vi.resetModules()
-    finalizeActivity.mockReset()
     parseCsvActivity.mockReset()
     parseVboActivity.mockReset()
     parseTcxActivity.mockReset()
+    parseFitActivity.mockReset()
+    parseGpxActivity.mockReset()
+    parseIgcActivity.mockReset()
+    parseSrtActivity.mockReset()
     parseUddfActivity.mockReset()
     parseSubsurfaceActivity.mockReset()
-    finalizeActivity.mockResolvedValue({
-      parsed_activity: {
-        metadata: {
-          duration_seconds: 0,
-        },
-      },
-    })
     parseCsvActivity.mockResolvedValue({
       parsed_activity: {
         metadata: {
@@ -69,68 +63,58 @@ describe('import-activity store boundary', () => {
     })
   })
 
-  test('saveFile is callable with optional store actions parameter', async () => {
-    const { default: saveFile } = await import('@/lib/activity/import-activity')
-    expect(typeof saveFile).toBe('function')
-    expect(saveFile.length).toBe(2) // fileOrPath + optional storeActions
+  test('imports a native FIT path and activates the Rust-finalized activity', async () => {
+    const { importActivityPath } = await import('@/lib/import-activity')
+    const store = storeActions()
+    const parsedActivity = { metadata: { duration_seconds: 5 } }
+    parseFitActivity.mockResolvedValue({ parsed_activity: parsedActivity })
+
+    await importActivityPath('C:\\activities\\ride.FIT', store)
+
+    expect(parseFitActivity).toHaveBeenCalledWith('C:\\activities\\ride.FIT')
+    expect(store.activateActivityFile).toHaveBeenCalledWith(parsedActivity)
+    expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\ride.FIT' })
   })
 
-  test('imports IGC files through the shared finalizer boundary', async () => {
-    const { default: saveFile } = await import('@/lib/activity/import-activity')
-    const text = await readFile(path.join(fixtureDir, '654G6NG1.IGC'), 'utf8')
-    const file = new File([text], '654G6NG1.IGC')
+  test('rejects a path without a native parser', async () => {
+    const { parseActivityPath } = await import('@/lib/import-activity')
+
+    await expect(parseActivityPath('C:\\activities\\notes.txt')).rejects.toThrow('Unsupported activity file format: notes.txt')
+  })
+
+  test('imports a native IGC path and activates the Rust-finalized activity', async () => {
+    const { importActivityPath } = await import('@/lib/import-activity')
+    const store = storeActions()
+    const parsedActivity = { metadata: { duration_seconds: 5 } }
+    parseIgcActivity.mockResolvedValue({ parsed_activity: parsedActivity })
+
+    await importActivityPath('C:\\activities\\flight.IGC', store)
+
+    expect(parseIgcActivity).toHaveBeenCalledWith('C:\\activities\\flight.IGC')
+    expect(store.activateActivityFile).toHaveBeenCalledWith(parsedActivity)
+    expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\flight.IGC' })
+  })
+
+  test('imports a native SRT path and activates the Rust-finalized activity', async () => {
+    const { importActivityPath } = await import('@/lib/import-activity')
+    const store = storeActions()
+    const parsedActivity = { metadata: { duration_seconds: 5 } }
+    parseSrtActivity.mockResolvedValue({ parsed_activity: parsedActivity })
+
+    await importActivityPath('C:\\activities\\flight.SRT', store)
+
+    expect(parseSrtActivity).toHaveBeenCalledWith('C:\\activities\\flight.SRT')
+    expect(store.activateActivityFile).toHaveBeenCalledWith(parsedActivity)
+    expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\flight.SRT' })
+  })
+
+  test('imports a native CSV path through its Rust parser', async () => {
+    const { importActivityPath } = await import('@/lib/import-activity')
     const store = storeActions()
 
-    await saveFile(file, store)
-
-    expect(finalizeActivity).toHaveBeenCalledTimes(1)
-    const rawActivity = finalizeActivity.mock.calls[0][0]
-    expect(rawActivity.file_name).toBe('654G6NG1.IGC')
-    expect(rawActivity.file_format).toBe('igc')
-    expect(rawActivity.raw_samples.length).toBeGreaterThan(0)
-    expect(parseCsvActivity).not.toHaveBeenCalled()
-    expect(store.setActivitySource).toHaveBeenCalledWith(null)
-    expect(store.activateActivityFile).toHaveBeenCalledWith({
-      metadata: {
-        duration_seconds: 0,
-      },
-    })
-  })
-
-  test.each([
-    ['gpx', async () => new File([minimalGpx], 'activity.gpx')],
-    ['fit', async () => new File([await readFile(path.join(fixtureDir, 'test-ride.fit'))], 'activity.fit')],
-    ['srt', async () => new File([minimalSrt], 'activity.srt')],
-  ])('keeps %s imports on the existing RawActivity finalizer route', async (format, createFile) => {
-    const { default: saveFile } = await import('@/lib/activity/import-activity')
-
-    await saveFile(await createFile(), storeActions())
-
-    expect(finalizeActivity.mock.calls[0][0].file_format).toBe(format)
-    expect(parseCsvActivity).not.toHaveBeenCalled()
-  })
-
-  test('passes FIT lap boundaries to the shared finalizer', async () => {
-    const { parseActivityFile } = await import('@/lib/activity/import-activity')
-    const bytes = await readFile(path.join(fixtureDir, 'test-ride.fit'))
-
-    await parseActivityFile(new File([bytes], 'laps.fit'))
-
-    expect(finalizeActivity).toHaveBeenCalledTimes(1)
-    const rawActivity = finalizeActivity.mock.calls[0][0]
-    expect(rawActivity.sync_time).toBe('2026-05-02T17:00:18.000Z')
-    expect(rawActivity.lap_markers.BeaconMarkers).toHaveLength(15)
-    expect(rawActivity.lap_markers.BeaconMarkers.slice(0, 3)).toEqual([0, 1248, 1298])
-  })
-
-  test('imports a native CSV path without creating a browser File or finalizing RawActivity', async () => {
-    const { importCsvActivityPath } = await import('@/lib/activity/import-activity')
-    const store = storeActions()
-
-    await importCsvActivityPath('C:\\activities\\sample Racebox.csv', store)
+    await importActivityPath('C:\\activities\\sample Racebox.csv', store)
 
     expect(parseCsvActivity).toHaveBeenCalledWith('C:\\activities\\sample Racebox.csv')
-    expect(finalizeActivity).not.toHaveBeenCalled()
     expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\sample Racebox.csv' })
     expect(store.activateActivityFile).toHaveBeenCalledWith({
       metadata: {
@@ -141,7 +125,7 @@ describe('import-activity store boundary', () => {
   })
 
   test('imports a native TCX path and activates the Rust-finalized activity', async () => {
-    const { importActivityPath } = await import('@/lib/activity/import-activity')
+    const { importActivityPath } = await import('@/lib/import-activity')
     const store = storeActions()
     const parsedActivity = { metadata: { duration_seconds: 5 } }
     parseTcxActivity.mockResolvedValue({ parsed_activity: parsedActivity })
@@ -149,9 +133,21 @@ describe('import-activity store boundary', () => {
     await importActivityPath('C:\\activities\\ride.TCX', store)
 
     expect(parseTcxActivity).toHaveBeenCalledWith('C:\\activities\\ride.TCX')
-    expect(finalizeActivity).not.toHaveBeenCalled()
     expect(store.activateActivityFile).toHaveBeenCalledWith(parsedActivity)
     expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\ride.TCX' })
+  })
+
+  test('imports a native GPX path and activates the Rust-finalized activity', async () => {
+    const { importActivityPath } = await import('@/lib/import-activity')
+    const store = storeActions()
+    const parsedActivity = { metadata: { duration_seconds: 5 } }
+    parseGpxActivity.mockResolvedValue({ parsed_activity: parsedActivity })
+
+    await importActivityPath('C:\\activities\\ride.GPX', store)
+
+    expect(parseGpxActivity).toHaveBeenCalledWith('C:\\activities\\ride.GPX')
+    expect(store.activateActivityFile).toHaveBeenCalledWith(parsedActivity)
+    expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\ride.GPX' })
   })
 
   test.each([
@@ -159,7 +155,7 @@ describe('import-activity store boundary', () => {
     ['dive.SSRF', parseSubsurfaceActivity],
     ['dive.XML', parseSubsurfaceActivity],
   ])('imports %s through its native Rust parser', async (filename, parser) => {
-    const { importActivityPath } = await import('@/lib/activity/import-activity')
+    const { importActivityPath } = await import('@/lib/import-activity')
     const store = storeActions()
     const parsedActivity = { metadata: { duration_seconds: 60 } }
     parser.mockResolvedValue({ parsed_activity: parsedActivity })
@@ -168,19 +164,17 @@ describe('import-activity store boundary', () => {
     await importActivityPath(path, store)
 
     expect(parser).toHaveBeenCalledWith(path)
-    expect(finalizeActivity).not.toHaveBeenCalled()
     expect(store.activateActivityFile).toHaveBeenCalledWith(parsedActivity)
     expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path })
   })
 
-  test('imports a native VBO path without creating a browser File or finalizing RawActivity', async () => {
-    const { importVboActivityPath } = await import('@/lib/activity/import-activity')
+  test('imports a native VBO path through its Rust parser', async () => {
+    const { importActivityPath } = await import('@/lib/import-activity')
     const store = storeActions()
 
-    await importVboActivityPath('C:\\activities\\session.vbo', store)
+    await importActivityPath('C:\\activities\\session.vbo', store)
 
     expect(parseVboActivity).toHaveBeenCalledWith('C:\\activities\\session.vbo')
-    expect(finalizeActivity).not.toHaveBeenCalled()
     expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\session.vbo' })
     expect(store.activateActivityFile).toHaveBeenCalledWith({
       metadata: {

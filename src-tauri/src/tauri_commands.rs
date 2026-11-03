@@ -200,23 +200,6 @@ pub(crate) async fn backend_render(
     serialize_command_result(&result).map_err(|message| BackendRenderError::RenderError { message })
 }
 
-/// Finalizes frontend-extracted raw samples into a parsed activity payload.
-///
-/// This wrapper intentionally does no activity work; it preserves the existing
-/// command convention by delegating to `ovrley_core` and serializing the result
-/// as a JSON string for JavaScript.
-#[tauri::command]
-pub(crate) async fn backend_finalize_activity(
-    app: AppHandle,
-    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
-    raw_activity_json: String,
-) -> Result<String, String> {
-    let response =
-        commands::backend_finalize_activity(&runtime_paths::app_paths(&app)?, &raw_activity_json)
-            .map_err(|error| error.to_string())?;
-    serialize_command_result(&previews.retain(response)?)
-}
-
 /// Parses a native CSV path through the core columnar activity pipeline.
 #[tauri::command]
 pub(crate) async fn backend_parse_csv_activity(
@@ -252,6 +235,58 @@ pub(crate) async fn backend_parse_tcx_activity(
 ) -> Result<FinalizeActivityResponse, String> {
     previews.retain(
         commands::backend_parse_tcx_activity(&runtime_paths::app_paths(&app)?, &path)
+            .map_err(|error| error.to_string())?,
+    )
+}
+
+/// Parses a native GPX path through the shared activity finalizer.
+#[tauri::command]
+pub(crate) async fn backend_parse_gpx_activity(
+    app: AppHandle,
+    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    path: String,
+) -> Result<FinalizeActivityResponse, String> {
+    previews.retain(
+        commands::backend_parse_gpx_activity(&runtime_paths::app_paths(&app)?, &path)
+            .map_err(|error| error.to_string())?,
+    )
+}
+
+/// Parses a native FIT path through the shared activity finalizer.
+#[tauri::command]
+pub(crate) async fn backend_parse_fit_activity(
+    app: AppHandle,
+    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    path: String,
+) -> Result<FinalizeActivityResponse, String> {
+    previews.retain(
+        commands::backend_parse_fit_activity(&runtime_paths::app_paths(&app)?, &path)
+            .map_err(|error| error.to_string())?,
+    )
+}
+
+/// Parses a native IGC path through the shared activity finalizer.
+#[tauri::command]
+pub(crate) async fn backend_parse_igc_activity(
+    app: AppHandle,
+    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    path: String,
+) -> Result<FinalizeActivityResponse, String> {
+    previews.retain(
+        commands::backend_parse_igc_activity(&runtime_paths::app_paths(&app)?, &path)
+            .map_err(|error| error.to_string())?,
+    )
+}
+
+/// Parses a native DJI SRT path through the shared activity finalizer.
+#[tauri::command]
+pub(crate) async fn backend_parse_srt_activity(
+    app: AppHandle,
+    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    path: String,
+) -> Result<FinalizeActivityResponse, String> {
+    previews.retain(
+        commands::backend_parse_srt_activity(&runtime_paths::app_paths(&app)?, &path)
             .map_err(|error| error.to_string())?,
     )
 }

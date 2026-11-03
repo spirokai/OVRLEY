@@ -2,13 +2,13 @@
 //! https://github.com/arnauddupuis/unabara/blob/main/src/core/format_parsers/subsurface_parser.cpp
 //! Rewritten in Rust for OVRLEY's canonical raw activity and diving metrics.
 
-use super::dive_xml::{
-    self, children, gas_fractions, mean, number, single_dive, start_time, timestamp,
-};
-use super::finalize::FinalizeActivityResponse;
-use super::schema::{LapMarkers, RawActivity, RawActivityOptions, RawSample};
+use super::dive_xml::{children, gas_fractions, mean, number, single_dive, start_time, timestamp};
+use super::helpers::parse_document;
+use super::{parse_text_path, parse_text_reader, BAR_PER_ATMOSPHERE};
+use crate::activity::finalize::FinalizeActivityResponse;
+use crate::activity::schema::{LapMarkers, RawActivity, RawActivityOptions, RawSample};
 use crate::error::{CoreError, CoreResult};
-use roxmltree::{Document, Node};
+use roxmltree::Node;
 use serde_json::json;
 use std::{collections::BTreeMap, io::Read, path::Path};
 
@@ -17,7 +17,7 @@ pub fn parse_subsurface_activity_path(
     path: &Path,
     repo_root: Option<&Path>,
 ) -> CoreResult<FinalizeActivityResponse> {
-    dive_xml::parse_path(path, repo_root, "Subsurface", extract_subsurface_activity)
+    parse_text_path(path, repo_root, "Subsurface", extract_subsurface_activity)
 }
 
 /// Reads a Subsurface dive using the shared activity finalizer.
@@ -26,7 +26,7 @@ pub fn parse_subsurface_activity_reader<R: Read>(
     file_name: &str,
     repo_root: Option<&Path>,
 ) -> CoreResult<FinalizeActivityResponse> {
-    dive_xml::parse_reader(
+    parse_text_reader(
         reader,
         file_name,
         repo_root,
@@ -80,9 +80,7 @@ fn prediction_minutes(text: &str) -> Option<f64> {
 
 /// Extracts the first sampled dive computer without merging independent profiles.
 pub fn extract_subsurface_activity(text: &str, file_name: &str) -> CoreResult<RawActivity> {
-    let document = Document::parse(text).map_err(|error| {
-        CoreError::Activity(format!("The Subsurface file could not be parsed: {error}"))
-    })?;
+    let document = parse_document(text, "Subsurface")?;
     let root = document.root_element();
     if root.tag_name().name() != "divelog" {
         return Err(CoreError::Activity(
@@ -192,7 +190,7 @@ pub fn extract_subsurface_activity(text: &str, file_name: &str) -> CoreResult<Ra
                 .is_some_and(|index| index.parse::<usize>().is_ok_and(|index| index > 0))
         }) {
             if let Some(value) = quantity(attribute.value(), "bar").filter(|value| *value >= 0.0) {
-                sensors.insert(attribute.name(), value / 1.01325);
+                sensors.insert(attribute.name(), value / BAR_PER_ATMOSPHERE);
             } else {
                 sensors.remove(attribute.name());
             }
@@ -200,7 +198,7 @@ pub fn extract_subsurface_activity(text: &str, file_name: &str) -> CoreResult<Ra
         if let Some(value) = sample.attribute("dc_supplied_ppo2") {
             supplied_ppo2 = quantity(value, "bar")
                 .filter(|value| *value >= 0.0)
-                .map(|value| value / 1.01325);
+                .map(|value| value / BAR_PER_ATMOSPHERE);
         }
         state.average_ppo2 = supplied_ppo2.or_else(|| mean(sensors.values().copied()));
         // `po2` is a CCR setpoint in Subsurface, not a sensor observation.
