@@ -16,8 +16,8 @@ use crate::{
     error::{CoreError, CoreResult},
     normalize::ValidatedRenderConfig,
 };
-use ovrley_map::gpu::{Buildings, GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileSizer};
-use ovrley_map::{view_tiles, MapDataSource, MapStyleCatalog, MapStyleId, MapStyleSpec, TileId};
+use ovrley_map::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileSizer};
+use ovrley_map::{view_tiles, MapDataSource, MapSource, MapStyleId, MapStyleInfo, TileId};
 use ovrley_widgets::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
@@ -47,8 +47,8 @@ const PREPARING_MESSAGE: &str = "Preparing video assets...";
 
 /// What a job's maps are prepared from.
 pub struct ExportMapJob<'a> {
-    /// The native tools have none, and fail on a map that needs tiles.
-    pub source: Option<&'a dyn MapDataSource>,
+    /// The installed styles and their bytes. The native tools have none, so they fail on any map.
+    pub source: Option<&'a MapSource>,
     /// The dense frames the export renders.
     pub frame_indices: &'a [usize],
     pub controller: &'a RenderController,
@@ -56,6 +56,8 @@ pub struct ExportMapJob<'a> {
 
 struct ExportMap {
     content: MapContent,
+    /// The installed style the widget's own resolved to.
+    style: MapStyleInfo,
     frames: Arc<dyn MapFrameProvider>,
 }
 
@@ -72,8 +74,7 @@ pub fn download_preview_tiles(
     progress: &(dyn Fn(usize, usize) + Sync),
 ) -> CoreResult<()> {
     let mut tiles = BTreeSet::new();
-    // A map without a style draws no tiles.
-    for widget in widgets.iter().filter(|widget| widget.style.is_some()) {
+    for widget in widgets {
         if let MapContent::Activity(map) = MapContent::for_host(widget, scene, host, Some(activity))? {
             let seconds: Vec<f64> = map.activity_seconds().collect();
             tiles.extend(walk_views(&map, &seconds, cancelled)?.into_iter().flatten());
@@ -111,6 +112,17 @@ impl ExportMaps {
         if config.maps.is_empty() {
             return Ok(Self::default());
         }
+        let source = job.source.ok_or_else(|| {
+            CoreError::Config(
+                "plots: a map widget needs the installed map styles, which this tool does not have"
+                    .into(),
+            )
+        })?;
+        let styles: Vec<MapStyleInfo> = config
+            .maps
+            .iter()
+            .map(|widget| source.styles.resolve(&widget.style).clone())
+            .collect();
         let contents = config
             .maps
             .iter()
@@ -121,43 +133,38 @@ impl ExportMaps {
         let views = profiler.measure("prepare.maps.walk", || {
             contents
                 .iter()
-                .zip(&config.maps)
-                .map(|(content, widget)| match content {
-                    MapContent::Activity(map) if widget.style.is_some() => {
-                        walk_views(map, seconds, &job.controller.cancel_flag())
-                    }
-                    MapContent::Activity(_) | MapContent::NoGps => Ok(Vec::new()),
+                .map(|content| match content {
+                    MapContent::Activity(map) => walk_views(map, seconds, &job.controller.cancel_flag()),
+                    MapContent::NoGps => Ok(Vec::new()),
                 })
                 .collect::<CoreResult<Vec<_>>>()
         })?;
-        // Without a style, without GPS, or with no frame inside the activity, nothing needs a tile
-        // or a GPU.
+        // Without GPS, or with no frame inside the activity, nothing needs a tile or a GPU.
         if views.iter().all(Vec::is_empty) {
             return Ok(Self {
                 widgets: contents
                     .into_iter()
-                    .map(|content| ExportMap {
+                    .zip(styles)
+                    .map(|(content, style)| ExportMap {
                         content,
+                        style,
                         frames: Arc::new(NoMapFrames),
                     })
                     .collect(),
                 _thread: None,
             });
         }
-        let source = job.source.ok_or_else(|| {
-            CoreError::Config(
-                "plots: a map widget needs a map data source, which this tool does not have".into(),
-            )
-        })?;
         let data = profiler.measure("prepare.maps.fetch", || {
-            JobMapData::fetch(source, &config.maps, &views, job.controller)
+            JobMapData::fetch(&*source.data, &styles, &views, job.controller)
         })?;
         let (mut renderers, mut slots) = (Vec::new(), Vec::with_capacity(views.len()));
-        for ((widget, content), views) in config.maps.iter().zip(&contents).zip(&views) {
-            slots.push(match (content, widget.spec()) {
-                (MapContent::Activity(map), Some(spec)) if !views.is_empty() => {
+        for (((widget, style), content), views) in
+            config.maps.iter().zip(&styles).zip(&contents).zip(&views)
+        {
+            slots.push(match content {
+                MapContent::Activity(map) if !views.is_empty() => {
                     renderers.push(profiler.measure("prepare.maps.renderer", || {
-                        ExportRenderer::new(widget, spec, map, views, &data, job.controller)
+                        ExportRenderer::new(widget, style, map, views, &data, job.controller)
                     })?);
                     Some(renderers.len() - 1)
                 }
@@ -168,9 +175,11 @@ impl ExportMaps {
         Ok(Self {
             widgets: contents
                 .into_iter()
+                .zip(styles)
                 .zip(slots)
-                .map(|(content, slot)| ExportMap {
+                .map(|((content, style), slot)| ExportMap {
                     content,
+                    style,
                     frames: match slot {
                         Some(renderer) => Arc::new(ExportMapFrames {
                             renderer,
@@ -192,13 +201,14 @@ impl ExportMaps {
         let map = &self.widgets[index];
         ValidatedWidget::Map {
             widget,
+            style: map.style.clone(),
             frames: map.frames.clone(),
             content: map.content.clone(),
         }
     }
 }
 
-/// A map that draws no frame in this export: no style, no GPS, or no frame inside the activity.
+/// A map that draws no frame in this export: no GPS, or no frame inside the activity.
 struct NoMapFrames;
 
 impl MapFrameProvider for NoMapFrames {
@@ -291,26 +301,21 @@ fn for_each_parallel<T: Sync, R: Send>(
 
 /// The job's map bytes, held so nothing outside can take them away while it runs.
 struct JobMapData {
-    catalog: MapStyleCatalog,
     styles: HashMap<MapStyleId, Vec<u8>>,
     tiles: HashMap<TileId, Vec<u8>>,
 }
 
 impl JobMapData {
+    /// `styles` are the maps' resolved styles, one per entry of `views`.
     fn fetch(
         source: &dyn MapDataSource,
-        maps: &[ValidatedMapWidget],
+        styles: &[MapStyleInfo],
         views: &[Vec<Vec<TileId>>],
         controller: &RenderController,
     ) -> CoreResult<Self> {
-        let mut styles = HashMap::new();
-        for (spec, _) in maps
-            .iter()
-            .zip(views)
-            .filter_map(|(map, views)| Some((map.spec()?, views)))
-            .filter(|(_, views)| !views.is_empty())
-        {
-            if let Entry::Vacant(entry) = styles.entry(spec.style) {
+        let mut documents = HashMap::new();
+        for (style, _) in styles.iter().zip(views).filter(|(_, views)| !views.is_empty()) {
+            if let Entry::Vacant(entry) = documents.entry(style.id.clone()) {
                 let style = source
                     .style(entry.key())
                     .map_err(|error| CoreError::Render(format!("Map style unavailable: {error}")))?;
@@ -345,8 +350,7 @@ impl JobMapData {
             tiles.values().map(Vec::len).sum::<usize>()
         );
         Ok(Self {
-            catalog: source.styles().clone(),
-            styles,
+            styles: documents,
             tiles,
         })
     }
@@ -364,10 +368,6 @@ fn fetch_tile(source: &dyn MapDataSource, tile: TileId) -> CoreResult<Vec<u8>> {
 }
 
 impl MapDataSource for JobMapData {
-    fn styles(&self) -> &MapStyleCatalog {
-        &self.catalog
-    }
-
     fn style(&self, style: &MapStyleId) -> Result<Vec<u8>, String> {
         self.styles
             .get(style)
@@ -393,21 +393,21 @@ struct ExportRenderer {
 
 impl ExportRenderer {
     /// Fails without a usable GPU, or when the job's largest view cannot fit.
+    /// `style` is the installed style the widget's own resolved to.
     fn new(
         widget: &ValidatedMapWidget,
-        spec: MapStyleSpec,
+        style: &MapStyleInfo,
         map: &ActivityMap,
         views: &[Vec<TileId>],
         data: &JobMapData,
         controller: &RenderController,
     ) -> CoreResult<Self> {
-        let buildings = Buildings::for_style(&data.style(&spec.style).map_err(CoreError::Render)?)
-            .map_err(CoreError::Render)?;
+        let spec = widget.spec(style);
         let sizer = MapTileSizer::new(
             spec.clone(),
             map.viewport(),
             map.zoom(),
-            &buildings,
+            &style.buildings,
             data,
         )
         .map_err(CoreError::Render)?;
@@ -442,7 +442,7 @@ impl ExportRenderer {
                 sample_count: widget.msaa_samples,
                 style_zoom: map.zoom(),
                 pools,
-                buildings,
+                buildings: style.buildings.clone(),
             },
             data,
         )

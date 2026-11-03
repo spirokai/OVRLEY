@@ -1,4 +1,5 @@
 use crate::widgets::route::config::RoutePathConfig;
+use ovrley_map::MapStyleId;
 use serde::{Deserialize, Serialize};
 
 /// Effective map config; every output-affecting field is required at ingress.
@@ -12,7 +13,8 @@ pub struct MapConfig {
     pub opacity: f32,
     /// The attribution's font. The attribution itself is always drawn.
     pub font: String,
-    pub map_style: String,
+    /// Need not be installed: drawing resolves it. See [`ovrley_map::MapStyleCatalog::resolve`].
+    pub map_style: MapStyleId,
     pub show_buildings: bool,
     pub show_paths: bool,
     pub camera_mode: String,

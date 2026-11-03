@@ -18,7 +18,6 @@ use ovrley_widgets::widgets::{
     map::validation::ValidatedMapWidget,
     route::validation::ValidatedRoutePlot, value::validation::ValidatedValue,
 };
-use ovrley_map::MapStyleCatalog;
 use widgets::validate_render_contents;
 
 pub(crate) use config::deserialize_render_presentation;
@@ -157,35 +156,29 @@ pub struct ValidatedRenderConfig<S = ValidatedSceneConfig> {
 
 /// Validates every value widget and label in the config. Returns the first
 /// missing or invalid field as an error. Plots are pre-parsed and validated.
-/// Without raster resources or installed map styles: its maps say their style is missing.
 pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderConfig> {
-    validate_render_config_with_resources(raw, None, &MapStyleCatalog::default())
+    validate_render_config_with_resources(raw, None)
 }
 
-/// Resolves session images and map styles while validating submission, before any render job
-/// starts.
+/// Resolves session images while validating submission, before any render job starts.
 pub fn validate_render_config_with_resources(
     raw: RenderConfig,
     resources: Option<&dyn crate::raster::RasterResourceResolver>,
-    map_styles: &MapStyleCatalog,
 ) -> CoreResult<ValidatedRenderConfig> {
     let scene = validate_scene_config(raw.scene.clone())?;
-    Ok(validate_render_contents(
-        raw.with_scene(scene.presentation.clone()),
-        resources,
-        map_styles,
-    )?
-    .with_scene(scene))
+    Ok(
+        validate_render_contents(raw.with_scene(scene.presentation.clone()), resources)?
+            .with_scene(scene),
+    )
 }
 
 /// Validates shared presentation directly, without inventing a render window.
 pub(crate) fn validate_render_presentation(
     raw: RenderConfig<ScenePresentationConfig>,
     resources: Option<&dyn crate::raster::RasterResourceResolver>,
-    map_styles: &MapStyleCatalog,
 ) -> CoreResult<ValidatedRenderConfig<ValidatedScenePresentation>> {
     let scene = validate_scene_presentation(raw.scene.clone())?;
-    validate_render_contents(raw.with_scene(scene), resources, map_styles)
+    validate_render_contents(raw.with_scene(scene), resources)
 }
 
 impl<S> ValidatedRenderConfig<S> {

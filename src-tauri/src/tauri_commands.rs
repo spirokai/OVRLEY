@@ -28,10 +28,9 @@ use ovrley_core::render_jobs::{
     contracts::{BatchAcceptance, BatchEncodingSettings, BatchRenderRequest, BatchSnapshot},
     planning::plan_batch_configuration,
 };
-use ovrley_map::{MapDataSource, MapStyleCatalog};
+use ovrley_map::MapStyleCatalog;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use tauri::AppHandle;
 
 const WINDOWS_HEVC_EXTENSION_URL: &str = "https://apps.microsoft.com/detail/9nmzlz57r3t7";
@@ -49,7 +48,7 @@ pub(crate) async fn backend_submit_batch(
     let paths = runtime_paths::app_paths(&app)
         .map_err(|message| BatchServiceError::InvalidRequest { message })?;
     let resources = raster_resources.inner().clone();
-    let map_source: Arc<dyn MapDataSource> = Arc::new(map_data.inner().clone());
+    let map_source = map_data.map_source();
     let service = state.render_execution.clone();
     let inspection = state.video_inspection.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -207,7 +206,7 @@ pub(crate) async fn backend_render(
             &output_path,
             overwrite,
             Some(&*raster_resources),
-            Some(Arc::new(map_data.inner().clone())),
+            Some(map_data.map_source()),
         )
         .map_err(BackendRenderError::from_core)?;
     serialize_command_result(&result).map_err(|message| BackendRenderError::RenderError { message })
@@ -300,6 +299,7 @@ pub(crate) async fn backend_parse_subsurface_activity(
 pub(crate) async fn backend_render_preview_frame(
     app: AppHandle,
     raster_resources: tauri::State<'_, crate::raster_resources::RasterResources>,
+    map_data: tauri::State<'_, MapData>,
     config_json: String,
     parsed_activity_json: String,
     second: f64,
@@ -312,6 +312,7 @@ pub(crate) async fn backend_render_preview_frame(
             &parsed_activity_json,
             second,
             Some(&*raster_resources),
+            Some(&map_data.map_source()),
         ))
     }
 

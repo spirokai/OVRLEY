@@ -288,28 +288,39 @@ export async function getPlatformInfo() {
   return typeof payload === 'string' ? JSON.parse(payload) : payload
 }
 
+// The installed styles are read once at startup, so one request serves every caller.
+let installedMapStyles = null
+
 /**
  * Lists the installed map styles, in the order the editor shows them. The first is what a map
  * draws when its own style isn't installed. Outside the desktop app none are installed.
  *
  * @returns {Promise<{id: string, label: string, background: number[]}[]>} Installed styles.
  */
-export async function listMapStyles() {
-  if (!hasTauriRuntime()) return []
-
-  const styles = await invokeCommand('backend_list_map_styles')
-  const valid =
-    Array.isArray(styles) &&
-    styles.every(
-      (style) =>
-        typeof style?.id === 'string' &&
-        typeof style.label === 'string' &&
-        Array.isArray(style.background) &&
-        style.background.length === 3 &&
-        style.background.every((channel) => Number.isInteger(channel) && channel >= 0 && channel <= 255),
-    )
-  if (!valid) throw new Error('Invalid map style catalog returned by backend')
-  return styles
+export function listMapStyles() {
+  if (!hasTauriRuntime()) return Promise.resolve([])
+  if (installedMapStyles === null) {
+    installedMapStyles = invokeCommand('backend_list_map_styles').then((styles) => {
+      const valid =
+        Array.isArray(styles) &&
+        styles.length > 0 &&
+        styles.every(
+          (style) =>
+            typeof style?.id === 'string' &&
+            typeof style.label === 'string' &&
+            Array.isArray(style.background) &&
+            style.background.length === 3 &&
+            style.background.every((channel) => Number.isInteger(channel) && channel >= 0 && channel <= 255),
+        )
+      if (!valid) throw new Error('Invalid map style catalog returned by backend')
+      return styles
+    })
+    // A failed request is made again by the next caller.
+    installedMapStyles.catch(() => {
+      installedMapStyles = null
+    })
+  }
+  return installedMapStyles
 }
 
 /**

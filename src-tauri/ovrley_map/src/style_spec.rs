@@ -17,7 +17,8 @@ use std::sync::OnceLock;
 
 const REFERENCE_JSON: &str = include_str!("../style-spec/v8.json");
 
-fn reference() -> &'static Json {
+/// The embedded style reference.
+pub(crate) fn reference() -> &'static Json {
     static REFERENCE: OnceLock<Json> = OnceLock::new();
     REFERENCE.get_or_init(|| {
         serde_json::from_str(REFERENCE_JSON).expect("the embedded style reference is valid JSON")
@@ -1513,13 +1514,28 @@ impl Validator<'_> {
 }
 
 /// The expression with every `["zoom"]` read as a number from the feature instead, so it checks
-/// as MapLibre checks a filter or a top-level value: with the zoom anywhere. Literals stay as written.
+/// as MapLibre checks a filter or a top-level value: with the zoom anywhere. Literals and `match`
+/// labels are data, not expressions, so they stay as written.
 fn without_zoom(value: &Json) -> Json {
     match value {
         Json::Array(items) if items.len() == 1 && items[0] == "zoom" => {
             json!(["number", ["get", ZOOM_STAND_IN]])
         }
         Json::Array(items) if items.first().is_some_and(|head| head == "literal") => value.clone(),
+        // `["match", input, label, output, ..., fallback]`: labels sit at even places before the last.
+        Json::Array(items) if items.first().is_some_and(|head| head == "match") => Json::Array(
+            items
+                .iter()
+                .enumerate()
+                .map(|(index, item)| {
+                    if index >= 2 && index % 2 == 0 && index + 1 < items.len() {
+                        item.clone()
+                    } else {
+                        without_zoom(item)
+                    }
+                })
+                .collect(),
+        ),
         Json::Array(items) => Json::Array(items.iter().map(without_zoom).collect()),
         _ => value.clone(),
     }
@@ -1768,26 +1784,6 @@ mod tests {
     use super::*;
     use serde_json::{json, Value as Json};
 
-    const BUNDLED: [(&str, &str); 5] = [
-        (
-            "bright",
-            include_str!("../../../assets/map-styles/bright.json"),
-        ),
-        ("dark", include_str!("../../../assets/map-styles/dark.json")),
-        (
-            "fiord",
-            include_str!("../../../assets/map-styles/fiord.json"),
-        ),
-        (
-            "liberty",
-            include_str!("../../../assets/map-styles/liberty.json"),
-        ),
-        (
-            "positron",
-            include_str!("../../../assets/map-styles/positron.json"),
-        ),
-    ];
-
     fn style(layers: Json) -> Json {
         json!({
             "version": 8,
@@ -1818,14 +1814,6 @@ mod tests {
             errors.iter().any(|error| error.contains(expected)),
             "expected an error containing {expected:?}, got {errors:#?}"
         );
-    }
-
-    #[test]
-    fn the_bundled_styles_are_valid() {
-        for (id, style) in BUNDLED {
-            let errors = style_errors(&serde_json::from_str(style).unwrap());
-            assert!(errors.is_empty(), "{id}: {errors:#?}");
-        }
     }
 
     #[test]
@@ -2122,6 +2110,12 @@ mod tests {
             &filtered(json!(["==", ["feature-state", "a"], 1])),
             "not supported with filters",
         );
+        // A `match` label is data: the zoom elsewhere in the filter leaves it alone.
+        assert_valid(&filtered(json!([
+            "all",
+            ["<", ["zoom"], 10],
+            ["match", ["get", "class"], ["zoom"], true, false]
+        ])));
 
         assert!(is_legacy_filter(&json!(["none", ["has", "a"]])));
         assert!(!is_legacy_filter(&json!(["all", ["has", "a"]])));

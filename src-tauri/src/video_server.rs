@@ -35,7 +35,7 @@ use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 use uuid::Uuid;
 
 use crate::map_styles::MapData;
-use crate::map_tile_service::{parse_tile_path, TilePayload};
+use crate::map_tile_service::{parse_tile_path, TileCacheStatus};
 
 const CHUNK_SIZE: usize = 512 * 1024;
 const WORKER_COUNT: usize = 4;
@@ -333,11 +333,7 @@ fn respond_to_request(
             format!("http://127.0.0.1:{port}/tiles/{{z}}/{{x}}/{{y}}.pbf")
         };
         return match map_data.registry().served(style, &tile_url_template) {
-            Some(Ok(bytes)) => respond_map_style(request, bytes),
-            Some(Err(error)) => {
-                log::warn!("Map style request failed: {error}");
-                respond_empty(request, StatusCode(500), common_headers(None, None))
-            }
+            Some(bytes) => respond_map_resource(request, bytes, "application/json", None),
             None => respond_empty(request, StatusCode(404), common_headers(None, None)),
         };
     }
@@ -353,9 +349,12 @@ fn respond_to_request(
             return respond_empty(request, StatusCode(404), common_headers(None, None));
         };
         return match map_data.tiles().resolve(coordinates) {
-            Ok(payload) => {
-                respond_map_resource(request, payload, "application/vnd.mapbox-vector-tile")
-            }
+            Ok(payload) => respond_map_resource(
+                request,
+                payload.bytes,
+                "application/vnd.mapbox-vector-tile",
+                Some(payload.cache_status),
+            ),
             Err(error) => {
                 log::warn!("Tile request failed: {error}");
                 respond_empty(request, StatusCode(502), common_headers(None, None))
@@ -401,45 +400,27 @@ fn respond_to_request(
     }
 }
 
-/// An installed style, as the preview's MapLibre reads it.
-fn respond_map_style(request: Request, bytes: Vec<u8>) -> Result<(), String> {
+/// A style or tile for the preview's MapLibre. Tiles say how the cache served them; styles are
+/// installed, so they have no cache.
+fn respond_map_resource(
+    request: Request,
+    bytes: Vec<u8>,
+    content_type: &str,
+    cache_status: Option<TileCacheStatus>,
+) -> Result<(), String> {
     let content_length = bytes.len();
-    let mut headers = common_headers(Some("application/json".to_string()), None);
+    let mut headers = common_headers(Some(content_type.to_string()), None);
     headers.push(header("Access-Control-Allow-Origin", "*")?);
     headers.push(header("Content-Length", content_length.to_string())?);
+    if let Some(cache_status) = cache_status {
+        headers.push(header("X-OVRLEY-Cache", cache_status.as_header_value())?);
+    }
     request
         .respond(
             Response::new(
                 StatusCode(200),
                 headers,
                 std::io::Cursor::new(bytes),
-                Some(content_length),
-                None,
-            )
-            .with_chunked_threshold(usize::MAX),
-        )
-        .map_err(|error| error.to_string())
-}
-
-fn respond_map_resource(
-    request: Request,
-    payload: TilePayload,
-    content_type: &str,
-) -> Result<(), String> {
-    let content_length = payload.bytes.len();
-    let mut headers = common_headers(Some(content_type.to_string()), None);
-    headers.push(header("Access-Control-Allow-Origin", "*")?);
-    headers.push(header("Content-Length", content_length.to_string())?);
-    headers.push(header(
-        "X-OVRLEY-Cache",
-        payload.cache_status.as_header_value(),
-    )?);
-    request
-        .respond(
-            Response::new(
-                StatusCode(200),
-                headers,
-                std::io::Cursor::new(payload.bytes),
                 Some(content_length),
                 None,
             )

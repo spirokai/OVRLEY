@@ -13,6 +13,7 @@ use crate::{
     normalize::{ValidatedRenderConfig, ValidatedSceneConfig},
     paths::AppPaths,
 };
+use ovrley_map::MapSource;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -56,13 +57,15 @@ impl FrameSize {
 }
 
 /// Renders the full scene frames of dense activity frames `dense_indices` as straight-alpha RGBA,
-/// through the full-frame atlas plan export uses for transparent video.
+/// through the full-frame atlas plan export uses for transparent video. Maps draw from
+/// `map_source`, which tools without one leave out: they fail on any map.
 pub fn render_full_frames(
     font_dirs: &[PathBuf],
     config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
     dense: &DenseActivityReport,
     dense_indices: &[usize],
+    map_source: Option<&MapSource>,
     profiler: &mut RenderProfiler,
 ) -> CoreResult<Vec<Vec<u8>>> {
     let size = FrameSize {
@@ -71,7 +74,7 @@ pub fn render_full_frames(
     };
     let controller = RenderController::default();
     let maps = ExportMapJob {
-        source: None,
+        source: map_source,
         frame_indices: dense_indices,
         controller: &controller,
     };
@@ -112,6 +115,7 @@ pub fn render_preview_frames(
     activity: &ParsedActivity,
     dense: &DenseActivityReport,
     frames: &[PreviewFrame],
+    map_source: Option<&MapSource>,
 ) -> CoreResult<PreviewRenderReport> {
     let started = Instant::now();
     let mut profiler = RenderProfiler::default();
@@ -120,7 +124,15 @@ pub fn render_preview_frames(
         .iter()
         .map(|frame| frame_index_for_second(scene, dense, frame.second))
         .collect();
-    let pixels = render_full_frames(&paths.font_dirs, config, activity, dense, &frame_indices, &mut profiler)?;
+    let pixels = render_full_frames(
+        &paths.font_dirs,
+        config,
+        activity,
+        dense,
+        &frame_indices,
+        map_source,
+        &mut profiler,
+    )?;
     let (width, height) = (scene.presentation.width, scene.presentation.height);
     for (frame, mut pixels) in frames.iter().zip(pixels) {
         profiler.measure("preview.png_write", || -> CoreResult<()> {
@@ -147,6 +159,7 @@ pub fn render_preview_frame(
     dense: &DenseActivityReport,
     second: f64,
     out_path: &Path,
+    map_source: Option<&MapSource>,
 ) -> CoreResult<PreviewRenderReport> {
     render_preview_frames(
         paths,
@@ -157,6 +170,7 @@ pub fn render_preview_frame(
             second,
             out_path: out_path.to_path_buf(),
         }],
+        map_source,
     )
 }
 

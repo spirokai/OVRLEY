@@ -10,7 +10,7 @@ pub mod mercator;
 mod route;
 mod source;
 mod spec;
-#[cfg(any(feature = "gpu", feature = "validate"))]
+#[cfg(feature = "validate")]
 mod style_file;
 #[cfg(feature = "validate")]
 pub mod style_spec;
@@ -23,10 +23,10 @@ pub use camera::{
     ClipPoint, GroundProjection, MapCamera, MapViewport, ViewState, LIGHT_XY, MAX_VIEW_TILES,
 };
 pub use route::{MapRouteDraw, MapRouteLine, MapRoutePoint, MapRouteStyle};
-pub use source::MapDataSource;
+pub use source::{MapDataSource, MapSource};
 pub use spec::{
-    MapLayers, MapStyleCatalog, MapStyleId, MapStyleInfo, MapStyleSpec, BUILDING_COLOR_KEY,
-    MAX_TILE_ZOOM, TILE_SIZE, VECTOR_SOURCE,
+    MapLayers, MapStyleBuildings, MapStyleCatalog, MapStyleId, MapStyleInfo, MapStyleSpec,
+    BUILDING_COLOR_KEY, MAX_TILE_ZOOM, TILE_SIZE, VECTOR_SOURCE,
 };
 #[cfg(feature = "validate")]
 pub use style_file::read_style_file;

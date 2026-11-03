@@ -24,7 +24,7 @@ use crate::{
         value::preview::{ContentBounds, TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
     },
 };
-use ovrley_map::{MapCamera, MapRouteDraw, MapRouteLine, MapStyleCatalog};
+use ovrley_map::{MapCamera, MapRouteDraw, MapRouteLine, MapStyleCatalog, MapStyleInfo};
 use serde_json::json;
 use skia_safe::{Canvas, Rect, Surface};
 use std::sync::{mpsc::Receiver, Arc};
@@ -45,8 +45,24 @@ pub struct MapFrameState {
     pub progress: f32,
 }
 
+/// The installed style `config`'s resolves to. `styles` are the host's installed styles, which the
+/// editor preview sets once it has them: until then it creates no map.
+fn resolve_style(
+    styles: Option<&MapStyleCatalog>,
+    config: &ValidatedMapWidget,
+) -> WidgetResult<MapStyleInfo> {
+    let styles = styles.ok_or_else(|| {
+        WidgetError::Config(
+            "a map needs the installed map styles, which this host has not set".into(),
+        )
+    })?;
+    Ok(styles.resolve(&config.style).clone())
+}
+
 pub struct PreviewMap {
     config: ValidatedMapWidget,
+    /// The installed style the config's resolved to.
+    style: MapStyleInfo,
     scene: ValidatedScenePresentation,
     window: Option<RouteWindow>,
     preview_duration: f64,
@@ -83,12 +99,13 @@ impl PreviewMap {
         widget: MapConfig,
         scene: ScenePresentationConfig,
         frames: Arc<dyn MapFrameProvider>,
-        styles: &MapStyleCatalog,
+        styles: Option<&MapStyleCatalog>,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
-        let config = validate_map_widget(&widget, 0, styles)?;
+        let config = validate_map_widget(&widget, 0)?;
         let host = WidgetHost::from_scene(&scene)?;
         Self::with_content(
+            resolve_style(styles, &config)?,
             config,
             validate_scene_presentation(scene)?,
             &host,
@@ -98,19 +115,22 @@ impl PreviewMap {
         )
     }
 
-    /// `content` is what the host resolved for this widget, from [`MapContent::for_host`].
+    /// `style` is the installed style `config`'s resolved to, and `content` what the host resolved
+    /// for this widget, from [`MapContent::for_host`].
     pub fn from_validated(
         config: ValidatedMapWidget,
+        style: MapStyleInfo,
         scene: ValidatedScenePresentation,
         host: &WidgetHost,
         frames: Arc<dyn MapFrameProvider>,
         content: MapContent,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
-        Self::with_content(config, scene, host, frames, Some(content), fonts)
+        Self::with_content(style, config, scene, host, frames, Some(content), fonts)
     }
 
     fn with_content(
+        style: MapStyleInfo,
         config: ValidatedMapWidget,
         scene: ValidatedScenePresentation,
         host: &WidgetHost,
@@ -120,8 +140,9 @@ impl PreviewMap {
     ) -> WidgetResult<Self> {
         let raster_scale = host.raster_scale;
         Ok(Self {
-            layout: MapLayout::new(&config, &scene, raster_scale, fonts)?,
+            layout: MapLayout::new(&config, &style, &scene, raster_scale, fonts)?,
             content_key: ContentKey::new(&config, &scene, raster_scale),
+            style,
             window: host.plot_window(config.show_full_activity),
             preview_duration: host.placeholder_duration()?,
             raster_scale,
@@ -150,10 +171,11 @@ impl PreviewMap {
         &mut self,
         widget: MapConfig,
         scene: ScenePresentationConfig,
-        styles: &MapStyleCatalog,
+        styles: Option<&MapStyleCatalog>,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<()> {
-        let config = validate_map_widget(&widget, 0, styles)?;
+        let config = validate_map_widget(&widget, 0)?;
+        let style = resolve_style(styles, &config)?;
         let host = WidgetHost::from_scene(&scene)?;
         let window = host.plot_window(config.show_full_activity);
         let preview_duration = host.placeholder_duration()?;
@@ -171,8 +193,9 @@ impl PreviewMap {
                 .transpose()?;
             self.content_key = key;
         }
-        self.layout = MapLayout::new(&config, &scene, raster_scale, fonts)?;
+        self.layout = MapLayout::new(&config, &style, &scene, raster_scale, fonts)?;
         self.config = config;
+        self.style = style;
         self.scene = scene;
         self.window = window;
         self.preview_duration = preview_duration;
@@ -229,9 +252,7 @@ impl PreviewMap {
 
     /// Publishes what the host's map canvas should draw at this state.
     fn publish_view(&mut self, state: &MapFrameState) -> WidgetResult<()> {
-        let (Some(spec), Some(camera), Some(MapContent::Activity(map))) =
-            (self.config.spec(), state.camera, &self.content)
-        else {
+        let (Some(camera), Some(MapContent::Activity(map))) = (state.camera, &self.content) else {
             self.view.clear();
             return Ok(());
         };
@@ -255,9 +276,10 @@ impl PreviewMap {
         let [r0, r1, r2, r3] = style.remaining_color;
         self.view = serde_json::to_vec(&json!({
             "renderer": {
-                "style": spec.style,
-                "buildings": spec.layers.buildings,
-                "paths": spec.layers.paths,
+                "style": self.style.id,
+                "style_buildings": self.style.buildings,
+                "buildings": self.config.layers.buildings,
+                "paths": self.config.layers.paths,
                 "pixel_ratio": viewport.pixel_ratio(),
                 "msaa_samples": self.config.msaa_samples,
             },
@@ -275,16 +297,14 @@ impl PreviewMap {
         Ok(())
     }
 
-    /// What the renderer must draw at this state; none without a style, or without a camera over the
-    /// activity.
+    /// What the renderer must draw at this state; none without a camera over the activity.
     fn frame_request(&self, state: &MapFrameState) -> Option<MapFrameRequest> {
-        let spec = self.config.spec()?;
         let camera = state.camera?;
         let Some(MapContent::Activity(map)) = &self.content else {
             return None;
         };
         Some(MapFrameRequest {
-            spec,
+            spec: self.config.spec(&self.style),
             camera,
             viewport: map.viewport,
             route: MapRouteDraw {
@@ -383,12 +403,6 @@ impl PreviewMap {
     ) {
         canvas.save();
         layout.clip_shape(canvas);
-        if layout.style_missing() {
-            layout.draw_missing_style(canvas);
-            layout.draw_border(canvas);
-            canvas.restore();
-            return;
-        }
         match resolved {
             Some((_, MapBacking::Image(frame))) => layout.draw_image(canvas, frame.image()),
             Some((_, MapBacking::Layer)) => {}

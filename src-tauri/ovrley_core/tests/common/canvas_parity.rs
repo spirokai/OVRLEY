@@ -219,7 +219,7 @@ pub fn render_skia_preview(
         "  rendering Skia frame at second {second} → {}",
         out_path.display()
     );
-    render_preview_frame(paths, config, activity, dense_activity, f64::from(second), out_path)
+    render_preview_frame(paths, config, activity, dense_activity, f64::from(second), out_path, None)
         .context("render_preview_frame failed")?;
     println!("  Skia render complete: {} kB", file_size_kb(out_path));
     Ok(())

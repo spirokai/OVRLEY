@@ -24,7 +24,6 @@ mod web;
 
 pub use pool::PoolEntries;
 pub use sizing::{GpuPoolSizes, MapTileSizer, DEFAULT_POOL_ENTRIES};
-pub use style::Buildings;
 #[cfg(target_arch = "wasm32")]
 pub use web::MapTileDecoder;
 
@@ -32,7 +31,9 @@ use extrusion::ExtrusionVertex;
 use fill_patterns::pattern_bind_groups;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::MapDataSource;
-use crate::{MapCamera, MapRouteDraw, MapStyleSpec, MapViewport, TileId, ViewState};
+use crate::{
+    MapCamera, MapRouteDraw, MapStyleBuildings, MapStyleSpec, MapViewport, TileId, ViewState,
+};
 use pattern::{stencil_reference_value_3d, TileShape, TileViewPattern};
 use pipelines::{
     BackgroundLayerMetadata, Pipelines, ShaderVertex, ShapeMaskInstance, COLOR_FORMAT, DEPTH_FORMAT,
@@ -74,7 +75,7 @@ pub struct GpuMapConfig {
     pub style_zoom: f64,
     /// Sizes each geometry pool. See [`GpuPoolSizes::for_views`].
     pub pools: GpuPoolSizes,
-    pub buildings: Buildings,
+    pub buildings: MapStyleBuildings,
 }
 
 /// One tile that finished loading, and why it failed if it did. Tile data is external, so a failure

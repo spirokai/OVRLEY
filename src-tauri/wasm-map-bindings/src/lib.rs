@@ -1,11 +1,11 @@
 //! External boundary between `ovrley_map::gpu` and the page. `MapLayer` owns one canvas's renderer on
 //! the UI thread, and `TileDecoder` turns tile bytes into geometry in a worker.
 use ovrley_map::gpu::{
-    Buildings, GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileDecoder, DEFAULT_POOL_ENTRIES,
+    GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileDecoder, DEFAULT_POOL_ENTRIES,
 };
 use ovrley_map::{
-    MapCamera, MapLayers, MapRouteDraw, MapRouteLine, MapRoutePoint, MapRouteStyle, MapStyleId,
-    MapStyleSpec, MapViewport, TileId,
+    MapCamera, MapLayers, MapRouteDraw, MapRouteLine, MapRoutePoint, MapRouteStyle,
+    MapStyleBuildings, MapStyleId, MapStyleSpec, MapViewport, TileId,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -14,7 +14,9 @@ use wasm_bindgen::prelude::*;
 /// The widget chose these, so they are not user input here. Keep in step with `PreviewMap::publish_view`.
 #[derive(Deserialize)]
 struct RendererConfig {
-    style: String,
+    style: MapStyleId,
+    /// The style's 3D buildings, from the catalog.
+    style_buildings: MapStyleBuildings,
     buildings: bool,
     paths: bool,
     width: u32,
@@ -35,12 +37,11 @@ fn js_error(message: String) -> JsValue {
     JsValue::from_str(&message)
 }
 
-/// `style` is the document the shell served for the config's style.
-fn parse_config(json: &str, style: &[u8]) -> Result<GpuMapConfig, String> {
+fn parse_config(json: &str) -> Result<GpuMapConfig, String> {
     let config: RendererConfig = serde_json::from_str(json).map_err(|error| error.to_string())?;
     Ok(GpuMapConfig {
         spec: MapStyleSpec {
-            style: MapStyleId::new(&config.style)?,
+            style: config.style,
             layers: MapLayers {
                 buildings: config.buildings,
                 labels: false,
@@ -51,7 +52,7 @@ fn parse_config(json: &str, style: &[u8]) -> Result<GpuMapConfig, String> {
         sample_count: config.msaa_samples,
         style_zoom: config.zoom,
         pools: GpuPoolSizes::uniform(DEFAULT_POOL_ENTRIES),
-        buildings: Buildings::for_style(style)?,
+        buildings: config.style_buildings,
     })
 }
 
@@ -80,7 +81,7 @@ impl MapLayer {
         style: Vec<u8>,
     ) -> Result<MapLayer, JsValue> {
         console_error_panic_hook::set_once();
-        let config = parse_config(&config, &style).map_err(js_error)?;
+        let config = parse_config(&config).map_err(js_error)?;
         let renderer = GpuMapRenderer::for_canvas(config, &style, canvas)
             .await
             .map_err(js_error)?;
@@ -183,7 +184,7 @@ impl TileDecoder {
     #[wasm_bindgen(constructor)]
     pub fn new(config: &str, style: &[u8]) -> Result<TileDecoder, JsValue> {
         console_error_panic_hook::set_once();
-        let config = parse_config(config, style).map_err(js_error)?;
+        let config = parse_config(config).map_err(js_error)?;
         MapTileDecoder::new(&config, style)
             .map(Self)
             .map_err(js_error)

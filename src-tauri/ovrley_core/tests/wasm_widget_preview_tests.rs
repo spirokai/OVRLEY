@@ -67,7 +67,7 @@ fn diving_profile_preview_matches_export_during_playback_and_seeking() {
     let dense = densify_activity(&trimmed, vec![0.0, 1.5, 3.25], &requirements);
     let root = common::test_config::repo_git_root();
     let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
-    let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+    let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), None, &mut RenderProfiler::default()).unwrap();
     let (mut preview, id) = elevation_preview(&request, &serde_json::to_vec(&activity).unwrap());
     let mut placement = None;
     for index in [0, 1, 2, 0] {
@@ -344,7 +344,7 @@ fn every_family_reports_layout_only_bounds_that_contain_its_drawing() {
         for (variant, request) in bounds_variants(&base) {
             let kind = format!("{} ({variant})", request["type"].as_str().unwrap());
             let raster = request["type"] == "raster";
-            let mut widget = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), &preview.fonts, &preview.images, Arc::new(PreviewMapFrames), &preview.map_styles)
+            let mut widget = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), &preview.fonts, &preview.images, Arc::new(PreviewMapFrames), preview.map_styles.as_ref())
                 .unwrap_or_else(|error| panic!("{kind}: {error}"));
             let allocated = allocated_surfaces();
             let bounds: Vec<TileBounds> = seconds
@@ -694,7 +694,7 @@ fn atlas_frames_reassemble_overlapping_rotated_widgets_of_every_family_into_the_
         };
         config[collection].as_array_mut().unwrap().push(widget);
     }
-    let config = validate_render_config_with_resources(parse_config_value(&config).unwrap(), Some(&resources), &ovrley_map::MapStyleCatalog::default()).unwrap();
+    let config = validate_render_config_with_resources(parse_config_value(&config).unwrap(), Some(&resources)).unwrap();
     assert_eq!(config.values.len(), 17, "every value family is exported");
 
     let atlas = assert_atlas_frames_match_the_full_frame("every family", &config, &every_family_parsed_activity());
@@ -732,7 +732,7 @@ fn widgets_accept_the_native_font_and_raster_resolvers_used_by_export() {
     let request_scene = raster["scene"].clone();
     for (mut preview, request) in [(raster_preview, raster), label_preview()] {
         let kind = request["type"].as_str().unwrap().to_owned();
-        let native = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), &fonts, resources, Arc::new(PreviewMapFrames), &ovrley_map::MapStyleCatalog::default()).unwrap();
+        let native = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), &fonts, resources, Arc::new(PreviewMapFrames), None).unwrap();
         let id = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
         let session = &preview.widgets[&id];
         assert_eq!(native.pixels(), session.pixels(), "{kind} pixels must not depend on the host");
@@ -740,7 +740,7 @@ fn widgets_accept_the_native_font_and_raster_resolvers_used_by_export() {
         assert_eq!(native.bounds(), session.bounds(), "{kind} bounds must not depend on the host");
     }
     let missing = json!({ "type":"raster", "widget": { "id":"raster", "x":0, "y":0, "width":1, "height":1, "rotation":0, "opacity":1, "path":"/image.png", "resourceId":"missing" }, "scene": request_scene });
-    assert!(PreviewWidget::new(serde_json::from_value(missing).unwrap(), &fonts, resources, Arc::new(PreviewMapFrames), &ovrley_map::MapStyleCatalog::default()).is_err(), "unresolved native rasters must fail loudly");
+    assert!(PreviewWidget::new(serde_json::from_value(missing).unwrap(), &fonts, resources, Arc::new(PreviewMapFrames), None).is_err(), "unresolved native rasters must fail loudly");
 }
 
 #[test]
@@ -762,7 +762,7 @@ fn elevation_preview_matches_export_labels_hover_seeking_and_activity_replacemen
         let trimmed = trim_activity(&activity, 0.25, 3.25, &requirements).unwrap();
         let seconds = vec![0.0, 0.75, 1.5, 2.2, 2.9];
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), None, &mut RenderProfiler::default()).unwrap();
         let (mut preview, id) = elevation_preview(&request, &bytes);
         let raw = serde_json::from_value(request["widget"].clone()).unwrap();
         let scene = validate_scene_presentation(serde_json::from_value(request["scene"].clone()).unwrap()).unwrap();
@@ -1030,7 +1030,7 @@ fn route_preview_matches_export_and_keeps_marker_out_of_selection_bounds() {
         let trimmed = trim_activity(&activity, 0.25, 3.25, &requirements).unwrap();
         let seconds = vec![0.0, 0.75, 2.2, 2.9];
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), None, &mut RenderProfiler::default()).unwrap();
         let mut preview = PreviewSession::default();
         // Compared against native export, which grid-fits text.
         preview.fonts.set_grid_fit(true);
@@ -1298,7 +1298,7 @@ fn gauges_match_export_pixels_sampling_cache_revisions_and_activity_replacement(
         let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), None, &mut RenderProfiler::default()).unwrap();
         let frame_width = config.scene.presentation.width as usize;
         let id = preview
             .create_widget(serde_json::from_value(request.clone()).unwrap())
@@ -1576,7 +1576,7 @@ fn heading_tape_matches_export_pixels_sampling_revisions_and_activity_replacemen
         let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), None, &mut RenderProfiler::default()).unwrap();
         let scene_width = config.scene.presentation.width as usize;
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         for index in [0,1,2,3,4,5,6,7,4,0] {
@@ -1795,7 +1795,7 @@ fn lap_timer_modes_match_export_pixels_sampling_and_resource_replacement() {
         let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.0, 5.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), None, &mut RenderProfiler::default()).unwrap();
         let scene_width = config.scene.presentation.width as usize;
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         for index in [0,1,2,3,4,5,6,7,8,9,10,11,6,3,0] {
@@ -1967,7 +1967,7 @@ fn splits_run_matches_export_pixels_skips_unchanged_samples_and_rejects_malforme
         let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), None, &mut RenderProfiler::default()).unwrap();
         let scene_width = config.scene.presentation.width as usize;
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         let mut distinct = std::collections::HashSet::new();
@@ -2072,7 +2072,7 @@ fn g_force_preview_matches_export_pixels_and_tracks_marker_and_percentile_change
     let seconds = [1.0, 1.002, 3.0];
     let dense = densify_activity(&trimmed, seconds.to_vec(), &requirements);
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
-    let frames = render_full_frames(&font_dirs, &config, &activity, &dense, &[0, 1, 2], &mut RenderProfiler::default()).unwrap();
+    let frames = render_full_frames(&font_dirs, &config, &activity, &dense, &[0, 1, 2], None, &mut RenderProfiler::default()).unwrap();
     let scene_width = config.scene.presentation.width as usize;
     let id = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
     for index in [0, 1, 2, 0] {
@@ -2209,7 +2209,7 @@ fn lean_angle_preview_matches_export_and_tracks_signed_fill_resources_and_valida
         user_templates_dir: std::env::temp_dir(),
         downloads_dir: std::env::temp_dir(),
     };
-    let frames = render_full_frames(&paths.font_dirs, &config, &parsed, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+    let frames = render_full_frames(&paths.font_dirs, &config, &parsed, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), None, &mut RenderProfiler::default()).unwrap();
     let scene_width = config.scene.presentation.width as usize;
     let id = preview
         .create_widget(serde_json::from_value(request.clone()).unwrap())
@@ -3231,7 +3231,7 @@ fn heading_compass_matches_export_pixels_rotates_continuously_and_validates_at_i
         let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), None, &mut RenderProfiler::default()).unwrap();
         let scene_width = config.scene.presentation.width as usize;
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         for (index, second) in seconds.iter().enumerate() {
@@ -3360,7 +3360,7 @@ fn heart_zones_matches_export_pixels_moves_continuously_and_validates_at_ingress
         let requirements = config.render_data_requirements();
         let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), None, &mut RenderProfiler::default()).unwrap();
         let scene_width = config.scene.presentation.width as usize;
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         for (index, second) in seconds.iter().enumerate() {
@@ -3484,7 +3484,7 @@ fn altitude_tape_matches_export_pixels_scrolls_continuously_and_validates_at_ing
         assert!(!other, "{metric} {unit} does not export the other source's rate");
         let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
         let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+        let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), None, &mut RenderProfiler::default()).unwrap();
         let scene_width = config.scene.presentation.width as usize;
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         for (index, second) in seconds.iter().enumerate() {
@@ -3625,7 +3625,7 @@ fn rolling_chart_matches_export_pixels_slides_with_the_playhead_and_validates_at
     assert!(requirements.speed && requirements.heartrate, "plotted metrics are export requirements");
     let trimmed = trim_activity(&activity, 0.0, 4.0, &requirements).unwrap();
     let dense = densify_activity(&trimmed, seconds.clone(), &requirements);
-    let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), &mut RenderProfiler::default()).unwrap();
+    let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), None, &mut RenderProfiler::default()).unwrap();
     let scene_width = config.scene.presentation.width as usize;
     let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
     for (index, second) in seconds.iter().enumerate() {

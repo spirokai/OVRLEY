@@ -50,12 +50,6 @@ fn rejects_invalid_tile_requests_before_cache_or_upstream_access() {
 fn serves_installed_styles_with_their_tiles_from_this_server() {
     let fake_upstream = FakeUpstream::start();
     let cache_root = temp_cache_root("styles");
-    let user_styles = temp_cache_root("user-styles");
-    let styles = MapStyleRegistry::load(&MapStyleDirs {
-        bundled: crate::runtime_paths::source_repo_root().join("assets").join("map-styles"),
-        user: user_styles.clone(),
-    })
-    .expect("bundled styles");
     let tiles = MapTileService::new(
         cache_root.clone(),
         format!("http://127.0.0.1:{}/{{z}}/{{x}}/{{y}}.pbf", fake_upstream.port),
@@ -64,13 +58,14 @@ fn serves_installed_styles_with_their_tiles_from_this_server() {
     .expect("tile service");
     let server = VideoServerHandle::new();
     server
-        .start_with_map_data(MapData::new(styles, tiles))
+        .start_with_map_data(MapData::new(installed_styles(), tiles))
         .expect("server starts");
     let port = server.port().expect("server port");
 
     let liberty = request(port, "GET", "/styles/liberty");
     assert!(response_headers(&liberty).contains("Content-Type: application/json"));
     assert!(response_headers(&liberty).contains("Access-Control-Allow-Origin: *"));
+    assert!(!response_headers(&liberty).contains("X-OVRLEY-Cache"));
     let served: serde_json::Value = serde_json::from_slice(response_body(&liberty)).expect("served style");
     assert_eq!(
         served["sources"]["openmaptiles"]["tiles"][0],
@@ -83,7 +78,6 @@ fn serves_installed_styles_with_their_tiles_from_this_server() {
     let unsupported_method = request(port, "POST", "/styles/liberty");
     assert!(response_headers(&unsupported_method).starts_with("HTTP/1.1 405 Method Not Allowed"));
     assert!(fake_upstream.requests().is_empty());
-    std::fs::remove_dir_all(user_styles).expect("remove user styles");
 }
 
 #[test]
@@ -406,7 +400,7 @@ fn successful_write_evicts_globally_oldest_entry_and_retains_recently_served_til
     .expect("obsolete tile service");
     let obsolete_server = VideoServerHandle::new();
     obsolete_server
-        .start_with_map_data(MapData::new(MapStyleRegistry::default(), obsolete_service))
+        .start_with_map_data(MapData::new(installed_styles(), obsolete_service))
         .expect("obsolete server starts");
     let obsolete_port = obsolete_server.port().expect("obsolete server port");
 
@@ -481,7 +475,7 @@ fn successful_write_evicts_globally_oldest_entry_and_retains_recently_served_til
     assert!(!orphan.exists());
     let active_server = VideoServerHandle::new();
     active_server
-        .start_with_map_data(MapData::new(MapStyleRegistry::default(), active_service))
+        .start_with_map_data(MapData::new(installed_styles(), active_service))
         .expect("active server starts");
     let active_port = active_server.port().expect("active server port");
 
@@ -520,7 +514,7 @@ fn clear_removes_all_namespaces_and_a_later_request_repopulates_the_cache() {
     .expect("tile service");
     let server = VideoServerHandle::new();
     server
-        .start_with_map_data(MapData::new(MapStyleRegistry::default(), map_tile_service.clone()))
+        .start_with_map_data(MapData::new(installed_styles(), map_tile_service.clone()))
         .expect("server starts");
     let port = server.port().expect("server port");
 
@@ -563,7 +557,7 @@ fn clear_waits_for_active_tile_resolution_without_disrupting_its_response() {
     .expect("tile service");
     let server = VideoServerHandle::new();
     server
-        .start_with_map_data(MapData::new(MapStyleRegistry::default(), map_tile_service.clone()))
+        .start_with_map_data(MapData::new(installed_styles(), map_tile_service.clone()))
         .expect("server starts");
     let port = server.port().expect("server port");
 
@@ -615,7 +609,7 @@ fn tile_server(cache_root: &Path, upstream: &FakeUpstream) -> VideoServerHandle 
     .expect("tile service");
     let server = VideoServerHandle::new();
     server
-        .start_with_map_data(MapData::new(MapStyleRegistry::default(), map_tile_service))
+        .start_with_map_data(MapData::new(installed_styles(), map_tile_service))
         .expect("server starts");
     server
 }
@@ -635,13 +629,25 @@ fn tile_server_with_timeouts(
     .expect("tile service");
     let server = VideoServerHandle::new();
     server
-        .start_with_map_data(MapData::new(MapStyleRegistry::default(), map_tile_service))
+        .start_with_map_data(MapData::new(installed_styles(), map_tile_service))
         .expect("server starts");
     server
 }
 
 fn temp_cache_root(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!("ovrley-tile-cache-{label}-{}", Uuid::new_v4()))
+}
+
+/// The bundled styles, installed as the app installs them.
+fn installed_styles() -> MapStyleRegistry {
+    let user = temp_cache_root("user-styles");
+    let styles = MapStyleRegistry::load(&MapStyleDirs {
+        bundled: crate::runtime_paths::source_repo_root().join("assets").join("map-styles"),
+        user: user.clone(),
+    })
+    .expect("bundled styles");
+    std::fs::remove_dir_all(user).expect("remove user styles");
+    styles
 }
 
 fn cache_pair_size(payload: &PathBuf) -> u64 {

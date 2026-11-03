@@ -1,6 +1,6 @@
 //! Map plot validation. Every field is required and parsed once, so consumers never see `pitch`
-//! on a fixed camera. The style resolves against the installed ones: a style that isn't installed
-//! draws the first one instead, and with none installed the widget says so.
+//! on a fixed camera. The style id is only checked for its form: whether it is installed is up to
+//! whatever draws the map, which resolves it against the installed styles.
 use super::config::MapConfig;
 use crate::{
     error::{WidgetError, WidgetResult},
@@ -10,7 +10,7 @@ use crate::{
     },
     widgets::route::validation::{validate_route_path, ValidatedRoutePath},
 };
-use ovrley_map::{MapLayers, MapStyleCatalog, MapStyleInfo, MapStyleSpec, MAX_TILE_ZOOM};
+use ovrley_map::{MapLayers, MapStyleId, MapStyleInfo, MapStyleSpec, MAX_TILE_ZOOM};
 use std::ops::RangeInclusive;
 
 const MAX_PITCH_DEG: f32 = 70.0;
@@ -63,8 +63,8 @@ pub struct ValidatedMapWidget {
     pub height: f32,
     pub opacity: f32,
     pub font: String,
-    /// The installed style it draws. `None` when none is installed.
-    pub style: Option<MapStyleInfo>,
+    /// The style it asks for, which need not be installed.
+    pub style: MapStyleId,
     pub layers: MapLayers,
     pub camera: MapCameraMode,
     pub msaa_samples: u32,
@@ -77,20 +77,16 @@ pub struct ValidatedMapWidget {
 }
 
 impl ValidatedMapWidget {
-    /// What its map draws; nothing without an installed style.
-    pub fn spec(&self) -> Option<MapStyleSpec> {
-        self.style.as_ref().map(|style| MapStyleSpec {
+    /// What its map draws in `style`, the installed style its own resolved to.
+    pub fn spec(&self, style: &MapStyleInfo) -> MapStyleSpec {
+        MapStyleSpec {
             style: style.id.clone(),
             layers: self.layers,
-        })
+        }
     }
 }
 
-pub fn validate_map_widget(
-    map: &MapConfig,
-    index: usize,
-    styles: &MapStyleCatalog,
-) -> WidgetResult<ValidatedMapWidget> {
+pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<ValidatedMapWidget> {
     let p = |f: &str| format!("plots[{index}].{f}");
     let invalid = |field: &str, message: &str| {
         WidgetError::Config(format!("{}: {message}", p(field)))
@@ -155,7 +151,7 @@ pub fn validate_map_widget(
         height,
         opacity: require_unit_opacity(Some(map.opacity), &p("opacity"))?,
         font: map.font.clone(),
-        style: styles.resolve(&map.map_style).cloned(),
+        style: map.map_style.clone(),
         // The GPU renderer draws no labels, so the config has no toggle for them.
         layers: MapLayers {
             buildings,

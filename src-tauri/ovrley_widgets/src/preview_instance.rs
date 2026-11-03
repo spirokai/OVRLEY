@@ -180,7 +180,7 @@ impl PreviewInstance {
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
         map_frames: Arc<dyn MapFrameProvider>,
-        map_styles: &MapStyleCatalog,
+        map_styles: Option<&MapStyleCatalog>,
     ) -> WidgetResult<Self> {
         let (position, _) = request.placement()?;
         let mut config = request.clone();
@@ -206,7 +206,7 @@ impl PreviewInstance {
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
         map_frames: Arc<dyn MapFrameProvider>,
-        map_styles: &MapStyleCatalog,
+        map_styles: Option<&MapStyleCatalog>,
     ) -> WidgetResult<()> {
         let (position, transient) = request.placement()?;
         let mut config = request.clone();

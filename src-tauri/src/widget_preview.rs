@@ -7,7 +7,6 @@ use ovrley_widgets::{
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
     widgets::map::{config::MapConfig, validation::validate_map_widget},
 };
-use ovrley_map::MapDataSource;
 use serde::Serialize;
 use std::{
     collections::BTreeMap,
@@ -114,7 +113,7 @@ pub(crate) async fn backend_map_prepare(
         let widgets = widgets
             .iter()
             .enumerate()
-            .map(|(index, widget)| validate_map_widget(widget, index, source.styles()))
+            .map(|(index, widget)| validate_map_widget(widget, index))
             .collect::<Result<Vec<_>, _>>()
             .map_err(CoreError::from)?;
         download_preview_tiles(

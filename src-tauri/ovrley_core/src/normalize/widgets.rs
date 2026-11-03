@@ -2,7 +2,6 @@
 
 use super::{config, raster, RenderConfig, ValidatedRenderConfig};
 use crate::error::{CoreError, CoreResult};
-use ovrley_map::MapStyleCatalog;
 use ovrley_widgets::model::scene::ValidatedScenePresentation;
 use ovrley_widgets::model::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
 use ovrley_widgets::model::types::{DisplayType, MetricKind};
@@ -47,7 +46,6 @@ use ovrley_widgets::widgets::{
 pub(super) fn validate_render_contents(
     raw: RenderConfig<ValidatedScenePresentation>,
     resources: Option<&dyn crate::raster::RasterResourceResolver>,
-    map_styles: &MapStyleCatalog,
 ) -> CoreResult<ValidatedRenderConfig<ValidatedScenePresentation>> {
     let scene = raw.scene;
     raster::validate_unique_raster_ids(&raw.rasters)?;
@@ -69,7 +67,7 @@ pub(super) fn validate_render_contents(
     }
     Ok(ValidatedRenderConfig {
         course_plots: validate_route_plots(&raw.plots)?,
-        maps: validate_map_widgets(&raw.plots, map_styles)?,
+        maps: validate_map_widgets(&raw.plots)?,
         elevation_plots: validate_elevation_plots(&raw.plots, &scene)?,
         diving_profiles: validate_diving_profiles(&raw.plots, &scene)?,
         rolling_charts: validate_rolling_charts(&raw.plots)?,
@@ -158,16 +156,13 @@ fn course_config_error(error: serde_json::Error) -> CoreError {
     CoreError::Config(format!("course plot config: {error}"))
 }
 
-fn validate_map_widgets(
-    plots: &serde_json::Value,
-    map_styles: &MapStyleCatalog,
-) -> CoreResult<Vec<ValidatedMapWidget>> {
+fn validate_map_widgets(plots: &serde_json::Value) -> CoreResult<Vec<ValidatedMapWidget>> {
     config::find_plot_values(plots, "map")
         .into_iter()
         .map(|(index, value)| {
             let map: MapConfig = serde_json::from_value(value.clone())
                 .map_err(|error| CoreError::Config(format!("map config: {error}")))?;
-            Ok(validate_map_widget(&map, index, map_styles)?)
+            Ok(validate_map_widget(&map, index)?)
         })
         .collect()
 }

@@ -19,7 +19,7 @@ use crate::media::prepared_video::check_source_freshness;
 use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
-use ovrley_map::MapDataSource;
+use ovrley_map::MapSource;
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "code", rename_all = "camelCase")]
@@ -114,7 +114,7 @@ impl RenderExecutionService {
         inspection: &VideoInspectionService,
         request: BatchRenderRequest,
         resources: Option<&dyn RasterResourceResolver>,
-        map_source: Option<Arc<dyn MapDataSource>>,
+        map_source: Option<MapSource>,
     ) -> Result<BatchAcceptance, BatchServiceError> {
         self.submit_batch_with_executor(
             paths,
@@ -132,7 +132,7 @@ impl RenderExecutionService {
         inspection: &VideoInspectionService,
         request: BatchRenderRequest,
         resources: Option<&dyn RasterResourceResolver>,
-        map_source: Option<Arc<dyn MapDataSource>>,
+        map_source: Option<MapSource>,
         executor: Arc<dyn BatchJobExecutor>,
     ) -> Result<BatchAcceptance, BatchServiceError> {
         let reservation = self

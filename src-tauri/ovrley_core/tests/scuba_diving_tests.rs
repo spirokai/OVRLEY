@@ -325,6 +325,7 @@ fn scuba_widgets_render_in_the_preview_cache_and_export_frame_with_matching_pixe
             &activity,
             &dense,
             &[0, 1, 2, 3, 4],
+            None,
             &mut RenderProfiler::default(),
         )
         .unwrap();

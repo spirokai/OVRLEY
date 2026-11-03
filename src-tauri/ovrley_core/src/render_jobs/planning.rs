@@ -35,9 +35,8 @@ use crate::normalize::{
 };
 use crate::output::{plan_batch_output_targets, RenderOutputKind};
 use crate::raster::RasterResourceResolver;
-use ovrley_map::{MapDataSource, MapStyleCatalog};
+use ovrley_map::MapSource;
 use ovrley_widgets::model::scene::{ScenePresentationConfig, ValidatedScenePresentation};
-use std::sync::Arc;
 
 /// Validated once at configuration/acceptance ingress; private fields keep
 /// consumers from substituting malformed settings after validation.
@@ -183,7 +182,7 @@ pub fn plan_batch_configuration(
 pub(crate) struct ValidatedBatchTemplate {
     config: ValidatedRenderConfig<ValidatedScenePresentation>,
     encoding: ValidatedBatchEncoding,
-    map_source: Option<Arc<dyn MapDataSource>>,
+    map_source: Option<MapSource>,
 }
 
 /// Reviewed and accepted jobs share the same output contract.
@@ -236,7 +235,7 @@ pub(crate) fn validate_batch_template(
     template: RenderConfig<ScenePresentationConfig>,
     encoding: ValidatedBatchEncoding,
     resources: Option<&dyn RasterResourceResolver>,
-    map_source: Option<Arc<dyn MapDataSource>>,
+    map_source: Option<MapSource>,
 ) -> CoreResult<ValidatedBatchTemplate> {
     if !template.extra.is_empty() || !template.scene.extra.is_empty() {
         return Err(CoreError::Config(
@@ -244,7 +243,7 @@ pub(crate) fn validate_batch_template(
         ));
     }
     Ok(ValidatedBatchTemplate {
-        config: validate_render_presentation(template, resources, &installed_styles(&map_source))?,
+        config: validate_render_presentation(template, resources)?,
         encoding,
         map_source,
     })
@@ -264,7 +263,7 @@ pub struct PlannedVideoRender {
     pub(crate) config: ValidatedRenderConfig,
     pub(crate) mode: VideoRenderModePlan,
     /// Where a map's bytes come from. The native tools have none, and fail on a map.
-    pub(crate) map_source: Option<Arc<dyn MapDataSource>>,
+    pub(crate) map_source: Option<MapSource>,
     sampling_fps: Fps,
     activity_offset: f64,
 }
@@ -300,24 +299,15 @@ impl PlannedVideoRender {
     }
 }
 
-/// The styles a job's maps can draw: none without a map source.
-fn installed_styles(map_source: &Option<Arc<dyn MapDataSource>>) -> MapStyleCatalog {
-    map_source
-        .as_deref()
-        .map(|source| source.styles().clone())
-        .unwrap_or_default()
-}
-
 /// Derives a single custom-range plan from validated submission inputs.
 pub fn plan_single_render(
     raw: RenderConfig,
     activity_end: f64,
     resources: Option<&dyn RasterResourceResolver>,
-    map_source: Option<Arc<dyn MapDataSource>>,
+    map_source: Option<MapSource>,
 ) -> CoreResult<PlannedVideoRender> {
     let raw_scene = raw.scene.clone();
-    let mut config =
-        validate_render_config_with_resources(raw, resources, &installed_styles(&map_source))?;
+    let mut config = validate_render_config_with_resources(raw, resources)?;
     let (mode, sampling_fps, activity_offset) = if raw_scene.composite_video_path.is_some() {
         let render =
             derive_composite_render_plan(&raw_scene, &mut config.scene, Some(activity_end))?;

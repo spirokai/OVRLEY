@@ -37,7 +37,7 @@ use crate::{
         },
     },
 };
-use ovrley_map::{MapCamera, MapStyleCatalog};
+use ovrley_map::{MapCamera, MapStyleCatalog, MapStyleInfo};
 use serde::{Deserialize, Deserializer, Serialize};
 use skia_safe::Canvas;
 use std::sync::Arc;
@@ -71,6 +71,8 @@ pub enum ValidatedWidget<'a> {
     /// instance of one widget shares one route line.
     Map {
         widget: &'a ValidatedMapWidget,
+        /// The installed style the widget's own resolved to.
+        style: MapStyleInfo,
         frames: Arc<dyn MapFrameProvider>,
         content: MapContent,
     },
@@ -313,7 +315,7 @@ impl PreviewWidget {
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
         map_frames: Arc<dyn MapFrameProvider>,
-        map_styles: &MapStyleCatalog,
+        map_styles: Option<&MapStyleCatalog>,
     ) -> WidgetResult<Self> {
         match request {
             WidgetRequest::DivingProfile { widget, scene, .. } => Ok(Self::DivingProfile(
@@ -407,10 +409,12 @@ impl PreviewWidget {
             )?),
             ValidatedWidget::Map {
                 widget,
+                style,
                 frames,
                 content,
             } => Self::Map(PreviewMap::from_validated(
                 widget.clone(),
+                style,
                 scene.clone(),
                 host,
                 frames,

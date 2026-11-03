@@ -74,8 +74,8 @@ pub struct PreviewSession {
     pub images: crate::widgets::raster::preview::PreviewImages,
     /// Maps are a canvas under the widget, so no frame ever arrives through this.
     pub map_frames: Arc<PreviewMapFrames>,
-    /// The installed map styles. The host sets them before it creates a map.
-    pub map_styles: MapStyleCatalog,
+    /// The installed map styles, once the host has set them. No map is created before.
+    pub map_styles: Option<MapStyleCatalog>,
     activity: Option<ActivitySampler>,
     /// The editor's disabled laps, applied to every activity this session samples.
     disabled_laps: Vec<usize>,
@@ -125,12 +125,7 @@ impl PreviewSession {
                 return Err(WidgetError::Config("map_view requires a map".into()));
             };
             return Ok(ResizeUpdate::MapView(
-                crate::widgets::map::interaction::adjust_map_view(
-                    widget,
-                    scene,
-                    &self.map_styles,
-                    gesture,
-                )?,
+                crate::widgets::map::interaction::adjust_map_view(widget, scene, gesture)?,
             ));
         }
         if let WidgetRequest::Backdrop { widget, scene, .. } = request.origin {
@@ -169,7 +164,6 @@ impl PreviewSession {
                 crate::widgets::map::interaction::resize_map(
                     widget,
                     scene,
-                    &self.map_styles,
                     size,
                     request.fixed,
                     request.point,
@@ -444,8 +438,9 @@ impl PreviewSession {
     }
     /// The shell's installed map styles, as JSON. Maps created after this resolve against them.
     pub fn replace_map_styles(&mut self, bytes: &[u8]) -> WidgetResult<()> {
-        self.map_styles =
-            serde_json::from_slice(bytes).map_err(|error| WidgetError::Config(error.to_string()))?;
+        self.map_styles = Some(
+            serde_json::from_slice(bytes).map_err(|error| WidgetError::Config(error.to_string()))?,
+        );
         Ok(())
     }
 
@@ -520,7 +515,7 @@ impl PreviewSession {
             &self.fonts,
             &self.images,
             self.map_frames.clone(),
-            &self.map_styles,
+            self.map_styles.as_ref(),
         )?;
         self.next_id = self
             .next_id
@@ -538,7 +533,7 @@ impl PreviewSession {
                 &self.fonts,
                 &self.images,
                 self.map_frames.clone(),
-                &self.map_styles,
+                self.map_styles.as_ref(),
             )
     }
     pub fn render(&mut self, second: f64) -> WidgetResult<()> {

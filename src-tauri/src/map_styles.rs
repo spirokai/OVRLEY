@@ -1,25 +1,27 @@
 //! The installed map styles, and `MapData`: the shell's map source, with them and the tile service.
 //!
 //! At startup every `*.json` in the build's `map-styles` folder, then in the user's
-//! `Documents/OVRLEY/map-styles`, is read with [`read_style_file`]. A file that passes is installed
-//! under its file name; one that doesn't is logged and left out. A user style whose name collides
-//! with a bundled one is left out too, so a bundled style always means the same map. Nothing is read
-//! again until the next start.
+//! `Documents/OVRLEY/map-styles`, is read with [`read_style_file`], its id the file name in
+//! lowercase. Every bundled style must install, the one a new map widget draws among them, or the
+//! app does not start: they ship with it. A user style that doesn't install is logged and left out,
+//! and so is one whose id is already installed, so a bundled style always means the same map.
+//! Nothing is read again until the next start.
 //!
-//! Liberty, the default for a new widget, lists first when installed, so it is also what a widget
-//! naming a missing style draws. The rest list by label, bundled before the user's.
+//! The default style lists first, so it is also what a widget naming a missing style draws. The rest
+//! list by label, bundled before the user's.
 
 use crate::map_tile_service::{MapTileService, TileCoordinates};
 use ovrley_map::{
-    read_style_file, MapDataSource, MapStyleCatalog, MapStyleId, MapStyleInfo, VECTOR_SOURCE,
+    read_style_file, MapDataSource, MapSource, MapStyleCatalog, MapStyleId, MapStyleInfo,
+    VECTOR_SOURCE,
 };
+use ovrley_widgets::model::standard_widgets::default_map_style;
+use serde_json::{json, Value as Json};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-/// What a new map widget draws.
-const DEFAULT_MAP_STYLE: &str = "liberty";
 const ATTRIBUTION: &str = "<a href=\"https://openfreemap.org\">OpenFreeMap</a> <a href=\"https://www.openmaptiles.org/\">&copy; OpenMapTiles</a> Data from <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>";
 
 /// Where installed styles are read from.
@@ -30,63 +32,79 @@ pub(crate) struct MapStyleDirs {
     pub(crate) user: PathBuf,
 }
 
-#[derive(Default)]
 pub(crate) struct MapStyleRegistry {
     catalog: MapStyleCatalog,
-    documents: HashMap<MapStyleId, Vec<u8>>,
+    /// Each installed style's document, as its file holds it.
+    documents: HashMap<MapStyleId, Json>,
 }
 
 impl MapStyleRegistry {
-    /// Fails only when the bundled folder can't be read.
+    /// Fails when a bundled style can't be read or doesn't install, or the default isn't bundled.
     pub(crate) fn load(dirs: &MapStyleDirs) -> Result<Self, String> {
-        let bundled = read_dir(&dirs.bundled)?;
+        let mut documents = HashMap::new();
+        let mut bundled = Vec::new();
+        for path in read_dir(&dirs.bundled)? {
+            let (info, document) = read_style(&path).map_err(|reason| {
+                format!(
+                    "Bundled map style {} does not install: {reason}",
+                    path.display()
+                )
+            })?;
+            documents.insert(info.id.clone(), document);
+            bundled.push(info);
+        }
+
         if let Err(error) = fs::create_dir_all(&dirs.user) {
             log::warn!(
                 "Map styles in {} are not read: {error}",
                 dirs.user.display()
             );
         }
-        let user = read_dir(&dirs.user).unwrap_or_else(|error| {
+        let mut user = Vec::new();
+        for path in read_dir(&dirs.user).unwrap_or_else(|error| {
             log::warn!("{error}");
             Vec::new()
-        });
-
-        let mut documents = HashMap::new();
-        let mut groups: [Vec<MapStyleInfo>; 2] = [Vec::new(), Vec::new()];
-        for (group, files) in groups.iter_mut().zip([bundled, user]) {
-            for path in files {
-                let Some((info, bytes)) = read_style(&path) else {
-                    continue;
-                };
-                if let Some(installed) = documents
-                    .keys()
-                    .find(|installed: &&MapStyleId| installed.collides(&info.id))
-                {
-                    log::warn!(
-                        "Map style {} is not installed: {installed} is already installed",
-                        path.display()
-                    );
-                    continue;
+        }) {
+            let not_installed = |reason: &str| {
+                log::warn!("Map style {} is not installed: {reason}", path.display());
+            };
+            match read_style(&path) {
+                Err(reason) => not_installed(&reason),
+                Ok((info, _)) if documents.contains_key(&info.id) => {
+                    not_installed(&format!("{} is already installed", info.id))
                 }
-                documents.insert(info.id.clone(), bytes);
-                group.push(info);
+                Ok((info, document)) => {
+                    documents.insert(info.id.clone(), document);
+                    user.push(info);
+                }
             }
-            group.sort_by(|a, b| {
-                a.label
-                    .cmp(&b.label)
-                    .then_with(|| a.id.as_str().cmp(b.id.as_str()))
-            });
         }
-        let mut styles: Vec<MapStyleInfo> = groups.into_iter().flatten().collect();
-        if let Some(default) = styles
+
+        let by_label = |a: &MapStyleInfo, b: &MapStyleInfo| {
+            a.label
+                .cmp(&b.label)
+                .then_with(|| a.id.as_str().cmp(b.id.as_str()))
+        };
+        bundled.sort_by(by_label);
+        user.sort_by(by_label);
+        let default = bundled
             .iter()
-            .position(|style| style.id.as_str() == DEFAULT_MAP_STYLE)
-        {
-            let default = styles.remove(default);
-            styles.insert(0, default);
-        }
+            .position(|style| &style.id == default_map_style())
+            .ok_or_else(|| {
+                format!(
+                    "The build has no {} map style, which new map widgets draw",
+                    default_map_style()
+                )
+            })?;
+        let default = bundled.remove(default);
         Ok(Self {
-            catalog: MapStyleCatalog::new(styles)?,
+            // Two bundled files may differ only in case: then they share an id, and this fails.
+            catalog: MapStyleCatalog::new(
+                std::iter::once(default)
+                    .chain(bundled)
+                    .chain(user)
+                    .collect(),
+            )?,
             documents,
         })
     }
@@ -96,15 +114,18 @@ impl MapStyleRegistry {
     }
 
     /// The style as the preview's MapLibre reads it: its vector tiles from `tile_url_template`, the
-    /// local tile service. `None` when it isn't installed.
-    pub(crate) fn served(
-        &self,
-        id: &str,
-        tile_url_template: &str,
-    ) -> Option<Result<Vec<u8>, String>> {
-        let info = self.catalog.get(id)?;
-        let bytes = &self.documents[&info.id];
-        Some(serve(bytes, tile_url_template))
+    /// local tile service, at the zooms it serves. `None` when `id` isn't installed.
+    pub(crate) fn served(&self, id: &str, tile_url_template: &str) -> Option<Vec<u8>> {
+        let mut style = self.documents.get(&MapStyleId::new(id).ok()?)?.clone();
+        let source = style["sources"][VECTOR_SOURCE]
+            .as_object_mut()
+            .expect("an installed style draws from an openmaptiles source");
+        source.remove("url");
+        source.insert("tiles".into(), json!([tile_url_template]));
+        source.insert("minzoom".into(), json!(0));
+        source.insert("maxzoom".into(), json!(14));
+        source.insert("attribution".into(), json!(ATTRIBUTION));
+        Some(serde_json::to_vec(&style).expect("a JSON document serializes"))
     }
 }
 
@@ -126,52 +147,15 @@ fn read_dir(dir: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(files)
 }
 
-/// The style in `path` with its bytes, or `None` after logging why it isn't installed.
-fn read_style(path: &Path) -> Option<(MapStyleInfo, Vec<u8>)> {
-    let not_installed = |reason: &str| {
-        log::warn!("Map style {} is not installed: {reason}", path.display());
-    };
-    let id = match path
+/// The style in `path` with its document, or why it doesn't install.
+fn read_style(path: &Path) -> Result<(MapStyleInfo, Json), String> {
+    let stem = path
         .file_stem()
         .and_then(|stem| stem.to_str())
-        .ok_or_else(|| "its file name is not UTF-8".to_string())
-        .and_then(MapStyleId::new)
-    {
-        Ok(id) => id,
-        Err(error) => {
-            not_installed(&error);
-            return None;
-        }
-    };
-    let bytes = match fs::read(path) {
-        Ok(bytes) => bytes,
-        Err(error) => {
-            not_installed(&error.to_string());
-            return None;
-        }
-    };
-    match read_style_file(id, &bytes) {
-        Ok(info) => Some((info, bytes)),
-        Err(errors) => {
-            not_installed(&errors.join("; "));
-            None
-        }
-    }
-}
-
-/// Points the style's vector source at the local tile service, at the zooms it serves.
-fn serve(bytes: &[u8], tile_url_template: &str) -> Result<Vec<u8>, String> {
-    let mut style: serde_json::Value = serde_json::from_slice(bytes)
-        .map_err(|error| format!("Installed map style is not JSON: {error}"))?;
-    let source = style["sources"][VECTOR_SOURCE]
-        .as_object_mut()
-        .ok_or_else(|| format!("Installed map style has no {VECTOR_SOURCE} source"))?;
-    source.remove("url");
-    source.insert("tiles".into(), serde_json::json!([tile_url_template]));
-    source.insert("minzoom".into(), serde_json::json!(0));
-    source.insert("maxzoom".into(), serde_json::json!(14));
-    source.insert("attribution".into(), serde_json::json!(ATTRIBUTION));
-    serde_json::to_vec(&style).map_err(|error| format!("Failed to serialize map style: {error}"))
+        .ok_or("its file name is not UTF-8")?;
+    let id = MapStyleId::new(&stem.to_ascii_lowercase())?;
+    let bytes = fs::read(path).map_err(|error| error.to_string())?;
+    read_style_file(id, &bytes).map_err(|errors| errors.join("; "))
 }
 
 /// Everything a map's bytes come from: the installed styles and the tile service.
@@ -196,19 +180,24 @@ impl MapData {
     pub(crate) fn tiles(&self) -> &MapTileService {
         &self.tiles
     }
+
+    /// What a render's maps draw from.
+    pub(crate) fn map_source(&self) -> MapSource {
+        MapSource {
+            styles: self.styles.catalog.clone(),
+            data: Arc::new(self.clone()),
+        }
+    }
 }
 
 impl MapDataSource for MapData {
-    fn styles(&self) -> &MapStyleCatalog {
-        self.styles.catalog()
-    }
-
     fn style(&self, style: &MapStyleId) -> Result<Vec<u8>, String> {
-        self.styles
+        let document = self
+            .styles
             .documents
             .get(style)
-            .cloned()
-            .ok_or_else(|| format!("Map style {style} is not installed"))
+            .ok_or_else(|| format!("Map style {style} is not installed"))?;
+        Ok(serde_json::to_vec(document).expect("a JSON document serializes"))
     }
 
     fn tile(&self, z: u8, x: u32, y: u32) -> Result<Vec<u8>, String> {
@@ -236,16 +225,27 @@ mod tests {
         dir
     }
 
-    fn style(name: Option<&str>) -> serde_json::Value {
-        let mut style = serde_json::json!({
+    fn style(name: Option<&str>) -> Json {
+        let mut style = json!({
             "version": 8,
             "sources": { "openmaptiles": { "type": "vector", "url": "https://example.com/tiles.json" } },
             "layers": [{ "id": "bg", "type": "background", "paint": { "background-color": "#102030" } }],
         });
         if let Some(name) = name {
-            style["name"] = serde_json::json!(name);
+            style["name"] = json!(name);
         }
         style
+    }
+
+    fn write(dir: &Path, file: &str, style: Json) {
+        fs::write(dir.join(file), serde_json::to_vec(&style).unwrap()).unwrap()
+    }
+
+    fn load(bundled: &Path, user: &Path) -> Result<MapStyleRegistry, String> {
+        MapStyleRegistry::load(&MapStyleDirs {
+            bundled: bundled.to_path_buf(),
+            user: user.to_path_buf(),
+        })
     }
 
     fn ids(registry: &MapStyleRegistry) -> Vec<&str> {
@@ -258,13 +258,10 @@ mod tests {
     }
 
     #[test]
-    fn the_bundled_styles_install_with_liberty_first() {
+    fn the_bundled_styles_install_with_the_default_first() {
         let user = temp_dir("bundled");
-        let registry = MapStyleRegistry::load(&MapStyleDirs {
-            bundled: bundled_dir(),
-            user: user.clone(),
-        })
-        .unwrap();
+        let registry = load(&bundled_dir(), &user).unwrap();
+        assert_eq!(default_map_style().as_str(), "liberty");
         assert_eq!(
             ids(&registry),
             ["liberty", "bright", "dark", "fiord", "positron"]
@@ -275,22 +272,15 @@ mod tests {
     #[test]
     fn user_styles_install_after_the_bundled_ones_unless_they_fail_or_collide() {
         let (bundled, user) = (temp_dir("ordered-bundled"), temp_dir("ordered-user"));
-        let write = |dir: &Path, file: &str, style: serde_json::Value| {
-            fs::write(dir.join(file), serde_json::to_vec(&style).unwrap()).unwrap()
-        };
         write(&bundled, "zulu.json", style(Some("Alpha")));
         write(&bundled, "liberty.json", style(Some("Liberty")));
-        write(&user, "beta.json", style(None));
+        write(&user, "Beta.json", style(None));
         write(&user, "Liberty.json", style(Some("Mine")));
         write(&user, "my style.json", style(None));
-        write(&user, "broken.json", serde_json::json!({ "version": 8 }));
+        write(&user, "broken.json", json!({ "version": 8 }));
         fs::write(user.join("notes.txt"), "not a style").unwrap();
 
-        let registry = MapStyleRegistry::load(&MapStyleDirs {
-            bundled: bundled.clone(),
-            user: user.clone(),
-        })
-        .unwrap();
+        let registry = load(&bundled, &user).unwrap();
         assert_eq!(ids(&registry), ["liberty", "zulu", "beta"]);
         assert_eq!(registry.catalog().styles()[2].label, "beta");
         assert!(registry
@@ -303,35 +293,41 @@ mod tests {
     }
 
     #[test]
+    fn a_bundled_style_that_does_not_install_or_a_missing_default_stops_the_load() {
+        let (bundled, user) = (temp_dir("strict-bundled"), temp_dir("strict-user"));
+        write(&bundled, "zulu.json", style(None));
+        assert!(load(&bundled, &user)
+            .err()
+            .unwrap()
+            .contains("no liberty map style"));
+
+        write(&bundled, "liberty.json", style(None));
+        write(&bundled, "broken.json", json!({ "version": 8 }));
+        assert!(load(&bundled, &user)
+            .err()
+            .unwrap()
+            .contains("broken.json does not install"));
+        fs::remove_dir_all(bundled).unwrap();
+        fs::remove_dir_all(user).unwrap();
+    }
+
+    #[test]
     fn a_missing_user_folder_is_created_and_a_missing_bundled_one_fails() {
         let root = temp_dir("folders");
         let user = root.join("user");
-        MapStyleRegistry::load(&MapStyleDirs {
-            bundled: bundled_dir(),
-            user: user.clone(),
-        })
-        .unwrap();
+        load(&bundled_dir(), &user).unwrap();
         assert!(user.is_dir());
-        assert!(MapStyleRegistry::load(&MapStyleDirs {
-            bundled: root.join("missing"),
-            user,
-        })
-        .is_err());
+        assert!(load(&root.join("missing"), &user).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
     fn a_served_style_reads_its_tiles_from_the_local_service() {
         let user = temp_dir("served");
-        let registry = MapStyleRegistry::load(&MapStyleDirs {
-            bundled: bundled_dir(),
-            user: user.clone(),
-        })
-        .unwrap();
-        let served: serde_json::Value = serde_json::from_slice(
+        let registry = load(&bundled_dir(), &user).unwrap();
+        let served: Json = serde_json::from_slice(
             &registry
                 .served("liberty", "http://127.0.0.1:1/tiles/{z}/{x}/{y}.pbf")
-                .unwrap()
                 .unwrap(),
         )
         .unwrap();
@@ -342,6 +338,7 @@ mod tests {
         );
         assert!(source.get("url").is_none());
         assert!(registry.served("unknown", "x").is_none());
+        assert!(registry.served("Liberty", "x").is_none());
         fs::remove_dir_all(user).unwrap();
     }
 }

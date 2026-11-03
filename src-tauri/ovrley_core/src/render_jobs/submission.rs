@@ -10,7 +10,7 @@ use crate::activity::schema::ParsedActivity;
 use crate::activity::validate_render_activity;
 use crate::error::{CoreError, CoreResult};
 use crate::raster::RasterResourceResolver;
-use ovrley_map::MapDataSource;
+use ovrley_map::MapSource;
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
@@ -35,7 +35,7 @@ pub(super) fn accept_batch(
     inspection: &VideoInspectionService,
     request: BatchRenderRequest,
     resources: Option<&dyn RasterResourceResolver>,
-    map_source: Option<Arc<dyn MapDataSource>>,
+    map_source: Option<MapSource>,
 ) -> Result<AcceptedBatch, BatchServiceError> {
     if request.jobs.is_empty() || request.jobs.len() > u32::MAX as usize {
         return Err(

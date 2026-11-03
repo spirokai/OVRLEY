@@ -23,7 +23,7 @@ use crate::normalize::parse_config_json;
 use crate::output::{RenderOutputKind, RenderOutputTarget};
 use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
-use ovrley_map::MapDataSource;
+use ovrley_map::MapSource;
 
 /// Existing single-render acceptance shape, serialized directly by the shell.
 #[derive(Debug, Serialize)]
@@ -126,7 +126,7 @@ impl RenderExecutionService {
         output_path: &str,
         overwrite: bool,
         resources: Option<&dyn RasterResourceResolver>,
-        map_source: Option<Arc<dyn MapDataSource>>,
+        map_source: Option<MapSource>,
     ) -> CoreResult<RenderAccepted> {
         let config = parse_config_json(config_json)?;
         let kind = if config.scene.composite_video_path.is_some() {
@@ -313,6 +313,6 @@ pub(crate) fn execute_render(
         session.controller(),
         target,
         request,
-        map_source.as_deref(),
+        map_source.as_ref(),
     )
 }

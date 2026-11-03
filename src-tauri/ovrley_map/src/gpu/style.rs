@@ -10,8 +10,7 @@ use maplibre_expr::{
     evaluate, is_expression, parse_filter, parse_property, typecheck, EvaluationContext, Expr, Type,
     Value,
 };
-use crate::style_file::{building_color, has_own_extrusion};
-use crate::{MapLayers, VECTOR_SOURCE};
+use crate::{MapLayers, MapStyleBuildings, VECTOR_SOURCE};
 use serde_json::{json, Value as Json};
 use std::borrow::Cow;
 
@@ -20,56 +19,21 @@ const TRANSPORTATION_LAYER: &str = "transportation";
 /// The class OpenMapTiles gives footways, cycleways, steps and bridleways.
 const PATH_CLASS: &str = "path";
 
-/// Which 3D buildings a renderer draws.
-#[derive(Clone, Debug)]
-pub enum Buildings {
-    /// No extrusions. Flat building layers still draw if the style has them.
-    None,
-    /// The style's own `fill-extrusion` layers.
-    FromStyle,
-    /// One `fill-extrusion` style layer, for styles without one. Replaces the style's own.
-    Fixed(Json),
-}
-
-impl Buildings {
-    /// A style's 3D buildings: its own `fill-extrusion` layers, or the `building` source layer with a
-    /// fixed extrusion. That takes the colour its `ovrley:building-color` names, and without one the
-    /// colour of its first visible flat building fill. Registration allows a style its own extrusions
-    /// or `ovrley:building-color`, not both. A style with none of the three draws no 3D buildings.
-    pub fn for_style(style_json: &[u8]) -> Result<Self, String> {
-        let style: Json = serde_json::from_slice(style_json)
-            .map_err(|error| format!("Map style is not valid JSON: {error}"))?;
-        let color = match building_color(&style) {
-            Some(color) => color,
-            None if has_own_extrusion(&style) => return Ok(Self::FromStyle),
-            // A fill colour reads the same as an extrusion colour: both are data-driven colours.
-            None => {
-                let flat = style["layers"].as_array().into_iter().flatten().find(|layer| {
-                    layer["type"] == "fill"
-                        && layer["source"] == VECTOR_SOURCE
-                        && layer["source-layer"] == "building"
-                        && layer["layout"]["visibility"] != "none"
-                });
-                match flat.and_then(|layer| layer["paint"].get("fill-color")) {
-                    Some(color) => color,
-                    None => return Ok(Self::None),
-                }
-            }
-        };
-        Ok(Self::Fixed(serde_json::json!({
-            "id": "fixed-building-3d",
-            "type": "fill-extrusion",
-            "source": VECTOR_SOURCE,
-            "source-layer": "building",
-            "minzoom": 14,
-            "filter": ["!", ["has", "hide_3d"]],
-            "paint": {
-                "fill-extrusion-color": color,
-                "fill-extrusion-height": ["get", "render_height"],
-                "fill-extrusion-base": ["get", "render_min_height"],
-            },
-        })))
-    }
+/// OVRLEY's extrusion of the `building` source layer, for a style without its own.
+fn added_buildings_layer(color: &Json) -> Json {
+    json!({
+        "id": "added-building-3d",
+        "type": "fill-extrusion",
+        "source": VECTOR_SOURCE,
+        "source-layer": "building",
+        "minzoom": 14,
+        "filter": ["!", ["has", "hide_3d"]],
+        "paint": {
+            "fill-extrusion-color": color,
+            "fill-extrusion-height": ["get", "render_height"],
+            "fill-extrusion-base": ["get", "render_min_height"],
+        },
+    })
 }
 
 /// The drawable part of one style, with zoom-dependent layer values evaluated at `zoom`.
@@ -134,7 +98,7 @@ pub(crate) fn parse_style(
     toggles: MapLayers,
     zoom: f64,
     pixel_ratio: f32,
-    buildings: &Buildings,
+    buildings: &MapStyleBuildings,
 ) -> Result<ParsedStyle, String> {
     let style: Json = serde_json::from_slice(style_json)
         .map_err(|error| format!("Map style is not valid JSON: {error}"))?;
@@ -144,16 +108,19 @@ pub(crate) fn parse_style(
         .ok_or_else(|| "Map style has no layers".to_string())?;
 
     let keeps_layer = |layer: &Json| match buildings {
-        Buildings::FromStyle => true,
-        Buildings::None | Buildings::Fixed(_) => layer["type"] != "fill-extrusion",
+        MapStyleBuildings::Own => true,
+        MapStyleBuildings::None | MapStyleBuildings::Added(_) => layer["type"] != "fill-extrusion",
+    };
+    let added = match buildings {
+        MapStyleBuildings::Added(color) => Some(added_buildings_layer(color)),
+        MapStyleBuildings::None | MapStyleBuildings::Own => None,
     };
 
-    // Fixed extrusions stand on the style's flat buildings and hide their outlines, which would
+    // Added extrusions stand on the style's flat buildings and hide their outlines, which would
     // otherwise add about 30 % to the vertices of the styles that have them.
-    let fixed_extrusions_draw = match buildings {
-        Buildings::Fixed(layer) => is_drawable(layer, toggles, zoom),
-        Buildings::None | Buildings::FromStyle => false,
-    };
+    let added_extrusions_draw = added
+        .as_ref()
+        .is_some_and(|layer| is_drawable(layer, toggles, zoom));
 
     let mut parsed = ParsedStyle {
         zoom,
@@ -173,7 +140,7 @@ pub(crate) fn parse_style(
             })
         } else {
             parse_vector_layer(layer, id, zoom, pixel_ratio, next_index).and_then(|vector_layer| {
-                let outline = if layer["source-layer"] == "building" && fixed_extrusions_draw {
+                let outline = if layer["source-layer"] == "building" && added_extrusions_draw {
                     None
                 } else {
                     parse_fill_outline(layer, id, zoom, next_index + 1)?
@@ -191,29 +158,24 @@ pub(crate) fn parse_style(
             Err(error) => log::warn!("Skipping map layer {id}: {error}"),
         }
     }
-    if let Buildings::Fixed(layer) = buildings {
-        push_fixed_layer(&mut parsed, layer, toggles, pixel_ratio, next_index)?;
+    if let Some(layer) = &added {
+        push_added_layer(&mut parsed, layer, toggles, pixel_ratio, next_index)?;
     }
     Ok(parsed)
 }
 
-/// The fixed building layer is our configuration, not external style data, so a bad one fails.
-fn push_fixed_layer(
+/// The added building layer is OVRLEY's, with a colour registration checked, so a bad one fails.
+fn push_added_layer(
     parsed: &mut ParsedStyle,
     layer: &Json,
     toggles: MapLayers,
     pixel_ratio: f32,
     index: u32,
 ) -> Result<(), String> {
-    let id = layer["id"].as_str().unwrap_or("<unnamed>");
-    if layer["type"] != "fill-extrusion" || layer["source"] != VECTOR_SOURCE {
-        return Err(format!(
-            "Fixed building layer {id} must be a fill-extrusion layer of {VECTOR_SOURCE}"
-        ));
-    }
     if is_drawable(layer, toggles, parsed.zoom) {
-        let vector_layer = parse_vector_layer(layer, id, parsed.zoom, pixel_ratio, index)
-            .map_err(|error| format!("Fixed building layer {id}: {error}"))?;
+        let vector_layer =
+            parse_vector_layer(layer, "added-building-3d", parsed.zoom, pixel_ratio, index)
+                .map_err(|error| format!("Added building layer: {error}"))?;
         parsed.vector_layers.push(vector_layer);
     }
     Ok(())
@@ -551,7 +513,6 @@ pub(crate) fn passes_filter(filter: Option<&Expr>, context: &EvaluationContext) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BUILDING_COLOR_KEY;
     use maplibre_expr::Feature;
     use std::collections::BTreeMap;
 
@@ -597,25 +558,5 @@ mod tests {
     fn hidden_paths_leave_other_source_layers_alone() {
         let water = json!({ "source-layer": "water", "filter": ["==", ["get", "class"], "path"] });
         assert!(matches!(without_hidden_features(&water, HIDDEN), Cow::Borrowed(_)));
-    }
-
-    #[test]
-    fn added_buildings_take_the_named_colour_or_else_the_flat_buildings_colour() {
-        let fill = json!({ "id": "b", "type": "fill", "source": VECTOR_SOURCE, "source-layer": "building",
-            "paint": { "fill-color": { "stops": [[13, "red"], [16, "blue"]] } } });
-        let read = |style: Json| Buildings::for_style(&serde_json::to_vec(&style).unwrap()).unwrap();
-        let extrusion_color = |buildings: Buildings| match buildings {
-            Buildings::Fixed(layer) => layer["paint"]["fill-extrusion-color"].clone(),
-            other => panic!("expected a fixed extrusion, got {other:?}"),
-        };
-
-        let named = json!({ "metadata": { BUILDING_COLOR_KEY: "green" }, "layers": [fill] });
-        assert_eq!(extrusion_color(read(named)), json!("green"));
-        let flat = json!({ "layers": [fill] });
-        assert_eq!(extrusion_color(read(flat)), fill["paint"]["fill-color"]);
-
-        let own = json!({ "layers": [fill, { "id": "3d", "type": "fill-extrusion", "source": VECTOR_SOURCE }] });
-        assert!(matches!(read(own), Buildings::FromStyle));
-        assert!(matches!(read(json!({ "layers": [] })), Buildings::None));
     }
 }

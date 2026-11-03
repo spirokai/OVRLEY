@@ -3,11 +3,12 @@ import { listMapStyles } from '@/api/backend'
 import useStore from '@/store/useStore'
 
 /**
- * The map style picker. Names stay as their files give them, in every language. A style that isn't
- * installed draws the first installed one, as the backend resolves it, so that is the one shown.
+ * A map style picker over the installed styles. Names stay as their files give them, in every
+ * language. A style that isn't installed draws the first installed one, as the backend resolves it,
+ * so that is the one shown. Until the styles load, and outside the desktop app, none is.
  *
- * @param {string} mapStyle The widget's style id.
- * @returns {{options: {value: string, label: string}[], value: string}} Installed styles and the drawn one.
+ * @param {string|null} mapStyle The chosen style id, or null for the first installed style.
+ * @returns {{options: {value: string, label: string}[], value: string|null}} Installed styles and the drawn one.
  */
 export function useMapStyleSelect(mapStyle) {
   const [styles, setStyles] = useState([])
@@ -26,6 +27,6 @@ export function useMapStyleSelect(mapStyle) {
   }, [])
   return {
     options: styles.map((style) => ({ value: style.id, label: style.label })),
-    value: (styles.find((style) => style.id === mapStyle) ?? styles[0])?.id ?? mapStyle,
+    value: (styles.find((style) => style.id === mapStyle) ?? styles[0])?.id ?? null,
   }
 }

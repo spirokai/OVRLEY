@@ -1,10 +1,12 @@
 //! What a map draws: which installed style and which layers.
 //!
-//! The shell registers the installed styles at startup and hands the catalog to everything that
-//! validates a map widget, the WASM preview included. A widget naming a style that isn't installed
-//! draws the first one instead, so a project keeps working on a machine without that style.
+//! The shell registers the installed styles at startup. At least one is always installed, and a
+//! widget naming a style that isn't installed draws the first one instead, so a project keeps
+//! working on a machine without that style. Only drawing resolves a style: validating a widget
+//! checks that its style id is well formed, nothing more.
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value as Json;
 use std::fmt;
 
 /// Style pixels along one tile edge at pixel ratio 1.
@@ -41,9 +43,8 @@ pub struct MapStyleSpec {
     pub layers: MapLayers,
 }
 
-/// An installed style's id: its file name without `.json`. ASCII letters, digits, `-` and `_`, so
-/// it can sit in a URL path. Two ids that differ only in case name the same file on Windows, so they
-/// collide.
+/// An installed style's id: its file name without `.json`, in lowercase. Lowercase ASCII letters,
+/// digits, `-` and `_`, so it can sit in a URL path and names one file on any file system.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct MapStyleId(String);
@@ -51,12 +52,12 @@ pub struct MapStyleId(String);
 impl MapStyleId {
     pub fn new(id: &str) -> Result<Self, String> {
         if id.is_empty()
-            || !id
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+            || !id.bytes().all(|byte| {
+                byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-' || byte == b'_'
+            })
         {
             return Err(format!(
-                "Map style id {id:?} must be ASCII letters, digits, '-' or '_'"
+                "Map style id {id:?} must be lowercase ASCII letters, digits, '-' or '_'"
             ));
         }
         Ok(Self(id.to_string()))
@@ -64,11 +65,6 @@ impl MapStyleId {
 
     pub fn as_str(&self) -> &str {
         &self.0
-    }
-
-    /// Whether the two would name the same file on a case-insensitive file system.
-    pub fn collides(&self, other: &Self) -> bool {
-        self.0.eq_ignore_ascii_case(&other.0)
     }
 }
 
@@ -92,6 +88,19 @@ impl fmt::Display for MapStyleId {
     }
 }
 
+/// The 3D buildings a style draws when a widget shows them.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MapStyleBuildings {
+    /// The style has nothing to extrude.
+    None,
+    /// Its own `fill-extrusion` layers.
+    Own,
+    /// OVRLEY's extrusion of the `building` source layer, in this colour: a colour value as a
+    /// style's `fill-extrusion-color` takes it.
+    Added(Json),
+}
+
 /// One installed style, as the editor lists it and the widget draws it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MapStyleInfo {
@@ -100,26 +109,24 @@ pub struct MapStyleInfo {
     pub label: String,
     /// RGB of the style's opaque background, which the widget shows until its map draws.
     pub background: [u8; 3],
+    pub buildings: MapStyleBuildings,
 }
 
-/// The installed styles, in the order the editor lists them. The first is what a widget draws when
-/// its own style isn't installed.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+/// The installed styles, in the order the editor lists them: never empty, and the first is what a
+/// widget draws when its own style isn't installed.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "Vec<MapStyleInfo>", into = "Vec<MapStyleInfo>")]
 pub struct MapStyleCatalog(Vec<MapStyleInfo>);
 
 impl MapStyleCatalog {
-    /// Fails when two ids collide.
+    /// Fails without any style, or when two share an id.
     pub fn new(styles: Vec<MapStyleInfo>) -> Result<Self, String> {
+        if styles.is_empty() {
+            return Err("No map style is installed".to_string());
+        }
         for (index, style) in styles.iter().enumerate() {
-            if let Some(earlier) = styles[..index]
-                .iter()
-                .find(|earlier| earlier.id.collides(&style.id))
-            {
-                return Err(format!(
-                    "Map styles {} and {} collide",
-                    earlier.id, style.id
-                ));
+            if styles[..index].iter().any(|earlier| earlier.id == style.id) {
+                return Err(format!("Map style {} is listed twice", style.id));
             }
         }
         Ok(Self(styles))
@@ -129,14 +136,13 @@ impl MapStyleCatalog {
         &self.0
     }
 
-    pub fn get(&self, id: &str) -> Option<&MapStyleInfo> {
-        self.0.iter().find(|style| style.id.as_str() == id)
+    pub fn get(&self, id: &MapStyleId) -> Option<&MapStyleInfo> {
+        self.0.iter().find(|style| &style.id == id)
     }
 
-    /// What a widget asking for `id` draws: that style when installed, otherwise the first. `None`
-    /// only when no style is installed at all.
-    pub fn resolve(&self, id: &str) -> Option<&MapStyleInfo> {
-        self.get(id).or_else(|| self.0.first())
+    /// What a widget asking for `id` draws: that style when installed, otherwise the first.
+    pub fn resolve(&self, id: &MapStyleId) -> &MapStyleInfo {
+        self.get(id).unwrap_or(&self.0[0])
     }
 }
 
@@ -163,25 +169,31 @@ mod tests {
             id: MapStyleId::new(id).unwrap(),
             label: id.to_string(),
             background: [0, 0, 0],
+            buildings: MapStyleBuildings::None,
         }
+    }
+
+    fn id(id: &str) -> MapStyleId {
+        MapStyleId::new(id).unwrap()
     }
 
     #[test]
     fn an_installed_style_resolves_to_itself_and_a_missing_one_to_the_first() {
         let catalog = MapStyleCatalog::new(vec![style("liberty"), style("dark")]).unwrap();
-        assert_eq!(catalog.resolve("dark").unwrap().id.as_str(), "dark");
-        assert_eq!(catalog.resolve("gone").unwrap().id.as_str(), "liberty");
-        assert!(MapStyleCatalog::default().resolve("liberty").is_none());
+        assert_eq!(catalog.resolve(&id("dark")).id, id("dark"));
+        assert_eq!(catalog.resolve(&id("gone")).id, id("liberty"));
     }
 
     #[test]
-    fn ids_that_differ_only_in_case_collide() {
-        assert!(MapStyleCatalog::new(vec![style("liberty"), style("Liberty")]).is_err());
+    fn a_catalog_is_never_empty_and_lists_each_id_once() {
+        assert!(MapStyleCatalog::new(Vec::new()).is_err());
+        assert!(serde_json::from_str::<MapStyleCatalog>("[]").is_err());
+        assert!(MapStyleCatalog::new(vec![style("liberty"), style("liberty")]).is_err());
     }
 
     #[test]
-    fn an_id_must_fit_a_url_path() {
-        for id in ["", "my style", "../liberty", "liberty.json"] {
+    fn an_id_must_fit_a_url_path_in_lowercase() {
+        for id in ["", "my style", "../liberty", "liberty.json", "Liberty"] {
             assert!(MapStyleId::new(id).is_err(), "{id:?}");
         }
         assert!(MapStyleId::new("my-style_2").is_ok());

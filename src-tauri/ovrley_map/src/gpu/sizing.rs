@@ -4,9 +4,9 @@
 //! depends on the area and style, not on zoom or pitch alone. So a host measures its tiles first.
 
 use super::pool::PoolEntries;
-use super::style::{parse_style, Buildings, ParsedStyle};
+use super::style::{parse_style, ParsedStyle};
 use super::tile::{prepare_tile, PreparedLayer};
-use crate::{MapDataSource, MapStyleSpec, MapViewport, TileId};
+use crate::{MapDataSource, MapStyleBuildings, MapStyleSpec, MapViewport, TileId};
 use std::collections::HashMap;
 
 /// Entries per geometry pool when a host has not measured: 73 MB of ground buffers. Upstream's
@@ -95,7 +95,7 @@ impl MapTileSizer {
         spec: MapStyleSpec,
         viewport: MapViewport,
         style_zoom: f64,
-        buildings: &Buildings,
+        buildings: &MapStyleBuildings,
         source: &dyn MapDataSource,
     ) -> Result<Self, String> {
         Ok(Self {

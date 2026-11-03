@@ -154,15 +154,12 @@ pub fn backend_render_preview_frame(
     parsed_activity_json: &str,
     second: f64,
     raster_resources: Option<&dyn crate::raster::RasterResourceResolver>,
+    map_source: Option<&ovrley_map::MapSource>,
 ) -> CoreResult<Value> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
-    // It renders without a map source, so its maps have no style.
-    let validated = crate::normalize::validate_render_config_with_resources(
-        config,
-        raster_resources,
-        &ovrley_map::MapStyleCatalog::default(),
-    )?;
+    let validated =
+        crate::normalize::validate_render_config_with_resources(config, raster_resources)?;
     let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -178,6 +175,7 @@ pub fn backend_render_preview_frame(
         &dense_activity,
         second,
         &output_path,
+        map_source,
     )?;
 
     Ok(json!({

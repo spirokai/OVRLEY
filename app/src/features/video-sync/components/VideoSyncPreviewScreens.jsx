@@ -32,7 +32,7 @@ function CourseLocationAction({ actionPoint, onConfirm }) {
   )
 }
 
-function MapStyleSelector({ style, styles, onStyleChange }) {
+function MapStyleSelector({ style, styleOptions, onStyleChange }) {
   const label = useTranslation().t('videoSync.mapStyle', 'Map style')
   return (
     <div className="absolute bottom-2 left-2 z-10" onClick={(event) => event.stopPropagation()}>
@@ -41,9 +41,9 @@ function MapStyleSelector({ style, styles, onStyleChange }) {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {styles.map((installed) => (
-            <SelectItem key={installed.id} value={installed.id}>
-              {installed.label}
+          {styleOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
             </SelectItem>
           ))}
         </SelectContent>
@@ -52,11 +52,11 @@ function MapStyleSelector({ style, styles, onStyleChange }) {
   )
 }
 
-function VideoSyncMapPreview({ containerRef, actionPoint, onConfirmActionPoint, onStyleChange, style, styles }) {
+function VideoSyncMapPreview({ containerRef, actionPoint, onConfirmActionPoint, onStyleChange, style, styleOptions }) {
   return (
     <div className="relative isolate h-full w-full bg-surface-elevated" data-testid="maplibre-map">
       <div ref={containerRef} className="h-full w-full" />
-      {style !== null && <MapStyleSelector style={style} styles={styles} onStyleChange={onStyleChange} />}
+      {style !== null && <MapStyleSelector style={style} styleOptions={styleOptions} onStyleChange={onStyleChange} />}
       <CourseLocationAction actionPoint={actionPoint} onConfirm={onConfirmActionPoint} />
     </div>
   )
@@ -122,7 +122,7 @@ export default function VideoSyncPreviewScreens({
     speedCanvasRef,
     speedError,
     style,
-    styles,
+    styleOptions,
     onStyleChange,
   } = useVideoSyncPreview({
     activity,
@@ -166,7 +166,7 @@ export default function VideoSyncPreviewScreens({
           onConfirmActionPoint={onConfirmActionPoint}
           onStyleChange={onStyleChange}
           style={style}
-          styles={styles}
+          styleOptions={styleOptions}
         />
       </div>
     </div>
