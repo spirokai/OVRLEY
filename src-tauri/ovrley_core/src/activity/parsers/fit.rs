@@ -10,7 +10,8 @@
 //! - Bytes after the first FIT file's data section are ignored, including a missing CRC.
 //! - Developer fields overlay native fields of the same name, which is how sensors
 //!   supply metrics that the FIT profile has no record field for. Developer fields
-//!   without a description are skipped (see `patches/README.md`).
+//!   without a description are named `unknown_dev_field_<index>_<number>`, which
+//!   no lookup reads.
 //! - Non-numeric `altitude` and `calories` values fail the import. Other unreadable
 //!   sensor values stay absent.
 //!

@@ -27,10 +27,8 @@ skia-safe = { git = "https://github.com/rust-skia/rust-skia", rev = "b7f043e0b1e
   "no-compile",
 ] }
 tzf-rs = { version = "1.3.7", default-features = false, features = ["bundled"] }
-# build.rs applies scripts/patches/telemetry-parser-dji-camera-metadata.patch
-# to this checkout automatically at build time (no fork needed).
-telemetry-parser = { git = "https://github.com/AdrianEddy/telemetry-parser.git", rev = "fd9a73e" }
-fitparser = "0.11"
+telemetry-parser = { git = "https://github.com/AdrianEddy/telemetry-parser.git", rev = "7743443" }
+fitparser = "0.12"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.3"

@@ -198,7 +198,7 @@ cyclemetry/
 | Desktop shell      | Tauri             | 2.9.x                                       |
 | Rendering (Rust)   | skia-safe         | 0.97.2                                      |
 | Video encoding     | FFmpeg            | 8.1+ (via subprocess)                       |
-| FIT decoding       | fitparser         | 0.11 (patched by `ovrley_core/build.rs`)    |
+| FIT decoding       | fitparser         | 0.12                                        |
 | Drag/resize        | react-moveable    | latest                                      |
 | Icons              | lucide-react      | latest                                      |
 | Package manager    | pnpm              | 10.25.0                                     |
