@@ -7,6 +7,7 @@ use crate::{
     render::text::FontResolver,
     widgets::map::frame_provider::PreviewMapFrames,
 };
+use ovrley_map::MapStyleCatalog;
 use skia_safe::{FontMgr, Typeface};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -73,6 +74,8 @@ pub struct PreviewSession {
     pub images: crate::widgets::raster::preview::PreviewImages,
     /// Maps are a canvas under the widget, so no frame ever arrives through this.
     pub map_frames: Arc<PreviewMapFrames>,
+    /// The installed map styles. The host sets them before it creates a map.
+    pub map_styles: MapStyleCatalog,
     activity: Option<ActivitySampler>,
     /// The editor's disabled laps, applied to every activity this session samples.
     disabled_laps: Vec<usize>,
@@ -122,7 +125,12 @@ impl PreviewSession {
                 return Err(WidgetError::Config("map_view requires a map".into()));
             };
             return Ok(ResizeUpdate::MapView(
-                crate::widgets::map::interaction::adjust_map_view(widget, scene, gesture)?,
+                crate::widgets::map::interaction::adjust_map_view(
+                    widget,
+                    scene,
+                    &self.map_styles,
+                    gesture,
+                )?,
             ));
         }
         if let WidgetRequest::Backdrop { widget, scene, .. } = request.origin {
@@ -161,6 +169,7 @@ impl PreviewSession {
                 crate::widgets::map::interaction::resize_map(
                     widget,
                     scene,
+                    &self.map_styles,
                     size,
                     request.fixed,
                     request.point,
@@ -433,6 +442,13 @@ impl PreviewSession {
     pub fn activity(&self) -> Option<&ActivitySampler> {
         self.activity.as_ref()
     }
+    /// The shell's installed map styles, as JSON. Maps created after this resolve against them.
+    pub fn replace_map_styles(&mut self, bytes: &[u8]) -> WidgetResult<()> {
+        self.map_styles =
+            serde_json::from_slice(bytes).map_err(|error| WidgetError::Config(error.to_string()))?;
+        Ok(())
+    }
+
     pub fn replace_activity(&mut self, bytes: &[u8]) -> WidgetResult<()> {
         self.activity = if bytes.is_empty() {
             None
@@ -499,8 +515,13 @@ impl PreviewSession {
         Ok(())
     }
     pub fn create_widget(&mut self, request: WidgetRequest) -> WidgetResult<u32> {
-        let widget =
-            PreviewInstance::new(request, &self.fonts, &self.images, self.map_frames.clone())?;
+        let widget = PreviewInstance::new(
+            request,
+            &self.fonts,
+            &self.images,
+            self.map_frames.clone(),
+            &self.map_styles,
+        )?;
         self.next_id = self
             .next_id
             .checked_add(1)
@@ -512,7 +533,13 @@ impl PreviewSession {
         self.widgets
             .get_mut(&id)
             .ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?
-            .update(request, &self.fonts, &self.images, self.map_frames.clone())
+            .update(
+                request,
+                &self.fonts,
+                &self.images,
+                self.map_frames.clone(),
+                &self.map_styles,
+            )
     }
     pub fn render(&mut self, second: f64) -> WidgetResult<()> {
         if !second.is_finite() {

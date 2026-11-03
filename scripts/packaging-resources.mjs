@@ -12,6 +12,7 @@ export const PACKAGING_DOCUMENTS = {
 export async function preparePackagingResources(rootDir = resolve(import.meta.dirname, '..')) {
   await ensureDirectory(join(rootDir, 'fonts'), 'Fonts source directory')
   await ensureDirectory(join(rootDir, 'templates'), 'Templates source directory')
+  await ensureDirectory(join(rootDir, 'assets', 'map-styles'), 'Map styles source directory')
 
   const ffmpegBinary = join(rootDir, 'vendor', 'ffmpeg', 'bin', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')
   const ffprobeBinary = join(rootDir, 'vendor', 'ffmpeg', 'bin', process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe')
@@ -38,6 +39,12 @@ function buildThirdPartyNotice(ffmpegBinaryPath) {
 
   return [
     'THIRD-PARTY NOTICES',
+    '',
+    'Map styles',
+    '----------',
+    'The map styles in map-styles/ are OpenFreeMap styles (MIT License, Copyright (c) 2023 Zsolt Ero),',
+    'forked from OpenMapTiles and OSM Liberty styles: code BSD 3-Clause, design CC BY 4.0.',
+    'map-styles/README.md lists each one. Map data (c) OpenStreetMap contributors.',
     '',
     'FFmpeg',
     '-------',
@@ -102,7 +109,7 @@ function buildLinuxInstallDocument() {
     '',
     'What is inside, and what comes from your system',
     '-----------------------------------------------',
-    'The AppImage contains OVRLEY, FFmpeg, FFprobe, fonts, and templates.',
+    'The AppImage contains OVRLEY, FFmpeg, FFprobe, fonts, templates, and map styles.',
     'It deliberately does NOT contain WebKitGTK, GTK, GLib, GStreamer, Mesa/EGL/GL, or GPU video drivers. Those must match your distribution, kernel, and GPU, and bundled copies are a common cause of crashes and blank windows on newer distributions.',
     'Package names below are the usual ones and can differ between releases. If a package is not found, search your package manager for the name in quotes.',
     '',

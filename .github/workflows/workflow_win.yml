@@ -181,7 +181,7 @@ jobs:
           Remove-Item -LiteralPath $extractDirectory -Recurse -Force -ErrorAction SilentlyContinue
           Expand-Archive -LiteralPath $portablePath -DestinationPath $extractDirectory
           $portableRoot = Join-Path $extractDirectory 'OVRLEY'
-          foreach ($requiredPath in @('OVRLEY.exe', '.ovrley-portable', 'fonts', 'templates', 'vendor\ffmpeg\bin\ffmpeg.exe', 'vendor\ffmpeg\bin\ffprobe.exe', 'THIRD_PARTY_NOTICES.txt')) {
+          foreach ($requiredPath in @('OVRLEY.exe', '.ovrley-portable', 'fonts', 'templates', 'map-styles', 'vendor\ffmpeg\bin\ffmpeg.exe', 'vendor\ffmpeg\bin\ffprobe.exe', 'THIRD_PARTY_NOTICES.txt')) {
             if (-not (Test-Path -LiteralPath (Join-Path $portableRoot $requiredPath))) { throw "Portable ZIP is missing $requiredPath." }
           }
 

@@ -15,6 +15,7 @@ use crate::{
     error::{WidgetError, WidgetResult},
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
 };
+use ovrley_map::MapStyleCatalog;
 use std::ops::RangeInclusive;
 
 /// The editor's smallest widget edge.
@@ -63,6 +64,7 @@ fn dominant_factor(requested: [f32; 2], current: [f32; 2]) -> f32 {
 pub fn resize_map(
     widget: MapConfig,
     scene: ScenePresentationConfig,
+    styles: &MapStyleCatalog,
     size: [f32; 2],
     fixed: [f32; 2],
     point: [f32; 2],
@@ -70,7 +72,7 @@ pub fn resize_map(
     if size.iter().any(|value| !value.is_finite() || *value <= 0.0) {
         return Err(WidgetError::Config("invalid map resize size".into()));
     }
-    let config = validate_map_widget(&widget, 0)?;
+    let config = validate_map_widget(&widget, 0, styles)?;
     let scene = validate_scene_presentation(scene)?;
     let requested = [size[0] / scene.scale, size[1] / scene.scale];
     // A circle has no sides, so it always scales.
@@ -135,6 +137,7 @@ pub enum MapViewUpdate {
 pub fn adjust_map_view(
     widget: MapConfig,
     scene: ScenePresentationConfig,
+    styles: &MapStyleCatalog,
     gesture: MapViewGesture,
 ) -> WidgetResult<MapViewUpdate> {
     let finite = match gesture {
@@ -146,7 +149,7 @@ pub fn adjust_map_view(
     if !finite {
         return Err(WidgetError::Config("invalid map view gesture".into()));
     }
-    let config = validate_map_widget(&widget, 0)?;
+    let config = validate_map_widget(&widget, 0, styles)?;
     let scene = validate_scene_presentation(scene)?;
     let levels = |wheel_delta: f32| -wheel_delta / WHEEL_PIXELS_PER_LEVEL;
     let (zoom_offset, pan) = match (config.camera, gesture) {
@@ -228,7 +231,7 @@ mod tests {
     fn the_view_follows_the_drag_and_zooms_around_the_cursor() {
         // At zoom offset 0 the route's longest side spans 420 widget units, 840 scene pixels at scale 2.
         let [zoom, pan_x, pan_y] = fixed(
-            adjust_map_view(map("fixed"), scene(), MapViewGesture::Pan([84.0, -42.0])).unwrap(),
+            adjust_map_view(map("fixed"), scene(), &MapStyleCatalog::default(), MapViewGesture::Pan([84.0, -42.0])).unwrap(),
         );
         assert_eq!(zoom, 0.0);
         assert!((pan_x - 0.1).abs() < 1e-6 && (pan_y + 0.05).abs() < 1e-6);
@@ -239,6 +242,7 @@ mod tests {
             adjust_map_view(
                 map("fixed"),
                 scene(),
+                &MapStyleCatalog::default(),
                 MapViewGesture::Zoom {
                     wheel_delta: -500.0,
                     point: centre,
@@ -252,6 +256,7 @@ mod tests {
             adjust_map_view(
                 map("fixed"),
                 scene(),
+                &MapStyleCatalog::default(),
                 MapViewGesture::Zoom {
                     wheel_delta: -500.0,
                     point: right,
@@ -261,6 +266,6 @@ mod tests {
         );
         assert!((pan_x + 0.05).abs() < 1e-6);
 
-        assert!(adjust_map_view(map("follow"), scene(), MapViewGesture::Pan([1.0, 0.0])).is_err());
+        assert!(adjust_map_view(map("follow"), scene(), &MapStyleCatalog::default(), MapViewGesture::Pan([1.0, 0.0])).is_err());
     }
 }

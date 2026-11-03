@@ -37,7 +37,7 @@ use crate::{
         },
     },
 };
-use ovrley_map::MapCamera;
+use ovrley_map::{MapCamera, MapStyleCatalog};
 use serde::{Deserialize, Deserializer, Serialize};
 use skia_safe::Canvas;
 use std::sync::Arc;
@@ -313,6 +313,7 @@ impl PreviewWidget {
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
         map_frames: Arc<dyn MapFrameProvider>,
+        map_styles: &MapStyleCatalog,
     ) -> WidgetResult<Self> {
         match request {
             WidgetRequest::DivingProfile { widget, scene, .. } => Ok(Self::DivingProfile(
@@ -328,7 +329,7 @@ impl PreviewWidget {
                 Ok(Self::Route(PreviewRoute::new(widget, scene)?))
             }
             WidgetRequest::Map { widget, scene, .. } => Ok(Self::Map(PreviewMap::new(
-                widget, scene, map_frames, fonts,
+                widget, scene, map_frames, map_styles, fonts,
             )?)),
             WidgetRequest::Raster { widget, scene, .. } => {
                 Ok(Self::Raster(PreviewRaster::new(widget, scene, images)?))

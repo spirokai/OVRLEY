@@ -24,7 +24,7 @@ use crate::{
         value::preview::{ContentBounds, TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
     },
 };
-use ovrley_map::{MapCamera, MapRouteDraw, MapRouteLine};
+use ovrley_map::{MapCamera, MapRouteDraw, MapRouteLine, MapStyleCatalog};
 use serde_json::json;
 use skia_safe::{Canvas, Rect, Surface};
 use std::sync::{mpsc::Receiver, Arc};
@@ -83,9 +83,10 @@ impl PreviewMap {
         widget: MapConfig,
         scene: ScenePresentationConfig,
         frames: Arc<dyn MapFrameProvider>,
+        styles: &MapStyleCatalog,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
-        let config = validate_map_widget(&widget, 0)?;
+        let config = validate_map_widget(&widget, 0, styles)?;
         let host = WidgetHost::from_scene(&scene)?;
         Self::with_content(
             config,
@@ -149,9 +150,10 @@ impl PreviewMap {
         &mut self,
         widget: MapConfig,
         scene: ScenePresentationConfig,
+        styles: &MapStyleCatalog,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<()> {
-        let config = validate_map_widget(&widget, 0)?;
+        let config = validate_map_widget(&widget, 0, styles)?;
         let host = WidgetHost::from_scene(&scene)?;
         let window = host.plot_window(config.show_full_activity);
         let preview_duration = host.placeholder_duration()?;
@@ -227,7 +229,9 @@ impl PreviewMap {
 
     /// Publishes what the host's map canvas should draw at this state.
     fn publish_view(&mut self, state: &MapFrameState) -> WidgetResult<()> {
-        let (Some(camera), Some(MapContent::Activity(map))) = (state.camera, &self.content) else {
+        let (Some(spec), Some(camera), Some(MapContent::Activity(map))) =
+            (self.config.spec(), state.camera, &self.content)
+        else {
             self.view.clear();
             return Ok(());
         };
@@ -251,9 +255,9 @@ impl PreviewMap {
         let [r0, r1, r2, r3] = style.remaining_color;
         self.view = serde_json::to_vec(&json!({
             "renderer": {
-                "style": self.config.spec.style.name(),
-                "buildings": self.config.spec.layers.buildings,
-                "paths": self.config.spec.layers.paths,
+                "style": spec.style,
+                "buildings": spec.layers.buildings,
+                "paths": spec.layers.paths,
                 "pixel_ratio": viewport.pixel_ratio(),
                 "msaa_samples": self.config.msaa_samples,
             },
@@ -271,14 +275,16 @@ impl PreviewMap {
         Ok(())
     }
 
-    /// What the renderer must draw at this state; none without a camera over the activity.
+    /// What the renderer must draw at this state; none without a style, or without a camera over the
+    /// activity.
     fn frame_request(&self, state: &MapFrameState) -> Option<MapFrameRequest> {
+        let spec = self.config.spec()?;
         let camera = state.camera?;
         let Some(MapContent::Activity(map)) = &self.content else {
             return None;
         };
         Some(MapFrameRequest {
-            spec: self.config.spec,
+            spec,
             camera,
             viewport: map.viewport,
             route: MapRouteDraw {
@@ -377,6 +383,12 @@ impl PreviewMap {
     ) {
         canvas.save();
         layout.clip_shape(canvas);
+        if layout.style_missing() {
+            layout.draw_missing_style(canvas);
+            layout.draw_border(canvas);
+            canvas.restore();
+            return;
+        }
         match resolved {
             Some((_, MapBacking::Image(frame))) => layout.draw_image(canvas, frame.image()),
             Some((_, MapBacking::Layer)) => {}

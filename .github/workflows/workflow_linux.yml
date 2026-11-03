@@ -192,6 +192,7 @@ jobs:
           cp -a vendor/ffmpeg "$payload_dir/vendor/ffmpeg"
           cp -a fonts "$payload_dir/fonts"
           cp -a templates "$payload_dir/templates"
+          cp -a assets/map-styles "$payload_dir/map-styles"
           install -m 0644 THIRD_PARTY_NOTICES.txt "$payload_dir/THIRD_PARTY_NOTICES.txt"
           install -m 0644 INSTALL-linux.txt "$payload_dir/INSTALL.txt"
           install -m 0755 scripts/appimage/AppRun "$app_dir/AppRun"
@@ -243,6 +244,7 @@ jobs:
           [[ -n "$ffprobe_path" && -x "$ffprobe_path" ]] || { echo 'Extracted AppImage is missing executable FFprobe.' >&2; exit 1; }
           find "$appimage_root" -type d -path '*/fonts' -print -quit | grep -q . || { echo 'Extracted AppImage is missing fonts.' >&2; exit 1; }
           find "$appimage_root" -type d -path '*/templates' -print -quit | grep -q . || { echo 'Extracted AppImage is missing templates.' >&2; exit 1; }
+          find "$appimage_root" -type d -path '*/map-styles' -print -quit | grep -q . || { echo 'Extracted AppImage is missing map styles.' >&2; exit 1; }
           find "$appimage_root" -type f -name 'THIRD_PARTY_NOTICES.txt' -print -quit | grep -q . || { echo 'Extracted AppImage is missing third-party notices.' >&2; exit 1; }
           find "$appimage_root" -type f -name 'INSTALL.txt' -print -quit | grep -q . || { echo 'Extracted AppImage is missing Linux installation documentation.' >&2; exit 1; }
           [[ -e "$appimage_root/.DirIcon" ]] || { echo 'Extracted AppImage is missing its root icon.' >&2; exit 1; }

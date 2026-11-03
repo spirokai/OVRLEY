@@ -8,6 +8,7 @@ use crate::{
         value::preview::{TileBounds, WidgetGeometry},
     },
 };
+use ovrley_map::MapStyleCatalog;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -179,12 +180,13 @@ impl PreviewInstance {
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
         map_frames: Arc<dyn MapFrameProvider>,
+        map_styles: &MapStyleCatalog,
     ) -> WidgetResult<Self> {
         let (position, _) = request.placement()?;
         let mut config = request.clone();
         config.pixel_config();
         let mut instance = Self {
-            widget: PreviewWidget::new(request, fonts, images, map_frames)?,
+            widget: PreviewWidget::new(request, fonts, images, map_frames, map_styles)?,
             config,
             origin: position,
             position,
@@ -204,6 +206,7 @@ impl PreviewInstance {
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
         map_frames: Arc<dyn MapFrameProvider>,
+        map_styles: &MapStyleCatalog,
     ) -> WidgetResult<()> {
         let (position, transient) = request.placement()?;
         let mut config = request.clone();
@@ -257,12 +260,12 @@ impl PreviewInstance {
             (
                 PreviewWidget::Map(map),
                 WidgetRequest::Map { widget, scene, .. },
-            ) => map.update(widget, scene, fonts)?,
+            ) => map.update(widget, scene, map_styles, fonts)?,
             (PreviewWidget::Raster(raster), WidgetRequest::Raster { widget, scene, .. }) => {
                 raster.update(widget, scene, images)?
             }
             (_, request) => {
-                self.widget = PreviewWidget::new(request, fonts, images, map_frames)?;
+                self.widget = PreviewWidget::new(request, fonts, images, map_frames, map_styles)?;
                 self.rendered_revision = None;
                 self.rendered_pixels_revision = None;
             }

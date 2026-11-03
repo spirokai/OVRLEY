@@ -321,6 +321,7 @@ name = "ovrley_map"
 version = "0.1.0"
 dependencies = [
  "cgmath",
+ "serde",
 ]
 
 [[package]]

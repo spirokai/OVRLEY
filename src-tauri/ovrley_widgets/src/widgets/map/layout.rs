@@ -1,5 +1,6 @@
 //! What the widget draws itself: the flat placeholder, the marker, the attribution and the border.
-//! The map and the route arrive inside the frame.
+//! The map and the route arrive inside the frame. Without any installed style there is no map, and
+//! the widget says so instead.
 //!
 //! The renderer crops the map to the shape, so preview and export crop it the same way. This clips
 //! what the widget draws over it to that shape.
@@ -19,7 +20,7 @@ use crate::{
         route::{geometry::PLACEHOLDER_ROUTE, layout::stroke_paint},
     },
 };
-use ovrley_map::{MapRouteStyle, MapStyle};
+use ovrley_map::MapRouteStyle;
 use skia_safe::{
     AlphaType, Canvas, Color, ContourMeasure, ContourMeasureIter, FilterMode, Font, IRect, Image,
     Paint, PaintJoin, PaintStyle, Path, PathBuilder, Point, RRect, RSXform, Rect, TextBlob,
@@ -34,16 +35,12 @@ const ATTRIBUTION_TEXT_OPACITY: f32 = 0.8;
 const ATTRIBUTION_BACKING_OPACITY: f32 = 0.65;
 /// The most of a curved edge the credit fills, so it never wraps up the sides.
 const ATTRIBUTION_MAX_EDGE_SHARE: f32 = 0.9;
-
-/// Each style's own `background-color`, shown until its frame arrives.
-fn placeholder_color(style: MapStyle) -> Color {
-    match style {
-        MapStyle::Positron => Color::from_rgb(242, 243, 240),
-        MapStyle::Bright | MapStyle::Liberty => Color::from_rgb(0xf8, 0xf4, 0xf0),
-        MapStyle::Dark => Color::from_rgb(12, 12, 12),
-        MapStyle::Fiord => Color::from_rgb(0x45, 0x51, 0x6e),
-    }
-}
+const MISSING_STYLE_TEXT: &str = "Map style missing";
+const MISSING_STYLE_FONT_SIZE: f32 = 14.0;
+/// The most of the frame's width the text fills.
+const MISSING_STYLE_MAX_WIDTH_SHARE: f32 = 0.85;
+const MISSING_STYLE_FILL: Color = Color::from_rgb(0x4a, 0x4a, 0x4a);
+const MISSING_STYLE_TEXT_OPACITY: f32 = 0.85;
 
 fn color_floats(color: &str, opacity: f32) -> [f32; 4] {
     let color = parse_color(color, opacity);
@@ -188,6 +185,61 @@ impl Attribution {
     }
 }
 
+/// What fills the frame under everything else.
+enum Backdrop {
+    /// The style's background, shown until its frame arrives, and the map's credit over it.
+    Map {
+        background: Paint,
+        attribution: Attribution,
+    },
+    /// No style is installed, so there is no map to draw.
+    MissingStyle {
+        fill: Paint,
+        text: Option<TextBlob>,
+        origin: Point,
+        text_paint: Paint,
+    },
+}
+
+impl Backdrop {
+    fn missing_style(
+        config: &ValidatedMapWidget,
+        scene: &ValidatedScenePresentation,
+        frame: Rect,
+        opacity: f32,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<Self> {
+        let mut font: Font = resolve_font(
+            fonts,
+            Some(&config.font),
+            MISSING_STYLE_FONT_SIZE * scene.scale,
+        )?;
+        let (natural, _) = font.measure_str(MISSING_STYLE_TEXT, None);
+        let room = frame.width() * MISSING_STYLE_MAX_WIDTH_SHARE;
+        if natural > room {
+            font.set_size(font.size() * (room / natural).max(f32::EPSILON));
+        }
+        let (width, _) = font.measure_str(MISSING_STYLE_TEXT, None);
+        let (_, metrics) = font.metrics();
+        let mut fill = Paint::default();
+        fill.set_color(MISSING_STYLE_FILL);
+        fill.set_alpha_f(opacity);
+        let mut text_paint = Paint::default();
+        text_paint.set_anti_alias(true);
+        text_paint.set_color(Color::WHITE);
+        text_paint.set_alpha_f(MISSING_STYLE_TEXT_OPACITY * opacity);
+        Ok(Self::MissingStyle {
+            fill,
+            text: TextBlob::from_str(MISSING_STYLE_TEXT, &font),
+            origin: Point::new(
+                frame.center_x() - width / 2.0,
+                frame.center_y() - (metrics.ascent + metrics.descent) / 2.0,
+            ),
+            text_paint,
+        })
+    }
+}
+
 /// The caret stands in the scene. The circles mark a point, so they stay flat on the frame.
 enum MapMarker {
     Arrow(MapArrow),
@@ -208,12 +260,11 @@ pub struct MapLayout {
     /// Whole scene pixels each corner reaches along the frame's edges.
     corner_margin: i32,
     border: Option<(RRect, Paint)>,
-    placeholder_paint: Paint,
+    backdrop: Backdrop,
     image_paint: Paint,
     completed_paint: Paint,
     remaining_paint: Paint,
     marker: MapMarker,
-    attribution: Attribution,
 }
 
 impl MapLayout {
@@ -260,9 +311,27 @@ impl MapLayout {
             let radius = (corner_radius - half).max(0.0);
             (RRect::new_rect_xy(ring, radius, radius), paint)
         });
-        let mut placeholder_paint = Paint::default();
-        placeholder_paint.set_color(placeholder_color(config.spec.style));
-        placeholder_paint.set_alpha_f(opacity);
+        let backdrop = match &config.style {
+            Some(style) => {
+                let [red, green, blue] = style.background;
+                let mut background = Paint::default();
+                background.set_color(Color::from_rgb(red, green, blue));
+                background.set_alpha_f(opacity);
+                Backdrop::Map {
+                    background,
+                    attribution: Attribution::new(
+                        config,
+                        scene,
+                        frame,
+                        corner_radius,
+                        border_width,
+                        opacity,
+                        fonts,
+                    )?,
+                }
+            }
+            None => Backdrop::missing_style(config, scene, frame, opacity, fonts)?,
+        };
         let mut image_paint = Paint::default();
         image_paint.set_alpha_f(opacity);
         Ok(Self {
@@ -284,7 +353,7 @@ impl MapLayout {
                 ),
                 width_px: line_width * raster_scale.value(),
             },
-            placeholder_paint,
+            backdrop,
             image_paint,
             completed_paint: stroke_paint(
                 &path.completed_line_color,
@@ -311,15 +380,6 @@ impl MapLayout {
                     scene.scale,
                 )),
             },
-            attribution: Attribution::new(
-                config,
-                scene,
-                frame,
-                corner_radius,
-                border_width,
-                opacity,
-                fonts,
-            )?,
         })
     }
 
@@ -369,11 +429,12 @@ impl MapLayout {
         );
     }
 
-    /// Copies everything outside the corners, and tells whether it did. Every style preset paints an
-    /// opaque background and the renderer's shape only crops inside the corners, so these pixels are
-    /// opaque. Writing ignores the clip, so it stays inside the rectangle that bounds it: the host's
-    /// slot and this shape, whose only non-rectangular parts are the corners left out here. A style
-    /// without an opaque background breaks this assumption, and no test catches it.
+    /// Copies everything outside the corners, and tells whether it did. Only styles with an opaque
+    /// background install (see `ovrley_map::read_style_file`) and the renderer's shape only crops
+    /// inside the corners, so these pixels are opaque. Writing ignores the clip, so it stays inside the
+    /// rectangle that bounds it: the host's slot and this shape, whose only non-rectangular parts are
+    /// the corners left out here. Registration reads the background at one zoom, so a style that turns
+    /// it translucent at another still breaks this assumption, and no test catches it.
     fn copy_opaque_interior(&self, canvas: &Canvas, image: &Image) -> bool {
         let (width, height) = (image.width(), image.height());
         let margin = self.corner_margin;
@@ -439,8 +500,31 @@ impl MapLayout {
         })
     }
 
+    /// Whether no style is installed, so the widget draws [`Self::draw_missing_style`] alone.
+    pub fn style_missing(&self) -> bool {
+        matches!(self.backdrop, Backdrop::MissingStyle { .. })
+    }
+
+    pub fn draw_missing_style(&self, canvas: &Canvas) {
+        if let Backdrop::MissingStyle {
+            fill,
+            text,
+            origin,
+            text_paint,
+        } = &self.backdrop
+        {
+            canvas.draw_rect(self.frame, fill);
+            if let Some(text) = text {
+                canvas.draw_text_blob(text, *origin, text_paint);
+            }
+        }
+    }
+
+    /// The style's background, until its frame arrives.
     pub fn draw_placeholder(&self, canvas: &Canvas) {
-        canvas.draw_rect(self.frame, &self.placeholder_paint);
+        if let Backdrop::Map { background, .. } = &self.backdrop {
+            canvas.draw_rect(self.frame, background);
+        }
     }
 
     /// The stand-in route when there's no GPS, in Skia because no frame exists to carry it.
@@ -486,6 +570,8 @@ impl MapLayout {
     }
 
     pub fn draw_attribution(&self, canvas: &Canvas) {
-        self.attribution.draw(canvas);
+        if let Backdrop::Map { attribution, .. } = &self.backdrop {
+            attribution.draw(canvas);
+        }
     }
 }

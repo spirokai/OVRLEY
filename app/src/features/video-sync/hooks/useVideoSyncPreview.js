@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getMapStyleUrlTemplate } from '@/api/backend'
+import { getMapStyleUrlTemplate, listMapStyles } from '@/api/backend'
 import { getPreference, setPreference } from '@/lib/preferences-store'
 import { useWasmWidgets } from '@/features/wasm-widgets/hooks/useWasmWidgets'
 import {
-  VIDEO_SYNC_DEFAULT_MAP_STYLE,
-  VIDEO_SYNC_MAP_STYLES,
   VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY,
   VIDEO_SYNC_NAVIGATION_MAP_PITCH,
   VIDEO_SYNC_SPEED_FONT,
@@ -18,9 +16,10 @@ import { buildVideoSyncScreenLayout } from '../utils/videoSyncPresentation'
 import NavigationMapController from '../map/NavigationMapController'
 import SelectionMapController from '../map/SelectionMapController'
 
-function requireMapStyle(value) {
-  if (!VIDEO_SYNC_MAP_STYLES.includes(value)) {
-    throw new Error(`Preference "${VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY}" must be a supported map style`)
+/** A style that has since been uninstalled is still a style id: the map then draws the first installed one. */
+function requireMapStylePreference(value) {
+  if (typeof value !== 'string') {
+    throw new Error(`Preference "${VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY}" must be a map style id`)
   }
   return value
 }
@@ -47,7 +46,9 @@ export default function useVideoSyncPreview({
   const actionsRef = useRef({ onSetCourseLocation, onDeleteCourseLocation })
   const [actionPoint, setActionPoint] = useState(null)
   const [pitch, setPitch] = useState(VIDEO_SYNC_NAVIGATION_MAP_PITCH)
-  const [style, setStyle] = useState(VIDEO_SYNC_DEFAULT_MAP_STYLE)
+  const [styles, setStyles] = useState([])
+  // The chosen style id, or null to draw the first installed style.
+  const [chosenStyle, setChosenStyle] = useState(null)
   const [styleUrlTemplate, setStyleUrlTemplate] = useState(null)
   const [error, setError] = useState(null)
   const screenLayout = buildVideoSyncScreenLayout(sceneSize, displayScale)
@@ -66,15 +67,18 @@ export default function useVideoSyncPreview({
     defaultFont: VIDEO_SYNC_SPEED_FONT,
   })
   const speedCanvasRef = useCallback((canvas) => attach(VIDEO_SYNC_SPEED_WIDGETS[0].id, canvas), [attach])
-  const styleUrl = styleUrlTemplate === null ? null : styleUrlTemplate.replace('{style}', style)
+  // A style that isn't installed draws the first installed one, as the backend resolves it.
+  const style = (styles.find((installed) => installed.id === chosenStyle) ?? styles[0])?.id ?? null
+  const styleUrl = styleUrlTemplate === null || style === null ? null : styleUrlTemplate.replace('{style}', style)
 
   useEffect(() => {
     let mounted = true
-    Promise.all([getMapStyleUrlTemplate(), getPreference(VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY).catch(() => undefined)])
-      .then(([template, storedStyle]) => {
+    Promise.all([getMapStyleUrlTemplate(), listMapStyles(), getPreference(VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY).catch(() => undefined)])
+      .then(([template, installedStyles, storedStyle]) => {
         if (!mounted) return
         setStyleUrlTemplate(template)
-        if (storedStyle !== undefined && storedStyle !== null) setStyle(requireMapStyle(storedStyle))
+        setStyles(installedStyles)
+        if (storedStyle !== undefined && storedStyle !== null) setChosenStyle(requireMapStylePreference(storedStyle))
       })
       .catch((loadError) => {
         if (mounted) setError(loadError)
@@ -127,9 +131,8 @@ export default function useVideoSyncPreview({
   }, [detection])
 
   const onStyleChange = useCallback((nextStyle) => {
-    const validatedStyle = requireMapStyle(nextStyle)
-    setStyle(validatedStyle)
-    void setPreference(VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY, validatedStyle).catch(setError)
+    setChosenStyle(nextStyle)
+    void setPreference(VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY, nextStyle).catch(setError)
   }, [])
 
   const onPitchChange = useCallback((nextPitch) => {
@@ -156,6 +159,7 @@ export default function useVideoSyncPreview({
     speedCanvasRef,
     speedError,
     style,
+    styles,
     onStyleChange,
   }
 }

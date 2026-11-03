@@ -1890,7 +1890,7 @@ mod tests {
         for invalid in [
             "not json".to_string(),
             valid_project_json().replace(PROJECT_FORMAT, "wrong-project"),
-            valid_project_json().replace("\"version\":4", "\"version\":99"),
+            valid_project_json().replace("\"version\":5", "\"version\":99"),
             valid_project_json().replace("\"fps\":30.0", "\"fps\":0.0"),
             valid_project_json().replace("\"qualityValue\":18", "\"qualityValue\":52"),
             valid_project_json()

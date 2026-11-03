@@ -160,6 +160,7 @@ jobs:
           for required_path in \
             "$app_bundle/Contents/Resources/fonts" \
             "$app_bundle/Contents/Resources/templates" \
+            "$app_bundle/Contents/Resources/map-styles" \
             "$app_bundle/Contents/Resources/vendor/ffmpeg/bin/ffmpeg" \
             "$app_bundle/Contents/Resources/vendor/ffmpeg/bin/ffprobe" \
             "$app_bundle/Contents/Resources/THIRD_PARTY_NOTICES.txt" \
@@ -271,6 +272,7 @@ jobs:
           tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/vendor/ffmpeg/bin/ffmpeg' >/dev/null || { echo 'Updater archive is missing FFmpeg.' >&2; exit 1; }
           tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/fonts/' >/dev/null || { echo 'Updater archive is missing fonts.' >&2; exit 1; }
           tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/templates/' >/dev/null || { echo 'Updater archive is missing templates.' >&2; exit 1; }
+          tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/map-styles/' >/dev/null || { echo 'Updater archive is missing map styles.' >&2; exit 1; }
           tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/THIRD_PARTY_NOTICES.txt' >/dev/null || { echo 'Updater archive is missing third-party notices.' >&2; exit 1; }
           tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/INSTALL.txt' >/dev/null || { echo 'Updater archive is missing macOS installation documentation.' >&2; exit 1; }
           expected="$(printf '%s\n' "$dmg_name" "$updater_name" "$updater_name.sig" | sort)"

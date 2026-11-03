@@ -1,5 +1,5 @@
 //! Native ownership of immutable finalized activity snapshots and font resources.
-use crate::map_tile_service::MapTileService;
+use crate::map_styles::MapData;
 use ovrley_core::{activity::finalize::FinalizeActivityResponse, render::download_preview_tiles, CoreError};
 use ovrley_widgets::{
     activity::ActivitySampler,
@@ -7,6 +7,7 @@ use ovrley_widgets::{
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
     widgets::map::{config::MapConfig, validation::validate_map_widget},
 };
+use ovrley_map::MapDataSource;
 use serde::Serialize;
 use std::{
     collections::BTreeMap,
@@ -80,7 +81,7 @@ pub(crate) async fn backend_map_prepare(
     app: AppHandle,
     previews: tauri::State<'_, PreviewActivities>,
     download: tauri::State<'_, MapDownload>,
-    map_tiles: tauri::State<'_, MapTileService>,
+    map_data: tauri::State<'_, MapData>,
     activity_id: String,
     widgets: Vec<MapConfig>,
     scene: ScenePresentationConfig,
@@ -104,7 +105,7 @@ pub(crate) async fn backend_map_prepare(
         .get(&activity_id)
         .ok_or_else(|| format!("unknown preview activity: {activity_id}"))?
         .clone();
-    let source = map_tiles.inner().clone();
+    let source = map_data.inner().clone();
     let events = app.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let activity = ActivitySampler::from_json(&activity).map_err(CoreError::from)?;
@@ -113,7 +114,7 @@ pub(crate) async fn backend_map_prepare(
         let widgets = widgets
             .iter()
             .enumerate()
-            .map(|(index, widget)| validate_map_widget(widget, index))
+            .map(|(index, widget)| validate_map_widget(widget, index, source.styles()))
             .collect::<Result<Vec<_>, _>>()
             .map_err(CoreError::from)?;
         download_preview_tiles(

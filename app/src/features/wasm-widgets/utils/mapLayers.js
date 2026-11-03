@@ -20,7 +20,7 @@ function loadMapModule() {
 }
 
 /**
- * @param {string} name Map style preset.
+ * @param {string} name Installed map style id.
  * @returns {Promise<{bytes: Uint8Array, tileUrl: string}>} Style document and the tile URL template it names.
  */
 function loadStyle(name) {

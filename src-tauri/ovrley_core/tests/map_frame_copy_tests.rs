@@ -7,6 +7,7 @@ use ovrley_widgets::widgets::map::{
     config::MapConfig, frame_provider::MapFramePixels, layout::MapLayout,
     validation::validate_map_widget,
 };
+use ovrley_map::{MapStyleCatalog, MapStyleId, MapStyleInfo};
 use serde_json::json;
 use skia_safe::{
     surfaces, AlphaType, Canvas, ColorType, FilterMode, IRect, Image, ImageInfo, Paint, RRect, Rect,
@@ -34,8 +35,14 @@ fn layout(x: f32, radius: f32, opacity: f32) -> MapLayout {
     }))
     .unwrap();
     let fonts = [PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fonts")];
+    let styles = MapStyleCatalog::new(vec![MapStyleInfo {
+        id: MapStyleId::new("liberty").unwrap(),
+        label: "Liberty".into(),
+        background: [0xf8, 0xf4, 0xf0],
+    }])
+    .unwrap();
     MapLayout::new(
-        &validate_map_widget(&config, 0).unwrap(),
+        &validate_map_widget(&config, 0, &styles).unwrap(),
         &validate_scene_presentation(scene).unwrap(),
         PreviewRasterScale::NATIVE,
         &NativeFonts(&fonts),

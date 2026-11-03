@@ -1,5 +1,6 @@
 //! Map plot validation. Every field is required and parsed once, so consumers never see `pitch`
-//! on a fixed camera.
+//! on a fixed camera. The style resolves against the installed ones: a style that isn't installed
+//! draws the first one instead, and with none installed the widget says so.
 use super::config::MapConfig;
 use crate::{
     error::{WidgetError, WidgetResult},
@@ -9,7 +10,7 @@ use crate::{
     },
     widgets::route::validation::{validate_route_path, ValidatedRoutePath},
 };
-use ovrley_map::{MapLayers, MapStyle, MapStyleSpec, MAX_TILE_ZOOM};
+use ovrley_map::{MapLayers, MapStyleCatalog, MapStyleInfo, MapStyleSpec, MAX_TILE_ZOOM};
 use std::ops::RangeInclusive;
 
 const MAX_PITCH_DEG: f32 = 70.0;
@@ -62,7 +63,9 @@ pub struct ValidatedMapWidget {
     pub height: f32,
     pub opacity: f32,
     pub font: String,
-    pub spec: MapStyleSpec,
+    /// The installed style it draws. `None` when none is installed.
+    pub style: Option<MapStyleInfo>,
+    pub layers: MapLayers,
     pub camera: MapCameraMode,
     pub msaa_samples: u32,
     pub shape: MapShape,
@@ -73,7 +76,21 @@ pub struct ValidatedMapWidget {
     pub path: ValidatedRoutePath,
 }
 
-pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<ValidatedMapWidget> {
+impl ValidatedMapWidget {
+    /// What its map draws; nothing without an installed style.
+    pub fn spec(&self) -> Option<MapStyleSpec> {
+        self.style.as_ref().map(|style| MapStyleSpec {
+            style: style.id.clone(),
+            layers: self.layers,
+        })
+    }
+}
+
+pub fn validate_map_widget(
+    map: &MapConfig,
+    index: usize,
+    styles: &MapStyleCatalog,
+) -> WidgetResult<ValidatedMapWidget> {
     let p = |f: &str| format!("plots[{index}].{f}");
     let invalid = |field: &str, message: &str| {
         WidgetError::Config(format!("{}: {message}", p(field)))
@@ -95,8 +112,6 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
     if map.font.trim().is_empty() {
         return Err(invalid("font", "must identify a font"));
     }
-    let style = MapStyle::from_name(&map.map_style)
-        .ok_or_else(|| invalid("map_style", "unsupported map style"))?;
     let camera = match map.camera_mode.as_str() {
         "fixed" => MapCameraMode::Fixed {
             zoom_offset: in_range(map.fixed_zoom, "fixed_zoom", FIXED_ZOOM_RANGE)?,
@@ -140,14 +155,12 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
         height,
         opacity: require_unit_opacity(Some(map.opacity), &p("opacity"))?,
         font: map.font.clone(),
-        spec: MapStyleSpec {
-            style,
-            // The GPU renderer draws no labels, so the config has no toggle for them.
-            layers: MapLayers {
-                buildings,
-                labels: false,
-                paths: map.show_paths,
-            },
+        style: styles.resolve(&map.map_style).cloned(),
+        // The GPU renderer draws no labels, so the config has no toggle for them.
+        layers: MapLayers {
+            buildings,
+            labels: false,
+            paths: map.show_paths,
         },
         camera,
         msaa_samples: map.msaa_samples,

@@ -4,7 +4,7 @@ use ovrley_map::gpu::{
     Buildings, GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileDecoder, DEFAULT_POOL_ENTRIES,
 };
 use ovrley_map::{
-    MapCamera, MapLayers, MapRouteDraw, MapRouteLine, MapRoutePoint, MapRouteStyle, MapStyle,
+    MapCamera, MapLayers, MapRouteDraw, MapRouteLine, MapRoutePoint, MapRouteStyle, MapStyleId,
     MapStyleSpec, MapViewport, TileId,
 };
 use serde::Deserialize;
@@ -35,13 +35,12 @@ fn js_error(message: String) -> JsValue {
     JsValue::from_str(&message)
 }
 
-fn parse_config(json: &str) -> Result<GpuMapConfig, String> {
+/// `style` is the document the shell served for the config's style.
+fn parse_config(json: &str, style: &[u8]) -> Result<GpuMapConfig, String> {
     let config: RendererConfig = serde_json::from_str(json).map_err(|error| error.to_string())?;
-    let style = MapStyle::from_name(&config.style)
-        .ok_or_else(|| format!("Unknown map style: {}", config.style))?;
     Ok(GpuMapConfig {
         spec: MapStyleSpec {
-            style,
+            style: MapStyleId::new(&config.style)?,
             layers: MapLayers {
                 buildings: config.buildings,
                 labels: false,
@@ -52,7 +51,7 @@ fn parse_config(json: &str) -> Result<GpuMapConfig, String> {
         sample_count: config.msaa_samples,
         style_zoom: config.zoom,
         pools: GpuPoolSizes::uniform(DEFAULT_POOL_ENTRIES),
-        buildings: Buildings::for_style(style),
+        buildings: Buildings::for_style(style)?,
     })
 }
 
@@ -81,7 +80,7 @@ impl MapLayer {
         style: Vec<u8>,
     ) -> Result<MapLayer, JsValue> {
         console_error_panic_hook::set_once();
-        let config = parse_config(&config).map_err(js_error)?;
+        let config = parse_config(&config, &style).map_err(js_error)?;
         let renderer = GpuMapRenderer::for_canvas(config, &style, canvas)
             .await
             .map_err(js_error)?;
@@ -184,7 +183,7 @@ impl TileDecoder {
     #[wasm_bindgen(constructor)]
     pub fn new(config: &str, style: &[u8]) -> Result<TileDecoder, JsValue> {
         console_error_panic_hook::set_once();
-        let config = parse_config(config).map_err(js_error)?;
+        let config = parse_config(config, style).map_err(js_error)?;
         MapTileDecoder::new(&config, style)
             .map(Self)
             .map_err(js_error)

@@ -72,8 +72,6 @@ export const VIDEO_SYNC_GRAPH_ROBUST_PERCENTILE = 0.99
 export const VIDEO_SYNC_GRAPH_MIN_SCALE_VALUE = 1
 export const VIDEO_SYNC_GRAPH_HEIGHT_PX = 64
 
-export const VIDEO_SYNC_MAP_STYLES = ['positron', 'bright', 'liberty', 'dark', 'fiord']
-export const VIDEO_SYNC_DEFAULT_MAP_STYLE = 'liberty'
 export const VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY = 'sync-map-style'
 export const VIDEO_SYNC_MAP_INITIAL_CENTER = [8.5417, 47.3769]
 export const VIDEO_SYNC_MAP_INITIAL_ZOOM = 13

@@ -9,20 +9,13 @@ import { getWebGl2Support } from '@/features/wasm-widgets/utils/webgl2Support'
 import { Label } from '@/components/ui/label'
 import { translateOptions } from '@/i18n'
 import { useTranslation } from 'react-i18next'
+import { useMapStyleSelect } from '../hooks/useMapStyleSelect'
 import { mapBuildingsAvailable, mapDiameterUpdate, mapShapeUpdate, maxMapCornerRadius } from '../utils/mapWidget'
 import { ColorField, NumberField, SelectField, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection } from './widgetEditorSections'
 import PlotMarkerSection from './PlotMarkerSection'
 import RouteLineSection from './RouteLineSection'
 
-// OpenFreeMap's preset names, which stay as they are in every language.
-const MAP_STYLE_OPTIONS = [
-  { value: 'liberty', label: 'Liberty' },
-  { value: 'bright', label: 'Bright' },
-  { value: 'positron', label: 'Positron' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'fiord', label: 'Fiord' },
-]
 const CAMERA_MODE_OPTIONS = [
   { value: 'follow', labelKey: 'widget-editor.chaseCamera', defaultLabel: 'Chase Camera' },
   { value: 'fixed', labelKey: 'widget-editor.topDown', defaultLabel: 'Top Down' },
@@ -58,6 +51,7 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
   const { t } = useTranslation()
   const { data } = widget
   const webgl2 = getWebGl2Support()
+  const mapStyle = useMapStyleSelect(data.map_style)
   const isChase = data.camera_mode === 'follow'
   const isCircle = data.shape === 'circle'
   const buildingsAvailable = mapBuildingsAvailable(data)
@@ -107,8 +101,8 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
         <div className="grid grid-cols-2 gap-4">
           <SelectField
             label={t('widget-editor.mapStyle', 'Map Style')}
-            value={data.map_style}
-            options={MAP_STYLE_OPTIONS}
+            value={mapStyle.value}
+            options={mapStyle.options}
             onValueChange={(map_style) => updateWidgetData(widget.id, { map_style })}
           />
           <SelectField

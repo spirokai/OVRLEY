@@ -27,6 +27,7 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub mod video_server; // test seam
 
+mod map_styles;
 mod map_tile_service;
 
 #[cfg(test)]
@@ -121,6 +122,7 @@ pub fn run() {
             tauri_commands::backend_clear_preview_video,
             tauri_commands::backend_get_video_state,
             tauri_commands::backend_get_map_style_url_template,
+            tauri_commands::backend_list_map_styles,
             tauri_commands::backend_detect_codecs,
             tauri_commands::backend_build_elevation_geometry,
             tauri_commands::backend_build_route_geometry,
@@ -160,14 +162,17 @@ pub fn run() {
                 ))),
             });
 
-            let map_tile_service = map_tile_service::MapTileService::for_application_cache(
-                app.path()
-                    .app_cache_dir()
-                    .map_err(|error| error.to_string())?,
-            )?;
-            app.manage(map_tile_service.clone());
+            let map_data = map_styles::MapData::new(
+                map_styles::MapStyleRegistry::load(&runtime_paths::map_style_dirs(app.handle())?)?,
+                map_tile_service::MapTileService::for_application_cache(
+                    app.path()
+                        .app_cache_dir()
+                        .map_err(|error| error.to_string())?,
+                )?,
+            );
+            app.manage(map_data.clone());
             app.state::<video_server::VideoServerHandle>()
-                .start_with_map_tile_service(map_tile_service)?;
+                .start_with_map_data(map_data)?;
 
             #[cfg(not(target_os = "macos"))]
             main_window::create(app)?.set_decorations(false)?;

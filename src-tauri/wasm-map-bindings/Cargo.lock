@@ -779,6 +779,7 @@ dependencies = [
  "lyon",
  "maplibre-expr",
  "pollster",
+ "serde",
  "serde_json",
  "web-sys",
  "wgpu",

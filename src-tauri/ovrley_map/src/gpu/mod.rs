@@ -171,7 +171,7 @@ impl GpuMapRenderer {
     pub fn new(config: GpuMapConfig, source: &dyn MapDataSource) -> Result<Self, String> {
         validate_config(&config)?;
         let style = parse_style(
-            &source.style(config.spec.style)?,
+            &source.style(&config.spec.style)?,
             config.spec.layers,
             config.style_zoom,
             config.viewport.pixel_ratio(),

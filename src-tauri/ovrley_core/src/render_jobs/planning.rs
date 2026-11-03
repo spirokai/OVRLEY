@@ -35,7 +35,7 @@ use crate::normalize::{
 };
 use crate::output::{plan_batch_output_targets, RenderOutputKind};
 use crate::raster::RasterResourceResolver;
-use ovrley_map::MapDataSource;
+use ovrley_map::{MapDataSource, MapStyleCatalog};
 use ovrley_widgets::model::scene::{ScenePresentationConfig, ValidatedScenePresentation};
 use std::sync::Arc;
 
@@ -244,7 +244,7 @@ pub(crate) fn validate_batch_template(
         ));
     }
     Ok(ValidatedBatchTemplate {
-        config: validate_render_presentation(template, resources)?,
+        config: validate_render_presentation(template, resources, &installed_styles(&map_source))?,
         encoding,
         map_source,
     })
@@ -300,6 +300,14 @@ impl PlannedVideoRender {
     }
 }
 
+/// The styles a job's maps can draw: none without a map source.
+fn installed_styles(map_source: &Option<Arc<dyn MapDataSource>>) -> MapStyleCatalog {
+    map_source
+        .as_deref()
+        .map(|source| source.styles().clone())
+        .unwrap_or_default()
+}
+
 /// Derives a single custom-range plan from validated submission inputs.
 pub fn plan_single_render(
     raw: RenderConfig,
@@ -308,7 +316,8 @@ pub fn plan_single_render(
     map_source: Option<Arc<dyn MapDataSource>>,
 ) -> CoreResult<PlannedVideoRender> {
     let raw_scene = raw.scene.clone();
-    let mut config = validate_render_config_with_resources(raw, resources)?;
+    let mut config =
+        validate_render_config_with_resources(raw, resources, &installed_styles(&map_source))?;
     let (mode, sampling_fps, activity_offset) = if raw_scene.composite_video_path.is_some() {
         let render =
             derive_composite_render_plan(&raw_scene, &mut config.scene, Some(activity_end))?;

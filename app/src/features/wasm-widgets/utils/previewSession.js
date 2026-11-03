@@ -1,5 +1,5 @@
 import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
-import { previewActivity, previewFont, previewSplitTable, rasterPreviewPng } from '@/api/backend'
+import { listMapStyles, previewActivity, previewFont, previewSplitTable, rasterPreviewPng } from '@/api/backend'
 import { isPreviewPerfEnabled, recordPreviewPerfDuration, setPreviewPerfValue } from '@/lib/preview-perf'
 import { createMapDownload } from './mapDownload'
 import { createMapLayers } from './mapLayers'
@@ -105,6 +105,8 @@ export function createPreviewSession(module, onError) {
   const targets = new Map()
   const fonts = new Map()
   const images = new Map()
+  // The installed map styles, which a map resolves its style against. Loaded with the first map.
+  let mapStyles = null
   // Split lengths requested for the current activity; Rust core derives each table once.
   const splitTables = new Set()
   let snapshot
@@ -176,6 +178,23 @@ export function createPreviewSession(module, onError) {
         upload(encoder.encode(id), (idPtr, idLen) =>
           upload(new Uint8Array(bytes), (ptr, len) => check(module._ovrley_preview_font(handle, idPtr, idLen, ptr, len))),
         )
+        resource.ready = true
+        schedule()
+      })
+      .catch((error) => {
+        if (disposed) return
+        resource.error = error
+        schedule()
+      })
+  }
+  function loadMapStyles() {
+    if (mapStyles) return
+    const resource = { ready: false, error: null }
+    mapStyles = resource
+    listMapStyles()
+      .then((styles) => {
+        if (disposed) return
+        upload(encoder.encode(JSON.stringify(styles)), (ptr, len) => check(module._ovrley_preview_map_styles(handle, ptr, len)))
         resource.ready = true
         schedule()
       })
@@ -257,6 +276,10 @@ export function createPreviewSession(module, onError) {
             targets.get(widget.id).style.visibility = 'hidden'
           }
           continue
+        }
+        if (widget.type === 'map') {
+          if (mapStyles.error) throw mapStyles.error
+          if (!mapStyles.ready) continue
         }
         const fontResources = widgetFonts(widget).map((font) => fonts.get(JSON.stringify(font)))
         for (const resource of fontResources) if (resource.error) throw resource.error
@@ -364,6 +387,7 @@ export function createPreviewSession(module, onError) {
       if (previous?.widgets !== next.widgets) {
         for (const widget of next.widgets) {
           for (const font of widgetFonts(widget)) loadFont(font)
+          if (widget.type === 'map') loadMapStyles()
           if (widget.type === 'raster' && widget.data.resourceId !== undefined) loadImage(widget.data.resourceId)
         }
       }

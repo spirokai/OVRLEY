@@ -100,7 +100,7 @@ impl MapTileSizer {
     ) -> Result<Self, String> {
         Ok(Self {
             style: parse_style(
-                &source.style(spec.style)?,
+                &source.style(&spec.style)?,
                 spec.layers,
                 style_zoom,
                 viewport.pixel_ratio(),

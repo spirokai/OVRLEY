@@ -18,7 +18,12 @@ const binaryName = process.platform === 'win32' ? 'OVRLEY.exe' : 'OVRLEY'
 const builtBinaryName = process.platform === 'win32' ? 'app.exe' : 'app'
 const builtBinaryPath = join(targetDir, builtBinaryName)
 const vendorFfmpegDir = join(rootDir, 'vendor', 'ffmpeg')
-const portableResourceDirs = ['fonts', 'templates']
+// Source directory in the checkout, and its name beside the binary.
+const portableResourceDirs = [
+  ['fonts', 'fonts'],
+  ['templates', 'templates'],
+  [join('assets', 'map-styles'), 'map-styles'],
+]
 
 main().catch((error) => {
   console.error(`[portable] ${error.message}`)
@@ -92,8 +97,8 @@ async function packagePortableBinary(destinationDir) {
 }
 
 async function copyPortableResourceDirs(destinationDir) {
-  for (const name of portableResourceDirs) {
-    const sourceDir = join(rootDir, name)
+  for (const [source, name] of portableResourceDirs) {
+    const sourceDir = join(rootDir, source)
     const destinationResourceDir = join(destinationDir, name)
     await ensureDirectory(sourceDir, `Portable ${name} source directory`)
     await rm(destinationResourceDir, { recursive: true, force: true })

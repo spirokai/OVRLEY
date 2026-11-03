@@ -344,7 +344,7 @@ fn every_family_reports_layout_only_bounds_that_contain_its_drawing() {
         for (variant, request) in bounds_variants(&base) {
             let kind = format!("{} ({variant})", request["type"].as_str().unwrap());
             let raster = request["type"] == "raster";
-            let mut widget = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), &preview.fonts, &preview.images, Arc::new(PreviewMapFrames))
+            let mut widget = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), &preview.fonts, &preview.images, Arc::new(PreviewMapFrames), &preview.map_styles)
                 .unwrap_or_else(|error| panic!("{kind}: {error}"));
             let allocated = allocated_surfaces();
             let bounds: Vec<TileBounds> = seconds
@@ -694,7 +694,7 @@ fn atlas_frames_reassemble_overlapping_rotated_widgets_of_every_family_into_the_
         };
         config[collection].as_array_mut().unwrap().push(widget);
     }
-    let config = validate_render_config_with_resources(parse_config_value(&config).unwrap(), Some(&resources)).unwrap();
+    let config = validate_render_config_with_resources(parse_config_value(&config).unwrap(), Some(&resources), &ovrley_map::MapStyleCatalog::default()).unwrap();
     assert_eq!(config.values.len(), 17, "every value family is exported");
 
     let atlas = assert_atlas_frames_match_the_full_frame("every family", &config, &every_family_parsed_activity());
@@ -732,7 +732,7 @@ fn widgets_accept_the_native_font_and_raster_resolvers_used_by_export() {
     let request_scene = raster["scene"].clone();
     for (mut preview, request) in [(raster_preview, raster), label_preview()] {
         let kind = request["type"].as_str().unwrap().to_owned();
-        let native = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), &fonts, resources, Arc::new(PreviewMapFrames)).unwrap();
+        let native = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), &fonts, resources, Arc::new(PreviewMapFrames), &ovrley_map::MapStyleCatalog::default()).unwrap();
         let id = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
         let session = &preview.widgets[&id];
         assert_eq!(native.pixels(), session.pixels(), "{kind} pixels must not depend on the host");
@@ -740,7 +740,7 @@ fn widgets_accept_the_native_font_and_raster_resolvers_used_by_export() {
         assert_eq!(native.bounds(), session.bounds(), "{kind} bounds must not depend on the host");
     }
     let missing = json!({ "type":"raster", "widget": { "id":"raster", "x":0, "y":0, "width":1, "height":1, "rotation":0, "opacity":1, "path":"/image.png", "resourceId":"missing" }, "scene": request_scene });
-    assert!(PreviewWidget::new(serde_json::from_value(missing).unwrap(), &fonts, resources, Arc::new(PreviewMapFrames)).is_err(), "unresolved native rasters must fail loudly");
+    assert!(PreviewWidget::new(serde_json::from_value(missing).unwrap(), &fonts, resources, Arc::new(PreviewMapFrames), &ovrley_map::MapStyleCatalog::default()).is_err(), "unresolved native rasters must fail loudly");
 }
 
 #[test]
