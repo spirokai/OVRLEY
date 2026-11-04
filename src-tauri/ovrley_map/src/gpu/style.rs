@@ -18,6 +18,8 @@ use std::borrow::Cow;
 const TRANSPORTATION_LAYER: &str = "transportation";
 /// The class OpenMapTiles gives footways, cycleways, steps and bridleways.
 const PATH_CLASS: &str = "path";
+/// The transportation classes that keep a style's dashes: railways, transit and ferry routes.
+const DASHED_CLASSES: [&str; 3] = ["rail", "transit", "ferry"];
 
 /// OVRLEY's extrusion of the `building` source layer, for a style without its own.
 fn added_buildings_layer(color: &Json) -> Json {
@@ -132,30 +134,46 @@ pub(crate) fn parse_style(
         if !is_drawable(layer, toggles, zoom) {
             continue;
         }
-        let layer = &*without_hidden_features(layer, toggles);
-        let id = layer["id"].as_str().unwrap_or("<unnamed>");
-        let result = if layer["type"] == "background" {
-            parse_background(layer, zoom, next_index).map(|background| {
-                parsed.backgrounds.push(background);
-            })
-        } else {
-            parse_vector_layer(layer, id, zoom, pixel_ratio, next_index).and_then(|vector_layer| {
-                let outline = if layer["source-layer"] == "building" && added_extrusions_draw {
-                    None
-                } else {
-                    parse_fill_outline(layer, id, zoom, next_index + 1)?
-                };
-                parsed.vector_layers.push(vector_layer);
-                if let Some(outline) = outline {
-                    parsed.vector_layers.push(outline);
-                    next_index += 1;
-                }
-                Ok(())
-            })
+        let layer = without_hidden_features(layer, toggles);
+        let variants = match with_solid_road_dashes(&layer, zoom) {
+            Ok(variants) => variants,
+            Err(error) => {
+                let id = layer["id"].as_str().unwrap_or("<unnamed>");
+                log::warn!("Skipping map layer {id}: {error}");
+                continue;
+            }
         };
-        match result {
-            Ok(()) => next_index += 1,
-            Err(error) => log::warn!("Skipping map layer {id}: {error}"),
+        for (layer, width_share) in &variants {
+            let id = layer["id"].as_str().unwrap_or("<unnamed>");
+            let result = if layer["type"] == "background" {
+                parse_background(layer, zoom, next_index).map(|background| {
+                    parsed.backgrounds.push(background);
+                })
+            } else {
+                parse_vector_layer(layer, id, zoom, pixel_ratio, next_index).and_then(
+                    |mut vector_layer| {
+                        if let VectorPaint::Line { width, .. } = &mut vector_layer.paint {
+                            *width *= width_share;
+                        }
+                        let outline =
+                            if layer["source-layer"] == "building" && added_extrusions_draw {
+                                None
+                            } else {
+                                parse_fill_outline(layer, id, zoom, next_index + 1)?
+                            };
+                        parsed.vector_layers.push(vector_layer);
+                        if let Some(outline) = outline {
+                            parsed.vector_layers.push(outline);
+                            next_index += 1;
+                        }
+                        Ok(())
+                    },
+                )
+            };
+            match result {
+                Ok(()) => next_index += 1,
+                Err(error) => log::warn!("Skipping map layer {id}: {error}"),
+            }
         }
     }
     if let Some(layer) = &added {
@@ -195,6 +213,53 @@ fn without_hidden_features(layer: &Json, toggles: MapLayers) -> Cow<'_, Json> {
         None => no_paths,
     };
     Cow::Owned(narrowed)
+}
+
+/// A layer as it draws, each with the share of its width it keeps. A dashed transportation line
+/// splits into its roads, drawn solid, its paths, drawn solid and thinner, and the classes whose
+/// dashes mean something, which keep them. Dashes crawl as the camera moves and shimmer where a
+/// pitched view packs them tight, and a road reads as well without them. The split runs on `class`,
+/// so it holds for any style however it names or groups its layers.
+fn with_solid_road_dashes(layer: &Json, zoom: f64) -> Result<Vec<(Cow<'_, Json>, f32)>, String> {
+    if layer["type"] != "line"
+        || layer["source-layer"] != TRANSPORTATION_LAYER
+        || layer["paint"].get("line-dasharray").is_none()
+    {
+        return Ok(vec![(Cow::Borrowed(layer), 1.0)]);
+    }
+    // A solid path keeps the ink its dashes had, so it stays below the roads it runs beside. Only
+    // paths narrow: a dashed road is usually a tunnel's casing, which would vanish under its road.
+    let dash = line_dash(layer, zoom, 1.0)?;
+    let period = dash.on + dash.off;
+    let path_width_share = if period > 0.0 {
+        ((dash.on + 2.0 * dash.cap_radius) / period).min(1.0)
+    } else {
+        1.0
+    };
+    let class_in = |classes: Json| json!(["match", ["get", "class"], classes, true, false]);
+    let narrowed = |class_filter: Json| {
+        let mut narrowed = layer.clone();
+        narrowed["filter"] = match layer.get("filter") {
+            Some(filter) => json!(["all", filter, class_filter]),
+            None => class_filter,
+        };
+        narrowed
+    };
+    let solid = |class_filter: Json| {
+        let mut solid = narrowed(class_filter);
+        solid["paint"]
+            .as_object_mut()
+            .expect("a layer with line-dasharray has a paint object")
+            .remove("line-dasharray");
+        Cow::Owned(solid)
+    };
+    let mut not_roads = DASHED_CLASSES.to_vec();
+    not_roads.push(PATH_CLASS);
+    Ok(vec![
+        (solid(json!(["!", class_in(json!(not_roads))])), 1.0),
+        (solid(class_in(json!([PATH_CLASS]))), path_width_share),
+        (Cow::Owned(narrowed(class_in(json!(DASHED_CLASSES)))), 1.0),
+    ])
 }
 
 /// Whether this renderer draws a layer at `zoom` under these toggles.

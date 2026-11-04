@@ -1,8 +1,8 @@
 struct FragmentInput {
     @location(0) v_color: vec4<f32>,
     @location(1) v_normal: vec2<f32>,
-    @location(2) v_width2: vec2<f32>,
-    @location(3) v_gamma_scale: f32,
+    @location(2) v_edges: vec2<f32>, // outer, inner
+    @location(3) v_extent: f32,
     @location(4) v_blur: f32,
     @location(5) v_distance: f32,
     @location(6) v_dash: vec3<f32>,
@@ -20,15 +20,19 @@ fn dashes_up_to(x: f32, on: f32, period: f32) -> f32 {
 
 @fragment
 fn main(in: FragmentInput) -> Output {
-    // Calculate the distance of the pixel from the line in pixels
-    let dist = length(in.v_normal) * in.v_width2.x;
+    // This pixel's distance from the line's centre, in pixels.
+    let dist = length(in.v_normal) * in.v_extent;
 
-    let pixel_ratio = 1.0;
-
-    // Calculate the antialiasing fade factor
-    let blur2 = (in.v_blur + (1.0 / pixel_ratio)) * in.v_gamma_scale;
-    let denom = max(blur2, 1e-6);
-    let alpha = clamp(min(dist - (in.v_width2.y - blur2), in.v_width2.x - dist) / denom, 0.0, 1.0);
+    // The share of a box one pixel plus the blur wide, centred here, that the line covers on either
+    // side of its centre. Unlike a ramp at each edge, this keeps a line thinner than its box at its
+    // true weight wherever it falls on the pixel grid, so it neither shimmers nor breaks up as it moves.
+    let outer = in.v_edges.x;
+    let inner = in.v_edges.y;
+    let half_box = (in.v_blur + 1.0) * 0.5;
+    let near = dist - half_box;
+    let far = dist + half_box;
+    let alpha = (clamp(far, inner, outer) - clamp(near, inner, outer) + clamp(-near, inner, outer) - clamp(-far, inner, outer))
+        / (2.0 * half_box);
 
     // Dashes are averaged over this pixel's length along the line, so they stay smooth as a pitched
     // view compresses them, and fade to their average where they get smaller than a pixel. Outside

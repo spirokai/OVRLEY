@@ -36,7 +36,8 @@ use crate::{
 };
 use pattern::{stencil_reference_value_3d, TileShape, TileViewPattern};
 use pipelines::{
-    BackgroundLayerMetadata, Pipelines, ShaderVertex, ShapeMaskInstance, COLOR_FORMAT, DEPTH_FORMAT,
+    BackgroundLayerMetadata, FogInstance, Pipelines, ShaderVertex, ShapeMaskInstance, COLOR_FORMAT,
+    DEPTH_FORMAT, WATER_STENCIL_BIT,
 };
 use pool::{BufferPool, IndexEntry, LayerGeometry};
 use route::RouteLayer;
@@ -61,6 +62,14 @@ use wgpu::util::DeviceExt;
 const MASK_VERTICES: u32 = 6;
 /// Marks route samples. Tile masks use at most `3 + 14 * 4`, and never run after the route.
 const ROUTE_STENCIL: u32 = 0xff;
+/// Source layers whose features are water. Haze over water reads as murk rather than distance.
+const WATER_SOURCE_LAYERS: [&str; 2] = ["water", "waterway"];
+/// Where the haze starts and where it is full, as the map centre's share of the ground's depth: 0.5
+/// is twice as far as the centre.
+const FOG_START: f32 = 0.8;
+const FOG_FULL: f32 = 0.2;
+/// The haze's strength where it is full.
+const FOG_STRENGTH: f32 = 0.6;
 
 /// Everything fixed for one renderer's lifetime.
 #[derive(Clone, Debug)]
@@ -101,6 +110,8 @@ enum ItemKind {
 
 #[derive(Clone)]
 struct GroundItem {
+    /// Water keeps the haze off what it draws.
+    water: bool,
     stencil_reference: u32,
     tile_range: Range<wgpu::BufferAddress>,
     entry: IndexEntry,
@@ -116,7 +127,8 @@ struct ExtrusionItem {
 enum BoundPipeline {
     None,
     Background,
-    Layer(LayerKind),
+    /// A ground layer's kind, and whether it is water.
+    Layer(LayerKind, bool),
 }
 
 /// Targets every output draws through.
@@ -153,6 +165,12 @@ pub struct GpuMapRenderer {
     background_buffer: Option<wgpu::Buffer>,
     route: Option<RouteLayer>,
     shape_buffer: wgpu::Buffer,
+    /// Style layers that draw water, which the haze passes over.
+    water_layers: HashSet<u32>,
+    /// Present when the style has a background, whose colour the haze takes.
+    fog_buffer: Option<wgpu::Buffer>,
+    /// Whether this frame's ground is in view, so its haze draws.
+    fogged: bool,
     /// Whether this frame's corners are rounded, so its shape mask draws.
     rounded: bool,
     /// Tiles that finished loading. Eviction removes them again.
@@ -257,6 +275,22 @@ impl GpuMapRenderer {
             mapped_at_creation: false,
         });
 
+        let fog_buffer = style.backgrounds.first().map(|_| {
+            device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("fog buffer"),
+                size: size_of::<FogInstance>() as u64,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        });
+
+        let water_layers = style
+            .vector_layers
+            .iter()
+            .filter(|layer| WATER_SOURCE_LAYERS.contains(&layer.source_layer.as_str()))
+            .map(|layer| layer.index)
+            .collect();
+
         let renderer = Self {
             config,
             device,
@@ -273,6 +307,9 @@ impl GpuMapRenderer {
             background_buffer,
             route: None,
             shape_buffer,
+            water_layers,
+            fog_buffer,
+            fogged: false,
             rounded: false,
             loaded: HashSet::new(),
             pool_clears: 0,
@@ -347,6 +384,22 @@ impl GpuMapRenderer {
             viewport.width_px() as f32,
             viewport.height_px() as f32,
         )?;
+        let depth_rows = view.ground_depth_rows();
+        self.fogged = false;
+        if let (Some(buffer), Some(background), Some((centre_row, per_row))) =
+            (&self.fog_buffer, self.style.backgrounds.first(), depth_rows)
+        {
+            self.queue.write_buffer(
+                buffer,
+                0,
+                bytemuck::bytes_of(&FogInstance {
+                    color: background.color,
+                    depth_rows: [centre_row as f32, per_row as f32],
+                    haze: [FOG_START, FOG_FULL, FOG_STRENGTH],
+                }),
+            );
+            self.fogged = true;
+        }
         self.prepare_route(&view, route)?;
         self.queue_items();
         Ok(())
@@ -391,10 +444,16 @@ impl GpuMapRenderer {
             let stencil_reference = stencil_reference_value_3d(shape.coords);
             if let Some(entries) = self.ground_pool.index().get_layers(shape.coords) {
                 for entry in entries {
+                    let water = self.water_layers.contains(&entry.layer);
                     self.layer_items.push(LayerItem {
                         index: entry.layer,
                         kind: ItemKind::Ground(GroundItem {
-                            stencil_reference,
+                            water,
+                            stencil_reference: if water {
+                                stencil_reference | WATER_STENCIL_BIT
+                            } else {
+                                stencil_reference
+                            },
                             tile_range: tile_range.clone(),
                             entry: entry.clone(),
                         }),
@@ -469,8 +528,8 @@ impl GpuMapRenderer {
                 }
                 ItemKind::Ground(ground) => {
                     let entry = &ground.entry;
-                    if bound != BoundPipeline::Layer(entry.kind) {
-                        pass.set_pipeline(self.pipelines.layer(entry.kind));
+                    if bound != BoundPipeline::Layer(entry.kind, ground.water) {
+                        pass.set_pipeline(self.pipelines.layer(entry.kind, ground.water));
                         if let LayerKind::FillPattern(pattern) = entry.kind {
                             pass.set_bind_group(
                                 0,
@@ -478,7 +537,7 @@ impl GpuMapRenderer {
                                 &[],
                             );
                         }
-                        bound = BoundPipeline::Layer(entry.kind);
+                        bound = BoundPipeline::Layer(entry.kind, ground.water);
                     }
                     pass.set_stencil_reference(ground.stencil_reference);
                     pass.set_index_buffer(
@@ -514,6 +573,13 @@ impl GpuMapRenderer {
             }
         }
 
+        if let Some(buffer) = self.fog_buffer.as_ref().filter(|_| self.fogged) {
+            pass.set_pipeline(&self.pipelines.fog);
+            pass.set_stencil_reference(0);
+            pass.set_vertex_buffer(0, buffer.slice(..));
+            pass.draw(0..MASK_VERTICES, 0..1);
+        }
+
         if let Some(route) = self.route.as_ref().filter(|route| route.has_draws()) {
             pass.set_pipeline(&self.pipelines.route);
             pass.set_stencil_reference(ROUTE_STENCIL);
@@ -521,7 +587,7 @@ impl GpuMapRenderer {
         }
 
         if !self.extrusion_items.is_empty() {
-            pass.set_pipeline(self.pipelines.layer(LayerKind::Extrusion));
+            pass.set_pipeline(self.pipelines.layer(LayerKind::Extrusion, false));
             for item in &self.extrusion_items {
                 let entry = &item.entry;
                 pass.set_index_buffer(

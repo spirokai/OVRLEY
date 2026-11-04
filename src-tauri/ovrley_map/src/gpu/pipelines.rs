@@ -90,6 +90,18 @@ pub(crate) struct BackgroundLayerMetadata {
     pub(crate) color: [f32; 4],
 }
 
+/// The haze over the far ground: the style's background colour, laid on by depth.
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub(crate) struct FogInstance {
+    pub(crate) color: [f32; 4],
+    /// The row where the ground is at the map centre's depth, and how the centre's share of a
+    /// row's depth changes per row. See `ViewState::ground_depth_rows`.
+    pub(crate) depth_rows: [f32; 2],
+    /// The centre's share of depth where the haze starts and where it is full, and its strength there.
+    pub(crate) haze: [f32; 3],
+}
+
 /// One frame's rounded shape, in output pixels.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -101,6 +113,12 @@ pub(crate) struct ShapeMaskInstance {
 const SHAPE_MASK_ATTRIBUTES: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![
     0 => Float32x2, // half_size
     1 => Float32, // radius
+];
+
+const FOG_ATTRIBUTES: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+    0 => Float32x4, // color
+    1 => Float32x2, // depth_rows
+    2 => Float32x3, // haze: start, full, strength
 ];
 
 const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
@@ -247,6 +265,21 @@ const LAYER_BLEND: wgpu::BlendState = wgpu::BlendState {
     },
 };
 
+/// Mixes the haze into what is drawn, by its coverage, and leaves the frame's alpha alone, so the
+/// transparent outside of a map that doesn't fill its frame stays clear.
+const FOG_BLEND: wgpu::BlendState = wgpu::BlendState {
+    color: wgpu::BlendComponent {
+        src_factor: wgpu::BlendFactor::DstAlpha,
+        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+        operation: wgpu::BlendOperation::Add,
+    },
+    alpha: wgpu::BlendComponent {
+        src_factor: wgpu::BlendFactor::Zero,
+        dst_factor: wgpu::BlendFactor::One,
+        operation: wgpu::BlendOperation::Add,
+    },
+};
+
 /// Multiplies what's already drawn by the fragment's alpha, which leaves it premultiplied.
 const SHAPE_MASK_BLEND: wgpu::BlendState = wgpu::BlendState {
     color: wgpu::BlendComponent {
@@ -261,6 +294,12 @@ const SHAPE_MASK_BLEND: wgpu::BlendState = wgpu::BlendState {
     },
 };
 
+/// The stencil bit water sets, so the haze passes over it. Tile masks write their values below it,
+/// and writing them clears it again.
+pub(crate) const WATER_STENCIL_BIT: u32 = 0x80;
+/// The stencil bits a tile mask's value lives in.
+const TILE_STENCIL_MASK: u32 = WATER_STENCIL_BIT - 1;
+
 /// How a tile pipeline uses the stencil.
 #[derive(Clone, Copy)]
 enum StencilUse {
@@ -272,20 +311,50 @@ enum StencilUse {
     Ignore,
     /// Draws each sample once and marks it, so crossings and section seams don't double the opacity.
     Once,
+    /// Draws as `Test` does, and sets the water bit where it draws.
+    TestAndMarkWater,
+    /// Draws only where the water bit is clear: the haze.
+    NotWater,
 }
 
 impl StencilUse {
     fn state(self) -> wgpu::StencilState {
-        let (compare, pass_op) = match self {
+        let (compare, pass_op, read_mask, write_mask) = match self {
             Self::Update => (
                 wgpu::CompareFunction::Always,
                 wgpu::StencilOperation::Replace,
+                0xff,
+                0xff,
             ),
-            Self::Test => (wgpu::CompareFunction::Equal, wgpu::StencilOperation::Keep),
-            Self::Ignore => (wgpu::CompareFunction::Always, wgpu::StencilOperation::Keep),
+            Self::Test => (
+                wgpu::CompareFunction::Equal,
+                wgpu::StencilOperation::Keep,
+                TILE_STENCIL_MASK,
+                0,
+            ),
+            Self::Ignore => (
+                wgpu::CompareFunction::Always,
+                wgpu::StencilOperation::Keep,
+                0,
+                0,
+            ),
             Self::Once => (
                 wgpu::CompareFunction::NotEqual,
                 wgpu::StencilOperation::Replace,
+                0xff,
+                0xff,
+            ),
+            Self::TestAndMarkWater => (
+                wgpu::CompareFunction::Equal,
+                wgpu::StencilOperation::Replace,
+                TILE_STENCIL_MASK,
+                WATER_STENCIL_BIT,
+            ),
+            Self::NotWater => (
+                wgpu::CompareFunction::Equal,
+                wgpu::StencilOperation::Keep,
+                WATER_STENCIL_BIT,
+                0,
             ),
         };
         let face = wgpu::StencilFaceState {
@@ -297,8 +366,8 @@ impl StencilUse {
         wgpu::StencilState {
             front: face,
             back: face,
-            read_mask: 0xff,
-            write_mask: 0xff,
+            read_mask,
+            write_mask,
         }
     }
 }
@@ -309,12 +378,37 @@ pub(crate) struct Pipelines {
     pub(crate) background: wgpu::RenderPipeline,
     pub(crate) route: wgpu::RenderPipeline,
     pub(crate) shape_mask: wgpu::RenderPipeline,
+    pub(crate) fog: wgpu::RenderPipeline,
     /// What a fill pattern's bind group is made for.
     pub(crate) pattern_bind_group_layout: wgpu::BindGroupLayout,
-    fill: wgpu::RenderPipeline,
-    fill_pattern: wgpu::RenderPipeline,
-    line: wgpu::RenderPipeline,
+    fill: GroundPipelines,
+    fill_pattern: GroundPipelines,
+    line: GroundPipelines,
     extrusion: wgpu::RenderPipeline,
+}
+
+/// One ground layer kind's pipelines: for water, which marks the stencil so haze passes over it, and
+/// for everything else.
+struct GroundPipelines {
+    land: wgpu::RenderPipeline,
+    water: wgpu::RenderPipeline,
+}
+
+impl GroundPipelines {
+    fn new(pipeline: impl Fn(StencilUse) -> wgpu::RenderPipeline) -> Self {
+        Self {
+            land: pipeline(StencilUse::Test),
+            water: pipeline(StencilUse::TestAndMarkWater),
+        }
+    }
+
+    const fn get(&self, water: bool) -> &wgpu::RenderPipeline {
+        if water {
+            &self.water
+        } else {
+            &self.land
+        }
+    }
 }
 
 struct PipelineBuilder<'a> {
@@ -382,11 +476,12 @@ fn ground_depth(stencil: StencilUse) -> wgpu::DepthStencilState {
 }
 
 impl Pipelines {
-    pub(crate) const fn layer(&self, kind: LayerKind) -> &wgpu::RenderPipeline {
+    /// `water` picks the variant that keeps haze off what it draws. Extrusions have none.
+    pub(crate) const fn layer(&self, kind: LayerKind, water: bool) -> &wgpu::RenderPipeline {
         match kind {
-            LayerKind::Fill => &self.fill,
-            LayerKind::FillPattern(_) => &self.fill_pattern,
-            LayerKind::Line => &self.line,
+            LayerKind::Fill => self.fill.get(water),
+            LayerKind::FillPattern(_) => self.fill_pattern.get(water),
+            LayerKind::Line => self.line.get(water),
             LayerKind::Extrusion => &self.extrusion,
         }
     }
@@ -425,23 +520,25 @@ impl Pipelines {
             },
             ground_depth(StencilUse::Update),
         );
-        let fill = builder.tile_pipeline(
-            "fill pipeline",
-            wgpu::include_wgsl!("shaders/fill.vertex.wgsl"),
-            wgpu::include_wgsl!("shaders/fill.fragment.wgsl"),
-            &[
-                Some(vertex_layout::<ShaderVertex>(&VERTEX_ATTRIBUTES)),
-                Some(instance_layout::<ShaderTileMetadata>(&FILL_TILE_ATTRIBUTES)),
-                Some(instance_layout::<ShaderLayerMetadata>(
-                    &FILL_LAYER_ATTRIBUTES,
-                )),
-                Some(vertex_layout::<FillShaderFeatureMetadata>(
-                    &FEATURE_ATTRIBUTES,
-                )),
-            ],
-            blended.clone(),
-            ground_depth(StencilUse::Test),
-        );
+        let fill = GroundPipelines::new(|stencil| {
+            builder.tile_pipeline(
+                "fill pipeline",
+                wgpu::include_wgsl!("shaders/fill.vertex.wgsl"),
+                wgpu::include_wgsl!("shaders/fill.fragment.wgsl"),
+                &[
+                    Some(vertex_layout::<ShaderVertex>(&VERTEX_ATTRIBUTES)),
+                    Some(instance_layout::<ShaderTileMetadata>(&FILL_TILE_ATTRIBUTES)),
+                    Some(instance_layout::<ShaderLayerMetadata>(
+                        &FILL_LAYER_ATTRIBUTES,
+                    )),
+                    Some(vertex_layout::<FillShaderFeatureMetadata>(
+                        &FEATURE_ATTRIBUTES,
+                    )),
+                ],
+                blended.clone(),
+                ground_depth(stencil),
+            )
+        });
         let pattern_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("fill pattern bind group layout"),
@@ -473,42 +570,46 @@ impl Pipelines {
             }),
             sample_count,
         };
-        let fill_pattern = pattern_builder.tile_pipeline(
-            "fill pattern pipeline",
-            wgpu::include_wgsl!("shaders/fill_pattern.vertex.wgsl"),
-            wgpu::include_wgsl!("shaders/fill_pattern.fragment.wgsl"),
-            &[
-                Some(vertex_layout::<ShaderVertex>(&VERTEX_ATTRIBUTES)),
-                Some(instance_layout::<ShaderTileMetadata>(
-                    &PATTERN_TILE_ATTRIBUTES,
-                )),
-                Some(instance_layout::<ShaderLayerMetadata>(
-                    &FILL_LAYER_ATTRIBUTES,
-                )),
-                Some(vertex_layout::<FillShaderFeatureMetadata>(
-                    &FEATURE_ATTRIBUTES,
-                )),
-            ],
-            blended.clone(),
-            ground_depth(StencilUse::Test),
-        );
-        let line = builder.tile_pipeline(
-            "line pipeline",
-            wgpu::include_wgsl!("shaders/line.vertex.wgsl"),
-            wgpu::include_wgsl!("shaders/line.fragment.wgsl"),
-            &[
-                Some(vertex_layout::<ShaderVertex>(&VERTEX_ATTRIBUTES)),
-                Some(instance_layout::<ShaderTileMetadata>(&LINE_TILE_ATTRIBUTES)),
-                Some(instance_layout::<ShaderLayerMetadata>(
-                    &LINE_LAYER_ATTRIBUTES,
-                )),
-                Some(vertex_layout::<FillShaderFeatureMetadata>(
-                    &FEATURE_ATTRIBUTES,
-                )),
-            ],
-            blended.clone(),
-            ground_depth(StencilUse::Test),
-        );
+        let fill_pattern = GroundPipelines::new(|stencil| {
+            pattern_builder.tile_pipeline(
+                "fill pattern pipeline",
+                wgpu::include_wgsl!("shaders/fill_pattern.vertex.wgsl"),
+                wgpu::include_wgsl!("shaders/fill_pattern.fragment.wgsl"),
+                &[
+                    Some(vertex_layout::<ShaderVertex>(&VERTEX_ATTRIBUTES)),
+                    Some(instance_layout::<ShaderTileMetadata>(
+                        &PATTERN_TILE_ATTRIBUTES,
+                    )),
+                    Some(instance_layout::<ShaderLayerMetadata>(
+                        &FILL_LAYER_ATTRIBUTES,
+                    )),
+                    Some(vertex_layout::<FillShaderFeatureMetadata>(
+                        &FEATURE_ATTRIBUTES,
+                    )),
+                ],
+                blended.clone(),
+                ground_depth(stencil),
+            )
+        });
+        let line = GroundPipelines::new(|stencil| {
+            builder.tile_pipeline(
+                "line pipeline",
+                wgpu::include_wgsl!("shaders/line.vertex.wgsl"),
+                wgpu::include_wgsl!("shaders/line.fragment.wgsl"),
+                &[
+                    Some(vertex_layout::<ShaderVertex>(&VERTEX_ATTRIBUTES)),
+                    Some(instance_layout::<ShaderTileMetadata>(&LINE_TILE_ATTRIBUTES)),
+                    Some(instance_layout::<ShaderLayerMetadata>(
+                        &LINE_LAYER_ATTRIBUTES,
+                    )),
+                    Some(vertex_layout::<FillShaderFeatureMetadata>(
+                        &FEATURE_ATTRIBUTES,
+                    )),
+                ],
+                blended.clone(),
+                ground_depth(stencil),
+            )
+        });
         let route = builder.tile_pipeline(
             "route pipeline",
             wgpu::include_wgsl!("shaders/route.vertex.wgsl"),
@@ -542,6 +643,17 @@ impl Pipelines {
                 ..opaque.clone()
             },
             ground_depth(StencilUse::Ignore),
+        );
+        let fog = builder.tile_pipeline(
+            "fog pipeline",
+            wgpu::include_wgsl!("shaders/fog.vertex.wgsl"),
+            wgpu::include_wgsl!("shaders/fog.fragment.wgsl"),
+            &[Some(instance_layout::<FogInstance>(&FOG_ATTRIBUTES))],
+            wgpu::ColorTargetState {
+                blend: Some(FOG_BLEND),
+                ..opaque.clone()
+            },
+            ground_depth(StencilUse::NotWater),
         );
         let extrusion = builder.tile_pipeline(
             "extrusion pipeline",
@@ -578,6 +690,7 @@ impl Pipelines {
             background,
             route,
             shape_mask,
+            fog,
             extrusion,
         }
     }

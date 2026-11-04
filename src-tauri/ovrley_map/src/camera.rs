@@ -275,6 +275,25 @@ impl ViewState {
         (self.view_projection() * Vector4::new(self.position.0, self.position.1, 0.0, 1.0)).w
     }
 
+    /// How the ground's depth runs down the window: the map centre's clip w over a ground point's is
+    /// 1 on row `.0` and changes by `.1` per row below it. Across a plane 1/w is affine in window
+    /// coordinates, so this holds on every row. Rows count down from the top in output pixels.
+    /// `None` when the ground is not in view.
+    pub fn ground_depth_rows(&self) -> Option<(f64, f64)> {
+        let view_projection = self.view_projection();
+        let clip = |(x, y): (f64, f64)| view_projection * Vector4::new(x, y, 0.0, 1.0);
+        let centre = clip(self.position);
+        let far = self
+            .ground_corners()?
+            .map(clip)
+            .into_iter()
+            .max_by(|a, b| a.w.total_cmp(&b.w))?;
+        let row = |point: Vector4<f64>| (1.0 - point.y / point.w) * 0.5 * self.height;
+        let rows = row(far) - row(centre);
+        let per_row = if rows.abs() < 1e-6 { 0.0 } else { (centre.w / far.w - 1.0) / rows };
+        Some((row(centre), per_row))
+    }
+
     fn camera_to_center_distance(&self) -> f64 {
         (self.height / 2.0) / self.y_tan
     }
