@@ -141,7 +141,7 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
                 label={t('widget-editor.pitch', 'Pitch')}
                 value={data.pitch}
                 min={0}
-                max={70}
+                max={60}
                 step={1}
                 suffix="°"
                 onSliderChange={(pitch) => updateWidgetDraft(widget.id, { pitch })}

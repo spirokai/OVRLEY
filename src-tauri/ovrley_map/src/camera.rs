@@ -13,8 +13,8 @@ use std::f64::consts::PI;
 /// The widest vertical field of view, 50 degrees, wider than MapLibre's 37. For one map scale a wider
 /// lens sits lower, so the road rushes past and buildings stand up more.
 const FOVY: f64 = 0.8726646259971648;
-/// Steeper than this, the top of the frustum no longer meets the ground in the view region.
-const MAX_PITCH_DEG: f64 = 85.0;
+/// The steepest camera. Past it, the far band packs so much map into so few rows that it shimmers.
+pub const MAX_PITCH_DEG: f64 = 60.0;
 /// The steepest the frame's top edge looks, from straight down. Past this the lens narrows, and past
 /// 90 the edge would miss the ground. Where the view reaches depends only on this angle, so a higher
 /// or lower camera can't change it. A follow camera keeps the full lens to about pitch 52.

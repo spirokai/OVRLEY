@@ -10,10 +10,9 @@ use crate::{
     },
     widgets::route::validation::{validate_route_path, ValidatedRoutePath},
 };
-use ovrley_map::{MapLayers, MapStyleId, MapStyleInfo, MapStyleSpec, MAX_TILE_ZOOM};
+use ovrley_map::{MapLayers, MapStyleId, MapStyleInfo, MapStyleSpec, MAX_PITCH_DEG, MAX_TILE_ZOOM};
 use std::ops::RangeInclusive;
 
-const MAX_PITCH_DEG: f32 = 70.0;
 /// Further out, a follow camera's pitched view takes in too many tiles.
 const MIN_FOLLOW_ZOOM: f32 = 14.0;
 pub(super) const FOLLOW_ZOOM_RANGE: RangeInclusive<f32> = MIN_FOLLOW_ZOOM..=MAX_TILE_ZOOM as f32;
@@ -122,7 +121,7 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
                 "rider_up" => MapOrientation::RiderUp,
                 _ => return Err(invalid("orientation", "unsupported orientation")),
             },
-            pitch_deg: in_range(map.pitch, "pitch", 0.0..=MAX_PITCH_DEG)?,
+            pitch_deg: in_range(map.pitch, "pitch", 0.0..=MAX_PITCH_DEG as f32)?,
             zoom: in_range(map.follow_zoom, "follow_zoom", FOLLOW_ZOOM_RANGE)?,
         },
         _ => return Err(invalid("camera_mode", "unsupported camera mode")),

@@ -20,7 +20,8 @@ mod view_region;
 pub mod gpu;
 
 pub use camera::{
-    ClipPoint, GroundProjection, MapCamera, MapViewport, ViewState, LIGHT_XY, MAX_VIEW_TILES,
+    ClipPoint, GroundProjection, MapCamera, MapViewport, ViewState, LIGHT_XY, MAX_PITCH_DEG,
+    MAX_VIEW_TILES,
 };
 pub use route::{MapRouteDraw, MapRouteLine, MapRoutePoint, MapRouteStyle};
 pub use source::{MapDataSource, MapSource};

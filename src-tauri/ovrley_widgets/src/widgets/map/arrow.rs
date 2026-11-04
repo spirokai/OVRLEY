@@ -447,7 +447,6 @@ mod tests {
         on_rider(&MarkerPose::top_down(Point::new(200.0, 150.0), 30.0), SOLID.middle);
         on_rider(&pose(30.0, 0.0, 0.0), (SOLID.middle + SOLID.tip) / 2.0);
         on_rider(&pose(60.0, 0.0, 0.0), SOLID.tip);
-        on_rider(&pose(70.0, 0.0, 0.0), SOLID.tip);
         assert!(SOLID.middle < -0.9, "the middle trails the tip: {}", SOLID.middle);
     }
 
