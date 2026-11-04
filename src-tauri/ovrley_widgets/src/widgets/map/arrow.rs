@@ -188,9 +188,10 @@ impl MarkerPose {
         let project = |x: f64, y: f64, height: f64| {
             let clip = projection.clip_above(x, y, height);
             (clip.z >= 0.0).then(|| {
+                let (x, y) = clip.window_share();
                 (
-                    f64::from(frame.left) + (clip.x / clip.w * 0.5 + 0.5) * f64::from(frame.width()),
-                    f64::from(frame.top) + (0.5 - clip.y / clip.w * 0.5) * f64::from(frame.height()),
+                    f64::from(frame.left) + x * f64::from(frame.width()),
+                    f64::from(frame.top) + y * f64::from(frame.height()),
                 )
             })
         };

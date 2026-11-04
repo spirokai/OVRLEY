@@ -16,15 +16,18 @@ use crate::{
     },
     widgets::{
         plot_marker::{plot_marker_radius, MarkerVariant, PlotMarker},
-        route::{geometry::PLACEHOLDER_ROUTE, layout::stroke_paint},
+        route::{
+            geometry::ProgressLine,
+            layout::{stroke_paint, SplitStroke},
+        },
     },
 };
-use ovrley_map::{MapRouteStyle, MapStyleInfo};
+use ovrley_map::{MapRouteStyle, MapStyleInfo, MapViewport};
 use skia_safe::{
     AlphaType, Canvas, Color, ContourMeasure, ContourMeasureIter, FilterMode, Font, IRect, Image,
     Paint, PaintJoin, PaintStyle, Path, PathBuilder, Point, RRect, RSXform, Rect, TextBlob,
 };
-use std::f32::consts::FRAC_1_SQRT_2;
+use std::{f32::consts::FRAC_1_SQRT_2, sync::Arc};
 
 /// The map's sources by name: the tile host, the tile schema and the data.
 const ATTRIBUTION: &str = "OpenFreeMap \u{a9} OpenMapTiles \u{a9} OpenStreetMap";
@@ -178,6 +181,14 @@ impl Attribution {
     }
 }
 
+/// The top-down route as the widget strokes it over a frame that never changes: its line in the
+/// viewport's output pixels, which the frame shows whole, and that line's stroke under one layout.
+pub struct ScreenRoute {
+    pub line: Arc<ProgressLine>,
+    viewport: MapViewport,
+    stroke: SplitStroke,
+}
+
 /// The caret stands in the scene. The circles mark a point, so they stay flat on the frame.
 enum MapMarker {
     Arrow(MapArrow),
@@ -200,8 +211,12 @@ pub struct MapLayout {
     border: Option<(RRect, Paint)>,
     placeholder_paint: Paint,
     image_paint: Paint,
-    completed_paint: Paint,
-    remaining_paint: Paint,
+    /// The remaining and completed sides of the top-down route, in output pixels as wide as
+    /// `route_style`'s, for [`Self::screen_route`].
+    screen_paints: [Paint; 2],
+    /// The stand-in route across the frame, in scene pixels, and its stroke.
+    placeholder: ProgressLine,
+    placeholder_stroke: SplitStroke,
     marker: MapMarker,
     attribution: Attribution,
 }
@@ -259,6 +274,30 @@ impl MapLayout {
         placeholder_paint.set_alpha_f(opacity);
         let mut image_paint = Paint::default();
         image_paint.set_alpha_f(opacity);
+        // Widget and scene opacity apply to the finished frame as a whole.
+        let route_style = MapRouteStyle {
+            completed_color: color_floats(&path.completed_line_color, path.completed_line_opacity),
+            remaining_color: color_floats(&path.remaining_line_color, path.remaining_line_opacity),
+            width_px: line_width * raster_scale.value(),
+        };
+        // What the widget strokes itself draws over the frame, so it carries the widget's opacity.
+        let route_paints = |width: f32| {
+            [
+                stroke_paint(
+                    &path.remaining_line_color,
+                    width,
+                    path.remaining_line_opacity * opacity,
+                ),
+                stroke_paint(
+                    &path.completed_line_color,
+                    width,
+                    path.completed_line_opacity * opacity,
+                ),
+            ]
+        };
+        let placeholder = ProgressLine::placeholder(frame);
+        let [remaining, completed] = route_paints(line_width);
+        let placeholder_stroke = SplitStroke::new(&placeholder, frame, remaining, completed);
         Ok(Self {
             frame,
             opacity,
@@ -266,30 +305,12 @@ impl MapLayout {
             corner_radius_px: corner_radius * raster_scale.value(),
             corner_margin: corner_radius.ceil() as i32,
             border,
-            // Widget and scene opacity apply to the finished frame as a whole.
-            route_style: MapRouteStyle {
-                completed_color: color_floats(
-                    &path.completed_line_color,
-                    path.completed_line_opacity,
-                ),
-                remaining_color: color_floats(
-                    &path.remaining_line_color,
-                    path.remaining_line_opacity,
-                ),
-                width_px: line_width * raster_scale.value(),
-            },
+            screen_paints: route_paints(route_style.width_px),
+            route_style,
             placeholder_paint,
             image_paint,
-            completed_paint: stroke_paint(
-                &path.completed_line_color,
-                line_width,
-                path.completed_line_opacity * opacity,
-            ),
-            remaining_paint: stroke_paint(
-                &path.remaining_line_color,
-                line_width,
-                path.remaining_line_opacity * opacity,
-            ),
+            placeholder,
+            placeholder_stroke,
             marker: match path.marker_variant {
                 MarkerVariant::Caret => MapMarker::Arrow(MapArrow::new(
                     plot_marker_radius(path.marker_size, scene.scale),
@@ -438,39 +459,41 @@ impl MapLayout {
         canvas.draw_rect(self.frame, &self.placeholder_paint);
     }
 
-    /// The stand-in route when there's no GPS, in Skia because no frame exists to carry it.
+    /// The stand-in route when there's no GPS, in Skia because no frame exists to carry it. Returns
+    /// where its marker sits, with the heading there.
     pub fn draw_placeholder_route(&self, canvas: &Canvas, progress: f32) -> (Point, f32) {
-        let at = |(x, y): (f32, f32)| {
-            Point::new(
-                self.frame.left + x * self.frame.width(),
-                self.frame.top + y * self.frame.height(),
-            )
-        };
-        let segments = (PLACEHOLDER_ROUTE.len() - 1) as f32;
-        let along = progress.clamp(0.0, 1.0) * segments;
-        let index = (along as usize).min(PLACEHOLDER_ROUTE.len() - 2);
-        let (a, b) = (
-            at(PLACEHOLDER_ROUTE[index]),
-            at(PLACEHOLDER_ROUTE[index + 1]),
+        self.placeholder_stroke
+            .draw(canvas, &self.placeholder, progress, [1.0, 1.0])
+    }
+
+    /// The top-down route's stroke for `line`, which is in `viewport`'s output pixels. Only what
+    /// crosses the frame is kept, however far the map is zoomed in.
+    pub fn screen_route(&self, line: Arc<ProgressLine>, viewport: MapViewport) -> ScreenRoute {
+        let [remaining, completed] = self.screen_paints.clone();
+        let within = Rect::from_wh(viewport.width_px() as f32, viewport.height_px() as f32);
+        ScreenRoute {
+            stroke: SplitStroke::new(&line, within, remaining, completed),
+            line,
+            viewport,
+        }
+    }
+
+    /// The top-down route over the frame, split at `travelled_metres`, with no shadow. The frame
+    /// shows the route's viewport whole, so the route lands where the renderer put its roads.
+    pub fn draw_route(&self, canvas: &Canvas, route: &ScreenRoute, travelled_metres: f32) {
+        let viewport = route.viewport;
+        canvas.save();
+        canvas.translate((self.frame.left, self.frame.top));
+        route.stroke.draw(
+            canvas,
+            &route.line,
+            travelled_metres,
+            [
+                self.frame.width() / viewport.width_px() as f32,
+                self.frame.height() / viewport.height_px() as f32,
+            ],
         );
-        let mix = along - index as f32;
-        let split = Point::new(a.x + (b.x - a.x) * mix, a.y + (b.y - a.y) * mix);
-
-        let mut remaining = PathBuilder::new();
-        remaining.move_to(split);
-        for point in &PLACEHOLDER_ROUTE[index + 1..] {
-            remaining.line_to(at(*point));
-        }
-        canvas.draw_path(&remaining.detach(), &self.remaining_paint);
-
-        let mut completed = PathBuilder::new();
-        completed.move_to(at(PLACEHOLDER_ROUTE[0]));
-        for point in &PLACEHOLDER_ROUTE[1..=index] {
-            completed.line_to(at(*point));
-        }
-        completed.line_to(split);
-        canvas.draw_path(&completed.detach(), &self.completed_paint);
-        (split, (b.x - a.x).atan2(a.y - b.y).to_degrees())
+        canvas.restore();
     }
 
     pub fn draw_marker(&self, canvas: &Canvas, pose: &MarkerPose) {

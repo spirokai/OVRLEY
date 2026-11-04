@@ -64,11 +64,12 @@ pub fn build_route_geometry_command(
 
     Ok(RouteGeometryResponse {
         points: geometry
-            .points
-            .into_iter()
+            .line
+            .points()
+            .iter()
             .map(|(x, y)| [x * scale, y * scale])
             .collect(),
-        progress_values: geometry.progress_values,
+        progress_values: geometry.line.progress().to_vec(),
         bbox: [0.0, 0.0, width, height],
         source_point_count: geometry.source_point_count,
         simplification: geometry.simplification,

@@ -2,7 +2,7 @@
 //! export builds it once and shares it: the renderer recognises a route line by identity.
 use super::{
     camera::WidgetCamera,
-    route::route_line,
+    route::{route_line, screen_line},
     track::{MapTrack, TrackPosition},
     validation::{MapCameraMode, ValidatedMapWidget},
 };
@@ -12,7 +12,7 @@ use crate::{
     host::WidgetHost,
     model::scene::ValidatedScenePresentation,
     render::preview::PreviewRasterScale,
-    widgets::route::sampling::RouteWindow,
+    widgets::route::{geometry::ProgressLine, sampling::RouteWindow},
 };
 use ovrley_map::{view_tiles, MapCamera, MapRouteLine, MapViewport, TileId, MAX_VIEW_TILES};
 use std::sync::Arc;
@@ -54,6 +54,10 @@ struct LineKey {
 pub struct ActivityMap {
     pub(super) track: Arc<MapTrack>,
     pub(super) line: Arc<MapRouteLine>,
+    /// The top-down route in the viewport's output pixels, projected once through the fixed camera,
+    /// which the widget strokes over a frame that never changes. None for a chase camera, whose
+    /// renderer draws the route under the buildings through every frame's camera.
+    pub(super) screen_route: Option<Arc<ProgressLine>>,
     line_key: LineKey,
     camera: WidgetCamera,
     pub(super) viewport: MapViewport,
@@ -84,9 +88,14 @@ impl ActivityMap {
             Some(previous) => previous.line.clone(),
             None => Arc::new(route_line(&track, line_key.zoom)?),
         };
+        let screen_route = match camera {
+            WidgetCamera::Fixed(camera) => Some(Arc::new(screen_line(&line, &camera, viewport)?)),
+            WidgetCamera::Follow { .. } => None,
+        };
         Ok(Self {
             track,
             line,
+            screen_route,
             line_key,
             camera,
             viewport,

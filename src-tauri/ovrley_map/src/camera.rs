@@ -166,6 +166,14 @@ pub struct ClipPoint {
     pub w: f64,
 }
 
+impl ClipPoint {
+    /// Where the point lands in the window, as shares of its width and height from the top left.
+    /// Only for a point in front of the near plane.
+    pub fn window_share(self) -> (f64, f64) {
+        (self.x / self.w * 0.5 + 0.5, 0.5 - self.y / self.w * 0.5)
+    }
+}
+
 /// The view matrix reduced to ground points, for projecting many per frame. `z >= 0` is in front
 /// of the near plane; points behind it must be clipped before dividing by `w`.
 #[derive(Clone, Copy, Debug)]

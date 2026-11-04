@@ -6,11 +6,10 @@ use crate::{
     rdp::simplify_rdp_indices_f64,
 };
 use skia_safe::{Path, PathBuilder, Rect};
-use std::sync::Mutex;
 
 const ROUTE_CURVE_FLATNESS_PX: f64 = 0.35;
 /// The stand-in route without telemetry, as shares of a widget's frame, at even progress steps.
-pub(crate) const PLACEHOLDER_ROUTE: [(f32, f32); 5] = [
+const PLACEHOLDER_ROUTE: [(f32, f32); 5] = [
     (0.12, 0.82),
     (0.30, 0.64),
     (0.46, 0.72),
@@ -47,26 +46,130 @@ impl GeometryKey {
     }
 }
 
+/// A polyline with a progress value per vertex that never decreases along it. A frame splits it at one
+/// progress, and the stretch behind the marker draws over the whole line. The route plot, the top-down
+/// map and the map's stand-in route all split their lines here.
+#[derive(Debug)]
+pub struct ProgressLine {
+    points: Vec<(f32, f32)>,
+    progress: Vec<f32>,
+}
+
+/// Where a line splits at one progress.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LineSplit {
+    pub point: (f32, f32),
+    /// The line's direction at the split, along the segment it's on.
+    pub direction: (f32, f32),
+    /// The vertex that segment ends at.
+    pub segment_end: usize,
+}
+
+impl ProgressLine {
+    pub fn new(points: Vec<(f32, f32)>, progress: Vec<f32>) -> WidgetResult<Self> {
+        if points.len() < 2 || progress.len() != points.len() {
+            return Err(WidgetError::Render(format!(
+                "A progress line needs two or more vertices with one progress each, got {} and {}",
+                points.len(),
+                progress.len()
+            )));
+        }
+        Ok(Self { points, progress })
+    }
+
+    /// The stand-in route without telemetry across `area`, from progress 0 to 1.
+    pub fn placeholder(area: Rect) -> Self {
+        let segments = (PLACEHOLDER_ROUTE.len() - 1) as f32;
+        Self {
+            points: PLACEHOLDER_ROUTE
+                .iter()
+                .map(|(x, y)| (area.left + x * area.width(), area.top + y * area.height()))
+                .collect(),
+            progress: (0..PLACEHOLDER_ROUTE.len())
+                .map(|index| index as f32 / segments)
+                .collect(),
+        }
+    }
+
+    pub fn points(&self) -> &[(f32, f32)] {
+        &self.points
+    }
+
+    pub fn progress(&self) -> &[f32] {
+        &self.progress
+    }
+
+    /// Held at the line's ends outside its progress range.
+    pub fn split(&self, progress: f32) -> LineSplit {
+        let index = self
+            .progress
+            .partition_point(|value| *value < progress)
+            .clamp(1, self.points.len() - 1);
+        let (left, right) = (self.progress[index - 1], self.progress[index]);
+        let mix = if right > left {
+            ((progress - left) / (right - left)).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        let (a, b) = (self.points[index - 1], self.points[index]);
+        LineSplit {
+            point: (a.0 + (b.0 - a.0) * mix, a.1 + (b.1 - a.1) * mix),
+            direction: (b.0 - a.0, b.1 - a.1),
+            segment_end: index,
+        }
+    }
+
+    /// The whole line. Segments wholly outside `within` are left out, so a line that mostly runs off
+    /// the frame strokes only what shows.
+    pub fn path(&self, within: Rect) -> Path {
+        visible_polyline(self.points.iter().copied(), within)
+    }
+
+    /// From the start to the split, leaving out what [`Self::path`] does.
+    pub fn completed_path(&self, split: &LineSplit, within: Rect) -> Path {
+        visible_polyline(
+            self.points[..split.segment_end]
+                .iter()
+                .copied()
+                .chain(std::iter::once(split.point)),
+            within,
+        )
+    }
+}
+
+/// The segments whose bounds meet `within`. A gap starts a new contour, and a gap's ends lie outside
+/// `within`, so their caps never show where a join would.
+fn visible_polyline(points: impl IntoIterator<Item = (f32, f32)>, within: Rect) -> Path {
+    let mut path = PathBuilder::new();
+    let mut points = points.into_iter();
+    let Some(mut from) = points.next() else {
+        return path.detach();
+    };
+    let mut joined = false;
+    for to in points {
+        let shows = from.0.min(to.0) <= within.right
+            && from.0.max(to.0) >= within.left
+            && from.1.min(to.1) <= within.bottom
+            && from.1.max(to.1) >= within.top;
+        if shows {
+            if !joined {
+                path.move_to(from);
+            }
+            path.line_to(to);
+        }
+        joined = shows;
+        from = to;
+    }
+    path.detach()
+}
+
 #[derive(Debug)]
 pub struct RouteGeometry {
     pub key: GeometryKey,
-    pub points: Vec<(f32, f32)>,
-    pub progress_values: Vec<f32>,
+    pub line: ProgressLine,
     pub source_point_count: usize,
     pub simplification: String,
-    // Skia paths are Send, not Sync. Borrow only while preparing a static layer.
-    pub path: Mutex<Path>,
     pub point_bounds: Rect,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct RouteFrameState {
-    pub progress01: f32,
-    pub marker_x: f32,
-    pub marker_y: f32,
-    /// The route's direction at the marker, along the segment it's on.
-    pub marker_direction: (f32, f32),
-    pub segment_index: usize,
 }
 
 impl RouteGeometry {
@@ -96,57 +199,52 @@ impl RouteGeometry {
         let simplified =
             simplify_route_samples(&downsampled, config.simplify_tolerance_px.max(0.05));
         let curved = curve_route_samples(&simplified, ROUTE_CURVE_FLATNESS_PX);
-        Self::from_points(
+        Ok(Self::from_line(
             key,
-            curved.iter().map(|sample| (sample.point.0 as f32, sample.point.1 as f32)).collect(),
-            curved.iter().map(|sample| sample.progress01).collect(),
+            ProgressLine::new(
+                curved.iter().map(|sample| (sample.point.0 as f32, sample.point.1 as f32)).collect(),
+                curved.iter().map(|sample| sample.progress01).collect(),
+            )?,
             samples.len(),
             format!("lttb_density_{:.2}_rdp_px_{:.2}_catmull_rom_flatness_px_{ROUTE_CURVE_FLATNESS_PX:.2}", config.target_density, config.simplify_tolerance_px),
-        )
+        ))
     }
 
     /// Existing preview shape when no external route telemetry is available.
-    pub fn placeholder(config: &ValidatedRoutePlot) -> WidgetResult<Self> {
-        Self::from_points(
+    pub fn placeholder(config: &ValidatedRoutePlot) -> Self {
+        Self::from_line(
             GeometryKey::new(config),
-            PLACEHOLDER_ROUTE
-                .map(|(x, y)| (x * config.width, y * config.height))
-            .to_vec(),
-            vec![0.0, 0.25, 0.5, 0.75, 1.0],
+            ProgressLine::placeholder(Rect::from_wh(config.width, config.height)),
             0,
             "placeholder".into(),
         )
     }
 
-    fn from_points(
+    fn from_line(
         key: GeometryKey,
-        points: Vec<(f32, f32)>,
-        progress_values: Vec<f32>,
+        line: ProgressLine,
         source_point_count: usize,
         simplification: String,
-    ) -> WidgetResult<Self> {
-        let first = points[0];
-        let mut path = PathBuilder::new();
-        path.move_to(first);
-        let mut bounds = Rect::new(first.0, first.1, first.0, first.1);
-        for point in &points {
-            path.line_to(*point);
-            bounds = Rect::new(
-                bounds.left.min(point.0),
-                bounds.top.min(point.1),
-                bounds.right.max(point.0),
-                bounds.bottom.max(point.1),
-            );
-        }
-        Ok(Self {
+    ) -> Self {
+        let (x, y) = line.points()[0];
+        let point_bounds = line
+            .points()
+            .iter()
+            .fold(Rect::new(x, y, x, y), |bounds, &(x, y)| {
+                Rect::new(
+                    bounds.left.min(x),
+                    bounds.top.min(y),
+                    bounds.right.max(x),
+                    bounds.bottom.max(y),
+                )
+            });
+        Self {
             key,
-            points,
-            progress_values,
+            line,
             source_point_count,
             simplification,
-            path: Mutex::new(path.detach()),
-            point_bounds: bounds,
-        })
+            point_bounds,
+        }
     }
 
     pub fn scale_to(&self, config: &ValidatedRoutePlot) -> [f32; 2] {
@@ -154,40 +252,6 @@ impl RouteGeometry {
             config.width / self.key.width,
             config.height / self.key.height,
         ]
-    }
-
-    pub fn state(&self, progress01: f32) -> RouteFrameState {
-        let target = progress01.clamp(0.0, 1.0);
-        let index = self
-            .progress_values
-            .partition_point(|value| *value < target)
-            .clamp(1, self.points.len() - 1);
-        let left = self.progress_values[index - 1];
-        let right = self.progress_values[index];
-        let mix = if right > left {
-            ((target - left) / (right - left)).clamp(0.0, 1.0)
-        } else {
-            1.0
-        };
-        let a = self.points[index - 1];
-        let b = self.points[index];
-        RouteFrameState {
-            progress01: target,
-            marker_x: a.0 + (b.0 - a.0) * mix,
-            marker_y: a.1 + (b.1 - a.1) * mix,
-            marker_direction: (b.0 - a.0, b.1 - a.1),
-            segment_index: index,
-        }
-    }
-
-    pub fn completed_path(&self, state: &RouteFrameState) -> Path {
-        let mut path = PathBuilder::new();
-        path.move_to(self.points[0]);
-        for point in &self.points[..state.segment_index] {
-            path.line_to(*point);
-        }
-        path.line_to((state.marker_x, state.marker_y));
-        path.detach()
     }
 }
 

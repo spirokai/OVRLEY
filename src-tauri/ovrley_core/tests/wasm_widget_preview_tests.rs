@@ -521,8 +521,9 @@ fn assert_atlas_reassembles_the_full_frame(
         let matches = |pixel: usize| {
             let (expected, actual) = (&expected[pixel * 4..pixel * 4 + 4], &reassembled[pixel * 4..pixel * 4 + 4]);
             // Skia rasterizes a path at its shifted atlas position in float, so anti-aliased
-            // coverage can round one level apart; overlapping slots add blending rounding.
-            let alpha_tolerance = if covers[pixel] <= 1 { 1 } else { 2 };
+            // coverage can round apart. A route strokes its whole line and its completed stretch on
+            // top every frame, so an edge can round two levels; overlapping slots add blending rounding.
+            let alpha_tolerance = if covers[pixel] <= 1 { 2 } else { 3 };
             // Compare premultiplied: straight colour is unstable where alpha is near zero.
             let premultiplied = |rgba: &[u8], channel: usize| f32::from(rgba[channel]) * f32::from(rgba[3]) / 255.0;
             (expected[3].abs_diff(actual[3]) <= alpha_tolerance)

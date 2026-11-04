@@ -271,12 +271,15 @@ export function createMapLayers({ schedule, setReady }) {
         // A renderer of another pixel density keeps its last frame, rescaled, until its replacement can draw.
         if (renderer?.pixelRatio !== view.renderer.pixel_ratio) return
         fitSize(renderer, view)
-        if (renderer.routeId !== view.route_id) {
+        // A top-down view has no route: the widget strokes it over the canvas, which draws only the map.
+        const { route } = view
+        if (route && renderer.routeId !== route.id) {
           renderer.layer.set_route(readRoute())
-          renderer.routeId = view.route_id
+          renderer.routeId = route.id
         }
         renderer.workers.want(renderer.layer.missing(camera))
-        renderer.layer.draw(camera, Float32Array.from(view.route_style), view.travelled_metres, view.corner_radius_px)
+        if (route) renderer.layer.draw_with_route(camera, Float32Array.from(route.style), route.travelled_metres, view.corner_radius_px)
+        else renderer.layer.draw(camera, view.corner_radius_px)
       } catch (error) {
         fail(id, state, key, error)
         return

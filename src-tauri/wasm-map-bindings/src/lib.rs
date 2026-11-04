@@ -133,7 +133,16 @@ impl MapLayer {
         self.renderer.resize(width, height).map_err(js_error)
     }
 
-    pub fn draw(
+    /// The map alone, for a top-down widget that strokes its route over it.
+    pub fn draw(&mut self, camera: &[f64], corner_radius_px: f32) -> Result<(), JsValue> {
+        let camera = parse_camera(camera).map_err(js_error)?;
+        self.renderer
+            .present(&camera, None, corner_radius_px)
+            .map_err(js_error)
+    }
+
+    /// The map with its route under the buildings, for a chase camera.
+    pub fn draw_with_route(
         &mut self,
         camera: &[f64],
         route_style: &[f32],

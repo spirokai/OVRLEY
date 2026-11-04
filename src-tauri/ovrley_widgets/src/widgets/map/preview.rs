@@ -5,7 +5,7 @@ use super::{
     config::MapConfig,
     content::{ContentKey, MapContent},
     frame_provider::{MapFrame, MapFramePixels, MapFrameProvider, MapFrameRequest},
-    layout::MapLayout,
+    layout::{MapLayout, ScreenRoute},
     validation::{validate_map_widget, ValidatedMapWidget},
 };
 use crate::{
@@ -76,6 +76,9 @@ pub struct PreviewMap {
     last_frame: Option<(MapFrameRequest, MapFramePixels)>,
     /// The frame the provider is drawing.
     drawing: Option<(MapFrameRequest, Receiver<Result<MapFramePixels, String>>)>,
+    /// The top-down route's stroke under this layout, kept while the map's line stays the same.
+    /// [`Self::frame_request`] brings it up to date, so it is current for any frame with a request.
+    screen_route: Option<ScreenRoute>,
     last_render: Option<(MapFrameState, bool)>,
     /// Whether the host's map canvas is showing under this widget.
     layer_ready: bool,
@@ -152,6 +155,7 @@ impl PreviewMap {
             content,
             last_frame: None,
             drawing: None,
+            screen_route: None,
             last_render: None,
             layer_ready: false,
             view: Vec::new(),
@@ -194,6 +198,8 @@ impl PreviewMap {
             self.content_key = key;
         }
         self.layout = MapLayout::new(&config, &style, &scene, raster_scale, fonts)?;
+        // Its stroke is the old layout's.
+        self.screen_route = None;
         self.config = config;
         self.style = style;
         self.scene = scene;
@@ -250,30 +256,44 @@ impl PreviewMap {
         }
     }
 
-    /// Publishes what the host's map canvas should draw at this state.
-    fn publish_view(&mut self, state: &MapFrameState) -> WidgetResult<()> {
-        let (Some(camera), Some(MapContent::Activity(map))) = (state.camera, &self.content) else {
+    /// Publishes what the host's map canvas should draw for `request`. A top-down request has no
+    /// route, since the tile strokes it, so the canvas draws only the map. Its view then holds still
+    /// through playback, and the canvas draws again only for an edit or a tile.
+    fn publish_view(&mut self, request: Option<&MapFrameRequest>) -> WidgetResult<()> {
+        let Some(request) = request else {
             self.view.clear();
             return Ok(());
         };
-        if !self
-            .view_line
-            .as_ref()
-            .is_some_and(|line| Arc::ptr_eq(line, &map.line))
-        {
-            self.route_points = map
-                .line
-                .points()
-                .iter()
-                .flat_map(|point| [point.world_x, point.world_y, f64::from(point.along_metres)])
-                .collect();
-            self.route_id = self.route_id.wrapping_add(1);
-            self.view_line = Some(map.line.clone());
-        }
-        let viewport = map.viewport;
-        let style = self.layout.route_style;
-        let [c0, c1, c2, c3] = style.completed_color;
-        let [r0, r1, r2, r3] = style.remaining_color;
+        let route = match &request.route {
+            None => serde_json::Value::Null,
+            Some(route) => {
+                if !self
+                    .view_line
+                    .as_ref()
+                    .is_some_and(|line| Arc::ptr_eq(line, &route.line))
+                {
+                    self.route_points = route
+                        .line
+                        .points()
+                        .iter()
+                        .flat_map(|point| {
+                            [point.world_x, point.world_y, f64::from(point.along_metres)]
+                        })
+                        .collect();
+                    self.route_id = self.route_id.wrapping_add(1);
+                    self.view_line = Some(route.line.clone());
+                }
+                let style = route.style;
+                let [c0, c1, c2, c3] = style.completed_color;
+                let [r0, r1, r2, r3] = style.remaining_color;
+                json!({
+                    "id": self.route_id,
+                    "style": [c0, c1, c2, c3, r0, r1, r2, r3, style.width_px],
+                    "travelled_metres": route.travelled_metres,
+                })
+            }
+        };
+        let (camera, viewport) = (request.camera, request.viewport);
         self.view = serde_json::to_vec(&json!({
             "renderer": {
                 "style": self.style.id,
@@ -287,31 +307,47 @@ impl PreviewMap {
             "height": viewport.height_px(),
             "style_zoom": camera.zoom(),
             "opacity": self.layout.opacity,
-            "corner_radius_px": self.layout.corner_radius_px,
+            "corner_radius_px": request.corner_radius_px,
             "camera": camera.values(),
-            "route_id": self.route_id,
-            "route_style": [c0, c1, c2, c3, r0, r1, r2, r3, style.width_px],
-            "travelled_metres": state.progress,
+            "route": route,
         }))
         .map_err(|error| WidgetError::Render(error.to_string()))?;
         Ok(())
     }
 
-    /// What the renderer must draw at this state; none without a camera over the activity.
-    fn frame_request(&self, state: &MapFrameState) -> Option<MapFrameRequest> {
+    /// What the renderer must draw at this state; none without a camera over the activity. This is
+    /// where the route's drawer is chosen: a top-down route is the widget's, whose stroke this keeps
+    /// in `screen_route`, so its request draws none. Any other goes to the renderer.
+    fn frame_request(&mut self, state: &MapFrameState) -> Option<MapFrameRequest> {
         let camera = state.camera?;
         let Some(MapContent::Activity(map)) = &self.content else {
             return None;
+        };
+        let route = match &map.screen_route {
+            Some(line) => {
+                if !self
+                    .screen_route
+                    .as_ref()
+                    .is_some_and(|route| Arc::ptr_eq(&route.line, line))
+                {
+                    self.screen_route = Some(self.layout.screen_route(line.clone(), map.viewport));
+                }
+                None
+            }
+            None => {
+                self.screen_route = None;
+                Some(MapRouteDraw {
+                    line: map.line.clone(),
+                    style: self.layout.route_style,
+                    travelled_metres: state.progress,
+                })
+            }
         };
         Some(MapFrameRequest {
             spec: self.config.spec(&self.style),
             camera,
             viewport: map.viewport,
-            route: MapRouteDraw {
-                line: map.line.clone(),
-                style: self.layout.route_style,
-                travelled_metres: state.progress,
-            },
+            route,
             corner_radius_px: self.layout.corner_radius_px,
         })
     }
@@ -350,12 +386,12 @@ impl PreviewMap {
         }
     }
 
-    /// The camera and backing to draw.
+    /// The camera and backing to draw `request` with.
     fn resolve_frame(
         &mut self,
-        state: &MapFrameState,
+        request: Option<MapFrameRequest>,
     ) -> WidgetResult<Option<(MapCamera, MapBacking)>> {
-        let Some(request) = self.frame_request(state) else {
+        let Some(request) = request else {
             return Ok(None);
         };
         let camera = request.camera;
@@ -394,19 +430,29 @@ impl PreviewMap {
         )
     }
 
+    /// `screen_route` is the top-down route, drawn over whatever backs a resolved frame and under the
+    /// marker. It is current only for a resolved frame, so a frame without one never draws it.
     fn paint(
         layout: &MapLayout,
         canvas: &Canvas,
         progress: f32,
         marker: Option<MarkerPose>,
         resolved: Option<&(MapCamera, MapBacking)>,
+        screen_route: Option<&ScreenRoute>,
     ) {
         canvas.save();
         layout.clip_shape(canvas);
         match resolved {
-            Some((_, MapBacking::Image(frame))) => layout.draw_image(canvas, frame.image()),
-            Some((_, MapBacking::Layer)) => {}
-            Some((_, MapBacking::Placeholder)) => layout.draw_placeholder(canvas),
+            Some((_, backing)) => {
+                match backing {
+                    MapBacking::Image(frame) => layout.draw_image(canvas, frame.image()),
+                    MapBacking::Layer => {}
+                    MapBacking::Placeholder => layout.draw_placeholder(canvas),
+                }
+                if let Some(route) = screen_route {
+                    layout.draw_route(canvas, route, progress);
+                }
+            }
             None => {
                 layout.draw_placeholder(canvas);
                 let (split, heading) = layout.draw_placeholder_route(canvas, progress);
@@ -433,7 +479,8 @@ impl PreviewMap {
         second: f64,
     ) -> WidgetResult<TileBounds> {
         let state = self.frame_state(activity, second)?;
-        let resolved = self.resolve_frame(&state)?;
+        let request = self.frame_request(&state);
+        let resolved = self.resolve_frame(request)?;
         let marker = resolved
             .as_ref()
             .and_then(|(camera, _)| self.marker_pose(camera, second));
@@ -443,14 +490,16 @@ impl PreviewMap {
             state.progress,
             marker,
             resolved.as_ref(),
+            self.screen_route.as_ref(),
         );
         Ok(self.layout_bounds())
     }
 
     pub fn render(&mut self, activity: Option<&ActivitySampler>, second: f64) -> WidgetResult<()> {
         let state = self.frame_state(activity, second)?;
-        self.publish_view(&state)?;
-        let resolved = self.resolve_frame(&state)?;
+        let request = self.frame_request(&state);
+        self.publish_view(request.as_ref())?;
+        let resolved = self.resolve_frame(request)?;
         let has_frame = resolved
             .as_ref()
             .is_some_and(|(_, backing)| !matches!(backing, MapBacking::Placeholder));
@@ -462,6 +511,7 @@ impl PreviewMap {
             .as_ref()
             .and_then(|(camera, _)| self.marker_pose(camera, second));
         let layout = &self.layout;
+        let screen_route = self.screen_route.as_ref();
         let bounds: Rect = outward(layout.frame);
         let (width, height, bounds) = render_tile(
             &mut self.surface,
@@ -470,7 +520,14 @@ impl PreviewMap {
             self.raster_scale,
             bounds,
             |canvas| {
-                Self::paint(layout, canvas, state.progress, marker, resolved.as_ref());
+                Self::paint(
+                    layout,
+                    canvas,
+                    state.progress,
+                    marker,
+                    resolved.as_ref(),
+                    screen_route,
+                );
                 Ok(())
             },
         )?;

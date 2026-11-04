@@ -476,7 +476,7 @@ impl ExportRenderer {
         let mut pixels = spare.unwrap_or_default();
         self.renderer.render(
             &request.camera,
-            Some(&request.route),
+            request.route.as_ref(),
             request.corner_radius_px,
             &mut pixels,
         )?;

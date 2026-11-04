@@ -749,26 +749,6 @@ export async function buildElevationGeometry(config, parsedActivity) {
 }
 
 /**
- * Builds route widget geometry from config and activity data.
- *
- * Returns simplified, projected geometry points for the route preview
- * without rendering a Skia surface. The JS frontend uses this to avoid
- * duplicating the geometry pipeline.
- *
- * @param {*} config - Overlay template configuration data.
- * @param {*} parsedActivity - Normalized activity payload used by the app.
- * @returns {Promise<object>} Promise resolving to route geometry (points, progressValues, bbox, etc.).
- */
-export async function buildRouteGeometry(config, parsedActivity) {
-  const safeConfig = safeJsonStringify(config)
-  const safeParsedActivity = safeJsonStringify(parsedActivity)
-  return apiCall('backend_build_route_geometry', {
-    configJson: safeConfig,
-    parsedActivityJson: safeParsedActivity,
-  })
-}
-
-/**
  * Extracts MP4 telemetry from a video file.
  *
  * @param {string} filePath - Absolute path to the video file.
