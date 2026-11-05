@@ -166,8 +166,9 @@ pub(crate) async fn backend_font_data(
     app: AppHandle,
     font_id: String,
     face_index: usize,
-) -> Result<Vec<u8>, String> {
+) -> Result<tauri::ipc::Response, String> {
     commands::backend_font_data(&runtime_paths::app_paths(&app)?, &font_id, face_index)
+        .map(tauri::ipc::Response::new)
         .map_err(|error| error.to_string())
 }
 

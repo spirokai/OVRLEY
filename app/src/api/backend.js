@@ -352,7 +352,7 @@ export function getFontCapabilities(fontId) {
   return apiCall('backend_font_capabilities', { fontId })
 }
 
-/** @param {string} fontId Canonical font ID. @param {number} faceIndex Catalog face index. @returns {Promise<number[]>} Font bytes. */
+/** @param {string} fontId Canonical font ID. @param {number} faceIndex Catalog face index. @returns {Promise<ArrayBuffer>} Raw font bytes. */
 export function getFontData(fontId, faceIndex) {
   return invokeCommand('backend_font_data', { fontId, faceIndex })
 }

@@ -4,7 +4,7 @@ import { createLabelFontSelection, supportsFontItalic } from '@/lib/fonts'
 import { prepareFont } from '@/lib/font-resources'
 
 const catalog = vi.hoisted(() => ({ recommendedFonts: [], systemFonts: [] }))
-vi.mock('@/api/backend', () => ({ listAvailableFonts: async () => catalog }))
+vi.mock('@/api/backend', () => ({ listAvailableFonts: async () => catalog, getFontData: async () => new ArrayBuffer(0) }))
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -17,12 +17,12 @@ test('registers genuine ital and slnt instances while weight-only fonts remain u
   const fonts = axisFonts.map(({ id, tag, min, max }) => ({
     id,
     name: id,
-    faces: [{ style: 'normal', weight: 400, axes: [weight, { tag, min, default: 0, max, hidden: false }], file: null, local_name: id }],
+    faces: [{ style: 'normal', weight: 400, axes: [weight, { tag, min, default: 0, max, hidden: false }], file: null, simulated: false }],
   }))
   const upright = {
     id: 'Weight only',
     name: 'Weight only',
-    faces: [{ style: 'normal', weight: 400, axes: [weight], file: null, local_name: 'Upright' }],
+    faces: [{ style: 'normal', weight: 400, axes: [weight], file: null, simulated: false }],
   }
   catalog.recommendedFonts = [...fonts, upright]
   const registered = []

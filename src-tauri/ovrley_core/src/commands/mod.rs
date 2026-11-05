@@ -179,13 +179,13 @@ pub fn backend_font_capabilities(paths: &AppPaths, font_id: &str) -> CoreResult<
     )?)?)
 }
 
-/// Supplies the session's bundled face bytes for browser font registration.
+/// Supplies one face's bytes (bundled or system) for browser font registration.
 pub fn backend_font_data(
     paths: &AppPaths,
     font_id: &str,
     face_index: usize,
 ) -> CoreResult<Vec<u8>> {
-    crate::fonts::bundled_face_data(&paths.font_dirs, font_id, face_index)
+    crate::fonts::face_data(&paths.font_dirs, font_id, face_index)
 }
 
 /// Renders one transparent preview PNG for the requested second.

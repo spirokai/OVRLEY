@@ -61,6 +61,7 @@ tmp/
 
 # Agent scratch files
 .agents/release-notes.md
+.agents/scratch/
 .claude/skills
 .agents/plans/
 .vite-hooks/
