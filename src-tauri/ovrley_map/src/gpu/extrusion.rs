@@ -74,7 +74,7 @@ pub(crate) fn tessellate_extrusions(
             builder.abandon_feature();
         }
     });
-    (!builder.buffer.indices.is_empty()).then(|| PreparedLayer {
+    (!builder.buffer.indices.is_empty()).then_some(PreparedLayer {
         index: layer.index,
         kind: LayerKind::Extrusion,
         vertices: builder.buffer.vertices,

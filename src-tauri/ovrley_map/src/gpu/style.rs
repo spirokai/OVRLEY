@@ -266,12 +266,7 @@ fn with_solid_road_dashes(layer: &Json, zoom: f64) -> Result<Vec<(Cow<'_, Json>,
 fn is_drawable(layer: &Json, toggles: MapLayers, zoom: f64) -> bool {
     let layer_type = layer["type"].as_str().unwrap_or_default();
     let source_layer = layer["source-layer"].as_str();
-    let supported = match layer_type {
-        "background" => true,
-        "fill" | "line" | "fill-extrusion" => true,
-        _ => false,
-    };
-    supported
+    matches!(layer_type, "background" | "fill" | "line" | "fill-extrusion")
         && (layer_type == "background" || layer["source"] == VECTOR_SOURCE)
         && layer["layout"]["visibility"] != "none"
         && !toggles.hides_layer(layer_type, source_layer)

@@ -1,0 +1,254 @@
+//! The native glyph service: the bundled font files, opened once, and every glyph made from them.
+//!
+//! Given (font, character) keys it answers with the face that draws each character, an SDF bitmap and its
+//! metrics. Export's tile threads call it directly; the preview reaches it through one shell command.
+
+use super::glyphs::{rasterize, GlyphBitmap};
+use super::text::{font_chain, Face, FontGlyph, GlyphMetrics};
+use ab_glyph::{Font, FontRef};
+use memmap2::Mmap;
+use std::collections::HashMap;
+use std::fs::File;
+use std::path::Path;
+use std::sync::{Arc, RwLock};
+
+/// One character in the font a style layer names, as `text-font` names it.
+#[derive(Clone, Copy, Debug)]
+pub struct GlyphKey<'a> {
+    pub font: &'a str,
+    pub character: char,
+}
+
+/// What the service answers a key with: the glyph as shaping sees it, and its distance field.
+#[derive(Clone, Debug)]
+pub struct ServedGlyph {
+    pub glyph: FontGlyph,
+    pub bitmap: Arc<GlyphBitmap>,
+}
+
+/// A font file, memory-mapped, so the OS loads only the outlines actually used.
+struct FaceFile {
+    /// Borrows `_map`'s bytes. Declared first so it is dropped first.
+    font: FontRef<'static>,
+    _map: Mmap,
+}
+
+impl FaceFile {
+    fn open(path: &Path) -> Result<Self, String> {
+        let file = File::open(path).map_err(|error| format!("{}: {error}", path.display()))?;
+        // SAFETY: the bundled font files are not modified while the app runs.
+        let map =
+            unsafe { Mmap::map(&file) }.map_err(|error| format!("{}: {error}", path.display()))?;
+        // SAFETY: the mapping's bytes do not move when `Mmap` does, and `font` is dropped before `_map`.
+        let bytes: &'static [u8] = unsafe { std::slice::from_raw_parts(map.as_ptr(), map.len()) };
+        let font = FontRef::try_from_slice(bytes)
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+        Ok(Self { font, _map: map })
+    }
+}
+
+/// Every glyph made so far, by the face that drew it and its character.
+type MadeGlyphs = HashMap<(Face, char), (GlyphMetrics, Arc<GlyphBitmap>)>;
+
+pub struct GlyphService {
+    faces: HashMap<Face, FaceFile>,
+    made: RwLock<MadeGlyphs>,
+}
+
+impl GlyphService {
+    /// Opens every bundled face in `directory` (`fonts/map/`).
+    pub fn open(directory: &Path) -> Result<Self, String> {
+        let faces = Face::ALL
+            .into_iter()
+            .map(|face| Ok((face, FaceFile::open(&directory.join(face.file_name()))?)))
+            .collect::<Result<_, String>>()?;
+        Ok(Self {
+            faces,
+            made: RwLock::new(HashMap::new()),
+        })
+    }
+
+    /// The glyph for each key, in order: `None` where no face in the key's font chain has the
+    /// character. A font with no chain is an error, since the caller skips such a layer before asking.
+    pub fn glyphs(&self, keys: &[GlyphKey]) -> Result<Vec<Option<ServedGlyph>>, String> {
+        keys.iter()
+            .map(|key| self.glyph(key.font, key.character))
+            .collect()
+    }
+
+    /// The glyph for one character of `font`. See [`GlyphService::glyphs`].
+    fn glyph(&self, font: &str, character: char) -> Result<Option<ServedGlyph>, String> {
+        let chain = font_chain(font).ok_or_else(|| format!("no font chain for \"{font}\""))?;
+        let Some(link) = chain
+            .iter()
+            .find(|link| self.faces[&link.face].font.glyph_id(character).0 != 0)
+        else {
+            return Ok(None);
+        };
+        let key = (link.face, character);
+
+        let cached = self
+            .made
+            .read()
+            .expect("glyph cache lock")
+            .get(&key)
+            .cloned();
+        let (metrics, bitmap) = match cached {
+            Some(made) => made,
+            None => {
+                let rasterized = rasterize(
+                    &self.faces[&link.face].font,
+                    character,
+                    link.face.texture_scale(),
+                )?;
+                let made = (rasterized.metrics, Arc::new(rasterized.bitmap));
+                // Two threads may make the same glyph at once; both get the first one stored.
+                self.made
+                    .write()
+                    .expect("glyph cache lock")
+                    .entry(key)
+                    .or_insert(made)
+                    .clone()
+            }
+        };
+        Ok(Some(ServedGlyph {
+            glyph: FontGlyph {
+                face: link.face,
+                bold: link.bold,
+                metrics,
+            },
+            bitmap,
+        }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gpu::labels::{shape, ShapeError, ShapeStyle, TextAnchor, TextJustify};
+    use serde_json::Value;
+
+    fn service() -> GlyphService {
+        let fonts = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts/map");
+        GlyphService::open(&fonts).unwrap()
+    }
+
+    fn style() -> ShapeStyle {
+        ShapeStyle {
+            max_width: Some(10.0),
+            line_height: 1.2,
+            letter_spacing: 0.0,
+            anchor: TextAnchor::Center,
+            justify: TextJustify::Auto,
+            offset: [0.0, 0.0],
+            uppercase: false,
+        }
+    }
+
+    fn shape_with(service: &GlyphService, font: &str, text: &str) -> Result<Vec<Face>, ShapeError> {
+        let lookup = |character| {
+            service
+                .glyph(font, character)
+                .unwrap()
+                .map(|served| served.glyph)
+        };
+        let shaping = shape(text, &style(), &lookup)?;
+        Ok(shaping
+            .lines
+            .iter()
+            .flatten()
+            .map(|glyph| glyph.face)
+            .collect())
+    }
+
+    #[test]
+    fn every_font_the_bundled_styles_name_has_a_chain() {
+        let styles = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/map-styles");
+        let mut named = 0;
+        for entry in std::fs::read_dir(styles).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_none_or(|extension| extension != "json") {
+                continue;
+            }
+            let style: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            for layer in style["layers"].as_array().unwrap() {
+                let Some(fonts) = layer["layout"].get("text-font") else {
+                    continue;
+                };
+                for font in fonts.as_array().unwrap() {
+                    let font = font.as_str().unwrap();
+                    assert!(font_chain(font).is_some(), "{}: {font}", path.display());
+                    named += 1;
+                }
+            }
+        }
+        assert!(named > 50);
+    }
+
+    #[test]
+    fn names_in_every_supported_script_shape_without_missing_glyphs() {
+        let service = service();
+        let samples = [
+            ("Praha-Žižkov", Face::NotoSansRegular),
+            ("Αθήνα", Face::NotoSansRegular),
+            ("Москва", Face::NotoSansRegular),
+            ("תל אביב-יפו", Face::NotoSansHebrewRegular),
+            ("北京市", Face::CjkPack),
+            ("東京都 ひらがな カタカナ", Face::CjkPack),
+            ("서울특별시", Face::CjkPack),
+        ];
+        for (name, face) in samples {
+            let faces = shape_with(&service, "Noto Sans Regular", name).unwrap();
+            assert!(faces.contains(&face), "{name}");
+        }
+        // Bold draws Latin from the bold face and CJK from the Regular pack, thickened by the renderer.
+        let bold = service.glyph("Noto Sans Bold", '北').unwrap().unwrap();
+        assert!(bold.glyph.bold && bold.glyph.face == Face::CjkPack);
+        assert!(
+            !service
+                .glyph("Noto Sans Bold", 'P')
+                .unwrap()
+                .unwrap()
+                .glyph
+                .bold
+        );
+    }
+
+    #[test]
+    fn a_character_the_cjk_pack_lacks_drops_the_label() {
+        // A rare GBK-only character, outside GB2312, JIS X 0208, Big5 and KS X 1001.
+        let service = service();
+        assert_eq!(
+            shape_with(&service, "Noto Sans Regular", "滧"),
+            Err(ShapeError::MissingGlyph('滧'))
+        );
+    }
+
+    #[test]
+    fn a_font_without_a_chain_is_an_error() {
+        assert!(service().glyph("Open Sans Regular", 'a').is_err());
+    }
+
+    #[test]
+    fn glyphs_are_distance_fields_cached_across_calls() {
+        let service = service();
+        let latin = service.glyph("Noto Sans Regular", 'I').unwrap().unwrap();
+        let again = service.glyph("Noto Sans Regular", 'I').unwrap().unwrap();
+        assert!(Arc::ptr_eq(&latin.bitmap, &again.bitmap));
+
+        // The bitmap is the glyph plus a 3 px border, and the distance field is 191 at the outline.
+        let (bitmap, metrics) = (&latin.bitmap, latin.glyph.metrics);
+        assert_eq!(bitmap.width as f32, metrics.width + 6.0);
+        assert_eq!(bitmap.height as f32, metrics.height + 6.0);
+        let (width, height) = (bitmap.width as usize, bitmap.height as usize);
+        let row = &bitmap.data[(height / 2) * width..][..width];
+        assert!(row[0] < 64, "outside the border: {}", row[0]);
+        assert!(row[width / 2] > 200, "inside the stem: {}", row[width / 2]);
+
+        let cjk = service.glyph("Noto Sans Regular", '北').unwrap().unwrap();
+        assert_eq!(
+            cjk.bitmap.width as f32,
+            cjk.glyph.metrics.width * 2.0 + 12.0
+        );
+    }
+}

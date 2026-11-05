@@ -12,6 +12,7 @@
 
 mod extrusion;
 mod fill_patterns;
+pub mod labels;
 mod pattern;
 mod pipelines;
 mod pool;
