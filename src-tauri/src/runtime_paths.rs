@@ -50,6 +50,12 @@ pub(crate) fn map_style_dirs(app: &AppHandle) -> Result<MapStyleDirs, String> {
     })
 }
 
+/// The bundled map fonts' folder: `fonts/map` in the checkout in development, in the build's resources
+/// otherwise.
+pub(crate) fn map_font_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(resource_root(app)?.join("fonts").join("map"))
+}
+
 /// The checkout in development, the build's resources otherwise.
 fn resource_root(app: &AppHandle) -> Result<PathBuf, String> {
     // cfg!() is intentional here, not #[cfg(debug_assertions)]. Both branches

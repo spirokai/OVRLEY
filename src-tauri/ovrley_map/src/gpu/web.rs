@@ -7,7 +7,9 @@
 
 use super::extrusion::ExtrusionVertex;
 use super::fill_patterns::PATTERN_COUNT;
-use super::pipelines::{FillShaderFeatureMetadata, ShaderLayerMetadata, ShaderVertex, COLOR_FORMAT};
+use super::pipelines::{
+    FillShaderFeatureMetadata, ShaderLayerMetadata, ShaderVertex, COLOR_FORMAT,
+};
 use super::pool::PoolEntries;
 use super::style::{parse_style, ParsedStyle};
 use super::tile::{prepare_tile, LayerKind, PreparedLayer, PreparedTile};
@@ -15,8 +17,8 @@ use super::{
     check_pool_sizes, upload_layer, validate_config, BufferPool, GpuMapConfig, GpuMapRenderer,
     GpuPoolSizes, Targets,
 };
-use bytemuck::Pod;
 use crate::{view_tiles, MapCamera, MapRouteDraw, MapViewport, TileId};
+use bytemuck::Pod;
 use std::collections::HashSet;
 use std::mem::size_of;
 
@@ -215,7 +217,7 @@ impl MapTileDecoder {
     /// Bytes for [`GpuMapRenderer::upload_tile`]. A malformed tile is external data, so it fails
     /// this tile only.
     pub fn decode(&self, tile: &[u8]) -> Result<Vec<u8>, String> {
-        Ok(encode_prepared(&prepare_tile(tile, &self.style)?))
+        Ok(encode_prepared(&prepare_tile(tile, &self.style, None)?))
     }
 }
 

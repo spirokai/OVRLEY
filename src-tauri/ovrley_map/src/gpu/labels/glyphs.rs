@@ -1,4 +1,4 @@
-//! Signed-distance-field glyphs: the rasterizer, and the native service that serves them.
+//! The native signed-distance-field glyph rasterizer the glyph service makes bitmaps with.
 //!
 //! The SDF is made from the outline's coverage by a Euclidean distance transform with radius 8 and
 //! cutoff 0.25 at 24 px with a 3 px buffer, the values the label shader's constants assume. Faces
@@ -7,14 +7,12 @@
 //! Everything here is pure Rust on plain IEEE arithmetic, so native and WASM make the same bytes. The
 //! one transcendental (the coverage gamma table) goes through `libm`, not the platform's `pow`.
 
-use super::text::{GlyphMetrics, ONE_EM};
+use super::text::{GlyphBitmap, GlyphMetrics, BUFFER, ONE_EM};
 use ab_glyph::{point, Font, PxScale, ScaleFont};
 use std::sync::OnceLock;
 
 /// The em size, in pixels, glyph bitmaps are made at.
 const FONT_SIZE: f32 = ONE_EM as f32;
-/// Pixels of distance field around a glyph's outline, at 1x.
-const BUFFER: usize = 3;
 /// Distance, in pixels at 1x, the SDF encodes either side of the edge.
 const RADIUS: f64 = 8.0;
 /// Where the edge sits in the byte range: 0.25 of it is outside, the rest is inside.
@@ -24,17 +22,8 @@ const INF: f64 = 1e20;
 /// Glyph metrics set `top` against an origin above the em box; the rasterizer's is the baseline, so
 /// it is moved up by this much.
 const TOP_ADJUSTMENT: f32 = 27.5;
-/// And `left` is moved right by this much (`leftAdjustment`).
+/// And `left` is moved right by this much.
 const LEFT_ADJUSTMENT: f32 = 0.5;
-
-/// A glyph's distance field: one byte per pixel, 255 inside the outline, with the border included.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct GlyphBitmap {
-    pub width: u32,
-    pub height: u32,
-    /// Row-major, `width * height` bytes. Empty for a glyph that draws nothing.
-    pub data: Vec<u8>,
-}
 
 /// A glyph as the atlas and the layout need it.
 #[derive(Clone, Debug, PartialEq)]
@@ -45,7 +34,11 @@ pub(super) struct Glyph {
 }
 
 /// Rasterizes one character of `font` to an SDF bitmap. The caller has checked `font` has it.
-pub(super) fn rasterize(font: &impl Font, character: char, texture_scale: u32) -> Result<Glyph, String> {
+pub(super) fn rasterize(
+    font: &impl Font,
+    character: char,
+    texture_scale: u32,
+) -> Result<Glyph, String> {
     let scale = texture_scale as f32;
     let font_size = FONT_SIZE * scale;
     let buffer = BUFFER * texture_scale as usize;

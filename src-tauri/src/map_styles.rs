@@ -11,6 +11,7 @@
 //! list by label, bundled before the user's.
 
 use crate::map_tile_service::{MapTileService, TileCoordinates};
+use ovrley_map::gpu::labels::GlyphService;
 use ovrley_map::{
     read_style_file, MapDataSource, MapSource, MapStyleCatalog, MapStyleId, MapStyleInfo,
     VECTOR_SOURCE,
@@ -158,18 +159,25 @@ fn read_style(path: &Path) -> Result<(MapStyleInfo, Json), String> {
     read_style_file(id, &bytes).map_err(|errors| errors.join("; "))
 }
 
-/// Everything a map's bytes come from: the installed styles and the tile service.
+/// Everything a map's bytes come from: the installed styles, the tile service and the bundled fonts'
+/// glyphs.
 #[derive(Clone)]
 pub(crate) struct MapData {
     styles: Arc<MapStyleRegistry>,
     tiles: MapTileService,
+    glyphs: Arc<GlyphService>,
 }
 
 impl MapData {
-    pub(crate) fn new(styles: MapStyleRegistry, tiles: MapTileService) -> Self {
+    pub(crate) fn new(
+        styles: MapStyleRegistry,
+        tiles: MapTileService,
+        glyphs: Arc<GlyphService>,
+    ) -> Self {
         Self {
             styles: Arc::new(styles),
             tiles,
+            glyphs,
         }
     }
 
@@ -204,6 +212,10 @@ impl MapDataSource for MapData {
         self.tiles
             .resolve(TileCoordinates { zoom: z, x, y })
             .map(|payload| payload.bytes)
+    }
+
+    fn glyphs(&self) -> Arc<GlyphService> {
+        self.glyphs.clone()
     }
 }
 

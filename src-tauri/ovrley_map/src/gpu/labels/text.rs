@@ -15,11 +15,13 @@ use unicode_bidi_mirroring::get_mirrored;
 
 /// One em, in the glyph units shaping works in. Glyph bitmaps are made at this size.
 pub const ONE_EM: f64 = 24.0;
+/// Pixels of distance field around a glyph's outline, at 1x.
+pub(super) const BUFFER: usize = 3;
 /// A glyph's origin sits 17 units above the line, and the glyph metrics' `top` is relative to it.
 const SHAPING_DEFAULT_OFFSET: f64 = -17.0;
 
 /// A bundled font file.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Face {
     NotoSansRegular,
     NotoSansBold,
@@ -111,6 +113,15 @@ pub struct GlyphMetrics {
     pub left: f32,
     pub top: f32,
     pub advance: f32,
+}
+
+/// A glyph's distance field: one byte per pixel, 255 inside the outline, with the border included.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GlyphBitmap {
+    pub width: u32,
+    pub height: u32,
+    /// Row-major, `width * height` bytes. Empty for a glyph that draws nothing.
+    pub data: Vec<u8>,
 }
 
 /// What shaping needs to know about a character: where it is drawn from, and how big it is.
@@ -676,8 +687,14 @@ mod tests {
             lines("aaaaaaaa bbbbbbbb cccccccc dddddddd", &style).len(),
             1
         );
-        assert_eq!(lines("aaa
-bbb", &style).len(), 1);
+        assert_eq!(
+            lines(
+                "aaa
+bbb", &style
+            )
+            .len(),
+            1
+        );
     }
 
     #[test]

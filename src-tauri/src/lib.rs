@@ -52,6 +52,7 @@ mod widget_preview;
 
 use ovrley_core::render_jobs::execution::RenderExecutionService;
 use ovrley_core::render_jobs::inspection::VideoInspectionService;
+use ovrley_map::gpu::labels::GlyphService;
 use std::sync::Arc;
 use tauri::Manager;
 
@@ -169,6 +170,9 @@ pub fn run() {
                         .app_cache_dir()
                         .map_err(|error| error.to_string())?,
                 )?,
+                Arc::new(GlyphService::open(&runtime_paths::map_font_dir(
+                    app.handle(),
+                )?)?),
             );
             app.manage(map_data.clone());
             app.state::<video_server::VideoServerHandle>()

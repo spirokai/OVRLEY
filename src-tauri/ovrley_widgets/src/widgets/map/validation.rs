@@ -129,6 +129,8 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
     // Seen from straight above, a building is only its roof, so the toggle needs a pitched camera.
     let buildings = map.show_buildings
         && matches!(camera, MapCameraMode::Follow { pitch_deg, .. } if pitch_deg > 0.0);
+    // A chase camera moves its labels every frame, which needs the time grid that comes with it.
+    let labels = map.show_labels && matches!(camera, MapCameraMode::Fixed { .. });
     if !MSAA_SAMPLES.contains(&map.msaa_samples) {
         return Err(invalid("msaa_samples", "must be 1 or 4"));
     }
@@ -151,10 +153,9 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
         opacity: require_unit_opacity(Some(map.opacity), &p("opacity"))?,
         font: map.font.clone(),
         style: map.map_style.clone(),
-        // The GPU renderer draws no labels, so the config has no toggle for them.
         layers: MapLayers {
             buildings,
-            labels: false,
+            labels,
             paths: map.show_paths,
         },
         camera,

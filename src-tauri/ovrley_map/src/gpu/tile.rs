@@ -6,6 +6,7 @@
 //! checks, so every feature is walked once here before geozero sees it.
 
 use super::extrusion::{tessellate_extrusions, ExtrusionVertex};
+use super::labels::{lay_out, GlyphLookup, LabelSymbol};
 use super::pipelines::{FillShaderFeatureMetadata, ShaderDash, ShaderLayerMetadata, ShaderVertex};
 use super::style::{evaluate_color, evaluate_number, passes_filter, ParsedStyle, VectorPaint};
 use geozero::mvt::{tile, Message, Tile};
@@ -40,6 +41,8 @@ const COMMAND_CLOSE_PATH: u32 = 7;
 pub(crate) struct PreparedTile {
     pub(crate) ground: Vec<PreparedLayer<ShaderVertex>>,
     pub(crate) extrusions: Vec<PreparedLayer<ExtrusionVertex>>,
+    /// The tile's labels, which stay on the CPU. Empty without a glyph source to size them.
+    pub(crate) labels: Vec<LabelSymbol>,
 }
 
 /// One layer of one tile.
@@ -77,8 +80,13 @@ pub(crate) enum GeometryKind {
     Polygon,
 }
 
-/// Decodes `bytes` and tessellates every layer of `style`.
-pub(crate) fn prepare_tile(bytes: &[u8], style: &ParsedStyle) -> Result<PreparedTile, String> {
+/// Decodes `bytes`, tessellates every layer of `style` and lays out its labels. Labels need `glyphs`,
+/// which a host without font files does not have: its tiles carry none.
+pub(crate) fn prepare_tile(
+    bytes: &[u8],
+    style: &ParsedStyle,
+    glyphs: Option<&dyn GlyphLookup>,
+) -> Result<PreparedTile, String> {
     let tile = Tile::decode(bytes).map_err(|error| format!("Tile does not decode: {error}"))?;
     let mut features_by_source: HashMap<&str, (Vec<DecodedFeature<'_>>, f32)> = HashMap::new();
     let mut context = EvaluationContext::new().with_zoom(style.zoom);
@@ -218,6 +226,29 @@ pub(crate) fn prepare_tile(bytes: &[u8], style: &ParsedStyle) -> Result<Prepared
                     prepared.extrusions.push(extrusion);
                 }
             }
+        }
+    }
+
+    if let Some(glyphs) = glyphs {
+        for layer in &style.labels {
+            let Some(source) = tile
+                .layers
+                .iter()
+                .find(|source| source.name == layer.source_layer)
+            else {
+                continue;
+            };
+            let (features, scale) = features_by_source
+                .entry(layer.source_layer.as_str())
+                .or_insert_with(|| (decode_features(source), 4096.0 / extent(source)));
+            lay_out(
+                layer,
+                features,
+                (extent(source), *scale),
+                &mut context,
+                glyphs,
+                &mut prepared.labels,
+            )?;
         }
     }
     Ok(prepared)
@@ -381,9 +412,28 @@ fn check_geometry(feature: &tile::Feature) -> Option<GeometryShape> {
     })
 }
 
+fn zigzag(value: u32) -> i64 {
+    i64::from((value >> 1) as i32 ^ -((value & 1) as i32))
+}
+
+/// The points of a point feature, in the tile's coordinates. [`check_geometry`] has accepted the
+/// feature as a single `MoveTo` and its coordinate pairs.
+pub(crate) fn point_coordinates(feature: &tile::Feature) -> impl Iterator<Item = [i64; 2]> + '_ {
+    let mut cursor = [0_i64; 2];
+    feature
+        .geometry
+        .get(1..)
+        .unwrap_or_default()
+        .chunks_exact(2)
+        .map(move |pair| {
+            cursor[0] += zigzag(pair[0]);
+            cursor[1] += zigzag(pair[1]);
+            cursor
+        })
+}
+
 /// Moves the cursor across one part, returning its surveyor's area. `None` beyond the sane range.
 fn advance_cursor(cursor: &mut [i64; 2], first: &[u32], rest: &[u32]) -> Option<i64> {
-    let zigzag = |value: u32| i64::from((value >> 1) as i32 ^ -((value & 1) as i32));
     cursor[0] += zigzag(first[0]);
     cursor[1] += zigzag(first[1]);
     let start = *cursor;

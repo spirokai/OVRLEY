@@ -84,6 +84,24 @@ pub(crate) struct RouteInstance {
     pub(crate) keep_side: f32,
 }
 
+/// One corner of a glyph's quad. Positions are final clip-space ones, projected on the CPU.
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub(crate) struct LabelVertex {
+    pub(crate) position: [f32; 4],
+    /// Texels of the glyph atlas.
+    pub(crate) texel: [u16; 2],
+    pub(crate) fill: [u8; 4],
+    pub(crate) halo: [u8; 4],
+    /// Output pixels per glyph unit.
+    pub(crate) font_scale: f32,
+    pub(crate) halo_width: f32,
+    pub(crate) halo_blur: f32,
+    pub(crate) opacity: f32,
+    /// 1 for a Regular standing in for a Bold, 0 otherwise.
+    pub(crate) bold: f32,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub(crate) struct BackgroundLayerMetadata {
@@ -211,6 +229,19 @@ const FEATURE_ATTRIBUTES: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![
 ];
 const BACKGROUND_ATTRIBUTES: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![
     0 => Float32x4, // color
+];
+
+const LABEL_VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 6] = wgpu::vertex_attr_array![
+    0 => Float32x4, // position
+    1 => Uint16x2, // texel
+    2 => Unorm8x4, // fill
+    3 => Unorm8x4, // halo
+    4 => Float32x4, // font_scale, halo_width, halo_blur, opacity
+    5 => Float32, // bold
+];
+/// Which pass a label draw makes: 1 for the halo, 0 for the fill.
+const LABEL_PASS_ATTRIBUTES: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![
+    6 => Float32,
 ];
 
 const ROUTE_VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
@@ -379,7 +410,9 @@ pub(crate) struct Pipelines {
     pub(crate) route: wgpu::RenderPipeline,
     pub(crate) shape_mask: wgpu::RenderPipeline,
     pub(crate) fog: wgpu::RenderPipeline,
-    /// What a fill pattern's bind group is made for.
+    /// Labels: only a style that draws them has it.
+    pub(crate) label: Option<wgpu::RenderPipeline>,
+    /// What a fill pattern's bind group is made for. The label atlas's bind group is made for it too.
     pub(crate) pattern_bind_group_layout: wgpu::BindGroupLayout,
     fill: GroundPipelines,
     fill_pattern: GroundPipelines,
@@ -486,7 +519,7 @@ impl Pipelines {
         }
     }
 
-    pub(crate) fn new(device: &wgpu::Device, sample_count: u32) -> Self {
+    pub(crate) fn new(device: &wgpu::Device, sample_count: u32, draws_labels: bool) -> Self {
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("tile pipeline layout"),
             bind_group_layouts: &[],
@@ -591,6 +624,20 @@ impl Pipelines {
                 ground_depth(stencil),
             )
         });
+        // Glyphs are not clipped to their tile and draw over everything, so they ignore stencil and depth.
+        let label = draws_labels.then(|| {
+            pattern_builder.tile_pipeline(
+                "label pipeline",
+                wgpu::include_wgsl!("shaders/label.vertex.wgsl"),
+                wgpu::include_wgsl!("shaders/label.fragment.wgsl"),
+                &[
+                    Some(vertex_layout::<LabelVertex>(&LABEL_VERTEX_ATTRIBUTES)),
+                    Some(instance_layout::<f32>(&LABEL_PASS_ATTRIBUTES)),
+                ],
+                blended.clone(),
+                ground_depth(StencilUse::Ignore),
+            )
+        });
         let line = GroundPipelines::new(|stencil| {
             builder.tile_pipeline(
                 "line pipeline",
@@ -691,6 +738,7 @@ impl Pipelines {
             route,
             shape_mask,
             fog,
+            label,
             extrusion,
         }
     }

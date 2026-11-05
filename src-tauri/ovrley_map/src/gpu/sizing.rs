@@ -4,10 +4,17 @@
 //! depends on the area and style, not on zoom or pitch alone. So a host measures its tiles first.
 
 use super::pool::PoolEntries;
-use super::style::{parse_style, ParsedStyle};
-use super::tile::{prepare_tile, PreparedLayer};
-use crate::{MapDataSource, MapStyleBuildings, MapStyleSpec, MapViewport, TileId};
+use crate::TileId;
 use std::collections::HashMap;
+#[cfg(not(target_arch = "wasm32"))]
+use {
+    super::labels::{GlyphId, GlyphService},
+    super::style::{parse_style, ParsedStyle},
+    super::tile::{prepare_tile, PreparedLayer},
+    crate::{MapDataSource, MapStyleBuildings, MapStyleSpec, MapViewport},
+    std::collections::BTreeSet,
+    std::sync::Arc,
+};
 
 /// Entries per geometry pool when a host has not measured: 73 MB of ground buffers. Upstream's
 /// 10 million lost the device on a 512 MB integrated GPU in 3 of 8 runs.
@@ -84,11 +91,21 @@ fn pool_for_views(
     }
 }
 
-/// Tessellates tiles to count their geometry, without touching the GPU.
-pub struct MapTileSizer {
-    style: ParsedStyle,
+/// What one tile asks of a renderer: room in the geometry pools, and the glyphs of its labels.
+#[cfg(not(target_arch = "wasm32"))]
+pub struct MeasuredTile {
+    pub pools: GpuPoolSizes,
+    pub glyphs: BTreeSet<GlyphId>,
 }
 
+/// Tessellates tiles to count their geometry, and lays out their labels, without touching the GPU.
+#[cfg(not(target_arch = "wasm32"))]
+pub struct MapTileSizer {
+    style: ParsedStyle,
+    glyphs: Arc<GlyphService>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 impl MapTileSizer {
     /// Takes what a renderer's style depends on. Fails loudly on an invalid style.
     pub fn new(
@@ -106,19 +123,30 @@ impl MapTileSizer {
                 viewport.pixel_ratio(),
                 buildings,
             )?,
+            glyphs: source.glyphs(),
         })
     }
 
-    /// What one tile asks of the pools. Fails when the bytes are not a tile.
-    pub fn measure(&self, bytes: &[u8]) -> Result<GpuPoolSizes, String> {
-        let prepared = prepare_tile(bytes, &self.style)?;
-        Ok(GpuPoolSizes {
-            ground: measure_layers(&prepared.ground),
-            extrusion: measure_layers(&prepared.extrusions),
+    /// What one tile asks for. Fails when the bytes are not a tile. Laying its labels out makes every
+    /// glyph they use in the glyph service, so a job that measures all its tiles has them all before
+    /// its first frame.
+    pub fn measure(&self, bytes: &[u8]) -> Result<MeasuredTile, String> {
+        let prepared = prepare_tile(bytes, &self.style, Some(&*self.glyphs))?;
+        Ok(MeasuredTile {
+            pools: GpuPoolSizes {
+                ground: measure_layers(&prepared.ground),
+                extrusion: measure_layers(&prepared.extrusions),
+            },
+            glyphs: prepared
+                .labels
+                .iter()
+                .flat_map(|symbol| symbol.quads.iter().map(|quad| quad.glyph))
+                .collect(),
         })
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn measure_layers<V>(layers: &[PreparedLayer<V>]) -> PoolEntries {
     PoolEntries {
         vertices: layers.iter().map(|layer| layer.vertices.len() as u64).sum(),

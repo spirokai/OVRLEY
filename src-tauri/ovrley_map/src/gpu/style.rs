@@ -4,13 +4,14 @@
 //! layer it cannot read is logged and skipped, while a document with no layers at all fails.
 
 use super::fill_patterns::pattern_index;
+use super::labels::{is_label_source, parse_label_layer, LabelLayer};
 use super::pipelines::ShaderDash;
+use crate::{MapLayers, MapStyleBuildings, VECTOR_SOURCE};
 use lyon::tessellation::LineJoin;
 use maplibre_expr::{
-    evaluate, is_expression, parse_filter, parse_property, typecheck, EvaluationContext, Expr, Type,
-    Value,
+    evaluate, is_expression, parse_filter, parse_property, typecheck, EvaluationContext, Expr,
+    Type, Value,
 };
-use crate::{MapLayers, MapStyleBuildings, VECTOR_SOURCE};
 use serde_json::{json, Value as Json};
 use std::borrow::Cow;
 
@@ -43,6 +44,8 @@ pub(crate) struct ParsedStyle {
     pub(crate) zoom: f64,
     pub(crate) backgrounds: Vec<BackgroundLayer>,
     pub(crate) vector_layers: Vec<VectorLayer>,
+    /// Symbol layers whose names draw, in style order.
+    pub(crate) labels: Vec<LabelLayer>,
 }
 
 pub(crate) struct BackgroundLayer {
@@ -128,6 +131,7 @@ pub(crate) fn parse_style(
         zoom,
         backgrounds: Vec::new(),
         vector_layers: Vec::new(),
+        labels: Vec::new(),
     };
     let mut next_index = 1;
     for layer in layers.iter().filter(|layer| keeps_layer(layer)) {
@@ -149,6 +153,9 @@ pub(crate) fn parse_style(
                 parse_background(layer, zoom, next_index).map(|background| {
                     parsed.backgrounds.push(background);
                 })
+            } else if layer["type"] == "symbol" {
+                parse_label_layer(layer, id, zoom, pixel_ratio, next_index)
+                    .map(|label| parsed.labels.push(label))
             } else {
                 parse_vector_layer(layer, id, zoom, pixel_ratio, next_index).and_then(
                     |mut vector_layer| {
@@ -266,7 +273,10 @@ fn with_solid_road_dashes(layer: &Json, zoom: f64) -> Result<Vec<(Cow<'_, Json>,
 fn is_drawable(layer: &Json, toggles: MapLayers, zoom: f64) -> bool {
     let layer_type = layer["type"].as_str().unwrap_or_default();
     let source_layer = layer["source-layer"].as_str();
-    matches!(layer_type, "background" | "fill" | "line" | "fill-extrusion")
+    (matches!(
+        layer_type,
+        "background" | "fill" | "line" | "fill-extrusion"
+    ) || (layer_type == "symbol" && is_label_source(source_layer)))
         && (layer_type == "background" || layer["source"] == VECTOR_SOURCE)
         && layer["layout"]["visibility"] != "none"
         && !toggles.hides_layer(layer_type, source_layer)
@@ -392,12 +402,12 @@ fn required_color(layer: &Json, name: &str) -> Result<Expr, String> {
     color_expr(name, value)
 }
 
-fn color_expr(name: &str, value: &Json) -> Result<Expr, String> {
+pub(crate) fn color_expr(name: &str, value: &Json) -> Result<Expr, String> {
     let expr = parse_property(name, value).map_err(|error| format!("{name}: {error}"))?;
     typecheck(&expr, Some(&Type::Color), false).map_err(|error| format!("{name}: {error}"))
 }
 
-fn number_property(layer: &Json, name: &str) -> Result<Option<Expr>, String> {
+pub(crate) fn number_property(layer: &Json, name: &str) -> Result<Option<Expr>, String> {
     layer["paint"]
         .get(name)
         .map(|value| parse_property(name, value).map_err(|error| format!("{name}: {error}")))
@@ -406,29 +416,14 @@ fn number_property(layer: &Json, name: &str) -> Result<Option<Expr>, String> {
 
 /// A number property at the view zoom. `default` is MapLibre's for a missing property.
 fn zoom_number(layer: &Json, name: &str, zoom: f64, default: f32) -> Result<f32, String> {
-    let Some(expr) = number_property(layer, name)? else {
-        return Ok(default);
-    };
-    let context = EvaluationContext::new().with_zoom(zoom);
-    evaluate(&expr, &context)
-        .map_err(|error| format!("{name}: {error}"))?
-        .as_number()
-        .map(|value| value as f32)
-        .ok_or_else(|| format!("{name} is not a number"))
+    let value = zoom_value(layer, "paint", name, zoom)?;
+    number(&value, name, f64::from(default)).map(|value| value as f32)
 }
 
 /// A keyword from `layout` at the view zoom, or `None` when the layer doesn't set it.
 fn layout_keyword(layer: &Json, name: &str, zoom: f64) -> Result<Option<String>, String> {
-    let Some(value) = layer["layout"].get(name) else {
-        return Ok(None);
-    };
-    let expr = parse_property(name, value).map_err(|error| format!("{name}: {error}"))?;
-    let context = EvaluationContext::new().with_zoom(zoom);
-    let value = evaluate(&expr, &context).map_err(|error| format!("{name}: {error}"))?;
-    value
-        .as_str()
-        .map(|keyword| Some(keyword.to_string()))
-        .ok_or_else(|| format!("{name} is not a keyword"))
+    let value = zoom_value(layer, "layout", name, zoom)?;
+    Ok(keyword(&value, name)?.map(str::to_string))
 }
 
 /// Whether `line-cap` rounds a dash's ends, which the line shader draws. A line's own ends stay butt
@@ -453,16 +448,11 @@ fn line_join(layer: &Json, zoom: f64) -> Result<LineJoin, String> {
 
 /// `fill-antialias` at the view zoom. Missing is MapLibre's default of on.
 fn fill_antialias(layer: &Json, zoom: f64) -> Result<bool, String> {
-    let Some(value) = layer["paint"].get("fill-antialias") else {
-        return Ok(true);
-    };
-    let expr = parse_property("fill-antialias", value)
-        .map_err(|error| format!("fill-antialias: {error}"))?;
-    let context = EvaluationContext::new().with_zoom(zoom);
-    evaluate(&expr, &context)
-        .map_err(|error| format!("fill-antialias: {error}"))?
-        .as_bool()
-        .ok_or_else(|| "fill-antialias is not a boolean".to_string())
+    boolean(
+        &zoom_value(layer, "paint", "fill-antialias", zoom)?,
+        "fill-antialias",
+        true,
+    )
 }
 
 /// The bundled image of `fill-pattern`. An image that isn't bundled skips the layer, because a solid
@@ -509,32 +499,92 @@ fn line_dash(layer: &Json, zoom: f64, width: f32) -> Result<ShaderDash, String> 
     Ok(ShaderDash {
         on: on as f32 * width,
         off: off as f32 * width,
-        cap_radius: if has_round_dashes(layer, zoom)? { width * 0.5 } else { 0.0 },
+        cap_radius: if has_round_dashes(layer, zoom)? {
+            width * 0.5
+        } else {
+            0.0
+        },
     })
 }
 
 /// A paint property holding an array of numbers, at the view zoom.
 fn zoom_numbers(layer: &Json, name: &str, zoom: f64) -> Result<Option<Vec<f64>>, String> {
-    let Some(value) = layer["paint"].get(name) else {
+    zoom_value(layer, "paint", name, zoom)?
+        .map(|value| numbers(&value).ok_or_else(|| format!("{name} is not an array of numbers")))
+        .transpose()
+}
+
+/// A property of a `section` (`layout` or `paint`) that depends on zoom alone, at the view zoom, or
+/// `None` when the layer doesn't set it.
+pub(crate) fn zoom_value(
+    layer: &Json,
+    section: &str,
+    name: &str,
+    zoom: f64,
+) -> Result<Option<Value>, String> {
+    let Some(raw) = layer[section].get(name) else {
         return Ok(None);
     };
-    let not_numbers = || format!("{name} is not an array of numbers");
     // A bare array isn't an expression, so it never reaches the expression parser.
-    if value.is_array() && !is_expression(value) {
-        return value
-            .as_array()
-            .and_then(|values| values.iter().map(Json::as_f64).collect())
-            .map(Some)
-            .ok_or_else(not_numbers);
+    if raw.is_array() && !is_expression(raw) {
+        return Ok(Some(Value::from_json(raw)));
     }
-    let expr = parse_property(name, value).map_err(|error| format!("{name}: {error}"))?;
-    let context = EvaluationContext::new().with_zoom(zoom);
-    let numbers = match evaluate(&expr, &context).map_err(|error| format!("{name}: {error}"))? {
-        Value::NumberArray(numbers) => Some(numbers),
+    let expr = parse_property(name, raw).map_err(|error| format!("{name}: {error}"))?;
+    evaluate_at_zoom(&expr, name, zoom).map(Some)
+}
+
+/// Evaluates `expr` at the view zoom, for a property that doesn't read feature data.
+pub(crate) fn evaluate_at_zoom(expr: &Expr, name: &str, zoom: f64) -> Result<Value, String> {
+    evaluate(expr, &EvaluationContext::new().with_zoom(zoom))
+        .map_err(|error| format!("{name}: {error}"))
+}
+
+pub(crate) fn keyword<'a>(value: &'a Option<Value>, name: &str) -> Result<Option<&'a str>, String> {
+    value
+        .as_ref()
+        .map(|value| {
+            value
+                .as_str()
+                .ok_or_else(|| format!("{name} is not a keyword"))
+        })
+        .transpose()
+}
+
+pub(crate) fn number(value: &Option<Value>, name: &str, default: f64) -> Result<f64, String> {
+    match value {
+        None => Ok(default),
+        Some(value) => value
+            .as_number()
+            .ok_or_else(|| format!("{name} is not a number")),
+    }
+}
+
+pub(crate) fn boolean(value: &Option<Value>, name: &str, default: bool) -> Result<bool, String> {
+    match value {
+        None => Ok(default),
+        Some(value) => value
+            .as_bool()
+            .ok_or_else(|| format!("{name} is not a boolean")),
+    }
+}
+
+/// A pair of numbers, which is zero when the layer doesn't set the property.
+pub(crate) fn pair(value: &Option<Value>, name: &str) -> Result<[f64; 2], String> {
+    match value {
+        None => Ok([0.0, 0.0]),
+        Some(value) => numbers(value)
+            .and_then(|numbers| <[f64; 2]>::try_from(numbers).ok())
+            .ok_or_else(|| format!("{name} is not two numbers")),
+    }
+}
+
+/// A list of numbers, whichever form the evaluator gave it.
+fn numbers(value: &Value) -> Option<Vec<f64>> {
+    match value {
+        Value::NumberArray(numbers) => Some(numbers.clone()),
         Value::Array(values) => values.iter().map(Value::as_number).collect(),
         _ => None,
-    };
-    numbers.map(Some).ok_or_else(not_numbers)
+    }
 }
 
 /// Evaluates a colour for a feature, as straight-alpha floats, with `opacity` applied.
@@ -617,6 +667,9 @@ mod tests {
     #[test]
     fn hidden_paths_leave_other_source_layers_alone() {
         let water = json!({ "source-layer": "water", "filter": ["==", ["get", "class"], "path"] });
-        assert!(matches!(without_hidden_features(&water, HIDDEN), Cow::Borrowed(_)));
+        assert!(matches!(
+            without_hidden_features(&water, HIDDEN),
+            Cow::Borrowed(_)
+        ));
     }
 }

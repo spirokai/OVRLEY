@@ -536,6 +536,7 @@
         "map_style": "liberty",
         "show_buildings": true,
         "show_paths": true,
+        "show_labels": true,
         "camera_mode": "follow",
         "orientation": "rider_up",
         "pitch": 50,

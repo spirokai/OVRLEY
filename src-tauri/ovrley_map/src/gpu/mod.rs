@@ -24,17 +24,22 @@ mod tile;
 mod web;
 
 pub use pool::PoolEntries;
-pub use sizing::{GpuPoolSizes, MapTileSizer, DEFAULT_POOL_ENTRIES};
+pub use sizing::{GpuPoolSizes, DEFAULT_POOL_ENTRIES};
+#[cfg(not(target_arch = "wasm32"))]
+pub use sizing::{MapTileSizer, MeasuredTile};
 #[cfg(target_arch = "wasm32")]
 pub use web::MapTileDecoder;
 
-use extrusion::ExtrusionVertex;
-use fill_patterns::pattern_bind_groups;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::MapDataSource;
 use crate::{
     MapCamera, MapRouteDraw, MapStyleBuildings, MapStyleSpec, MapViewport, TileId, ViewState,
 };
+use extrusion::ExtrusionVertex;
+use fill_patterns::pattern_bind_groups;
+#[cfg(not(target_arch = "wasm32"))]
+use labels::GlyphId;
+use labels::LabelLayers;
 use pattern::{stencil_reference_value_3d, TileShape, TileViewPattern};
 use pipelines::{
     BackgroundLayerMetadata, FogInstance, Pipelines, ShaderVertex, ShapeMaskInstance, COLOR_FORMAT,
@@ -42,6 +47,8 @@ use pipelines::{
 };
 use pool::{BufferPool, IndexEntry, LayerGeometry};
 use route::RouteLayer;
+#[cfg(not(target_arch = "wasm32"))]
+use std::collections::BTreeSet;
 use std::collections::HashSet;
 use std::mem::size_of;
 use std::ops::Range;
@@ -165,6 +172,8 @@ pub struct GpuMapRenderer {
     extrusion_pool: BufferPool<ExtrusionVertex>,
     background_buffer: Option<wgpu::Buffer>,
     route: Option<RouteLayer>,
+    /// Present when the style has label layers.
+    labels: Option<LabelLayers>,
     shape_buffer: wgpu::Buffer,
     /// Style layers that draw water, which the haze passes over.
     water_layers: HashSet<u32>,
@@ -248,7 +257,8 @@ impl GpuMapRenderer {
             record_gpu_error(&uncaptured_error, format!("GPU error: {error}"));
         }));
 
-        let pipelines = Pipelines::new(&device, config.sample_count);
+        let draws_labels = !style.labels.is_empty();
+        let pipelines = Pipelines::new(&device, config.sample_count, draws_labels);
         let pattern_bind_groups =
             pattern_bind_groups(&device, &queue, &pipelines.pattern_bind_group_layout);
         let (width, height) = (config.viewport.width_px(), config.viewport.height_px());
@@ -292,6 +302,9 @@ impl GpuMapRenderer {
             .map(|layer| layer.index)
             .collect();
 
+        let labels = draws_labels
+            .then(|| LabelLayers::new(&device, &queue, &pipelines.pattern_bind_group_layout));
+
         let renderer = Self {
             config,
             device,
@@ -307,6 +320,7 @@ impl GpuMapRenderer {
             extrusion_pool,
             background_buffer,
             route: None,
+            labels,
             shape_buffer,
             water_layers,
             fog_buffer,
@@ -402,6 +416,16 @@ impl GpuMapRenderer {
             self.fogged = true;
         }
         self.prepare_route(&view, route)?;
+        if let Some(labels) = &mut self.labels {
+            labels.prepare(
+                &self.device,
+                &self.queue,
+                &self.style.labels,
+                camera,
+                viewport,
+                self.pattern.shapes().iter().map(|shape| shape.coords),
+            )?;
+        }
         self.queue_items();
         Ok(())
     }
@@ -614,13 +638,19 @@ impl GpuMapRenderer {
             }
         }
 
+        if let (Some(labels), Some(pipeline)) = (&self.labels, &self.pipelines.label) {
+            if labels.has_draws() {
+                pass.set_pipeline(pipeline);
+                labels.record(&mut pass);
+            }
+        }
+
         if self.rounded {
             pass.set_pipeline(&self.pipelines.shape_mask);
             pass.set_vertex_buffer(0, self.shape_buffer.slice(..));
             pass.draw(0..MASK_VERTICES, 0..1);
         }
     }
-
 }
 
 /// Export: tile loading across threads, and frames read back to pixels.
@@ -636,7 +666,7 @@ impl GpuMapRenderer {
         source: &dyn MapDataSource,
     ) -> Result<(), String> {
         if self.has_all(tiles) {
-            return Ok(());
+            return self.restore_atlas(tiles, source);
         }
         self.load_or_fail(tiles, source)?;
         if self.has_all(tiles) {
@@ -655,6 +685,44 @@ impl GpuMapRenderer {
             tiles.len(),
             self.pool_bytes()
         ))
+    }
+
+    /// Puts back the glyphs of resident tiles that the atlas lost when it filled and was refilled for
+    /// another view.
+    fn restore_atlas(
+        &mut self,
+        tiles: &[TileId],
+        source: &dyn MapDataSource,
+    ) -> Result<(), String> {
+        match &mut self.labels {
+            Some(labels) if labels.atlas_is_partial() => {
+                let glyphs = source.glyphs();
+                labels.fill_atlas(
+                    &self.queue,
+                    &|id| glyphs.bitmap(id.face, id.character),
+                    tiles,
+                )
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Puts the glyphs a job will use in the label atlas before its first frame. Glyphs that don't fit
+    /// are left for the views that need them.
+    pub fn preload_glyphs(
+        &mut self,
+        glyphs: &BTreeSet<GlyphId>,
+        source: &dyn MapDataSource,
+    ) -> Result<(), String> {
+        let Some(labels) = &mut self.labels else {
+            return Ok(());
+        };
+        let service = source.glyphs();
+        labels.preload_atlas(
+            &self.queue,
+            &|id| service.bitmap(id.face, id.character),
+            glyphs,
+        )
     }
 
     fn has_all(&self, tiles: &[TileId]) -> bool {
@@ -736,6 +804,9 @@ impl GpuMapRenderer {
                     match uploaded {
                         Ok(()) => {
                             self.loaded.insert(report.tile);
+                            if let Some(labels) = &mut self.labels {
+                                labels.insert_tile(report.tile, prepared.labels);
+                            }
                         }
                         Err(error) => {
                             log::warn!(
@@ -758,6 +829,16 @@ impl GpuMapRenderer {
         }
         for tile in self.extrusion_pool.drain_evicted_tiles() {
             self.loaded.remove(&tile);
+        }
+        if let Some(labels) = &mut self.labels {
+            let loaded = &self.loaded;
+            labels.retain_tiles(|tile| loaded.contains(&tile));
+            let glyphs = source.glyphs();
+            labels.fill_atlas(
+                &self.queue,
+                &|id| glyphs.bitmap(id.face, id.character),
+                tiles,
+            )?;
         }
         self.queue.submit([]);
         self.device
@@ -843,7 +924,10 @@ impl GpuMapRenderer {
             let row = viewport.width_px() as usize * 4;
             let stride = self.output.padded_bytes_per_row as usize;
             pixels.resize(row * viewport.height_px() as usize, 0);
-            for (to, from) in pixels.chunks_exact_mut(row).zip(mapped.chunks_exact(stride)) {
+            for (to, from) in pixels
+                .chunks_exact_mut(row)
+                .zip(mapped.chunks_exact(stride))
+            {
                 to.copy_from_slice(&from[..row]);
             }
         }
@@ -877,7 +961,10 @@ impl Targets {
         });
         let depth = texture("map depth stencil", DEPTH_FORMAT, sample_count)
             .create_view(&wgpu::TextureViewDescriptor::default());
-        Self { multisampled, depth }
+        Self {
+            multisampled,
+            depth,
+        }
     }
 }
 
@@ -945,8 +1032,9 @@ fn check_pool_sizes(
     max_buffer_size: u64,
     adapter_name: &str,
 ) -> Result<(), String> {
-    let largest_buffer = BufferPool::<ShaderVertex>::largest_buffer(pools.ground)
-        .max(BufferPool::<ExtrusionVertex>::largest_buffer(pools.extrusion));
+    let largest_buffer = BufferPool::<ShaderVertex>::largest_buffer(pools.ground).max(
+        BufferPool::<ExtrusionVertex>::largest_buffer(pools.extrusion),
+    );
     if largest_buffer > max_buffer_size {
         return Err(format!(
             "This map view needs a {largest_buffer} byte GPU buffer and {adapter_name} allows \
@@ -965,7 +1053,7 @@ fn fetch_and_prepare(
 ) -> (TileLoadReport, Option<PreparedTile>) {
     let prepared = source
         .tile(tile.z, tile.x as u32, tile.y as u32)
-        .and_then(|bytes| prepare_tile(&bytes, style));
+        .and_then(|bytes| prepare_tile(&bytes, style, Some(&*source.glyphs())));
     match prepared {
         Ok(prepared) => (TileLoadReport { tile, error: None }, Some(prepared)),
         Err(error) => {

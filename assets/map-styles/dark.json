@@ -132,6 +132,30 @@
       }
     },
     {
+      "id": "water_name_point_label",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "water_name",
+      "filter": ["match", ["geometry-type"], ["MultiPoint", "Point"], true, false],
+      "layout": {
+        "text-field": [
+          "case",
+          ["has", "name:nonlatin"],
+          ["concat", ["get", "name:latin"], "\n", ["get", "name:nonlatin"]],
+          ["coalesce", ["get", "name_en"], ["get", "name"]]
+        ],
+        "text-font": ["Noto Sans Regular"],
+        "text-letter-spacing": 0.2,
+        "text-max-width": 5,
+        "text-size": 12
+      },
+      "paint": {
+        "text-color": "hsla(0,0%,0%,0.7)",
+        "text-halo-color": "hsl(0,0%,27%)",
+        "text-halo-width": 1
+      }
+    },
+    {
       "id": "building",
       "type": "fill",
       "source": "openmaptiles",
@@ -656,6 +680,31 @@
         "line-color": "hsl(0,0%,23%)",
         "line-opacity": 1,
         "line-width": ["interpolate", ["exponential", 1.1], ["zoom"], 3, 1, 22, 20]
+      }
+    },
+    {
+      "id": "park_label",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "park",
+      "filter": ["match", ["geometry-type"], ["MultiPoint", "Point"], true, false],
+      "layout": {
+        "text-field": [
+          "case",
+          ["has", "name:nonlatin"],
+          ["concat", ["get", "name:latin"], "\n", ["get", "name:nonlatin"]],
+          ["coalesce", ["get", "name_en"], ["get", "name"]]
+        ],
+        "text-anchor": "center",
+        "text-font": ["Noto Sans Regular"],
+        "text-justify": "center",
+        "text-size": 10
+      },
+      "paint": {
+        "text-color": "rgb(101,101,101)",
+        "text-halo-blur": 1,
+        "text-halo-color": "rgba(0,0,0,0.7)",
+        "text-halo-width": 1
       }
     },
     {

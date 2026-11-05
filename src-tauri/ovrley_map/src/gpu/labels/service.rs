@@ -3,8 +3,9 @@
 //! Given (font, character) keys it answers with the face that draws each character, an SDF bitmap and its
 //! metrics. Export's tile threads call it directly; the preview reaches it through one shell command.
 
-use super::glyphs::{rasterize, GlyphBitmap};
-use super::text::{font_chain, Face, FontGlyph, GlyphMetrics};
+use super::glyphs::rasterize;
+use super::layout::GlyphLookup;
+use super::text::{font_chain, Face, FontGlyph, GlyphBitmap, GlyphMetrics};
 use ab_glyph::{Font, FontRef};
 use memmap2::Mmap;
 use std::collections::HashMap;
@@ -85,32 +86,7 @@ impl GlyphService {
         else {
             return Ok(None);
         };
-        let key = (link.face, character);
-
-        let cached = self
-            .made
-            .read()
-            .expect("glyph cache lock")
-            .get(&key)
-            .cloned();
-        let (metrics, bitmap) = match cached {
-            Some(made) => made,
-            None => {
-                let rasterized = rasterize(
-                    &self.faces[&link.face].font,
-                    character,
-                    link.face.texture_scale(),
-                )?;
-                let made = (rasterized.metrics, Arc::new(rasterized.bitmap));
-                // Two threads may make the same glyph at once; both get the first one stored.
-                self.made
-                    .write()
-                    .expect("glyph cache lock")
-                    .entry(key)
-                    .or_insert(made)
-                    .clone()
-            }
-        };
+        let (metrics, bitmap) = self.made(link.face, character)?;
         Ok(Some(ServedGlyph {
             glyph: FontGlyph {
                 face: link.face,
@@ -119,6 +95,53 @@ impl GlyphService {
             },
             bitmap,
         }))
+    }
+
+    /// The distance field of a character a face has, which the atlas holds under that key.
+    pub fn bitmap(&self, face: Face, character: char) -> Result<Arc<GlyphBitmap>, String> {
+        self.made(face, character).map(|(_, bitmap)| bitmap)
+    }
+
+    /// How many glyphs have been rasterized so far. Export makes them all before its first frame.
+    pub fn rasterized(&self) -> usize {
+        self.made.read().expect("glyph cache lock").len()
+    }
+
+    /// The glyph `face` draws `character` with, from the cache or by rasterizing it.
+    fn made(
+        &self,
+        face: Face,
+        character: char,
+    ) -> Result<(GlyphMetrics, Arc<GlyphBitmap>), String> {
+        let key = (face, character);
+        let cached = self
+            .made
+            .read()
+            .expect("glyph cache lock")
+            .get(&key)
+            .cloned();
+        match cached {
+            Some(made) => Ok(made),
+            None => {
+                let rasterized =
+                    rasterize(&self.faces[&face].font, character, face.texture_scale())?;
+                let made = (rasterized.metrics, Arc::new(rasterized.bitmap));
+                // Two threads may make the same glyph at once; both get the first one stored.
+                Ok(self
+                    .made
+                    .write()
+                    .expect("glyph cache lock")
+                    .entry(key)
+                    .or_insert(made)
+                    .clone())
+            }
+        }
+    }
+}
+
+impl GlyphLookup for GlyphService {
+    fn glyph(&self, font: &str, character: char) -> Result<Option<FontGlyph>, String> {
+        Ok(GlyphService::glyph(self, font, character)?.map(|served| served.glyph))
     }
 }
 

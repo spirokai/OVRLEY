@@ -16,7 +16,8 @@ use crate::{
     error::{CoreError, CoreResult},
     normalize::ValidatedRenderConfig,
 };
-use ovrley_map::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileSizer};
+use ovrley_map::gpu::labels::{GlyphId, GlyphService};
+use ovrley_map::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileSizer, MeasuredTile};
 use ovrley_map::{view_tiles, MapDataSource, MapSource, MapStyleId, MapStyleInfo, TileId};
 use ovrley_widgets::{
     activity::ActivitySampler,
@@ -303,6 +304,7 @@ fn for_each_parallel<T: Sync, R: Send>(
 struct JobMapData {
     styles: HashMap<MapStyleId, Vec<u8>>,
     tiles: HashMap<TileId, Vec<u8>>,
+    glyphs: Arc<GlyphService>,
 }
 
 impl JobMapData {
@@ -352,6 +354,7 @@ impl JobMapData {
         Ok(Self {
             styles: documents,
             tiles,
+            glyphs: source.glyphs(),
         })
     }
 }
@@ -380,6 +383,10 @@ impl MapDataSource for JobMapData {
             .get(&TileId::new(z, x as i32, y as i32))
             .cloned()
             .ok_or_else(|| format!("Map tile {z}/{x}/{y} was not prepared"))
+    }
+
+    fn glyphs(&self) -> Arc<GlyphService> {
+        self.glyphs.clone()
     }
 }
 
@@ -419,7 +426,7 @@ impl ExportRenderer {
             .into_iter()
             .collect();
         let threads = thread::available_parallelism().map_or(1, NonZeroUsize::get);
-        let sizes: HashMap<TileId, GpuPoolSizes> =
+        let measured: Vec<(TileId, MeasuredTile)> =
             for_each_parallel(&tiles, threads, &controller.cancel_flag(), |_| {}, |tile| {
                 let bytes = data
                     .tile(tile.z, tile.x as u32, tile.y as u32)
@@ -431,11 +438,18 @@ impl ExportRenderer {
                     ))
                 })?;
                 Ok((*tile, size))
-            })?
+            })?;
+        // Measuring laid out every tile's labels, so the glyph service has made every glyph the job uses.
+        let glyphs: BTreeSet<GlyphId> = measured
+            .iter()
+            .flat_map(|(_, measured)| measured.glyphs.iter().copied())
+            .collect();
+        let sizes: HashMap<TileId, GpuPoolSizes> = measured
             .into_iter()
+            .map(|(tile, measured)| (tile, measured.pools))
             .collect();
         let pools = GpuPoolSizes::for_views(&sizes, views);
-        let renderer = GpuMapRenderer::new(
+        let mut renderer = GpuMapRenderer::new(
             GpuMapConfig {
                 spec,
                 viewport: map.viewport(),
@@ -447,12 +461,16 @@ impl ExportRenderer {
             data,
         )
         .map_err(CoreError::Render)?;
+        renderer
+            .preload_glyphs(&glyphs, data)
+            .map_err(CoreError::Render)?;
         log::info!(
-            "Map export renders {} tiles in {} views on {}, pools {} bytes: {pools:?}",
+            "Map export renders {} tiles in {} views on {}, pools {} bytes: {pools:?}, {} label glyphs",
             tiles.len(),
             views.len(),
             renderer.adapter_name(),
-            renderer.pool_bytes()
+            renderer.pool_bytes(),
+            glyphs.len()
         );
         Ok(Self {
             renderer,
@@ -533,11 +551,16 @@ impl MapFrameThread {
         let handle = thread::Builder::new()
             .name("map-frames".into())
             .spawn(move || {
+                let rasterized = data.glyphs.rasterized();
                 for job in receiver {
                     let result = renderers[job.renderer].frame(&job.request, job.spare, &data);
                     // A worker that stopped waiting has already failed the job.
                     let _ = job.reply.send(result);
                 }
+                log::info!(
+                    "Map export rasterized {} glyphs while drawing frames",
+                    data.glyphs.rasterized() - rasterized
+                );
                 for renderer in &renderers {
                     log::info!(
                         "Map export drew {} frames: load {:.0} ms, render {:.0} ms, {} layers evicted, {} pool clears",

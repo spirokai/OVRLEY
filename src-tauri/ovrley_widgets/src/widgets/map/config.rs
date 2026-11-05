@@ -17,6 +17,7 @@ pub struct MapConfig {
     pub map_style: MapStyleId,
     pub show_buildings: bool,
     pub show_paths: bool,
+    pub show_labels: bool,
     pub camera_mode: String,
     pub orientation: String,
     pub pitch: f32,
