@@ -202,7 +202,7 @@ impl PreviewElevation {
         let scene = validate_scene_presentation(scene)?;
         let mut config = validate_elevation_plot(&widget, 0, &scene)?;
         self.geometry_at(activity, second)?;
-        resize_elevation(&mut config, &scene, size)?;
+        resize_elevation(&mut config, &scene, size, fixed)?;
         if commit {
             let samples = self.samples.as_ref().expect("elevation samples prepared");
             self.prepared_geometry = Some(Arc::new(if samples.is_empty() {
@@ -219,7 +219,13 @@ impl PreviewElevation {
             self.layout = None;
             self.last_state = None;
         }
-        Ok(anchored_update(&config, &scene, fixed, point))
+        Ok(anchored_update(
+            &config,
+            &scene,
+            fixed,
+            point,
+            &widget.point_label,
+        ))
     }
 
     /// Altitude correction and label range for the activity, shared by layout and its bounds.
