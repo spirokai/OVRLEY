@@ -185,10 +185,10 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       const current = begin(target)
       set(current.origin.data.rotation)
     },
-    onRotate: ({ beforeRotate, drag }) => {
+    onRotate: ({ beforeRotate }) => {
       const current = gesture.current
       if (!current) return
-      current.controller.update({ type: 'rotate', rotation: beforeRotate, translate: drag.beforeTranslate })
+      current.controller.update({ type: 'rotate', rotation: beforeRotate })
     },
     onRotateEnd: finish,
     onDragGroupStart: ({ events }) => {

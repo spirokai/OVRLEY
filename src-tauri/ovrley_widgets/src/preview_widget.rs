@@ -36,6 +36,7 @@ use crate::{
 use serde::{Deserialize, Deserializer, Serialize};
 use skia_safe::Canvas;
 
+use crate::widgets::altitude_tape::preview::{AltitudeTapeSample, PreviewAltitudeTape};
 use crate::widgets::diving_profile::{config::DivingProfileConfig, preview::PreviewDivingProfile};
 use crate::widgets::elevation::{config::ElevationPlotConfig, preview::PreviewElevation};
 use crate::widgets::g_force::preview::PreviewGForce;
@@ -44,7 +45,6 @@ use crate::widgets::gradient::preview::PreviewGradient;
 use crate::widgets::heading::preview::PreviewHeading;
 use crate::widgets::heading_compass::preview::PreviewHeadingCompass;
 use crate::widgets::heart_zones::preview::PreviewHeartZones;
-use crate::widgets::altitude_tape::preview::{AltitudeTapeSample, PreviewAltitudeTape};
 use crate::widgets::lap_timer::preview::PreviewLapTimer;
 use crate::widgets::lean_angle::preview::PreviewLeanAngle;
 use crate::widgets::raster::{config::RasterConfig, preview::PreviewRaster};
@@ -375,7 +375,7 @@ impl PreviewWidget {
                 source_id,
                 image,
             } => Self::Raster(PreviewRaster::from_validated(
-                geometry, scene, source_id, image,
+                geometry, scene, host, source_id, image,
             )?),
             ValidatedWidget::Backdrop(widget) => Self::Backdrop(PreviewBackdrop::from_validated(
                 widget.clone(),

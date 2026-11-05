@@ -52,7 +52,7 @@ Moveable refreshes.
 Active drags set `transient` so fractional movement can reuse cached pixels. On
 mouseup, clearing that flag and flushing restores native/export pixel alignment,
 with one rerasterization when the final fractional position requires it. Raster
-images retain their existing placement behavior. The paused 15-widget drag
+images follow the same rule: Rust draws the rotated frame with Skia like export. The paused 15-widget drag
 benchmark measured zero steady-state pixel copies and canvas uploads after this
 change; per-widget config and geometry updates still occur. See the
 [overlay editor notes](../overlay-editor/README.md) for selection measurement costs.

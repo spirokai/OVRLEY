@@ -2,14 +2,14 @@ import { useWasmCanvas } from '../hooks/useWasmCanvas'
 
 /** @param {object} props Standalone widget canvas registration. @returns {JSX.Element} Rust-positioned canvas. */
 export function WasmWidgetCanvas({ widget, attach, registerNode, handleWidgetMouseDown }) {
-  const separateRaster = widget.type === 'course' || widget.type === 'elevation' || widget.type === 'diving_profile'
+  const separateRaster = ['course', 'elevation', 'diving_profile', 'raster'].includes(widget.type)
   const { wrapperRef, canvasRef } = useWasmCanvas({ id: widget.id, attach, registerNode, separateRaster })
   const canvas = (
     <canvas
       ref={canvasRef}
       data-wasm-widget-id={widget.id}
       aria-label={`${widget.type} preview`}
-      className={`pointer-events-none absolute ${separateRaster ? 'z-3' : ''}`}
+      className={`pointer-events-none absolute ${widget.type === 'raster' ? 'z-2' : separateRaster ? 'z-3' : ''}`}
     />
   )
   return (
