@@ -10,6 +10,7 @@ import {
   MOVEABLE_FULL_SIZE_VIEWPORT_WIDTH,
   MOVEABLE_MIN_HANDLE_SCALE,
   MOVEABLE_ZOOM,
+  SNAP_THRESHOLD_SCREEN_PIXELS,
   VIEWPORT_PADDING,
   ZOOM_MAX,
   ZOOM_MIN,
@@ -108,5 +109,6 @@ export function useEditorViewport({ contentSize, onZoomLevelChange, sceneElement
     horizontalGuidelines,
     verticalGuidelines,
     moveableZoom: (MOVEABLE_ZOOM / displayScale / 2) * getHandleScale(viewportSize),
+    snapThreshold: SNAP_THRESHOLD_SCREEN_PIXELS / displayScale,
   }
 }
