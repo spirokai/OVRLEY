@@ -15,8 +15,8 @@ use crate::error::{CoreError, CoreResult};
 use crate::render::{AtlasPlan, FrameSize};
 
 use super::composite_filters::{
-    composite_filter_complex, cuda_display_metadata_filter, format_seconds_arg,
-    normalize_source_rotation, qsv_overlay_cpu_rotation_filter, source_rotation_filter,
+    composite_filter_complex, format_seconds_arg, normalize_source_rotation,
+    qsv_overlay_cpu_rotation_filter, source_rotation_filter,
 };
 use super::composite_profiles::composite_profile;
 
@@ -306,11 +306,6 @@ pub fn build_composite_ffmpeg_settings(
             .iter()
             .map(|arg| (*arg).to_string()),
     );
-    if let Some(metadata_filter) =
-        cuda_display_metadata_filter(selected_profile.codec_id, width, height)
-    {
-        output_args.extend(["-bsf:v".to_string(), metadata_filter]);
-    }
     output_args.extend(rate_control_args(selected_profile, render.quality));
     if include_audio {
         output_args.extend([
@@ -452,17 +447,8 @@ mod tests {
     }
 
     #[test]
-    fn rotated_cuda_profiles_use_post_orientation_dimensions_for_metadata() {
-        for (codec_id, expected_metadata) in [
-            (
-                CompositeCodecId::NnvgpuH264,
-                "h264_metadata=crop_right=8:crop_bottom=0",
-            ),
-            (
-                CompositeCodecId::NnvgpuHevc,
-                "hevc_metadata=width=1080:height=1920",
-            ),
-        ] {
+    fn rotated_cuda_profiles_orient_the_main_video_without_crop_metadata() {
+        for codec_id in [CompositeCodecId::NnvgpuH264, CompositeCodecId::NnvgpuHevc] {
             let render = render_plan(codec_id, Vec::new());
             let size = FrameSize {
                 width: 1080,
@@ -482,7 +468,7 @@ mod tests {
             assert!(settings
                 .filter_complex
                 .contains("transpose_cuda=2,sidedata=mode=delete:type=DISPLAYMATRIX,scale_cuda"));
-            assert_argument_pair(&settings.output_args, "-bsf:v", expected_metadata);
+            assert!(!settings.output_args.iter().any(|arg| arg == "-bsf:v"));
         }
     }
 
@@ -624,7 +610,7 @@ mod tests {
             }
             assert!(graph.contains(&format!("[base][slot0]{overlay_filter}=")), "{name}: {graph}");
             assert!(graph.contains(&format!("[main1];[main1][slot1]{overlay_filter}=")), "{name}: {graph}");
-            assert!(graph.contains("shortest=1[out];[2:a]atrim="), "{name}: {graph}");
+            assert!(graph.contains("[out];[2:a]atrim="), "{name}: {graph}");
         }
     }
 
@@ -633,7 +619,7 @@ mod tests {
         let empty = AtlasPlan::from_layer_bounds(UHD, &[None], SlotPlacement::Overlay).unwrap();
         let cuda = atlas_settings(CompositeCodecId::NnvgpuHevc, &empty).unwrap();
         assert!(cuda.filter_complex.contains(
-            "[1:v]setpts=PTS-STARTPTS,format=yuva420p,null,hwupload[slot0];[base][slot0]overlay_cuda=0:0:eof_action=repeat:shortest=1[out]"
+            "[1:v]setpts=PTS-STARTPTS,format=yuva420p,null,hwupload[slot0];[base][slot0]overlay_cuda=0:0:eof_action=repeat:shortest=1:repeatlast=0[out]"
         ));
         let vaapi = atlas_settings(CompositeCodecId::VaapiH264, &empty).unwrap();
         assert!(vaapi.filter_complex.contains(
