@@ -1026,6 +1026,7 @@ fn a_failed_join_keeps_the_parts_and_a_cancelled_one_removes_them() {
     };
     assert!(message.contains("Controlled join failure"));
     assert!(message.contains(retained[0].to_str().unwrap()));
+    assert_eq!(message.matches("Encoding error").count(), 1, "{message}");
     assert!(!fixture.directory.join("joinfail.mov").exists());
     fs::remove_dir_all(&retained[0]).unwrap();
 

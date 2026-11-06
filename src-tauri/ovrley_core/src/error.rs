@@ -142,3 +142,15 @@ pub enum CoreError {
     #[error(transparent)]
     Serialization(#[from] serde_json::Error),
 }
+
+impl CoreError {
+    /// The text of this error for building a new [`CoreError::Encode`]: an encoding
+    /// error gives its bare message, so the new error shows one "Encoding error:"
+    /// prefix; any other error keeps the prefix that names its kind.
+    pub fn encode_message(&self) -> String {
+        match self {
+            Self::Encode(message) => message.clone(),
+            other => other.to_string(),
+        }
+    }
+}

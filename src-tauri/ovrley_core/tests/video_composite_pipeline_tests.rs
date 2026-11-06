@@ -703,6 +703,8 @@ fn test_6_5_broken_pipe_error_includes_ffmpeg_exit_context() {
     assert!(message.contains("Filter graph"));
     assert!(message.contains("FFmpeg stderr"));
     assert!(message.contains("Unknown filter"));
+    // The cause must not sit behind a long filter graph.
+    assert!(message.find("Unknown filter") < message.find("Filter graph"));
 }
 
 /// On success, `verify_successful_output` must not error for a

@@ -114,7 +114,7 @@ impl VideoEncoding {
         stderr: &str,
     ) -> CoreError {
         if let Self::Composite(plan) = self {
-            let message = error.to_string();
+            let message = error.encode_message();
             if is_pipe_write_error(&message) {
                 return CoreError::Encode(format_pipe_write_failure(message, status, stderr, plan));
             }
@@ -122,7 +122,11 @@ impl VideoEncoding {
         if stderr.is_empty() {
             error
         } else {
-            CoreError::Encode(format!("{error}. FFmpeg stderr:\n{}", stderr_tail(stderr)))
+            CoreError::Encode(format!(
+                "{}. FFmpeg stderr:\n{}",
+                error.encode_message(),
+                stderr_tail(stderr)
+            ))
         }
     }
 }

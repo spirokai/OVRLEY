@@ -122,12 +122,13 @@ pub fn format_pipe_write_failure(
             fallback.metadata().profile_name
         ));
     }
-    message.push_str("\nFilter graph:\n");
-    message.push_str(&plan.ffmpeg_settings.filter_complex);
+    // The cause comes first: a filter graph with many atlas slots is long.
     if !stderr.trim().is_empty() {
         message.push_str("\nFFmpeg stderr:\n");
         message.push_str(&stderr_tail(stderr));
     }
+    message.push_str("\nFilter graph:\n");
+    message.push_str(&plan.ffmpeg_settings.filter_complex);
     message
 }
 
