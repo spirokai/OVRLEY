@@ -17,6 +17,8 @@ use std::borrow::Cow;
 
 /// The source layer every road, path and track comes from.
 const TRANSPORTATION_LAYER: &str = "transportation";
+/// The source layer of road, path and track names.
+const TRANSPORTATION_NAME_LAYER: &str = "transportation_name";
 /// The class OpenMapTiles gives footways, cycleways, steps and bridleways.
 const PATH_CLASS: &str = "path";
 /// The transportation classes that keep a style's dashes: railways, transit and ferry routes.
@@ -207,10 +209,15 @@ fn push_added_layer(
 }
 
 /// A layer narrowed to the features these toggles show. Hidden paths leave every transportation layer,
-/// including those that draw them with other roads, so the filter changes rather than the layer list.
+/// and the names of paths leave every transportation name layer, including those that draw them with
+/// other roads, so the filter changes rather than the layer list.
 /// Every OpenFreeMap style writes its filters as expressions, so the narrowing is one too.
 fn without_hidden_features(layer: &Json, toggles: MapLayers) -> Cow<'_, Json> {
-    if toggles.paths || layer["source-layer"] != TRANSPORTATION_LAYER {
+    if toggles.paths
+        || ![TRANSPORTATION_LAYER, TRANSPORTATION_NAME_LAYER]
+            .iter()
+            .any(|name| layer["source-layer"] == *name)
+    {
         return Cow::Borrowed(layer);
     }
     let no_paths = json!(["!=", ["get", "class"], PATH_CLASS]);
@@ -662,6 +669,14 @@ mod tests {
         let unfiltered = without_hidden_features(&unfiltered, HIDDEN);
         assert!(passes(&unfiltered, "track"));
         assert!(!passes(&unfiltered, "path"));
+    }
+
+    #[test]
+    fn hidden_paths_take_their_names_too() {
+        let names = json!({ "source-layer": "transportation_name" });
+        let narrowed = without_hidden_features(&names, HIDDEN);
+        assert!(passes(&narrowed, "minor"));
+        assert!(!passes(&narrowed, "path"));
     }
 
     #[test]

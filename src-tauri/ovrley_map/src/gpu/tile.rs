@@ -432,6 +432,29 @@ pub(crate) fn point_coordinates(feature: &tile::Feature) -> impl Iterator<Item =
         })
 }
 
+/// The parts of a line feature, in the tile's coordinates. [`check_geometry`] has accepted the feature
+/// as whole `MoveTo` and `LineTo` commands.
+pub(crate) fn line_coordinates(feature: &tile::Feature) -> Vec<Vec<[i64; 2]>> {
+    let mut cursor = [0_i64; 2];
+    let mut rest = feature.geometry.as_slice();
+    let mut parts = Vec::new();
+    while !rest.is_empty() {
+        let count = (rest[3] >> 3) as usize;
+        let mut part = Vec::with_capacity(count + 1);
+        cursor[0] += zigzag(rest[1]);
+        cursor[1] += zigzag(rest[2]);
+        part.push(cursor);
+        for pair in rest[4..4 + count * 2].chunks_exact(2) {
+            cursor[0] += zigzag(pair[0]);
+            cursor[1] += zigzag(pair[1]);
+            part.push(cursor);
+        }
+        parts.push(part);
+        rest = &rest[4 + count * 2..];
+    }
+    parts
+}
+
 /// Moves the cursor across one part, returning its surveyor's area. `None` beyond the sane range.
 fn advance_cursor(cursor: &mut [i64; 2], first: &[u32], rest: &[u32]) -> Option<i64> {
     cursor[0] += zigzag(first[0]);

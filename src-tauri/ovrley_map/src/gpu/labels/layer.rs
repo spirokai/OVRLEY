@@ -5,22 +5,33 @@
 //! MapLibre allows it to. A layer asking for something this renderer cannot draw is an error here, and
 //! the caller logs it and skips the layer.
 //!
+//! Line labels lie flat on the ground, turning with the map. A line layer that asks for anything else is
+//! an error here.
+//!
 //! Icons never draw. An `icon-image` that depends on zoom alone is dropped with the icon, and the
 //! layer draws its text. One that reads feature data (road shields) skips the layer, since its text
 //! belongs on the icon.
 
-use super::text::{font_chain, TextAnchor, TextJustify};
+use super::layout::TILE_UNITS;
+use super::text::{font_chain, TextAnchor, TextJustify, ONE_EM};
 use crate::gpu::style::{
     boolean, color_expr, evaluate_at_zoom, evaluate_color, evaluate_number, keyword, number, pair,
     zoom_value as ground_zoom_value,
 };
+use crate::{data_level, TILE_SIZE};
 use maplibre_expr::{
     is_expression, parse_property, typecheck, EvaluationContext, Expr, FormatArg, Type, Value,
 };
 use serde_json::Value as Json;
 
 /// The source layers whose names draw. `transportation_name` and `waterway` are the line labels.
-pub(crate) const LABEL_SOURCE_LAYERS: [&str; 3] = ["place", "water_name", "park"];
+pub(crate) const LABEL_SOURCE_LAYERS: [&str; 5] = [
+    "place",
+    "water_name",
+    "park",
+    "transportation_name",
+    "waterway",
+];
 
 /// The operators that read the feature being styled.
 const FEATURE_OPERATORS: [&str; 10] = [
@@ -134,6 +145,9 @@ pub(crate) struct LabelLayer {
     pub(crate) uppercase: bool,
     pub(crate) padding_px: f64,
     pub(crate) translate_px: [f64; 2],
+    /// `translate_px` in tile units at the style zoom, which is how far a map-anchored translation moves
+    /// a label on the ground.
+    pub(crate) translate_units: [f64; 2],
     pub(crate) translate_anchor: Alignment,
     pub(crate) allow_overlap: bool,
     pub(crate) ignore_placement: bool,
@@ -141,18 +155,20 @@ pub(crate) struct LabelLayer {
     pub(crate) pixel_ratio: f64,
     pub(crate) paint: LabelPaint,
     /// Read by line labels.
-    #[allow(dead_code)]
     pub(crate) line: LineLabel,
 }
 
 /// The properties only a label along a line reads.
-#[allow(dead_code)]
 pub(crate) struct LineLabel {
+    /// Output pixels.
     pub(crate) spacing_px: f64,
     pub(crate) max_angle_deg: f64,
     pub(crate) keep_upright: bool,
-    pub(crate) rotation_alignment: Alignment,
-    pub(crate) pitch_alignment: Alignment,
+    /// Tile units in one output pixel of a tile cut for the style zoom, which tile data is laid out in.
+    pub(crate) units_per_px: f64,
+    /// Tile units in one glyph unit at the style zoom, which is the label's size on the ground when the
+    /// ground is as far from the camera as the map centre.
+    pub(crate) units_per_glyph: f64,
 }
 
 /// Whether a symbol layer's source layer is one whose names draw.
@@ -297,10 +313,12 @@ pub(crate) fn parse_label_layer(
         &at("text-pitch-alignment")?,
         rotation_alignment,
     )?;
-    if placement == SymbolPlacement::Point
-        && (rotation_alignment != Alignment::Viewport || pitch_alignment != Alignment::Viewport)
-    {
-        return Err("a point label aligned to the map is not supported".to_string());
+    if placement == SymbolPlacement::Point {
+        if rotation_alignment != Alignment::Viewport || pitch_alignment != Alignment::Viewport {
+            return Err("a point label aligned to the map is not supported".to_string());
+        }
+    } else if rotation_alignment != Alignment::Map || pitch_alignment != Alignment::Map {
+        return Err("a line label aligned to the viewport is not supported".to_string());
     }
 
     // Without a text-font, MapLibre draws Open Sans, which has no chain.
@@ -338,6 +356,25 @@ pub(crate) fn parse_label_layer(
         Some("viewport") => Alignment::Viewport,
         Some(other) => return Err(format!("text-translate-anchor {other} is not an anchor")),
     };
+    let translate_px = pair(
+        &zoom_value(layer, "paint", "text-translate", zoom)?,
+        "text-translate",
+    )?
+    .map(|value| value * ratio);
+    if placement != SymbolPlacement::Point
+        && translate_anchor == Alignment::Viewport
+        && translate_px != [0.0, 0.0]
+    {
+        return Err("a line label translated along the viewport is not supported".to_string());
+    }
+
+    let line_height_ems = number(&at("text-line-height")?, "text-line-height", 1.2)?;
+    if line_height_ems <= 0.0 {
+        return Err("text-line-height must be positive".to_string());
+    }
+    let size_px = number(&at("text-size")?, "text-size", 16.0)? * ratio;
+    let units_per_px = TILE_UNITS
+        / (f64::from(TILE_SIZE) * ratio * 2_f64.powf(zoom - f64::from(data_level(zoom))));
 
     Ok(LabelLayer {
         index,
@@ -356,9 +393,9 @@ pub(crate) fn parse_label_layer(
         font,
         text_field,
         sort_key: varying_number(layer, "layout", "symbol-sort-key", zoom)?,
-        size_px: number(&at("text-size")?, "text-size", 16.0)? * ratio,
+        size_px,
         max_width_ems: number(&at("text-max-width")?, "text-max-width", 10.0)?,
-        line_height_ems: number(&at("text-line-height")?, "text-line-height", 1.2)?,
+        line_height_ems,
         letter_spacing_ems: number(&at("text-letter-spacing")?, "text-letter-spacing", 0.0)?,
         anchor: match keyword(&at("text-anchor")?, "text-anchor")? {
             None | Some("center") => TextAnchor::Center,
@@ -382,11 +419,8 @@ pub(crate) fn parse_label_layer(
         offset_ems: pair(&at("text-offset")?, "text-offset")?,
         uppercase,
         padding_px: number(&at("text-padding")?, "text-padding", 2.0)? * ratio,
-        translate_px: pair(
-            &zoom_value(layer, "paint", "text-translate", zoom)?,
-            "text-translate",
-        )?
-        .map(|value| value * ratio),
+        translate_px,
+        translate_units: translate_px.map(|value| value * units_per_px),
         translate_anchor,
         allow_overlap: boolean(&at("text-allow-overlap")?, "text-allow-overlap", false)?,
         ignore_placement: boolean(
@@ -415,8 +449,8 @@ pub(crate) fn parse_label_layer(
             spacing_px: number(&at("symbol-spacing")?, "symbol-spacing", 250.0)? * ratio,
             max_angle_deg: number(&at("text-max-angle")?, "text-max-angle", 45.0)?,
             keep_upright: boolean(&at("text-keep-upright")?, "text-keep-upright", true)?,
-            rotation_alignment,
-            pitch_alignment,
+            units_per_px,
+            units_per_glyph: size_px / ONE_EM * units_per_px,
         },
     })
 }

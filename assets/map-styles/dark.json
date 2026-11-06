@@ -132,6 +132,33 @@
       }
     },
     {
+      "id": "waterway_line_label",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "waterway",
+      "minzoom": 10,
+      "filter": ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false],
+      "layout": {
+        "symbol-placement": "line",
+        "symbol-spacing": 350,
+        "text-field": [
+          "case",
+          ["has", "name:nonlatin"],
+          ["concat", ["get", "name:latin"], " ", ["get", "name:nonlatin"]],
+          ["coalesce", ["get", "name_en"], ["get", "name"]]
+        ],
+        "text-font": ["Noto Sans Regular"],
+        "text-letter-spacing": 0.2,
+        "text-rotation-alignment": "map",
+        "text-size": 12
+      },
+      "paint": {
+        "text-color": "hsla(0,0%,0%,0.7)",
+        "text-halo-color": "hsl(0,0%,27%)",
+        "text-halo-width": 1
+      }
+    },
+    {
       "id": "water_name_point_label",
       "type": "symbol",
       "source": "openmaptiles",
@@ -595,7 +622,7 @@
         ],
         "text-font": ["Noto Sans Regular"],
         "text-max-angle": 30,
-        "text-pitch-alignment": "viewport",
+        "text-pitch-alignment": "map",
         "text-rotation-alignment": "map",
         "text-size": 10,
         "text-transform": "uppercase"
@@ -619,8 +646,8 @@
         "symbol-spacing": 350,
         "text-field": ["to-string", ["get", "ref"]],
         "text-font": ["Noto Sans Regular"],
-        "text-pitch-alignment": "viewport",
-        "text-rotation-alignment": "viewport",
+        "text-pitch-alignment": "map",
+        "text-rotation-alignment": "map",
         "text-size": 10
       },
       "paint": {

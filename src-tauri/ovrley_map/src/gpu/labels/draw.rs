@@ -9,8 +9,8 @@
 #![cfg_attr(target_arch = "wasm32", allow(dead_code))]
 
 use super::layer::LabelLayer;
-use super::layout::{GlyphId, LabelSymbol};
-use super::placement::{place, LabelView, PlacedSymbol};
+use super::layout::{GlyphId, GlyphQuad, LabelSymbol, LineSymbol, SymbolKind};
+use super::placement::{glyph_pose, place, GroundLabel, LabelView, PlacedSymbol};
 use super::text::GlyphBitmap;
 use crate::gpu::pipelines::LabelVertex;
 use crate::{MapCamera, MapViewport, TileId, ViewState};
@@ -207,6 +207,8 @@ struct LayerDraw {
     indices: Range<u32>,
     /// Whether any of its labels has a halo to draw first.
     halo: bool,
+    /// Whether its labels lie on the ground, which buildings can hide.
+    ground: bool,
 }
 
 /// The resident label tiles, their atlas, and this frame's draws.
@@ -408,6 +410,7 @@ impl LabelLayers {
         self.draws.clear();
         let mut layer_start = 0;
         let mut layer_halo = false;
+        let mut layer_ground;
         for (position, symbol_placed) in placed.iter().enumerate() {
             let next_layer = placed.get(position + 1).map(|next| next.layer);
             let symbol = self.symbol(symbol_placed);
@@ -418,26 +421,35 @@ impl LabelLayers {
             let ([x, y], w) = view
                 .project(symbol_placed.tile, symbol, layer)
                 .ok_or("A placed label is behind the camera")?;
-            layer_halo |= symbol.halo[3] > 0 && symbol.halo_width > 0.0;
+            layer_halo |= symbol.paint.halo[3] > 0 && symbol.paint.halo_width > 0.0;
+            let ground = match &symbol.kind {
+                SymbolKind::Point { .. } => None,
+                SymbolKind::Line(line) => Some((line, view.ground_label(w, symbol, layer))),
+            };
+            // A layer's symbols are all points or all lines.
+            layer_ground = ground.is_some();
             for quad in &symbol.quads {
                 let rect = self.atlas.rects.get(&quad.glyph).ok_or_else(|| {
                     format!("Glyph {:?} is not in the label atlas", quad.glyph.character)
                 })?;
-                push_quad(
-                    &mut vertices,
-                    &view,
-                    symbol,
-                    quad.bold,
-                    quad.rect,
-                    (x, y, w),
-                    *rect,
-                );
+                match &ground {
+                    None => push_quad(&mut vertices, &view, symbol, quad, (x, y, w), *rect),
+                    Some((line, label)) => push_ground_quad(
+                        &mut vertices,
+                        &view,
+                        (symbol_placed, symbol, line, layer),
+                        quad,
+                        label,
+                        *rect,
+                    )?,
+                }
             }
             if next_layer != Some(symbol_placed.layer) {
                 let end = vertices.len() as u32 / 4 * QUAD_INDICES.len() as u32;
                 self.draws.push(LayerDraw {
                     indices: layer_start..end,
                     halo: layer_halo,
+                    ground: layer_ground,
                 });
                 layer_start = end;
                 layer_halo = false;
@@ -470,13 +482,19 @@ impl LabelLayers {
     }
 
     /// Records the frame's draws, layer by layer from the bottom of the style up, a layer's halos
-    /// first. The pipeline must already be bound.
-    pub(crate) fn record(&self, pass: &mut wgpu::RenderPass<'_>) {
+    /// first. Labels on the ground draw with `ground`, the rest with `screen`.
+    pub(crate) fn record(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        screen: &wgpu::RenderPipeline,
+        ground: &wgpu::RenderPipeline,
+    ) {
         pass.set_bind_group(0, &self.bind_group, &[]);
         pass.set_index_buffer(self.indices.slice(..), wgpu::IndexFormat::Uint32);
         pass.set_vertex_buffer(0, self.vertices.slice(..));
         pass.set_vertex_buffer(1, self.passes.slice(..));
         for draw in &self.draws {
+            pass.set_pipeline(if draw.ground { ground } else { screen });
             if draw.halo {
                 pass.draw_indexed(draw.indices.clone(), 0, 0..1);
             }
@@ -518,14 +536,13 @@ fn quad_buffers(
     (vertices, indices)
 }
 
-/// Appends a glyph's four corners. The anchor is `(x, y)` pixels from the top left, `w` its clip w:
-/// corners are offset on screen from it, then written in clip space with the anchor's real w.
+/// Appends an upright glyph's four corners. The anchor is `(x, y)` pixels from the top left, `w` its clip
+/// w: corners are offset on screen from it, then written in clip space with the anchor's real w.
 fn push_quad(
     vertices: &mut Vec<LabelVertex>,
     view: &LabelView,
     symbol: &LabelSymbol,
-    bold: bool,
-    rect: [f32; 4],
+    quad: &GlyphQuad,
     (x, y, w): (f64, f64, f64),
     atlas: AtlasRect,
 ) {
@@ -536,23 +553,96 @@ fn push_quad(
         let ndc_y = 1.0 - (y + f64::from(dy) * scale) / height * 2.0;
         [(ndc_x * w) as f32, (ndc_y * w) as f32, 0.0, w as f32]
     };
-    let (left, top, right, bottom) = (rect[0], rect[1], rect[2], rect[3]);
+    let [left, top, right, bottom] = quad.rect;
+    push_corners(
+        vertices,
+        symbol,
+        (quad.bold, symbol.font_scale),
+        [
+            corner(left, top),
+            corner(right, top),
+            corner(left, bottom),
+            corner(right, bottom),
+        ],
+        atlas,
+    );
+}
+
+/// Appends a glyph of a line label, lying on the ground along the line. Its centre is walked out from the
+/// anchor, and its corners are laid out on the ground there and projected, so the glyph foreshortens with
+/// the map. Fails when the line no longer holds the label, or a corner is behind the camera, which
+/// placement has ruled out.
+fn push_ground_quad(
+    vertices: &mut Vec<LabelVertex>,
+    view: &LabelView,
+    (placed, symbol, line, layer): (&PlacedSymbol, &LabelSymbol, &LineSymbol, &LabelLayer),
+    quad: &GlyphQuad,
+    label: &GroundLabel,
+    atlas: AtlasRect,
+) -> Result<(), String> {
+    let pose = glyph_pose(
+        (symbol, line, layer),
+        f64::from(quad.along) * label.units_per_glyph,
+        placed.flipped,
+    )
+    .ok_or("A placed label no longer fits its line")?;
+    // The glyph's x runs along the text, and its y turns a quarter clockwise from it.
+    let corner = |dx: f32, dy: f32| -> Result<[f32; 4], String> {
+        let (dx, dy) = (
+            f64::from(dx) * label.units_per_glyph,
+            f64::from(dy) * label.units_per_glyph,
+        );
+        let ground = [
+            pose.point[0] + pose.direction[0] * dx - pose.direction[1] * dy,
+            pose.point[1] + pose.direction[1] * dx + pose.direction[0] * dy,
+        ];
+        let clip = view
+            .clip(placed.tile, ground)
+            .ok_or("A placed label's glyph is behind the camera")?;
+        Ok([clip.x as f32, clip.y as f32, clip.z as f32, clip.w as f32])
+    };
+    let [left, top, right, bottom] = quad.rect;
+    push_corners(
+        vertices,
+        symbol,
+        (quad.bold, label.screen_scale as f32),
+        [
+            corner(left, top)?,
+            corner(right, top)?,
+            corner(left, bottom)?,
+            corner(right, bottom)?,
+        ],
+        atlas,
+    );
+    Ok(())
+}
+
+/// Appends a glyph's quad: four clip-space corners in the order top left, top right, bottom left and
+/// bottom right, with the atlas texels they sample. `(bold, font_scale)` is the glyph's thickening and its
+/// size in output pixels per glyph unit on screen.
+fn push_corners(
+    vertices: &mut Vec<LabelVertex>,
+    symbol: &LabelSymbol,
+    (bold, font_scale): (bool, f32),
+    positions: [[f32; 4]; 4],
+    atlas: AtlasRect,
+) {
     let texel = |u: u16, v: u16| [atlas.x + u, atlas.y + v];
     let corners = [
-        (corner(left, top), texel(0, 0)),
-        (corner(right, top), texel(atlas.width, 0)),
-        (corner(left, bottom), texel(0, atlas.height)),
-        (corner(right, bottom), texel(atlas.width, atlas.height)),
+        (positions[0], texel(0, 0)),
+        (positions[1], texel(atlas.width, 0)),
+        (positions[2], texel(0, atlas.height)),
+        (positions[3], texel(atlas.width, atlas.height)),
     ];
     vertices.extend(corners.map(|(position, texel)| LabelVertex {
         position,
         texel,
-        fill: symbol.fill,
-        halo: symbol.halo,
-        font_scale: symbol.font_scale,
-        halo_width: symbol.halo_width,
-        halo_blur: symbol.halo_blur,
-        opacity: symbol.opacity,
+        fill: symbol.paint.fill,
+        halo: symbol.paint.halo,
+        font_scale,
+        halo_width: symbol.paint.halo_width,
+        halo_blur: symbol.paint.halo_blur,
+        opacity: symbol.paint.opacity,
         bold: f32::from(u8::from(bold)),
     }));
 }

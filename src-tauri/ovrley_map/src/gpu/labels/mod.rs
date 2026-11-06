@@ -4,6 +4,9 @@
 //! The glyph service is native only; layout takes glyph metrics from a lookup, so it also runs where
 //! there are no font files.
 //!
+//! Names along roads and rivers lie flat on the ground (`line`): their glyphs are walked along the line for
+//! each camera.
+//!
 //! Label tiles are laid out with the tile geometry (`layout`), kept on the CPU, and placed for each
 //! camera (`placement`). Only the quads placement chose reach the GPU (`draw`).
 
@@ -12,6 +15,7 @@ mod draw;
 mod glyphs;
 mod layer;
 mod layout;
+mod line;
 mod placement;
 #[cfg(not(target_arch = "wasm32"))]
 mod service;

@@ -638,10 +638,9 @@ impl GpuMapRenderer {
             }
         }
 
-        if let (Some(labels), Some(pipeline)) = (&self.labels, &self.pipelines.label) {
+        if let (Some(labels), Some(pipelines)) = (&self.labels, &self.pipelines.labels) {
             if labels.has_draws() {
-                pass.set_pipeline(pipeline);
-                labels.record(&mut pass);
+                labels.record(&mut pass, &pipelines.screen, &pipelines.ground);
             }
         }
 

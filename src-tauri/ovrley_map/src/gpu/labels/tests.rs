@@ -1,5 +1,6 @@
 //! Labels from a tile's bytes to pixels: layout, placement and a frame drawn on the GPU.
 
+use super::layout::SymbolKind;
 use super::placement::{place, LabelView};
 use super::text::{Face, FontGlyph, GlyphMetrics};
 use super::{GlyphLookup, GlyphService, LabelSymbol};
@@ -54,12 +55,52 @@ fn place_tile(points: &[(i32, i32, &str)]) -> Vec<u8> {
     .encode_to_vec()
 }
 
-fn label_style(layout: Json) -> Vec<u8> {
+/// A `transportation_name` layer holding one named line per `(points, name)`, in a 4096-unit tile.
+fn line_tile(lines: &[(&[(i32, i32)], &str)]) -> Vec<u8> {
+    let features = lines
+        .iter()
+        .enumerate()
+        .map(|(index, (points, _))| {
+            let mut geometry = vec![9, zigzag(points[0].0), zigzag(points[0].1)];
+            geometry.push((points.len() as u32 - 1) << 3 | 2);
+            for pair in points.windows(2) {
+                geometry.push(zigzag(pair[1].0 - pair[0].0));
+                geometry.push(zigzag(pair[1].1 - pair[0].1));
+            }
+            tile::Feature {
+                tags: vec![0, index as u32],
+                r#type: Some(tile::GeomType::Linestring as i32),
+                geometry,
+                ..Default::default()
+            }
+        })
+        .collect();
+    let values = lines
+        .iter()
+        .map(|(_, name)| tile::Value {
+            string_value: Some((*name).to_string()),
+            ..Default::default()
+        })
+        .collect();
+    Tile {
+        layers: vec![tile::Layer {
+            version: 2,
+            name: "transportation_name".to_string(),
+            features,
+            keys: vec!["name".to_string()],
+            values,
+            extent: Some(4096),
+        }],
+    }
+    .encode_to_vec()
+}
+
+fn style_for(source_layer: &str, layout: Json) -> Vec<u8> {
     let mut label = json!({
         "id": "label",
         "type": "symbol",
         "source": "openmaptiles",
-        "source-layer": "place",
+        "source-layer": source_layer,
         "layout": { "text-field": ["get", "name"], "text-font": ["Noto Sans Bold"], "text-size": 24 },
         "paint": { "text-color": "#000000", "text-halo-color": "#ff0000", "text-halo-width": 2 },
     });
@@ -124,7 +165,7 @@ fn each_point_in_the_tile_gets_one_symbol_and_a_name_no_face_covers_drops_its_la
         (-1, 1000, "Outside"),
         (2000, 2000, "Brno?"),
     ]);
-    let (style, symbols) = laid_out(&label_style(json!({})), &bytes);
+    let (style, symbols) = laid_out(&style_for("place", json!({})), &bytes);
 
     assert_eq!(symbols.len(), 1);
     let symbol = &symbols[0];
@@ -134,10 +175,13 @@ fn each_point_in_the_tile_gets_one_symbol_and_a_name_no_face_covers_drops_its_la
     // 24 px text on a 24 unit em is one pixel a unit. Five glyphs of 12 units, 3 px of padding each
     // side of the quads, and `text-padding` of 2 px around the text.
     assert_eq!(symbol.font_scale, 1.0);
-    assert_eq!(symbol.bounds[2] - symbol.bounds[0], 5.0 * 12.0 + 2.0 * 2.0);
-    assert_eq!(symbol.halo_width, 2.0);
-    assert_eq!(symbol.fill, [0, 0, 0, 255]);
-    assert_eq!(symbol.halo, [255, 0, 0, 255]);
+    let SymbolKind::Point { bounds } = symbol.kind else {
+        panic!("a place is a point label");
+    };
+    assert_eq!(bounds[2] - bounds[0], 5.0 * 12.0 + 2.0 * 2.0);
+    assert_eq!(symbol.paint.halo_width, 2.0);
+    assert_eq!(symbol.paint.fill, [0, 0, 0, 255]);
+    assert_eq!(symbol.paint.halo, [255, 0, 0, 255]);
 }
 
 fn camera_over(tile: TileId) -> MapCamera {
@@ -163,7 +207,7 @@ fn placement_keeps_the_first_of_two_overlapping_labels_and_culls_what_is_far_off
     ]);
 
     let place_with = |layout: Json| {
-        let (style, symbols) = laid_out(&label_style(layout), &bytes);
+        let (style, symbols) = laid_out(&style_for("place", layout), &bytes);
         let placed = place(&view, &style.labels, &[(tile, &symbols)]);
         placed
             .iter()
@@ -181,6 +225,33 @@ fn placement_keeps_the_first_of_two_overlapping_labels_and_culls_what_is_far_off
         ),
         [1, 2]
     );
+}
+
+#[test]
+fn a_name_follows_its_line_and_stays_upright() {
+    let tile = TileId::new(14, 8000, 5000);
+    let viewport = MapViewport::new(200, 120, 1.0).unwrap();
+    let view = LabelView::new(&ViewState::new(&camera_over(tile), viewport), 200, 120);
+    let layout = json!({ "symbol-placement": "line", "text-keep-upright": true });
+    // 24 px text on 8 tile units a pixel: "East" is 48 px, 384 units.
+    let placed = |lines: &[(&[(i32, i32)], &str)]| {
+        let (style, symbols) = laid_out(
+            &style_for("transportation_name", layout.clone()),
+            &line_tile(lines),
+        );
+        let place_with = place(&view, &style.labels, &[(tile, &symbols)]);
+        (symbols, place_with)
+    };
+
+    let east = [(300, 2048), (3800, 2048)];
+    let west = [(3800, 2048), (300, 2048)];
+    let (symbols, placed_east) = placed(&[(&east, "East")]);
+    assert!(!symbols.is_empty());
+    assert!(symbols.iter().all(|symbol| symbol.anchor[1] == 2048.0));
+    assert!(!placed_east.is_empty() && placed_east.iter().all(|placed| !placed.flipped));
+    // The same road drawn the other way round reads the same way on screen: it is flipped.
+    let (_, placed_west) = placed(&[(&west, "West")]);
+    assert!(!placed_west.is_empty() && placed_west.iter().all(|placed| placed.flipped));
 }
 
 /// The bundled fonts, and a source that serves one tile for every address.
@@ -206,10 +277,18 @@ impl MapDataSource for TestSource {
 
 /// Renders a frame centred on the tile's one label, with labels on or off.
 fn render(labels: bool) -> (Vec<u8>, usize) {
+    render_tile(
+        style_for("place", json!({ "text-size": 40 })),
+        place_tile(&[(2048, 2048, "Praha")]),
+        labels,
+    )
+}
+
+fn render_tile(style: Vec<u8>, tile_bytes: Vec<u8>, labels: bool) -> (Vec<u8>, usize) {
     let fonts = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts/map");
     let source = TestSource {
-        style: label_style(json!({ "text-size": 40 })),
-        tile: place_tile(&[(2048, 2048, "Praha")]),
+        style,
+        tile: tile_bytes,
         glyphs: Arc::new(GlyphService::open(&fonts).unwrap()),
     };
     let tile = TileId::new(14, 8000, 5000);
@@ -276,4 +355,32 @@ fn a_frame_draws_a_labels_glyphs_and_halo_where_it_was_placed() {
     let (first, last) = (ink.iter().min().unwrap(), ink.iter().max().unwrap());
     assert!(*first > 30 && *last < 210, "ink spans {first}..{last}");
     assert!((120_i64 - (*first + *last) as i64 / 2).abs() < 8);
+}
+
+#[test]
+fn a_flipped_name_draws_exactly_as_one_that_needed_no_flip() {
+    // The same 2080 unit street from either end, named at its middle. Drawn east to west the name is
+    // flipped to stay upright, so both must put the same pixels on screen.
+    let style = style_for(
+        "transportation_name",
+        json!({ "symbol-placement": "line-center", "text-size": 40 }),
+    );
+    let render_street =
+        |points: &[(i32, i32)]| render_tile(style.clone(), line_tile(&[(points, "Praha")]), true).0;
+    let east = render_street(&[(1008, 2048), (3088, 2048)]);
+    let west = render_street(&[(3088, 2048), (1008, 2048)]);
+
+    let ink = |pixels: &[u8]| {
+        pixels
+            .chunks_exact(4)
+            .filter(|pixel| pixel[0] < 60 && pixel[1] < 60 && pixel[2] < 60)
+            .count()
+    };
+    assert!(ink(&east) > 150, "{} dark pixels", ink(&east));
+    let differing = east
+        .iter()
+        .zip(&west)
+        .filter(|(a, b)| a.abs_diff(**b) > 8)
+        .count();
+    assert_eq!(differing, 0);
 }
