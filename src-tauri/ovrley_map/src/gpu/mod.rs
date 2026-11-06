@@ -653,10 +653,9 @@ impl GpuMapRenderer {
             }
         }
 
-        // Upright labels draw over the buildings, and skip the samples the route marked so it stays on top.
+        // Upright labels draw over everything, the route and the buildings included.
         if let (Some(labels), Some(pipelines)) = (&self.labels, &self.pipelines.labels) {
             if labels.has_draws(false) {
-                pass.set_stencil_reference(ROUTE_STENCIL);
                 labels.record(&mut pass, &pipelines.screen, false);
             }
         }

@@ -346,8 +346,6 @@ enum StencilUse {
     TestAndMarkWater,
     /// Draws only where the water bit is clear: the haze.
     NotWater,
-    /// Draws only where its reference, the route's mark, is not set: upright labels, under the route.
-    NotRoute,
 }
 
 impl StencilUse {
@@ -387,12 +385,6 @@ impl StencilUse {
                 wgpu::CompareFunction::Equal,
                 wgpu::StencilOperation::Keep,
                 WATER_STENCIL_BIT,
-                0,
-            ),
-            Self::NotRoute => (
-                wgpu::CompareFunction::NotEqual,
-                wgpu::StencilOperation::Keep,
-                0xff,
                 0,
             ),
         };
@@ -641,7 +633,7 @@ impl Pipelines {
             )
         });
         // Glyphs are not clipped to their tile, and ignore depth. Upright ones draw over the buildings
-        // and test the stencil to stay under the route; those lying on the ground draw before both.
+        // and the route; those lying on the ground draw before both.
         let label = |name, depth| {
             pattern_builder.tile_pipeline(
                 name,
@@ -656,7 +648,7 @@ impl Pipelines {
             )
         };
         let labels = draws_labels.then(|| LabelPipelines {
-            screen: label("label screen pipeline", ground_depth(StencilUse::NotRoute)),
+            screen: label("label screen pipeline", ground_depth(StencilUse::Ignore)),
             ground: label("label ground pipeline", ground_depth(StencilUse::Ignore)),
         });
         let line = GroundPipelines::new(|stencil| {
