@@ -32,7 +32,8 @@ pub struct MapLayers {
 impl MapLayers {
     /// Whether these toggles hide a style layer, from its `type` and `source-layer`.
     pub fn hides_layer(self, layer_type: &str, source_layer: Option<&str>) -> bool {
-        (!self.labels && layer_type == "symbol") || (!self.buildings && source_layer == Some("building"))
+        (!self.labels && layer_type == "symbol")
+            || (!self.buildings && source_layer == Some("building"))
     }
 }
 

@@ -2,8 +2,8 @@
 
 use super::fill_patterns::PATTERN_PERIOD_PX;
 use super::pipelines::ShaderTileMetadata;
-use cgmath::{Matrix4, Vector3};
 use crate::{data_level, TileId, ViewState, MAX_VIEW_TILES, TILE_SIZE};
+use cgmath::{Matrix4, Vector3};
 use std::collections::HashSet;
 use std::mem::size_of;
 use std::ops::Range;
@@ -45,9 +45,8 @@ fn tile_transform(tile: TileId, view: &ViewState) -> Matrix4<f64> {
 /// A tile's corner in style pixels at the view zoom, wrapped where every fill pattern repeats.
 fn pattern_origin(tile: TileId, view: &ViewState) -> [f32; 2] {
     let tile_pixels = f64::from(TILE_SIZE) * 2_f64.powf(view.zoom() - f64::from(tile.z));
-    [tile.x, tile.y].map(|index| {
-        (f64::from(index) * tile_pixels).rem_euclid(PATTERN_PERIOD_PX) as f32
-    })
+    [tile.x, tile.y]
+        .map(|index| (f64::from(index) * tile_pixels).rem_euclid(PATTERN_PERIOD_PX) as f32)
 }
 
 /// Where one tile is drawn this frame and which slice of the pattern buffer holds its matrix.
@@ -99,8 +98,7 @@ impl TileViewPattern {
     pub(crate) fn generate(&mut self, view: &ViewState, has_tile: impl Fn(TileId) -> bool) {
         self.shapes.clear();
         self.seen.clear();
-        let Some(region) = view.create_view_region(data_level(view.zoom()))
-        else {
+        let Some(region) = view.create_view_region(data_level(view.zoom())) else {
             return;
         };
         for coords in region.iter() {

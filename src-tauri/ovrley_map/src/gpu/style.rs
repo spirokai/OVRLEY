@@ -6,7 +6,7 @@
 use super::fill_patterns::pattern_index;
 use super::labels::{is_label_source, parse_label_layer, LabelLayer};
 use super::pipelines::ShaderDash;
-use crate::{MapLayers, MapStyleBuildings, VECTOR_SOURCE};
+use crate::{data_level, MapLayers, MapStyleBuildings, VECTOR_SOURCE};
 use lyon::tessellation::LineJoin;
 use maplibre_expr::{
     evaluate, is_expression, parse_filter, parse_property, typecheck, EvaluationContext, Expr,
@@ -44,6 +44,9 @@ fn added_buildings_layer(color: &Json) -> Json {
 /// The drawable part of one style, with zoom-dependent layer values evaluated at `zoom`.
 pub(crate) struct ParsedStyle {
     pub(crate) zoom: f64,
+    /// Tile units to one output pixel on the tile level drawn at `zoom`, which is what line widths
+    /// tessellate against.
+    pub(crate) tile_units_per_pixel: f32,
     pub(crate) backgrounds: Vec<BackgroundLayer>,
     pub(crate) vector_layers: Vec<VectorLayer>,
     /// Symbol layers whose names draw, in style order.
@@ -131,6 +134,9 @@ pub(crate) fn parse_style(
 
     let mut parsed = ParsedStyle {
         zoom,
+        // A 4096-unit tile spans 512 style pixels on its own level.
+        tile_units_per_pixel: (8.0 * 2_f64.powf(f64::from(data_level(zoom)) - zoom)) as f32
+            / pixel_ratio,
         backgrounds: Vec::new(),
         vector_layers: Vec::new(),
         labels: Vec::new(),

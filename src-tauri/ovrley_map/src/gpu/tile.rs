@@ -146,17 +146,33 @@ pub(crate) fn prepare_tile(
                 let (kind, is_line_layer, draws_lines, stroke) = match layer.paint {
                     VectorPaint::Line {
                         width,
+                        gap_width,
                         polygons_only,
                         join,
                         ..
-                    } => (
-                        LayerKind::Line,
-                        true,
-                        !polygons_only,
-                        StrokeOptions::tolerance(arc_tolerance(width))
-                            .with_line_join(join)
-                            .with_miter_limit(MITER_LIMIT),
-                    ),
+                    } => {
+                        // A line without width draws nothing, and lyon can't stroke it.
+                        if width == 0.0 {
+                            continue;
+                        }
+                        // Lyon decides joins against the width, so it strokes the line as wide as
+                        // it draws: a cased line's two strokes and the gap between them.
+                        let drawn_width = if gap_width > 0.0 {
+                            gap_width + 2.0 * width
+                        } else {
+                            width
+                        };
+                        let stroke_width = drawn_width * style.tile_units_per_pixel;
+                        (
+                            LayerKind::Line,
+                            true,
+                            !polygons_only,
+                            StrokeOptions::tolerance(arc_tolerance(drawn_width) * stroke_width)
+                                .with_line_width(stroke_width)
+                                .with_line_join(join)
+                                .with_miter_limit(MITER_LIMIT),
+                        )
+                    }
                     VectorPaint::Fill { pattern, .. } => (
                         pattern.map_or(LayerKind::Fill, LayerKind::FillPattern),
                         false,
@@ -254,9 +270,8 @@ pub(crate) fn prepare_tile(
     Ok(prepared)
 }
 
-/// The stroke tessellator's tolerance for round joins on a line `width` output pixels wide.
-/// It strokes at width 1 and the shader scales that, so its error grows with the line, and a thin
-/// line's arcs can be far coarser than a wide road's.
+/// The stroke tessellator's tolerance for round joins on a line `width` output pixels wide, as a
+/// share of that width. A thin line's arcs can be far coarser than a wide road's.
 fn arc_tolerance(width: f32) -> f32 {
     (MAX_ARC_ERROR_PX / width.max(f32::MIN_POSITIVE)).min(MAX_ARC_TOLERANCE)
 }

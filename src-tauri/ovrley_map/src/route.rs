@@ -23,10 +23,7 @@ pub struct MapRouteLine {
 impl MapRouteLine {
     pub fn new(points: Vec<MapRoutePoint>) -> Result<Self, String> {
         if points.len() < 2 {
-            return Err(format!(
-                "Map route needs two points, got {}",
-                points.len()
-            ));
+            return Err(format!("Map route needs two points, got {}", points.len()));
         }
         Ok(Self { points })
     }

@@ -130,9 +130,7 @@ pub struct MapViewport {
 impl MapViewport {
     pub fn new(width_px: u32, height_px: u32, pixel_ratio: f32) -> Result<Self, String> {
         if width_px == 0 || height_px == 0 {
-            return Err(format!(
-                "Map size {width_px}x{height_px} must not be empty"
-            ));
+            return Err(format!("Map size {width_px}x{height_px} must not be empty"));
         }
         if !pixel_ratio.is_finite() || pixel_ratio <= 0.0 {
             return Err(format!("Map pixel ratio {pixel_ratio} must be positive"));
@@ -290,7 +288,11 @@ impl ViewState {
             .max_by(|a, b| a.w.total_cmp(&b.w))?;
         let row = |point: Vector4<f64>| (1.0 - point.y / point.w) * 0.5 * self.height;
         let rows = row(far) - row(centre);
-        let per_row = if rows.abs() < 1e-6 { 0.0 } else { (centre.w / far.w - 1.0) / rows };
+        let per_row = if rows.abs() < 1e-6 {
+            0.0
+        } else {
+            (centre.w / far.w - 1.0) / rows
+        };
         Some((row(centre), per_row))
     }
 
@@ -319,7 +321,10 @@ impl ViewState {
     /// Top padding widens the frustum upward, so the top rays reach further than the bottom ones.
     fn furthest_distance(&self, camera_height: f64) -> f64 {
         let (x, y) = (self.x_tan(), self.y_tan());
-        let (top, bottom) = (y * (1.0 + self.top_padding_ratio), y * (self.top_padding_ratio - 1.0));
+        let (top, bottom) = (
+            y * (1.0 + self.top_padding_ratio),
+            y * (self.top_padding_ratio - 1.0),
+        );
         let rays = [
             Vector3::new(x, top, 1.0),
             Vector3::new(-x, top, 1.0),

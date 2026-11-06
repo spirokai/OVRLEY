@@ -4,8 +4,8 @@
 
 use super::pipelines::{FillShaderFeatureMetadata, ShaderLayerMetadata};
 use super::tile::LayerKind;
-use bytemuck::Pod;
 use crate::TileId;
+use bytemuck::Pod;
 use std::collections::{btree_map, BTreeMap, VecDeque};
 use std::marker::PhantomData;
 use std::mem::size_of;

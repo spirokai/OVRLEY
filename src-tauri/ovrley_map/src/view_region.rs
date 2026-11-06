@@ -70,7 +70,9 @@ impl ViewRegion {
     pub fn iter(&self) -> impl Iterator<Item = TileId> + '_ {
         let z = self.min_tile.z;
         (self.min_tile.x..=self.max_tile.x)
-            .flat_map(move |x| (self.min_tile.y..=self.max_tile.y).map(move |y| TileId::new(z, x, y)))
+            .flat_map(move |x| {
+                (self.min_tile.y..=self.max_tile.y).map(move |y| TileId::new(z, x, y))
+            })
             .filter(|tile| tile.is_on_grid())
             .filter(|tile| footprint_touches(&self.footprint, *tile))
             .take(self.max_n_tiles)
