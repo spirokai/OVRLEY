@@ -3,11 +3,8 @@
 //! the target is removed unless the joined output is verified. The caller owns
 //! the parts directory and its retention.
 
-use std::io::Read;
 use std::path::Path;
-use std::process::{Command, Stdio};
-use std::thread;
-use std::time::Duration;
+use std::sync::atomic::AtomicBool;
 
 use serde::Deserialize;
 
@@ -17,12 +14,11 @@ use crate::encode::ffmpeg::assemble::{
     concat_manifest, join_args, probe_output_args, remux_part_args, transition_segment_args,
     AssemblyKind, AssemblySegment, OutputAssembly,
 };
-use crate::encode::ffmpeg::binary::{configure_ffmpeg_command, resolve_ffmpeg_binary};
+use crate::encode::ffmpeg::binary::resolve_ffmpeg_binary;
+use crate::encode::ffmpeg::process::run;
 use crate::encode::progress::RenderController;
 use crate::error::{CoreError, CoreResult};
 use crate::paths::AppPaths;
-
-const CANCEL_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 /// Encodes composite transitions, remuxes every composite segment, joins them
 /// into the target and verifies its frame count and audio track.
@@ -32,6 +28,7 @@ pub(crate) fn assemble_output(
     controller: &RenderController,
 ) -> CoreResult<()> {
     let ffmpeg = resolve_ffmpeg_binary(&paths.repo_root)?;
+    let cancel = controller.cancel_flag();
     if let AssemblyKind::Composite {
         hevc,
         transition_encoding,
@@ -40,15 +37,15 @@ pub(crate) fn assemble_output(
     {
         for segment in &assembly.segments {
             if matches!(segment, AssemblySegment::Transition { .. }) {
-                run_ffmpeg(
+                run_join_step(
                     &ffmpeg,
                     &transition_segment_args(transition_encoding, segment),
-                    controller,
+                    &cancel,
                 )?;
             }
         }
         for (part, remux) in assembly.remuxes() {
-            run_ffmpeg(&ffmpeg, &remux_part_args(&part, &remux, *hevc), controller)?;
+            run_join_step(&ffmpeg, &remux_part_args(&part, &remux, *hevc), &cancel)?;
         }
     }
     let manifest = assembly.manifest_path();
@@ -59,53 +56,19 @@ pub(crate) fn assemble_output(
         }
     })?;
     let mut output = PartialOutputGuard::new(&assembly.target);
-    run_ffmpeg(&ffmpeg, &join_args(assembly), controller)?;
-    verify_joined_output(&ffmpeg, assembly)?;
+    run_join_step(&ffmpeg, &join_args(assembly), &cancel)?;
+    verify_joined_output(&ffmpeg, assembly, &cancel)?;
     output.preserve();
     Ok(())
 }
 
-/// Runs one FFmpeg command to completion; kills and reaps it on cancellation.
-fn run_ffmpeg(binary: &Path, args: &[String], controller: &RenderController) -> CoreResult<()> {
-    controller.check_cancelled()?;
-    let mut command = Command::new(binary);
-    configure_ffmpeg_command(&mut command);
-    let mut child = command
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| CoreError::Encode(format!("Could not start ffmpeg: {error}")))?;
-    let mut stderr = child.stderr.take().expect("piped ffmpeg stderr");
-    let reader = thread::spawn(move || {
-        let mut text = String::new();
-        stderr.read_to_string(&mut text).map(|_| text)
-    });
-    let process_error =
-        |error: std::io::Error| CoreError::Encode(format!("ffmpeg process error: {error}"));
-    let status = loop {
-        if let Some(status) = child.try_wait().map_err(process_error)? {
-            break status;
-        }
-        if controller.check_cancelled().is_err() {
-            if let Err(error) = child.kill() {
-                log::warn!("Could not terminate ffmpeg while joining parts: {error}");
-            }
-            child.wait().map_err(process_error)?;
-            let _ = reader.join().expect("ffmpeg stderr reader panicked");
-            return Err(CoreError::Cancelled);
-        }
-        thread::sleep(CANCEL_POLL_INTERVAL);
-    };
-    let stderr = reader
-        .join()
-        .expect("ffmpeg stderr reader panicked")
-        .map_err(process_error)?;
-    if !status.success() {
+fn run_join_step(ffmpeg: &Path, args: &[String], cancel: &AtomicBool) -> CoreResult<()> {
+    let step = run(ffmpeg, args, false, cancel)?;
+    if !step.status.success() {
         return Err(CoreError::Encode(format!(
-            "ffmpeg failed while joining output parts ({status}). FFmpeg stderr:\n{}",
-            stderr_tail(&stderr)
+            "ffmpeg failed while joining output parts ({}). FFmpeg stderr:\n{}",
+            step.status,
+            stderr_tail(&step.stderr)
         )));
     }
     Ok(())
@@ -124,24 +87,22 @@ struct ProbedStream {
 
 /// The joined output must hold exactly the planned video frames, and an audio
 /// track exactly when the assembly encodes one.
-fn verify_joined_output(ffmpeg: &Path, assembly: &OutputAssembly) -> CoreResult<()> {
+fn verify_joined_output(
+    ffmpeg: &Path,
+    assembly: &OutputAssembly,
+    cancel: &AtomicBool,
+) -> CoreResult<()> {
     let ffprobe = ffmpeg.with_file_name(if cfg!(windows) {
         "ffprobe.exe"
     } else {
         "ffprobe"
     });
-    let mut command = Command::new(&ffprobe);
-    configure_ffmpeg_command(&mut command);
-    let output = command
-        .args(probe_output_args(&assembly.target))
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|error| CoreError::Encode(format!("Could not start ffprobe: {error}")))?;
+    let output = run(&ffprobe, &probe_output_args(&assembly.target), true, cancel)?;
     if !output.status.success() {
         return Err(CoreError::Encode(format!(
             "ffprobe could not read the joined output {}: {}",
             assembly.target.display(),
-            String::from_utf8_lossy(&output.stderr).trim()
+            output.stderr.trim()
         )));
     }
     let probed: ProbedOutput = serde_json::from_slice(&output.stdout).map_err(|error| {
@@ -191,49 +152,33 @@ fn verify_joined_output(ffmpeg: &Path, assembly: &OutputAssembly) -> CoreResult<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::Ordering;
-    use std::time::Instant;
 
-    #[test]
-    fn cancellation_kills_a_running_ffmpeg_step() {
-        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let ffmpeg = resolve_ffmpeg_binary(&repo_root).unwrap();
-        let controller = RenderController::default();
-        let flag = controller.cancel_flag();
-        let canceller = thread::spawn(move || {
-            thread::sleep(Duration::from_millis(200));
-            flag.store(true, Ordering::SeqCst);
-        });
-        let started = Instant::now();
-        let args = [
-            "-nostdin",
-            "-f",
-            "lavfi",
-            "-re",
-            "-i",
-            "testsrc2=duration=600",
-            "-f",
-            "null",
-            "-",
-        ]
-        .map(String::from);
-        assert!(matches!(
-            run_ffmpeg(&ffmpeg, &args, &controller),
-            Err(CoreError::Cancelled)
-        ));
-        assert!(started.elapsed() < Duration::from_secs(10));
-        canceller.join().unwrap();
+    fn ffmpeg() -> std::path::PathBuf {
+        resolve_ffmpeg_binary(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")).unwrap()
     }
 
     #[test]
     fn failed_steps_report_ffmpeg_stderr() {
-        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let ffmpeg = resolve_ffmpeg_binary(&repo_root).unwrap();
         let args = ["-nostdin", "-i", "/nonexistent/part.ts", "-f", "null", "-"].map(String::from);
-        let error = run_ffmpeg(&ffmpeg, &args, &RenderController::default()).unwrap_err();
+        let error = run_join_step(&ffmpeg(), &args, &AtomicBool::new(false)).unwrap_err();
         assert!(
             error.to_string().contains("/nonexistent/part.ts"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn cancellation_stops_output_verification() {
+        let assembly = OutputAssembly {
+            target: "/nonexistent/joined.mov".into(),
+            parts_directory: "/nonexistent".into(),
+            segments: Vec::new(),
+            frames: 1,
+            kind: AssemblyKind::Transparent,
+        };
+        assert!(matches!(
+            verify_joined_output(&ffmpeg(), &assembly, &AtomicBool::new(true)),
+            Err(CoreError::Cancelled)
+        ));
     }
 }

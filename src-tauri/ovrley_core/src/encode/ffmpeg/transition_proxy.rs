@@ -4,14 +4,14 @@
 //! runtime temp directory and are cleared at startup.
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use serde::Deserialize;
 
-use super::binary::{configure_ffmpeg_command, resolve_ffmpeg_binary};
+use super::binary::resolve_ffmpeg_binary;
 use super::composite_filters::format_seconds_arg;
+use super::process::run;
 use super::transitions::is_xfade_transition;
 use crate::encode::fps::Fps;
 use crate::error::{CoreError, CoreResult};
@@ -186,20 +186,20 @@ pub fn render_transition_proxy(
         std::process::id(),
         NEXT_PROXY.fetch_add(1, Ordering::Relaxed)
     ));
-    let mut command = Command::new(resolve_ffmpeg_binary(&paths.repo_root)?);
-    configure_ffmpeg_command(&mut command);
-    let result = command
-        .args(transition_proxy_args(request, &output))
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|error| CoreError::Encode(format!("Could not start ffmpeg: {error}")))?;
+    // Nothing cancels a preview render today: its request runs to completion.
+    let result = run(
+        &resolve_ffmpeg_binary(&paths.repo_root)?,
+        &transition_proxy_args(request, &output),
+        false,
+        &AtomicBool::new(false),
+    )?;
     if !result.status.success() {
         if output.exists() {
             remove_transition_proxy(&output)?;
         }
         return Err(CoreError::Encode(format!(
             "ffmpeg could not render the transition preview: {}",
-            String::from_utf8_lossy(&result.stderr).trim()
+            result.stderr.trim()
         )));
     }
     Ok(output)
