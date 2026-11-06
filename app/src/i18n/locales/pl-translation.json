@@ -116,8 +116,6 @@
     "resetView": "Resetuj widok",
     "rewindToEnd": "Przewiń do końca",
     "rewindToStart": "Przewiń do początku",
-    "setExportEndAtPlayhead": "Ustaw koniec eksportu w pozycji głowicy",
-    "setExportStartAtPlayhead": "Ustaw początek eksportu w pozycji głowicy",
     "stepBack": "Krok wstecz",
     "stepForward": "Krok naprzód",
     "timelineAxis": "Oś czasu",

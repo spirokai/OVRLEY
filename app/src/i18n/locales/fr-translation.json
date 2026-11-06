@@ -116,8 +116,6 @@
     "resetView": "Réinitialiser la vue",
     "rewindToEnd": "Aller à la fin",
     "rewindToStart": "Revenir au début",
-    "setExportEndAtPlayhead": "Définir la fin de l’exportation à la tête de lecture",
-    "setExportStartAtPlayhead": "Définir le début de l’exportation à la tête de lecture",
     "stepBack": "Reculer d’un pas",
     "stepForward": "Avancer d’un pas",
     "timelineAxis": "Axe de la chronologie",

@@ -116,8 +116,6 @@
     "resetView": "Görünümü sıfırla",
     "rewindToEnd": "Sona sar",
     "rewindToStart": "Başa sar",
-    "setExportEndAtPlayhead": "Oynatma konumunda dışa aktarma sonunu ayarla",
-    "setExportStartAtPlayhead": "Oynatma konumunda dışa aktarma başlangıcını ayarla",
     "stepBack": "Bir adım geri",
     "stepForward": "Bir adım ileri",
     "timelineAxis": "Zaman çizelgesi ekseni",

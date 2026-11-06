@@ -116,8 +116,6 @@
     "resetView": "Obnovit zobrazení",
     "rewindToEnd": "Přejít na konec",
     "rewindToStart": "Přejít na začátek",
-    "setExportEndAtPlayhead": "Nastavit konec exportu",
-    "setExportStartAtPlayhead": "Nastavit začátek exportu",
     "stepBack": "O krok zpět",
     "stepForward": "O krok vpřed",
     "timelineAxis": "Osa časové osy",

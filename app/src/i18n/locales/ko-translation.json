@@ -116,8 +116,6 @@
     "resetView": "보기 초기화",
     "rewindToEnd": "끝으로 이동",
     "rewindToStart": "시작으로 이동",
-    "setExportEndAtPlayhead": "재생 위치를 내보내기 끝으로 설정",
-    "setExportStartAtPlayhead": "재생 위치를 내보내기 시작으로 설정",
     "stepBack": "한 단계 뒤로",
     "stepForward": "한 단계 앞으로",
     "timelineAxis": "타임라인 축",

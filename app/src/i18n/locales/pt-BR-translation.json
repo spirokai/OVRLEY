@@ -116,8 +116,6 @@
     "resetView": "Redefinir visualização",
     "rewindToEnd": "Ir para o fim",
     "rewindToStart": "Voltar ao início",
-    "setExportEndAtPlayhead": "Definir fim da exportação no cursor de reprodução",
-    "setExportStartAtPlayhead": "Definir início da exportação no cursor de reprodução",
     "stepBack": "Voltar um passo",
     "stepForward": "Avançar um passo",
     "timelineAxis": "Eixo da linha do tempo",

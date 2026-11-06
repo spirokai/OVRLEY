@@ -116,8 +116,6 @@
     "resetView": "Reimposta visualizzazione",
     "rewindToEnd": "Vai alla fine",
     "rewindToStart": "Vai all'inizio",
-    "setExportEndAtPlayhead": "Imposta fine export sulla testina",
-    "setExportStartAtPlayhead": "Imposta inizio export sulla testina",
     "stepBack": "Un passo indietro",
     "stepForward": "Un passo avanti",
     "timelineAxis": "Asse della timeline",
