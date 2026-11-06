@@ -346,6 +346,8 @@ enum StencilUse {
     TestAndMarkWater,
     /// Draws only where the water bit is clear: the haze.
     NotWater,
+    /// Draws only where its reference, the route's mark, is not set: upright labels, under the route.
+    NotRoute,
 }
 
 impl StencilUse {
@@ -387,6 +389,12 @@ impl StencilUse {
                 WATER_STENCIL_BIT,
                 0,
             ),
+            Self::NotRoute => (
+                wgpu::CompareFunction::NotEqual,
+                wgpu::StencilOperation::Keep,
+                0xff,
+                0,
+            ),
         };
         let face = wgpu::StencilFaceState {
             compare,
@@ -407,7 +415,7 @@ impl StencilUse {
 pub(crate) struct LabelPipelines {
     /// Labels upright on the screen.
     pub(crate) screen: wgpu::RenderPipeline,
-    /// Labels lying on the ground, which the depth of buildings hides.
+    /// Labels lying on the ground. They draw before the route and the buildings, which cover them.
     pub(crate) ground: wgpu::RenderPipeline,
 }
 
@@ -513,15 +521,6 @@ fn ground_depth(stencil: StencilUse) -> wgpu::DepthStencilState {
         depth_compare: Some(wgpu::CompareFunction::Always),
         stencil: stencil.state(),
         bias: wgpu::DepthBiasState::default(),
-    }
-}
-
-/// Depth writes off, compare `LessEqual`, and no stencil: what stands in front of the ground hides a label
-/// lying on it.
-fn label_ground_depth() -> wgpu::DepthStencilState {
-    wgpu::DepthStencilState {
-        depth_compare: Some(wgpu::CompareFunction::LessEqual),
-        ..ground_depth(StencilUse::Ignore)
     }
 }
 
@@ -641,8 +640,8 @@ impl Pipelines {
                 ground_depth(stencil),
             )
         });
-        // Glyphs are not clipped to their tile. Upright ones draw over everything, so they ignore stencil
-        // and depth; those lying on the ground ignore the stencil and test the depth.
+        // Glyphs are not clipped to their tile, and ignore depth. Upright ones draw over the buildings
+        // and test the stencil to stay under the route; those lying on the ground draw before both.
         let label = |name, depth| {
             pattern_builder.tile_pipeline(
                 name,
@@ -657,8 +656,8 @@ impl Pipelines {
             )
         };
         let labels = draws_labels.then(|| LabelPipelines {
-            screen: label("label screen pipeline", ground_depth(StencilUse::Ignore)),
-            ground: label("label ground pipeline", label_ground_depth()),
+            screen: label("label screen pipeline", ground_depth(StencilUse::NotRoute)),
+            ground: label("label ground pipeline", ground_depth(StencilUse::Ignore)),
         });
         let line = GroundPipelines::new(|stencil| {
             builder.tile_pipeline(

@@ -1,6 +1,6 @@
 //! Tile identities and view regions, ported from maplibre-rs `coords.rs`.
 
-use crate::camera::{MapCamera, MapViewport, ViewState};
+use crate::camera::{MapCamera, MapLabelDraw, MapViewport, ViewState};
 
 /// Tiles stop at this level upstream. Deeper views draw these tiles scaled.
 const MAX_DATA_LEVEL: u8 = 14;
@@ -40,6 +40,47 @@ pub fn view_tiles(camera: &MapCamera, viewport: MapViewport) -> Vec<TileId> {
     view.create_view_region(data_level(view.zoom()))
         .map(|region| region.iter().collect())
         .unwrap_or_default()
+}
+
+/// The tiles a frame needs, and how many its busiest camera sees.
+pub struct FrameTiles {
+    /// The most tiles any one camera of the frame sees.
+    pub busiest: usize,
+    /// The tiles of the frame's camera and of each of its label placements' cameras, each once, in the
+    /// order they are first seen. A label is placed from the tiles around its own camera.
+    pub tiles: Vec<TileId>,
+}
+
+/// The tiles a renderer must hold to draw a frame at `camera` with `labels`. Each distinct camera is
+/// walked once.
+pub fn frame_tiles(
+    camera: &MapCamera,
+    labels: Option<&MapLabelDraw>,
+    viewport: MapViewport,
+) -> FrameTiles {
+    let mut cameras = vec![*camera];
+    if let Some(labels) = labels {
+        for placement in labels.cameras() {
+            if !cameras.contains(&placement) {
+                cameras.push(placement);
+            }
+        }
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut frame = FrameTiles {
+        busiest: 0,
+        tiles: Vec::new(),
+    };
+    for camera in &cameras {
+        let seen_by_camera = view_tiles(camera, viewport);
+        frame.busiest = frame.busiest.max(seen_by_camera.len());
+        for tile in seen_by_camera {
+            if seen.insert(tile) {
+                frame.tiles.push(tile);
+            }
+        }
+    }
+    frame
 }
 
 /// A bounding box of tiles at one level, cut to the frustum's footprint.

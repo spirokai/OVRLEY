@@ -18,7 +18,7 @@ use crate::{
 };
 use ovrley_map::gpu::labels::{GlyphId, GlyphService};
 use ovrley_map::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileSizer, MeasuredTile};
-use ovrley_map::{view_tiles, MapDataSource, MapSource, MapStyleId, MapStyleInfo, TileId};
+use ovrley_map::{MapDataSource, MapSource, MapStyleId, MapStyleInfo, TileId};
 use ovrley_widgets::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},
@@ -78,7 +78,11 @@ pub fn download_preview_tiles(
     for widget in widgets {
         if let MapContent::Activity(map) = MapContent::for_host(widget, scene, host, Some(activity))? {
             let seconds: Vec<f64> = map.activity_seconds().collect();
-            tiles.extend(walk_views(&map, &seconds, cancelled)?.into_iter().flatten());
+            tiles.extend(
+                walk_views(&map, &seconds, cancelled)?
+                    .into_iter()
+                    .flatten(),
+            );
         }
     }
     let tiles: Vec<TileId> = tiles.into_iter().collect();
@@ -135,7 +139,9 @@ impl ExportMaps {
             contents
                 .iter()
                 .map(|content| match content {
-                    MapContent::Activity(map) => walk_views(map, seconds, &job.controller.cancel_flag()),
+                    MapContent::Activity(map) => {
+                        walk_views(map, seconds, &job.controller.cancel_flag())
+                    }
                     MapContent::NoGps => Ok(Vec::new()),
                 })
                 .collect::<CoreResult<Vec<_>>>()
@@ -220,7 +226,7 @@ impl MapFrameProvider for NoMapFrames {
     }
 }
 
-/// Every view `map` shows over `seconds`, in order.
+/// Every view `map` shows over `seconds`, in order, with the views of its labels' placements.
 fn walk_views(
     map: &ActivityMap,
     seconds: &[f64],
@@ -486,7 +492,7 @@ impl ExportRenderer {
         spare: Option<Vec<u8>>,
         data: &JobMapData,
     ) -> Result<MapFramePixels, String> {
-        let tiles = view_tiles(&request.camera, request.viewport);
+        let tiles = request.tiles();
         let started = Instant::now();
         self.renderer.load_view(&tiles, data)?;
         self.load_ms += started.elapsed().as_secs_f64() * 1000.0;
@@ -494,6 +500,7 @@ impl ExportRenderer {
         let mut pixels = spare.unwrap_or_default();
         self.renderer.render(
             &request.camera,
+            request.labels.as_ref(),
             request.route.as_ref(),
             request.corner_radius_px,
             &mut pixels,
@@ -563,12 +570,13 @@ impl MapFrameThread {
                 );
                 for renderer in &renderers {
                     log::info!(
-                        "Map export drew {} frames: load {:.0} ms, render {:.0} ms, {} layers evicted, {} pool clears",
+                        "Map export drew {} frames: load {:.0} ms, render {:.0} ms, {} layers evicted, {} pool clears, {} label atlas clears",
                         renderer.frames,
                         renderer.load_ms,
                         renderer.render_ms,
                         renderer.renderer.evicted_layers(),
-                        renderer.renderer.pool_clears()
+                        renderer.renderer.pool_clears(),
+                        renderer.renderer.atlas_clears()
                     );
                 }
             })

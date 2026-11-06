@@ -176,7 +176,8 @@ impl GpuMapRenderer {
         route: Option<&MapRouteDraw>,
         corner_radius_px: f32,
     ) -> Result<(), String> {
-        self.prepare_frame(camera, route, corner_radius_px)?;
+        // The preview does not draw labels yet.
+        self.prepare_frame(camera, None, route, corner_radius_px)?;
         let frame = match self.output.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,

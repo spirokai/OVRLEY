@@ -1,7 +1,9 @@
 //! How a finished map frame reaches the widget. Hosts implement this: `ovrley_widgets` compiles to
 //! WASM and never depends on the renderer.
 use crate::error::{WidgetError, WidgetResult};
-use ovrley_map::{MapCamera, MapRouteDraw, MapStyleSpec, MapViewport};
+use ovrley_map::{
+    frame_tiles, MapCamera, MapLabelDraw, MapRouteDraw, MapStyleSpec, MapViewport, TileId,
+};
 use skia_safe::{images, AlphaType, ColorType, Data, Image, ImageInfo};
 use std::sync::{mpsc::Receiver, Arc};
 
@@ -14,8 +16,19 @@ pub struct MapFrameRequest {
     /// What the renderer draws under the buildings. None for a top-down camera: its widget strokes the
     /// route over the frame, so the request, and the frame, stay the same all activity long.
     pub route: Option<MapRouteDraw>,
+    /// How the renderer places and fades labels: None when the map shows none. A top-down camera sends
+    /// one placement, so its request stays the same all activity long.
+    pub labels: Option<MapLabelDraw>,
     /// The renderer crops the frame to this, in output pixels. A circle's is half its width.
     pub corner_radius_px: f32,
+}
+
+impl MapFrameRequest {
+    /// The tiles a renderer must hold to draw this frame: those its camera sees, and with labels those
+    /// each placement camera sees, since a label is placed from the tiles around its own camera.
+    pub fn tiles(&self) -> Vec<TileId> {
+        frame_tiles(&self.camera, self.labels.as_ref(), self.viewport).tiles
+    }
 }
 
 /// A finished frame: its premultiplied RGBA pixels, and an image reading them without a copy.

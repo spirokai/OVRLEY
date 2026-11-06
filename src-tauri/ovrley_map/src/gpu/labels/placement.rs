@@ -1,20 +1,33 @@
 //! Label placement: which symbols a camera shows.
 //!
-//! Placement is a pure function of the camera and the resident label tiles, in `f64` on plain IEEE
-//! arithmetic, so a frame draws the same wherever and whenever it is asked for. Export frames reach the
-//! map thread out of order, so nothing is carried from one frame to the next.
+//! Placement is a function of the camera, the resident label tiles and the placement before it, in `f64`
+//! on plain IEEE arithmetic. What the last placement showed is placed first and keeps its reading
+//! direction, so labels don't flicker between neighbours that collide by a hair. Export frames reach the
+//! map thread a little out of order, so a frame names the cameras of several placements before its own,
+//! and the renderer links up with whichever of them it still holds.
 
 use super::layer::{Alignment, LabelLayer};
 use super::layout::{LabelSymbol, LineSymbol, SymbolKind, TILE_UNITS};
 use super::line::{pose_at, Pose};
 use super::text::ONE_EM;
-use crate::{ClipPoint, GroundProjection, TileId, ViewState};
+use crate::gpu::FOG_FULL;
+use crate::{ClipPoint, GroundProjection, MapCamera, TileId, ViewState};
 use std::cmp::Reverse;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Cell size of the collision grid, in output pixels.
 const GRID_CELL: f64 = 25.0;
 /// How far outside the viewport labels are still placed, so they settle off screen first.
 pub(crate) const VIEWPORT_PADDING: f64 = 100.0;
+/// Labels where the perspective ratio is below this are not placed or drawn: where the haze is full,
+/// since `FOG_FULL` is the map centre's share of the depth there and the ratio is `0.5 + 0.5` times it.
+pub(crate) const PERSPECTIVE_CUTOFF: f64 = 0.5 + 0.5 * FOG_FULL as f64;
+/// Placements the cache holds. A frame names `LABEL_PLACEMENTS`, and neighbouring frames share them.
+const CACHE_CAPACITY: usize = 8;
+/// How far past vertical, as the cosine of its angle to the screen's x axis, a line label that kept its
+/// reading direction from the last placement may lean before it turns to read the other way.
+const FLIP_MARGIN: f64 = 0.25;
 
 /// A camera on a viewport, reduced to what projecting label anchors needs.
 pub(crate) struct LabelView {
@@ -81,6 +94,12 @@ impl LabelView {
         (clip.z >= 0.0).then_some(clip)
     }
 
+    /// How much bigger than its flat size a label at clip-space `w` is drawn: halfway between a constant
+    /// screen size and true perspective, so labels far off shrink less than the ground does.
+    pub(crate) fn perspective_ratio(&self, w: f64) -> f64 {
+        (0.5 + 0.5 * self.centre_w / w).clamp(0.0, 4.0)
+    }
+
     /// Where a point of a tile lands on screen, in output pixels from the top left.
     fn screen(&self, tile: TileId, point: [f64; 2]) -> Option<[f64; 2]> {
         let (share_x, share_y) = self.clip(tile, point)?.window_share();
@@ -96,7 +115,7 @@ impl LabelView {
         symbol: &LabelSymbol,
         layer: &LabelLayer,
     ) -> GroundLabel {
-        let ratio = (0.5 + 0.5 * self.centre_w / w).clamp(0.0, 4.0);
+        let ratio = self.perspective_ratio(w);
         GroundLabel {
             units_per_glyph: layer.line.units_per_glyph / ratio,
             screen_scale: f64::from(symbol.font_scale) * self.centre_w / w / ratio,
@@ -118,7 +137,7 @@ pub(crate) fn glyph_pose(
 }
 
 /// A symbol a camera shows.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct PlacedSymbol {
     /// The style layer, which is also the draw order.
     pub(crate) layer: u32,
@@ -129,20 +148,38 @@ pub(crate) struct PlacedSymbol {
     pub(crate) flipped: bool,
 }
 
-/// Chooses the symbols of `tiles` the view shows. Layers place from the top of the style down,
-/// then tile by tile, then by `symbol-sort-key` and layout order. A symbol that
-/// collides with a placed one, or lies outside the viewport and its padding, is left out unless its
-/// layer allows overlap. The result is in placement order.
+/// Chooses the symbols of `tiles` the view shows. The symbols of the `previous` placement go first, in
+/// its order, and keep their reading direction while they can. The rest follow: layers from the top of
+/// the style down, then tile by tile, then by `symbol-sort-key` and layout order. A symbol whose anchor
+/// is behind the camera, outside the viewport and its padding, or past the haze is left out. So is one
+/// that collides with a placed one, unless its layer allows overlap. The result is in placement order.
 pub(crate) fn place(
     view: &LabelView,
     layers: &[LabelLayer],
     tiles: &[(TileId, &[LabelSymbol])],
+    previous: Option<&[PlacedSymbol]>,
 ) -> Vec<PlacedSymbol> {
-    let mut candidates: Vec<(Reverse<u32>, TileId, f64, u32)> = tiles
+    let shown: HashMap<(u32, TileId, u32), (usize, bool)> = previous
+        .unwrap_or_default()
+        .iter()
+        .enumerate()
+        .map(|(rank, placed)| {
+            (
+                (placed.layer, placed.tile, placed.symbol),
+                (rank, placed.flipped),
+            )
+        })
+        .collect();
+    let mut candidates: Vec<(usize, Reverse<u32>, TileId, f64, u32)> = tiles
         .iter()
         .flat_map(|(tile, symbols)| {
-            symbols.iter().enumerate().map(|(position, symbol)| {
+            let shown = &shown;
+            symbols.iter().enumerate().map(move |(position, symbol)| {
+                let rank = shown
+                    .get(&(symbol.layer, *tile, position as u32))
+                    .map_or(usize::MAX, |(rank, _)| *rank);
                 (
+                    rank,
                     Reverse(symbol.layer),
                     *tile,
                     symbol.paint.sort_key,
@@ -154,8 +191,9 @@ pub(crate) fn place(
     candidates.sort_by(|a, b| {
         a.0.cmp(&b.0)
             .then(a.1.cmp(&b.1))
-            .then(a.2.total_cmp(&b.2))
-            .then(a.3.cmp(&b.3))
+            .then(a.2.cmp(&b.2))
+            .then(a.3.total_cmp(&b.3))
+            .then(a.4.cmp(&b.4))
     });
 
     let (width, height) = view.size();
@@ -163,19 +201,34 @@ pub(crate) fn place(
         width + 2.0 * VIEWPORT_PADDING,
         height + 2.0 * VIEWPORT_PADDING,
     );
-    let symbols: std::collections::HashMap<TileId, &[LabelSymbol]> =
-        tiles.iter().copied().collect();
+    let symbols: HashMap<TileId, &[LabelSymbol]> = tiles.iter().copied().collect();
     let mut placed = Vec::new();
-    for (Reverse(layer_index), tile, _, position) in candidates {
+    for (_, Reverse(layer_index), tile, _, position) in candidates {
         let Some(layer) = layers.iter().find(|layer| layer.index == layer_index) else {
             continue;
         };
         let symbol = &symbols[&tile][position as usize];
+        let Some((anchor, w)) = view.project(tile, symbol, layer) else {
+            continue;
+        };
+        let (x, y) = (anchor[0], anchor[1]);
+        let ratio = view.perspective_ratio(w);
+        if ratio < PERSPECTIVE_CUTOFF
+            || !(-VIEWPORT_PADDING..=width + VIEWPORT_PADDING).contains(&x)
+            || !(-VIEWPORT_PADDING..=height + VIEWPORT_PADDING).contains(&y)
+        {
+            continue;
+        }
         let candidate = match &symbol.kind {
             SymbolKind::Point { bounds } => {
-                place_point(view, tile, symbol, layer, *bounds).map(|shape| (vec![shape], false))
+                Some((vec![place_point(ratio, anchor, *bounds)], false))
             }
-            SymbolKind::Line(line) => place_line(view, tile, symbol, line, layer),
+            SymbolKind::Line(line) => {
+                let flipped = shown
+                    .get(&(layer_index, tile, position))
+                    .map(|(_, flipped)| *flipped);
+                place_line(view, (tile, symbol, line, layer), w, flipped)
+            }
         };
         let Some((shapes, flipped)) = candidate else {
             continue;
@@ -200,35 +253,28 @@ pub(crate) fn place(
     placed
 }
 
-/// A point label's collision box on the grid, which starts `VIEWPORT_PADDING` out from the viewport.
-fn place_point(
-    view: &LabelView,
-    tile: TileId,
-    symbol: &LabelSymbol,
-    layer: &LabelLayer,
-    bounds: [f32; 4],
-) -> Option<Shape> {
-    let ([x, y], _) = view.project(tile, symbol, layer)?;
-    let [left, top, right, bottom] = bounds.map(f64::from);
-    Some(Shape::Box([
+/// A point label's collision box on the grid, which starts `VIEWPORT_PADDING` out from the viewport. The
+/// box is the size the label is drawn at: scaled by the perspective `ratio` about its anchor.
+fn place_point(ratio: f64, [x, y]: [f64; 2], bounds: [f32; 4]) -> Shape {
+    let [left, top, right, bottom] = bounds.map(|edge| f64::from(edge) * ratio);
+    Shape::Box([
         x + left + VIEWPORT_PADDING,
         y + top + VIEWPORT_PADDING,
         x + right + VIEWPORT_PADDING,
         y + bottom + VIEWPORT_PADDING,
-    ]))
+    ])
 }
 
 /// A line label's collision circles along its path, and whether it reads against its line to stay
-/// upright. `None` when it cannot be placed: its anchor is behind the camera, or the line has no room
-/// for it.
+/// upright. `w` is its anchor's clip-space w, and `flipped` its reading direction in the last placement,
+/// which it keeps until it leans `FLIP_MARGIN` past vertical. `None` when it cannot be placed: any vertex
+/// it needs is behind the camera, or the line has no room for it.
 fn place_line(
     view: &LabelView,
-    tile: TileId,
-    symbol: &LabelSymbol,
-    line: &LineSymbol,
-    layer: &LabelLayer,
+    (tile, symbol, line, layer): (TileId, &LabelSymbol, &LineSymbol, &LabelLayer),
+    w: f64,
+    flipped: Option<bool>,
 ) -> Option<(Vec<Shape>, bool)> {
-    let (_, w) = view.project(tile, symbol, layer)?;
     let ground = view.ground_label(w, symbol, layer);
     // Layout leaves every symbol at least one glyph.
     let first = f64::from(symbol.quads[0].along);
@@ -248,10 +294,16 @@ fn place_line(
         };
         Some([view.screen(tile, start.point)?, view.screen(tile, end)?])
     };
-    let mut flip = false;
     let [start, end] = ends(false)?;
-    if layer.line.keep_upright && start[0] > end[0] {
-        flip = true;
+    // How far the text leans from reading left to right: 1 along the x axis, 0 vertical, -1 upside down.
+    let lean = (end[0] - start[0]) / (end[0] - start[0]).hypot(end[1] - start[1]);
+    let flip = layer.line.keep_upright
+        && match flipped {
+            None => lean < 0.0,
+            Some(true) => lean < FLIP_MARGIN,
+            Some(false) => lean < -FLIP_MARGIN,
+        };
+    if flip {
         ends(true)?;
     }
 
@@ -286,6 +338,62 @@ fn place_line(
         });
     }
     Some((circles, flip))
+}
+
+/// A camera's latest placement, and the residency of the label tiles it was made from. Residency changes
+/// whenever label tiles load or are evicted.
+struct PlacementEntry {
+    camera: MapCamera,
+    size: (u32, u32),
+    residency: u64,
+    placed: Arc<Vec<PlacedSymbol>>,
+}
+
+/// The last few placements, least recently used first.
+#[derive(Default)]
+pub(crate) struct PlacementCache {
+    entries: Vec<PlacementEntry>,
+}
+
+impl PlacementCache {
+    /// The placements of `cameras`, oldest first, on a viewport of `size`. A camera placed from the current
+    /// tiles keeps its placement. Any other is placed by `place` on the placement before it: the last
+    /// camera's, or for the first camera its own from older tiles, or none.
+    pub(crate) fn place_chain<const N: usize>(
+        &mut self,
+        cameras: &[MapCamera; N],
+        size: (u32, u32),
+        residency: u64,
+        mut place: impl FnMut(&MapCamera, Option<&[PlacedSymbol]>) -> Vec<PlacedSymbol>,
+    ) -> [Arc<Vec<PlacedSymbol>>; N] {
+        let mut last: Option<Arc<Vec<PlacedSymbol>>> = None;
+        std::array::from_fn(|index| {
+            let camera = cameras[index];
+            let held = self
+                .entries
+                .iter()
+                .position(|entry| entry.camera == camera && entry.size == size)
+                .map(|position| self.entries.remove(position));
+            let placed = match held {
+                Some(entry) if entry.residency == residency => entry.placed,
+                held => {
+                    let prior = last.take().or(held.map(|entry| entry.placed));
+                    Arc::new(place(&camera, prior.as_deref().map(Vec::as_slice)))
+                }
+            };
+            if self.entries.len() == CACHE_CAPACITY {
+                self.entries.remove(0);
+            }
+            self.entries.push(PlacementEntry {
+                camera,
+                size,
+                residency,
+                placed: placed.clone(),
+            });
+            last = Some(placed.clone());
+            placed
+        })
+    }
 }
 
 /// What a label takes up on the collision grid.

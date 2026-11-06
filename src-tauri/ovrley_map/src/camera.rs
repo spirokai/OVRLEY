@@ -118,6 +118,36 @@ impl MapCamera {
     }
 }
 
+/// How many placements a frame names. It fades between the last two; the ones before link it to the
+/// placement history a renderer holds, even when frames reach it a little out of order.
+pub const LABEL_PLACEMENTS: usize = 4;
+
+/// How a frame draws its labels: the cameras of its placements, oldest first, and how far the fade between
+/// the last two is, from 0 at the second to last to 1 at the last. Built only through
+/// [`MapLabelDraw::new`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MapLabelDraw {
+    cameras: [MapCamera; LABEL_PLACEMENTS],
+    blend: f32,
+}
+
+impl MapLabelDraw {
+    pub fn new(cameras: [MapCamera; LABEL_PLACEMENTS], blend: f32) -> Result<Self, String> {
+        if !(0.0..=1.0).contains(&blend) {
+            return Err(format!("Map label blend {blend} is outside 0..=1"));
+        }
+        Ok(Self { cameras, blend })
+    }
+
+    pub const fn cameras(self) -> [MapCamera; LABEL_PLACEMENTS] {
+        self.cameras
+    }
+
+    pub const fn blend(self) -> f32 {
+        self.blend
+    }
+}
+
 /// The output a camera draws to. One world unit is one device pixel at pixel ratio 1, so a higher
 /// ratio shows the same map sharper. Built only through [`MapViewport::new`].
 #[derive(Clone, Copy, Debug, PartialEq)]

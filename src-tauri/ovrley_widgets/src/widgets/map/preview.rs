@@ -24,7 +24,9 @@ use crate::{
         value::preview::{ContentBounds, TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
     },
 };
-use ovrley_map::{MapCamera, MapRouteDraw, MapRouteLine, MapStyleCatalog, MapStyleInfo};
+use ovrley_map::{
+    MapCamera, MapLabelDraw, MapRouteDraw, MapRouteLine, MapStyleCatalog, MapStyleInfo,
+};
 use serde_json::json;
 use skia_safe::{Canvas, Rect, Surface};
 use std::sync::{mpsc::Receiver, Arc};
@@ -37,11 +39,13 @@ enum MapBacking {
     Placeholder,
 }
 
-/// What the frame at one second depends on: a camera when GPS exists, and the marker's progress.
-/// With a camera that's travelled metres; without one, the placeholder's share of its route.
+/// What the frame at one second depends on: a camera when GPS exists, how its labels are placed and
+/// faded when the map shows them, and the marker's progress. With a camera that's travelled metres;
+/// without one, the placeholder's share of its route.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MapFrameState {
     pub camera: Option<MapCamera>,
+    pub labels: Option<MapLabelDraw>,
     pub progress: f32,
 }
 
@@ -238,11 +242,13 @@ impl PreviewMap {
                 let position = map.track.position_at(second);
                 Ok(MapFrameState {
                     camera: Some(map.camera_at(&position)?),
+                    labels: map.label_draw(second)?,
                     progress: position.distance_meters as f32,
                 })
             }
             _ => Ok(MapFrameState {
                 camera: None,
+                labels: None,
                 progress: (second / self.preview_duration.max(1e-9)).clamp(0.0, 1.0) as f32,
             }),
         }
@@ -348,6 +354,7 @@ impl PreviewMap {
             camera,
             viewport: map.viewport,
             route,
+            labels: state.labels,
             corner_radius_px: self.layout.corner_radius_px,
         })
     }

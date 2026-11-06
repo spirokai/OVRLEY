@@ -14,7 +14,9 @@ use crate::{
     render::preview::PreviewRasterScale,
     widgets::route::{geometry::ProgressLine, sampling::RouteWindow},
 };
-use ovrley_map::{view_tiles, MapCamera, MapRouteLine, MapViewport, TileId, MAX_VIEW_TILES};
+use ovrley_map::{
+    frame_tiles, MapCamera, MapLabelDraw, MapRouteLine, MapViewport, TileId, MAX_VIEW_TILES,
+};
 use std::sync::Arc;
 
 /// The inputs a widget's content is built from, so unrelated edits keep it.
@@ -25,6 +27,7 @@ pub(super) struct ContentKey {
     height: f32,
     route_smoothing_m: f32,
     pixel_ratio: f32,
+    labels: bool,
 }
 
 impl ContentKey {
@@ -39,6 +42,7 @@ impl ContentKey {
             height: config.height,
             route_smoothing_m: config.route_smoothing_m,
             pixel_ratio: scene.scale * raster_scale.value(),
+            labels: config.layers.labels,
         }
     }
 }
@@ -62,6 +66,8 @@ pub struct ActivityMap {
     camera: WidgetCamera,
     pub(super) viewport: MapViewport,
     activity_end: f64,
+    /// Whether the map shows labels, so whether its frames carry a label draw.
+    labels: bool,
 }
 
 impl ActivityMap {
@@ -100,6 +106,7 @@ impl ActivityMap {
             camera,
             viewport,
             activity_end,
+            labels: key.labels,
         })
     }
 
@@ -110,6 +117,13 @@ impl ActivityMap {
 
     pub(super) fn camera_at(&self, position: &TrackPosition) -> WidgetResult<MapCamera> {
         self.camera.at(&self.track, position)
+    }
+
+    /// How a frame at `second` places and fades its labels. None when the map shows none.
+    pub(super) fn label_draw(&self, second: f64) -> WidgetResult<Option<MapLabelDraw>> {
+        self.labels
+            .then(|| self.camera.label_draw(&self.track, second))
+            .transpose()
     }
 
     pub fn viewport(&self) -> MapViewport {
@@ -126,20 +140,21 @@ impl ActivityMap {
         (0..=self.activity_end.floor() as u64).map(|second| second as f64)
     }
 
-    /// The tiles each of `seconds` sees, with consecutive equal views merged. A view at the tile
-    /// limit may be missing tiles, so it fails instead of drawing a blank patch.
+    /// The tiles each of `seconds` sees, with consecutive equal views merged. A view also holds what the
+    /// cameras of its labels' placements see. A view at the tile limit may be missing tiles, so it
+    /// fails instead of drawing a blank patch.
     pub fn views(&self, seconds: impl Iterator<Item = f64>) -> WidgetResult<Vec<Vec<TileId>>> {
         let mut views: Vec<Vec<TileId>> = Vec::new();
         for second in seconds.filter(|second| self.covers(*second)) {
             let camera = self.camera_at(&self.track.position_at(second))?;
-            let tiles = view_tiles(&camera, self.viewport);
-            if tiles.len() >= MAX_VIEW_TILES {
+            let frame = frame_tiles(&camera, self.label_draw(second)?.as_ref(), self.viewport);
+            if frame.busiest >= MAX_VIEW_TILES {
                 return Err(WidgetError::Config(format!(
                     "map: this camera sees at least {MAX_VIEW_TILES} tiles at {second:.1} s. Raise its zoom or lower its pitch."
                 )));
             }
-            if views.last() != Some(&tiles) {
-                views.push(tiles);
+            if views.last() != Some(&frame.tiles) {
+                views.push(frame.tiles);
             }
         }
         Ok(views)

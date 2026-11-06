@@ -10,11 +10,15 @@
 
 use super::layer::LabelLayer;
 use super::layout::{GlyphId, GlyphQuad, LabelSymbol, LineSymbol, SymbolKind};
-use super::placement::{glyph_pose, place, GroundLabel, LabelView, PlacedSymbol};
+use super::placement::{
+    glyph_pose, place, GroundLabel, LabelView, PlacedSymbol, PlacementCache, PERSPECTIVE_CUTOFF,
+};
 use super::text::GlyphBitmap;
 use crate::gpu::pipelines::LabelVertex;
-use crate::{MapCamera, MapViewport, TileId, ViewState};
-use std::collections::{BTreeSet, HashMap};
+use crate::{
+    view_tiles, MapCamera, MapLabelDraw, MapViewport, TileId, ViewState, LABEL_PLACEMENTS,
+};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::mem::size_of;
 use std::ops::Range;
 use std::sync::Arc;
@@ -192,13 +196,12 @@ impl GlyphAtlas {
     }
 }
 
-/// What a placement was made for. A frame with the same key draws the same quads.
+/// What a frame's quads were made for. A frame with the same key draws the same quads.
 #[derive(Clone, Debug, PartialEq)]
 struct FrameKey {
     camera: MapCamera,
+    labels: MapLabelDraw,
     size: (u32, u32),
-    /// The drawn tiles that have labels, in order.
-    tiles: Vec<TileId>,
     generation: u64,
 }
 
@@ -218,8 +221,13 @@ pub(crate) struct LabelLayers {
     bind_group: wgpu::BindGroup,
     /// Whether the atlas lacks glyphs of resident tiles, because it filled and was refilled for one view.
     atlas_partial: bool,
-    /// Changes whenever the tiles or the atlas do, which any placement depends on.
+    /// Changes whenever the tiles or the atlas do, which a frame's quads depend on.
     generation: u64,
+    /// Changes whenever the resident tiles do, which a placement depends on.
+    residency: u64,
+    /// Times the atlas filled and was cleared.
+    atlas_clears: u64,
+    placements: PlacementCache,
     frame: Option<FrameKey>,
     draws: Vec<LayerDraw>,
     vertices: wgpu::Buffer,
@@ -272,6 +280,9 @@ impl LabelLayers {
             bind_group,
             atlas_partial: false,
             generation: 0,
+            residency: 0,
+            atlas_clears: 0,
+            placements: PlacementCache::default(),
             frame: None,
             draws: Vec::new(),
             vertices,
@@ -284,6 +295,7 @@ impl LabelLayers {
     /// Keeps a tile's symbols. Their glyphs reach the atlas through [`Self::fill_atlas`].
     pub(crate) fn insert_tile(&mut self, tile: TileId, symbols: Vec<LabelSymbol>) {
         self.generation += 1;
+        self.residency += 1;
         self.tiles.insert(tile, symbols);
     }
 
@@ -293,6 +305,7 @@ impl LabelLayers {
         self.tiles.retain(|tile, _| keep(*tile));
         if self.tiles.len() != before {
             self.generation += 1;
+            self.residency += 1;
         }
     }
 
@@ -323,6 +336,7 @@ impl LabelLayers {
         }
 
         self.atlas.clear(queue);
+        self.atlas_clears += 1;
         self.generation += 1;
         for id in &needed {
             if !self.atlas.insert(queue, *id, &*bitmap(*id)?) {
@@ -341,6 +355,11 @@ impl LabelLayers {
             }
         }
         Ok(())
+    }
+
+    /// Times the atlas filled up and was cleared and refilled.
+    pub(crate) const fn atlas_clears(&self) -> u64 {
+        self.atlas_clears
     }
 
     /// Whether the atlas may lack glyphs of tiles already resident, which a view of them must restore.
@@ -369,88 +388,90 @@ impl LabelLayers {
         Ok(())
     }
 
-    /// Chooses this frame's symbols and writes their quads. Placement and the quads depend on the
-    /// camera, the drawn tiles and the resident labels alone, so a frame like the last one writes nothing.
+    /// Chooses this frame's symbols and writes their quads. Labels are placed at each camera of `labels` in
+    /// turn, each placement on the one before it, and the frame fades between the last two by its blend: in both placements it is fully drawn, in one only
+    /// it is drawn by the blend or its rest. Positions and sizes follow `camera`, so labels move with the
+    /// map between placements. Without `labels` nothing is drawn. A frame like the last one writes nothing.
     pub(crate) fn prepare(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         layers: &[LabelLayer],
         camera: &MapCamera,
+        labels: Option<&MapLabelDraw>,
         viewport: MapViewport,
-        drawn: impl Iterator<Item = TileId>,
     ) -> Result<(), String> {
-        let mut tiles: Vec<TileId> = drawn.filter(|tile| self.tiles.contains_key(tile)).collect();
-        tiles.sort_unstable();
+        let Some(labels) = labels else {
+            self.draws.clear();
+            self.frame = None;
+            return Ok(());
+        };
         let key = FrameKey {
             camera: *camera,
+            labels: *labels,
             size: (viewport.width_px(), viewport.height_px()),
-            tiles,
             generation: self.generation,
         };
         if self.frame.as_ref() == Some(&key) {
             return Ok(());
         }
 
+        let [.., before, after] = self.placements(layers, &labels.cameras(), viewport);
+        let blend = labels.blend();
+        let in_before: HashSet<PlacedSymbol> = before.iter().copied().collect();
+        let in_after: HashSet<PlacedSymbol> = after.iter().copied().collect();
+        let mut shown: Vec<(PlacedSymbol, f32)> = Vec::with_capacity(before.len().max(after.len()));
+        shown.extend(after.iter().map(|placed| {
+            (
+                *placed,
+                if in_before.contains(placed) {
+                    1.0
+                } else {
+                    blend
+                },
+            )
+        }));
+        shown.extend(
+            before
+                .iter()
+                .filter(|placed| !in_after.contains(placed))
+                .map(|placed| (*placed, 1.0 - blend)),
+        );
+        shown.retain(|(_, fade)| *fade > 0.0);
+        // Placement runs from the top layer down, and drawing from the bottom up.
+        shown.sort_by_key(|(placed, _)| placed.layer);
+
         let view = LabelView::new(
             &ViewState::new(camera, viewport),
             viewport.width_px(),
             viewport.height_px(),
         );
-        let resident: Vec<(TileId, &[LabelSymbol])> = key
-            .tiles
-            .iter()
-            .map(|tile| (*tile, self.tiles[tile].as_slice()))
-            .collect();
-        let mut placed = place(&view, layers, &resident);
-        // Placement runs from the top layer down, and drawing from the bottom up.
-        placed.sort_by_key(|placed| placed.layer);
-
         let mut vertices: Vec<LabelVertex> = Vec::new();
         self.draws.clear();
         let mut layer_start = 0;
         let mut layer_halo = false;
-        let mut layer_ground;
-        for (position, symbol_placed) in placed.iter().enumerate() {
-            let next_layer = placed.get(position + 1).map(|next| next.layer);
-            let symbol = self.symbol(symbol_placed);
+        for (position, (placed, fade)) in shown.iter().enumerate() {
+            let next_layer = shown.get(position + 1).map(|(next, _)| next.layer);
+            let symbol = self.symbol(placed);
             let layer = layers
                 .iter()
-                .find(|layer| layer.index == symbol_placed.layer)
+                .find(|layer| layer.index == placed.layer)
                 .ok_or("A placed label has no layer")?;
-            let ([x, y], w) = view
-                .project(symbol_placed.tile, symbol, layer)
-                .ok_or("A placed label is behind the camera")?;
-            layer_halo |= symbol.paint.halo[3] > 0 && symbol.paint.halo_width > 0.0;
-            let ground = match &symbol.kind {
-                SymbolKind::Point { .. } => None,
-                SymbolKind::Line(line) => Some((line, view.ground_label(w, symbol, layer))),
-            };
-            // A layer's symbols are all points or all lines.
-            layer_ground = ground.is_some();
-            for quad in &symbol.quads {
-                let rect = self.atlas.rects.get(&quad.glyph).ok_or_else(|| {
-                    format!("Glyph {:?} is not in the label atlas", quad.glyph.character)
-                })?;
-                match &ground {
-                    None => push_quad(&mut vertices, &view, symbol, quad, (x, y, w), *rect),
-                    Some((line, label)) => push_ground_quad(
-                        &mut vertices,
-                        &view,
-                        (symbol_placed, symbol, line, layer),
-                        quad,
-                        label,
-                        *rect,
-                    )?,
-                }
+            // A label placed for another camera can be out of reach of this one, and is left out.
+            if self.push_symbol(&mut vertices, &view, (placed, symbol, layer), *fade)? {
+                layer_halo |= symbol.paint.halo[3] > 0 && symbol.paint.halo_width > 0.0;
             }
-            if next_layer != Some(symbol_placed.layer) {
+            // A layer's symbols are all points or all lines.
+            let ground = matches!(symbol.kind, SymbolKind::Line(_));
+            if next_layer != Some(placed.layer) {
                 let end = vertices.len() as u32 / 4 * QUAD_INDICES.len() as u32;
-                self.draws.push(LayerDraw {
-                    indices: layer_start..end,
-                    halo: layer_halo,
-                    ground: layer_ground,
-                });
+                if end > layer_start {
+                    self.draws.push(LayerDraw {
+                        indices: layer_start..end,
+                        halo: layer_halo,
+                        ground,
+                    });
+                }
                 layer_start = end;
                 layer_halo = false;
             }
@@ -462,6 +483,91 @@ impl LabelLayers {
         }
         self.frame = Some(key);
         Ok(())
+    }
+
+    /// The symbols each of `cameras` places, oldest first, each on the placement before it, from the cache
+    /// when it has them. Only the labels of the tiles a camera sees take part, and a renderer is asked to
+    /// hold all of those.
+    fn placements(
+        &mut self,
+        layers: &[LabelLayer],
+        cameras: &[MapCamera; LABEL_PLACEMENTS],
+        viewport: MapViewport,
+    ) -> [Arc<Vec<PlacedSymbol>>; LABEL_PLACEMENTS] {
+        let tiles = &self.tiles;
+        self.placements.place_chain(
+            cameras,
+            (viewport.width_px(), viewport.height_px()),
+            self.residency,
+            |camera, previous| {
+                let seen: Vec<(TileId, &[LabelSymbol])> = view_tiles(camera, viewport)
+                    .into_iter()
+                    .filter_map(|tile| tiles.get(&tile).map(|symbols| (tile, symbols.as_slice())))
+                    .collect();
+                let view = LabelView::new(
+                    &ViewState::new(camera, viewport),
+                    viewport.width_px(),
+                    viewport.height_px(),
+                );
+                place(&view, layers, &seen, previous)
+            },
+        )
+    }
+
+    /// Appends a placed symbol's quads as `view` sees it, at `fade` of its opacity. `false`, with
+    /// nothing appended, when it cannot be drawn here: its anchor or a glyph is behind the camera, past
+    /// the haze, or its line no longer holds it.
+    fn push_symbol(
+        &self,
+        vertices: &mut Vec<LabelVertex>,
+        view: &LabelView,
+        (placed, symbol, layer): (&PlacedSymbol, &LabelSymbol, &LabelLayer),
+        fade: f32,
+    ) -> Result<bool, String> {
+        let Some(([x, y], w)) = view.project(placed.tile, symbol, layer) else {
+            return Ok(false);
+        };
+        let ratio = view.perspective_ratio(w);
+        if ratio < PERSPECTIVE_CUTOFF {
+            return Ok(false);
+        }
+        let start = vertices.len();
+        let ground = match &symbol.kind {
+            SymbolKind::Point { .. } => None,
+            SymbolKind::Line(line) => Some((line, view.ground_label(w, symbol, layer))),
+        };
+        for quad in &symbol.quads {
+            let rect = self.atlas.rects.get(&quad.glyph).ok_or_else(|| {
+                format!("Glyph {:?} is not in the label atlas", quad.glyph.character)
+            })?;
+            let drawn = match &ground {
+                None => {
+                    push_quad(
+                        vertices,
+                        view,
+                        symbol,
+                        quad,
+                        (x, y, w),
+                        (ratio, fade),
+                        *rect,
+                    );
+                    true
+                }
+                Some((line, label)) => push_ground_quad(
+                    vertices,
+                    view,
+                    (placed, symbol, line, layer),
+                    quad,
+                    (label, fade),
+                    *rect,
+                ),
+            };
+            if !drawn {
+                vertices.truncate(start);
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     fn symbol(&self, placed: &PlacedSymbol) -> &LabelSymbol {
@@ -477,24 +583,27 @@ impl LabelLayers {
         (self.vertices, self.indices) = quad_buffers(device, queue, self.quad_capacity);
     }
 
-    pub(crate) fn has_draws(&self) -> bool {
-        !self.draws.is_empty()
+    /// Whether this frame draws labels lying on the ground (`ground`) or upright ones (`!ground`).
+    pub(crate) fn has_draws(&self, ground: bool) -> bool {
+        self.draws.iter().any(|draw| draw.ground == ground)
     }
 
-    /// Records the frame's draws, layer by layer from the bottom of the style up, a layer's halos
-    /// first. Labels on the ground draw with `ground`, the rest with `screen`.
+    /// Records the frame's draws of labels lying on the ground (`ground`) or upright ones (`!ground`)
+    /// with `pipeline`, layer by layer from the bottom of the style up, a layer's halos first. The two
+    /// kinds are recorded at different points of the pass: ground labels under the route, upright ones
+    /// over the buildings.
     pub(crate) fn record(
         &self,
         pass: &mut wgpu::RenderPass<'_>,
-        screen: &wgpu::RenderPipeline,
-        ground: &wgpu::RenderPipeline,
+        pipeline: &wgpu::RenderPipeline,
+        ground: bool,
     ) {
+        pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &self.bind_group, &[]);
         pass.set_index_buffer(self.indices.slice(..), wgpu::IndexFormat::Uint32);
         pass.set_vertex_buffer(0, self.vertices.slice(..));
         pass.set_vertex_buffer(1, self.passes.slice(..));
-        for draw in &self.draws {
-            pass.set_pipeline(if draw.ground { ground } else { screen });
+        for draw in self.draws.iter().filter(|draw| draw.ground == ground) {
             if draw.halo {
                 pass.draw_indexed(draw.indices.clone(), 0, 0..1);
             }
@@ -537,17 +646,19 @@ fn quad_buffers(
 }
 
 /// Appends an upright glyph's four corners. The anchor is `(x, y)` pixels from the top left, `w` its clip
-/// w: corners are offset on screen from it, then written in clip space with the anchor's real w.
+/// w: corners are offset on screen from it, grown by the perspective `ratio`, then written in clip space
+/// with the anchor's real w.
 fn push_quad(
     vertices: &mut Vec<LabelVertex>,
     view: &LabelView,
     symbol: &LabelSymbol,
     quad: &GlyphQuad,
     (x, y, w): (f64, f64, f64),
+    (ratio, fade): (f64, f32),
     atlas: AtlasRect,
 ) {
     let (width, height) = view.size();
-    let scale = f64::from(symbol.font_scale);
+    let scale = f64::from(symbol.font_scale) * ratio;
     let corner = |dx: f32, dy: f32| {
         let ndc_x = (x + f64::from(dx) * scale) / width * 2.0 - 1.0;
         let ndc_y = 1.0 - (y + f64::from(dy) * scale) / height * 2.0;
@@ -557,7 +668,7 @@ fn push_quad(
     push_corners(
         vertices,
         symbol,
-        (quad.bold, symbol.font_scale),
+        (quad.bold, scale as f32, fade),
         [
             corner(left, top),
             corner(right, top),
@@ -570,24 +681,25 @@ fn push_quad(
 
 /// Appends a glyph of a line label, lying on the ground along the line. Its centre is walked out from the
 /// anchor, and its corners are laid out on the ground there and projected, so the glyph foreshortens with
-/// the map. Fails when the line no longer holds the label, or a corner is behind the camera, which
-/// placement has ruled out.
+/// the map. `false`, with nothing appended, when the line no longer holds the label or a corner is behind
+/// the camera, as it can be for a label placed at another camera.
 fn push_ground_quad(
     vertices: &mut Vec<LabelVertex>,
     view: &LabelView,
     (placed, symbol, line, layer): (&PlacedSymbol, &LabelSymbol, &LineSymbol, &LabelLayer),
     quad: &GlyphQuad,
-    label: &GroundLabel,
+    (label, fade): (&GroundLabel, f32),
     atlas: AtlasRect,
-) -> Result<(), String> {
-    let pose = glyph_pose(
+) -> bool {
+    let Some(pose) = glyph_pose(
         (symbol, line, layer),
         f64::from(quad.along) * label.units_per_glyph,
         placed.flipped,
-    )
-    .ok_or("A placed label no longer fits its line")?;
+    ) else {
+        return false;
+    };
     // The glyph's x runs along the text, and its y turns a quarter clockwise from it.
-    let corner = |dx: f32, dy: f32| -> Result<[f32; 4], String> {
+    let corner = |dx: f32, dy: f32| -> Option<[f32; 4]> {
         let (dx, dy) = (
             f64::from(dx) * label.units_per_glyph,
             f64::from(dy) * label.units_per_glyph,
@@ -596,34 +708,35 @@ fn push_ground_quad(
             pose.point[0] + pose.direction[0] * dx - pose.direction[1] * dy,
             pose.point[1] + pose.direction[1] * dx + pose.direction[0] * dy,
         ];
-        let clip = view
-            .clip(placed.tile, ground)
-            .ok_or("A placed label's glyph is behind the camera")?;
-        Ok([clip.x as f32, clip.y as f32, clip.z as f32, clip.w as f32])
+        let clip = view.clip(placed.tile, ground)?;
+        Some([clip.x as f32, clip.y as f32, clip.z as f32, clip.w as f32])
     };
     let [left, top, right, bottom] = quad.rect;
+    let (Some(top_left), Some(top_right), Some(bottom_left), Some(bottom_right)) = (
+        corner(left, top),
+        corner(right, top),
+        corner(left, bottom),
+        corner(right, bottom),
+    ) else {
+        return false;
+    };
     push_corners(
         vertices,
         symbol,
-        (quad.bold, label.screen_scale as f32),
-        [
-            corner(left, top)?,
-            corner(right, top)?,
-            corner(left, bottom)?,
-            corner(right, bottom)?,
-        ],
+        (quad.bold, label.screen_scale as f32, fade),
+        [top_left, top_right, bottom_left, bottom_right],
         atlas,
     );
-    Ok(())
+    true
 }
 
 /// Appends a glyph's quad: four clip-space corners in the order top left, top right, bottom left and
-/// bottom right, with the atlas texels they sample. `(bold, font_scale)` is the glyph's thickening and its
-/// size in output pixels per glyph unit on screen.
+/// bottom right, with the atlas texels they sample. `(bold, font_scale, fade)` is the glyph's thickening,
+/// its size in output pixels per glyph unit on screen, and the share of the label's opacity it draws at.
 fn push_corners(
     vertices: &mut Vec<LabelVertex>,
     symbol: &LabelSymbol,
-    (bold, font_scale): (bool, f32),
+    (bold, font_scale, fade): (bool, f32, f32),
     positions: [[f32; 4]; 4],
     atlas: AtlasRect,
 ) {
@@ -642,7 +755,7 @@ fn push_corners(
         font_scale,
         halo_width: symbol.paint.halo_width,
         halo_blur: symbol.paint.halo_blur,
-        opacity: symbol.paint.opacity,
+        opacity: symbol.paint.opacity * fade,
         bold: f32::from(u8::from(bold)),
     }));
 }

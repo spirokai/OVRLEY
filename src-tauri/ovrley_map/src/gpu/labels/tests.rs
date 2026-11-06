@@ -1,7 +1,7 @@
 //! Labels from a tile's bytes to pixels: layout, placement and a frame drawn on the GPU.
 
 use super::layout::SymbolKind;
-use super::placement::{place, LabelView};
+use super::placement::{place, LabelView, PlacedSymbol};
 use super::text::{Face, FontGlyph, GlyphMetrics};
 use super::{GlyphLookup, GlyphService, LabelSymbol};
 use crate::gpu::style::{parse_style, ParsedStyle};
@@ -9,8 +9,8 @@ use crate::gpu::tile::prepare_tile;
 use crate::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes};
 use crate::mercator::world_to_lon_lat;
 use crate::{
-    view_tiles, MapCamera, MapDataSource, MapLayers, MapStyleBuildings, MapStyleId, MapStyleSpec,
-    MapViewport, TileId, ViewState,
+    frame_tiles, view_tiles, MapCamera, MapDataSource, MapLabelDraw, MapLayers,
+    MapStyleBuildings, MapStyleId, MapStyleSpec, MapViewport, TileId, ViewState, LABEL_PLACEMENTS,
 };
 use geozero::mvt::{tile, Message, Tile};
 use serde_json::{json, Value as Json};
@@ -206,14 +206,24 @@ fn placement_keeps_the_first_of_two_overlapping_labels_and_culls_what_is_far_off
         (4000, 2048, "Far"),
     ]);
 
-    let place_with = |layout: Json| {
+    let place_after = |layout: Json, previous: &[u32]| {
         let (style, symbols) = laid_out(&style_for("place", layout), &bytes);
-        let placed = place(&view, &style.labels, &[(tile, &symbols)]);
+        let previous: Vec<PlacedSymbol> = previous
+            .iter()
+            .map(|symbol| PlacedSymbol {
+                layer: symbols[*symbol as usize].layer,
+                tile,
+                symbol: *symbol,
+                flipped: false,
+            })
+            .collect();
+        let placed = place(&view, &style.labels, &[(tile, &symbols)], Some(&previous));
         placed
             .iter()
             .map(|placed| placed.symbol)
             .collect::<Vec<_>>()
     };
+    let place_with = |layout: Json| place_after(layout, &[]);
     // Layout order decides: Centre, then Beside collides with it, Below is 80 px down and clears it,
     // and Far is 244 px right, past the 100 px that labels are still placed beyond the viewport.
     assert_eq!(place_with(json!({})), [0, 2]);
@@ -225,6 +235,8 @@ fn placement_keeps_the_first_of_two_overlapping_labels_and_culls_what_is_far_off
         ),
         [1, 2]
     );
+    // What the last placement showed goes first: Beside keeps its place, and Centre stays out.
+    assert_eq!(place_after(json!({}), &[1]), [1, 2]);
 }
 
 #[test]
@@ -239,7 +251,7 @@ fn a_name_follows_its_line_and_stays_upright() {
             &style_for("transportation_name", layout.clone()),
             &line_tile(lines),
         );
-        let place_with = place(&view, &style.labels, &[(tile, &symbols)]);
+        let place_with = place(&view, &style.labels, &[(tile, &symbols)], None);
         (symbols, place_with)
     };
 
@@ -284,17 +296,20 @@ fn render(labels: bool) -> (Vec<u8>, usize) {
     )
 }
 
-fn render_tile(style: Vec<u8>, tile_bytes: Vec<u8>, labels: bool) -> (Vec<u8>, usize) {
+/// A renderer over a source that serves one tile for every address, on a 240 by 120 viewport.
+fn renderer_over(
+    style: Vec<u8>,
+    tile_bytes: Vec<u8>,
+    labels: bool,
+) -> (GpuMapRenderer, TestSource, MapViewport) {
     let fonts = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts/map");
     let source = TestSource {
         style,
         tile: tile_bytes,
         glyphs: Arc::new(GlyphService::open(&fonts).unwrap()),
     };
-    let tile = TileId::new(14, 8000, 5000);
     let viewport = MapViewport::new(240, 120, 1.0).unwrap();
-    let camera = camera_over(tile);
-    let mut renderer = GpuMapRenderer::new(
+    let renderer = GpuMapRenderer::new(
         GpuMapConfig {
             spec: MapStyleSpec {
                 style: MapStyleId::new("test").unwrap(),
@@ -313,12 +328,36 @@ fn render_tile(style: Vec<u8>, tile_bytes: Vec<u8>, labels: bool) -> (Vec<u8>, u
         &source,
     )
     .unwrap();
+    (renderer, source, viewport)
+}
+
+/// Draws one frame at `camera` with every tile its placements need loaded.
+fn draw_frame(
+    renderer: &mut GpuMapRenderer,
+    source: &TestSource,
+    viewport: MapViewport,
+    camera: &MapCamera,
+    labels: &MapLabelDraw,
+) -> Vec<u8> {
+    renderer
+        .load_view(&frame_tiles(camera, Some(labels), viewport).tiles, source)
+        .unwrap();
+    let mut pixels = Vec::new();
+    renderer
+        .render(camera, Some(labels), None, 0.0, &mut pixels)
+        .unwrap();
+    pixels
+}
+
+fn render_tile(style: Vec<u8>, tile_bytes: Vec<u8>, labels: bool) -> (Vec<u8>, usize) {
+    let (mut renderer, source, viewport) = renderer_over(style, tile_bytes, labels);
+    let camera = camera_over(TileId::new(14, 8000, 5000));
+    let still = MapLabelDraw::new([camera; LABEL_PLACEMENTS], 1.0).unwrap();
     renderer
         .load_view(&view_tiles(&camera, viewport), &source)
         .unwrap();
     let rasterized = source.glyphs.rasterized();
-    let mut pixels = Vec::new();
-    renderer.render(&camera, None, 0.0, &mut pixels).unwrap();
+    let pixels = draw_frame(&mut renderer, &source, viewport, &camera, &still);
     // Drawing a frame asks the glyph service for nothing.
     assert_eq!(source.glyphs.rasterized(), rasterized);
     (pixels, rasterized)
@@ -383,4 +422,104 @@ fn a_flipped_name_draws_exactly_as_one_that_needed_no_flip() {
         .filter(|(a, b)| a.abs_diff(**b) > 8)
         .count();
     assert_eq!(differing, 0);
+}
+
+fn pitched_over(tile: TileId, pitch_deg: f64) -> MapCamera {
+    let [lon, lat, zoom, _, bearing, padding] = camera_over(tile).values();
+    MapCamera::new(lon, lat, zoom, pitch_deg, bearing, padding).unwrap()
+}
+
+#[test]
+fn placement_leaves_out_labels_behind_the_camera_and_past_the_haze() {
+    let tile = TileId::new(14, 8000, 5000);
+    let viewport = MapViewport::new(300, 300, 1.0).unwrap();
+    let view = LabelView::new(
+        &ViewState::new(&pitched_over(tile, 60.0), viewport),
+        300,
+        300,
+    );
+    let (style, symbols) = laid_out(
+        &style_for("place", json!({ "text-allow-overlap": true })),
+        &place_tile(&[(2048, 2048, "Praha")]),
+    );
+    // One label at the centre of each tile in a column: the camera's own, three north of it, and one
+    // south of it. At pitch 60 the perspective ratio there falls to 0.63 and then 0.597: the last one
+    // north is still on screen but past the haze. The one south is behind the camera.
+    let rows = [5000, 4999, 4998, 4997, 5001];
+    let placed = place(
+        &view,
+        &style.labels,
+        &rows.map(|row| (TileId::new(14, 8000, row), symbols.as_slice())),
+        None,
+    );
+    let mut placed: Vec<i32> = placed.iter().map(|placed| placed.tile.y).collect();
+    placed.sort_unstable();
+    assert_eq!(placed, [4998, 4999, 5000]);
+}
+
+/// The cameras of a frame that fades from a placement at `from` to one at `to`, with only `from` before.
+fn fade(from: MapCamera, to: MapCamera) -> [MapCamera; LABEL_PLACEMENTS] {
+    let mut cameras = [from; LABEL_PLACEMENTS];
+    cameras[LABEL_PLACEMENTS - 1] = to;
+    cameras
+}
+
+/// The ink a frame has: pixels dark in every channel.
+fn black_pixels(pixels: &[u8]) -> usize {
+    pixels
+        .chunks_exact(4)
+        .filter(|pixel| pixel[..3].iter().all(|channel| *channel < 45))
+        .count()
+}
+
+fn marked_pixels(pixels: &[u8]) -> usize {
+    pixels
+        .chunks_exact(4)
+        .filter(|pixel| pixel[..3] != [255, 255, 255])
+        .count()
+}
+
+#[test]
+fn a_label_placed_at_one_camera_fades_in_over_the_blend() {
+    let style = style_for("place", json!({ "text-size": 40 }));
+    let (mut renderer, source, viewport) =
+        renderer_over(style, place_tile(&[(2048, 2048, "Praha")]), true);
+    let near = camera_over(TileId::new(14, 8000, 5000));
+    // Three tiles east, the label of the camera's own tile is not in view, so only `near` places it.
+    let away = camera_over(TileId::new(14, 8003, 5000));
+    let mut frame = |blend: f32| {
+        let labels = MapLabelDraw::new(fade(away, near), blend).unwrap();
+        draw_frame(&mut renderer, &source, viewport, &near, &labels)
+    };
+
+    assert_eq!(marked_pixels(&frame(0.0)), 0);
+    let half = frame(0.5);
+    assert!(marked_pixels(&half) > 150);
+    assert_eq!(black_pixels(&half), 0, "half drawn text is not black");
+    let full = frame(1.0);
+    assert!(black_pixels(&full) > 150);
+}
+
+#[test]
+fn a_frame_draws_the_same_when_drawn_again() {
+    let style = style_for("place", json!({ "text-size": 40 }));
+    let tile_bytes = place_tile(&[(2048, 2048, "Praha")]);
+    let near = camera_over(TileId::new(14, 8000, 5000));
+    let beside = camera_over(TileId::new(14, 8001, 5000));
+    let away = camera_over(TileId::new(14, 8003, 5000));
+    let first = (near, MapLabelDraw::new(fade(away, near), 0.25).unwrap());
+    let second = (beside, MapLabelDraw::new(fade(near, beside), 0.75).unwrap());
+
+    let (mut renderer, source, viewport) = renderer_over(style.clone(), tile_bytes.clone(), true);
+    let mut draw = |(camera, labels): &(MapCamera, MapLabelDraw)| {
+        draw_frame(&mut renderer, &source, viewport, camera, labels)
+    };
+    let (once, other, again) = (draw(&first), draw(&second), draw(&first));
+    assert_ne!(once, other);
+    assert!(once == again);
+
+    // A lone label collides with nothing, so its placement history doesn't change it.
+    let (mut fresh, source, viewport) = renderer_over(style, tile_bytes, true);
+    let alone = draw_frame(&mut fresh, &source, viewport, &second.0, &second.1);
+    assert!(alone == other);
 }

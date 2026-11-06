@@ -33,7 +33,8 @@ pub use web::MapTileDecoder;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::MapDataSource;
 use crate::{
-    MapCamera, MapRouteDraw, MapStyleBuildings, MapStyleSpec, MapViewport, TileId, ViewState,
+    MapCamera, MapLabelDraw, MapRouteDraw, MapStyleBuildings, MapStyleSpec, MapViewport, TileId,
+    ViewState,
 };
 use extrusion::ExtrusionVertex;
 use fill_patterns::pattern_bind_groups;
@@ -358,6 +359,12 @@ impl GpuMapRenderer {
         self.pool_clears
     }
 
+    /// How many times the label atlas filled up and was cleared. Many in a short export means it is too
+    /// small for the route's labels.
+    pub fn atlas_clears(&self) -> u64 {
+        self.labels.as_ref().map_or(0, LabelLayers::atlas_clears)
+    }
+
     fn check_gpu(&self) -> Result<(), String> {
         match lock_gpu_error(&self.gpu_error)?.clone() {
             Some(error) => Err(error),
@@ -370,6 +377,7 @@ impl GpuMapRenderer {
     fn prepare_frame(
         &mut self,
         camera: &MapCamera,
+        labels: Option<&MapLabelDraw>,
         route: Option<&MapRouteDraw>,
         corner_radius_px: f32,
     ) -> Result<(), String> {
@@ -416,14 +424,14 @@ impl GpuMapRenderer {
             self.fogged = true;
         }
         self.prepare_route(&view, route)?;
-        if let Some(labels) = &mut self.labels {
-            labels.prepare(
+        if let Some(layers) = &mut self.labels {
+            layers.prepare(
                 &self.device,
                 &self.queue,
                 &self.style.labels,
                 camera,
+                labels,
                 viewport,
-                self.pattern.shapes().iter().map(|shape| shape.coords),
             )?;
         }
         self.queue_items();
@@ -605,6 +613,13 @@ impl GpuMapRenderer {
             pass.draw(0..MASK_VERTICES, 0..1);
         }
 
+        // Labels lying on the ground draw under the route, and the opaque buildings drawn after cover them.
+        if let (Some(labels), Some(pipelines)) = (&self.labels, &self.pipelines.labels) {
+            if labels.has_draws(true) {
+                labels.record(&mut pass, &pipelines.ground, true);
+            }
+        }
+
         if let Some(route) = self.route.as_ref().filter(|route| route.has_draws()) {
             pass.set_pipeline(&self.pipelines.route);
             pass.set_stencil_reference(ROUTE_STENCIL);
@@ -638,9 +653,11 @@ impl GpuMapRenderer {
             }
         }
 
+        // Upright labels draw over the buildings, and skip the samples the route marked so it stays on top.
         if let (Some(labels), Some(pipelines)) = (&self.labels, &self.pipelines.labels) {
-            if labels.has_draws() {
-                labels.record(&mut pass, &pipelines.screen, &pipelines.ground);
+            if labels.has_draws(false) {
+                pass.set_stencil_reference(ROUTE_STENCIL);
+                labels.record(&mut pass, &pipelines.screen, false);
             }
         }
 
@@ -848,28 +865,31 @@ impl GpuMapRenderer {
     }
 
     /// Draws one frame into `pixels` as RGBA, with a blocking readback, sizing it on first use so a
-    /// reused buffer costs no allocation. A route draws above the roads and below the buildings. A
-    /// new line is tessellated and uploaded on first use. Pixels outside corners of
+    /// reused buffer costs no allocation. `labels` says how its labels are placed and faded, and the
+    /// view tiles of every camera in it must be loaded. A route draws above the roads and the labels,
+    /// and below the buildings. A new line is tessellated and uploaded on first use. Pixels outside corners of
     /// `corner_radius_px` are transparent. Performance: staging is copied straight into `pixels`, so
     /// do not add a buffer of the renderer's own in between.
     pub fn render(
         &mut self,
         camera: &MapCamera,
+        labels: Option<&MapLabelDraw>,
         route: Option<&MapRouteDraw>,
         corner_radius_px: f32,
         pixels: &mut Vec<u8>,
     ) -> Result<(), String> {
-        self.draw_frame(camera, route, corner_radius_px)?;
+        self.draw_frame(camera, labels, route, corner_radius_px)?;
         self.read_back(pixels)
     }
 
     fn draw_frame(
         &mut self,
         camera: &MapCamera,
+        labels: Option<&MapLabelDraw>,
         route: Option<&MapRouteDraw>,
         corner_radius_px: f32,
     ) -> Result<(), String> {
-        self.prepare_frame(camera, route, corner_radius_px)?;
+        self.prepare_frame(camera, labels, route, corner_radius_px)?;
         let viewport = self.config.viewport;
         let mut encoder = self
             .device

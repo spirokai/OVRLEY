@@ -4,7 +4,9 @@ use super::{
     validation::{MapCameraMode, MapOrientation},
 };
 use crate::error::{WidgetError, WidgetResult};
-use ovrley_map::{mercator::world_to_lon_lat, MapCamera, MAX_TILE_ZOOM, TILE_SIZE};
+use ovrley_map::{
+    mercator::world_to_lon_lat, MapCamera, MapLabelDraw, LABEL_PLACEMENTS, MAX_TILE_ZOOM, TILE_SIZE,
+};
 
 /// A follow camera sits low in the frame, showing more road ahead, as `NavigationMapController` does.
 const FOLLOW_TOP_PADDING: f64 = 0.45;
@@ -16,6 +18,9 @@ const FIXED_MARGIN: f64 = 0.08;
 const FIXED_FIT_FRAME: f64 = 500.0;
 /// Scene units the route's longest side spans at zoom offset 0.
 const FIXED_ROUTE_SPAN: f64 = FIXED_FIT_FRAME * (1.0 - FIXED_MARGIN * 2.0);
+
+/// Seconds of activity time between label placements.
+const LABEL_STEP_SECONDS: f64 = 0.3;
 
 /// Widget units one unit of pan spans at `zoom_offset`: the route's longest side on screen.
 pub(super) fn fixed_route_span(zoom_offset: f64) -> f64 {
@@ -86,6 +91,32 @@ impl WidgetCamera {
             }
         }
     }
+
+    /// How a frame at `second` places and fades its labels. Placement runs on a grid of
+    /// `LABEL_STEP_SECONDS`, at the camera of each grid time. A frame between grid times `t_k` and `t_k+1`
+    /// fades from the placement at `t_k-1` to the one at `t_k` as it runs from `t_k` to `t_k+1`, and names
+    /// the grid times before those too, back to `LABEL_PLACEMENTS` in all, so the renderer can place each
+    /// on the one before it. A fixed camera never moves, so its one placement serves every frame.
+    pub fn label_draw(&self, track: &MapTrack, second: f64) -> WidgetResult<MapLabelDraw> {
+        let (cameras, blend) = match *self {
+            Self::Fixed(camera) => ([camera; LABEL_PLACEMENTS], 1.0),
+            Self::Follow { .. } => {
+                let steps = second / LABEL_STEP_SECONDS;
+                let step = steps.floor();
+                let at = |back: usize| {
+                    let grid = (step - back as f64) * LABEL_STEP_SECONDS;
+                    self.at(track, &track.position_at(grid))
+                };
+                // Filled with the newest, then the older ones are written oldest first.
+                let mut cameras = [at(0)?; LABEL_PLACEMENTS];
+                for (back, camera) in (1..LABEL_PLACEMENTS).rev().zip(&mut cameras) {
+                    *camera = at(back)?;
+                }
+                (cameras, (steps - step) as f32)
+            }
+        };
+        MapLabelDraw::new(cameras, blend).map_err(WidgetError::Render)
+    }
 }
 
 fn clamp_zoom(zoom: f64) -> f64 {
@@ -110,4 +141,69 @@ fn fixed_camera(track: &MapTrack, zoom_offset: f64, pan: [f64; 2]) -> WidgetResu
         (min.1 + max.1) / 2.0 - pan[1] * longest,
     );
     MapCamera::new(lon, lat, zoom, 0.0, 0.0, 0.0).map_err(WidgetError::Render)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::widgets::route::sampling::TrackSample;
+
+    /// A minute riding north at 5 m/s.
+    fn track() -> MapTrack {
+        let samples = (0..=60)
+            .map(|second| TrackSample {
+                second: f64::from(second),
+                lat: f64::from(second) * 4.5e-5,
+                lon: 14.0,
+            })
+            .collect();
+        MapTrack::new(samples, 8.0).unwrap()
+    }
+
+    #[test]
+    fn a_fixed_camera_has_one_placement_for_the_whole_activity() {
+        let track = track();
+        let camera = WidgetCamera::new(
+            MapCameraMode::Fixed {
+                zoom_offset: 0.0,
+                pan: [0.0, 0.0],
+            },
+            &track,
+        )
+        .unwrap();
+        let early = camera.label_draw(&track, 3.0).unwrap();
+        assert_eq!(early, camera.label_draw(&track, 41.7).unwrap());
+        assert_eq!(early.blend(), 1.0);
+        assert_eq!(early.cameras(), [early.cameras()[0]; LABEL_PLACEMENTS]);
+    }
+
+    #[test]
+    fn a_chase_camera_places_on_the_grid_and_fades_from_the_last_placement() {
+        let track = track();
+        let follow = WidgetCamera::Follow {
+            zoom: 16.0,
+            pitch_deg: 60.0,
+            orientation: MapOrientation::RiderUp,
+        };
+        let at = |second| follow.label_draw(&track, second).unwrap();
+        let camera_at = |step: f64| {
+            follow
+                .at(&track, &track.position_at(step * LABEL_STEP_SECONDS))
+                .unwrap()
+        };
+
+        // Both frames are in the step from the grid time 3 to 4, which fades from the placement at
+        // grid time 2 to the one at 3, and names the grid times before them back to 0.
+        let (early, late) = (at(0.95), at(1.1));
+        assert_eq!(
+            early.cameras(),
+            [camera_at(0.0), camera_at(1.0), camera_at(2.0), camera_at(3.0)]
+        );
+        assert_eq!(early.cameras(), late.cameras());
+        assert!((early.blend() - 1.0 / 6.0).abs() < 1e-5);
+        assert!((late.blend() - 2.0 / 3.0).abs() < 1e-5);
+        // The next step starts where this one ends: the placement it faded to is the one it fades from.
+        let next = at(1.25).cameras();
+        assert_eq!(next[LABEL_PLACEMENTS - 2], early.cameras()[LABEL_PLACEMENTS - 1]);
+    }
 }

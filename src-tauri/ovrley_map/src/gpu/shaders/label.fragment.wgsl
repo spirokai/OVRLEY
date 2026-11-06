@@ -24,7 +24,19 @@ fn main(
     let opacity = paint.w;
     let is_halo = pass_data.y > 0.5;
 
-    let distance = textureSample(atlas, atlas_sampler, texel / vec2<f32>(textureDimensions(atlas))).r;
+    // Four samples per pixel on a rotated grid, stepped by how far the atlas moves per pixel, so a glyph
+    // squashed by pitch or shrunk with distance is averaged over its pixel instead of point sampled.
+    let uv = texel / vec2<f32>(textureDimensions(atlas));
+    let uv_dx = dpdx(uv);
+    let uv_dy = dpdy(uv);
+    let d0 = textureSampleLevel(atlas, atlas_sampler, uv + uv_dx * 0.125 + uv_dy * 0.375, 0.0).r;
+    let d1 = textureSampleLevel(atlas, atlas_sampler, uv - uv_dx * 0.375 + uv_dy * 0.125, 0.0).r;
+    let d2 = textureSampleLevel(atlas, atlas_sampler, uv + uv_dx * 0.375 - uv_dy * 0.125, 0.0).r;
+    let d3 = textureSampleLevel(atlas, atlas_sampler, uv - uv_dx * 0.125 - uv_dy * 0.375, 0.0).r;
+    // How much the field changes across one pixel. Foreshortening makes it change faster across the
+    // squashed axis than the font scale, which assumes an upright glyph, accounts for.
+    let centre = textureSampleLevel(atlas, atlas_sampler, uv, 0.0).r;
+    let field_step = length(vec2<f32>(dpdx(centre), dpdy(centre)));
 
     var color = fill;
     var gamma = EDGE_GAMMA / font_scale;
@@ -35,8 +47,11 @@ fn main(
         edge = (6.0 - halo_width / font_scale) / SDF_PX;
     }
     edge = edge - pass_data.x * BOLD_SHIFT;
+    // Each sample's edge ramp spans at least the field's change across a pixel, so the edge never steps.
+    gamma = max(gamma, 0.5 * field_step);
 
-    let alpha = smoothstep(edge - gamma, edge + gamma, distance);
+    let alpha = 0.25 * (smoothstep(edge - gamma, edge + gamma, d0) + smoothstep(edge - gamma, edge + gamma, d1)
+        + smoothstep(edge - gamma, edge + gamma, d2) + smoothstep(edge - gamma, edge + gamma, d3));
     // The layer blend wants straight alpha.
     return vec4<f32>(color.rgb, color.a * alpha * opacity);
 }
