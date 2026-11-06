@@ -21,28 +21,21 @@ export function transitionLabel(transition, t) {
 }
 
 /**
- * Returns the stored override of a join: `transitionIn` of the clip it leads
- * into, or the transition of the deleted part it bridges.
- * @param {{kind: 'clip'|'deletedPart', ownerId: string}} join Program join.
+ * Returns the stored override of a join: `transitionIn` of the segment it leads into.
+ * @param {{videoId: string, segmentKey: string}} join Program join.
  * @param {Array<object>} clips Timeline clips with their edits.
  * @returns {{type: string, durationSeconds: number}|null} Override, or null for the defaults.
  */
 export function joinOverride(join, clips) {
-  if (join.kind === 'clip') return clips.find((clip) => clip.id === join.ownerId).transitionIn
-  for (const clip of clips) {
-    const part = clip.deletedParts.find((candidate) => candidate.id === join.ownerId)
-    if (part !== undefined) return part.transition
-  }
-  throw new Error(`Unknown deleted part: ${join.ownerId}`)
+  return clips.find((clip) => clip.id === join.videoId).segments[join.segmentKey].transitionIn
 }
 
 /**
- * Builds the transition control of a join. Without a join (a deleted part at a
- * clip edge) the control is unavailable. Durations are stored snapped to the
+ * Builds the transition control of a join. Durations are stored snapped to the
  * frames of the joined pieces, as the export counts them.
  * @param {object} options Model inputs.
- * @param {object|undefined} options.join Program join.
- * @param {{num: number, den: number}|null} options.fps Frame rate of the joined pieces; null without a join.
+ * @param {object} options.join Program join.
+ * @param {{num: number, den: number}} options.fps Frame rate of the joined pieces.
  * @param {{type: string, durationSeconds: number}|null} options.override Stored override.
  * @param {{durationSeconds: number}} options.transitionDefaults Project transition defaults.
  * @param {boolean} options.isInvalid Whether the transition does not fit the pieces it joins.
@@ -52,16 +45,14 @@ export function joinOverride(join, clips) {
  */
 export function buildJoinTransitionModel({ join, fps, override, transitionDefaults, isInvalid, setJoinTransition, t }) {
   const isXfade = override !== null && override.type !== NO_TRANSITION
-  const effective = join?.transition ?? null
+  const effective = join.transition
   return {
-    isAvailable: join !== undefined,
     value: override === null ? DEFAULT_TRANSITION_OPTION : override.type,
-    label: effective === null ? t('transitions.noJoin', 'No join') : transitionLabel(effective, t),
-    defaultLabel:
-      join !== undefined && join.isDefault
-        ? t('transitions.defaultIs', { defaultValue: 'Default ({{transition}})', transition: transitionLabel(join.transition, t) })
-        : t('transitions.default', 'Default'),
-    previewType: effective !== null && effective.type !== NO_TRANSITION ? effective.type : null,
+    label: transitionLabel(effective, t),
+    defaultLabel: join.isDefault
+      ? t('transitions.defaultIs', { defaultValue: 'Default ({{transition}})', transition: transitionLabel(join.transition, t) })
+      : t('transitions.default', 'Default'),
+    previewType: effective.type !== NO_TRANSITION ? effective.type : null,
     durationSeconds: isXfade ? override.durationSeconds : null,
     durationFps: fps,
     error: isInvalid ? t('transitions.tooLong', 'Too long for the video pieces it joins') : null,

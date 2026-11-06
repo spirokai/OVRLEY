@@ -19,31 +19,6 @@ function pathExtension(path) {
   return typeof path === 'string' ? path.split('.').pop()?.toLowerCase() || '' : ''
 }
 
-/**
- * Summarizes one imported video for drawers and project views.
- * @param {object} video Imported video entity.
- * @returns {object} Presentational video summary.
- */
-function createVideoSummary(video) {
-  return {
-    id: video.id,
-    path: video.path,
-    filename: filenameFromSelectedPath(video.path),
-    duration: video.durationSeconds,
-    fps: video.fps.num / video.fps.den,
-    resolution: video.resolution,
-    creationTime: video.creationTime,
-    timeSource: video.timeSource,
-    codecName: video.codecName,
-    codecLongName: video.codecLongName,
-    bitRate: video.bitRate,
-    cameraType: video.cameraType,
-    cameraModel: video.cameraModel,
-    offsetSeconds: video.offsetSeconds,
-    telemetryStatus: video.telemetry.status,
-  }
-}
-
 export default function useVideoImport({ debugModeEnabled = false, onSetBackgroundMode }) {
   const importedVideos = useStore((state) => state.importedVideos)
   const videoEdits = useStore((state) => state.videoEdits)
@@ -53,15 +28,14 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   const setImportingVideo = useStore((state) => state.setImportingVideo)
   const setErrorMessage = useStore((state) => state.setErrorMessage)
 
-  const videoSummaries = useMemo(
-    () => sortVideosByTimeline(joinVideoEdits(importedVideos, videoEdits)).map(createVideoSummary),
-    [importedVideos, videoEdits],
-  )
-  const hasVideos = videoSummaries.length > 0
+  const clips = useMemo(() => sortVideosByTimeline(joinVideoEdits(importedVideos, videoEdits)), [importedVideos, videoEdits])
+  const hasVideos = clips.length > 0
   const importedVideoLabel =
-    videoSummaries.length > 1
-      ? i18next.t('video-preview.videoCount', { defaultValue: '{{count}} videos', count: videoSummaries.length })
-      : (videoSummaries[0]?.filename ?? null)
+    clips.length > 1
+      ? i18next.t('video-preview.videoCount', { defaultValue: '{{count}} videos', count: clips.length })
+      : clips.length === 1
+        ? filenameFromSelectedPath(clips[0].path)
+        : null
   const importedBackgroundImageFilename = importedBackgroundImagePath ? filenameFromSelectedPath(importedBackgroundImagePath) : null
   const importedMediaFilename = importedBackgroundImageFilename || importedVideoLabel
 
@@ -165,7 +139,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
     importedBackgroundImageFilename,
     importedMediaFilename,
     importedVideoLabel,
-    videoSummaries,
+    clips,
     clearImportedVideos: handleClearImportedVideos,
     handleImportVideo,
     handleVideoFilesDrop,

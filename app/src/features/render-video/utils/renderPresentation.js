@@ -1,6 +1,7 @@
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import i18next from 'i18next'
 import { formatClockDuration } from '@/lib/time-format'
+import { isVideoExcluded } from '@/lib/video-program/video-segments'
 import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { captureBatchSync } from './renderRequest'
 
@@ -143,6 +144,8 @@ export function reviewBatchQueue(clips, piecesByVideo, skipOverlay, inspection, 
       pieces: piecesByVideo.get(clip.id) ?? [],
       skipOverlay: skipOverlay[clip.id] === true,
     }
+    if (item.pieces.length === 0 && isVideoExcluded(clip))
+      return { ...item, status: 'blocked', error: i18next.getFixedT(locale)('render-video.excludedFromExport', 'Excluded from export') }
     if (item.pieces.length === 0)
       return { ...item, status: 'blocked', error: i18next.getFixedT(locale)('render-video.outsideExportRange', 'Outside the export range') }
     if (inspection?.error && inspection.error.message !== 'reinspectionRequired')

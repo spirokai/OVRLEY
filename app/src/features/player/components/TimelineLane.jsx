@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { JoinTransitionControl } from '@/features/transitions'
 
@@ -33,6 +34,31 @@ function JoinMarker({ marker }) {
   )
 }
 
+function CutMarker({ marker }) {
+  const { t } = useTranslation()
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={marker.label}
+          title={marker.label}
+          className="absolute top-3 bottom-1 z-20 w-1.5 -translate-x-1/2 cursor-pointer bg-foreground/80 outline-none hover:bg-foreground focus-visible:ring-2 focus-visible:ring-foreground"
+          style={marker.style}
+          onPointerDown={stopPointer}
+          onDoubleClick={stopPointer}
+        />
+      </PopoverTrigger>
+      <PopoverContent side="top" className="w-56 space-y-2 p-3" onPointerDown={stopPointer}>
+        <p className="text-xs font-semibold">{marker.label}</p>
+        <Button type="button" variant="secondary" className="h-7 w-full text-xs" onClick={marker.onRemove}>
+          {t('player.removeCut', 'Remove cut')}
+        </Button>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function TimelineClip({ clip }) {
   const Icon = clip.icon
   return (
@@ -50,23 +76,15 @@ function TimelineClip({ clip }) {
         {clip.highlightStyle && (
           <div aria-hidden="true" className="pointer-events-none absolute -top-3 -bottom-1 bg-success/20" style={clip.highlightStyle} />
         )}
-        {clip.cuts.map((cut) => (
+        {clip.excludedSegments.map((segment) => (
           <div
-            key={cut.key}
-            data-testid="timeline-deleted-part"
+            key={segment.key}
+            data-testid="timeline-excluded-segment"
             aria-hidden="true"
             className="pointer-events-none absolute inset-y-0 z-10 bg-background/75 bg-[repeating-linear-gradient(45deg,transparent_0,transparent_3px,rgb(255_255_255/0.12)_3px,rgb(255_255_255/0.12)_6px)]"
-            style={cut.style}
+            style={segment.style}
           />
         ))}
-        {clip.markStyle && (
-          <div
-            data-testid="timeline-deleted-part-mark"
-            aria-hidden="true"
-            className="pointer-events-none absolute -inset-y-1 z-10 w-0.5 -translate-x-1/2 bg-destructive"
-            style={clip.markStyle}
-          />
-        )}
         {clip.showText && (
           <div
             className={`relative grid h-full items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${clip.textClassName}`}
@@ -150,6 +168,9 @@ function TimelineLane({ lane }) {
             />
           ) : null,
         )}
+        {lane.cutMarkers.map((marker) => (
+          <CutMarker key={marker.key} marker={marker} />
+        ))}
         {lane.joinMarkers.map((marker) => (marker.isVisible ? <JoinMarker key={marker.key} marker={marker} /> : null))}
       </div>
       {lane.clips.map((clip) => (clip.tooltip.isVisible && clip.label ? <TimelineClipTooltip key={clip.id} clip={clip} /> : null))}

@@ -3,24 +3,30 @@ import { getTimelineMinimum, getTotalPlaybackDuration } from '@/features/player/
 import { createCachedPromise } from '@/lib/cached-promise'
 import { clamp } from '@/lib/utils'
 import {
+  applyFilenameCreationTimes,
+  cutVideo,
+  findVideo,
   placeAutomaticVideos,
+  removeCut,
   removeVideo,
   resetCreationTimes,
   resetVideoOffset,
+  segmentBeforeCut,
+  setSegmentExcluded,
+  setSegmentTransition,
   setVideoOffset,
   setVideoSyncTimezoneMode,
   shiftVideoOffsets,
-  applyFilenameCreationTimes,
 } from '@/lib/video-program/collection-edits'
 import { requireTelemetry } from '@/lib/video-program/imported-video'
-import { DEFAULT_TRANSITION_SETTINGS, NO_TRANSITION, XFADE_TRANSITIONS } from '@/lib/video-program/transition-catalog'
+import { DEFAULT_TRANSITION_SETTINGS, requireTransitionType } from '@/lib/video-program/transition-catalog'
 import { getVideosTimelineBounds, joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import { applyCoursePlotDimensions } from '../store-utils'
 
 let fetchCodecsOnce = null
 
 function requireTransitionDefaults({ type, durationSeconds, splitGapThresholdSeconds }) {
-  if (type !== NO_TRANSITION && !XFADE_TRANSITIONS.includes(type)) throw new Error(`Unknown transition type: ${type}`)
+  requireTransitionType(type)
   if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) throw new Error('Transition duration must be a positive number of seconds')
   if (!Number.isFinite(splitGapThresholdSeconds) || splitGapThresholdSeconds < 0) {
     throw new Error('Continuity threshold must be zero or a positive number of seconds')
@@ -43,6 +49,7 @@ export const createVideoImportSlice = (set, get) => ({
   videoEdits: {}, // undoable user edits keyed by video ID (see createVideoEdits)
   importedBackgroundImagePath: null, // absolute path from Tauri file dialog
   videoDragPreview: null, // { videoId: string|null, deltaSeconds } while one clip (or, with null, every clip) is dragged
+  cutRemovalRequest: null, // { videoId, cutId } while the user chooses the state of the merged segment
   videoSyncTimezoneMode: null, // session "Apply Timezone" selection: "local" | "utc"; null requests automatic inference
   transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
   availableCodecs: null,
@@ -61,7 +68,7 @@ export const createVideoImportSlice = (set, get) => ({
       draft.videoSyncTimezoneMode = videoSyncTimezoneMode
       draft.importedBackgroundImagePath = null
       draft.videoDragPreview = null
-      if (!importedVideos.some((video) => video.id === draft.deletedPartMark?.videoId)) draft.deletedPartMark = null
+      draft.cutRemovalRequest = null
       clampPlayheadToVideos(draft, 0)
     })
     const { manualVideoSync } = get()
@@ -78,7 +85,7 @@ export const createVideoImportSlice = (set, get) => ({
       importedBackgroundImagePath: path || null,
       videoDragPreview: null,
       videoSyncTimezoneMode: null,
-      deletedPartMark: null,
+      cutRemovalRequest: null,
     })
     get().selectVideoSyncVideo(null)
   },
@@ -90,7 +97,7 @@ export const createVideoImportSlice = (set, get) => ({
       importedBackgroundImagePath: null,
       videoDragPreview: null,
       videoSyncTimezoneMode: null,
-      deletedPartMark: null,
+      cutRemovalRequest: null,
     })
     get().selectVideoSyncVideo(null)
   },
@@ -104,7 +111,7 @@ export const createVideoImportSlice = (set, get) => ({
     set((draft) => {
       removeVideo(draft, videoId)
       draft.videoDragPreview = null
-      if (draft.deletedPartMark?.videoId === videoId) draft.deletedPartMark = null
+      if (draft.cutRemovalRequest?.videoId === videoId) draft.cutRemovalRequest = null
       clampPlayheadToVideos(draft, 0)
     })
     if (get().manualVideoSync.videoId === videoId) {
@@ -153,12 +160,63 @@ export const createVideoImportSlice = (set, get) => ({
     })
   },
 
+  /**
+   * Splits a video at a frame (see `cutVideo`).
+   * @returns {string} ID of the new cut.
+   */
+  cutVideo: (videoId, frame) => {
+    let cutId
+    set((draft) => {
+      cutId = cutVideo(draft, videoId, frame)
+    })
+    return cutId
+  },
+
+  /**
+   * Removes a cut. Segments in the same export state merge at once; otherwise the
+   * user chooses the state of the merged segment (`resolveCutRemoval`).
+   */
+  requestCutRemoval: (videoId, cutId) => {
+    const edits = get().videoEdits[videoId]
+    const earlier = edits.segments[segmentBeforeCut(edits, cutId)]
+    if (earlier.excluded === edits.segments[cutId].excluded) {
+      set((draft) => removeCut(draft, videoId, cutId, earlier.excluded))
+      return
+    }
+    set({ cutRemovalRequest: { videoId, cutId } })
+  },
+
+  /** Removes the requested cut, giving the merged segment the chosen export state. */
+  resolveCutRemoval: (excluded) => {
+    const { videoId, cutId } = get().cutRemovalRequest
+    set((draft) => {
+      removeCut(draft, videoId, cutId, excluded)
+      draft.cutRemovalRequest = null
+    })
+  },
+
+  dismissCutRemoval: () => {
+    set({ cutRemovalRequest: null })
+  },
+
+  /** Excludes a segment from export or includes it again. */
+  setVideoSegmentExcluded: (videoId, segmentKey, excluded) => {
+    set((draft) => setSegmentExcluded(draft, videoId, segmentKey, excluded))
+  },
+
+  /**
+   * Overrides the transition of a program join, or with `null` returns it to the defaults.
+   * @param {{videoId: string, segmentKey: string}} join Join from `buildProgram`.
+   * @param {{type: string, durationSeconds: number}|null} transition Override.
+   */
+  setJoinTransition: ({ videoId, segmentKey }, transition) => {
+    set((draft) => setSegmentTransition(draft, videoId, segmentKey, transition))
+  },
+
   /** Sets or clears the transient shift of the dragged clip, or of every clip when `videoId` is null. */
   setVideoDragPreview: (dragPreview) => {
     if (dragPreview !== null) {
-      if (dragPreview.videoId !== null && !get().importedVideos.some((video) => video.id === dragPreview.videoId)) {
-        throw new Error(`Unknown imported video: ${dragPreview.videoId}`)
-      }
+      if (dragPreview.videoId !== null) findVideo(get(), dragPreview.videoId)
       if (!Number.isFinite(dragPreview.deltaSeconds)) throw new Error('Video drag shift must be a finite number')
     }
     set({ videoDragPreview: dragPreview })

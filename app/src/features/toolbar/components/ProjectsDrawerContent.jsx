@@ -1,6 +1,7 @@
 import { Activity, FilePlus2, Film, FolderOpen, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SectionHeading } from '@/components/ui/section-heading'
+import { filenameFromSelectedPath } from '@/lib/file-dialog'
 import { useTranslation } from 'react-i18next'
 
 function ProjectSource({ icon: Icon, label, filename, path }) {
@@ -30,7 +31,7 @@ export function ProjectsDrawerContent({
   projectPath,
   activityFilename,
   activityPath,
-  videoSources,
+  videoClips,
   status,
   busy,
   onNew,
@@ -74,8 +75,14 @@ export function ProjectsDrawerContent({
           </div>
           <div className="min-w-0 space-y-8">
             <ProjectSource icon={Activity} label={t('toolbar.activity', 'Activity')} filename={activityFilename} path={activityPath} />
-            {videoSources.map((video) => (
-              <ProjectSource key={video.id} icon={Film} label={t('toolbar.video', 'Video')} filename={video.filename} path={video.path} />
+            {videoClips.map((video) => (
+              <ProjectSource
+                key={video.id}
+                icon={Film}
+                label={t('toolbar.video', 'Video')}
+                filename={filenameFromSelectedPath(video.path)}
+                path={video.path}
+              />
             ))}
           </div>
         </div>

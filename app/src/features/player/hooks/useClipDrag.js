@@ -3,6 +3,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { framesToSeconds, secondsToFrames } from '@/lib/video-program/frame-grid'
 import { getVideosTimelineBounds } from '@/lib/video-program/video-collection'
 import { getTimelineMinimum } from '../utils/playerTiming'
 import { snapClipDelta, videoIdFromLaneId, viewPxToSeconds } from '../utils/timelineGeometry'
@@ -45,8 +46,8 @@ function clipEdges(clips) {
   return clips.flatMap((clip) => [clip.offsetSeconds, clip.offsetSeconds + clip.durationSeconds])
 }
 
-function roundToTenth(seconds) {
-  return Math.round(seconds * 10) / 10
+function snapToClipFrames(seconds, clip) {
+  return framesToSeconds(secondsToFrames(seconds, clip.fps), clip.fps)
 }
 
 /**
@@ -135,17 +136,18 @@ export default function useClipDrag({ setVideoDragPreview, setVideoOffset, shift
     [setVideoDragPreview],
   )
 
-  // Commit - one clip snaps its start to a tenth of a second; a shared shift keeps relative placement and rounds the earliest clip.
+  // Commit - one clip snaps its start to its own frames; a shared shift keeps relative placement and snaps the earliest clip.
   // An edge snapped onto another edge commits exactly, so touching clips stay touching.
   const commitShift = useCallback(
     ({ videoId, movingClips }, { delta: deltaSeconds, guidelineSecond }) => {
-      const round = guidelineSecond === null ? roundToTenth : (seconds) => seconds
+      const place = (clip) =>
+        guidelineSecond === null ? snapToClipFrames(clip.offsetSeconds + deltaSeconds, clip) : clip.offsetSeconds + deltaSeconds
       if (videoId !== null) {
-        setVideoOffset(videoId, round(movingClips[0].offsetSeconds + deltaSeconds))
+        setVideoOffset(videoId, place(movingClips[0]))
         return
       }
-      const earliestOffset = Math.min(...movingClips.map((clip) => clip.offsetSeconds))
-      shiftVideoOffsets(round(earliestOffset + deltaSeconds) - earliestOffset)
+      const earliest = movingClips.reduce((first, clip) => (clip.offsetSeconds < first.offsetSeconds ? clip : first))
+      shiftVideoOffsets(place(earliest) - earliest.offsetSeconds)
     },
     [setVideoOffset, shiftVideoOffsets],
   )

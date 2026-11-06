@@ -183,7 +183,7 @@ describe('useOverlayPlayer', () => {
 
     act(() => {
       result.current.timeline.containerProps.ref(createTimelineElement(500))
-      result.current.toolbar.exportRange.setStart()
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i' }))
     })
 
     expect(result.current.toolbar.exportRange.isCustom).toBe(true)
@@ -250,55 +250,57 @@ describe('useOverlayPlayer', () => {
     unmount()
   })
 
-  test('marks a deleted part between Shift+I and Shift+O on the clip under the playhead', () => {
+  test('cuts and excludes at the playhead with C and X', () => {
     useStore.setState({ selectedSecond: 15 })
     const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
-    expect(result.current.toolbar.deletedPart).toMatchObject({ isVisible: true, canStart: true, canEnd: false, markLabel: null })
+    const press = (key) => act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key })))
+    const edits = () => useStore.getState().videoEdits['video-1']
+    const markers = () => result.current.timeline.lanes.find((lane) => lane.id === 'video').cutMarkers
+    expect(result.current.toolbar.videoEdit).toMatchObject({ isVisible: true, canCut: true, excluded: false })
 
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'I', shiftKey: true }))
-    })
-    expect(useStore.getState().deletedPartMark).toEqual({ videoId: 'video-1', sourceSecond: 5 })
-    expect(result.current.toolbar.deletedPart.markLabel).toBe('ride.mp4 00:05')
-    expect(findLane(result, 'video:video-1').markStyle).toEqual({ left: '25%' })
+    press('c')
+    const [cut] = edits().cuts
+    expect(cut.frame).toBe(150)
+    expect(markers()).toEqual([expect.objectContaining({ label: 'Cut at 00:05', style: { left: expect.any(String) } })])
+    // The playhead is on the cut now.
+    expect(result.current.toolbar.videoEdit.canCut).toBe(false)
 
-    act(() => useStore.getState().setSelectedSecond(22))
-    expect(result.current.toolbar.deletedPart.canEnd).toBe(true)
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'O', shiftKey: true }))
-    })
-    expect(useStore.getState().videoEdits['video-1'].deletedParts).toEqual([
-      expect.objectContaining({ fromSecond: 5, toSecond: 12, transition: null }),
-    ])
-    expect(useStore.getState().deletedPartMark).toBeNull()
-    expect(findLane(result, 'video:video-1').cuts.map((cut) => cut.style)).toEqual([{ left: '25%', width: '35%' }])
-    // Outside every clip there is nothing to mark.
+    press('x')
+    expect(edits().segments).toEqual({ start: { excluded: false, transitionIn: null }, [cut.id]: { excluded: true, transitionIn: null } })
+    expect(result.current.toolbar.videoEdit.excluded).toBe(true)
+    expect(findLane(result, 'video:video-1').excludedSegments.map((segment) => segment.style)).toEqual([{ left: '25%', width: '75%' }])
+
+    act(() => markers()[0].onRemove())
+    expect(useStore.getState().cutRemovalRequest).toEqual({ videoId: 'video-1', cutId: cut.id })
+
+    // Outside every clip there is nothing to cut or exclude.
     act(() => useStore.getState().setSelectedSecond(40))
-    expect(result.current.toolbar.deletedPart.canStart).toBe(false)
+    expect(result.current.toolbar.videoEdit).toMatchObject({ canCut: false, excluded: null })
+    press('c')
+    expect(edits().cuts).toHaveLength(1)
   })
 
-  test('Alt+drag on a clip deletes the dragged range instead of moving the clip', () => {
+  test('a clip keeps its selection while the cut button is pressed', () => {
+    createTwoClipStore()
     const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
-    const altPointer = (clientX) => ({
-      ...createPointerEvent(clientX),
-      altKey: true,
-      currentTarget: {
-        focus: vi.fn(),
-        getBoundingClientRect: () => ({ left: 100, width: 200 }),
-        releasePointerCapture: vi.fn(),
-        setPointerCapture: vi.fn(),
-      },
-    })
-    act(() => findLane(result, 'video:video-1').clipProps.onPointerDown(altPointer(250)))
-    act(() => findLane(result, 'video:video-1').clipProps.onPointerMove(altPointer(150)))
-    expect(findLane(result, 'video:video-1').cuts).toHaveLength(1)
-    act(() => findLane(result, 'video:video-1').clipProps.onPointerUp(altPointer(150)))
+    act(() =>
+      findLane(result, 'video:second').clipProps.onPointerDown({
+        ...createPointerEvent(100),
+        currentTarget: { focus: vi.fn(), setPointerCapture: vi.fn() },
+      }),
+    )
+    expect(findLane(result, 'video:second').isSelected).toBe(true)
 
-    expect(useStore.getState().videoEdits['video-1']).toMatchObject({
-      offsetSeconds: 10,
-      deletedParts: [expect.objectContaining({ fromSecond: 5, toSecond: 15 })],
-    })
-    expect(useStore.getState().videoDragPreview).toBeNull()
+    const button = document.createElement('button')
+    const controls = document.createElement('div')
+    controls.setAttribute('data-keeps-clip-selection', '')
+    controls.append(button)
+    document.body.append(controls)
+    act(() => button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })))
+    expect(findLane(result, 'video:second').isSelected).toBe(true)
+    act(() => document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })))
+    expect(findLane(result, 'video:second').isSelected).toBe(false)
+    controls.remove()
   })
 
   test('marks each join on the video lane with its transition window and control', () => {
@@ -308,9 +310,9 @@ describe('useOverlayPlayer', () => {
     const markers = () => result.current.timeline.lanes.find((lane) => lane.id === 'video').joinMarkers
 
     // A 20 s gap is above the continuity threshold: the default transition applies.
-    expect(markers()).toEqual([expect.objectContaining({ key: 'clip:second', hasTransition: true, isInvalid: false, label: 'Join: wipeleft, 2 s' })])
+    expect(markers()).toEqual([expect.objectContaining({ key: 'second:start', hasTransition: true, isInvalid: false, label: 'Join: wipeleft, 2 s' })])
     act(() => markers()[0].control.onSelect('none'))
-    expect(useStore.getState().videoEdits.second.transitionIn).toEqual({ type: 'none', durationSeconds: 0 })
+    expect(useStore.getState().videoEdits.second.segments.start.transitionIn).toEqual({ type: 'none', durationSeconds: 0 })
     expect(markers()[0]).toMatchObject({ hasTransition: false, bandStyle: null, label: 'Join: No transition' })
   })
 })

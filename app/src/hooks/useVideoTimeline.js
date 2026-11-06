@@ -10,37 +10,49 @@ import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import { listTransitionProxyJobs } from '@/lib/video-program/transition-proxies'
 import { deriveVideoWarnings } from '@/lib/video-program/video-warnings'
 
+/** Remembers the latest result, so every subscriber shares one build per change. */
+function memoizeLatest(build) {
+  let latestArgs = null
+  let latestValue
+  return (...args) => {
+    if (latestArgs === null || args.some((arg, index) => arg !== latestArgs[index])) {
+      latestArgs = args
+      latestValue = build(...args)
+    }
+    return latestValue
+  }
+}
+
+const buildCommitted = memoizeLatest((videos, videoEdits, transitionDefaults) =>
+  buildTimelineProgram({ videos, videoEdits, dragPreview: null, transitionDefaults }),
+)
+const buildDisplayed = memoizeLatest((committed, videos, videoEdits, dragPreview, transitionDefaults) =>
+  dragPreview === null ? committed : buildTimelineProgram({ videos, videoEdits, dragPreview, transitionDefaults }),
+)
+const combineTimeline = memoizeLatest((committed, displayed) => ({ ...committed, displayed }))
+
 /**
- * Returns the committed clips, their timeline program, and covered interval, plus
+ * Selects the committed clips, their timeline program, and covered interval, plus
  * the same values as displayed during a transient clip drag.
- * @returns {{clips: Array<object>, program: object, bounds: object|null, displayed: {clips: Array<object>, program: object, bounds: object|null}}} Memoized timeline.
+ * @param {object} state Application state.
+ * @returns {{clips: Array<object>, program: object, bounds: object|null, displayed: {clips: Array<object>, program: object, bounds: object|null}}} Timeline.
+ */
+export function selectVideoTimeline({ importedVideos, videoEdits, videoDragPreview, transitionDefaults }) {
+  const committed = buildCommitted(importedVideos, videoEdits, transitionDefaults)
+  return combineTimeline(committed, buildDisplayed(committed, importedVideos, videoEdits, videoDragPreview, transitionDefaults))
+}
+
+/**
+ * Returns the timeline (see `selectVideoTimeline`).
+ * @returns {object} Timeline, built once per change for every subscriber.
  */
 export function useVideoTimeline() {
-  const { importedVideos, videoEdits, videoDragPreview, transitionDefaults } = useStore(
-    useShallow((state) => ({
-      importedVideos: state.importedVideos,
-      videoEdits: state.videoEdits,
-      videoDragPreview: state.videoDragPreview,
-      transitionDefaults: state.transitionDefaults,
-    })),
-  )
-  const committed = useMemo(
-    () => buildTimelineProgram({ videos: importedVideos, videoEdits, dragPreview: null, transitionDefaults }),
-    [importedVideos, transitionDefaults, videoEdits],
-  )
-  const displayed = useMemo(
-    () =>
-      videoDragPreview === null
-        ? committed
-        : buildTimelineProgram({ videos: importedVideos, videoEdits, dragPreview: videoDragPreview, transitionDefaults }),
-    [committed, importedVideos, transitionDefaults, videoDragPreview, videoEdits],
-  )
-  return useMemo(() => ({ ...committed, displayed }), [committed, displayed])
+  return useStore(selectVideoTimeline)
 }
 
 /**
  * Returns the warnings of every committed clip (see `deriveVideoWarnings`).
- * @returns {Map<string, Array<{kind: string, message: string}>>} Warnings keyed by video ID.
+ * @returns {Map<string, Array<{kind: string, params: object}>>} Warnings keyed by video ID.
  */
 export function useVideoWarnings() {
   const { clips, program } = useVideoTimeline()

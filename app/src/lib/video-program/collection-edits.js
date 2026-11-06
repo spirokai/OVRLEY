@@ -8,28 +8,35 @@
  * correction of the collection; a clip whose time cannot be determined sits next
  * to its placement anchor. A `manual` clip keeps the start set by hand when times
  * are detected again. Shifts move every clip and keep their relative placement.
+ *
+ * Cuts and segments: see `video-segments`.
  */
 
 import { parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { placeVideosByCreationTime, resolveVideosSync } from '@/lib/video-sync'
 import { createVideoEdits } from './imported-video'
+import { requireTransition } from './transition-catalog'
 import { joinVideoEdits, sortVideosByTimeline } from './video-collection'
+import { FIRST_SEGMENT_KEY } from './video-segments'
 
 /**
- * Returns the timeline start that puts a clip directly before or after its anchor clip.
- * @param {{durationSeconds: number}} video Placed clip.
- * @param {{offsetSeconds: number, durationSeconds: number}} anchor Anchor clip with its committed offset.
- * @param {'before'|'after'} side Side of the anchor.
- * @returns {number} Timeline start second.
+ * Returns an imported video of the collection.
+ * @param {{importedVideos: Array<object>}} collection Collection state.
+ * @param {string} videoId Video ID.
+ * @returns {object} Imported video entity.
  */
-export function anchoredOffsetSeconds(video, anchor, side) {
-  return side === 'before' ? anchor.offsetSeconds - video.durationSeconds : anchor.offsetSeconds + anchor.durationSeconds
-}
-
-function findVideo(collection, videoId) {
+export function findVideo(collection, videoId) {
   const video = collection.importedVideos.find((candidate) => candidate.id === videoId)
   if (video === undefined) throw new Error(`Unknown imported video: ${videoId}`)
   return video
+}
+
+/** Puts a clip directly before or after its anchor clip. */
+function placeAtAnchor(draft, videoId) {
+  const { videoId: anchorId, side } = draft.videoEdits[videoId].placementAnchor
+  const anchorOffset = draft.videoEdits[anchorId].offsetSeconds
+  draft.videoEdits[videoId].offsetSeconds =
+    side === 'before' ? anchorOffset - findVideo(draft, videoId).durationSeconds : anchorOffset + findVideo(draft, anchorId).durationSeconds
 }
 
 function requireFiniteOffset(seconds, label) {
@@ -62,12 +69,7 @@ function placeAtAnchors(draft, videoId) {
   const moved = [videoId]
   while (moved.length > 0) {
     const movedId = moved.shift()
-    const { videoId: anchorId, side } = draft.videoEdits[movedId].placementAnchor
-    draft.videoEdits[movedId].offsetSeconds = anchoredOffsetSeconds(
-      findVideo(draft, movedId),
-      { ...findVideo(draft, anchorId), ...draft.videoEdits[anchorId] },
-      side,
-    )
+    placeAtAnchor(draft, movedId)
     moved.push(
       ...draft.importedVideos
         .filter((video) => {
@@ -205,12 +207,7 @@ export function placeAutomaticVideos(draft) {
     const index = anchored.findIndex((videoId) => resolved.has(draft.videoEdits[videoId].placementAnchor.videoId))
     if (index === -1) throw new Error('Video placement anchors must reference imported videos')
     const [videoId] = anchored.splice(index, 1)
-    const { videoId: anchorId, side } = draft.videoEdits[videoId].placementAnchor
-    draft.videoEdits[videoId].offsetSeconds = anchoredOffsetSeconds(
-      findVideo(draft, videoId),
-      { ...findVideo(draft, anchorId), ...draft.videoEdits[anchorId] },
-      side,
-    )
+    placeAtAnchor(draft, videoId)
     findVideo(draft, videoId).syncWarning = null
     resolved.add(videoId)
   }
@@ -257,6 +254,71 @@ export function removeVideo(draft, videoId) {
   for (const edits of Object.values(draft.videoEdits)) {
     if (edits.placementAnchor?.videoId === videoId) edits.placementAnchor = removedAnchor === null ? null : { ...removedAnchor }
   }
+}
+
+/**
+ * Splits a video at a frame. The new segment starts out in the same export state
+ * as the segment it comes from, and follows the transition defaults.
+ * @param {object} draft Collection draft.
+ * @param {string} videoId Video ID.
+ * @param {number} frame Integer frame strictly inside the video and not on a cut.
+ * @returns {string} ID of the new cut.
+ */
+export function cutVideo(draft, videoId, frame) {
+  const { frameCount } = findVideo(draft, videoId)
+  const edits = draft.videoEdits[videoId]
+  if (!Number.isInteger(frame) || frame <= 0 || frame >= frameCount) throw new Error(`A cut must lie inside its video: frame ${frame}`)
+  if (edits.cuts.some((cut) => cut.frame === frame)) throw new Error(`The video is already cut at frame ${frame}`)
+  const id = globalThis.crypto.randomUUID()
+  const previous = edits.cuts.filter((cut) => cut.frame < frame).at(-1)
+  edits.segments[id] = { excluded: edits.segments[previous?.id ?? FIRST_SEGMENT_KEY].excluded, transitionIn: null }
+  edits.cuts.splice(previous === undefined ? 0 : edits.cuts.indexOf(previous) + 1, 0, { id, frame })
+  return id
+}
+
+/**
+ * Returns the key of the segment that ends at a cut.
+ * @param {{cuts: Array<{id: string}>}} edits Video edits.
+ * @param {string} cutId Cut ID.
+ * @returns {string} Segment key.
+ */
+export function segmentBeforeCut(edits, cutId) {
+  const index = edits.cuts.findIndex((cut) => cut.id === cutId)
+  if (index === -1) throw new Error(`Unknown cut: ${cutId}`)
+  return index === 0 ? FIRST_SEGMENT_KEY : edits.cuts[index - 1].id
+}
+
+/**
+ * Removes a cut, merging its two segments. The merged segment keeps the earlier
+ * segment's transition and takes the given export state.
+ * @param {object} draft Collection draft.
+ * @param {string} videoId Video ID.
+ * @param {string} cutId Cut ID.
+ * @param {boolean} excluded Export state of the merged segment.
+ */
+export function removeCut(draft, videoId, cutId, excluded) {
+  findVideo(draft, videoId)
+  const edits = draft.videoEdits[videoId]
+  edits.segments[segmentBeforeCut(edits, cutId)].excluded = excluded
+  edits.cuts = edits.cuts.filter((cut) => cut.id !== cutId)
+  delete edits.segments[cutId]
+}
+
+function requireSegment(draft, videoId, segmentKey) {
+  findVideo(draft, videoId)
+  const segment = draft.videoEdits[videoId].segments[segmentKey]
+  if (segment === undefined) throw new Error(`Unknown video segment: ${segmentKey}`)
+  return segment
+}
+
+/** Excludes a segment from export or includes it again. */
+export function setSegmentExcluded(draft, videoId, segmentKey, excluded) {
+  requireSegment(draft, videoId, segmentKey).excluded = excluded
+}
+
+/** Overrides the transition into a segment, or with `null` returns it to the defaults. */
+export function setSegmentTransition(draft, videoId, segmentKey, transition) {
+  requireSegment(draft, videoId, segmentKey).transitionIn = requireTransition(transition)
 }
 
 /** Interprets ambiguous camera clock times in local time or UTC, then detects times again. */

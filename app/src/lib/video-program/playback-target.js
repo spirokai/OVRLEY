@@ -6,46 +6,48 @@
 import { framesToSeconds } from './frame-grid'
 import { resolveProgramPosition } from './program'
 
+function excludedTarget(program, second) {
+  const segment = program.excludedSegments.find((candidate) => candidate.timelineStartSecond <= second && second < candidate.timelineEndSecond)
+  if (segment === undefined) return null
+  return {
+    videoId: segment.videoId,
+    piece: segment,
+    sourceSecond: segment.sourceStartSecond + (second - segment.timelineStartSecond),
+    isInside: false,
+    isExcluded: true,
+  }
+}
+
 /**
  * Inside a piece (including its outgoing transition window) the piece's own frame
- * is shown. Inside a deleted part the deleted frame of that video is shown and
- * flagged. Before the first piece and inside gaps the upcoming piece's first frame
- * is shown; after the last piece its final frame is shown.
- * @param {{pieces: Array<object>, joins: Array<object>}} program Built program.
+ * is shown. Inside an excluded segment that no piece covers, the segment's frame is
+ * shown and flagged. Before the first piece and inside gaps the upcoming piece's
+ * first frame is shown; after the last piece its final frame is shown.
+ * @param {{pieces: Array<object>, joins: Array<object>, excludedSegments: Array<object>}} program Built program.
  * @param {number} second Timeline second.
- * @returns {{videoId: string, piece: object, sourceSecond: number, isInside: boolean, isDeleted: boolean}|null}
- *   Preview target (`piece` is the piece whose video is shown), or null without pieces.
+ * @returns {{videoId: string, piece: object, sourceSecond: number, isInside: boolean, isExcluded: boolean}|null}
+ *   Preview target (`piece` is the piece or excluded segment whose video is shown), or null with nothing to show.
  */
 export function resolvePreviewTarget(program, second) {
   const position = resolveProgramPosition(program, second)
+  if (position.kind === 'piece' || position.kind === 'transition') {
+    return { videoId: position.piece.videoId, piece: position.piece, sourceSecond: position.sourceSecond, isInside: true, isExcluded: false }
+  }
+  const excluded = excludedTarget(program, second)
+  if (excluded !== null) return excluded
   switch (position.kind) {
-    case 'piece':
-    case 'transition':
-      return { videoId: position.piece.videoId, piece: position.piece, sourceSecond: position.sourceSecond, isInside: true, isDeleted: false }
-    case 'gap': {
-      const { previousPiece, nextPiece, join } = position
-      if (join.kind === 'deletedPart' && previousPiece.videoId === nextPiece.videoId) {
-        return {
-          videoId: previousPiece.videoId,
-          piece: previousPiece,
-          sourceSecond: previousPiece.sourceEndSecond + (second - previousPiece.timelineEndSecond),
-          isInside: false,
-          isDeleted: true,
-        }
-      }
-      return { videoId: nextPiece.videoId, piece: nextPiece, sourceSecond: nextPiece.sourceStartSecond, isInside: false, isDeleted: false }
-    }
+    case 'gap':
     case 'before':
       return {
         videoId: position.nextPiece.videoId,
         piece: position.nextPiece,
         sourceSecond: position.nextPiece.sourceStartSecond,
         isInside: false,
-        isDeleted: false,
+        isExcluded: false,
       }
     case 'after': {
       const piece = position.previousPiece
-      return { videoId: piece.videoId, piece, sourceSecond: framesToSeconds(piece.sourceEndFrame - 1, piece.fps), isInside: false, isDeleted: false }
+      return { videoId: piece.videoId, piece, sourceSecond: framesToSeconds(piece.sourceEndFrame - 1, piece.fps), isInside: false, isExcluded: false }
     }
     default:
       return null
@@ -54,8 +56,9 @@ export function resolvePreviewTarget(program, second) {
 
 /**
  * Resolves where playback starts and which clock drives it. Inside a piece the
- * video plays; inside a gap or deleted part playback skips to the next piece.
- * Before the first and after the last piece the timeline clock plays the activity.
+ * video plays; inside a gap or an excluded segment between pieces playback skips to
+ * the next piece. Before the first and after the last piece the timeline clock
+ * plays the activity.
  * @param {{pieces: Array<object>, joins: Array<object>}} program Built program.
  * @param {number} second Requested timeline second.
  * @returns {{source: 'video'|'timeline', second: number}} Playback start.

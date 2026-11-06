@@ -44,8 +44,8 @@ describe('project snapshot contract', () => {
           path: { kind: 'absolute', value: 'D:\\video\\lap.mp4' },
           offsetSeconds: 7.5,
           offsetSource: 'auto',
-          deletedParts: [],
-          transitionIn: null,
+          cuts: [],
+          segments: { start: { excluded: false, transitionIn: null } },
           placementAnchor: null,
         },
       ],
@@ -217,15 +217,19 @@ describe('project snapshot contract', () => {
     useStore.setState(useStore.getInitialState(), true)
     const later = createTestVideo({ id: 'video-2', path: 'C:\\Events\\clips\\b.mp4', importOrder: 1 })
     const earlier = createTestVideo({ id: 'video-1', path: 'D:\\a.mp4' })
-    const deletedPart = { id: 'cut-1', fromSecond: 5, toSecond: 10, transition: { type: 'dissolve', durationSeconds: 1.5 } }
+    const cut = { id: 'cut-1', frame: 150 }
+    const segments = {
+      start: { excluded: false, transitionIn: { type: 'none', durationSeconds: 0 } },
+      'cut-1': { excluded: true, transitionIn: { type: 'dissolve', durationSeconds: 1.5 } },
+    }
     useStore.setState({
       importedVideos: [later, earlier],
       videoEdits: {
-        'video-1': { offsetSeconds: -12.5, deletedParts: [], transitionIn: null, placementAnchor: null },
+        'video-1': { offsetSeconds: -12.5, cuts: [], segments: { start: { excluded: false, transitionIn: null } }, placementAnchor: null },
         'video-2': {
           offsetSeconds: 70,
-          deletedParts: [deletedPart],
-          transitionIn: { type: 'none', durationSeconds: 0 },
+          cuts: [cut],
+          segments,
           placementAnchor: { videoId: 'video-1', side: 'after' },
         },
       },
@@ -239,20 +243,21 @@ describe('project snapshot contract', () => {
         id: 'video-1',
         path: { kind: 'absolute', value: 'D:\\a.mp4' },
         offsetSeconds: -12.5,
-        deletedParts: [],
-        transitionIn: null,
+        cuts: [],
+        segments: { start: { excluded: false, transitionIn: null } },
         placementAnchor: null,
       },
       {
         id: 'video-2',
         path: { kind: 'project-relative', value: 'clips/b.mp4' },
         offsetSeconds: 70,
-        deletedParts: [deletedPart],
-        transitionIn: { type: 'none', durationSeconds: 0 },
+        cuts: [cut],
+        segments,
         placementAnchor: { videoId: 'video-1', side: 'after' },
       },
     ])
-    expect(project.sources.videos[1].deletedParts[0]).not.toBe(deletedPart)
+    expect(project.sources.videos[1].cuts[0]).not.toBe(cut)
+    expect(project.sources.videos[1].segments['cut-1'].transitionIn).not.toBe(segments['cut-1'].transitionIn)
     expect(project.transitionDefaults).toEqual({ type: 'none', durationSeconds: 3, splitGapThresholdSeconds: 0.5 })
     expect(project.render.exportMode).toBe('composite')
   })

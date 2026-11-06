@@ -62,7 +62,7 @@ describe('useTransitionProxyQueue', () => {
     expect(Object.values(useStore.getState().transitionProxies).map((proxy) => proxy.status)).toEqual(['ready', 'failed'])
 
     // A hard cut into c no longer needs its proxy; the failed one is not retried.
-    act(() => useStore.getState().setJoinTransition({ kind: 'clip', ownerId: 'c' }, { type: 'none', durationSeconds: 0 }))
+    act(() => useStore.getState().setJoinTransition({ videoId: 'c', segmentKey: 'start' }, { type: 'none', durationSeconds: 0 }))
     await waitFor(() => expect(backend.releaseTransitionProxy).toHaveBeenCalledExactlyOnceWith('proxy-c'))
     expect(Object.values(useStore.getState().transitionProxies).map((proxy) => proxy.status)).toEqual(['failed'])
     expect(backend.renderTransitionProxy).toHaveBeenCalledTimes(2)

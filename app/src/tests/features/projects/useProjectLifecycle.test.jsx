@@ -57,8 +57,8 @@ function projectVideo(id, path, offsetSeconds = 0) {
     path: { kind: 'project-relative', value: path },
     offsetSeconds,
     offsetSource: 'auto',
-    deletedParts: [],
-    transitionIn: null,
+    cuts: [],
+    segments: { start: { excluded: false, transitionIn: null } },
     placementAnchor: null,
   }
 }
@@ -719,8 +719,11 @@ describe('useProjectLifecycle canonical load orchestration', () => {
           projectVideo('clip-missing', 'missing.mp4', 50),
           {
             ...projectVideo('clip-c', 'c.mp4', 100),
-            deletedParts: [{ id: 'cut-1', fromSecond: 5, toSecond: 10, transition: null }],
-            transitionIn: { type: 'fade', durationSeconds: 1 },
+            cuts: [{ id: 'cut-1', frame: 150 }],
+            segments: {
+              start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 } },
+              'cut-1': { excluded: true, transitionIn: null },
+            },
             placementAnchor: { videoId: 'clip-missing', side: 'after' },
           },
         ],
@@ -771,12 +774,21 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     ])
     expect(state.importedVideos.map((video) => video.preview.importId)).toEqual(['import:C:\\Events\\a.mp4', 'import:C:\\Events\\c.mp4'])
     expect(state.videoEdits).toEqual({
-      'clip-a': { offsetSeconds: -5, offsetSource: 'auto', deletedParts: [], transitionIn: null, placementAnchor: null },
+      'clip-a': {
+        offsetSeconds: -5,
+        offsetSource: 'auto',
+        cuts: [],
+        segments: { start: { excluded: false, transitionIn: null } },
+        placementAnchor: null,
+      },
       'clip-c': {
         offsetSeconds: 100,
         offsetSource: 'auto',
-        deletedParts: [{ id: 'cut-1', fromSecond: 5, toSecond: 10, transition: null }],
-        transitionIn: { type: 'fade', durationSeconds: 1 },
+        cuts: [{ id: 'cut-1', frame: 150 }],
+        segments: {
+          start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 } },
+          'cut-1': { excluded: true, transitionIn: null },
+        },
         placementAnchor: null,
       },
     })
@@ -823,8 +835,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       rasterLoadResults: {},
       legacyBatchVideoFolder: null,
     })
-    // The file located for clip-c is shorter than its deleted part (5–10 s).
-    boundaries.preparePreviewVideo.mockImplementation(async (path) => preparedVideo(path, path.endsWith('c.mp4') ? 8 : 40))
+    // The file located for clip-c ends before its cut (at 5 s).
+    boundaries.preparePreviewVideo.mockImplementation(async (path) => preparedVideo(path, path.endsWith('c.mp4') ? 3 : 40))
 
     await expect(
       loadProject({
@@ -832,7 +844,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         resolveProjectSources: vi.fn().mockResolvedValue({ activityPath: null, videoPaths: multiVideoPaths }),
         prepareActivityPath: vi.fn(),
       }),
-    ).rejects.toThrow('Deleted video parts must be within the imported video duration')
+    ).rejects.toThrow('Video cuts must lie inside the imported video')
 
     expect(boundaries.registerPreviewVideo).not.toHaveBeenCalled()
     expect(boundaries.removePreviewVideo).not.toHaveBeenCalled()

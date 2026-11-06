@@ -62,7 +62,13 @@ describe('createImportedVideo ingress', () => {
   })
 
   test('new edits are automatic and import order continues after the collection', () => {
-    expect(createVideoEdits()).toEqual({ offsetSeconds: 0, offsetSource: 'auto', deletedParts: [], transitionIn: null, placementAnchor: null })
+    expect(createVideoEdits()).toEqual({
+      offsetSeconds: 0,
+      offsetSource: 'auto',
+      cuts: [],
+      segments: { start: { excluded: false, transitionIn: null } },
+      placementAnchor: null,
+    })
     expect(nextImportOrder([])).toBe(0)
     expect(nextImportOrder([{ importOrder: 4 }, { importOrder: 1 }])).toBe(5)
   })

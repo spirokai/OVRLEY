@@ -11,14 +11,13 @@ export function JoinTransitionControl({ model, id }) {
   const { t } = useTranslation()
   return (
     <div className="space-y-1">
-      <div className="grid grid-cols-[minmax(0,1fr)_6rem] items-start gap-2">
+      <div className={`grid items-start gap-2 ${model.durationSeconds !== null ? 'grid-cols-[minmax(0,1fr)_6rem]' : 'grid-cols-1'}`}>
         <TransitionSelect
           id={id}
           value={model.value}
           label={model.label}
           previewType={model.previewType}
           defaultLabel={model.defaultLabel}
-          disabled={!model.isAvailable}
           onSelect={model.onSelect}
         />
         {model.durationSeconds !== null ? (

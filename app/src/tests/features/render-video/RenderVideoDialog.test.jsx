@@ -189,7 +189,7 @@ describe('RenderVideoDialog', () => {
     render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), exportMode: 'composite', codec: 'libx264' }} />)
 
     expect(screen.getByRole('alert', { name: 'One video file cannot be rendered' })).toHaveTextContent(
-      'Videos overlap (ride.mp4, climb.mp4). Move a video or delete the overlapping part.',
+      'Videos overlap (ride.mp4, climb.mp4). Move a video or exclude the overlapping part from export.',
     )
   })
 

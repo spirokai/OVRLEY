@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vite-plus/test'
 import { reviewExport } from '@/features/render-video/utils/exportOutputs'
 import { joinVideoEdits } from '@/lib/video-program/video-collection'
-import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
+import { createTestVideo, cutEdits, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 const defaults = { type: 'wipeleft', durationSeconds: 1, splitGapThresholdSeconds: 2 }
 const all = { type: 'all', from: 0, to: 0 }
@@ -66,9 +66,15 @@ describe('reviewExport', () => {
     expect(review({ clips, exportMode: 'transparent' }).outputs[0].transitions).toEqual([{ type: 'none', durationSeconds: 0 }])
   })
 
-  test('renders separate files joined at their deleted parts', () => {
+  test('renders separate files joined across their excluded segments', () => {
     const clips = clipsOf([ride, climb], { ride: 0, climb: 30 }, (edits) => {
-      edits.ride.deletedParts = [{ id: 'part', fromSecond: 10, toSecond: 20, transition: { type: 'fade', durationSeconds: 0.5 } }]
+      Object.assign(
+        edits.ride,
+        cutEdits([
+          { id: 'c1', frame: 300, excluded: true },
+          { id: 'c2', frame: 600, transitionIn: { type: 'fade', durationSeconds: 0.5 } },
+        ]),
+      )
     })
     // Overlapping videos render as separate files without trimming each other.
     const { outputs, blockers } = review({ clips, outputMode: 'separate' })
@@ -93,7 +99,7 @@ describe('reviewExport', () => {
     const { blockers, outputs } = review({ clips, inspection: inspected(clips, ['climb']) })
     expect(outputs).toBeNull()
     expect(blockers).toEqual([
-      'Videos overlap (ride.mp4, climb.mp4). Move a video or delete the overlapping part.',
+      'Videos overlap (ride.mp4, climb.mp4). Move a video or exclude the overlapping part from export.',
       'Videos differ in resolution or frame rate (wide.mp4). Remove them or export separate files.',
       'Some videos cannot be exported (climb.mp4).',
     ])
@@ -104,8 +110,14 @@ describe('reviewExport', () => {
 
   test('blocks transitions longer than the pieces they join', () => {
     const clips = clipsOf([ride, climb], { ride: 0, climb: 70 }, (edits) => {
-      edits.climb.transitionIn = { type: 'fade', durationSeconds: 40 }
-      edits.ride.deletedParts = [{ id: 'part', fromSecond: 10, toSecond: 20, transition: { type: 'fade', durationSeconds: 12 } }]
+      edits.climb.segments.start.transitionIn = { type: 'fade', durationSeconds: 40 }
+      Object.assign(
+        edits.ride,
+        cutEdits([
+          { id: 'c1', frame: 300, excluded: true },
+          { id: 'c2', frame: 600, transitionIn: { type: 'fade', durationSeconds: 12 } },
+        ]),
+      )
     })
     expect(review({ clips }).blockers).toEqual(['Some transitions are longer than the video pieces they join.'])
     const separate = review({ clips, outputMode: 'separate' })
@@ -114,6 +126,16 @@ describe('reviewExport', () => {
       error: 'A transition is longer than the video pieces it joins',
     })
     expect(separate.outputs.map((output) => output.id)).toEqual(['/videos/climb.mp4'])
+  })
+
+  test('a video excluded as a whole renders nothing and says so', () => {
+    const clips = clipsOf([ride, climb], { ride: 0, climb: 70 }, (edits) => {
+      edits.climb.segments.start.excluded = true
+    })
+    const { rows, outputs } = review({ clips, outputMode: 'separate' })
+    expect(rows.find((row) => row.id === 'climb')).toMatchObject({ status: 'blocked', error: 'Excluded from export' })
+    expect(outputs.map((output) => output.id)).toEqual(['/videos/ride.mp4'])
+    expect(review({ clips }).outputs[0].pieces.map((piece) => piece.sourceId)).toEqual(['source-ride'])
   })
 
   test('builds no outputs while videos are still being inspected', () => {

@@ -289,13 +289,13 @@ pub fn build_composite_ffmpeg_settings(
     if include_audio {
         output_args.extend(["-map".to_string(), "[aout]".to_string()]);
     }
-    // A constant output grid: a source whose frames do not sit on the planned frame
-    // rate (variable or misreported) still renders exactly its planned frames.
+    // `-r` makes the output constant-rate, which keeps a frame whose timestamp the
+    // source repeats. The encoder stops at the planned frames: joined outputs count them.
     output_args.extend([
-        "-fps_mode".to_string(),
-        "cfr".to_string(),
         "-r".to_string(),
         render.source_fps.ffmpeg_arg(),
+        "-frames:v".to_string(),
+        render.output_frame_count.to_string(),
     ]);
     output_args.extend([
         "-c:v".to_string(),

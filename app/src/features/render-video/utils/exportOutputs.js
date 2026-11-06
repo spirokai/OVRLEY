@@ -1,9 +1,9 @@
 /**
  * Reviews an export of the imported videos and builds its native batch outputs.
  *
- * Separate mode renders one output per video: its pieces after deleted parts and
+ * Separate mode renders one output per video: its pieces after excluded segments and
  * the export range (overlaps with other videos do not trim them), joined by the
- * transitions at its deleted parts. Combined mode renders one output holding the
+ * transitions of its segments. Combined mode renders one output holding the
  * program (overlaps resolved), joined by the program's transitions. Transparent
  * outputs join their pieces with hard cuts.
  */
@@ -44,7 +44,7 @@ export function formatCombinedExportIssue(issue, clips, t) {
   const names = clips.filter((clip) => issue.videoIds.includes(clip.id)).map((clip) => filenameFromSelectedPath(clip.path))
   return issue.kind === 'overlap'
     ? t('render-video.combinedOverlap', {
-        defaultValue: 'Videos overlap ({{names}}). Move a video or delete the overlapping part.',
+        defaultValue: 'Videos overlap ({{names}}). Move a video or exclude the overlapping part from export.',
         names: names.join(', '),
       })
     : t('render-video.combinedIncompatible', {

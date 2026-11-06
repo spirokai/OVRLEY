@@ -145,7 +145,8 @@ describe('useClipDrag', () => {
 
     expect(setVideoOffset).toHaveBeenCalledTimes(1)
     expect(setVideoOffset.mock.calls[0][0]).toBe('second')
-    expect(setVideoOffset.mock.calls[0][1]).toBe(25)
+    // The snapped edge commits exactly, so the clips touch.
+    expect(setVideoOffset.mock.calls[0][1]).toBe(5.03 + 20)
   })
 
   test('drags the activity lane by shifting every clip the opposite way', () => {
@@ -173,8 +174,8 @@ describe('useClipDrag', () => {
 
     expect(setVideoOffset).not.toHaveBeenCalled()
     expect(shiftVideoOffsets).toHaveBeenCalledTimes(1)
-    expect(shiftVideoOffsets.mock.calls[0][0]).toBeCloseTo(-1.23)
-    expect(5.03 + shiftVideoOffsets.mock.calls[0][0]).toBeCloseTo(3.8)
+    // The earliest clip lands on a frame of its own (30 fps).
+    expect(5.03 + shiftVideoOffsets.mock.calls[0][0]).toBeCloseTo(115 / 30)
     expect(setVideoDragPreview).toHaveBeenLastCalledWith(null)
   })
 
@@ -253,7 +254,7 @@ describe('useClipDrag', () => {
       result.current.commitNudge()
     })
 
-    expect(setVideoOffset).toHaveBeenLastCalledWith('first', 4.8)
+    expect(setVideoOffset).toHaveBeenLastCalledWith('first', 145 / 30)
     expect(setVideoDragPreview).toHaveBeenLastCalledWith(null)
 
     act(() => {
@@ -267,7 +268,7 @@ describe('useClipDrag', () => {
     })
 
     expect(shiftVideoOffsets).toHaveBeenCalledTimes(1)
-    expect(5.03 + shiftVideoOffsets.mock.calls[0][0]).toBeCloseTo(4.9)
+    expect(5.03 + shiftVideoOffsets.mock.calls[0][0]).toBeCloseTo(148 / 30)
   })
 
   test('reduces autoscroll edge penetration when the timeline is zoomed in', () => {

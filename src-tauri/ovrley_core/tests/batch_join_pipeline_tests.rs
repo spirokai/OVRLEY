@@ -620,6 +620,85 @@ fn sources_with_edit_lists_or_late_video_join_with_their_planned_frames() {
     }
 }
 
+/// A spliced recording can repeat a frame's timestamp. Constant-rate output keeps
+/// the extra frame, so the part must still stop at its planned frames.
+#[test]
+fn a_source_repeating_a_timestamp_joins_with_its_planned_frames() {
+    let workspace = Workspace::new("batch-join-repeated-timestamp");
+    let base = workspace.source("base.mp4", 2.0, false);
+    let encoded = workspace.paths.temp_dir.join("encoded.mp4");
+    let repeated = workspace.paths.temp_dir.join("repeated.mp4");
+    // B-frames leave room between DTS and PTS, so the later PTS can move back a frame.
+    for args in [
+        vec![
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x32:rate=30000/1001:duration=3",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "medium",
+            "-bf",
+            "2",
+            encoded.to_str().unwrap(),
+        ],
+        vec![
+            "-i",
+            encoded.to_str().unwrap(),
+            "-c",
+            "copy",
+            "-bsf:v",
+            r"setts=pts=if(gt(PTS\,30000)\,PTS-1001\,PTS)",
+            repeated.to_str().unwrap(),
+        ],
+    ] {
+        let generated = Command::new(&workspace.ffmpeg)
+            .args(["-v", "error", "-y"])
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            generated.status.success(),
+            "{}",
+            String::from_utf8_lossy(&generated.stderr)
+        );
+    }
+    let source = workspace
+        .inspection
+        .inspect_source(
+            &workspace.paths,
+            &workspace.inspection_id,
+            repeated.to_str().unwrap(),
+        )
+        .unwrap();
+    let base_piece = common::builders::whole_source_piece(&base, false);
+    let piece = common::builders::whole_source_piece(&source, false);
+    let frames = (base_piece.end_frame + piece.end_frame).to_string();
+    let target = workspace.paths.downloads_dir.join("joined.mp4");
+    let request = workspace.request(
+        BatchExportMode::Composite,
+        BatchDestination::File {
+            path: target.to_str().unwrap().into(),
+            overwrite: false,
+        },
+        vec![BatchRenderOutput {
+            id: "joined".into(),
+            pieces: vec![base_piece, piece],
+            transitions: common::builders::hard_cuts(2),
+        }],
+    );
+    let snapshot = workspace.render(request);
+    assert_eq!(
+        snapshot.phase,
+        BatchPhase::Completed,
+        "{:?}",
+        snapshot.items[0].outcome
+    );
+    let streams = workspace.probe_streams(&target);
+    assert_eq!(stream(&streams, "video")[0]["nb_read_packets"], frames);
+}
+
 #[test]
 fn frames_without_activity_coverage_keep_only_raster_widgets() {
     let workspace = Workspace::new("raster-only-outside-coverage");

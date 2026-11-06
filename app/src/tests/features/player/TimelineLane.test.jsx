@@ -8,7 +8,7 @@ function createClip(overrides = {}) {
     clipContentClassName: 'translate-y-[0.04rem]',
     clipProps: {},
     clipStyle: { left: '0%', width: '50%' },
-    cuts: [],
+    excludedSegments: [],
     durationLabel: '00:20',
     formatLabel: 'FIT',
     highlightStyle: null,
@@ -17,7 +17,6 @@ function createClip(overrides = {}) {
     isVideo: false,
     isVisible: true,
     label: 'ride.fit',
-    markStyle: null,
     showText: true,
     sourceColumnWidth: '1.5rem',
     textClassName: 'text-background',
@@ -38,6 +37,7 @@ function createLane(clipOverrides = {}, laneOverrides = {}) {
     isVideo: false,
     clips: [createClip(clipOverrides)],
     conflictBands: [],
+    cutMarkers: [],
     joinMarkers: [],
     ...laneOverrides,
   }
@@ -48,6 +48,22 @@ function renderLane(overrides = {}) {
 }
 
 describe('TimelineLane', () => {
+  test('greys excluded segments and offers removing a cut from its marker', () => {
+    const onRemove = vi.fn()
+    render(
+      <TimelineLane
+        lane={createLane(
+          { excludedSegments: [{ key: 'c1', style: { left: '25%', width: '50%' } }] },
+          { cutMarkers: [{ key: 'ride:c1', style: { left: '25%' }, label: 'Cut at 00:05', onRemove }] },
+        )}
+      />,
+    )
+    expect(screen.getByTestId('timeline-excluded-segment')).toHaveStyle({ left: '25%', width: '50%' })
+    fireEvent.click(screen.getByRole('button', { name: 'Cut at 00:05' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove cut' }))
+    expect(onRemove).toHaveBeenCalledOnce()
+  })
+
   test('renders activity source, filename, and duration when the lane model allows text', () => {
     renderLane()
 
