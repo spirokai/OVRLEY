@@ -689,7 +689,9 @@ impl ValidatedBatchTemplate {
                                     .metadata
                                     .has_audio
                                     .then(|| PathBuf::from(&piece.source.metadata.path)),
-                                trim_start: piece.window.trim_start,
+                                // The audio stays with the frames, wherever they start in the file.
+                                trim_start: piece.window.trim_start
+                                    + piece.source.metadata.video_start_seconds(),
                                 duration: seconds(piece.frames),
                             })
                             .collect(),

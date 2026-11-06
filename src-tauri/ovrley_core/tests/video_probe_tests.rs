@@ -22,7 +22,7 @@
 
 use serde_json::json;
 
-use ovrley_core::media::video_probe::read_video_stream_duration;
+use ovrley_core::media::video_probe::{read_video_start_offset, read_video_stream_duration};
 use ovrley_core::media::{Resolution, SourceVideoMetadata};
 
 mod common;
@@ -49,6 +49,53 @@ fn falls_back_to_frame_count_when_stream_duration_is_missing() {
     let duration = read_video_stream_duration(&stream, Some(30.0)).unwrap();
 
     assert!((duration - 30.033333333333335).abs() < 1e-9);
+}
+
+#[test]
+fn a_duration_cut_short_by_an_edit_list_is_rounded_down_to_whole_frames() {
+    let fps = 30000.0 / 1001.0;
+    // 180 frames in the track; the edit list shows 5.506 s, or 165.015 frames.
+    let stream = json!({ "duration": "5.506000", "nb_frames": "180" });
+
+    let duration = read_video_stream_duration(&stream, Some(fps)).unwrap();
+
+    assert!((duration - 165.0 / fps).abs() < 1e-9, "{duration}");
+}
+
+#[test]
+fn a_rounded_duration_of_a_whole_track_is_kept() {
+    let fps = 1056900.0 / 17627.0;
+    let stream = json!({ "duration": "117.513333", "nb_frames": "7046" });
+
+    assert_eq!(
+        read_video_stream_duration(&stream, Some(fps)),
+        Some(117.513333)
+    );
+}
+
+#[test]
+fn the_video_start_offset_counts_from_the_file_start() {
+    let late = read_video_start_offset(
+        &json!({ "start_time": "0.066700" }),
+        &json!({ "start_time": "0.000000" }),
+    )
+    .unwrap();
+    assert!((late - 0.0667).abs() < 1e-9);
+    // Timestamps that start high with every stream are not late video.
+    assert_eq!(
+        read_video_start_offset(
+            &json!({ "start_time": "10.000000" }),
+            &json!({ "start_time": "10.000000" }),
+        ),
+        Some(0.0)
+    );
+    assert_eq!(
+        read_video_start_offset(
+            &json!({ "start_time": "N/A" }),
+            &json!({ "start_time": "0" })
+        ),
+        None
+    );
 }
 
 #[test]
@@ -80,6 +127,7 @@ fn source_video_metadata_serializes_sync_and_legacy_creation_fields() {
         camera_type: None,
         camera_model: None,
         time_source: None,
+        video_start_offset: None,
     };
 
     let value = serde_json::to_value(metadata).unwrap();

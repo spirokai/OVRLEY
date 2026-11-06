@@ -520,6 +520,106 @@ fn transition_proxies_blend_the_join_at_preview_size() {
     assert!(!stale.exists());
 }
 
+/// Guards the "N video frames instead of M" join failure. A source renders exactly
+/// its planned frames when an edit list hides frames of its track (the plan counts
+/// what the edit list shows) and when its video starts after the file does (the
+/// trims follow the video), with the audio as long as the video.
+#[test]
+fn sources_with_edit_lists_or_late_video_join_with_their_planned_frames() {
+    let workspace = Workspace::new("batch-join-short-sources");
+    let temp = &workspace.paths.temp_dir;
+    let base = workspace.source("base.mp4", 6.0, false);
+    let ride = workspace.source("ride.mp4", 6.0, true);
+    let remux = |name: &str, args: &[&str]| {
+        let path = temp.join(name);
+        let remuxed = Command::new(&workspace.ffmpeg)
+            .args(["-v", "error", "-y"])
+            .args(args)
+            .args(["-c", "copy"])
+            .arg(&path)
+            .output()
+            .unwrap();
+        assert!(
+            remuxed.status.success(),
+            "{}",
+            String::from_utf8_lossy(&remuxed.stderr)
+        );
+        workspace
+            .inspection
+            .inspect_source(
+                &workspace.paths,
+                &workspace.inspection_id,
+                path.to_str().unwrap(),
+            )
+            .unwrap()
+    };
+    let ride_path = ride.metadata.path.as_str();
+    let edit_list = remux("edit-list.mp4", &["-ss", "0.5", "-i", ride_path]);
+    let late_video = remux(
+        "late-video.mp4",
+        &[
+            "-itsoffset",
+            "0.0667",
+            "-i",
+            ride_path,
+            "-i",
+            ride_path,
+            "-map",
+            "0:v",
+            "-map",
+            "1:a",
+        ],
+    );
+    let base_piece = common::builders::whole_source_piece(&base, false);
+    assert_eq!(base_piece.end_frame, 180);
+    let mut joins = 0;
+    for (short, short_frames) in [(&edit_list, 165), (&late_video, 180)] {
+        let short_piece = common::builders::whole_source_piece(short, false);
+        assert_eq!(short_piece.end_frame, short_frames);
+        for (transition, transition_frames) in
+            [(xfade("none", 0.0), 0), (xfade("wipeleft", 0.5), 15)]
+        {
+            joins += 1;
+            let target = workspace
+                .paths
+                .downloads_dir
+                .join(format!("joined-{joins}.mp4"));
+            let request = workspace.request(
+                BatchExportMode::Composite,
+                BatchDestination::File {
+                    path: target.to_str().unwrap().into(),
+                    overwrite: false,
+                },
+                vec![BatchRenderOutput {
+                    id: "joined".into(),
+                    pieces: vec![base_piece.clone(), short_piece.clone()],
+                    transitions: vec![transition],
+                }],
+            );
+            let snapshot = workspace.render(request);
+            assert_eq!(
+                snapshot.phase,
+                BatchPhase::Completed,
+                "{:?}",
+                snapshot.items[0].outcome
+            );
+            let frames = 180 + short_frames - transition_frames;
+            let streams = workspace.probe_streams(&target);
+            assert_eq!(
+                stream(&streams, "video")[0]["nb_read_packets"],
+                frames.to_string()
+            );
+            let video_seconds = frames as f64 * 1001.0 / 30000.0;
+            let audio_seconds = seconds(&stream(&streams, "audio")[0]["duration"]);
+            assert!(
+                (audio_seconds - video_seconds).abs() < 0.03,
+                "audio {audio_seconds} s, video {video_seconds} s"
+            );
+            assert!(workspace.parts_directories().is_empty());
+        }
+    }
+}
+
 #[test]
 fn frames_without_activity_coverage_keep_only_raster_widgets() {
     let workspace = Workspace::new("raster-only-outside-coverage");

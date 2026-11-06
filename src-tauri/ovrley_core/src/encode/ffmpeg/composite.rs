@@ -289,7 +289,14 @@ pub fn build_composite_ffmpeg_settings(
     if include_audio {
         output_args.extend(["-map".to_string(), "[aout]".to_string()]);
     }
-    output_args.extend(["-r".to_string(), render.source_fps.ffmpeg_arg()]);
+    // A constant output grid: a source whose frames do not sit on the planned frame
+    // rate (variable or misreported) still renders exactly its planned frames.
+    output_args.extend([
+        "-fps_mode".to_string(),
+        "cfr".to_string(),
+        "-r".to_string(),
+        render.source_fps.ffmpeg_arg(),
+    ]);
     output_args.extend([
         "-c:v".to_string(),
         selected_profile

@@ -41,6 +41,16 @@ pub struct SourceVideoMetadata {
     pub camera_type: Option<String>,
     pub camera_model: Option<String>,
     pub time_source: Option<String>,
+    /// Seconds the first video frame sits after the file's start, when reported
+    /// by ffprobe. FFmpeg's trims count from the file's start.
+    pub video_start_offset: Option<f64>,
+}
+
+impl SourceVideoMetadata {
+    /// Where the video stream starts in file time. An unreported start is the file's.
+    pub fn video_start_seconds(&self) -> f64 {
+        self.video_start_offset.unwrap_or(0.0)
+    }
 }
 
 /// Width and height in pixels as reported by source video probes.
