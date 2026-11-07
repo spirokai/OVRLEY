@@ -92,9 +92,12 @@ export function buildWidgetBadges({
     const left = geometry.content.left + originX - originX * cos + originY * sin
     const top = geometry.content.top + originY - originX * sin - originY * cos
     const { width, height } = geometry.content
+    const widget = widgetMap[id]
     badges.push({
       id,
-      type: widgetMap[id].type,
+      type: widget.type,
+      // Badges outlive the widget map by a render, e.g. after deletion, so the hint reads this, not the map.
+      cameraMode: widget.type === 'map' ? widget.data.camera_mode : undefined,
       left: left * displayScale + 2 * cos + 20 * sin,
       top: Math.max(top * displayScale + 2 * sin - 20 * cos, 0),
       rotation: (Math.atan2(sin, cos) * 180) / Math.PI,
@@ -115,7 +118,7 @@ export function areWidgetBadgesEqual(previous, next) {
     const left = previous[index]
     const right = next[index]
     if (left.id !== right.id || left.type !== right.type || left.left !== right.left || left.top !== right.top) return false
-    if (left.rotation !== right.rotation) return false
+    if (left.rotation !== right.rotation || left.cameraMode !== right.cameraMode) return false
     if (left.bottomCenter.left !== right.bottomCenter.left || left.bottomCenter.top !== right.bottomCenter.top) return false
   }
   return true

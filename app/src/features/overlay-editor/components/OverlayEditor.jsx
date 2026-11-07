@@ -47,7 +47,6 @@ function OverlayEditorContent(props) {
     handleWidgetMouseDown,
     moveableProps,
     widgetBadges,
-    widgetMap,
   } = editor
   const { displayScale, viewportRef, scrollViewportRef, handleWheel } = viewport
   return (
@@ -154,7 +153,7 @@ function OverlayEditorContent(props) {
                       style={{ left: badge.bottomCenter.left, top: badge.bottomCenter.top }}
                     >
                       {/* A chase camera follows the rider, so it only zooms. */}
-                      {widgetMap[badge.id].data.camera_mode === 'fixed'
+                      {badge.cameraMode === 'fixed'
                         ? t('overlay-editor.mapViewHint', 'Double-click to pan & zoom')
                         : t('overlay-editor.mapViewZoomHint', 'Double-click to zoom')}
                     </div>
