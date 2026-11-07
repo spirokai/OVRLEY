@@ -1,4 +1,5 @@
-// One tile worker: fetches a tile through the loopback cache, then decodes and tessellates it.
+// One tile worker: fetches a tile through the loopback cache, then decodes, tessellates and labels it.
+// Labels need the bundled font files, which the shell serves beside the tiles; the decoder names them.
 const BASE_URL = '/wasm-bindings'
 let ready
 let tileUrl
@@ -7,7 +8,15 @@ async function start({ config, style, tileUrl: url }) {
   tileUrl = url
   const module = await import(/* @vite-ignore */ `${BASE_URL}/wasm_map_bindings.js`)
   await module.default({ module_or_path: `${BASE_URL}/wasm_map_bindings_bg.wasm` })
-  return new module.TileDecoder(config, style)
+  const fonts = await Promise.all(module.TileDecoder.font_files(config, style).map(fetchFont))
+  return new module.TileDecoder(config, style, fonts)
+}
+
+/** @param {string} name Font file name. @returns {Promise<Uint8Array>} Its bytes. */
+async function fetchFont(name) {
+  const response = await fetch(new URL(`/fonts/${name}`, tileUrl))
+  if (!response.ok) throw new Error(`Map font ${name}: HTTP ${response.status}`)
+  return new Uint8Array(await response.arrayBuffer())
 }
 
 async function decode(decoder, { z, x, y }) {

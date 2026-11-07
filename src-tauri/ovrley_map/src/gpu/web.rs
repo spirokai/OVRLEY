@@ -1,26 +1,30 @@
 //! The editor preview's output: a canvas over WebGL2.
 //!
 //! Tiles decode in workers through [`MapTileDecoder`] and reach the renderer as bytes, so the UI
-//! thread only uploads. A view draws with what is resident, and missing tiles show the style's
-//! background until they arrive, because the preview must never block. Pools start small and grow
-//! when a view evicts its own tiles.
+//! thread only uploads. A worker lays a tile's labels out with its own glyph service, built from the
+//! bundled font files the shell serves, and sends the distance fields they draw with them, so the atlas
+//! fills as export's does. A view draws with what is resident, and missing tiles show the style's background until they arrive, because the
+//! preview must never block. Pools start small and grow when a view evicts its own tiles.
 
 use super::extrusion::ExtrusionVertex;
 use super::fill_patterns::PATTERN_COUNT;
+use super::labels::transfer::{decode_labels, encode_labels, TileLabels};
+use super::labels::{Face, GlyphBitmap, GlyphId, GlyphService};
 use super::pipelines::{
     FillShaderFeatureMetadata, ShaderLayerMetadata, ShaderVertex, COLOR_FORMAT,
 };
 use super::pool::PoolEntries;
 use super::style::{parse_style, ParsedStyle};
 use super::tile::{prepare_tile, LayerKind, PreparedLayer, PreparedTile};
+use super::transfer::Reader;
 use super::{
     check_pool_sizes, upload_layer, validate_config, BufferPool, GpuMapConfig, GpuMapRenderer,
     GpuPoolSizes, Targets,
 };
-use crate::{view_tiles, MapCamera, MapRouteDraw, MapViewport, TileId};
+use crate::{frame_tiles, MapCamera, MapLabelDraw, MapRouteDraw, MapViewport, TileId};
 use bytemuck::Pod;
-use std::collections::HashSet;
-use std::mem::size_of;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 /// Decoded layer kinds from here up are fill patterns, by image.
 const FILL_PATTERN_KINDS: u32 = 3;
@@ -30,6 +34,8 @@ pub(crate) struct Output {
     surface_config: wgpu::SurfaceConfiguration,
     /// The tiles of the last asked view, to recognise when a view evicts itself.
     view: HashSet<TileId>,
+    /// Every glyph bitmap the decode workers sent, which the label atlas is filled from.
+    glyphs: HashMap<GlyphId, Arc<GlyphBitmap>>,
 }
 
 impl GpuMapRenderer {
@@ -84,6 +90,7 @@ impl GpuMapRenderer {
             surface,
             surface_config,
             view: HashSet::new(),
+            glyphs: HashMap::new(),
         };
         Self::assemble(config, parsed, device, queue, adapter_name, output)
     }
@@ -101,9 +108,15 @@ impl GpuMapRenderer {
         self.check_gpu()
     }
 
-    /// The tiles `camera` sees that are not on the GPU. Remembers the view for [`Self::upload_tile`].
-    pub fn missing_tiles(&mut self, camera: &MapCamera) -> Vec<TileId> {
-        let tiles = view_tiles(camera, self.config.viewport);
+    /// The tiles a frame at `camera` with `labels` needs that are not on the GPU: those its camera
+    /// sees, and with labels those of their placements' cameras. Remembers the view for
+    /// [`Self::upload_tile`].
+    pub fn missing_tiles(
+        &mut self,
+        camera: &MapCamera,
+        labels: Option<&MapLabelDraw>,
+    ) -> Vec<TileId> {
+        let tiles = frame_tiles(camera, labels, self.config.viewport).tiles;
         self.output.view = tiles.iter().copied().collect();
         tiles
             .into_iter()
@@ -111,12 +124,12 @@ impl GpuMapRenderer {
             .collect()
     }
 
-    /// Uploads a tile from [`MapTileDecoder::decode`]. Grows the pools when it can't fit or when it
-    /// pushes out a tile the view still shows, and the tiles then come back through
+    /// Uploads a tile from [`MapTileDecoder::decode`], with its labels. Grows the pools when it can't
+    /// fit or when it pushes out a tile the view still shows, and the tiles then come back through
     /// [`Self::missing_tiles`].
     pub fn upload_tile(&mut self, tile: TileId, bytes: &[u8]) -> Result<(), String> {
         self.check_gpu()?;
-        let prepared = decode_prepared(bytes)?;
+        let (prepared, labels) = decode_prepared(bytes)?;
         let uploaded = prepared
             .ground
             .iter()
@@ -141,6 +154,20 @@ impl GpuMapRenderer {
         }
         if uploaded.is_err() || evicted_from_view {
             self.grow_pools()?;
+        }
+        // A tile's labels go with its roads.
+        if let Some(layers) = &mut self.labels {
+            let loaded = &self.loaded;
+            layers.retain_tiles(|tile| loaded.contains(&tile));
+            if loaded.contains(&tile) {
+                for (id, bitmap) in labels.glyphs {
+                    self.output.glyphs.entry(id).or_insert_with(|| Arc::new(bitmap));
+                }
+                layers.insert_tile(tile, labels.symbols);
+            }
+            let view: Vec<TileId> = self.output.view.iter().copied().collect();
+            let glyphs = &self.output.glyphs;
+            layers.fill_atlas(&self.queue, &|id| sent_bitmap(glyphs, id), &view)?;
         }
         self.check_gpu()
     }
@@ -169,15 +196,22 @@ impl GpuMapRenderer {
         Ok(())
     }
 
-    /// Draws one frame and presents it to the canvas.
+    /// Draws one frame and presents it to the canvas. `labels` says how its labels are placed and
+    /// faded; the tiles of every camera in it should be loaded.
     pub fn present(
         &mut self,
         camera: &MapCamera,
+        labels: Option<&MapLabelDraw>,
         route: Option<&MapRouteDraw>,
         corner_radius_px: f32,
     ) -> Result<(), String> {
-        // The preview does not draw labels yet.
-        self.prepare_frame(camera, None, route, corner_radius_px)?;
+        // An atlas refilled for another view may lack this one's glyphs, as in export.
+        if let Some(layers) = self.labels.as_mut().filter(|layers| layers.atlas_is_partial()) {
+            let view = frame_tiles(camera, labels, self.config.viewport).tiles;
+            let glyphs = &self.output.glyphs;
+            layers.fill_atlas(&self.queue, &|id| sent_bitmap(glyphs, id), &view)?;
+        }
+        self.prepare_frame(camera, labels, route, corner_radius_px)?;
         let frame = match self.output.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
@@ -196,32 +230,76 @@ impl GpuMapRenderer {
     }
 }
 
-/// Turns tile bytes into uploadable geometry. Runs in a worker, with no GPU.
+/// A bitmap a decode worker sent. Every tile carries those of its labels, so one is always there.
+fn sent_bitmap(
+    glyphs: &HashMap<GlyphId, Arc<GlyphBitmap>>,
+    id: GlyphId,
+) -> Result<Arc<GlyphBitmap>, String> {
+    glyphs
+        .get(&id)
+        .cloned()
+        .ok_or_else(|| format!("No decode worker sent glyph {:?}", id.character))
+}
+
+/// Turns tile bytes into uploadable geometry and laid-out labels. Runs in a worker, with no GPU.
 pub struct MapTileDecoder {
     style: ParsedStyle,
+    /// `None` when the style draws no labels, so the font files are not needed.
+    glyphs: Option<GlyphService>,
 }
 
 impl MapTileDecoder {
-    pub fn new(config: &GpuMapConfig, style: &[u8]) -> Result<Self, String> {
-        validate_config(config)?;
-        Ok(Self {
-            style: parse_style(
-                style,
-                config.spec.layers,
-                config.style_zoom,
-                config.viewport.pixel_ratio(),
-                &config.buildings,
-            )?,
+    /// The font files a decoder for this style takes, in order, which the shell serves by these names:
+    /// every bundled face when the style draws labels, and none when it doesn't.
+    pub fn font_files(config: &GpuMapConfig, style: &[u8]) -> Result<Vec<&'static str>, String> {
+        Ok(if Self::parse(config, style)?.labels.is_empty() {
+            Vec::new()
+        } else {
+            Face::ALL.iter().map(|face| face.file_name()).collect()
         })
     }
 
-    /// Bytes for [`GpuMapRenderer::upload_tile`]. A malformed tile is external data, so it fails
-    /// this tile only.
+    /// `fonts` holds the bytes of [`Self::font_files`], in order.
+    pub fn new(config: &GpuMapConfig, style: &[u8], fonts: Vec<Vec<u8>>) -> Result<Self, String> {
+        let style = Self::parse(config, style)?;
+        let glyphs = if style.labels.is_empty() {
+            None
+        } else {
+            Some(GlyphService::from_files(fonts)?)
+        };
+        Ok(Self { style, glyphs })
+    }
+
+    fn parse(config: &GpuMapConfig, style: &[u8]) -> Result<ParsedStyle, String> {
+        validate_config(config)?;
+        parse_style(
+            style,
+            config.spec.layers,
+            config.style_zoom,
+            config.viewport.pixel_ratio(),
+            &config.buildings,
+        )
+    }
+
+    /// Bytes for [`GpuMapRenderer::upload_tile`]: the tile's roads, buildings and labels. A malformed
+    /// tile is external data, so it fails this tile only.
     pub fn decode(&self, tile: &[u8]) -> Result<Vec<u8>, String> {
-        Ok(encode_prepared(&prepare_tile(tile, &self.style, None)?))
+        let prepared = prepare_tile(
+            tile,
+            &self.style,
+            self.glyphs.as_ref().map(|glyphs| glyphs as _),
+        )?;
+        let bitmap = |face, character| match &self.glyphs {
+            Some(glyphs) => glyphs.bitmap(face, character),
+            None => Err("A map decoder without labels drew a glyph".to_string()),
+        };
+        let mut out = encode_prepared(&prepared);
+        encode_labels(&prepared.labels, &bitmap, &mut out)?;
+        Ok(out)
     }
 }
 
+/// The tile's geometry; [`MapTileDecoder::decode`] appends its labels after it.
 fn encode_prepared(tile: &PreparedTile) -> Vec<u8> {
     fn layer<V: Pod>(out: &mut Vec<u8>, layer: &PreparedLayer<V>) {
         let kind: u32 = match layer.kind {
@@ -255,20 +333,7 @@ fn encode_prepared(tile: &PreparedTile) -> Vec<u8> {
     out
 }
 
-struct Reader<'a>(&'a [u8]);
-
 impl Reader<'_> {
-    fn take<T: Pod>(&mut self, count: usize) -> Result<Vec<T>, String> {
-        let length = count * size_of::<T>();
-        if length > self.0.len() {
-            return Err("A decoded map tile is truncated".to_string());
-        }
-        let (bytes, rest) = self.0.split_at(length);
-        self.0 = rest;
-        // The bytes came from JavaScript, so they may not be aligned for `T`.
-        Ok(bytemuck::pod_collect_to_vec(bytes))
-    }
-
     fn layer<V: Pod>(&mut self) -> Result<PreparedLayer<V>, String> {
         let header: Vec<u32> = self.take(5)?;
         let kind = match header[1] {
@@ -295,7 +360,7 @@ impl Reader<'_> {
     }
 }
 
-fn decode_prepared(bytes: &[u8]) -> Result<PreparedTile, String> {
+fn decode_prepared(bytes: &[u8]) -> Result<(PreparedTile, TileLabels), String> {
     let mut reader = Reader(bytes);
     let counts: Vec<u32> = reader.take(2)?;
     let mut tile = PreparedTile::default();
@@ -305,5 +370,7 @@ fn decode_prepared(bytes: &[u8]) -> Result<PreparedTile, String> {
     for _ in 0..counts[1] {
         tile.extrusions.push(reader.layer::<ExtrusionVertex>()?);
     }
-    Ok(tile)
+    let labels = decode_labels(&mut reader)?;
+    reader.finish()?;
+    Ok((tile, labels))
 }

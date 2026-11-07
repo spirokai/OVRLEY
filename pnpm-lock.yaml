@@ -162,8 +162,8 @@ importers:
         specifier: ^26.4.1
         version: 26.4.1
       igc-parser:
-        specifier: git+https://github.com/Turbo87/igc-parser.git#29672f82c87b93cc2c44b567421a97c05383ea4c
-        version: https://codeload.github.com/Turbo87/igc-parser/tar.gz/29672f82c87b93cc2c44b567421a97c05383ea4c
+        specifier: 2.0.0
+        version: 2.0.0
       immer:
         specifier: ^11.1.4
         version: 11.1.4
@@ -3177,9 +3177,8 @@ packages:
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
 
-  igc-parser@https://codeload.github.com/Turbo87/igc-parser/tar.gz/29672f82c87b93cc2c44b567421a97c05383ea4c:
-    resolution: {tarball: https://codeload.github.com/Turbo87/igc-parser/tar.gz/29672f82c87b93cc2c44b567421a97c05383ea4c}
-    version: 2.0.0
+  igc-parser@2.0.0:
+    resolution: {integrity: sha512-bsJZjPaZRmT8ElFvNgsn5p5rNV6KLilQaRt4fvspufvHeHoeAWpZqsm2UBlwxTnapxnYmhRwaCazZELY4H01BA==}
     engines: {node: '>=12'}
 
   ignore@5.3.2:
@@ -7770,7 +7769,7 @@ snapshots:
 
   ieee754@1.2.1: {}
 
-  igc-parser@https://codeload.github.com/Turbo87/igc-parser/tar.gz/29672f82c87b93cc2c44b567421a97c05383ea4c:
+  igc-parser@2.0.0:
     dependencies:
       flight-recorder-manufacturers: 2.0.0
 

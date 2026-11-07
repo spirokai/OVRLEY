@@ -20,6 +20,8 @@ mod route;
 mod sizing;
 mod style;
 mod tile;
+#[cfg(any(target_arch = "wasm32", test))]
+mod transfer;
 #[cfg(target_arch = "wasm32")]
 mod web;
 

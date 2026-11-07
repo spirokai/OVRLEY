@@ -300,11 +300,22 @@ impl PreviewMap {
             }
         };
         let (camera, viewport) = (request.camera, request.viewport);
+        // The placement cameras, then the blend; empty when the frame draws no labels.
+        let labels: Vec<f64> = request.labels.map_or_else(Vec::new, |draw| {
+            let mut values: Vec<f64> = draw
+                .cameras()
+                .into_iter()
+                .flat_map(MapCamera::values)
+                .collect();
+            values.push(f64::from(draw.blend()));
+            values
+        });
         self.view = serde_json::to_vec(&json!({
             "renderer": {
                 "style": self.style.id,
                 "style_buildings": self.style.buildings,
                 "buildings": self.config.layers.buildings,
+                "labels": self.config.layers.labels,
                 "paths": self.config.layers.paths,
                 "pixel_ratio": viewport.pixel_ratio(),
                 "msaa_samples": self.config.msaa_samples,
@@ -315,6 +326,7 @@ impl PreviewMap {
             "opacity": self.layout.opacity,
             "corner_radius_px": request.corner_radius_px,
             "camera": camera.values(),
+            "labels": labels,
             "route": route,
         }))
         .map_err(|error| WidgetError::Render(error.to_string()))?;

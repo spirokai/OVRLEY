@@ -4,8 +4,8 @@ use ovrley_map::gpu::{
     GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileDecoder, DEFAULT_POOL_ENTRIES,
 };
 use ovrley_map::{
-    MapCamera, MapLayers, MapRouteDraw, MapRouteLine, MapRoutePoint, MapRouteStyle,
-    MapStyleBuildings, MapStyleId, MapStyleSpec, MapViewport, TileId,
+    MapCamera, MapLabelDraw, MapLayers, MapRouteDraw, MapRouteLine, MapRoutePoint, MapRouteStyle,
+    MapStyleBuildings, MapStyleId, MapStyleSpec, MapViewport, TileId, LABEL_PLACEMENTS,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -18,6 +18,7 @@ struct RendererConfig {
     /// The style's 3D buildings, from the catalog.
     style_buildings: MapStyleBuildings,
     buildings: bool,
+    labels: bool,
     paths: bool,
     width: u32,
     height: u32,
@@ -28,6 +29,9 @@ struct RendererConfig {
 
 /// `lon, lat, zoom, pitch, bearing, top padding`, from the widget's view.
 const CAMERA_VALUES: usize = 6;
+/// The cameras of a frame's label placements, oldest first, then the blend between the last two. Empty
+/// when the frame draws no labels.
+const LABEL_VALUES: usize = LABEL_PLACEMENTS * CAMERA_VALUES + 1;
 /// Completed rgba, remaining rgba, then the shared width.
 const ROUTE_STYLE_VALUES: usize = 9;
 /// `world_x, world_y, along_metres` per vertex.
@@ -44,7 +48,7 @@ fn parse_config(json: &str) -> Result<GpuMapConfig, String> {
             style: config.style,
             layers: MapLayers {
                 buildings: config.buildings,
-                labels: false,
+                labels: config.labels,
                 paths: config.paths,
             },
         },
@@ -64,6 +68,27 @@ fn parse_camera(values: &[f64]) -> Result<MapCamera, String> {
         ));
     };
     MapCamera::new(lon, lat, zoom, pitch, bearing, padding)
+}
+
+/// `None` for an empty array: the frame draws no labels.
+fn parse_labels(values: &[f64]) -> Result<Option<MapLabelDraw>, String> {
+    if values.is_empty() {
+        return Ok(None);
+    }
+    if values.len() != LABEL_VALUES {
+        return Err(format!(
+            "A map label draw has {LABEL_VALUES} values, got {}",
+            values.len()
+        ));
+    }
+    let mut cameras = Vec::with_capacity(LABEL_PLACEMENTS);
+    for camera in values[..LABEL_VALUES - 1].chunks_exact(CAMERA_VALUES) {
+        cameras.push(parse_camera(camera)?);
+    }
+    let cameras: [MapCamera; LABEL_PLACEMENTS] = cameras
+        .try_into()
+        .map_err(|_| "A map label draw has the wrong number of cameras".to_string())?;
+    MapLabelDraw::new(cameras, values[LABEL_VALUES - 1] as f32).map(Some)
 }
 
 #[wasm_bindgen]
@@ -110,18 +135,20 @@ impl MapLayer {
         Ok(())
     }
 
-    /// The `z, x, y` of each tile this camera sees that isn't on the GPU yet.
-    pub fn missing(&mut self, camera: &[f64]) -> Result<Vec<u32>, JsValue> {
+    /// The `z, x, y` of each tile this camera, and the cameras of its label placements, see that aren't
+    /// on the GPU yet.
+    pub fn missing(&mut self, camera: &[f64], labels: &[f64]) -> Result<Vec<u32>, JsValue> {
         let camera = parse_camera(camera).map_err(js_error)?;
+        let labels = parse_labels(labels).map_err(js_error)?;
         Ok(self
             .renderer
-            .missing_tiles(&camera)
+            .missing_tiles(&camera, labels.as_ref())
             .iter()
             .flat_map(|tile| [u32::from(tile.z), tile.x as u32, tile.y as u32])
             .collect())
     }
 
-    /// Uploads what [`TileDecoder::decode`] returned.
+    /// Uploads what [`TileDecoder::decode`] returned: a tile's roads, buildings and labels.
     pub fn upload(&mut self, z: u8, x: u32, y: u32, tile: &[u8]) -> Result<(), JsValue> {
         self.renderer
             .upload_tile(TileId::new(z, x as i32, y as i32), tile)
@@ -133,11 +160,18 @@ impl MapLayer {
         self.renderer.resize(width, height).map_err(js_error)
     }
 
-    /// The map alone, for a top-down widget that strokes its route over it.
-    pub fn draw(&mut self, camera: &[f64], corner_radius_px: f32) -> Result<(), JsValue> {
+    /// The map alone, for a top-down widget that strokes its route over it. `labels` is the cameras of
+    /// the label placements and their blend, or empty for none.
+    pub fn draw(
+        &mut self,
+        camera: &[f64],
+        labels: &[f64],
+        corner_radius_px: f32,
+    ) -> Result<(), JsValue> {
         let camera = parse_camera(camera).map_err(js_error)?;
+        let labels = parse_labels(labels).map_err(js_error)?;
         self.renderer
-            .present(&camera, None, corner_radius_px)
+            .present(&camera, labels.as_ref(), None, corner_radius_px)
             .map_err(js_error)
     }
 
@@ -145,11 +179,13 @@ impl MapLayer {
     pub fn draw_with_route(
         &mut self,
         camera: &[f64],
+        labels: &[f64],
         route_style: &[f32],
         travelled_metres: f32,
         corner_radius_px: f32,
     ) -> Result<(), JsValue> {
         let camera = parse_camera(camera).map_err(js_error)?;
+        let labels = parse_labels(labels).map_err(js_error)?;
         let line = self
             .route
             .clone()
@@ -180,7 +216,7 @@ impl MapLayer {
             travelled_metres,
         };
         self.renderer
-            .present(&camera, Some(&route), corner_radius_px)
+            .present(&camera, labels.as_ref(), Some(&route), corner_radius_px)
             .map_err(js_error)
     }
 }
@@ -190,15 +226,33 @@ pub struct TileDecoder(MapTileDecoder);
 
 #[wasm_bindgen]
 impl TileDecoder {
+    /// The bundled font files a decoder for this style takes, in order, by the names the shell serves
+    /// them under. Empty when the style draws no labels.
+    pub fn font_files(config: &str, style: &[u8]) -> Result<Vec<String>, JsValue> {
+        let config = parse_config(config).map_err(js_error)?;
+        Ok(MapTileDecoder::font_files(&config, style)
+            .map_err(js_error)?
+            .into_iter()
+            .map(str::to_owned)
+            .collect())
+    }
+
+    /// `fonts` holds the bytes of [`Self::font_files`], in order.
     #[wasm_bindgen(constructor)]
-    pub fn new(config: &str, style: &[u8]) -> Result<TileDecoder, JsValue> {
+    pub fn new(
+        config: &str,
+        style: &[u8],
+        fonts: Vec<js_sys::Uint8Array>,
+    ) -> Result<TileDecoder, JsValue> {
         console_error_panic_hook::set_once();
         let config = parse_config(config).map_err(js_error)?;
-        MapTileDecoder::new(&config, style)
+        let fonts = fonts.iter().map(js_sys::Uint8Array::to_vec).collect();
+        MapTileDecoder::new(&config, style, fonts)
             .map(Self)
             .map_err(js_error)
     }
 
+    /// A tile's roads, buildings and labels, for [`MapLayer::upload`].
     pub fn decode(&self, tile: &[u8]) -> Result<Vec<u8>, JsValue> {
         self.0.decode(tile).map_err(js_error)
     }

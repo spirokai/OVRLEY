@@ -5,13 +5,14 @@
 //! every glyph the resident tiles use. The vertex shader passes positions through, so projection
 //! happens here, in `f64`, once per placed symbol.
 //!
-//! The preview feeds tiles and glyphs in a later phase, so until then only native export calls most of this.
-#![cfg_attr(target_arch = "wasm32", allow(dead_code))]
+//! Both hosts fill the atlas the same way, from a bitmap lookup: export's is its glyph service, and the
+//! preview's the bitmaps its decode workers sent with each tile.
 
 use super::layer::LabelLayer;
 use super::layout::{GlyphId, GlyphQuad, LabelSymbol, LineSymbol, SymbolKind};
 use super::placement::{
-    glyph_pose, place, GroundLabel, LabelView, PlacedSymbol, PlacementCache, PERSPECTIVE_CUTOFF,
+    glyph_pose, label_source_tile, label_sources, place, GroundLabel, LabelView, PlacedSymbol,
+    PlacementCache, PERSPECTIVE_CUTOFF,
 };
 use super::text::GlyphBitmap;
 use crate::gpu::pipelines::LabelVertex;
@@ -309,15 +310,20 @@ impl LabelLayers {
         }
     }
 
-    /// Puts the glyphs of `view`'s tiles in the atlas. When it fills it is cleared and refilled from
-    /// the resident tiles, the view's first. Fails only when one view's glyphs do not fit.
+    /// Puts the glyphs `view`'s labels draw in the atlas: those of its tiles, or of the resident tile
+    /// above one that stands in while it loads. When it fills it is cleared and refilled from the
+    /// resident tiles, the view's first. Fails only when one view's glyphs do not fit.
     pub(crate) fn fill_atlas(
         &mut self,
         queue: &wgpu::Queue,
         bitmap: &dyn Fn(GlyphId) -> Result<Arc<GlyphBitmap>, String>,
         view: &[TileId],
     ) -> Result<(), String> {
-        let needed = glyphs_of(view.iter().filter_map(|tile| self.tiles.get(tile)));
+        let sources: BTreeSet<TileId> = view
+            .iter()
+            .filter_map(|tile| label_source_tile(*tile, &self.tiles))
+            .collect();
+        let needed = glyphs_of(sources.iter().map(|tile| &self.tiles[tile]));
         let mut inserted = false;
         let mut fits = true;
         for id in &needed {
@@ -369,6 +375,7 @@ impl LabelLayers {
 
     /// Puts as many of `glyphs` in the atlas as fit, without clearing it. Export knows every glyph
     /// it will use before its first frame.
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn preload_atlas(
         &mut self,
         queue: &wgpu::Queue,
@@ -500,10 +507,7 @@ impl LabelLayers {
             (viewport.width_px(), viewport.height_px()),
             self.residency,
             |camera, previous| {
-                let seen: Vec<(TileId, &[LabelSymbol])> = view_tiles(camera, viewport)
-                    .into_iter()
-                    .filter_map(|tile| tiles.get(&tile).map(|symbols| (tile, symbols.as_slice())))
-                    .collect();
+                let seen = label_sources(&view_tiles(camera, viewport), tiles);
                 let view = LabelView::new(
                     &ViewState::new(camera, viewport),
                     viewport.width_px(),

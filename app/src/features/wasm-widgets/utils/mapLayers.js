@@ -259,13 +259,14 @@ export function createMapLayers({ schedule, setReady }) {
       if (key === state.failedKey) return
       wantRenderer(id, state, view, key)
       const camera = Float64Array.from(view.camera)
+      const labels = Float64Array.from(view.labels)
       state.holder.style.opacity = `${view.opacity}`
       try {
         // A replacement fetches for the view it is about to show. Nothing left to wait for means it can show it.
         const replacement = state.replacement
         if (replacement?.key === key) {
           fitSize(replacement, view)
-          if (replacement.workers.want(replacement.layer.missing(camera)) === 0) show(id, state, replacement)
+          if (replacement.workers.want(replacement.layer.missing(camera, labels)) === 0) show(id, state, replacement)
         }
         const renderer = state.current
         // A renderer of another pixel density keeps its last frame, rescaled, until its replacement can draw.
@@ -277,9 +278,9 @@ export function createMapLayers({ schedule, setReady }) {
           renderer.layer.set_route(readRoute())
           renderer.routeId = route.id
         }
-        renderer.workers.want(renderer.layer.missing(camera))
-        if (route) renderer.layer.draw_with_route(camera, Float32Array.from(route.style), route.travelled_metres, view.corner_radius_px)
-        else renderer.layer.draw(camera, view.corner_radius_px)
+        renderer.workers.want(renderer.layer.missing(camera, labels))
+        if (route) renderer.layer.draw_with_route(camera, labels, Float32Array.from(route.style), route.travelled_metres, view.corner_radius_px)
+        else renderer.layer.draw(camera, labels, view.corner_radius_px)
       } catch (error) {
         fail(id, state, key, error)
         return

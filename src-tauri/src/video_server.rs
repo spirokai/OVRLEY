@@ -302,7 +302,8 @@ fn handle_request(
 
 /// Routes and validates an incoming HTTP request.
 ///
-/// Supports `/health`, `/styles/<style>`, `/tiles/<z>/<x>/<y>.pbf`, and `/video/<import_id>`.
+/// Supports `/health`, `/styles/<style>`, `/tiles/<z>/<x>/<y>.pbf`, `/fonts/<file>`, and
+/// `/video/<import_id>`.
 /// Video requests must match the current import ID and source file; stale IDs,
 /// missing files, and absent registrations all return `404`.
 fn respond_to_request(
@@ -334,6 +335,16 @@ fn respond_to_request(
         };
         return match map_data.registry().served(style, &tile_url_template) {
             Some(bytes) => respond_map_resource(request, bytes, "application/json", None),
+            None => respond_empty(request, StatusCode(404), common_headers(None, None)),
+        };
+    }
+
+    if let Some(name) = url.strip_prefix("/fonts/") {
+        if method != Method::Get {
+            return respond_empty(request, StatusCode(405), common_headers(None, None));
+        }
+        return match map_data.and_then(|map_data| map_data.font_file(name)) {
+            Some(bytes) => respond_map_resource(request, bytes, "application/octet-stream", None),
             None => respond_empty(request, StatusCode(404), common_headers(None, None)),
         };
     }
@@ -400,7 +411,7 @@ fn respond_to_request(
     }
 }
 
-/// A style or tile for the preview's MapLibre. Tiles say how the cache served them; styles are
+/// A style, tile or font for the preview. Tiles say how the cache served them; styles and fonts are
 /// installed, so they have no cache.
 fn respond_map_resource(
     request: Request,

@@ -13,7 +13,7 @@ use super::text::ONE_EM;
 use crate::gpu::FOG_FULL;
 use crate::{ClipPoint, GroundProjection, MapCamera, TileId, ViewState};
 use std::cmp::Reverse;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 /// Cell size of the collision grid, in output pixels.
@@ -148,6 +148,101 @@ pub(crate) struct PlacedSymbol {
     pub(crate) flipped: bool,
 }
 
+/// A resident label tile a placement draws from: a tile the view sees, or while its tiles load the
+/// nearest resident tile above one.
+pub(crate) struct LabelSource<'a> {
+    pub(crate) tile: TileId,
+    pub(crate) symbols: &'a [LabelSymbol],
+    /// The view's tiles under this one that draw from a source of their own, which already holds the
+    /// labels of their ground. Anchors of this tile inside them are left out.
+    covered: HashSet<TileId>,
+    /// The tile level the view's tiles are at.
+    level: u8,
+}
+
+impl<'a> LabelSource<'a> {
+    /// A source whose anchors are all candidates.
+    pub(crate) fn whole(tile: TileId, symbols: &'a [LabelSymbol]) -> Self {
+        Self {
+            tile,
+            symbols,
+            covered: HashSet::new(),
+            level: tile.z,
+        }
+    }
+
+    /// Whether a drawn tile under this one holds the label's ground.
+    fn hides(&self, symbol: &LabelSymbol) -> bool {
+        if self.covered.is_empty() {
+            return false;
+        }
+        let tiles_across = f64::from(1_u32 << (self.level - self.tile.z));
+        let [x, y] = symbol
+            .anchor
+            .map(|axis| (f64::from(axis) / TILE_UNITS * tiles_across).floor() as i32);
+        let across = tiles_across as i32;
+        self.covered.contains(&TileId::new(
+            self.level,
+            self.tile.x * across + x,
+            self.tile.y * across + y,
+        ))
+    }
+}
+
+/// The tile a view tile's labels come from: the tile itself when its labels are resident, and otherwise
+/// the nearest resident tile above it, as the ground does while tiles load.
+pub(crate) fn label_source_tile(
+    tile: TileId,
+    resident: &HashMap<TileId, Vec<LabelSymbol>>,
+) -> Option<TileId> {
+    let mut source = Some(tile);
+    while let Some(candidate) = source.filter(|candidate| !resident.contains_key(candidate)) {
+        source = candidate.parent();
+    }
+    source
+}
+
+/// The sources a view's labels come from, each [`label_source_tile`] of its `view` tiles once. A source
+/// above the view leaves out its anchors inside view tiles that have a source of their own.
+pub(crate) fn label_sources<'a>(
+    view: &[TileId],
+    resident: &'a HashMap<TileId, Vec<LabelSymbol>>,
+) -> Vec<LabelSource<'a>> {
+    let drawn_from: Vec<(TileId, Option<TileId>)> = view
+        .iter()
+        .map(|tile| (*tile, label_source_tile(*tile, resident)))
+        .collect();
+    let Some(level) = view.first().map(|tile| tile.z) else {
+        return Vec::new();
+    };
+    let mut sources: Vec<LabelSource<'a>> = Vec::new();
+    for (_, source) in &drawn_from {
+        if let Some(tile) = source.filter(|tile| sources.iter().all(|seen| seen.tile != *tile)) {
+            sources.push(LabelSource {
+                level,
+                ..LabelSource::whole(tile, &resident[&tile])
+            });
+        }
+    }
+    for source in sources
+        .iter_mut()
+        .filter(|source| source.tile.z < source.level)
+    {
+        let tile = source.tile;
+        source.covered = drawn_from
+            .iter()
+            .filter(|(drawn, from)| {
+                *from != Some(tile)
+                    && drawn.z >= tile.z
+                    && drawn.x >> (drawn.z - tile.z) == tile.x
+                    && drawn.y >> (drawn.z - tile.z) == tile.y
+            })
+            .map(|(drawn, _)| *drawn)
+            .collect();
+    }
+    sources
+}
+
 /// Chooses the symbols of `tiles` the view shows. The symbols of the `previous` placement go first, in
 /// its order, and keep their reading direction while they can. The rest follow: layers from the top of
 /// the style down, then tile by tile, then by `symbol-sort-key` and layout order. A symbol whose anchor
@@ -156,7 +251,7 @@ pub(crate) struct PlacedSymbol {
 pub(crate) fn place(
     view: &LabelView,
     layers: &[LabelLayer],
-    tiles: &[(TileId, &[LabelSymbol])],
+    tiles: &[LabelSource],
     previous: Option<&[PlacedSymbol]>,
 ) -> Vec<PlacedSymbol> {
     let shown: HashMap<(u32, TileId, u32), (usize, bool)> = previous
@@ -172,20 +267,26 @@ pub(crate) fn place(
         .collect();
     let mut candidates: Vec<(usize, Reverse<u32>, TileId, f64, u32)> = tiles
         .iter()
-        .flat_map(|(tile, symbols)| {
+        .flat_map(|source| {
             let shown = &shown;
-            symbols.iter().enumerate().map(move |(position, symbol)| {
-                let rank = shown
-                    .get(&(symbol.layer, *tile, position as u32))
-                    .map_or(usize::MAX, |(rank, _)| *rank);
-                (
-                    rank,
-                    Reverse(symbol.layer),
-                    *tile,
-                    symbol.paint.sort_key,
-                    position as u32,
-                )
-            })
+            let tile = source.tile;
+            source
+                .symbols
+                .iter()
+                .enumerate()
+                .filter(|(_, symbol)| !source.hides(symbol))
+                .map(move |(position, symbol)| {
+                    let rank = shown
+                        .get(&(symbol.layer, tile, position as u32))
+                        .map_or(usize::MAX, |(rank, _)| *rank);
+                    (
+                        rank,
+                        Reverse(symbol.layer),
+                        tile,
+                        symbol.paint.sort_key,
+                        position as u32,
+                    )
+                })
         })
         .collect();
     candidates.sort_by(|a, b| {
@@ -201,7 +302,10 @@ pub(crate) fn place(
         width + 2.0 * VIEWPORT_PADDING,
         height + 2.0 * VIEWPORT_PADDING,
     );
-    let symbols: HashMap<TileId, &[LabelSymbol]> = tiles.iter().copied().collect();
+    let symbols: HashMap<TileId, &[LabelSymbol]> = tiles
+        .iter()
+        .map(|source| (source.tile, source.symbols))
+        .collect();
     let mut placed = Vec::new();
     for (_, Reverse(layer_index), tile, _, position) in candidates {
         let Some(layer) = layers.iter().find(|layer| layer.index == layer_index) else {
