@@ -47,7 +47,9 @@ function renderValues(values) {
 
 /**
  * Materializes shared batch presentation once, excluding editor timing and
- * source/encoding fields. Each native video plan owns its dimensions and clock.
+ * source/encoding fields. Every job renders at this template's scene size: transparent
+ * overlays take it as given, and composite clips must match it. Each native video plan
+ * owns its clock.
  * @param {object} config Committed template configuration.
  * @param {object} globalDefaults Captured global presentation defaults.
  * @param {string} language App language that names chart legends.

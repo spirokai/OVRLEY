@@ -231,9 +231,12 @@ impl ValidatedBatchEncoding {
     }
 }
 
+/// Every job renders at the template's scene size: transparent overlays take it
+/// as given, and composite clips must already match it (no layout rescaling).
 pub(crate) fn validate_batch_template(
     template: RenderConfig<ScenePresentationConfig>,
     encoding: ValidatedBatchEncoding,
+    sources: &super::inspection::AcceptedInspectionSources,
     resources: Option<&dyn RasterResourceResolver>,
     map_source: Option<MapSource>,
 ) -> CoreResult<ValidatedBatchTemplate> {
@@ -242,11 +245,51 @@ pub(crate) fn validate_batch_template(
             "Batch template must contain only shared presentation fields".into(),
         ));
     }
+    let config = validate_render_presentation(template, resources)?;
+    let (width, height) = (config.scene.width, config.scene.height);
+    match encoding.codec {
+        CodecSelection::Transparent(_) => require_even_transparent_size(width, height)?,
+        CodecSelection::Composite(_) => {
+            let mismatched = sources
+                .sources()
+                .iter()
+                .filter(|source| {
+                    (
+                        source.display_resolution.width,
+                        source.display_resolution.height,
+                    ) != (u64::from(width), u64::from(height))
+                })
+                .map(|source| {
+                    let name = Path::new(&source.metadata.path).file_name().map_or_else(
+                        || source.metadata.path.clone(),
+                        |name| name.to_string_lossy().into_owned(),
+                    );
+                    let resolution = &source.display_resolution;
+                    format!("{name} is {}x{}", resolution.width, resolution.height)
+                })
+                .collect::<Vec<_>>();
+            if !mismatched.is_empty() {
+                return Err(CoreError::Config(format!(
+                    "Composite batch clips must match the scene resolution {width}x{height}: {}",
+                    mismatched.join(", ")
+                )));
+            }
+        }
+    }
     Ok(ValidatedBatchTemplate {
-        config: validate_render_presentation(template, resources)?,
+        config,
         encoding,
         map_source,
     })
+}
+
+fn require_even_transparent_size(width: u32, height: u32) -> CoreResult<()> {
+    if !width.is_multiple_of(2) || !height.is_multiple_of(2) {
+        return Err(CoreError::Config(format!(
+            "Transparent video dimensions must be even: {width}x{height}"
+        )));
+    }
+    Ok(())
 }
 
 pub enum VideoRenderModePlan {
@@ -386,11 +429,8 @@ pub(crate) fn plan_batch_item(
             layout_frame_count,
         )?,
     };
-    let mut presentation = template.config.scene.clone();
-    presentation.width = source.display_resolution.width as u32;
-    presentation.height = source.display_resolution.height as u32;
     let scene = ValidatedSceneConfig {
-        presentation,
+        presentation: template.config.scene.clone(),
         start: coverage.start,
         end: coverage.end,
         fps: sampling_fps.as_f64(),
@@ -461,11 +501,7 @@ fn plan_transparent_render(
     container_fps: Fps,
     coverage: ActivityCoverage,
 ) -> CoreResult<VideoRenderModePlan> {
-    if !scene.presentation.width.is_multiple_of(2) || !scene.presentation.height.is_multiple_of(2) {
-        return Err(CoreError::Config(
-            "Transparent video dimensions must be even".into(),
-        ));
-    }
+    require_even_transparent_size(scene.presentation.width, scene.presentation.height)?;
     let frames = FrameProductionPlan::decimated(layout_frame_count, scene.update_rate)?;
     Ok(VideoRenderModePlan::Transparent(TransparentRenderPlan {
         frames,

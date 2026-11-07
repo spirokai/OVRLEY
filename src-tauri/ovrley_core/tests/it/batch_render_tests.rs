@@ -674,6 +674,46 @@ fn invalid_calibration_and_missing_baselines_reject_before_reserving_the_rendere
 }
 
 #[test]
+fn transparent_batch_follows_scene_size_and_composite_requires_matching_clips() {
+    let fixture = Fixture::new();
+    let plan = |mode, width, height| {
+        let mut request = fixture.request(&["1-size.mp4"], true);
+        request.template.scene.width = Some(width);
+        request.template.scene.height = Some(height);
+        if mode == BatchExportMode::Composite {
+            request.encoding.export_mode = mode;
+            request.encoding.export_codec = "libx264".into();
+        }
+        let inspection_id = request.inspection_id.clone();
+        common::builders::batch_video_plan(
+            &fixture.paths,
+            &fixture.inspection,
+            &inspection_id,
+            request,
+        )
+    };
+    let size = |plan: &PlannedVideoRender| {
+        let scene = &plan.config().scene.presentation;
+        (scene.width, scene.height)
+    };
+    // The fixture clip is 64x32; a transparent overlay keeps the scene's size.
+    let transparent = plan(BatchExportMode::Transparent, 1280, 720).unwrap();
+    assert_eq!(size(&transparent), (1280, 720));
+    let Err(odd) = plan(BatchExportMode::Transparent, 1281, 720) else {
+        panic!("odd transparent scene accepted")
+    };
+    assert!(odd.to_string().contains("must be even"), "{odd}");
+    let composite = plan(BatchExportMode::Composite, 64, 32).unwrap();
+    assert_eq!(size(&composite), (64, 32));
+    let Err(mismatched) = plan(BatchExportMode::Composite, 1280, 720) else {
+        panic!("mismatched composite clip accepted")
+    };
+    let message = mismatched.to_string();
+    assert!(message.contains("1-size.mp4 is 64x32"), "{message}");
+    assert!(message.contains("1280x720"), "{message}");
+}
+
+#[test]
 fn batch_wire_accepts_frontend_template_and_rejects_redundant_fields() {
     let fixture = Fixture::new();
     let mut frontend_request = fixture.request(&["1-frontend.mp4"], true);
@@ -688,7 +728,7 @@ fn batch_wire_accepts_frontend_template_and_rejects_redundant_fields() {
         frontend_request,
     )
     .unwrap();
-    assert_eq!(plan.config().scene.presentation.width, 64);
+    assert_eq!(plan.config().scene.presentation.width, 1920);
     let request = fixture.request(&["1-first.mp4"], false);
     let wire = serde_json::to_value(request).unwrap();
     serde_json::from_value::<BatchRenderRequest>(wire.clone()).unwrap();

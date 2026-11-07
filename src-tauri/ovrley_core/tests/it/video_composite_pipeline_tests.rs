@@ -151,6 +151,10 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
         assert_eq!(decoded.stdout.len(), 32 * 64 * 4);
         decoded.stdout
     };
+    // Composite clips must match the scene; this one is 32x64 once rotated for display.
+    let mut template = common::builders::batch_template();
+    template.scene.width = Some(32);
+    template.scene.height = Some(64);
     for (mode, offset) in [
         (BatchExportMode::Transparent, -5.0),
         (BatchExportMode::Transparent, 110.0),
@@ -182,7 +186,7 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
                 &session.inspection_id,
                 &inspected,
                 encoding,
-                common::builders::batch_template(),
+                template.clone(),
                 activity.clone(),
                 offset,
                 mode == BatchExportMode::Composite,

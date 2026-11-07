@@ -145,7 +145,10 @@ fn video_plans_sample_the_video_clock_and_clear_padding_with_static_art() {
     )
     .unwrap();
     let original_activity = serde_json::to_value(&activity).unwrap();
-    let template = common::builders::batch_template();
+    // Composite clips must match the scene; this one is 32x64 once rotated for display.
+    let mut template = common::builders::batch_template();
+    template.scene.width = Some(32);
+    template.scene.height = Some(64);
     let original_template = serde_json::to_value(&template).unwrap();
     let paths = common::composite::test_paths_named("batch-video-window");
     for mode in [BatchExportMode::Transparent, BatchExportMode::Composite] {

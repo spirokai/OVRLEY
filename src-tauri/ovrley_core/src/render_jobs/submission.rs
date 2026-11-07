@@ -77,7 +77,8 @@ pub(super) fn accept_batch(
     };
     let encoding = validate_batch_encoding(&request.encoding)?;
     let outputs = encoding.plan_outputs(&owned, Path::new(&request.output_directory))?;
-    let template = validate_batch_template(request.template, encoding, resources, map_source)?;
+    let template =
+        validate_batch_template(request.template, encoding, &owned, resources, map_source)?;
     let external_activity = match request.activity {
         BatchActivity::EmbeddedActivity {} => None,
         BatchActivity::ExternalActivity {
