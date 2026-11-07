@@ -29,6 +29,7 @@
     "benchmark:widgets:build": "node benchmarks/widgets/run.mjs --build",
     "benchmark:widgets:summary": "node benchmarks/widgets/summarize.mjs",
     "benchmark:interactions": "node benchmarks/widget-interactions/run.mjs",
+    "benchmark:map-labels": "node benchmarks/map-labels/run.mjs",
     "prepare": "vp config"
   },
   "keywords": [],

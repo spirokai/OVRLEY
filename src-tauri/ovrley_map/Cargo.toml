@@ -28,6 +28,12 @@ gpu = [
 ]
 validate = ["dep:maplibre-expr"]
 
+[[bin]]
+name = "benchmark_map_labels"
+path = "../../benchmarks/map-labels/native.rs"
+required-features = ["gpu", "validate"]
+test = false
+
 [dependencies]
 ab_glyph = { version = "0.2", optional = true }
 bytemuck = { version = "1", features = ["derive"], optional = true }

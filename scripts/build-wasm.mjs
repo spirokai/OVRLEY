@@ -92,7 +92,7 @@ function buildWasm() {
 }
 
 /** The map preview: `ovrley_map::gpu` on WebGL2, as its own module beside the widget module. */
-function buildMapBindings() {
+export function buildMapBindings() {
   const targetDir = join(root, 'src-tauri', 'target', 'wasm-map-bindings')
   const env = { ...process.env, CARGO_TARGET_DIR: targetDir }
   execFileSync('rustup', ['target', 'add', '--toolchain', rustVersion, mapTarget], { env, stdio: 'inherit' })
