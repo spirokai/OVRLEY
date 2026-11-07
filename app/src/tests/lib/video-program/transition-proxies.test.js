@@ -29,14 +29,14 @@ describe('transition windows', () => {
     const ride = program.pieces[0]
     expect(resolveTransitionWindow(program, 57.9)).toBeNull()
     expect(resolveTransitionWindow(program, 59)).toMatchObject({
-      join: { key: 'clip:climb' },
+      join: { key: 'climb:start' },
       progress: expect.closeTo(0.5, 5),
       elapsedSeconds: expect.closeTo(1, 5),
       incomingSecond: expect.closeTo(101, 5),
     })
     // Playback continues after the incoming start the shown transition played.
-    expect(resolveContinuation(program, ride.id, new Set(['clip:climb']))).toEqual({ piece: program.pieces[1], second: 102 })
-    expect(resolveContinuation(program, program.pieces[1].id, new Set(['clip:climb']))).toBeNull()
+    expect(resolveContinuation(program, ride.id, new Set(['climb:start']))).toEqual({ piece: program.pieces[1], second: 102 })
+    expect(resolveContinuation(program, program.pieces[1].id, new Set(['climb:start']))).toBeNull()
     expect(() => resolveContinuation(program, 'missing', new Set())).toThrow('Unknown program piece')
   })
 
@@ -47,12 +47,12 @@ describe('transition windows', () => {
       const shown = listShownTransitionJoinKeys(jobs, proxies)
       expect(resolveContinuation(program, program.pieces[0].id, shown)).toEqual({ piece: program.pieces[1], second: 100 })
     }
-    expect(listShownTransitionJoinKeys(jobs, { [jobs[0].key]: { status: 'ready' } })).toEqual(new Set(['clip:climb']))
+    expect(listShownTransitionJoinKeys(jobs, { [jobs[0].key]: { status: 'ready' } })).toEqual(new Set(['climb:start']))
   })
 
   test('hard cuts continue at the next piece and have no window', () => {
     const { program } = timeline((edits) => {
-      edits.climb.transitionIn = { type: 'none', durationSeconds: 0 }
+      edits.climb.segments.start.transitionIn = { type: 'none', durationSeconds: 0 }
     })
     expect(resolveTransitionWindow(program, 59.5)).toBeNull()
     expect(resolveContinuation(program, program.pieces[0].id, new Set()).second).toBe(100)
@@ -63,7 +63,7 @@ describe('transition proxy jobs', () => {
   test('describe every xfade join by its content, at preview size', () => {
     const { clips, program } = timeline()
     const [job] = listTransitionProxyJobs(program, clips)
-    expect(job.joinKey).toBe('clip:climb')
+    expect(job.joinKey).toBe('climb:start')
     expect(job.windowStartSecond).toBeCloseTo(58, 5)
     expect(job.request).toEqual({
       outgoing: { path: '/videos/ride.mp4', startSecond: expect.closeTo(58, 5), hasAudio: true },
@@ -78,11 +78,11 @@ describe('transition proxy jobs', () => {
     expect(job.key).toBe(JSON.stringify(job.request))
     // Any change to what the proxy shows changes its key.
     const moved = timeline((edits) => {
-      edits.climb.transitionIn = { type: 'wipeleft', durationSeconds: 2 }
+      edits.climb.segments.start.transitionIn = { type: 'wipeleft', durationSeconds: 2 }
     })
     expect(listTransitionProxyJobs(moved.program, moved.clips)[0].key).not.toBe(job.key)
     const cut = timeline((edits) => {
-      edits.climb.transitionIn = { type: 'none', durationSeconds: 0 }
+      edits.climb.segments.start.transitionIn = { type: 'none', durationSeconds: 0 }
     })
     expect(listTransitionProxyJobs(cut.program, cut.clips)).toEqual([])
   })

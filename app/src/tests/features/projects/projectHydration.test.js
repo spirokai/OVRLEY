@@ -83,8 +83,8 @@ function projectVideo(id, offsetSeconds, edits = {}) {
     path: { kind: 'absolute', value: `C:\\${id}.mp4` },
     offsetSeconds,
     offsetSource: 'auto',
-    deletedParts: [],
-    transitionIn: null,
+    cuts: [],
+    segments: { start: { excluded: false, transitionIn: null } },
     placementAnchor: null,
     ...edits,
   }
@@ -127,28 +127,39 @@ function createProject({ videos, manual = {}, timeline = { playheadSecond: 0, vi
 
 test('saved edits of every loaded video are restored and checked against the probed videos', () => {
   const videos = [createTestVideo({ id: 'clip-a', durationSeconds: 30 }), createTestVideo({ id: 'clip-b', durationSeconds: 40, importOrder: 1 })]
-  const deletedPart = { id: 'cut-1', fromSecond: 5, toSecond: 10, transition: { type: 'dissolve', durationSeconds: 1.5 } }
+  const cut = { id: 'cut-1', frame: 150 }
+  const segments = {
+    start: { excluded: false, transitionIn: { type: 'none', durationSeconds: 0 } },
+    'cut-1': { excluded: true, transitionIn: { type: 'dissolve', durationSeconds: 1.5 } },
+  }
   const projectVideos = [
     projectVideo('clip-a', -12.5, { offsetSource: 'manual' }),
     projectVideo('clip-b', 70, {
-      deletedParts: [deletedPart],
-      transitionIn: { type: 'none', durationSeconds: 0 },
+      cuts: [cut],
+      segments,
       placementAnchor: { videoId: 'clip-a', side: 'after' },
     }),
   ]
 
   const edits = createProjectVideoEdits(videos, projectVideos)
   expect(edits).toEqual({
-    'clip-a': { offsetSeconds: -12.5, offsetSource: 'manual', deletedParts: [], transitionIn: null, placementAnchor: null },
+    'clip-a': {
+      offsetSeconds: -12.5,
+      offsetSource: 'manual',
+      cuts: [],
+      segments: { start: { excluded: false, transitionIn: null } },
+      placementAnchor: null,
+    },
     'clip-b': {
       offsetSeconds: 70,
       offsetSource: 'auto',
-      deletedParts: [deletedPart],
-      transitionIn: { type: 'none', durationSeconds: 0 },
+      cuts: [cut],
+      segments,
       placementAnchor: { videoId: 'clip-a', side: 'after' },
     },
   })
-  expect(edits['clip-b'].deletedParts[0]).not.toBe(deletedPart)
+  expect(edits['clip-b'].cuts[0]).not.toBe(cut)
+  expect(edits['clip-b'].segments['cut-1'].transitionIn).not.toBe(segments['cut-1'].transitionIn)
   // An anchor to a skipped video is dropped; the clip keeps its offset.
   expect(createProjectVideoEdits([videos[1]], projectVideos)['clip-b']).toMatchObject({ offsetSeconds: 70, placementAnchor: null })
 })
@@ -168,8 +179,13 @@ test('saved edits outside the probed video duration are rejected before the proj
     /within the imported video duration/,
   )
   expect(() =>
-    createProjectVideoEdits(videos, [projectVideo('clip-a', 0, { deletedParts: [{ id: 'cut-1', fromSecond: 20, toSecond: 31, transition: null }] })]),
-  ).toThrow(/Deleted video parts must be within/)
+    createProjectVideoEdits(videos, [
+      projectVideo('clip-a', 0, {
+        cuts: [{ id: 'cut-1', frame: 900 }],
+        segments: { start: { excluded: false, transitionIn: null }, 'cut-1': { excluded: false, transitionIn: null } },
+      }),
+    ]),
+  ).toThrow(/Video cuts must lie inside/)
   expect(() => createProjectVideoEdits(videos, [projectVideo('other', 0)])).toThrow(/not part of the project/)
 })
 

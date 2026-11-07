@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vite-plus/test'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
-import { deriveVideoWarnings } from '@/lib/video-program/video-warnings'
+import { deriveVideoWarnings, formatVideoWarning } from '@/lib/video-program/video-warnings'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 function warningsFor(videos, offsets, activityDurationSeconds = null) {
@@ -31,17 +31,17 @@ describe('deriveVideoWarnings', () => {
     )
 
     expect(warnings).toEqual({
-      a: [{ kind: 'overlap', message: 'Overlaps b.mp4' }],
+      a: [{ kind: 'overlap', params: { name: 'b.mp4' } }],
       b: [
-        { kind: 'incompatible', message: 'Different resolution or frame rate than the other videos' },
-        { kind: 'overlap', message: 'Overlaps a.mp4' },
+        { kind: 'incompatible', params: {} },
+        { kind: 'overlap', params: { name: 'a.mp4' } },
       ],
-      outside: [{ kind: 'sync', message: 'Video is outside the activity' }],
+      outside: [{ kind: 'sync', params: { message: 'Video is outside the activity' } }],
     })
   })
 
   test('warns when a clip without a sync warning starts more than an hour before or after the activity', () => {
-    const far = { kind: 'far', message: 'Starts more than an hour before or after the activity' }
+    const far = { kind: 'far', params: {} }
     const clip = (id, importOrder) => createTestVideo({ id, path: `/videos/${id}.mp4`, durationSeconds: 0.5, importOrder })
     const synced = { ...clip('synced', 4), syncWarning: 'Video is outside the activity' }
     const offsets = { early: -3601, edgeBefore: -3600, edgeAfter: 1000 + 3600, late: 1000 + 3601, synced: -5000 }
@@ -52,10 +52,37 @@ describe('deriveVideoWarnings', () => {
       edgeBefore: [],
       edgeAfter: [],
       late: [far],
-      synced: [{ kind: 'sync', message: 'Video is outside the activity' }],
+      synced: [{ kind: 'sync', params: { message: 'Video is outside the activity' } }],
     })
     // Without an activity there is nothing to be far from.
     expect(warningsFor(videos, offsets).early).toEqual([])
+  })
+
+  test('a video excluded from export does not count as an incompatible format', () => {
+    const { importedVideos, videoEdits } = videoStoreState([
+      createTestVideo({ id: 'a', path: '/videos/a.mp4', durationSeconds: 30 }),
+      createTestVideo({ id: 'b', path: '/videos/b.mp4', durationSeconds: 30, importOrder: 1 }),
+      createTestVideo({ id: 'other', path: '/videos/other.mp4', durationSeconds: 30, fps: { num: 25, den: 1 }, importOrder: 2 }),
+    ])
+    videoEdits.a.offsetSeconds = 0
+    videoEdits.b.offsetSeconds = 100
+    videoEdits.other.offsetSeconds = 200
+    videoEdits.other.segments.start.excluded = true
+    const { clips, program } = buildTimelineProgram({
+      videos: importedVideos,
+      videoEdits,
+      dragPreview: null,
+      transitionDefaults: DEFAULT_TRANSITION_SETTINGS,
+    })
+    expect(deriveVideoWarnings(clips, program, null).get('other')).toEqual([])
+  })
+
+  test('words warnings through the translation function', () => {
+    const t = (key, { defaultValue, ...params }) => `${key}|${defaultValue}|${JSON.stringify(params)}`
+    expect(formatVideoWarning({ kind: 'overlap', params: { name: 'b.mp4' } }, t)).toBe(
+      'video-preview.warningOverlap|Overlaps {{name}}|{"name":"b.mp4"}',
+    )
+    expect(formatVideoWarning({ kind: 'sync', params: { message: 'Translated already' } }, t)).toBe('Translated already')
   })
 
   test('gives every clip an entry, empty when nothing is wrong', () => {

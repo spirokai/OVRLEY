@@ -21,14 +21,6 @@ function renderClipsProps(overrides = {}) {
       fileFormat: 'fit',
       fileName: 'activity.fit',
     },
-    deletedPartDrag: {
-      preview: null,
-      onPointerDown: () => false,
-      onPointerMove: () => false,
-      onPointerUp: () => false,
-      onPointerCancel: () => false,
-    },
-    deletedPartMark: null,
     exportHighlightRange: { fromSecond: 10, toSecond: 20 },
     clips: createClips([createTestVideo({ path: 'C:\\clips\\ride.mp4', durationSeconds: 20 })], { 'video-1': 5 }),
     getLaneDragProps: () => ({}),
@@ -165,7 +157,7 @@ describe('useTimelineClips', () => {
       { a: 0, b: 20 },
     )
     const warnings = new Map([
-      ['a', [{ kind: 'overlap', message: 'Overlaps b.mp4' }]],
+      ['a', [{ kind: 'overlap', params: { name: 'b.mp4' } }]],
       ['b', []],
     ])
     const { result } = renderClips({ clips, overlaps: [{ startSecond: 20, endSecond: 30 }], warnings })

@@ -324,25 +324,18 @@
           "bindings": [{ "key": "o", "modifiers": ["alt"] }]
         },
         {
-          "id": "deletedPart.markStart",
+          "id": "videoEdit.cut",
           "display": true,
           "scope": "player",
-          "descriptionKey": "keyboard-shortcuts.deletedPartMarkStart",
-          "bindings": [{ "key": "i", "modifiers": ["shift"] }]
+          "descriptionKey": "keyboard-shortcuts.videoEditCut",
+          "bindings": [{ "key": "c", "modifiers": [] }]
         },
         {
-          "id": "deletedPart.markEnd",
+          "id": "videoEdit.toggleExcluded",
           "display": true,
           "scope": "player",
-          "descriptionKey": "keyboard-shortcuts.deletedPartMarkEnd",
-          "bindings": [{ "key": "o", "modifiers": ["shift"] }]
-        },
-        {
-          "id": "deletedPart.clearMark",
-          "display": true,
-          "scope": "player",
-          "descriptionKey": "keyboard-shortcuts.deletedPartClearMark",
-          "bindings": [{ "key": "x", "modifiers": ["shift"] }]
+          "descriptionKey": "keyboard-shortcuts.videoEditToggleExcluded",
+          "bindings": [{ "key": "x", "modifiers": [] }]
         }
       ]
     },

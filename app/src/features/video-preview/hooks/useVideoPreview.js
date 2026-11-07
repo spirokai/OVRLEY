@@ -30,7 +30,7 @@ function previewSourceOf(clip) {
  *
  * @param {Array<React.RefObject<HTMLVideoElement>>} slotRefs - Refs to the two video elements.
  * @param {boolean} isActive - Whether the imported video preview is currently visible.
- * @returns {{ slots: Array<{src: string, isActive: boolean}>, videoSrc: string, importId: string|null, isOutOfRange: boolean, isDeleted: boolean, isInOverlap: boolean, transition: {proxyStatus: 'queued'|'rendering'|'ready'|'failed', proxyUrl: string|null, elapsedSeconds: number, isPlaying: boolean}|null, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
+ * @returns {{ slots: Array<{src: string, isActive: boolean}>, videoSrc: string, importId: string|null, isOutOfRange: boolean, isExcluded: boolean, isInOverlap: boolean, transition: {proxyStatus: 'queued'|'rendering'|'ready'|'failed', proxyUrl: string|null, elapsedSeconds: number, isPlaying: boolean}|null, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
  *   Inside a transition window `transition` describes its proxy, shown over the outgoing piece once ready.
  */
 export function useVideoPreview(slotRefs, isActive = true) {
@@ -61,7 +61,7 @@ export function useVideoPreview(slotRefs, isActive = true) {
 
   // Element slots - the active element shows the target piece; the parked one waits on the piece after it.
   const shownJoinKeys = listShownTransitionJoinKeys(transitionProxyJobs, transitionProxies)
-  const continuation = target === null ? null : resolveContinuation(program, target.piece.id, shownJoinKeys)
+  const continuation = target === null || target.isExcluded ? null : resolveContinuation(program, target.piece.id, shownJoinKeys)
   const preloadPiece = continuation?.piece ?? null
   const preloadClip = preloadPiece === null ? null : clips.find((clip) => clip.id === preloadPiece.videoId)
   const [previousSlots, setPreviousSlots] = useState(EMPTY_PREVIEW_SLOTS)
@@ -93,7 +93,7 @@ export function useVideoPreview(slotRefs, isActive = true) {
     })
   }, [])
 
-  // Piece end - continue with the next piece (skipping gaps, deleted parts, and the start a shown
+  // Piece end - continue with the next piece (skipping gaps, excluded segments, and the start a shown
   // transition already played) or hand the rest of the activity to the timeline clock, holding the
   // last frame of the piece.
   const handlePieceEnded = () => {
@@ -325,7 +325,7 @@ export function useVideoPreview(slotRefs, isActive = true) {
     videoSrc,
     importId: activeClip?.preview.importId ?? null,
     isOutOfRange,
-    isDeleted: target?.isDeleted ?? false,
+    isExcluded: target?.isExcluded ?? false,
     isInOverlap,
     transition,
     hevcPlaybackWarning,

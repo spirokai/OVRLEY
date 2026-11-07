@@ -1,12 +1,13 @@
 //! ffmpeg discovery and process helpers.
 //!
-//! Resolves the ffmpeg binary and provides platform-specific process-launch
-//! utilities. Codec settings construction has moved to
+//! Resolves the ffmpeg binary and provides platform-specific process
+//! configuration. Running tools is owned by
+//! [`process`](crate::encode::ffmpeg::process); codec settings construction by
 //! [`settings`](crate::encode::ffmpeg::settings).
 
 use std::env;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::Command;
 
 use crate::error::{CoreError, CoreResult};
 
@@ -62,19 +63,6 @@ pub fn configure_ffmpeg_command(command: &mut Command) {
 
     #[cfg(not(windows))]
     let _ = command;
-}
-
-/// Spawns one FFmpeg encode command with the pipe ownership shared by all video pipelines.
-pub(crate) fn spawn_ffmpeg(binary_path: &Path, args: &[String]) -> CoreResult<Child> {
-    let mut command = Command::new(binary_path);
-    configure_ffmpeg_command(&mut command);
-    command
-        .args(args)
-        .stdin(Stdio::piped())
-        .stderr(Stdio::piped())
-        .stdout(Stdio::null())
-        .spawn()
-        .map_err(|error| CoreError::Encode(format!("Could not start ffmpeg: {error}")))
 }
 
 // Searches the process PATH for a binary with the requested platform filename.

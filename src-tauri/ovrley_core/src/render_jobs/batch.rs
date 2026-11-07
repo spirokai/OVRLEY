@@ -350,7 +350,8 @@ fn execute_batch_item(
             result
         }
         Err(error) => Err(CoreError::Encode(format!(
-            "{error}. The rendered parts were kept in {}",
+            "{}. The rendered parts were kept in {}",
+            error.encode_message(),
             parts_directory.display()
         ))),
     }

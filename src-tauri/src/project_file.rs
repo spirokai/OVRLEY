@@ -33,6 +33,8 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 const PROJECT_FORMAT: &str = "ovrley-project";
 const PROJECT_VERSION: u32 = 6;
+/// Key of the virtual clip at the start of a video, which no cut begins.
+const FIRST_SEGMENT_KEY: &str = "start";
 const PROJECT_VERSION_V1: u32 = 1;
 const PROJECT_VERSION_V2: u32 = 2;
 const PROJECT_VERSION_V3: u32 = 3;
@@ -258,8 +260,7 @@ struct ProjectSource {
     path: PathLocator,
 }
 
-/// One imported video with its user edits. A `null` transition follows the
-/// project transition defaults; a present one is a user override.
+/// One imported video with its user edits.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectVideo {
@@ -268,9 +269,10 @@ struct ProjectVideo {
     offset_seconds: f64,
     /// Whether the start was set by hand; detecting times again keeps a manual start.
     offset_source: OffsetSource,
-    deleted_parts: Vec<ProjectDeletedPart>,
-    #[serde(deserialize_with = "deserialize_required_option")]
-    transition_in: Option<ProjectTransition>,
+    /// Where the video is split, by source frame in increasing order.
+    cuts: Vec<ProjectCut>,
+    /// The edits of each virtual clip, keyed by the cut it starts at (`start` for the first).
+    segments: BTreeMap<String, ProjectSegment>,
     /// Places a video whose time cannot be determined next to another video.
     #[serde(deserialize_with = "deserialize_required_option")]
     placement_anchor: Option<ProjectPlacementAnchor>,
@@ -297,15 +299,23 @@ enum PlacementSide {
     After,
 }
 
-/// A clip-local source range excluded from output and the transition of the join it leaves.
+/// A split of a video at a source frame.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectDeletedPart {
+struct ProjectCut {
     id: String,
-    from_second: f64,
-    to_second: f64,
+    frame: u64,
+}
+
+/// One virtual clip: whether it is exported, and the transition of the join into
+/// it. A `null` transition follows the project transition defaults; a present one
+/// is a user override.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectSegment {
+    excluded: bool,
     #[serde(deserialize_with = "deserialize_required_option")]
-    transition: Option<ProjectTransition>,
+    transition_in: Option<ProjectTransition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -773,11 +783,43 @@ fn validate_transition_defaults(defaults: &ProjectTransitionDefaults) -> Result<
     Ok(())
 }
 
-/// Validates the video collection. Bounds that need the probed duration
-/// (deleted parts, landmarks) are checked by the frontend after import.
+/// Cuts lie at strictly increasing frames after the first, and every virtual clip
+/// has exactly one entry in `segments`, keyed by the cut it starts at.
+fn validate_cuts_and_segments(video: &ProjectVideo) -> Result<(), String> {
+    let mut expected_keys = HashSet::from([FIRST_SEGMENT_KEY]);
+    let mut previous_frame = 0;
+    for cut in &video.cuts {
+        if cut.id.trim().is_empty() || cut.id == FIRST_SEGMENT_KEY {
+            return Err(format!("sources.videos cuts id is not valid: {:?}", cut.id));
+        }
+        if !expected_keys.insert(cut.id.as_str()) {
+            return Err(format!("sources.videos cuts id is duplicated: {}", cut.id));
+        }
+        if cut.frame <= previous_frame {
+            return Err("sources.videos cuts require strictly increasing frames above 0".into());
+        }
+        previous_frame = cut.frame;
+    }
+    let keys: HashSet<&str> = video.segments.keys().map(String::as_str).collect();
+    if keys != expected_keys {
+        return Err(format!(
+            "sources.videos segments of {} must have one entry per cut and one for {FIRST_SEGMENT_KEY}",
+            video.id
+        ));
+    }
+    for segment in video.segments.values() {
+        if let Some(transition) = &segment.transition_in {
+            validate_transition(transition)
+                .map_err(|error| format!("sources.videos segments transitionIn {error}"))?;
+        }
+    }
+    Ok(())
+}
+
+/// Validates the video collection. Bounds that need the probed frame count
+/// (cuts, landmarks) are checked by the frontend after import.
 fn validate_videos(videos: &[ProjectVideo]) -> Result<(), String> {
     let mut video_ids = HashSet::new();
-    let mut part_ids = HashSet::new();
     for video in videos {
         if video.id.trim().is_empty() {
             return Err("sources.videos id must not be empty".into());
@@ -789,44 +831,7 @@ fn validate_videos(videos: &[ProjectVideo]) -> Result<(), String> {
         if !video.offset_seconds.is_finite() {
             return Err("sources.videos offsetSeconds must be finite".into());
         }
-        if let Some(transition) = &video.transition_in {
-            validate_transition(transition)
-                .map_err(|error| format!("sources.videos transitionIn {error}"))?;
-        }
-
-        let mut parts: Vec<&ProjectDeletedPart> = video.deleted_parts.iter().collect();
-        for part in &parts {
-            if part.id.trim().is_empty() {
-                return Err("sources.videos deletedParts id must not be empty".into());
-            }
-            // Joins are keyed by deleted-part ID across the whole program.
-            if !part_ids.insert(part.id.as_str()) {
-                return Err(format!(
-                    "sources.videos deletedParts id is duplicated: {}",
-                    part.id
-                ));
-            }
-            if !part.from_second.is_finite()
-                || !part.to_second.is_finite()
-                || part.from_second < 0.0
-                || part.from_second >= part.to_second
-            {
-                return Err(
-                    "sources.videos deletedParts require finite 0 <= fromSecond < toSecond".into(),
-                );
-            }
-            if let Some(transition) = &part.transition {
-                validate_transition(transition)
-                    .map_err(|error| format!("sources.videos deletedParts transition {error}"))?;
-            }
-        }
-        parts.sort_by(|left, right| left.from_second.total_cmp(&right.from_second));
-        if parts
-            .windows(2)
-            .any(|pair| pair[1].from_second < pair[0].to_second)
-        {
-            return Err("sources.videos deletedParts must not overlap".into());
-        }
+        validate_cuts_and_segments(video)?;
     }
     validate_placement_anchors(videos)
 }
@@ -1135,7 +1140,7 @@ fn insert_lap_selection(value: &mut Value) -> Result<(), String> {
 }
 
 /// Versions 1 to 5 store at most one video. It becomes a one-clip collection at its
-/// saved offset that owns the manual sync landmarks, with no deleted parts,
+/// saved offset that owns the manual sync landmarks, with no cuts,
 /// transitions following the defaults, and the hard transition defaults.
 /// A project without a video that rendered a video folder keeps rendering
 /// separate files to the same output folder; the folder itself is handed to the
@@ -1162,8 +1167,14 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
         path: source.path,
         offset_seconds: project.sync.video_offset_seconds,
         offset_source: OffsetSource::Auto,
-        deleted_parts: Vec::new(),
-        transition_in: None,
+        cuts: Vec::new(),
+        segments: BTreeMap::from([(
+            FIRST_SEGMENT_KEY.to_string(),
+            ProjectSegment {
+                excluded: false,
+                transition_in: None,
+            },
+        )]),
         placement_anchor: None,
     });
     let manual = project.sync.manual;
@@ -2059,8 +2070,8 @@ mod tests {
             "path": { "kind": "project-relative", "value": path },
             "offsetSeconds": offset_seconds,
             "offsetSource": "auto",
-            "deletedParts": [],
-            "transitionIn": null,
+            "cuts": [],
+            "segments": { "start": { "excluded": false, "transitionIn": null } },
             "placementAnchor": null
         })
     }
@@ -2068,12 +2079,17 @@ mod tests {
     fn multi_video_project_json() -> Value {
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
         let mut second = video("clip-b", "media/b.mp4", 70.0);
-        second["deletedParts"] = serde_json::json!([
-            { "id": "cut-1", "fromSecond": 5.0, "toSecond": 10.0, "transition": null },
-            { "id": "cut-2", "fromSecond": 20.0, "toSecond": 30.0,
-              "transition": { "type": "dissolve", "durationSeconds": 1.5 } }
+        second["cuts"] = serde_json::json!([
+            { "id": "cut-1", "frame": 150 },
+            { "id": "cut-2", "frame": 600 }
         ]);
-        second["transitionIn"] = serde_json::json!({ "type": "none", "durationSeconds": 0.0 });
+        second["segments"] = serde_json::json!({
+            "start": { "excluded": false,
+                       "transitionIn": { "type": "none", "durationSeconds": 0.0 } },
+            "cut-1": { "excluded": true, "transitionIn": null },
+            "cut-2": { "excluded": false,
+                       "transitionIn": { "type": "dissolve", "durationSeconds": 1.5 } }
+        });
         second["placementAnchor"] = serde_json::json!({ "videoId": "clip-a", "side": "after" });
         project["sources"]["videos"] =
             serde_json::json!([video("clip-a", "media/a.mp4", -12.5), second]);
@@ -2788,8 +2804,9 @@ mod tests {
             matches!(&video.path, PathLocator::ProjectRelative(path) if path == "media/ride.mp4")
         );
         assert_eq!(video.offset_seconds, 12.5);
-        assert!(video.deleted_parts.is_empty());
-        assert!(video.transition_in.is_none());
+        assert!(video.cuts.is_empty());
+        let start = &video.segments[FIRST_SEGMENT_KEY];
+        assert!(!start.excluded && start.transition_in.is_none());
         assert!(video.placement_anchor.is_none());
         assert_eq!(
             parsed.sync.manual.video_id.as_deref(),
@@ -2852,7 +2869,7 @@ mod tests {
 
     #[test]
     fn rejects_malformed_v4_video_collection_contracts() {
-        let cases: [(&str, fn(&mut Value)); 27] = [
+        let cases: [(&str, fn(&mut Value)); 33] = [
             ("missing placementAnchor", |project| {
                 project["sources"]["videos"][0]
                     .as_object_mut()
@@ -2893,49 +2910,72 @@ mod tests {
                     .remove("offsetSource");
             }),
             ("missing transitionIn", |project| {
-                project["sources"]["videos"][0]
+                project["sources"]["videos"][0]["segments"]["start"]
                     .as_object_mut()
                     .unwrap()
                     .remove("transitionIn");
             }),
             ("unknown transition", |project| {
-                project["sources"]["videos"][1]["transitionIn"] =
+                project["sources"]["videos"][1]["segments"]["start"]["transitionIn"] =
                     serde_json::json!({ "type": "custom", "durationSeconds": 1.0 });
             }),
             ("hard cut with duration", |project| {
-                project["sources"]["videos"][1]["transitionIn"] =
+                project["sources"]["videos"][1]["segments"]["start"]["transitionIn"] =
                     serde_json::json!({ "type": "none", "durationSeconds": 2.0 });
             }),
             ("transition without duration", |project| {
-                project["sources"]["videos"][1]["transitionIn"] =
+                project["sources"]["videos"][1]["segments"]["start"]["transitionIn"] =
                     serde_json::json!({ "type": "fade", "durationSeconds": 0.0 });
             }),
-            ("deleted part transition", |project| {
-                project["sources"]["videos"][1]["deletedParts"][0]["transition"] =
+            ("negative segment transition", |project| {
+                project["sources"]["videos"][1]["segments"]["cut-2"]["transitionIn"] =
                     serde_json::json!({ "type": "fade", "durationSeconds": -1.0 });
             }),
-            ("missing deleted part transition", |project| {
-                project["sources"]["videos"][1]["deletedParts"][0]
+            ("missing excluded", |project| {
+                project["sources"]["videos"][1]["segments"]["cut-1"]
                     .as_object_mut()
                     .unwrap()
-                    .remove("transition");
+                    .remove("excluded");
             }),
-            ("empty deleted part id", |project| {
-                project["sources"]["videos"][1]["deletedParts"][0]["id"] = Value::from("")
+            ("empty cut id", |project| {
+                project["sources"]["videos"][1]["cuts"][0]["id"] = Value::from("")
             }),
-            ("duplicate deleted part id across videos", |project| {
-                project["sources"]["videos"][0]["deletedParts"] = serde_json::json!([
-                    { "id": "cut-1", "fromSecond": 1.0, "toSecond": 2.0, "transition": null }
-                ]);
+            ("cut named like the first segment", |project| {
+                project["sources"]["videos"][1]["cuts"][0]["id"] = Value::from("start")
             }),
-            ("negative deleted part start", |project| {
-                project["sources"]["videos"][1]["deletedParts"][0]["fromSecond"] = Value::from(-1.0)
+            ("duplicate cut id", |project| {
+                project["sources"]["videos"][1]["cuts"][1]["id"] = Value::from("cut-1")
             }),
-            ("empty deleted part", |project| {
-                project["sources"]["videos"][1]["deletedParts"][0]["toSecond"] = Value::from(5.0)
+            ("cut at the first frame", |project| {
+                project["sources"]["videos"][1]["cuts"][0]["frame"] = Value::from(0)
             }),
-            ("overlapping deleted parts", |project| {
-                project["sources"]["videos"][1]["deletedParts"][1]["fromSecond"] = Value::from(9.0)
+            ("fractional cut frame", |project| {
+                project["sources"]["videos"][1]["cuts"][0]["frame"] = Value::from(1.5)
+            }),
+            ("negative cut frame", |project| {
+                project["sources"]["videos"][1]["cuts"][0]["frame"] = Value::from(-1)
+            }),
+            ("unsorted cuts", |project| {
+                project["sources"]["videos"][1]["cuts"][1]["frame"] = Value::from(100)
+            }),
+            ("duplicate cut frame", |project| {
+                project["sources"]["videos"][1]["cuts"][1]["frame"] = Value::from(150)
+            }),
+            ("cut without a segment", |project| {
+                project["sources"]["videos"][1]["segments"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("cut-1");
+            }),
+            ("segment without a cut", |project| {
+                project["sources"]["videos"][1]["segments"]["other"] =
+                    serde_json::json!({ "excluded": false, "transitionIn": null });
+            }),
+            ("missing first segment", |project| {
+                project["sources"]["videos"][1]["segments"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("start");
             }),
             ("unknown manual video", |project| {
                 project["sync"]["manual"]["videoId"] = Value::from("missing")

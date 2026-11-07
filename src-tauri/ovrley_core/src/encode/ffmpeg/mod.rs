@@ -8,6 +8,7 @@ pub(crate) mod composite_filters;
 pub mod composite_profiles;
 pub mod detect;
 pub(crate) mod probes;
+pub(crate) mod process;
 pub mod settings;
 mod transparent_filters;
 pub mod transition_proxy;

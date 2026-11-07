@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vite-plus/test'
 import { buildJoinTransitionModel, joinOverride, transitionLabel } from '@/features/transitions'
 import { transitionPreviewStyle } from '@/features/transitions/utils/transitionPreviews'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
-import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
+import { createTestVideo, cutEdits, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 const t = (key, options) => (typeof options === 'string' ? options : options.defaultValue.replace(/{{(\w+)}}/g, (_, name) => options[name]))
 const defaults = { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 2 }
@@ -17,10 +17,15 @@ function timeline() {
     ],
     { later: 125 },
   )
-  videoEdits.ride.deletedParts = [
-    { id: 'short', fromSecond: 10, toSecond: 11, transition: null },
-    { id: 'long', fromSecond: 30, toSecond: 60, transition: { type: 'wipeleft', durationSeconds: 1.5 } },
-  ]
+  Object.assign(
+    videoEdits.ride,
+    cutEdits([
+      { id: 'short', frame: 300, excluded: true },
+      { id: 'afterShort', frame: 330 },
+      { id: 'long', frame: 900, excluded: true },
+      { id: 'afterLong', frame: 1800, transitionIn: { type: 'wipeleft', durationSeconds: 1.5 } },
+    ]),
+  )
   return buildTimelineProgram({ videos: importedVideos, videoEdits, dragPreview: null, transitionDefaults: defaults })
 }
 
@@ -41,9 +46,8 @@ describe('join transition model', () => {
   test('shows the effective transition and the default each join follows', () => {
     const { clips, program } = timeline()
     const [atShort, atLong, intoLater] = program.joins.map((join) => model(join, clips))
-    // One deleted second is within the continuity threshold: a hard cut by default.
+    // One excluded second is within the continuity threshold: a hard cut by default.
     expect(atShort).toMatchObject({
-      isAvailable: true,
       value: 'default',
       label: 'No transition',
       defaultLabel: 'Default (No transition)',

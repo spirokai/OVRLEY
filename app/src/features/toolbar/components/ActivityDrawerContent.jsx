@@ -57,7 +57,7 @@ export function ActivityDrawerContent({
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-4 thin-scrollbar">
       <FileDragCursor position={isDraggingFile ? dragPosition : null} />
 
-      <Button type="button" className="h-9 w-full gap-2" onClick={onBrowseActivity} aria-keyshortcuts="Alt+A">
+      <Button type="button" className="h-9 w-full gap-2" onClick={onBrowseActivity} aria-keyshortcuts="Mod+K">
         <Activity className="h-4 w-4" />
         {t('toolbar.loadActivity', 'Load activity')}
       </Button>

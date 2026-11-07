@@ -116,8 +116,6 @@
     "resetView": "Ansicht zurücksetzen",
     "rewindToEnd": "Zum Ende springen",
     "rewindToStart": "Zum Anfang springen",
-    "setExportEndAtPlayhead": "Exportende am Abspielkopf festlegen",
-    "setExportStartAtPlayhead": "Exportbeginn am Abspielkopf festlegen",
     "stepBack": "Einen Schritt zurück",
     "stepForward": "Einen Schritt vor",
     "timelineAxis": "Zeitleistenachse",

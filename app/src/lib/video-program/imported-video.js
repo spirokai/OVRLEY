@@ -7,6 +7,7 @@
  */
 
 import { frameCountForDuration } from './frame-grid'
+import { FIRST_SEGMENT_KEY } from './video-segments'
 
 const TELEMETRY_STATUSES = new Set(['pending', 'ready', 'absent', 'failed'])
 
@@ -63,7 +64,7 @@ function createVideoId() {
 /**
  * Validates probed source metadata once at import ingress and creates a canonical video entity
  * without a preview registration. Duration is stored on the exact frame grid:
- * `frameCount × fps.den / fps.num`. User edits (placement, deleted parts, transitions) live in
+ * `frameCount × fps.den / fps.num`. User edits (placement, cuts, segments) live in
  * `videoEdits` keyed by the entity ID.
  * @param {object} metadata Probed source metadata.
  * @param {object} options Entity identity.
@@ -134,11 +135,18 @@ export function withPreviewRegistration(video, registration) {
  * Creates the user edits of a newly imported video. `offsetSource` is `manual`
  * once the start was set by hand, which re-detection keeps. `placementAnchor`
  * places a clip whose time cannot be determined directly before or after another clip.
- * @returns {{offsetSeconds: number, offsetSource: 'auto'|'manual', deletedParts: Array<object>, transitionIn: object|null, placementAnchor: {videoId: string, side: 'before'|'after'}|null}}
+ * Cuts and segments are described in `video-segments`.
+ * @returns {{offsetSeconds: number, offsetSource: 'auto'|'manual', cuts: Array<{id: string, frame: number}>, segments: object, placementAnchor: {videoId: string, side: 'before'|'after'}|null}}
  *   Initial edits.
  */
 export function createVideoEdits() {
-  return { offsetSeconds: 0, offsetSource: 'auto', deletedParts: [], transitionIn: null, placementAnchor: null }
+  return {
+    offsetSeconds: 0,
+    offsetSource: 'auto',
+    cuts: [],
+    segments: { [FIRST_SEGMENT_KEY]: { excluded: false, transitionIn: null } },
+    placementAnchor: null,
+  }
 }
 
 /**

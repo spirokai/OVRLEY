@@ -2,41 +2,25 @@
  * Derives the output program (ordered pieces and the joins between them) from
  * the imported-video collection.
  *
- * A piece is a continuous source range of one video that survives deleted parts
- * and the export range. Overlapping pieces are resolved for playback: the
- * earlier-starting video plays to its end and the later video continues at the
- * matching source position. Overlaps are still reported so single-file export
- * can be blocked.
+ * A piece is a continuous source range of one video: a segment that is not
+ * excluded from export, inside the export range. Overlapping pieces are resolved
+ * for playback: the earlier-starting video plays to its end and the later video
+ * continues at the matching source position. Overlaps are still reported so
+ * single-file export can be blocked. Excluded segments are listed as well: they
+ * stay on the timeline and in the preview, but leave no piece.
  *
- * A join connects consecutive pieces. It is a `clip` join when the incoming
- * piece is the first piece of its video (transition stored on
- * `video.transitionIn`) and a `deletedPart` join otherwise (transition stored on
- * the deleted part that precedes the incoming piece). A stored transition of
- * `null` means the join follows the project transition defaults, snapped to the
- * frames of the pieces it joins.
+ * A join connects consecutive pieces and belongs to the incoming piece's segment:
+ * its `transitionIn` is the join's transition. A stored transition of `null` means
+ * the join follows the project transition defaults, snapped to the frames of the
+ * pieces it joins.
  */
 
 import { framesToSeconds, secondsToFrames, snapDurationToFrames } from './frame-grid'
 import { HARD_CUT, NO_TRANSITION } from './transition-catalog'
 import { sortVideosByTimeline } from './video-collection'
+import { listVideoSegments, segmentJoinKey } from './video-segments'
 
 const TIME_EPSILON_SECONDS = 1e-6
-
-function keptSegments(video) {
-  const parts = video.deletedParts
-    .map((part) => ({ id: part.id, startFrame: secondsToFrames(part.fromSecond, video.fps), endFrame: secondsToFrames(part.toSecond, video.fps) }))
-    .sort((left, right) => left.startFrame - right.startFrame)
-  const segments = []
-  let cursor = 0
-  let leadingDeletedPartId = null
-  for (const part of parts) {
-    if (part.startFrame > cursor) segments.push({ startFrame: cursor, endFrame: part.startFrame, leadingDeletedPartId })
-    cursor = Math.max(cursor, part.endFrame)
-    leadingDeletedPartId = segments.length > 0 ? part.id : null
-  }
-  if (video.frameCount > cursor) segments.push({ startFrame: cursor, endFrame: video.frameCount, leadingDeletedPartId })
-  return segments
-}
 
 function exportWindowFrames(video, exportRange) {
   if (exportRange.type !== 'custom') return { startFrame: 0, endFrame: video.frameCount }
@@ -46,7 +30,7 @@ function exportWindowFrames(video, exportRange) {
   }
 }
 
-function createPiece(video, startFrame, endFrame, leadingDeletedPartId) {
+function createPiece(video, startFrame, endFrame, segmentKey) {
   const sourceStartSecond = framesToSeconds(startFrame, video.fps)
   const sourceEndSecond = framesToSeconds(endFrame, video.fps)
   return {
@@ -61,7 +45,7 @@ function createPiece(video, startFrame, endFrame, leadingDeletedPartId) {
     timelineStartSecond: video.offsetSeconds + sourceStartSecond,
     timelineEndSecond: video.offsetSeconds + sourceEndSecond,
     durationSeconds: sourceEndSecond - sourceStartSecond,
-    leadingDeletedPartId,
+    segmentKey,
   }
 }
 
@@ -69,10 +53,10 @@ function collectPieces(videos, exportRange) {
   const pieces = []
   for (const video of videos) {
     const window = exportWindowFrames(video, exportRange)
-    for (const segment of keptSegments(video)) {
+    for (const segment of listVideoSegments(video)) {
       const startFrame = Math.max(segment.startFrame, window.startFrame)
       const endFrame = Math.min(segment.endFrame, window.endFrame)
-      if (endFrame > startFrame) pieces.push(createPiece(video, startFrame, endFrame, segment.leadingDeletedPartId))
+      if (!segment.excluded && endFrame > startFrame) pieces.push(createPiece(video, startFrame, endFrame, segment.key))
     }
   }
   return pieces.sort(
@@ -81,8 +65,16 @@ function collectPieces(videos, exportRange) {
   )
 }
 
+function collectExcludedSegments(videos) {
+  return videos.flatMap((video) =>
+    listVideoSegments(video)
+      .filter((segment) => segment.excluded)
+      .map((segment) => createPiece(video, segment.startFrame, segment.endFrame, segment.key)),
+  )
+}
+
 /**
- * Lists the pieces each video keeps after its deleted parts and the export
+ * Lists the pieces each video keeps after its excluded segments and the export
  * range, without resolving overlaps between videos. Separate-file export renders
  * these; the combined program trims overlapping pieces (see `buildProgram`).
  * @param {object} options Piece inputs.
@@ -105,7 +97,8 @@ function resolveOverlaps(sortedPieces, videosById) {
   let runningVideoId = null
   for (const piece of sortedPieces) {
     const overlapSeconds = runningEndSecond - piece.timelineStartSecond
-    if (overlapSeconds <= TIME_EPSILON_SECONDS) {
+    // Less than half a frame is no overlap: not one frame is shown twice.
+    if (overlapSeconds < framesToSeconds(1, piece.fps) / 2) {
       pieces.push(piece)
       runningEndSecond = piece.timelineEndSecond
       runningVideoId = piece.videoId
@@ -120,7 +113,7 @@ function resolveOverlaps(sortedPieces, videosById) {
     })
     const trimmedStartFrame = piece.sourceStartFrame + Math.ceil((overlapSeconds * piece.fps.num) / piece.fps.den - TIME_EPSILON_SECONDS)
     if (trimmedStartFrame < piece.sourceEndFrame) {
-      pieces.push(createPiece(videosById.get(piece.videoId), trimmedStartFrame, piece.sourceEndFrame, piece.leadingDeletedPartId))
+      pieces.push(createPiece(videosById.get(piece.videoId), trimmedStartFrame, piece.sourceEndFrame, piece.segmentKey))
     }
     if (piece.timelineEndSecond > runningEndSecond) {
       runningEndSecond = piece.timelineEndSecond
@@ -139,51 +132,37 @@ function defaultTransition(previous, next, gapSeconds, transitionDefaults) {
   return { type: transitionDefaults.type, durationSeconds }
 }
 
-function deletedPartsOf(videos) {
-  return new Map([...videos].flatMap((video) => video.deletedParts.map((part) => [part.id, part])))
-}
-
 function buildJoins(pieces, videosById, transitionDefaults) {
-  const deletedPartsById = deletedPartsOf(videosById.values())
-
-  const seenVideoIds = new Set(pieces.length > 0 ? [pieces[0].videoId] : [])
-  const joins = []
-  for (let index = 1; index < pieces.length; index += 1) {
-    const previous = pieces[index - 1]
-    const next = pieces[index]
-    const kind = seenVideoIds.has(next.videoId) ? 'deletedPart' : 'clip'
-    seenVideoIds.add(next.videoId)
-    const ownerId = kind === 'clip' ? next.videoId : next.leadingDeletedPartId
-    const override = kind === 'clip' ? videosById.get(ownerId).transitionIn : deletedPartsById.get(ownerId).transition
+  return pieces.slice(1).map((next, index) => {
+    const previous = pieces[index]
+    const override = videosById.get(next.videoId).segments[next.segmentKey].transitionIn
     const gapSeconds = Math.max(0, next.timelineStartSecond - previous.timelineEndSecond)
-    joins.push({
-      key: `${kind}:${ownerId}`,
-      kind,
-      ownerId,
+    return {
+      key: segmentJoinKey(next.videoId, next.segmentKey),
+      videoId: next.videoId,
+      segmentKey: next.segmentKey,
       fromPieceId: previous.id,
       toPieceId: next.id,
       gapSeconds,
       transition: override ?? defaultTransition(previous, next, gapSeconds, transitionDefaults),
       isDefault: override === null,
-    })
-  }
-  return joins
+    }
+  })
 }
 
 /**
  * Lists the transitions between consecutive pieces of one video (its separate
- * output): the joins at its deleted parts, by the same rule as the program.
+ * output), by the same rule as the program.
  * @param {object} video Imported video joined with its edits.
  * @param {Array<object>} pieces The video's pieces in source order (`collectVideoPieces`).
  * @param {{type: string, durationSeconds: number, splitGapThresholdSeconds: number}} transitionDefaults Project transition defaults.
  * @returns {Array<{type: string, durationSeconds: number}>} One transition per join.
  */
 export function buildVideoPieceTransitions(video, pieces, transitionDefaults) {
-  const deletedPartsById = deletedPartsOf([video])
   return pieces.slice(1).map((next, index) => {
     const previous = pieces[index]
     const gapSeconds = next.timelineStartSecond - previous.timelineEndSecond
-    return deletedPartsById.get(next.leadingDeletedPartId).transition ?? defaultTransition(previous, next, gapSeconds, transitionDefaults)
+    return video.segments[next.segmentKey].transitionIn ?? defaultTransition(previous, next, gapSeconds, transitionDefaults)
   })
 }
 
@@ -193,7 +172,7 @@ export function buildVideoPieceTransitions(video, pieces, transitionDefaults) {
  * @param {Array<object>} options.videos Imported videos.
  * @param {{type: 'all'|'custom', from: number, to: number}} options.exportRange Export range in timeline seconds.
  * @param {{type: string, durationSeconds: number, splitGapThresholdSeconds: number}} options.transitionDefaults Project transition defaults.
- * @returns {{pieces: Array<object>, joins: Array<object>, overlaps: Array<object>, durationSeconds: number}} Program in playback order.
+ * @returns {{pieces: Array<object>, joins: Array<object>, overlaps: Array<object>, excludedSegments: Array<object>, durationSeconds: number}} Program in playback order.
  */
 export function buildProgram({ videos, exportRange, transitionDefaults }) {
   const videosById = new Map(videos.map((video) => [video.id, video]))
@@ -201,7 +180,7 @@ export function buildProgram({ videos, exportRange, transitionDefaults }) {
   const joins = buildJoins(pieces, videosById, transitionDefaults)
   const piecesSeconds = pieces.reduce((total, piece) => total + piece.durationSeconds, 0)
   const transitionSeconds = joins.reduce((total, join) => total + join.transition.durationSeconds, 0)
-  return { pieces, joins, overlaps, durationSeconds: piecesSeconds - transitionSeconds }
+  return { pieces, joins, overlaps, excludedSegments: collectExcludedSegments(videos), durationSeconds: piecesSeconds - transitionSeconds }
 }
 
 /**

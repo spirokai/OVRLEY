@@ -26,6 +26,10 @@ use serde_json::Value;
 use std::path::Path;
 use std::process::Command;
 
+/// Below this many frames, a gap between `nb_frames` and `duration` is rounding in
+/// the reported values, not frames hidden by an edit list.
+const HIDDEN_FRAME_TOLERANCE: f64 = 1e-4;
+
 /// Probes a video file with ffprobe and returns structured metadata.
 ///
 /// Spawns `ffprobe -v quiet -print_format json -show_format -show_streams` for
@@ -113,6 +117,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
         camera_type: None,
         camera_model: None,
         time_source: None,
+        video_start_offset: None,
     };
 
     let format = json.get("format");
@@ -205,6 +210,8 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
         }
 
         metadata.duration = read_video_stream_duration(stream, metadata.fps).or(metadata.duration);
+        metadata.video_start_offset =
+            format.and_then(|format| read_video_start_offset(stream, format));
     }
 
     // ── PHASE 4: BUILD CREATION TIME VIA PRIORITY CHAIN ──
@@ -271,20 +278,44 @@ fn read_rational_rate(stream: &Value, key: &str) -> Option<(u32, u32)> {
 /// `nb_frames / fps` when the duration field is absent or unparseable. The FPS
 /// value is expected to have been validated (finite, positive) before this call.
 /// Returns `None` when neither source is available.
+///
+/// `nb_frames` counts the whole track while `duration` is what its edit list
+/// shows. When frames are hidden the duration usually ends mid-frame and only
+/// whole frames can be relied on, so it is rounded down to a whole frame.
 pub fn read_video_stream_duration(stream: &Value, fps: Option<f64>) -> Option<f64> {
     // test seam
-    stream
+    let frames = stream
+        .get("nb_frames")
+        .and_then(|v| v.as_str())
+        .and_then(|value| value.parse::<u64>().ok());
+    let fps = fps.filter(|value| value.is_finite() && *value > 0.0);
+    let duration = stream
         .get("duration")
         .and_then(|v| v.as_str())
-        .and_then(parse_positive_f64)
-        .or_else(|| {
-            let frames = stream
-                .get("nb_frames")
-                .and_then(|v| v.as_str())
-                .and_then(|value| value.parse::<u64>().ok())?;
-            let fps = fps.filter(|value| value.is_finite() && *value > 0.0)?;
-            Some(frames as f64 / fps)
-        })
+        .and_then(parse_positive_f64);
+    match (duration, frames, fps) {
+        (Some(duration), Some(frames), Some(fps))
+            if duration * fps < frames as f64 - HIDDEN_FRAME_TOLERANCE =>
+        {
+            Some(((duration * fps).floor() / fps).max(1.0 / fps))
+        }
+        (Some(duration), _, _) => Some(duration),
+        (None, Some(frames), Some(fps)) => Some(frames as f64 / fps),
+        (None, _, _) => None,
+    }
+}
+
+/// How far the first video frame sits after the file's start. FFmpeg counts from
+/// the earliest stream, so video that starts after its audio has a positive offset.
+pub fn read_video_start_offset(stream: &Value, format: &Value) -> Option<f64> {
+    let seconds = |value: &Value| {
+        value
+            .get("start_time")
+            .and_then(Value::as_str)
+            .and_then(|text| text.parse::<f64>().ok())
+            .filter(|parsed| parsed.is_finite())
+    };
+    Some((seconds(stream)? - seconds(format)?).max(0.0))
 }
 
 fn parse_positive_f64(value: &str) -> Option<f64> {

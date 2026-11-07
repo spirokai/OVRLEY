@@ -80,8 +80,6 @@ describe('OverlayPlayer', () => {
 
     render(<OverlayPlayer {...playerProps} videoSyncMode />)
 
-    expect(screen.queryByRole('button', { name: 'Set export start at playhead' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Set export end at playhead' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Clear custom export range' })).not.toBeInTheDocument()
     expect(screen.queryByText('[00:00:10-00:00:20]')).not.toBeInTheDocument()
   })

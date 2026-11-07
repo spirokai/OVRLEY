@@ -4,7 +4,7 @@
  * Timeline clips join a canonical video entity (validated at import ingress:
  * `durationSeconds` is frame-exact, `fps` is an exact rational, `resolution` is
  * display-oriented) with its user edits (`offsetSeconds` committed timeline
- * start, `deletedParts`, `transitionIn`).
+ * start, `cuts`, `segments`).
  */
 
 import { fpsEquals } from './frame-grid'
@@ -43,7 +43,7 @@ export function getVideosTimelineBounds(videos) {
 /**
  * Joins imported video entities with their user edits into timeline clips.
  * @param {Array<object>} videos Imported video entities.
- * @param {Object<string, {offsetSeconds: number, deletedParts: Array<object>, transitionIn: object|null}>} videoEdits Edits keyed by video ID.
+ * @param {Object<string, {offsetSeconds: number, cuts: Array<object>, segments: object}>} videoEdits Edits keyed by video ID.
  * @returns {Array<object>} Timeline clips.
  */
 export function joinVideoEdits(videos, videoEdits) {

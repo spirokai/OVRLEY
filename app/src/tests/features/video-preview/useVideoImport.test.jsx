@@ -548,7 +548,7 @@ describe('editing in the dialog', () => {
     expect(row(result, 'a.mp4').overlaps).toEqual([{ name: 'b.mp4', seconds: 10 }])
     expect(row(result, 'c.mp4')).toMatchObject({ isIncluded: true, isIncompatible: true, formatLabel: '1920×1080 · 60 fps · 00:30' })
     expect(dialog(result).issues).toEqual([
-      'Videos overlap (a.mp4, b.mp4). Move a video or delete the overlapping part.',
+      'Videos overlap (a.mp4, b.mp4). Move a video or exclude the overlapping part from export.',
       'Videos differ in resolution or frame rate (c.mp4). Remove them or export separate files.',
     ])
     expect(dialog(result).transition).toMatchObject({ type: 'none', typeLabel: 'No transition' })

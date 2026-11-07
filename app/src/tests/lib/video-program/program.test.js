@@ -2,15 +2,17 @@ import { describe, expect, test } from 'vite-plus/test'
 
 import { buildProgram, collectVideoPieces, findInvalidTransitions, resolveProgramPosition } from '@/lib/video-program/program'
 import { DEFAULT_TRANSITION_SETTINGS, HARD_CUT } from '@/lib/video-program/transition-catalog'
+import { cutEdits } from '@/tests/helpers/videoFixtures'
 
 const FPS = { num: 30, den: 1 }
+const NTSC = { num: 30000, den: 1001 }
 const ALL = { type: 'all', from: 0, to: 0 }
 const WIPE = { type: 'wipeleft', durationSeconds: 2 }
 const WIPE_DEFAULTS = { ...DEFAULT_TRANSITION_SETTINGS, ...WIPE }
 
-function video(id, { offsetSeconds = 0, durationSeconds = 60, importOrder = 0, deletedParts = [], transitionIn = null, fps = FPS } = {}) {
+function video(id, { offsetSeconds = 0, durationSeconds = 60, importOrder = 0, cuts = [], start = {}, fps = FPS } = {}) {
   const frameCount = Math.round((durationSeconds * fps.num) / fps.den)
-  return { id, offsetSeconds, durationSeconds: (frameCount * fps.den) / fps.num, frameCount, fps, importOrder, deletedParts, transitionIn }
+  return { id, offsetSeconds, durationSeconds: (frameCount * fps.den) / fps.num, frameCount, fps, importOrder, ...cutEdits(cuts, start) }
 }
 
 function program(videos, { exportRange = ALL, transitionDefaults = WIPE_DEFAULTS } = {}) {
@@ -70,13 +72,13 @@ describe('buildProgram joins and default transitions', () => {
   ])('$name', ({ videos, defaults, transition, duration }) => {
     const result = program(videos, { transitionDefaults: defaults })
     expect(result.joins).toHaveLength(1)
-    expect(result.joins[0]).toMatchObject({ key: 'clip:b', kind: 'clip', ownerId: 'b', transition, isDefault: true })
+    expect(result.joins[0]).toMatchObject({ key: 'b:start', videoId: 'b', segmentKey: 'start', transition, isDefault: true })
     expect(result.durationSeconds).toBeCloseTo(duration, 9)
   })
 
   test('a stored override wins over defaults and changes the output duration (Σ pieces − Σ transitions)', () => {
     const fade = { type: 'fade', durationSeconds: 3 }
-    const result = program([video('a'), video('b', { offsetSeconds: 60, importOrder: 1, transitionIn: fade })])
+    const result = program([video('a'), video('b', { offsetSeconds: 60, importOrder: 1, start: { transitionIn: fade } })])
     expect(result.joins[0]).toMatchObject({ transition: fade, isDefault: false, gapSeconds: 0 })
     expect(result.durationSeconds).toBe(117)
   })
@@ -84,7 +86,7 @@ describe('buildProgram joins and default transitions', () => {
   test('changing defaults re-derives only joins still on their default', () => {
     const videos = [
       video('a'),
-      video('b', { offsetSeconds: 70, importOrder: 1, transitionIn: { type: 'fade', durationSeconds: 1 } }),
+      video('b', { offsetSeconds: 70, importOrder: 1, start: { transitionIn: { type: 'fade', durationSeconds: 1 } } }),
       video('c', { offsetSeconds: 140, importOrder: 2 }),
     ]
     const result = program(videos, { transitionDefaults: { ...WIPE_DEFAULTS, type: 'dissolve', durationSeconds: 3 } })
@@ -95,62 +97,114 @@ describe('buildProgram joins and default transitions', () => {
   })
 
   test('default durations snap to the frames of the pieces they join, as the export counts them', () => {
-    const ntsc = { num: 30000, den: 1001 }
-    const videos = [video('a', { fps: ntsc }), video('b', { offsetSeconds: 70, importOrder: 1, fps: ntsc })]
+    const videos = [video('a', { fps: NTSC }), video('b', { offsetSeconds: 70, importOrder: 1, fps: NTSC })]
     const result = program(videos, { transitionDefaults: { ...WIPE_DEFAULTS, durationSeconds: 1.01 } })
     expect(result.joins[0].transition).toEqual({ type: 'wipeleft', durationSeconds: (30 * 1001) / 30000 })
   })
 })
 
-describe('buildProgram deleted parts', () => {
-  test('a deleted middle part splits one video into two pieces joined at the deleted part', () => {
-    const result = program([video('a', { durationSeconds: 1200, deletedParts: [{ id: 'd1', fromSecond: 300, toSecond: 900, transition: null }] })])
+describe('buildProgram cuts and excluded segments', () => {
+  test('a cut alone splits a video into two pieces with a hard cut and the same output', () => {
+    const result = program([video('a', { cuts: [{ id: 'c1', frame: 300 }] })])
+    expect(pieceSpans(result)).toEqual([
+      ['a', 0, 10, 0, 10],
+      ['a', 10, 60, 10, 60],
+    ])
+    expect(result.joins[0]).toMatchObject({ key: 'a:c1', segmentKey: 'c1', gapSeconds: 0, transition: HARD_CUT, isDefault: true })
+    expect(result.durationSeconds).toBe(60)
+    expect(result.excludedSegments).toEqual([])
+  })
+
+  test('an excluded middle segment leaves two pieces joined by the transition of the segment after it', () => {
+    const cuts = [
+      { id: 'c1', frame: 9000, excluded: true },
+      { id: 'c2', frame: 27000 },
+    ]
+    const result = program([video('a', { durationSeconds: 1200, cuts })])
     expect(pieceSpans(result)).toEqual([
       ['a', 0, 300, 0, 300],
       ['a', 900, 1200, 900, 1200],
     ])
-    expect(result.joins[0]).toMatchObject({ key: 'deletedPart:d1', kind: 'deletedPart', ownerId: 'd1', gapSeconds: 600, transition: WIPE })
+    expect(result.joins).toHaveLength(1)
+    expect(result.joins[0]).toMatchObject({ key: 'a:c2', segmentKey: 'c2', gapSeconds: 600, transition: WIPE })
     expect(result.durationSeconds).toBe(598)
+    expect(
+      result.excludedSegments.map(({ videoId, segmentKey, timelineStartSecond, timelineEndSecond }) => [
+        videoId,
+        segmentKey,
+        timelineStartSecond,
+        timelineEndSecond,
+      ]),
+    ).toEqual([['a', 'c1', 300, 900]])
   })
 
-  test('a short deleted part defaults to a hard cut and a stored transition overrides it', () => {
-    const parts = [
-      { id: 'd1', fromSecond: 90, toSecond: 91, transition: null },
-      { id: 'd2', fromSecond: 200, toSecond: 210, transition: HARD_CUT },
+  test('a short excluded segment defaults to a hard cut and a stored transition overrides it', () => {
+    const cuts = [
+      { id: 'c1', frame: 2700, excluded: true },
+      { id: 'c2', frame: 2730 },
+      { id: 'c3', frame: 6000, excluded: true },
+      { id: 'c4', frame: 6300, transitionIn: HARD_CUT },
     ]
-    const result = program([video('a', { durationSeconds: 300, deletedParts: parts })])
+    const result = program([video('a', { durationSeconds: 300, cuts })])
     expect(result.joins.map(({ key, transition, isDefault }) => [key, transition, isDefault])).toEqual([
-      ['deletedPart:d1', HARD_CUT, true],
-      ['deletedPart:d2', HARD_CUT, false],
+      ['a:c2', HARD_CUT, true],
+      ['a:c4', HARD_CUT, false],
     ])
     expect(result.durationSeconds).toBe(289)
   })
 
-  test('leading and trailing deleted parts trim without creating joins', () => {
-    const parts = [
-      { id: 'head', fromSecond: 0, toSecond: 5, transition: null },
-      { id: 'tail', fromSecond: 55, toSecond: 60, transition: null },
+  test('excluded segments at the edges trim without creating joins', () => {
+    const cuts = [
+      { id: 'c1', frame: 150 },
+      { id: 'c2', frame: 1650, excluded: true },
     ]
-    const result = program([video('a', { offsetSeconds: 10, deletedParts: parts })])
+    const result = program([video('a', { offsetSeconds: 10, cuts, start: { excluded: true } })])
     expect(pieceSpans(result)).toEqual([['a', 5, 55, 15, 65]])
     expect(result.joins).toEqual([])
   })
 
-  test('join keys stay unique when another clip sits inside a deleted part', () => {
+  test('excluding a whole video leaves no piece, keeps it listed, and joins its neighbours', () => {
     const result = program([
-      video('b', { durationSeconds: 20, deletedParts: [{ id: 'd1', fromSecond: 5, toSecond: 15, transition: null }] }),
-      video('a', { offsetSeconds: 8, durationSeconds: 4, importOrder: 1 }),
+      video('a'),
+      video('b', { offsetSeconds: 60, durationSeconds: 10, importOrder: 1, start: { excluded: true } }),
+      video('c', { offsetSeconds: 70, importOrder: 2 }),
     ])
+    expect(result.pieces.map(({ videoId }) => videoId)).toEqual(['a', 'c'])
+    expect(result.joins.map(({ key, gapSeconds, transition }) => [key, gapSeconds, transition])).toEqual([['c:start', 10, WIPE]])
+    expect(result.excludedSegments.map(({ videoId, segmentKey }) => [videoId, segmentKey])).toEqual([['b', 'start']])
+  })
+
+  test('the join into a video whose first segment is excluded belongs to its first kept segment', () => {
+    const result = program([
+      video('a'),
+      video('b', {
+        offsetSeconds: 60,
+        importOrder: 1,
+        start: { excluded: true, transitionIn: { type: 'fade', durationSeconds: 1 } },
+        cuts: [{ id: 'c1', frame: 300 }],
+      }),
+    ])
+    expect(result.joins).toHaveLength(1)
+    expect(result.joins[0]).toMatchObject({ key: 'b:c1', isDefault: true })
+  })
+
+  test('join keys stay unique when another clip sits inside an excluded segment', () => {
+    const cuts = [
+      { id: 'c1', frame: 150, excluded: true },
+      { id: 'c2', frame: 450 },
+    ]
+    const result = program([video('b', { durationSeconds: 20, cuts }), video('a', { offsetSeconds: 8, durationSeconds: 4, importOrder: 1 })])
     expect(result.pieces.map(({ videoId }) => videoId)).toEqual(['b', 'a', 'b'])
-    expect(result.joins.map(({ key }) => key)).toEqual(['clip:a', 'deletedPart:d1'])
+    expect(result.joins.map(({ key }) => key)).toEqual(['a:start', 'b:c2'])
     expect(result.overlaps).toEqual([])
   })
 
-  test('deleted part boundaries snap to the source frame grid', () => {
-    const ntsc = { num: 30000, den: 1001 }
-    const result = program([
-      video('a', { durationSeconds: 10.01, fps: ntsc, deletedParts: [{ id: 'd1', fromSecond: 1.0, toSecond: 2.0, transition: null }] }),
-    ])
+  test('cuts sit on the source frame grid', () => {
+    const cuts = [
+      { id: 'c1', frame: 30, excluded: true },
+      { id: 'c2', frame: 60 },
+    ]
+    const result = program([video('a', { durationSeconds: 10.01, fps: NTSC, cuts })])
     expect(result.pieces.map(({ sourceStartFrame, sourceEndFrame }) => [sourceStartFrame, sourceEndFrame])).toEqual([
       [0, 30],
       [60, 300],
@@ -165,18 +219,20 @@ describe('buildProgram export range', () => {
       ['a', 30, 60, 30, 60],
       ['b', 0, 30, 60, 90],
     ])
-    expect(result.joins.map(({ key }) => key)).toEqual(['clip:b'])
+    expect(result.joins.map(({ key }) => key)).toEqual(['b:start'])
   })
 
-  test('a range starting inside a deleted part leaves only the later piece', () => {
-    const result = program([video('a', { deletedParts: [{ id: 'd1', fromSecond: 10, toSecond: 20, transition: null }] })], {
-      exportRange: { type: 'custom', from: 15, to: 40 },
-    })
+  test('a range starting inside an excluded segment leaves only the later piece', () => {
+    const cuts = [
+      { id: 'c1', frame: 300, excluded: true },
+      { id: 'c2', frame: 600 },
+    ]
+    const result = program([video('a', { cuts })], { exportRange: { type: 'custom', from: 15, to: 40 } })
     expect(pieceSpans(result)).toEqual([['a', 20, 40, 20, 40]])
     expect(result.joins).toEqual([])
   })
 
-  test('videos outside the range are excluded', () => {
+  test('videos outside the range leave no pieces', () => {
     const result = program([video('a'), video('b', { offsetSeconds: 200, importOrder: 1 })], { exportRange: { type: 'custom', from: 0, to: 100 } })
     expect(result.pieces.map(({ videoId }) => videoId)).toEqual(['a'])
   })
@@ -190,7 +246,7 @@ describe('buildProgram overlaps', () => {
       ['a', 0, 60, 0, 60],
       ['b', 10, 60, 60, 110],
     ])
-    expect(result.joins[0]).toMatchObject({ key: 'clip:b', gapSeconds: 0, transition: HARD_CUT })
+    expect(result.joins[0]).toMatchObject({ key: 'b:start', gapSeconds: 0, transition: HARD_CUT })
   })
 
   test('a fully covered clip is dropped from playback but still reported', () => {
@@ -199,17 +255,25 @@ describe('buildProgram overlaps', () => {
     expect(result.pieces.map(({ videoId }) => videoId)).toEqual(['a'])
   })
 
-  test('deleting the overlapping part resolves the overlap', () => {
-    const result = program([
-      video('a', { deletedParts: [{ id: 'd1', fromSecond: 50, toSecond: 60, transition: null }] }),
-      video('b', { offsetSeconds: 50, importOrder: 1 }),
-    ])
+  test('excluding the overlapping segment resolves the overlap', () => {
+    const result = program([video('a', { cuts: [{ id: 'c1', frame: 1500, excluded: true }] }), video('b', { offsetSeconds: 50, importOrder: 1 })])
     expect(result.overlaps).toEqual([])
   })
 
   test('touching clips with floating-point offsets are not overlaps', () => {
     const result = program([video('a', { offsetSeconds: 0.1 }), video('b', { offsetSeconds: 0.1 + 60 - 1e-9, importOrder: 1 })])
     expect(result.overlaps).toEqual([])
+  })
+
+  test('a clip snapped onto the end of a 29.97 fps clip does not overlap it, and a whole frame does', () => {
+    const first = video('a', { durationSeconds: 10.01, fps: NTSC })
+    const end = first.durationSeconds
+    const snapped = program([first, video('b', { offsetSeconds: end, importOrder: 1, fps: NTSC })])
+    expect(snapped.overlaps).toEqual([])
+    const subFrame = program([first, video('b', { offsetSeconds: end - 0.01, importOrder: 1, fps: NTSC })])
+    expect(subFrame.overlaps).toEqual([])
+    const wholeFrame = program([first, video('b', { offsetSeconds: end - 1001 / 30000, importOrder: 1, fps: NTSC })])
+    expect(wholeFrame.overlaps).toHaveLength(1)
   })
 })
 
@@ -218,10 +282,10 @@ describe('findInvalidTransitions', () => {
     const three = { type: 'fade', durationSeconds: 3 }
     const result = program([
       video('a'),
-      video('b', { offsetSeconds: 60, durationSeconds: 5, importOrder: 1, transitionIn: three }),
-      video('c', { offsetSeconds: 65, importOrder: 2, transitionIn: three }),
+      video('b', { offsetSeconds: 60, durationSeconds: 5, importOrder: 1, start: { transitionIn: three } }),
+      video('c', { offsetSeconds: 65, importOrder: 2, start: { transitionIn: three } }),
     ])
-    expect(findInvalidTransitions(result)).toEqual([{ pieceId: result.pieces[1].id, joinKeys: ['clip:b', 'clip:c'] }])
+    expect(findInvalidTransitions(result)).toEqual([{ pieceId: result.pieces[1].id, joinKeys: ['b:start', 'c:start'] }])
   })
 
   test('accepts transitions that fit', () => {
@@ -261,9 +325,13 @@ describe('resolveProgramPosition', () => {
 })
 
 describe('collectVideoPieces for separate-file export', () => {
-  test('keeps each video whole across overlaps, splits at deleted parts, and applies the export range', () => {
+  test('keeps each video whole across overlaps, skips excluded segments, and applies the export range', () => {
+    const cuts = [
+      { id: 'c1', frame: 300, excluded: true },
+      { id: 'c2', frame: 600 },
+    ]
     const videos = [
-      video('a', { durationSeconds: 60, deletedParts: [{ id: 'cut', fromSecond: 10, toSecond: 20, transition: null }] }),
+      video('a', { durationSeconds: 60, cuts }),
       video('b', { offsetSeconds: 50, durationSeconds: 30, importOrder: 1 }),
       video('c', { offsetSeconds: 200, durationSeconds: 10, importOrder: 2 }),
     ]

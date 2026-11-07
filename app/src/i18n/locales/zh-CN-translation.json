@@ -116,8 +116,6 @@
     "resetView": "重置视图",
     "rewindToEnd": "跳到末尾",
     "rewindToStart": "跳到开头",
-    "setExportEndAtPlayhead": "将导出结束点设为播放头",
-    "setExportStartAtPlayhead": "将导出起点设为播放头",
     "stepBack": "后退一步",
     "stepForward": "前进一步",
     "timelineAxis": "时间轴",

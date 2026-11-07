@@ -40,6 +40,20 @@ fn encode_error_display() {
 }
 
 #[test]
+fn wrapping_an_encoding_error_shows_one_prefix() {
+    let inner = CoreError::Encode("Failed writing composite overlay frame".into());
+    let wrapped = CoreError::Encode(format!("{}. More detail", inner.encode_message()));
+    assert_eq!(
+        wrapped.to_string(),
+        "Encoding error: Failed writing composite overlay frame. More detail"
+    );
+    assert_eq!(
+        CoreError::Config("bad".into()).encode_message(),
+        "Invalid configuration: bad"
+    );
+}
+
+#[test]
 fn io_error_display() {
     let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
     let err = CoreError::Io {

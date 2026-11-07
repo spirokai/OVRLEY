@@ -2,6 +2,17 @@ import { describe, expect, test } from 'vite-plus/test'
 import { getKeyboardShortcutGroups } from '@/features/app-shell/utils/keyboardShortcutGroups'
 
 describe('keyboard shortcut help groups', () => {
+  test('lists the cut and exclude commands of the video player', () => {
+    const playerGroup = getKeyboardShortcutGroups().find((group) => group.name === 'Video player')
+    const keysOf = (description) =>
+      playerGroup.shortcuts.find((shortcut) => shortcut.description === description)?.options.flatMap((option) => option.keys)
+
+    expect(keysOf('Cut the video at the playhead')).toEqual(['C'])
+    expect(keysOf('Exclude the part at the playhead from export, or include it')).toEqual(['X'])
+    expect(keysOf('Set export start at playhead')).toEqual(['I'])
+    expect(keysOf('Set export end at playhead')).toEqual(['O'])
+  })
+
   test('combines bindings with the same description into one row', () => {
     const groups = getKeyboardShortcutGroups()
     const editorGroup = groups.find((group) => group.name === 'Widget editor')

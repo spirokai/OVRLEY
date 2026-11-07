@@ -267,11 +267,14 @@ pub struct CompositeSourceMetadata {
     /// Colour the overlay is converted to; None when the source's colour space
     /// has no supported matrix (the overlay is then piped as RGBA).
     pub color: Option<crate::encode::overlay_format::YuvColor>,
+    /// Where the video stream starts in file time.
+    pub video_start_seconds: f64,
 }
 
 impl CompositeSourceMetadata {
     pub(crate) fn from_source(metadata: &crate::media::SourceVideoMetadata) -> Self {
         Self {
+            video_start_seconds: metadata.video_start_seconds(),
             has_audio: metadata.has_audio,
             audio_bit_rate: metadata.audio_bit_rate,
             rotation_degrees: metadata.rotation_degrees,

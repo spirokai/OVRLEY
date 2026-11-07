@@ -116,8 +116,6 @@
     "resetView": "Återställ vy",
     "rewindToEnd": "Spola till slutet",
     "rewindToStart": "Spola till början",
-    "setExportEndAtPlayhead": "Ange exportslut vid spelhuvudet",
-    "setExportStartAtPlayhead": "Ange exportstart vid spelhuvudet",
     "stepBack": "Stega bakåt",
     "stepForward": "Stega framåt",
     "timelineAxis": "Tidslinjeaxel",

@@ -5,13 +5,18 @@ export const PROJECT_FORMAT = 'ovrley-project'
 export const PROJECT_VERSION = 6
 export const LAST_PROJECT_DIRECTORY_KEY = 'last-project-dir'
 
-function cloneTransition(transition) {
-  return transition === null ? null : { type: transition.type, durationSeconds: transition.durationSeconds }
+function projectSegments(segments) {
+  return Object.fromEntries(
+    Object.entries(segments).map(([key, { excluded, transitionIn }]) => [
+      key,
+      { excluded, transitionIn: transitionIn === null ? null : { ...transitionIn } },
+    ]),
+  )
 }
 
 /**
  * Projects the video collection in import order: identity, source locator, and user edits.
- * A `null` transition follows the project transition defaults.
+ * A segment whose `transitionIn` is `null` follows the project transition defaults.
  */
 function projectVideos(state, projectPath) {
   return [...state.importedVideos]
@@ -23,13 +28,8 @@ function projectVideos(state, projectPath) {
         path: createPathLocator(video.path, projectPath),
         offsetSeconds: edits.offsetSeconds,
         offsetSource: edits.offsetSource,
-        deletedParts: edits.deletedParts.map((part) => ({
-          id: part.id,
-          fromSecond: part.fromSecond,
-          toSecond: part.toSecond,
-          transition: cloneTransition(part.transition),
-        })),
-        transitionIn: cloneTransition(edits.transitionIn),
+        cuts: edits.cuts.map((cut) => ({ id: cut.id, frame: cut.frame })),
+        segments: projectSegments(edits.segments),
         placementAnchor: edits.placementAnchor === null ? null : { ...edits.placementAnchor },
       }
     })

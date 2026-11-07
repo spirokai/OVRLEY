@@ -23,6 +23,7 @@ import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_SYNC_TOOL, VIDEO_TOOL, WIDGETS_TOOL
 import { MissingSourceDialog, ProjectNoticeDialog, StartupProjectsDialog } from '@/features/projects'
 import { VideoImportDialog } from '@/features/video-preview'
 import { UpdatePromptDialog } from '@/features/app-update'
+import { CutRemovalDialog } from '@/features/player/components/CutRemovalDialog'
 import {
   AppHeader,
   ControlPanel,
@@ -33,6 +34,7 @@ import {
   useAppShellComposition,
 } from '@/features/app-shell'
 import * as backend from './api/backend'
+import { hasTextSelection } from '@/lib/keyboard-shortcuts'
 import { useTranslation } from 'react-i18next'
 import { changeLanguagePreference } from '@/i18n/language-preference'
 
@@ -43,6 +45,8 @@ function useRightClickDevtools() {
     }
 
     const handleContextMenu = (event) => {
+      // Selected text keeps the native menu, which offers Copy.
+      if (hasTextSelection()) return
       event.preventDefault()
       import('@tauri-apps/api/core')
         .then(({ invoke }) => invoke('plugin:webview|internal_toggle_devtools'))
@@ -96,7 +100,7 @@ function App() {
           projectPath={projectLifecycle.loadedProjectPath}
           activityFilename={activityImport.activityFilename}
           activityPath={activityImport.activityPath}
-          videoSources={videoControls.videoSummaries}
+          videoClips={videoControls.clips}
           status={projectLifecycle.status}
           busy={projectLifecycle.busy}
           onNew={projectLifecycle.handleNewProject}
@@ -120,7 +124,6 @@ function App() {
     } else if (toolbarDrawer.activeTool === VIDEO_TOOL) {
       drawerContent = (
         <VideoDrawerContent
-          videoSummaries={videoControls.videoSummaries}
           onBrowseVideo={videoControls.handleImportVideo}
           onDeleteVideo={videoControls.clearImportedVideos}
           onRemoveVideo={videoControls.removeVideo}
@@ -166,6 +169,7 @@ function App() {
         <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />
         <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
         <ProjectNoticeDialog {...projectLifecycle.noticeDialog} />
+        <CutRemovalDialog />
         <VideoImportDialog {...videoControls.importDialog} />
         <KeyboardShortcutsDialog
           open={editorShell.keyboardShortcutsOpen}

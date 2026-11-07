@@ -118,57 +118,35 @@ fn source_fps(source: &InspectedVideoSource) -> CoreResult<Fps> {
     )
 }
 
-/// Validates a piece against its source and derives its window. The source frame
-/// count uses the same rule as the frontend program and the renderer.
-pub(crate) fn piece_window(
+/// Validates a frame range against its source and derives its window. The source
+/// frame count uses the same rule as the frontend program and the renderer.
+fn frame_window(
     source: &InspectedVideoSource,
-    piece: &BatchRenderPiece,
+    start_frame: u64,
+    end_frame: u64,
 ) -> CoreResult<PieceWindow> {
     let fps = source_fps(source)?;
     let total =
         fps.frame_count_for_duration(source.metadata.duration.expect("inspected source duration"))?;
-    if piece.start_frame >= piece.end_frame || piece.end_frame > total {
+    if start_frame >= end_frame || end_frame > total {
         return Err(CoreError::Config(format!(
-            "Piece frames [{}, {}) must lie within the {total} frames of {}",
-            piece.start_frame, piece.end_frame, source.metadata.path
+            "Piece frames [{start_frame}, {end_frame}) must lie within the {total} frames of {}",
+            source.metadata.path
         )));
     }
-    let trim_start = fps.seconds_at_frame(piece.start_frame);
+    let trim_start = fps.seconds_at_frame(start_frame);
     // A piece reaching the last frame ends where the source ends: that frame may be
     // shown only partly, and a whole-source piece renders exactly like the file.
-    let end = if piece.end_frame == total {
+    let end = if end_frame == total {
         source.metadata.duration.expect("inspected source duration")
     } else {
-        fps.seconds_at_frame(piece.end_frame)
+        fps.seconds_at_frame(end_frame)
     };
     Ok(PieceWindow {
         trim_start,
         duration: end - trim_start,
-        frame_count: piece.end_frame - piece.start_frame,
+        frame_count: end_frame - start_frame,
     })
-}
-
-/// Output review and job preparation use the same exact frame-count rules.
-fn video_output_work(
-    source: &InspectedVideoSource,
-    window: PieceWindow,
-    codec: CodecSelection,
-    layout_fps: Fps,
-    update_rate: NonZeroU32,
-) -> CoreResult<(u32, Fps)> {
-    let (frames, fps) = match codec {
-        CodecSelection::Composite(_) => (window.frame_count, source_fps(source)?),
-        CodecSelection::Transparent(_) => {
-            let layout = layout_fps.frame_count_for_duration(window.duration)?;
-            (
-                u64::from(FrameProductionPlan::decimated(layout, update_rate)?.count()),
-                layout_fps.divided_by(update_rate)?,
-            )
-        }
-    };
-    let frames = u32::try_from(frames)
-        .map_err(|_| CoreError::Encode("Batch output frame count exceeds u32".into()))?;
-    Ok((frames, fps))
 }
 
 /// Validates the outputs against their destination before any source is touched:
@@ -354,6 +332,28 @@ fn sum_frames(frames: impl Iterator<Item = u32>) -> CoreResult<u32> {
 }
 
 impl ValidatedBatchEncoding {
+    /// Output frames of a window of its source. Output review and job preparation
+    /// use the same exact frame-count rules.
+    fn window_output_frames(&self, window: PieceWindow) -> CoreResult<u32> {
+        let frames = match self.codec {
+            CodecSelection::Composite(_) => window.frame_count,
+            CodecSelection::Transparent(_) => {
+                let layout = self.layout_fps.frame_count_for_duration(window.duration)?;
+                u64::from(FrameProductionPlan::decimated(layout, self.update_rate)?.count())
+            }
+        };
+        u32::try_from(frames)
+            .map_err(|_| CoreError::Encode("Batch output frame count exceeds u32".into()))
+    }
+
+    /// The frame rate of an output whose pieces join by stream copy.
+    fn container_fps(&self, first_source: &InspectedVideoSource) -> CoreResult<Fps> {
+        match self.codec {
+            CodecSelection::Composite(_) => source_fps(first_source),
+            CodecSelection::Transparent(_) => self.layout_fps.divided_by(self.update_rate),
+        }
+    }
+
     /// Plans every requested output at its destination. The pieces of an output
     /// must join by stream copy: one display resolution, and for composite output
     /// one source FPS (and one rotation where the encoder keeps the display matrix).
@@ -402,32 +402,19 @@ impl ValidatedBatchEncoding {
                     .iter()
                     .map(|piece| {
                         let source = source_of(piece);
-                        let window = piece_window(&source, piece)?;
-                        let (frames, _) = video_output_work(
-                            &source,
-                            window,
-                            self.codec,
-                            self.layout_fps,
-                            self.update_rate,
-                        )?;
+                        let window = frame_window(&source, piece.start_frame, piece.end_frame)?;
                         Ok(PlannedPiece {
                             source,
                             start_frame: piece.start_frame,
                             end_frame: piece.end_frame,
                             window,
-                            frames,
+                            frames: self.window_output_frames(window)?,
                             skip_overlay: piece.skip_overlay,
                         })
                     })
                     .collect::<CoreResult<Vec<_>>>()?;
                 self.check_joinable(&output.id, &pieces)?;
-                let (_, container_fps) = video_output_work(
-                    &pieces[0].source,
-                    pieces[0].window,
-                    self.codec,
-                    self.layout_fps,
-                    self.update_rate,
-                )?;
+                let container_fps = self.container_fps(&pieces[0].source)?;
                 let transitions = self.plan_transitions(output, &pieces, container_fps)?;
                 let segments = self.plan_segments(&pieces, &transitions)?;
                 let transition_frames = sum_frames(
@@ -575,27 +562,12 @@ impl ValidatedBatchEncoding {
                 if start_frame == end_frame {
                     continue;
                 }
-                let window = piece_window(
-                    &piece.source,
-                    &BatchRenderPiece {
-                        source_id: piece.source.source_id.clone(),
-                        start_frame,
-                        end_frame,
-                        skip_overlay: piece.skip_overlay,
-                    },
-                )?;
-                let (frames, _) = video_output_work(
-                    &piece.source,
-                    window,
-                    self.codec,
-                    self.layout_fps,
-                    self.update_rate,
-                )?;
+                let window = frame_window(&piece.source, start_frame, end_frame)?;
                 segments.push(PlannedSegment {
                     piece: index,
                     role,
                     window,
-                    frames,
+                    frames: self.window_output_frames(window)?,
                 });
             }
         }
@@ -717,7 +689,9 @@ impl ValidatedBatchTemplate {
                                     .metadata
                                     .has_audio
                                     .then(|| PathBuf::from(&piece.source.metadata.path)),
-                                trim_start: piece.window.trim_start,
+                                // The audio stays with the frames, wherever they start in the file.
+                                trim_start: piece.window.trim_start
+                                    + piece.source.metadata.video_start_seconds(),
                                 duration: seconds(piece.frames),
                             })
                             .collect(),

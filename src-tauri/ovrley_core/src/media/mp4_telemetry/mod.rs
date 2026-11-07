@@ -107,6 +107,7 @@ pub fn probe_video_metadata(repo_root: &Path, file_path: &str) -> CoreResult<Sou
         rotation_degrees: Some(-vm.rotation),
         camera_type,
         camera_model,
+        video_start_offset: None,
     })
 }
 

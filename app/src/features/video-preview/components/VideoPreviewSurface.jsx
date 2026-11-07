@@ -80,7 +80,7 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
     videoSrc,
     importId,
     isOutOfRange,
-    isDeleted,
+    isExcluded,
     isInOverlap,
     transition,
     hevcPlaybackWarning,
@@ -134,11 +134,11 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
           </div>
         </div>
       ) : null}
-      {videoSrc && isDeleted ? (
+      {videoSrc && isExcluded ? (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center p-4">
           <div role="status" className="flex items-center gap-2 rounded-sm bg-black/80 px-4 py-2 text-sm font-semibold text-white shadow-lg">
             <Scissors className="h-4 w-4 shrink-0" aria-hidden="true" />
-            {t('video-preview.deletedPartIndicator', 'Deleted part – not exported')}
+            {t('video-preview.excludedIndicator', 'Excluded from export')}
           </div>
         </div>
       ) : null}

@@ -15,8 +15,13 @@ function resolveDisabledLaps(disabledLaps, parsedActivity) {
   return disabledLaps
 }
 
-function cloneTransition(transition) {
-  return transition === null ? null : { type: transition.type, durationSeconds: transition.durationSeconds }
+function cloneSegments(segments) {
+  return Object.fromEntries(
+    Object.entries(segments).map(([key, { excluded, transitionIn }]) => [
+      key,
+      { excluded, transitionIn: transitionIn === null ? null : { ...transitionIn } },
+    ]),
+  )
 }
 
 /**
@@ -35,16 +40,16 @@ export function createProjectVideoEdits(videos, projectVideos) {
     videos.map((video) => {
       const projectVideo = projectVideosById.get(video.id)
       if (!projectVideo) throw new Error(`Imported video is not part of the project: ${video.id}`)
-      if (projectVideo.deletedParts.some((part) => part.toSecond > video.durationSeconds)) {
-        throw new Error('Deleted video parts must be within the imported video duration')
+      if (projectVideo.cuts.some((cut) => cut.frame >= video.frameCount)) {
+        throw new Error('Video cuts must lie inside the imported video')
       }
       return [
         video.id,
         {
           offsetSeconds: projectVideo.offsetSeconds,
           offsetSource: projectVideo.offsetSource,
-          deletedParts: projectVideo.deletedParts.map((part) => ({ ...part, transition: cloneTransition(part.transition) })),
-          transitionIn: cloneTransition(projectVideo.transitionIn),
+          cuts: projectVideo.cuts.map((cut) => ({ ...cut })),
+          segments: cloneSegments(projectVideo.segments),
           placementAnchor:
             projectVideo.placementAnchor !== null && loadedIds.has(projectVideo.placementAnchor.videoId) ? { ...projectVideo.placementAnchor } : null,
         },
@@ -148,7 +153,7 @@ export function applyProjectOwnedState(store, project, manualVideoSync) {
     draft.disabledLaps = disabledLaps
     draft.transitionDefaults = { ...project.transitionDefaults }
     draft.videoDragPreview = null
-    draft.deletedPartMark = null
+    draft.cutRemovalRequest = null
     draft.renderSettings = { ...renderSettings, range }
     draft.batchOutputFolder = batchOutputFolder
     draft.batchSkipOverlay = {}

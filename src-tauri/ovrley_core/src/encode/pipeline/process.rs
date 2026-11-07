@@ -1,7 +1,7 @@
-//! Shared FFmpeg process lifecycle and pipeline teardown.
+//! The encoder pipeline's FFmpeg process, writer and monitor threads, and teardown.
 
 use std::path::{Path, PathBuf};
-use std::process::{Child, ExitStatus};
+use std::process::{Child, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -15,7 +15,7 @@ use super::buffers::FrameBufferPool;
 use super::diagnostics::EncoderMonitor;
 use super::FramePipelinePlan;
 use crate::debug::{RenderProfiler, TimingBucket};
-use crate::encode::ffmpeg::binary::spawn_ffmpeg;
+use crate::encode::ffmpeg::process::{spawn, terminate, POLL_INTERVAL, TERMINATE_TIMEOUT};
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -85,13 +85,20 @@ impl PipelineShutdown {
 
 const WRITER_DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
 const FFMPEG_FINALIZE_TIMEOUT: Duration = Duration::from_secs(600);
-const FFMPEG_TERMINATE_TIMEOUT: Duration = Duration::from_secs(2);
-const SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(25);
 
 #[derive(Clone, Copy)]
 pub(crate) enum PipelineKind {
     Transparent,
     Composite,
+}
+
+impl PipelineKind {
+    fn ffmpeg_label(self) -> &'static str {
+        match self {
+            Self::Transparent => "transparent ffmpeg",
+            Self::Composite => "composite ffmpeg",
+        }
+    }
 }
 
 impl std::fmt::Display for PipelineKind {
@@ -159,7 +166,7 @@ impl PipelineProcesses {
         shutdown: Arc<PipelineShutdown>,
         monitor: Arc<EncoderMonitor>,
     ) -> CoreResult<Self> {
-        let child = spawn_ffmpeg(binary, &plan.ffmpeg_args)?;
+        let child = spawn(binary, &plan.ffmpeg_args, Stdio::piped(), Stdio::null())?;
         let mut processes = Self {
             child,
             writer: None,
@@ -212,7 +219,7 @@ impl Drop for PipelineProcesses {
             ));
         }
         let pipeline = self.pipeline;
-        if let Err(error) = terminate_ffmpeg(&mut self.child, pipeline) {
+        if let Err(error) = terminate(&mut self.child, pipeline.ffmpeg_label()) {
             log::warn!("Could not stop {pipeline} ffmpeg during pipeline cleanup: {error}");
         }
         if let Some(writer) = self.writer.take() {
@@ -274,10 +281,7 @@ impl PipelineProcesses {
                 self.shutdown.signal_failure(error);
                 // A polling failure must not leave the stderr reader waiting
                 // on a live child. Retain ownership through forced teardown.
-                match terminate_ffmpeg(&mut self.child, self.pipeline) {
-                    Ok(status) => status,
-                    Err(error) => return Err(error),
-                }
+                terminate(&mut self.child, self.pipeline.ffmpeg_label())?
             }
         };
         if let Err(error) = join_shutdown_thread(
@@ -328,22 +332,22 @@ fn unblock_stalled_writer<T>(
     let deadline = Instant::now() + WRITER_DRAIN_TIMEOUT;
     while !writer.is_finished() && Instant::now() < deadline {
         if shutdown.is_stopped() {
-            let _ = terminate_ffmpeg(child, pipeline)?;
-            if wait_for_thread(writer, FFMPEG_TERMINATE_TIMEOUT) {
+            let _ = terminate(child, pipeline.ffmpeg_label())?;
+            if wait_for_thread(writer, TERMINATE_TIMEOUT) {
                 return Ok(());
             }
             return Err(CoreError::Encode(format!(
                 "{pipeline} encoder writer did not stop after cancellation"
             )));
         }
-        thread::sleep(SHUTDOWN_POLL_INTERVAL);
+        thread::sleep(POLL_INTERVAL);
     }
     if writer.is_finished() {
         return Ok(());
     }
 
-    let _ = terminate_ffmpeg(child, pipeline)?;
-    if wait_for_thread(writer, FFMPEG_TERMINATE_TIMEOUT) {
+    let _ = terminate(child, pipeline.ffmpeg_label())?;
+    if wait_for_thread(writer, TERMINATE_TIMEOUT) {
         return Err(CoreError::Encode(format!(
             "{pipeline} ffmpeg did not drain stdin within {} seconds and was terminated",
             WRITER_DRAIN_TIMEOUT.as_secs()
@@ -369,46 +373,24 @@ fn wait_for_ffmpeg(
             return Ok(status);
         }
         if shutdown.is_stopped() {
-            return terminate_ffmpeg(child, pipeline);
+            return terminate(child, pipeline.ffmpeg_label());
         }
         if Instant::now() >= deadline {
             break;
         }
-        thread::sleep(SHUTDOWN_POLL_INTERVAL);
+        thread::sleep(POLL_INTERVAL);
     }
 
-    let _ = terminate_ffmpeg(child, pipeline)?;
+    let _ = terminate(child, pipeline.ffmpeg_label())?;
     Err(CoreError::Encode(format!(
         "{pipeline} ffmpeg did not finalize within {} seconds and was terminated",
         FFMPEG_FINALIZE_TIMEOUT.as_secs()
     )))
 }
 
-/// Immediately terminates FFmpeg and waits a bounded time for it to exit.
-fn terminate_ffmpeg(child: &mut Child, pipeline: PipelineKind) -> CoreResult<ExitStatus> {
-    if let Some(status) = child
-        .try_wait()
-        .map_err(|error| CoreError::Encode(format!("{pipeline} ffmpeg process error: {error}")))?
-    {
-        return Ok(status);
-    }
-    child.kill().map_err(|error| {
-        CoreError::Encode(format!("Failed to terminate {pipeline} ffmpeg: {error}"))
-    })?;
-    if let Some(status) = poll_child_exit(child, FFMPEG_TERMINATE_TIMEOUT, pipeline)? {
-        return Ok(status);
-    }
-    // Retain native ownership if termination is slow. A timeout is diagnostic,
-    // never permission to detach a live process and release the renderer.
-    log::warn!("{pipeline} ffmpeg is still stopping after forced termination");
-    child
-        .wait()
-        .map_err(|error| CoreError::Encode(format!("Could not reap {pipeline} ffmpeg: {error}")))
-}
-
 /// Joins an encoder-owned thread before releasing native execution ownership.
 fn join_shutdown_thread<T>(handle: JoinHandle<T>, thread_name: &str) -> CoreResult<T> {
-    if !wait_for_thread(&handle, FFMPEG_TERMINATE_TIMEOUT) {
+    if !wait_for_thread(&handle, TERMINATE_TIMEOUT) {
         log::warn!("{thread_name} is still stopping after encoder shutdown");
     }
     handle
@@ -419,28 +401,9 @@ fn join_shutdown_thread<T>(handle: JoinHandle<T>, thread_name: &str) -> CoreResu
 fn wait_for_thread<T>(handle: &JoinHandle<T>, timeout: Duration) -> bool {
     let deadline = Instant::now() + timeout;
     while !handle.is_finished() && Instant::now() < deadline {
-        thread::sleep(SHUTDOWN_POLL_INTERVAL);
+        thread::sleep(POLL_INTERVAL);
     }
     handle.is_finished()
-}
-
-fn poll_child_exit(
-    child: &mut Child,
-    timeout: Duration,
-    pipeline: PipelineKind,
-) -> CoreResult<Option<ExitStatus>> {
-    let deadline = Instant::now() + timeout;
-    loop {
-        if let Some(status) = child.try_wait().map_err(|error| {
-            CoreError::Encode(format!("{pipeline} ffmpeg process error: {error}"))
-        })? {
-            return Ok(Some(status));
-        }
-        if Instant::now() >= deadline {
-            return Ok(None);
-        }
-        thread::sleep(SHUTDOWN_POLL_INTERVAL);
-    }
 }
 
 #[cfg(test)]

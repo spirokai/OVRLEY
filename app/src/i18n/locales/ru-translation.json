@@ -116,8 +116,6 @@
     "resetView": "Сбросить вид",
     "rewindToEnd": "Перейти в конец",
     "rewindToStart": "Перейти в начало",
-    "setExportEndAtPlayhead": "Установить конец экспорта в позиции воспроизведения",
-    "setExportStartAtPlayhead": "Установить начало экспорта в позиции воспроизведения",
     "stepBack": "Шаг назад",
     "stepForward": "Шаг вперёд",
     "timelineAxis": "Ось временной шкалы",

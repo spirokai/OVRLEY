@@ -183,22 +183,32 @@ fn needs_ffprobe_salvage(metadata: &crate::media::SourceVideoMetadata) -> bool {
         || !metadata.has_audio
 }
 
+fn planned_frames(metadata: &crate::media::SourceVideoMetadata) -> Option<u64> {
+    Fps::new(metadata.fps_num?, metadata.fps_den?)
+        .ok()?
+        .frame_count_for_duration(metadata.duration?)
+        .ok()
+}
+
 fn merge_ffprobe_metadata(
     mut metadata: crate::media::SourceVideoMetadata,
     ffprobe_metadata: crate::media::SourceVideoMetadata,
 ) -> crate::media::SourceVideoMetadata {
-    if metadata.duration.is_none() {
-        metadata.duration = ffprobe_metadata.duration;
-    }
-    if metadata.fps.is_none() {
+    // The renderer's FFmpeg honours edit lists and ffprobe reports what it will
+    // read; telemetry-parser's duration is the whole track, edit list ignored.
+    metadata.duration = ffprobe_metadata.duration.or(metadata.duration);
+    // A nominal rate keeps clips of one camera joinable, but it must not plan more
+    // frames than the file holds: the render cannot produce them.
+    let keeps_nominal_rate = match (planned_frames(&metadata), planned_frames(&ffprobe_metadata)) {
+        (Some(nominal), Some(measured)) => nominal <= measured,
+        (nominal, _) => nominal.is_some(),
+    };
+    if !keeps_nominal_rate {
         metadata.fps = ffprobe_metadata.fps;
-    }
-    if metadata.fps_num.is_none() {
         metadata.fps_num = ffprobe_metadata.fps_num;
-    }
-    if metadata.fps_den.is_none() {
         metadata.fps_den = ffprobe_metadata.fps_den;
     }
+    metadata.video_start_offset = ffprobe_metadata.video_start_offset;
     if metadata.sync_time.is_none() {
         metadata.sync_time = ffprobe_metadata
             .sync_time
@@ -252,4 +262,51 @@ fn merge_ffprobe_metadata(
         metadata.audio_bit_rate = ffprobe_metadata.audio_bit_rate;
     }
     metadata
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn metadata(duration: f64, fps_num: u32, fps_den: u32) -> SourceVideoMetadata {
+        serde_json::from_value(serde_json::json!({
+            "path": "clip.mp4",
+            "duration": duration,
+            "fps": f64::from(fps_num) / f64::from(fps_den),
+            "fpsNum": fps_num,
+            "fpsDen": fps_den,
+            "hasAudio": false,
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn ffprobe_gives_the_duration_and_where_the_video_starts() {
+        let mut probed = metadata(5.5, 25, 1);
+        probed.video_start_offset = Some(0.04);
+        let merged = merge_ffprobe_metadata(metadata(6.0, 25, 1), probed);
+        assert_eq!(merged.duration, Some(5.5));
+        assert_eq!(merged.video_start_seconds(), 0.04);
+    }
+
+    #[test]
+    fn a_nominal_rate_that_plans_more_frames_than_the_file_holds_gives_way() {
+        let merged = merge_ffprobe_metadata(
+            metadata(4325.020733, 30, 1),
+            metadata(4325.020733, 1942335000, 64875311),
+        );
+        assert_eq!(
+            (merged.fps_num, merged.fps_den),
+            (Some(1942335000), Some(64875311))
+        );
+    }
+
+    #[test]
+    fn a_nominal_rate_that_fits_the_file_keeps_clips_of_one_camera_joinable() {
+        let merged = merge_ffprobe_metadata(
+            metadata(117.513333, 60000, 1001),
+            metadata(117.513333, 1056900, 17627),
+        );
+        assert_eq!((merged.fps_num, merged.fps_den), (Some(60000), Some(1001)));
+    }
 }

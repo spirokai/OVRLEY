@@ -116,8 +116,6 @@
     "resetView": "表示をリセット",
     "rewindToEnd": "最後に移動",
     "rewindToStart": "最初に戻る",
-    "setExportEndAtPlayhead": "再生ヘッド位置を終了位置に設定",
-    "setExportStartAtPlayhead": "再生ヘッド位置を開始位置に設定",
     "stepBack": "1ステップ戻る",
     "stepForward": "1ステップ進む",
     "timelineAxis": "タイムライン軸",

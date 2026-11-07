@@ -66,7 +66,11 @@ function BatchRenderQueueRow({ item, isActive, batchRunning, showBatchProgress, 
             {item.error === 'reinspectionRequired' ? t('render-video.reinspectionRequired') : item.error}
           </p>
         ) : null}
-        {item.status === 'failed' && item.error ? <p className="truncate text-[0.7rem] text-red-700">{item.error}</p> : null}
+        {item.status === 'failed' && item.error ? (
+          <p className="mt-0.5 max-h-48 overflow-y-auto wrap-anywhere whitespace-pre-wrap text-[0.7rem] normal-case text-red-700 select-text">
+            {item.error}
+          </p>
+        ) : null}
         {item.status === 'preparing' ? <p className="text-[0.7rem] text-muted-foreground/60">{t('render-video.preparingBatch')}</p> : null}
         {item.status === 'cancelled' || item.status === 'unstarted' ? (
           <p className="text-[0.7rem] text-muted-foreground/60">{t(`render-video.${item.status}`)}</p>

@@ -7,70 +7,66 @@ import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import { useJoinTransitionModels } from '@/features/transitions'
 import { useVideoTimeline, useVideoWarnings } from '@/hooks/useVideoTimeline'
+import { filenameFromSelectedPath } from '@/lib/file-dialog'
+import { sortVideosByTimeline } from '@/lib/video-program/video-collection'
+import { formatVideoWarning } from '@/lib/video-program/video-warnings'
 import useStore from '@/store/useStore'
-import { buildDeletedPartRows } from '../utils/deletedPartRows'
 import { buildVideoDrawerViewModel } from '../utils/videoDrawerUtils'
+import { buildVideoSegmentRows } from '../utils/videoSegmentRows'
 
 /**
  * Returns one row per clip in timeline order: details, its own timeline offset,
- * warnings, the transition into the clip, deleted parts with their join
- * transitions, and removal. Editing a row's offset moves only that clip.
+ * warnings, its parts with their export state and transitions, and removal.
+ * Editing a row's offset moves only that clip.
  *
  * @param {object} options Row inputs.
- * @param {Array<object>} options.videoSummaries Clip summaries in timeline order.
  * @param {string|null} options.timezone Activity timezone used to display creation times.
  * @param {'local'|'utc'|null} options.videoSyncTimezoneMode Session timezone interpretation.
- * @param {(videoId: string) => void} options.onRemoveVideo Removes one clip.
+ * @param {(videoId: string) => void} options.onRemoveVideo Removes one clip from the project.
  * @returns {Array<object>} Presentational rows.
  */
-export function useVideoClipRows({ videoSummaries, timezone, videoSyncTimezoneMode, onRemoveVideo }) {
+export function useVideoClipRows({ timezone, videoSyncTimezoneMode, onRemoveVideo }) {
   const { t } = useTranslation()
   const warnings = useVideoWarnings()
   const { clips, program } = useVideoTimeline()
   const joinModels = useJoinTransitionModels({ clips, program })
-  const { setVideoOffset, resetVideoOffset, setDeletedPartRange, removeDeletedPart, commitPreviewScrub } = useStore(
+  const { setVideoOffset, resetVideoOffset, setVideoSegmentExcluded, requestCutRemoval, commitPreviewScrub } = useStore(
     useShallow((state) => ({
       setVideoOffset: state.setVideoOffset,
       resetVideoOffset: state.resetVideoOffset,
-      setDeletedPartRange: state.setDeletedPartRange,
-      removeDeletedPart: state.removeDeletedPart,
+      setVideoSegmentExcluded: state.setVideoSegmentExcluded,
+      requestCutRemoval: state.requestCutRemoval,
       commitPreviewScrub: state.commitPreviewScrub,
     })),
   )
 
   return useMemo(() => {
-    const commands = { setDeletedPartRange, removeDeletedPart, seek: commitPreviewScrub }
-    return videoSummaries.map((summary) => {
-      const clip = clips.find((candidate) => candidate.id === summary.id)
-      return {
-        id: summary.id,
-        filename: summary.filename,
-        metadataRows: buildVideoDrawerViewModel(summary, timezone, videoSyncTimezoneMode, t).metadataRows,
-        // The start snaps to the clip's own frames.
-        offsetSeconds: clip.offsetSeconds,
-        offsetFps: clip.fps,
-        offsetIsManual: clip.offsetSource === 'manual',
-        warnings: (warnings.get(summary.id) ?? []).map((warning) => warning.message),
-        onOffsetCommit: (seconds) => setVideoOffset(summary.id, seconds),
-        onOffsetReset: () => resetVideoOffset(summary.id),
-        onRemove: () => onRemoveVideo(summary.id),
-        // Only a clip that follows another piece has a join leading into it.
-        transitionIn: joinModels.get(`clip:${summary.id}`) ?? null,
-        deletedParts: buildDeletedPartRows({ clip, joinModels, commands, t }),
-      }
-    })
+    const commands = { setVideoSegmentExcluded, requestCutRemoval, seek: commitPreviewScrub }
+    return sortVideosByTimeline(clips).map((clip) => ({
+      id: clip.id,
+      filename: filenameFromSelectedPath(clip.path),
+      metadataRows: buildVideoDrawerViewModel(clip, timezone, videoSyncTimezoneMode, t).metadataRows,
+      // The start snaps to the clip's own frames.
+      offsetSeconds: clip.offsetSeconds,
+      offsetFps: clip.fps,
+      offsetIsManual: clip.offsetSource === 'manual',
+      warnings: warnings.get(clip.id).map((warning) => formatVideoWarning(warning, t)),
+      onOffsetCommit: (seconds) => setVideoOffset(clip.id, seconds),
+      onOffsetReset: () => resetVideoOffset(clip.id),
+      onRemove: () => onRemoveVideo(clip.id),
+      segments: buildVideoSegmentRows({ clip, joinModels, commands }),
+    }))
   }, [
     clips,
     commitPreviewScrub,
     joinModels,
     onRemoveVideo,
-    removeDeletedPart,
+    requestCutRemoval,
     resetVideoOffset,
-    setDeletedPartRange,
     setVideoOffset,
+    setVideoSegmentExcluded,
     t,
     timezone,
-    videoSummaries,
     videoSyncTimezoneMode,
     warnings,
   ])

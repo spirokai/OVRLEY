@@ -14,13 +14,12 @@ import { PLAYHEAD_CENTER_X } from '../data/playheadGeometry'
 import { roundToDevicePixel, secondsToViewPx, snapToScreenPixel } from '../utils/timelineGeometry'
 
 import useClipDrag from './useClipDrag'
-import useDeletedPartDrag from './useDeletedPartDrag'
-import useDeletedPartMarking from './useDeletedPartMarking'
 import useExportRangeTimeline from './useExportRangeTimeline'
 import usePlaybackEngine from './usePlaybackEngine'
 import useTimelineClips from './useTimelineClips'
 import useTimelineGestures from './useTimelineGestures'
 import useTimelineViewport from './useTimelineViewport'
+import useVideoCuts from './useVideoCuts'
 import useVideoSyncTimeline from '@/features/video-sync/hooks/useVideoSyncTimeline'
 
 function getMarkerClassName(marker) {
@@ -44,9 +43,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     useShallow((state) => ({
       activityFilename: state.activitySource?.path?.split(/[/\\]/).at(-1) ?? state.activitySummary?.fileName ?? null,
       activitySummary: state.activitySummary,
-      addDeletedPart: state.addDeletedPart,
       beginPreviewScrub: state.beginPreviewScrub,
-      deletedPartMark: state.deletedPartMark,
       commitPreviewScrub: state.commitPreviewScrub,
       fallbackDurationSeconds: state.fallbackDurationSeconds,
       hasVideoTelemetry: state.importedVideos.some((video) => video.telemetry.status === 'ready'),
@@ -55,6 +52,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       manualVideoSyncVideoId: state.manualVideoSync.videoId,
       moveVideoSyncLandmark: state.moveVideoSyncLandmark,
       pausePreviewPlayback: state.pausePreviewPlayback,
+      requestCutRemoval: state.requestCutRemoval,
       toggleVideoMute: state.toggleVideoMute,
       isVideoMuted: state.isVideoMuted,
       previewPlaybackSource: state.previewPlaybackSource,
@@ -125,7 +123,9 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
   }, [playerStore.activitySummary, videoIdentity])
 
   useEffect(() => {
-    const clearClipSelection = () => setSelectedClipId(null)
+    const clearClipSelection = (event) => {
+      if (!event.target.closest?.('[data-keeps-clip-selection]')) setSelectedClipId(null)
+    }
     window.addEventListener('pointerdown', clearClipSelection, true)
     return () => window.removeEventListener('pointerdown', clearClipSelection, true)
   }, [])
@@ -136,8 +136,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     setVideoOffset: playerStore.setVideoOffset,
     shiftVideoOffsets: playerStore.shiftVideoOffsets,
   })
-  const deletedPartDrag = useDeletedPartDrag({ addDeletedPart: playerStore.addDeletedPart })
-  const deletedPartMarking = useDeletedPartMarking({
+  const videoCuts = useVideoCuts({
     clips: timeline.clips,
     program: timeline.program,
     playheadSecond: playback.clampedPlayhead,
@@ -286,20 +285,15 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
         event.preventDefault()
         playback.commitScrub(exportTimeline.toSecond)
         return
-      case 'deletedPart.markStart':
-        if (videoSyncMode || !deletedPartMarking.canStart) return
+      case 'videoEdit.cut':
+        if (videoSyncMode || !videoCuts.canCut) return
         event.preventDefault()
-        deletedPartMarking.start()
+        videoCuts.cut()
         return
-      case 'deletedPart.markEnd':
-        if (videoSyncMode || !deletedPartMarking.canEnd) return
+      case 'videoEdit.toggleExcluded':
+        if (videoSyncMode || videoCuts.excluded === null) return
         event.preventDefault()
-        deletedPartMarking.end()
-        return
-      case 'deletedPart.clearMark':
-        if (deletedPartMarking.mark === null) return
-        event.preventDefault()
-        deletedPartMarking.clear()
+        videoCuts.toggleExcluded()
         return
       case 'timeline.fitAll':
         if (!playback.hasActivity && !hasVideo) return
@@ -346,13 +340,12 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     canSelect: canSelectClip,
     clips: displayedTimeline.clips,
     commitClipNudge,
-    deletedPartDrag,
-    deletedPartMark: playerStore.deletedPartMark,
     exportHighlightRange: videoSyncMode ? null : exportTimeline.highlightRange,
     getLaneDragProps,
     hasActivity: hasActivityData && playback.hasActivity,
     joinModels,
     nudgeClip,
+    onRemoveCut: playerStore.requestCutRemoval,
     onRemoveVideo,
     overlaps: displayedTimeline.program.overlaps,
     program: videoSyncMode ? null : displayedTimeline.program,
@@ -438,30 +431,24 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
 
   // Toolbar view model - memoized without the playhead so the toolbar skips playback frames; the time label
   // subscribes to the playhead itself.
-  const { clear: clearExportRange, isCustom: isExportRangeCustom, rangeLabel: exportRangeLabel, setBoundary: setExportBoundary } = exportTimeline
+  const { clear: clearExportRange, isCustom: isExportRangeCustom, rangeLabel: exportRangeLabel } = exportTimeline
   const { jumpToEnd, resetToStart, timelineMinimum, totalDuration } = playback
   const { isVideoMuted, toggleVideoMute } = playerStore
   const { isFullTimelineVisible, resetView, zoomIn, zoomOut } = viewport
-  const { canEnd: canEndDeletedPart, canStart: canStartDeletedPart, clear: clearDeletedPartMark } = deletedPartMarking
-  const { end: endDeletedPart, mark: deletedPartMark, start: startDeletedPart } = deletedPartMarking
+  const { canCut, cut: cutAtPlayhead, excluded: excludedAtPlayhead, toggleExcluded: toggleExcludedAtPlayhead } = videoCuts
   const toolbar = useMemo(
     () => ({
-      deletedPart: {
+      videoEdit: {
         isVisible: hasVideo,
-        canStart: canStartDeletedPart,
-        canEnd: canEndDeletedPart,
-        markLabel: deletedPartMark?.label ?? null,
-        start: startDeletedPart,
-        end: endDeletedPart,
-        clear: clearDeletedPartMark,
+        canCut,
+        cut: cutAtPlayhead,
+        excluded: excludedAtPlayhead,
+        toggleExcluded: toggleExcludedAtPlayhead,
       },
       exportRange: {
         clear: clearExportRange,
         isCustom: isExportRangeCustom,
-        isDisabled: !hasActivityData && !hasVideo,
         label: exportRangeLabel,
-        setEnd: () => setExportBoundary('to', readExportBoundarySecond()),
-        setStart: () => setExportBoundary('from', readExportBoundarySecond()),
       },
       fitTargets,
       resetView: {
@@ -489,16 +476,13 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       zoomOut,
     }),
     [
-      canEndDeletedPart,
-      canStartDeletedPart,
-      clearDeletedPartMark,
+      canCut,
       clearExportRange,
-      deletedPartMark,
-      endDeletedPart,
+      cutAtPlayhead,
+      excludedAtPlayhead,
       exportRangeLabel,
       fitTargets,
       hasActivity,
-      hasActivityData,
       hasVideo,
       isExportRangeCustom,
       isFullTimelineVisible,
@@ -507,13 +491,11 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       jumpToEnd,
       pause,
       play,
-      readExportBoundarySecond,
       resetToStart,
       resetView,
-      setExportBoundary,
-      startDeletedPart,
       stepBySeconds,
       timelineMinimum,
+      toggleExcludedAtPlayhead,
       toggleVideoMute,
       totalDuration,
       zoomIn,

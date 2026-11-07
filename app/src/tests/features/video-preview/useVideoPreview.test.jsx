@@ -14,7 +14,7 @@ import { useVideoPlaybackClock } from '@/features/video-preview/hooks/useVideoPl
 import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
 import { listTransitionProxyJobs } from '@/lib/video-program/transition-proxies'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
-import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
+import { createTestVideo, cutEdits, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 vi.mock('@/features/video-preview/hooks/useVideoPlaybackClock', () => ({
   useVideoPlaybackClock: vi.fn(),
@@ -196,10 +196,16 @@ describe('useVideoPreview', () => {
     expect(playing.pause).toHaveBeenCalled()
   })
 
-  test('jumps over a deleted part within the same video by swapping to the element parked after it', () => {
+  test('jumps over an excluded segment within the same video by swapping to the element parked after it', () => {
     const video = createTestVideo({ id: 'video-1', path: 'C:\\clips\\ride.mp4', durationSeconds: 30 })
     const state = videoStoreState([video], { 'video-1': 5 })
-    state.videoEdits['video-1'].deletedParts = [{ id: 'cut', fromSecond: 10, toSecond: 20, transition: null }]
+    Object.assign(
+      state.videoEdits['video-1'],
+      cutEdits([
+        { id: 'c1', frame: 300, excluded: true },
+        { id: 'c2', frame: 600 },
+      ]),
+    )
     useStore.setState(state)
     playingAt(14.9)
     const element = createVideoStub({ duration: 30, paused: false, currentTime: 9.9 })
@@ -273,17 +279,23 @@ describe('useVideoPreview', () => {
     expect(useStore.getState()).toMatchObject({ previewPlaybackState: 'playing', previewPlaybackSource: 'timeline', selectedSecond: 35 })
   })
 
-  test('flags deleted parts and overlaps at the playhead', () => {
+  test('flags excluded segments and overlaps at the playhead', () => {
     const first = createTestVideo({ id: 'video-1', path: 'C:\\clips\\first.mp4', durationSeconds: 30 })
     const second = createTestVideo({ id: 'video-2', path: 'C:\\clips\\second.mp4', durationSeconds: 10, importOrder: 1 })
     const state = videoStoreState([first, second], { 'video-1': 0, 'video-2': 25 })
-    state.videoEdits['video-1'].deletedParts = [{ id: 'cut', fromSecond: 5, toSecond: 10, transition: null }]
+    Object.assign(
+      state.videoEdits['video-1'],
+      cutEdits([
+        { id: 'c1', frame: 150, excluded: true },
+        { id: 'c2', frame: 300 },
+      ]),
+    )
     useStore.setState({ ...state, selectedSecond: 7 })
     const { result } = renderHook(() => useVideoPreview([{ current: createVideoStub() }, { current: createVideoStub() }], true))
-    expect(result.current).toMatchObject({ isDeleted: true, isInOverlap: false, isOutOfRange: true })
+    expect(result.current).toMatchObject({ isExcluded: true, isInOverlap: false, isOutOfRange: true })
 
     act(() => useStore.getState().setSelectedSecond(27))
-    expect(result.current).toMatchObject({ isDeleted: false, isInOverlap: true, isOutOfRange: false, importId: 'import-video-1' })
+    expect(result.current).toMatchObject({ isExcluded: false, isInOverlap: true, isOutOfRange: false, importId: 'import-video-1' })
 
     act(() => useStore.getState().setSelectedSecond(31))
     expect(result.current).toMatchObject({ isInOverlap: false, importId: 'import-video-2' })

@@ -9,7 +9,10 @@ import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatClockDuration } from '@/lib/time-format'
 import { getClipGeometry, getExportRangeHighlightGeometry, secondsToViewPx } from '../utils/timelineGeometry'
 import { getActivityAttributeLabel } from '@/lib/widget/widget-presentation'
+import { framesToSeconds } from '@/lib/video-program/frame-grid'
 import { sortVideosByTimeline } from '@/lib/video-program/video-collection'
+import { formatVideoWarning } from '@/lib/video-program/video-warnings'
+import { listVideoSegments } from '@/lib/video-program/video-segments'
 import i18next from 'i18next'
 
 const TEXT_HIDE_THRESHOLD_REM = 3
@@ -38,16 +41,14 @@ function clipRangeStyle(fromSecond, toSecond, durationSeconds) {
   return { left: `${(fromSecond / durationSeconds) * 100}%`, width: `${((toSecond - fromSecond) / durationSeconds) * 100}%` }
 }
 
-/** Deleted parts, the drawn range and the marked start, positioned within their clip. */
-function deletedPartOverlays(clip, dragPreview, mark) {
-  const cuts = clip.deletedParts.map((part) => ({ key: part.id, style: clipRangeStyle(part.fromSecond, part.toSecond, clip.durationSeconds) }))
-  if (dragPreview?.videoId === clip.id) {
-    cuts.push({ key: 'drawing', style: clipRangeStyle(dragPreview.fromSecond, dragPreview.toSecond, clip.durationSeconds) })
-  }
-  return {
-    cuts,
-    markStyle: mark?.videoId === clip.id ? { left: `${(mark.sourceSecond / clip.durationSeconds) * 100}%` } : null,
-  }
+/** Styles of the excluded segments of a clip, positioned within it. */
+function excludedSegmentStyles(clip) {
+  return listVideoSegments(clip)
+    .filter((segment) => segment.excluded)
+    .map((segment) => ({
+      key: segment.key,
+      style: clipRangeStyle(framesToSeconds(segment.startFrame, clip.fps), framesToSeconds(segment.endFrame, clip.fps), clip.durationSeconds),
+    }))
 }
 
 function percentStyle(geometry, widthPx) {
@@ -66,13 +67,12 @@ function percentStyle(geometry, widthPx) {
  * @param {boolean} options.canSelect Whether clips can be selected for keyboard nudges.
  * @param {Array<object>} options.clips Displayed timeline clips.
  * @param {function} options.commitClipNudge Callback to commit a keyboard sync adjustment.
- * @param {object} options.deletedPartDrag Alt+drag handlers and preview from useDeletedPartDrag.
- * @param {{videoId: string, sourceSecond: number}|null} options.deletedPartMark Marked start of a deleted part.
  * @param {{ fromSecond: number, toSecond: number }|null} options.exportHighlightRange Active export highlight range.
  * @param {function} options.getLaneDragProps Per-lane drag handler factory from useClipDrag.
  * @param {boolean} options.hasActivity Whether the external activity lane should be present.
  * @param {Map<string, object>} [options.joinModels] Transition controls keyed by join key (`useJoinTransitionModels`).
  * @param {function} options.nudgeClip Callback to move a clip by a relative number of seconds.
+ * @param {function} [options.onRemoveCut] Callback to remove a cut by video ID and cut ID.
  * @param {function} [options.onRemoveVideo] Callback to remove a video clip by video ID.
  * @param {Array<{startSecond: number, endSecond: number}>} [options.overlaps] Overlapping timeline intervals of the displayed clips.
  * @param {{pieces: Array<object>, joins: Array<object>}} [options.program] Displayed program, for its join markers.
@@ -80,7 +80,7 @@ function percentStyle(geometry, widthPx) {
  * @param {function} options.setSelectedClipId Callback to set selected clip id.
  * @param {number} options.viewEnd Visible viewport end second.
  * @param {number} options.viewStart Visible viewport start second.
- * @param {Map<string, Array<{message: string}>>} [options.warnings] Clip warnings keyed by video ID.
+ * @param {Map<string, Array<object>>} [options.warnings] Clip warnings keyed by video ID (`useVideoWarnings`).
  * @param {number} options.widthPx Measured timeline width.
  * @returns {Array<object>} Presentational lane view models, each with its clips.
  */
@@ -90,13 +90,12 @@ export default function useTimelineClips({
   canSelect,
   clips,
   commitClipNudge,
-  deletedPartDrag,
-  deletedPartMark,
   exportHighlightRange,
   getLaneDragProps,
   hasActivity,
   joinModels,
   nudgeClip,
+  onRemoveCut,
   onRemoveVideo,
   overlaps = [],
   program,
@@ -132,7 +131,7 @@ export default function useTimelineClips({
         isVideo: true,
         label: getBasename(clip.path),
         startSecond: clip.offsetSeconds,
-        warnings: (warnings?.get(clip.id) ?? []).map((warning) => warning.message),
+        warnings: (warnings?.get(clip.id) ?? []).map((warning) => formatVideoWarning(warning, i18next.t)),
       })
     }
 
@@ -183,7 +182,7 @@ export default function useTimelineClips({
       // Presentational lane model - TimelineLane renders these values without owning calculations.
       return {
         ...lane,
-        ...(lane.isVideo ? deletedPartOverlays(lane.clip, deletedPartDrag.preview, deletedPartMark) : { cuts: [], markStyle: null }),
+        excludedSegments: lane.isVideo ? excludedSegmentStyles(lane.clip) : [],
         clipClassName: lane.isVideo
           ? `bg-accent/70 ${lane.warnings.length > 0 ? 'outline outline-1 -outline-offset-1 outline-destructive' : ''}`
           : 'bg-primary/80',
@@ -230,17 +229,7 @@ export default function useTimelineClips({
               event.currentTarget.focus()
               setSelectedClipId(lane.id)
             }
-            if (lane.isVideo && deletedPartDrag.onPointerDown(event, lane.clip)) return
             dragProps.onPointerDown?.(event)
-          },
-          onPointerMove: (event) => {
-            if (!deletedPartDrag.onPointerMove(event)) dragProps.onPointerMove?.(event)
-          },
-          onPointerUp: (event) => {
-            if (!deletedPartDrag.onPointerUp(event)) dragProps.onPointerUp?.(event)
-          },
-          onPointerCancel: (event) => {
-            if (!deletedPartDrag.onPointerCancel(event)) dragProps.onPointerCancel?.(event)
           },
         },
         clipStyle: percentStyle(geometry, widthPx),
@@ -307,6 +296,25 @@ export default function useTimelineClips({
       })
       .filter((marker) => marker.isVisible || marker.bandStyle !== null)
 
+    // Cut markers - one per cut of a clip, in the editing workspace.
+    // TODO: drag cut markers along the timeline, snapping to the clip's frames and
+    // keeping the cut contract (see tmp/multiple-mp4-v2/TODO.md).
+    const cutMarkers = (program === null || program === undefined ? [] : sortVideosByTimeline(clips))
+      .flatMap((clip) =>
+        clip.cuts.map((cut) => {
+          const sourceSecond = framesToSeconds(cut.frame, clip.fps)
+          const second = clip.offsetSeconds + sourceSecond
+          return {
+            key: `${clip.id}:${cut.id}`,
+            isVisible: second >= viewStart && second <= viewEnd,
+            style: { left: widthPx > 0 ? `${(secondsToViewPx({ second, viewStart, viewEnd, widthPx }) / widthPx) * 100}%` : '0%' },
+            label: i18next.t('player.cutAt', { defaultValue: 'Cut at {{time}}', time: formatClockDuration(sourceSecond) }),
+            onRemove: () => onRemoveCut(clip.id, cut.id),
+          }
+        }),
+      )
+      .filter((marker) => marker.isVisible)
+
     const videoClips = clipModels.filter((clip) => clip.isVideo)
     const activityClips = clipModels.filter((clip) => !clip.isVideo)
     return [
@@ -318,6 +326,7 @@ export default function useTimelineClips({
               isVideo: true,
               clips: videoClips,
               conflictBands,
+              cutMarkers,
               joinMarkers,
             },
           ]
@@ -330,6 +339,7 @@ export default function useTimelineClips({
               isVideo: false,
               clips: activityClips,
               conflictBands: [],
+              cutMarkers: [],
               joinMarkers: [],
             },
           ]
@@ -341,14 +351,13 @@ export default function useTimelineClips({
     canSelect,
     clips,
     commitClipNudge,
-    deletedPartDrag,
-    deletedPartMark,
     exportHighlightRange,
     getLaneDragProps,
     hasActivity,
     hoveredLaneId,
     joinModels,
     nudgeClip,
+    onRemoveCut,
     onRemoveVideo,
     overlaps,
     program,

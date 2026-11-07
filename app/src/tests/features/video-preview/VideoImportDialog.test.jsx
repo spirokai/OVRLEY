@@ -49,7 +49,7 @@ function model(overrides = {}) {
     ],
     failures: [{ key: '/clips/notes.txt', name: 'notes.txt', message: 'Not a supported video file (MP4, MOV, MKV).' }],
     importCount: 1,
-    issues: ['Videos overlap (ride.mp4, old.mp4). Move a video or delete the overlapping part.'],
+    issues: ['Videos overlap (ride.mp4, old.mp4). Move a video or exclude the overlapping part from export.'],
     sync: {
       activitySummary: { durationSeconds: 120 },
       canResetCreationTime: false,

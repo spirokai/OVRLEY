@@ -17,13 +17,13 @@ const TIME_SOURCE_KEYS = {
 /**
  * Builds the display model for imported video metadata.
  *
- * @param {object} videoSummary - Canonical imported video summary.
+ * @param {object} clip - Timeline clip (video joined with its edits).
  * @param {string|null} timezone - Activity timezone used for display.
  * @param {string} timezoneMode - Video sync timezone mode.
  * @param {import('i18next').TFunction} t - Translation function.
  * @returns {{formatLabel: string, metadataRows: Array<{label: string, value: string}>}} Video drawer display model.
  */
-export function buildVideoDrawerViewModel(videoSummary, timezone, timezoneMode, t) {
+export function buildVideoDrawerViewModel(clip, timezone, timezoneMode, t) {
   const unknownValue = t('toolbar.unknown', 'Unknown')
   const formatTimeSource = (source) => {
     if (!source) return unknownValue
@@ -33,51 +33,49 @@ export function buildVideoDrawerViewModel(videoSummary, timezone, timezoneMode, 
   }
 
   const metadataRows = [
-    { label: t('toolbar.duration', 'Duration'), value: videoSummary.duration ? formatClockDuration(videoSummary.duration) : unknownValue },
+    { label: t('toolbar.duration', 'Duration'), value: formatClockDuration(clip.durationSeconds) },
     {
       label: t('toolbar.frameRate', 'Frame rate'),
-      value: videoSummary.fps ? t('toolbar.valFps', { defaultValue: '{{val}} fps', val: Math.round(videoSummary.fps * 100) / 100 }) : unknownValue,
+      value: t('toolbar.valFps', { defaultValue: '{{val}} fps', val: Math.round((clip.fps.num / clip.fps.den) * 100) / 100 }),
     },
     {
       label: t('toolbar.resolution', 'Resolution'),
-      value: videoSummary.resolution
-        ? t('toolbar.valResolution', {
-            defaultValue: '{{width}}×{{height}}',
-            width: videoSummary.resolution.width,
-            height: videoSummary.resolution.height,
-          })
-        : unknownValue,
+      value: t('toolbar.valResolution', {
+        defaultValue: '{{width}}×{{height}}',
+        width: clip.resolution.width,
+        height: clip.resolution.height,
+      }),
     },
     {
       label: t('toolbar.createdAt', 'Created at'),
-      value: formatVideoCreationTime(videoSummary.creationTime, videoSummary.timeSource, timezone, timezoneMode) || unknownValue,
+      value: formatVideoCreationTime(clip.creationTime, clip.timeSource, timezone, timezoneMode) || unknownValue,
     },
     {
       label: t('toolbar.timeSource', 'Time source'),
-      value: formatTimeSource(videoSummary.timeSource),
+      value: formatTimeSource(clip.timeSource),
     },
     {
       label: t('toolbar.codec', 'Codec'),
-      value: videoSummary.codecName || videoSummary.codecLongName || unknownValue,
+      value: clip.codecName || clip.codecLongName || unknownValue,
     },
     {
       label: t('toolbar.bitRate', 'Bit rate'),
-      value: videoSummary.bitRate
-        ? t('toolbar.valBitRate', { defaultValue: '{{val}} Mbps', val: (Number(videoSummary.bitRate) / 1_000_000).toFixed(0) })
+      value: clip.bitRate
+        ? t('toolbar.valBitRate', { defaultValue: '{{val}} Mbps', val: (Number(clip.bitRate) / 1_000_000).toFixed(0) })
         : unknownValue,
     },
     {
       label: t('toolbar.camera', 'Camera'),
-      value: videoSummary.cameraModel || videoSummary.cameraType || unknownValue,
+      value: clip.cameraModel || clip.cameraType || unknownValue,
     },
     {
       label: t('toolbar.telemetry', 'Telemetry'),
-      value: t(...TELEMETRY_STATUS_LABELS[videoSummary.telemetryStatus]),
+      value: t(...TELEMETRY_STATUS_LABELS[clip.telemetry.status]),
     },
   ]
 
   return {
-    formatLabel: videoSummary.codecName?.toUpperCase() || unknownValue,
+    formatLabel: clip.codecName?.toUpperCase() || unknownValue,
     metadataRows,
   }
 }
