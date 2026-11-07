@@ -130,7 +130,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
             "-temporal-aq",
             "true",
         ],
-        quality_args: &["-rc:v", "vbr", "-b:v", "0", "-cq:v", "{quality}"],
+        quality_args: &["-rc:v", "vbr", "-b:v", "0", "-maxrate", "200M", "-cq:v", "{quality}"],
         bitrate_args: &[
             "-rc:v",
             "vbr",
@@ -157,7 +157,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
             "-tag:v",
             "hvc1",
         ],
-        quality_args: &["-rc:v", "vbr", "-b:v", "0", "-cq:v", "{quality}"],
+        quality_args: &["-rc:v", "vbr", "-b:v", "0", "-maxrate", "200M", "-cq:v", "{quality}"],
         bitrate_args: &[
             "-rc:v",
             "vbr",
@@ -193,7 +193,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
             "-temporal-aq",
             "true",
         ],
-        quality_args: &["-rc:v", "vbr", "-b:v", "0", "-cq:v", "{quality}"],
+        quality_args: &["-rc:v", "vbr", "-b:v", "0", "-maxrate", "200M", "-cq:v", "{quality}"],
         bitrate_args: &[
             "-rc:v",
             "vbr",
@@ -229,7 +229,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
             "-tag:v",
             "hvc1",
         ],
-        quality_args: &["-rc:v", "vbr", "-b:v", "0", "-cq:v", "{quality}"],
+        quality_args: &["-rc:v", "vbr", "-b:v", "0", "-maxrate", "200M", "-cq:v", "{quality}"],
         bitrate_args: &[
             "-rc:v",
             "vbr",

@@ -346,7 +346,7 @@ export function createPreviewSession(module, onError) {
           widget.pixelsRevision = pixelsRevision
         }
         // Pixel-only playback changes do not require DOM writes or a Moveable measurement.
-        if (geometryChanged) presentWidgetGeometry(canvas, geometry, targets.get(id), widget.type)
+        if (geometryChanged) presentWidgetGeometry(canvas, geometry, targets.get(id))
         widget.geometry = geometry
         widget.geometryJson = geometryJson
         widget.revision = revision

@@ -1,76 +1,25 @@
 //! Shared helpers at the native diving XML boundary.
 
-use crate::activity::finalize::{finalize_raw_activity, FinalizeActivityResponse};
-use crate::activity::schema::RawActivity;
+use super::helpers::{self, finite_number};
 use crate::error::{CoreError, CoreResult};
 use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeDelta};
 use roxmltree::Node;
-use std::{fs::File, io::Read, path::Path};
 
-pub(super) fn parse_path(
-    path: &Path,
-    repo_root: Option<&Path>,
-    format: &str,
-    extract: fn(&str, &str) -> CoreResult<RawActivity>,
-) -> CoreResult<FinalizeActivityResponse> {
-    let file = File::open(path).map_err(|source| CoreError::Io {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    let file_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| {
-            CoreError::Activity(format!(
-                "{format} path has no valid UTF-8 filename: {}",
-                path.display()
-            ))
-        })?;
-    parse_reader(file, file_name, repo_root, format, extract)
-}
-
-pub(super) fn parse_reader<R: Read>(
-    mut reader: R,
-    file_name: &str,
-    repo_root: Option<&Path>,
-    format: &str,
-    extract: fn(&str, &str) -> CoreResult<RawActivity>,
-) -> CoreResult<FinalizeActivityResponse> {
-    let result = (|| {
-        let mut text = String::new();
-        reader.read_to_string(&mut text).map_err(|error| {
-            CoreError::Activity(format!("Failed to read {format} input: {error}"))
-        })?;
-        finalize_raw_activity(&extract(&text, file_name)?, repo_root)
-    })();
-    result.map_err(|error| CoreError::Activity(format!("{format} import '{file_name}': {error}")))
-}
-
+/// Finds child elements in the parent's namespace.
 pub(super) fn children<'a, 'input>(
     node: Node<'a, 'input>,
     name: &'a str,
 ) -> impl Iterator<Item = Node<'a, 'input>> {
-    node.children().filter(move |child| {
-        child.is_element()
-            && child.tag_name().name() == name
-            && child.tag_name().namespace() == node.tag_name().namespace()
-    })
+    helpers::children(node, name, node.tag_name().namespace())
 }
 
 pub(super) fn child_text<'a>(node: Node<'a, '_>, name: &'a str) -> Option<&'a str> {
-    children(node, name)
-        .next()?
-        .text()
-        .map(str::trim)
-        .filter(|text| !text.is_empty())
+    helpers::child_text(node, name, node.tag_name().namespace())
 }
 
+/// Reads a number, accepting a decimal comma.
 pub(super) fn number(text: &str) -> Option<f64> {
-    text.trim()
-        .replace(',', ".")
-        .parse::<f64>()
-        .ok()
-        .filter(|value| value.is_finite())
+    finite_number(&text.trim().replace(',', "."))
 }
 
 pub(super) fn single_dive<'a, 'input>(

@@ -44,22 +44,6 @@ pub(crate) fn write_template_file(path: String, contents: String) -> Result<Stri
     Ok(path)
 }
 
-/// Writes parser/debug output under `debug/activities` in the source checkout.
-///
-/// This command is intended for development diagnostics rather than packaged
-/// user data.
-#[tauri::command]
-pub(crate) fn write_parse_debug_file(filename: String, contents: String) -> Result<String, String> {
-    let mut path = runtime_paths::source_repo_root();
-    path.push("debug");
-    path.push("activities");
-    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
-    path.push(filename);
-
-    std::fs::write(&path, contents).map_err(|e| e.to_string())?;
-    Ok(path.to_string_lossy().to_string())
-}
-
 /// Reads one user-selected file from an absolute path and returns its raw bytes.
 #[tauri::command]
 pub(crate) fn read_selected_file_bytes(path: String) -> Result<Vec<u8>, String> {

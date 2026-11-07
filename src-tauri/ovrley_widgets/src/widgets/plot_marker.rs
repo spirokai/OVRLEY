@@ -153,3 +153,17 @@ impl PlotMarker {
         }
     }
 }
+
+/// Marker scale for one frame resize. Edge handles reshape the plot and keep the marker;
+/// corner handles scale it by the geometric mean of the axis ratios, so repeated gestures
+/// are reversible. `fixed` is the anchored corner, where an edge handle has a 0.5 component.
+pub(crate) fn frame_resize_marker_factor(
+    previous: [f32; 2],
+    next: [f32; 2],
+    fixed: [f32; 2],
+) -> f32 {
+    if fixed.contains(&0.5) {
+        return 1.0;
+    }
+    ((next[0] / previous[0]) * (next[1] / previous[1])).sqrt()
+}

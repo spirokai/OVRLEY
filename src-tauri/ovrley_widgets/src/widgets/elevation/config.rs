@@ -48,6 +48,7 @@ pub struct ElevationPlotConfig {
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct PointLabelConfig {
     /// Omitted font inherits the scene's optional native font selection.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub font: Option<String>,
     pub font_size: f32,
     pub color: String,

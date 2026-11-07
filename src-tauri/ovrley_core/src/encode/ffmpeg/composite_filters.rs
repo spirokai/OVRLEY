@@ -1,13 +1,11 @@
 //! Composite filter-graph and input-validation helpers.
 
-use crate::encode::ffmpeg::catalog::{CompositeCodecId, CompositeFilterStackKind};
+use crate::encode::ffmpeg::catalog::CompositeFilterStackKind;
 use crate::error::{CoreError, CoreResult};
 use crate::render::{AtlasPlan, AtlasSlot, FrameSize};
 use skia_safe::IRect;
 
 use super::composite_profiles::CompositeProfile;
-
-const CUDA_FRAME_ALIGNMENT: u32 = 32;
 
 /// Converts probed display rotation into the canonical quarter-turn contract
 /// consumed by every command-building decision.
@@ -23,35 +21,6 @@ pub(super) fn normalize_source_rotation(rotation_degrees: Option<i32>) -> CoreRe
             "Unsupported source rotation {degrees} degrees; expected a multiple of 90 degrees"
         ))),
     }
-}
-
-/// Returns codec-specific metadata that hides CUDA's aligned frame overhang.
-///
-/// Composite dimensions are display-oriented before this point. CUDA and CPU
-/// profiles physically orient the main video before scaling, while the full
-/// QSV profile keeps the main surface in coded orientation and preserves its
-/// display matrix.
-pub(super) fn cuda_display_metadata_filter(
-    codec_id: CompositeCodecId,
-    display_width: u32,
-    display_height: u32,
-) -> Option<String> {
-    match codec_id {
-        CompositeCodecId::NnvgpuH264 => {
-            let crop_right = cuda_frame_overhang(display_width);
-            let crop_bottom = cuda_frame_overhang(display_height);
-            (crop_right != 0 || crop_bottom != 0)
-                .then(|| format!("h264_metadata=crop_right={crop_right}:crop_bottom={crop_bottom}"))
-        }
-        CompositeCodecId::NnvgpuHevc => Some(format!(
-            "hevc_metadata=width={display_width}:height={display_height}"
-        )),
-        _ => None,
-    }
-}
-
-fn cuda_frame_overhang(dimension: u32) -> u32 {
-    (CUDA_FRAME_ALIGNMENT - dimension % CUDA_FRAME_ALIGNMENT) % CUDA_FRAME_ALIGNMENT
 }
 
 /// Builds the selected profile's composite filter graph.
@@ -225,7 +194,10 @@ fn slot_overlay_filter(filter_stack_kind: CompositeFilterStackKind, x: i32, y: i
         CompositeFilterStackKind::SoftwareOverlay | CompositeFilterStackKind::AmfD3d11Overlay => {
             format!("overlay={x}:{y}:{OVERLAY_OPTIONS}")
         }
-        CompositeFilterStackKind::CudaOverlay => format!("overlay_cuda={x}:{y}:{OVERLAY_OPTIONS}"),
+        // `repeatlast=0` keeps framesync from cloning the main frame into a writable
+        // copy: that copy comes from the 32-aligned CUDA frame pool, so it would carry
+        // blank padding to the encoder. `shortest=1` still ends the graph at either EOF.
+        CompositeFilterStackKind::CudaOverlay => format!("overlay_cuda={x}:{y}:{OVERLAY_OPTIONS}:repeatlast=0"),
         CompositeFilterStackKind::VaapiOverlay => format!("overlay_vaapi=x={x}:y={y}:{OVERLAY_OPTIONS}"),
         CompositeFilterStackKind::QsvFullOverlay => format!("overlay_qsv=x={x}:y={y}"),
     }

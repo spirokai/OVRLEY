@@ -162,7 +162,7 @@ impl PreviewDivingProfile {
         let scene = validate_scene_presentation(scene)?;
         let mut config = validate_diving_profile(&widget, 0, &scene)?;
         self.geometry_at(activity);
-        resize_diving_profile(&mut config, &scene, size)?;
+        resize_diving_profile(&mut config, &scene, size, fixed)?;
         if commit {
             self.prepared_geometry = Some(Arc::new(match activity {
                 Some(a) => DivingGeometry::new(
@@ -175,7 +175,13 @@ impl PreviewDivingProfile {
             self.layout = None;
             self.last_state = None;
         }
-        Ok(anchored_update(&config, &scene, fixed, point))
+        Ok(anchored_update(
+            &config,
+            &scene,
+            fixed,
+            point,
+            &widget.point_label,
+        ))
     }
 
     fn state(

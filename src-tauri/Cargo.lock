@@ -559,7 +559,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6fac387a98bb7c37292057cffc56d62ecb629900026402633ae9160df93a8766"
 dependencies = [
- "nom",
+ "nom 7.1.3",
 ]
 
 [[package]]
@@ -1150,17 +1150,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
-name = "fc-blackbox"
-version = "0.2.0"
-source = "git+https://github.com/ilya-epifanov/fc-blackbox.git?rev=de08350#de08350b2bd95f7af93b1b4adf0f27dc3dfd227a"
+name = "fc-blackbox-patched"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8a9e947ccbbd8b8dded8e8ef045371b0d90afdbddffd628e7349da5f2883af7"
 dependencies = [
  "chrono",
  "integer-encoding",
- "itertools 0.10.5",
- "nom",
+ "itertools 0.15.0",
+ "nom 8.0.0",
  "num-rational",
  "num-traits",
- "thiserror 1.0.69",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -1207,6 +1208,17 @@ name = "find-msvc-tools"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "645cbb3a84e60b7531617d5ae4e57f7e27308f6445f5abf653209ea76dec8dff"
+
+[[package]]
+name = "fitparser"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0501374d4c289511f6c5f567acddc56f1e1ebe6208e5fe315295447006c73947"
+dependencies = [
+ "chrono",
+ "nom 8.0.0",
+ "serde",
+]
 
 [[package]]
 name = "fixedbitset"
@@ -1929,12 +1941,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
-name = "human-sort"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "140a09c9305e6d5e557e2ed7cbc68e05765a7d4213975b87cb04920689cc6219"
-
-[[package]]
 name = "hyper"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2186,9 +2192,9 @@ dependencies = [
 
 [[package]]
 name = "integer-encoding"
-version = "3.0.4"
+version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
+checksum = "14c00403deb17c3221a1fe4fb571b9ed0370b3dcd116553c77fa294a3d918699"
 
 [[package]]
 name = "ipnet"
@@ -2227,18 +2233,18 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.10.5"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
+checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
 dependencies = [
  "either",
 ]
 
 [[package]]
 name = "itertools"
-version = "0.12.1"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
 dependencies = [
  "either",
 ]
@@ -2700,9 +2706,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "mp4parse"
-version = "0.17.0"
-source = "git+https://github.com/AdrianEddy/mp4parse-rust.git#ff910c618cb7edba5a475571ba2baf37a1681844"
+name = "mp4parse-patched"
+version = "0.17.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e716c09d8cbadaf594442c48e3762d4091f5a3f632783d1f7361a64e152c53c0"
 dependencies = [
  "bitreader",
  "byteorder",
@@ -2827,6 +2834,15 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "nom"
+version = "8.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df9761775871bdef83bee530e60050f7e54b1105350d6884eb0fb4f46c2f9405"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -3198,6 +3214,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "csv",
+ "fitparser",
  "image",
  "log",
  "objc2",
@@ -3205,6 +3222,7 @@ dependencies = [
  "open",
  "ovrley_map",
  "ovrley_widgets",
+ "regex",
  "roxmltree",
  "same-file",
  "serde",
@@ -5304,21 +5322,21 @@ dependencies = [
 
 [[package]]
 name = "telemetry-parser"
-version = "0.3.0"
-source = "git+https://github.com/AdrianEddy/telemetry-parser.git?rev=fd9a73e#fd9a73e87db90a39df86332be2f95f4d50112d2a"
+version = "0.4.0"
+source = "git+https://github.com/AdrianEddy/telemetry-parser.git?rev=7743443#77434434f6d3d72682704443799ee0c8cf2c4b63"
 dependencies = [
  "argh",
  "byteorder",
  "chrono",
+ "crc32fast",
  "csv",
- "fc-blackbox",
+ "fc-blackbox-patched",
  "half",
  "hex-literal",
- "human-sort",
  "jni 0.22.4",
  "log",
  "memchr",
- "mp4parse",
+ "mp4parse-patched",
  "ndk-context",
  "paste",
  "pretty-hex",
@@ -5326,6 +5344,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "video-types",
 ]
 
 [[package]]
@@ -5948,6 +5967,17 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "video-types"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9d822b9262d72ef4a171e736d60682bdbb3e2a51a4aea9614616f3183d75b92"
+dependencies = [
+ "serde",
+ "smallvec",
+ "thiserror 2.0.21",
+]
 
 [[package]]
 name = "vswhom"

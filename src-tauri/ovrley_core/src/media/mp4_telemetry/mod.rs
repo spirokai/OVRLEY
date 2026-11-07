@@ -208,7 +208,7 @@ struct Mp4TelemetryExtraction {
 /// telemetry-parser remains the primary decoder. DJI files without a GPS group
 /// are handed to the AC004 decoder before the result is returned, so metadata
 /// probing and activity extraction cannot choose different timestamps or
-/// sources.
+/// sources. The AC004 GPS keeps telemetry-parser's camera settings.
 fn resolve_telemetry(
     repo_root: &Path,
     path: &Path,
@@ -253,24 +253,53 @@ fn resolve_telemetry(
                 Vec::new()
             };
 
-            if (purpose == TelemetryPurpose::Activity && extracted.is_empty())
-                || (camera_type == "DJI" && !has_gps_group)
-            {
+            if purpose == TelemetryPurpose::Activity && extracted.is_empty() {
                 resolve_dji_fallback(repo_root, path, camera_type, purpose)?
             } else {
-                Some(ResolvedTelemetry {
+                let parsed = ResolvedTelemetry {
                     samples: extracted,
                     sync_time: extract_sync_time_from_samples(parser_samples),
                     camera_type,
                     camera_model,
                     source: TelemetrySource::TelemetryParser,
-                })
+                };
+                if parsed.camera_type == "DJI" && !has_gps_group {
+                    resolve_dji_with_fallback_gps(repo_root, path, purpose, parsed)?
+                } else {
+                    Some(parsed)
+                }
             }
         }
         _ => resolve_dji_fallback(repo_root, path, camera_type, purpose)?,
     };
 
     Ok(resolved)
+}
+
+/// Adds the AC004 remote's GPS, which only the fallback decodes, to the camera
+/// settings telemetry-parser read from a DJI file. Without that GPS the file is
+/// telemetry-parser's alone.
+fn resolve_dji_with_fallback_gps(
+    repo_root: &Path,
+    path: &Path,
+    purpose: TelemetryPurpose,
+    parsed: ResolvedTelemetry,
+) -> CoreResult<Option<ResolvedTelemetry>> {
+    let Some(mut fallback) =
+        resolve_dji_fallback(repo_root, path, parsed.camera_type.clone(), purpose)?
+    else {
+        return Ok(Some(parsed));
+    };
+    fallback.samples.extend(
+        parsed
+            .samples
+            .into_iter()
+            .filter(NativeSample::has_camera_payload),
+    );
+    fallback
+        .samples
+        .sort_by(|left, right| left.timestamp_ms.total_cmp(&right.timestamp_ms));
+    Ok(Some(fallback))
 }
 
 /// Shared core: resolves telemetry once, smooths GPS/IMU series, and records

@@ -21,6 +21,7 @@ export default function OverlayMoveable({
   horizontalGuidelines,
   verticalGuidelines,
   zoom,
+  snapThreshold,
   handlers,
 }) {
   if ((!selectedTarget && !selectedTargets.length) || !sceneElement) return null
@@ -48,7 +49,7 @@ export default function OverlayMoveable({
       snappable
       snapDirections={SNAP_DIRECTIONS}
       elementSnapDirections={SNAP_DIRECTIONS}
-      snapThreshold={8}
+      snapThreshold={snapThreshold}
       snapGap
       keepRatio={maintainAspectRatio || isGroupSelection}
       useResizeObserver

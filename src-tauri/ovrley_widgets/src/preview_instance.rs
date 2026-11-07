@@ -148,8 +148,7 @@ impl WidgetRequest {
     }
 }
 
-/// Family geometry has optional rotation metadata, and source rasters also have
-/// presentation opacity. Translation changes neither of those properties.
+/// Family geometry has optional rotation metadata, which translation does not change.
 #[derive(Deserialize, Serialize)]
 struct PlacementGeometry {
     #[serde(flatten)]
@@ -158,8 +157,6 @@ struct PlacementGeometry {
     rotation: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rotation_origin: Option<[f32; 2]>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    opacity: Option<f32>,
 }
 
 pub struct PreviewInstance {
@@ -169,7 +166,6 @@ pub struct PreviewInstance {
     position: [f64; 2],
     placed_geometry: Option<Vec<u8>>,
     rendered_revision: Option<u32>,
-    rendered_pixels_revision: Option<u32>,
     revision: u32,
     pixels_revision: u32,
 }
@@ -192,7 +188,6 @@ impl PreviewInstance {
             position,
             placed_geometry: None,
             rendered_revision: None,
-            rendered_pixels_revision: None,
             revision: 0,
             pixels_revision: 0,
         };
@@ -212,12 +207,9 @@ impl PreviewInstance {
         let mut config = request.clone();
         config.pixel_config();
         let delta = [position[0] - self.origin[0], position[1] - self.origin[1]];
-        let source_raster = matches!(&self.widget, PreviewWidget::Raster(_));
         // A live drag may resample cached pixels at a fractional position. Once
         // committed, rebuild at that position to match native export exactly.
-        if config == self.config
-            && (transient || source_raster || delta.iter().all(|value| value.fract() == 0.0))
-        {
+        if config == self.config && (transient || delta.iter().all(|value| value.fract() == 0.0)) {
             // Pixel-changing requests use the family's validation below. Only
             // placement-only input bypasses it and validates its new x/y here.
             if position.iter().any(|value| !(*value as f32).is_finite()) {
@@ -267,7 +259,6 @@ impl PreviewInstance {
             (_, request) => {
                 self.widget = PreviewWidget::new(request, fonts, images, map_frames, map_styles)?;
                 self.rendered_revision = None;
-                self.rendered_pixels_revision = None;
             }
         }
         self.config = config;
@@ -285,14 +276,7 @@ impl PreviewInstance {
             return Ok(());
         }
         self.rendered_revision = Some(revision);
-        let pixels_revision = match &self.widget {
-            PreviewWidget::Raster(raster) => raster.pixels_revision,
-            _ => revision,
-        };
-        if self.rendered_pixels_revision != Some(pixels_revision) {
-            self.rendered_pixels_revision = Some(pixels_revision);
-            self.pixels_revision = self.pixels_revision.wrapping_add(1);
-        }
+        self.pixels_revision = self.pixels_revision.wrapping_add(1);
         self.place_geometry()?;
         self.revision = self.revision.wrapping_add(1);
         Ok(())

@@ -167,18 +167,6 @@ export async function suggestRenderOutputPath(outputKind, rememberedDirectory) {
 }
 
 /**
- * Finalizes extracted raw activity samples through the Rust backend pipeline.
- *
- * @param {object} rawActivity - RawActivity contract produced by format parsers.
- * @returns {Promise<object>} Promise resolving to parsed activity and debug payload.
- */
-export async function finalizeActivity(rawActivity) {
-  return apiCall('backend_finalize_activity', {
-    rawActivityJson: safeJsonStringify(rawActivity),
-  })
-}
-
-/**
  * Downloads the tiles a project's maps will show in the background, replacing any earlier download.
  * Progress arrives as `map-prepare` events.
  * @param {string} activityId Native snapshot identity.
@@ -241,6 +229,42 @@ export async function parseVboActivity(path) {
  */
 export async function parseTcxActivity(path) {
   return invokeCommand('backend_parse_tcx_activity', { path })
+}
+
+/**
+ * Parses and finalizes a native GPX activity using the Rust parser.
+ * @param {string} path - Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseGpxActivity(path) {
+  return invokeCommand('backend_parse_gpx_activity', { path })
+}
+
+/**
+ * Parses and finalizes a native FIT activity using the Rust parser.
+ * @param {string} path - Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseFitActivity(path) {
+  return invokeCommand('backend_parse_fit_activity', { path })
+}
+
+/**
+ * Parses and finalizes a native IGC flight log using the Rust parser.
+ * @param {string} path - Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseIgcActivity(path) {
+  return invokeCommand('backend_parse_igc_activity', { path })
+}
+
+/**
+ * Parses and finalizes a native DJI SRT file using the Rust parser.
+ * @param {string} path - Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Finalized activity response.
+ */
+export async function parseSrtActivity(path) {
+  return invokeCommand('backend_parse_srt_activity', { path })
 }
 
 /**
@@ -375,7 +399,7 @@ export function getFontCapabilities(fontId) {
   return apiCall('backend_font_capabilities', { fontId })
 }
 
-/** @param {string} fontId Canonical font ID. @param {number} faceIndex Catalog face index. @returns {Promise<number[]>} Font bytes. */
+/** @param {string} fontId Canonical font ID. @param {number} faceIndex Catalog face index. @returns {Promise<ArrayBuffer>} Raw font bytes. */
 export function getFontData(fontId, faceIndex) {
   return invokeCommand('backend_font_data', { fontId, faceIndex })
 }

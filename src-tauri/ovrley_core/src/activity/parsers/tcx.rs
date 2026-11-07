@@ -1,26 +1,50 @@
+//! Native TCX ingestion through the shared raw-activity finalizer.
+//!
+//! Extraction is based on python-tcxparser by Vinod Kurup:
+//! https://github.com/vkurup/python-tcxparser/tree/master/tcxparser
+//!
 //! TCX XML is an external-system boundary. Missing or invalid sensor readings
 //! remain absent; each Trackpoint still produces one canonical RawSample.
 //! Workout summaries and derived metrics belong to the shared finalizer.
 
-use crate::activity::schema::{
-    LapMarkers, RawActivity, RawActivityOptions, RawSample, SmoothingOption,
+use super::helpers::{child_text, children, finite_number, parse_document};
+use super::{
+    parse_text_path, parse_text_reader, seconds_between, smoothing_options, TRACK_SMOOTHING,
 };
+use crate::activity::finalize::FinalizeActivityResponse;
+use crate::activity::schema::{LapMarkers, RawActivity, RawActivityOptions, RawSample};
 use crate::error::{CoreError, CoreResult};
 use chrono::{DateTime, FixedOffset};
-use roxmltree::{Document, Node};
+use roxmltree::Node;
 use serde_json::json;
-use std::collections::BTreeMap;
+use std::io::Read;
+use std::path::Path;
 
 const TCX_NAMESPACE: &str = "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2";
 const EXTENSION_NAMESPACE: &str = "http://www.garmin.com/xmlschemas/ActivityExtension/v2";
+
+/// Opens a native TCX file and returns the shared finalized activity response.
+pub fn parse_tcx_activity_path(
+    path: &Path,
+    repo_root: Option<&Path>,
+) -> CoreResult<FinalizeActivityResponse> {
+    parse_text_path(path, repo_root, "TCX", extract_tcx_activity)
+}
+
+/// Reads UTF-8 TCX XML, extracts aligned samples, and finalizes them exactly once.
+pub fn parse_tcx_activity_reader<R: Read>(
+    reader: R,
+    file_name: &str,
+    repo_root: Option<&Path>,
+) -> CoreResult<FinalizeActivityResponse> {
+    parse_text_reader(reader, file_name, repo_root, "TCX", extract_tcx_activity)
+}
 
 /// Extracts one TCX activity's laps and tracks into the canonical raw contract.
 /// Multiple activities are rejected instead of merging independent timelines.
 /// Both namespace-qualified TCX v2 and unqualified exports are accepted.
 pub fn extract_tcx_activity(text: &str, file_name: &str) -> CoreResult<RawActivity> {
-    let document = Document::parse(text).map_err(|error| {
-        CoreError::Activity(format!("The TCX file could not be parsed: {error}"))
-    })?;
+    let document = parse_document(text, "TCX")?;
     let root = document.root_element();
     let namespace = root.tag_name().namespace();
     if root.tag_name().name() != "TrainingCenterDatabase"
@@ -102,24 +126,7 @@ pub fn extract_tcx_activity(text: &str, file_name: &str) -> CoreResult<RawActivi
         raw_samples,
         options: RawActivityOptions {
             skip_idle_gap_fill: false,
-            smoothing: BTreeMap::from([
-                (
-                    "pace".to_string(),
-                    SmoothingOption {
-                        enabled: true,
-                        method: "zero_phase_ma".to_string(),
-                        window_seconds: 5.0,
-                    },
-                ),
-                (
-                    "heading".to_string(),
-                    SmoothingOption {
-                        enabled: true,
-                        method: "circular_ema".to_string(),
-                        window_seconds: 3.0,
-                    },
-                ),
-            ]),
+            smoothing: smoothing_options(&TRACK_SMOOTHING),
         },
     })
 }
@@ -151,7 +158,7 @@ fn extract_lap_markers(
     };
     let lap_start_elapsed_seconds: Vec<_> = lap_start_times
         .into_iter()
-        .map(|start| (start - origin).num_milliseconds() as f64 / 1000.0)
+        .map(|start| seconds_between(origin, start))
         .collect();
     if lap_start_elapsed_seconds.iter().any(|start| *start < 0.0)
         || lap_start_elapsed_seconds
@@ -180,7 +187,7 @@ fn extract_trackpoint(
     let elapsed_seconds = timestamp
         .as_deref()
         .and_then(|time| DateTime::parse_from_rfc3339(time).ok())
-        .map(|time| (time - origin).num_milliseconds() as f64 / 1000.0);
+        .map(|time| seconds_between(origin, time));
     RawSample {
         timestamp,
         elapsed_seconds,
@@ -201,33 +208,6 @@ fn extract_trackpoint(
     }
 }
 
-fn children<'a, 'input>(
-    node: Node<'a, 'input>,
-    name: &'a str,
-    namespace: Option<&'a str>,
-) -> impl Iterator<Item = Node<'a, 'input>> {
-    node.children().filter(move |child| {
-        child.is_element()
-            && child.tag_name().name() == name
-            && child.tag_name().namespace() == namespace
-    })
-}
-
-fn child_text<'a, 'input>(
-    node: Node<'a, 'input>,
-    name: &'a str,
-    namespace: Option<&'a str>,
-) -> Option<&'a str> {
-    children(node, name, namespace)
-        .next()
-        .and_then(|child| child.text())
-        .map(str::trim)
-        .filter(|text| !text.is_empty())
-}
-
 fn number(node: Node<'_, '_>, name: &str, namespace: Option<&str>) -> Option<f64> {
-    child_text(node, name, namespace)?
-        .parse::<f64>()
-        .ok()
-        .filter(|value| value.is_finite())
+    finite_number(child_text(node, name, namespace)?)
 }

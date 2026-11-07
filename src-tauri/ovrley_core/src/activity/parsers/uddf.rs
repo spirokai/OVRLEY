@@ -3,12 +3,13 @@
 //! Rewritten in Rust for OVRLEY's canonical raw activity and diving metrics.
 
 use super::dive_xml::{
-    self, child_text, children, gas_fractions, mean, number, single_dive, start_time, timestamp,
+    child_text, children, gas_fractions, mean, number, single_dive, start_time, timestamp,
 };
-use super::finalize::FinalizeActivityResponse;
-use super::schema::{LapMarkers, RawActivity, RawActivityOptions, RawSample};
+use super::helpers::parse_document;
+use super::{parse_text_path, parse_text_reader};
+use crate::activity::finalize::FinalizeActivityResponse;
+use crate::activity::schema::{LapMarkers, RawActivity, RawActivityOptions, RawSample};
 use crate::error::{CoreError, CoreResult};
-use roxmltree::Document;
 use serde_json::json;
 use std::{collections::BTreeMap, io::Read, path::Path};
 
@@ -17,7 +18,7 @@ pub fn parse_uddf_activity_path(
     path: &Path,
     repo_root: Option<&Path>,
 ) -> CoreResult<FinalizeActivityResponse> {
-    dive_xml::parse_path(path, repo_root, "UDDF", extract_uddf_activity)
+    parse_text_path(path, repo_root, "UDDF", extract_uddf_activity)
 }
 
 /// Reads UDDF XML and finalizes it through the shared activity pipeline.
@@ -26,14 +27,12 @@ pub fn parse_uddf_activity_reader<R: Read>(
     file_name: &str,
     repo_root: Option<&Path>,
 ) -> CoreResult<FinalizeActivityResponse> {
-    dive_xml::parse_reader(reader, file_name, repo_root, "UDDF", extract_uddf_activity)
+    parse_text_reader(reader, file_name, repo_root, "UDDF", extract_uddf_activity)
 }
 
 /// Extracts SI-unit waypoint observations, gas switches, and measured oxygen sensors.
 pub fn extract_uddf_activity(text: &str, file_name: &str) -> CoreResult<RawActivity> {
-    let document = Document::parse(text).map_err(|error| {
-        CoreError::Activity(format!("The UDDF file could not be parsed: {error}"))
-    })?;
+    let document = parse_document(text, "UDDF")?;
     let root = document.root_element();
     if root.tag_name().name() != "uddf" {
         return Err(CoreError::Activity(

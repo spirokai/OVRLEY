@@ -200,6 +200,7 @@ export default function useOverlayEditorState({
       horizontalGuidelines: viewport.horizontalGuidelines,
       verticalGuidelines: viewport.verticalGuidelines,
       zoom: viewport.moveableZoom,
+      snapThreshold: viewport.snapThreshold,
       handlers,
     },
   }

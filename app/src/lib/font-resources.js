@@ -1,6 +1,6 @@
 import { getFontCapabilities, getFontData, listAvailableFonts } from '@/api/backend'
 import { createCachedPromise } from './cached-promise'
-import { collectFontIds, getFontWeightAxis, hasItalicVariation, styleFaces, supportsFontItalic } from './fonts'
+import { collectFontIds, getFontWeightAxis, styleFaces, supportsFontItalic } from './fonts'
 
 const preparations = new Map()
 const preparedFonts = new Map()
@@ -48,11 +48,11 @@ async function registerBrowserFont(font) {
   const italicFaces = supportsFontItalic(font) ? styleFaces(font, true) : []
   const faces = await Promise.all(
     font.faces.map(async (face, index) => {
-      // Windows reports synthetic slants using the upright local identity.
-      // Keep the upright registration so the browser can synthesize that slant.
-      if (isSimulatedItalicFace(font, face)) return []
+      // OS-simulated slants share the upright face's data; the upright
+      // registration lets the browser synthesize that slant instead.
+      if (face.simulated) return []
       const axis = getFontWeightAxis(face)
-      const source = face.file === null ? `local(${JSON.stringify(face.local_name)})` : new Uint8Array(await getFontData(font.id, index))
+      const source = await getFontData(font.id, index)
       const styles = [...(face.style === 'normal' ? [false] : []), ...(italicFaces.includes(face) ? [true] : [])]
       return Promise.all(
         styles.map((italic) =>
@@ -66,17 +66,6 @@ async function registerBrowserFont(font) {
     }),
   )
   for (const face of faces.flat()) document.fonts.add(face)
-}
-
-function isSimulatedItalicFace(font, face) {
-  // Windows exposes simulated slants with the upright face's exact local name.
-  // Registering those regular glyphs as italic would prevent browser synthesis.
-  return (
-    face.file === null &&
-    face.style !== 'normal' &&
-    !hasItalicVariation(face) &&
-    font.faces.some((upright) => upright.style === 'normal' && upright.local_name === face.local_name)
-  )
 }
 
 function styleVariations(face, italic) {

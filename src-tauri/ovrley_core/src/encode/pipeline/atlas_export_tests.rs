@@ -226,6 +226,7 @@ fn decode_as(paths: &AppPaths, video: &Path, pixel_format: &str) -> Vec<u8> {
 }
 
 #[test]
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn atlas_export_decodes_to_the_full_frame_export() {
     let paths = test_paths();
     let (atlas, planned) = export(&paths, true);

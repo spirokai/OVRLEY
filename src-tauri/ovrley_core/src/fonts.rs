@@ -69,8 +69,9 @@ pub struct FontFace {
     pub axes: Vec<FontAxis>,
     /// Bundled asset filename, or null for a system face.
     pub file: Option<String>,
-    /// Exact system face identity for browser local() registration.
-    pub local_name: Option<String>,
+    /// OS-simulated slant sharing its upright face's data (Windows). Browsers
+    /// must synthesize it from the upright registration instead.
+    pub simulated: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -157,11 +158,7 @@ fn describe_face(typeface: &Typeface, file: Option<String>) -> FontFace {
         style: style.into(),
         weight: *typeface.font_style().weight() as f32,
         axes,
-        local_name: file.is_none().then(|| {
-            typeface
-                .post_script_name()
-                .unwrap_or_else(|| typeface.family_name())
-        }),
+        simulated: false,
         file,
     }
 }
@@ -343,6 +340,22 @@ fn loaded_family(font_dirs: &[PathBuf], id: &str) -> CoreResult<Arc<LoadedFamily
             "font family is unavailable: {id}"
         )));
     }
+    // A simulated slant is served from its upright face's file, so its name
+    // table is identical; a genuine italic always names its own subfamily.
+    let name_tag = u32::from_be_bytes(*b"name");
+    let upright_names: Vec<_> = faces
+        .iter()
+        .filter(|face| face.metadata.style == "normal")
+        .filter_map(|face| face.typeface.copy_table_data(name_tag))
+        .collect();
+    for face in &mut faces {
+        if face.metadata.style != "normal" && !supports_variable_italic(&face.metadata) {
+            face.metadata.simulated = face
+                .typeface
+                .copy_table_data(name_tag)
+                .is_some_and(|name| upright_names.iter().any(|upright| upright.as_bytes() == name.as_bytes()));
+        }
+    }
     let loaded = Arc::new(LoadedFamily {
         id: id.into(),
         name: id.into(),
@@ -357,13 +370,79 @@ pub fn font_capabilities(font_dirs: &[PathBuf], id: &str) -> CoreResult<FontFami
     Ok(loaded_family(font_dirs, id)?.capabilities())
 }
 
-/// Returns the same bundled bytes that Skia loaded, including after asset replacement.
-pub fn bundled_face_data(font_dirs: &[PathBuf], id: &str, index: usize) -> CoreResult<Vec<u8>> {
-    loaded_family(font_dirs, id)?
+/// Returns the bytes Skia loaded for one face. Bundled faces return their
+/// asset bytes; system faces are rebuilt as a standalone sfnt from Skia's
+/// tables, which also extracts a single face from a `.ttc` collection.
+pub fn face_data(font_dirs: &[PathBuf], id: &str, index: usize) -> CoreResult<Vec<u8>> {
+    let loaded = loaded_family(font_dirs, id)?;
+    let face = loaded
         .faces
         .get(index)
-        .and_then(|face| face.data.clone())
-        .ok_or_else(|| CoreError::Config(format!("no bundled font data for {id} face {index}")))
+        .ok_or_else(|| CoreError::Config(format!("{id} has no face {index}")))?;
+    match &face.data {
+        Some(data) => Ok(data.clone()),
+        None => sfnt_from_tables(&face.typeface)
+            .ok_or_else(|| CoreError::Config(format!("unable to read font tables for {id} face {index}"))),
+    }
+}
+
+fn sfnt_checksum(bytes: &[u8]) -> u32 {
+    bytes.chunks(4).fold(0u32, |sum, chunk| {
+        let mut word = [0u8; 4];
+        word[..chunk.len()].copy_from_slice(chunk);
+        sum.wrapping_add(u32::from_be_bytes(word))
+    })
+}
+
+fn sfnt_from_tables(typeface: &Typeface) -> Option<Vec<u8>> {
+    let mut tags = typeface.read_table_tags()?;
+    tags.sort_unstable();
+    let tables = tags
+        .iter()
+        .map(|tag| Some((*tag, typeface.copy_table_data(*tag)?)))
+        .collect::<Option<Vec<_>>>()?;
+    let count = tables.len();
+    if count == 0 {
+        return None;
+    }
+    let is_cff = tags
+        .iter()
+        .any(|tag| *tag == u32::from_be_bytes(*b"CFF ") || *tag == u32::from_be_bytes(*b"CFF2"));
+    let entry_selector = count.ilog2() as u16;
+    let search_range = (1u16 << entry_selector) * 16;
+    let mut out = Vec::new();
+    out.extend_from_slice(if is_cff { b"OTTO" } else { &[0, 1, 0, 0] });
+    out.extend_from_slice(&(count as u16).to_be_bytes());
+    out.extend_from_slice(&search_range.to_be_bytes());
+    out.extend_from_slice(&entry_selector.to_be_bytes());
+    out.extend_from_slice(&((count as u16) * 16 - search_range).to_be_bytes());
+    let mut offset = 12 + 16 * count;
+    let mut head_offset = None;
+    for (tag, data) in &tables {
+        let mut bytes = data.as_bytes().to_vec();
+        if *tag == u32::from_be_bytes(*b"head") && bytes.len() >= 12 {
+            bytes[8..12].fill(0);
+            head_offset = Some(offset);
+        }
+        out.extend_from_slice(&tag.to_be_bytes());
+        out.extend_from_slice(&sfnt_checksum(&bytes).to_be_bytes());
+        out.extend_from_slice(&(offset as u32).to_be_bytes());
+        out.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
+        offset += bytes.len().next_multiple_of(4);
+    }
+    for (tag, data) in &tables {
+        let start = out.len();
+        out.extend_from_slice(data.as_bytes());
+        if *tag == u32::from_be_bytes(*b"head") && data.len() >= 12 {
+            out[start + 8..start + 12].fill(0);
+        }
+        out.resize(out.len().next_multiple_of(4), 0);
+    }
+    if let Some(head) = head_offset {
+        let adjustment = 0xB1B0_AFBAu32.wrapping_sub(sfnt_checksum(&out));
+        out[head + 8..head + 12].copy_from_slice(&adjustment.to_be_bytes());
+    }
+    Some(out)
 }
 
 // CSS Fonts 4 weight matching. Browser and Rust use this policy for static
@@ -390,13 +469,15 @@ fn weight_rank(requested: f32, candidate: f32) -> (u8, f32) {
     }
 }
 
+fn supports_variable_italic(face: &FontFace) -> bool {
+    face.axes.iter().any(|axis| {
+        (axis.tag == "ital" && axis.max > 0.0)
+            || (axis.tag == "slnt" && (axis.min < 0.0 || axis.max > 0.0))
+    })
+}
+
 fn supports_italic(face: &FontFace) -> bool {
-    face.style == "italic"
-        || face.style == "oblique"
-        || face.axes.iter().any(|axis| {
-            (axis.tag == "ital" && axis.max > 0.0)
-                || (axis.tag == "slnt" && (axis.min < 0.0 || axis.max > 0.0))
-        })
+    face.style == "italic" || face.style == "oblique" || supports_variable_italic(face)
 }
 
 fn italic_rank(face: &FontFace) -> u8 {

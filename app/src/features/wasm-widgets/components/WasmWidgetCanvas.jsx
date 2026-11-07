@@ -5,7 +5,7 @@ const WIDGET_LAYERS = { backdrop: 'z-1', map: 'z-2', raster: 'z-3', course: 'z-4
 
 /** @param {object} props Standalone widget canvas registration, and whether drag pans a map's view. @returns {JSX.Element} Rust-positioned canvas. */
 export function WasmWidgetCanvas({ widget, attach, attachMapLayer, registerNode, isMapView, handleWidgetMouseDown }) {
-  const separateRaster = widget.type === 'course' || widget.type === 'elevation' || widget.type === 'diving_profile'
+  const separateRaster = ['course', 'elevation', 'diving_profile', 'raster'].includes(widget.type)
   const { wrapperRef, canvasRef, mapLayerRef } = useWasmCanvas({ id: widget.id, attach, attachMapLayer, registerNode, separateRaster })
   const layer = WIDGET_LAYERS[widget.type] ?? 'z-10'
   // A chase camera follows the rider, so its view mode only zooms.
