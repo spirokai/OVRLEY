@@ -1,5 +1,6 @@
-//! The `fill-pattern` images, bundled so that drawing them needs no download. See
-//! `patterns/NOTICE.md`.
+//! The `fill-pattern` images, bundled so that drawing them needs no download: raw RGBA8 crops of
+//! `wetland_bg_11` (30 x 30) and `pedestrian_polygon` (128 x 128) from OpenFreeMap's
+//! `ofm_f384/ofm@2x.png` sprite (credited in `THIRD_PARTY_NOTICES.txt`).
 //!
 //! Each image has its own repeating, mipmapped texture rather than a place in an atlas, because a
 //! pitched view minifies them far enough to shimmer as the camera moves.

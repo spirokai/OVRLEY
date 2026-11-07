@@ -408,7 +408,7 @@ transfer also spikes by 10–20 ms on some frames, with no cause found.
   reads back from a texture, preview presents to a canvas. WASM opens its device asynchronously and refuses software WebGL by
   renderer name, because wgpu reports it as `Other`.
 - **`src-tauri/wasm-map-bindings`** (isolated workspace, like `wasm-bindings`): the wasm-bindgen module, `wasm_map_bindings`. `MapLayer` owns
-  one canvas's renderer. `TileDecoder` runs in workers. `scripts/build-wasm.mjs` builds it next to the widget module, so dev
+  one canvas's renderer. `TileDecoder` runs in workers. `scripts/wasm/build.mjs` builds it next to the widget module, so dev
   rebuilds, CI artifacts and packaging treat both alike. It loads only when a project has a map, and a crash in it can't end
   other widgets.
 - **Widget:** `PreviewMap` still owns the camera, marker and attribution. Once its layer is ready it leaves the frame clear, and

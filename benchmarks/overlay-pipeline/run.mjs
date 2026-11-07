@@ -6,7 +6,7 @@
  * overlay frames to the encoder's stdin, like the app does.
  *
  * Usage:
- *   node scripts/bench-overlay-pipeline.mjs [--source debug/benchmarks/test-4k.mp4]
+ *   node benchmarks/overlay-pipeline/run.mjs [--source debug/benchmarks/test-4k.mp4]
  *     [--seconds 20] [--codec hevc|h264] [--backends amf,nvenc,cuda,qsv,qsvfull,software]
  *     [--quality 23] [--ffmpeg path/to/ffmpeg]
  *
@@ -32,7 +32,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const exe = process.platform === 'win32' ? '.exe' : ''
 
 function parseArgs(argv) {

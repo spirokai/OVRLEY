@@ -51,7 +51,7 @@ jobs:
           version="$tag"
           echo "commit=$commit"
           echo "tag=$tag"
-          node scripts/set-release-version.mjs "$version"
+          node scripts/release/set-version.mjs "$version"
           {
             echo "ref=$RELEASE_REF"
             echo "tag=$tag"
@@ -222,7 +222,7 @@ jobs:
           set -euo pipefail
           owner="${GITHUB_REPOSITORY%%/*}"
           repo="${GITHUB_REPOSITORY##*/}"
-          node scripts/create-latest-json.mjs \
+          node scripts/release/create-latest-json.mjs \
             --owner "$owner" \
             --repo "$repo" \
             --tag "$RELEASE_TAG" \
@@ -230,7 +230,7 @@ jobs:
             --notes-file release-notes.txt \
             --staging-dir release-staging \
             --output public-assets/latest.json
-          node scripts/create-latest-json.mjs \
+          node scripts/release/create-latest-json.mjs \
             --owner "$owner" \
             --repo "$repo" \
             --tag "$RELEASE_TAG" \

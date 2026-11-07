@@ -102,7 +102,7 @@ jobs:
 
           echo "commit=$commit"
           echo "tag=$tag"
-          node scripts/set-release-version.mjs "$version"
+          node scripts/release/set-version.mjs "$version"
           {
             echo "tag=$tag"
             echo "commit=$commit"
@@ -193,10 +193,10 @@ jobs:
           cp -a fonts "$payload_dir/fonts"
           cp -a templates "$payload_dir/templates"
           cp -a assets/map-styles "$payload_dir/map-styles"
-          install -m 0644 THIRD_PARTY_NOTICES.txt "$payload_dir/THIRD_PARTY_NOTICES.txt"
-          install -m 0644 INSTALL-linux.txt "$payload_dir/INSTALL.txt"
-          install -m 0755 scripts/appimage/AppRun "$app_dir/AppRun"
-          install -m 0644 scripts/appimage/com.ovrley.desktop "$app_dir/usr/share/applications/com.ovrley.desktop"
+          install -m 0644 src-tauri/target/packaging/THIRD_PARTY_NOTICES.txt "$payload_dir/THIRD_PARTY_NOTICES.txt"
+          install -m 0644 packaging/install/INSTALL-linux.txt "$payload_dir/INSTALL.txt"
+          install -m 0755 packaging/appimage/AppRun "$app_dir/AppRun"
+          install -m 0644 packaging/appimage/com.ovrley.desktop "$app_dir/usr/share/applications/com.ovrley.desktop"
           ln -s ../lib/ovrley/OVRLEY "$app_dir/usr/bin/OVRLEY"
 
           for size in 32x32 64x64 128x128; do
@@ -292,8 +292,8 @@ jobs:
           rm -rf "$archive_root"
           mkdir -p "$archive_root"
           install -m 0755 "dist-release/$appimage_name" "$archive_root/$appimage_name"
-          install -m 0644 THIRD_PARTY_NOTICES.txt "$archive_root/THIRD_PARTY_NOTICES.txt"
-          install -m 0644 INSTALL-linux.txt "$archive_root/INSTALL.txt"
+          install -m 0644 src-tauri/target/packaging/THIRD_PARTY_NOTICES.txt "$archive_root/THIRD_PARTY_NOTICES.txt"
+          install -m 0644 packaging/install/INSTALL-linux.txt "$archive_root/INSTALL.txt"
           (cd "$archive_root" && zip -q "$GITHUB_WORKSPACE/dist-release/$archive_name" "$appimage_name" THIRD_PARTY_NOTICES.txt INSTALL.txt)
 
           expected="$(printf '%s\n' "$appimage_name" THIRD_PARTY_NOTICES.txt INSTALL.txt | sort)"

@@ -3,9 +3,8 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { delimiter, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { loadLocalEnvironment } from './build-environment.mjs'
 
-export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 export const crateDir = join(root, 'src-tauri', 'wasm-bindings')
 export const target = 'wasm32-unknown-emscripten'
 export const revision = 'b7f043e0b1e2a850e702245de811f01df1f6b0ff'
@@ -25,7 +24,8 @@ const wasmBindgenVersion = '0.2.130'
 
 /** Load and validate the SDK boundary once for both compilation commands. */
 export function toolchainEnvironment() {
-  loadLocalEnvironment(root)
+  // Machine-specific SDK paths; shell variables take precedence.
+  if (existsSync(join(root, '.env.local'))) process.loadEnvFile(join(root, '.env.local'))
   if (!process.env.EMSDK) throw new Error('Set EMSDK in .env.local (see .env.example).')
   const emsdk = resolve(root, process.env.EMSDK)
   const emscripten = join(emsdk, 'upstream', 'emscripten')

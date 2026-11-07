@@ -91,7 +91,7 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 - CI: `pnpm install --frozen-lockfile` → `pnpm tauri build --bundles <type>`.
 - Release workflow (`.github/workflows/release.yml`): manual trigger with tag input, builds Windows (NSI/MSI + portable) and macOS (DMG + portable).
 - semantic-release auto-creates tags on pushes to `skia-render-backend` branch using `@semantic-release/commit-analyzer`.
-- The portable archive script (`scripts/package-portable.mjs`) packages: Tauri binary renamed to `OVRLEY(.exe)`, `vendor/ffmpeg/`, `fonts/`, `templates/`.
+- The portable archive script (`packaging/portable.mjs`) packages: Tauri binary renamed to `OVRLEY(.exe)`, `vendor/ffmpeg/`, `fonts/`, `templates/`.
 
 ## Testing
 

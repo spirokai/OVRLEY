@@ -3,7 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs'
 import { delimiter, join, resolve } from 'node:path'
-import { archivePathFor, cargoBuild, emscriptenVersion, revision, root, rustVersion, target, toolchainEnvironment, vendorDir } from './build-wasm.mjs'
+import { archivePathFor, cargoBuild, emscriptenVersion, revision, root, rustVersion, target, toolchainEnvironment, vendorDir } from './build.mjs'
 
 const { env, emscripten, emcc, emxx, emar } = toolchainEnvironment()
 if (!env.LIBCLANG_PATH) throw new Error('Set LIBCLANG_PATH to the directory containing libclang. LLVM 23.1.0 is verified.')
@@ -21,7 +21,7 @@ run('git', ['-C', checkout, '-c', 'core.longpaths=true', 'submodule', 'update', 
 
 // skcms imports unsupported AVX/AVX-512 headers on Clang even for SSE2.
 // Emscripten's immintrin.h already supplies the enabled intrinsic headers.
-const intrinsicsPatch = join(root, 'scripts', 'patches', 'skcms-emscripten-intrinsics.patch')
+const intrinsicsPatch = join(root, 'scripts', 'wasm', 'skcms-emscripten-intrinsics.patch')
 const patchApplied = spawnSync('git', ['apply', '--reverse', '--check', intrinsicsPatch], { cwd: skia, env, stdio: 'pipe' })
 if (patchApplied.error) throw patchApplied.error
 if (patchApplied.status !== 0) run('git', ['apply', intrinsicsPatch], skia)

@@ -1,11 +1,10 @@
+// Packages the `tauri build` output as a standalone ZIP: the binary beside its fonts, templates,
+// map styles, FFmpeg, notices, and install guide (macOS: the .app bundle instead).
+import { spawn, spawnSync } from 'node:child_process'
 import { chmod, cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, resolve } from 'node:path'
-import { spawn } from 'node:child_process'
-import { spawnSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
-import { PACKAGING_DOCUMENTS, preparePackagingResources } from './packaging-resources.mjs'
+import { basename, dirname, join } from 'node:path'
+import { ensureDirectory, ensureFile, installGuide, noticePath, preparePackagingResources, rootDir } from './resources.mjs'
 
-const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
 const profile = readArg('--profile') ?? 'release'
 const targetDir = join(rootDir, 'src-tauri', 'target', profile)
@@ -31,7 +30,7 @@ main().catch((error) => {
 })
 
 async function main() {
-  await preparePackagingResources(rootDir)
+  await preparePackagingResources()
   const version = await readArchiveVersion()
   const requestedArchiveName = readArg('--archive-name')
   const archiveName = requestedArchiveName ?? `OVRLEY-${platformSlug()}-${version}.zip`
@@ -49,7 +48,7 @@ async function main() {
     await packagePortableBinary(appDir)
   }
 
-  await copyGeneratedPackagingDocuments(appDir)
+  await copyPackagingDocuments(appDir)
 
   await rm(archivePath, { force: true })
   await zipDirectory(appDir, archivePath)
@@ -117,13 +116,13 @@ async function copyPortableFfmpeg(destinationDir) {
   await ensureFile(join(destinationFfmpegDir, 'bin', process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe'), 'Packaged FFprobe binary')
 }
 
-async function copyGeneratedPackagingDocuments(destinationDir) {
-  await cp(join(rootDir, PACKAGING_DOCUMENTS.notice), join(destinationDir, PACKAGING_DOCUMENTS.notice))
+async function copyPackagingDocuments(destinationDir) {
+  await cp(noticePath, join(destinationDir, basename(noticePath)))
 
   if (process.platform === 'darwin') {
-    await cp(join(rootDir, PACKAGING_DOCUMENTS.macosInstall), join(destinationDir, 'INSTALL.txt'))
+    await cp(installGuide.macos, join(destinationDir, 'INSTALL.txt'))
   } else if (process.platform === 'linux') {
-    await cp(join(rootDir, PACKAGING_DOCUMENTS.linuxInstall), join(destinationDir, 'INSTALL.txt'))
+    await cp(installGuide.linux, join(destinationDir, 'INSTALL.txt'))
   }
 }
 
@@ -214,30 +213,6 @@ async function resolveMacosAppBundle() {
   }
 
   throw new Error(`macOS app bundle not found under ${bundleDir}`)
-}
-
-async function ensureFile(path, label) {
-  try {
-    const entry = await stat(path)
-    if (entry.isFile()) {
-      return
-    }
-  } catch {
-    // Fall through to the shared error below.
-  }
-  throw new Error(`${label} not found at ${path}`)
-}
-
-async function ensureDirectory(path, label) {
-  try {
-    const entry = await stat(path)
-    if (entry.isDirectory()) {
-      return
-    }
-  } catch {
-    // Fall through to the shared error below.
-  }
-  throw new Error(`${label} not found at ${path}`)
 }
 
 async function pathIsDirectory(path) {

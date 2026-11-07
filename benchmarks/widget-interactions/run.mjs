@@ -8,7 +8,7 @@ import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createServer } from 'vite-plus'
 import { chromium } from '@playwright/test'
-import { artifactDir } from '../../scripts/build-wasm.mjs'
+import { artifactDir } from '../../scripts/wasm/build.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const appRequire = createRequire(join(root, 'app/package.json'))

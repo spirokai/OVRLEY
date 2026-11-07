@@ -47,7 +47,7 @@
       "../templates": "templates",
       "../assets/map-styles": "map-styles",
       "../vendor/ffmpeg": "vendor/ffmpeg",
-      "../THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt"
+      "target/packaging/THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt"
     },
     "linux": {
       "deb": {

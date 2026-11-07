@@ -1,11 +1,11 @@
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
-import { artifactDir, artifactNames, crateDir, mapCrateDir, root, vendorDir } from './build-wasm.mjs'
+import { artifactDir, artifactNames, crateDir, mapCrateDir, root, vendorDir } from './build.mjs'
 
 /** Production assets and serialized development rebuilds of the portable renderer. */
 export function wasmBindingsPlugin() {
-  const buildScript = join(root, 'scripts', 'build-wasm.mjs')
+  const buildScript = join(root, 'scripts', 'wasm', 'build.mjs')
   const sharedDirs = ['ovrley_widgets', 'ovrley_map'].map((name) => join(root, 'src-tauri', name))
   const widgetAssets = join(root, 'assets')
   const assets = new Map(

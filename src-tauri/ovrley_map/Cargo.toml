@@ -1,7 +1,7 @@
 [package]
 # Map vocabulary shared by native and WASM. The `gpu` feature adds the wgpu renderer, whose
 # method is ported from maplibre-rs (see src/gpu/LICENSE-MIT). The `validate` feature adds the
-# MapLibre style validator that registers installed styles (see style-spec/ATTRIBUTION.md).
+# MapLibre style validator that registers installed styles (see src/style_spec.rs).
 name = "ovrley_map"
 version = "0.1.0"
 edition = "2021"

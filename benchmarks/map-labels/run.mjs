@@ -42,7 +42,7 @@ async function build() {
     ['build', '-p', 'ovrley_map', '--release', '--features', 'gpu,validate', '--bin', 'benchmark_map_labels', '--locked'],
     join(root, 'src-tauri'),
   )
-  const { buildMapBindings } = await import('../../scripts/build-wasm.mjs')
+  const { buildMapBindings } = await import('../../scripts/wasm/build.mjs')
   buildMapBindings()
 }
 
@@ -73,7 +73,7 @@ async function fetchTiles() {
 
 /** Serves the page, the production map module, fonts, style and tiles, cross-origin isolated for fine timers. */
 async function serve(planPath) {
-  const { artifactDir } = await import('../../scripts/build-wasm.mjs')
+  const { artifactDir } = await import('../../scripts/wasm/build.mjs')
   const routes = [
     ['/plan.json', () => planPath],
     ['/style.json', () => join(root, 'assets/map-styles/liberty.json')],

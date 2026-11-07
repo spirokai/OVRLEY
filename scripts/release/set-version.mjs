@@ -2,11 +2,11 @@ import { appendFile, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const version = process.argv.slice(2)
 
 if (version.length !== 1) {
-  fail('Usage: node scripts/set-release-version.mjs X.Y.Z')
+  fail('Usage: node scripts/release/set-version.mjs X.Y.Z')
 }
 
 assertStableVersion(version[0])

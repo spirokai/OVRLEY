@@ -1,6 +1,7 @@
 //! MapLibre's style validator, `validateStyleMin` from `@maplibre/maplibre-gl-style-spec`, ported so
 //! the shell can tell which installed styles MapLibre will load. It reads the same reference at the
-//! version the frontend's maplibre-gl ships: see `style-spec/ATTRIBUTION.md`.
+//! version the frontend's maplibre-gl ships: `style-spec/v8.json`, written by
+//! `scripts/prune-map-style-spec.mjs` (rerun it after updating maplibre-gl).
 //!
 //! Parity is on acceptance: a style passes exactly when MapLibre reports no errors. Messages follow
 //! MapLibre's and are keyed by where in the style they are, without its line numbers. Warnings are

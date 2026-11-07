@@ -43,7 +43,7 @@ modules:
       - mkdir -p src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm
       - cp wasm_bindings.js wasm_bindings.wasm wasm_map_bindings.js wasm_map_bindings_bg.wasm src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm/
       # Same version stamping as the other release builds
-      - node scripts/set-release-version.mjs "$OVRLEY_VERSION" && VITE_OVRLEY_VERSION="$OVRLEY_VERSION" pnpm --dir app build
+      - node scripts/release/set-version.mjs "$OVRLEY_VERSION" && VITE_OVRLEY_VERSION="$OVRLEY_VERSION" pnpm --dir app build
       # Backend; the Tauri CLI is not used, so enable the embedded frontend explicitly
       - cd src-tauri && TAURI_CONFIG="$(cat ../packaging/flatpak/tauri.flatpak.conf.json)" cargo build --release --locked --features tauri/custom-protocol
       # Install
@@ -54,7 +54,7 @@ modules:
       # Same FFmpeg build as the other Linux releases, fetched by pnpm install's postinstall
       - mkdir -p /app/lib/OVRLEY/vendor/ffmpeg && cp -r vendor/ffmpeg/bin /app/lib/OVRLEY/vendor/ffmpeg/
       - /app/lib/OVRLEY/vendor/ffmpeg/bin/ffmpeg -hide_banner -version
-      - node packaging/flatpak/make-third-party-notices.mjs /app/lib/OVRLEY/THIRD_PARTY_NOTICES.txt
+      - node packaging/resources.mjs /app/lib/OVRLEY/THIRD_PARTY_NOTICES.txt
       - install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.desktop /app/share/applications/cc.ovrley.OVRLEY.desktop
       - install -Dm644 packaging/flatpak/cc.ovrley.OVRLEY.metainfo.xml /app/share/metainfo/cc.ovrley.OVRLEY.metainfo.xml
       # Installers show the MetaInfo release, so stamp it with the build version too
@@ -80,7 +80,7 @@ modules:
         sha512: 5e82639027af37cf832061bcc6d639c219634488e0f2baebe785028a793de7b525ffcd3f7ff574f5e9860654e098fe852ba8ac5dd5cefe1767d23a020a92f501
         strip-components: 1
         dest: pnpm
-      # Prebuilt WASM preview renderer, built by CI (scripts/build-wasm.mjs)
+      # Prebuilt WASM preview renderer, built by CI (scripts/wasm/build.mjs)
       - type: file
         path: wasm/wasm_bindings.js
       - type: file

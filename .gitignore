@@ -66,9 +66,3 @@ tmp/
 .claude/skills
 .agents/plans/
 .vite-hooks/
-
-# Generated package resources
-/THIRD_PARTY_NOTICES.txt
-INSTALL-macos.txt
-INSTALL-linux.txt
-INSTALL-debian.txt

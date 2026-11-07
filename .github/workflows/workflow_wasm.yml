@@ -45,7 +45,7 @@ jobs:
           actions-cache-folder: emsdk-cache
 
       - name: Build WASM bindings
-        run: node scripts/build-wasm.mjs
+        run: node scripts/wasm/build.mjs
 
       - name: Upload WASM bindings
         uses: actions/upload-artifact@v7

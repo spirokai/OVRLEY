@@ -102,7 +102,7 @@ jobs:
 
           echo "commit=$commit"
           echo "tag=$tag"
-          node scripts/set-release-version.mjs "$version"
+          node scripts/release/set-version.mjs "$version"
           {
             echo "tag=$tag"
             echo "commit=$commit"
@@ -169,7 +169,7 @@ jobs:
           $nativeVersion = $nativeBinary.VersionInfo.ProductVersion
           if ($nativeVersion -notmatch "^$([regex]::Escape($version))(\.0)?$") { throw "Native Windows version $nativeVersion does not match $version." }
 
-          node scripts/package-portable.mjs --version $version --archive-name $portableName
+          node packaging/portable.mjs --version $version --archive-name $portableName
           $portablePath = Join-Path $portableDirectory $portableName
           if (-not (Test-Path -LiteralPath $portablePath)) { throw 'Portable ZIP was not produced.' }
 

@@ -25,7 +25,7 @@
       "signingIdentity": "-"
     },
     "resources": {
-      "../INSTALL-macos.txt": "INSTALL.txt"
+      "../packaging/install/INSTALL-macos.txt": "INSTALL.txt"
     }
   }
 }
