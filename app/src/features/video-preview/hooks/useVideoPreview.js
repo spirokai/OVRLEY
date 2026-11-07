@@ -117,7 +117,7 @@ export function useVideoPreview(videoRef, isActive = true) {
     scrubSchedulerRef.current = scrubScheduler
 
     return () => {
-      scrubScheduler.dispose()
+      scrubScheduler.clear()
       if (scrubSchedulerRef.current === scrubScheduler) {
         scrubSchedulerRef.current = null
       }

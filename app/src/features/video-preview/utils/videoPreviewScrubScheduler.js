@@ -1,5 +1,5 @@
 /**
- * Coalesces rapid scrub seeks into timed currentTime updates, one seek in flight at a time.
+ * Coalesces rapid scrub seeks into timed currentTime updates.
  */
 
 import { syncVideoCurrentTime } from './videoPreviewPlayback'
@@ -12,7 +12,7 @@ import { syncVideoCurrentTime } from './videoPreviewPlayback'
  * @param {number} options.flushIntervalMs - Minimum spacing between applied seeks.
  * @param {() => number} [options.getNowMs] - Clock source used for scheduling.
  * @param {HTMLVideoElement} options.video - Preview video element.
- * @returns {{ clear: () => void, dispose: () => void, schedule: (second: number) => void }} Scrub scheduling API.
+ * @returns {{ clear: () => void, schedule: (second: number) => void }} Scrub scheduling API.
  */
 export function createVideoPreviewScrubScheduler({ epsilonSeconds, flushIntervalMs, getNowMs = () => performance.now(), video }) {
   let pendingSecond = null
@@ -30,8 +30,6 @@ export function createVideoPreviewScrubScheduler({ epsilonSeconds, flushInterval
 
   const flush = () => {
     pendingTimeoutId = null
-    // A new seek discards the frame still decoding, and WebKitGTK shows black until one lands; seeked flushes the latest target.
-    if (video.seeking) return
     const nextSecond = pendingSecond
     pendingSecond = null
     lastSeekMs = getNowMs()
@@ -57,19 +55,8 @@ export function createVideoPreviewScrubScheduler({ epsilonSeconds, flushInterval
     }
   }
 
-  const handleSeeked = () => {
-    if (pendingSecond !== null && pendingTimeoutId === null) schedule(pendingSecond)
-  }
-  video.addEventListener('seeked', handleSeeked)
-
-  const dispose = () => {
-    clear()
-    video.removeEventListener('seeked', handleSeeked)
-  }
-
   return {
     clear,
-    dispose,
     schedule,
   }
 }
