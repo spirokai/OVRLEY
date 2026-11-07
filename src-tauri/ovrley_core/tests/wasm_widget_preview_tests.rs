@@ -236,14 +236,8 @@ fn every_preview_family_derives_serialized_geometry_from_typed_tile_bounds() {
             let field = |name: &str| geometry[name].as_f64().unwrap() as f32;
             assert_eq!((field("left"), field("top")), (bounds.left, bounds.top), "{kind} {stage}: tile origin");
             let size = (geometry["width"].as_u64().unwrap() as u32, geometry["height"].as_u64().unwrap() as u32);
-            if kind == "raster" {
-                // Source pixels stretch over the unrotated content frame.
-                let content = (geometry["content"]["width"].as_f64().unwrap() as f32, geometry["content"]["height"].as_f64().unwrap() as f32);
-                assert_eq!(content, (bounds.width, bounds.height), "{kind} {stage}: tile extent");
-            } else {
-                let scale = field("preview_raster_scale");
-                assert_eq!(size, ((bounds.width * scale).ceil() as u32, (bounds.height * scale).ceil() as u32), "{kind} {stage}: tile extent");
-            }
+            let scale = field("preview_raster_scale");
+            assert_eq!(size, ((bounds.width * scale).ceil() as u32, (bounds.height * scale).ceil() as u32), "{kind} {stage}: tile extent");
         };
         assert_derived(&preview, "rendered");
         let (x, y) = (request["widget"]["x"].as_f64().unwrap(), request["widget"]["y"].as_f64().unwrap());
