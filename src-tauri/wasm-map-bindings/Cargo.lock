@@ -801,6 +801,7 @@ dependencies = [
  "bytemuck",
  "cgmath",
  "geozero",
+ "js-sys",
  "libm",
  "log",
  "lyon",
@@ -811,6 +812,7 @@ dependencies = [
  "serde_json",
  "unicode-bidi",
  "unicode-bidi-mirroring",
+ "wasm-bindgen",
  "web-sys",
  "wgpu",
 ]

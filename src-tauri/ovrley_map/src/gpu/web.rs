@@ -25,12 +25,15 @@ use crate::{frame_tiles, MapCamera, MapLabelDraw, MapRouteDraw, MapViewport, Til
 use bytemuck::Pod;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use wasm_bindgen::{closure::Closure, JsCast, JsValue};
 
 /// Decoded layer kinds from here up are fill patterns, by image.
 const FILL_PATTERN_KINDS: u32 = 3;
 
 pub(crate) struct Output {
     surface: wgpu::Surface<'static>,
+    /// The canvas context's `bufferData` override. It must outlive every buffer the context creates.
+    _static_buffers: StaticBufferHint,
     surface_config: wgpu::SurfaceConfiguration,
     /// The tiles of the last asked view, to recognise when a view evicts itself.
     view: HashSet<TileId>,
@@ -58,8 +61,10 @@ impl GpuMapRenderer {
         descriptor.backends = wgpu::Backends::GL;
         let instance = wgpu::Instance::new(descriptor);
         let surface = instance
-            .create_surface(wgpu::SurfaceTarget::Canvas(canvas))
+            .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
             .map_err(|error| format!("No WebGL2 surface for the map: {error}"))?;
+        // The surface made the context; the device below makes the first buffers.
+        let static_buffers = hint_static_buffers(&canvas)?;
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -88,6 +93,7 @@ impl GpuMapRenderer {
         surface.configure(&device, &surface_config);
         let output = Output {
             surface,
+            _static_buffers: static_buffers,
             surface_config,
             view: HashSet::new(),
             glyphs: HashMap::new(),
@@ -228,6 +234,39 @@ impl GpuMapRenderer {
         self.queue.present(frame);
         self.check_gpu()
     }
+}
+
+type StaticBufferHint = Closure<dyn Fn(u32, JsValue, u32) -> Result<(), JsValue>>;
+
+/// Makes `canvas`'s WebGL2 context create buffers `STATIC_DRAW` where wgpu asks for `DYNAMIC_DRAW`.
+/// wgpu's GL backend creates every buffer `DYNAMIC_DRAW` (gfx-rs/wgpu#3371), and its mappable ones are
+/// emulated without a GL buffer on WebGL, so that is every buffer it creates. Chrome's ANGLE on Vulkan
+/// keeps dynamic buffers in host memory, which a discrete GPU reads over the bus on every draw: frames
+/// with buildings drew about 3-5x slower (`benchmarks/map-labels`, `--diagnose`). The hint only places
+/// the buffer; wgpu still writes it with `bufferSubData`, which works on any buffer.
+fn hint_static_buffers(canvas: &web_sys::HtmlCanvasElement) -> Result<StaticBufferHint, String> {
+    const DYNAMIC_DRAW: u32 = 0x88E8;
+    const STATIC_DRAW: u32 = 0x88E4;
+    let context = canvas
+        .get_context("webgl2")
+        .ok()
+        .flatten()
+        .ok_or("The map canvas has no WebGL2 context")?;
+    let name = JsValue::from_str("bufferData");
+    let buffer_data: js_sys::Function = js_sys::Reflect::get(&context, &name)
+        .ok()
+        .and_then(|value| value.dyn_into().ok())
+        .ok_or("The map canvas's WebGL2 context has no bufferData")?;
+    let buffer_data = buffer_data.bind0(&context);
+    let hint: StaticBufferHint = Closure::new(move |target: u32, data: JsValue, usage: u32| {
+        let usage = if usage == DYNAMIC_DRAW { STATIC_DRAW } else { usage };
+        buffer_data
+            .call3(&JsValue::UNDEFINED, &target.into(), &data, &usage.into())
+            .map(drop)
+    });
+    js_sys::Reflect::set(&context, &name, hint.as_ref())
+        .map_err(|_| "The map canvas's WebGL2 context refused the buffer hint".to_string())?;
+    Ok(hint)
 }
 
 /// A bitmap a decode worker sent. Every tile carries those of its labels, so one is always there.

@@ -13,6 +13,7 @@ gpu = [
   "dep:ab_glyph",
   "dep:bytemuck",
   "dep:geozero",
+  "dep:js-sys",
   "dep:libm",
   "dep:log",
   "dep:lyon",
@@ -21,6 +22,7 @@ gpu = [
   "dep:pollster",
   "dep:unicode-bidi",
   "dep:unicode-bidi-mirroring",
+  "dep:wasm-bindgen",
   "dep:web-sys",
   "dep:wgpu",
 ]
@@ -47,5 +49,7 @@ wgpu = { version = "30", optional = true }
 
 # The editor preview: WebGL2 in a canvas.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = { version = "0.3", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
 web-sys = { version = "0.3", features = ["HtmlCanvasElement"], optional = true }
 wgpu = { version = "30", features = ["webgl"], optional = true }
