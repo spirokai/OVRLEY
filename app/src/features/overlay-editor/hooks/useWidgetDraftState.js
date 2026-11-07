@@ -1,11 +1,12 @@
 /**
- * Shared inspector and group-drag patches, published once per animation frame.
- * WASM owns gesture geometry; drafts contain only canonical widget data and
- * global default updates.
+ * Shared inspector and global default patches, published once per animation frame.
+ * Canvas gestures publish separately: the WASM preview already presents them, so only
+ * the open inspector subscribes, and the editor and sidebars do not re-render per frame.
+ * Both channels contain only canonical widget data.
  */
 
-import { useState, useSyncExternalStore } from 'react'
-import { mergeWidgetData } from '@/lib/widget/widget-resolver'
+import { useMemo, useState, useSyncExternalStore } from 'react'
+import { applyWidgetPatch, mergeWidgetData } from '@/lib/widget/widget-resolver'
 
 function notify(state) {
   for (const listener of state.listeners) listener()
@@ -103,6 +104,25 @@ function getWidgetNodeRef(state, widgetId) {
   return state.nodeCallbacks.get(widgetId)
 }
 
+function setGesturePatches(state, patchesById) {
+  state.gesturePatches = patchesById
+  for (const listener of state.gestureListeners) listener()
+}
+
+function clearGesturePatches(state) {
+  if (Object.keys(state.gesturePatches).length === 0) return
+  setGesturePatches(state, {})
+}
+
+function getGesturePatch(state, widgetId) {
+  return state.gesturePatches[widgetId] ?? null
+}
+
+function subscribeGesture(state, listener) {
+  state.gestureListeners.add(listener)
+  return () => state.gestureListeners.delete(listener)
+}
+
 function getSnapshot(state) {
   return state.snapshot
 }
@@ -124,23 +144,29 @@ function createWidgetLiveEdits() {
     globalDefaults,
     frame: null,
     listeners: new Set(),
+    gesturePatches: {},
+    gestureListeners: new Set(),
     nodeCallbacks: new Map(),
     snapshot: { liveWidgetDrafts: {}, liveGlobalDefaults: globalDefaults, widgetNodes: {} },
   }
   return {
+    clearGesturePatches: clearGesturePatches.bind(null, state),
     clearGlobalDefaultDrafts: clearGlobalDefaultDrafts.bind(null, state),
     clearWidgetDraft: clearWidgetDraft.bind(null, state),
     clearWidgetDrafts: clearWidgetDrafts.bind(null, state),
+    getGesturePatch: getGesturePatch.bind(null, state),
     getGlobalDefaultDrafts: getGlobalDefaultDrafts.bind(null, state),
     getSnapshot: getSnapshot.bind(null, state),
     getWidgetDraft: getWidgetDraft.bind(null, state),
     getWidgetNode: getWidgetNode.bind(null, state),
     getWidgetNodeRef: getWidgetNodeRef.bind(null, state),
     resetWidgetDrafts: resetWidgetDrafts.bind(null, state),
+    setGesturePatches: setGesturePatches.bind(null, state),
     setLiveGlobalDefault: setLiveGlobalDefault.bind(null, state),
     setLiveWidgetDraft: setLiveWidgetDraft.bind(null, state),
     setLiveWidgetDrafts: setLiveWidgetDrafts.bind(null, state),
     subscribe: subscribe.bind(null, state),
+    subscribeGesture: subscribeGesture.bind(null, state),
   }
 }
 
@@ -154,4 +180,10 @@ export default function useWidgetDraftState() {
 export function useWidgetDraftView(controller) {
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot)
   return { ...controller, ...snapshot }
+}
+
+/** @param {object} controller Shared controller. @param {object} widget Config widget. @returns {object} The widget with its live canvas gesture applied. */
+export function useGestureWidget(controller, widget) {
+  const patch = useSyncExternalStore(controller.subscribeGesture, () => controller.getGesturePatch(widget.id))
+  return useMemo(() => (patch === null ? widget : applyWidgetPatch(widget, patch)), [patch, widget])
 }

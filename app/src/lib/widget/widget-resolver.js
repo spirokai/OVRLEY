@@ -78,10 +78,14 @@ export function buildDisplayModeUpdate(displayType, value) {
   return { ...requireDisplayMode(displayType, value).defaults }
 }
 
+/** @param {object} widget Config widget. @param {object} patch Data patch. @returns {object} Widget with the patch applied to its active data. */
+export function applyWidgetPatch(widget, patch) {
+  return { ...widget, data: resolveActiveWidgetData(mergeWidgetData(widget.data, patch)) }
+}
+
 function applyWidgetDraft(drafts, widget) {
   const draft = drafts[widget.id]
-  if (draft === undefined) return widget
-  return { ...widget, data: resolveActiveWidgetData(mergeWidgetData(widget.data, draft)) }
+  return draft === undefined ? widget : applyWidgetPatch(widget, draft)
 }
 
 /** @param {object[]} widgets Config widgets. @param {object} drafts Data patches keyed by ID. @returns {object[]} Widgets with live data applied. */

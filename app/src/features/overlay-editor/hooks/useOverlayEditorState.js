@@ -71,7 +71,7 @@ export default function useOverlayEditorState({
   const clipboardRef = useRef(null)
   const gridRef = useRef(null)
   const [sceneElement, setSceneElement] = useState(null)
-  const { liveGlobalDefaults, liveWidgetDrafts, widgetNodes, clearWidgetDrafts, resetWidgetDrafts, setLiveWidgetDraft, setLiveWidgetDrafts } =
+  const { liveGlobalDefaults, liveWidgetDrafts, widgetNodes, clearGesturePatches, resetWidgetDrafts, setGesturePatches, setLiveWidgetDraft } =
     useWidgetDraftView(widgetLiveEdits)
   // Global default slider drags preview through drafts and commit once on release.
   const globalDefaults = useMemo(() => ({ ...committedGlobalDefaults, ...liveGlobalDefaults }), [committedGlobalDefaults, liveGlobalDefaults])
@@ -97,7 +97,7 @@ export default function useOverlayEditorState({
 
   const state = {
     activity: parsedActivity,
-    clearWidgetDrafts,
+    clearGesturePatches,
     commitWidgetUpdate: commitUpdate,
     commitWidgetUpdates: commitUpdates,
     config,
@@ -107,8 +107,7 @@ export default function useOverlayEditorState({
     widgetMap,
     sceneElement,
     sceneSize,
-    setLiveWidgetDraft,
-    setLiveWidgetDrafts,
+    setGesturePatches,
     setSceneElement,
     widgetNodes,
     widgetRefCallbacks,
