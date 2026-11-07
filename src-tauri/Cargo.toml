@@ -60,6 +60,11 @@ objc2-app-kit = { version = "0.3", default-features = false, features = [
   "NSWindow",
 ] }
 
+# Full DWARF for opt-level-3 workspace crates is ~140 MB of every ~170 MB test
+# binary, and ovrley_core links ~60 of them. Line tables keep backtrace line numbers.
+[profile.dev]
+debug = "line-tables-only"
+
 # Per-pixel overlay conversion runs in ovrley_core; unoptimized it makes dev exports unusably slow.
 [profile.dev.package.ovrley_core]
 opt-level = 3

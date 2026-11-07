@@ -100,8 +100,11 @@ export function buildMapBindings() {
   const bindgenRoot = join(root, 'vendor', 'wasm-bindgen', wasmBindgenVersion)
   const bindgen = join(bindgenRoot, 'bin', `wasm-bindgen${process.platform === 'win32' ? '.exe' : ''}`)
   if (!existsSync(bindgen)) {
+    // Without CARGO_TARGET_DIR, `cargo install` builds in a temp dir it deletes afterwards;
+    // with it, the ~600 MB host build of the CLI stays in the map target dir.
+    const { CARGO_TARGET_DIR: _, ...installEnv } = process.env
     execFileSync('cargo', [`+${rustVersion}`, 'install', 'wasm-bindgen-cli', '--version', wasmBindgenVersion, '--locked', '--root', bindgenRoot], {
-      env,
+      env: installEnv,
       stdio: 'inherit',
     })
   }

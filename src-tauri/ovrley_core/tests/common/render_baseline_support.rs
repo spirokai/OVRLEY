@@ -649,7 +649,7 @@ fn compare_or_record_png(
     // ── Phase 3: compare mode — ensure baseline exists ──────────────
     if !baseline_path.is_file() {
         bail!(
-            "missing baseline for {case_label}: {}. Record baselines with `OVRLEY_RECORD_BASELINES=1 cargo test -p ovrley_core --test render_baseline_suite -- --nocapture`.",
+            "missing baseline for {case_label}: {}. Record baselines with `OVRLEY_RECORD_BASELINES=1 cargo test -p ovrley_core --test it render_baseline_suite:: -- --nocapture`.",
             baseline_path.display()
         );
     }
@@ -933,7 +933,7 @@ fn ensure_source_video_exists(path: &Path) -> Result<()> {
     }
 
     bail!(
-        "missing composite source fixture {}. Place `test-1080p.mp4` under `src-tauri/ovrley_core/tests/fixtures/video/` and rerun `cargo test -p ovrley_core --test render_baseline_suite -- --nocapture`.",
+        "missing composite source fixture {}. Place `test-1080p.mp4` under `src-tauri/ovrley_core/tests/fixtures/video/` and rerun `cargo test -p ovrley_core --test it render_baseline_suite:: -- --nocapture`.",
         path.display()
     );
 }
