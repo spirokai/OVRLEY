@@ -629,6 +629,7 @@
     "chaseCamera": "Sledovací kamera",
     "mapBuildings": "Budovy",
     "mapPaths": "Stezky",
+    "mapLabels": "Popisky",
     "mapWebgl2Unavailable": "WebGL2 není v tomto systému k dispozici, takže mapu nelze zobrazit v náhledu.",
     "mapWebgl2Software": "Nebyla nalezena žádná GPU. Mapa se vykresluje softwarově, takže náhled i export mohou být pomalé.",
     "mapStyle": "Styl mapy",

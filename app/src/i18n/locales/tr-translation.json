@@ -629,6 +629,7 @@
     "chaseCamera": "Takip kamerası",
     "mapBuildings": "Binalar",
     "mapPaths": "Patikalar",
+    "mapLabels": "Etiketler",
     "mapWebgl2Unavailable": "Bu sistemde WebGL2 kullanılamıyor, bu yüzden harita önizlenemez.",
     "mapWebgl2Software": "GPU bulunamadı. Harita yazılımla işlenir; önizleme ve dışa aktarma yavaş olabilir.",
     "mapStyle": "Harita stili",

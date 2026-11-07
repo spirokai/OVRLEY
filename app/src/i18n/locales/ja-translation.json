@@ -629,6 +629,7 @@
     "chaseCamera": "追尾カメラ",
     "mapBuildings": "建物",
     "mapPaths": "小道",
+    "mapLabels": "ラベル",
     "mapWebgl2Unavailable": "このシステムでは WebGL2 を利用できないため、マップをプレビューできません。",
     "mapWebgl2Software": "GPU が見つかりません。マップはソフトウェアで描画されるため、プレビューと書き出しが遅くなる場合があります。",
     "mapStyle": "地図スタイル",

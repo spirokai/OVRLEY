@@ -629,6 +629,7 @@
     "chaseCamera": "Câmera de perseguição",
     "mapBuildings": "Edifícios",
     "mapPaths": "Caminhos",
+    "mapLabels": "Rótulos",
     "mapWebgl2Unavailable": "O WebGL2 não está disponível neste sistema, então o mapa não pode ser visualizado.",
     "mapWebgl2Software": "Nenhuma GPU encontrada. O mapa é renderizado por software, então a prévia e a exportação podem ficar lentas.",
     "mapStyle": "Estilo do mapa",

@@ -629,6 +629,7 @@
     "chaseCamera": "Chase Camera",
     "mapBuildings": "Buildings",
     "mapPaths": "Paths",
+    "mapLabels": "Labels",
     "mapWebgl2Unavailable": "WebGL2 isn't available on this system, so the map can't be previewed.",
     "mapWebgl2Software": "No GPU found. The map draws in software, so its preview and export may be slow.",
     "mapStyle": "Map Style",
