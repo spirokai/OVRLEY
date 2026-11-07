@@ -50,7 +50,8 @@ modules:
       - install -Dm755 src-tauri/target/release/app /app/bin/OVRLEY
       - touch /app/bin/.ovrley-portable # in-app updates are not available in the sandbox
       - mkdir -p /app/lib/OVRLEY
-      - cp -r fonts templates /app/lib/OVRLEY/
+      - cp -r fonts templates assets/map-styles /app/lib/OVRLEY/
+      - ls /app/lib/OVRLEY/map-styles/*.json # the app refuses to start without its bundled map styles
       # Same FFmpeg build as the other Linux releases, fetched by pnpm install's postinstall
       - mkdir -p /app/lib/OVRLEY/vendor/ffmpeg && cp -r vendor/ffmpeg/bin /app/lib/OVRLEY/vendor/ffmpeg/
       - /app/lib/OVRLEY/vendor/ffmpeg/bin/ffmpeg -hide_banner -version
