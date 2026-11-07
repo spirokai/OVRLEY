@@ -484,13 +484,14 @@ fn run_case(
 
     // Export's preparation, single-threaded so it is comparable across cases: export spreads it over
     // every core. The second pass finds every glyph made, so the difference is rasterization.
-    let sizer = MapTileSizer::new(
-        spec.clone(),
+    let config = GpuMapConfig {
+        spec,
         viewport,
-        case.zoom,
-        &plan.style_buildings,
-        &source,
-    )?;
+        sample_count: MSAA_SAMPLES,
+        style_zoom: case.zoom,
+        buildings: plan.style_buildings.clone(),
+    };
+    let sizer = MapTileSizer::new(&config, &source)?;
     let measure = |tile: &TileId| sizer.measure(&tiles[tile]);
     let started = Instant::now();
     let measured: Vec<_> = case_tiles.iter().map(measure).collect::<Result<_, _>>()?;
@@ -512,17 +513,8 @@ fn run_case(
         .collect();
 
     let started = Instant::now();
-    let mut renderer = GpuMapRenderer::new(
-        GpuMapConfig {
-            spec,
-            viewport,
-            sample_count: MSAA_SAMPLES,
-            style_zoom: case.zoom,
-            pools: GpuPoolSizes::for_views(&sizes, &views),
-            buildings: plan.style_buildings.clone(),
-        },
-        &source,
-    )?;
+    let mut renderer =
+        GpuMapRenderer::new(config, GpuPoolSizes::for_views(&sizes, &views), &source)?;
     let renderer_new_ms = ms(started);
     *adapter = renderer.adapter_name().to_string();
     let started = Instant::now();

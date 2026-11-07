@@ -1,14 +1,21 @@
 //! Decodes one vector tile and tessellates every style layer it feeds, ported from maplibre-rs
-//! `vector/process_vector.rs` and `vector/tessellation.rs`.
+//! `vector/process_vector.rs` and `vector/tessellation.rs`, and lays out its labels.
+//!
+//! 3D buildings come from `fill-extrusion` layers. Nothing exists for them upstream, so they follow
+//! maplibre-rs's shape: tessellated once per tile on a worker, drawn per frame from bound slices.
+//! Geometry rules follow MapLibre's fill-extrusion bucket. Its lighting is anchored to the viewport,
+//! so it is evaluated per frame in `shaders/extrusion.vertex.wgsl` from the normal stored here.
 //!
 //! Tile data is external. A malformed feature is logged and skipped, and a layer that fails is
 //! dropped, so nothing here panics on it. geozero's reader indexes the geometry without bounds
 //! checks, so every feature is walked once here before geozero sees it.
 
-use super::extrusion::{tessellate_extrusions, ExtrusionVertex};
 use super::labels::{lay_out, GlyphLookup, LabelSymbol};
 use super::pipelines::{FillShaderFeatureMetadata, ShaderDash, ShaderLayerMetadata, ShaderVertex};
-use super::style::{evaluate_color, evaluate_number, passes_filter, ParsedStyle, VectorPaint};
+use super::style::{
+    evaluate_color, evaluate_number, passes_filter, ParsedStyle, VectorLayer, VectorPaint,
+};
+use bytemuck::{Pod, Zeroable};
 use geozero::mvt::{tile, Message, Tile};
 use geozero::{error::GeozeroError, GeomProcessor, GeozeroGeometry};
 use lyon::geom::point;
@@ -18,9 +25,12 @@ use lyon::tessellation::{
     BuffersBuilder, FillOptions, FillRule, FillTessellator, FillVertex, FillVertexConstructor,
     StrokeOptions, StrokeTessellator, StrokeVertex, StrokeVertexConstructor, VertexBuffers,
 };
-use maplibre_expr::{EvaluationContext, Feature, Value};
+use maplibre_expr::{EvaluationContext, Expr, Feature, Value};
 use std::collections::{BTreeMap, HashMap};
 
+/// Tile units along a tile's edge, whatever extent the tile was cut with: what every tile's
+/// geometry and labels are scaled to.
+pub(crate) const TILE_UNITS: f64 = 4096.0;
 /// Curve flattening tolerance, in tile units.
 pub(crate) const DEFAULT_TOLERANCE: f32 = 0.02;
 /// Lyon bevels a miter longer than twice this, in half line widths. MapLibre's default
@@ -35,6 +45,8 @@ const MAX_COORDINATE: i64 = 1 << 20;
 const COMMAND_MOVE_TO: u32 = 1;
 const COMMAND_LINE_TO: u32 = 2;
 const COMMAND_CLOSE_PATH: u32 = 7;
+/// The lower bound of MapLibre's wall gradient at its default light intensity of 0.5.
+const WALL_GRADIENT_FLOOR: f32 = 0.84;
 
 /// One tile's geometry, ready to upload.
 #[derive(Default)]
@@ -65,6 +77,16 @@ pub(crate) enum LayerKind {
     Extrusion,
 }
 
+/// `position` is in tile units on x and y, and metres above the ground on z. `normal` is the wall's
+/// unit normal on the ground plane, and zero on roofs. `gradient` darkens walls toward their base.
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub(crate) struct ExtrusionVertex {
+    pub(crate) position: [f32; 3],
+    pub(crate) normal: [f32; 2],
+    pub(crate) gradient: f32,
+}
+
 /// One feature of one source layer: its raw geometry and what expressions read of it.
 pub(crate) struct DecodedFeature<'a> {
     pub(crate) raw: &'a tile::Feature,
@@ -80,6 +102,54 @@ pub(crate) enum GeometryKind {
     Polygon,
 }
 
+/// The features of each source layer a style reads, decoded once however many layers read them, with
+/// the tile's extent.
+type SourceFeatures<'t> = HashMap<&'t str, (Vec<DecodedFeature<'t>>, f32)>;
+
+fn source_features<'t, 'c>(
+    decoded: &'c mut SourceFeatures<'t>,
+    tile: &'t Tile,
+    name: &str,
+) -> Option<&'c mut (Vec<DecodedFeature<'t>>, f32)> {
+    // A style layer whose source layer is absent from this tile simply draws nothing here.
+    let source = tile.layers.iter().find(|source| source.name == name)?;
+    Some(
+        decoded
+            .entry(source.name.as_str())
+            .or_insert_with(|| (decode_features(source), extent(source))),
+    )
+}
+
+/// How one ground layer tessellates and draws.
+struct GroundStyle<'a> {
+    kind: LayerKind,
+    color: &'a Expr,
+    opacity: Option<&'a Expr>,
+    /// A line layer's stroke. It outlines polygons, which a fill layer fills.
+    stroke: Option<StrokeOptions>,
+    /// Whether line features draw: in a line layer that isn't a fill's outline.
+    draws_lines: bool,
+    metadata: ShaderLayerMetadata,
+}
+
+fn layer_metadata(
+    layer: &VectorLayer,
+    [line_width, line_blur, line_gap_width]: [f32; 3],
+    translate: [f32; 2],
+    dash: ShaderDash,
+    narrows_with_distance: f32,
+) -> ShaderLayerMetadata {
+    ShaderLayerMetadata {
+        z_index: layer.index as f32,
+        line_width,
+        line_blur,
+        line_gap_width,
+        translate,
+        narrows_with_distance,
+        dash,
+    }
+}
+
 /// Decodes `bytes`, tessellates every layer of `style` and lays out its labels. Labels need `glyphs`,
 /// which a host without font files does not have: its tiles carry none.
 pub(crate) fn prepare_tile(
@@ -88,142 +158,79 @@ pub(crate) fn prepare_tile(
     glyphs: Option<&dyn GlyphLookup>,
 ) -> Result<PreparedTile, String> {
     let tile = Tile::decode(bytes).map_err(|error| format!("Tile does not decode: {error}"))?;
-    let mut features_by_source: HashMap<&str, (Vec<DecodedFeature<'_>>, f32)> = HashMap::new();
+    let mut decoded = SourceFeatures::new();
     let mut context = EvaluationContext::new().with_zoom(style.zoom);
-    let mut ground_tessellator = ZeroTessellator::default();
+    let mut ground = ZeroTessellator::default();
     let mut prepared = PreparedTile::default();
 
     for layer in &style.vector_layers {
-        // A style layer whose source layer is absent from this tile simply draws nothing here.
-        let Some(source) = tile
-            .layers
-            .iter()
-            .find(|source| source.name == layer.source_layer)
+        let Some((features, extent)) = source_features(&mut decoded, &tile, &layer.source_layer)
         else {
             continue;
         };
-        let (features, scale) = features_by_source
-            .entry(layer.source_layer.as_str())
-            .or_insert_with(|| (decode_features(source), 4096.0 / extent(source)));
-
-        let (line_width, line_blur, line_gap_width, translate, dash, narrows_with_distance) =
-            match layer.paint {
-                // A fill's outline is a hairline, which MapLibre keeps at one pixel everywhere.
-                VectorPaint::Line {
-                    width,
-                    blur,
-                    gap_width,
-                    translate,
-                    dash,
-                    polygons_only,
-                    ..
-                } => (
-                    width,
-                    blur,
-                    gap_width,
-                    translate,
-                    dash,
-                    if polygons_only { 0.0 } else { 1.0 },
+        let scale = TILE_UNITS as f32 / *extent;
+        let ground_style = match &layer.paint {
+            VectorPaint::Fill {
+                color,
+                opacity,
+                translate,
+                pattern,
+            } => GroundStyle {
+                kind: pattern.map_or(LayerKind::Fill, LayerKind::FillPattern),
+                color,
+                opacity: opacity.as_ref(),
+                stroke: None,
+                draws_lines: false,
+                metadata: layer_metadata(
+                    layer,
+                    [1.0, 0.0, 0.0],
+                    *translate,
+                    ShaderDash::default(),
+                    0.0,
                 ),
-                VectorPaint::Fill { translate, .. } => {
-                    (1.0, 0.0, 0.0, translate, ShaderDash::default(), 0.0)
+            },
+            VectorPaint::Line {
+                color,
+                opacity,
+                width,
+                blur,
+                gap_width,
+                translate,
+                polygons_only,
+                join,
+                dash,
+            } => {
+                // A line without width draws nothing, and lyon can't stroke it.
+                if *width == 0.0 {
+                    continue;
                 }
-                VectorPaint::Extrusion { .. } => {
-                    (1.0, 0.0, 0.0, [0.0, 0.0], ShaderDash::default(), 0.0)
-                }
-            };
-        let metadata = ShaderLayerMetadata {
-            z_index: layer.index as f32,
-            line_width,
-            line_blur,
-            line_gap_width,
-            translate,
-            narrows_with_distance,
-            dash,
-        };
-        match &layer.paint {
-            VectorPaint::Fill { color, opacity, .. } | VectorPaint::Line { color, opacity, .. } => {
-                let (kind, is_line_layer, draws_lines, stroke) = match layer.paint {
-                    VectorPaint::Line {
-                        width,
-                        gap_width,
-                        polygons_only,
-                        join,
-                        ..
-                    } => {
-                        // A line without width draws nothing, and lyon can't stroke it.
-                        if width == 0.0 {
-                            continue;
-                        }
-                        // Lyon decides joins against the width, so it strokes the line as wide as
-                        // it draws: a cased line's two strokes and the gap between them.
-                        let drawn_width = if gap_width > 0.0 {
-                            gap_width + 2.0 * width
-                        } else {
-                            width
-                        };
-                        let stroke_width = drawn_width * style.tile_units_per_pixel;
-                        (
-                            LayerKind::Line,
-                            true,
-                            !polygons_only,
-                            StrokeOptions::tolerance(arc_tolerance(drawn_width) * stroke_width)
-                                .with_line_width(stroke_width)
-                                .with_line_join(join)
-                                .with_miter_limit(MITER_LIMIT),
-                        )
-                    }
-                    VectorPaint::Fill { pattern, .. } => (
-                        pattern.map_or(LayerKind::Fill, LayerKind::FillPattern),
-                        false,
-                        false,
-                        StrokeOptions::default(),
-                    ),
-                    VectorPaint::Extrusion { .. } => {
-                        (LayerKind::Fill, false, false, StrokeOptions::default())
-                    }
+                // Lyon decides joins against the width, so it strokes the line as wide as it draws:
+                // a cased line's two strokes and the gap between them.
+                let drawn_width = if *gap_width > 0.0 {
+                    gap_width + 2.0 * width
+                } else {
+                    *width
                 };
-                ground_tessellator.begin_layer(is_line_layer, *scale, stroke);
-                let mut feature_metadata = Vec::new();
-                for_each_passing(
-                    features,
-                    layer.filter.as_ref(),
-                    &mut context,
-                    |feature, ctx| {
-                        let draws = match feature.kind {
-                            GeometryKind::Polygon => true,
-                            GeometryKind::Line => draws_lines,
-                            GeometryKind::Point => false,
-                        };
-                        if !draws {
-                            return;
-                        }
-                        let alpha = evaluate_number(opacity.as_ref(), ctx, 1.0);
-                        let Some(color) = evaluate_color(color, ctx, alpha) else {
-                            return;
-                        };
-                        match ground_tessellator.tessellate_feature(feature.raw) {
-                            Ok(vertices) => feature_metadata.extend(std::iter::repeat_n(
-                                FillShaderFeatureMetadata { color },
-                                vertices,
-                            )),
-                            Err(error) => {
-                                log::debug!("Skipping a feature of {}: {error}", layer.id);
-                            }
-                        }
-                    },
-                );
-                let buffer =
-                    std::mem::replace(&mut ground_tessellator.buffer, VertexBuffers::new());
-                if !buffer.indices.is_empty() {
-                    prepared.ground.push(PreparedLayer {
-                        index: layer.index,
-                        kind,
-                        vertices: buffer.vertices,
-                        indices: buffer.indices,
-                        feature_metadata,
-                        layer_metadata: metadata,
-                    });
+                let stroke_width = drawn_width * style.tile_units_per_pixel;
+                GroundStyle {
+                    kind: LayerKind::Line,
+                    color,
+                    opacity: opacity.as_ref(),
+                    stroke: Some(
+                        StrokeOptions::tolerance(arc_tolerance(drawn_width) * stroke_width)
+                            .with_line_width(stroke_width)
+                            .with_line_join(*join)
+                            .with_miter_limit(MITER_LIMIT),
+                    ),
+                    draws_lines: !polygons_only,
+                    // A fill's outline is a hairline, which MapLibre keeps at one pixel everywhere.
+                    metadata: layer_metadata(
+                        layer,
+                        [*width, *blur, *gap_width],
+                        *translate,
+                        *dash,
+                        if *polygons_only { 0.0 } else { 1.0 },
+                    ),
                 }
             }
             VectorPaint::Extrusion {
@@ -231,40 +238,47 @@ pub(crate) fn prepare_tile(
                 height,
                 base,
             } => {
-                if let Some(extrusion) = tessellate_extrusions(
+                let metadata = layer_metadata(
+                    layer,
+                    [1.0, 0.0, 0.0],
+                    [0.0, 0.0],
+                    ShaderDash::default(),
+                    0.0,
+                );
+                prepared.extrusions.extend(tessellate_extrusions(
                     features,
                     layer,
                     (color, height.as_ref(), base.as_ref()),
                     &mut context,
-                    *scale,
+                    scale,
                     metadata,
-                ) {
-                    prepared.extrusions.push(extrusion);
-                }
+                ));
+                continue;
             }
-        }
+        };
+        prepared.ground.extend(ground.tessellate_layer(
+            features,
+            layer,
+            &mut context,
+            scale,
+            &ground_style,
+        ));
     }
 
     if let Some(glyphs) = glyphs {
         for layer in &style.labels {
-            let Some(source) = tile
-                .layers
-                .iter()
-                .find(|source| source.name == layer.source_layer)
-            else {
-                continue;
-            };
-            let (features, scale) = features_by_source
-                .entry(layer.source_layer.as_str())
-                .or_insert_with(|| (decode_features(source), 4096.0 / extent(source)));
-            lay_out(
-                layer,
-                features,
-                (extent(source), *scale),
-                &mut context,
-                glyphs,
-                &mut prepared.labels,
-            )?;
+            if let Some((features, extent)) =
+                source_features(&mut decoded, &tile, &layer.source_layer)
+            {
+                lay_out(
+                    layer,
+                    features,
+                    *extent,
+                    &mut context,
+                    glyphs,
+                    &mut prepared.labels,
+                )?;
+            }
         }
     }
     Ok(prepared)
@@ -542,10 +556,54 @@ impl Default for ZeroTessellator {
 }
 
 impl ZeroTessellator {
-    fn begin_layer(&mut self, is_line_layer: bool, scale: f32, stroke_options: StrokeOptions) {
-        self.is_line_layer = is_line_layer;
+    /// The features of `layer` that `style` draws, each in its colour. `None` when none draws.
+    fn tessellate_layer(
+        &mut self,
+        features: &mut [DecodedFeature<'_>],
+        layer: &VectorLayer,
+        context: &mut EvaluationContext,
+        scale: f32,
+        style: &GroundStyle<'_>,
+    ) -> Option<PreparedLayer<ShaderVertex>> {
+        self.is_line_layer = style.stroke.is_some();
+        self.stroke_options = style.stroke.unwrap_or_default();
         self.scale = scale;
-        self.stroke_options = stroke_options;
+        let mut feature_metadata = Vec::new();
+        for_each_passing(
+            features,
+            layer.filter.as_ref(),
+            context,
+            |feature, context| {
+                let draws = match feature.kind {
+                    GeometryKind::Polygon => true,
+                    GeometryKind::Line => style.draws_lines,
+                    GeometryKind::Point => false,
+                };
+                if !draws {
+                    return;
+                }
+                let alpha = evaluate_number(style.opacity, context, 1.0);
+                let Some(color) = evaluate_color(style.color, context, alpha) else {
+                    return;
+                };
+                match self.tessellate_feature(feature.raw) {
+                    Ok(vertices) => feature_metadata.extend(std::iter::repeat_n(
+                        FillShaderFeatureMetadata { color },
+                        vertices,
+                    )),
+                    Err(error) => log::debug!("Skipping a feature of {}: {error}", layer.id),
+                }
+            },
+        );
+        let buffer = std::mem::replace(&mut self.buffer, VertexBuffers::new());
+        (!buffer.indices.is_empty()).then_some(PreparedLayer {
+            index: layer.index,
+            kind: style.kind,
+            vertices: buffer.vertices,
+            indices: buffer.indices,
+            feature_metadata,
+            layer_metadata: style.metadata,
+        })
     }
 
     /// Appends one feature, returning how many vertices it added. On failure nothing is kept.
@@ -654,4 +712,228 @@ impl GeomProcessor for ZeroTessellator {
             self.tessellate_fill()
         }
     }
+}
+
+struct RoofVertex {
+    height: f32,
+}
+
+impl FillVertexConstructor<ExtrusionVertex> for RoofVertex {
+    fn new_vertex(&mut self, vertex: FillVertex) -> ExtrusionVertex {
+        let [x, y] = vertex.position().to_array();
+        ExtrusionVertex {
+            position: [x, y, self.height],
+            normal: [0.0, 0.0],
+            gradient: 1.0,
+        }
+    }
+}
+
+/// Tessellates every polygon of an extrusion layer into roofs and walls.
+fn tessellate_extrusions(
+    features: &mut [DecodedFeature<'_>],
+    layer: &VectorLayer,
+    (color, height, base): (&Expr, Option<&Expr>, Option<&Expr>),
+    context: &mut EvaluationContext,
+    scale: f32,
+    layer_metadata: ShaderLayerMetadata,
+) -> Option<PreparedLayer<ExtrusionVertex>> {
+    let mut builder = ExtrusionBuilder::new(scale);
+    for_each_passing(features, layer.filter.as_ref(), context, |feature, ctx| {
+        if feature.kind != GeometryKind::Polygon {
+            return;
+        }
+        let Some(color) = evaluate_color(color, ctx, 1.0) else {
+            return;
+        };
+        builder.begin_feature(
+            color,
+            evaluate_number(height, ctx, 0.0) as f32,
+            evaluate_number(base, ctx, 0.0) as f32,
+        );
+        if let Err(error) = feature.raw.process_geom(&mut builder) {
+            log::debug!("Skipping a building of {}: {error}", layer.id);
+            builder.abandon_feature();
+        }
+    });
+    (!builder.buffer.indices.is_empty()).then_some(PreparedLayer {
+        index: layer.index,
+        kind: LayerKind::Extrusion,
+        vertices: builder.buffer.vertices,
+        indices: builder.buffer.indices,
+        feature_metadata: builder.colors,
+        layer_metadata,
+    })
+}
+
+struct ExtrusionBuilder {
+    scale: f32,
+    fill: FillTessellator,
+    buffer: VertexBuffers<ExtrusionVertex, u32>,
+    colors: Vec<FillShaderFeatureMetadata>,
+    /// Rings of the polygon being read, closed by a repeated first point.
+    rings: Vec<Vec<[f32; 2]>>,
+    color: [f32; 4],
+    height: f32,
+    base: f32,
+    feature_start: (usize, usize),
+}
+
+impl ExtrusionBuilder {
+    fn new(scale: f32) -> Self {
+        Self {
+            scale,
+            fill: FillTessellator::new(),
+            buffer: VertexBuffers::new(),
+            colors: Vec::new(),
+            rings: Vec::new(),
+            color: [0.0; 4],
+            height: 0.0,
+            base: 0.0,
+            feature_start: (0, 0),
+        }
+    }
+
+    fn begin_feature(&mut self, color: [f32; 4], height: f32, base: f32) {
+        self.color = color;
+        self.height = height;
+        self.base = base;
+        self.feature_start = (self.buffer.vertices.len(), self.buffer.indices.len());
+        self.rings.clear();
+    }
+
+    fn abandon_feature(&mut self) {
+        self.buffer.vertices.truncate(self.feature_start.0);
+        self.buffer.indices.truncate(self.feature_start.1);
+        self.colors.truncate(self.feature_start.0);
+        self.rings.clear();
+    }
+
+    /// The roof by fill tessellation with holes, and one quad per ring edge.
+    fn finish_polygon(&mut self) -> Result<(), GeozeroError> {
+        let mut path = Path::builder();
+        for ring in &self.rings {
+            let Some((first, rest)) = ring.split_first() else {
+                continue;
+            };
+            path.begin(point(first[0], first[1]));
+            for position in rest {
+                path.line_to(point(position[0], position[1]));
+            }
+            path.end(true);
+        }
+        self.fill
+            .tessellate_path(
+                &path.build(),
+                &FillOptions::tolerance(DEFAULT_TOLERANCE).with_fill_rule(FillRule::NonZero),
+                &mut BuffersBuilder::new(
+                    &mut self.buffer,
+                    RoofVertex {
+                        height: self.height,
+                    },
+                ),
+            )
+            .map_err(|error| GeozeroError::Geometry(format!("{error:?}")))?;
+        self.colors.resize(
+            self.buffer.vertices.len(),
+            FillShaderFeatureMetadata { color: self.color },
+        );
+
+        for ring_index in 0..self.rings.len() {
+            if is_entirely_outside(&self.rings[ring_index]) {
+                continue;
+            }
+            for edge in 1..self.rings[ring_index].len() {
+                let (a, b) = (
+                    self.rings[ring_index][edge],
+                    self.rings[ring_index][edge - 1],
+                );
+                if !is_boundary_edge(a, b) {
+                    self.push_wall(a, b);
+                }
+            }
+        }
+        self.rings.clear();
+        Ok(())
+    }
+
+    fn push_wall(&mut self, a: [f32; 2], b: [f32; 2]) {
+        let first = self.buffer.vertices.len() as u32;
+        let normal = wall_normal(a, b);
+        let [bottom, top] = wall_gradient(self.height, self.base);
+        for ([x, y], z, gradient) in [
+            (a, self.base, bottom),
+            (a, self.height, top),
+            (b, self.base, bottom),
+            (b, self.height, top),
+        ] {
+            self.buffer.vertices.push(ExtrusionVertex {
+                position: [x, y, z],
+                normal,
+                gradient,
+            });
+            self.colors
+                .push(FillShaderFeatureMetadata { color: self.color });
+        }
+        self.buffer.indices.extend_from_slice(&[
+            first,
+            first + 2,
+            first + 1,
+            first + 1,
+            first + 2,
+            first + 3,
+        ]);
+    }
+}
+
+impl GeomProcessor for ExtrusionBuilder {
+    fn xy(&mut self, x: f64, y: f64, _idx: usize) -> Result<(), GeozeroError> {
+        if let Some(ring) = self.rings.last_mut() {
+            ring.push([x as f32 * self.scale, y as f32 * self.scale]);
+        }
+        Ok(())
+    }
+
+    fn linestring_begin(
+        &mut self,
+        _tagged: bool,
+        size: usize,
+        _idx: usize,
+    ) -> Result<(), GeozeroError> {
+        self.rings.push(Vec::with_capacity(size + 1));
+        Ok(())
+    }
+
+    fn polygon_end(&mut self, _tagged: bool, _idx: usize) -> Result<(), GeozeroError> {
+        self.finish_polygon()
+    }
+}
+
+/// Edges along the tile's clip boundary are not real walls, or tile seams would grow them.
+fn is_boundary_edge(a: [f32; 2], b: [f32; 2]) -> bool {
+    let (low, high) = (0.0, TILE_UNITS as f32);
+    (a[0] == b[0] && (a[0] < low || a[0] > high)) || (a[1] == b[1] && (a[1] < low || a[1] > high))
+}
+
+fn is_entirely_outside(ring: &[[f32; 2]]) -> bool {
+    let (low, high) = (0.0, TILE_UNITS as f32);
+    ring.iter().all(|point| point[0] < low)
+        || ring.iter().all(|point| point[0] > high)
+        || ring.iter().all(|point| point[1] < low)
+        || ring.iter().all(|point| point[1] > high)
+}
+
+fn wall_normal(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
+    let (dx, dy) = (a[0] - b[0], a[1] - b[1]);
+    let length = dx.hypot(dy).max(f32::MIN_POSITIVE);
+    [-dy / length, dx / length]
+}
+
+/// MapLibre's vertical gradient on a wall, at its bottom and top.
+fn wall_gradient(height: f32, base: f32) -> [f32; 2] {
+    let scale = (height.max(0.0) / 150.0).sqrt();
+    [
+        (base * scale).clamp(WALL_GRADIENT_FLOOR, 1.0),
+        ((1.0 + base) * scale).clamp(WALL_GRADIENT_FLOOR, 1.0),
+    ]
 }

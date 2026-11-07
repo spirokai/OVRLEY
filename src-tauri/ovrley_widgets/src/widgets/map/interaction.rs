@@ -4,8 +4,8 @@
 //!
 //! The view mode's drag and wheel pan and zoom the map inside a fixed frame.
 use super::{
-    camera::fixed_route_span,
     config::MapConfig,
+    content::fixed_route_span,
     validation::{
         validate_map_widget, MapCameraMode, MapShape, FIXED_PAN_RANGE, FIXED_ZOOM_RANGE,
         FOLLOW_ZOOM_RANGE,

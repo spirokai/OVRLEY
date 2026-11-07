@@ -14,7 +14,7 @@ use unicode_bidi::{bidi_class, BidiClass, BidiInfo};
 use unicode_bidi_mirroring::get_mirrored;
 
 /// One em, in the glyph units shaping works in. Glyph bitmaps are made at this size.
-pub const ONE_EM: f64 = 24.0;
+pub(crate) const ONE_EM: f64 = 24.0;
 /// Pixels of distance field around a glyph's outline, at 1x.
 pub(super) const BUFFER: usize = 3;
 /// A glyph's origin sits 17 units above the line, and the glyph metrics' `top` is relative to it.
@@ -65,7 +65,7 @@ impl Face {
 
 /// One face of a font chain.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ChainLink {
+pub(crate) struct ChainLink {
     pub face: Face,
     /// The face is a Regular standing in for a Bold: the renderer lowers the SDF threshold for it.
     pub bold: bool,
@@ -94,7 +94,7 @@ const ITALIC_CHAIN: &[ChainLink] = &[
 
 /// The faces a style's `text-font` name draws with, in order. A character resolves to the first that
 /// has it. `None` for a name this renderer has no fonts for.
-pub fn font_chain(font: &str) -> Option<&'static [ChainLink]> {
+pub(crate) fn font_chain(font: &str) -> Option<&'static [ChainLink]> {
     match font {
         "Noto Sans Regular" => Some(REGULAR_CHAIN),
         "Noto Sans Bold" => Some(BOLD_CHAIN),
@@ -107,7 +107,7 @@ pub fn font_chain(font: &str) -> Option<&'static [ChainLink]> {
 ///
 /// `top` and `left` place the bitmap against the origin [`shape`] gives each positioned glyph.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct GlyphMetrics {
+pub(crate) struct GlyphMetrics {
     pub width: f32,
     pub height: f32,
     pub left: f32,
@@ -126,14 +126,14 @@ pub struct GlyphBitmap {
 
 /// What shaping needs to know about a character: where it is drawn from, and how big it is.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct FontGlyph {
+pub(crate) struct FontGlyph {
     pub face: Face,
     pub bold: bool,
     pub metrics: GlyphMetrics,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TextAnchor {
+pub(crate) enum TextAnchor {
     Center,
     Left,
     Right,
@@ -146,7 +146,7 @@ pub enum TextAnchor {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TextJustify {
+pub(crate) enum TextJustify {
     /// Follows the anchor: a left anchor justifies left, a right anchor right, the rest centre.
     Auto,
     Left,
@@ -156,7 +156,7 @@ pub enum TextJustify {
 
 /// A label's layout properties, already evaluated at the style zoom. Lengths are in ems.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ShapeStyle {
+pub(crate) struct ShapeStyle {
     /// `text-max-width`. `None` never breaks for width, as for a line label; only a `\n` does.
     pub max_width: Option<f64>,
     pub line_height: f64,
@@ -169,7 +169,7 @@ pub struct ShapeStyle {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PositionedGlyph {
+pub(crate) struct PositionedGlyph {
     pub character: char,
     pub face: Face,
     pub bold: bool,
@@ -182,7 +182,7 @@ pub struct PositionedGlyph {
 /// A laid-out label: glyph positions and the text block's bounds, in glyph units from the anchor.
 /// The bounds include the `text-offset`; the glyph positions do not (the quads add it).
 #[derive(Clone, Debug, PartialEq)]
-pub struct Shaping {
+pub(crate) struct Shaping {
     pub lines: Vec<Vec<PositionedGlyph>>,
     pub top: f64,
     pub bottom: f64,
@@ -191,7 +191,7 @@ pub struct Shaping {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ShapeError {
+pub(crate) enum ShapeError {
     /// No face in the label's chain has this character. The label is dropped whole.
     MissingGlyph(char),
     /// The text draws nothing.
@@ -240,7 +240,7 @@ impl Glyphs<'_> {
 ///
 /// `glyph` returns what draws a character, or `None` when no face in the label's font chain has it.
 /// Such a character makes the whole label [`ShapeError::MissingGlyph`].
-pub fn shape(
+pub(crate) fn shape(
     text: &str,
     style: &ShapeStyle,
     glyph: &dyn Fn(char) -> Option<FontGlyph>,

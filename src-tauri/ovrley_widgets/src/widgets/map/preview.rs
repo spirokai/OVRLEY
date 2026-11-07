@@ -1,11 +1,13 @@
 //! A map handle retains the track and the last frame across config edits. Every edit draws at its own
 //! size and camera straight away, so a resize shows more or less of the map and never stretches it.
+//!
+//! Export's frames reach the widget through a [`MapFrameProvider`] its host implements:
+//! `ovrley_widgets` compiles to WASM and never depends on the renderer. The editor preview has none:
+//! its map is a canvas under the widget, not an image inside it (see [`PreviewMap::set_layer_ready`]).
 use super::{
-    arrow::MarkerPose,
     config::MapConfig,
     content::{ContentKey, MapContent},
-    frame_provider::{MapFrame, MapFramePixels, MapFrameProvider, MapFrameRequest},
-    layout::{MapLayout, ScreenRoute},
+    layout::{MapLayout, MarkerPose, ScreenRoute},
     validation::{validate_map_widget, ValidatedMapWidget},
 };
 use crate::{
@@ -25,11 +27,91 @@ use crate::{
     },
 };
 use ovrley_map::{
-    MapCamera, MapLabelDraw, MapRouteDraw, MapRouteLine, MapStyleCatalog, MapStyleInfo,
+    frame_tiles, MapCamera, MapLabelDraw, MapRouteDraw, MapRouteLine, MapStyleCatalog,
+    MapStyleInfo, MapStyleSpec, MapViewport, TileId,
 };
 use serde_json::json;
-use skia_safe::{Canvas, Rect, Surface};
+use skia_safe::{images, AlphaType, Canvas, ColorType, Data, Image, ImageInfo, Rect, Surface};
 use std::sync::{mpsc::Receiver, Arc};
+
+/// Everything a frame's pixels depend on.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MapFrameRequest {
+    pub spec: MapStyleSpec,
+    pub camera: MapCamera,
+    pub viewport: MapViewport,
+    /// What the renderer draws under the buildings. None for a top-down camera: its widget strokes the
+    /// route over the frame, so the request, and the frame, stay the same all activity long.
+    pub route: Option<MapRouteDraw>,
+    /// How the renderer places and fades labels: None when the map shows none. A top-down camera sends
+    /// one placement, so its request stays the same all activity long.
+    pub labels: Option<MapLabelDraw>,
+    /// The renderer crops the frame to this, in output pixels. A circle's is half its width.
+    pub corner_radius_px: f32,
+}
+
+impl MapFrameRequest {
+    /// The tiles a renderer must hold to draw this frame: those its camera sees, and with labels those
+    /// each placement camera sees, since a label is placed from the tiles around its own camera.
+    pub fn tiles(&self) -> Vec<TileId> {
+        frame_tiles(&self.camera, self.labels.as_ref(), self.viewport).tiles
+    }
+}
+
+/// A finished frame: its premultiplied RGBA pixels, and an image reading them without a copy.
+///
+/// Performance: do not go back to `Data::new_copy` or a new buffer per frame. Without them, the map
+/// thread went from about 6.5 to 4.5 ms per frame on the 4K benchmark.
+#[derive(Clone)]
+pub struct MapFramePixels {
+    /// Declared first, so it drops before the pixels it reads.
+    image: Image,
+    pixels: Arc<Vec<u8>>,
+}
+
+impl MapFramePixels {
+    pub fn new(width: u32, height: u32, pixels: Vec<u8>) -> WidgetResult<Self> {
+        let info = ImageInfo::new(
+            (width as i32, height as i32),
+            ColorType::RGBA8888,
+            AlphaType::Premul,
+            None,
+        );
+        let pixels = Arc::new(pixels);
+        // SAFETY: the bytes are never written while shared, and every clone of this frame holds them
+        // for as long as its image. `image()` lends the image out only to draw it.
+        let data = unsafe { Data::new_bytes(&pixels) };
+        let image = images::raster_from_data(&info, data, width as usize * 4)
+            .ok_or_else(|| WidgetError::Render("unable to wrap map frame pixels".into()))?;
+        Ok(Self { image, pixels })
+    }
+
+    pub fn image(&self) -> &Image {
+        &self.image
+    }
+
+    /// The buffer back for another frame, unless a clone is still reading it. Keeping a clone across
+    /// frames still works, but silently allocates a new buffer every frame.
+    pub fn into_pixels(self) -> Option<Vec<u8>> {
+        let Self { image, pixels } = self;
+        drop(image);
+        Arc::into_inner(pixels)
+    }
+}
+
+/// A frame being drawn elsewhere: the finished frame, or why it failed, arrives here.
+pub type MapFrameReply = Receiver<Result<MapFramePixels, String>>;
+
+pub trait MapFrameProvider: Send + Sync {
+    /// Starts the frame without waiting for it, drawing into `spare` when given one. Never blocks on
+    /// the network. Fails only when the renderer has failed.
+    /// Performance: must return before the frame is drawn, or export workers wait on the map again.
+    fn frame(
+        &self,
+        request: &MapFrameRequest,
+        spare: Option<Vec<u8>>,
+    ) -> WidgetResult<MapFrameReply>;
+}
 
 /// What is behind the marker and attribution.
 enum MapBacking {
@@ -71,7 +153,8 @@ pub struct PreviewMap {
     window: Option<RouteWindow>,
     preview_duration: f64,
     raster_scale: PreviewRasterScale,
-    frames: Arc<dyn MapFrameProvider>,
+    /// Export's frames. The editor preview has none: its map is the host's canvas.
+    frames: Option<Arc<dyn MapFrameProvider>>,
     layout: MapLayout,
     content: Option<MapContent>,
     /// The inputs of `content`.
@@ -79,7 +162,7 @@ pub struct PreviewMap {
     /// The last frame by request, so an unchanged request asks the provider once.
     last_frame: Option<(MapFrameRequest, MapFramePixels)>,
     /// The frame the provider is drawing.
-    drawing: Option<(MapFrameRequest, Receiver<Result<MapFramePixels, String>>)>,
+    drawing: Option<(MapFrameRequest, MapFrameReply)>,
     /// The top-down route's stroke under this layout, kept while the map's line stays the same.
     /// [`Self::frame_request`] brings it up to date, so it is current for any frame with a request.
     screen_route: Option<ScreenRoute>,
@@ -102,10 +185,10 @@ pub struct PreviewMap {
 }
 
 impl PreviewMap {
+    /// The editor preview's map, which the host's map canvas draws.
     pub fn new(
         widget: MapConfig,
         scene: ScenePresentationConfig,
-        frames: Arc<dyn MapFrameProvider>,
         styles: Option<&MapStyleCatalog>,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
@@ -116,7 +199,7 @@ impl PreviewMap {
             config,
             validate_scene_presentation(scene)?,
             &host,
-            frames,
+            None,
             None,
             fonts,
         )
@@ -133,7 +216,15 @@ impl PreviewMap {
         content: MapContent,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
-        Self::with_content(style, config, scene, host, frames, Some(content), fonts)
+        Self::with_content(
+            style,
+            config,
+            scene,
+            host,
+            Some(frames),
+            Some(content),
+            fonts,
+        )
     }
 
     fn with_content(
@@ -141,7 +232,7 @@ impl PreviewMap {
         config: ValidatedMapWidget,
         scene: ValidatedScenePresentation,
         host: &WidgetHost,
-        frames: Arc<dyn MapFrameProvider>,
+        frames: Option<Arc<dyn MapFrameProvider>>,
         content: Option<MapContent>,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
@@ -371,8 +462,11 @@ impl PreviewMap {
         })
     }
 
-    /// Asks for a frame neither held nor being drawn, handing it the last frame's buffer.
+    /// Asks the provider for a frame neither held nor being drawn, handing it the last frame's buffer.
     fn start_request(&mut self, request: &MapFrameRequest) -> WidgetResult<()> {
+        let Some(frames) = &self.frames else {
+            return Ok(());
+        };
         let held = |frame: Option<&MapFrameRequest>| frame == Some(request);
         if held(self.last_frame.as_ref().map(|(frame, _)| frame))
             || held(self.drawing.as_ref().map(|(frame, _)| frame))
@@ -384,10 +478,7 @@ impl PreviewMap {
             .last_frame
             .take()
             .and_then(|(_, frame)| frame.into_pixels());
-        self.drawing = match self.frames.frame(request, spare)? {
-            MapFrame::Drawing(answer) => Some((request.clone(), answer)),
-            MapFrame::Pending => None,
-        };
+        self.drawing = Some((request.clone(), frames.frame(request, spare)?));
         Ok(())
     }
 

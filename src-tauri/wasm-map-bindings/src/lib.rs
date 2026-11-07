@@ -1,8 +1,6 @@
 //! External boundary between `ovrley_map::gpu` and the page. `MapLayer` owns one canvas's renderer on
 //! the UI thread, and `TileDecoder` turns tile bytes into geometry in a worker.
-use ovrley_map::gpu::{
-    GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileDecoder, DEFAULT_POOL_ENTRIES,
-};
+use ovrley_map::gpu::{GpuMapConfig, GpuMapRenderer, MapTileDecoder};
 use ovrley_map::{
     MapCamera, MapLabelDraw, MapLayers, MapRouteDraw, MapRouteLine, MapRoutePoint, MapRouteStyle,
     MapStyleBuildings, MapStyleId, MapStyleSpec, MapViewport, TileId, LABEL_PLACEMENTS,
@@ -55,7 +53,6 @@ fn parse_config(json: &str) -> Result<GpuMapConfig, String> {
         viewport: MapViewport::new(config.width, config.height, config.pixel_ratio)?,
         sample_count: config.msaa_samples,
         style_zoom: config.zoom,
-        pools: GpuPoolSizes::uniform(DEFAULT_POOL_ENTRIES),
         buildings: config.style_buildings,
     })
 }
@@ -81,14 +78,15 @@ fn parse_labels(values: &[f64]) -> Result<Option<MapLabelDraw>, String> {
             values.len()
         ));
     }
-    let mut cameras = Vec::with_capacity(LABEL_PLACEMENTS);
-    for camera in values[..LABEL_VALUES - 1].chunks_exact(CAMERA_VALUES) {
-        cameras.push(parse_camera(camera)?);
-    }
+    let (cameras, blend) = values.split_at(LABEL_VALUES - 1);
+    let cameras = cameras
+        .chunks_exact(CAMERA_VALUES)
+        .map(parse_camera)
+        .collect::<Result<Vec<_>, _>>()?;
     let cameras: [MapCamera; LABEL_PLACEMENTS] = cameras
         .try_into()
-        .map_err(|_| "A map label draw has the wrong number of cameras".to_string())?;
-    MapLabelDraw::new(cameras, values[LABEL_VALUES - 1] as f32).map(Some)
+        .expect("LABEL_VALUES holds LABEL_PLACEMENTS cameras");
+    MapLabelDraw::new(cameras, blend[0] as f32).map(Some)
 }
 
 #[wasm_bindgen]
@@ -190,28 +188,18 @@ impl MapLayer {
             .route
             .clone()
             .ok_or_else(|| js_error("A map layer drew before its route".to_string()))?;
-        if route_style.len() != ROUTE_STYLE_VALUES {
+        let &[c0, c1, c2, c3, r0, r1, r2, r3, width_px] = route_style else {
             return Err(js_error(format!(
                 "A map route style has {ROUTE_STYLE_VALUES} values, got {}",
                 route_style.len()
             )));
-        }
+        };
         let route = MapRouteDraw {
             line,
             style: MapRouteStyle {
-                completed_color: [
-                    route_style[0],
-                    route_style[1],
-                    route_style[2],
-                    route_style[3],
-                ],
-                remaining_color: [
-                    route_style[4],
-                    route_style[5],
-                    route_style[6],
-                    route_style[7],
-                ],
-                width_px: route_style[8],
+                completed_color: [c0, c1, c2, c3],
+                remaining_color: [r0, r1, r2, r3],
+                width_px,
             },
             travelled_metres,
         };

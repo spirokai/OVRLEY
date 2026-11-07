@@ -2,12 +2,13 @@
 //! `render/view_state.rs`. It matches how maplibre-gl-js builds its perspective.
 //!
 //! This is the one owner of the view matrix: the GPU renderer draws roads with it and the widget
-//! projects the route with it, so the two cannot disagree.
+//! projects the route with it, so the two cannot disagree. Tile identities and view regions are
+//! ported from maplibre-rs `coords.rs`.
 
 use crate::mercator::lon_lat_to_world;
-use crate::view_region::{TileId, ViewRegion};
 use crate::{MAX_TILE_ZOOM, TILE_SIZE};
 use cgmath::{frustum, Deg, InnerSpace, Matrix4, Rad, SquareMatrix, Vector3, Vector4};
+use std::collections::HashSet;
 use std::f64::consts::PI;
 
 /// The widest vertical field of view, 50 degrees, wider than MapLibre's 37. For one map scale a wider
@@ -26,6 +27,8 @@ pub const LIGHT_XY: (f64, f64) = (0.2875, -0.498);
 
 /// The most tiles one view draws. A view that reaches this may be missing some.
 pub const MAX_VIEW_TILES: usize = 512;
+/// Tiles stop at this level upstream. Deeper views draw these tiles scaled.
+const MAX_DATA_LEVEL: u8 = 14;
 
 #[rustfmt::skip]
 const OPENGL_TO_WGPU_MATRIX: Matrix4<f64> = Matrix4::new(
@@ -330,12 +333,8 @@ impl ViewState {
         (self.height / 2.0) / self.y_tan
     }
 
-    const fn y_tan(&self) -> f64 {
-        self.y_tan
-    }
-
     fn x_tan(&self) -> f64 {
-        self.y_tan() * self.width / self.height
+        self.y_tan * self.width / self.height
     }
 
     fn rotation(&self) -> Matrix4<f64> {
@@ -350,7 +349,7 @@ impl ViewState {
 
     /// Top padding widens the frustum upward, so the top rays reach further than the bottom ones.
     fn furthest_distance(&self, camera_height: f64) -> f64 {
-        let (x, y) = (self.x_tan(), self.y_tan());
+        let (x, y) = (self.x_tan(), self.y_tan);
         let (top, bottom) = (
             y * (1.0 + self.top_padding_ratio),
             y * (self.top_padding_ratio - 1.0),
@@ -374,7 +373,7 @@ impl ViewState {
         // Add a bit extra to avoid precision problems at exactly `furthest_distance`.
         let far_z = self.furthest_distance(camera_to_center_distance) * 1.01;
         let near_z = self.height / 50.0;
-        let (xmax, ymax) = (near_z * self.x_tan(), near_z * self.y_tan());
+        let (xmax, ymax) = (near_z * self.x_tan(), near_z * self.y_tan);
         // Upstream shifts this frustum the other way, which moves the centre up. FLIP_Y runs after
         // the frustum, so MapLibre's padding needs the opposite sign here.
         let offset = self.top_padding_ratio;
@@ -426,43 +425,27 @@ impl ViewState {
             .then_some(corners)
     }
 
-    /// The frustum's footprint on the ground as `(min, max)`, in world pixels. `None` when the
-    /// ground is not in view.
-    fn ground_footprint(&self) -> Option<((f64, f64), (f64, f64))> {
-        let corners = self.ground_corners()?;
-        Some(corners.iter().fold(
-            ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN)),
-            |(min, max), corner| {
-                (
-                    (min.0.min(corner.0), min.1.min(corner.1)),
-                    (max.0.max(corner.0), max.1.max(corner.1)),
-                )
-            },
-        ))
-    }
-
     /// The frustum's footprint on the ground as `(min, max)`, in Mercator world coordinates.
     pub fn ground_bounds(&self) -> Option<((f64, f64), (f64, f64))> {
-        let (min, max) = self.ground_footprint()?;
         let size = self.world_size();
-        Some(((min.0 / size, min.1 / size), (max.0 / size, max.1 / size)))
+        Some(corner_bounds(
+            &self.ground_corners()?.map(|(x, y)| (x / size, y / size)),
+        ))
     }
 
     /// The tiles at `level` under the frustum's footprint on the ground. `None` when the ground
     /// is not in view.
     pub fn create_view_region(&self, level: u8) -> Option<ViewRegion> {
-        let (min, max) = self.ground_footprint()?;
         let tile_scale = 2_f64.powi(i32::from(level)) / self.world_size();
-        let to_tile = |value: f64| (value * tile_scale) as i32;
         let footprint = self
             .ground_corners()?
-            .map(|corner| (corner.0 * tile_scale, corner.1 * tile_scale));
-        Some(ViewRegion::new(
-            TileId::new(level, to_tile(min.0), to_tile(min.1)),
-            TileId::new(level, to_tile(max.0), to_tile(max.1)),
+            .map(|(x, y)| (x * tile_scale, y * tile_scale));
+        let (min, max) = corner_bounds(&footprint);
+        Some(ViewRegion {
+            min_tile: TileId::new(level, min.0 as i32, min.1 as i32),
+            max_tile: TileId::new(level, max.0 as i32, max.1 as i32),
             footprint,
-            MAX_VIEW_TILES,
-        ))
+        })
     }
 
     /// The world coordinates under a window position, on the `z = 0` plane.
@@ -486,6 +469,140 @@ impl ViewState {
     }
 }
 
+/// The bounding box of a footprint's corners as `(min, max)`.
+fn corner_bounds(corners: &[(f64, f64); 4]) -> ((f64, f64), (f64, f64)) {
+    corners.iter().fold(
+        ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN)),
+        |(min, max), corner| {
+            (
+                (min.0.min(corner.0), min.1.min(corner.1)),
+                (max.0.max(corner.0), max.1.max(corner.1)),
+            )
+        },
+    )
+}
+
 fn world_size(zoom: f64, pixel_ratio: f64) -> f64 {
     f64::from(TILE_SIZE) * 2_f64.powf(zoom) * pixel_ratio
+}
+
+/// A position in the tile pyramid.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TileId {
+    pub z: u8,
+    pub x: i32,
+    pub y: i32,
+}
+
+impl TileId {
+    pub const fn new(z: u8, x: i32, y: i32) -> Self {
+        Self { z, x, y }
+    }
+
+    /// Whether this tile exists on the grid.
+    pub const fn is_on_grid(self) -> bool {
+        let bounds = 1_i32 << self.z;
+        self.x >= 0 && self.y >= 0 && self.x < bounds && self.y < bounds
+    }
+
+    pub fn parent(self) -> Option<Self> {
+        (self.z > 0).then(|| Self::new(self.z - 1, self.x >> 1, self.y >> 1))
+    }
+}
+
+/// The tile level drawn at a view zoom, capped so deeper views overzoom.
+pub fn data_level(zoom: f64) -> u8 {
+    (zoom.floor() as u8).min(MAX_DATA_LEVEL)
+}
+
+/// The on-grid tiles a camera sees on a viewport.
+pub fn view_tiles(camera: &MapCamera, viewport: MapViewport) -> Vec<TileId> {
+    let view = ViewState::new(camera, viewport);
+    view.create_view_region(data_level(view.zoom()))
+        .map(|region| region.iter().collect())
+        .unwrap_or_default()
+}
+
+/// The tiles a frame needs, and how many its busiest camera sees.
+pub struct FrameTiles {
+    /// The most tiles any one camera of the frame sees.
+    pub busiest: usize,
+    /// The tiles of the frame's camera and of each of its label placements' cameras, each once, in the
+    /// order they are first seen. A label is placed from the tiles around its own camera.
+    pub tiles: Vec<TileId>,
+}
+
+/// The tiles a renderer must hold to draw a frame at `camera` with `labels`. Each distinct camera is
+/// walked once.
+pub fn frame_tiles(
+    camera: &MapCamera,
+    labels: Option<&MapLabelDraw>,
+    viewport: MapViewport,
+) -> FrameTiles {
+    let mut cameras = vec![*camera];
+    if let Some(labels) = labels {
+        for placement in labels.cameras() {
+            if !cameras.contains(&placement) {
+                cameras.push(placement);
+            }
+        }
+    }
+    let mut seen = HashSet::new();
+    let mut frame = FrameTiles {
+        busiest: 0,
+        tiles: Vec::new(),
+    };
+    for camera in &cameras {
+        let seen_by_camera = view_tiles(camera, viewport);
+        frame.busiest = frame.busiest.max(seen_by_camera.len());
+        for tile in seen_by_camera {
+            if seen.insert(tile) {
+                frame.tiles.push(tile);
+            }
+        }
+    }
+    frame
+}
+
+/// A bounding box of tiles at one level, cut to the frustum's footprint.
+pub struct ViewRegion {
+    min_tile: TileId,
+    max_tile: TileId,
+    /// The footprint's corners in order, in tile units at this level. A pitched, rotated view's
+    /// footprint fills well under half of its bounding box.
+    footprint: [(f64, f64); 4],
+}
+
+impl ViewRegion {
+    pub fn iter(&self) -> impl Iterator<Item = TileId> + '_ {
+        let z = self.min_tile.z;
+        (self.min_tile.x..=self.max_tile.x)
+            .flat_map(move |x| {
+                (self.min_tile.y..=self.max_tile.y).map(move |y| TileId::new(z, x, y))
+            })
+            .filter(|tile| tile.is_on_grid())
+            .filter(|tile| footprint_touches(&self.footprint, *tile))
+            .take(MAX_VIEW_TILES)
+    }
+}
+
+/// Whether a tile's square meets the footprint. The bounding box already covers the square's own
+/// axes, so only the footprint's edges can separate the two.
+fn footprint_touches(footprint: &[(f64, f64); 4], tile: TileId) -> bool {
+    let (left, top) = (f64::from(tile.x), f64::from(tile.y));
+    let corners = [
+        (left, top),
+        (left + 1.0, top),
+        (left + 1.0, top + 1.0),
+        (left, top + 1.0),
+    ];
+    let edges = [0, 1, 2, 3].map(|index| (footprint[index], footprint[(index + 1) % 4]));
+    // Twice the signed area: its sign says which side of each edge is inside.
+    let winding: f64 = edges.iter().map(|(a, b)| a.0 * b.1 - b.0 * a.1).sum();
+    edges.iter().all(|(a, b)| {
+        corners.iter().any(|corner| {
+            let side = (b.0 - a.0) * (corner.1 - a.1) - (b.1 - a.1) * (corner.0 - a.0);
+            side * winding >= 0.0
+        })
+    })
 }

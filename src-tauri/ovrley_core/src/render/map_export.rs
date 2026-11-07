@@ -27,7 +27,7 @@ use ovrley_widgets::{
     preview_widget::ValidatedWidget,
     widgets::map::{
         content::{ActivityMap, MapContent},
-        frame_provider::{MapFrame, MapFramePixels, MapFrameProvider, MapFrameRequest},
+        preview::{MapFramePixels, MapFrameProvider, MapFrameReply, MapFrameRequest},
         validation::ValidatedMapWidget,
     },
 };
@@ -74,18 +74,14 @@ pub fn download_preview_tiles(
     cancelled: &AtomicBool,
     progress: &(dyn Fn(usize, usize) + Sync),
 ) -> CoreResult<()> {
-    let mut tiles = BTreeSet::new();
+    let mut views = Vec::new();
     for widget in widgets {
         if let MapContent::Activity(map) = MapContent::for_host(widget, scene, host, Some(activity))? {
             let seconds: Vec<f64> = map.activity_seconds().collect();
-            tiles.extend(
-                walk_views(&map, &seconds, cancelled)?
-                    .into_iter()
-                    .flatten(),
-            );
+            views.extend(walk_views(&map, &seconds, cancelled)?);
         }
     }
-    let tiles: Vec<TileId> = tiles.into_iter().collect();
+    let tiles = distinct_tiles(&views);
     let total = tiles.len();
     progress(0, total);
     for_each_parallel(
@@ -96,6 +92,17 @@ pub fn download_preview_tiles(
         |tile| fetch_tile(source, *tile).map(drop),
     )?;
     Ok(())
+}
+
+/// Every tile of `views`, once each, in order.
+fn distinct_tiles<'a>(views: impl IntoIterator<Item = &'a Vec<TileId>>) -> Vec<TileId> {
+    views
+        .into_iter()
+        .flatten()
+        .copied()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
 /// One entry per config map. `widgets` holds the senders, so it drops first and ends the thread.
@@ -146,39 +153,26 @@ impl ExportMaps {
                 })
                 .collect::<CoreResult<Vec<_>>>()
         })?;
-        // Without GPS, or with no frame inside the activity, nothing needs a tile or a GPU.
-        if views.iter().all(Vec::is_empty) {
-            return Ok(Self {
-                widgets: contents
-                    .into_iter()
-                    .zip(styles)
-                    .map(|(content, style)| ExportMap {
-                        content,
-                        style,
-                        frames: Arc::new(NoMapFrames),
-                    })
-                    .collect(),
-                _thread: None,
-            });
-        }
-        let data = profiler.measure("prepare.maps.fetch", || {
-            JobMapData::fetch(&*source.data, &styles, &views, job.controller)
-        })?;
-        let (mut renderers, mut slots) = (Vec::new(), Vec::with_capacity(views.len()));
-        for (((widget, style), content), views) in
-            config.maps.iter().zip(&styles).zip(&contents).zip(&views)
-        {
-            slots.push(match content {
-                MapContent::Activity(map) if !views.is_empty() => {
+        // Without GPS, or with no frame inside the activity, a map needs no tile or GPU.
+        let mut slots = vec![None; views.len()];
+        let mut thread = None;
+        if views.iter().any(|views| !views.is_empty()) {
+            let data = profiler.measure("prepare.maps.fetch", || {
+                JobMapData::fetch(&*source.data, &styles, &views, job.controller)
+            })?;
+            let mut renderers = Vec::new();
+            for (index, ((widget, content), views)) in
+                config.maps.iter().zip(&contents).zip(&views).enumerate()
+            {
+                if let (MapContent::Activity(map), false) = (content, views.is_empty()) {
                     renderers.push(profiler.measure("prepare.maps.renderer", || {
-                        ExportRenderer::new(widget, style, map, views, &data, job.controller)
+                        ExportRenderer::new(widget, &styles[index], map, views, &data, job.controller)
                     })?);
-                    Some(renderers.len() - 1)
+                    slots[index] = Some(renderers.len() - 1);
                 }
-                _ => None,
-            });
+            }
+            thread = Some(MapFrameThread::start(renderers, data)?);
         }
-        let (sender, thread) = MapFrameThread::start(renderers, data)?;
         Ok(Self {
             widgets: contents
                 .into_iter()
@@ -187,16 +181,16 @@ impl ExportMaps {
                 .map(|((content, style), slot)| ExportMap {
                     content,
                     style,
-                    frames: match slot {
-                        Some(renderer) => Arc::new(ExportMapFrames {
+                    frames: match (slot, &thread) {
+                        (Some(renderer), Some((sender, _))) => Arc::new(ExportMapFrames {
                             renderer,
                             sender: sender.clone(),
                         }),
-                        None => Arc::new(NoMapFrames),
+                        _ => Arc::new(NoMapFrames),
                     },
                 })
                 .collect(),
-            _thread: Some(thread),
+            _thread: thread.map(|(_, thread)| thread),
         })
     }
 
@@ -219,7 +213,7 @@ impl ExportMaps {
 struct NoMapFrames;
 
 impl MapFrameProvider for NoMapFrames {
-    fn frame(&self, _request: &MapFrameRequest, _spare: Option<Vec<u8>>) -> WidgetResult<MapFrame> {
+    fn frame(&self, _request: &MapFrameRequest, _spare: Option<Vec<u8>>) -> WidgetResult<MapFrameReply> {
         Err(WidgetError::Render(
             "A map asked for a frame that its export did not prepare".into(),
         ))
@@ -330,14 +324,7 @@ impl JobMapData {
                 entry.insert(style);
             }
         }
-        let tiles: Vec<TileId> = views
-            .iter()
-            .flatten()
-            .flatten()
-            .copied()
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect();
+        let tiles = distinct_tiles(views.iter().flatten());
         let total = tiles.len();
         let fetched = for_each_parallel(
             &tiles,
@@ -415,22 +402,15 @@ impl ExportRenderer {
         data: &JobMapData,
         controller: &RenderController,
     ) -> CoreResult<Self> {
-        let spec = widget.spec(style);
-        let sizer = MapTileSizer::new(
-            spec.clone(),
-            map.viewport(),
-            map.zoom(),
-            &style.buildings,
-            data,
-        )
-        .map_err(CoreError::Render)?;
-        let tiles: Vec<TileId> = views
-            .iter()
-            .flatten()
-            .copied()
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect();
+        let config = GpuMapConfig {
+            spec: widget.spec(style),
+            viewport: map.viewport(),
+            sample_count: widget.msaa_samples,
+            style_zoom: map.zoom(),
+            buildings: style.buildings.clone(),
+        };
+        let sizer = MapTileSizer::new(&config, data).map_err(CoreError::Render)?;
+        let tiles = distinct_tiles(views);
         let threads = thread::available_parallelism().map_or(1, NonZeroUsize::get);
         let measured: Vec<(TileId, MeasuredTile)> =
             for_each_parallel(&tiles, threads, &controller.cancel_flag(), |_| {}, |tile| {
@@ -455,18 +435,7 @@ impl ExportRenderer {
             .map(|(tile, measured)| (tile, measured.pools))
             .collect();
         let pools = GpuPoolSizes::for_views(&sizes, views);
-        let mut renderer = GpuMapRenderer::new(
-            GpuMapConfig {
-                spec,
-                viewport: map.viewport(),
-                sample_count: widget.msaa_samples,
-                style_zoom: map.zoom(),
-                pools,
-                buildings: style.buildings.clone(),
-            },
-            data,
-        )
-        .map_err(CoreError::Render)?;
+        let mut renderer = GpuMapRenderer::new(config, pools, data).map_err(CoreError::Render)?;
         renderer
             .preload_glyphs(&glyphs, data)
             .map_err(CoreError::Render)?;
@@ -532,7 +501,7 @@ struct ExportMapFrames {
 }
 
 impl MapFrameProvider for ExportMapFrames {
-    fn frame(&self, request: &MapFrameRequest, spare: Option<Vec<u8>>) -> WidgetResult<MapFrame> {
+    fn frame(&self, request: &MapFrameRequest, spare: Option<Vec<u8>>) -> WidgetResult<MapFrameReply> {
         let (reply, answer) = mpsc::channel();
         self.sender
             .send(FrameJob {
@@ -542,7 +511,7 @@ impl MapFrameProvider for ExportMapFrames {
                 reply,
             })
             .map_err(|_| WidgetError::Render("The map frame thread has stopped".into()))?;
-        Ok(MapFrame::Drawing(answer))
+        Ok(answer)
     }
 }
 

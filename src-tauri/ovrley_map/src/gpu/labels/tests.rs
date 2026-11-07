@@ -2,17 +2,16 @@
 
 use super::layout::SymbolKind;
 use super::placement::{label_sources, place, LabelSource, LabelView, PlacedSymbol};
-use super::text::{Face, FontGlyph, GlyphBitmap, GlyphMetrics};
-use super::transfer::{decode_labels, encode_labels, TileLabels};
+use super::text::{Face, FontGlyph, GlyphMetrics};
 use super::{GlyphLookup, GlyphService, LabelSymbol};
-use crate::gpu::transfer::Reader;
 use crate::gpu::style::{parse_style, ParsedStyle};
 use crate::gpu::tile::prepare_tile;
+use crate::gpu::web::{decoded, MapTileDecoder, SentGlyphs};
 use crate::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes};
 use crate::mercator::world_to_lon_lat;
 use crate::{
     frame_tiles, view_tiles, MapCamera, MapDataSource, MapLabelDraw, MapLayers, MapStyleBuildings,
-    MapStyleId, MapStyleSpec, MapViewport, TileId, ViewState, LABEL_PLACEMENTS,
+    MapStyleId, MapStyleSpec, MapViewport, TileId, LABEL_PLACEMENTS,
 };
 use geozero::mvt::{tile, Message, Tile};
 use serde_json::{json, Value as Json};
@@ -200,7 +199,7 @@ fn camera_over(tile: TileId) -> MapCamera {
 fn placement_keeps_the_first_of_two_overlapping_labels_and_culls_what_is_far_off_screen() {
     let tile = TileId::new(14, 8000, 5000);
     let viewport = MapViewport::new(200, 120, 1.0).unwrap();
-    let view = LabelView::new(&ViewState::new(&camera_over(tile), viewport), 200, 120);
+    let view = LabelView::new(&camera_over(tile), viewport);
     // 2048 is the tile's centre: where the camera looks.
     let bytes = place_tile(&[
         (2048, 2048, "Centre"),
@@ -251,7 +250,7 @@ fn placement_keeps_the_first_of_two_overlapping_labels_and_culls_what_is_far_off
 fn a_name_follows_its_line_and_stays_upright() {
     let tile = TileId::new(14, 8000, 5000);
     let viewport = MapViewport::new(200, 120, 1.0).unwrap();
-    let view = LabelView::new(&ViewState::new(&camera_over(tile), viewport), 200, 120);
+    let view = LabelView::new(&camera_over(tile), viewport);
     let layout = json!({ "symbol-placement": "line", "text-keep-upright": true });
     // 24 px text on 8 tile units a pixel: "East" is 48 px, 384 units.
     let placed = |lines: &[(&[(i32, i32)], &str)]| {
@@ -309,38 +308,42 @@ fn render(labels: bool) -> (Vec<u8>, usize) {
     )
 }
 
-/// A renderer over a source that serves one tile for every address, on a 240 by 120 viewport.
+/// What a renderer over the test style draws: on a 240 by 120 viewport, with labels or without.
+fn config(labels: bool) -> GpuMapConfig {
+    GpuMapConfig {
+        spec: MapStyleSpec {
+            style: MapStyleId::new("test").unwrap(),
+            layers: MapLayers {
+                buildings: false,
+                labels,
+                paths: true,
+            },
+        },
+        viewport: MapViewport::new(240, 120, 1.0).unwrap(),
+        sample_count: 1,
+        style_zoom: ZOOM,
+        buildings: MapStyleBuildings::None,
+    }
+}
+
+fn fonts() -> GlyphService {
+    GlyphService::open(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts/map")).unwrap()
+}
+
+/// A renderer over a source that serves one tile for every address.
 fn renderer_over(
     style: Vec<u8>,
     tile_bytes: Vec<u8>,
     labels: bool,
 ) -> (GpuMapRenderer, TestSource, MapViewport) {
-    let fonts = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts/map");
     let source = TestSource {
         style,
         tile: tile_bytes,
-        glyphs: Arc::new(GlyphService::open(&fonts).unwrap()),
+        glyphs: Arc::new(fonts()),
     };
-    let viewport = MapViewport::new(240, 120, 1.0).unwrap();
-    let renderer = GpuMapRenderer::new(
-        GpuMapConfig {
-            spec: MapStyleSpec {
-                style: MapStyleId::new("test").unwrap(),
-                layers: MapLayers {
-                    buildings: false,
-                    labels,
-                    paths: true,
-                },
-            },
-            viewport,
-            sample_count: 1,
-            style_zoom: ZOOM,
-            pools: GpuPoolSizes::uniform(1000),
-            buildings: MapStyleBuildings::None,
-        },
-        &source,
-    )
-    .unwrap();
+    let config = config(labels);
+    let viewport = config.viewport;
+    let renderer = GpuMapRenderer::new(config, GpuPoolSizes::uniform(1000), &source).unwrap();
     (renderer, source, viewport)
 }
 
@@ -446,11 +449,7 @@ fn pitched_over(tile: TileId, pitch_deg: f64) -> MapCamera {
 fn placement_leaves_out_labels_behind_the_camera_and_past_the_haze() {
     let tile = TileId::new(14, 8000, 5000);
     let viewport = MapViewport::new(300, 300, 1.0).unwrap();
-    let view = LabelView::new(
-        &ViewState::new(&pitched_over(tile, 60.0), viewport),
-        300,
-        300,
-    );
+    let view = LabelView::new(&pitched_over(tile, 60.0), viewport);
     let (style, symbols) = laid_out(
         &style_for("place", json!({ "text-allow-overlap": true })),
         &place_tile(&[(2048, 2048, "Praha")]),
@@ -542,37 +541,26 @@ fn parsed(style: &[u8]) -> ParsedStyle {
     laid_out(style, &place_tile(&[])).0
 }
 
-/// What a preview decode worker sends for a tile: its labels, laid out with a glyph service over the font
-/// files' bytes, with their bitmaps.
-fn sent_by_a_worker(worker: &GlyphService, tile: &[u8], style: &ParsedStyle) -> TileLabels {
-    let symbols = prepare_tile(tile, style, Some(worker)).unwrap().labels;
-    let mut bytes = Vec::new();
-    encode_labels(
-        &symbols,
-        &|face, character| worker.bitmap(face, character),
-        &mut bytes,
-    )
-    .unwrap();
-    let mut reader = Reader(&bytes);
-    let labels = decode_labels(&mut reader).unwrap();
-    reader.finish().unwrap();
-    labels
-}
-
-/// A glyph service over the bundled font files' bytes, as a preview decode worker builds it.
-fn worker_glyphs(opened: &GlyphService) -> GlyphService {
+/// What a preview decode worker sends for a tile, read as the UI thread reads it: the tile laid out
+/// with a glyph service over the font files' bytes, and the bitmap of every glyph its labels draw.
+fn sent_by_a_worker(
+    opened: &GlyphService,
+    style: &[u8],
+    tile: &[u8],
+) -> (crate::gpu::tile::PreparedTile, SentGlyphs) {
     let files = Face::ALL
         .iter()
         .map(|face| opened.font_file(face.file_name()).unwrap().to_vec())
         .collect();
-    GlyphService::from_files(files).unwrap()
+    decoded(
+        &MapTileDecoder::new(&config(true), style, files).unwrap(),
+        tile,
+    )
 }
 
 #[test]
 fn labels_a_decode_worker_sends_are_those_laid_out_beside_the_font_files() {
-    let fonts = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts/map");
-    let service = GlyphService::open(&fonts).unwrap();
-    let worker = worker_glyphs(&service);
+    let service = fonts();
     let names = place_tile(&[
         (1000, 1000, "Praha"),
         (2000, 1000, "תל)"),
@@ -593,15 +581,16 @@ fn labels_a_decode_worker_sends_are_those_laid_out_beside_the_font_files() {
         ),
     ];
     for (style_bytes, tile) in cases {
-        let style = parsed(&style_bytes);
-        let sent = sent_by_a_worker(&worker, &tile, &style);
-        let beside_fonts = prepare_tile(&tile, &style, Some(&service)).unwrap().labels;
+        let (sent, glyphs) = sent_by_a_worker(&service, &style_bytes, &tile);
+        let beside_fonts = prepare_tile(&tile, &parsed(&style_bytes), Some(&service))
+            .unwrap()
+            .labels;
         assert!(!beside_fonts.is_empty());
-        assert!(sent.symbols == beside_fonts);
+        assert!(sent.labels == beside_fonts);
 
         // Every glyph the labels draw comes with the bitmap export makes for it, once.
-        let bitmaps: HashMap<_, _> = sent.glyphs.iter().cloned().collect();
-        assert_eq!(bitmaps.len(), sent.glyphs.len());
+        let bitmaps: HashMap<_, _> = glyphs.iter().cloned().collect();
+        assert_eq!(bitmaps.len(), glyphs.len());
         for quad in beside_fonts.iter().flat_map(|symbol| &symbol.quads) {
             let made = service
                 .bitmap(quad.glyph.face, quad.glyph.character)
@@ -617,7 +606,7 @@ fn a_parent_tile_leaves_out_its_anchors_inside_children_whose_labels_are_in() {
     let northwest_child = TileId::new(14, 8000, 5000);
     let viewport = MapViewport::new(200, 120, 1.0).unwrap();
     let camera = camera_over(parent);
-    let view = LabelView::new(&ViewState::new(&camera, viewport), 200, 120);
+    let view = LabelView::new(&camera, viewport);
     let layout = style_for("place", json!({ "text-allow-overlap": true }));
     // Both of the parent's names are within 40 px of the centre, in its northwest and southeast
     // quarters. The child holds the northwest one again, at the same place.
@@ -652,19 +641,23 @@ fn a_frame_draws_glyphs_a_worker_sent_as_it_draws_those_export_loaded() {
     let tile_bytes = place_tile(&[(2048, 2048, "Praha")]);
     let (loaded, _) = render_tile(style.clone(), tile_bytes.clone(), true);
 
-    // The preview inserts what a worker sent, and fills the atlas from the bitmaps that came with it.
+    // The preview uploads what a worker sent, and fills the atlas from the bitmaps that came with it.
     let (mut renderer, source, _) = renderer_over(style.clone(), tile_bytes.clone(), true);
     let tile = TileId::new(14, 8000, 5000);
-    let sent = sent_by_a_worker(&worker_glyphs(&source.glyphs), &tile_bytes, &parsed(&style));
-    let bitmaps: HashMap<_, _> = sent
-        .glyphs
+    let (prepared, glyphs) = sent_by_a_worker(&source.glyphs, &style, &tile_bytes);
+    let bitmaps: HashMap<_, _> = glyphs
         .into_iter()
         .map(|(id, bitmap)| (id, Arc::new(bitmap)))
         .collect();
-    let lookup = |id| -> Result<Arc<GlyphBitmap>, String> { Ok(Arc::clone(&bitmaps[&id])) };
-    let labels = renderer.labels.as_mut().unwrap();
-    labels.insert_tile(tile, sent.symbols);
-    labels.fill_atlas(&renderer.queue, &lookup, &[tile]).unwrap();
+    renderer.upload_tile_layers(tile, prepared).unwrap();
+    renderer
+        .labels
+        .as_mut()
+        .unwrap()
+        .fill_atlas(&renderer.queue, &renderer.loaded, &[tile], &|id| {
+            Ok(Arc::clone(&bitmaps[&id]))
+        })
+        .unwrap();
     let camera = camera_over(tile);
     let still = MapLabelDraw::new([camera; LABEL_PLACEMENTS], 1.0).unwrap();
     let mut sent_frame = Vec::new();

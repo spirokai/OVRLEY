@@ -4,8 +4,7 @@ use ovrley_core::fonts::NativeFonts;
 use ovrley_widgets::model::scene::{validate_scene_presentation, ScenePresentationConfig};
 use ovrley_widgets::render::preview::PreviewRasterScale;
 use ovrley_widgets::widgets::map::{
-    config::MapConfig, frame_provider::MapFramePixels, layout::MapLayout,
-    validation::validate_map_widget,
+    config::MapConfig, layout::MapLayout, preview::MapFramePixels, validation::validate_map_widget,
 };
 use ovrley_map::{MapStyleBuildings, MapStyleId, MapStyleInfo};
 use serde_json::json;

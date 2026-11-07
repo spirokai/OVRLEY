@@ -8,8 +8,10 @@ use crate::widgets::{
     gauges::{metric::GaugeFrameState, validation::ValidatedGauge},
     lap_timer::format::LapTimerContent,
     map::{
-        config::MapConfig, content::MapContent, frame_provider::MapFrameProvider,
-        preview::PreviewMap, validation::ValidatedMapWidget,
+        config::MapConfig,
+        content::MapContent,
+        preview::{MapFrameProvider, PreviewMap},
+        validation::ValidatedMapWidget,
     },
     raster::validation::RasterGeometry,
     route::validation::ValidatedRoutePlot,
@@ -314,7 +316,6 @@ impl PreviewWidget {
         request: WidgetRequest,
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
-        map_frames: Arc<dyn MapFrameProvider>,
         map_styles: Option<&MapStyleCatalog>,
     ) -> WidgetResult<Self> {
         match request {
@@ -331,7 +332,7 @@ impl PreviewWidget {
                 Ok(Self::Route(PreviewRoute::new(widget, scene)?))
             }
             WidgetRequest::Map { widget, scene, .. } => Ok(Self::Map(PreviewMap::new(
-                widget, scene, map_frames, map_styles, fonts,
+                widget, scene, map_styles, fonts,
             )?)),
             WidgetRequest::Raster { widget, scene, .. } => {
                 Ok(Self::Raster(PreviewRaster::new(widget, scene, images)?))

@@ -5,12 +5,10 @@ use crate::{
     preview_instance::PreviewInstance,
     preview_widget::{PreviewWidget, ResizeRequest, ResizeUpdate, WidgetRequest},
     render::text::FontResolver,
-    widgets::map::frame_provider::PreviewMapFrames,
 };
 use ovrley_map::MapStyleCatalog;
 use skia_safe::{FontMgr, Typeface};
 use std::collections::BTreeMap;
-use std::sync::Arc;
 
 #[derive(Default)]
 pub struct PreviewFonts {
@@ -72,8 +70,6 @@ impl FontResolver for PreviewFonts {
 pub struct PreviewSession {
     pub fonts: PreviewFonts,
     pub images: crate::widgets::raster::preview::PreviewImages,
-    /// Maps are a canvas under the widget, so no frame ever arrives through this.
-    pub map_frames: Arc<PreviewMapFrames>,
     /// The installed map styles, once the host has set them. No map is created before.
     pub map_styles: Option<MapStyleCatalog>,
     activity: Option<ActivitySampler>,
@@ -439,7 +435,8 @@ impl PreviewSession {
     /// The shell's installed map styles, as JSON. Maps created after this resolve against them.
     pub fn replace_map_styles(&mut self, bytes: &[u8]) -> WidgetResult<()> {
         self.map_styles = Some(
-            serde_json::from_slice(bytes).map_err(|error| WidgetError::Config(error.to_string()))?,
+            serde_json::from_slice(bytes)
+                .map_err(|error| WidgetError::Config(error.to_string()))?,
         );
         Ok(())
     }
@@ -510,13 +507,8 @@ impl PreviewSession {
         Ok(())
     }
     pub fn create_widget(&mut self, request: WidgetRequest) -> WidgetResult<u32> {
-        let widget = PreviewInstance::new(
-            request,
-            &self.fonts,
-            &self.images,
-            self.map_frames.clone(),
-            self.map_styles.as_ref(),
-        )?;
+        let widget =
+            PreviewInstance::new(request, &self.fonts, &self.images, self.map_styles.as_ref())?;
         self.next_id = self
             .next_id
             .checked_add(1)
@@ -528,13 +520,7 @@ impl PreviewSession {
         self.widgets
             .get_mut(&id)
             .ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?
-            .update(
-                request,
-                &self.fonts,
-                &self.images,
-                self.map_frames.clone(),
-                self.map_styles.as_ref(),
-            )
+            .update(request, &self.fonts, &self.images, self.map_styles.as_ref())
     }
     pub fn render(&mut self, second: f64) -> WidgetResult<()> {
         if !second.is_finite() {

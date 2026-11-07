@@ -6,12 +6,12 @@
 //! map thread a little out of order, so a frame names the cameras of several placements before its own,
 //! and the renderer links up with whichever of them it still holds.
 
-use super::layer::{Alignment, LabelLayer};
-use super::layout::{LabelSymbol, LineSymbol, SymbolKind, TILE_UNITS};
-use super::line::{pose_at, Pose};
+use super::layout::{pose_at, LabelSymbol, LineSymbol, Pose, SymbolKind};
 use super::text::ONE_EM;
+use crate::gpu::style::{Alignment, LabelLayer};
+use crate::gpu::tile::TILE_UNITS;
 use crate::gpu::FOG_FULL;
-use crate::{ClipPoint, GroundProjection, MapCamera, TileId, ViewState};
+use crate::{ClipPoint, GroundProjection, MapCamera, MapViewport, TileId, ViewState};
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -47,12 +47,13 @@ pub(crate) struct GroundLabel {
 }
 
 impl LabelView {
-    pub(crate) fn new(view: &ViewState, width_px: u32, height_px: u32) -> Self {
+    pub(crate) fn new(camera: &MapCamera, viewport: MapViewport) -> Self {
+        let view = ViewState::new(camera, viewport);
         Self {
             projection: view.ground_projection(),
             centre_w: view.centre_clip_w(),
-            width: f64::from(width_px),
-            height: f64::from(height_px),
+            width: f64::from(viewport.width_px()),
+            height: f64::from(viewport.height_px()),
         }
     }
 
