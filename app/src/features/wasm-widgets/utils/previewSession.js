@@ -133,7 +133,7 @@ export function createPreviewSession(module, onError) {
     getSnapshot: () => snapshot,
     getGeometry: (id) => widgets.get(id).geometry,
     resize(request, id) {
-      const input = ['course', 'elevation', 'diving_profile'].includes(request.type) ? { ...request, handle: widgets.get(id).handle } : request
+      const input = ['course', 'elevation', 'diving_profile', 'map'].includes(request.type) ? { ...request, handle: widgets.get(id).handle } : request
       upload(encoder.encode(JSON.stringify(input)), (ptr, len) => check(module._ovrley_preview_resize(handle, ptr, len)))
       return JSON.parse(read(module._ovrley_preview_resize_ptr(handle), module._ovrley_preview_resize_len(handle)))
     },

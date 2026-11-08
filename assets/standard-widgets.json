@@ -541,7 +541,7 @@
         "orientation": "rider_up",
         "pitch": 50,
         "follow_zoom": 16,
-        "fixed_zoom": 0,
+        "fixed_zoom": 14,
         "fixed_pan_x": 0,
         "fixed_pan_y": 0,
         "msaa_samples": 4,

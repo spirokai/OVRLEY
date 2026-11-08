@@ -23,7 +23,7 @@ pub struct MapConfig {
     pub pitch: f32,
     /// The chase camera's zoom level.
     pub follow_zoom: f32,
-    /// Top-down zoom levels past the zoom that fits the whole route.
+    /// The top-down camera's zoom level.
     pub fixed_zoom: f32,
     /// How far the top-down route sits from the centre, as a share of its longest side.
     pub fixed_pan_x: f32,

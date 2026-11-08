@@ -120,8 +120,19 @@ impl PreviewSession {
             let WidgetRequest::Map { widget, scene, .. } = request.origin else {
                 return Err(WidgetError::Config("map_view requires a map".into()));
             };
+            let handle = request.handle.ok_or_else(|| {
+                WidgetError::Config("map_view requires its preview handle".into())
+            })?;
+            let Some(PreviewInstance {
+                widget: PreviewWidget::Map(map),
+                ..
+            }) = self.widgets.get_mut(&handle)
+            else {
+                return Err(WidgetError::Config("map_view requires a map handle".into()));
+            };
+            let route = map.route_extent(self.activity.as_ref())?;
             return Ok(ResizeUpdate::MapView(
-                crate::widgets::map::interaction::adjust_map_view(widget, scene, gesture)?,
+                crate::widgets::map::interaction::adjust_map_view(widget, scene, gesture, route)?,
             ));
         }
         if let WidgetRequest::Backdrop { widget, scene, .. } = request.origin {

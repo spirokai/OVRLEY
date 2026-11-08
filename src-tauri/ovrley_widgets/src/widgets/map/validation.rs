@@ -16,8 +16,9 @@ use std::ops::RangeInclusive;
 /// Further out, a follow camera's pitched view takes in too many tiles.
 const MIN_FOLLOW_ZOOM: f32 = 14.0;
 pub(super) const FOLLOW_ZOOM_RANGE: RangeInclusive<f32> = MIN_FOLLOW_ZOOM..=MAX_TILE_ZOOM as f32;
-/// Top-down zoom levels around the zoom that fits the whole route.
-pub(super) const FIXED_ZOOM_RANGE: RangeInclusive<f32> = -4.0..=8.0;
+/// Further out, the world is narrower than a large widget.
+const MIN_FIXED_ZOOM: f32 = 2.0;
+pub(super) const FIXED_ZOOM_RANGE: RangeInclusive<f32> = MIN_FIXED_ZOOM..=MAX_TILE_ZOOM as f32;
 pub(super) const FIXED_PAN_RANGE: RangeInclusive<f32> = -1.0..=1.0;
 /// Metres. The low end looks almost raw, and past the high end a road's own bends start to go.
 const ROUTE_SMOOTHING_RANGE: RangeInclusive<f32> = 1.0..=20.0;
@@ -33,7 +34,7 @@ pub enum MapOrientation {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MapCameraMode {
     /// North up and pitch 0. The tiles never move: only the marker and the route's split do.
-    Fixed { zoom_offset: f32, pan: [f32; 2] },
+    Fixed { zoom: f32, pan: [f32; 2] },
     Follow {
         orientation: MapOrientation,
         pitch_deg: f32,
@@ -87,9 +88,8 @@ impl ValidatedMapWidget {
 
 pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<ValidatedMapWidget> {
     let p = |f: &str| format!("plots[{index}].{f}");
-    let invalid = |field: &str, message: &str| {
-        WidgetError::Config(format!("{}: {message}", p(field)))
-    };
+    let invalid =
+        |field: &str, message: &str| WidgetError::Config(format!("{}: {message}", p(field)));
     let in_range = |value: f32, field: &str, range: RangeInclusive<f32>| -> WidgetResult<f32> {
         let value = require_f32(Some(value), &p(field))?;
         if range.contains(&value) {
@@ -109,7 +109,7 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
     }
     let camera = match map.camera_mode.as_str() {
         "fixed" => MapCameraMode::Fixed {
-            zoom_offset: in_range(map.fixed_zoom, "fixed_zoom", FIXED_ZOOM_RANGE)?,
+            zoom: in_range(map.fixed_zoom, "fixed_zoom", FIXED_ZOOM_RANGE)?,
             pan: [
                 in_range(map.fixed_pan_x, "fixed_pan_x", FIXED_PAN_RANGE)?,
                 in_range(map.fixed_pan_y, "fixed_pan_y", FIXED_PAN_RANGE)?,

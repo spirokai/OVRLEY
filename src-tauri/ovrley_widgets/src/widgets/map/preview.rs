@@ -6,7 +6,7 @@
 //! its map is a canvas under the widget, not an image inside it (see [`PreviewMap::set_layer_ready`]).
 use super::{
     config::MapConfig,
-    content::{ContentKey, MapContent},
+    content::{ContentKey, MapContent, RouteExtent},
     layout::{MapLayout, MarkerPose, ScreenRoute},
     validation::{validate_map_widget, ValidatedMapWidget},
 };
@@ -304,6 +304,18 @@ impl PreviewMap {
         self.last_render = None;
         self.geometry_stale = true;
         Ok(())
+    }
+
+    /// What a top-down view gesture pans across: the activity's route, once the map has one.
+    pub fn route_extent(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+    ) -> WidgetResult<Option<RouteExtent>> {
+        self.prepare(activity)?;
+        Ok(match self.content.as_ref() {
+            Some(MapContent::Activity(map)) => Some(RouteExtent::of(&map.track)),
+            _ => None,
+        })
     }
 
     pub fn invalidate_activity(&mut self) {

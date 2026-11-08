@@ -32,10 +32,6 @@ function panDisplay(value) {
   return `${Math.round(value * 100)}`
 }
 
-function zoomOffsetDisplay(value) {
-  return `${value > 0 ? '+' : ''}${value.toFixed(1)}`
-}
-
 /**
  * Renders the tile map editor.
  *
@@ -156,10 +152,10 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
                 editable
                 label={t('widget-editor.zoom', 'Zoom')}
                 value={data.fixed_zoom}
-                min={-4}
-                max={8}
+                min={2}
+                max={19}
                 step={0.1}
-                valueDisplay={zoomOffsetDisplay(data.fixed_zoom)}
+                valueDisplay={data.fixed_zoom.toFixed(1)}
                 onSliderChange={(value) => updateWidgetDraft(widget.id, { fixed_zoom: Number(value.toFixed(1)) })}
                 onSliderCommit={commit}
               />

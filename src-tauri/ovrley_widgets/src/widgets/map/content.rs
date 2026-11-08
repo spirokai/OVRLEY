@@ -16,7 +16,7 @@ use crate::{
 };
 use ovrley_map::{
     frame_tiles, mercator::world_to_lon_lat, MapCamera, MapLabelDraw, MapRouteLine, MapViewport,
-    TileId, LABEL_PLACEMENTS, MAX_TILE_ZOOM, MAX_VIEW_TILES, TILE_SIZE,
+    TileId, LABEL_PLACEMENTS, MAX_VIEW_TILES, TILE_SIZE,
 };
 use std::sync::Arc;
 
@@ -226,21 +226,34 @@ impl MapContent {
 
 /// A follow camera sits low in the frame, showing more road ahead, as `NavigationMapController` does.
 const FOLLOW_TOP_PADDING: f64 = 0.45;
-/// Empty share of a fixed camera's frame on each side of the route.
-const FIXED_MARGIN: f64 = 0.08;
-/// The frame a fixed camera fits the route into at zoom offset 0, in scene units: the default widget's.
-/// It doesn't follow the widget's size, so a side resize crops the map. A corner resize rescales it
-/// through the zoom offset instead.
-const FIXED_FIT_FRAME: f64 = 500.0;
-/// Scene units the route's longest side spans at zoom offset 0.
-const FIXED_ROUTE_SPAN: f64 = FIXED_FIT_FRAME * (1.0 - FIXED_MARGIN * 2.0);
-
 /// Seconds of activity time between label placements.
 const LABEL_STEP_SECONDS: f64 = 0.3;
 
-/// Widget units one unit of pan spans at `zoom_offset`: the route's longest side on screen.
-pub(super) fn fixed_route_span(zoom_offset: f64) -> f64 {
-    FIXED_ROUTE_SPAN * zoom_offset.exp2()
+/// The world-space bounding box of a track: its centre and its longest side, which a top-down camera
+/// centres on and measures its pan in.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RouteExtent {
+    pub centre: (f64, f64),
+    pub longest: f64,
+}
+
+impl RouteExtent {
+    pub fn of(track: &MapTrack) -> Self {
+        let (mut min, mut max) = ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN));
+        for point in track.world() {
+            min = (min.0.min(point.0), min.1.min(point.1));
+            max = (max.0.max(point.0), max.1.max(point.1));
+        }
+        Self {
+            centre: ((min.0 + max.0) / 2.0, (min.1 + max.1) / 2.0),
+            longest: (max.0 - min.0).max(max.1 - min.1),
+        }
+    }
+
+    /// Widget units one unit of pan spans at `zoom`: the route's longest side on screen.
+    pub fn span(&self, zoom: f64) -> f64 {
+        self.longest * f64::from(TILE_SIZE) * zoom.exp2()
+    }
 }
 
 /// One widget's camera with its constant parts resolved.
@@ -258,11 +271,9 @@ impl WidgetCamera {
     /// Never depends on the widget's size, so a size edit shows more or less of the same map.
     pub fn new(mode: MapCameraMode, track: &MapTrack) -> WidgetResult<Self> {
         Ok(match mode {
-            MapCameraMode::Fixed { zoom_offset, pan } => Self::Fixed(fixed_camera(
-                track,
-                f64::from(zoom_offset),
-                pan.map(f64::from),
-            )?),
+            MapCameraMode::Fixed { zoom, pan } => {
+                Self::Fixed(fixed_camera(track, f64::from(zoom), pan.map(f64::from))?)
+            }
             MapCameraMode::Follow {
                 orientation,
                 pitch_deg,
@@ -328,26 +339,13 @@ impl WidgetCamera {
     }
 }
 
-fn clamp_zoom(zoom: f64) -> f64 {
-    zoom.clamp(0.0, f64::from(MAX_TILE_ZOOM))
-}
-
-/// North up, pitch 0. `zoom_offset` counts levels past the zoom that fits the whole route, and a
-/// positive `pan` moves the route right and down in the frame, as a share of its longest side. Both
-/// are relative to the route, so a project's framing carries over to another activity.
-fn fixed_camera(track: &MapTrack, zoom_offset: f64, pan: [f64; 2]) -> WidgetResult<MapCamera> {
-    let (mut min, mut max) = ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN));
-    for point in track.world() {
-        min = (min.0.min(point.0), min.1.min(point.1));
-        max = (max.0.max(point.0), max.1.max(point.1));
-    }
-    let tile = f64::from(TILE_SIZE);
-    let longest = (max.0 - min.0).max(max.1 - min.1);
-    // A span of zero fits at any zoom, and the clamp takes it to the deepest one.
-    let zoom = clamp_zoom((FIXED_ROUTE_SPAN / (longest * tile)).log2() + zoom_offset);
+/// North up, pitch 0, at `zoom`. A positive `pan` moves the route right and down in the frame, as a
+/// share of its longest side, so a project's framing carries over to another activity.
+fn fixed_camera(track: &MapTrack, zoom: f64, pan: [f64; 2]) -> WidgetResult<MapCamera> {
+    let route = RouteExtent::of(track);
     let (lon, lat) = world_to_lon_lat(
-        (min.0 + max.0) / 2.0 - pan[0] * longest,
-        (min.1 + max.1) / 2.0 - pan[1] * longest,
+        route.centre.0 - pan[0] * route.longest,
+        route.centre.1 - pan[1] * route.longest,
     );
     MapCamera::new(lon, lat, zoom, 0.0, 0.0, 0.0).map_err(WidgetError::Render)
 }
@@ -374,7 +372,7 @@ mod tests {
         let track = track();
         let camera = WidgetCamera::new(
             MapCameraMode::Fixed {
-                zoom_offset: 0.0,
+                zoom: 15.0,
                 pan: [0.0, 0.0],
             },
             &track,
