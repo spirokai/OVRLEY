@@ -100,6 +100,9 @@
     "getHevcCodec": "Ottieni codec HEVC",
     "hevcVideoCannotBePlayed": "Impossibile riprodurre il video HEVC",
     "installCodecForSystem": "Installa il pacchetto corretto per il sistema.",
+    "mapViewHint": "Doppio clic per spostare e zoomare",
+    "mapViewZoomHint": "Doppio clic per zoomare",
+    "mapReset": "Ripristina",
     "microsoftStoreHevcCodec": "Puoi ottenere il codec HEVC da Microsoft Store.",
     "onUbuntu": "Su Ubuntu:",
     "overlayCanvasReady": "Canvas della sovrapposizione pronto",
@@ -557,6 +560,9 @@
       "delta": "Delta",
       "lapLog": "Registro giri"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Mappa", "route": "Percorso", "mapTiles": "Tile della mappa", "route3d": "Percorso 3D" }
+    },
     "types": {
       "rolling_chart": { "name": "Grafici", "shortName": "Grafici" },
       "diving_profile": {
@@ -581,6 +587,7 @@
       "color_temperature": { "name": "Temperatura colore", "shortName": "WB" },
       "core_temperature": { "name": "Temperatura corporea", "shortName": "Temp. corp." },
       "course": { "name": "Mappa percorso", "shortName": "Mappa" },
+      "map": { "name": "Mappa stradale", "shortName": "Strade" },
       "distance": { "name": "Distanza", "shortName": "Dist." },
       "distance_to_home": { "name": "Distanza da casa", "shortName": "Casa" },
       "elevation": { "name": "Profilo altimetrico", "shortName": "Profilo" },
@@ -619,6 +626,23 @@
     }
   },
   "widget-editor": {
+    "cameraMode": "Modalità telecamera",
+    "chaseCamera": "Telecamera di inseguimento",
+    "mapBuildings": "Edifici",
+    "mapPaths": "Sentieri",
+    "mapLabels": "Etichette",
+    "mapLocalNames": "Nomi locali",
+    "mapWebgl2Unavailable": "WebGL2 non è disponibile su questo sistema, quindi la mappa non può essere visualizzata in anteprima.",
+    "mapWebgl2Software": "Nessuna GPU trovata. La mappa viene renderizzata via software, quindi anteprima ed esportazione potrebbero essere lente.",
+    "mapStyle": "Stile mappa",
+    "mapView": "Vista mappa",
+    "msaa": "Antialiasing (MSAA)",
+    "msaaOff": "Disattivato",
+    "northUp": "Nord in alto",
+    "pitch": "Inclinazione",
+    "riderUp": "Direzione in alto",
+    "topDown": "Vista dall'alto",
+    "zoom": "Zoom",
     "chartMetrics": "Metriche",
     "chartMetric": "Metrica",
     "addMetric": "Aggiungi metrica",
@@ -852,6 +876,7 @@
     "singleCircle": "Cerchio singolo",
     "smoothing": "Levigatura",
     "solidHalo": "Alone pieno",
+    "markerArrow": "Freccia",
     "style": "Stile",
     "text": "Testo",
     "thickness": "Spessore",

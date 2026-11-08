@@ -9,7 +9,7 @@
 //! order, since compositing over is associative. A plan whose slots are copied
 //! onto a transparent frame instead merges every overlap, and a plan overlaid
 //! as one slot merges every slot. The slots are then
-//! shelf-packed into one atlas frame. Each slot
+//! packed into one atlas frame. Each slot
 //! keeps its scene position modulo [`PIXEL_PHASE`], so widgets drawn straight
 //! into the atlas produce the pixels they produce in the full frame, up to one
 //! level where Skia's float anti-aliasing rounds a shifted path differently.
@@ -235,7 +235,14 @@ fn merge_overlapping(slots: &mut Vec<(IRect, Vec<usize>)>, placement: SlotPlacem
     slots.sort_unstable_by_key(|(_, layers)| layers[0]);
 }
 
-/// Shelf packing, tallest slots first, into a roughly square atlas no narrower than the widest slot.
+/// Atlas widths tried, from the widest slot up to twice the square's edge.
+const PACK_WIDTHS: i32 = 32;
+
+/// Packs tallest slots first at several atlas widths and keeps the smallest atlas, since every byte of
+/// it is copied, converted and piped with every frame.
+///
+/// Performance: do not return to one-width shelf packing. It left a gap beside a tall map slot: 5.2 MP
+/// against 4.0 MP on the 4K benchmark, worth about 7 fps.
 fn pack(slots: Vec<(IRect, Vec<usize>)>) -> AtlasPlan {
     if slots.is_empty() {
         // Nothing is ever visible; the smallest yuva420p frame stays transparent.
@@ -249,34 +256,19 @@ fn pack(slots: Vec<(IRect, Vec<usize>)>) -> AtlasPlan {
         .map(|(rect, _)| rect.width() as u64 * rect.height() as u64)
         .sum();
     let widest = slots.iter().map(|(rect, _)| rect.width()).max().expect("slots");
-    let square = ((area as f64).sqrt().ceil() as i32 + 1) & !1;
-    let shelf_width = widest.max(square);
+    let square = (area as f64).sqrt().ceil() as i32;
     let mut order: Vec<usize> = (0..slots.len()).collect();
     order.sort_by_key(|index| {
         let rect = slots[*index].0;
         (std::cmp::Reverse(rect.height()), std::cmp::Reverse(rect.width()), *index)
     });
-    let mut origins = vec![IPoint::new(0, 0); slots.len()];
-    let (mut x, mut y, mut shelf_height, mut width) = (0, 0, 0, 0);
-    for index in order {
-        let rect = slots[index].0;
-        let mut left = in_phase(x, rect.left);
-        if x > 0 && left + rect.width() > shelf_width {
-            y += shelf_height;
-            (x, shelf_height) = (0, 0);
-            left = in_phase(x, rect.left);
-        }
-        let top = in_phase(y, rect.top);
-        origins[index] = IPoint::new(left, top);
-        x = left + rect.width();
-        width = width.max(x);
-        shelf_height = shelf_height.max(top - y + rect.height());
-    }
+    let span = (2 * square - widest).max(0);
+    let (size, origins) = (0..=PACK_WIDTHS)
+        .map(|step| place_slots(&slots, &order, widest + span * step / PACK_WIDTHS))
+        .min_by_key(|(size, _)| (u64::from(size.width) * u64::from(size.height), size.width))
+        .expect("at least one atlas width");
     AtlasPlan {
-        size: FrameSize {
-            width: width as u32,
-            height: (y + shelf_height) as u32,
-        },
+        size,
         slots: slots
             .into_iter()
             .zip(origins)
@@ -287,6 +279,38 @@ fn pack(slots: Vec<(IRect, Vec<usize>)>) -> AtlasPlan {
             })
             .collect(),
     }
+}
+
+/// Puts each slot, in `order`, at the lowest then leftmost place it fits within `max_width`, resting on
+/// the slots already placed. A slot whose pixel phase pushes it past the width keeps its place at the left.
+fn place_slots(slots: &[(IRect, Vec<usize>)], order: &[usize], max_width: i32) -> (FrameSize, Vec<IPoint>) {
+    let mut origins = vec![IPoint::new(0, 0); slots.len()];
+    let mut placed: Vec<IRect> = Vec::with_capacity(slots.len());
+    for index in order {
+        let rect = slots[*index].0;
+        let origin = std::iter::once(0)
+            .chain(placed.iter().map(|other| other.right))
+            .map(|x| in_phase(x, rect.left))
+            .filter(|left| *left + rect.width() <= max_width || *left < PIXEL_PHASE)
+            .map(|left| {
+                let floor = placed
+                    .iter()
+                    .filter(|other| other.left < left + rect.width() && left < other.right)
+                    .map(|other| other.bottom)
+                    .max()
+                    .unwrap_or(0);
+                IPoint::new(left, in_phase(floor, rect.top))
+            })
+            .min_by_key(|origin| (origin.y, origin.x))
+            .expect("the left edge is always a candidate");
+        origins[*index] = origin;
+        placed.push(IRect::from_xywh(origin.x, origin.y, rect.width(), rect.height()));
+    }
+    let size = FrameSize {
+        width: placed.iter().map(|rect| rect.right).max().unwrap_or(0) as u32,
+        height: placed.iter().map(|rect| rect.bottom).max().unwrap_or(0) as u32,
+    };
+    (size, origins)
 }
 
 #[cfg(test)]
@@ -459,6 +483,18 @@ mod tests {
         assert_eq!(layers, (0..40).collect::<Vec<_>>());
         let atlas = u64::from(plan.size().width) * u64::from(plan.size().height);
         assert!(atlas * 4 < 3840 * 2160, "atlas {:?} must stay small", plan.size());
+    }
+
+    #[test]
+    fn small_slots_fill_the_space_beside_a_tall_slot() {
+        // The benchmark template's shape: one large map and a column of small widgets.
+        let mut bounds = vec![Some(IRect::new(1376, 74, 2776, 1306))];
+        bounds.extend((0..8).map(|index| Some(IRect::from_xywh(40, 40 + index * 200, 400, 160))));
+        let plan = AtlasPlan::from_layer_bounds(UHD, &bounds, SlotPlacement::Overlay).unwrap();
+        assert_packed(&plan);
+        let slots: u64 = plan.slots().iter().map(|slot| area(&slot.scene) as u64).sum();
+        let atlas = u64::from(plan.size().width) * u64::from(plan.size().height);
+        assert!(atlas * 100 <= slots * 115, "atlas {:?} wastes space around {slots} pixels of slots", plan.size());
     }
 
     #[test]

@@ -1,5 +1,6 @@
 //! Runtime typography and icon metadata from the canonical widget manifest.
 
+use ovrley_map::MapStyleId;
 use serde::Deserialize;
 use std::sync::OnceLock;
 
@@ -30,6 +31,7 @@ struct WidgetDefinition {
     #[serde(rename = "type")]
     kind: String,
     icon: WidgetIcon,
+    defaults: serde_json::Value,
     /// Declared only by `rolling_chart`.
     #[serde(default)]
     chart_limits: Option<ChartLimits>,
@@ -45,6 +47,7 @@ struct RuntimeWidgetMetadata {
     widget_font_weight: f32,
     time_icon_asset_file: String,
     chart_limits: ChartLimits,
+    default_map_style: MapStyleId,
 }
 
 static WIDGET_METADATA: OnceLock<RuntimeWidgetMetadata> = OnceLock::new();
@@ -73,6 +76,10 @@ fn metadata() -> &'static RuntimeWidgetMetadata {
             chart_limits: definition("rolling_chart")
                 .chart_limits
                 .expect("rolling_chart must declare chartLimits"),
+            default_map_style: serde_json::from_value(
+                definition("map").defaults["map_style"].clone(),
+            )
+            .expect("map defaults must name a map style"),
         }
     })
 }
@@ -88,4 +95,9 @@ pub fn time_icon_asset_file() -> &'static str {
 
 pub fn chart_limits() -> ChartLimits {
     metadata().chart_limits
+}
+
+/// The style a new map widget draws, which every build must install.
+pub fn default_map_style() -> &'static MapStyleId {
+    &metadata().default_map_style
 }

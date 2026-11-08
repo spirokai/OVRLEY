@@ -3,10 +3,11 @@
  */
 
 import { memo } from 'react'
-import { LayoutGrid } from 'lucide-react'
+import { LayoutGrid, RotateCcw } from 'lucide-react'
 import useStore from '@/store/useStore'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { WIDGET_ICONS } from '@/lib/widget/widget-icons'
 import { getWidgetTypeName } from '@/lib/widget/widget-presentation'
 import EditorToolbar from '@/features/app-shell/components/EditorToolbar'
@@ -38,7 +39,10 @@ function OverlayEditorContent(props) {
     selectionRect,
     videoSyncMarkControls,
     setStageElement,
+    handleSceneDoubleClick,
     handleSceneMouseDown,
+    resetMapView,
+    handleCanvasMouseLeave,
     activity,
     previewSecond,
     sceneSize,
@@ -86,6 +90,7 @@ function OverlayEditorContent(props) {
           data-testid="overlay-editor-stage"
           className="relative grid min-h-full min-w-full w-max place-items-center overflow-visible p-4"
           onMouseDown={videoSyncMode ? undefined : handleSceneMouseDown}
+          onDoubleClick={videoSyncMode ? undefined : handleSceneDoubleClick}
         >
           <div
             className="relative shrink-0"
@@ -141,6 +146,42 @@ function OverlayEditorContent(props) {
                     </div>
                   )
                 })}
+                {widgetBadges
+                  .filter((badge) => badge.type === 'map')
+                  .map((badge) => (
+                    <div
+                      key={`${badge.id}-view-hint`}
+                      className="absolute -mt-3 flex -translate-x-1/2 -translate-y-full items-center gap-1.5 whitespace-nowrap"
+                      style={{ left: badge.bottomCenter.left, top: badge.bottomCenter.top }}
+                    >
+                      <div
+                        data-map-view-hint={badge.id}
+                        className="flex h-6 items-center rounded-xs border border-border/70 bg-card/90 px-2 text-[0.741rem] font-medium leading-none text-muted-foreground shadow-sm"
+                      >
+                        {/* A chase camera follows the rider, so it only zooms. */}
+                        {badge.cameraMode === 'fixed'
+                          ? t('overlay-editor.mapViewHint', 'Double-click to pan & zoom')
+                          : t('overlay-editor.mapViewZoomHint', 'Double-click to zoom')}
+                      </div>
+                      {badge.cameraMode === 'fixed' ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          data-map-reset={badge.id}
+                          className="pointer-events-auto h-6 gap-1 rounded-xs border-accent-border/70 px-2 text-[0.741rem] text-muted-foreground hover:border-accent-border hover:bg-surface-accent-soft hover:text-foreground has-[>svg]:px-2 [&_svg:not([class*='size-'])]:size-3"
+                          // The scene would otherwise take the press as a deselect or a marquee.
+                          onMouseDown={(event) => event.stopPropagation()}
+                          onDoubleClick={(event) => event.stopPropagation()}
+                          // Leaving it is leaving the map; the map takes the hover back if the pointer returns.
+                          onMouseLeave={handleCanvasMouseLeave}
+                          onClick={() => resetMapView(badge.id)}
+                        >
+                          <RotateCcw />
+                          {t('overlay-editor.mapReset', 'Reset')}
+                        </Button>
+                      ) : null}
+                    </div>
+                  ))}
               </div>
             ) : null}
             {videoSyncMode ? (

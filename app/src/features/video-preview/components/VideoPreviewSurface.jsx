@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import useStore from '@/store/useStore'
 import { useVideoPreview } from '../hooks/useVideoPreview'
+import { useVideoFreezeFrame } from '../hooks/useVideoFreezeFrame'
 
 function HevcPlaybackPlaceholder({ displayScale, importId, openVideoPreviewHelp, platformOs, videoPreviewHelpAvailable }) {
   const { t } = useTranslation()
@@ -67,6 +68,7 @@ function HevcPlaybackPlaceholder({ displayScale, importId, openVideoPreviewHelp,
  */
 export default function VideoPreviewSurface({ children, displayScale, isActive }) {
   const videoRef = useRef(null)
+  const freezeFrameRef = useRef(null)
   const isVideoMuted = useStore((state) => state.isVideoMuted)
   const platformOs = useStore((state) => state.platformOs)
   const { videoSrc, importId, isOutOfRange, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } = useVideoPreview(
@@ -74,6 +76,8 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
     isActive,
   )
   const hasHevcPlaybackError = Boolean(hevcPlaybackWarning)
+  useVideoFreezeFrame({ videoRef, canvasRef: freezeFrameRef, enabled: platformOs === 'linux', videoSrc })
+  const videoClassName = cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')
 
   return (
     <>
@@ -82,12 +86,15 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
           key={importId ?? 'no-video'}
           ref={videoRef}
           src={videoSrc}
-          className={cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')}
+          className={videoClassName}
           preload="auto"
           playsInline
           muted={isVideoMuted}
           onError={(event) => console.error('[VideoPreviewSurface] Video Error:', event)}
         />
+      ) : null}
+      {videoSrc && !hasHevcPlaybackError && platformOs === 'linux' ? (
+        <canvas key={`${importId ?? 'no-video'}-freeze-frame`} ref={freezeFrameRef} className={videoClassName} style={{ visibility: 'hidden' }} />
       ) : null}
       {children}
       {videoSrc && hasHevcPlaybackError ? (

@@ -111,7 +111,18 @@ function setupMarqueeCleanup(marqueeRef) {
 }
 
 function selectWidgetSelection(state) {
-  return { selectedWidgetId: state.selectedWidgetId, selectedWidgetIds: state.selectedWidgetIds, setWidgetSelection: state.setWidgetSelection }
+  return {
+    mapViewWidgetId: state.mapViewWidgetId,
+    selectedWidgetId: state.selectedWidgetId,
+    selectedWidgetIds: state.selectedWidgetIds,
+    setMapViewWidgetId: state.setMapViewWidgetId,
+    setWidgetSelection: state.setWidgetSelection,
+  }
+}
+
+function handleSceneDoubleClick({ setMapViewWidgetId, widgetMap }, event) {
+  const node = event.target instanceof Element ? event.target.closest('[data-widget-id]') : null
+  if (node !== null && widgetMap[node.dataset.widgetId].type === 'map') setMapViewWidgetId(node.dataset.widgetId)
 }
 
 function commitSelection(setWidgetSelection, orderedWidgetIds, widgetIds, preferredId = null) {
@@ -152,7 +163,7 @@ export default function useWidgetSelection({ displayScale, orderedWidgetIds, wid
   const [selectionRect, setSelectionRect] = useState(null)
   const marqueeRef = useRef(null)
   useEffect(() => setupMarqueeCleanup(marqueeRef), [])
-  const { selectedWidgetId, selectedWidgetIds, setWidgetSelection } = useStore(useShallow(selectWidgetSelection))
+  const { mapViewWidgetId, selectedWidgetId, selectedWidgetIds, setMapViewWidgetId, setWidgetSelection } = useStore(useShallow(selectWidgetSelection))
   const isGroupDragActive = groupGestureType === 'drag'
   // Store selection can advance before controlled config props after paste or deletion.
   const effectiveIds = useMemo(
@@ -197,7 +208,11 @@ export default function useWidgetSelection({ displayScale, orderedWidgetIds, wid
     }
   }, [sceneElement])
   const canvasMouseOver = useCallback((event) => setHoveredWidgetFromEvent(setHoveredWidgetId, event), [])
-  const canvasMouseLeave = useCallback(() => setHoveredWidgetId(null), [])
+  // A map's own controls sit over it in the badge layer, so moving onto them keeps it hovered.
+  const canvasMouseLeave = useCallback((event) => {
+    if (event.relatedTarget instanceof Element && event.relatedTarget.closest('[data-map-reset]')) return
+    setHoveredWidgetId(null)
+  }, [])
   const selectedWidgets = useMemo(() => getSelectedWidgets(widgetMap, effectiveIds), [effectiveIds, widgetMap])
   const primaryId = getPrimarySelectionId(effectiveIds, selectedWidgetId)
   const isGroupSelection = effectiveIds.length > 1
@@ -233,12 +248,19 @@ export default function useWidgetSelection({ displayScale, orderedWidgetIds, wid
   )
   const widgetMouseDown = useCallback((event, widgetId) => handleWidgetMouseDown(pointerContext, event, widgetId), [pointerContext])
   const sceneMouseDown = useCallback((event) => handleSceneMouseDown(pointerContext, event), [pointerContext])
+  const sceneDoubleClick = useCallback((event) => handleSceneDoubleClick({ setMapViewWidgetId, widgetMap }, event), [setMapViewWidgetId, widgetMap])
+  const selectedWidget = primaryId === null ? null : widgetMap[primaryId]
+  // The mode belongs to the map while it alone stays selected.
+  const mapViewWidget = !isGroupSelection && selectedWidget !== null && selectedWidget.id === mapViewWidgetId ? selectedWidget : null
   return {
     handleCanvasMouseOver: canvasMouseOver,
     handleCanvasMouseLeave: canvasMouseLeave,
     widgetBadges: areWidgetBadgesHidden ? [] : widgetBadges,
+    handleSceneDoubleClick: sceneDoubleClick,
     handleSceneMouseDown: sceneMouseDown,
     handleWidgetMouseDown: widgetMouseDown,
+    mapViewWidget,
+    setMapViewWidgetId,
     isGroupDragActive,
     selectionRect,
     setGroupDragSelectionIds,
@@ -248,7 +270,7 @@ export default function useWidgetSelection({ displayScale, orderedWidgetIds, wid
     isGroupSelection,
     selectedTarget: !isGroupSelection && primaryId !== null ? (widgetNodes[primaryId] ?? null) : null,
     selectedTargets,
-    selectedWidget: primaryId === null ? null : widgetMap[primaryId],
+    selectedWidget,
     selectedWidgetId,
     selectedWidgetIds,
     selectedWidgets,

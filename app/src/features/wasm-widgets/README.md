@@ -14,6 +14,14 @@ export start second, and native export shares the timestamp sampler and formatte
 WASM also owns gauges, gradient, lean-angle, G-force, lap timers, heading tapes,
 labels, backdrops, raster images, routes, and elevation profiles.
 
+Maps are the exception: `ovrley_map::gpu` draws them on WebGL2 from a separate module,
+`wasm_map_bindings`, loaded only when a project has a map. `mapLayers` draws its canvas under
+the widget in the session's animation frame, and the widget keeps the camera, marker and
+attribution. Tiles decode in workers (`mapTileWorkers`), labels included: each worker fetches the
+bundled map fonts once from the shell's loopback server and lays labels out in Rust, as export does,
+so JavaScript only moves bytes. WebGL2 is optional, so its failures
+stay on the map: the widget shows its placeholder and nothing reaches the session's errors.
+
 WASM module loading starts at canvas mount and does not gate app startup. Module
 initialization errors are displayed by the canvas. The preview session lives for
 the canvas lifetime, including when there are no

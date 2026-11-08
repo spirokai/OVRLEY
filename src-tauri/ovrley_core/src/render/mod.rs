@@ -2,15 +2,18 @@
 //! widget engine, for video frames and for preview PNGs alike.
 mod atlas;
 mod engine;
+mod map_export;
 pub mod surface;
 
 use crate::{
     activity::schema::{DenseActivityReport, ParsedActivity},
     debug::{RenderProfiler, TimingBucket},
+    encode::progress::RenderController,
     error::{CoreError, CoreResult},
     normalize::{ValidatedRenderConfig, ValidatedSceneConfig},
     paths::AppPaths,
 };
+use ovrley_map::MapSource;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -20,6 +23,7 @@ use surface::{wrap_native_surface, write_surface_png};
 
 pub use atlas::{AtlasPlan, AtlasSlot, SlotPlacement};
 pub use engine::{ExportWidgets, PreparedAtlas, WorkerWidgets};
+pub use map_export::{download_preview_tiles, ExportMapJob};
 
 /// Canonical dimensions for a rendered video frame.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -53,20 +57,28 @@ impl FrameSize {
 }
 
 /// Renders the full scene frames of dense activity frames `dense_indices` as straight-alpha RGBA,
-/// through the full-frame atlas plan export uses for transparent video.
+/// through the full-frame atlas plan export uses for transparent video. Maps draw from
+/// `map_source`, which tools without one leave out: they fail on any map.
 pub fn render_full_frames(
     font_dirs: &[PathBuf],
     config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
     dense: &DenseActivityReport,
     dense_indices: &[usize],
+    map_source: Option<&MapSource>,
     profiler: &mut RenderProfiler,
 ) -> CoreResult<Vec<Vec<u8>>> {
     let size = FrameSize {
         width: config.scene.presentation.width,
         height: config.scene.presentation.height,
     };
-    let export = ExportWidgets::prepare(font_dirs, config, activity, dense, size, 0, profiler)?;
+    let controller = RenderController::default();
+    let maps = ExportMapJob {
+        source: map_source,
+        frame_indices: dense_indices,
+        controller: &controller,
+    };
+    let export = ExportWidgets::prepare(font_dirs, config, activity, dense, size, 0, maps, profiler)?;
     let atlas = export.prepare_atlas(export.full_frame_atlas(), profiler)?;
     let mut worker = export.worker()?;
     dense_indices
@@ -103,6 +115,7 @@ pub fn render_preview_frames(
     activity: &ParsedActivity,
     dense: &DenseActivityReport,
     frames: &[PreviewFrame],
+    map_source: Option<&MapSource>,
 ) -> CoreResult<PreviewRenderReport> {
     let started = Instant::now();
     let mut profiler = RenderProfiler::default();
@@ -111,7 +124,15 @@ pub fn render_preview_frames(
         .iter()
         .map(|frame| frame_index_for_second(scene, dense, frame.second))
         .collect();
-    let pixels = render_full_frames(&paths.font_dirs, config, activity, dense, &frame_indices, &mut profiler)?;
+    let pixels = render_full_frames(
+        &paths.font_dirs,
+        config,
+        activity,
+        dense,
+        &frame_indices,
+        map_source,
+        &mut profiler,
+    )?;
     let (width, height) = (scene.presentation.width, scene.presentation.height);
     for (frame, mut pixels) in frames.iter().zip(pixels) {
         profiler.measure("preview.png_write", || -> CoreResult<()> {
@@ -138,6 +159,7 @@ pub fn render_preview_frame(
     dense: &DenseActivityReport,
     second: f64,
     out_path: &Path,
+    map_source: Option<&MapSource>,
 ) -> CoreResult<PreviewRenderReport> {
     render_preview_frames(
         paths,
@@ -148,6 +170,7 @@ pub fn render_preview_frame(
             second,
             out_path: out_path.to_path_buf(),
         }],
+        map_source,
     )
 }
 

@@ -21,8 +21,8 @@ pub fn scale_route(config: &mut ValidatedRoutePlot, factor: f32) {
     config.height *= factor;
     config.completed_line_width *= factor;
     config.remaining_line_width *= factor;
-    config.marker_size *= factor;
-    config.marker_variant_diameter *= factor;
+    config.path.marker_size *= factor;
+    config.path.marker_variant_diameter *= factor;
 }
 
 pub fn resize_route(
@@ -43,7 +43,7 @@ pub fn resize_route(
         height: config.height,
         completed_line_width: config.completed_line_width,
         remaining_line_width: config.remaining_line_width,
-        marker_size: config.marker_size,
-        marker_variant_diameter: config.marker_variant_diameter,
+        marker_size: config.path.marker_size,
+        marker_variant_diameter: config.path.marker_variant_diameter,
     }
 }

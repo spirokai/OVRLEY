@@ -11,6 +11,46 @@
     "scuba_diving": "widgets.categories.scuba_diving",
     "other": "widgets.categories.other"
   },
+  "drawerGroups": {
+    "map": {
+      "category": "general",
+      "shortNameKey": "widgets.drawerGroups.map.shortName",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-course.svg"
+      },
+      "options": [
+        {
+          "value": "route",
+          "type": "course",
+          "labelKey": "widgets.drawerGroups.map.route",
+          "icon": {
+            "source": "custom",
+            "assetFile": "widget-course.svg"
+          }
+        },
+        {
+          "value": "map_tiles",
+          "type": "map",
+          "labelKey": "widgets.drawerGroups.map.mapTiles",
+          "icon": {
+            "source": "custom",
+            "assetFile": "widget-map.svg"
+          },
+          "preset": { "camera_mode": "fixed" }
+        },
+        {
+          "value": "route_3d",
+          "type": "map",
+          "labelKey": "widgets.drawerGroups.map.route3d",
+          "icon": {
+            "source": "lucide",
+            "name": "Navigation"
+          }
+        }
+      ]
+    }
+  },
   "collections": {
     "backdrops": {
       "type": "backdrop",
@@ -39,6 +79,7 @@
   },
   "widgetDefaults": {
     "current": true,
+    "drawerGroup": null,
     "plottable": false,
     "metric": false,
     "layoutMode": "intrinsic",
@@ -413,6 +454,7 @@
     },
     {
       "type": "course",
+      "drawerGroup": "map",
       "activity": {
         "column": {
           "specialized": true,
@@ -467,6 +509,67 @@
         "minDimension": 80
       },
       "initializers": ["courseSizing"]
+    },
+    {
+      "type": "map",
+      "drawerGroup": "map",
+      "activity": {
+        "coverageSource": "course",
+        "sources": [],
+        "requires": ["course", "distance_progress"]
+      },
+      "nameKey": "widgets.types.map.name",
+      "shortNameKey": "widgets.types.map.shortName",
+      "category": "general",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-map.svg"
+      },
+      "defaults": {
+        "value": "map",
+        "x": 100,
+        "y": 100,
+        "opacity": 1,
+        "font": "Inter.ttf",
+        "width": 500,
+        "height": 500,
+        "map_style": "liberty",
+        "show_buildings": true,
+        "show_paths": true,
+        "show_labels": true,
+        "local_names": false,
+        "camera_mode": "follow",
+        "orientation": "rider_up",
+        "pitch": 50,
+        "follow_zoom": 16,
+        "fixed_zoom": 14,
+        "fixed_pan_x": 0,
+        "fixed_pan_y": 0,
+        "msaa_samples": 4,
+        "shape": "rectangle",
+        "corner_radius": 0,
+        "border_color": "#ffffff",
+        "border_thickness": 0,
+        "border_opacity": 1,
+        "route_smoothing_m": 8,
+        "show_full_activity": true,
+        "line_width": 6,
+        "completed_line_opacity": 100,
+        "remaining_line_opacity": 60,
+        "completed_line_color": "#ff4d1f",
+        "remaining_line_color": "#1f7bff",
+        "marker_variant": "single",
+        "marker_variant_diameter": 44,
+        "marker_size": 10,
+        "marker_opacity": 100,
+        "marker_color": "#ffffff"
+      },
+      "collection": "plots",
+      "layoutMode": "boxed",
+      "timeDependent": true,
+      "globalBindings": {
+        "opacity": "opacity"
+      }
     },
     {
       "type": "time",

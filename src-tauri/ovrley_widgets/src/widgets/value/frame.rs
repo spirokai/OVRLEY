@@ -7,11 +7,12 @@ use crate::{
     error::WidgetResult,
     render::icons::metric_icon_bounds,
     render::text::{
-        measure_text, parse_color, text_selection_bounds, FontResolver, ResolvedTextStyle,
+        measure_text, parse_color, resolve_styled_font, text_selection_bounds, FontResolver,
+        ResolvedTextStyle,
     },
     widgets::value::{format::MetricDisplayParts, validation::ValidatedValueWidget},
 };
-use skia_safe::Rect;
+use skia_safe::{Font, Rect};
 
 pub struct PreparedText {
     pub text: String,
@@ -214,6 +215,20 @@ fn finish_frame(
     frame
 }
 
+/// Many display fonts lack the prime marks (U+2032, U+2033), and Skia draws a missing glyph as a
+/// box; such fonts get the ASCII apostrophe and quote instead. Both marks switch together so a
+/// line never mixes styles.
+fn coordinate_marks_for_font(text: &str, font: &Font) -> String {
+    let has_primes = ['\u{2032}', '\u{2033}']
+        .iter()
+        .all(|mark| font.unichar_to_glyph(*mark as i32) != 0);
+    if has_primes {
+        text.to_owned()
+    } else {
+        text.replace('\u{2032}', "'").replace('\u{2033}', "\"")
+    }
+}
+
 fn prepare_coordinate_frame(
     base_style: &ResolvedTextStyle,
     parts: &MetricDisplayParts,
@@ -241,13 +256,25 @@ fn prepare_coordinate_frame(
     let mut value_style = base_style.clone();
     value_style.font_size = coordinate_font_size;
     value_style.line_height = line_height;
-    for line in &coordinate.lines {
+    let font = resolve_styled_font(
+        fonts,
+        value_style.font_name.as_deref(),
+        value_style.font_size,
+        value_style.font_weight,
+        value_style.italic,
+    )?;
+    let value_texts: Vec<String> = coordinate
+        .lines
+        .iter()
+        .map(|line| coordinate_marks_for_font(&line.value_text, &font))
+        .collect();
+    for (line, value_text) in coordinate.lines.iter().zip(&value_texts) {
         let direction_measure = line
             .direction
             .as_deref()
             .map(|direction| measure_text(direction, &value_style, fonts))
             .transpose()?;
-        let value_measure = measure_text(&line.value_text, &value_style, fonts)?;
+        let value_measure = measure_text(value_text, &value_style, fonts)?;
         let direction_width = direction_measure.map_or(0.0, |measure| measure.width);
         line_measurements.push((direction_width, value_measure.width));
     }
@@ -296,11 +323,11 @@ fn prepare_coordinate_frame(
     let mut texts = Vec::new();
     let mut bounds = Rect::new_empty();
     let mut content_bounds = Rect::new_empty();
-    for (index, line) in coordinate.lines.iter().enumerate() {
+    for (index, (line, value_text)) in coordinate.lines.iter().zip(&value_texts).enumerate() {
         let line_y = text_top + index as f32 * (line_height + line_gap);
         let (_, value_width) = line_measurements[index];
         let line_x = horizontal_layout.value_x;
-        let line_vertical_metrics_text = metric_vertical_metrics_text(&line.value_text);
+        let line_vertical_metrics_text = metric_vertical_metrics_text(value_text);
         if let Some(direction) = line.direction.as_deref() {
             let mut direction_style = value_style.clone();
             direction_style.x = line_x;
@@ -329,16 +356,12 @@ fn prepare_coordinate_frame(
                 value_column_width - value_width
             };
         number_style.y = line_y;
-        let (number_bounds, number_content) = text_bounds(
-            &line.value_text,
-            line_vertical_metrics_text,
-            &number_style,
-            fonts,
-        )?;
+        let (number_bounds, number_content) =
+            text_bounds(value_text, line_vertical_metrics_text, &number_style, fonts)?;
         bounds.join(number_bounds);
         content_bounds.join(number_content);
         texts.push(PreparedText {
-            text: line.value_text.clone(),
+            text: value_text.clone(),
             reference: line_vertical_metrics_text.to_owned(),
             style: number_style,
         });

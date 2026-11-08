@@ -1,0 +1,716 @@
+//! Activity parsing, trimming, and densification integration tests.
+
+use crate::common;
+
+use std::fs;
+
+use ovrley_core::activity::finalize::finalize_raw_activity_json;
+use ovrley_core::activity::schema::ParsedActivity;
+use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
+use ovrley_core::commands::parse_and_validate_config;
+use ovrley_core::normalize::RenderDataRequirements;
+
+fn full_scene(fps: f64, start: f64, end: f64) -> serde_json::Value {
+    let mut scene = common::builders::scene_json();
+    scene["fps"] = serde_json::json!(fps);
+    scene["start"] = serde_json::json!(start);
+    scene["end"] = serde_json::json!(end);
+    scene
+}
+
+fn speed_value() -> serde_json::Value {
+    common::builders::speed_value_json()
+}
+
+fn time_value() -> String {
+    r##"{"value":"time","x":0,"y":0,"font":"f","font_size":12.0,"color":"#ffffff","opacity":1.0,"show_icon":false,"icon_color":"#000000","icon_size":1.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"show_units":false,"unit_color":"#000000","display_unit":"","prefix":"","suffix":"","time_mode":"daytime","format":"time-24","hours_offset":0,"elapsed_origin":"activity","show_hundredths":false,"decimals":0,"content_alignment":"left"}"##.to_string()
+}
+
+#[test]
+fn finalizes_raw_activity_with_idle_gap_debug_payload() {
+    let raw_activity = serde_json::json!({
+        "file_name": "raw-regression.fit",
+        "file_format": "fit",
+        "metadata": {
+            "sport": "cycling"
+        },
+        "raw_samples": [
+            {
+                "timestamp": "2026-01-01T00:00:00.000Z",
+                "elapsed_seconds": 0.0,
+                "latitude": 50.0,
+                "longitude": 14.0,
+                "elevation": 100.0,
+                "distance": 0.0
+            },
+            {
+                "timestamp": "2026-01-01T00:00:01.000Z",
+                "elapsed_seconds": 1.0,
+                "latitude": 50.0,
+                "longitude": 14.0001,
+                "elevation": 101.0,
+                "distance": 10.0
+            },
+            {
+                "timestamp": "2026-01-01T00:00:05.000Z",
+                "elapsed_seconds": 5.0,
+                "latitude": 50.0,
+                "longitude": 14.0001,
+                "elevation": 101.0,
+                "distance": 10.0
+            }
+        ],
+        "options": {
+            "skip_idle_gap_fill": false,
+            "smoothing": {}
+        }
+    });
+
+    let response = finalize_raw_activity_json(&raw_activity.to_string(), None).unwrap();
+    let activity = response.parsed_activity;
+
+    assert_eq!(activity.file_name.as_deref(), Some("raw-regression.fit"));
+    assert_eq!(activity.file_format.as_deref(), Some("fit"));
+    assert_eq!(
+        activity.sample_elapsed_seconds,
+        vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+    );
+    assert_eq!(
+        activity.distance,
+        vec![
+            Some(0.0),
+            Some(10.0),
+            Some(10.0),
+            Some(10.0),
+            Some(10.0),
+            Some(10.0)
+        ]
+    );
+    assert_eq!(
+        activity.speed,
+        vec![None, Some(10.0), Some(0.0), Some(0.0), Some(0.0), Some(0.0)]
+    );
+    assert_eq!(
+        activity.sample_distance_progress,
+        vec![0.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    );
+
+    let metadata = activity.metadata.as_object().unwrap();
+    assert_eq!(metadata["sport"], "cycling");
+    assert_eq!(metadata["sample_count"], 6);
+    assert_eq!(metadata["original_sample_count"], 3);
+    assert_eq!(metadata["inserted_idle_sample_count"], 3);
+    assert_eq!(metadata["duration_seconds"], 5.0);
+    assert_eq!(metadata["total_distance_m"], 10.0);
+
+    let coverage = activity.extra["coverage"].as_object().unwrap();
+    assert_eq!(coverage["speed"]["source"], "mixed");
+    assert_eq!(coverage["speed"]["availableCount"], 5);
+    assert_eq!(coverage["distance"]["availableCount"], 6);
+    assert_eq!(coverage["gps_coordinates"]["source"], "direct");
+    assert_eq!(coverage["gps_coordinates"]["availableCount"], 6);
+
+    let debug_payload = response
+        .debug_payload
+        .expect("debug builds must return parser diagnostics");
+    assert_eq!(debug_payload["file_name"], "raw-regression.fit");
+    assert_eq!(debug_payload["file_format"], "fit");
+    assert_eq!(debug_payload["idle_gap_fill"]["inserted_sample_count"], 3);
+    assert_eq!(
+        debug_payload["idle_gap_fill"]["detected_gaps"][0]["gap_seconds"],
+        4.0
+    );
+    assert_eq!(
+        debug_payload["idle_gap_fill"]["detected_gaps"][0]["inserted_samples"],
+        3
+    );
+    assert_eq!(
+        debug_payload["parsed_activity"]["metadata"]["inserted_idle_sample_count"],
+        3
+    );
+}
+
+#[test]
+fn finalizes_raw_activity_axis_g_force_and_lean_angle_samples() {
+    let raw_activity = serde_json::json!({
+        "file_name": "session.gpx",
+        "file_format": "gpx",
+        "raw_samples": [
+            {
+                "elapsed_seconds": 0.0,
+                "distance": 0.0,
+                "lap_number": 1,
+                "g_force_x": 0.1,
+                "g_force_y": -0.2,
+                "g_force_z": 0.3,
+                "lean_angle": 4.5
+            },
+            {
+                "elapsed_seconds": 1.0,
+                "distance": 12.5,
+                "lap_number": 2,
+                "g_force_x": -0.4,
+                "g_force_y": 0.5,
+                "g_force_z": -0.6,
+                "lean_angle": -7.25
+            }
+        ],
+        "options": {
+            "skip_idle_gap_fill": true,
+            "smoothing": {}
+        }
+    });
+
+    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.distance, vec![Some(0.0), Some(12.5)]);
+    assert_eq!(activity.lap_number, vec![0, 1]);
+    assert_eq!(activity.lap_time_seconds, vec![Some(0.0), Some(0.0)]);
+    assert_eq!(activity.lap_start_elapsed_seconds, vec![0.0, 1.0]);
+    assert_eq!(activity.lap_durations_seconds, vec![1.0, 0.0]);
+    assert_eq!(activity.g_force_x, vec![Some(0.1), Some(-0.4)]);
+    assert_eq!(activity.g_force_y, vec![Some(-0.2), Some(0.5)]);
+    assert_eq!(activity.g_force_z, vec![Some(0.3), Some(-0.6)]);
+    assert_eq!(activity.lean_angle, vec![Some(4.5), Some(-7.25)]);
+}
+
+#[test]
+fn finalizes_raw_activity_with_default_derived_speed_smoothing_when_map_is_empty() {
+    // A stepped 8 m/s climb over 4 s: distance and altitude advance every other 0.25 s sample.
+    let raw_samples: Vec<_> = (0..17)
+        .map(|index| {
+            let step = (index / 2) as f64;
+            serde_json::json!({
+                "elapsed_seconds": index as f64 * 0.25,
+                "distance": step * 10.0,
+                "elevation": 100.0 + step * 4.0,
+            })
+        })
+        .collect();
+    let raw_activity = serde_json::json!({
+        "file_name": "raw-no-smoothing.srt",
+        "file_format": "srt",
+        "raw_samples": raw_samples,
+        "options": {
+            "skip_idle_gap_fill": true,
+            "smoothing": {}
+        }
+    });
+
+    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.speed[0], None);
+    assert!(activity.speed.iter().flatten().all(|speed| *speed > 0.0 && *speed < 40.0));
+    // Stepped altitude differentiates into alternating 0/16 m/s. More than 1 s from either end,
+    // where the smoothing windows are cut short, it reads as the 8 m/s climb.
+    assert!(
+        activity.vertical_speed[5..12]
+            .iter()
+            .all(|rate| rate.is_some_and(|rate| (rate - 8.0).abs() < 0.5)),
+        "{:?}",
+        activity.vertical_speed
+    );
+}
+
+#[test]
+fn ingress_altitude_smoothing_turns_a_stepped_climb_into_a_steady_vertical_speed() {
+    // 4 Hz altitude that climbs 4 m every half second differentiates into alternating 0/16 m/s.
+    let raw_samples: Vec<_> = (0..=20)
+        .map(|index| {
+            serde_json::json!({
+                "elapsed_seconds": f64::from(index) * 0.25,
+                "distance": f64::from(index) * 5.0,
+                "elevation": 100.0 + f64::from(index / 2) * 4.0,
+            })
+        })
+        .collect();
+    let raw_activity = serde_json::json!({
+        "file_name": "raw-stepped-climb.srt",
+        "file_format": "srt",
+        "raw_samples": raw_samples,
+        "options": {
+            "skip_idle_gap_fill": true,
+            "smoothing": {}
+        }
+    });
+
+    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
+        .unwrap()
+        .parsed_activity;
+
+    // The 1 s window is cut short within two passes of half a window from either end, which flattens
+    // the climb there. Everywhere else the smoothed altitude reads as the true 8 m/s.
+    let interior = &activity.vertical_speed[5..=16];
+    assert!(
+        interior
+            .iter()
+            .all(|speed| speed.is_some_and(|speed| (speed - 8.0).abs() < 0.5)),
+        "{interior:?}"
+    );
+}
+
+#[test]
+fn finalizes_raw_activity_with_srt_style_zero_phase_smoothing() {
+    let raw_activity = serde_json::json!({
+        "file_name": "raw-smoothed.srt",
+        "file_format": "srt",
+        "raw_samples": [
+            { "elapsed_seconds": 0.0, "distance": 0.0, "elevation": 100.0, "iso": 100.0 },
+            { "elapsed_seconds": 0.25, "distance": 0.0, "elevation": 100.0, "iso": 200.0 },
+            { "elapsed_seconds": 0.5, "distance": 10.0, "elevation": 104.0, "iso": 400.0 },
+            { "elapsed_seconds": 0.75, "distance": 10.0, "elevation": 104.0, "iso": 800.0 },
+            { "elapsed_seconds": 1.0, "distance": 20.0, "elevation": 108.0, "iso": 1600.0 }
+        ],
+        "options": {
+            "skip_idle_gap_fill": true,
+            "smoothing": {
+                "speed": { "enabled": true, "method": "zero_phase_ma", "window_seconds": 0.5 },
+                "vertical_speed": { "enabled": true, "method": "zero_phase_ma", "window_seconds": 1.0 },
+                "elevation": { "enabled": true, "method": "zero_phase_ma", "window_seconds": 1.0 },
+                "iso": { "enabled": true, "method": "zero_phase_ma", "window_seconds": 1.0 }
+            }
+        }
+    });
+
+    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
+        .unwrap()
+        .parsed_activity;
+
+    assert_ne!(
+        activity.speed,
+        vec![None, Some(0.0), Some(40.0), Some(0.0), Some(40.0)]
+    );
+    assert!(activity.speed[2].unwrap() > 0.0);
+    assert!(activity.speed[2].unwrap() < 40.0);
+    assert_ne!(
+        activity.elevation,
+        vec![
+            Some(100.0),
+            Some(100.0),
+            Some(104.0),
+            Some(104.0),
+            Some(108.0)
+        ]
+    );
+    assert_eq!(
+        activity.iso,
+        vec![
+            Some(100.0),
+            Some(200.0),
+            Some(400.0),
+            Some(800.0),
+            Some(1600.0)
+        ]
+    );
+}
+
+#[test]
+fn finalizes_raw_activity_with_circular_ema_without_heading_wrap_glitch() {
+    let raw_activity = serde_json::json!({
+        "file_name": "raw-heading.srt",
+        "file_format": "srt",
+        "raw_samples": [
+            { "elapsed_seconds": 0.0, "heading": 350.0 },
+            { "elapsed_seconds": 1.0, "heading": 355.0 },
+            { "elapsed_seconds": 2.0, "heading": 5.0 },
+            { "elapsed_seconds": 3.0, "heading": 10.0 }
+        ],
+        "options": {
+            "skip_idle_gap_fill": true,
+            "smoothing": {
+                "heading": { "enabled": true, "method": "circular_ema", "window_seconds": 0.5 }
+            }
+        }
+    });
+
+    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.heading[0], Some(350.0));
+    for heading in activity.heading.iter().flatten() {
+        assert!(
+            *heading >= 340.0 || *heading <= 20.0,
+            "heading should stay near north across wrap, got {heading}"
+        );
+    }
+    assert!(activity.heading[2].unwrap() <= 20.0);
+}
+
+#[test]
+fn finalizes_igc_raw_activity_fixture() {
+    let raw_activity_json =
+        fs::read_to_string(common::test_config::igc_raw_activity_path()).unwrap();
+    let activity = finalize_raw_activity_json(&raw_activity_json, None)
+        .unwrap()
+        .parsed_activity;
+
+    let n = activity.sample_elapsed_seconds.len();
+    assert!(n > 0, "expected IGC elapsed samples");
+    assert_eq!(activity.file_format.as_deref(), Some("igc"));
+    assert_eq!(activity.sample_course_points.len(), n);
+    assert_eq!(activity.time.len(), n);
+    assert!(
+        activity
+            .sample_course_points
+            .iter()
+            .any(|(lat, lon)| lat.is_some() && lon.is_some()),
+        "expected IGC course points"
+    );
+    assert!(
+        activity.time.iter().any(Option::is_some),
+        "expected IGC timestamp series"
+    );
+}
+
+#[test]
+fn builds_dense_report_for_full_fixture() {
+    let activity_json = fs::read_to_string(common::test_config::parsed_activity_path()).unwrap();
+    let activity = parse_activity_json(&activity_json).unwrap();
+    let config = parse_and_validate_config(
+        &serde_json::json!({
+            "scene": full_scene(30.0, 0.0, 4672.0),
+            "values": [speed_value()]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let report = build_dense_activity_report_validated(&activity, &config).unwrap();
+
+    assert_eq!(report.frame_count, 140160);
+    assert_eq!(report.frame_elapsed_seconds.first().copied(), Some(0.0));
+    assert!(
+        report
+            .frame_elapsed_seconds
+            .last()
+            .copied()
+            .unwrap_or_default()
+            < 4672.0
+    );
+    assert_eq!(report.series.speed.len(), report.frame_count);
+    assert!(report.series.course_lat.is_empty());
+}
+
+#[test]
+fn trims_non_integer_window_across_multiple_fps() {
+    let activity_json = fs::read_to_string(common::test_config::fit_activity_path()).unwrap();
+    let activity = parse_activity_json(&activity_json).unwrap();
+
+    for (fps, expected_frames) in [(24.0, 708usize), (30.0, 885usize), (60.0, 1770usize)] {
+        let config = parse_and_validate_config(
+            &serde_json::json!({
+                "scene": full_scene(fps, 600.25, 629.75),
+                "values": [serde_json::from_str::<serde_json::Value>(&time_value()).unwrap()]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let report = build_dense_activity_report_validated(&activity, &config).unwrap();
+        assert_eq!(report.frame_count, expected_frames);
+        assert_eq!(report.frame_elapsed_seconds.first().copied(), Some(0.0));
+        assert!(
+            report
+                .frame_elapsed_seconds
+                .last()
+                .copied()
+                .unwrap_or_default()
+                < 29.5
+        );
+        assert_eq!(report.series.time.len(), report.frame_count);
+    }
+}
+
+#[test]
+fn only_densifies_series_requested_by_template() {
+    let activity_json = fs::read_to_string(common::test_config::fit_activity_path()).unwrap();
+    let activity = parse_activity_json(&activity_json).unwrap();
+    let config = parse_and_validate_config(
+        &serde_json::json!({
+            "scene": full_scene(30.0, 600.0, 630.0),
+            "values": [speed_value()],
+            "plots": {
+                "course": {
+                    "value": "course", "x": 0, "y": 0, "width": 200, "height": 100, "rotation": 0.0,
+                    "simplify_tolerance_px": 1.0, "target_density": 1.0,
+                    "completed_line_width": 2.0, "completed_line_color": "#000000",
+                    "completed_line_opacity": 1.0,
+                    "remaining_line_width": 2.0, "remaining_line_color": "#888888",
+                    "remaining_line_opacity": 1.0,
+                    "marker_variant": "single", "marker_variant_diameter": 12.0,
+                    "marker_size": 8.0, "marker_color": "#ff0000", "marker_opacity": 1.0,
+                    "show_full_activity": false
+                }
+            }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let report = build_dense_activity_report_validated(&activity, &config).unwrap();
+
+    assert_eq!(report.series.speed.len(), report.frame_count);
+    assert!(report.series.elevation.is_empty());
+    assert!(report.series.gradient.is_empty());
+    assert!(report.series.time.is_empty());
+    assert!(report.series.course_lat.is_empty());
+    assert!(report.series.course_lon.is_empty());
+    assert_eq!(report.frame_distance_progress.len(), report.frame_count);
+}
+
+#[test]
+fn trimmed_exports_keep_absolute_distance_progress() {
+    let activity_json = fs::read_to_string(common::test_config::fit_activity_path()).unwrap();
+    let activity = parse_activity_json(&activity_json).unwrap();
+    let config = parse_and_validate_config(
+        &serde_json::json!({
+            "scene": full_scene(30.0, 600.0, 630.0),
+            "plots": {
+                "course": {
+                    "value": "course", "x": 0, "y": 0, "width": 200, "height": 100, "rotation": 0.0,
+                    "simplify_tolerance_px": 1.0, "target_density": 1.0,
+                    "completed_line_width": 2.0, "completed_line_color": "#000000",
+                    "completed_line_opacity": 1.0,
+                    "remaining_line_width": 2.0, "remaining_line_color": "#888888",
+                    "remaining_line_opacity": 1.0,
+                    "marker_variant": "single", "marker_variant_diameter": 12.0,
+                    "marker_size": 8.0, "marker_color": "#ff0000", "marker_opacity": 1.0,
+                    "show_full_activity": false
+                }
+            }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let report = build_dense_activity_report_validated(&activity, &config).unwrap();
+
+    let first_progress = report
+        .frame_distance_progress
+        .first()
+        .and_then(|value| *value)
+        .unwrap_or_default();
+    let last_progress = report
+        .frame_distance_progress
+        .last()
+        .and_then(|value| *value)
+        .unwrap_or_default();
+
+    assert!(first_progress > 0.0);
+    assert!(last_progress > first_progress);
+    assert!(last_progress < 1.0);
+}
+
+#[test]
+fn parsed_activity_deserializes_barometric_altitude_series() {
+    let json = serde_json::json!({
+        "sample_elapsed_seconds": [0.0, 1.0, 2.0],
+        "barometric_altitude": [100.0, 110.0, 120.0],
+        "iso": [200.0, 400.0, 800.0],
+        "aperture": [1.7, 2.8, 4.0],
+        "shutter_speed": [0.0003125, 0.001, 0.002],
+        "focal_length": [24.0, 35.0, 50.0],
+        "ev": [0.0, -1.0, 1.5],
+        "color_temperature": [5491.0, 5600.0, 3200.0]
+    });
+    let activity: ParsedActivity = serde_json::from_value(json).unwrap();
+
+    assert_eq!(
+        activity.barometric_altitude,
+        vec![Some(100.0), Some(110.0), Some(120.0)]
+    );
+    assert_eq!(activity.iso, vec![Some(200.0), Some(400.0), Some(800.0)]);
+    assert_eq!(activity.aperture, vec![Some(1.7), Some(2.8), Some(4.0)]);
+    assert_eq!(
+        activity.shutter_speed,
+        vec![Some(0.0003125), Some(0.001), Some(0.002)]
+    );
+    assert_eq!(
+        activity.focal_length,
+        vec![Some(24.0), Some(35.0), Some(50.0)]
+    );
+    assert_eq!(activity.ev, vec![Some(0.0), Some(-1.0), Some(1.5)]);
+    assert_eq!(
+        activity.color_temperature,
+        vec![Some(5491.0), Some(5600.0), Some(3200.0)]
+    );
+}
+
+#[test]
+fn parsed_activity_new_series_default_to_empty() {
+    let json = serde_json::json!({
+        "sample_elapsed_seconds": [0.0, 1.0]
+    });
+    let activity: ParsedActivity = serde_json::from_value(json).unwrap();
+
+    assert!(activity.barometric_altitude.is_empty());
+    assert!(activity.iso.is_empty());
+    assert!(activity.aperture.is_empty());
+    assert!(activity.shutter_speed.is_empty());
+    assert!(activity.focal_length.is_empty());
+    assert!(activity.ev.is_empty());
+    assert!(activity.color_temperature.is_empty());
+}
+
+#[test]
+fn parsed_activity_handles_nulls_in_new_series() {
+    let json = serde_json::json!({
+        "sample_elapsed_seconds": [0.0, 1.0, 2.0],
+        "iso": [200.0, null, 800.0],
+        "ev": [null, -1.0, null]
+    });
+    let activity: ParsedActivity = serde_json::from_value(json).unwrap();
+
+    assert_eq!(activity.iso, vec![Some(200.0), None, Some(800.0)]);
+    assert_eq!(activity.ev, vec![None, Some(-1.0), None]);
+}
+
+#[test]
+fn finalization_emits_calories_and_distance_to_home_series() {
+    let raw_activity = serde_json::json!({
+        "file_name": "activity.fit",
+        "file_format": "fit",
+        "raw_samples": [
+            {"elapsed_seconds": 0.0, "latitude": 0.0, "longitude": 0.0, "calories": 100.0},
+            {"elapsed_seconds": 1.0, "latitude": 0.0, "longitude": 1.0, "calories": 150.0}
+        ]
+    });
+
+    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.calories, vec![Some(100.0), Some(150.0)]);
+    assert_eq!(activity.distance_to_home.first(), Some(&Some(0.0)));
+    assert!((activity.distance_to_home[1].unwrap() - 111_194.927).abs() < 0.001);
+}
+
+#[test]
+fn finalization_rejects_out_of_range_gps_coordinates() {
+    let raw_activity = serde_json::json!({
+        "file_name": "activity.fit",
+        "file_format": "fit",
+        "raw_samples": [
+            {"elapsed_seconds": 0.0, "latitude": 91.0, "longitude": 0.0},
+            {"elapsed_seconds": 1.0, "latitude": 0.0, "longitude": 1.0}
+        ]
+    });
+
+    let error = finalize_raw_activity_json(&raw_activity.to_string(), None).unwrap_err();
+    assert!(error.to_string().contains("Invalid latitude"));
+}
+
+#[test]
+fn hold_interpolation_densifies_iso_as_step_function() {
+    use ovrley_core::activity::interpolate::{densify_activity, frame_timeline_for_fps};
+
+    // iso samples: 200 at t=0, 800 at t=1
+    // With hold interpolation, all frames before t=1 should hold 200
+    let mut trimmed = common::builders::minimal_trimmed_activity(vec![0.0, 1.0]);
+    trimmed.iso = vec![Some(200.0), Some(800.0)];
+    let requirements = RenderDataRequirements {
+        iso: true,
+        ..Default::default()
+    };
+
+    // fps=4 → frames at t=0, 0.25, 0.5, 0.75 (all before t=1)
+    let report = densify_activity(
+        &trimmed,
+        frame_timeline_for_fps(1.0, 4.0).unwrap(),
+        &requirements,
+    );
+
+    assert_eq!(report.series.iso.len(), 4);
+    // Hold: all frames before t=1 should be 200 (the last known value at or before each frame)
+    for (i, value) in report.series.iso.iter().enumerate() {
+        assert_eq!(
+            *value,
+            Some(200.0),
+            "frame {i} should hold 200.0, got {value:?}"
+        );
+    }
+}
+
+#[test]
+fn linear_interpolation_densifies_barometric_altitude_as_smooth_line() {
+    use ovrley_core::activity::interpolate::{densify_activity, frame_timeline_for_fps};
+
+    // barometric-altitude samples: 100 at t=0, 200 at t=1
+    let mut trimmed = common::builders::minimal_trimmed_activity(vec![0.0, 1.0]);
+    trimmed.barometric_altitude = vec![Some(100.0), Some(200.0)];
+    let requirements = RenderDataRequirements {
+        barometric_altitude: true,
+        ..Default::default()
+    };
+
+    // fps=4 → frames at t=0, 0.25, 0.5, 0.75
+    let report = densify_activity(
+        &trimmed,
+        frame_timeline_for_fps(1.0, 4.0).unwrap(),
+        &requirements,
+    );
+
+    assert_eq!(report.series.barometric_altitude.len(), 4);
+    // Linear: t=0→100, t=0.25→125, t=0.5→150, t=0.75→175
+    let expected = [100.0, 125.0, 150.0, 175.0];
+    for (i, (value, exp)) in report
+        .series
+        .barometric_altitude
+        .iter()
+        .zip(expected.iter())
+        .enumerate()
+    {
+        let v = value.unwrap();
+        assert!(
+            (v - exp).abs() < 0.01,
+            "frame {i}: expected ~{exp}, got {v}"
+        );
+    }
+}
+
+#[test]
+fn vehicle_metrics_survive_trim_and_linear_densification() {
+    use ovrley_core::activity::interpolate::{densify_activity, frame_timeline_for_fps};
+    use ovrley_core::activity::trim::trim_activity;
+
+    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({
+        "sample_elapsed_seconds": [0.0, 1.0, 2.0],
+        "rpm": [1000.0, 3000.0, 5000.0],
+        "throttle_position": [0.0, 50.0, 100.0],
+        "brake_position": [100.0, 50.0, 0.0],
+        "lean_angle": [-30.0, 0.0, 30.0]
+    }))
+    .unwrap();
+    let requirements = RenderDataRequirements {
+        rpm: true,
+        throttle_position: true,
+        brake_position: true,
+        lean_angle: true,
+        ..RenderDataRequirements::default()
+    };
+
+    let trimmed = trim_activity(&activity, 0.5, 1.5, &requirements).unwrap();
+    assert_eq!(trimmed.rpm, vec![Some(2000.0), Some(3000.0), Some(4000.0)]);
+    assert_eq!(
+        trimmed.throttle_position,
+        vec![Some(25.0), Some(50.0), Some(75.0)]
+    );
+    assert_eq!(
+        trimmed.brake_position,
+        vec![Some(75.0), Some(50.0), Some(25.0)]
+    );
+    assert_eq!(trimmed.lean_angle, vec![Some(-15.0), Some(0.0), Some(15.0)]);
+
+    let dense = densify_activity(
+        &trimmed,
+        frame_timeline_for_fps(1.0, 2.0).unwrap(),
+        &requirements,
+    );
+    assert_eq!(dense.series.rpm, vec![Some(2000.0), Some(3000.0)]);
+    assert_eq!(dense.series.throttle_position, vec![Some(25.0), Some(50.0)]);
+    assert_eq!(dense.series.brake_position, vec![Some(75.0), Some(50.0)]);
+    assert_eq!(dense.series.lean_angle, vec![Some(-15.0), Some(0.0)]);
+}

@@ -1,1 +1,4 @@
 * text=auto eol=lf
+
+# Raw pixel data, which line ending normalisation would corrupt.
+*.rgba binary

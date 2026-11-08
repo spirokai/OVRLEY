@@ -100,6 +100,9 @@
     "getHevcCodec": "Obtenir le codec HEVC",
     "hevcVideoCannotBePlayed": "Impossible de lire la vidéo HEVC",
     "installCodecForSystem": "Installez le paquet adapté à votre système.",
+    "mapViewHint": "Double-cliquez pour déplacer et zoomer",
+    "mapViewZoomHint": "Double-cliquez pour zoomer",
+    "mapReset": "Réinitialiser",
     "microsoftStoreHevcCodec": "Vous pouvez obtenir le codec HEVC dans le Microsoft Store.",
     "onUbuntu": "Sous Ubuntu :",
     "overlayCanvasReady": "Canevas de superposition prêt",
@@ -557,6 +560,9 @@
       "delta": "Écart",
       "lapLog": "Journal des tours"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Carte", "route": "Itinéraire", "mapTiles": "Tuiles de carte", "route3d": "Itinéraire 3D" }
+    },
     "types": {
       "rolling_chart": { "name": "Graphiques", "shortName": "Graphiques" },
       "diving_profile": {
@@ -581,6 +587,7 @@
       "color_temperature": { "name": "Température de couleur", "shortName": "WB" },
       "core_temperature": { "name": "Température corporelle", "shortName": "Temp. corps" },
       "course": { "name": "Carte du parcours", "shortName": "Carte" },
+      "map": { "name": "Plan des rues", "shortName": "Rues" },
       "distance": { "name": "Distance", "shortName": "Dist." },
       "distance_to_home": { "name": "Distance jusqu’au domicile", "shortName": "Domicile" },
       "elevation": { "name": "Profil altimétrique", "shortName": "Déniv." },
@@ -619,6 +626,23 @@
     }
   },
   "widget-editor": {
+    "cameraMode": "Mode de caméra",
+    "chaseCamera": "Caméra de poursuite",
+    "mapBuildings": "Bâtiments",
+    "mapPaths": "Chemins",
+    "mapLabels": "Libellés",
+    "mapLocalNames": "Noms locaux",
+    "mapWebgl2Unavailable": "WebGL2 n'est pas disponible sur ce système : la carte ne peut pas être prévisualisée.",
+    "mapWebgl2Software": "Aucun GPU détecté. La carte est rendue par logiciel : l'aperçu et l'export peuvent être lents.",
+    "mapStyle": "Style de carte",
+    "mapView": "Vue de la carte",
+    "msaa": "Anticrénelage (MSAA)",
+    "msaaOff": "Désactivé",
+    "northUp": "Nord en haut",
+    "pitch": "Inclinaison",
+    "riderUp": "Direction en haut",
+    "topDown": "Vue de dessus",
+    "zoom": "Zoom",
     "chartMetrics": "Mesures",
     "chartMetric": "Mesure",
     "addMetric": "Ajouter une mesure",
@@ -852,6 +876,7 @@
     "singleCircle": "Cercle unique",
     "smoothing": "Lissage",
     "solidHalo": "Halo plein",
+    "markerArrow": "Flèche",
     "style": "Style",
     "text": "Texte",
     "thickness": "Épaisseur",

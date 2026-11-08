@@ -1,0 +1,87 @@
+THIRD-PARTY NOTICES
+
+OVRLEY is licensed under GPL-3.0-or-later. It includes the third-party components below, each under
+its own license.
+
+
+FFmpeg
+------
+This distribution includes unmodified FFmpeg and FFprobe command-line binaries as separate
+components. OVRLEY runs them as subprocesses (ffmpeg to encode video, ffprobe to read video
+metadata); they are not linked into the OVRLEY executable. The exact build and its license follow at
+the end of this file.
+
+Project: https://ffmpeg.org/
+Source code: https://ffmpeg.org/download.html
+License information: https://ffmpeg.org/legal.html
+Windows and Linux builds: BtbN FFmpeg builds, https://github.com/BtbN/FFmpeg-Builds
+macOS builds: https://ffmpeg.martin-riedl.de/
+
+
+Skia and rust-skia
+------------------
+The widget preview renderer is Skia (BSD-3-Clause, Copyright (c) 2011 Google Inc.) through rust-skia
+(MIT, Copyright (c) 2019 LongYinan & Armin Sander, rust-skia Contributors), compiled to WebAssembly
+together with Expat, FreeType, libjpeg-turbo, libpng, Wuffs and zlib. Their license texts follow at
+the end of this file.
+
+This software is based in part on the work of the Independent JPEG Group.
+Portions of this software are copyright (c) The FreeType Project (https://freetype.org). All rights
+reserved.
+
+
+maplibre-rs
+-----------
+The map renderer's method is ported from maplibre-rs (https://github.com/maplibre/maplibre-rs).
+License: MIT. Copyright (c) 2022 MapLibre contributors.
+
+
+MapLibre style specification
+----------------------------
+The map style validator embeds the style reference of @maplibre/maplibre-gl-style-spec and ports its
+validator (https://github.com/maplibre/maplibre-style-spec).
+License: BSD-3-Clause. Copyright (c) 2020, MapLibre contributors.
+
+
+Map styles and map data
+-----------------------
+The map styles in map-styles/ and the bundled fill patterns are from OpenFreeMap styles
+(https://github.com/hyperknot/openfreemap-styles), MIT License, Copyright (c) 2023 Zsolt Ero. Each
+style is a fork, with code under BSD 3-Clause and design under CC BY 4.0:
+
+- Positron: openmaptiles/positron-gl-style. Derived from CartoDB Basemaps designed by Stamen and
+  Paul Norman for CartoDB Inc., CC BY 3.0.
+- Bright: openmaptiles/osm-bright-gl-style. Derived from Mapbox Open Styles.
+- Liberty: maputnik/osm-liberty, a fork of OSM Bright.
+- Dark: openmaptiles/dark-matter-gl-style.
+- Fiord: openmaptiles/fiord-color-gl-style.
+
+Map data (c) OpenStreetMap contributors (https://www.openstreetmap.org/copyright). Tiles follow the
+OpenMapTiles schema (https://openmaptiles.org/) and are served by OpenFreeMap
+(https://openfreemap.org/).
+
+
+Fonts
+-----
+These fonts are licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org):
+
+- Inter: Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
+- JetBrains Mono: Copyright 2020 The JetBrains Mono Project Authors
+  (https://github.com/JetBrains/JetBrainsMono)
+- Oxanium: Copyright 2019 The Oxanium Project Authors (https://github.com/sevmeyer/oxanium)
+- Rajdhani: Copyright (c) 2014 Indian Type Foundry
+- Saira Stencil: Copyright 2020 The Saira Project Authors (https://github.com/Omnibus-Type/Saira)
+- Share Tech Mono: Copyright (c) 2012, Carrois Type Design, Ralph du Carrois, with Reserved Font
+  Name 'Share'
+- Teko: Copyright 2023 The Teko Project Authors (https://www.github.com/googlefonts/teko)
+- Noto Sans and Noto Sans Hebrew: Copyright 2022-2024 The Noto Project Authors
+  (https://github.com/notofonts)
+- Noto Sans CJK SC, subset to the characters map labels use: Copyright 2014-2021 Adobe
+  (http://www.adobe.com/)
+
+Furore: Copyright (c) 2009 by Daniel Pouzeot, Jovanny Lemonad. Distributed by its authors as a
+freeware font, without an explicit license.
+
+Evogria: Copyright (c) 2014, Situjuh Nazara (c7nazara@gmail.com), with Reserved Font Name Evogria.
+Free for personal use under the 1001Fonts Free For Personal Use License
+(http://www.1001fonts.com/licenses/ffp.html); commercial use requires the author's permission.

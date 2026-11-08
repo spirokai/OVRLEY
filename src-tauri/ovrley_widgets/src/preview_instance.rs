@@ -5,6 +5,7 @@ use crate::{
     render::{image::ImageSource, text::FontResolver},
     widgets::value::preview::{TileBounds, WidgetGeometry},
 };
+use ovrley_map::MapStyleCatalog;
 use serde::{Deserialize, Serialize};
 
 impl WidgetRequest {
@@ -20,6 +21,9 @@ impl WidgetRequest {
                 widget, transient, ..
             } => ([widget.x as f64, widget.y as f64], *transient),
             Self::Route {
+                widget, transient, ..
+            } => ([widget.x as f64, widget.y as f64], *transient),
+            Self::Map {
                 widget, transient, ..
             } => ([widget.x as f64, widget.y as f64], *transient),
             Self::Raster {
@@ -93,6 +97,13 @@ impl WidgetRequest {
                 widget.y = 0.0;
                 *transient = false;
             }
+            Self::Map {
+                widget, transient, ..
+            } => {
+                widget.x = 0.0;
+                widget.y = 0.0;
+                *transient = false;
+            }
             Self::Raster {
                 widget, transient, ..
             } => {
@@ -160,12 +171,13 @@ impl PreviewInstance {
         request: WidgetRequest,
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
+        map_styles: Option<&MapStyleCatalog>,
     ) -> WidgetResult<Self> {
         let (position, _) = request.placement()?;
         let mut config = request.clone();
         config.pixel_config();
         let mut instance = Self {
-            widget: PreviewWidget::new(request, fonts, images)?,
+            widget: PreviewWidget::new(request, fonts, images, map_styles)?,
             config,
             origin: position,
             position,
@@ -183,6 +195,7 @@ impl PreviewInstance {
         request: WidgetRequest,
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
+        map_styles: Option<&MapStyleCatalog>,
     ) -> WidgetResult<()> {
         let (position, transient) = request.placement()?;
         let mut config = request.clone();
@@ -230,11 +243,14 @@ impl PreviewInstance {
                     transient,
                 },
             ) => route.update(widget, scene, transient)?,
+            (PreviewWidget::Map(map), WidgetRequest::Map { widget, scene, .. }) => {
+                map.update(widget, scene, map_styles, fonts)?
+            }
             (PreviewWidget::Raster(raster), WidgetRequest::Raster { widget, scene, .. }) => {
                 raster.update(widget, scene, images)?
             }
             (_, request) => {
-                self.widget = PreviewWidget::new(request, fonts, images)?;
+                self.widget = PreviewWidget::new(request, fonts, images, map_styles)?;
                 self.rendered_revision = None;
             }
         }

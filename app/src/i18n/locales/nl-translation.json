@@ -100,6 +100,9 @@
     "getHevcCodec": "HEVC-codec verkrijgen",
     "hevcVideoCannotBePlayed": "HEVC-video kan niet worden afgespeeld",
     "installCodecForSystem": "Installeer het juiste pakket voor uw systeem.",
+    "mapViewHint": "Dubbelklik om te verschuiven en te zoomen",
+    "mapViewZoomHint": "Dubbelklik om te zoomen",
+    "mapReset": "Herstellen",
     "microsoftStoreHevcCodec": "U kunt de HEVC-codec verkrijgen in de Microsoft Store.",
     "onUbuntu": "Op Ubuntu:",
     "overlayCanvasReady": "Overlaycanvas gereed",
@@ -557,6 +560,9 @@
       "delta": "Delta",
       "lapLog": "Rondeoverzicht"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Kaart", "route": "Route", "mapTiles": "Kaarttegels", "route3d": "3D-route" }
+    },
     "types": {
       "rolling_chart": { "name": "Grafieken", "shortName": "Grafieken" },
       "diving_profile": {
@@ -581,6 +587,7 @@
       "color_temperature": { "name": "Kleurtemperatuur", "shortName": "WB" },
       "core_temperature": { "name": "Kerntemperatuur", "shortName": "Kerntemp." },
       "course": { "name": "Routekaart", "shortName": "Kaart" },
+      "map": { "name": "Stratenkaart", "shortName": "Straten" },
       "distance": { "name": "Afstand", "shortName": "Afstand" },
       "distance_to_home": { "name": "Afstand tot huis", "shortName": "Thuis" },
       "elevation": { "name": "Hoogteprofiel", "shortName": "Profiel" },
@@ -619,6 +626,23 @@
     }
   },
   "widget-editor": {
+    "cameraMode": "Cameramodus",
+    "chaseCamera": "Volgcamera",
+    "mapBuildings": "Gebouwen",
+    "mapPaths": "Paden",
+    "mapLabels": "Labels",
+    "mapLocalNames": "Lokale namen",
+    "mapWebgl2Unavailable": "WebGL2 is niet beschikbaar op dit systeem, dus de kaart kan niet worden bekeken.",
+    "mapWebgl2Software": "Geen GPU gevonden. De kaart wordt softwarematig weergegeven, dus voorbeeld en export kunnen traag zijn.",
+    "mapStyle": "Kaartstijl",
+    "mapView": "Kaartweergave",
+    "msaa": "Anti-aliasing (MSAA)",
+    "msaaOff": "Uit",
+    "northUp": "Noorden boven",
+    "pitch": "Helling",
+    "riderUp": "Rijrichting boven",
+    "topDown": "Bovenaanzicht",
+    "zoom": "Zoom",
     "chartMetrics": "Meetwaarden",
     "chartMetric": "Meetwaarde",
     "addMetric": "Meetwaarde toevoegen",
@@ -852,6 +876,7 @@
     "singleCircle": "Eén cirkel",
     "smoothing": "Verzachting",
     "solidHalo": "Effen halo",
+    "markerArrow": "Pijl",
     "style": "Stijl",
     "text": "Tekst",
     "thickness": "Dikte",

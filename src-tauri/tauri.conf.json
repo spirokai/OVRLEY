@@ -13,6 +13,8 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
+        "create": false,
         "title": "OVRLEY",
         "backgroundColor": "#00111b",
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required --disable_direct_composition_video_overlays=1",
@@ -43,8 +45,9 @@
     "resources": {
       "../fonts": "fonts",
       "../templates": "templates",
+      "../assets/map-styles": "map-styles",
       "../vendor/ffmpeg": "vendor/ffmpeg",
-      "../THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt"
+      "target/packaging/THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt"
     },
     "linux": {
       "deb": {
@@ -58,7 +61,7 @@
           "libssl3",
           "libwebkit2gtk-4.1-0"
         ],
-        "recommends": ["intel-media-va-driver | intel-media-va-driver-non-free", "mesa-va-drivers | mesa-libgallium"]
+        "recommends": ["intel-media-va-driver | intel-media-va-driver-non-free", "mesa-va-drivers | mesa-libgallium", "mesa-vulkan-drivers"]
       }
     },
     "icon": ["icons/32x32.png", "icons/64x64.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico", "icons/icon.png"]

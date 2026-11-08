@@ -104,6 +104,7 @@ pub fn batch_video_plan(
             inspection,
             request,
             None,
+            None,
             std::sync::Arc::new(Capture(std::sync::Mutex::new(send))),
         )
         .map_err(|error| CoreError::Config(format!("Submission failed: {error:?}")))?;

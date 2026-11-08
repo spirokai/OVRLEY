@@ -70,6 +70,8 @@ function setWidgetSelectionState(state, widgetIds, preferredWidgetId = null) {
 
   state.selectedWidgetIds = nextSelectedWidgetIds
   state.selectedWidgetId = getPrimarySelectionId(nextSelectedWidgetIds, preferredWidgetId)
+  // A click outside the map selects something else, which ends its view mode.
+  state.mapViewWidgetId = null
 }
 
 /**
@@ -90,6 +92,8 @@ export function createEditorSlice(set, get) {
     editorDocumentRevision: 0,
     selectedWidgetId: null,
     selectedWidgetIds: [],
+    /** The selected map whose drag and wheel pan and zoom its view instead of moving it. */
+    mapViewWidgetId: null,
     isMarqueeSelecting: false,
     previewInterpolationEnabled: true,
     hasUnrenderedChanges: false,
@@ -270,6 +274,11 @@ export function createEditorSlice(set, get) {
     setWidgetSelection: (widgetIds, preferredWidgetId = null) =>
       set((state) => {
         setWidgetSelectionState(state, widgetIds, preferredWidgetId)
+      }),
+
+    setMapViewWidgetId: (widgetId) =>
+      set((state) => {
+        state.mapViewWidgetId = widgetId
       }),
 
     setMarqueeSelecting: (isMarqueeSelecting) =>

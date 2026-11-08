@@ -100,6 +100,9 @@
     "getHevcCodec": "Получить кодек HEVC",
     "hevcVideoCannotBePlayed": "Видео HEVC невозможно воспроизвести",
     "installCodecForSystem": "Установите подходящий пакет для вашей системы.",
+    "mapViewHint": "Дважды щёлкните, чтобы сдвигать и масштабировать",
+    "mapViewZoomHint": "Дважды щёлкните, чтобы масштабировать",
+    "mapReset": "Сбросить",
     "microsoftStoreHevcCodec": "Кодек HEVC можно получить в Microsoft Store.",
     "onUbuntu": "В Ubuntu:",
     "overlayCanvasReady": "Холст оверлея готов",
@@ -557,6 +560,9 @@
       "delta": "Дельта",
       "lapLog": "Журнал кругов"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Карта", "route": "Маршрут", "mapTiles": "Тайлы карты", "route3d": "3D-маршрут" }
+    },
     "types": {
       "rolling_chart": { "name": "Графики", "shortName": "Графики" },
       "diving_profile": {
@@ -581,6 +587,7 @@
       "color_temperature": { "name": "Цветовая температура", "shortName": "WB" },
       "core_temperature": { "name": "Температура тела", "shortName": "Темп. тела" },
       "course": { "name": "Карта маршрута", "shortName": "Карта" },
+      "map": { "name": "Карта улиц", "shortName": "Улицы" },
       "distance": { "name": "Расстояние", "shortName": "Расст." },
       "distance_to_home": { "name": "Расстояние до дома", "shortName": "Дом" },
       "elevation": { "name": "Профиль высот", "shortName": "Профиль" },
@@ -619,6 +626,23 @@
     }
   },
   "widget-editor": {
+    "cameraMode": "Режим камеры",
+    "chaseCamera": "Камера слежения",
+    "mapBuildings": "Здания",
+    "mapPaths": "Дорожки",
+    "mapLabels": "Подписи",
+    "mapLocalNames": "Местные названия",
+    "mapWebgl2Unavailable": "WebGL2 недоступен в этой системе, поэтому карту нельзя просмотреть.",
+    "mapWebgl2Software": "GPU не найден. Карта отрисовывается программно, поэтому предпросмотр и экспорт могут работать медленно.",
+    "mapStyle": "Стиль карты",
+    "mapView": "Вид карты",
+    "msaa": "Сглаживание (MSAA)",
+    "msaaOff": "Выкл.",
+    "northUp": "Север сверху",
+    "pitch": "Наклон",
+    "riderUp": "Направление движения сверху",
+    "topDown": "Вид сверху",
+    "zoom": "Масштаб",
     "chartMetrics": "Метрики",
     "chartMetric": "Метрика",
     "addMetric": "Добавить метрику",
@@ -852,6 +876,7 @@
     "singleCircle": "Одиночный круг",
     "smoothing": "Сглаживание",
     "solidHalo": "Сплошной ореол",
+    "markerArrow": "Стрелка",
     "style": "Стиль",
     "text": "Текст",
     "thickness": "Толщина",

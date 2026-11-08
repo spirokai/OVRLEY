@@ -6,6 +6,7 @@ const moveable = vi.hoisted(() => vi.fn(() => null))
 vi.mock('react-moveable', () => ({ default: moveable }))
 
 const props = {
+  canDragSelected: true,
   canResizeSelected: true,
   canRotateSelected: false,
   elementGuidelines: [],
@@ -15,6 +16,7 @@ const props = {
   handlers: { onResize: vi.fn(), onDragGroup: vi.fn(), onResizeGroupStart: vi.fn(), onResizeGroup: vi.fn(), onResizeGroupEnd: vi.fn() },
   isGroupDragActive: false,
   isGroupSelection: false,
+  isMapView: false,
   maintainAspectRatio: true,
   moveableRef: { current: null },
   sceneElement: document.createElement('div'),

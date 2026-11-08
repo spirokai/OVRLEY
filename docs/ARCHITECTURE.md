@@ -179,7 +179,11 @@ cyclemetry/
 ├── templates/                    # Bundled template JSON files
 ├── fonts/                        # Bundled fonts (Evogria, Furore)
 ├── vendor/ffmpeg/                # FFmpeg binaries (downloaded by postinstall)
-├── scripts/                      # Build & packaging scripts
+├── scripts/                      # Dev tooling: tauri wrapper, pnpm hooks, FFmpeg install
+│   ├── wasm/                     # WASM preview builds (widgets, map, Skia) + Vite plugin
+│   └── release/                  # Version stamping, updater latest.json
+├── packaging/                    # Release packaging: notices, install guides, portable ZIP,
+│                                 # AppImage, Flatpak
 ├── .github/workflows/            # CI/CD (release, semantic-release)
 └── .agents/                      # Agent development guides
 ```
@@ -842,7 +846,7 @@ pnpm tauri build
     ├── Vite builds app/ → app/dist/
     ├── Cargo builds src-tauri/ (Rust compilation)
     └── Tauri bundles: portable ZIP (Windows), app bundle (macOS)
-        └── scripts/package-portable.mjs: creates standalone ZIP
+        └── packaging/portable.mjs: creates standalone ZIP
             ├── OVRLEY binary
             ├── vendor/ffmpeg/
             ├── fonts/

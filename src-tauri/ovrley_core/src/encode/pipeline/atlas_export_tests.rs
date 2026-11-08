@@ -104,7 +104,7 @@ fn transparent_config(activity_end: f64) -> RenderConfig {
 fn export_transparent(paths: &AppPaths, planned: bool) -> (AtlasPlan, PathBuf) {
     let activity = activity();
     let activity_end = validate_render_activity(&activity).unwrap();
-    let plan = plan_single_render(transparent_config(activity_end), activity_end, None).unwrap();
+    let plan = plan_single_render(transparent_config(activity_end), activity_end, None, None).unwrap();
     let dense = plan.prepare_activity(&activity).unwrap();
     let PlannedVideoRender { config, mode, .. } = plan;
     let VideoRenderModePlan::Transparent(render) = mode else {
@@ -122,6 +122,7 @@ fn export_transparent(paths: &AppPaths, planned: bool) -> (AtlasPlan, PathBuf) {
         &dense,
         size,
         render.coverage.blank_leading_frame_count,
+        crate::render::ExportMapJob { source: None, frame_indices: &[], controller: &crate::encode::progress::RenderController::default() },
         &mut profiler,
     )
     .unwrap();
@@ -155,7 +156,7 @@ fn export_transparent(paths: &AppPaths, planned: bool) -> (AtlasPlan, PathBuf) {
 fn export(paths: &AppPaths, planned: bool) -> (AtlasPlan, PathBuf) {
     let activity = activity();
     let activity_end = validate_render_activity(&activity).unwrap();
-    let plan = plan_single_render(config(activity_end), activity_end, None).unwrap();
+    let plan = plan_single_render(config(activity_end), activity_end, None, None).unwrap();
     let dense = plan.prepare_activity(&activity).unwrap();
     let PlannedVideoRender { config, mode, .. } = plan;
     let VideoRenderModePlan::Composite { render, .. } = mode else {
@@ -176,6 +177,7 @@ fn export(paths: &AppPaths, planned: bool) -> (AtlasPlan, PathBuf) {
         &dense,
         size,
         render.coverage.blank_leading_frame_count,
+        crate::render::ExportMapJob { source: None, frame_indices: &[], controller: &crate::encode::progress::RenderController::default() },
         &mut profiler,
     )
     .unwrap();

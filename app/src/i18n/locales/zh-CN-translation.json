@@ -100,6 +100,9 @@
     "getHevcCodec": "获取 HEVC 编解码器",
     "hevcVideoCannotBePlayed": "无法播放 HEVC 视频",
     "installCodecForSystem": "请为您的系统安装正确的软件包。",
+    "mapViewHint": "双击以平移和缩放",
+    "mapViewZoomHint": "双击以缩放",
+    "mapReset": "重置",
     "microsoftStoreHevcCodec": "您可以从 Microsoft Store 获取 HEVC 编解码器。",
     "onUbuntu": "在 Ubuntu 上:",
     "overlayCanvasReady": "叠加层画布已准备就绪",
@@ -557,6 +560,9 @@
       "delta": "差值",
       "lapLog": "圈记录"
     },
+    "drawerGroups": {
+      "map": { "shortName": "地图", "route": "路线", "mapTiles": "地图瓦片", "route3d": "3D 路线" }
+    },
     "types": {
       "rolling_chart": { "name": "图表", "shortName": "图表" },
       "diving_profile": {
@@ -581,6 +587,7 @@
       "color_temperature": { "name": "色温", "shortName": "色温" },
       "core_temperature": { "name": "核心体温", "shortName": "核心体温" },
       "course": { "name": "路线地图", "shortName": "地图" },
+      "map": { "name": "街道地图", "shortName": "街道" },
       "distance": { "name": "距离", "shortName": "距离" },
       "distance_to_home": { "name": "距家距离", "shortName": "家" },
       "elevation": { "name": "海拔", "shortName": "海拔" },
@@ -619,6 +626,23 @@
     }
   },
   "widget-editor": {
+    "cameraMode": "相机模式",
+    "chaseCamera": "追踪相机",
+    "mapBuildings": "建筑",
+    "mapPaths": "小路",
+    "mapLabels": "标注",
+    "mapLocalNames": "本地名称",
+    "mapWebgl2Unavailable": "此系统不支持 WebGL2，因此无法预览地图。",
+    "mapWebgl2Software": "未找到 GPU。地图使用软件渲染，预览和导出可能较慢。",
+    "mapStyle": "地图样式",
+    "mapView": "地图视图",
+    "msaa": "抗锯齿 (MSAA)",
+    "msaaOff": "关闭",
+    "northUp": "北向朝上",
+    "pitch": "俯仰",
+    "riderUp": "行进方向朝上",
+    "topDown": "俯视",
+    "zoom": "缩放",
     "chartMetrics": "指标",
     "chartMetric": "指标",
     "addMetric": "添加指标",
@@ -852,6 +876,7 @@
     "singleCircle": "单圆",
     "smoothing": "平滑",
     "solidHalo": "实心光晕",
+    "markerArrow": "箭头",
     "style": "样式",
     "text": "文本",
     "thickness": "粗细",

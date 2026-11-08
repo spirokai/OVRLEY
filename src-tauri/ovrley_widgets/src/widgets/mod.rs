@@ -12,6 +12,7 @@ pub mod heart_zones;
 pub mod label;
 pub mod lap_timer;
 pub mod lean_angle;
+pub mod map;
 pub mod plot_marker;
 pub mod raster;
 pub mod rolling_chart;

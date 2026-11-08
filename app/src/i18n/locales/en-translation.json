@@ -100,6 +100,9 @@
     "getHevcCodec": "Get HEVC codec",
     "hevcVideoCannotBePlayed": "HEVC video cannot be played",
     "installCodecForSystem": "Install the correct package for your system.",
+    "mapViewHint": "Double-click to pan & zoom",
+    "mapViewZoomHint": "Double-click to zoom",
+    "mapReset": "Reset",
     "microsoftStoreHevcCodec": "You can get the HEVC codec from the Microsoft Store.",
     "onUbuntu": "On Ubuntu:",
     "overlayCanvasReady": "Overlay canvas ready",
@@ -557,6 +560,9 @@
       "delta": "Delta",
       "lapLog": "Lap Log"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Map", "route": "Route", "mapTiles": "Map Tiles", "route3d": "3D Route" }
+    },
     "types": {
       "rolling_chart": { "name": "Charts", "shortName": "Charts" },
       "diving_profile": {
@@ -581,6 +587,7 @@
       "color_temperature": { "name": "Color Temperature", "shortName": "WB" },
       "core_temperature": { "name": "Core Temperature", "shortName": "Core T." },
       "course": { "name": "Route Map", "shortName": "Map" },
+      "map": { "name": "Street Map", "shortName": "Streets" },
       "distance": { "name": "Distance", "shortName": "Dist." },
       "distance_to_home": { "name": "Distance to Home", "shortName": "Home" },
       "elevation": { "name": "Elevation", "shortName": "Elev." },
@@ -619,6 +626,23 @@
     }
   },
   "widget-editor": {
+    "cameraMode": "Camera Mode",
+    "chaseCamera": "Chase Camera",
+    "mapBuildings": "Buildings",
+    "mapPaths": "Paths",
+    "mapLabels": "Labels",
+    "mapLocalNames": "Local Names",
+    "mapWebgl2Unavailable": "WebGL2 isn't available on this system, so the map can't be previewed.",
+    "mapWebgl2Software": "No GPU found. The map draws in software, so its preview and export may be slow.",
+    "mapStyle": "Map Style",
+    "mapView": "Map View",
+    "msaa": "Anti-aliasing (MSAA)",
+    "msaaOff": "Off",
+    "northUp": "North Up",
+    "pitch": "Pitch",
+    "riderUp": "Rider Up",
+    "topDown": "Top Down",
+    "zoom": "Zoom",
     "chartMetrics": "Metrics",
     "chartMetric": "Metric",
     "addMetric": "Add metric",
@@ -852,6 +876,7 @@
     "singleCircle": "Single Circle",
     "smoothing": "Smoothing",
     "solidHalo": "Solid Halo",
+    "markerArrow": "Arrow",
     "style": "Style",
     "text": "Text",
     "thickness": "Thickness",

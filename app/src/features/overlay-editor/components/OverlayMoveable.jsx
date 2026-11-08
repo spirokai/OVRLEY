@@ -10,7 +10,9 @@ export default function OverlayMoveable({
   selectedTargets,
   isGroupSelection,
   isGroupDragActive,
+  isMapView,
   sceneElement,
+  canDragSelected,
   canResizeSelected,
   canRotateSelected,
   maintainAspectRatio,
@@ -27,6 +29,7 @@ export default function OverlayMoveable({
     <Moveable
       ref={moveableRef}
       className="ovrley-moveable"
+      isMapView={isMapView}
       target={selectedTarget ?? undefined}
       targets={selectedTargets.length ? selectedTargets : undefined}
       container={sceneElement}
@@ -37,7 +40,7 @@ export default function OverlayMoveable({
       passDragArea={isGroupSelection}
       ables={SELECTION_BORDER_ABLES}
       hideChildMoveableDefaultLines={isGroupDragActive && isGroupSelection}
-      draggable
+      draggable={canDragSelected}
       resizable={canResizeSelected}
       checkResizableError={false}
       scalable={false}
@@ -88,13 +91,20 @@ const SELECTION_BORDER_ABLES = [
         return [pos1, pos2, pos4, pos3].map(([x, y]) => ({ x: left + x, y: top + y }))
       })
       return [
-        React.createElement(SelectionBorder, { key: 'selection-border', container: moveable.getContainer(), borders, zoom: moveable.props.zoom }),
+        React.createElement(SelectionBorder, {
+          key: 'selection-border',
+          container: moveable.getContainer(),
+          borders,
+          zoom: moveable.props.zoom,
+          dashed: moveable.props.isMapView,
+        }),
       ]
     },
   },
 ]
 
-function SelectionBorder({ container, borders, zoom }) {
+// A dashed border marks a map whose drag and wheel adjust its view instead of moving it.
+function SelectionBorder({ container, borders, zoom, dashed }) {
   const border = useSelectionBorder(container, borders, zoom)
   if (border === null) return null // Measured in the layout effect before the first paint.
   return createPortal(
@@ -103,7 +113,12 @@ function SelectionBorder({ container, borders, zoom }) {
       className="ovrley-moveable ovrley-selection-border"
       style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 1, clipPath: border.clipPath }}
     >
-      <g fill="none" stroke="var(--theme-color-accent)" strokeWidth={border.strokeWidth}>
+      <g
+        fill="none"
+        stroke="var(--theme-color-accent)"
+        strokeWidth={dashed ? border.strokeWidth * 2 : border.strokeWidth}
+        strokeDasharray={dashed ? `${border.strokeWidth * 8} ${border.strokeWidth * 5}` : undefined}
+      >
         {border.polygons.map((points, index) => (
           <polygon key={index} points={points} />
         ))}

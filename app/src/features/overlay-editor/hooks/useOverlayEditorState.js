@@ -8,6 +8,7 @@ import { convertFileSrc } from '@tauri-apps/api/core'
 import { resolveVideoSyncMarkControls } from '@/features/video-sync'
 import { useWasmWidgetInteractions } from '@/features/wasm-widgets/hooks/useWasmWidgetInteractions'
 import { buildWasmScene } from '@/features/wasm-widgets/utils/previewScene'
+import { getWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 import {
   getEditorGridSize,
   getOrderedWidgetIds,
@@ -21,6 +22,7 @@ import {
 import useWidgetSelection from './useWidgetSelection'
 import { useEditorViewport } from './useEditorViewport'
 import { useEditorKeyboard } from './useEditorKeyboard'
+import { useMapViewGesture } from './useMapViewGesture'
 import { useOverlayPreviewStore, useVideoSyncPreviewSecond } from '@/hooks/useAppStoreSelectors'
 import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
@@ -70,7 +72,7 @@ export default function useOverlayEditorState({
   const clipboardRef = useRef(null)
   const gridRef = useRef(null)
   const [sceneElement, setSceneElement] = useState(null)
-  const { liveGlobalDefaults, liveWidgetDrafts, widgetNodes, clearWidgetDrafts, resetWidgetDrafts, setLiveWidgetDraft, setLiveWidgetDrafts } =
+  const { liveGlobalDefaults, liveWidgetDrafts, widgetNodes, clearGesturePatches, resetWidgetDrafts, setGesturePatches, setLiveWidgetDraft } =
     useWidgetDraftView(widgetLiveEdits)
   // Global default slider drags preview through drafts and commit once on release.
   const globalDefaults = useMemo(() => ({ ...committedGlobalDefaults, ...liveGlobalDefaults }), [committedGlobalDefaults, liveGlobalDefaults])
@@ -96,7 +98,7 @@ export default function useOverlayEditorState({
 
   const state = {
     activity: parsedActivity,
-    clearWidgetDrafts,
+    clearGesturePatches,
     commitWidgetUpdate: commitUpdate,
     commitWidgetUpdates: commitUpdates,
     config,
@@ -106,8 +108,7 @@ export default function useOverlayEditorState({
     widgetMap,
     sceneElement,
     sceneSize,
-    setLiveWidgetDraft,
-    setLiveWidgetDrafts,
+    setGesturePatches,
     setSceneElement,
     widgetNodes,
     widgetRefCallbacks,
@@ -116,6 +117,7 @@ export default function useOverlayEditorState({
   const viewportContentSize = useMemo(() => getViewportContentSize(sceneSize, videoSyncMode), [sceneSize, videoSyncMode])
   const viewport = useEditorViewport({ contentSize: viewportContentSize, onZoomLevelChange, sceneElement, sceneSize, snapToGrid, zoomLevel })
   const selection = useWidgetSelection({ ...state, displayScale: viewport.displayScale })
+  const { mapViewWidget } = selection
   useEditorKeyboard({
     config,
     editorShell,
@@ -124,6 +126,15 @@ export default function useOverlayEditorState({
     selectedWidgetIds: selection.selectedWidgetIds,
     selectedWidgets: selection.selectedWidgets,
     setWidgetSelection: selection.setWidgetSelection,
+  })
+  useMapViewGesture({
+    widget: mapViewWidget,
+    node: mapViewWidget === null ? undefined : widgetNodes[mapViewWidget.id],
+    sceneElement,
+    widgetMap,
+    setLiveWidgetDraft,
+    commitWidgetUpdate: commitUpdate,
+    setMapViewWidgetId: selection.setMapViewWidgetId,
   })
   const handlers = useWasmWidgetInteractions({
     selectedWidget: selection.selectedWidget,
@@ -159,6 +170,7 @@ export default function useOverlayEditorState({
     sceneSize,
     setSceneElement,
     widgets,
+    widgetMap,
     widgetRefCallbacks,
     viewport,
     viewportContentSize,
@@ -166,7 +178,11 @@ export default function useOverlayEditorState({
     gridRef,
     backgroundImageSrc: importedBackgroundImagePath === null ? null : convertFileSrc(importedBackgroundImagePath),
     gridStyle: { transform: `scale(${1 / viewport.displayScale})`, transformOrigin: 'top left' },
+    handleSceneDoubleClick: selection.handleSceneDoubleClick,
+    resetMapView: (widgetId) =>
+      commitUpdate(widgetId, getWidgetInteraction(widgetNodes[widgetId]).resize({ widget: widgetMap[widgetId].data, map_view: 'fit' })),
     handleSceneMouseDown: selection.handleSceneMouseDown,
+    mapViewWidgetId: mapViewWidget === null ? null : mapViewWidget.id,
     handleWidgetMouseDown: selection.handleWidgetMouseDown,
     handleCanvasMouseOver: selection.handleCanvasMouseOver,
     handleCanvasMouseLeave: selection.handleCanvasMouseLeave,
@@ -175,13 +191,14 @@ export default function useOverlayEditorState({
     setStageElement: selection.setStageElement,
     videoSyncMarkControls: markControls,
     moveableProps: {
-      ...getWidgetResizeOptions(selection.selectedWidget, selection.isGroupSelection),
+      ...getWidgetResizeOptions(selection.selectedWidget, selection.isGroupSelection, mapViewWidget !== null),
       moveableRef,
       sceneElement,
       selectedTarget: selection.selectedTarget,
       selectedTargets: selection.selectedTargets,
       isGroupSelection: selection.isGroupSelection,
       isGroupDragActive: selection.isGroupDragActive,
+      isMapView: mapViewWidget !== null,
       elementGuidelines: selection.elementGuidelines,
       horizontalGuidelines: viewport.horizontalGuidelines,
       verticalGuidelines: viewport.verticalGuidelines,

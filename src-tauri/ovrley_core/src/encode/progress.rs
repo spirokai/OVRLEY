@@ -355,6 +355,20 @@ impl RenderController {
         Ok(())
     }
 
+    /// Updates what a preparing item says it is doing, published at most ~10 Hz.
+    pub(crate) fn set_preparing_message(&self, message: String) {
+        let mut session = self.session.lock().expect("render session mutex poisoned");
+        let now = Instant::now();
+        let due = session
+            .last_fps_emit_at
+            .is_none_or(|previous| now.duration_since(previous) >= PROGRESS_EMIT_MIN_INTERVAL);
+        session.progress.message = message;
+        if due {
+            session.last_fps_emit_at = Some(now);
+            self.publish_progress(session);
+        }
+    }
+
     /// Publishes encoding startup without overwriting a pending cancellation.
     pub fn start_encoding(&self) -> CoreResult<()> {
         let mut session = self.session.lock().expect("render session mutex poisoned");
