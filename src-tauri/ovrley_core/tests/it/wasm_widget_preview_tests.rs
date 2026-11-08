@@ -436,8 +436,8 @@ fn assert_atlas_frames_match_the_full_frame(
 
 /// The planned atlas holds every widget's bounds of every planned frame, and compositing its
 /// slots in order over a transparent frame at their scene positions gives the full-frame plan's
-/// frame: within one level of anti-aliasing rounding where one slot covers a pixel, within
-/// 8-bit blending rounding where slots overlap.
+/// frame: flat pixels within one level of rounding where one slot covers them, within 8-bit
+/// blending rounding where slots overlap, and anti-aliased edge pixels roughly.
 fn assert_atlas_reassembles_the_full_frame(
     name: &str,
     export: &ovrley_core::render::ExportWidgets,
@@ -511,15 +511,23 @@ fn assert_atlas_reassembles_the_full_frame(
         }
         drew |= expected.iter().skip(3).step_by(4).any(|alpha| *alpha > 0);
         let matches = |pixel: usize| {
+            // Skia snaps a stroked path's points to 1/64 px after placing them, and float rounding
+            // at the full frame's larger coordinates can land a point on a neighbouring step, so an
+            // anti-aliased edge pixel's coverage is not stable under a whole-pixel shift: a route a
+            // few thousand pixels across shifts edges by several levels. Edges therefore only need
+            // to roughly match. Flat pixels, inside or outside a shape, must match closely; a
+            // misplaced, misclipped or misordered slot moves its edges over flat pixels and fails.
+            // Overlapping slots add 8-bit blending rounding.
+            let (alpha_tolerance, colour_tolerance) = match (is_edge(&expected, width, pixel), covers[pixel] <= 1) {
+                (true, _) => (32, 32.0),
+                (false, true) => (1, 2.0),
+                (false, false) => (2, 2.0),
+            };
             let (expected, actual) = (&expected[pixel * 4..pixel * 4 + 4], &reassembled[pixel * 4..pixel * 4 + 4]);
-            // Skia rasterizes a path at its shifted atlas position in float, so anti-aliased
-            // coverage can round apart. A route strokes its whole line and its completed stretch on
-            // top every frame, so an edge can round two levels; overlapping slots add blending rounding.
-            let alpha_tolerance = if covers[pixel] <= 1 { 2 } else { 3 };
             // Compare premultiplied: straight colour is unstable where alpha is near zero.
             let premultiplied = |rgba: &[u8], channel: usize| f32::from(rgba[channel]) * f32::from(rgba[3]) / 255.0;
             (expected[3].abs_diff(actual[3]) <= alpha_tolerance)
-                && (0..3).all(|channel| (premultiplied(expected, channel) - premultiplied(actual, channel)).abs() <= 2.0)
+                && (0..3).all(|channel| (premultiplied(expected, channel) - premultiplied(actual, channel)).abs() <= colour_tolerance)
         };
         if let Some(pixel) = (0..width * height).find(|pixel| !matches(*pixel)) {
             panic!(
@@ -548,6 +556,17 @@ fn source_over(target: &mut [u8], source: &[u8]) {
         target[channel] = (color / alpha).round() as u8;
     }
     target[3] = (alpha * 255.0).round() as u8;
+}
+
+/// Whether straight-alpha RGBA `frame` pixel `pixel` lies on an anti-aliased edge: its alpha
+/// differs from a neighbour's by more than rounding.
+fn is_edge(frame: &[u8], width: usize, pixel: usize) -> bool {
+    let height = frame.len() / 4 / width;
+    let (x, y) = (pixel % width, pixel / width);
+    let alpha = frame[pixel * 4 + 3];
+    (y.saturating_sub(1)..=(y + 1).min(height - 1)).any(|ny| {
+        (x.saturating_sub(1)..=(x + 1).min(width - 1)).any(|nx| frame[(ny * width + nx) * 4 + 3].abs_diff(alpha) > 2)
+    })
 }
 
 /// Whether two slots cover a common scene pixel or one slot holds several layers.
