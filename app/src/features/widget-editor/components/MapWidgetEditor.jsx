@@ -176,6 +176,16 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
             <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold">{t('widget-editor.mapLabels', 'Labels')}</Label>
             <ToggleField checked={data.show_labels} onCheckedChange={(show_labels) => updateWidgetData(widget.id, { show_labels })} />
           </div>
+          <div className="flex items-center justify-between gap-2 pl-1">
+            <Label className="p-0 text-[0.667rem] text-muted-foreground uppercase font-bold" disabled={!data.show_labels}>
+              {t('widget-editor.mapLocalNames', 'Local Names')}
+            </Label>
+            <ToggleField
+              checked={data.local_names}
+              disabled={!data.show_labels}
+              onCheckedChange={(local_names) => updateWidgetData(widget.id, { local_names })}
+            />
+          </div>
         </div>
       </div>
 

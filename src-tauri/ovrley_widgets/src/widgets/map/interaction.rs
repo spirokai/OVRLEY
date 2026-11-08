@@ -224,7 +224,7 @@ mod tests {
     fn map(camera_mode: &str) -> MapConfig {
         serde_json::from_value(json!({
             "value": "map", "x": 100, "y": 50, "opacity": 1, "font": "Inter.ttf", "width": 200, "height": 100,
-            "map_style": "liberty", "show_buildings": false, "show_paths": true, "show_labels": true, "camera_mode": camera_mode,
+            "map_style": "liberty", "show_buildings": false, "show_paths": true, "show_labels": true, "local_names": false, "camera_mode": camera_mode,
             "orientation": "north_up", "pitch": 0, "follow_zoom": 16, "fixed_zoom": 15, "fixed_pan_x": 0,
             "fixed_pan_y": 0, "msaa_samples": 4, "shape": "rectangle", "corner_radius": 0,
             "border_color": "#ffffff", "border_thickness": 0, "border_opacity": 1, "route_smoothing_m": 8,

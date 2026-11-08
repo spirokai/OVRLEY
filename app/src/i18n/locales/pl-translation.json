@@ -631,6 +631,7 @@
     "mapBuildings": "Budynki",
     "mapPaths": "Ścieżki",
     "mapLabels": "Etykiety",
+    "mapLocalNames": "Nazwy lokalne",
     "mapWebgl2Unavailable": "WebGL2 jest niedostępny w tym systemie, więc nie można wyświetlić podglądu mapy.",
     "mapWebgl2Software": "Nie znaleziono GPU. Mapa jest renderowana programowo, więc podgląd i eksport mogą działać wolno.",
     "mapStyle": "Styl mapy",

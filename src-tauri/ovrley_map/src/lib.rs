@@ -87,6 +87,8 @@ pub struct MapLayers {
     pub labels: bool,
     /// Footways, cycleways, steps and bridleways: OpenMapTiles' `path` class of roads.
     pub paths: bool,
+    /// Each place's own name, as written locally, instead of the one it is known by internationally.
+    pub local_names: bool,
 }
 
 impl MapLayers {

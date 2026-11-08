@@ -156,6 +156,7 @@ pub(crate) fn parse_style(
             continue;
         }
         let layer = without_hidden_features(layer, toggles);
+        let layer = with_label_names(&layer, toggles);
         let variants = match with_solid_road_dashes(&layer, zoom) {
             Ok(variants) => variants,
             Err(error) => {
@@ -242,6 +243,45 @@ fn without_hidden_features(layer: &Json, toggles: MapLayers) -> Cow<'_, Json> {
         None => no_paths,
     };
     Cow::Owned(narrowed)
+}
+
+/// A place's own name, as OpenMapTiles has it, or the one it is known by internationally: English,
+/// then the international name, then a Latin transliteration, before falling back to its own.
+fn label_name(local: bool) -> Json {
+    if local {
+        json!(["get", "name"])
+    } else {
+        json!([
+            "coalesce",
+            ["get", "name_en"],
+            ["get", "name_int"],
+            ["get", "name:latin"],
+            ["get", "name"]
+        ])
+    }
+}
+
+/// Whether an expression reads one of a feature's names, rather than a road's `ref`.
+fn reads_name(expr: &Json) -> bool {
+    match expr {
+        Json::Array(items) => {
+            matches!(items.as_slice(), [Json::String(op), Json::String(field)]
+                if op == "get" && (field == "name" || field.starts_with("name:") || field.starts_with("name_")))
+                || items.iter().any(reads_name)
+        }
+        _ => false,
+    }
+}
+
+/// A label layer with the style's own choice of name replaced by one side of the switch. Styles mix
+/// scripts and languages in their own ways; the switch gives each map one of two consistent ends.
+fn with_label_names(layer: &Json, toggles: MapLayers) -> Cow<'_, Json> {
+    if layer["type"] != "symbol" || !reads_name(&layer["layout"]["text-field"]) {
+        return Cow::Borrowed(layer);
+    }
+    let mut named = layer.clone();
+    named["layout"]["text-field"] = label_name(toggles.local_names);
+    Cow::Owned(named)
 }
 
 /// A layer as it draws, each with the share of its width it keeps. A dashed transportation line
@@ -1126,6 +1166,7 @@ mod tests {
         buildings: true,
         labels: false,
         paths: true,
+        local_names: false,
     };
     const HIDDEN: MapLayers = MapLayers {
         paths: false,
@@ -1175,6 +1216,58 @@ mod tests {
             without_hidden_features(&water, HIDDEN),
             Cow::Borrowed(_)
         ));
+    }
+
+    fn evaluate_name(layer: &Json, properties: &[(&str, &str)]) -> Option<String> {
+        let text_field = parse_property("text-field", &layer["layout"]["text-field"]).unwrap();
+        let mut context = EvaluationContext::new().with_zoom(14.0);
+        context.feature = Feature {
+            properties: properties
+                .iter()
+                .map(|(key, value)| (key.to_string(), Value::String(value.to_string())))
+                .collect(),
+            ..Feature::default()
+        };
+        match maplibre_expr::evaluate(&text_field, &context) {
+            Ok(Value::String(text)) => Some(text),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn the_name_switch_picks_a_places_own_name_or_its_international_one() {
+        let moscow = [
+            ("name", "Москва"),
+            ("name:latin", "Moskva"),
+            ("name_en", "Moscow"),
+        ];
+        let village = [("name", "Ústí"), ("name:latin", "Ústí")];
+        let local = MapLayers {
+            local_names: true,
+            ..SHOWN
+        };
+        let name = |toggles, place: &[(&str, &str)]| {
+            evaluate_name(&with_label_names(&place_layer(), toggles), place)
+        };
+        assert_eq!(name(local, &moscow).as_deref(), Some("Москва"));
+        assert_eq!(name(SHOWN, &moscow).as_deref(), Some("Moscow"));
+        assert_eq!(name(SHOWN, &village).as_deref(), Some("Ústí"));
+
+        // A road's number is not a name.
+        let shield =
+            json!({ "type": "symbol", "layout": { "text-field": ["to-string", ["get", "ref"]] } });
+        assert!(matches!(with_label_names(&shield, local), Cow::Borrowed(_)));
+    }
+
+    fn place_layer() -> Json {
+        json!({
+            "type": "symbol",
+            "layout": {
+                "text-field": ["case", ["has", "name:nonlatin"],
+                    ["concat", ["get", "name:latin"], "\n", ["get", "name:nonlatin"]],
+                    ["coalesce", ["get", "name_en"], ["get", "name"]]],
+            },
+        })
     }
 
     fn parse(layer: &Json) -> Result<LabelLayer, String> {

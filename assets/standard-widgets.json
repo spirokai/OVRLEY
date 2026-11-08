@@ -537,6 +537,7 @@
         "show_buildings": true,
         "show_paths": true,
         "show_labels": true,
+        "local_names": false,
         "camera_mode": "follow",
         "orientation": "rider_up",
         "pitch": 50,

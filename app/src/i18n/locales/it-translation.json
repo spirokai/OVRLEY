@@ -631,6 +631,7 @@
     "mapBuildings": "Edifici",
     "mapPaths": "Sentieri",
     "mapLabels": "Etichette",
+    "mapLocalNames": "Nomi locali",
     "mapWebgl2Unavailable": "WebGL2 non è disponibile su questo sistema, quindi la mappa non può essere visualizzata in anteprima.",
     "mapWebgl2Software": "Nessuna GPU trovata. La mappa viene renderizzata via software, quindi anteprima ed esportazione potrebbero essere lente.",
     "mapStyle": "Stile mappa",

@@ -44,6 +44,7 @@ export async function diagnose({ caseId, labels, msaa, buildings, warmup, frames
     buildings,
     labels,
     paths: true,
+    local_names: false,
     width: spec.size,
     height: spec.size,
     pixel_ratio: spec.pixel_ratio,

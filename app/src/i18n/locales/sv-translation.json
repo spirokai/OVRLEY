@@ -631,6 +631,7 @@
     "mapBuildings": "Byggnader",
     "mapPaths": "Stigar",
     "mapLabels": "Etiketter",
+    "mapLocalNames": "Lokala namn",
     "mapWebgl2Unavailable": "WebGL2 är inte tillgängligt på det här systemet, så kartan kan inte förhandsvisas.",
     "mapWebgl2Software": "Ingen GPU hittades. Kartan renderas i mjukvara, så förhandsvisning och export kan vara långsamma.",
     "mapStyle": "Kartstil",

@@ -154,6 +154,7 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
             buildings,
             labels: map.show_labels,
             paths: map.show_paths,
+            local_names: map.local_names,
         },
         camera,
         msaa_samples: map.msaa_samples,

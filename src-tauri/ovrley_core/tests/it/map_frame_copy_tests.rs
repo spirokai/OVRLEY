@@ -19,7 +19,7 @@ const HEIGHT: u32 = 80;
 fn layout(x: f32, radius: f32, opacity: f32) -> MapLayout {
     let config: MapConfig = serde_json::from_value(json!({
         "value": "map", "x": x, "y": 40, "opacity": opacity, "font": "Inter.ttf", "width": WIDTH, "height": HEIGHT,
-        "map_style": "liberty", "show_buildings": true, "show_paths": true, "show_labels": true, "camera_mode": "follow", "orientation": "rider_up", "pitch": 45,
+        "map_style": "liberty", "show_buildings": true, "show_paths": true, "show_labels": true, "local_names": false, "camera_mode": "follow", "orientation": "rider_up", "pitch": 45,
         "follow_zoom": 16, "fixed_zoom": 14, "fixed_pan_x": 0, "fixed_pan_y": 0, "msaa_samples": 4, "shape": "rectangle",
         "corner_radius": radius, "border_color": "#ffffff", "border_thickness": 0, "border_opacity": 1,
         "route_smoothing_m": 8, "show_full_activity": true, "line_width": 6,

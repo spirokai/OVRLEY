@@ -39,6 +39,7 @@ async function runCase(plan, spec, labels, style, tiles) {
     buildings: true,
     labels,
     paths: true,
+    local_names: false,
     width: spec.size,
     height: spec.size,
     pixel_ratio: spec.pixel_ratio,

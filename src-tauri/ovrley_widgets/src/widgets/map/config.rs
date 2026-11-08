@@ -18,6 +18,8 @@ pub struct MapConfig {
     pub show_buildings: bool,
     pub show_paths: bool,
     pub show_labels: bool,
+    /// Labels with each place's own name instead of its international one.
+    pub local_names: bool,
     pub camera_mode: String,
     pub orientation: String,
     pub pitch: f32,

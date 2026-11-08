@@ -631,6 +631,7 @@
     "mapBuildings": "建物",
     "mapPaths": "小道",
     "mapLabels": "ラベル",
+    "mapLocalNames": "現地名",
     "mapWebgl2Unavailable": "このシステムでは WebGL2 を利用できないため、マップをプレビューできません。",
     "mapWebgl2Software": "GPU が見つかりません。マップはソフトウェアで描画されるため、プレビューと書き出しが遅くなる場合があります。",
     "mapStyle": "地図スタイル",

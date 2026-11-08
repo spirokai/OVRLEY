@@ -444,6 +444,7 @@ fn run_case(
             buildings: true,
             labels,
             paths: true,
+            local_names: false,
         },
     };
     // A fresh glyph service, so every case rasterizes its glyphs cold, as an export's first job does.

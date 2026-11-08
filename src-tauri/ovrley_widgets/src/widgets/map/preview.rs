@@ -420,6 +420,7 @@ impl PreviewMap {
                 "buildings": self.config.layers.buildings,
                 "labels": self.config.layers.labels,
                 "paths": self.config.layers.paths,
+                "local_names": self.config.layers.local_names,
                 "pixel_ratio": viewport.pixel_ratio(),
                 "msaa_samples": self.config.msaa_samples,
             },

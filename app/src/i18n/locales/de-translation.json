@@ -631,6 +631,7 @@
     "mapBuildings": "Gebäude",
     "mapPaths": "Wege",
     "mapLabels": "Beschriftungen",
+    "mapLocalNames": "Lokale Namen",
     "mapWebgl2Unavailable": "WebGL2 ist auf diesem System nicht verfügbar, daher kann die Karte nicht in der Vorschau angezeigt werden.",
     "mapWebgl2Software": "Keine GPU gefunden. Die Karte wird per Software gerendert, daher können Vorschau und Export langsam sein.",
     "mapStyle": "Kartenstil",
