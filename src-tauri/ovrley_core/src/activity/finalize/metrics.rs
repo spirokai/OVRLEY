@@ -906,7 +906,7 @@ mod tests {
             ]
         );
         // Speeds are m/s. The rider stops at index 9 (1.8 km/h) and stays stopped at
-        // index 10 (4.32 km/h, between the thresholds) until index 11 (7.2 km/h).
+        // index 10 (2.52 km/h, between the thresholds) until index 11 (7.2 km/h).
         let speeds = vec![
             Some(5.0),
             Some(5.0),
@@ -918,7 +918,7 @@ mod tests {
             Some(5.0),
             None,
             Some(0.5),
-            Some(1.2),
+            Some(0.7),
             Some(2.0),
             Some(5.0),
         ];
