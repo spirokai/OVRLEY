@@ -7,8 +7,7 @@ use super::{
     config::MapConfig,
     content::RouteExtent,
     validation::{
-        validate_map_widget, MapCameraMode, MapShape, FIXED_PAN_RANGE, FIXED_ZOOM_RANGE,
-        FOLLOW_ZOOM_RANGE,
+        validate_map_widget, MapCameraMode, MapShape, FIXED_ZOOM_RANGE, FOLLOW_ZOOM_RANGE,
     },
 };
 use crate::{
@@ -116,6 +115,9 @@ pub enum MapViewGesture {
     Pan([f32; 2]),
     /// A wheel's `deltaY` at a scene point. A top-down map keeps that point in place.
     Zoom { wheel_delta: f32, point: [f32; 2] },
+    /// The top-down view that centres the whole route in the frame, in either camera mode, so a map
+    /// can switch to top down already fitted.
+    Fit,
 }
 
 /// The view fields of the widget's camera mode.
@@ -144,6 +146,7 @@ pub fn adjust_map_view(
         MapViewGesture::Zoom { wheel_delta, point } => {
             wheel_delta.is_finite() && point.iter().all(|value| value.is_finite())
         }
+        MapViewGesture::Fit => true,
     };
     if !finite {
         return Err(WidgetError::Config("invalid map view gesture".into()));
@@ -152,6 +155,17 @@ pub fn adjust_map_view(
     let scene = validate_scene_presentation(scene)?;
     let levels = |wheel_delta: f32| -wheel_delta / WHEEL_PIXELS_PER_LEVEL;
     let (zoom, pan) = match (config.camera, gesture) {
+        (_, MapViewGesture::Fit) => {
+            // Without GPS there is nothing to fit, and the zoom stays.
+            let zoom = route.map_or(widget.fixed_zoom, |route| {
+                route.fit_zoom([f64::from(config.width), f64::from(config.height)]) as f32
+            });
+            return Ok(MapViewUpdate::Fixed {
+                fixed_zoom: within(zoom, FIXED_ZOOM_RANGE),
+                fixed_pan_x: 0.0,
+                fixed_pan_y: 0.0,
+            });
+        }
         (MapCameraMode::Follow { zoom, .. }, MapViewGesture::Zoom { wheel_delta, .. }) => {
             return Ok(MapViewUpdate::Follow {
                 follow_zoom: within(zoom + levels(wheel_delta), FOLLOW_ZOOM_RANGE),
@@ -176,6 +190,7 @@ pub fn adjust_map_view(
             zoom,
             delta.map(|value| value / scene.scale * per_unit(zoom)),
         ),
+        MapViewGesture::Fit => unreachable!("fit returned above"),
         MapViewGesture::Zoom { wheel_delta, point } => {
             let next = within(zoom + levels(wheel_delta), FIXED_ZOOM_RANGE);
             // The cursor's offset from the frame's centre, in widget units, shows the same place.
@@ -187,10 +202,17 @@ pub fn adjust_map_view(
             (next, anchor.map(|value| value * change))
         }
     };
+    let pan = [pan[0] + shift[0], pan[1] + shift[1]];
+    let [fixed_pan_x, fixed_pan_y] = match route {
+        Some(route) => route
+            .clamp_pan(pan.map(f64::from))
+            .map(|value| value as f32),
+        None => pan,
+    };
     Ok(MapViewUpdate::Fixed {
         fixed_zoom: next,
-        fixed_pan_x: within(pan[0] + shift[0], FIXED_PAN_RANGE),
-        fixed_pan_y: within(pan[1] + shift[1], FIXED_PAN_RANGE),
+        fixed_pan_x,
+        fixed_pan_y,
     })
 }
 
@@ -232,11 +254,14 @@ mod tests {
         }
     }
 
+    const LONGEST: f64 = 420.0 / (ovrley_map::TILE_SIZE as f64 * 32768.0);
+
     /// A route whose longest side spans 420 widget units at zoom 15, 840 scene pixels at scale 2.
     fn route() -> Option<RouteExtent> {
         Some(RouteExtent {
             centre: (0.5, 0.5),
-            longest: 420.0 / (f64::from(ovrley_map::TILE_SIZE) * 15f64.exp2()),
+            size: (LONGEST, LONGEST / 2.0),
+            longest: LONGEST,
         })
     }
 
@@ -291,6 +316,22 @@ mod tests {
             route()
         )
         .is_err());
+    }
+
+    #[test]
+    fn fit_centres_the_route_and_fills_the_frame_inside_its_margin() {
+        // A 200 by 100 frame: the route's 420 by 210 units at zoom 15 fit its height, 84 units inside
+        // the margin, at zoom 15 + log2(84 / 210).
+        let mut panned = map("follow");
+        panned.fixed_pan_x = 3.0;
+        let [zoom, pan_x, pan_y] =
+            fixed(adjust_map_view(panned, scene(), MapViewGesture::Fit, route()).unwrap());
+        assert!((zoom - (15.0 + (84.0f32 / 210.0).log2())).abs() < 1e-4);
+        assert_eq!([pan_x, pan_y], [0.0, 0.0]);
+        // Without GPS only the pan resets.
+        let [zoom, ..] =
+            fixed(adjust_map_view(map("fixed"), scene(), MapViewGesture::Fit, None).unwrap());
+        assert_eq!(zoom, 15.0);
     }
 
     #[test]

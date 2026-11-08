@@ -8,6 +8,7 @@ import { convertFileSrc } from '@tauri-apps/api/core'
 import { resolveVideoSyncMarkControls } from '@/features/video-sync'
 import { useWasmWidgetInteractions } from '@/features/wasm-widgets/hooks/useWasmWidgetInteractions'
 import { buildWasmScene } from '@/features/wasm-widgets/utils/previewScene'
+import { getWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 import {
   getEditorGridSize,
   getOrderedWidgetIds,
@@ -178,6 +179,8 @@ export default function useOverlayEditorState({
     backgroundImageSrc: importedBackgroundImagePath === null ? null : convertFileSrc(importedBackgroundImagePath),
     gridStyle: { transform: `scale(${1 / viewport.displayScale})`, transformOrigin: 'top left' },
     handleSceneDoubleClick: selection.handleSceneDoubleClick,
+    resetMapView: (widgetId) =>
+      commitUpdate(widgetId, getWidgetInteraction(widgetNodes[widgetId]).resize({ widget: widgetMap[widgetId].data, map_view: 'fit' })),
     handleSceneMouseDown: selection.handleSceneMouseDown,
     mapViewWidgetId: mapViewWidget === null ? null : mapViewWidget.id,
     handleWidgetMouseDown: selection.handleWidgetMouseDown,

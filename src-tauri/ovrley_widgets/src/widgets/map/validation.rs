@@ -19,7 +19,6 @@ pub(super) const FOLLOW_ZOOM_RANGE: RangeInclusive<f32> = MIN_FOLLOW_ZOOM..=MAX_
 /// Further out, the world is narrower than a large widget.
 const MIN_FIXED_ZOOM: f32 = 2.0;
 pub(super) const FIXED_ZOOM_RANGE: RangeInclusive<f32> = MIN_FIXED_ZOOM..=MAX_TILE_ZOOM as f32;
-pub(super) const FIXED_PAN_RANGE: RangeInclusive<f32> = -1.0..=1.0;
 /// Metres. The low end looks almost raw, and past the high end a road's own bends start to go.
 const ROUTE_SMOOTHING_RANGE: RangeInclusive<f32> = 1.0..=20.0;
 /// The sample counts every GPU supports, so a project draws the same on any machine.
@@ -111,8 +110,8 @@ pub fn validate_map_widget(map: &MapConfig, index: usize) -> WidgetResult<Valida
         "fixed" => MapCameraMode::Fixed {
             zoom: in_range(map.fixed_zoom, "fixed_zoom", FIXED_ZOOM_RANGE)?,
             pan: [
-                in_range(map.fixed_pan_x, "fixed_pan_x", FIXED_PAN_RANGE)?,
-                in_range(map.fixed_pan_y, "fixed_pan_y", FIXED_PAN_RANGE)?,
+                require_f32(Some(map.fixed_pan_x), &p("fixed_pan_x"))?,
+                require_f32(Some(map.fixed_pan_y), &p("fixed_pan_y"))?,
             ],
         },
         "follow" => MapCameraMode::Follow {

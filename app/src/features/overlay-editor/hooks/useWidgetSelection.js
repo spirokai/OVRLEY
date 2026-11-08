@@ -208,7 +208,11 @@ export default function useWidgetSelection({ displayScale, orderedWidgetIds, wid
     }
   }, [sceneElement])
   const canvasMouseOver = useCallback((event) => setHoveredWidgetFromEvent(setHoveredWidgetId, event), [])
-  const canvasMouseLeave = useCallback(() => setHoveredWidgetId(null), [])
+  // A map's own controls sit over it in the badge layer, so moving onto them keeps it hovered.
+  const canvasMouseLeave = useCallback((event) => {
+    if (event.relatedTarget instanceof Element && event.relatedTarget.closest('[data-map-reset]')) return
+    setHoveredWidgetId(null)
+  }, [])
   const selectedWidgets = useMemo(() => getSelectedWidgets(widgetMap, effectiveIds), [effectiveIds, widgetMap])
   const primaryId = getPrimarySelectionId(effectiveIds, selectedWidgetId)
   const isGroupSelection = effectiveIds.length > 1

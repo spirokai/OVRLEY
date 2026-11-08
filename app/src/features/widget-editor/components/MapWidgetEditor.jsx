@@ -28,10 +28,6 @@ const SHAPE_OPTIONS = [
   { value: 'rectangle', labelKey: 'widgets.backdropTypes.rectangle', defaultLabel: 'Rectangle' },
   { value: 'circle', labelKey: 'widgets.backdropTypes.circle', defaultLabel: 'Circle' },
 ]
-function panDisplay(value) {
-  return `${Math.round(value * 100)}`
-}
-
 /**
  * Renders the tile map editor.
  *
@@ -146,50 +142,20 @@ export default function MapWidgetEditor({ widget, updateWidgetData, updateWidget
             </div>
           </>
         ) : (
-          <>
-            <div className="grid grid-cols-2 gap-4">
-              <SliderField
-                editable
-                label={t('widget-editor.zoom', 'Zoom')}
-                value={data.fixed_zoom}
-                min={2}
-                max={19}
-                step={0.1}
-                valueDisplay={data.fixed_zoom.toFixed(1)}
-                onSliderChange={(value) => updateWidgetDraft(widget.id, { fixed_zoom: Number(value.toFixed(1)) })}
-                onSliderCommit={commit}
-              />
-              {msaa}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <SliderField
-                editable
-                label={t('widget-editor.routeOffsetX', 'Route Offset X')}
-                value={data.fixed_pan_x}
-                min={-1}
-                max={1}
-                step={0.005}
-                valueScale={100}
-                valueDisplay={panDisplay(data.fixed_pan_x)}
-                suffix="%"
-                onSliderChange={(fixed_pan_x) => updateWidgetDraft(widget.id, { fixed_pan_x })}
-                onSliderCommit={commit}
-              />
-              <SliderField
-                editable
-                label={t('widget-editor.routeOffsetY', 'Route Offset Y')}
-                value={data.fixed_pan_y}
-                min={-1}
-                max={1}
-                step={0.005}
-                valueScale={100}
-                valueDisplay={panDisplay(data.fixed_pan_y)}
-                suffix="%"
-                onSliderChange={(fixed_pan_y) => updateWidgetDraft(widget.id, { fixed_pan_y })}
-                onSliderCommit={commit}
-              />
-            </div>
-          </>
+          <div className="grid grid-cols-2 gap-4">
+            <SliderField
+              editable
+              label={t('widget-editor.zoom', 'Zoom')}
+              value={data.fixed_zoom}
+              min={2}
+              max={19}
+              step={0.1}
+              valueDisplay={data.fixed_zoom.toFixed(1)}
+              onSliderChange={(value) => updateWidgetDraft(widget.id, { fixed_zoom: Number(value.toFixed(1)) })}
+              onSliderCommit={commit}
+            />
+            {msaa}
+          </div>
         )}
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center justify-between gap-2 pl-1">

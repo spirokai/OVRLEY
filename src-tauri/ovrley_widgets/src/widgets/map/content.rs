@@ -226,14 +226,17 @@ impl MapContent {
 
 /// A follow camera sits low in the frame, showing more road ahead, as `NavigationMapController` does.
 const FOLLOW_TOP_PADDING: f64 = 0.45;
+/// Empty share of the frame on each side of a fitted route.
+const FIT_MARGIN: f64 = 0.08;
 /// Seconds of activity time between label placements.
 const LABEL_STEP_SECONDS: f64 = 0.3;
 
-/// The world-space bounding box of a track: its centre and its longest side, which a top-down camera
-/// centres on and measures its pan in.
+/// The world-space bounding box of a track, which a top-down camera centres on and fits, and whose
+/// longest side its pan is measured in.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RouteExtent {
     pub centre: (f64, f64),
+    pub size: (f64, f64),
     pub longest: f64,
 }
 
@@ -244,10 +247,34 @@ impl RouteExtent {
             min = (min.0.min(point.0), min.1.min(point.1));
             max = (max.0.max(point.0), max.1.max(point.1));
         }
+        let size = (max.0 - min.0, max.1 - min.1);
         Self {
             centre: ((min.0 + max.0) / 2.0, (min.1 + max.1) / 2.0),
-            longest: (max.0 - min.0).max(max.1 - min.1),
+            size,
+            longest: size.0.max(size.1),
         }
+    }
+
+    /// The zoom at which the whole route fits a `frame` of widget units, inside its margin. Infinite
+    /// for a route that is one point, which fits at any zoom.
+    pub fn fit_zoom(&self, frame: [f64; 2]) -> f64 {
+        let tile = f64::from(TILE_SIZE);
+        let fit = |frame: f64, size: f64| (frame * (1.0 - FIT_MARGIN * 2.0) / (size * tile)).log2();
+        fit(frame[0], self.size.0).min(fit(frame[1], self.size.1))
+    }
+
+    /// `pan` with the camera's centre kept on the map. A route that is one point has no pan.
+    pub fn clamp_pan(&self, pan: [f64; 2]) -> [f64; 2] {
+        if self.longest <= 0.0 {
+            return [0.0, 0.0];
+        }
+        let centre = [self.centre.0, self.centre.1];
+        [0, 1].map(|axis| {
+            pan[axis].clamp(
+                (centre[axis] - 1.0) / self.longest,
+                centre[axis] / self.longest,
+            )
+        })
     }
 
     /// Widget units one unit of pan spans at `zoom`: the route's longest side on screen.
@@ -340,9 +367,11 @@ impl WidgetCamera {
 }
 
 /// North up, pitch 0, at `zoom`. A positive `pan` moves the route right and down in the frame, as a
-/// share of its longest side, so a project's framing carries over to another activity.
+/// share of its longest side, so a project's framing carries over to another activity, where it may
+/// reach past the map's edge.
 fn fixed_camera(track: &MapTrack, zoom: f64, pan: [f64; 2]) -> WidgetResult<MapCamera> {
     let route = RouteExtent::of(track);
+    let pan = route.clamp_pan(pan);
     let (lon, lat) = world_to_lon_lat(
         route.centre.0 - pan[0] * route.longest,
         route.centre.1 - pan[1] * route.longest,
