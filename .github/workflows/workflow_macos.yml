@@ -45,7 +45,7 @@ jobs:
     needs: wasm
     if: ${{ !cancelled() && needs.wasm.result != 'failure' }}
     name: Build macOS aarch64
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       # Cargo's built-in git client is slow at cloning the rust-skia submodules.
       CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
