@@ -131,26 +131,21 @@ pub fn canonical_source_path(path: &Path) -> CoreResult<String> {
         .map_err(|_| CoreError::Config("Source path cannot be represented as UTF-8".into()))
 }
 
-/// Telemetry-first probing with the existing ffprobe salvage policy. This is
-/// the common owner for interactive import and non-interactive inspection.
+/// Telemetry-first probing completed by ffprobe. This is the common owner for
+/// interactive import and non-interactive inspection. ffprobe always runs: it owns
+/// the timing the renderer's FFmpeg will see (see `merge_ffprobe_metadata`).
 pub fn probe_video_metadata(
     paths: &AppPaths,
     file_path: &str,
 ) -> CoreResult<crate::media::SourceVideoMetadata> {
     match crate::media::mp4_telemetry::probe_video_metadata(&paths.repo_root, file_path) {
-        Ok(metadata) => {
-            if needs_ffprobe_salvage(&metadata) {
-                match crate::media::video_probe::probe_video(&paths.repo_root, file_path) {
-                    Ok(ffprobe_metadata) => Ok(merge_ffprobe_metadata(metadata, ffprobe_metadata)),
-                    Err(error) => {
-                        log::warn!("ffprobe fallback failed for {file_path}: {error}");
-                        Ok(metadata)
-                    }
-                }
-            } else {
+        Ok(metadata) => match crate::media::video_probe::probe_video(&paths.repo_root, file_path) {
+            Ok(ffprobe_metadata) => Ok(merge_ffprobe_metadata(metadata, ffprobe_metadata)),
+            Err(error) => {
+                log::warn!("ffprobe failed for {file_path}: {error}");
                 Ok(metadata)
             }
-        }
+        },
         Err(error) => {
             log::warn!(
                 "telemetry-parser probe failed for {file_path}: {error}; falling back to ffprobe"
@@ -160,29 +155,6 @@ pub fn probe_video_metadata(
     }
 }
 
-fn needs_ffprobe_salvage(metadata: &crate::media::SourceVideoMetadata) -> bool {
-    metadata.duration.is_none()
-        || metadata.fps.is_none()
-        || metadata.fps_num.is_none()
-        || metadata.fps_den.is_none()
-        || metadata.sync_time.is_none()
-        || metadata.creation_time.is_none()
-        || metadata.codec_name.is_none()
-        || metadata.codec_long_name.is_none()
-        || metadata.codec_profile.is_none()
-        || metadata.pix_fmt.is_none()
-        || metadata.bits_per_raw_sample.is_none()
-        || metadata.resolution.is_none()
-        || metadata
-            .rotation_degrees
-            .map(|degrees| degrees.rem_euclid(360) == 0)
-            .unwrap_or(true)
-        || metadata.container_format.is_none()
-        || metadata.bit_rate.is_none()
-        || (metadata.has_audio && metadata.audio_bit_rate.is_none())
-        || !metadata.has_audio
-}
-
 fn planned_frames(metadata: &crate::media::SourceVideoMetadata) -> Option<u64> {
     Fps::new(metadata.fps_num?, metadata.fps_den?)
         .ok()?
@@ -190,6 +162,9 @@ fn planned_frames(metadata: &crate::media::SourceVideoMetadata) -> Option<u64> {
         .ok()
 }
 
+/// ffprobe owns the timing (duration, where the video starts, and whether the
+/// nominal frame rate holds); every other field it only fills where
+/// telemetry-parser left a gap.
 fn merge_ffprobe_metadata(
     mut metadata: crate::media::SourceVideoMetadata,
     ffprobe_metadata: crate::media::SourceVideoMetadata,
@@ -286,7 +261,7 @@ mod tests {
         probed.video_start_offset = Some(0.04);
         let merged = merge_ffprobe_metadata(metadata(6.0, 25, 1), probed);
         assert_eq!(merged.duration, Some(5.5));
-        assert_eq!(merged.video_start_seconds(), 0.04);
+        assert_eq!(merged.file_seconds(1.0), 1.04);
     }
 
     #[test]
