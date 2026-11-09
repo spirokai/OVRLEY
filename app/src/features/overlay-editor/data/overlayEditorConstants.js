@@ -30,4 +30,6 @@ export const PROJECT_STATUS_TRANSLATIONS = {
   Modified: { key: 'overlay-editor.statusModified', defaultLabel: 'Modified' },
 }
 
+// Moveable compares snap distances in scene pixels; this is the on-screen distance at any zoom.
+export const SNAP_THRESHOLD_SCREEN_PIXELS = 8
 export const SNAP_DIRECTIONS = { left: true, top: true, right: true, bottom: true, center: true, middle: true }

@@ -23,7 +23,8 @@ function initializePointLabelFontSize(data, { sceneFontSize = data.point_label.f
 const INITIALIZERS = { courseSizing: initializeCourseSize, pointLabelFontSize: initializePointLabelFontSize }
 
 /**
- * @param {{type: string, displayType?: string}} selection Drawer selection, including any display-owned mode selection.
+ * @param {{type: string, displayType?: string, preset?: object}} selection Drawer selection, including any display-owned mode selection.
+ *   A drawer group's option may preset some of the widget's own fields; the catalog checks they exist.
  * @param {object} globalDefaults Canonical editor defaults; omitted to use application defaults.
  * @param {{coursePoints?: number[][], sceneFontSize?: number}} options Activity and scene creation inputs.
  * @returns {object} New canonical widget data, before document identity assignment.
@@ -34,6 +35,7 @@ export function createWidgetDefaults(selection, globalDefaults = DEFAULT_GLOBAL_
   if (displayType !== definition.defaults.display_type && !definition.displayTypes.includes(displayType))
     throw new Error(`Unsupported display type: ${displayType}`)
   let data = structuredClone(definition.defaults)
+  Object.assign(data, selection.preset)
   for (const initializer of definition.initializers) INITIALIZERS[initializer](data, options, definition)
   if (displayType === undefined) {
     applyGlobalBindings(data, definition.globalBindings, globalDefaults)

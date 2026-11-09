@@ -1,4 +1,4 @@
-//! Vector tile route integration tests.
+//! Map style and vector tile route integration tests.
 
 use std::collections::VecDeque;
 use std::io::{Read, Write};
@@ -10,6 +10,8 @@ use std::time::{Duration, SystemTime};
 
 use uuid::Uuid;
 
+use crate::map_styles::{MapData, MapStyleDirs, MapStyleRegistry};
+use ovrley_map::gpu::labels::GlyphService;
 use crate::map_tile_service::MapTileService;
 use crate::video_server::VideoServerHandle;
 
@@ -46,46 +48,37 @@ fn rejects_invalid_tile_requests_before_cache_or_upstream_access() {
 }
 
 #[test]
-fn fetches_caches_and_rewrites_supported_map_styles() {
-    let style = r#"{"version":8,"sources":{"openmaptiles":{"type":"vector","url":"https://tiles.openfreemap.org/planet"}},"layers":[]}"#;
-    let fake_upstream = FakeUpstream::start_with(vec![FakeResponse::json(style)]);
-    let cache_root = temp_cache_root("style-cache");
-    let map_service = MapTileService::new(
+fn serves_installed_styles_with_their_tiles_from_this_server() {
+    let fake_upstream = FakeUpstream::start();
+    let cache_root = temp_cache_root("styles");
+    let tiles = MapTileService::new(
         cache_root.clone(),
         format!("http://127.0.0.1:{}/{{z}}/{{x}}/{{y}}.pbf", fake_upstream.port),
         "openfreemap-planet".to_string(),
     )
-    .expect("map service")
-    .with_style_source_url(format!(
-        "http://127.0.0.1:{}/styles/{{style}}",
-        fake_upstream.port
-    ))
-    .expect("style source");
+    .expect("tile service");
     let server = VideoServerHandle::new();
     server
-        .start_with_map_tile_service(map_service)
+        .start_with_map_data(MapData::new(installed_styles(), tiles, glyph_service()))
         .expect("server starts");
     let port = server.port().expect("server port");
 
-    let first = request(port, "GET", "/styles/liberty");
-    assert!(response_headers(&first).contains("Content-Type: application/json"));
-    assert!(response_headers(&first).contains("Access-Control-Allow-Origin: *"));
-    assert!(response_headers(&first).contains("X-OVRLEY-Cache: miss"));
-    let rewritten: serde_json::Value = serde_json::from_slice(response_body(&first)).expect("rewritten style");
+    let liberty = request(port, "GET", "/styles/liberty");
+    assert!(response_headers(&liberty).contains("Content-Type: application/json"));
+    assert!(response_headers(&liberty).contains("Access-Control-Allow-Origin: *"));
+    assert!(!response_headers(&liberty).contains("X-OVRLEY-Cache"));
+    let served: serde_json::Value = serde_json::from_slice(response_body(&liberty)).expect("served style");
     assert_eq!(
-        rewritten["sources"]["openmaptiles"]["tiles"][0],
+        served["sources"]["openmaptiles"]["tiles"][0],
         format!("http://127.0.0.1:{port}/tiles/{{z}}/{{x}}/{{y}}.pbf")
     );
-    assert!(rewritten["sources"]["openmaptiles"].get("url").is_none());
-    assert!(cache_root.join("openfreemap-styles/liberty.json").is_file());
+    assert!(served["sources"]["openmaptiles"].get("url").is_none());
 
-    let second = request(port, "GET", "/styles/liberty");
-    assert!(response_headers(&second).contains("X-OVRLEY-Cache: hit"));
-    assert_eq!(fake_upstream.requests().len(), 1);
-
-    let unsupported = request(port, "GET", "/styles/unknown");
-    assert!(response_headers(&unsupported).starts_with("HTTP/1.1 400 Bad Request"));
-    std::fs::remove_dir_all(cache_root).expect("remove map cache");
+    let unknown = request(port, "GET", "/styles/unknown");
+    assert!(response_headers(&unknown).starts_with("HTTP/1.1 404 Not Found"));
+    let unsupported_method = request(port, "POST", "/styles/liberty");
+    assert!(response_headers(&unsupported_method).starts_with("HTTP/1.1 405 Method Not Allowed"));
+    assert!(fake_upstream.requests().is_empty());
 }
 
 #[test]
@@ -408,7 +401,7 @@ fn successful_write_evicts_globally_oldest_entry_and_retains_recently_served_til
     .expect("obsolete tile service");
     let obsolete_server = VideoServerHandle::new();
     obsolete_server
-        .start_with_map_tile_service(obsolete_service)
+        .start_with_map_data(MapData::new(installed_styles(), obsolete_service, glyph_service()))
         .expect("obsolete server starts");
     let obsolete_port = obsolete_server.port().expect("obsolete server port");
 
@@ -483,7 +476,7 @@ fn successful_write_evicts_globally_oldest_entry_and_retains_recently_served_til
     assert!(!orphan.exists());
     let active_server = VideoServerHandle::new();
     active_server
-        .start_with_map_tile_service(active_service)
+        .start_with_map_data(MapData::new(installed_styles(), active_service, glyph_service()))
         .expect("active server starts");
     let active_port = active_server.port().expect("active server port");
 
@@ -522,7 +515,7 @@ fn clear_removes_all_namespaces_and_a_later_request_repopulates_the_cache() {
     .expect("tile service");
     let server = VideoServerHandle::new();
     server
-        .start_with_map_tile_service(map_tile_service.clone())
+        .start_with_map_data(MapData::new(installed_styles(), map_tile_service.clone(), glyph_service()))
         .expect("server starts");
     let port = server.port().expect("server port");
 
@@ -565,7 +558,7 @@ fn clear_waits_for_active_tile_resolution_without_disrupting_its_response() {
     .expect("tile service");
     let server = VideoServerHandle::new();
     server
-        .start_with_map_tile_service(map_tile_service.clone())
+        .start_with_map_data(MapData::new(installed_styles(), map_tile_service.clone(), glyph_service()))
         .expect("server starts");
     let port = server.port().expect("server port");
 
@@ -617,7 +610,7 @@ fn tile_server(cache_root: &Path, upstream: &FakeUpstream) -> VideoServerHandle 
     .expect("tile service");
     let server = VideoServerHandle::new();
     server
-        .start_with_map_tile_service(map_tile_service)
+        .start_with_map_data(MapData::new(installed_styles(), map_tile_service, glyph_service()))
         .expect("server starts");
     server
 }
@@ -637,13 +630,31 @@ fn tile_server_with_timeouts(
     .expect("tile service");
     let server = VideoServerHandle::new();
     server
-        .start_with_map_tile_service(map_tile_service)
+        .start_with_map_data(MapData::new(installed_styles(), map_tile_service, glyph_service()))
         .expect("server starts");
     server
 }
 
 fn temp_cache_root(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!("ovrley-tile-cache-{label}-{}", Uuid::new_v4()))
+}
+
+/// The bundled styles, installed as the app installs them.
+fn installed_styles() -> MapStyleRegistry {
+    let user = temp_cache_root("user-styles");
+    let styles = MapStyleRegistry::load(&MapStyleDirs {
+        bundled: crate::runtime_paths::source_repo_root().join("assets").join("map-styles"),
+        user: user.clone(),
+    })
+    .expect("bundled styles");
+    std::fs::remove_dir_all(user).expect("remove user styles");
+    styles
+}
+
+/// The bundled map fonts, opened as the app opens them.
+fn glyph_service() -> Arc<GlyphService> {
+    let fonts = crate::runtime_paths::source_repo_root().join("fonts").join("map");
+    Arc::new(GlyphService::open(&fonts).expect("bundled map fonts"))
 }
 
 fn cache_pair_size(payload: &PathBuf) -> u64 {
@@ -758,16 +769,6 @@ impl FakeResponse {
             status: 200,
             body: body.as_bytes().to_vec(),
             headers: vec![("Content-Type", "text/plain")],
-            delay: None,
-            disconnect: false,
-        }
-    }
-
-    fn json(body: &str) -> Self {
-        Self {
-            status: 200,
-            body: body.as_bytes().to_vec(),
-            headers: vec![("Content-Type", "application/json")],
             delay: None,
             disconnect: false,
         }

@@ -15,7 +15,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     const current = gesture.current
     gesture.current = null
     if (!current) return
-    state.clearWidgetDrafts(current.ids)
+    state.clearGesturePatches()
     setGroupGestureType(null)
     setGroupDragSelectionIds([])
   }
@@ -69,7 +69,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
 
   const begin = (target) => {
     const controller = getWidgetInteraction(target)
-    const origin = controller.begin((patch) => state.setLiveWidgetDraft(selectedWidget.id, patch))
+    const origin = controller.begin((patch) => state.setGesturePatches({ [selectedWidget.id]: patch }))
     gesture.current = { controller, origin, ids: [selectedWidget.id], axis: null }
     return gesture.current
   }
@@ -133,7 +133,7 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
     onResizeGroupStart: ({ events, direction, moveable }) => {
       const ids = selectedWidgets.map((widget) => widget.id)
       const controller = getWidgetInteraction(events[0].target).group(ids)
-      const origins = controller.begin(state.setLiveWidgetDrafts)
+      const origins = controller.begin(state.setGesturePatches)
       gesture.current = {
         controller,
         origins,
@@ -185,16 +185,16 @@ export function useWasmWidgetInteractions({ selectedWidget, selectedWidgets, sta
       const current = begin(target)
       set(current.origin.data.rotation)
     },
-    onRotate: ({ beforeRotate, drag }) => {
+    onRotate: ({ beforeRotate }) => {
       const current = gesture.current
       if (!current) return
-      current.controller.update({ type: 'rotate', rotation: beforeRotate, translate: drag.beforeTranslate })
+      current.controller.update({ type: 'rotate', rotation: beforeRotate })
     },
     onRotateEnd: finish,
     onDragGroupStart: ({ events }) => {
       const ids = selectedWidgets.map((widget) => widget.id)
       const controller = getWidgetInteraction(events[0].target).group(ids)
-      controller.begin(state.setLiveWidgetDrafts)
+      controller.begin(state.setGesturePatches)
       gesture.current = { ids, controller, axis: null }
       setGroupGestureType('drag')
       setGroupDragSelectionIds(ids)

@@ -3,6 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 
 const getMapStyleUrlTemplate = vi.hoisted(() => vi.fn())
+const listMapStyles = vi.hoisted(() => vi.fn())
+const INSTALLED_STYLES = ['liberty', 'bright', 'dark', 'fiord', 'positron'].map((id) => ({
+  id,
+  label: id.charAt(0).toUpperCase() + id.slice(1),
+  background: [0, 0, 0],
+}))
 const attachSpeedCanvas = vi.hoisted(() => vi.fn())
 const useWasmWidgets = vi.hoisted(() => vi.fn())
 const mapOptions = vi.hoisted(() => vi.fn())
@@ -74,7 +80,7 @@ const navigationMarker = vi.hoisted(() => ({ addTo: vi.fn(), getElement: vi.fn()
 const popup = vi.hoisted(() => ({ getElement: vi.fn(), on: vi.fn(), setDOMContent: vi.fn() }))
 const popupContent = vi.hoisted(() => ({ addEventListener: vi.fn(), click: vi.fn() }))
 
-vi.mock('@/api/backend', () => ({ getMapStyleUrlTemplate }))
+vi.mock('@/api/backend', () => ({ getMapStyleUrlTemplate, listMapStyles }))
 vi.mock('@/lib/preferences-store', () => ({ getPreference, setPreference }))
 vi.mock('@/features/wasm-widgets/hooks/useWasmWidgets', () => ({ useWasmWidgets }))
 
@@ -150,6 +156,8 @@ describe('VideoSyncPreviewScreens', () => {
   beforeEach(() => {
     getMapStyleUrlTemplate.mockReset()
     getMapStyleUrlTemplate.mockResolvedValue('http://127.0.0.1:3210/styles/{style}')
+    listMapStyles.mockReset()
+    listMapStyles.mockResolvedValue(INSTALLED_STYLES)
     attachSpeedCanvas.mockReset()
     useWasmWidgets.mockReset().mockReturnValue({ attach: attachSpeedCanvas, error: null })
     getPreference.mockReset()
@@ -400,6 +408,24 @@ describe('VideoSyncPreviewScreens', () => {
     await waitFor(() => expect(getPreference).toHaveBeenCalledWith('sync-map-style'))
     await waitFor(() => expect(map.setStyle).toHaveBeenCalledWith('http://127.0.0.1:3210/styles/dark'))
     expect(screen.getByRole('combobox', { name: 'Map style' })).toHaveTextContent('Dark')
+  })
+
+  test('draws the first installed style when the persisted one is gone', async () => {
+    getPreference.mockResolvedValue('uninstalled')
+
+    render(
+      <VideoSyncPreviewScreens
+        activity={null}
+        detection={null}
+        displayScale={1}
+        previewSecond={0}
+        sceneSize={{ width: 100, height: 100 }}
+        setSceneElement={() => {}}
+      />,
+    )
+
+    await waitFor(() => expect(map.setStyle).toHaveBeenCalledWith('http://127.0.0.1:3210/styles/liberty'))
+    expect(screen.getByRole('combobox', { name: 'Map style' })).toHaveTextContent('Liberty')
   })
 
   test('resizes the mounted map once while preserving its fitted camera', async () => {

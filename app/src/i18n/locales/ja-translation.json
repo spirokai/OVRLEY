@@ -100,6 +100,9 @@
     "getHevcCodec": "HEVCコーデックを取得",
     "hevcVideoCannotBePlayed": "HEVC動画を再生できません",
     "installCodecForSystem": "システムに適したパッケージをインストールしてください。",
+    "mapViewHint": "ダブルクリックで移動・ズーム",
+    "mapViewZoomHint": "ダブルクリックでズーム",
+    "mapReset": "リセット",
     "microsoftStoreHevcCodec": "HEVCコーデックはMicrosoft Storeから入手できます。",
     "onUbuntu": "Ubuntuの場合:",
     "overlayCanvasReady": "オーバーレイキャンバスの準備完了",
@@ -557,6 +560,9 @@
       "delta": "差分",
       "lapLog": "ラップログ"
     },
+    "drawerGroups": {
+      "map": { "shortName": "マップ", "route": "ルート", "mapTiles": "マップタイル", "route3d": "3D ルート" }
+    },
     "types": {
       "rolling_chart": { "name": "チャート", "shortName": "チャート" },
       "diving_profile": {
@@ -581,6 +587,7 @@
       "color_temperature": { "name": "色温度", "shortName": "色温度" },
       "core_temperature": { "name": "深部体温", "shortName": "深部体温" },
       "course": { "name": "ルートマップ", "shortName": "マップ" },
+      "map": { "name": "ストリートマップ", "shortName": "街路" },
       "distance": { "name": "距離", "shortName": "距離" },
       "distance_to_home": { "name": "自宅までの距離", "shortName": "自宅" },
       "elevation": { "name": "標高", "shortName": "標高" },
@@ -619,6 +626,23 @@
     }
   },
   "widget-editor": {
+    "cameraMode": "カメラモード",
+    "chaseCamera": "追尾カメラ",
+    "mapBuildings": "建物",
+    "mapPaths": "小道",
+    "mapLabels": "ラベル",
+    "mapLocalNames": "現地名",
+    "mapWebgl2Unavailable": "このシステムでは WebGL2 を利用できないため、マップをプレビューできません。",
+    "mapWebgl2Software": "GPU が見つかりません。マップはソフトウェアで描画されるため、プレビューと書き出しが遅くなる場合があります。",
+    "mapStyle": "地図スタイル",
+    "mapView": "地図ビュー",
+    "msaa": "アンチエイリアス (MSAA)",
+    "msaaOff": "オフ",
+    "northUp": "北を上",
+    "pitch": "傾き",
+    "riderUp": "進行方向を上",
+    "topDown": "真上から",
+    "zoom": "ズーム",
     "chartMetrics": "指標",
     "chartMetric": "指標",
     "addMetric": "指標を追加",
@@ -852,6 +876,7 @@
     "singleCircle": "単一円",
     "smoothing": "スムージング",
     "solidHalo": "塗りつぶしハロー",
+    "markerArrow": "矢印",
     "style": "スタイル",
     "text": "テキスト",
     "thickness": "太さ",

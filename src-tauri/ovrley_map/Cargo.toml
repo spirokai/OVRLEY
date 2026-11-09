@@ -1,0 +1,61 @@
+[package]
+# Map vocabulary shared by native and WASM. The `gpu` feature adds the wgpu renderer, whose
+# method is ported from maplibre-rs (see src/gpu/LICENSE-MIT). The `validate` feature adds the
+# MapLibre style validator that registers installed styles (see src/style_spec.rs).
+name = "ovrley_map"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-or-later"
+
+[features]
+gpu = [
+  "dep:ab_glyph",
+  "dep:bytemuck",
+  "dep:geozero",
+  "dep:js-sys",
+  "dep:libm",
+  "dep:log",
+  "dep:lyon",
+  "dep:maplibre-expr",
+  "dep:memmap2",
+  "dep:pollster",
+  "dep:unicode-bidi",
+  "dep:unicode-bidi-mirroring",
+  "dep:wasm-bindgen",
+  "dep:web-sys",
+  "dep:wgpu",
+]
+validate = ["dep:maplibre-expr"]
+
+[[bin]]
+name = "benchmark_map_labels"
+path = "../../benchmarks/map-labels/native.rs"
+required-features = ["gpu", "validate"]
+test = false
+
+[dependencies]
+ab_glyph = { version = "0.2", optional = true }
+bytemuck = { version = "1", features = ["derive"], optional = true }
+cgmath = "0.18"
+geozero = { version = "0.15", default-features = false, features = ["with-mvt"], optional = true }
+libm = { version = "0.2", optional = true }
+log = { version = "0.4", optional = true }
+lyon = { version = "1", optional = true }
+maplibre-expr = { version = "0.5", default-features = false, optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+unicode-bidi = { version = "0.3", optional = true }
+unicode-bidi-mirroring = { version = "0.4", optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+memmap2 = { version = "0.9", optional = true }
+pollster = { version = "0.4", optional = true }
+wgpu = { version = "30", optional = true }
+
+# The editor preview: WebGL2 in a canvas.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = { version = "0.3", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
+web-sys = { version = "0.3", features = ["HtmlCanvasElement"], optional = true }
+wgpu = { version = "30", features = ["webgl"], optional = true }

@@ -50,6 +50,7 @@ src-tauri/binaries/
 vendor/ffmpeg/*
 !vendor/ffmpeg/.gitkeep
 vendor/telemetry-parser/
+vendor/wasm-bindgen/
 
 # Test fixtures (large video files)
 src-tauri/ovrley_core/tests/fixtures/video/
@@ -61,12 +62,7 @@ tmp/
 
 # Agent scratch files
 .agents/release-notes.md
+.agents/scratch/
 .claude/skills
 .agents/plans/
 .vite-hooks/
-
-# Generated package resources
-/THIRD_PARTY_NOTICES.txt
-INSTALL-macos.txt
-INSTALL-linux.txt
-INSTALL-debian.txt

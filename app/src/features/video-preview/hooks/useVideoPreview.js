@@ -9,7 +9,7 @@ import useStore from '@/store/useStore'
 import { useVideoPlaybackClock } from './useVideoPlaybackClock'
 import { useVideoPreviewWarnings } from './useVideoPreviewWarnings'
 import { SCRUB_SEEK_EPSILON_SECONDS, SCRUB_SEEK_INTERVAL_MS } from '../data/videoPreviewConstants'
-import { primeVideoFirstFrame, syncVideoCurrentTime } from '../utils/videoPreviewPlayback'
+import { isWithinPausedFrame, primeVideoFirstFrame, syncVideoCurrentTime } from '../utils/videoPreviewPlayback'
 import { createVideoPreviewScrubScheduler } from '../utils/videoPreviewScrubScheduler'
 import { isVideoPreviewOutOfRange, resolveVideoPreviewSource } from '../utils/videoPreviewSource'
 import i18next from 'i18next'
@@ -38,6 +38,7 @@ export function useVideoPreview(videoRef, isActive = true) {
   const setSelectedSecond = useStore((state) => state.setSelectedSecond)
   const startPreviewPlayback = useStore((state) => state.startPreviewPlayback)
   const videoDuration = useStore((state) => state.importedVideoDuration || 0)
+  const importedVideoFps = useStore((state) => state.importedVideoFps)
   const effectiveVideoSyncOffsetSeconds = videoSyncOffsetPreviewSeconds ?? videoSyncOffsetSeconds
 
   // Derived state - determines whether the video should play and which source URL to load.
@@ -177,6 +178,7 @@ export function useVideoPreview(videoRef, isActive = true) {
         return
       }
 
+      const pausedFromVideoPlayback = videoPlaybackOwnerRef.current !== null
       videoPlaybackOwnerRef.current = null
       if (!video.paused) {
         video.pause()
@@ -194,6 +196,8 @@ export function useVideoPreview(videoRef, isActive = true) {
       }
 
       scrubSchedulerRef.current?.clear()
+      // Pausing video playback keeps the frame on screen; deliberate jumps are at least a frame away and still seek.
+      if (pausedFromVideoPlayback && importedVideoFps !== null && isWithinPausedFrame(video, desiredVideoSecond, importedVideoFps)) return
       syncVideoCurrentTime(video, desiredVideoSecond)
     }
 
@@ -209,6 +213,7 @@ export function useVideoPreview(videoRef, isActive = true) {
       video.removeEventListener('loadedmetadata', handleLoadedMetadata)
     }
   }, [
+    importedVideoFps,
     isActive,
     isVideoPlaybackMode,
     pausePreviewPlayback,

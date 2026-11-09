@@ -100,6 +100,9 @@
     "getHevcCodec": "HEVC 코덱 받기",
     "hevcVideoCannotBePlayed": "HEVC 동영상을 재생할 수 없음",
     "installCodecForSystem": "시스템에 맞는 패키지를 설치하세요.",
+    "mapViewHint": "더블클릭하여 이동 및 확대/축소",
+    "mapViewZoomHint": "더블클릭하여 확대/축소",
+    "mapReset": "초기화",
     "microsoftStoreHevcCodec": "Microsoft Store에서 HEVC 코덱을 받을 수 있습니다.",
     "onUbuntu": "Ubuntu에서:",
     "overlayCanvasReady": "오버레이 캔버스 준비 완료",
@@ -557,6 +560,9 @@
       "delta": "델타",
       "lapLog": "랩 기록"
     },
+    "drawerGroups": {
+      "map": { "shortName": "지도", "route": "경로", "mapTiles": "지도 타일", "route3d": "3D 경로" }
+    },
     "types": {
       "rolling_chart": { "name": "차트", "shortName": "차트" },
       "diving_profile": {
@@ -581,6 +587,7 @@
       "color_temperature": { "name": "색온도", "shortName": "WB" },
       "core_temperature": { "name": "체온", "shortName": "체온" },
       "course": { "name": "경로 지도", "shortName": "지도" },
+      "map": { "name": "거리 지도", "shortName": "거리" },
       "distance": { "name": "거리", "shortName": "거리" },
       "distance_to_home": { "name": "집까지 거리", "shortName": "집" },
       "elevation": { "name": "고도", "shortName": "고도" },
@@ -619,6 +626,23 @@
     }
   },
   "widget-editor": {
+    "cameraMode": "카메라 모드",
+    "chaseCamera": "추적 카메라",
+    "mapBuildings": "건물",
+    "mapPaths": "오솔길",
+    "mapLabels": "라벨",
+    "mapLocalNames": "현지 이름",
+    "mapWebgl2Unavailable": "이 시스템에서는 WebGL2를 사용할 수 없어 지도를 미리 볼 수 없습니다.",
+    "mapWebgl2Software": "GPU를 찾을 수 없습니다. 지도가 소프트웨어로 렌더링되어 미리보기와 내보내기가 느릴 수 있습니다.",
+    "mapStyle": "지도 스타일",
+    "mapView": "지도 보기",
+    "msaa": "안티앨리어싱 (MSAA)",
+    "msaaOff": "끔",
+    "northUp": "북쪽 위",
+    "pitch": "기울기",
+    "riderUp": "진행 방향 위",
+    "topDown": "위에서 보기",
+    "zoom": "확대/축소",
     "chartMetrics": "지표",
     "chartMetric": "지표",
     "addMetric": "지표 추가",
@@ -852,6 +876,7 @@
     "singleCircle": "단일 원",
     "smoothing": "스무딩",
     "solidHalo": "단색 후광",
+    "markerArrow": "화살표",
     "style": "스타일",
     "text": "텍스트",
     "thickness": "두께",

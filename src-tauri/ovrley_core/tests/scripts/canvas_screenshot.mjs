@@ -20,7 +20,7 @@ import { chromium } from '@playwright/test'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { artifactDir } from '../../../../scripts/build-wasm.mjs'
+import { artifactDir } from '../../../../scripts/wasm/build.mjs'
 
 const args = process.argv.slice(2)
 

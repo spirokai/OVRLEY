@@ -4,12 +4,14 @@ import { groupContentBounds, normalizeRotation } from './widgetGestureGeometry'
 
 const targets = new WeakMap()
 
-function rotationPatch(widget, rotation, translate = [0, 0], geometry) {
+// Centered families keep the gesture-start content center fixed; Moveable's own rotation
+// translation is measured against the live, re-rendered target and would feed back into it.
+function rotationPatch(widget, rotation, geometry) {
   const { data } = widget
   const centeredRotation = widget.type === 'course' || widget.type === 'raster'
   const patch = {
-    x: data.x + translate[0],
-    y: data.y + translate[1],
+    x: data.x,
+    y: data.y,
     rotation: normalizeRotation(centeredRotation ? Math.round(rotation) : rotation),
   }
   if (centeredRotation) {
@@ -17,8 +19,8 @@ function rotationPatch(widget, rotation, translate = [0, 0], geometry) {
     const angle = ((patch.rotation - data.rotation) * Math.PI) / 180
     const dx = data.x - center[0]
     const dy = data.y - center[1]
-    patch.x = center[0] + dx * Math.cos(angle) - dy * Math.sin(angle) + translate[0]
-    patch.y = center[1] + dx * Math.sin(angle) + dy * Math.cos(angle) + translate[1]
+    patch.x = center[0] + dx * Math.cos(angle) - dy * Math.sin(angle)
+    patch.y = center[1] + dx * Math.sin(angle) + dy * Math.cos(angle)
   }
   return patch
 }
@@ -96,7 +98,7 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
     if (!active) return null
     for (const widget of active.widgets.values()) {
       widget.committing =
-        widget.intent?.type === 'drag' || (['course', 'elevation', 'diving_profile'].includes(widget.type) && widget.intent?.type === 'resize')
+        widget.intent?.type === 'drag' || (['course', 'elevation', 'diving_profile', 'map'].includes(widget.type) && widget.intent?.type === 'resize')
     }
     flush() // Mouseup can precede the pending animation frame.
     const patches = [...active.widgets].filter(([, widget]) => widget.patch !== null).map(([id, widget]) => [id, widget.patch])
@@ -121,7 +123,7 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
           flush()
           const widget = getSnapshot().widgets.find((item) => item.id === id)
           if (!widget) throw new Error(`Missing WASM widget: ${id}`)
-          return rotationPatch(widget, rotation, [0, 0], getGeometry(id))
+          return rotationPatch(widget, rotation, getGeometry(id))
         },
         resize(geometry) {
           const snapshot = getSnapshot()
@@ -193,7 +195,7 @@ export function createWidgetInteraction({ schedule, flush, getSnapshot, getGeome
             intent.type === 'drag'
               ? { x: widget.data.x + intent.translate[0], y: widget.data.y + intent.translate[1] }
               : intent.type === 'rotate'
-                ? rotationPatch(widget, intent.rotation, intent.translate, widget.geometry)
+                ? rotationPatch(widget, intent.rotation, widget.geometry)
                 : resize(
                     {
                       type: widget.type,

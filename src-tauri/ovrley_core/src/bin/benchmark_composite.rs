@@ -322,6 +322,7 @@ fn main() -> Result<(), String> {
                 raw,
                 validate_render_activity(&activity).map_err(|e| e.to_string())?,
                 None,
+                None,
             )
             .map_err(|e| e.to_string())?;
             let overlay_duration = plan.config().scene.end - plan.config().scene.start;

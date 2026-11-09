@@ -265,7 +265,7 @@ pub fn render_fixture_composite_with_paths(
 
     let activity = fixture_activity();
     let plan =
-        plan_single_render(config, validate_render_activity(&activity).unwrap(), None).unwrap();
+        plan_single_render(config, validate_render_activity(&activity).unwrap(), None, None).unwrap();
 
     // ── Phase 4: execute canonical frame-worker composite render ────
     let output_target = custom_output_target(&paths, "render", RenderOutputKind::Composite);

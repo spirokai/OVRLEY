@@ -100,6 +100,9 @@
     "getHevcCodec": "Obtener códec HEVC",
     "hevcVideoCannotBePlayed": "No se puede reproducir el vídeo HEVC",
     "installCodecForSystem": "Instala el paquete correcto para tu sistema.",
+    "mapViewHint": "Doble clic para mover y hacer zoom",
+    "mapViewZoomHint": "Doble clic para hacer zoom",
+    "mapReset": "Restablecer",
     "microsoftStoreHevcCodec": "Puedes obtener el códec HEVC en Microsoft Store.",
     "onUbuntu": "En Ubuntu:",
     "overlayCanvasReady": "Lienzo de superposición listo",
@@ -557,6 +560,9 @@
       "delta": "Diferencia",
       "lapLog": "Registro de vueltas"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Mapa", "route": "Ruta", "mapTiles": "Teselas de mapa", "route3d": "Ruta 3D" }
+    },
     "types": {
       "rolling_chart": { "name": "Gráficos", "shortName": "Gráficos" },
       "diving_profile": {
@@ -581,6 +587,7 @@
       "color_temperature": { "name": "Temperatura de color", "shortName": "Temp. color" },
       "core_temperature": { "name": "Temperatura corporal", "shortName": "Corporal" },
       "course": { "name": "Mapa de ruta", "shortName": "Mapa" },
+      "map": { "name": "Mapa de calles", "shortName": "Calles" },
       "distance": { "name": "Distancia", "shortName": "Dist." },
       "distance_to_home": { "name": "Distancia hasta casa", "shortName": "Casa" },
       "elevation": { "name": "Elevación", "shortName": "Elevación" },
@@ -619,6 +626,23 @@
     }
   },
   "widget-editor": {
+    "cameraMode": "Modo de cámara",
+    "chaseCamera": "Cámara de seguimiento",
+    "mapBuildings": "Edificios",
+    "mapPaths": "Senderos",
+    "mapLabels": "Etiquetas",
+    "mapLocalNames": "Nombres locales",
+    "mapWebgl2Unavailable": "WebGL2 no está disponible en este sistema, por lo que el mapa no se puede previsualizar.",
+    "mapWebgl2Software": "No se encontró ninguna GPU. El mapa se renderiza por software, por lo que la vista previa y la exportación pueden ir lentas.",
+    "mapStyle": "Estilo de mapa",
+    "mapView": "Vista del mapa",
+    "msaa": "Suavizado (MSAA)",
+    "msaaOff": "Desactivado",
+    "northUp": "Norte arriba",
+    "pitch": "Inclinación",
+    "riderUp": "Dirección arriba",
+    "topDown": "Vista cenital",
+    "zoom": "Zoom",
     "chartMetrics": "Métricas",
     "chartMetric": "Métrica",
     "addMetric": "Añadir métrica",
@@ -852,6 +876,7 @@
     "singleCircle": "Círculo único",
     "smoothing": "Suavizado",
     "solidHalo": "Halo sólido",
+    "markerArrow": "Flecha",
     "style": "Estilo",
     "text": "Texto",
     "thickness": "Grosor",

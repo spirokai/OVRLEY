@@ -100,6 +100,9 @@
     "getHevcCodec": "Skaffa HEVC-kodek",
     "hevcVideoCannotBePlayed": "HEVC-videon kan inte spelas upp",
     "installCodecForSystem": "Installera rätt paket för ditt system.",
+    "mapViewHint": "Dubbelklicka för att panorera och zooma",
+    "mapViewZoomHint": "Dubbelklicka för att zooma",
+    "mapReset": "Återställ",
     "microsoftStoreHevcCodec": "Du kan hämta HEVC-kodeken från Microsoft Store.",
     "onUbuntu": "I Ubuntu:",
     "overlayCanvasReady": "Överläggsytan är klar",
@@ -557,6 +560,9 @@
       "delta": "Delta",
       "lapLog": "Varvlogg"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Karta", "route": "Rutt", "mapTiles": "Kartrutor", "route3d": "3D-rutt" }
+    },
     "types": {
       "rolling_chart": { "name": "Diagram", "shortName": "Diagram" },
       "diving_profile": {
@@ -581,6 +587,7 @@
       "color_temperature": { "name": "Färgtemperatur", "shortName": "WB" },
       "core_temperature": { "name": "Kroppstemperatur", "shortName": "Kroppstemp." },
       "course": { "name": "Ruttkarta", "shortName": "Karta" },
+      "map": { "name": "Gatukarta", "shortName": "Gator" },
       "distance": { "name": "Avstånd", "shortName": "Avst." },
       "distance_to_home": { "name": "Avstånd hem", "shortName": "Hem" },
       "elevation": { "name": "Höjdprofil", "shortName": "Profil" },
@@ -619,6 +626,23 @@
     }
   },
   "widget-editor": {
+    "cameraMode": "Kameraläge",
+    "chaseCamera": "Följekamera",
+    "mapBuildings": "Byggnader",
+    "mapPaths": "Stigar",
+    "mapLabels": "Etiketter",
+    "mapLocalNames": "Lokala namn",
+    "mapWebgl2Unavailable": "WebGL2 är inte tillgängligt på det här systemet, så kartan kan inte förhandsvisas.",
+    "mapWebgl2Software": "Ingen GPU hittades. Kartan renderas i mjukvara, så förhandsvisning och export kan vara långsamma.",
+    "mapStyle": "Kartstil",
+    "mapView": "Kartvy",
+    "msaa": "Kantutjämning (MSAA)",
+    "msaaOff": "Av",
+    "northUp": "Norr uppåt",
+    "pitch": "Lutning",
+    "riderUp": "Färdriktning uppåt",
+    "topDown": "Ovanifrån",
+    "zoom": "Zoom",
     "chartMetrics": "Mätvärden",
     "chartMetric": "Mätvärde",
     "addMetric": "Lägg till mätvärde",
@@ -852,6 +876,7 @@
     "singleCircle": "Enkel cirkel",
     "smoothing": "Utjämning",
     "solidHalo": "Tät halo",
+    "markerArrow": "Pil",
     "style": "Stil",
     "text": "Text",
     "thickness": "Tjocklek",

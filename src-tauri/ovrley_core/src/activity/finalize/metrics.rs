@@ -279,67 +279,68 @@ pub fn derive_gradient_series(
     gradient_series
 }
 
-/// Derives heading from course points using a distance-based baseline.
+/// Speed below which a moving rider counts as stopped and heading holds.
+const HEADING_STOPPED_BELOW_KMH: f64 = 2.0;
+/// Speed a stopped rider must exceed before heading updates again. The gap to
+/// the stop threshold keeps GPS speed noise from toggling the state.
+const HEADING_MOVING_ABOVE_KMH: f64 = 3.0;
+/// How far in time a heading baseline may reach on either side of a sample.
+const HEADING_BASELINE_WINDOW_SECONDS: f64 = 5.0;
+
+/// Derives heading from course points using a straight-line baseline.
 ///
-/// The centered lookback/lookahead path reduces GPS jitter around the current
-/// point; the fallback lookback keeps headings available near the tail where no
-/// future sample exists.
+/// A stopped receiver's position wanders inside a few metres, so path length
+/// keeps growing while the rider stands still. The baseline therefore measures
+/// straight-line displacement: the centered pair needs half the baseline on each
+/// side, and the lookback fallback keeps headings available near the tail. When
+/// no displacement is large enough within the time window, the last heading
+/// holds. Speed gates updates with hysteresis so drift at a standstill never
+/// turns the heading; samples without speed keep the previous moving state.
 pub fn derive_heading_series(
     course_series: &[(Option<f64>, Option<f64>)],
-    distance_series: &NumericSeries,
-    min_distance_meters: f64,
+    speed_series: &NumericSeries,
+    elapsed_series: &[f64],
+    min_displacement_meters: f64,
 ) -> NumericSeries {
     let mut derived = Vec::with_capacity(course_series.len());
     let mut last_heading = None;
-    let half_baseline_meters = min_distance_meters / 2.0;
-    let mut centered_lookback_index = None;
-    let mut fallback_lookback_index = None;
-    let mut lookahead_index = 0;
+    let mut moving = true;
+    let half_baseline_meters = min_displacement_meters / 2.0;
 
     for index in 0..course_series.len() {
-        let current_distance = distance_series[index].and_then(finite_f64);
-        let mut heading = None;
-
-        if let Some(current_distance) = current_distance {
-            advance_lookback_index(
-                distance_series,
-                index,
-                current_distance,
-                half_baseline_meters,
-                &mut centered_lookback_index,
-            );
-            advance_lookahead_index(
-                distance_series,
-                index,
-                current_distance,
-                half_baseline_meters,
-                &mut lookahead_index,
-            );
-            advance_lookback_index(
-                distance_series,
-                index,
-                current_distance,
-                min_distance_meters,
-                &mut fallback_lookback_index,
-            );
-
-            let centered =
-                centered_lookback_index.filter(|&index| distance_series[index].is_some());
-            let lookahead = (lookahead_index < course_series.len()
-                && distance_series[lookahead_index].is_some())
-            .then_some(lookahead_index);
-            let fallback =
-                fallback_lookback_index.filter(|&index| distance_series[index].is_some());
-
-            if let (Some(left), Some(right)) = (centered, lookahead) {
-                heading = bearing_between(course_series[left], course_series[right]);
-            } else if let Some(left) = fallback {
-                heading = bearing_between(course_series[left], course_series[index]);
+        if let Some(speed_kmh) = speed_series[index]
+            .and_then(finite_f64)
+            .map(|mps| mps * 3.6)
+        {
+            if moving && speed_kmh < HEADING_STOPPED_BELOW_KMH {
+                moving = false;
+            } else if !moving && speed_kmh > HEADING_MOVING_ABOVE_KMH {
+                moving = true;
             }
-        } else {
-            centered_lookback_index = Some(index);
-            fallback_lookback_index = Some(index);
         }
+
+        let heading = present_gps_point(course_series[index])
+            .filter(|_| moving)
+            .and_then(|current| {
+                let displaced = |radius: f64, candidates: &mut dyn Iterator<Item = usize>| {
+                    baseline_point(
+                        course_series,
+                        elapsed_series,
+                        index,
+                        current,
+                        radius,
+                        candidates,
+                    )
+                };
+                let centered = displaced(half_baseline_meters, &mut (0..index).rev()).zip(
+                    displaced(half_baseline_meters, &mut (index + 1..course_series.len())),
+                );
+                match centered {
+                    Some((left, right)) => bearing_degrees(left.0, left.1, right.0, right.1),
+                    None => displaced(min_displacement_meters, &mut (0..index).rev())
+                        .and_then(|left| bearing_degrees(left.0, left.1, current.0, current.1)),
+                }
+            });
 
         if let Some(value) = heading.and_then(|value| round_f64(value, 3)) {
             last_heading = Some(value);
@@ -348,6 +349,32 @@ pub fn derive_heading_series(
     }
 
     derived
+}
+
+/// Finds the nearest candidate at least `radius` metres in a straight line from
+/// `current`, scanning only within the heading baseline time window.
+fn baseline_point(
+    course_series: &[(Option<f64>, Option<f64>)],
+    elapsed_series: &[f64],
+    index: usize,
+    current: (f64, f64),
+    radius: f64,
+    candidates: &mut dyn Iterator<Item = usize>,
+) -> Option<(f64, f64)> {
+    let current_elapsed = finite_f64(elapsed_series[index])?;
+    for candidate in candidates {
+        let elapsed = finite_f64(elapsed_series[candidate])?;
+        if (elapsed - current_elapsed).abs() > HEADING_BASELINE_WINDOW_SECONDS {
+            return None;
+        }
+        let Some(point) = present_gps_point(course_series[candidate]) else {
+            continue;
+        };
+        if haversine_distance(current.0, current.1, point.0, point.1) >= radius {
+            return Some(point);
+        }
+    }
+    None
 }
 
 /// Derives the surface distance from the first valid GPS coordinate.
@@ -421,17 +448,6 @@ fn present_gps_point(point: (Option<f64>, Option<f64>)) -> Option<(f64, f64)> {
         (Some(latitude), Some(longitude)) => Some((latitude, longitude)),
         _ => None,
     }
-}
-
-/// Resolves a bearing between two optional course points.
-///
-/// Keeping the option handling here lets heading derivation stay focused on
-/// baseline selection while invalid coordinates simply produce no update.
-fn bearing_between(
-    from: (Option<f64>, Option<f64>),
-    to: (Option<f64>, Option<f64>),
-) -> Option<f64> {
-    bearing_degrees(from.0?, from.1?, to.0?, to.1?)
 }
 
 /// Derives a per-second rate from adjacent numeric samples.
@@ -662,11 +678,19 @@ pub fn derive_activity_metric_series(
     let derived_speed = if columns.options.smoothing.contains_key("speed") {
         derived_speed
     } else {
-        let timestamps_ms: Vec<_> = elapsed_series.iter().map(|second| second * 1000.0).collect();
+        let timestamps_ms: Vec<_> = elapsed_series
+            .iter()
+            .map(|second| second * 1000.0)
+            .collect();
         let window = smoothing_window_for_seconds(&timestamps_ms, 1.0);
         zero_phase_smooth(&derived_speed, window)
     };
-    let derived_heading = derive_heading_series(course_series, distance_series, 2.0);
+    let heading_speed: NumericSeries = direct["speed"]
+        .iter()
+        .zip(&derived_speed)
+        .map(|(recorded, derived)| recorded.or(*derived))
+        .collect();
+    let derived_heading = derive_heading_series(course_series, &heading_speed, elapsed_series, 8.0);
     let derived_distance_to_home = derive_distance_to_home_series(course_series);
     let derived_total_ascent =
         derive_total_ascent_series(&direct["barometric_altitude"], &direct["elevation"]);
@@ -881,8 +905,28 @@ mod tests {
                 Some(6.84),
             ]
         );
+        // Speeds are m/s. The rider stops at index 9 (1.8 km/h) and stays stopped at
+        // index 10 (2.52 km/h, between the thresholds) until index 11 (7.2 km/h).
+        let speeds = vec![
+            Some(5.0),
+            Some(5.0),
+            Some(5.0),
+            Some(5.0),
+            Some(5.0),
+            None,
+            Some(5.0),
+            Some(5.0),
+            None,
+            Some(0.5),
+            Some(0.7),
+            Some(2.0),
+            Some(5.0),
+        ];
+        let elapsed = (0..distances.len())
+            .map(|second| second as f64)
+            .collect::<Vec<_>>();
         assert_eq!(
-            derive_heading_series(&course, &distances, 2.0),
+            derive_heading_series(&course, &speeds, &elapsed, 2.0),
             vec![
                 None,
                 None,
@@ -891,10 +935,10 @@ mod tests {
                 Some(90.0),
                 Some(90.0),
                 Some(90.0),
-                Some(90.0),
-                Some(90.0),
-                Some(90.0),
-                Some(0.0),
+                Some(14.931),
+                Some(14.931),
+                Some(14.931),
+                Some(14.931),
                 Some(0.0),
                 Some(0.0),
             ]
@@ -906,10 +950,21 @@ mod tests {
         let sample_count = 100_000;
         let distances = vec![Some(10.0); sample_count];
         let elevations = vec![Some(100.0); sample_count];
-        let course = vec![(Some(47.0), Some(8.0)); sample_count];
+        // A stationary receiver drifts about 1 m around its fix; without speed,
+        // only the straight-line baseline keeps that drift from producing headings.
+        let course = (0..sample_count)
+            .map(|index| {
+                let drift = [0.0, 1.0, -1.0, 0.5][index % 4] * 0.000_008;
+                (Some(47.0 + drift), Some(8.0 - drift))
+            })
+            .collect::<Vec<_>>();
+        let speeds = vec![None; sample_count];
+        let elapsed = (0..sample_count)
+            .map(|index| index as f64 / 10.0)
+            .collect::<Vec<_>>();
 
         let gradients = derive_gradient_series(&elevations, &distances);
-        let headings = derive_heading_series(&course, &distances, 5.0);
+        let headings = derive_heading_series(&course, &speeds, &elapsed, 5.0);
         assert_eq!(gradients.len(), sample_count);
         assert_eq!(headings.len(), sample_count);
         assert!(gradients.iter().all(|value| *value == Some(0.0)));

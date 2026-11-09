@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "ovrley_core", "ovrley_widgets"]
+members = [".", "ovrley_core", "ovrley_map", "ovrley_widgets"]
 
 [package]
 name = "app"
@@ -35,6 +35,7 @@ tauri-plugin-updater = "=2.9.0"
 base64 = "0.22"
 open = "5"
 ovrley_core = { path = "ovrley_core" }
+ovrley_map = { path = "ovrley_map", features = ["gpu", "validate"] }
 ovrley_widgets = { path = "ovrley_widgets" }
 tiny_http = "0.12"
 uuid = { version = "1", features = ["v4"] }
@@ -43,6 +44,10 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 reqwest = { version = "0.12.28", default-features = false, features = ["blocking", "rustls-tls"] }
 http = "1.4"
 http-cache-semantics = "=2.1.0"
+
+# DXGI tells whether a hardware GPU exists before WebView2 starts.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = ["Win32_Graphics_Dxgi"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3", default-features = false, features = [
@@ -54,6 +59,11 @@ objc2-app-kit = { version = "0.3", default-features = false, features = [
   "NSView",
   "NSWindow",
 ] }
+
+# Full DWARF for opt-level-3 workspace crates is ~140 MB of every ~170 MB test
+# binary, and ovrley_core links ~60 of them. Line tables keep backtrace line numbers.
+[profile.dev]
+debug = "line-tables-only"
 
 # Per-pixel overlay conversion runs in ovrley_core; unoptimized it makes dev exports unusably slow.
 [profile.dev.package.ovrley_core]

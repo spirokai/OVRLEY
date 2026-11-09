@@ -100,6 +100,9 @@
     "getHevcCodec": "HEVC-Codec beziehen",
     "hevcVideoCannotBePlayed": "HEVC-Video kann nicht abgespielt werden",
     "installCodecForSystem": "Installieren Sie das richtige Paket für Ihr System.",
+    "mapViewHint": "Doppelklicken zum Verschieben und Zoomen",
+    "mapViewZoomHint": "Doppelklicken zum Zoomen",
+    "mapReset": "Zurücksetzen",
     "microsoftStoreHevcCodec": "Den HEVC-Codec erhalten Sie im Microsoft Store.",
     "onUbuntu": "Unter Ubuntu:",
     "overlayCanvasReady": "Overlay-Leinwand ist bereit",
@@ -557,6 +560,9 @@
       "delta": "Differenz",
       "lapLog": "Rundenprotokoll"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Karte", "route": "Route", "mapTiles": "Kartenkacheln", "route3d": "3D-Route" }
+    },
     "types": {
       "rolling_chart": { "name": "Diagramme", "shortName": "Diagramme" },
       "diving_profile": {
@@ -581,6 +587,7 @@
       "color_temperature": { "name": "Farbtemperatur", "shortName": "Farbtemp." },
       "core_temperature": { "name": "Körpertemperatur", "shortName": "Körpertemp." },
       "course": { "name": "Routenkarte", "shortName": "Karte" },
+      "map": { "name": "Straßenkarte", "shortName": "Straßen" },
       "distance": { "name": "Entfernung", "shortName": "Entf." },
       "distance_to_home": { "name": "Entfernung bis nach Hause", "shortName": "Zuhause" },
       "elevation": { "name": "Höhenprofil", "shortName": "Profil" },
@@ -619,6 +626,23 @@
     }
   },
   "widget-editor": {
+    "cameraMode": "Kameramodus",
+    "chaseCamera": "Verfolgerkamera",
+    "mapBuildings": "Gebäude",
+    "mapPaths": "Wege",
+    "mapLabels": "Beschriftungen",
+    "mapLocalNames": "Lokale Namen",
+    "mapWebgl2Unavailable": "WebGL2 ist auf diesem System nicht verfügbar, daher kann die Karte nicht in der Vorschau angezeigt werden.",
+    "mapWebgl2Software": "Keine GPU gefunden. Die Karte wird per Software gerendert, daher können Vorschau und Export langsam sein.",
+    "mapStyle": "Kartenstil",
+    "mapView": "Kartenansicht",
+    "msaa": "Kantenglättung (MSAA)",
+    "msaaOff": "Aus",
+    "northUp": "Norden oben",
+    "pitch": "Neigung",
+    "riderUp": "Fahrtrichtung oben",
+    "topDown": "Draufsicht",
+    "zoom": "Zoom",
     "chartMetrics": "Messwerte",
     "chartMetric": "Messwert",
     "addMetric": "Messwert hinzufügen",
@@ -852,6 +876,7 @@
     "singleCircle": "Einzelner Kreis",
     "smoothing": "Glättung",
     "solidHalo": "Voller Halo",
+    "markerArrow": "Pfeil",
     "style": "Stil",
     "text": "Text",
     "thickness": "Dicke",

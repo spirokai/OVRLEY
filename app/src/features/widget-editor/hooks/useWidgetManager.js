@@ -82,6 +82,12 @@ export function useWidgetManager({ widgetLiveEdits }) {
       }
     }
 
+    // A map switching to top down starts with its whole route in view.
+    if (widget?.type === 'map' && updates.camera_mode === 'fixed' && widget.data.camera_mode !== 'fixed') {
+      const fit = getWidgetInteraction(liveEdits.getWidgetNode(id)).resize({ widget: { ...widget.data, ...nextUpdates }, map_view: 'fit' })
+      nextUpdates = { ...nextUpdates, ...fit }
+    }
+
     const state = useStore.getState()
     state.setConfig(updateWidgetInConfig(state.config, id, nextUpdates))
   }

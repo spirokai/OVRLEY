@@ -36,9 +36,10 @@ src-tauri/ovrley_core/   Standalone Rust crate — Skia rendering, ffmpeg encodi
 | `pnpm dev`          | Full dev: builds frontend + launches Tauri window                   |
 | `pnpm dev:frontend` | Vite dev server only (port 5173)                                    |
 | `pnpm build`        | Production build (runs `pnpm tauri build` via wrapper)              |
-| `pnpm lint`         | ESLint on `app/` (flat config v9, Prettier-integrated)              |
-| `pnpm format`       | Prettier on `app/`                                                  |
-| `pnpm test`         | Frontend Vitest suite                                              |
+| `pnpm lint`         | `vp lint` (Vite+ oxlint) on `app/`                                  |
+| `pnpm format`       | `vp fmt --write` (Vite+ formatter) on `app/`                        |
+| `pnpm format:check` | `vp fmt --check` on `app/`                                          |
+| `pnpm test`         | Frontend Vitest suite (`vp test run`)                               |
 | `pnpm release`      | semantic-release (auto-tags on `skia-render-backend` branch pushes) |
 
 `pnpm tauri build` is wrapped by `scripts/tauri.mjs` — it runs Tauri with `--no-bundle`, then creates a standalone `.zip` portable archive containing the binary + `vendor/ffmpeg/` + `fonts/` + `templates/`.
@@ -47,8 +48,11 @@ ABSOLUTELY NEVER run build without the user's permission!
 
 ## Code style (frontend)
 
-- **Prettier** (enforced via ESLint `prettier/prettier: error`): no semicolons, single quotes, trailing commas, 150 print width, LF line endings.
-- **ESLint**: `react/prop-types: off`, `react-hooks/exhaustive-deps: error` (flat config at `app/eslint.config.js`).
+- **Formatting and linting are Vite+ only**, configured in the root `vite.config.js` (`fmt` and `lint` blocks). There is no ESLint or Prettier config in this repo.
+  - Format: `pnpm exec vp fmt <files> --write` from `app/`, or `pnpm format` for everything. Style: no semicolons, single quotes, trailing commas, 150 print width, LF line endings.
+  - Lint: `pnpm exec vp lint <files>` from `app/`, or `pnpm lint`. It includes `react/exhaustive-deps: error` and `react/rules-of-hooks: error`.
+  - NEVER run `npx prettier` or `npx eslint`: without the project config they reformat with defaults (80 columns, semicolons) and expand untouched code.
+- To run a single test file: `pnpm exec vp test run <paths>` from `app/`. Arguments after `pnpm test --` are not passed through, so that runs the whole suite.
 - **No TypeScript.** Use JSDoc `@param`/`@returns` on exported functions for type documentation.
 - **Zustand** for global state with Immer middleware (store slices in `app/src/store/slices/`). Use `useShallow` for object selectors.
 - **shadcn/ui components** live in `app/src/components/ui/`. Use existing Radix primitives when adding new UI.
@@ -87,7 +91,7 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 - CI: `pnpm install --frozen-lockfile` → `pnpm tauri build --bundles <type>`.
 - Release workflow (`.github/workflows/release.yml`): manual trigger with tag input, builds Windows (NSI/MSI + portable) and macOS (DMG + portable).
 - semantic-release auto-creates tags on pushes to `skia-render-backend` branch using `@semantic-release/commit-analyzer`.
-- The portable archive script (`scripts/package-portable.mjs`) packages: Tauri binary renamed to `OVRLEY(.exe)`, `vendor/ffmpeg/`, `fonts/`, `templates/`.
+- The portable archive script (`packaging/portable.mjs`) packages: Tauri binary renamed to `OVRLEY(.exe)`, `vendor/ffmpeg/`, `fonts/`, `templates/`.
 
 ## Testing
 

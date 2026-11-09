@@ -161,14 +161,21 @@ fn yuva420p_plane_lens(size: FrameSize) -> CoreResult<(usize, usize)> {
 }
 
 /// Fixed-point (16.16) conversion coefficients for one matrix and range.
+#[derive(Clone, Copy)]
 struct Coefficients {
-    y: [i64; 3],
-    cb: [i64; 3],
-    cr: [i64; 3],
-    y_offset: i64,
+    y: [i32; 3],
+    cb: [i32; 3],
+    cr: [i32; 3],
+    y_offset: i32,
 }
 
 const FIXED_ONE: f64 = 65536.0;
+/// Alpha of a 2×2 block of opaque pixels.
+const OPAQUE_BLOCK: i32 = 4 * 255;
+/// Blocks converted before their alphas are checked.
+const BLOCK_RUN: usize = 64;
+/// Every other byte of a pair of pixels, so summing up to four pairs cannot carry between them.
+const EVEN_BYTES: u64 = 0x00FF_00FF_00FF_00FF;
 
 impl Coefficients {
     fn new(color: YuvColor) -> Self {
@@ -183,7 +190,7 @@ impl Coefficients {
         } else {
             (219.0 / 255.0, 224.0 / 255.0, 16.0)
         };
-        let fixed = |value: f64| (value * FIXED_ONE).round() as i64;
+        let fixed = |value: f64| (value * FIXED_ONE).round() as i32;
         let cb_scale = chroma_scale / (2.0 * (1.0 - kb));
         let cr_scale = chroma_scale / (2.0 * (1.0 - kr));
         Self {
@@ -195,8 +202,212 @@ impl Coefficients {
     }
 }
 
-fn clamp_byte(value: i64) -> u8 {
-    value.clamp(0, 255) as u8
+/// Chroma of a block of opaque pixels from its colour sums. Weighting by alpha multiplies numerator
+/// and denominator alike by 255, so this rounds exactly as [`weighted_chroma`] does, without dividing.
+#[inline(always)]
+fn opaque_chroma([kr, kg, kb]: [i32; 3], [r, g, b]: [i32; 3]) -> u8 {
+    let numerator = kr * r + kg * g + kb * b;
+    let sign = numerator >> 31;
+    let magnitude = (((numerator ^ sign) - sign) + (1 << 17)) >> 18;
+    (128 + ((magnitude ^ sign) - sign)).clamp(0, 255) as u8
+}
+
+/// Chroma of any block: averages its pixels weighted by alpha. On the edges of an odd frame a block
+/// covers fewer pixels.
+fn weighted_chroma(
+    rgba: &[u8],
+    (width, height): (usize, usize),
+    (chroma_column, chroma_row): (usize, usize),
+    coefficients: &Coefficients,
+) -> (u8, u8) {
+    let (mut sum_alpha, mut sum_r, mut sum_g, mut sum_b) = (0i64, 0i64, 0i64, 0i64);
+    for row in (2 * chroma_row)..(2 * chroma_row + 2).min(height) {
+        for column in (2 * chroma_column)..(2 * chroma_column + 2).min(width) {
+            let offset = (row * width + column) * 4;
+            let alpha = i64::from(rgba[offset + 3]);
+            sum_alpha += alpha;
+            sum_r += alpha * i64::from(rgba[offset]);
+            sum_g += alpha * i64::from(rgba[offset + 1]);
+            sum_b += alpha * i64::from(rgba[offset + 2]);
+        }
+    }
+    if sum_alpha == 0 {
+        return (128, 128);
+    }
+    let chroma = |[kr, kg, kb]: [i32; 3]| {
+        let numerator = i64::from(kr) * sum_r + i64::from(kg) * sum_g + i64::from(kb) * sum_b;
+        let denominator = sum_alpha << 16;
+        // Rounded division of a signed numerator.
+        let rounded = if numerator >= 0 {
+            (numerator + denominator / 2) / denominator
+        } else {
+            -((-numerator + denominator / 2) / denominator)
+        };
+        (128 + rounded).clamp(0, 255) as u8
+    };
+    (chroma(coefficients.cb), chroma(coefficients.cr))
+}
+
+/// Luma and alpha of a run of whole rows. A fully transparent stretch needs neither colour nor luma.
+#[inline(always)]
+fn convert_luma_alpha(
+    rgba: &[u8],
+    coefficients: &Coefficients,
+    black_luma: u8,
+    y_rows: &mut [u8],
+    a_rows: &mut [u8],
+) {
+    let [yr, yg, yb] = coefficients.y;
+    for ((pixels, y_run), a_run) in rgba
+        .as_chunks::<4>()
+        .0
+        .chunks(BLOCK_RUN)
+        .zip(y_rows.chunks_mut(BLOCK_RUN))
+        .zip(a_rows.chunks_mut(BLOCK_RUN))
+    {
+        for (a, pixel) in a_run.iter_mut().zip(pixels) {
+            *a = pixel[3];
+        }
+        if a_run.iter().fold(0, |any, a| any | *a) == 0 {
+            y_run.fill(black_luma);
+            continue;
+        }
+        let mut luma = [0i32; BLOCK_RUN];
+        for (luma, pixel) in luma.iter_mut().zip(pixels) {
+            let word = u32::from_le_bytes(*pixel);
+            let (r, g, b) = (word & 255, (word >> 8) & 255, (word >> 16) & 255);
+            *luma = (yr * r as i32
+                + yg * g as i32
+                + yb * b as i32
+                + coefficients.y_offset
+                + 32768)
+                >> 16;
+        }
+        for ((y, luma), a) in y_run.iter_mut().zip(&luma).zip(a_run.iter()) {
+            *y = if *a == 0 {
+                black_luma
+            } else {
+                (*luma).clamp(0, 255) as u8
+            };
+        }
+    }
+}
+
+/// One frame's planes, a pair of rows at a time so the frame is read from memory once. Inlined into
+/// each instruction set it is compiled for.
+///
+/// Performance: do not split this into separate luma and chroma passes over the frame, which reads
+/// the whole atlas from memory twice. Output must stay byte-identical: see the division-based test.
+#[inline(always)]
+fn convert_planes(
+    rgba: &[u8],
+    (width, height): (usize, usize),
+    coefficients: &Coefficients,
+    [y_plane, u_plane, v_plane, a_plane]: [&mut [u8]; 4],
+) {
+    let black_luma = ((coefficients.y_offset + 32768) >> 16).clamp(0, 255) as u8;
+    let size = (width, height);
+    let stride = width * 4;
+    let chroma_width = width.div_ceil(2);
+    let whole_blocks = width / 2;
+    for chroma_row in 0..height / 2 {
+        convert_luma_alpha(
+            &rgba[2 * chroma_row * stride..][..2 * stride],
+            coefficients,
+            black_luma,
+            &mut y_plane[2 * chroma_row * width..][..2 * width],
+            &mut a_plane[2 * chroma_row * width..][..2 * width],
+        );
+        let top = &rgba[2 * chroma_row * stride..][..stride];
+        let bottom = &rgba[(2 * chroma_row + 1) * stride..][..stride];
+        let u_row = &mut u_plane[chroma_row * chroma_width..][..chroma_width];
+        let v_row = &mut v_plane[chroma_row * chroma_width..][..chroma_width];
+        let mut column = 0;
+        for ((top, bottom), (u_run, v_run)) in top
+            .as_chunks::<8>()
+            .0
+            .chunks(BLOCK_RUN)
+            .zip(bottom.as_chunks::<8>().0.chunks(BLOCK_RUN))
+            .zip(
+                u_row[..whole_blocks]
+                    .chunks_mut(BLOCK_RUN)
+                    .zip(v_row[..whole_blocks].chunks_mut(BLOCK_RUN)),
+            )
+        {
+            // Each block's channel sums, red and green in the low half of a word, blue and alpha in the high.
+            // Performance: one load per block, written to vectorize. Reading per channel was slower.
+            let (mut red_blue, mut green_alpha) = ([0u32; BLOCK_RUN], [0u32; BLOCK_RUN]);
+            for (((red_blue, green_alpha), top), bottom) in
+                red_blue.iter_mut().zip(&mut green_alpha).zip(top).zip(bottom)
+            {
+                let (top, bottom) = (u64::from_le_bytes(*top), u64::from_le_bytes(*bottom));
+                let even = (top & EVEN_BYTES) + (bottom & EVEN_BYTES);
+                let odd = ((top >> 8) & EVEN_BYTES) + ((bottom >> 8) & EVEN_BYTES);
+                *red_blue = (even + (even >> 32)) as u32;
+                *green_alpha = (odd + (odd >> 32)) as u32;
+            }
+            let green_alpha = &green_alpha[..top.len()];
+            let alpha = |word: &u32| (*word >> 16) as i32;
+            if green_alpha.iter().fold(0, |any, word| any | alpha(word)) == 0 {
+                u_run.fill(128);
+                v_run.fill(128);
+            } else if green_alpha.iter().fold(true, |opaque, word| opaque & (alpha(word) == OPAQUE_BLOCK)) {
+                let colour = |index: usize| {
+                    [
+                        (red_blue[index] & 0xFFFF) as i32,
+                        (green_alpha[index] & 0xFFFF) as i32,
+                        (red_blue[index] >> 16) as i32,
+                    ]
+                };
+                for (index, u) in u_run.iter_mut().enumerate() {
+                    *u = opaque_chroma(coefficients.cb, colour(index));
+                }
+                for (index, v) in v_run.iter_mut().enumerate() {
+                    *v = opaque_chroma(coefficients.cr, colour(index));
+                }
+            } else {
+                for (index, word) in green_alpha.iter().enumerate() {
+                    (u_run[index], v_run[index]) = if alpha(word) == 0 {
+                        (128, 128)
+                    } else {
+                        weighted_chroma(rgba, size, (column + index, chroma_row), coefficients)
+                    };
+                }
+            }
+            column += top.len();
+        }
+        if whole_blocks != chroma_width {
+            (u_row[whole_blocks], v_row[whole_blocks]) =
+                weighted_chroma(rgba, size, (whole_blocks, chroma_row), coefficients);
+        }
+    }
+    if height % 2 == 1 {
+        let last = height - 1;
+        convert_luma_alpha(
+            &rgba[last * stride..],
+            coefficients,
+            black_luma,
+            &mut y_plane[last * width..],
+            &mut a_plane[last * width..],
+        );
+        let chroma_row = height / 2;
+        for column in 0..chroma_width {
+            let index = chroma_row * chroma_width + column;
+            (u_plane[index], v_plane[index]) =
+                weighted_chroma(rgba, size, (column, chroma_row), coefficients);
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+fn convert_planes_avx2(
+    rgba: &[u8],
+    size: (usize, usize),
+    coefficients: &Coefficients,
+    planes: [&mut [u8]; 4],
+) {
+    convert_planes(rgba, size, coefficients, planes);
 }
 
 /// Converts straight-alpha RGBA into planar `yuva420p` (Y, U, V, A planes).
@@ -217,67 +428,17 @@ pub fn convert_rgba_to_yuva420p(rgba: &[u8], size: FrameSize, color: YuvColor, o
         "yuva420p frame length"
     );
     let coefficients = Coefficients::new(color);
-    let black_luma = clamp_byte((coefficients.y_offset + 32768) >> 16);
     let (y_plane, rest) = out.split_at_mut(luma_len);
     let (u_plane, rest) = rest.split_at_mut(chroma_len);
     let (v_plane, a_plane) = rest.split_at_mut(chroma_len);
-
-    for (index, [r, g, b, alpha]) in rgba.as_chunks::<4>().0.iter().enumerate() {
-        a_plane[index] = *alpha;
-        y_plane[index] = if *alpha == 0 {
-            black_luma
-        } else {
-            let [r, g, b] = [*r, *g, *b].map(i64::from);
-            let [yr, yg, yb] = coefficients.y;
-            clamp_byte((yr * r + yg * g + yb * b + coefficients.y_offset + 32768) >> 16)
-        };
+    let planes = [y_plane, u_plane, v_plane, a_plane];
+    #[cfg(target_arch = "x86_64")]
+    if std::arch::is_x86_feature_detected!("avx2") {
+        // SAFETY: the feature this function is compiled for was just detected.
+        unsafe { convert_planes_avx2(rgba, (width, height), &coefficients, planes) };
+        return;
     }
-
-    for chroma_row in 0..height.div_ceil(2) {
-        let rows = [2 * chroma_row, (2 * chroma_row + 1).min(height - 1)];
-        for chroma_column in 0..chroma_width {
-            let columns = [2 * chroma_column, (2 * chroma_column + 1).min(width - 1)];
-            let (mut sum_alpha, mut sum_r, mut sum_g, mut sum_b) = (0i64, 0i64, 0i64, 0i64);
-            for row in rows
-                .iter()
-                .copied()
-                .take(if rows[0] == rows[1] { 1 } else { 2 })
-            {
-                for column in
-                    columns
-                        .iter()
-                        .copied()
-                        .take(if columns[0] == columns[1] { 1 } else { 2 })
-                {
-                    let offset = (row * width + column) * 4;
-                    let alpha = i64::from(rgba[offset + 3]);
-                    sum_alpha += alpha;
-                    sum_r += alpha * i64::from(rgba[offset]);
-                    sum_g += alpha * i64::from(rgba[offset + 1]);
-                    sum_b += alpha * i64::from(rgba[offset + 2]);
-                }
-            }
-            let index = chroma_row * chroma_width + chroma_column;
-            if sum_alpha == 0 {
-                u_plane[index] = 128;
-                v_plane[index] = 128;
-                continue;
-            }
-            let chroma = |[kr, kg, kb]: [i64; 3]| {
-                let numerator = kr * sum_r + kg * sum_g + kb * sum_b;
-                let denominator = sum_alpha << 16;
-                // Rounded division of a signed numerator.
-                let rounded = if numerator >= 0 {
-                    (numerator + denominator / 2) / denominator
-                } else {
-                    -((-numerator + denominator / 2) / denominator)
-                };
-                clamp_byte(128 + rounded)
-            };
-            u_plane[index] = chroma(coefficients.cb);
-            v_plane[index] = chroma(coefficients.cr);
-        }
-    }
+    convert_planes(rgba, (width, height), &coefficients, planes);
 }
 
 #[cfg(test)]
@@ -298,6 +459,121 @@ mod tests {
         let mut out = vec![0; OverlayPixelFormat::Yuva420p(color).frame_len(size).unwrap()];
         convert_rgba_to_yuva420p(rgba, size, color, &mut out);
         out
+    }
+
+    /// The division-based conversion the fast one must reproduce byte for byte.
+    fn reference(rgba: &[u8], width: usize, height: usize, color: YuvColor) -> Vec<u8> {
+        let c = Coefficients::new(color);
+        let chroma_width = width.div_ceil(2);
+        let black = ((c.y_offset + 32768) >> 16).clamp(0, 255) as u8;
+        let mut y = Vec::new();
+        let mut a = Vec::new();
+        for pixel in rgba.as_chunks::<4>().0 {
+            a.push(pixel[3]);
+            let [r, g, b] = [pixel[0], pixel[1], pixel[2]].map(i64::from);
+            let [yr, yg, yb] = c.y.map(i64::from);
+            let luma = (yr * r + yg * g + yb * b + i64::from(c.y_offset) + 32768) >> 16;
+            y.push(if pixel[3] == 0 {
+                black
+            } else {
+                luma.clamp(0, 255) as u8
+            });
+        }
+        let (mut u, mut v) = (Vec::new(), Vec::new());
+        for chroma_row in 0..height.div_ceil(2) {
+            for chroma_column in 0..chroma_width {
+                let (mut sa, mut sr, mut sg, mut sb) = (0i64, 0i64, 0i64, 0i64);
+                for row in (2 * chroma_row)..(2 * chroma_row + 2).min(height) {
+                    for column in (2 * chroma_column)..(2 * chroma_column + 2).min(width) {
+                        let o = (row * width + column) * 4;
+                        let alpha = i64::from(rgba[o + 3]);
+                        sa += alpha;
+                        sr += alpha * i64::from(rgba[o]);
+                        sg += alpha * i64::from(rgba[o + 1]);
+                        sb += alpha * i64::from(rgba[o + 2]);
+                    }
+                }
+                if sa == 0 {
+                    u.push(128);
+                    v.push(128);
+                    continue;
+                }
+                let chroma = |k: [i32; 3]| {
+                    let [kr, kg, kb] = k.map(i64::from);
+                    let n = kr * sr + kg * sg + kb * sb;
+                    let d = sa << 16;
+                    let rounded = if n >= 0 {
+                        (n + d / 2) / d
+                    } else {
+                        -((-n + d / 2) / d)
+                    };
+                    (128 + rounded).clamp(0, 255) as u8
+                };
+                u.push(chroma(c.cb));
+                v.push(chroma(c.cr));
+            }
+        }
+        [y, u, v, a].concat()
+    }
+
+    #[test]
+    fn matches_the_division_based_conversion_byte_for_byte() {
+        let colors = [
+            BT601_FULL,
+            BT709_LIMITED,
+            YuvColor::from_probe(Some("bt2020nc"), Some("tv")).unwrap(),
+            YuvColor::from_probe(Some("bt709"), Some("pc")).unwrap(),
+        ];
+        let mut state = 0x2545_f491u32;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+        // Opaque, mixed and partial pixels, and saturated colours that clamp.
+        for (width, height) in [
+            (1, 1),
+            (2, 2),
+            (3, 3),
+            (2, 5),
+            (130, 4),
+            (131, 5),
+            (257, 9),
+            (64, 64),
+        ] {
+            for pattern in 0..5 {
+                let mut rgba = Vec::new();
+                for index in 0..width * height {
+                    let random = next().to_le_bytes();
+                    let alpha = match (pattern, random[3] % 4) {
+                        (0, _) => 255,
+                        // Stretches longer than a block run, opaque and transparent, with colour left in.
+                        (4, _) if (index / 70) % 2 == 0 => 0,
+                        (4, _) => 255,
+                        (1, 0) => 0,
+                        (1, _) => 255,
+                        (2, 0) => 255,
+                        (2, 1) => 0,
+                        (3, _) => 255,
+                        _ => random[3],
+                    };
+                    let tone = |byte: u8| match (pattern, byte < 128) {
+                        (3, true) => 0,
+                        (3, false) => 255,
+                        _ => byte,
+                    };
+                    rgba.extend([tone(random[0]), tone(random[1]), tone(random[2]), alpha]);
+                }
+                for color in colors {
+                    assert_eq!(
+                        convert(&rgba, width as u32, height as u32, color),
+                        reference(&rgba, width, height, color),
+                        "{width}x{height} pattern {pattern}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

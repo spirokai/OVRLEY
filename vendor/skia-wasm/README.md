@@ -38,7 +38,7 @@ intrinsics to WebAssembly SIMD; the SSE4.1 macro selects this Skia revision's
 vector raster pipeline. The application linker also receives `-msimd128`.
 Rust's own code generation flags are unchanged, keeping the alpha-conversion
 loop outside this experiment. The generated manifest records the C++ flags.
-The source builder applies `scripts/patches/skcms-emscripten-intrinsics.patch`
+The source builder applies `scripts/wasm/skcms-emscripten-intrinsics.patch`
 to omit skcms's extra Clang header imports on Emscripten; its `immintrin.h`
 already includes the enabled intrinsic headers. No drawing code is patched.
 

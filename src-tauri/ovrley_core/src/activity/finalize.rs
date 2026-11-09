@@ -407,21 +407,47 @@ impl ActivityColumns {
     }
 }
 
+/// Recorded distance between two samples above which a repeated GPS fix counts as stale.
+const STALE_FIX_DISTANCE_METERS: f64 = 1.0;
+
 /// Builds lat/lon tuples while preserving partial GPS samples.
 ///
 /// Each coordinate is guarded independently so one bad component does not
 /// poison the whole vector shape; downstream interpolation can still decide
 /// whether enough course data exists to render.
+///
+/// A receiver that misses a fix can repeat the last one while the recorded distance keeps growing.
+/// That repeat is a missing fix rather than a stop, so it becomes a gap that route interpolation
+/// bridges, instead of stalling the rider on the map. The distance is compared sample to sample, so
+/// creep while stopped never adds up to movement. Without recorded distance a repeat stays.
 fn build_course_series(columns: &ActivityColumns) -> Vec<(Option<f64>, Option<f64>)> {
+    let mut last_fix = None;
+    let mut last_distance = None;
     columns
         .latitude
         .iter()
         .zip(&columns.longitude)
-        .map(|(latitude, longitude)| {
-            (
+        .zip(&columns.distance)
+        .map(|((latitude, longitude), distance)| {
+            let point = (
                 latitude.and_then(finite_f64),
                 longitude.and_then(finite_f64),
-            )
+            );
+            let distance = distance.and_then(finite_f64);
+            let moved = distance
+                .zip(last_distance)
+                .is_some_and(|(now, then)| now - then > STALE_FIX_DISTANCE_METERS);
+            if distance.is_some() {
+                last_distance = distance;
+            }
+            let Some(fix) = point.0.zip(point.1) else {
+                return point;
+            };
+            if moved && last_fix == Some(fix) {
+                return (None, None);
+            }
+            last_fix = Some(fix);
+            point
         })
         .collect()
 }

@@ -1,0 +1,237 @@
+use crate::common;
+
+use ovrley_core::activity::schema::DenseActivityReport;
+use ovrley_core::normalize::RenderConfig;
+use ovrley_core::normalize::validate_render_config;
+use ovrley_widgets::widgets::gauges::validation::ValidatedLinearGaugeOrientation;
+use ovrley_core::paths::AppPaths;
+use ovrley_widgets::widgets::gauges::linear::{bar_fill_rect, bordered_bar_fill_rect};
+use ovrley_widgets::model::types::TrackFillStyle;
+use ovrley_widgets::widgets::value::config::ValueConfig;
+use std::collections::BTreeMap;
+
+#[test]
+fn value_config_deserializes_linear_gauge_fields() {
+    let value: ValueConfig = serde_json::from_value(serde_json::json!({
+        "value": "speed",
+        "x": 24,
+        "y": 48,
+        "display_type": "linear",
+        "width": 240,
+        "height": 44,
+        "orientation": "vertical",
+        "track_corner_radius": 8,
+        "track_border_thickness": 2,
+        "track_border_color": "#112233",
+        "track_empty_color": "#445566",
+        "track_empty_opacity": 0.4,
+        "track_filled_color": "#778899",
+        "track_filled_opacity": 0.8,
+        "track_filled_gradient": false,
+        "track_filled_gradient_stops": [{ "offset": 0, "color": "#40e0d0" }, { "offset": 1, "color": "#c65102" }],
+        "track_fill_flat": true,
+        "track_fill_style": "bars",
+        "bar_count": 12,
+        "bar_gap": 3,
+        "show_min_max_labels": true,
+        "min_max_label_font": "Teko.ttf",
+        "min_max_label_font_size": 12,
+        "min_max_label_color": "#aabbcc"
+    }))
+    .unwrap();
+
+    assert_eq!(value.display_type.as_str(), "linear");
+    assert_eq!(value.width, Some(240.0));
+    assert_eq!(value.height, Some(44.0));
+    assert_eq!(value.orientation.as_deref(), Some("vertical"));
+    assert_eq!(value.track_corner_radius, Some(8.0));
+    assert_eq!(value.track_border_thickness, Some(2.0));
+    assert_eq!(value.track_border_color.as_deref(), Some("#112233"));
+    assert_eq!(value.track_empty_color.as_deref(), Some("#445566"));
+    assert_eq!(value.track_empty_opacity, Some(0.4));
+    assert_eq!(value.track_filled_color.as_deref(), Some("#778899"));
+    assert_eq!(value.track_filled_opacity, Some(0.8));
+    assert_eq!(value.track_fill_flat, Some(true));
+    assert_eq!(value.track_fill_style, Some(TrackFillStyle::Bars));
+    assert_eq!(value.bar_count, Some(12));
+    assert_eq!(value.bar_gap, Some(3.0));
+    assert_eq!(value.show_min_max_labels, Some(true));
+    assert_eq!(value.min_max_label_font.as_deref(), Some("Teko.ttf"));
+    assert_eq!(value.min_max_label_font_size, Some(12.0));
+    assert_eq!(value.min_max_label_color.as_deref(), Some("#aabbcc"));
+}
+
+#[test]
+fn rejects_starting_altitude_on_non_altitude_linear_gauge() {
+    let mut value = full_linear_gauge_config(20, 30);
+    value["starting_altitude"] = serde_json::json!(500);
+    let result = validate_render_config(RenderConfig {
+        scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
+        backdrops: vec![],
+        rasters: vec![],
+        labels: vec![],
+        values: vec![serde_json::from_value(value).unwrap()],
+        plots: serde_json::Value::Object(serde_json::Map::new()),
+        extra: BTreeMap::new(),
+    });
+
+    let error = match result {
+        Ok(_) => panic!("starting_altitude must be rejected for speed gauges"),
+        Err(error) => error,
+    };
+    assert!(error
+        .to_string()
+        .contains("starting_altitude: is only valid for altitude widgets"));
+}
+
+#[test]
+fn linear_fill_rect_respects_horizontal_and_vertical_orientation() {
+    let horizontal = bar_fill_rect(
+        10.0,
+        20.0,
+        200.0,
+        40.0,
+        0.25,
+        ValidatedLinearGaugeOrientation::Horizontal,
+    );
+    assert_eq!(horizontal, (10.0, 20.0, 50.0, 40.0));
+
+    let vertical = bar_fill_rect(
+        10.0,
+        20.0,
+        200.0,
+        40.0,
+        0.25,
+        ValidatedLinearGaugeOrientation::Vertical,
+    );
+    assert_eq!(vertical, (10.0, 50.0, 200.0, 10.0));
+}
+
+#[test]
+fn linear_fill_rect_stays_inside_track_border() {
+    let horizontal = bordered_bar_fill_rect(
+        10.0,
+        20.0,
+        200.0,
+        40.0,
+        0.25,
+        ValidatedLinearGaugeOrientation::Horizontal,
+        2.0,
+    );
+    assert_eq!(horizontal, (12.0, 22.0, 49.0, 36.0));
+
+    let vertical = bordered_bar_fill_rect(
+        10.0,
+        20.0,
+        200.0,
+        40.0,
+        0.25,
+        ValidatedLinearGaugeOrientation::Vertical,
+        2.0,
+    );
+    assert_eq!(vertical, (12.0, 49.0, 196.0, 9.0));
+}
+
+#[test]
+fn linear_gauge_samples_fill_across_the_activity_range() {
+    let config = validate_render_config(RenderConfig {
+        scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
+        backdrops: vec![],
+        rasters: vec![],
+        labels: vec![],
+        values: vec![serde_json::from_value(full_linear_gauge_config(20, 30)).unwrap()],
+        plots: serde_json::Value::Object(serde_json::Map::new()),
+        extra: BTreeMap::new(),
+    })
+    .unwrap();
+    let paths = test_paths();
+    let dense = dense_speed_activity(vec![Some(10.0), Some(30.0), Some(50.0)]);
+
+    let (_, frame_states) = common::gauge::gauge_layout(&config, &dense, &ovrley_core::fonts::NativeFonts(&paths.font_dirs));
+    assert_eq!(frame_states[1].fill01, 0.5);
+}
+
+#[test]
+fn bars_style_resolves_configured_linear_geometry_into_the_cache() {
+    let mut value = full_linear_gauge_config(20, 30);
+    value["track_fill_style"] = serde_json::json!("bars");
+    value["bar_count"] = serde_json::json!(8);
+    value["bar_gap"] = serde_json::json!(4);
+    let config = validate_render_config(RenderConfig {
+        scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
+        backdrops: vec![],
+        rasters: vec![],
+        labels: vec![],
+        values: vec![serde_json::from_value(value).unwrap()],
+        plots: serde_json::Value::Object(serde_json::Map::new()),
+        extra: BTreeMap::new(),
+    })
+    .unwrap();
+    let paths = test_paths();
+    let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
+    let (layout, _) = common::gauge::gauge_layout(&config, &dense, &ovrley_core::fonts::NativeFonts(&paths.font_dirs));
+    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Linear(layout) = &layout else { panic!("gauge layout"); };
+    assert_eq!(layout.track_fill_style, TrackFillStyle::Bars);
+    assert_eq!(layout.bar_geometry.unwrap().count, 8);
+}
+
+fn full_linear_gauge_config(x: i32, y: i32) -> serde_json::Value {
+    serde_json::json!({
+        "value": "speed",
+        "x": x,
+        "y": y,
+        "display_type": "linear",
+        "width": 200,
+        "height": 40,
+        "rotation": 0,
+        "orientation": "horizontal",
+        "track_corner_radius": 6,
+        "track_border_thickness": 2,
+        "track_border_color": "#ffffff",
+        "track_empty_color": "#222222",
+        "track_empty_opacity": 0.5,
+        "track_filled_color": "#40e0d0",
+        "track_filled_opacity": 1,
+        "track_filled_gradient": false,
+        "track_filled_gradient_stops": [{ "offset": 0, "color": "#40e0d0" }, { "offset": 1, "color": "#c65102" }],
+        "track_fill_flat": false,
+        "show_min_max_labels": false,
+        "min_max_label_font": "Arial.ttf",
+        "min_max_label_font_size": 12,
+        "min_max_label_position": "bottom",
+        "min_max_label_color": "#ffffff"
+    })
+}
+
+fn dense_speed_activity(speed: Vec<Option<f64>>) -> DenseActivityReport {
+    let frame_count = speed.len();
+    let mut series = common::builders::empty_dense_series();
+    series.speed = speed;
+    DenseActivityReport {
+        frame_count,
+        frame_elapsed_seconds: (0..frame_count).map(|i| i as f64).collect(),
+        frame_distance_progress: vec![Some(0.0); frame_count],
+        full_activity_distance: None,
+        full_activity_total_ascent: None,
+        full_activity_metric_ranges: ovrley_core::activity::sampling::calculate_metric_range(
+            &series.speed,
+        )
+        .map(|range| (ovrley_widgets::model::types::MetricKind::Speed, range))
+        .into_iter()
+        .collect(),
+        series,
+    }
+}
+
+fn test_paths() -> AppPaths {
+    let workspace_root = common::test_config::repo_git_root();
+    AppPaths {
+        repo_root: workspace_root.clone(),
+        font_dirs: vec![workspace_root.join("fonts")],
+        debug_render_dir: std::env::temp_dir(),
+        temp_dir: std::env::temp_dir(),
+        bundled_templates_dirs: vec![],
+        user_templates_dir: std::env::temp_dir(),
+        downloads_dir: std::env::temp_dir(),
+    }
+}

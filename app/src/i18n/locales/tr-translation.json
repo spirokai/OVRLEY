@@ -100,6 +100,9 @@
     "getHevcCodec": "HEVC kodeğini edin",
     "hevcVideoCannotBePlayed": "HEVC video oynatılamıyor",
     "installCodecForSystem": "Sisteminiz için doğru paketi yükleyin.",
+    "mapViewHint": "Kaydırmak ve yakınlaştırmak için çift tıklayın",
+    "mapViewZoomHint": "Yakınlaştırmak için çift tıklayın",
+    "mapReset": "Sıfırla",
     "microsoftStoreHevcCodec": "HEVC kodeğini Microsoft Store'dan edinebilirsiniz.",
     "onUbuntu": "Ubuntu'da:",
     "overlayCanvasReady": "Kaplama tuvali hazır",
@@ -557,6 +560,9 @@
       "delta": "Fark",
       "lapLog": "Tur günlüğü"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Harita", "route": "Rota", "mapTiles": "Harita döşemeleri", "route3d": "3D rota" }
+    },
     "types": {
       "rolling_chart": { "name": "Grafikler", "shortName": "Grafikler" },
       "diving_profile": {
@@ -581,6 +587,7 @@
       "color_temperature": { "name": "Renk sıcaklığı", "shortName": "WB" },
       "core_temperature": { "name": "Vücut sıcaklığı", "shortName": "Vücut sıc." },
       "course": { "name": "Rota haritası", "shortName": "Harita" },
+      "map": { "name": "Sokak haritası", "shortName": "Sokak" },
       "distance": { "name": "Mesafe", "shortName": "Mes." },
       "distance_to_home": { "name": "Eve mesafe", "shortName": "Ev" },
       "elevation": { "name": "Yükseklik", "shortName": "Yükseklik" },
@@ -619,6 +626,23 @@
     }
   },
   "widget-editor": {
+    "cameraMode": "Kamera modu",
+    "chaseCamera": "Takip kamerası",
+    "mapBuildings": "Binalar",
+    "mapPaths": "Patikalar",
+    "mapLabels": "Etiketler",
+    "mapLocalNames": "Yerel adlar",
+    "mapWebgl2Unavailable": "Bu sistemde WebGL2 kullanılamıyor, bu yüzden harita önizlenemez.",
+    "mapWebgl2Software": "GPU bulunamadı. Harita yazılımla işlenir; önizleme ve dışa aktarma yavaş olabilir.",
+    "mapStyle": "Harita stili",
+    "mapView": "Harita görünümü",
+    "msaa": "Kenar yumuşatma (MSAA)",
+    "msaaOff": "Kapalı",
+    "northUp": "Kuzey yukarıda",
+    "pitch": "Eğim",
+    "riderUp": "Gidiş yönü yukarıda",
+    "topDown": "Üstten görünüm",
+    "zoom": "Yakınlaştırma",
     "chartMetrics": "Ölçümler",
     "chartMetric": "Ölçüm",
     "addMetric": "Ölçüm ekle",
@@ -852,6 +876,7 @@
     "singleCircle": "Tek daire",
     "smoothing": "Yumuşatma",
     "solidHalo": "Dolu halo",
+    "markerArrow": "Ok",
     "style": "Stil",
     "text": "Metin",
     "thickness": "Kalınlık",

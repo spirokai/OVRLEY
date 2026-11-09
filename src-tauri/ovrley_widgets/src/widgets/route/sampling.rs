@@ -49,6 +49,14 @@ impl RouteWindow {
     }
 }
 
+/// One GPS sample in geographic coordinates, unlike the equirectangular `RouteSample`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TrackSample {
+    pub second: f64,
+    pub lat: f64,
+    pub lon: f64,
+}
+
 pub struct RouteActivity {
     times: Vec<f64>,
     course: Vec<(Option<f64>, Option<f64>)>,
@@ -138,6 +146,38 @@ impl RouteActivity {
             })
             .collect::<Vec<_>>();
         Arc::new(project_course_samples(&course, &normalized))
+    }
+
+    /// Every GPS sample in `window`, with its edges interpolated, as `samples` selects them.
+    pub fn track_samples(&self, window: Option<RouteWindow>) -> Vec<TrackSample> {
+        let inner = |start: f64, end: f64| {
+            self.times
+                .iter()
+                .copied()
+                .filter(move |second| *second > start && *second < end)
+        };
+        let seconds: Vec<f64> = match window {
+            None => self.times.clone(),
+            Some(window) => std::iter::once(window.start)
+                .chain(inner(window.start, window.end))
+                .chain(std::iter::once(window.end))
+                .collect(),
+        };
+        let coordinate = |points: &[(f64, f64)], second| {
+            points
+                .first()
+                .zip(points.last())
+                .filter(|(a, b)| second >= a.0 && second <= b.0)
+                .and_then(|_| interpolate_points(points, second))
+        };
+        seconds
+            .into_iter()
+            .filter_map(|second| {
+                let lat = coordinate(&self.latitude, second)?;
+                let lon = coordinate(&self.longitude, second)?;
+                Some(TrackSample { second, lat, lon })
+            })
+            .collect()
     }
 
     pub fn progress_at(&self, second: f64, window: Option<RouteWindow>) -> f32 {

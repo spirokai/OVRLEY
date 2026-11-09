@@ -27,6 +27,10 @@ use ovrley_widgets::widgets::{
     lap_timer::validation::validate_lap_timer,
     splits_run::validation::validate_splits_run,
     lean_angle::validation::validate_lean_angle,
+    map::{
+        config::MapConfig,
+        validation::{validate_map_widget, ValidatedMapWidget},
+    },
     rolling_chart::{
         config::RollingChartConfig,
         validation::{validate_rolling_chart, ValidatedRollingChart},
@@ -63,6 +67,7 @@ pub(super) fn validate_render_contents(
     }
     Ok(ValidatedRenderConfig {
         course_plots: validate_route_plots(&raw.plots)?,
+        maps: validate_map_widgets(&raw.plots)?,
         elevation_plots: validate_elevation_plots(&raw.plots, &scene)?,
         diving_profiles: validate_diving_profiles(&raw.plots, &scene)?,
         rolling_charts: validate_rolling_charts(&raw.plots)?,
@@ -149,6 +154,17 @@ pub fn validate_route_plots(plots: &serde_json::Value) -> CoreResult<Vec<Validat
 
 fn course_config_error(error: serde_json::Error) -> CoreError {
     CoreError::Config(format!("course plot config: {error}"))
+}
+
+fn validate_map_widgets(plots: &serde_json::Value) -> CoreResult<Vec<ValidatedMapWidget>> {
+    config::find_plot_values(plots, "map")
+        .into_iter()
+        .map(|(index, value)| {
+            let map: MapConfig = serde_json::from_value(value.clone())
+                .map_err(|error| CoreError::Config(format!("map config: {error}")))?;
+            Ok(validate_map_widget(&map, index)?)
+        })
+        .collect()
 }
 
 pub fn validate_elevation_plots(

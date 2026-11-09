@@ -77,6 +77,21 @@ export function syncVideoCurrentTime(video, second, epsilonSeconds = 0.001) {
 }
 
 /**
+ * Whether a video that just paused still shows the frame starting at `second`.
+ * Pausing lands slightly past the last presented frame; seeking back would make
+ * WebKitGTK blank the video until the frame decodes again.
+ *
+ * @param {HTMLVideoElement} video - The paused video element.
+ * @param {number} second - Last presented frame time in seconds.
+ * @param {number} fps - Video frame rate.
+ * @returns {boolean} Whether the video is within that frame.
+ */
+export function isWithinPausedFrame(video, second, fps) {
+  const drift = video.currentTime - clampVideoTime(video, second)
+  return drift >= 0 && drift < 1 / fps
+}
+
+/**
  * Nudges a metadata-only paused video into decoding its first drawable frame.
  *
  * Some WebKit-backed video elements report metadata at t=0 without painting a

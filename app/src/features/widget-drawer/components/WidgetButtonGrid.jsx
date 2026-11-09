@@ -13,7 +13,7 @@ function WidgetButton({ item, onClick, isAvailable }) {
 
   const button = (
     <button
-      onClick={hasMultipleOptions ? undefined : () => onClick({ type: item.type, ...item.options[0].selection })}
+      onClick={hasMultipleOptions ? undefined : () => onClick(item.options[0].selection)}
       className="group relative flex flex-col items-center justify-center gap-2 w-full aspect-square rounded-xs border border-border/70 bg-surface transition-all hover:border-accent-border hover:bg-surface-accent-soft/30 cursor-pointer overflow-hidden"
     >
       {isAvailable && (
@@ -27,7 +27,7 @@ function WidgetButton({ item, onClick, isAvailable }) {
   if (!hasMultipleOptions) return button
 
   return (
-    <WidgetOptionPopover options={item.options} onSelect={(selection) => onClick({ type: item.type, ...selection })}>
+    <WidgetOptionPopover options={item.options} onSelect={onClick}>
       {button}
     </WidgetOptionPopover>
   )
@@ -37,7 +37,7 @@ function WidgetButton({ item, onClick, isAvailable }) {
  * Renders a scrollable 3-column grid of widget-type buttons, grouped by category.
  *
  * @param {object} props
- * @param {(request: {type: string, displayType?: string, lapTimerMode?: string}) => void} props.onAddWidget - Called with a canonical creation request.
+ * @param {(request: {type: string, displayType?: string, lapTimerMode?: string, preset?: object}) => void} props.onAddWidget - Called with a canonical creation request.
  * @param {Array<{attribute: string, source: string}>} props.availableMetrics - Canonical available activity metrics.
  * @returns {JSX.Element} Rendered React element.
  */
@@ -55,7 +55,7 @@ export function WidgetButtonGrid({ onAddWidget, availableMetrics }) {
           <div className="text-[0.7rem] font-bold uppercase tracking-wider text-muted-foreground/60 px-1 mb-1.5">{t(group.nameKey)}</div>
           <div className="grid grid-cols-4 gap-1">
             {group.items.map((item) => (
-              <WidgetButton key={item.type} item={item} onClick={onAddWidget} isAvailable={availableAttributes.has(item.type)} />
+              <WidgetButton key={item.key} item={item} onClick={onAddWidget} isAvailable={item.types.some((type) => availableAttributes.has(type))} />
             ))}
           </div>
         </div>

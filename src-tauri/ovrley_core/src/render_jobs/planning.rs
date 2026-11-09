@@ -35,6 +35,7 @@ use crate::normalize::{
 };
 use crate::output::{plan_batch_output_targets, RenderOutputKind};
 use crate::raster::RasterResourceResolver;
+use ovrley_map::MapSource;
 use ovrley_widgets::model::scene::{ScenePresentationConfig, ValidatedScenePresentation};
 
 /// Validated once at configuration/acceptance ingress; private fields keep
@@ -181,6 +182,7 @@ pub fn plan_batch_configuration(
 pub(crate) struct ValidatedBatchTemplate {
     config: ValidatedRenderConfig<ValidatedScenePresentation>,
     encoding: ValidatedBatchEncoding,
+    map_source: Option<MapSource>,
 }
 
 /// Reviewed and accepted jobs share the same output contract.
@@ -229,20 +231,65 @@ impl ValidatedBatchEncoding {
     }
 }
 
+/// Every job renders at the template's scene size: transparent overlays take it
+/// as given, and composite clips must already match it (no layout rescaling).
 pub(crate) fn validate_batch_template(
     template: RenderConfig<ScenePresentationConfig>,
     encoding: ValidatedBatchEncoding,
+    sources: &super::inspection::AcceptedInspectionSources,
     resources: Option<&dyn RasterResourceResolver>,
+    map_source: Option<MapSource>,
 ) -> CoreResult<ValidatedBatchTemplate> {
     if !template.extra.is_empty() || !template.scene.extra.is_empty() {
         return Err(CoreError::Config(
             "Batch template must contain only shared presentation fields".into(),
         ));
     }
+    let config = validate_render_presentation(template, resources)?;
+    let (width, height) = (config.scene.width, config.scene.height);
+    match encoding.codec {
+        CodecSelection::Transparent(_) => require_even_transparent_size(width, height)?,
+        CodecSelection::Composite(_) => {
+            let mismatched = sources
+                .sources()
+                .iter()
+                .filter(|source| {
+                    (
+                        source.display_resolution.width,
+                        source.display_resolution.height,
+                    ) != (u64::from(width), u64::from(height))
+                })
+                .map(|source| {
+                    let name = Path::new(&source.metadata.path).file_name().map_or_else(
+                        || source.metadata.path.clone(),
+                        |name| name.to_string_lossy().into_owned(),
+                    );
+                    let resolution = &source.display_resolution;
+                    format!("{name} is {}x{}", resolution.width, resolution.height)
+                })
+                .collect::<Vec<_>>();
+            if !mismatched.is_empty() {
+                return Err(CoreError::Config(format!(
+                    "Composite batch clips must match the scene resolution {width}x{height}: {}",
+                    mismatched.join(", ")
+                )));
+            }
+        }
+    }
     Ok(ValidatedBatchTemplate {
-        config: validate_render_presentation(template, resources)?,
+        config,
         encoding,
+        map_source,
     })
+}
+
+fn require_even_transparent_size(width: u32, height: u32) -> CoreResult<()> {
+    if !width.is_multiple_of(2) || !height.is_multiple_of(2) {
+        return Err(CoreError::Config(format!(
+            "Transparent video dimensions must be even: {width}x{height}"
+        )));
+    }
+    Ok(())
 }
 
 pub enum VideoRenderModePlan {
@@ -258,6 +305,8 @@ pub enum VideoRenderModePlan {
 pub struct PlannedVideoRender {
     pub(crate) config: ValidatedRenderConfig,
     pub(crate) mode: VideoRenderModePlan,
+    /// Where a map's bytes come from. The native tools have none, and fail on a map.
+    pub(crate) map_source: Option<MapSource>,
     sampling_fps: Fps,
     activity_offset: f64,
 }
@@ -298,6 +347,7 @@ pub fn plan_single_render(
     raw: RenderConfig,
     activity_end: f64,
     resources: Option<&dyn RasterResourceResolver>,
+    map_source: Option<MapSource>,
 ) -> CoreResult<PlannedVideoRender> {
     let raw_scene = raw.scene.clone();
     let mut config = validate_render_config_with_resources(raw, resources)?;
@@ -341,6 +391,7 @@ pub fn plan_single_render(
     Ok(PlannedVideoRender {
         config,
         mode,
+        map_source,
         sampling_fps,
         activity_offset,
     })
@@ -378,11 +429,8 @@ pub(crate) fn plan_batch_item(
             layout_frame_count,
         )?,
     };
-    let mut presentation = template.config.scene.clone();
-    presentation.width = source.display_resolution.width as u32;
-    presentation.height = source.display_resolution.height as u32;
     let scene = ValidatedSceneConfig {
-        presentation,
+        presentation: template.config.scene.clone(),
         start: coverage.start,
         end: coverage.end,
         fps: sampling_fps.as_f64(),
@@ -401,6 +449,7 @@ pub(crate) fn plan_batch_item(
         config.labels.clear();
         config.values.clear();
         config.course_plots.clear();
+        config.maps.clear();
         config.elevation_plots.clear();
         config.diving_profiles.clear();
         config.rolling_charts.clear();
@@ -439,6 +488,7 @@ pub(crate) fn plan_batch_item(
     Ok(PlannedVideoRender {
         config,
         mode,
+        map_source: template.map_source.clone(),
         sampling_fps,
         activity_offset: offset,
     })
@@ -451,11 +501,7 @@ fn plan_transparent_render(
     container_fps: Fps,
     coverage: ActivityCoverage,
 ) -> CoreResult<VideoRenderModePlan> {
-    if !scene.presentation.width.is_multiple_of(2) || !scene.presentation.height.is_multiple_of(2) {
-        return Err(CoreError::Config(
-            "Transparent video dimensions must be even".into(),
-        ));
-    }
+    require_even_transparent_size(scene.presentation.width, scene.presentation.height)?;
     let frames = FrameProductionPlan::decimated(layout_frame_count, scene.update_rate)?;
     Ok(VideoRenderModePlan::Transparent(TransparentRenderPlan {
         frames,

@@ -100,6 +100,9 @@
     "getHevcCodec": "Získat kodek HEVC",
     "hevcVideoCannotBePlayed": "Video ve formátu HEVC nelze přehrát",
     "installCodecForSystem": "Nainstalujte správný balíček pro váš systém.",
+    "mapViewHint": "Dvojklikem posunete a přiblížíte",
+    "mapViewZoomHint": "Dvojklikem přiblížíte",
+    "mapReset": "Obnovit",
     "microsoftStoreHevcCodec": "Kodek HEVC můžete získat v Microsoft Storu.",
     "onUbuntu": "V Ubuntu:",
     "overlayCanvasReady": "Plátno grafiky je připraveno",
@@ -557,6 +560,9 @@
       "delta": "Rozdíl",
       "lapLog": "Přehled kol"
     },
+    "drawerGroups": {
+      "map": { "shortName": "Mapa", "route": "Trasa", "mapTiles": "Mapové dlaždice", "route3d": "3D trasa" }
+    },
     "types": {
       "rolling_chart": { "name": "Grafy", "shortName": "Grafy" },
       "diving_profile": {
@@ -581,6 +587,7 @@
       "color_temperature": { "name": "Teplota barev", "shortName": "Tepl. barev" },
       "core_temperature": { "name": "Teplota těla", "shortName": "Tepl. těla" },
       "course": { "name": "Mapa trasy", "shortName": "Mapa" },
+      "map": { "name": "Mapa ulic", "shortName": "Ulice" },
       "distance": { "name": "Vzdálenost", "shortName": "Vzdál." },
       "distance_to_home": { "name": "Vzdálenost domů", "shortName": "Domů" },
       "elevation": { "name": "Výškový profil", "shortName": "Profil" },
@@ -619,6 +626,23 @@
     }
   },
   "widget-editor": {
+    "cameraMode": "Režim kamery",
+    "chaseCamera": "Sledovací kamera",
+    "mapBuildings": "Budovy",
+    "mapPaths": "Stezky",
+    "mapLabels": "Popisky",
+    "mapLocalNames": "Místní názvy",
+    "mapWebgl2Unavailable": "WebGL2 není v tomto systému k dispozici, takže mapu nelze zobrazit v náhledu.",
+    "mapWebgl2Software": "Nebyla nalezena žádná GPU. Mapa se vykresluje softwarově, takže náhled i export mohou být pomalé.",
+    "mapStyle": "Styl mapy",
+    "mapView": "Zobrazení mapy",
+    "msaa": "Vyhlazování (MSAA)",
+    "msaaOff": "Vypnuto",
+    "northUp": "Sever nahoře",
+    "pitch": "Sklon",
+    "riderUp": "Směr jízdy nahoře",
+    "topDown": "Pohled shora",
+    "zoom": "Přiblížení",
     "chartMetrics": "Metriky",
     "chartMetric": "Metrika",
     "addMetric": "Přidat metriku",
@@ -852,6 +876,7 @@
     "singleCircle": "Jednoduchý kruh",
     "smoothing": "Vyhlazení",
     "solidHalo": "Plná zář",
+    "markerArrow": "Šipka",
     "style": "Styl",
     "text": "Text",
     "thickness": "Tloušťka",

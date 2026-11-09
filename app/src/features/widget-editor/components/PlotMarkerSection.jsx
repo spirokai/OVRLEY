@@ -13,6 +13,7 @@ const MARKER_VARIANT_OPTIONS = [
   { value: 'ring', labelKey: 'widget-editor.concentricRing', defaultLabel: 'Concentric Ring' },
   { value: 'halo', labelKey: 'widget-editor.solidHalo', defaultLabel: 'Solid Halo' },
 ]
+const ARROW_OPTION = { value: 'caret', labelKey: 'widget-editor.markerArrow', defaultLabel: 'Arrow' }
 
 /**
  * Renders the plot marker section.
@@ -23,6 +24,7 @@ const MARKER_VARIANT_OPTIONS = [
  * @param {Function} props.updateWidgetDraft - Applies a live widget draft, published once per frame.
  * @param {Function} props.commitWidgetDraft - Commits the live widget draft.
  * @param {boolean} [props.showColor=true] - Whether the plot has one marker color; charts color markers per series.
+ * @param {boolean} [props.showArrow=false] - Whether the plot draws a route, which an arrow can point along.
  * @param {boolean} [props.disabled=false] - Whether the marker is hidden.
  * @param {React.ReactNode} [props.trailing=null] - Optional heading control.
  * @returns {JSX.Element} Rendered component output.
@@ -33,6 +35,7 @@ export default function PlotMarkerSection({
   updateWidgetDraft,
   commitWidgetDraft,
   showColor = true,
+  showArrow = false,
   disabled = false,
   trailing = null,
 }) {
@@ -47,7 +50,7 @@ export default function PlotMarkerSection({
         <SelectField
           label={t('widget-editor.markerType', 'Marker Type')}
           value={variant}
-          options={translateOptions(MARKER_VARIANT_OPTIONS, t)}
+          options={translateOptions(showArrow ? [...MARKER_VARIANT_OPTIONS, ARROW_OPTION] : MARKER_VARIANT_OPTIONS, t)}
           disabled={disabled}
           onValueChange={(marker_variant) => updateWidgetData(widget.id, { marker_variant })}
         />
@@ -87,7 +90,7 @@ export default function PlotMarkerSection({
           onSliderChange={(marker_opacity) => updateWidgetDraft(widget.id, { marker_opacity })}
           onSliderCommit={commit}
         />
-        {variant !== 'single' ? (
+        {variant === 'ring' || variant === 'halo' ? (
           <SliderField
             editable
             integerDisplay

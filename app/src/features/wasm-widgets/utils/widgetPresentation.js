@@ -1,14 +1,11 @@
 /**
- * Installs Rust placement and interaction bounds. Static image buffers retain
- * source dimensions and are displayed at their scene size; other rasters overflow for shadows.
+ * Installs Rust placement and interaction bounds. Rasters overflow the content frame for shadows.
  * @param {HTMLCanvasElement} canvas Widget raster.
  * @param {object} geometry Rust drawing and content bounds.
- * @param {HTMLElement} target Selection wrapper; a sibling raster avoids transformed overflow for routes.
- * @param {string} widgetType Canonical widget family.
+ * @param {HTMLElement} target Selection wrapper; rotated families draw into a sibling raster to avoid transformed overflow.
  */
-export function presentWidgetGeometry(canvas, geometry, target = canvas.parentElement, widgetType) {
+export function presentWidgetGeometry(canvas, geometry, target = canvas.parentElement) {
   const { content } = geometry
-  const sourceRaster = widgetType === 'raster'
   // Moveable reads offsetLeft/offsetTop in whole CSS pixels but sizes and transforms fractionally.
   // Whole-pixel placement plus a fractional translate keeps its box exactly on the content.
   const left = Math.floor(content.left)
@@ -24,15 +21,12 @@ export function presentWidgetGeometry(canvas, geometry, target = canvas.parentEl
   canvas.style.top = `${geometry.top - (nested ? content.top : 0)}px`
   // Density changes raster allocation; placement and interaction stay in scene pixels.
   const rasterScale = geometry.preview_raster_scale
-  canvas.style.width = `${sourceRaster ? content.width : geometry.width / rasterScale}px`
-  canvas.style.height = `${sourceRaster ? content.height : geometry.height / rasterScale}px`
-  canvas.style.opacity = sourceRaster ? `${geometry.opacity}` : ''
-  // Other rotated families already have their rotation baked into the pixels.
+  canvas.style.width = `${geometry.width / rasterScale}px`
+  canvas.style.height = `${geometry.height / rasterScale}px`
+  // Rotated families bake their rotation into the sibling raster; only the selection wrapper rotates.
   const rotation = geometry.rotation ?? 0
   const origin = geometry.rotation_origin ?? [0, 0]
   target.style.transformOrigin = `${origin[0]}px ${origin[1]}px`
   target.style.transform = `translate(${content.left - left}px, ${content.top - top}px) rotate(${rotation}deg)`
-  canvas.style.transformOrigin = `${content.left - geometry.left + origin[0]}px ${content.top - geometry.top + origin[1]}px`
-  canvas.style.transform = nested && !sourceRaster ? `rotate(${-rotation}deg)` : 'none'
   target.dispatchEvent(new Event('wasm-widget-render', { bubbles: true }))
 }
