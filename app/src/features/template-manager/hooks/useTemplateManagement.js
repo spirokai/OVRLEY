@@ -6,7 +6,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 import { hasTauriRuntime, useUnsavedChangesConfirm } from '@/features/app-shell'
-import { fileFromSelectedPath, openSinglePath } from '@/lib/file-dialog'
+import { caseInsensitiveFilters, fileFromSelectedPath, openSinglePath } from '@/lib/file-dialog'
 import { deletePreference, getPreference, setPreference } from '@/lib/preferences-store'
 import { useTemplateStore } from '@/hooks/useAppStoreSelectors'
 import { replaceEditorDocument } from '@/features/undo-redo/undoHistory'
@@ -139,12 +139,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
         const selectedPath = await save({
           title: i18next.t('template-manager.saveTemplate', 'Save Template'),
           defaultPath,
-          filters: [
-            {
-              name: 'OVRLEY Template',
-              extensions: ['json'],
-            },
-          ],
+          filters: caseInsensitiveFilters([{ name: 'OVRLEY Template', extensions: ['json'] }]),
         })
 
         if (!selectedPath) return

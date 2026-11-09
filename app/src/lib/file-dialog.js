@@ -50,6 +50,20 @@ export async function rememberAcceptedRenderOutput(outputPath) {
   }
 }
 
+/**
+ * GTK file-chooser patterns are case-sensitive, so `*.mp4` hides `CLIP.MP4`.
+ * Lowercase stays first so save dialogs keep appending the canonical extension.
+ *
+ * @param {{name: string, extensions: string[]}[]} filters Lowercase dialog filters.
+ * @returns {{name: string, extensions: string[]}[]} Filters matching any extension case.
+ */
+export function caseInsensitiveFilters(filters) {
+  return filters.map((filter) => ({
+    ...filter,
+    extensions: [...new Set(filter.extensions.flatMap((extension) => [extension, extension.toUpperCase()]))],
+  }))
+}
+
 export const selectBrowserFile = (accept) =>
   new Promise((resolve) => {
     const input = document.createElement('input')
@@ -77,7 +91,7 @@ export async function openSinglePath(filters, options = {}) {
 
   const selected = await open({
     multiple: false,
-    filters,
+    filters: caseInsensitiveFilters(filters),
     ...(defaultPath ? { defaultPath } : {}),
   })
 
@@ -143,7 +157,7 @@ export async function saveSinglePath(defaultPath, extension, filterName = extens
   }
   const selected = await save({
     defaultPath: resolvedDefaultPath,
-    filters: [{ name: filterName, extensions: [extension] }],
+    filters: caseInsensitiveFilters([{ name: filterName, extensions: [extension] }]),
   })
   if (selected && lastDirectoryKey) {
     try {
