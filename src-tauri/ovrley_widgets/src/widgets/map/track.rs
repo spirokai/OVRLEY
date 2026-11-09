@@ -20,7 +20,7 @@ const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
 /// rider this far along it.
 const MIN_MOVE_METERS: f64 = 3.0;
 /// How far behind and ahead of the rider the bearing's chord reaches along the route.
-const BEARING_REACH_METERS: f64 = 10.0;
+const BEARING_REACH_METERS: f64 = 2.0;
 /// How far a reduced route line may leave the smoothed one, in scene units at the view zoom. Under a
 /// pixel, so a curve never shows its facets.
 const REDUCTION_TOLERANCE_PX: f64 = 0.3;
