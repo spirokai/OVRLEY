@@ -135,7 +135,9 @@ impl AltitudeTapeCache {
         }
     }
 
-    fn draw_ticks(&self, canvas: &Canvas, altitude: f64) {
+    /// Draws the strip on whole host pixels and returns the shift that snapping applied, so the
+    /// labels can step on the same pixel grid as their ticks.
+    fn draw_ticks(&self, canvas: &Canvas, altitude: f64) -> f32 {
         let layout = &self.layout;
         let interval = f64::from(self.major_tick_interval);
         let major = (altitude / interval).floor() * interval;
@@ -150,23 +152,25 @@ impl AltitudeTapeCache {
         let top = major_y - ((major_y - layout.body.top) / self.period).ceil() * self.period;
         // Whole host pixels let the strip copy without resampling and keep thin ticks crisp.
         let snap = |value: f32| (value * self.raster_scale).round() / self.raster_scale;
-        let (left, top) = (snap(layout.frame.left), snap(top));
+        let (left, snapped_top) = (snap(layout.frame.left), snap(top));
         let scale = self.raster_scale.recip();
         canvas.draw_image_rect_with_sampling_options(
             &self.tick_strip,
             None,
             Rect::from_xywh(
                 left,
-                top,
+                snapped_top,
                 self.tick_strip.width() as f32 * scale,
                 self.tick_strip.height() as f32 * scale,
             ),
             FilterMode::Nearest,
             &Paint::default(),
         );
+        snapped_top - top
     }
 
-    fn draw_labels(&self, canvas: &Canvas, altitude: f64) {
+    /// `tick_shift` is the strip's snap shift; every label takes it so it moves with its tick.
+    fn draw_labels(&self, canvas: &Canvas, altitude: f64, tick_shift: f32) {
         let layout = &self.layout;
         let half_extent = layout.body.height() * 0.5 + self.label_font.size();
         for value in visible_major_values(
@@ -188,6 +192,7 @@ impl AltitudeTapeCache {
                     self.pixels_per_unit,
                     self.source.direction(),
                 )
+                    + tick_shift
                     + self.label_baseline_offset,
             );
             draw_text(canvas, &blob, origin, &self.label_paint);
@@ -222,9 +227,9 @@ impl AltitudeTapeFrame {
         // A hard clip rounds to whole pixels; an anti-aliased one at a fractional edge would
         // force every tick and label draw inside it through a coverage mask.
         canvas.clip_rect(body, ClipOp::Intersect, false);
-        cache.draw_ticks(canvas, self.altitude);
+        let tick_shift = cache.draw_ticks(canvas, self.altitude);
         if cache.show_tick_labels {
-            cache.draw_labels(canvas, self.altitude);
+            cache.draw_labels(canvas, self.altitude, tick_shift);
         }
         canvas.restore();
         if let Some((rect, climbing)) = &self.trend {
