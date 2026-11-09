@@ -22,7 +22,7 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
     handleCanvasMouseLeave,
     mapViewWidgetId,
   } = state
-  const { attach, attachMapLayer, error } = useWasmWidgets({
+  const { attach, attachMapLayer, documentRevision, error } = useWasmWidgets({
     widgets,
     scene,
     activity,
@@ -57,8 +57,9 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
           </div>
         ) : null}
         {widgets.map((widget) => (
+          // Ids repeat across documents, so a replaced document remounts its canvases.
           <WasmWidgetCanvas
-            key={widget.id}
+            key={`${documentRevision}:${widget.id}`}
             widget={widget}
             attach={attach}
             attachMapLayer={attachMapLayer}
