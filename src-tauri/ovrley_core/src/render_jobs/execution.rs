@@ -11,8 +11,9 @@ use serde::Serialize;
 
 use super::activity::RenderActivity;
 use super::batch_state::BatchState;
-use super::inspection::verify_composite_source_resolution;
-use super::planning::{plan_single_render, PlannedVideoRender, VideoRenderModePlan};
+use super::planning::{
+    plan_single_render, resolve_single_composite_source, PlannedVideoRender, VideoRenderModePlan,
+};
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::{parse_activity_json, validate_render_activity};
 use crate::debug::RenderProgress;
@@ -290,14 +291,14 @@ pub(crate) fn execute_render(
     session.check_cancelled()?;
     let request = match plan.mode {
         VideoRenderModePlan::Composite {
-            render,
+            mut render,
             source_metadata,
         } => {
             let source = match source_metadata {
                 Some(metadata) => metadata,
-                None => verify_composite_source_resolution(
+                None => resolve_single_composite_source(
                     paths,
-                    &render.video_path,
+                    &mut render,
                     plan.config.scene.presentation.width,
                     plan.config.scene.presentation.height,
                 )?,

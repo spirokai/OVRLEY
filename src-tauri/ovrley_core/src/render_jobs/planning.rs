@@ -11,7 +11,7 @@ use super::contracts::{
     BatchDestination, BatchEncodingSettings, BatchExportMode, BatchOutputSelection,
     BatchRenderOutput, BatchRenderPiece, BatchTransition,
 };
-use super::inspection::CompositeSourceMetadata;
+use super::inspection::{verify_composite_source_resolution, CompositeSourceMetadata};
 use super::inspection::{
     InspectionRejection, InspectionSourceSelection, InspectionValidation, VideoInspectionService,
 };
@@ -41,6 +41,7 @@ use crate::normalize::{
     RenderConfig, ValidatedFfmpegConfig, ValidatedRenderConfig, ValidatedSceneConfig,
 };
 use crate::output::{plan_batch_output_targets, plan_file_output_target, RenderOutputKind};
+use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
 use ovrley_widgets::model::scene::{ScenePresentationConfig, ValidatedScenePresentation};
 
@@ -106,7 +107,11 @@ pub(crate) fn validate_batch_encoding(
 /// The source window of one piece on its source's exact frame grid.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct PieceWindow {
+    /// Start on the video's own clock (its first frame at zero), which widget timing uses.
     pub trim_start: f64,
+    /// Start on the file's clock, which FFmpeg's seeks and trims of the source's
+    /// video and audio use (see `SourceVideoMetadata::file_seconds`).
+    pub file_start: f64,
     pub duration: f64,
     frame_count: u64,
 }
@@ -144,6 +149,7 @@ fn frame_window(
     };
     Ok(PieceWindow {
         trim_start,
+        file_start: source.metadata.file_seconds(trim_start),
         duration: end - trim_start,
         frame_count: end_frame - start_frame,
     })
@@ -689,9 +695,7 @@ impl ValidatedBatchTemplate {
                                     .metadata
                                     .has_audio
                                     .then(|| PathBuf::from(&piece.source.metadata.path)),
-                                // The audio stays with the frames, wherever they start in the file.
-                                trim_start: piece.window.trim_start
-                                    + piece.source.metadata.video_start_seconds(),
+                                trim_start: piece.window.file_start,
                                 duration: seconds(piece.frames),
                             })
                             .collect(),
@@ -788,6 +792,21 @@ impl PlannedVideoRender {
             coverage.frame_timeline(self.sampling_fps, self.activity_offset),
         )
     }
+}
+
+/// Completes a single composite render on the worker, where its source is probed:
+/// checks the source against the scene and, as `frame_window` does for batch
+/// pieces, moves the trim onto the file's clock.
+pub(crate) fn resolve_single_composite_source(
+    paths: &AppPaths,
+    render: &mut CompositeRenderPlan,
+    scene_width: u32,
+    scene_height: u32,
+) -> CoreResult<CompositeSourceMetadata> {
+    let metadata =
+        verify_composite_source_resolution(paths, &render.video_path, scene_width, scene_height)?;
+    render.trim_start = metadata.file_seconds(render.trim_start);
+    Ok(CompositeSourceMetadata::from_source(&metadata))
 }
 
 /// Derives a single custom-range plan from validated submission inputs.
@@ -913,7 +932,7 @@ pub(crate) fn plan_batch_item(
                 video_path: PathBuf::from(&source.metadata.path),
                 quality: encoding.quality,
                 sync_offset: piece_offset,
-                trim_start: window.trim_start,
+                trim_start: window.file_start,
                 render_duration: duration,
                 update_rate,
                 source_fps: container_fps,

@@ -267,14 +267,11 @@ pub struct CompositeSourceMetadata {
     /// Colour the overlay is converted to; None when the source's colour space
     /// has no supported matrix (the overlay is then piped as RGBA).
     pub color: Option<crate::encode::overlay_format::YuvColor>,
-    /// Where the video stream starts in file time.
-    pub video_start_seconds: f64,
 }
 
 impl CompositeSourceMetadata {
     pub(crate) fn from_source(metadata: &crate::media::SourceVideoMetadata) -> Self {
         Self {
-            video_start_seconds: metadata.video_start_seconds(),
             has_audio: metadata.has_audio,
             audio_bit_rate: metadata.audio_bit_rate,
             rotation_degrees: metadata.rotation_degrees,
@@ -286,12 +283,14 @@ impl CompositeSourceMetadata {
     }
 }
 
+/// Probes the source of a single composite render and checks that its display
+/// resolution matches the scene.
 pub(crate) fn verify_composite_source_resolution(
     paths: &AppPaths,
     composite_video_path: &Path,
     scene_width: u32,
     scene_height: u32,
-) -> CoreResult<CompositeSourceMetadata> {
+) -> CoreResult<crate::media::SourceVideoMetadata> {
     if !composite_video_path.is_file() {
         return Err(CoreError::Config(format!(
             "Composite video does not exist: {}",
@@ -334,5 +333,5 @@ pub(crate) fn verify_composite_source_resolution(
         )));
     }
 
-    Ok(CompositeSourceMetadata::from_source(&metadata))
+    Ok(metadata)
 }

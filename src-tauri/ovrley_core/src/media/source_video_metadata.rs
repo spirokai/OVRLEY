@@ -47,9 +47,11 @@ pub struct SourceVideoMetadata {
 }
 
 impl SourceVideoMetadata {
-    /// Where the video stream starts in file time. An unreported start is the file's.
-    pub fn video_start_seconds(&self) -> f64 {
-        self.video_start_offset.unwrap_or(0.0)
+    /// Converts a second on the video's own clock (its first frame at zero) to the
+    /// file's clock, which FFmpeg's seeks and trims use. An unreported video start
+    /// is the file's start.
+    pub fn file_seconds(&self, video_seconds: f64) -> f64 {
+        video_seconds + self.video_start_offset.unwrap_or(0.0)
     }
 }
 

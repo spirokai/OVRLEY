@@ -19,8 +19,9 @@ use crate::normalize::{parse_template_value, RenderConfig};
 use crate::output::{RenderOutputKind, RenderOutputTarget};
 use crate::paths::AppPaths;
 use crate::render::{AtlasPlan, ExportWidgets, FrameSize, SlotPlacement};
-use crate::render_jobs::inspection::verify_composite_source_resolution;
-use crate::render_jobs::planning::{plan_single_render, PlannedVideoRender, VideoRenderModePlan};
+use crate::render_jobs::planning::{
+    plan_single_render, resolve_single_composite_source, PlannedVideoRender, VideoRenderModePlan,
+};
 
 const RENDER_SECONDS: f64 = 1.0;
 /// Seconds of the export left after the activity ends.
@@ -158,7 +159,7 @@ fn export(paths: &AppPaths, planned: bool) -> (AtlasPlan, PathBuf) {
     let plan = plan_single_render(config(activity_end), activity_end, None).unwrap();
     let dense = plan.prepare_activity(&activity).unwrap();
     let PlannedVideoRender { config, mode, .. } = plan;
-    let VideoRenderModePlan::Composite { render, .. } = mode else {
+    let VideoRenderModePlan::Composite { mut render, .. } = mode else {
         panic!("a composite video path plans a composite render");
     };
     let size = FrameSize {
@@ -167,7 +168,7 @@ fn export(paths: &AppPaths, planned: bool) -> (AtlasPlan, PathBuf) {
     };
     let covered = render.coverage.blank_leading_frame_count + render.coverage.frame_count;
     assert!(covered > 0 && covered < render.overlay_frame_count, "the export must cover and outlast the activity: {:?}", render.coverage);
-    let source = verify_composite_source_resolution(paths, &render.video_path, size.width, size.height).unwrap();
+    let source = resolve_single_composite_source(paths, &mut render, size.width, size.height).unwrap();
     let mut profiler = RenderProfiler::default();
     let export = ExportWidgets::prepare(
         &paths.font_dirs,
