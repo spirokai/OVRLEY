@@ -5,7 +5,7 @@
 //! one place avoids subtle drift between GPS row expansion, sync-time
 //! derivation, and vendor fallback parsers.
 
-use chrono::{NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Days, NaiveDateTime, TimeDelta, TimeZone, Utc};
 use chrono_tz::Tz;
 use telemetry_parser::util::SampleInfo;
 
@@ -74,19 +74,66 @@ pub(crate) fn gpsu_millis_to_video_start_rfc3339(
     unix_millis_plus_offset_ms_to_rfc3339(gpsu_unix_ms, -first_row_media_time_ms)
 }
 
-/// Converts a DJI AC004 camera-local timestamp to UTC RFC 3339 text.
+/// Converts a DJI AC004 timestamp to UTC RFC 3339 text.
 ///
-/// DJI stores timestamps in the camera's local time without a timezone offset.
-/// This function uses the IANA timezone derived from GPS coordinates to convert
-/// the naive timestamp into an absolute UTC instant. Returns `None` when the
-/// timezone name is unrecognized, the timestamp text is malformed, or the
-/// local time is ambiguous (e.g. DST spring-forward gap).
-pub(crate) fn dji_timestamp_to_rfc3339(timestamp_text: &str, tz_name: &str) -> Option<String> {
+/// Depending on camera model and firmware, DJI AC004 metadata stores timestamps
+/// either in the camera's local timezone (sometimes with the `UTC+8` calendar
+/// date, rolling the date by `+1 day` in negative-UTC zones) or directly in
+/// China Standard Time (`Asia/Shanghai`). When a reference UTC instant from the
+/// container metadata is supplied, candidate dates within `±1 day` are evaluated
+/// in both the GPS-derived timezone and `Asia/Shanghai`, selecting the instant
+/// closest to the container reference while preserving the GPS clock's exact
+/// minutes and seconds.
+pub(crate) fn dji_naive_timestamp_to_rfc3339(
+    naive: NaiveDateTime,
+    tz: Tz,
+    reference_utc: Option<DateTime<Utc>>,
+) -> Option<String> {
+    let resolve_in = |zone: Tz, candidate: NaiveDateTime| {
+        zone.from_local_datetime(&candidate)
+            .single()
+            .map(|local_dt| local_dt.with_timezone(&Utc))
+    };
+    let base_utc = resolve_in(tz, naive)?;
+    let utc_dt = match reference_utc {
+        Some(reference) => {
+            let day_candidates = [
+                Some(naive),
+                naive.checked_sub_days(Days::new(1)),
+                naive.checked_add_days(Days::new(1)),
+            ];
+            [tz, Tz::Asia__Shanghai]
+                .into_iter()
+                .flat_map(|zone| {
+                    day_candidates
+                        .into_iter()
+                        .flatten()
+                        .filter_map(move |candidate| resolve_in(zone, candidate))
+                })
+                .min_by_key(|candidate| (*candidate - reference).num_seconds().abs())
+                .unwrap_or(base_utc)
+        }
+        None => base_utc,
+    };
+    Some(utc_dt.to_rfc3339())
+}
+
+#[cfg(test)]
+pub(crate) fn dji_timestamp_to_rfc3339(
+    timestamp_text: &str,
+    tz_name: &str,
+    reference_utc: Option<DateTime<Utc>>,
+) -> Option<String> {
     let naive = NaiveDateTime::parse_from_str(timestamp_text, DJI_TIMESTAMP_FORMAT).ok()?;
     let tz: Tz = tz_name.parse().ok()?;
-    let local_dt = tz.from_local_datetime(&naive).single()?;
-    let utc_dt = local_dt.with_timezone(&Utc);
-    Some(utc_dt.to_rfc3339())
+    dji_naive_timestamp_to_rfc3339(naive, tz, reference_utc)
+}
+
+pub(crate) fn advance_utc_by_ms(base: DateTime<Utc>, offset_ms: f64) -> DateTime<Utc> {
+    if !offset_ms.is_finite() {
+        return base;
+    }
+    base + TimeDelta::milliseconds(offset_ms.round() as i64)
 }
 
 #[cfg(test)]
@@ -112,15 +159,47 @@ mod tests {
     #[test]
     fn dji_timestamp_parser_converts_camera_local_to_utc_via_timezone() {
         assert_eq!(
-            dji_timestamp_to_rfc3339("2026-03-15 23:58:14", "Europe/Prague").as_deref(),
+            dji_timestamp_to_rfc3339("2026-03-15 23:58:14", "Europe/Prague", None).as_deref(),
             Some("2026-03-15T22:58:14+00:00")
+        );
+    }
+
+    #[test]
+    fn dji_timestamp_parser_corrects_plus_one_day_roll_against_reference() {
+        let reference = DateTime::parse_from_rfc3339("2026-11-07T19:10:33Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        assert_eq!(
+            dji_timestamp_to_rfc3339(
+                "2026-11-08 10:33:56",
+                "America/Los_Angeles",
+                Some(reference),
+            )
+            .as_deref(),
+            Some("2026-11-07T18:33:56+00:00")
+        );
+    }
+
+    #[test]
+    fn dji_timestamp_parser_supports_shanghai_timestamps_against_reference() {
+        let reference = DateTime::parse_from_rfc3339("2026-03-15T15:58:14Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        assert_eq!(
+            dji_timestamp_to_rfc3339(
+                "2026-03-15 23:58:14",
+                "Europe/Prague",
+                Some(reference),
+            )
+            .as_deref(),
+            Some("2026-03-15T15:58:14+00:00")
         );
     }
 
     #[test]
     fn dji_timestamp_parser_rejects_invalid_timezone() {
         assert_eq!(
-            dji_timestamp_to_rfc3339("2026-03-15 23:58:14", "Not/A_Tz"),
+            dji_timestamp_to_rfc3339("2026-03-15 23:58:14", "Not/A_Tz", None),
             None
         );
     }
@@ -128,7 +207,7 @@ mod tests {
     #[test]
     fn dji_timestamp_parser_rejects_malformed_timestamp() {
         assert_eq!(
-            dji_timestamp_to_rfc3339("2026-13-01 99:99:99", "Europe/Prague"),
+            dji_timestamp_to_rfc3339("2026-13-01 99:99:99", "Europe/Prague", None),
             None
         );
     }

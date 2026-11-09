@@ -1,4 +1,7 @@
-use ovrley_core::media::dji_ac004::{extract_from_video, parse_raw_metadata};
+use chrono::{DateTime, Utc};
+use ovrley_core::media::dji_ac004::{
+    extract_from_video, parse_raw_metadata, parse_raw_metadata_with_reference,
+};
 use ovrley_core::media::mp4_telemetry;
 use std::path::Path;
 
@@ -110,7 +113,7 @@ fn parse_raw_metadata_extracts_ac004_gps_points() {
     assert_eq!(telemetry.sample_rate_hz, Some(25.0));
     assert_eq!(
         telemetry.sync_time.as_deref(),
-        Some("2026-03-15T15:58:14+00:00")
+        Some("2026-03-15T22:58:14+00:00")
     );
     assert_eq!(telemetry.samples.len(), 1);
 
@@ -123,7 +126,35 @@ fn parse_raw_metadata_extracts_ac004_gps_points() {
     assert!((sample.speed - 5.0).abs() < 1e-9);
     assert!((sample.heading.unwrap() - 36.869_897_645_844_02).abs() < 1e-9);
     assert!((sample.g_force.unwrap() - 0.5).abs() < 1e-9);
-    assert_eq!(sample.timestamp, "2026-03-15T15:58:14+00:00");
+    assert_eq!(sample.timestamp, "2026-03-15T22:58:14+00:00");
+}
+
+#[test]
+fn parse_raw_metadata_with_reference_corrects_ac004_day_roll() {
+    let raw = top_level_sample(sample_payload(
+        "DJI AC004",
+        59.94,
+        1,
+        36.586_589_6,
+        -121.755_676_2,
+        201_433,
+        "2026-11-08 10:33:56",
+        0.0,
+        0.0,
+        None,
+    ));
+    let reference = DateTime::parse_from_rfc3339("2026-11-07T19:10:33.000000Z")
+        .unwrap()
+        .with_timezone(&Utc);
+
+    let telemetry =
+        parse_raw_metadata_with_reference(&raw, Some(reference)).expect("expected AC004 telemetry");
+
+    assert_eq!(
+        telemetry.sync_time.as_deref(),
+        Some("2026-11-07T18:33:56+00:00")
+    );
+    assert_eq!(telemetry.samples[0].timestamp, "2026-11-07T18:33:56+00:00");
 }
 
 #[test]

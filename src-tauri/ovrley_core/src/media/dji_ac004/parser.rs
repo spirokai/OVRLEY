@@ -13,10 +13,16 @@
 //! Does not own: wire-format decoding (see [`super::protobuf`]), inspection
 //!       (see [`super::inspect`]), or FFmpeg integration (see [`super`]).
 
+use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono_tz::Tz;
+
 use super::protobuf::{get_f32, get_f64, get_string, get_submessage, get_varint};
 use super::{DjiAc004Sample, DjiAc004Telemetry, DEFAULT_SAMPLE_RATE_HZ};
 use crate::media::telemetry_math::g_force_from_components;
-use crate::media::time::dji_timestamp_to_rfc3339;
+use crate::media::time::{
+    advance_utc_by_ms, dji_naive_timestamp_to_rfc3339, DJI_TIMESTAMP_FORMAT,
+};
+use crate::media::timezone::timezone_for_coordinates;
 
 /// Parses raw concatenated DJI metadata samples into structured telemetry.
 ///
@@ -25,6 +31,16 @@ use crate::media::time::dji_timestamp_to_rfc3339;
 /// payload lives under `f3.f4`. Unknown fields are skipped so new camera fields
 /// do not break extraction of the stable GPS subset.
 pub fn parse_raw_metadata(raw_data: &[u8]) -> Option<DjiAc004Telemetry> {
+    parse_raw_metadata_with_reference(raw_data, None)
+}
+
+/// Parses raw concatenated DJI metadata samples, optionally anchoring the
+/// calendar date against the video container's creation timestamp to correct
+/// the AC004 firmware's `+1 day` date roll in negative-UTC timezones.
+pub fn parse_raw_metadata_with_reference(
+    raw_data: &[u8],
+    reference_creation_time: Option<DateTime<Utc>>,
+) -> Option<DjiAc004Telemetry> {
     let device_info = first_device_info(raw_data);
     let sample_rate_hz = device_info
         .as_ref()
@@ -35,6 +51,7 @@ pub fn parse_raw_metadata(raw_data: &[u8]) -> Option<DjiAc004Telemetry> {
     let mut points = Vec::new();
     let mut pos = 0;
     let mut frame_index = 0usize;
+    let mut cached_tz: Option<Tz> = None;
 
     while pos < raw_data.len() {
         let Some((field_num, value, next_pos)) = super::protobuf::decode_field(raw_data, pos)
@@ -45,8 +62,16 @@ pub fn parse_raw_metadata(raw_data: &[u8]) -> Option<DjiAc004Telemetry> {
 
         if field_num == 3 {
             if let super::protobuf::WireValue::LengthDelimited(sample_data) = value {
-                if let Some(mut point) = parse_point_from_sample(sample_data, frame_index) {
-                    point.timestamp_ms = frame_index as f64 * 1000.0 / sample_rate;
+                let timestamp_ms = frame_index as f64 * 1000.0 / sample_rate;
+                let reference_utc = reference_creation_time
+                    .map(|creation_time| advance_utc_by_ms(creation_time, timestamp_ms));
+                if let Some(point) = parse_point_from_sample(
+                    sample_data,
+                    frame_index,
+                    timestamp_ms,
+                    &mut cached_tz,
+                    reference_utc,
+                ) {
                     points.push(point);
                 }
                 frame_index += 1;
@@ -67,7 +92,13 @@ pub fn parse_raw_metadata(raw_data: &[u8]) -> Option<DjiAc004Telemetry> {
 }
 
 /// Reads the AC004 GPS subset from one top-level sample message.
-fn parse_point_from_sample(sample_data: &[u8], frame_index: usize) -> Option<DjiAc004Sample> {
+fn parse_point_from_sample(
+    sample_data: &[u8],
+    frame_index: usize,
+    timestamp_ms: f64,
+    cached_tz: &mut Option<Tz>,
+    reference_utc: Option<DateTime<Utc>>,
+) -> Option<DjiAc004Sample> {
     let gps_msg = get_submessage(sample_data, 4)?;
     let fix_msg = get_submessage(gps_msg, 2)?;
     let coords_msg = get_submessage(fix_msg, 1)?;
@@ -83,27 +114,22 @@ fn parse_point_from_sample(sample_data: &[u8], frame_index: usize) -> Option<Dji
         return None;
     }
 
-    /// Timezone used by DJI AC004 metadata timestamps.
-    ///
-    /// DJI firmware stores timestamps in China Standard Time (UTC+8) regardless of
-    /// the camera's geographic location. Converting from this fixed timezone to UTC
-    /// yields the correct absolute instant.
-    ///
-    /// **Note**: It has not been verified whether this +8 offset is a universal
-    /// behaviour of all AC004 remotes or whether it depends on the camera's
-    /// configured timezone. The offset is derived from comparing the first GPS
-    /// fix's raw timestamp with the video container's `creation_time` tag (UTC)
-    /// across the files tested during development. If AC004 remotes shipped to
-    /// other regions emit timestamps in a different local timezone this constant
-    /// will need to be replaced with a runtime offset derived from the container
-    /// metadata.
-    const DJI_TIMEZONE: &str = "Asia/Shanghai";
+    let tz = match *cached_tz {
+        Some(tz) => tz,
+        None => {
+            let tz_name = timezone_for_coordinates(longitude, latitude)?;
+            let parsed_tz: Tz = tz_name.parse().ok()?;
+            *cached_tz = Some(parsed_tz);
+            parsed_tz
+        }
+    };
 
     let altitude = get_varint(fix_msg, 2).map_or(0.0, |value| value as f64 / 1000.0);
     let timestamp_msg = get_submessage(fix_msg, 6)?;
     let timestamp = {
         let timestamp_text = get_string(timestamp_msg, 1)?;
-        dji_timestamp_to_rfc3339(&timestamp_text, DJI_TIMEZONE)?
+        let naive = NaiveDateTime::parse_from_str(&timestamp_text, DJI_TIMESTAMP_FORMAT).ok()?;
+        dji_naive_timestamp_to_rfc3339(naive, tz, reference_utc)?
     };
 
     let (vx, vy) = get_submessage(gps_msg, 3).map_or((0.0, 0.0), |velocity_msg| {
@@ -117,7 +143,7 @@ fn parse_point_from_sample(sample_data: &[u8], frame_index: usize) -> Option<Dji
 
     Some(DjiAc004Sample {
         frame_index,
-        timestamp_ms: 0.0,
+        timestamp_ms,
         timestamp,
         latitude,
         longitude,
