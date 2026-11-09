@@ -4,7 +4,7 @@
  */
 
 import { useMemo } from 'react'
-import { clearPreviewVideos, removePreviewVideo } from '@/api/backend'
+import { removePreviewVideo } from '@/api/backend'
 import { changeVideoCollection } from '@/features/undo-redo/undoHistory'
 import { openMultiplePaths } from '@/lib/file-dialog'
 import { filenameFromSelectedPath } from '@/lib/file-dialog'
@@ -12,6 +12,7 @@ import { joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-
 import useStore from '@/store/useStore'
 import i18next from 'i18next'
 import useVideoImportReview from './useVideoImportReview'
+import { clearVideoPreviews } from '../videoImportOperations'
 
 const DEBUG_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
 
@@ -44,10 +45,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   const applyBackgroundImage = async (path) => {
     setImportingVideo(true)
     try {
-      if (hasVideos) {
-        await clearPreviewVideos()
-        useStore.getState().clearTransitionProxies()
-      }
+      if (hasVideos) await clearVideoPreviews()
       changeVideoCollection(useStore, () => setImportedBackgroundImage(path))
       onSetBackgroundMode?.('image')
     } finally {
@@ -121,10 +119,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
 
   const handleClearImportedVideos = async () => {
     try {
-      if (hasVideos) {
-        await clearPreviewVideos()
-        useStore.getState().clearTransitionProxies()
-      }
+      if (hasVideos) await clearVideoPreviews()
     } catch (err) {
       console.error('Failed to clear preview videos:', err)
     } finally {

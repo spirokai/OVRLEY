@@ -1,6 +1,12 @@
 import * as backend from '@/api/backend'
 import { replaceEditorDocument } from '@/features/undo-redo/undoHistory'
-import { probeVideo, queueTelemetryExtraction, registerVideoPreviews, releaseVideoPreviews } from '@/features/video-preview/videoImportOperations'
+import {
+  clearVideoPreviews,
+  probeVideo,
+  queueTelemetryExtraction,
+  registerVideoPreviews,
+  releaseVideoPreviews,
+} from '@/features/video-preview/videoImportOperations'
 import { createDurableEditorState } from '@/lib/template/template-state'
 import { attachRasterLoadResults } from '@/lib/widget/widget-config'
 import useStore from '@/store/useStore'
@@ -55,8 +61,7 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
     throw error
   }
   if (videos.length === 0) {
-    await backend.clearPreviewVideos()
-    useStore.getState().clearTransitionProxies()
+    await clearVideoPreviews()
   } else {
     await releaseVideoPreviews(previousVideos)
     onSetBackgroundMode?.('video')

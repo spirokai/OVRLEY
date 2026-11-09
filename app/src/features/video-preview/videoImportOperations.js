@@ -61,6 +61,12 @@ export async function releaseVideoPreviews(videos) {
   for (const video of videos) await backend.removePreviewVideo(video.preview.importId)
 }
 
+/** Removes every preview registration, transition proxies included, and forgets the proxies. */
+export async function clearVideoPreviews() {
+  await backend.clearPreviewVideos()
+  useStore.getState().clearTransitionProxies()
+}
+
 async function extractTelemetryResult(path) {
   try {
     const response = await backend.extractVideoTelemetry(path)
