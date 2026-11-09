@@ -848,7 +848,7 @@ pub(crate) fn pattern_bind_groups(
 fn premultiplied_mips(image: &PatternImage) -> (u32, Vec<u8>) {
     let mut level: Vec<[f32; 4]> = image
         .rgba
-        .chunks_exact(4)
+        .as_chunks::<4>().0.iter()
         .map(|texel| {
             let alpha = f32::from(texel[3]) / 255.0;
             [
