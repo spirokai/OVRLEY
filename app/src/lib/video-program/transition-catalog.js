@@ -14,12 +14,12 @@ export const DEFAULT_TRANSITION_SETTINGS = Object.freeze({ ...transitionCatalogu
 
 export const HARD_CUT = Object.freeze({ type: NO_TRANSITION, durationSeconds: 0 })
 
-/**
- * Validates a transition type.
- * @param {string} type Transition type.
- */
-export function requireTransitionType(type) {
+function requireTransitionType(type) {
   if (type !== NO_TRANSITION && !XFADE_TRANSITIONS.includes(type)) throw new Error(`Unknown transition type: ${type}`)
+}
+
+function requireTransitionDuration(durationSeconds) {
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) throw new Error('Transition duration must be a positive number of seconds')
 }
 
 /**
@@ -33,8 +33,22 @@ export function requireTransition(transition) {
   requireTransitionType(type)
   if (type === NO_TRANSITION) {
     if (durationSeconds !== 0) throw new Error('No transition has a duration of 0 seconds')
-  } else if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
-    throw new Error('Transition duration must be a positive number of seconds')
+  } else {
+    requireTransitionDuration(durationSeconds)
   }
   return { type, durationSeconds }
+}
+
+/**
+ * Validates project transition defaults.
+ * @param {{type: string, durationSeconds: number, splitGapThresholdSeconds: number}} defaults Defaults.
+ * @returns {{type: string, durationSeconds: number, splitGapThresholdSeconds: number}} The canonical value to store.
+ */
+export function requireTransitionDefaults({ type, durationSeconds, splitGapThresholdSeconds }) {
+  requireTransitionType(type)
+  requireTransitionDuration(durationSeconds)
+  if (!Number.isFinite(splitGapThresholdSeconds) || splitGapThresholdSeconds < 0) {
+    throw new Error('Continuity threshold must be zero or a positive number of seconds')
+  }
+  return { type, durationSeconds, splitGapThresholdSeconds }
 }

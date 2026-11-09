@@ -19,19 +19,11 @@ import {
   shiftVideoOffsets,
 } from '@/lib/video-program/collection-edits'
 import { requireTelemetry } from '@/lib/video-program/imported-video'
-import { DEFAULT_TRANSITION_SETTINGS, requireTransitionType } from '@/lib/video-program/transition-catalog'
+import { DEFAULT_TRANSITION_SETTINGS, requireTransitionDefaults } from '@/lib/video-program/transition-catalog'
 import { getVideosTimelineBounds, joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import { applyCoursePlotDimensions } from '../store-utils'
 
 let fetchCodecsOnce = null
-
-function requireTransitionDefaults({ type, durationSeconds, splitGapThresholdSeconds }) {
-  requireTransitionType(type)
-  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) throw new Error('Transition duration must be a positive number of seconds')
-  if (!Number.isFinite(splitGapThresholdSeconds) || splitGapThresholdSeconds < 0) {
-    throw new Error('Continuity threshold must be zero or a positive number of seconds')
-  }
-}
 
 function clampPlayheadToVideos(draft, deltaSeconds) {
   const bounds = getVideosTimelineBounds(joinVideoEdits(draft.importedVideos, draft.videoEdits))
@@ -122,9 +114,7 @@ export const createVideoImportSlice = (set, get) => ({
 
   /** Stores the project transition defaults chosen by the user. */
   setTransitionDefaults: (defaults) => {
-    requireTransitionDefaults(defaults)
-    const { type, durationSeconds, splitGapThresholdSeconds } = defaults
-    set({ transitionDefaults: { type, durationSeconds, splitGapThresholdSeconds } })
+    set({ transitionDefaults: requireTransitionDefaults(defaults) })
   },
 
   /** Places every automatic clip by detected time (see `placeAutomaticVideos`). */
