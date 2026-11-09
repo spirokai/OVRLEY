@@ -1,6 +1,6 @@
 import { getActivityDurationSeconds } from '@/lib/activity/activity-summary'
 import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
-import { buildTimelineProgram } from '@/lib/video-program/timeline'
+import { selectVideoTimeline } from '@/lib/video-program/timeline'
 import { captureVideoSyncTimezoneMode } from '@/lib/video-sync'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { clamp } from '@/lib/utils'
@@ -27,13 +27,8 @@ export function renderTransport(state) {
  * @param {object} state Editor snapshot.
  * @returns {{clip: object|null, activity: object|null, originSecond: number, timelineStart: number, timelineEnd: number}} Render inputs.
  */
-export function resolveSingleRenderInputs(state) {
-  const { clips, program } = buildTimelineProgram({
-    videos: state.importedVideos,
-    videoEdits: state.videoEdits,
-    dragPreview: null,
-    transitionDefaults: state.transitionDefaults,
-  })
+function resolveSingleRenderInputs(state) {
+  const { clips, program } = selectVideoTimeline(state)
   const target = resolvePreviewTarget(program, state.selectedSecond)
   const clip = target === null ? null : clips.find((candidate) => candidate.id === target.videoId)
   if (state.parsedActivity !== null || clip === null) {
@@ -129,8 +124,7 @@ export function createBatchRenderRequest({ editorSnapshot, settings, language, i
   )
 }
 
-function createSingleRenderConfig(state, settings, language) {
-  const { clip, originSecond, timelineStart, timelineEnd } = resolveSingleRenderInputs(state)
+function createSingleRenderConfig(state, { clip, originSecond, timelineStart, timelineEnd }, settings, language) {
   return createRenderEffectiveConfig({
     language,
     config: state.config,
@@ -174,9 +168,10 @@ export function createRenderRequest({ editorSnapshot, settings, language, batchR
       settings: acceptedSettings,
     }
   }
+  const inputs = resolveSingleRenderInputs(editorSnapshot)
   const payload = {
-    config: createSingleRenderConfig(editorSnapshot, settings, language),
-    parsedActivity: resolveSingleRenderInputs(editorSnapshot).activity,
+    config: createSingleRenderConfig(editorSnapshot, inputs, settings, language),
+    parsedActivity: inputs.activity,
     outputPath,
     overwrite,
   }
@@ -206,11 +201,13 @@ function buildPreviewFrameWindow({ activityDuration, previewSecond, sceneFps }) 
 
 /** @param {object} state Captured editor snapshot. @param {string} language App language naming chart legends. @returns {object} Native preview frame inputs. */
 export function createPreviewRenderRequest(state, language) {
-  const { activity, originSecond } = resolveSingleRenderInputs(state)
+  const inputs = resolveSingleRenderInputs(state)
+  const { activity, originSecond } = inputs
   if (activity === null) throw new Error('No parsed activity available')
   const hasVideo = state.importedVideos.length > 0
   const config = createSingleRenderConfig(
     state,
+    inputs,
     {
       ...state.renderSettings,
       exportMode: hasVideo ? 'composite' : 'transparent',

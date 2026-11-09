@@ -6,41 +6,9 @@ import { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { hasActivityCoverage, resolveActivityClipId, resolveActivityContext, resolveAvailableMetrics } from '@/lib/activity/activity-context'
-import { buildTimelineProgram } from '@/lib/video-program/timeline'
+import { selectVideoTimeline } from '@/lib/video-program/timeline'
 import { listTransitionProxyJobs } from '@/lib/video-program/transition-proxies'
 import { deriveVideoWarnings } from '@/lib/video-program/video-warnings'
-
-/** Remembers the latest result, so every subscriber shares one build per change. */
-function memoizeLatest(build) {
-  let latestArgs = null
-  let latestValue
-  return (...args) => {
-    if (latestArgs === null || args.some((arg, index) => arg !== latestArgs[index])) {
-      latestArgs = args
-      latestValue = build(...args)
-    }
-    return latestValue
-  }
-}
-
-const buildCommitted = memoizeLatest((videos, videoEdits, transitionDefaults) =>
-  buildTimelineProgram({ videos, videoEdits, dragPreview: null, transitionDefaults }),
-)
-const buildDisplayed = memoizeLatest((committed, videos, videoEdits, dragPreview, transitionDefaults) =>
-  dragPreview === null ? committed : buildTimelineProgram({ videos, videoEdits, dragPreview, transitionDefaults }),
-)
-const combineTimeline = memoizeLatest((committed, displayed) => ({ ...committed, displayed }))
-
-/**
- * Selects the committed clips, their timeline program, and covered interval, plus
- * the same values as displayed during a transient clip drag.
- * @param {object} state Application state.
- * @returns {{clips: Array<object>, program: object, bounds: object|null, displayed: {clips: Array<object>, program: object, bounds: object|null}}} Timeline.
- */
-export function selectVideoTimeline({ importedVideos, videoEdits, videoDragPreview, transitionDefaults }) {
-  const committed = buildCommitted(importedVideos, videoEdits, transitionDefaults)
-  return combineTimeline(committed, buildDisplayed(committed, importedVideos, videoEdits, videoDragPreview, transitionDefaults))
-}
 
 /**
  * Returns the timeline (see `selectVideoTimeline`).
