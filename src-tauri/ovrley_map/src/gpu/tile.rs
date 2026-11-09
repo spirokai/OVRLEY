@@ -320,7 +320,7 @@ fn decode_features(layer: &tile::Layer) -> Vec<DecodedFeature<'_>> {
             continue;
         };
         let mut properties = BTreeMap::new();
-        for pair in raw.tags.chunks_exact(2) {
+        for pair in raw.tags.as_chunks::<2>().0 {
             if let (Some(key), Some(value)) = (
                 layer.keys.get(pair[0] as usize),
                 values.get(pair[1] as usize),
@@ -453,7 +453,7 @@ pub(crate) fn point_coordinates(feature: &tile::Feature) -> impl Iterator<Item =
         .geometry
         .get(1..)
         .unwrap_or_default()
-        .chunks_exact(2)
+        .as_chunks::<2>().0.iter()
         .map(move |pair| {
             cursor[0] += zigzag(pair[0]);
             cursor[1] += zigzag(pair[1]);
@@ -473,7 +473,7 @@ pub(crate) fn line_coordinates(feature: &tile::Feature) -> Vec<Vec<[i64; 2]>> {
         cursor[0] += zigzag(rest[1]);
         cursor[1] += zigzag(rest[2]);
         part.push(cursor);
-        for pair in rest[4..4 + count * 2].chunks_exact(2) {
+        for pair in rest[4..4 + count * 2].as_chunks::<2>().0 {
             cursor[0] += zigzag(pair[0]);
             cursor[1] += zigzag(pair[1]);
             part.push(cursor);
@@ -490,7 +490,7 @@ fn advance_cursor(cursor: &mut [i64; 2], first: &[u32], rest: &[u32]) -> Option<
     cursor[1] += zigzag(first[1]);
     let start = *cursor;
     let mut area = 0;
-    for pair in rest.chunks_exact(2) {
+    for pair in rest.as_chunks::<2>().0 {
         let previous = *cursor;
         cursor[0] += zigzag(pair[0]);
         cursor[1] += zigzag(pair[1]);

@@ -385,8 +385,8 @@ fn render_tile(style: Vec<u8>, tile_bytes: Vec<u8>, labels: bool) -> (Vec<u8>, u
 fn a_frame_draws_a_labels_glyphs_and_halo_where_it_was_placed() {
     let (blank, _) = render(false);
     assert!(blank
-        .chunks_exact(4)
-        .all(|pixel| pixel == [255, 255, 255, 255]));
+        .as_chunks::<4>().0.iter()
+        .all(|pixel| *pixel == [255, 255, 255, 255]));
 
     let (labelled, glyphs) = render(true);
     assert_eq!(
@@ -396,9 +396,9 @@ fn a_frame_draws_a_labels_glyphs_and_halo_where_it_was_placed() {
             .collect::<std::collections::BTreeSet<_>>()
             .len()
     );
-    let columns = |is: fn(&[u8]) -> bool| -> Vec<usize> {
+    let columns = |is: fn(&[u8; 4]) -> bool| -> Vec<usize> {
         labelled
-            .chunks_exact(4)
+            .as_chunks::<4>().0.iter()
             .enumerate()
             .filter(|(_, pixel)| is(pixel))
             .map(|(at, _)| at % 240)
@@ -429,7 +429,7 @@ fn a_flipped_name_draws_exactly_as_one_that_needed_no_flip() {
 
     let ink = |pixels: &[u8]| {
         pixels
-            .chunks_exact(4)
+            .as_chunks::<4>().0.iter()
             .filter(|pixel| pixel[0] < 60 && pixel[1] < 60 && pixel[2] < 60)
             .count()
     };
@@ -481,14 +481,14 @@ fn fade(from: MapCamera, to: MapCamera) -> [MapCamera; LABEL_PLACEMENTS] {
 /// The ink a frame has: pixels dark in every channel.
 fn black_pixels(pixels: &[u8]) -> usize {
     pixels
-        .chunks_exact(4)
+        .as_chunks::<4>().0.iter()
         .filter(|pixel| pixel[..3].iter().all(|channel| *channel < 45))
         .count()
 }
 
 fn marked_pixels(pixels: &[u8]) -> usize {
     pixels
-        .chunks_exact(4)
+        .as_chunks::<4>().0.iter()
         .filter(|pixel| pixel[..3] != [255, 255, 255])
         .count()
 }

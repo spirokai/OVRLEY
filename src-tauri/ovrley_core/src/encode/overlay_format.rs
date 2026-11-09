@@ -468,7 +468,7 @@ mod tests {
         let black = ((c.y_offset + 32768) >> 16).clamp(0, 255) as u8;
         let mut y = Vec::new();
         let mut a = Vec::new();
-        for pixel in rgba.chunks_exact(4) {
+        for pixel in rgba.as_chunks::<4>().0 {
             a.push(pixel[3]);
             let [r, g, b] = [pixel[0], pixel[1], pixel[2]].map(i64::from);
             let [yr, yg, yb] = c.y.map(i64::from);
