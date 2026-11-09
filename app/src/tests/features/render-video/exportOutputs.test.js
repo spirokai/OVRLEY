@@ -31,6 +31,7 @@ function review(overrides) {
   return reviewExport({
     outputMode: 'combined',
     exportMode: 'composite',
+    codec: 'libx264',
     exportRange: all,
     transitionDefaults: defaults,
     skipOverlay: {},
@@ -90,6 +91,27 @@ describe('reviewExport', () => {
       },
       { id: '/videos/climb.mp4', pieces: [{ sourceId: 'source-climb', startFrame: 0, endFrame: 900, skipOverlay: false }], transitions: [] },
     ])
+    const ranged = review({ clips, outputMode: 'separate', exportRange: { type: 'custom', from: 15, to: 50 } }).outputs
+    expect(ranged.map(({ pieces }) => pieces.map(({ startFrame, endFrame }) => [startFrame, endFrame]))).toEqual([[[600, 1500]], [[0, 600]]])
+  })
+
+  test('an encoder that keeps the display rotation joins only videos of one rotation', () => {
+    // Coded portrait and rotated: the same display resolution as ride.
+    const turned = createTestVideo({
+      id: 'turned',
+      path: '/videos/turned.mp4',
+      durationSeconds: 30,
+      width: 1080,
+      height: 1920,
+      rotationDegrees: 90,
+      importOrder: 1,
+    })
+    const clips = clipsOf([ride, turned], { ride: 0, turned: 70 })
+    expect(review({ clips }).blockers).toEqual([])
+    expect(review({ clips, codec: 'qsv_full_h264' }).blockers).toEqual([
+      'Videos are rotated differently (ride.mp4, turned.mp4), which this encoder cannot join into one file. Export separate files.',
+    ])
+    expect(review({ clips, codec: 'qsv_full_h264', outputMode: 'separate' }).blockers).toEqual([])
   })
 
   test('explains every reason one combined file cannot be rendered', () => {

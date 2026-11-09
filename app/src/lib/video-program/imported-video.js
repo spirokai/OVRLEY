@@ -19,7 +19,20 @@ function greatestCommonDivisor(left, right) {
   return right === 0 ? left : greatestCommonDivisor(right, left % right)
 }
 
-function displayResolutionForImportedVideo(metadata) {
+function requireRotation(metadata) {
+  const rotation = metadata.rotationDegrees === null || metadata.rotationDegrees === undefined ? 0 : Number(metadata.rotationDegrees)
+  if (!Number.isFinite(rotation)) {
+    throw new Error('Imported video metadata contains an invalid rotation')
+  }
+
+  const normalizedRotation = ((rotation % 360) + 360) % 360
+  if (![0, 90, 180, 270].includes(normalizedRotation)) {
+    throw new Error('Imported video metadata contains an unsupported rotation')
+  }
+  return normalizedRotation
+}
+
+function displayResolutionForImportedVideo(metadata, rotationDegrees) {
   const resolution = metadata.resolution
   if (!resolution) {
     throw new Error('Imported video metadata must include a resolution')
@@ -31,17 +44,7 @@ function displayResolutionForImportedVideo(metadata) {
     throw new Error('Imported video metadata contains an invalid resolution')
   }
 
-  const rotation = metadata.rotationDegrees === null || metadata.rotationDegrees === undefined ? 0 : Number(metadata.rotationDegrees)
-  if (!Number.isFinite(rotation)) {
-    throw new Error('Imported video metadata contains an invalid rotation')
-  }
-
-  const normalizedRotation = ((rotation % 360) + 360) % 360
-  if (![0, 90, 180, 270].includes(normalizedRotation)) {
-    throw new Error('Imported video metadata contains an unsupported rotation')
-  }
-
-  if (normalizedRotation === 90 || normalizedRotation === 270) {
+  if (rotationDegrees === 90 || rotationDegrees === 270) {
     return { width: height, height: width }
   }
 
@@ -64,7 +67,8 @@ function createVideoId() {
 /**
  * Validates probed source metadata once at import ingress and creates a canonical video entity
  * without a preview registration. Duration is stored on the exact frame grid:
- * `frameCount × fps.den / fps.num`. User edits (placement, cuts, segments) live in
+ * `frameCount × fps.den / fps.num`. `resolution` is display-oriented and
+ * `rotationDegrees` is the display rotation, normalized to 0, 90, 180 or 270. User edits (placement, cuts, segments) live in
  * `videoEdits` keyed by the entity ID.
  * @param {object} metadata Probed source metadata.
  * @param {object} options Entity identity.
@@ -91,6 +95,7 @@ export function createImportedVideo(metadata, { importOrder, previewWarnings, id
   const fps = { num: metadata.fpsNum / divisor, den: metadata.fpsDen / divisor }
   // A positive duration always has at least one frame.
   const frameCount = frameCountForDuration(metadata.duration, fps)
+  const rotationDegrees = requireRotation(metadata)
 
   return {
     id,
@@ -99,7 +104,8 @@ export function createImportedVideo(metadata, { importOrder, previewWarnings, id
     durationSeconds: (frameCount * fps.den) / fps.num,
     frameCount,
     fps,
-    resolution: displayResolutionForImportedVideo(metadata),
+    resolution: displayResolutionForImportedVideo(metadata, rotationDegrees),
+    rotationDegrees,
     hasAudio: metadata.hasAudio,
     codecName: metadata.codecName ?? null,
     codecLongName: metadata.codecLongName ?? null,

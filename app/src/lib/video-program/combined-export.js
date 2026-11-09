@@ -6,12 +6,15 @@ import { deriveCompatibility } from './video-collection'
 
 /**
  * Lists what prevents the videos from being exported as one file: overlapping
- * videos and videos whose resolution or frame rate differs from the others.
- * @param {{overlaps: Array<{earlierVideoId: string, laterVideoId: string}>}} program Program of the videos.
+ * videos, videos whose resolution or frame rate differs from the others, and,
+ * when the encoder keeps the display rotation of the file, videos rotated
+ * differently from the first piece's video.
+ * @param {{pieces: Array<{videoId: string}>, overlaps: Array<{earlierVideoId: string, laterVideoId: string}>}} program Program of the videos.
  * @param {Array<object>} clips Clips of the program.
- * @returns {Array<{kind: 'overlap'|'incompatible', videoIds: Array<string>}>} Issues; empty when one file is possible.
+ * @param {{keepsRotation?: boolean}} [options] Whether the encoder joins only videos of one rotation.
+ * @returns {Array<{kind: 'overlap'|'incompatible'|'rotation', videoIds: Array<string>}>} Issues; empty when one file is possible.
  */
-export function findCombinedExportIssues(program, clips) {
+export function findCombinedExportIssues(program, clips, { keepsRotation = false } = {}) {
   const issues = []
   if (program.overlaps.length > 0) {
     const overlapping = new Set(program.overlaps.flatMap((overlap) => [overlap.earlierVideoId, overlap.laterVideoId]))
@@ -20,5 +23,11 @@ export function findCombinedExportIssues(program, clips) {
   const { incompatibleIds } = deriveCompatibility(clips)
   if (incompatibleIds.size > 0)
     issues.push({ kind: 'incompatible', videoIds: clips.filter((clip) => incompatibleIds.has(clip.id)).map((clip) => clip.id) })
+  if (keepsRotation && program.pieces.length > 0) {
+    const firstVideoId = program.pieces[0].videoId
+    const { rotationDegrees } = clips.find((clip) => clip.id === firstVideoId)
+    const rotated = clips.filter((clip) => clip.rotationDegrees !== rotationDegrees)
+    if (rotated.length > 0) issues.push({ kind: 'rotation', videoIds: [firstVideoId, ...rotated.map((clip) => clip.id)] })
+  }
   return issues
 }

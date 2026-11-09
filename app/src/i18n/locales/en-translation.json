@@ -204,6 +204,7 @@
     "excludedFromExport": "Excluded from export",
     "combinedOverlap": "Videos overlap ({{names}}). Move a video or exclude the overlapping part from export.",
     "combinedIncompatible": "Videos differ in resolution or frame rate ({{names}}). Remove them or export separate files.",
+    "combinedRotation": "Videos are rotated differently ({{names}}), which this encoder cannot join into one file. Export separate files.",
     "combinedInvalidTransitions": "Some transitions are longer than the video pieces they join.",
     "combinedUnavailable": "Some videos cannot be exported ({{names}}).",
     "invalidTransitions": "A transition is longer than the video pieces it joins",

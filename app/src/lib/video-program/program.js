@@ -7,7 +7,9 @@
  * for playback: the earlier-starting video plays to its end and the later video
  * continues at the matching source position. Overlaps are still reported so
  * single-file export can be blocked. Excluded segments are listed as well: they
- * stay on the timeline and in the preview, but leave no piece.
+ * stay on the timeline and in the preview, but leave no piece. A separate-file
+ * export builds one program per video, so overlaps with other videos do not
+ * trim it.
  *
  * A join connects consecutive pieces and belongs to the incoming piece's segment:
  * its `transitionIn` is the join's transition. A stored transition of `null` means
@@ -73,23 +75,6 @@ function collectExcludedSegments(videos) {
   )
 }
 
-/**
- * Lists the pieces each video keeps after its excluded segments and the export
- * range, without resolving overlaps between videos. Separate-file export renders
- * these; the combined program trims overlapping pieces (see `buildProgram`).
- * @param {object} options Piece inputs.
- * @param {Array<object>} options.videos Imported videos joined with their edits.
- * @param {{type: 'all'|'custom', from: number, to: number}} options.exportRange Export range in timeline seconds.
- * @returns {Map<string, Array<object>>} Pieces of each video that keeps any, in source order.
- */
-export function collectVideoPieces({ videos, exportRange }) {
-  const piecesByVideo = new Map()
-  for (const piece of collectPieces(videos, exportRange)) {
-    piecesByVideo.set(piece.videoId, [...(piecesByVideo.get(piece.videoId) ?? []), piece])
-  }
-  return piecesByVideo
-}
-
 function resolveOverlaps(sortedPieces, videosById) {
   const pieces = []
   const overlaps = []
@@ -123,11 +108,17 @@ function resolveOverlaps(sortedPieces, videosById) {
   return { pieces, overlaps }
 }
 
+/** Whether a piece keeps at least one frame outside its incoming and outgoing transitions. */
+function leavesUntouchedFrame(piece, incomingSeconds, outgoingSeconds) {
+  return incomingSeconds + outgoingSeconds + framesToSeconds(1, piece.fps) <= piece.durationSeconds + TIME_EPSILON_SECONDS
+}
+
+/** A default transition is kept only where it would fit with the same transition at the piece's other end. */
 function defaultTransition(previous, next, gapSeconds, transitionDefaults) {
   if (gapSeconds <= transitionDefaults.splitGapThresholdSeconds + TIME_EPSILON_SECONDS) return HARD_CUT
   if (transitionDefaults.type === NO_TRANSITION) return HARD_CUT
   const durationSeconds = snapDurationToFrames(transitionDefaults.durationSeconds, previous.fps)
-  const fits = (piece) => 2 * durationSeconds + framesToSeconds(1, piece.fps) <= piece.durationSeconds + TIME_EPSILON_SECONDS
+  const fits = (piece) => leavesUntouchedFrame(piece, durationSeconds, durationSeconds)
   if (!fits(previous) || !fits(next)) return HARD_CUT
   return { type: transitionDefaults.type, durationSeconds }
 }
@@ -147,22 +138,6 @@ function buildJoins(pieces, videosById, transitionDefaults) {
       transition: override ?? defaultTransition(previous, next, gapSeconds, transitionDefaults),
       isDefault: override === null,
     }
-  })
-}
-
-/**
- * Lists the transitions between consecutive pieces of one video (its separate
- * output), by the same rule as the program.
- * @param {object} video Imported video joined with its edits.
- * @param {Array<object>} pieces The video's pieces in source order (`collectVideoPieces`).
- * @param {{type: string, durationSeconds: number, splitGapThresholdSeconds: number}} transitionDefaults Project transition defaults.
- * @returns {Array<{type: string, durationSeconds: number}>} One transition per join.
- */
-export function buildVideoPieceTransitions(video, pieces, transitionDefaults) {
-  return pieces.slice(1).map((next, index) => {
-    const previous = pieces[index]
-    const gapSeconds = next.timelineStartSecond - previous.timelineEndSecond
-    return video.segments[next.segmentKey].transitionIn ?? defaultTransition(previous, next, gapSeconds, transitionDefaults)
   })
 }
 
@@ -194,8 +169,7 @@ export function findInvalidTransitions(program) {
   program.pieces.forEach((piece, index) => {
     const incoming = program.joins[index - 1] ?? null
     const outgoing = program.joins[index] ?? null
-    const required = (incoming?.transition.durationSeconds ?? 0) + (outgoing?.transition.durationSeconds ?? 0) + framesToSeconds(1, piece.fps)
-    if (required > piece.durationSeconds + TIME_EPSILON_SECONDS) {
+    if (!leavesUntouchedFrame(piece, incoming?.transition.durationSeconds ?? 0, outgoing?.transition.durationSeconds ?? 0)) {
       issues.push({
         pieceId: piece.id,
         joinKeys: [incoming, outgoing].filter((join) => join && join.transition.durationSeconds > 0).map((join) => join.key),
