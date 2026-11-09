@@ -33,15 +33,17 @@ export function deriveVideoWarnings(clips, program, activityDurationSeconds) {
   for (const clip of clips) {
     if (incompatibleIds.has(clip.id)) warnings.get(clip.id).push({ kind: 'incompatible', params: {} })
   }
+  // One warning per overlapping pair of videos; two videos may share a filename.
+  const warnedPairs = new Set()
   for (const { earlierVideoId, laterVideoId } of program.overlaps) {
     for (const [videoId, otherId] of [
       [earlierVideoId, laterVideoId],
       [laterVideoId, earlierVideoId],
     ]) {
-      const name = names.get(otherId)
-      if (!warnings.get(videoId).some((warning) => warning.kind === 'overlap' && warning.params.name === name)) {
-        warnings.get(videoId).push({ kind: 'overlap', params: { name } })
-      }
+      const pair = JSON.stringify([videoId, otherId])
+      if (warnedPairs.has(pair)) continue
+      warnedPairs.add(pair)
+      warnings.get(videoId).push({ kind: 'overlap', params: { name: names.get(otherId) } })
     }
   }
   for (const clip of clips) {

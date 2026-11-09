@@ -12,10 +12,10 @@ import { useVideoClipRows } from '../hooks/useVideoClipRows'
 import { FileDragCursor, FileDropZone } from './FileDropZone'
 import { useTranslation } from 'react-i18next'
 
-function VideoSegmentRow({ segment, filename, showRange }) {
+function VideoSegmentRow({ segment, clipId, filename, showRange }) {
   const { t } = useTranslation()
   const includedLabel = t('toolbar.includeInExport', 'Include in export')
-  const transitionId = `video-segment-transition-${filename}-${segment.key}`
+  const transitionId = `video-segment-transition-${clipId}-${segment.key}`
   return (
     <li className={`space-y-2 ${showRange ? 'rounded-xs border border-border/50 p-2' : ''}`}>
       {showRange ? (
@@ -134,8 +134,9 @@ function VideoClipRow({ row }) {
       </div>
       {row.warnings.length > 0 && (
         <ul className="space-y-1 px-2 text-xs text-destructive">
-          {row.warnings.map((warning) => (
-            <li key={warning} className="flex items-start gap-1.5">
+          {/* Warnings may read alike: two overlapping videos can share a filename. */}
+          {row.warnings.map((warning, index) => (
+            <li key={index} className="flex items-start gap-1.5">
               <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
               <span>{warning}</span>
             </li>
@@ -165,7 +166,7 @@ function VideoClipRow({ row }) {
       {row.segments.length > 1 ? <SectionHeading icon={Scissors} title={t('toolbar.videoParts', 'Parts')} variant="drawer" /> : null}
       <ul className="space-y-2 px-2">
         {row.segments.map((segment) => (
-          <VideoSegmentRow key={segment.key} segment={segment} filename={row.filename} showRange={row.segments.length > 1} />
+          <VideoSegmentRow key={segment.key} segment={segment} clipId={row.id} filename={row.filename} showRange={row.segments.length > 1} />
         ))}
       </ul>
       <SectionHeading icon={Film} title={t('toolbar.details', 'Details')} variant="drawer" />

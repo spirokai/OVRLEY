@@ -127,8 +127,9 @@ function TimelineClipTooltip({ clip }) {
       )}
       {clip.warnings.length > 0 && (
         <ul className="mt-1 border-t border-border/40 pt-1 text-[0.65rem] leading-relaxed text-destructive">
-          {clip.warnings.map((warning) => (
-            <li key={warning}>{warning}</li>
+          {/* Warnings may read alike: two overlapping videos can share a filename. */}
+          {clip.warnings.map((warning, index) => (
+            <li key={index}>{warning}</li>
           ))}
         </ul>
       )}

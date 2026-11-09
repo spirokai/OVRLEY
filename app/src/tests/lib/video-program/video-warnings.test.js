@@ -40,6 +40,21 @@ describe('deriveVideoWarnings', () => {
     })
   })
 
+  test('a clip overlapping two videos of one filename warns about each', () => {
+    const warnings = warningsFor(
+      [
+        createTestVideo({ id: 'long', path: '/videos/long.mp4', durationSeconds: 60 }),
+        createTestVideo({ id: 'day1', path: '/day1/ride.mp4', durationSeconds: 20, importOrder: 1 }),
+        createTestVideo({ id: 'day2', path: '/day2/ride.mp4', durationSeconds: 20, importOrder: 2 }),
+      ],
+      { long: 0, day1: 10, day2: 40 },
+    )
+    expect(warnings.long).toEqual([
+      { kind: 'overlap', params: { name: 'ride.mp4' } },
+      { kind: 'overlap', params: { name: 'ride.mp4' } },
+    ])
+  })
+
   test('warns when a clip without a sync warning starts more than an hour before or after the activity', () => {
     const far = { kind: 'far', params: {} }
     const clip = (id, importOrder) => createTestVideo({ id, path: `/videos/${id}.mp4`, durationSeconds: 0.5, importOrder })
