@@ -107,13 +107,15 @@ pub(crate) fn validate_batch_encoding(
 /// The source window of one piece on its source's exact frame grid.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct PieceWindow {
+    /// Source frames `[start_frame, end_frame)`.
+    pub start_frame: u64,
+    pub end_frame: u64,
     /// Start on the video's own clock (its first frame at zero), which widget timing uses.
     pub trim_start: f64,
     /// Start on the file's clock, which FFmpeg's seeks and trims of the source's
     /// video and audio use (see `SourceVideoMetadata::file_seconds`).
     pub file_start: f64,
     pub duration: f64,
-    frame_count: u64,
 }
 
 fn source_fps(source: &InspectedVideoSource) -> CoreResult<Fps> {
@@ -148,10 +150,11 @@ fn frame_window(
         fps.seconds_at_frame(end_frame)
     };
     Ok(PieceWindow {
+        start_frame,
+        end_frame,
         trim_start,
         file_start: source.metadata.file_seconds(trim_start),
         duration: end - trim_start,
-        frame_count: end_frame - start_frame,
     })
 }
 
@@ -267,9 +270,6 @@ pub(crate) struct ValidatedBatchTemplate {
 /// One piece of a planned output: a window of one source.
 pub(crate) struct PlannedPiece {
     pub source: std::sync::Arc<InspectedVideoSource>,
-    /// Source frames `[start_frame, end_frame)`.
-    pub start_frame: u64,
-    pub end_frame: u64,
     pub window: PieceWindow,
     /// Output frames of this piece.
     pub frames: u32,
@@ -342,7 +342,7 @@ impl ValidatedBatchEncoding {
     /// use the same exact frame-count rules.
     fn window_output_frames(&self, window: PieceWindow) -> CoreResult<u32> {
         let frames = match self.codec {
-            CodecSelection::Composite(_) => window.frame_count,
+            CodecSelection::Composite(_) => window.end_frame - window.start_frame,
             CodecSelection::Transparent(_) => {
                 let layout = self.layout_fps.frame_count_for_duration(window.duration)?;
                 u64::from(FrameProductionPlan::decimated(layout, self.update_rate)?.count())
@@ -411,8 +411,6 @@ impl ValidatedBatchEncoding {
                         let window = frame_window(&source, piece.start_frame, piece.end_frame)?;
                         Ok(PlannedPiece {
                             source,
-                            start_frame: piece.start_frame,
-                            end_frame: piece.end_frame,
                             window,
                             frames: self.window_output_frames(window)?,
                             skip_overlay: piece.skip_overlay,
@@ -558,12 +556,13 @@ impl ValidatedBatchEncoding {
                 });
                 continue;
             }
-            let body_start = piece.start_frame + incoming;
-            let body_end = piece.end_frame - outgoing;
+            let (first, last) = (piece.window.start_frame, piece.window.end_frame);
+            let body_start = first + incoming;
+            let body_end = last - outgoing;
             for (role, start_frame, end_frame) in [
-                (SegmentRole::Head, piece.start_frame, body_start),
+                (SegmentRole::Head, first, body_start),
                 (SegmentRole::Body, body_start, body_end),
-                (SegmentRole::Tail, body_end, piece.end_frame),
+                (SegmentRole::Tail, body_end, last),
             ] {
                 if start_frame == end_frame {
                     continue;
