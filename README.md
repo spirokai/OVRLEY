@@ -8,7 +8,7 @@
   <img src="docs/hero.avif" alt="OVRLEY Dashboard Interface" width="100%" />
   <img src="docs/hero2.avif" alt="OVRLEY Dashboard Interface" width="100%" />
   <img src="docs/widgets-showcase.avif" alt="OVRLEY Widget Showcase" width="100%" />
-  <img src="docs/maps-showcase-1200.avif" alt="OVRLEY Gauge Showcase" width="100%" />
+  <img src="docs/maps-showcase.avif" alt="OVRLEY Gauge Showcase" width="100%" />
 </div>
 
 <br />
