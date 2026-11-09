@@ -156,13 +156,8 @@ describe('adding videos', () => {
     expect(state.videoEdits.first.placementAnchor).toBeNull()
   })
 
-  test('rejects an empty addition and paths already in the collection', () => {
-    const state = apply(collection(), addVideos, [clip('a')])
-    expect(() => apply(state, addVideos, [])).toThrow('At least one video')
-    expect(() => apply(state, addVideos, [clip('b', { path: '/videos/a.mp4', importOrder: 1 })])).toThrow('already imported')
-    expect(() => apply(state, addVideos, [clip('c', { importOrder: 1 }), clip('d', { path: '/videos/c.mp4', importOrder: 2 })])).toThrow(
-      'already imported',
-    )
+  test('rejects an empty addition', () => {
+    expect(() => apply(collection(), addVideos, [])).toThrow('At least one video')
   })
 })
 

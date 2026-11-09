@@ -113,15 +113,13 @@ function placeLikeTheCollection(draft, videoIds) {
  * clips are placed like the collection (see `placeLikeTheCollection`). A new clip
  * whose time cannot be determined goes after the last placed clip.
  * @param {object} draft Collection draft.
- * @param {Array<object>} videos Imported video entities with paths not yet in the collection.
+ * @param {Array<object>} videos Imported video entities with paths not yet in the collection (the import review
+ *   turns away the others).
  * @returns {Array<string>} IDs of added clips whose time could not be determined, in input order.
  */
 export function addVideos(draft, videos) {
   if (videos.length === 0) throw new Error('At least one video is required')
-  const paths = new Set(draft.importedVideos.map((video) => video.path))
   for (const video of videos) {
-    if (paths.has(video.path)) throw new Error(`Video is already imported: ${video.path}`)
-    paths.add(video.path)
     draft.importedVideos.push(video)
     draft.videoEdits[video.id] = createVideoEdits()
   }
