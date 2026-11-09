@@ -16,11 +16,9 @@ use super::catalog::{CompositeCodecId, CompositeFilterStackKind};
 use super::composite::derive_composite_input_window;
 use super::composite_filters::format_seconds_arg;
 use super::composite_profiles::composite_profile;
+use super::transitions::{acrossfade_filter, blended_audio_chain, xfade_filter};
 use crate::encode::fps::Fps;
 use crate::encode::quality::{rate_control_args, EncodingQuality};
-
-/// Every audio piece is resampled to this rate and stereo before joining.
-const JOINED_AUDIO_SAMPLE_RATE: u32 = 48_000;
 
 /// The rendered segments of one output and how to join them.
 #[derive(Clone, Debug, PartialEq)]
@@ -210,8 +208,8 @@ pub fn transition_segment_args(
     args.extend([
         "-filter_complex".into(),
         format!(
-            "[0:v][1:v]xfade=transition={name}:duration={}:offset=0,{}[out]",
-            format_seconds_arg(*duration),
+            "[0:v][1:v]{},{}[out]",
+            xfade_filter(name, *duration),
             encoding.output_filter
         ),
         "-map".into(),
@@ -339,23 +337,16 @@ pub fn audio_graph(audio: &AssemblyAudio) -> String {
     let mut input = 0;
     let mut chains = Vec::with_capacity(2 * audio.pieces.len());
     for (index, piece) in audio.pieces.iter().enumerate() {
-        let duration = format_seconds_arg(piece.duration);
-        chains.push(match &piece.source {
-            Some(_) => {
-                input += 1;
-                let window = derive_composite_input_window(piece.trim_start);
-                format!(
-                    "[{input}:a]atrim=start={}:duration={duration},asetpts=N/SR/TB,\
-                     aresample={JOINED_AUDIO_SAMPLE_RATE},\
-                     aformat=sample_fmts=fltp:channel_layouts=stereo,\
-                     apad=whole_dur={duration}[a{index}]",
-                    format_seconds_arg(window.filter_start),
-                )
-            }
-            None => format!(
-                "anullsrc=r={JOINED_AUDIO_SAMPLE_RATE}:cl=stereo,atrim=duration={duration}[a{index}]"
-            ),
+        let source_input = piece.source.as_ref().map(|_| {
+            input += 1;
+            input
         });
+        chains.push(blended_audio_chain(
+            source_input,
+            derive_composite_input_window(piece.trim_start).filter_start,
+            piece.duration,
+            &format!("a{index}"),
+        ));
     }
     let last = audio.crossfades.len();
     let mut joined = "a0".to_string();
@@ -367,9 +358,9 @@ pub fn audio_graph(audio: &AssemblyAudio) -> String {
         };
         chains.push(if *crossfade > 0.0 {
             format!(
-                "[{joined}][a{}]acrossfade=d={}:c1=tri:c2=tri[{next}]",
+                "[{joined}][a{}]{}[{next}]",
                 index + 1,
-                format_seconds_arg(*crossfade)
+                acrossfade_filter(*crossfade)
             )
         } else {
             format!("[{joined}][a{}]concat=n=2:v=0:a=1[{next}]", index + 1)

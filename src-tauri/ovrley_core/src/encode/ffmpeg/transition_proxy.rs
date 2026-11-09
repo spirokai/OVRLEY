@@ -12,13 +12,14 @@ use serde::Deserialize;
 use super::binary::resolve_ffmpeg_binary;
 use super::composite_filters::format_seconds_arg;
 use super::process::run;
-use super::transitions::is_xfade_transition;
+use super::transitions::{
+    acrossfade_filter, blended_audio_chain, is_xfade_transition, xfade_filter,
+};
 use crate::encode::fps::Fps;
 use crate::error::{CoreError, CoreResult};
 use crate::paths::AppPaths;
 
 const PROXY_DIRECTORY: &str = "transition-proxies";
-const PROXY_SAMPLE_RATE: u32 = 48_000;
 /// A keyframe every few frames keeps seeking inside the proxy immediate.
 const PROXY_GOP_FRAMES: u32 = 10;
 /// Proxy files of a session; the directory is cleared at startup.
@@ -97,26 +98,25 @@ pub fn transition_proxy_args(request: &TransitionProxyRequest, output: &Path) ->
             request.fps_num, request.fps_den
         )
     };
+    // Each input is already cut to the window by `-ss`/`-t`.
     let audio = |input: usize, source: &TransitionProxySource| {
-        if source.has_audio {
-            format!(
-                "[{input}:a]aresample={PROXY_SAMPLE_RATE},aformat=sample_fmts=fltp:channel_layouts=stereo,\
-                 apad=whole_dur={duration},atrim=duration={duration},asetpts=N/SR/TB[a{input}]"
-            )
-        } else {
-            format!("anullsrc=r={PROXY_SAMPLE_RATE}:cl=stereo,atrim=duration={duration}[a{input}]")
-        }
+        blended_audio_chain(
+            source.has_audio.then_some(input),
+            0.0,
+            request.duration_seconds,
+            &format!("a{input}"),
+        )
     };
     let graph = [
         video(0),
         video(1),
         format!(
-            "[v0][v1]xfade=transition={}:duration={duration}:offset=0[v]",
-            request.transition
+            "[v0][v1]{}[v]",
+            xfade_filter(&request.transition, request.duration_seconds)
         ),
         audio(0, &request.outgoing),
         audio(1, &request.incoming),
-        format!("[a0][a1]acrossfade=d={duration}:c1=tri:c2=tri[a]"),
+        format!("[a0][a1]{}[a]", acrossfade_filter(request.duration_seconds)),
     ]
     .join(";");
     let mut args: Vec<String> = ["-loglevel", "error", "-nostdin"]
@@ -258,7 +258,7 @@ mod tests {
              [0:v]fps=30000/1001,scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[v0];\
              [1:v]fps=30000/1001,scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[v1];\
              [v0][v1]xfade=transition=wipeleft:duration=1.5:offset=0[v];\
-             [0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad=whole_dur=1.5,atrim=duration=1.5,asetpts=N/SR/TB[a0];\
+             [0:a]atrim=start=0:duration=1.5,asetpts=N/SR/TB,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad=whole_dur=1.5[a0];\
              anullsrc=r=48000:cl=stereo,atrim=duration=1.5[a1];\
              [a0][a1]acrossfade=d=1.5:c1=tri:c2=tri[a] \
              -map [v] -map [a] -c:v libx264 -preset ultrafast -crf 26 -g 10 -c:a aac -b:a 128k -movflags faststart -y /tmp/p.mp4"

@@ -93,11 +93,8 @@ pub(crate) enum PipelineKind {
 }
 
 impl PipelineKind {
-    fn ffmpeg_label(self) -> &'static str {
-        match self {
-            Self::Transparent => "transparent ffmpeg",
-            Self::Composite => "composite ffmpeg",
-        }
+    fn ffmpeg_label(self) -> String {
+        format!("{self} ffmpeg")
     }
 }
 
@@ -219,7 +216,7 @@ impl Drop for PipelineProcesses {
             ));
         }
         let pipeline = self.pipeline;
-        if let Err(error) = terminate(&mut self.child, pipeline.ffmpeg_label()) {
+        if let Err(error) = terminate(&mut self.child, &pipeline.ffmpeg_label()) {
             log::warn!("Could not stop {pipeline} ffmpeg during pipeline cleanup: {error}");
         }
         if let Some(writer) = self.writer.take() {
@@ -281,7 +278,7 @@ impl PipelineProcesses {
                 self.shutdown.signal_failure(error);
                 // A polling failure must not leave the stderr reader waiting
                 // on a live child. Retain ownership through forced teardown.
-                terminate(&mut self.child, self.pipeline.ffmpeg_label())?
+                terminate(&mut self.child, &self.pipeline.ffmpeg_label())?
             }
         };
         if let Err(error) = join_shutdown_thread(
@@ -332,7 +329,7 @@ fn unblock_stalled_writer<T>(
     let deadline = Instant::now() + WRITER_DRAIN_TIMEOUT;
     while !writer.is_finished() && Instant::now() < deadline {
         if shutdown.is_stopped() {
-            let _ = terminate(child, pipeline.ffmpeg_label())?;
+            let _ = terminate(child, &pipeline.ffmpeg_label())?;
             if wait_for_thread(writer, TERMINATE_TIMEOUT) {
                 return Ok(());
             }
@@ -346,7 +343,7 @@ fn unblock_stalled_writer<T>(
         return Ok(());
     }
 
-    let _ = terminate(child, pipeline.ffmpeg_label())?;
+    let _ = terminate(child, &pipeline.ffmpeg_label())?;
     if wait_for_thread(writer, TERMINATE_TIMEOUT) {
         return Err(CoreError::Encode(format!(
             "{pipeline} ffmpeg did not drain stdin within {} seconds and was terminated",
@@ -373,7 +370,7 @@ fn wait_for_ffmpeg(
             return Ok(status);
         }
         if shutdown.is_stopped() {
-            return terminate(child, pipeline.ffmpeg_label());
+            return terminate(child, &pipeline.ffmpeg_label());
         }
         if Instant::now() >= deadline {
             break;
@@ -381,7 +378,7 @@ fn wait_for_ffmpeg(
         thread::sleep(POLL_INTERVAL);
     }
 
-    let _ = terminate(child, pipeline.ffmpeg_label())?;
+    let _ = terminate(child, &pipeline.ffmpeg_label())?;
     Err(CoreError::Encode(format!(
         "{pipeline} ffmpeg did not finalize within {} seconds and was terminated",
         FFMPEG_FINALIZE_TIMEOUT.as_secs()
