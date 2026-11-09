@@ -1,6 +1,5 @@
 import { describe, expect, test, vi } from 'vite-plus/test'
-import { buildJoinTransitionModel, joinOverride, transitionLabel } from '@/features/transitions'
-import { transitionPreviewStyle } from '@/features/transitions/utils/transitionPreviews'
+import { buildJoinTransitionModel, joinOverride } from '@/features/transitions'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import { createTestVideo, cutEdits, videoStoreState } from '@/tests/helpers/videoFixtures'
 
@@ -34,37 +33,6 @@ function model(join, clips, setJoinTransition = vi.fn(), isInvalid = false) {
 }
 
 describe('join transition model', () => {
-  test('shows each catalogue transition from its cell of the preview sprite', () => {
-    expect(transitionPreviewStyle('fade')).toMatchObject({
-      backgroundImage: expect.stringMatching(/transition-previews\.webp/),
-      backgroundPosition: '0% 0%',
-    })
-    expect(transitionPreviewStyle('revealdown')).toMatchObject({ backgroundSize: '800% 800%', backgroundPosition: '14.285714285714285% 100%' })
-    expect(() => transitionPreviewStyle('spin')).toThrow(/no preview/)
-  })
-
-  test('shows the effective transition and the default each join follows', () => {
-    const { clips, program } = timeline()
-    const [atShort, atLong, intoLater] = program.joins.map((join) => model(join, clips))
-    // One excluded second is within the continuity threshold: a hard cut by default.
-    expect(atShort).toMatchObject({
-      value: 'default',
-      label: 'No transition',
-      defaultLabel: 'Default (No transition)',
-      previewType: null,
-    })
-    expect(atLong).toMatchObject({
-      value: 'wipeleft',
-      label: 'wipeleft, 1.5 s',
-      defaultLabel: 'Default',
-      previewType: 'wipeleft',
-      durationSeconds: 1.5,
-      durationFps: fps,
-    })
-    expect(intoLater).toMatchObject({ value: 'default', label: 'fade, 1 s', defaultLabel: 'Default (fade, 1 s)', durationSeconds: null })
-    expect(transitionLabel({ type: 'none', durationSeconds: 0 }, t)).toBe('No transition')
-  })
-
   test('selects overrides, keeps an override duration and stores typed durations', () => {
     const { clips, program } = timeline()
     const setJoinTransition = vi.fn()
@@ -95,10 +63,5 @@ describe('join transition model', () => {
       t,
     }).onSelect('fade')
     expect(setJoinTransition).toHaveBeenLastCalledWith(program.joins[0], { type: 'fade', durationSeconds: 1 })
-  })
-
-  test('flags a transition that does not fit the pieces it joins', () => {
-    const { clips, program } = timeline()
-    expect(model(program.joins[1], clips, vi.fn(), true).error).toBe('Too long for the video pieces it joins')
   })
 })

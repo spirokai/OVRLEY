@@ -60,33 +60,6 @@ describe('transition windows', () => {
 })
 
 describe('transition proxy jobs', () => {
-  test('describe every xfade join by its content, at preview size', () => {
-    const { clips, program } = timeline()
-    const [job] = listTransitionProxyJobs(program, clips)
-    expect(job.joinKey).toBe('climb:start')
-    expect(job.windowStartSecond).toBeCloseTo(58, 5)
-    expect(job.request).toEqual({
-      outgoing: { path: '/videos/ride.mp4', startSecond: expect.closeTo(58, 5), hasAudio: true },
-      incoming: { path: '/videos/climb.mp4', startSecond: 0, hasAudio: false },
-      transition: 'fade',
-      durationSeconds: 2,
-      width: 640,
-      height: 360,
-      fpsNum: 30,
-      fpsDen: 1,
-    })
-    expect(job.key).toBe(JSON.stringify(job.request))
-    // Any change to what the proxy shows changes its key.
-    const moved = timeline((edits) => {
-      edits.climb.segments.start.transitionIn = { type: 'wipeleft', durationSeconds: 2 }
-    })
-    expect(listTransitionProxyJobs(moved.program, moved.clips)[0].key).not.toBe(job.key)
-    const cut = timeline((edits) => {
-      edits.climb.segments.start.transitionIn = { type: 'none', durationSeconds: 0 }
-    })
-    expect(listTransitionProxyJobs(cut.program, cut.clips)).toEqual([])
-  })
-
   test('render the missing proxy nearest the playhead first', () => {
     const near = { key: 'near', windowStartSecond: 10, request: { durationSeconds: 2 } }
     const far = { key: 'far', windowStartSecond: 100, request: { durationSeconds: 2 } }

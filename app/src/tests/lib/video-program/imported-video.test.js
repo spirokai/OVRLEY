@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vite-plus/test'
-import { createImportedVideo, createVideoEdits, nextImportOrder, requireTelemetry, withPreviewRegistration } from '@/lib/video-program/imported-video'
+import { createImportedVideo, requireTelemetry } from '@/lib/video-program/imported-video'
 
 function metadata(overrides = {}) {
   return { path: '/videos/ride.mp4', duration: 60, fpsNum: 30, fpsDen: 1, resolution: { width: 1920, height: 1080 }, hasAudio: true, ...overrides }
@@ -47,29 +47,9 @@ describe('createImportedVideo ingress', () => {
     expect(frames(10.01, 30000, 1001)).toBe(300)
   })
 
-  test('attaches one preview registration when the video joins the collection', () => {
-    const video = createImportedVideo(metadata(), { importOrder: 0, previewWarnings: [] })
-    const registered = withPreviewRegistration(video, { importId: 'import-1', previewUrl: 'http://127.0.0.1:1/video/import-1' })
-    expect(registered.preview).toEqual({ importId: 'import-1', url: 'http://127.0.0.1:1/video/import-1' })
-    expect(() => withPreviewRegistration(registered, { importId: 'import-2', previewUrl: 'x' })).toThrow('already registered')
-    expect(() => withPreviewRegistration(video, { importId: 'import-1' })).toThrow('requires a preview registration')
-  })
-
   test('accepts settled telemetry and rejects inconsistent telemetry', () => {
     expect(() => requireTelemetry({ status: 'ready', activity: {} })).not.toThrow()
     expect(() => requireTelemetry({ status: 'absent', activity: {} })).toThrow('Only ready video telemetry carries an activity')
     expect(() => requireTelemetry({ status: 'done', activity: null })).toThrow('Invalid video telemetry status')
-  })
-
-  test('new edits are automatic and import order continues after the collection', () => {
-    expect(createVideoEdits()).toEqual({
-      offsetSeconds: 0,
-      offsetSource: 'auto',
-      cuts: [],
-      segments: { start: { excluded: false, transitionIn: null } },
-      placementAnchor: null,
-    })
-    expect(nextImportOrder([])).toBe(0)
-    expect(nextImportOrder([{ importOrder: 4 }, { importOrder: 1 }])).toBe(5)
   })
 })

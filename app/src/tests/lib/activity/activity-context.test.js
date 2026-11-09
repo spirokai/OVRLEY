@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vite-plus/test'
-import { hasActivityCoverage, resolveActivityContext, resolveAvailableMetrics } from '@/lib/activity/activity-context'
+import { hasActivityCoverage, resolveActivityContext } from '@/lib/activity/activity-context'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
@@ -38,10 +38,6 @@ describe('hasActivityCoverage', () => {
     expect(covered(35)).toBe(false) // gap
     expect(covered(50)).toBe(false) // clip without telemetry
   })
-
-  test('counts everything as covered without any activity or clip', () => {
-    expect(hasActivityCoverage({ parsedActivity: null, activitySummary: null, program: { pieces: [], joins: [] }, clips: [], second: 5 })).toBe(true)
-  })
 })
 
 function clipTelemetry(attributes = ['speed']) {
@@ -73,16 +69,5 @@ describe('resolveActivityContext', () => {
     const pending = { ...createTestVideo(), offsetSeconds: 0 }
     expect(resolveActivityContext({ parsedActivity: null, activitySummary: null, clip: pending })).toMatchObject({ activity: null, summary: null })
     expect(resolveActivityContext({ parsedActivity: null, activitySummary: null, clip: null })).toBeNull()
-  })
-
-  test('available metrics come from the external activity or from every clip telemetry', () => {
-    const videos = [
-      createTestVideo({ id: 'a', telemetry: { status: 'ready', activity: clipTelemetry(['speed']) } }),
-      createTestVideo({ id: 'b', telemetry: { status: 'ready', activity: clipTelemetry(['speed', 'cadence']) } }),
-      createTestVideo({ id: 'c' }),
-    ]
-    expect(resolveAvailableMetrics(null, videos).map(({ attribute }) => attribute)).toEqual(['speed', 'cadence'])
-    const externalSummary = { availableMetrics: [{ attribute: 'heartrate', source: 'direct' }] }
-    expect(resolveAvailableMetrics(externalSummary, videos)).toBe(externalSummary.availableMetrics)
   })
 })

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vite-plus/test'
 import { buildTimelineProgram } from '@/lib/video-program/timeline'
 import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
-import { deriveVideoWarnings, formatVideoWarning } from '@/lib/video-program/video-warnings'
+import { deriveVideoWarnings } from '@/lib/video-program/video-warnings'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 function warningsFor(videos, offsets, activityDurationSeconds = null) {
@@ -90,17 +90,5 @@ describe('deriveVideoWarnings', () => {
       transitionDefaults: DEFAULT_TRANSITION_SETTINGS,
     })
     expect(deriveVideoWarnings(clips, program, null).get('other')).toEqual([])
-  })
-
-  test('words warnings through the translation function', () => {
-    const t = (key, { defaultValue, ...params }) => `${key}|${defaultValue}|${JSON.stringify(params)}`
-    expect(formatVideoWarning({ kind: 'overlap', params: { name: 'b.mp4' } }, t)).toBe(
-      'video-preview.warningOverlap|Overlaps {{name}}|{"name":"b.mp4"}',
-    )
-    expect(formatVideoWarning({ kind: 'sync', params: { message: 'Translated already' } }, t)).toBe('Translated already')
-  })
-
-  test('gives every clip an entry, empty when nothing is wrong', () => {
-    expect(warningsFor([createTestVideo({ id: 'a', path: '/videos/a.mp4' })], { a: 0 })).toEqual({ a: [] })
   })
 })

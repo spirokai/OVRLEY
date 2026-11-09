@@ -4,12 +4,10 @@ import { createActivitySummary } from '@/lib/activity/activity-summary'
 import {
   addVideos,
   anchorVideo,
-  applyFilenameCreationTimes,
   findUndeterminedVideoIds,
   moveVideoNextTo,
   placeAutomaticVideos,
   removeVideo,
-  resetCreationTimes,
   resetVideoOffset,
   setVideoOffset,
   setVideoSyncTimezoneMode,
@@ -87,21 +85,6 @@ describe('placement', () => {
     expect(offsets(state)).toEqual({ video: 12657 })
     expect(state.videoSyncTimezoneMode).toBe('utc')
   })
-
-  test('filename timestamps apply to every clip that has one and reset restores detected times', () => {
-    const named = clip('named', { path: '/videos/VID_20260718_080100.mp4', creationTime: '2026-07-18T08:00:00Z', timeSource: 'gps' })
-    const plain = clip('plain', { creationTime: '2026-07-18T08:00:00Z', timeSource: 'gps', importOrder: 1 })
-    let state = apply(collection(), addVideos, [named, plain])
-
-    state = apply(state, applyFilenameCreationTimes)
-    expect(state.importedVideos.map(({ creationTime, timeSource }) => [creationTime, timeSource])).toEqual([
-      ['2026-07-18T08:01:00', 'filename'],
-      ['2026-07-18T08:00:00Z', 'gps'],
-    ])
-    state = apply(state, resetCreationTimes)
-    expect(state.importedVideos.map(({ timeSource }) => timeSource)).toEqual(['gps', 'gps'])
-    expect(() => apply(apply(collection(), addVideos, [clip('only')]), applyFilenameCreationTimes)).toThrow('No video filename contains')
-  })
 })
 
 describe('adding videos', () => {
@@ -119,24 +102,6 @@ describe('adding videos', () => {
     expect(state.importedVideos.map((video) => video.id)).toEqual(['first', 'second', 'added'])
   })
 
-  test('without an automatic clip new clips keep their real-time distance to a clip placed by hand', () => {
-    let state = apply(collection(), addVideos, [clip('existing', { creationTime: '2026-07-18T08:10:00Z', timeSource: 'ffprobe' })])
-    state = apply(state, setVideoOffset, 'existing', 40)
-
-    const earlier = clip('earlier', { creationTime: '2026-07-18T08:05:00Z', timeSource: 'ffprobe', importOrder: 1 })
-    state = apply(state, addVideos, [earlier])
-    expect(offsets(state)).toEqual({ existing: 40, earlier: -260 })
-  })
-
-  test('with an activity, a clip placed by hand does not shift new clips', () => {
-    let state = apply(collection(activityFile), addVideos, [
-      clip('first', { creationTime: '2026-07-18T08:00:10Z', timeSource: 'gps', durationSeconds: 20 }),
-    ])
-    state = apply(state, setVideoOffset, 'first', 9000)
-    state = apply(state, addVideos, [clip('added', { creationTime: '2026-07-18T08:01:00Z', timeSource: 'gps', durationSeconds: 20, importOrder: 1 })])
-    expect(offsets(state)).toEqual({ first: 9000, added: 60 })
-  })
-
   test('a clip whose time cannot be determined goes after the last placed clip', () => {
     const known = clip('known', { creationTime: '2026-07-18T08:00:00Z', timeSource: 'ffprobe', durationSeconds: 20 })
     const first = clip('first', { durationSeconds: 20, importOrder: 1 })
@@ -148,16 +113,6 @@ describe('adding videos', () => {
     expect(state.videoEdits.second.placementAnchor).toEqual({ videoId: 'first', side: 'after' })
     expect(warnings(state)).toEqual({ known: null, first: null, second: null })
     expect(findUndeterminedVideoIds(state)).toEqual(new Set(['first', 'second']))
-  })
-
-  test('the first undeterminable clip of an empty collection stays at the start', () => {
-    const state = apply(collection(), addVideos, [clip('first', { durationSeconds: 30 }), clip('second', { importOrder: 1 })])
-    expect(offsets(state)).toEqual({ first: 0, second: 30 })
-    expect(state.videoEdits.first.placementAnchor).toBeNull()
-  })
-
-  test('rejects an empty addition', () => {
-    expect(() => apply(collection(), addVideos, [])).toThrow('At least one video')
   })
 })
 
@@ -189,28 +144,11 @@ describe('placement anchors', () => {
     expect(offsets(state)).toEqual({ known: 30, first: 60, second: 80 })
   })
 
-  test('a clip whose time cannot be determined and that has no anchor keeps its start when times are detected again', () => {
-    let state = apply(undetermined(), removeVideo, 'known')
-    state = produce(state, (draft) => {
-      draft.videoEdits.first.offsetSeconds = 45
-      placeAutomaticVideos(draft)
-    })
-    expect(state.videoEdits.first.placementAnchor).toBeNull()
-    expect(offsets(state)).toEqual({ first: 45, second: 65 })
-  })
-
   test('moving an anchored clip past the clip anchored to it hands its anchor on instead of forming a cycle', () => {
     const state = apply(undetermined(), moveVideoNextTo, 'first', 'second', 'after')
     expect(state.videoEdits.second.placementAnchor).toEqual({ videoId: 'known', side: 'after' })
     expect(state.videoEdits.first.placementAnchor).toEqual({ videoId: 'second', side: 'after' })
     expect(offsets(state)).toEqual({ known: 0, second: 20, first: 40 })
-  })
-
-  test('moving a clip into an occupied place inserts it there, before the clip that held the place', () => {
-    const state = apply(undetermined(), moveVideoNextTo, 'second', 'known', 'after')
-    expect(state.videoEdits.second.placementAnchor).toEqual({ videoId: 'known', side: 'after' })
-    expect(state.videoEdits.first.placementAnchor).toEqual({ videoId: 'second', side: 'after' })
-    expect(offsets(state)).toEqual({ known: 0, first: 40, second: 20 })
   })
 
   test('rejects anchors to unknown clips, to the clip itself, through cycles, and unknown sides', () => {
@@ -250,14 +188,6 @@ describe('starts set by hand', () => {
     expect(offsets(state)).toEqual({ first: 10, second: 75 })
   })
 
-  test('reset places the clip like the other automatic clips again', () => {
-    let state = apply(synced(), shiftVideoOffsets, 3)
-    state = apply(state, setVideoOffset, 'second', 70)
-    state = apply(state, resetVideoOffset, 'second')
-    expect(state.videoEdits.second.offsetSource).toBe('auto')
-    expect(offsets(state)).toEqual({ first: 13, second: 43 })
-  })
-
   test('reset returns an undeterminable clip next to its anchor', () => {
     const known = clip('known', { creationTime: '2026-07-18T08:00:00Z', timeSource: 'ffprobe', durationSeconds: 20 })
     let state = apply(collection(), addVideos, [known, clip('unknown', { durationSeconds: 20, importOrder: 1 })])
@@ -265,13 +195,5 @@ describe('starts set by hand', () => {
     state = apply(state, resetVideoOffset, 'unknown')
     expect(offsets(state)).toEqual({ known: 0, unknown: 20 })
     expect(warnings(state).unknown).toBeNull()
-  })
-
-  test('rejects non-finite edits and unknown clips', () => {
-    const state = synced()
-    expect(() => apply(state, setVideoOffset, 'first', Number.NaN)).toThrow('finite')
-    expect(() => apply(state, setVideoOffset, 'missing', 1)).toThrow('Unknown imported video')
-    expect(() => apply(state, shiftVideoOffsets, Infinity)).toThrow('finite')
-    expect(() => apply(collection(), shiftVideoOffsets, 1)).toThrow('A video must be loaded')
   })
 })

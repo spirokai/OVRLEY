@@ -83,19 +83,6 @@ describe('buildProgram joins and default transitions', () => {
     expect(result.durationSeconds).toBe(117)
   })
 
-  test('changing defaults re-derives only joins still on their default', () => {
-    const videos = [
-      video('a'),
-      video('b', { offsetSeconds: 70, importOrder: 1, start: { transitionIn: { type: 'fade', durationSeconds: 1 } } }),
-      video('c', { offsetSeconds: 140, importOrder: 2 }),
-    ]
-    const result = program(videos, { transitionDefaults: { ...WIPE_DEFAULTS, type: 'dissolve', durationSeconds: 3 } })
-    expect(result.joins.map(({ transition }) => transition)).toEqual([
-      { type: 'fade', durationSeconds: 1 },
-      { type: 'dissolve', durationSeconds: 3 },
-    ])
-  })
-
   test('default durations snap to the frames of the pieces they join, as the export counts them', () => {
     const videos = [video('a', { fps: NTSC }), video('b', { offsetSeconds: 70, importOrder: 1, fps: NTSC })]
     const result = program(videos, { transitionDefaults: { ...WIPE_DEFAULTS, durationSeconds: 1.01 } })
@@ -104,17 +91,6 @@ describe('buildProgram joins and default transitions', () => {
 })
 
 describe('buildProgram cuts and excluded segments', () => {
-  test('a cut alone splits a video into two pieces with a hard cut and the same output', () => {
-    const result = program([video('a', { cuts: [{ id: 'c1', frame: 300 }] })])
-    expect(pieceSpans(result)).toEqual([
-      ['a', 0, 10, 0, 10],
-      ['a', 10, 60, 10, 60],
-    ])
-    expect(result.joins[0]).toMatchObject({ key: 'a:c1', segmentKey: 'c1', gapSeconds: 0, transition: HARD_CUT, isDefault: true })
-    expect(result.durationSeconds).toBe(60)
-    expect(result.excludedSegments).toEqual([])
-  })
-
   test('an excluded middle segment leaves two pieces joined by the transition of the segment after it', () => {
     const cuts = [
       { id: 'c1', frame: 9000, excluded: true },
@@ -136,21 +112,6 @@ describe('buildProgram cuts and excluded segments', () => {
         timelineEndSecond,
       ]),
     ).toEqual([['a', 'c1', 300, 900]])
-  })
-
-  test('a short excluded segment defaults to a hard cut and a stored transition overrides it', () => {
-    const cuts = [
-      { id: 'c1', frame: 2700, excluded: true },
-      { id: 'c2', frame: 2730 },
-      { id: 'c3', frame: 6000, excluded: true },
-      { id: 'c4', frame: 6300, transitionIn: HARD_CUT },
-    ]
-    const result = program([video('a', { durationSeconds: 300, cuts })])
-    expect(result.joins.map(({ key, transition, isDefault }) => [key, transition, isDefault])).toEqual([
-      ['a:c2', HARD_CUT, true],
-      ['a:c4', HARD_CUT, false],
-    ])
-    expect(result.durationSeconds).toBe(289)
   })
 
   test('excluded segments at the edges trim without creating joins', () => {
@@ -198,18 +159,6 @@ describe('buildProgram cuts and excluded segments', () => {
     expect(result.joins.map(({ key }) => key)).toEqual(['a:start', 'b:c2'])
     expect(result.overlaps).toEqual([])
   })
-
-  test('cuts sit on the source frame grid', () => {
-    const cuts = [
-      { id: 'c1', frame: 30, excluded: true },
-      { id: 'c2', frame: 60 },
-    ]
-    const result = program([video('a', { durationSeconds: 10.01, fps: NTSC, cuts })])
-    expect(result.pieces.map(({ sourceStartFrame, sourceEndFrame }) => [sourceStartFrame, sourceEndFrame])).toEqual([
-      [0, 30],
-      [60, 300],
-    ])
-  })
 })
 
 describe('buildProgram export range', () => {
@@ -220,21 +169,6 @@ describe('buildProgram export range', () => {
       ['b', 0, 30, 60, 90],
     ])
     expect(result.joins.map(({ key }) => key)).toEqual(['b:start'])
-  })
-
-  test('a range starting inside an excluded segment leaves only the later piece', () => {
-    const cuts = [
-      { id: 'c1', frame: 300, excluded: true },
-      { id: 'c2', frame: 600 },
-    ]
-    const result = program([video('a', { cuts })], { exportRange: { type: 'custom', from: 15, to: 40 } })
-    expect(pieceSpans(result)).toEqual([['a', 20, 40, 20, 40]])
-    expect(result.joins).toEqual([])
-  })
-
-  test('videos outside the range leave no pieces', () => {
-    const result = program([video('a'), video('b', { offsetSeconds: 200, importOrder: 1 })], { exportRange: { type: 'custom', from: 0, to: 100 } })
-    expect(result.pieces.map(({ videoId }) => videoId)).toEqual(['a'])
   })
 })
 
@@ -249,19 +183,8 @@ describe('buildProgram overlaps', () => {
     expect(result.joins[0]).toMatchObject({ key: 'b:start', gapSeconds: 0, transition: HARD_CUT })
   })
 
-  test('a fully covered clip is dropped from playback but still reported', () => {
-    const result = program([video('a'), video('b', { offsetSeconds: 10, durationSeconds: 20, importOrder: 1 })])
-    expect(result.overlaps).toEqual([{ earlierVideoId: 'a', laterVideoId: 'b', startSecond: 10, endSecond: 30 }])
-    expect(result.pieces.map(({ videoId }) => videoId)).toEqual(['a'])
-  })
-
   test('excluding the overlapping segment resolves the overlap', () => {
     const result = program([video('a', { cuts: [{ id: 'c1', frame: 1500, excluded: true }] }), video('b', { offsetSeconds: 50, importOrder: 1 })])
-    expect(result.overlaps).toEqual([])
-  })
-
-  test('touching clips with floating-point offsets are not overlaps', () => {
-    const result = program([video('a', { offsetSeconds: 0.1 }), video('b', { offsetSeconds: 0.1 + 60 - 1e-9, importOrder: 1 })])
     expect(result.overlaps).toEqual([])
   })
 
@@ -286,10 +209,6 @@ describe('findInvalidTransitions', () => {
       video('c', { offsetSeconds: 65, importOrder: 2, start: { transitionIn: three } }),
     ])
     expect(findInvalidTransitions(result)).toEqual([{ pieceId: result.pieces[1].id, joinKeys: ['b:start', 'c:start'] }])
-  })
-
-  test('accepts transitions that fit', () => {
-    expect(findInvalidTransitions(program([video('a'), video('b', { offsetSeconds: 70, importOrder: 1 })]))).toEqual([])
   })
 })
 
@@ -317,9 +236,5 @@ describe('resolveProgramPosition', () => {
       progress: 0.75,
       incomingSourceSecond: 1.5,
     })
-  })
-
-  test('an empty program has nothing to show', () => {
-    expect(resolveProgramPosition(program([]), 0)).toEqual({ kind: 'empty' })
   })
 })

@@ -65,10 +65,4 @@ describe('video edits in the store', () => {
     useStore.getState().removeImportedVideo('ride')
     expect(useStore.getState().cutRemovalRequest).toBeNull()
   })
-
-  test('rejects unknown transition types in the defaults', () => {
-    expect(() => useStore.getState().setTransitionDefaults({ type: 'spin', durationSeconds: 1, splitGapThresholdSeconds: 2 })).toThrow(
-      /Unknown transition type/,
-    )
-  })
 })

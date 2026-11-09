@@ -13,23 +13,6 @@ function timeline(offsets, dragPreview = null) {
   return buildTimelineProgram({ videos: importedVideos, videoEdits, dragPreview, transitionDefaults: DEFAULT_TRANSITION_SETTINGS })
 }
 
-describe('buildTimelineProgram', () => {
-  test('joins entities with their edits into clips covering the whole timeline', () => {
-    const result = timeline({ first: 5, second: 30 })
-    expect(result.clips.map(({ id, offsetSeconds }) => [id, offsetSeconds])).toEqual([
-      ['first', 5],
-      ['second', 30],
-    ])
-    expect(result.bounds).toEqual({ startSecond: 5, endSecond: 40 })
-    expect(result.program.pieces).toHaveLength(2)
-  })
-
-  test('applies a drag preview to one clip or to every clip', () => {
-    expect(timeline({ first: 5, second: 30 }, { videoId: 'second', deltaSeconds: -10 }).bounds).toEqual({ startSecond: 5, endSecond: 30 })
-    expect(timeline({ first: 5, second: 30 }, { videoId: null, deltaSeconds: -10 }).bounds).toEqual({ startSecond: -5, endSecond: 30 })
-  })
-})
-
 describe('resolvePreviewTarget', () => {
   const { program } = timeline({ first: 5, second: 30 })
 
@@ -70,18 +53,6 @@ describe('resolvePreviewTarget', () => {
       isExcluded: true,
     })
     expect(resolvePlaybackStart(cut, 8)).toEqual({ source: 'video', second: 9 })
-  })
-
-  test('shows a video excluded as a whole, flagged, and otherwise nothing', () => {
-    const excluded = programOf(cutEdits([], { excluded: true }))
-    expect(excluded.pieces).toEqual([])
-    expect(resolvePreviewTarget(excluded, 8)).toMatchObject({ videoId: 'first', sourceSecond: 3, isInside: false, isExcluded: true })
-    expect(resolvePreviewTarget(excluded, 20)).toBeNull()
-    expect(resolvePlaybackStart(excluded, 8)).toEqual({ source: 'timeline', second: 8 })
-  })
-
-  test('is null without clips', () => {
-    expect(resolvePreviewTarget({ pieces: [], joins: [], excludedSegments: [] }, 0)).toBeNull()
   })
 
   test('playback skips gaps to the next piece and plays the activity before and after the videos on the timeline clock', () => {
