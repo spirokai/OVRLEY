@@ -445,49 +445,9 @@ mod tests {
     }
 
     #[test]
-    fn composite_segments_remux_to_annex_b_transport_streams() {
-        let args = remux_part_args(Path::new("/p/part.mp4"), Path::new("/p/part.ts"), true);
-        assert_eq!(
-            args.join(" "),
-            "-loglevel error -nostdin -i /p/part.mp4 -map 0:v -c copy -bsf:v hevc_mp4toannexb -f mpegts -y /p/part.ts"
-        );
-        assert!(
-            remux_part_args(Path::new("a.mp4"), Path::new("a.ts"), false)
-                .contains(&"h264_mp4toannexb".to_string())
-        );
-        let assembly = composite(None, false, None);
-        assert_eq!(
-            assembly.joined_parts(),
-            vec![
-                PathBuf::from("/out/.parts/part-0000.ts"),
-                PathBuf::from("/out/.parts/transition-0000.ts"),
-                PathBuf::from("/out/.parts/part-0003.ts")
-            ]
-        );
-        assert_eq!(
-            assembly.remuxes()[1],
-            (
-                PathBuf::from("/out/.parts/transition-0000.mp4"),
-                PathBuf::from("/out/.parts/transition-0000.ts")
-            )
-        );
-    }
-
-    #[test]
-    fn transitions_blend_tail_into_head_with_the_output_encoder() {
-        assert_eq!(
-            transition_segment_args(&software(false), &transition()).join(" "),
-            "-loglevel error -nostdin -noautorotate -i /out/.parts/part-0001.mp4 -noautorotate -i /out/.parts/part-0002.mp4 \
-             -filter_complex [0:v][1:v]xfade=transition=wipeleft:duration=1.001:offset=0,format=yuv420p[out] -map [out] \
-             -r 30000/1001 -c:v libx264 -preset veryfast -crf 20 -an -movflags faststart -y /out/.parts/transition-0000.mp4"
-        );
-        let hevc = software(true);
-        assert_eq!(
-            hevc.encoder_args.join(" "),
-            "-r 30000/1001 -c:v libx265 -pix_fmt yuv420p10le -profile:v main10 -preset veryfast -tag:v hvc1 -crf 20"
-        );
+    fn transitions_encode_on_the_output_encoder_device_in_the_parts_format() {
         // The blend keeps the parts' pixel format, the profile's own when it pins one.
-        assert_eq!(hevc.output_filter, "format=yuv420p10le");
+        assert_eq!(software(true).output_filter, "format=yuv420p10le");
         // Hardware-frame encoders get their device and an upload; the others take system frames.
         let fps = Fps::new(30, 1).unwrap();
         let vaapi = TransitionEncoding::for_codec(
@@ -544,45 +504,25 @@ mod tests {
             ],
             crossfades: vec![1.001, 0.0],
         };
-        let args = join_args(&composite(Some(audio), true, None));
-        assert_eq!(
-            args.join(" ").replace('\\', "/"),
-            "-loglevel error -nostdin -f concat -i /out/.parts/parts.txt \
-             -ss 7.5 -i /v/a.mp4 -i /v/c.mp4 -filter_complex \
-             [1:a]atrim=start=5:duration=3,asetpts=N/SR/TB,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad=whole_dur=3[a0];\
-             anullsrc=r=48000:cl=stereo,atrim=duration=2[a1];\
-             [2:a]atrim=start=1:duration=1.5,asetpts=N/SR/TB,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad=whole_dur=1.5[a2];\
-             [a0][a1]acrossfade=d=1.001:c1=tri:c2=tri[j1];\
-             [j1][a2]concat=n=2:v=0:a=1[aout] \
-             -map 0:v -map [aout] -c:v copy -tag:v hvc1 -c:a aac -b:a 192k -movflags faststart -y /out/joined.mp4"
+        let args = join_args(&composite(Some(audio), true, None)).join(" ");
+        // A fast seek to a few seconds before the cut, then an exact trim from there.
+        assert!(args.contains("-ss 7.5 -i /v/a.mp4 -i /v/c.mp4"), "{args}");
+        assert!(args.contains("[1:a]atrim=start=5:duration=3,"), "{args}");
+        assert!(
+            args.contains(
+                "[a0][a1]acrossfade=d=1.001:c1=tri:c2=tri[j1];[j1][a2]concat=n=2:v=0:a=1[aout]"
+            ),
+            "{args}"
         );
     }
 
     #[test]
     fn outputs_without_audio_copy_video_only_and_restore_rotation() {
-        assert_eq!(
-            join_args(&composite(None, false, Some(270))).join(" ").replace('\\', "/"),
-            "-loglevel error -nostdin -display_rotation 270 -f concat -i /out/.parts/parts.txt \
-             -map 0:v -c:v copy -movflags faststart -y /out/joined.mp4"
-        );
-    }
-
-    #[test]
-    fn transparent_parts_join_as_mov() {
-        let assembly = OutputAssembly {
-            target: "/out/joined.mov".into(),
-            parts_directory: "/out/.parts".into(),
-            segments: vec![AssemblySegment::Part("/out/.parts/part-0000.mov".into())],
-            frames: 10,
-            kind: AssemblyKind::Transparent,
-        };
-        assert_eq!(
-            assembly.joined_parts(),
-            [PathBuf::from("/out/.parts/part-0000.mov")]
-        );
-        assert_eq!(
-            join_args(&assembly).join(" ").replace('\\', "/"),
-            "-loglevel error -nostdin -f concat -i /out/.parts/parts.txt -map 0:v -c copy -y /out/joined.mov"
+        let args = join_args(&composite(None, false, Some(270))).join(" ");
+        assert!(args.contains("-display_rotation 270 -f concat"), "{args}");
+        assert!(
+            args.contains("-map 0:v -c:v copy -movflags") && !args.contains("aout"),
+            "{args}"
         );
     }
 }

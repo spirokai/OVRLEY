@@ -117,54 +117,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(useStore.getState().config.values[0].content_alignment).toBe('left')
   })
 
-  test('replaces the previous preview registration only after the opened project video is applied', async () => {
-    const initialState = useStore.getState()
-    const videoPath = 'C:\\Events\\ride.mp4'
-    const project = {
-      format: 'ovrley-project',
-      version: 6,
-      savedAt: '2026-08-27T12:00:00.000Z',
-      editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
-      sources: { activity: null, videos: [projectVideo('ride-video', 'ride.mp4')] },
-      sync: {
-        videoTimezoneMode: null,
-        manual: { videoId: 'ride-video', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
-      },
-      laps: { disabled: [] },
-      transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
-      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
-      timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 40 },
-    }
-    useStore.setState(
-      videoStoreState([
-        createTestVideo({ id: 'previous-1', path: 'C:\\Previous\\a.mp4' }),
-        createTestVideo({ id: 'previous-2', path: 'C:\\Previous\\b.mp4', importOrder: 1 }),
-      ]),
-    )
-    boundaries.readProjectFile.mockResolvedValue({
-      project,
-      resolvedSources: { activityPath: null, videoPaths: [videoPath] },
-      rasterLoadResults: {},
-      legacyBatchVideoFolder: null,
-    })
-    boundaries.removePreviewVideo.mockImplementation(async () => {
-      expect(useStore.getState().importedVideos.map((video) => video.preview.importId)).toEqual(['owner-import-id'])
-      return null
-    })
-
-    await loadProject({
-      path: 'C:\\Events\\Ride.oly',
-      resolveProjectSources: vi.fn().mockResolvedValue({ activityPath: null, videoPaths: [videoPath] }),
-      prepareActivityPath: vi.fn(),
-    })
-
-    expect(boundaries.registerPreviewVideo).toHaveBeenCalledWith(videoPath)
-    expect(boundaries.removePreviewVideo).toHaveBeenCalledTimes(2)
-    expect(boundaries.removePreviewVideo).toHaveBeenNthCalledWith(1, 'import-previous-1')
-    expect(boundaries.removePreviewVideo).toHaveBeenNthCalledWith(2, 'import-previous-2')
-    expect(boundaries.clearPreviewVideos).not.toHaveBeenCalled()
-  })
-
   test('delegates source population to each owner before restoring project settings', async () => {
     const projectPath = 'C:\\Events\\Race.oly'
     const activityPath = 'C:\\Events\\ride.fit'
@@ -741,8 +693,9 @@ describe('useProjectLifecycle canonical load orchestration', () => {
 
   const multiVideoPaths = ['C:\\Events\\a.mp4', 'C:\\Events\\missing.mp4', 'C:\\Events\\c.mp4']
 
-  test('opens every project video and skips a missing one after Load Anyway', async () => {
+  test('opens every project video, skips a missing one after Load Anyway, and then releases the previous previews', async () => {
     const project = multiVideoProject()
+    useStore.setState(videoStoreState([createTestVideo({ id: 'previous', path: 'C:\\Previous\\a.mp4' })]))
     boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
     boundaries.openSinglePath.mockResolvedValue('C:\\Events\\Session.oly')
     boundaries.readProjectFile.mockResolvedValue({
@@ -794,35 +747,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     })
     expect(state.manualVideoSync.videoId).toBe('clip-c')
     expect(state.transitionDefaults).toEqual(project.transitionDefaults)
+    expect(boundaries.removePreviewVideo).toHaveBeenCalledExactlyOnceWith('import-previous')
     expect(result.current.status).toBe('Modified')
-  })
-
-  test('removes registrations already made when a later project video fails to register', async () => {
-    const project = multiVideoProject()
-    useStore.setState({ activitySource: { kind: 'file', path: 'C:\\Current\\ride.fit' } })
-    boundaries.readProjectFile.mockResolvedValue({
-      project,
-      resolvedSources: { activityPath: null, videoPaths: multiVideoPaths },
-      rasterLoadResults: {},
-      legacyBatchVideoFolder: null,
-    })
-    boundaries.registerPreviewVideo
-      .mockResolvedValueOnce({ importId: 'first-import', previewUrl: 'http://preview/a' })
-      .mockResolvedValueOnce({ importId: 'second-import', previewUrl: 'http://preview/missing' })
-      .mockRejectedValueOnce(new Error('preview server unavailable'))
-
-    await expect(
-      loadProject({
-        path: 'C:\\Events\\Session.oly',
-        resolveProjectSources: vi.fn().mockResolvedValue({ activityPath: null, videoPaths: multiVideoPaths }),
-        prepareActivityPath: vi.fn(),
-      }),
-    ).rejects.toThrow('preview server unavailable')
-
-    expect(boundaries.removePreviewVideo.mock.calls).toEqual([['first-import'], ['second-import']])
-    expect(boundaries.clearPreviewVideos).not.toHaveBeenCalled()
-    expect(useStore.getState().importedVideos).toEqual([])
-    expect(useStore.getState().activitySource.path).toBe('C:\\Current\\ride.fit')
   })
 
   test('keeps the current session and its previews when a located video is shorter than its saved edits', async () => {

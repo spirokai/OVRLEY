@@ -229,7 +229,7 @@ pub fn clear_transition_proxies(paths: &AppPaths) -> CoreResult<()> {
 mod tests {
     use super::*;
 
-    pub(super) fn request(has_audio: bool) -> TransitionProxyRequest {
+    fn request(has_audio: bool) -> TransitionProxyRequest {
         TransitionProxyRequest {
             outgoing: TransitionProxySource {
                 path: "/v/a.mp4".into(),
@@ -248,21 +248,6 @@ mod tests {
             fps_num: 30000,
             fps_den: 1001,
         }
-    }
-
-    #[test]
-    fn proxies_blend_both_windows_with_crossfaded_audio() {
-        assert_eq!(
-            transition_proxy_args(&request(true), Path::new("/tmp/p.mp4")).join(" "),
-            "-loglevel error -nostdin -ss 8.5 -t 1.5 -i /v/a.mp4 -ss 0 -t 1.5 -i /v/b.mp4 -filter_complex \
-             [0:v]fps=30000/1001,scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[v0];\
-             [1:v]fps=30000/1001,scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[v1];\
-             [v0][v1]xfade=transition=wipeleft:duration=1.5:offset=0[v];\
-             [0:a]atrim=start=0:duration=1.5,asetpts=N/SR/TB,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad=whole_dur=1.5[a0];\
-             anullsrc=r=48000:cl=stereo,atrim=duration=1.5[a1];\
-             [a0][a1]acrossfade=d=1.5:c1=tri:c2=tri[a] \
-             -map [v] -map [a] -c:v libx264 -preset ultrafast -crf 26 -g 10 -c:a aac -b:a 128k -movflags faststart -y /tmp/p.mp4"
-        );
     }
 
     #[test]

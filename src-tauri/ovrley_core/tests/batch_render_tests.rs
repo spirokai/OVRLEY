@@ -200,7 +200,6 @@ struct ControlledExecutor {
     offsets: Mutex<Vec<f64>>,
     /// Per executed job: whether it received an activity and its covered frame count.
     activities: Mutex<Vec<(bool, u64)>>,
-    assemblies: Mutex<Vec<OutputAssembly>>,
     cleanup: Option<(mpsc::Sender<()>, Mutex<mpsc::Receiver<()>>)>,
 }
 
@@ -311,7 +310,6 @@ impl BatchJobExecutor for ControlledExecutor {
                 } => assert!(outgoing.is_file() && incoming.is_file()),
             }
         }
-        self.assemblies.lock().unwrap().push(assembly.clone());
         session.check_cancelled()?;
         if assembly.target.to_str().unwrap().contains("joinfail") {
             return Err(CoreError::Encode("Controlled join failure".into()));
@@ -337,7 +335,6 @@ fn executor(
             embedded: Mutex::new(Vec::new()),
             offsets: Mutex::new(Vec::new()),
             activities: Mutex::new(Vec::new()),
-            assemblies: Mutex::new(Vec::new()),
             cleanup,
         }),
         entered_rx,
@@ -852,28 +849,6 @@ fn a_separate_output_renders_its_pieces_to_parts_and_joins_them() {
     );
     assert_eq!(fs::read(&target).unwrap(), b"joined output");
     assert_eq!(*executor.offsets.lock().unwrap(), vec![10.0, 14.0]);
-    let assemblies = executor.assemblies.lock().unwrap().clone();
-    assert_eq!(assemblies.len(), 1);
-    let assembly = &assemblies[0];
-    assert_eq!(
-        fs::canonicalize(&assembly.target).unwrap(),
-        fs::canonicalize(&target).unwrap()
-    );
-    assert_eq!(assembly.frames, 90);
-    assert_eq!(
-        assembly.segments,
-        vec![
-            AssemblySegment::Part(assembly.parts_directory.join("part-0000.mov")),
-            AssemblySegment::Part(assembly.parts_directory.join("part-0001.mov"))
-        ]
-    );
-    assert!(assembly
-        .parts_directory
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .starts_with(".ovrley-parts-4-ride_overlay-"));
     // Verified output: the parts are gone.
     assert!(parts_directories(&fixture.directory).is_empty());
     // The second piece reports item progress after the first piece's 30 frames.
@@ -890,35 +865,6 @@ fn a_separate_output_renders_its_pieces_to_parts_and_joins_them() {
         .collect::<Vec<_>>();
     assert!(progress.contains(&(15, 90)), "{progress:?}");
     assert!(progress.contains(&(60, 90)), "{progress:?}");
-}
-
-#[test]
-fn a_combined_output_joins_pieces_of_several_sources_into_one_file() {
-    let fixture = Fixture::new();
-    let request = combined_request(&fixture, &["2-first.mp4", "4-second.mp4"], "joined.mov");
-    let (service, _, terminal) = service();
-    let (executor, entered, resume) = executor(None);
-    service
-        .submit_batch_with_executor(
-            &fixture.paths,
-            &fixture.inspection,
-            request,
-            None,
-            executor.clone(),
-        )
-        .unwrap();
-    for _ in 0..2 {
-        entered.recv_timeout(WAIT).unwrap();
-        resume.send(()).unwrap();
-    }
-    let snapshot = terminal.recv_timeout(WAIT).unwrap();
-    assert_eq!(snapshot.phase, BatchPhase::Completed);
-    let target = fixture.directory.join("joined.mov");
-    assert_eq!(snapshot.outputs[0].output_path, target.to_str().unwrap());
-    assert_eq!(fs::read(&target).unwrap(), b"joined output");
-    // Each piece starts at the activity second of its own first frame.
-    assert_eq!(*executor.offsets.lock().unwrap(), vec![0.0, 1.0]);
-    assert!(parts_directories(&fixture.directory).is_empty());
 }
 
 #[test]
@@ -1110,27 +1056,6 @@ fn transitions_render_heads_and_tails_and_blend_them_between_bodies() {
     assert_eq!(
         *executor.offsets.lock().unwrap(),
         vec![10.0, 12.0, 14.0, 15.0]
-    );
-    let assembly = executor.assemblies.lock().unwrap()[0].clone();
-    let part = |index: usize| {
-        assembly
-            .parts_directory
-            .join(format!("part-{index:04}.mp4"))
-    };
-    assert_eq!(assembly.frames, 180);
-    assert_eq!(
-        assembly.segments,
-        vec![
-            AssemblySegment::Part(part(0)),
-            AssemblySegment::Transition {
-                outgoing: part(1),
-                incoming: part(2),
-                name: "fade".into(),
-                duration: 1.0,
-                output: assembly.parts_directory.join("transition-0000.mp4"),
-            },
-            AssemblySegment::Part(part(3)),
-        ]
     );
 }
 

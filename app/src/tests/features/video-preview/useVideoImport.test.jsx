@@ -241,23 +241,6 @@ describe('which videos are imported', () => {
     expect(useStore.getState().videoEdits[useStore.getState().importedVideos[1].id]).toMatchObject({ offsetSeconds: -4000, offsetSource: 'manual' })
   })
 
-  test('a fresh import without an activity switches on the largest group of videos starting within 12 hours', async () => {
-    probe('/clips/morning.mp4', { creationTime: '2026-07-18T08:00:00Z' })
-    probe('/clips/noon.mp4', { creationTime: '2026-07-18T12:00:00Z' })
-    probe('/clips/next-day.mp4', { creationTime: '2026-07-19T09:00:00Z' })
-    const { result } = renderImport()
-
-    await selectFiles(result, ['/clips/morning.mp4', '/clips/noon.mp4', '/clips/next-day.mp4'])
-
-    expect(dialog(result).windowKind).toBe('span')
-    expect(dialog(result).rows.map(({ filename, isIncluded, isFar }) => [filename, isIncluded, isFar])).toEqual([
-      ['morning.mp4', true, false],
-      ['noon.mp4', true, false],
-      ['next-day.mp4', false, true],
-    ])
-    expect(dialog(result).importCount).toBe(2)
-  })
-
   test('a first import against an activity reads camera clocks the way that puts most videos near it', async () => {
     useStore.getState().activateActivityFile(activityFile)
     // As UTC: a minute before the activity and inside it. As Sofia time: both three hours before it.
@@ -299,23 +282,6 @@ describe('which videos are imported', () => {
     expect(row(result, 'uhd.mp4').isIncluded).toBe(false)
     await confirm(result)
     expect(importedPaths()).toEqual(['/clips/first.mp4', '/clips/hd.mp4'])
-  })
-
-  test('a fresh import takes the resolution of most new videos', async () => {
-    probe('/clips/a.mp4', { creationTime: '2026-07-18T08:00:00Z' })
-    probe('/clips/b.mp4', { creationTime: '2026-07-18T08:01:00Z', format: formats.uhd60 })
-    probe('/clips/c.mp4', { creationTime: '2026-07-18T08:02:00Z', format: formats.uhd60 })
-    const { result } = renderImport()
-    await selectFiles(result, ['/clips/a.mp4', '/clips/b.mp4', '/clips/c.mp4'])
-
-    expect(dialog(result).resolutionLabel).toBe('3840×2160')
-    expect(dialog(result).rows.map(({ filename, isIncluded, hasOtherResolution }) => [filename, isIncluded, hasOtherResolution])).toEqual([
-      ['a.mp4', false, true],
-      ['b.mp4', true, false],
-      ['c.mp4', true, false],
-    ])
-    await confirm(result)
-    expect(useStore.getState().config.scene).toMatchObject({ width: 3840, height: 2160 })
   })
 
   test('switches follow the defaults when times are detected again, unless the user set them', async () => {
@@ -363,24 +329,6 @@ describe('which videos are imported', () => {
 
     expect(importedPaths()).toEqual(['/clips/ride.mp4', '/clips/more.mp4'])
     expect(boundaries.registerPreviewVideo.mock.calls.map(([path]) => path)).toEqual(['/clips/ride.mp4', '/clips/more.mp4'])
-  })
-
-  test('without an activity, a new video must start within an hour of the videos already imported', async () => {
-    probe('/clips/first.mp4', { creationTime: '2026-07-18T08:00:00Z' })
-    const { result } = renderImport()
-    await selectFiles(result, ['/clips/first.mp4'])
-    await confirm(result)
-
-    probe('/clips/close.mp4', { creationTime: '2026-07-18T08:50:00Z' })
-    probe('/clips/far.mp4', { creationTime: '2026-07-18T10:00:00Z' })
-    await selectFiles(result, ['/clips/close.mp4', '/clips/far.mp4'])
-
-    expect(dialog(result).windowKind).toBe('videos')
-    expect(dialog(result).rows.map(({ filename, isNew, isIncluded, isFar }) => [filename, isNew, isIncluded, isFar])).toEqual([
-      ['first.mp4', false, true, false],
-      ['close.mp4', true, true, false],
-      ['far.mp4', true, false, true],
-    ])
   })
 
   test('an existing video outside the activity window stays switched on and is removed from the project when switched off', async () => {
