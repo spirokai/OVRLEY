@@ -5,6 +5,7 @@
 
 import { useCallback, useId, useMemo, useState } from 'react'
 import { Video } from 'lucide-react'
+import { filenameFromSelectedPath } from '@/lib/file-dialog'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatClockDuration } from '@/lib/time-format'
 import { getClipGeometry, getExportRangeHighlightGeometry, secondsToViewPx } from '../utils/timelineGeometry'
@@ -27,14 +28,6 @@ function getRootRemPx() {
 
 function clampPx(value, min, max) {
   return Math.min(max, Math.max(min, value))
-}
-
-function getBasename(path) {
-  return path.split(/[\\/]/).pop()
-}
-
-function videoIdFromClipId(clipId) {
-  return clipId.slice('video:'.length)
 }
 
 function clipRangeStyle(fromSecond, toSecond, durationSeconds) {
@@ -129,7 +122,7 @@ export default function useTimelineClips({
         icon: Video,
         id: `video:${clip.id}`,
         isVideo: true,
-        label: getBasename(clip.path),
+        label: filenameFromSelectedPath(clip.path),
         startSecond: clip.offsetSeconds,
         warnings: (warnings?.get(clip.id) ?? []).map((warning) => formatVideoWarning(warning, i18next.t)),
       })
@@ -206,7 +199,7 @@ export default function useTimelineClips({
             if (match?.commandId === 'timelineClip.remove' && lane.isVideo && onRemoveVideo) {
               event.preventDefault()
               event.stopPropagation()
-              onRemoveVideo(videoIdFromClipId(lane.id))
+              onRemoveVideo(lane.clip.id)
               return
             }
             if (match?.commandId !== 'timelineClip.nudge') return

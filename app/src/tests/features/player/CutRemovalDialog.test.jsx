@@ -1,10 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, test } from 'vite-plus/test'
-import { CutRemovalDialog } from '@/features/player/components/CutRemovalDialog'
+import { CutRemovalDialog, useCutRemovalDialog } from '@/features/player'
 import useStore from '@/store/useStore'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 let cutId
+
+function ConnectedCutRemovalDialog() {
+  return <CutRemovalDialog {...useCutRemovalDialog()} />
+}
 
 beforeEach(() => {
   useStore.setState(useStore.getInitialState(), true)
@@ -15,7 +19,7 @@ beforeEach(() => {
 
 describe('CutRemovalDialog', () => {
   test('stays closed until a cut between different states is removed', () => {
-    render(<CutRemovalDialog />)
+    render(<ConnectedCutRemovalDialog />)
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
@@ -24,7 +28,7 @@ describe('CutRemovalDialog', () => {
     ['Exclude both', true],
   ])('%s merges the parts in that state', (name, excluded) => {
     useStore.getState().requestCutRemoval('ride', cutId)
-    render(<CutRemovalDialog />)
+    render(<ConnectedCutRemovalDialog />)
     fireEvent.click(screen.getByRole('button', { name }))
     const edits = useStore.getState().videoEdits.ride
     expect(edits.cuts).toEqual([])
@@ -34,7 +38,7 @@ describe('CutRemovalDialog', () => {
 
   test('keeping the cut changes nothing', () => {
     useStore.getState().requestCutRemoval('ride', cutId)
-    render(<CutRemovalDialog />)
+    render(<ConnectedCutRemovalDialog />)
     fireEvent.click(screen.getByRole('button', { name: 'Keep the cut' }))
     expect(useStore.getState().videoEdits.ride.cuts).toHaveLength(1)
     expect(useStore.getState().cutRemovalRequest).toBeNull()

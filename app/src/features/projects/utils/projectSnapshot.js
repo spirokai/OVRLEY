@@ -1,18 +1,10 @@
 import { createDurableEditorState } from '@/lib/template/template-state'
+import { cloneVideoSegments } from '@/lib/video-program/video-segments'
 import { createPathLocator } from './projectPaths'
 
 export const PROJECT_FORMAT = 'ovrley-project'
 export const PROJECT_VERSION = 6
 export const LAST_PROJECT_DIRECTORY_KEY = 'last-project-dir'
-
-function projectSegments(segments) {
-  return Object.fromEntries(
-    Object.entries(segments).map(([key, { excluded, transitionIn }]) => [
-      key,
-      { excluded, transitionIn: transitionIn === null ? null : { ...transitionIn } },
-    ]),
-  )
-}
 
 /**
  * Projects the video collection in import order: identity, source locator, and user edits.
@@ -29,7 +21,7 @@ function projectVideos(state, projectPath) {
         offsetSeconds: edits.offsetSeconds,
         offsetSource: edits.offsetSource,
         cuts: edits.cuts.map((cut) => ({ id: cut.id, frame: cut.frame })),
-        segments: projectSegments(edits.segments),
+        segments: cloneVideoSegments(edits.segments),
         placementAnchor: edits.placementAnchor === null ? null : { ...edits.placementAnchor },
       }
     })

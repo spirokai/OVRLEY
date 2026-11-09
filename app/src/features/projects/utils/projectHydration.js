@@ -5,6 +5,7 @@ import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlic
 import { activateParsedActivity } from '@/lib/activity/import-activity'
 import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
 import { getVideosTimelineBounds, joinVideoEdits } from '@/lib/video-program/video-collection'
+import { cloneVideoSegments } from '@/lib/video-program/video-segments'
 
 // Laps belong to the external activity file; one loaded as absent takes its lap selection with it.
 function resolveDisabledLaps(disabledLaps, parsedActivity) {
@@ -13,15 +14,6 @@ function resolveDisabledLaps(disabledLaps, parsedActivity) {
     throw new Error('Project laps.disabled must identify laps of the loaded activity')
   }
   return disabledLaps
-}
-
-function cloneSegments(segments) {
-  return Object.fromEntries(
-    Object.entries(segments).map(([key, { excluded, transitionIn }]) => [
-      key,
-      { excluded, transitionIn: transitionIn === null ? null : { ...transitionIn } },
-    ]),
-  )
 }
 
 /**
@@ -49,7 +41,7 @@ export function createProjectVideoEdits(videos, projectVideos) {
           offsetSeconds: projectVideo.offsetSeconds,
           offsetSource: projectVideo.offsetSource,
           cuts: projectVideo.cuts.map((cut) => ({ ...cut })),
-          segments: cloneSegments(projectVideo.segments),
+          segments: cloneVideoSegments(projectVideo.segments),
           placementAnchor:
             projectVideo.placementAnchor !== null && loadedIds.has(projectVideo.placementAnchor.videoId) ? { ...projectVideo.placementAnchor } : null,
         },

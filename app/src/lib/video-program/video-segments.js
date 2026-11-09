@@ -26,6 +26,20 @@ export function listVideoSegments(video) {
 }
 
 /**
+ * Copies the segment edits of a video (see the module description).
+ * @param {Object<string, {excluded: boolean, transitionIn: {type: string, durationSeconds: number}|null}>} segments Segment edits.
+ * @returns {Object<string, {excluded: boolean, transitionIn: {type: string, durationSeconds: number}|null}>} Independent copy.
+ */
+export function cloneVideoSegments(segments) {
+  return Object.fromEntries(
+    Object.entries(segments).map(([key, { excluded, transitionIn }]) => [
+      key,
+      { excluded, transitionIn: transitionIn === null ? null : { type: transitionIn.type, durationSeconds: transitionIn.durationSeconds } },
+    ]),
+  )
+}
+
+/**
  * Returns the key of the join into a segment.
  * @param {string} videoId Video of the segment.
  * @param {string} segmentKey Segment key.

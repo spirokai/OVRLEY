@@ -23,7 +23,7 @@ import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_SYNC_TOOL, VIDEO_TOOL, WIDGETS_TOOL
 import { MissingSourceDialog, ProjectNoticeDialog, StartupProjectsDialog } from '@/features/projects'
 import { VideoImportDialog } from '@/features/video-preview'
 import { UpdatePromptDialog } from '@/features/app-update'
-import { CutRemovalDialog } from '@/features/player/components/CutRemovalDialog'
+import { CutRemovalDialog, useCutRemovalDialog } from '@/features/player'
 import {
   AppHeader,
   ControlPanel,
@@ -89,6 +89,7 @@ function App() {
   const toolbarDrawer = useToolbarDrawer(layout)
   const videoSync = useVideoSyncControls()
   const videoSyncWorkspace = useVideoSyncWorkspace({ toolbarDrawer, videoSync })
+  const cutRemovalDialog = useCutRemovalDialog()
   const { config, globalDefaults, importingVideo, isProcessing, setConfig } = appShell
   let drawerContent = null
 
@@ -169,7 +170,7 @@ function App() {
         <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />
         <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
         <ProjectNoticeDialog {...projectLifecycle.noticeDialog} />
-        <CutRemovalDialog />
+        <CutRemovalDialog {...cutRemovalDialog} />
         <VideoImportDialog {...videoControls.importDialog} />
         <KeyboardShortcutsDialog
           open={editorShell.keyboardShortcutsOpen}
