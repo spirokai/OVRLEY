@@ -64,21 +64,22 @@ export function findUndeterminedVideoIds(collection) {
   return new Set(collection.importedVideos.filter((_, index) => !placements[index].determined).map((video) => video.id))
 }
 
-/** Moves a clip next to its anchor, then every automatic clip anchored to it, along anchor chains. */
-function placeAtAnchors(draft, videoId) {
-  const moved = [videoId]
-  while (moved.length > 0) {
-    const movedId = moved.shift()
+/**
+ * Moves clips next to their anchors, then along anchor chains every clip anchored
+ * to a moved clip that `follows` admits (automatic clips by default).
+ * @returns {Array<string>} IDs of the moved clips, each after its anchor.
+ */
+function placeAtAnchors(draft, videoIds, follows = (videoId) => draft.videoEdits[videoId].offsetSource === 'auto') {
+  const moved = [...videoIds]
+  for (const movedId of moved) {
     placeAtAnchor(draft, movedId)
     moved.push(
       ...draft.importedVideos
-        .filter((video) => {
-          const edits = draft.videoEdits[video.id]
-          return edits.placementAnchor?.videoId === movedId && edits.offsetSource === 'auto'
-        })
+        .filter((video) => draft.videoEdits[video.id].placementAnchor?.videoId === movedId && follows(video.id))
         .map((video) => video.id),
     )
   }
+  return moved
 }
 
 /**
@@ -153,7 +154,7 @@ export function anchorVideo(draft, videoId, anchorVideoId, side) {
   draft.videoEdits[videoId].placementAnchor = { videoId: anchorVideoId, side }
   draft.videoEdits[videoId].offsetSource = 'auto'
   findVideo(draft, videoId).syncWarning = null
-  placeAtAnchors(draft, videoId)
+  placeAtAnchors(draft, [videoId])
 }
 
 /**
@@ -175,10 +176,10 @@ export function moveVideoNextTo(draft, videoId, anchorVideoId, side) {
   anchorVideo(draft, videoId, anchorVideoId, side)
   for (const occupant of occupants) {
     draft.videoEdits[occupant.id].placementAnchor = { videoId, side }
-    placeAtAnchors(draft, occupant.id)
+    placeAtAnchors(draft, [occupant.id])
   }
   for (const follower of followers) {
-    if (draft.videoEdits[follower.id].placementAnchor !== null) placeAtAnchors(draft, follower.id)
+    if (draft.videoEdits[follower.id].placementAnchor !== null) placeAtAnchors(draft, [follower.id])
   }
 }
 
@@ -190,27 +191,22 @@ export function moveVideoNextTo(draft, videoId, anchorVideoId, side) {
 export function placeAutomaticVideos(draft) {
   if (draft.importedVideos.length === 0) return
   const { placements, timezoneMode } = detectVideoPlacements(draft, draft.importedVideos)
-  const anchored = []
+  const anchored = new Set()
   draft.importedVideos.forEach((video, index) => {
     const edits = draft.videoEdits[video.id]
     if (edits.offsetSource === 'manual') return
     if (!placements[index].determined) {
-      if (edits.placementAnchor !== null) anchored.push(video.id)
+      if (edits.placementAnchor !== null) anchored.add(video.id)
       return
     }
     edits.offsetSeconds = placements[index].offsetSeconds
     video.syncWarning = placements[index].syncWarning
   })
-  // Anchors are resolved after the clips they point to (anchors never form cycles).
-  const resolved = new Set(draft.importedVideos.map((video) => video.id).filter((videoId) => !anchored.includes(videoId)))
-  while (anchored.length > 0) {
-    const index = anchored.findIndex((videoId) => resolved.has(draft.videoEdits[videoId].placementAnchor.videoId))
-    if (index === -1) throw new Error('Video placement anchors must reference imported videos')
-    const [videoId] = anchored.splice(index, 1)
-    placeAtAnchor(draft, videoId)
-    findVideo(draft, videoId).syncWarning = null
-    resolved.add(videoId)
-  }
+  // Anchored clips are placed from the ones anchored to placed clips (anchors never form cycles).
+  const roots = [...anchored].filter((videoId) => !anchored.has(draft.videoEdits[videoId].placementAnchor.videoId))
+  const placed = placeAtAnchors(draft, roots, (videoId) => anchored.has(videoId))
+  if (placed.length !== anchored.size) throw new Error('Video placement anchors must reference imported videos')
+  for (const videoId of placed) findVideo(draft, videoId).syncWarning = null
   draft.videoSyncTimezoneMode = timezoneMode
 }
 
@@ -231,7 +227,7 @@ export function resetVideoOffset(draft, videoId) {
   const [undetermined] = placeLikeTheCollection(draft, [videoId])
   if (undetermined !== undefined && edits.placementAnchor !== null) {
     findVideo(draft, videoId).syncWarning = null
-    placeAtAnchors(draft, videoId)
+    placeAtAnchors(draft, [videoId])
   }
 }
 
