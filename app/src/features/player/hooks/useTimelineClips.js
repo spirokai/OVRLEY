@@ -291,7 +291,7 @@ export default function useTimelineClips({
 
     // Cut markers - one per cut of a clip, in the editing workspace.
     // TODO: drag cut markers along the timeline, snapping to the clip's frames and
-    // keeping the cut contract (see tmp/multiple-mp4-v2/TODO.md).
+    // keeping the cut contract.
     const cutMarkers = (program === null || program === undefined ? [] : sortVideosByTimeline(clips))
       .flatMap((clip) =>
         clip.cuts.map((cut) => {
