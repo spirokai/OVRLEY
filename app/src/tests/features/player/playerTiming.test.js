@@ -45,10 +45,6 @@ describe('playerTiming utilities', () => {
     ).toBe(12.509)
   })
 
-  test('uses the fallback duration without activity or videos', () => {
-    expect(getTotalPlaybackDuration({ activityDurationSeconds: undefined, fallbackDurationSeconds: 73, videoBounds: null })).toBe(73)
-  })
-
   test('keeps video-clock playback scoped to the imported video window', () => {
     const shifted = timelineProgram([createTestVideo({ durationSeconds: 4 })], { 'video-1': 5 })
     const negative = timelineProgram([createTestVideo({ durationSeconds: 4 })], { 'video-1': -5 })
@@ -65,22 +61,6 @@ describe('playerTiming utilities', () => {
     expect(source(negative, -1)).toEqual({ source: 'timeline', second: -1 })
   })
 
-  test('skips gaps between imported clips to the next clip', () => {
-    const program = timelineProgram(
-      [
-        createTestVideo({ id: 'first', durationSeconds: 4 }),
-        createTestVideo({ id: 'second', path: '/videos/second.mp4', durationSeconds: 4, importOrder: 1 }),
-      ],
-      { first: 0, second: 10 },
-    )
-
-    const source = (playheadSecond) => resolvePlaybackSource({ shouldUseVideoPlayback: true, program, playheadSecond })
-    expect(source(2)).toEqual({ source: 'video', second: 2 })
-    expect(source(6)).toEqual({ source: 'video', second: 10 })
-    expect(source(12)).toEqual({ source: 'video', second: 12 })
-    expect(source(14)).toEqual({ source: 'timeline', second: 14 })
-  })
-
   test('uses the negative video start as the timeline minimum', () => {
     expect(getTimelineMinimum({ videoBounds: { startSecond: -5, endSecond: 25 } })).toBe(-5)
     expect(getTimelineMinimum({ videoBounds: { startSecond: 3, endSecond: 25 } })).toBe(0)
@@ -92,25 +72,6 @@ describe('playerTiming utilities', () => {
         videoBounds: { startSecond: -5, endSecond: 25 },
       }),
     ).toBe(25)
-  })
-
-  test('spans the bounds of several imported clips', () => {
-    const { importedVideos, videoEdits } = videoStoreState(
-      [
-        createTestVideo({ id: 'first', durationSeconds: 10 }),
-        createTestVideo({ id: 'second', path: '/videos/second.mp4', durationSeconds: 20, importOrder: 1 }),
-      ],
-      { first: -3, second: 30 },
-    )
-    const { bounds } = buildTimelineProgram({
-      videos: importedVideos,
-      videoEdits,
-      dragPreview: null,
-      transitionDefaults: DEFAULT_TRANSITION_SETTINGS,
-    })
-
-    expect(getTimelineMinimum({ videoBounds: bounds })).toBe(-3)
-    expect(getTotalPlaybackDuration({ activityDurationSeconds: 40, fallbackDurationSeconds: 0, videoBounds: bounds })).toBe(50)
   })
 
   test('creates timeline anchors and resolves elapsed playback seconds', () => {

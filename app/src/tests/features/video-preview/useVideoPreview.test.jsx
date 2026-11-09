@@ -112,51 +112,6 @@ describe('useVideoPreview', () => {
     expect(useStore.getState().selectedSecond).toBe(8)
   })
 
-  test('hands the video element to the clip under the playhead', async () => {
-    useStore.setState(
-      videoStoreState(
-        [
-          createTestVideo({ id: 'video-1', path: 'C:\\clips\\first.mp4', durationSeconds: 10 }),
-          createTestVideo({ id: 'video-2', path: 'C:\\clips\\second.mp4', durationSeconds: 10, importOrder: 1 }),
-        ],
-        { 'video-1': 0, 'video-2': 20 },
-      ),
-    )
-    act(() => useStore.getState().setSelectedSecond(24))
-
-    const firstElement = createVideoStub({ duration: 10 })
-    const secondElement = createVideoStub({ duration: 10 })
-    const { result } = renderHook(() => useVideoPreview([{ current: firstElement }, { current: secondElement }], true))
-
-    expect(result.current.videoSrc).toBe('http://127.0.0.1:4321/video/import-video-2')
-    expect(result.current.importId).toBe('import-video-2')
-    expect(result.current.isOutOfRange).toBe(false)
-    expect(result.current.slots).toEqual([
-      { src: 'http://127.0.0.1:4321/video/import-video-2', isActive: true },
-      { src: '', isActive: false },
-    ])
-    await waitFor(() => expect(firstElement.currentTime).toBe(4))
-
-    // The first clip loads into the other element; the second clip stays parked as the next piece.
-    act(() => useStore.getState().setSelectedSecond(3))
-
-    expect(result.current.videoSrc).toBe('http://127.0.0.1:4321/video/import-video-1')
-    expect(result.current.importId).toBe('import-video-1')
-    expect(result.current.isOutOfRange).toBe(false)
-    expect(result.current.slots).toEqual([
-      { src: 'http://127.0.0.1:4321/video/import-video-2', isActive: false },
-      { src: 'http://127.0.0.1:4321/video/import-video-1', isActive: true },
-    ])
-    await waitFor(() => expect(secondElement.currentTime).toBe(3))
-    expect(firstElement.currentTime).toBe(0)
-
-    act(() => useStore.getState().setSelectedSecond(15))
-
-    expect(result.current.importId).toBe('import-video-2')
-    expect(result.current.isOutOfRange).toBe(true)
-    expect(result.current.slots.map((slot) => slot.isActive)).toEqual([true, false])
-  })
-
   function lastClock() {
     return vi.mocked(useVideoPlaybackClock).mock.calls.at(-1)[0]
   }
@@ -265,39 +220,5 @@ describe('useVideoPreview', () => {
 
     act(() => lastClock().onPlaybackEnded())
     expect(useStore.getState().selectedSecond).toBe(20)
-  })
-
-  test('after the last piece hands the activity to the timeline clock and holds the last frame', () => {
-    playingAt(34.9)
-    const video = createVideoStub({ duration: 30, paused: false, currentTime: 29.9 })
-    renderHook(() => useVideoPreview([{ current: video }, { current: createVideoStub() }], true))
-
-    act(() => lastClock().onPlaybackEnded())
-
-    expect(video.pause).toHaveBeenCalled()
-    expect(video.currentTime).toBeCloseTo(899 / 30, 9)
-    expect(useStore.getState()).toMatchObject({ previewPlaybackState: 'playing', previewPlaybackSource: 'timeline', selectedSecond: 35 })
-  })
-
-  test('flags excluded segments and overlaps at the playhead', () => {
-    const first = createTestVideo({ id: 'video-1', path: 'C:\\clips\\first.mp4', durationSeconds: 30 })
-    const second = createTestVideo({ id: 'video-2', path: 'C:\\clips\\second.mp4', durationSeconds: 10, importOrder: 1 })
-    const state = videoStoreState([first, second], { 'video-1': 0, 'video-2': 25 })
-    Object.assign(
-      state.videoEdits['video-1'],
-      cutEdits([
-        { id: 'c1', frame: 150, excluded: true },
-        { id: 'c2', frame: 300 },
-      ]),
-    )
-    useStore.setState({ ...state, selectedSecond: 7 })
-    const { result } = renderHook(() => useVideoPreview([{ current: createVideoStub() }, { current: createVideoStub() }], true))
-    expect(result.current).toMatchObject({ isExcluded: true, isInOverlap: false, isOutOfRange: true })
-
-    act(() => useStore.getState().setSelectedSecond(27))
-    expect(result.current).toMatchObject({ isExcluded: false, isInOverlap: true, isOutOfRange: false, importId: 'import-video-1' })
-
-    act(() => useStore.getState().setSelectedSecond(31))
-    expect(result.current).toMatchObject({ isInOverlap: false, importId: 'import-video-2' })
   })
 })

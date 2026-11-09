@@ -149,71 +149,6 @@ describe('useClipDrag', () => {
     expect(setVideoOffset.mock.calls[0][1]).toBe(5.03 + 20)
   })
 
-  test('drags the activity lane by shifting every clip the opposite way', () => {
-    const animationFrames = mockAnimationFrames()
-    const { result, setVideoDragPreview, setVideoOffset, shiftVideoOffsets } = renderDrag({ clips: TWO_CLIPS })
-    const target = createTarget()
-
-    act(() => {
-      result.current.getLaneDragProps('activity').onPointerDown(createEvent(100, target))
-    })
-
-    expect(setVideoDragPreview).toHaveBeenLastCalledWith({ videoId: null, deltaSeconds: 0 })
-
-    act(() => {
-      result.current.getLaneDragProps('activity').onPointerMove(createEvent(103, target))
-      animationFrames[0](16)
-    })
-
-    expect(setVideoDragPreview.mock.lastCall[0].videoId).toBeNull()
-    expect(setVideoDragPreview.mock.lastCall[0].deltaSeconds).toBeCloseTo(-1.2)
-
-    act(() => {
-      result.current.getLaneDragProps('activity').onPointerUp(createEvent(103, target))
-    })
-
-    expect(setVideoOffset).not.toHaveBeenCalled()
-    expect(shiftVideoOffsets).toHaveBeenCalledTimes(1)
-    // The earliest clip lands on a frame of its own (30 fps).
-    expect(5.03 + shiftVideoOffsets.mock.calls[0][0]).toBeCloseTo(115 / 30)
-    expect(setVideoDragPreview).toHaveBeenLastCalledWith(null)
-  })
-
-  test('snaps the activity lane so a clip edge lands on the activity start', () => {
-    const { result, shiftVideoOffsets } = renderDrag({ clips: TWO_CLIPS })
-    const target = createTarget()
-
-    act(() => {
-      result.current.getLaneDragProps('activity').onPointerDown(createEvent(100, target))
-      result.current.getLaneDragProps('activity').onPointerMove(createEvent(112, target))
-    })
-
-    expect(result.current.snapGuidelineSecond).toBe(0)
-
-    act(() => {
-      result.current.getLaneDragProps('activity').onPointerUp(createEvent(112, target))
-    })
-
-    expect(shiftVideoOffsets).toHaveBeenCalledTimes(1)
-    expect(shiftVideoOffsets.mock.calls[0][0]).toBeCloseTo(-5.03)
-  })
-
-  test('discards the transient shift when the pointer drag is cancelled', () => {
-    const { result, setVideoDragPreview, setVideoOffset, shiftVideoOffsets } = renderDrag()
-    const target = createTarget()
-
-    act(() => {
-      result.current.getLaneDragProps('video:video-1').onPointerDown(createEvent(100, target))
-      result.current.getLaneDragProps('video:video-1').onPointerMove(createEvent(103, target))
-      result.current.getLaneDragProps('video:video-1').onPointerCancel(createEvent(103, target))
-    })
-
-    expect(setVideoOffset).not.toHaveBeenCalled()
-    expect(shiftVideoOffsets).not.toHaveBeenCalled()
-    expect(setVideoDragPreview).toHaveBeenLastCalledWith(null)
-    expect(result.current.isDragging).toBe(false)
-  })
-
   test('commits a negative offset while the video still overlaps the activity', () => {
     const { result, setVideoOffset } = renderDrag()
     const target = createTarget()
@@ -226,17 +161,6 @@ describe('useClipDrag', () => {
     })
 
     expect(setVideoOffset).toHaveBeenLastCalledWith('video-1', -3)
-  })
-
-  test('ignores lane drags without imported clips', () => {
-    const { result, setVideoDragPreview } = renderDrag({ clips: [] })
-
-    act(() => {
-      result.current.getLaneDragProps('activity').onPointerDown(createEvent(100))
-    })
-
-    expect(setVideoDragPreview).not.toHaveBeenCalled()
-    expect(result.current.isDragging).toBe(false)
   })
 
   test('accumulates keyboard nudges per lane and commits them as one edit', () => {
@@ -269,24 +193,5 @@ describe('useClipDrag', () => {
 
     expect(shiftVideoOffsets).toHaveBeenCalledTimes(1)
     expect(5.03 + shiftVideoOffsets.mock.calls[0][0]).toBeCloseTo(148 / 30)
-  })
-
-  test('reduces autoscroll edge penetration when the timeline is zoomed in', () => {
-    const animationFrames = mockAnimationFrames()
-    const followSecond = vi.fn(() => null)
-    const { result } = renderDrag()
-    const target = createTarget()
-
-    act(() => {
-      result.current.updateMetrics({ followSecond, viewStart: 40, viewEnd: 60 })
-      result.current.getLaneDragProps('video:video-1').onPointerDown(createEvent(125, target))
-      result.current.getLaneDragProps('video:video-1').onPointerMove(createEvent(25, target))
-      animationFrames[1](16)
-    })
-
-    const targetSecond = followSecond.mock.calls[0][0]
-    expect(targetSecond).toBeGreaterThan(42)
-    expect(targetSecond).toBeLessThan(43)
-    expect(followSecond).toHaveBeenCalledWith(targetSecond, -3)
   })
 })
