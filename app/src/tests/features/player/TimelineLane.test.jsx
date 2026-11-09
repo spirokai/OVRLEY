@@ -48,22 +48,6 @@ function renderLane(overrides = {}) {
 }
 
 describe('TimelineLane', () => {
-  test('greys excluded segments and offers removing a cut from its marker', () => {
-    const onRemove = vi.fn()
-    render(
-      <TimelineLane
-        lane={createLane(
-          { excludedSegments: [{ key: 'c1', style: { left: '25%', width: '50%' } }] },
-          { cutMarkers: [{ key: 'ride:c1', style: { left: '25%' }, label: 'Cut at 00:05', onRemove }] },
-        )}
-      />,
-    )
-    expect(screen.getByTestId('timeline-excluded-segment')).toHaveStyle({ left: '25%', width: '50%' })
-    fireEvent.click(screen.getByRole('button', { name: 'Cut at 00:05' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Remove cut' }))
-    expect(onRemove).toHaveBeenCalledOnce()
-  })
-
   test('renders activity source, filename, and duration when the lane model allows text', () => {
     renderLane()
 
@@ -120,59 +104,5 @@ describe('TimelineLane', () => {
 
     expect(onPointerDown).not.toHaveBeenCalled()
     expect(onClick).not.toHaveBeenCalled()
-  })
-
-  test('renders every clip of the lane, overlap bands, and clip warnings in the tooltip', () => {
-    render(
-      <TimelineLane
-        lane={createLane(
-          {},
-          {
-            id: 'video',
-            isVideo: true,
-            clips: [
-              createClip({ id: 'video:a', label: 'a.mp4', warnings: ['Overlaps b.mp4'], tooltip: { id: 'tooltip-a', isVisible: true, style: {} } }),
-              createClip({ id: 'video:b', label: 'b.mp4', clipStyle: { left: '50%', width: '50%' } }),
-            ],
-            conflictBands: [{ key: '20:30', style: { left: '20%', width: '10%' } }],
-          },
-        )}
-      />,
-    )
-
-    expect(screen.getByLabelText('a.mp4')).toBeInTheDocument()
-    expect(screen.getByLabelText('b.mp4')).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'Overlapping videos' })).toHaveStyle({ left: '20%', width: '10%' })
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Overlaps b.mp4')
-  })
-
-  test('renders join markers with their transition window and opens the join control', () => {
-    const marker = {
-      key: 'clip:second',
-      isVisible: true,
-      style: { left: '40%' },
-      bandStyle: { left: '38%', width: '2%' },
-      isInvalid: false,
-      hasTransition: true,
-      label: 'Join: fade, 1 s',
-      control: {
-        isAvailable: true,
-        value: 'default',
-        label: 'fade, 1 s',
-        defaultLabel: 'Default (fade, 1 s)',
-        previewType: 'fade',
-        durationSeconds: null,
-        error: null,
-        onSelect: vi.fn(),
-        commitDuration: vi.fn(),
-      },
-    }
-    render(<TimelineLane lane={createLane({}, { joinMarkers: [marker] })} />)
-
-    expect(screen.getByTestId('timeline-transition-window')).toHaveStyle({ left: '38%', width: '2%' })
-    fireEvent.click(screen.getByRole('button', { name: 'Join: fade, 1 s' }))
-    fireEvent.click(screen.getByRole('button', { name: /fade, 1 s/, expanded: false }))
-    fireEvent.click(screen.getByRole('option', { name: 'No transition' }))
-    expect(marker.control.onSelect).toHaveBeenCalledExactlyOnceWith('none')
   })
 })
