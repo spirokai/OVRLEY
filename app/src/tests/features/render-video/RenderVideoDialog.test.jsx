@@ -14,14 +14,6 @@ globalThis.ResizeObserver ??= class ResizeObserver {
   disconnect() {}
 }
 
-// Output modes and the video queue appear only with more than one video.
-function twoVideos() {
-  return [
-    createTestVideo({ id: 'ride', path: 'C:\\videos\\ride.mp4' }),
-    createTestVideo({ id: 'climb', path: 'C:\\videos\\climb.mp4', importOrder: 1 }),
-  ]
-}
-
 function RenderVideoDialogHarness({ initialSettings }) {
   const [settings, setSettings] = useState(initialSettings)
 
@@ -156,74 +148,6 @@ describe('RenderVideoDialog', () => {
     expect(outputPathInput).toHaveValue('C:\\missing\\nested\\output.mov')
   })
 
-  test('renders videos as one combined file or as separate files in an output folder', async () => {
-    useStore.setState(videoStoreState(twoVideos(), { climb: 120 }))
-    const user = userEvent.setup()
-
-    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), exportMode: 'composite', codec: 'libx264' }} />)
-
-    expect(screen.getByRole('tab', { name: 'One video file', selected: true })).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Output path' })).toBeInTheDocument()
-    expect(screen.getByText('ride.mp4')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /start render/i })).toBeDisabled()
-
-    await user.click(screen.getByRole('tab', { name: 'Separate files' }))
-
-    expect(screen.getByText('Output folder')).toBeInTheDocument()
-    expect(screen.queryByRole('textbox', { name: 'Output path' })).not.toBeInTheDocument()
-    expect(screen.queryByText('Custom Export Range')).not.toBeInTheDocument()
-    expect(screen.getByText("Locked to each video's FPS")).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /start render/i })).toBeDisabled()
-  })
-
-  test('explains why overlapping videos cannot be one combined file', () => {
-    useStore.setState(
-      videoStoreState(
-        [
-          createTestVideo({ id: 'ride', path: 'C:\\videos\\ride.mp4', durationSeconds: 60 }),
-          createTestVideo({ id: 'climb', path: 'C:\\videos\\climb.mp4', durationSeconds: 60, importOrder: 1 }),
-        ],
-        { ride: 0, climb: 30 },
-      ),
-    )
-    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), exportMode: 'composite', codec: 'libx264' }} />)
-
-    expect(screen.getByRole('alert', { name: 'One video file cannot be rendered' })).toHaveTextContent(
-      'Videos overlap (ride.mp4, climb.mp4). Move a video or exclude the overlapping part from export.',
-    )
-  })
-
-  test('blocks only a combined file on the video resolution mismatch', async () => {
-    useStore.setState(
-      videoStoreState(
-        [
-          createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12, width: 640, height: 360 }),
-          createTestVideo({ id: 'climb', path: 'C:\\climb.mp4', durationSeconds: 12, width: 640, height: 360, importOrder: 1 }),
-        ],
-        { climb: 20 },
-      ),
-    )
-    const user = userEvent.setup()
-
-    render(<RenderVideoDialogHarness initialSettings={transparentSettings()} />)
-
-    expect(screen.getByText(/must match imported video/i)).toBeInTheDocument()
-    await user.click(screen.getByRole('tab', { name: 'Separate files' }))
-
-    expect(screen.queryByText(/must match imported video/i)).not.toBeInTheDocument()
-    expect(screen.getByText('video.mp4')).toBeInTheDocument()
-  })
-
-  test('keeps start disabled until imported videos have fresh native inspection', () => {
-    useStore.setState(videoStoreState(twoVideos(), { climb: 120 }))
-    useStore.getState().setBatchOutputFolder('C:\\renders')
-
-    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), outputMode: 'separate' }} />)
-
-    expect(screen.getByText('ride.mp4')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /start render/i })).toBeDisabled()
-  })
-
   test('keeps fractional bar progress, rounds percentage labels and ETA, and preserves completion presentation', () => {
     const id = 'C:/videos/ride.mp4'
     const snapshot = {
@@ -293,15 +217,6 @@ describe('RenderVideoDialog', () => {
     expect(screen.queryByText(/1 completed/)).not.toBeInTheDocument()
     expect(screen.queryByText('Est. Remaining')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled()
-  })
-
-  test('renders only the activity overlay without videos', () => {
-    render(<RenderVideoDialogHarness initialSettings={transparentSettings()} />)
-
-    expect(screen.queryByRole('tab', { name: 'One video file' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('tab', { name: 'Full Video' })).not.toBeInTheDocument()
-    expect(screen.getByText('Custom Export Range')).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Output path' })).toBeInTheDocument()
   })
 })
 

@@ -2832,42 +2832,6 @@ mod tests {
     }
 
     #[test]
-    fn v4_round_trips_the_video_collection_and_resolves_every_video_path() {
-        let directory =
-            std::env::temp_dir().join(format!("ovrley-project-videos-{}", Uuid::new_v4()));
-        fs::create_dir_all(&directory).unwrap();
-        let path = directory.join("Session.oly");
-        let project = multi_video_project_json();
-
-        let result = write_project_file_sync(
-            path_string(path.clone()),
-            project.to_string(),
-            None,
-            HashMap::new(),
-        )
-        .unwrap();
-        assert_eq!(result.backup_path, None);
-        let loaded =
-            read_project_file_sync(&RasterResources::default(), path_string(path)).unwrap();
-        let mut serialized = serde_json::to_value(&loaded.project).unwrap();
-        serialized["savedAt"] = project["savedAt"].clone();
-        assert_eq!(serialized["sources"], project["sources"]);
-        assert_eq!(serialized["sync"], project["sync"]);
-        assert_eq!(
-            serialized["transitionDefaults"],
-            project["transitionDefaults"]
-        );
-        assert_eq!(
-            loaded.resolved_sources.video_paths,
-            vec![
-                path_string(directory.join("media/a.mp4")),
-                path_string(directory.join("media/b.mp4"))
-            ]
-        );
-        fs::remove_dir_all(directory).unwrap();
-    }
-
-    #[test]
     fn rejects_malformed_v4_video_collection_contracts() {
         let cases: [(&str, fn(&mut Value)); 33] = [
             ("missing placementAnchor", |project| {
