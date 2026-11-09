@@ -16,6 +16,10 @@ finish-args:
   - --device=dri # GPU rendering and VAAPI/NVENC export
   - --filesystem=xdg-documents # ~/Documents/OVRLEY holds templates and renders
   - --filesystem=xdg-videos
+  # NVIDIA's egl-wayland in the GL extension enables explicit sync on WebKit's surface, then a
+  # commit without an acquire point makes the compositor drop the connection (Error 71) at startup.
+  # Only NVIDIA's driver reads this; it keeps WebKit's GPU renderer instead of disabling DMABUF.
+  - --env=__NV_DISABLE_EXPLICIT_SYNC=1
 
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node24/bin:/run/build/ovrley/tools/bin
