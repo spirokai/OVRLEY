@@ -209,41 +209,40 @@ export function VideoImportDialog(props) {
   const isProbing = phase === 'probing'
   const isImporting = phase === 'importing'
   const isConfirming = phase === 'confirming'
+  // While the files are read (or the dialog closes) the frame stays and only the body shows the status.
+  const isLoading = isProbing || !open
   const description = t(
     'video-preview.importDescription',
     'Check the sync of every video before importing. Sync is the start of a video in seconds from the start of the activity (or of the first video).',
   )
   const importLabel = (count) => t('video-preview.importConfirm', { defaultValue: 'Import {{count}} videos', count })
   const importAnywayLabel = t('video-preview.importAnyway', 'Import anyway')
-  const newCount = props.rows?.filter((row) => row.isNew).length ?? 0
+  const newCount = isLoading ? props.fileCount : props.rows.filter((row) => row.isNew).length
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && !isImporting && onCancel()}>
       <DialogContent
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
-        className="w-full max-w-5xl rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50"
+        className="flex max-h-[90vh] w-full max-w-5xl flex-col rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50 md:h-[min(42rem,90vh)]"
       >
         <div className="flex items-center gap-1">
           <DialogTitle className="text-lg font-bold">{t('video-preview.importTitle', 'Import videos')}</DialogTitle>
-          {isProbing || !open ? null : <HelpTooltip content={description} />}
+          {isLoading ? null : <HelpTooltip content={description} />}
         </div>
-        {isProbing || !open ? (
-          <DialogDescription className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
+        {isLoading ? (
+          <DialogDescription className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             {t('video-preview.importReading', { defaultValue: 'Reading {{count}} files…', count: props.fileCount })}
           </DialogDescription>
         ) : (
           <>
             <DialogDescription className="sr-only">{description}</DialogDescription>
-            <div className="mt-4 grid gap-8 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-              <div className="min-w-0 space-y-8">
+            <div className="mt-4 grid min-h-0 flex-1 gap-8 overflow-y-auto md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:grid-rows-[minmax(0,1fr)] md:overflow-visible">
+              <div className="min-w-0 space-y-8 md:overflow-y-auto">
                 <VideoSyncControls {...props.sync} title={t('video-preview.importGlobalSync', 'Global sync')} />
                 <TransitionSection transition={props.transition} />
               </div>
-              {/* Sized by the left column: the list fills its height and scrolls instead of growing the dialog. */}
-              <section
-                aria-label={t('video-preview.importVideosHeading', 'Importing videos')}
-                className="flex min-w-0 flex-col gap-4 md:min-h-80 md:[contain:size]"
-              >
+              {/* The list fills the rest of the column and scrolls instead of growing the dialog. */}
+              <section aria-label={t('video-preview.importVideosHeading', 'Importing videos')} className="flex min-h-0 min-w-0 flex-col gap-4">
                 <SectionHeading icon={Film} title={t('video-preview.importVideosHeading', 'Importing videos')} variant="drawer" />
                 {props.issues.length > 0 ? (
                   <div role="alert" className={cn('flex gap-2 rounded-sm bg-amber-500/15 p-3 text-amber-500', SELECTABLE_TEXT_CLASS)}>
@@ -281,46 +280,46 @@ export function VideoImportDialog(props) {
                 </ul>
               </section>
             </div>
-            {isConfirming ? (
-              <div role="alert" className={cn('mt-6 flex gap-2 rounded-sm bg-amber-500/15 p-3 text-xs text-amber-500', SELECTABLE_TEXT_CLASS)}>
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <p>
-                  {t('video-preview.importFarConfirm', {
-                    defaultValue:
-                      'These videos start far from the activity or the other videos: {{names}}. The timeline will run from {{from}} to {{to}}. Import them anyway?',
-                    names: props.farConfirmation.names.join(', '),
-                    from: props.farConfirmation.from,
-                    to: props.farConfirmation.to,
-                  })}
-                </p>
-              </div>
-            ) : null}
-            <div className="mt-6 flex items-center justify-end gap-3">
-              {props.error !== null ? (
-                <p role="alert" className={cn('mr-auto text-xs text-red-700', SELECTABLE_TEXT_CLASS)}>
-                  {props.error}
-                </p>
-              ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
-                onClick={isConfirming ? props.onBack : onCancel}
-                disabled={isImporting}
-              >
-                {isConfirming ? t('video-preview.importBack', 'Back') : t('video-preview.cancel', 'Cancel')}
-              </Button>
-              <Button type="button" className="tabular-nums" onClick={props.onConfirm} disabled={isImporting || props.importCount === 0}>
-                {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                <StableLabel
-                  label={isConfirming ? importAnywayLabel : importLabel(props.importCount)}
-                  // A sample count of every plural form (one, few, many in most languages) and the largest count.
-                  alternatives={[...new Set([1, 2, 5, newCount].map(importLabel)), importAnywayLabel]}
-                />
-              </Button>
-            </div>
           </>
         )}
+        {isConfirming ? (
+          <div role="alert" className={cn('mt-6 flex gap-2 rounded-sm bg-amber-500/15 p-3 text-xs text-amber-500', SELECTABLE_TEXT_CLASS)}>
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              {t('video-preview.importFarConfirm', {
+                defaultValue:
+                  'These videos start far from the activity or the other videos: {{names}}. The timeline will run from {{from}} to {{to}}. Import them anyway?',
+                names: props.farConfirmation.names.join(', '),
+                from: props.farConfirmation.from,
+                to: props.farConfirmation.to,
+              })}
+            </p>
+          </div>
+        ) : null}
+        <div className="mt-6 flex items-center justify-end gap-3">
+          {!isLoading && props.error !== null ? (
+            <p role="alert" className={cn('mr-auto text-xs text-red-700', SELECTABLE_TEXT_CLASS)}>
+              {props.error}
+            </p>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
+            onClick={isConfirming ? props.onBack : onCancel}
+            disabled={isImporting}
+          >
+            {isConfirming ? t('video-preview.importBack', 'Back') : t('video-preview.cancel', 'Cancel')}
+          </Button>
+          <Button type="button" className="tabular-nums" onClick={props.onConfirm} disabled={isLoading || isImporting || props.importCount === 0}>
+            {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            <StableLabel
+              label={isConfirming ? importAnywayLabel : importLabel(isLoading ? props.fileCount : props.importCount)}
+              // A sample count of every plural form (one, few, many in most languages) and the largest count.
+              alternatives={[...new Set([1, 2, 5, newCount].map(importLabel)), importAnywayLabel]}
+            />
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )
