@@ -6,11 +6,12 @@
  * Pure presentational - all logic is in useVideoImportReview.
  */
 
-import { AlertTriangle, ArrowDown, ArrowUp, Blend, Download, Loader2 } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, Blend, Download, Film, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { HelpTooltip } from '@/components/ui/help-tooltip'
 import { Label } from '@/components/ui/label'
 import { SecondsInput } from '@/components/ui/seconds-input'
 import { SectionHeading } from '@/components/ui/section-heading'
@@ -20,10 +21,12 @@ import { VideoSyncControls } from '@/features/video-sync'
 import { formatSecondsClock } from '@/lib/time-format'
 import { cn } from '@/lib/utils'
 
-const ICON_BUTTON_CLASS = 'h-8 w-8 shrink-0 text-muted-foreground hover:bg-surface-accent-soft hover:text-primary'
+const ICON_BUTTON_CLASS =
+  'h-8 w-8 shrink-0 text-muted-foreground hover:bg-surface-accent-soft hover:text-primary disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-muted-foreground'
 // Text selection is off app-wide (`index.css`); the dialog's text can be copied.
 const SELECTABLE_TEXT_CLASS = 'select-text **:select-text'
 
+// The switch and the badge show whether a video is imported; the status only warns.
 function statusLabel(row, resolutionLabel, t) {
   if (row.hasOtherResolution) {
     return t('video-preview.importOtherResolution', {
@@ -31,8 +34,25 @@ function statusLabel(row, resolutionLabel, t) {
       resolution: resolutionLabel,
     })
   }
-  if (row.isNew) return row.isIncluded ? t('video-preview.importJoins', 'Will be imported') : t('video-preview.importSkipped', 'Not imported')
-  return row.isIncluded ? t('video-preview.importKept', 'Already imported') : t('video-preview.importRemoved', 'Will be removed from the project')
+  if (row.isNew || row.isIncluded) return null
+  return t('video-preview.importRemoved', 'Will be removed from the project')
+}
+
+/**
+ * Renders the current label over invisible alternatives in one grid cell, so the
+ * element is as wide as the widest of them in any language and never resizes.
+ */
+function StableLabel({ label, alternatives }) {
+  return (
+    <span className="inline-grid justify-items-center">
+      <span className="col-start-1 row-start-1">{label}</span>
+      {alternatives.map((alternative) => (
+        <span key={alternative} aria-hidden="true" className="invisible col-start-1 row-start-1">
+          {alternative}
+        </span>
+      ))}
+    </span>
+  )
 }
 
 function farLabel(windowKind, t) {
@@ -43,13 +63,15 @@ function farLabel(windowKind, t) {
 
 function VideoImportRow({ row, windowKind, resolutionLabel }) {
   const { t } = useTranslation()
+  const status = statusLabel(row, resolutionLabel, t)
   return (
     <li
       aria-label={row.filename}
-      className="grid grid-cols-[2rem_minmax(0,1fr)_9.5rem_4.25rem] items-start gap-3 rounded-sm px-2 py-2 hover:bg-surface-elevated"
+      className="grid grid-cols-[2rem_minmax(0,1fr)_4rem_9.5rem] items-start gap-3 rounded-sm px-2 py-2 hover:bg-surface-elevated"
     >
-      <div className="flex h-8 items-center">
+      <div className="flex">
         <Switch
+          variant="status"
           checked={row.isIncluded}
           onCheckedChange={row.onIncludedChange}
           disabled={row.onIncludedChange === null}
@@ -66,7 +88,7 @@ function VideoImportRow({ row, windowKind, resolutionLabel }) {
             {row.filename}
           </span>
           {row.isNew ? (
-            <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[0.6rem]">
+            <Badge variant="secondary" className="shrink-0 rounded-xs px-1.5 py-0 text-[0.6rem]">
               {t('video-preview.importNew', 'New')}
             </Badge>
           ) : null}
@@ -79,22 +101,9 @@ function VideoImportRow({ row, windowKind, resolutionLabel }) {
         >
           {row.formatLabel}
         </p>
-        <p
-          className={cn(
-            'text-[0.7rem] leading-tight',
-            row.hasOtherResolution
-              ? 'text-red-700'
-              : !row.isIncluded
-                ? row.isNew
-                  ? 'text-muted-foreground/70'
-                  : 'text-amber-500'
-                : row.isNew
-                  ? 'text-green-700'
-                  : 'text-muted-foreground/70',
-          )}
-        >
-          {statusLabel(row, resolutionLabel, t)}
-        </p>
+        {status !== null ? (
+          <p className={cn('text-[0.7rem] leading-tight', row.hasOtherResolution ? 'text-red-700' : 'text-amber-500')}>{status}</p>
+        ) : null}
         {row.isFar ? <p className="text-[0.7rem] leading-tight text-amber-500">{farLabel(windowKind, t)}</p> : null}
         {row.isPositioned ? (
           <p className="text-[0.7rem] leading-tight text-muted-foreground/70">
@@ -110,6 +119,30 @@ function VideoImportRow({ row, windowKind, resolutionLabel }) {
             })}
           </p>
         ))}
+      </div>
+      <div className="flex items-center">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={ICON_BUTTON_CLASS}
+          onClick={row.onMoveUp}
+          disabled={row.onMoveUp === null}
+          aria-label={t('video-preview.importMoveUp', { defaultValue: 'Move {{name}} up', name: row.filename })}
+        >
+          <ArrowUp className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={ICON_BUTTON_CLASS}
+          onClick={row.onMoveDown}
+          disabled={row.onMoveDown === null}
+          aria-label={t('video-preview.importMoveDown', { defaultValue: 'Move {{name}} down', name: row.filename })}
+        >
+          <ArrowDown className="h-3.5 w-3.5" />
+        </Button>
       </div>
       <SecondsInput
         value={row.offsetSeconds}
@@ -127,34 +160,6 @@ function VideoImportRow({ row, windowKind, resolutionLabel }) {
         className="h-8 text-xs"
         aria-label={t('video-preview.importSyncOf', { defaultValue: 'Sync of {{name}}', name: row.filename })}
       />
-      <div className="flex flex-wrap items-center justify-end">
-        {row.isPositioned ? (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className={ICON_BUTTON_CLASS}
-              onClick={row.onMoveUp}
-              disabled={row.onMoveUp === null}
-              aria-label={t('video-preview.importMoveUp', { defaultValue: 'Move {{name}} up', name: row.filename })}
-            >
-              <ArrowUp className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className={ICON_BUTTON_CLASS}
-              onClick={row.onMoveDown}
-              disabled={row.onMoveDown === null}
-              aria-label={t('video-preview.importMoveDown', { defaultValue: 'Move {{name}} down', name: row.filename })}
-            >
-              <ArrowDown className="h-3.5 w-3.5" />
-            </Button>
-          </>
-        ) : null}
-      </div>
     </li>
   )
 }
@@ -204,13 +209,23 @@ export function VideoImportDialog(props) {
   const isProbing = phase === 'probing'
   const isImporting = phase === 'importing'
   const isConfirming = phase === 'confirming'
+  const description = t(
+    'video-preview.importDescription',
+    'Check the sync of every video before importing. Sync is the start of a video in seconds from the start of the activity (or of the first video).',
+  )
+  const importLabel = (count) => t('video-preview.importConfirm', { defaultValue: 'Import {{count}} videos', count })
+  const importAnywayLabel = t('video-preview.importAnyway', 'Import anyway')
+  const newCount = props.rows?.filter((row) => row.isNew).length ?? 0
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && !isImporting && onCancel()}>
       <DialogContent
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
         className="w-full max-w-5xl rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50"
       >
-        <DialogTitle className="text-lg font-bold">{t('video-preview.importTitle', 'Import videos')}</DialogTitle>
+        <div className="flex items-center gap-1">
+          <DialogTitle className="text-lg font-bold">{t('video-preview.importTitle', 'Import videos')}</DialogTitle>
+          {isProbing || !open ? null : <HelpTooltip content={description} />}
+        </div>
         {isProbing || !open ? (
           <DialogDescription className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -218,18 +233,18 @@ export function VideoImportDialog(props) {
           </DialogDescription>
         ) : (
           <>
-            <DialogDescription className={cn('text-sm text-muted-foreground', SELECTABLE_TEXT_CLASS)}>
-              {t(
-                'video-preview.importDescription',
-                'Check the sync of every video before importing. Sync is the start of a video in seconds from the start of the activity (or of the first video).',
-              )}
-            </DialogDescription>
+            <DialogDescription className="sr-only">{description}</DialogDescription>
             <div className="mt-4 grid gap-8 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
               <div className="min-w-0 space-y-8">
-                <VideoSyncControls {...props.sync} />
+                <VideoSyncControls {...props.sync} title={t('video-preview.importGlobalSync', 'Global sync')} />
                 <TransitionSection transition={props.transition} />
               </div>
-              <div className="flex min-h-0 min-w-0 flex-col gap-3">
+              {/* Sized by the left column: the list fills its height and scrolls instead of growing the dialog. */}
+              <section
+                aria-label={t('video-preview.importVideosHeading', 'Importing videos')}
+                className="flex min-w-0 flex-col gap-4 md:min-h-80 md:[contain:size]"
+              >
+                <SectionHeading icon={Film} title={t('video-preview.importVideosHeading', 'Importing videos')} variant="drawer" />
                 {props.issues.length > 0 ? (
                   <div role="alert" className={cn('flex gap-2 rounded-sm bg-amber-500/15 p-3 text-amber-500', SELECTABLE_TEXT_CLASS)}>
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -246,7 +261,7 @@ export function VideoImportDialog(props) {
                 <ul
                   aria-label={t('video-preview.importVideos', 'Videos')}
                   className={cn(
-                    'max-h-[55vh] min-h-0 space-y-1 overflow-y-auto rounded-sm border border-border/70 bg-surface p-2 [scrollbar-gutter:stable]',
+                    'max-h-[55vh] min-h-0 flex-1 space-y-1 overflow-y-auto md:max-h-none rounded-sm border border-border/70 bg-surface p-2 [scrollbar-gutter:stable]',
                     SELECTABLE_TEXT_CLASS,
                   )}
                 >
@@ -264,7 +279,7 @@ export function VideoImportDialog(props) {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </section>
             </div>
             {isConfirming ? (
               <div role="alert" className={cn('mt-6 flex gap-2 rounded-sm bg-amber-500/15 p-3 text-xs text-amber-500', SELECTABLE_TEXT_CLASS)}>
@@ -295,11 +310,13 @@ export function VideoImportDialog(props) {
               >
                 {isConfirming ? t('video-preview.importBack', 'Back') : t('video-preview.cancel', 'Cancel')}
               </Button>
-              <Button type="button" onClick={props.onConfirm} disabled={isImporting || props.importCount === 0}>
+              <Button type="button" className="tabular-nums" onClick={props.onConfirm} disabled={isImporting || props.importCount === 0}>
                 {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                {isConfirming
-                  ? t('video-preview.importAnyway', 'Import anyway')
-                  : t('video-preview.importConfirm', { defaultValue: 'Import {{count}} videos', count: props.importCount })}
+                <StableLabel
+                  label={isConfirming ? importAnywayLabel : importLabel(props.importCount)}
+                  // A sample count of every plural form (one, few, many in most languages) and the largest count.
+                  alternatives={[...new Set([1, 2, 5, newCount].map(importLabel)), importAnywayLabel]}
+                />
               </Button>
             </div>
           </>

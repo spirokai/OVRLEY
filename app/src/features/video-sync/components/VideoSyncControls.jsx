@@ -12,9 +12,11 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
  * sync only where it is available (`openManualVideoSync`, after import).
  *
  * @param {object} props Video sync state and actions.
+ * @param {string} [props.title] Heading text; the Sync Doctor title by default.
  * @returns {JSX.Element} Rendered controls.
  */
 export function VideoSyncControls({
+  title,
   canResetCreationTime,
   filenameCreationTimeAvailable,
   timezoneDisabled,
@@ -35,7 +37,7 @@ export function VideoSyncControls({
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
-        <SectionHeading icon={Clock3} title={t('toolbar.videoSync', 'Video Sync')} variant="drawer" />
+        <SectionHeading icon={Clock3} title={title ?? t('toolbar.videoSync', 'Video Sync')} variant="drawer" />
         <Button
           type="button"
           variant="ghost"

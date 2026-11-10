@@ -606,6 +606,8 @@
     "importDescription": "Check the sync of every video before importing. Sync is the start of a video in seconds from the start of the activity (or of the first video).",
     "importSingleFileBlocked": "These videos cannot be exported as one file:",
     "importVideos": "Videos",
+    "importVideosHeading": "Importing videos",
+    "importGlobalSync": "Global sync",
     "importFailed": "Not imported: {{message}}",
     "importConfirm_one": "Import {{count}} video",
     "importConfirm_other": "Import {{count}} videos",
