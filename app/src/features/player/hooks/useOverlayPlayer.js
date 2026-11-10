@@ -24,6 +24,9 @@ import useTimelineViewport from './useTimelineViewport'
 import useVideoCuts from './useVideoCuts'
 import useVideoSyncTimeline from '@/features/video-sync/hooks/useVideoSyncTimeline'
 
+/** Elements whose clicks keep the clip selection: kept areas, and the portaled popups and dialogs they open. */
+const KEEPS_CLIP_SELECTION = '[data-keeps-clip-selection], [data-radix-popper-content-wrapper], [role="dialog"]'
+
 function getMarkerClassName(marker) {
   return `mt-1 h-4 w-2.5 bg-success/10 ${
     marker === 'from' ? 'rounded-l-sm border-b-2 border-l-2 border-t-2' : 'rounded-r-sm border-b-2 border-r-2 border-t-2'
@@ -124,10 +127,11 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
   const { getExportMarkerProps, updateTimelineMetrics } = gestures
 
   // Selection ends when the user clicks outside the timeline, its toolbar, the video panel, and the video drawer;
-  // the store ends it when its clip leaves the timeline.
+  // the store ends it when its clip leaves the timeline. Pickers, menus, and dialogs are portaled outside those
+  // areas but belong to the control that opened them, so using them keeps the selection.
   useEffect(() => {
     const clearClipSelection = (event) => {
-      if (useStore.getState().selectedClip !== null && !event.target.closest?.('[data-keeps-clip-selection]')) selectClip(null)
+      if (useStore.getState().selectedClip !== null && !event.target.closest?.(KEEPS_CLIP_SELECTION)) selectClip(null)
     }
     window.addEventListener('pointerdown', clearClipSelection, true)
     return () => window.removeEventListener('pointerdown', clearClipSelection, true)

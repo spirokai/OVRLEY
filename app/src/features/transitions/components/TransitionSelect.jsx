@@ -27,13 +27,26 @@ export function TransitionSelect({ value, label, previewType, defaultLabel = nul
     setOpen(false)
     onSelect(option)
   }
+  const hasPreview = previewType !== null
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button id={id} type="button" disabled={disabled} data-size={size} className={cn(SELECT_TRIGGER_CLASS, 'min-w-0 text-xs')}>
-          <span className="flex min-w-0 items-center gap-2">
-            {previewType !== null ? (
-              <span aria-hidden="true" style={transitionPreviewStyle(previewType)} className="h-4 w-7 shrink-0 rounded-[2px]" />
+        <button
+          id={id}
+          type="button"
+          disabled={disabled}
+          data-size={size}
+          // The preview fills the trigger's height inside a hairline inset; the label keeps the trigger's padding.
+          className={cn(SELECT_TRIGGER_CLASS, 'min-w-0 text-xs', hasPreview && 'py-0.5 pl-1')}
+        >
+          <span className={cn('flex min-w-0 items-center gap-3', hasPreview && 'self-stretch')}>
+            {hasPreview ? (
+              <span
+                aria-hidden="true"
+                style={transitionPreviewStyle(previewType)}
+                // Widths keep the 120:68 preview cell at the inset height of each trigger size.
+                className={cn('shrink-0 self-stretch rounded-[2px]', size === 'sm' ? 'w-11.5' : 'w-13')}
+              />
             ) : null}
             <span className="truncate">{label}</span>
           </span>

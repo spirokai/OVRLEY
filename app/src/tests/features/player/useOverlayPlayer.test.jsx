@@ -56,6 +56,27 @@ describe('useOverlayPlayer', () => {
     expect(timelineClips(result).map((clip) => clip.id)).toEqual(['video:video-1', 'activity'])
   })
 
+  test('keeps the clip selection for clicks in kept areas and the popups and dialogs they open, and ends it on other clicks', () => {
+    renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
+    const selection = { laneId: 'video:video-1', segmentKey: null }
+    act(() => useStore.getState().selectClip(selection))
+    const pointerDownOn = (attributes) => {
+      const element = document.createElement('div')
+      for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value)
+      document.body.append(element)
+      act(() => element.dispatchEvent(new Event('pointerdown', { bubbles: true })))
+      element.remove()
+    }
+
+    pointerDownOn({ 'data-keeps-clip-selection': '' })
+    pointerDownOn({ 'data-radix-popper-content-wrapper': '' })
+    pointerDownOn({ role: 'dialog' })
+    expect(useStore.getState().selectedClip).toEqual(selection)
+
+    pointerDownOn({})
+    expect(useStore.getState().selectedClip).toBeNull()
+  })
+
   test('routes toolbar transport commands through store playback state', () => {
     const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
 

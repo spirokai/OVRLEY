@@ -6,6 +6,7 @@ import { SecondsInput } from '@/components/ui/seconds-input'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { Switch } from '@/components/ui/switch'
 import { JoinTransitionControl } from '@/features/transitions'
+import { VideoSyncControls } from '@/features/video-sync'
 import { cn } from '@/lib/utils'
 import { useFileDropZone } from '../hooks/useFileDropZone'
 import { useSelectedVideoRow } from '../hooks/useSelectedVideoRow'
@@ -208,8 +209,9 @@ function SelectedVideoDetails({ row }) {
 }
 
 /**
- * Renders the video import controls and the details of the video selected in the
- * video panel; the panel holds the video list and the project's video settings.
+ * Renders the video import controls, the session's video sync settings, and the
+ * details of the selected video clip; the video panel holds the video list and the
+ * default transitions.
  *
  * @param {object} props - Component props.
  * @param {boolean} props.hasVideos - Whether the project has videos.
@@ -217,7 +219,7 @@ function SelectedVideoDetails({ row }) {
  * @param {(videoId: string) => void} props.onRemoveVideo - Removes one imported video.
  * @param {(videoId: string) => void} props.onLocateVideo - Asks for the file of a missing video.
  * @param {(selections: Array<File|string>) => void} props.onDropVideoFiles - Imports dropped video files or native paths.
- * @param {{timezone: string|null, videoSyncTimezoneMode: 'local'|'utc'|null}} props.videoSync - Timezone used to show recording times.
+ * @param {object} props.videoSync - Video sync state and handlers; its timezone also shows recording times.
  * @returns {JSX.Element} Rendered drawer content.
  */
 export function VideoDrawerContent({ hasVideos, onBrowseVideo, onRemoveVideo, onLocateVideo, onDropVideoFiles, videoSync }) {
@@ -248,13 +250,12 @@ export function VideoDrawerContent({ hasVideos, onBrowseVideo, onRemoveVideo, on
       />
 
       {hasVideos ? (
-        <div className="mt-10 border-t border-border/80 pt-2">
+        <div className="mt-10 space-y-8 border-t border-border/80 pt-6">
+          {videoSync.activitySummary ? <VideoSyncControls {...videoSync} /> : null}
           {row !== null ? (
             <SelectedVideoDetails row={row} />
           ) : (
-            <p className="px-2 pt-4 text-center text-xs text-muted-foreground">
-              {t('toolbar.selectVideoHint', 'Select a video to see its details.')}
-            </p>
+            <p className="px-2 text-center text-xs text-muted-foreground">{t('toolbar.selectVideoHint', 'Select a video to see its details.')}</p>
           )}
         </div>
       ) : null}

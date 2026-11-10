@@ -5,7 +5,6 @@ import { Label } from '@/components/ui/label'
 import { SecondsInput } from '@/components/ui/seconds-input'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { TransitionSelect } from '@/features/transitions'
-import { VideoSyncControls } from '@/features/video-sync'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { cn } from '@/lib/utils'
 import { useTransitionDefaultsSection } from '../hooks/useTransitionDefaultsSection'
@@ -36,7 +35,7 @@ function TransitionDefaultsSection() {
           "Used at every join you have not set yourself. Separate videos closer together than the continuity threshold, such as a camera's split recording, are joined without a transition.",
         )}
       />
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-2">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         <LabeledField id="transition-defaults-type" label={t('video-preview.transitionType', 'Transition')}>
           <TransitionSelect
             id="transition-defaults-type"
@@ -141,27 +140,25 @@ function VideoCard({ card }) {
 }
 
 /**
- * The video tab's companion panel, in place of the widget sidebar: the project's
- * video settings above a column of video cards in timeline order.
+ * The video tab's companion panel, in place of (and as wide as) the widget sidebar:
+ * the default transitions above a two-column grid of video cards in timeline order.
  *
  * @param {object} props - Component props.
  * @param {() => void} props.onDeleteVideo - Removes every imported video.
  * @param {(videoId: string) => void} props.onRemoveVideo - Removes one imported video.
- * @param {object} props.videoSync - Video sync state and handlers.
  * @returns {JSX.Element} Rendered panel.
  */
-export function VideoPanel({ onDeleteVideo, onRemoveVideo, videoSync }) {
+export function VideoPanel({ onDeleteVideo, onRemoveVideo }) {
   const { t } = useTranslation()
   const cards = useVideoCards({ onRemoveVideo })
 
   return (
     <aside
-      className="relative z-60 flex h-full w-83 min-w-83 max-w-83 shrink-0 flex-col overflow-y-auto border-l border-border bg-card px-4.5 pb-4 thin-scrollbar"
+      className="relative z-60 flex h-full w-106 min-w-106 max-w-106 shrink-0 flex-col overflow-y-auto border-l border-border bg-card px-4.5 pb-4 thin-scrollbar"
       data-keeps-clip-selection
     >
       {cards.length > 0 ? (
         <div className="space-y-8 py-4">
-          {videoSync.activitySummary ? <VideoSyncControls {...videoSync} /> : null}
           <TransitionDefaultsSection />
           <section className="space-y-3" aria-label={t('toolbar.importedVideos', 'Imported videos')}>
             <SectionHeading
@@ -180,7 +177,7 @@ export function VideoPanel({ onDeleteVideo, onRemoveVideo, videoSync }) {
                 </Button>
               }
             />
-            <ul className="space-y-3" aria-label={t('toolbar.videos', 'Videos')}>
+            <ul className="grid grid-cols-2 gap-3" aria-label={t('toolbar.videos', 'Videos')}>
               {cards.map((card) => (
                 <VideoCard key={card.id} card={card} />
               ))}

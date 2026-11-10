@@ -91,4 +91,32 @@ describe('VideoDrawerContent', () => {
 
     expect(onLocateVideo).toHaveBeenCalledExactlyOnceWith('video-1')
   })
+
+  test('holds the video sync settings and offers manual sync when automatic sync cannot find an offset', () => {
+    useStore.setState(videoStoreState([ride]))
+    const openManualVideoSync = vi.fn()
+    renderDrawer({
+      videoSync: {
+        ...videoSync,
+        activitySummary: { timezone: 'Europe/Zurich', syncTime: '2026-07-18T07:20:03.000Z' },
+        canResetCreationTime: false,
+        filenameCreationTimeAvailable: true,
+        sharedOffsetSeconds: 0,
+        sharedOffsetFps: { num: 30, den: 1 },
+        timezoneDisabled: false,
+        videoSyncWarning: 'Video could not be synced with activity',
+        openManualVideoSync,
+        computeVideoSync: vi.fn(),
+        commitSharedOffset: vi.fn(() => null),
+        resetVideoCreationTimes: vi.fn(),
+        setVideoCreationTimesFromFilenames: vi.fn(),
+        setVideoSyncTimezoneMode: vi.fn(),
+      },
+    })
+
+    expect(screen.getByRole('heading', { name: 'Sync Doctor' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open Manual Sync' }))
+
+    expect(openManualVideoSync).toHaveBeenCalledOnce()
+  })
 })
