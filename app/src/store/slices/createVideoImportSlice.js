@@ -19,6 +19,7 @@ import {
   setVideoOffset,
   setVideoSyncTimezoneMode,
   shiftVideoOffsets,
+  trimVideo,
 } from '@/lib/video-program/collection-edits'
 import { requireTelemetry } from '@/lib/video-program/imported-video'
 import { DEFAULT_TRANSITION_SETTINGS, requireTransitionDefaults } from '@/lib/video-program/transition-catalog'
@@ -207,6 +208,13 @@ export const createVideoImportSlice = (set, get) => ({
       cutId = cutVideo(draft, videoId, frame)
     })
     return cutId
+  },
+
+  /** Trims the start or end of a video, excluding the outer part (see `trimVideo`). */
+  trimVideo: (videoId, side, frame) => {
+    set((draft) => {
+      trimVideo(draft, videoId, side, frame)
+    })
   },
 
   /** Moves a cut to another frame between its neighbours (see `moveCut`). */

@@ -53,6 +53,28 @@ describe('video edits in the store', () => {
     expect(edits().segments.start.excluded).toBe(expected)
   })
 
+  test('a trim cuts the video and excludes the outer part in one undoable step, and never passes a cut', () => {
+    useStore.getState().setJoinTransition({ videoId: 'ride', segmentKey: 'start' }, { type: 'fade', durationSeconds: 1 })
+    const cutId = useStore.getState().cutVideo('ride', 150)
+
+    useStore.getState().trimVideo('ride', 'start', 30)
+    const [trim] = edits().cuts
+    expect(trim.frame).toBe(30)
+    // The video's incoming transition moves to the part that now starts it.
+    expect(edits().segments.start).toEqual({ excluded: true, transitionIn: null })
+    expect(edits().segments[trim.id]).toEqual({ excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 } })
+    useStore.getState().trimVideo('ride', 'end', 270)
+    expect(edits().cuts.map((cut) => cut.frame)).toEqual([30, 150, 270])
+    expect(edits().segments[edits().cuts[2].id].excluded).toBe(true)
+
+    expect(() => useStore.getState().trimVideo('ride', 'start', 20)).toThrow('already excluded')
+    useStore.temporal.getState().undo()
+    useStore.temporal.getState().undo()
+    expect(edits().cuts).toEqual([{ id: cutId, frame: 150 }])
+    expect(edits().segments.start).toEqual({ excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 } })
+    expect(() => useStore.getState().trimVideo('ride', 'end', 100)).toThrow('cannot pass a cut')
+  })
+
   test('keeping the cut changes nothing, and removing the video ends the question', () => {
     const cutId = useStore.getState().cutVideo('ride', 150)
     useStore.getState().setVideoSegmentExcluded('ride', cutId, true)

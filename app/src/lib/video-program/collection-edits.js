@@ -271,6 +271,32 @@ export function cutVideo(draft, videoId, frame) {
 }
 
 /**
+ * Trims the start or end of a video: cuts it at a frame before its first cut (start)
+ * or after its last cut (end) and excludes the outer part. A start trim hands the
+ * video's incoming transition to the part that now starts it.
+ * @param {object} draft Collection draft.
+ * @param {string} videoId Video ID.
+ * @param {'start'|'end'} side Trimmed end of the video.
+ * @param {number} frame Integer frame of the new cut.
+ * @returns {string} ID of the new cut.
+ */
+export function trimVideo(draft, videoId, side, frame) {
+  const { cuts, segments } = draft.videoEdits[videoId]
+  const outer = side === 'start' ? FIRST_SEGMENT_KEY : (cuts.at(-1)?.id ?? FIRST_SEGMENT_KEY)
+  if (segments[outer].excluded) throw new Error(`The ${side} of the video is already excluded`)
+  const bound = side === 'start' ? cuts[0]?.frame : cuts.at(-1)?.frame
+  if (bound !== undefined && (side === 'start' ? frame >= bound : frame <= bound)) throw new Error(`A trim cannot pass a cut: frame ${frame}`)
+  const id = cutVideo(draft, videoId, frame)
+  if (side === 'start') {
+    segments[id].transitionIn = segments[FIRST_SEGMENT_KEY].transitionIn
+    segments[FIRST_SEGMENT_KEY] = { excluded: true, transitionIn: null }
+  } else {
+    segments[id].excluded = true
+  }
+  return id
+}
+
+/**
  * Returns the key of the segment that ends at a cut.
  * @param {{cuts: Array<{id: string}>}} edits Video edits.
  * @param {string} cutId Cut ID.

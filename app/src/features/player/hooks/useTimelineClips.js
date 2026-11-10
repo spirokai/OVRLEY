@@ -8,6 +8,7 @@ import { AlertTriangle, Video } from 'lucide-react'
 import { filenameFromSelectedPath } from '@/lib/file-dialog'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatClockDuration } from '@/lib/time-format'
+import { edgeCutSide, listEdgeCuts } from '../utils/cutDrag'
 import { ACTIVITY_LANE_ID, getClipGeometry, getExportRangeHighlightGeometry, secondsToViewPx, videoLaneId } from '../utils/timelineGeometry'
 import { getActivityAttributeLabel } from '@/lib/widget/widget-presentation'
 import { framesToSeconds } from '@/lib/video-program/frame-grid'
@@ -19,6 +20,7 @@ import i18next from 'i18next'
 import { skippedDefaultLabel } from '@/features/transitions'
 
 const TEXT_HIDE_THRESHOLD_REM = 3
+const EDGE_CUT_MIN_CLIP_REM = 3
 const CLIP_SOURCE_COLUMN_WIDTH = '3rem'
 const CLIP_CONTENT_OFFSET_CLASS = 'translate-y-[0.04rem]'
 const CLIP_SYNC_STEP_SECONDS = 0.1
@@ -71,9 +73,9 @@ function percentStyle(geometry, widthPx) {
  * @param {boolean} options.canSelect Whether clips can be selected for keyboard nudges.
  * @param {Array<object>} options.clips Displayed timeline clips.
  * @param {function} options.commitClipNudge Callback to commit a keyboard sync adjustment.
- * @param {{videoId: string, cutId: string, frame: number}|null} options.draggedCut Cut being dragged (`useCutDrag`), or null.
+ * @param {{videoId: string, cutId: string, frame: number}|null} options.draggedCut Cut being dragged, edge cuts included (`useCutDrag`), or null.
  * @param {{ fromSecond: number, toSecond: number }|null} options.exportHighlightRange Active export highlight range.
- * @param {function} options.getCutDragProps Cut marker drag handler factory from useCutDrag.
+ * @param {function} options.getCutDragProps Cut marker drag handler factory from useCutDrag (edge cuts included).
  * @param {function} options.getLaneDragProps Per-lane drag handler factory from useClipDrag.
  * @param {boolean} options.hasActivity Whether the external activity lane should be present.
  * @param {Map<string, object>} [options.joinModels] Transition controls keyed by join key (`useJoinTransitionModels`).
@@ -324,23 +326,45 @@ export default function useTimelineClips({
     // A join whose default transition did not fit is drawn outside the clip mask, so its tooltip is not clipped.
     const skippedJoinMarkers = joinMarkers.filter((marker) => marker.disabledReason !== null)
 
-    // Cut markers - a hit area per cut of a clip, in the editing workspace: click to remove, drag to move.
+    // Cut markers - a hit area per cut of a clip, in the editing workspace: click to remove, drag to move. An edge
+    // whose outer part is still exported is an edge cut: dragging it in trims that end. Clips too narrow on screen
+    // have no edge cuts, so they can still be moved; a dragged edge cut is in the clip's cuts.
+    const minEdgeCutClipPx = EDGE_CUT_MIN_CLIP_REM * getRootRemPx()
     const cutMarkers = (program === null || program === undefined ? [] : sortVideosByTimeline(clips))
-      .flatMap((clip) =>
-        clip.cuts.map((cut) => {
+      .flatMap((clip) => {
+        const clipWidthPx = getClipGeometry({
+          startSecond: clip.offsetSeconds,
+          durationSeconds: clip.durationSeconds,
+          viewStart,
+          viewEnd,
+          widthPx,
+        }).width
+        const cuts = [...clip.cuts, ...(clipWidthPx >= minEdgeCutClipPx ? listEdgeCuts(clip) : [])]
+        // A fixed order (start edge, cuts, end edge) keeps a dragged edge cut's element in place, and its pointer capture.
+        const bySide = (side) => cuts.filter((cut) => edgeCutSide(cut.id) === side)
+        return [...bySide('start'), ...bySide(null), ...bySide('end')].map((cut) => {
           const sourceSecond = framesToSeconds(cut.frame, clip.fps)
           const second = clip.offsetSeconds + sourceSecond
+          const side = edgeCutSide(cut.id)
+          const name = filenameFromSelectedPath(clip.path)
           return {
             key: `${clip.id}:${cut.id}`,
             isVisible: second >= viewStart && second <= viewEnd,
+            // An edge cut at its edge sits inside the clip; a dragged one is centred on its frame like any cut.
+            align: cut.frame === 0 ? 'start' : cut.frame === clip.frameCount ? 'end' : 'center',
             style: { left: widthPx > 0 ? `${(secondsToViewPx({ second, viewStart, viewEnd, widthPx }) / widthPx) * 100}%` : '0%' },
-            label: i18next.t('player.cutAt', { defaultValue: 'Cut at {{time}}', time: formatClockDuration(sourceSecond) }),
-            onRemove: () => onRemoveCut(clip.id, cut.id),
-            isDragging: draggedCut?.cutId === cut.id,
+            label:
+              side === 'start'
+                ? i18next.t('player.trimStart', { defaultValue: 'Drag to trim the start of {{name}}', name })
+                : side === 'end'
+                  ? i18next.t('player.trimEnd', { defaultValue: 'Drag to trim the end of {{name}}', name })
+                  : i18next.t('player.cutAt', { defaultValue: 'Cut at {{time}}', time: formatClockDuration(sourceSecond) }),
+            onRemove: side === null ? () => onRemoveCut(clip.id, cut.id) : null,
+            isDragging: draggedCut?.videoId === clip.id && draggedCut.cutId === cut.id,
             dragProps: getCutDragProps(clip, cut),
           }
-        }),
-      )
+        })
+      })
       .filter((marker) => marker.isVisible)
 
     const videoClips = clipModels.filter((clip) => clip.isVideo)

@@ -58,6 +58,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       moveVideoSyncLandmark: state.moveVideoSyncLandmark,
       pausePreviewPlayback: state.pausePreviewPlayback,
       moveCut: state.moveCut,
+      trimVideo: state.trimVideo,
       requestCutRemoval: state.requestCutRemoval,
       toggleVideoMute: state.toggleVideoMute,
       isVideoMuted: state.isVideoMuted,
@@ -343,6 +344,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
   // Cut drag - the dragged cut is shown at its draft frame until it is committed on release.
   const cutDrag = useCutDrag({
     moveCut: playerStore.moveCut,
+    trimVideo: playerStore.trimVideo,
     viewEnd: viewport.viewport.viewEnd,
     viewStart: viewport.viewport.viewStart,
     widthPx: viewport.widthPx,

@@ -127,6 +127,8 @@
     "excludeAtPlayhead": "Exclude this part from export",
     "includeAtPlayhead": "Include this part in export",
     "cutAt": "Cut at {{time}}",
+    "trimStart": "Drag to trim the start of {{name}}",
+    "trimEnd": "Drag to trim the end of {{name}}",
     "removeCut": "Remove cut",
     "cutRemovalTitle": "Remove this cut?",
     "cutRemovalDescription": "One side of this cut is included in the export and the other is excluded. Choose what happens to the merged part.",

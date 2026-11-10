@@ -52,29 +52,41 @@ function JoinMarker({ marker }) {
   )
 }
 
+const CUT_MARKER_ALIGN = {
+  center: { area: '-translate-x-1/2', line: 'left-1/2 -translate-x-1/2' },
+  start: { area: '', line: 'left-0' },
+  end: { area: '-translate-x-full', line: 'right-0' },
+}
+
+/**
+ * A hit area over a cut: drag moves the cut, and the line shows on hover and while dragging. A real cut's click
+ * opens a popover that removes it; an edge cut (which trims the clip when dragged in) sits inside the clip's edge.
+ */
 function CutMarker({ marker }) {
   const { t } = useTranslation()
+  const align = CUT_MARKER_ALIGN[marker.align]
+  const hitArea = (
+    <button
+      type="button"
+      aria-label={marker.label}
+      title={marker.label}
+      className={`group/cut absolute top-3 bottom-1 z-20 w-2 cursor-ew-resize touch-none bg-transparent outline-none ${align.area}`}
+      style={marker.style}
+      onDoubleClick={stopPropagation}
+      {...marker.dragProps}
+    >
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-y-0 w-0.5 bg-foreground transition-opacity group-hover/cut:opacity-100 group-focus-visible/cut:opacity-100 ${align.line} ${
+          marker.isDragging ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+    </button>
+  )
+  if (marker.onRemove === null) return hitArea
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        {/* A hit area over the seam: click opens the popover, drag moves the cut; the line shows on hover and while dragging. */}
-        <button
-          type="button"
-          aria-label={marker.label}
-          title={marker.label}
-          className="group/cut absolute top-3 bottom-1 z-20 w-2 -translate-x-1/2 cursor-ew-resize touch-none bg-transparent outline-none"
-          style={marker.style}
-          onDoubleClick={stopPropagation}
-          {...marker.dragProps}
-        >
-          <span
-            aria-hidden="true"
-            className={`pointer-events-none absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-foreground transition-opacity group-hover/cut:opacity-100 group-focus-visible/cut:opacity-100 ${
-              marker.isDragging ? 'opacity-100' : 'opacity-0'
-            }`}
-          />
-        </button>
-      </PopoverTrigger>
+      <PopoverTrigger asChild>{hitArea}</PopoverTrigger>
       <PopoverContent side="top" className="w-56 space-y-2 p-3">
         <p className="text-xs font-semibold">{marker.label}</p>
         <Button type="button" variant="secondary" className="h-7 w-full text-xs" onClick={marker.onRemove}>
