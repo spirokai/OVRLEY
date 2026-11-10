@@ -13,6 +13,7 @@ import { getActivityAttributeLabel } from '@/lib/widget/widget-presentation'
 import { framesToSeconds } from '@/lib/video-program/frame-grid'
 import { sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import { formatVideoWarning } from '@/lib/video-program/video-warnings'
+import { segmentBeforeCut } from '@/lib/video-program/collection-edits'
 import { listVideoSegments } from '@/lib/video-program/video-segments'
 import i18next from 'i18next'
 
@@ -34,14 +35,22 @@ function clipRangeStyle(fromSecond, toSecond, durationSeconds) {
   return { left: `${(fromSecond / durationSeconds) * 100}%`, width: `${((toSecond - fromSecond) / durationSeconds) * 100}%` }
 }
 
-/** Styles of the excluded segments of a clip, positioned within it. */
-function excludedSegmentStyles(clip) {
-  return listVideoSegments(clip)
-    .filter((segment) => segment.excluded)
-    .map((segment) => ({
-      key: segment.key,
-      style: clipRangeStyle(framesToSeconds(segment.startFrame, clip.fps), framesToSeconds(segment.endFrame, clip.fps), clip.durationSeconds),
-    }))
+/** Segment blocks of a clip, positioned within it, with a seam at each cut. */
+function segmentModels(clip, selectedSegmentKey) {
+  const segments = listVideoSegments(clip)
+  return segments.map((segment, index) => ({
+    key: segment.key,
+    excluded: segment.excluded,
+    hasSeamBefore: index > 0,
+    hasSeamAfter: index < segments.length - 1,
+    isSelected: segment.key === selectedSegmentKey,
+    style: clipRangeStyle(framesToSeconds(segment.startFrame, clip.fps), framesToSeconds(segment.endFrame, clip.fps), clip.durationSeconds),
+  }))
+}
+
+/** Segment under a pointer event on a video clip, or null for a keyboard press on the clip itself. */
+function segmentKeyFromEvent(event) {
+  return event.target.closest?.('[data-segment-key]')?.dataset.segmentKey ?? null
 }
 
 function percentStyle(geometry, widthPx) {
@@ -60,7 +69,9 @@ function percentStyle(geometry, widthPx) {
  * @param {boolean} options.canSelect Whether clips can be selected for keyboard nudges.
  * @param {Array<object>} options.clips Displayed timeline clips.
  * @param {function} options.commitClipNudge Callback to commit a keyboard sync adjustment.
+ * @param {{videoId: string, cutId: string, frame: number}|null} options.draggedCut Cut being dragged (`useCutDrag`), or null.
  * @param {{ fromSecond: number, toSecond: number }|null} options.exportHighlightRange Active export highlight range.
+ * @param {function} options.getCutDragProps Cut marker drag handler factory from useCutDrag.
  * @param {function} options.getLaneDragProps Per-lane drag handler factory from useClipDrag.
  * @param {boolean} options.hasActivity Whether the external activity lane should be present.
  * @param {Map<string, object>} [options.joinModels] Transition controls keyed by join key (`useJoinTransitionModels`).
@@ -69,8 +80,8 @@ function percentStyle(geometry, widthPx) {
  * @param {function} [options.onRemoveVideo] Callback to remove a video clip by video ID.
  * @param {Array<{startSecond: number, endSecond: number}>} [options.overlaps] Overlapping timeline intervals of the displayed clips.
  * @param {{pieces: Array<object>, joins: Array<object>}} [options.program] Displayed program, for its join markers.
- * @param {string|null} options.selectedClipId Currently selected clip id.
- * @param {function} options.setSelectedClipId Callback to set selected clip id.
+ * @param {{laneId: string, segmentKey: string|null}|null} options.selectedClip Selected clip, and segment of a video clip.
+ * @param {function} options.setSelectedClip Callback to set the selection.
  * @param {number} options.viewEnd Visible viewport end second.
  * @param {number} options.viewStart Visible viewport start second.
  * @param {Map<string, Array<object>>} [options.warnings] Clip warnings keyed by video ID (`useVideoWarnings`).
@@ -83,7 +94,9 @@ export default function useTimelineClips({
   canSelect,
   clips,
   commitClipNudge,
+  draggedCut,
   exportHighlightRange,
+  getCutDragProps,
   getLaneDragProps,
   hasActivity,
   joinModels,
@@ -92,8 +105,8 @@ export default function useTimelineClips({
   onRemoveVideo,
   overlaps = [],
   program,
-  selectedClipId,
-  setSelectedClipId,
+  selectedClip,
+  setSelectedClip,
   viewEnd,
   viewStart,
   warnings,
@@ -171,30 +184,33 @@ export default function useTimelineClips({
       const visibleEndPx = geometry.isVisible ? clampPx(geometry.x + geometry.width, 0, widthPx) : 0
       const tooltipAnchorPx = visibleStartPx + Math.max(0, visibleEndPx - visibleStartPx) / 2
       const showTooltip = hoveredLaneId === lane.id && Boolean(lane.label)
+      const isSelected = selectedClip?.laneId === lane.id
+      const selectedSegmentKey = isSelected ? selectedClip.segmentKey : null
+      const select = (event) => setSelectedClip({ laneId: lane.id, segmentKey: lane.isVideo ? segmentKeyFromEvent(event) : null })
 
       // Presentational lane model - TimelineLane renders these values without owning calculations.
       return {
         ...lane,
-        excludedSegments: lane.isVideo ? excludedSegmentStyles(lane.clip) : [],
-        clipClassName: lane.isVideo
-          ? `bg-accent/70 ${lane.warnings.length > 0 ? 'outline outline-1 -outline-offset-1 outline-destructive' : ''}`
-          : 'bg-primary/80',
+        segments: lane.isVideo ? segmentModels(lane.clip, selectedSegmentKey) : [],
+        clipClassName: lane.isVideo ? (lane.warnings.length > 0 ? 'outline outline-1 -outline-offset-1 outline-destructive' : '') : 'bg-primary/80',
         clipContentClassName: CLIP_CONTENT_OFFSET_CLASS,
         clipProps: {
           ...dragProps,
           'aria-keyshortcuts': `ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight${lane.isVideo ? ' Delete Backspace' : ''}`,
-          'aria-pressed': selectedClipId === lane.id,
+          'aria-pressed': isSelected,
           tabIndex: canSelect ? 0 : -1,
           onClick: (e) => {
             stopClipEvent(e)
             if (!canSelect) return
+            // Pointer presses select on pointer down; a clip drag captures the pointer, so the click lands on the clip.
+            if (e.detail !== 0) return
             e.currentTarget.focus()
-            setSelectedClipId(lane.id)
+            select(e)
           },
           onDoubleClick: stopClipEvent,
           onBlur: commitClipNudge,
           onKeyDown: (event) => {
-            if (selectedClipId !== lane.id || event.defaultPrevented) return
+            if (!isSelected || event.defaultPrevented) return
             const match = matchKeyboardShortcut(event, 'timeline-clip')
             if (match?.commandId === 'timelineClip.remove' && lane.isVideo && onRemoveVideo) {
               event.preventDefault()
@@ -220,7 +236,7 @@ export default function useTimelineClips({
           onPointerDown: (event) => {
             if (canSelect && (event.button === undefined || event.button === 0)) {
               event.currentTarget.focus()
-              setSelectedClipId(lane.id)
+              select(event)
             }
             dragProps.onPointerDown?.(event)
           },
@@ -235,7 +251,9 @@ export default function useTimelineClips({
               }
             : null,
         isVisible: geometry.isVisible,
-        isSelected: selectedClipId === lane.id,
+        // The whole clip shows as selected unless one of its segments is; then the segment alone carries the outline.
+        isSelected: isSelected && selectedSegmentKey === null,
+        hasSelectedSegment: isSelected && selectedSegmentKey !== null,
         showText: geometry.isVisible && geometry.width >= TEXT_HIDE_THRESHOLD_REM * getRootRemPx(),
         sourceColumnWidth: CLIP_SOURCE_COLUMN_WIDTH,
         textClassName: lane.isVideo ? 'text-accent-foreground' : 'text-background',
@@ -267,7 +285,19 @@ export default function useTimelineClips({
     // Join markers - one per join at the end of its outgoing piece, with the
     // transition window (the last `d` seconds of that piece) shaded.
     const piecesById = new Map((program?.pieces ?? []).map((piece) => [piece.id, piece]))
+    // The join at the end of the segment before a dragged cut is hidden until the drop rebuilds the program.
+    const draggedSegmentKey =
+      draggedCut === null
+        ? null
+        : segmentBeforeCut(
+            clips.find((clip) => clip.id === draggedCut.videoId),
+            draggedCut.cutId,
+          )
     const joinMarkers = (program?.joins ?? [])
+      .filter((join) => {
+        const from = piecesById.get(join.fromPieceId)
+        return draggedCut === null || from.videoId !== draggedCut.videoId || from.segmentKey !== draggedSegmentKey
+      })
       .map((join) => {
         const endSecond = piecesById.get(join.fromPieceId).timelineEndSecond
         const windowSeconds = join.transition.durationSeconds
@@ -289,9 +319,7 @@ export default function useTimelineClips({
       })
       .filter((marker) => marker.isVisible || marker.bandStyle !== null)
 
-    // Cut markers - one per cut of a clip, in the editing workspace.
-    // TODO: drag cut markers along the timeline, snapping to the clip's frames and
-    // keeping the cut contract.
+    // Cut markers - a hit area per cut of a clip, in the editing workspace: click to remove, drag to move.
     const cutMarkers = (program === null || program === undefined ? [] : sortVideosByTimeline(clips))
       .flatMap((clip) =>
         clip.cuts.map((cut) => {
@@ -303,6 +331,8 @@ export default function useTimelineClips({
             style: { left: widthPx > 0 ? `${(secondsToViewPx({ second, viewStart, viewEnd, widthPx }) / widthPx) * 100}%` : '0%' },
             label: i18next.t('player.cutAt', { defaultValue: 'Cut at {{time}}', time: formatClockDuration(sourceSecond) }),
             onRemove: () => onRemoveCut(clip.id, cut.id),
+            isDragging: draggedCut?.cutId === cut.id,
+            dragProps: getCutDragProps(clip, cut),
           }
         }),
       )
@@ -344,7 +374,9 @@ export default function useTimelineClips({
     canSelect,
     clips,
     commitClipNudge,
+    draggedCut,
     exportHighlightRange,
+    getCutDragProps,
     getLaneDragProps,
     hasActivity,
     hoveredLaneId,
@@ -354,8 +386,8 @@ export default function useTimelineClips({
     onRemoveVideo,
     overlaps,
     program,
-    selectedClipId,
-    setSelectedClipId,
+    selectedClip,
+    setSelectedClip,
     stopClipEvent,
     tooltipBaseId,
     viewEnd,

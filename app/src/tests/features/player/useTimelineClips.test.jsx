@@ -23,6 +23,8 @@ function renderClipsProps(overrides = {}) {
     },
     exportHighlightRange: { fromSecond: 10, toSecond: 20 },
     clips: createClips([createTestVideo({ path: 'C:\\clips\\ride.mp4', durationSeconds: 20 })], { 'video-1': 5 }),
+    draggedCut: null,
+    getCutDragProps: () => ({}),
     getLaneDragProps: () => ({}),
     hasActivity: true,
     viewEnd: 100,
@@ -59,8 +61,8 @@ describe('useTimelineClips', () => {
     const { result } = renderClips({
       commitClipNudge,
       nudgeClip,
-      selectedClipId: 'video:video-1',
-      setSelectedClipId: vi.fn(),
+      selectedClip: { laneId: 'video:video-1', segmentKey: null },
+      setSelectedClip: vi.fn(),
     })
     const event = {
       defaultPrevented: false,
@@ -82,14 +84,14 @@ describe('useTimelineClips', () => {
   test('removes the selected video clip with Delete or Backspace but never the activity', () => {
     const onRemoveVideo = vi.fn()
     const keyEvent = (key) => ({ defaultPrevented: false, key, preventDefault: vi.fn(), stopPropagation: vi.fn() })
-    const { result, rerender } = renderClips({ onRemoveVideo, selectedClipId: 'video:video-1', setSelectedClipId: vi.fn() })
+    const { result, rerender } = renderClips({ onRemoveVideo, selectedClip: { laneId: 'video:video-1', segmentKey: null }, setSelectedClip: vi.fn() })
 
     act(() => clipModel(result, 'video:video-1').clipProps.onKeyDown(keyEvent('Delete')))
     act(() => clipModel(result, 'video:video-1').clipProps.onKeyDown(keyEvent('Backspace')))
     expect(onRemoveVideo.mock.calls).toEqual([['video-1'], ['video-1']])
     expect(clipModel(result, 'video:video-1').clipProps['aria-keyshortcuts']).toContain('Delete Backspace')
 
-    rerender(renderClipsProps({ onRemoveVideo, selectedClipId: 'activity', setSelectedClipId: vi.fn() }))
+    rerender(renderClipsProps({ onRemoveVideo, selectedClip: { laneId: 'activity', segmentKey: null }, setSelectedClip: vi.fn() }))
     act(() => clipModel(result, 'activity').clipProps.onKeyDown(keyEvent('Delete')))
     expect(onRemoveVideo).toHaveBeenCalledTimes(2)
   })

@@ -120,9 +120,11 @@ export default function useTimelineGestures({ scrubTo, commitScrub, cancelScrub,
   }
 
   // Pan handlers - lane background drag converts pixel deltas into seconds before moving the viewport.
+  // React bubbles events from portalled popovers through the lanes, so presses outside the surface's DOM are ignored.
   const panSurfaceProps = {
     onPointerDown: useCallback(
       (event) => {
+        if (!event.currentTarget.contains(event.target)) return
         startCapturedDrag(event, { lastClientX: event.clientX, type: 'pan' })
       },
       [startCapturedDrag],

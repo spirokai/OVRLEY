@@ -11,9 +11,11 @@ import { useVideoTimeline, useVideoWarnings } from '@/hooks/useVideoTimeline'
 import useStore from '@/store/useStore'
 import { snapTimelineSecondToFrame } from '../utils/playerTiming'
 import { PLAYHEAD_CENTER_X } from '../data/playheadGeometry'
+import { applyCutDraft } from '../utils/cutDrag'
 import { roundToDevicePixel, secondsToViewPx, snapToScreenPixel } from '../utils/timelineGeometry'
 
 import useClipDrag from './useClipDrag'
+import useCutDrag from './useCutDrag'
 import useExportRangeTimeline from './useExportRangeTimeline'
 import usePlaybackEngine from './usePlaybackEngine'
 import useTimelineClips from './useTimelineClips'
@@ -52,6 +54,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       manualVideoSyncVideoId: state.manualVideoSync.videoId,
       moveVideoSyncLandmark: state.moveVideoSyncLandmark,
       pausePreviewPlayback: state.pausePreviewPlayback,
+      moveCut: state.moveCut,
       requestCutRemoval: state.requestCutRemoval,
       toggleVideoMute: state.toggleVideoMute,
       isVideoMuted: state.isVideoMuted,
@@ -75,7 +78,8 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
   const joinModels = useJoinTransitionModels(displayedTimeline)
   const videoIdentity = useMemo(() => timeline.clips.map((clip) => `${clip.id}:${clip.durationSeconds}`).join('|'), [timeline.clips])
 
-  const [selectedClipId, setSelectedClipId] = useState(null)
+  // Timeline selection - a clip, and on a video clip the segment under the pointer (null when selected from the keyboard).
+  const [selectedClip, setSelectedClip] = useState(null)
 
   // Media flags - downstream hooks need explicit availability booleans, not inferred path/summary checks.
   const hasVideo = timeline.clips.length > 0
@@ -119,12 +123,12 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
 
   // Selection is scoped to the current media and ends when the user clicks elsewhere.
   useEffect(() => {
-    setSelectedClipId(null)
+    setSelectedClip(null)
   }, [playerStore.activitySummary, videoIdentity])
 
   useEffect(() => {
     const clearClipSelection = (event) => {
-      if (!event.target.closest?.('[data-keeps-clip-selection]')) setSelectedClipId(null)
+      if (!event.target.closest?.('[data-keeps-clip-selection]')) setSelectedClip(null)
     }
     window.addEventListener('pointerdown', clearClipSelection, true)
     return () => window.removeEventListener('pointerdown', clearClipSelection, true)
@@ -141,7 +145,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     program: timeline.program,
     playheadSecond: playback.clampedPlayhead,
     readPlayheadSecond,
-    selectedClipId,
+    selectedClip,
   })
   const {
     commitNudge: commitClipNudge,
@@ -333,13 +337,24 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Cut drag - the dragged cut is shown at its draft frame until it is committed on release.
+  const cutDrag = useCutDrag({
+    moveCut: playerStore.moveCut,
+    viewEnd: viewport.viewport.viewEnd,
+    viewStart: viewport.viewport.viewStart,
+    widthPx: viewport.widthPx,
+  })
+  const timelineClips = useMemo(() => applyCutDraft(displayedTimeline.clips, cutDrag.draft), [displayedTimeline.clips, cutDrag.draft])
+
   // Lane models - clip geometry and tooltip state are prepared before presentational rendering.
   const lanes = useTimelineClips({
     activityFilename: playerStore.activityFilename,
     activitySummary: playerStore.activitySummary,
     canSelect: canSelectClip,
-    clips: displayedTimeline.clips,
+    clips: timelineClips,
     commitClipNudge,
+    getCutDragProps: cutDrag.getCutDragProps,
+    draggedCut: cutDrag.draft,
     exportHighlightRange: videoSyncMode ? null : exportTimeline.highlightRange,
     getLaneDragProps,
     hasActivity: hasActivityData && playback.hasActivity,
@@ -349,8 +364,8 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     onRemoveVideo,
     overlaps: displayedTimeline.program.overlaps,
     program: videoSyncMode ? null : displayedTimeline.program,
-    selectedClipId,
-    setSelectedClipId,
+    selectedClip,
+    setSelectedClip,
     warnings: videoWarnings,
     viewEnd: viewport.viewport.viewEnd,
     viewStart: viewport.viewport.viewStart,

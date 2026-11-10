@@ -8,7 +8,7 @@ function createClip(overrides = {}) {
     clipContentClassName: 'translate-y-[0.04rem]',
     clipProps: {},
     clipStyle: { left: '0%', width: '50%' },
-    excludedSegments: [],
+    segments: [],
     durationLabel: '00:20',
     formatLabel: 'FIT',
     highlightStyle: null,

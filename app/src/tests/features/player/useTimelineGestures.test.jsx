@@ -4,6 +4,7 @@ import useTimelineGestures from '@/features/player/hooks/useTimelineGestures'
 
 function createTarget() {
   return {
+    contains: () => true,
     getBoundingClientRect: () => ({ left: 0, width: 100 }),
     hasPointerCapture: vi.fn(() => true),
     releasePointerCapture: vi.fn(),

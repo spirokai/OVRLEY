@@ -204,7 +204,7 @@ describe('useTimelineViewport', () => {
     const beforePan = { ...result.current.viewport }
 
     act(() => {
-      result.current.handleWheel({ clientX: 50, deltaY: 10, preventDefault, type: 'wheel' })
+      result.current.handleWheel({ clientX: 50, currentTarget: { contains: () => true }, deltaY: 10, preventDefault, type: 'wheel' })
     })
 
     expect(preventDefault).toHaveBeenCalled()
@@ -221,7 +221,7 @@ describe('useTimelineViewport', () => {
     })
 
     act(() => {
-      result.current.handleWheel({ clientX: 25, ctrlKey: true, deltaY: -100, preventDefault, type: 'wheel' })
+      result.current.handleWheel({ clientX: 25, ctrlKey: true, currentTarget: { contains: () => true }, deltaY: -100, preventDefault, type: 'wheel' })
     })
 
     expect(preventDefault).toHaveBeenCalled()

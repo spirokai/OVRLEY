@@ -280,6 +280,8 @@ export default function useTimelineViewport({
   // Wheel navigation - scroll zooms around the pointer; Ctrl+scroll pans the visible timeline.
   const handleWheel = useCallback(
     (event) => {
+      // React bubbles wheel events from portalled popovers through the timeline; they scroll the popover only.
+      if (!event.currentTarget.contains(event.target)) return
       const match = matchKeyboardShortcut(event, 'player')
       if (!match) return
 

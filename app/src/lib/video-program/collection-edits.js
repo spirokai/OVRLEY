@@ -283,6 +283,25 @@ export function segmentBeforeCut(edits, cutId) {
 }
 
 /**
+ * Moves a cut to another frame between its neighbouring cuts. Segment edits stay
+ * keyed by the cut, so both segments keep their export state and transitions.
+ * @param {object} draft Collection draft.
+ * @param {string} videoId Video ID.
+ * @param {string} cutId Cut ID.
+ * @param {number} frame Integer frame strictly between the neighbouring cuts (or the video's ends).
+ */
+export function moveCut(draft, videoId, cutId, frame) {
+  const { frameCount } = findVideo(draft, videoId)
+  const { cuts } = draft.videoEdits[videoId]
+  const index = cuts.findIndex((cut) => cut.id === cutId)
+  if (index === -1) throw new Error(`Unknown cut: ${cutId}`)
+  const lower = index === 0 ? 0 : cuts[index - 1].frame
+  const upper = cuts[index + 1]?.frame ?? frameCount
+  if (!Number.isInteger(frame) || frame <= lower || frame >= upper) throw new Error(`A cut must lie between its neighbours: frame ${frame}`)
+  cuts[index].frame = frame
+}
+
+/**
  * Removes a cut, merging its two segments. The merged segment keeps the earlier
  * segment's transition and takes the given export state.
  * @param {object} draft Collection draft.

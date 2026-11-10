@@ -172,7 +172,11 @@ describe('useOverlayPlayer', () => {
     press('x')
     expect(edits().segments).toEqual({ start: { excluded: false, transitionIn: null }, [cut.id]: { excluded: true, transitionIn: null } })
     expect(result.current.toolbar.videoEdit.excluded).toBe(true)
-    expect(findLane(result, 'video:video-1').excludedSegments.map((segment) => segment.style)).toEqual([{ left: '25%', width: '75%' }])
+    expect(
+      findLane(result, 'video:video-1')
+        .segments.filter((segment) => segment.excluded)
+        .map((segment) => segment.style),
+    ).toEqual([{ left: '25%', width: '75%' }])
 
     act(() => markers()[0].onRemove())
     expect(useStore.getState().cutRemovalRequest).toEqual({ videoId: 'video-1', cutId: cut.id })

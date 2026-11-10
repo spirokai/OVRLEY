@@ -2,9 +2,9 @@ import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { JoinTransitionControl } from '@/features/transitions'
+import { JoinTransitionPanel } from '@/features/transitions'
 
-const stopPointer = (event) => event.stopPropagation()
+const stopPropagation = (event) => event.stopPropagation()
 
 function JoinMarker({ marker }) {
   return (
@@ -22,13 +22,12 @@ function JoinMarker({ marker }) {
                 : 'border-foreground/60 bg-background'
           }`}
           style={marker.style}
-          onPointerDown={stopPointer}
-          onDoubleClick={stopPointer}
+          onPointerDown={stopPropagation}
+          onDoubleClick={stopPropagation}
         />
       </PopoverTrigger>
-      <PopoverContent side="top" className="w-72 space-y-2 p-3" onPointerDown={stopPointer}>
-        <p className="text-xs font-semibold">{marker.label}</p>
-        <JoinTransitionControl id={`timeline-${marker.key}`} model={marker.control} />
+      <PopoverContent side="top" className="w-104 p-3">
+        <JoinTransitionPanel model={marker.control} />
       </PopoverContent>
     </Popover>
   )
@@ -39,23 +38,51 @@ function CutMarker({ marker }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
+        {/* A hit area over the seam: click opens the popover, drag moves the cut; the line shows on hover and while dragging. */}
         <button
           type="button"
           aria-label={marker.label}
           title={marker.label}
-          className="absolute top-3 bottom-1 z-20 w-1.5 -translate-x-1/2 cursor-pointer bg-foreground/80 outline-none hover:bg-foreground focus-visible:ring-2 focus-visible:ring-foreground"
+          className="group/cut absolute top-3 bottom-1 z-20 w-2 -translate-x-1/2 cursor-ew-resize touch-none bg-transparent outline-none"
           style={marker.style}
-          onPointerDown={stopPointer}
-          onDoubleClick={stopPointer}
-        />
+          onDoubleClick={stopPropagation}
+          {...marker.dragProps}
+        >
+          <span
+            aria-hidden="true"
+            className={`pointer-events-none absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-foreground transition-opacity group-hover/cut:opacity-100 group-focus-visible/cut:opacity-100 ${
+              marker.isDragging ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        </button>
       </PopoverTrigger>
-      <PopoverContent side="top" className="w-56 space-y-2 p-3" onPointerDown={stopPointer}>
+      <PopoverContent side="top" className="w-56 space-y-2 p-3">
         <p className="text-xs font-semibold">{marker.label}</p>
         <Button type="button" variant="secondary" className="h-7 w-full text-xs" onClick={marker.onRemove}>
           {t('player.removeCut', 'Remove cut')}
         </Button>
       </PopoverContent>
     </Popover>
+  )
+}
+
+/** One segment of a video clip: a block between cuts, dimmed when excluded from export. */
+function TimelineSegment({ segment }) {
+  return (
+    <div
+      data-segment-key={segment.key}
+      className={`absolute inset-y-0 border-background bg-accent/70 ${segment.hasSeamBefore ? 'border-l' : ''} ${segment.hasSeamAfter ? 'border-r' : ''}`}
+      style={segment.style}
+    >
+      {segment.excluded ? (
+        <div
+          data-testid="timeline-excluded-segment"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-10 bg-background/90 bg-[repeating-linear-gradient(45deg,transparent_0,transparent_3px,rgb(255_255_255/0.08)_3px,rgb(255_255_255/0.08)_6px)]"
+        />
+      ) : null}
+      {segment.isSelected ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 ring-2 ring-foreground" /> : null}
+    </div>
   )
 }
 
@@ -71,23 +98,17 @@ function TimelineClip({ clip }) {
       {...clip.clipProps}
     >
       <div
-        className={`absolute inset-0 overflow-visible group-focus-visible:ring-2 group-focus-visible:ring-foreground ${clip.isSelected ? 'ring-2 ring-foreground' : ''} ${clip.clipClassName}`}
+        className={`absolute inset-0 overflow-visible ${clip.hasSelectedSegment ? '' : 'group-focus-visible:ring-2 group-focus-visible:ring-foreground'} ${clip.isSelected ? 'ring-2 ring-foreground' : ''} ${clip.clipClassName}`}
       >
         {clip.highlightStyle && (
           <div aria-hidden="true" className="pointer-events-none absolute -top-3 -bottom-1 bg-success/20" style={clip.highlightStyle} />
         )}
-        {clip.excludedSegments.map((segment) => (
-          <div
-            key={segment.key}
-            data-testid="timeline-excluded-segment"
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 z-10 bg-background/75 bg-[repeating-linear-gradient(45deg,transparent_0,transparent_3px,rgb(255_255_255/0.12)_3px,rgb(255_255_255/0.12)_6px)]"
-            style={segment.style}
-          />
+        {clip.segments.map((segment) => (
+          <TimelineSegment key={segment.key} segment={segment} />
         ))}
         {clip.showText && (
           <div
-            className={`relative grid h-full items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${clip.textClassName}`}
+            className={`pointer-events-none relative grid h-full items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${clip.textClassName}`}
             style={{ gridTemplateColumns: `${clip.sourceColumnWidth} minmax(0, 1fr) auto` }}
           >
             <span className={`flex min-w-0 items-center justify-left pl-2 ${clip.clipContentClassName}`}>

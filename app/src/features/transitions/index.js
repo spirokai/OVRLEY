@@ -1,4 +1,5 @@
 export { JoinTransitionControl } from './components/JoinTransitionControl'
+export { JoinTransitionPanel } from './components/JoinTransitionPanel'
 export { TransitionSelect } from './components/TransitionSelect'
 export { useJoinTransitionModels } from './hooks/useJoinTransitionModels'
 export { buildJoinTransitionModel, DEFAULT_TRANSITION_OPTION, joinOverride, transitionLabel } from './utils/joinTransitionModel'

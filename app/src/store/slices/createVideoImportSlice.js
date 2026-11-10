@@ -6,6 +6,7 @@ import {
   applyFilenameCreationTimes,
   cutVideo,
   findVideo,
+  moveCut,
   placeAutomaticVideos,
   removeCut,
   removeVideo,
@@ -160,6 +161,11 @@ export const createVideoImportSlice = (set, get) => ({
       cutId = cutVideo(draft, videoId, frame)
     })
     return cutId
+  },
+
+  /** Moves a cut to another frame between its neighbours (see `moveCut`). */
+  moveCut: (videoId, cutId, frame) => {
+    set((draft) => moveCut(draft, videoId, cutId, frame))
   },
 
   /**
