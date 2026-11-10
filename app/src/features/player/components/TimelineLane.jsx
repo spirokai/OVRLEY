@@ -70,14 +70,14 @@ function CutMarker({ marker }) {
       type="button"
       aria-label={marker.label}
       title={marker.label}
-      className={`group/cut absolute top-3 bottom-1 z-20 w-2 cursor-ew-resize touch-none bg-transparent outline-none ${align.area}`}
+      className={`group/cut absolute top-3 bottom-1 z-20 w-3 cursor-ew-resize touch-none bg-transparent outline-none ${align.area}`}
       style={marker.style}
       onDoubleClick={stopPropagation}
       {...marker.dragProps}
     >
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-y-0 w-0.5 bg-foreground transition-opacity group-hover/cut:opacity-100 group-focus-visible/cut:opacity-100 ${align.line} ${
+        className={`pointer-events-none absolute inset-y-0 w-0.75 bg-white transition-opacity group-hover/cut:opacity-100 group-focus-visible/cut:opacity-100 ${align.line} ${
           marker.isDragging ? 'opacity-100' : 'opacity-0'
         }`}
       />
