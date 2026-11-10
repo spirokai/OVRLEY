@@ -73,6 +73,7 @@ describe('useTimelineViewport', () => {
         hasActivityData: true,
         totalDuration: 100,
         videoBounds: { startSecond: 10, endSecond: 30 },
+        videoClipRange: { startSecond: 10, endSecond: 30 },
         videoIdentity: 'video-1:20',
       }),
     )
@@ -103,6 +104,7 @@ describe('useTimelineViewport', () => {
         useTimelineViewport({
           totalDuration: 100,
           videoBounds: { startSecond, endSecond: startSecond + 20 },
+          videoClipRange: { startSecond, endSecond: startSecond + 20 },
           videoIdentity: 'video-1:20',
         }),
       { initialProps: [10] },
@@ -143,18 +145,19 @@ describe('useTimelineViewport', () => {
     expect(result.current.timelineMinimum).toBe(-5)
   })
 
-  test('uses displayed drag bounds for the timeline minimum and committed bounds for fit targets', () => {
+  test('uses displayed drag bounds for the timeline minimum and the committed clip for the video fit target', () => {
     const { result } = renderHook(() =>
       useTimelineViewport({
         displayedVideoBounds: { startSecond: -8, endSecond: 32 },
         totalDuration: 100,
         videoBounds: { startSecond: 0, endSecond: 40 },
+        videoClipRange: { startSecond: 20, endSecond: 40 },
         videoIdentity: 'first:20|second:20',
       }),
     )
 
     expect(result.current.timelineMinimum).toBe(-8)
-    expect(result.current.fitTargets.find((target) => target.id === 'video').viewport.viewStart).toBe(0)
+    expect(result.current.fitTargets.find((target) => target.id === 'video').viewport.viewStart).toBeCloseTo(19.2)
   })
 
   test('does not change viewport scale while a sync offset drag changes total duration', () => {

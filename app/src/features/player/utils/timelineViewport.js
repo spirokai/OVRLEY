@@ -176,19 +176,52 @@ export function followPlayhead({ playheadSecond, viewStart, viewEnd, totalDurati
 }
 
 /**
+ * Picks the clip the video fit target zooms to: the selected clip, otherwise the
+ * clip at the playhead (the earliest one where clips overlap), otherwise the clip
+ * nearest to the playhead.
+ *
+ * @param {Array<{id: string, offsetSeconds: number, durationSeconds: number}>} clips Timeline clips.
+ * @param {string|null} selectedVideoId Selected clip's video, if any.
+ * @param {number} second Playhead second.
+ * @returns {object|null} Clip, or null without clips.
+ */
+export function resolveFitVideoClip(clips, selectedVideoId, second) {
+  const selected = clips.find((clip) => clip.id === selectedVideoId)
+  if (selected !== undefined) return selected
+  const distance = (clip) => Math.max(0, clip.offsetSeconds - second, second - (clip.offsetSeconds + clip.durationSeconds))
+  return clips.reduce(
+    (nearest, clip) =>
+      nearest === null || distance(clip) < distance(nearest) || (distance(clip) === distance(nearest) && clip.offsetSeconds < nearest.offsetSeconds)
+        ? clip
+        : nearest,
+    null,
+  )
+}
+
+/**
  * Builds canonical fit targets for the current media shape.
  *
- * @param {{ totalDuration: number, widthPx?: number, videoBounds: {startSecond: number, endSecond: number}|null, hasActivityData: boolean, activityDurationSeconds: number, fallbackDurationSeconds: number }} options
+ * The video target fits one clip (`resolveFitVideoClip`); the interval of every video sets the timeline's start.
+ *
+ * @param {{ totalDuration: number, widthPx?: number, videoBounds: {startSecond: number, endSecond: number}|null, videoClipRange: {startSecond: number, endSecond: number}|null, hasActivityData: boolean, activityDurationSeconds: number, fallbackDurationSeconds: number }} options
  * @returns {Array<{ id: 'all'|'video'|'activity', label: string, viewport: { viewStart: number, viewEnd: number } }>}
  */
-export function buildFitTargets({ totalDuration, widthPx = 0, videoBounds, hasActivityData, activityDurationSeconds, fallbackDurationSeconds }) {
+export function buildFitTargets({
+  totalDuration,
+  widthPx = 0,
+  videoBounds,
+  videoClipRange,
+  hasActivityData,
+  activityDurationSeconds,
+  fallbackDurationSeconds,
+}) {
   const targets = []
   const timelineMinimum = getTimelineMinimum({ videoBounds })
   const componentRanges = []
 
-  if (videoBounds !== null) {
-    const start = videoBounds.startSecond
-    const end = videoBounds.endSecond
+  if (videoClipRange !== null) {
+    const start = videoClipRange.startSecond
+    const end = videoClipRange.endSecond
     componentRanges.push({ start, end })
     targets.push({
       id: 'video',

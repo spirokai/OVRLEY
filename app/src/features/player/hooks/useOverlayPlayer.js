@@ -12,7 +12,8 @@ import useStore from '@/store/useStore'
 import { snapTimelineSecondToFrame } from '../utils/playerTiming'
 import { PLAYHEAD_CENTER_X } from '../data/playheadGeometry'
 import { applyCutDraft } from '../utils/cutDrag'
-import { roundToDevicePixel, secondsToViewPx, snapToScreenPixel } from '../utils/timelineGeometry'
+import { roundToDevicePixel, secondsToViewPx, snapToScreenPixel, videoIdFromLaneId } from '../utils/timelineGeometry'
+import { resolveFitVideoClip } from '../utils/timelineViewport'
 
 import useClipDrag from './useClipDrag'
 import useCutDrag from './useCutDrag'
@@ -161,6 +162,19 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
   } = clipDrag
 
   // Viewport domain - owns measurement, fit targets, ticks, zoom, pan, and playback follow behavior.
+  // Video fit target - one clip (selected, at the playhead, or nearest to it), kept by value so playback frames
+  // do not rebuild the fit targets.
+  const fitVideoClip = resolveFitVideoClip(
+    timeline.clips,
+    selectedClip === null ? null : videoIdFromLaneId(selectedClip.laneId),
+    playback.clampedPlayhead,
+  )
+  const fitVideoStart = fitVideoClip?.offsetSeconds ?? null
+  const fitVideoEnd = fitVideoClip === null ? null : fitVideoClip.offsetSeconds + fitVideoClip.durationSeconds
+  const videoClipRange = useMemo(
+    () => (fitVideoStart === null ? null : { startSecond: fitVideoStart, endSecond: fitVideoEnd }),
+    [fitVideoEnd, fitVideoStart],
+  )
   const viewport = useTimelineViewport({
     activityDurationSeconds,
     displayedVideoBounds: displayedTimeline.bounds,
@@ -171,6 +185,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     playheadSecond: playback.clampedPlayhead,
     totalDuration: playback.totalDuration,
     videoBounds: timeline.bounds,
+    videoClipRange,
     videoIdentity,
   })
   const { displayedFitTargetId, fitTarget, fitTargets: viewportFitTargets, viewport: timelineViewport, widthPx } = viewport

@@ -45,6 +45,7 @@ function measureScreenPixelGrid(element) {
  * @param {number} options.totalDuration Total playable duration.
  * @param {{startSecond: number, endSecond: number}|null} [options.videoBounds=null] Committed interval covered by videos.
  * @param {{startSecond: number, endSecond: number}|null} [options.displayedVideoBounds] Interval covered by videos during a drag preview.
+ * @param {{startSecond: number, endSecond: number}|null} [options.videoClipRange=null] Interval of the clip the video fit target zooms to.
  * @param {string} [options.videoIdentity=''] Identity of the imported videos; changes reset the viewport.
  * @param {boolean} [options.hasActivityData=false] Whether activity metadata is loaded.
  * @param {number} [options.activityDurationSeconds=0] Activity duration in seconds.
@@ -58,6 +59,7 @@ export default function useTimelineViewport({
   totalDuration,
   videoBounds = null,
   displayedVideoBounds = videoBounds,
+  videoClipRange = null,
   videoIdentity = '',
   hasActivityData = false,
   activityDurationSeconds = 0,
@@ -185,11 +187,12 @@ export default function useTimelineViewport({
         totalDuration,
         widthPx,
         videoBounds,
+        videoClipRange,
         hasActivityData,
         activityDurationSeconds,
         fallbackDurationSeconds,
       }),
-    [activityDurationSeconds, fallbackDurationSeconds, hasActivityData, totalDuration, videoBounds, widthPx],
+    [activityDurationSeconds, fallbackDurationSeconds, hasActivityData, totalDuration, videoBounds, videoClipRange, widthPx],
   )
 
   const displayedFitTargetId = useMemo(() => getMatchingFitTargetId({ viewport, targets: fitTargets }), [fitTargets, viewport])

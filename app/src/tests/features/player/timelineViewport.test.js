@@ -10,6 +10,7 @@ import {
   getTimelineTickStep,
   panViewport,
   rangesMatch,
+  resolveFitVideoClip,
   zoomRange,
 } from '@/features/player/utils/timelineViewport'
 
@@ -29,6 +30,7 @@ describe('timelineViewport utilities', () => {
         hasActivityData: true,
         totalDuration: 25,
         videoBounds: { startSecond: -5, endSecond: 25 },
+        videoClipRange: { startSecond: -5, endSecond: 25 },
       })[0].viewport,
     ).toEqual({ viewStart: -5, viewEnd: 25 })
   })
@@ -71,6 +73,7 @@ describe('timelineViewport utilities', () => {
       hasActivityData: true,
       totalDuration: 100,
       videoBounds: { startSecond: 10, endSecond: 30 },
+      videoClipRange: { startSecond: 10, endSecond: 30 },
     })
 
     expect(targets.map((target) => target.id)).toEqual(['all', 'video', 'activity'])
@@ -78,17 +81,28 @@ describe('timelineViewport utilities', () => {
     expect(rangesMatch({ viewStart: 0, viewEnd: 100 }, { viewStart: 0, viewEnd: 100.0005 })).toBe(true)
   })
 
-  test('fits the video target to the bounds spanning every imported clip', () => {
+  test('fits the video target to one clip: the selected one, else the one at the playhead, else the nearest', () => {
+    const clips = [
+      { id: 'a', offsetSeconds: 0, durationSeconds: 20 },
+      { id: 'b', offsetSeconds: 15, durationSeconds: 10 },
+      { id: 'c', offsetSeconds: 60, durationSeconds: 20 },
+    ]
+    expect(resolveFitVideoClip(clips, 'c', 5).id).toBe('c')
+    // Where clips overlap, the earliest one.
+    expect(resolveFitVideoClip(clips, null, 17).id).toBe('a')
+    expect(resolveFitVideoClip(clips, null, 50).id).toBe('c')
+    expect(resolveFitVideoClip([], null, 50)).toBeNull()
+
     const targets = buildFitTargets({
       activityDurationSeconds: undefined,
       fallbackDurationSeconds: 73,
       hasActivityData: false,
-      totalDuration: 40,
-      videoBounds: { startSecond: 0, endSecond: 40 },
+      totalDuration: 80,
+      videoBounds: { startSecond: 0, endSecond: 80 },
+      videoClipRange: { startSecond: 60, endSecond: 80 },
     })
-
-    expect(targets.map((target) => target.id)).toEqual(['video'])
-    expect(targets[0].viewport).toEqual({ viewStart: 0, viewEnd: 40 })
+    expect(targets.map((target) => target.id)).toEqual(['all', 'video'])
+    expect(targets[1].viewport).toEqual(fitRangeToViewport({ rangeStart: 60, rangeEnd: 80, timelineMinimum: 0, totalDuration: 80 }))
   })
 
   test('computes a major and minor tick strip from its anchor', () => {
