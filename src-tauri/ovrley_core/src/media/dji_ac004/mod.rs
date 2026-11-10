@@ -23,8 +23,9 @@ use serde_json::Value;
 
 use crate::encode::ffmpeg::binary::{configure_ffmpeg_command, resolve_ffmpeg_binary};
 use crate::error::{CoreError, CoreResult};
+use crate::media::video_probe::ffprobe_creation_time;
 
-pub use parser::{parse_raw_metadata, parse_raw_metadata_with_reference};
+pub use parser::parse_raw_metadata;
 
 pub(crate) const DEFAULT_SAMPLE_RATE_HZ: f64 = 25.0;
 
@@ -81,7 +82,7 @@ pub fn extract_from_video(
     };
 
     let raw_data = extract_dji_meta_raw(&ffmpeg_path, file_path, stream_info.index)?;
-    Ok(parser::parse_raw_metadata_with_reference(
+    Ok(parser::parse_raw_metadata(
         &raw_data,
         stream_info.creation_time,
     ))
@@ -89,6 +90,7 @@ pub fn extract_from_video(
 
 struct DjiMetaStreamInfo {
     index: usize,
+    /// Video creation time; decides how the GPS clock text maps to UTC.
     creation_time: Option<DateTime<Utc>>,
 }
 
@@ -128,30 +130,20 @@ fn detect_dji_meta_stream(
     let Some(streams) = json.get("streams").and_then(Value::as_array) else {
         return Ok(None);
     };
-
-    let format_creation_time = json
-        .get("format")
-        .and_then(|format| format.get("tags"))
-        .and_then(|tags| tags.get("creation_time"))
-        .and_then(Value::as_str)
-        .and_then(parse_rfc3339_utc);
+    let creation_time = ffprobe_creation_time(&json).and_then(parse_rfc3339_utc);
 
     for stream in streams {
         let codec_tag = stream.get("codec_tag_string").and_then(Value::as_str);
-        let tags = stream.get("tags");
-        let handler_name = tags
+        let handler_name = stream
+            .get("tags")
             .and_then(|tags| tags.get("handler_name"))
             .and_then(Value::as_str);
 
         if codec_tag == Some("djmd") || handler_name == Some("DJI meta") {
             if let Some(index) = stream.get("index").and_then(Value::as_u64) {
-                let stream_creation_time = tags
-                    .and_then(|tags| tags.get("creation_time"))
-                    .and_then(Value::as_str)
-                    .and_then(parse_rfc3339_utc);
                 return Ok(Some(DjiMetaStreamInfo {
                     index: index as usize,
-                    creation_time: format_creation_time.or(stream_creation_time),
+                    creation_time,
                 }));
             }
         }

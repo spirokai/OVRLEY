@@ -1,7 +1,5 @@
 use chrono::{DateTime, Utc};
-use ovrley_core::media::dji_ac004::{
-    extract_from_video, parse_raw_metadata, parse_raw_metadata_with_reference,
-};
+use ovrley_core::media::dji_ac004::{extract_from_video, parse_raw_metadata};
 use ovrley_core::media::mp4_telemetry;
 use std::path::Path;
 
@@ -107,13 +105,13 @@ fn parse_raw_metadata_extracts_ac004_gps_points() {
         Some((0.0, 0.0, 1.5)),
     ));
 
-    let telemetry = parse_raw_metadata(&raw).expect("expected AC004 telemetry");
+    let telemetry = parse_raw_metadata(&raw, None).expect("expected AC004 telemetry");
 
     assert_eq!(telemetry.device_name.as_deref(), Some("DJI AC004"));
     assert_eq!(telemetry.sample_rate_hz, Some(25.0));
     assert_eq!(
         telemetry.sync_time.as_deref(),
-        Some("2026-03-15T22:58:14+00:00")
+        Some("2026-03-15T15:58:14+00:00")
     );
     assert_eq!(telemetry.samples.len(), 1);
 
@@ -126,11 +124,11 @@ fn parse_raw_metadata_extracts_ac004_gps_points() {
     assert!((sample.speed - 5.0).abs() < 1e-9);
     assert!((sample.heading.unwrap() - 36.869_897_645_844_02).abs() < 1e-9);
     assert!((sample.g_force.unwrap() - 0.5).abs() < 1e-9);
-    assert_eq!(sample.timestamp, "2026-03-15T22:58:14+00:00");
+    assert_eq!(sample.timestamp, "2026-03-15T15:58:14+00:00");
 }
 
 #[test]
-fn parse_raw_metadata_with_reference_corrects_ac004_day_roll() {
+fn parse_raw_metadata_uses_creation_time_to_correct_ac004_day_roll() {
     let raw = top_level_sample(sample_payload(
         "DJI AC004",
         59.94,
@@ -147,8 +145,7 @@ fn parse_raw_metadata_with_reference_corrects_ac004_day_roll() {
         .unwrap()
         .with_timezone(&Utc);
 
-    let telemetry =
-        parse_raw_metadata_with_reference(&raw, Some(reference)).expect("expected AC004 telemetry");
+    let telemetry = parse_raw_metadata(&raw, Some(reference)).expect("expected AC004 telemetry");
 
     assert_eq!(
         telemetry.sync_time.as_deref(),
@@ -184,7 +181,7 @@ fn parse_raw_metadata_uses_sample_rate_for_relative_timing() {
         None,
     )));
 
-    let telemetry = parse_raw_metadata(&raw).expect("expected AC004 telemetry");
+    let telemetry = parse_raw_metadata(&raw, None).expect("expected AC004 telemetry");
 
     assert_eq!(telemetry.samples.len(), 2);
     assert_eq!(telemetry.samples[0].timestamp_ms, 0.0);
@@ -206,7 +203,7 @@ fn parse_raw_metadata_rejects_samples_without_gps_fix() {
         None,
     ));
 
-    assert!(parse_raw_metadata(&raw).is_none());
+    assert!(parse_raw_metadata(&raw, None).is_none());
 }
 
 fn sample_payload(

@@ -5,11 +5,19 @@
 //! one place avoids subtle drift between GPS row expansion, sync-time
 //! derivation, and vendor fallback parsers.
 
-use chrono::{DateTime, Days, NaiveDateTime, TimeDelta, TimeZone, Utc};
+use chrono::{DateTime, NaiveDateTime, TimeDelta, TimeZone, Utc};
 use chrono_tz::Tz;
 use telemetry_parser::util::SampleInfo;
 
-pub(crate) const DJI_TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
+const DJI_TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
+
+/// How far DJI GPS clock text runs ahead of UTC unless the container clock
+/// says otherwise: `UTC+8` wall-clock time, wherever the clip was recorded.
+const DJI_DEFAULT_CLOCK_OFFSET: TimeDelta = TimeDelta::hours(8);
+
+/// Largest gap between the container clock and a reading of the GPS clock
+/// text for the container clock to be trusted to choose that reading.
+const DJI_MAX_REFERENCE_ERROR: TimeDelta = TimeDelta::hours(2);
 
 /// Distributes a sub-frame telemetry row within its enclosing parser sample.
 ///
@@ -74,59 +82,63 @@ pub(crate) fn gpsu_millis_to_video_start_rfc3339(
     unix_millis_plus_offset_ms_to_rfc3339(gpsu_unix_ms, -first_row_media_time_ms)
 }
 
-/// Converts a DJI AC004 timestamp to UTC RFC 3339 text.
-///
-/// Depending on camera model and firmware, DJI AC004 metadata stores timestamps
-/// either in the camera's local timezone (sometimes with the `UTC+8` calendar
-/// date, rolling the date by `+1 day` in negative-UTC zones) or directly in
-/// China Standard Time (`Asia/Shanghai`). When a reference UTC instant from the
-/// container metadata is supplied, candidate dates within `±1 day` are evaluated
-/// in both the GPS-derived timezone and `Asia/Shanghai`, selecting the instant
-/// closest to the container reference while preserving the GPS clock's exact
-/// minutes and seconds.
-pub(crate) fn dji_naive_timestamp_to_rfc3339(
-    naive: NaiveDateTime,
-    tz: Tz,
-    reference_utc: Option<DateTime<Utc>>,
-) -> Option<String> {
-    let resolve_in = |zone: Tz, candidate: NaiveDateTime| {
-        zone.from_local_datetime(&candidate)
-            .single()
-            .map(|local_dt| local_dt.with_timezone(&Utc))
-    };
-    let base_utc = resolve_in(tz, naive)?;
-    let utc_dt = match reference_utc {
-        Some(reference) => {
-            let day_candidates = [
-                Some(naive),
-                naive.checked_sub_days(Days::new(1)),
-                naive.checked_add_days(Days::new(1)),
-            ];
-            [tz, Tz::Asia__Shanghai]
-                .into_iter()
-                .flat_map(|zone| {
-                    day_candidates
-                        .into_iter()
-                        .flatten()
-                        .filter_map(move |candidate| resolve_in(zone, candidate))
-                })
-                .min_by_key(|candidate| (*candidate - reference).num_seconds().abs())
-                .unwrap_or(base_utc)
-        }
-        None => base_utc,
-    };
-    Some(utc_dt.to_rfc3339())
+/// Parses DJI GPS clock text (`YYYY-MM-DD HH:MM:SS`, no zone designator).
+pub(crate) fn parse_dji_timestamp(text: &str) -> Option<NaiveDateTime> {
+    NaiveDateTime::parse_from_str(text, DJI_TIMESTAMP_FORMAT).ok()
 }
 
-#[cfg(test)]
+/// Decides how far a clip's DJI GPS clock text runs ahead of UTC.
+///
+/// DJI firmware disagrees on what the zone-less text means. Most clips store
+/// `UTC+8` wall-clock time wherever they were recorded; some store local time
+/// of day at the GPS position with a calendar date that can be a day off. The
+/// text alone cannot tell these apart, so `UTC+8` stays the default.
+///
+/// `reference` is the container `creation_time` advanced to the first fix.
+/// When it lies within [`DJI_MAX_REFERENCE_ERROR`] of a reading, the closest
+/// reading wins: `UTC+8`, or local time at `gps_tz` on the text's date `±1`
+/// day. A missing or unreliable camera clock never moves the result away from
+/// `UTC+8`. Decided once per clip from `first_fix`, the offset is applied to
+/// every sample, keeping the GPS clock's exact seconds.
+pub(crate) fn dji_clock_offset(
+    first_fix: NaiveDateTime,
+    gps_tz: Option<Tz>,
+    reference: Option<DateTime<Utc>>,
+) -> TimeDelta {
+    let Some(reference) = reference else {
+        return DJI_DEFAULT_CLOCK_OFFSET;
+    };
+    let error = |offset: TimeDelta| ((first_fix - offset).and_utc() - reference).abs();
+    // Both readings of a repeated DST hour stay candidates.
+    let local_offsets = gps_tz.into_iter().flat_map(|tz| {
+        [-1, 0, 1]
+            .into_iter()
+            .filter_map(move |days| first_fix.checked_add_signed(TimeDelta::days(days)))
+            .flat_map(move |shifted| {
+                let local = tz.from_local_datetime(&shifted);
+                [local.earliest(), local.latest()]
+            })
+            .flatten()
+            .map(move |local| first_fix - local.naive_utc())
+    });
+    let closest = std::iter::once(DJI_DEFAULT_CLOCK_OFFSET)
+        .chain(local_offsets)
+        .min_by_key(|offset| error(*offset))
+        .unwrap_or(DJI_DEFAULT_CLOCK_OFFSET);
+    if error(closest) <= DJI_MAX_REFERENCE_ERROR {
+        closest
+    } else {
+        DJI_DEFAULT_CLOCK_OFFSET
+    }
+}
+
+/// Converts DJI GPS clock text to UTC RFC 3339 text using the clip's offset
+/// from [`dji_clock_offset`].
 pub(crate) fn dji_timestamp_to_rfc3339(
-    timestamp_text: &str,
-    tz_name: &str,
-    reference_utc: Option<DateTime<Utc>>,
-) -> Option<String> {
-    let naive = NaiveDateTime::parse_from_str(timestamp_text, DJI_TIMESTAMP_FORMAT).ok()?;
-    let tz: Tz = tz_name.parse().ok()?;
-    dji_naive_timestamp_to_rfc3339(naive, tz, reference_utc)
+    timestamp: NaiveDateTime,
+    clock_offset: TimeDelta,
+) -> String {
+    (timestamp - clock_offset).and_utc().to_rfc3339()
 }
 
 pub(crate) fn advance_utc_by_ms(base: DateTime<Utc>, offset_ms: f64) -> DateTime<Utc> {
@@ -156,60 +168,35 @@ mod tests {
         );
     }
 
-    #[test]
-    fn dji_timestamp_parser_converts_camera_local_to_utc_via_timezone() {
-        assert_eq!(
-            dji_timestamp_to_rfc3339("2026-03-15 23:58:14", "Europe/Prague", None).as_deref(),
-            Some("2026-03-15T22:58:14+00:00")
-        );
-    }
-
-    #[test]
-    fn dji_timestamp_parser_corrects_plus_one_day_roll_against_reference() {
-        let reference = DateTime::parse_from_rfc3339("2026-11-07T19:10:33Z")
+    fn utc(text: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(text)
             .unwrap()
-            .with_timezone(&Utc);
+            .with_timezone(&Utc)
+    }
+
+    #[test]
+    fn dji_clock_offset_keeps_utc_plus_8_when_container_clock_agrees() {
+        let first_fix = parse_dji_timestamp("2026-07-28 01:46:15").unwrap();
+        let reference = Some(utc("2026-07-27T17:46:07Z"));
         assert_eq!(
-            dji_timestamp_to_rfc3339(
-                "2026-11-08 10:33:56",
-                "America/Los_Angeles",
-                Some(reference),
-            )
-            .as_deref(),
-            Some("2026-11-07T18:33:56+00:00")
+            dji_clock_offset(first_fix, Some(Tz::America__Los_Angeles), reference),
+            TimeDelta::hours(8)
         );
     }
 
     #[test]
-    fn dji_timestamp_parser_supports_shanghai_timestamps_against_reference() {
-        let reference = DateTime::parse_from_rfc3339("2026-03-15T15:58:14Z")
-            .unwrap()
-            .with_timezone(&Utc);
+    fn dji_clock_offset_ignores_unreliable_container_clock() {
+        let first_fix = parse_dji_timestamp("2026-11-08 10:33:56").unwrap();
+        let reference = Some(utc("2020-01-01T00:00:00Z"));
         assert_eq!(
-            dji_timestamp_to_rfc3339(
-                "2026-03-15 23:58:14",
-                "Europe/Prague",
-                Some(reference),
-            )
-            .as_deref(),
-            Some("2026-03-15T15:58:14+00:00")
-        );
-    }
-
-    #[test]
-    fn dji_timestamp_parser_rejects_invalid_timezone() {
-        assert_eq!(
-            dji_timestamp_to_rfc3339("2026-03-15 23:58:14", "Not/A_Tz", None),
-            None
+            dji_clock_offset(first_fix, Some(Tz::America__Los_Angeles), reference),
+            TimeDelta::hours(8)
         );
     }
 
     #[test]
     fn dji_timestamp_parser_rejects_malformed_timestamp() {
-        assert_eq!(
-            dji_timestamp_to_rfc3339("2026-13-01 99:99:99", "Europe/Prague", None),
-            None
-        );
+        assert_eq!(parse_dji_timestamp("2026-13-01 99:99:99"), None);
     }
 
     #[test]
