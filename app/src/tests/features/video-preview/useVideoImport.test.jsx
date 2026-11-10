@@ -127,13 +127,22 @@ describe('reviewing an import', () => {
     expect(useStore.temporal.getState().pastStates).toEqual([])
   })
 
+  test('imports a single video into a project without videos without the dialog', async () => {
+    probe('/clips/only.mp4')
+    const { result } = renderImport()
+
+    await selectFiles(result, ['/clips/only.mp4'])
+
+    expect(dialog(result).open).toBe(false)
+    expect(importedPaths()).toEqual(['/clips/only.mp4'])
+  })
+
   test('lists failed and duplicate files while the other files still import', async () => {
     probe('/clips/existing.mp4', { creationTime: '2026-07-18T08:00:00Z' })
     probe('/clips/good.mp4', { creationTime: '2026-07-18T08:05:00Z' })
     probe('/clips/no-fps.mp4', { fpsNum: undefined })
     const { result } = renderImport()
     await selectFiles(result, ['/clips/existing.mp4'])
-    await confirm(result)
 
     await selectFiles(result, [
       '/clips/good.mp4',

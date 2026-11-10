@@ -1,7 +1,9 @@
 /**
  * Owns the import dialog: probes the selected files, keeps a draft of the whole
  * video collection (videos already imported and new ones) that the dialog edits
- * with the same recipes as the store, and commits the reviewed import.
+ * with the same recipes as the store, and commits the reviewed import. A single
+ * video joining a project without videos has nothing to review: its review stays
+ * quiet (the dialog does not open) and is committed as it opens.
  */
 
 import { useMemo, useRef, useState } from 'react'
@@ -56,9 +58,21 @@ export default function useVideoImportReview({ onImported }) {
   /** Probes the files and opens the review of the whole collection with them. */
   const start = async (paths) => {
     if (reviewRef.current !== null) return
+    const state = useStore.getState()
+    const isQuiet = paths.length === 1 && state.importedVideos.length === 0
     // Cancelling while the files are read discards this review.
     const token = Symbol('import review')
-    setReview({ phase: 'probing', fileCount: paths.length, token })
+    setReview({ phase: 'probing', fileCount: paths.length, token, isQuiet })
+    // A quiet review shows no dialog: the app's import indicator shows the progress instead.
+    if (isQuiet) state.setImportingVideo(true)
+    try {
+      await probeAndOpen(paths, token, isQuiet)
+    } finally {
+      if (isQuiet) useStore.getState().setImportingVideo(false)
+    }
+  }
+
+  const probeAndOpen = async (paths, token, isQuiet) => {
     const state = useStore.getState()
     const knownPaths = new Set(state.importedVideos.map((video) => video.path))
     let importOrder = nextImportOrder(state.importedVideos)
@@ -81,15 +95,34 @@ export default function useVideoImportReview({ onImported }) {
     })
     if (reviewRef.current?.token !== token) return
     const current = useStore.getState()
-    setReview({
+    const opened = {
       token,
       phase: 'reviewing',
       ...openImportReview(snapshotCollection(current), videos),
       failures,
       transitionDefaults: { ...current.transitionDefaults },
       adoptsFormat: current.importedVideos.length === 0,
+      // A file that could not be read is reported in the dialog.
+      isQuiet: isQuiet && videos.length === 1 && current.importedVideos.length === 0,
       error: null,
-    })
+    }
+    // The only video of the project is imported whole, as the review placed it.
+    if (opened.isQuiet) await commit(opened, opened.collection)
+    else setReview(opened)
+  }
+
+  /** Imports the reviewed collection; a failure opens the review with the reason. */
+  const commit = async (current, reviewed) => {
+    const adoptedFormat = current.adoptsFormat ? deriveCompatibility(reviewed.importedVideos).reference : null
+    setReview({ ...current, phase: 'importing', error: null })
+    try {
+      const { importedVideos, videoEdits, videoSyncTimezoneMode } = reviewed
+      const added = await commitReviewedImport({ importedVideos, videoEdits, videoSyncTimezoneMode }, current.transitionDefaults, adoptedFormat)
+      setReview(null)
+      onImported(added)
+    } catch (error) {
+      setReview({ ...current, phase: 'reviewing', isQuiet: false, error: errorMessage(error) })
+    }
   }
 
   /** Applies a change of the review state; returns the reason when the change is rejected. */
@@ -133,23 +166,18 @@ export default function useVideoImportReview({ onImported }) {
       setReview({ ...current, phase: 'confirming', error: null })
       return
     }
-    const reviewed = derived.included
-    const adoptedFormat = current.adoptsFormat ? deriveCompatibility(reviewed.importedVideos).reference : null
-    setReview({ ...current, phase: 'importing', error: null })
-    try {
-      const { importedVideos, videoEdits, videoSyncTimezoneMode } = reviewed
-      const added = await commitReviewedImport({ importedVideos, videoEdits, videoSyncTimezoneMode }, current.transitionDefaults, adoptedFormat)
-      setReview(null)
-      onImported(added)
-    } catch (error) {
-      setReview({ ...current, phase: 'reviewing', error: errorMessage(error) })
-    }
+    await commit(current, derived.included)
   }
 
   if (review === null || derived === null) {
     return {
       start,
-      dialog: { open: review !== null, phase: review?.phase ?? null, fileCount: review?.fileCount ?? 0, onCancel: () => setReview(null) },
+      dialog: {
+        open: review !== null && !review.isQuiet,
+        phase: review?.phase ?? null,
+        fileCount: review?.fileCount ?? 0,
+        onCancel: () => setReview(null),
+      },
     }
   }
 
@@ -175,7 +203,7 @@ export default function useVideoImportReview({ onImported }) {
   return {
     start,
     dialog: {
-      open: true,
+      open: !review.isQuiet,
       phase: review.phase,
       fileCount: review.newIds.size + review.failures.length,
       windowKind,
