@@ -8,14 +8,15 @@ import { deriveCompatibility } from './video-collection'
 import { isVideoExcluded } from './video-segments'
 
 const WARNING_TEXT = {
+  missing: ['video-preview.warningMissing', 'Video file not found. Locate it or remove the video.'],
   incompatible: ['video-preview.warningIncompatible', 'Different resolution or frame rate than the other videos'],
   overlap: ['video-preview.warningOverlap', 'Overlaps {{name}}'],
   far: ['video-preview.warningFarFromActivity', 'Starts more than an hour before or after the activity'],
 }
 
 /**
- * Collects the warnings of every clip: a format that keeps it out of a combined
- * export, overlaps with other clips, and its synchronization warning (outside the
+ * Collects the warnings of every clip: a file that cannot be found, a format that
+ * keeps it out of a combined export, overlaps with other clips, and its synchronization warning (outside the
  * activity, unknown recording time). A clip without a synchronization warning was
  * placed by hand, shifted, or placed next to another clip; it is far when it starts
  * outside the start window around the activity (`VIDEO_START_WINDOW_SECONDS`).
@@ -23,14 +24,15 @@ const WARNING_TEXT = {
  * @param {Array<object>} clips Timeline clips (videos joined with their edits).
  * @param {{overlaps: Array<{earlierVideoId: string, laterVideoId: string}>}} program Timeline program of the same clips.
  * @param {number|null} activityDurationSeconds External activity duration, or null without an activity.
- * @returns {Map<string, Array<{kind: 'incompatible'|'overlap'|'sync'|'far', params: object}>>} Warnings keyed by video ID (see
- *   `formatVideoWarning`); every clip has an entry.
+ * @returns {Map<string, Array<{kind: 'missing'|'incompatible'|'overlap'|'sync'|'far', params: object}>>} Warnings keyed by
+ *   video ID (see `formatVideoWarning`); every clip has an entry.
  */
 export function deriveVideoWarnings(clips, program, activityDurationSeconds) {
   const { incompatibleIds } = deriveCompatibility(clips.filter((clip) => !isVideoExcluded(clip)))
   const names = new Map(clips.map((clip) => [clip.id, filenameFromSelectedPath(clip.path)]))
   const warnings = new Map(clips.map((clip) => [clip.id, []]))
   for (const clip of clips) {
+    if (clip.missing) warnings.get(clip.id).push({ kind: 'missing', params: {} })
     if (incompatibleIds.has(clip.id)) warnings.get(clip.id).push({ kind: 'incompatible', params: {} })
   }
   // One warning per overlapping pair of videos; two videos may share a filename.

@@ -5,7 +5,7 @@ import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlic
 import { activateParsedActivity } from '@/lib/activity/import-activity'
 import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
 import { getVideosTimelineBounds, joinVideoEdits } from '@/lib/video-program/video-collection'
-import { cloneVideoSegments } from '@/lib/video-program/video-segments'
+import { fitCutsToFrameCount } from '@/lib/video-program/video-segments'
 
 // Laps belong to the external activity file; one loaded as absent takes its lap selection with it.
 function resolveDisabledLaps(disabledLaps, parsedActivity) {
@@ -17,11 +17,11 @@ function resolveDisabledLaps(disabledLaps, parsedActivity) {
 }
 
 /**
- * Restores the saved edits of every loaded video. The native boundary validated
- * their shape; bounds that need the probed duration are checked here, before the
- * project replaces the session. An anchor to a video skipped as a missing source
- * is dropped; the clip keeps its offset.
- * @param {Array<object>} videos Probed video entities with their saved IDs.
+ * Restores the saved edits of every loaded video, missing ones included. The native
+ * boundary validated their shape against the saved metadata; a found file shorter
+ * than the saved video keeps only the cuts inside it. An anchor to a video removed
+ * at load (an older project's missing video) is dropped; the clip keeps its offset.
+ * @param {Array<object>} videos Loaded video entities with their saved IDs.
  * @param {Array<object>} projectVideos Saved project videos.
  * @returns {object} Video edits keyed by video ID.
  */
@@ -32,16 +32,12 @@ export function createProjectVideoEdits(videos, projectVideos) {
     videos.map((video) => {
       const projectVideo = projectVideosById.get(video.id)
       if (!projectVideo) throw new Error(`Imported video is not part of the project: ${video.id}`)
-      if (projectVideo.cuts.some((cut) => cut.frame >= video.frameCount)) {
-        throw new Error('Video cuts must lie inside the imported video')
-      }
       return [
         video.id,
         {
           offsetSeconds: projectVideo.offsetSeconds,
           offsetSource: projectVideo.offsetSource,
-          cuts: projectVideo.cuts.map((cut) => ({ ...cut })),
-          segments: cloneVideoSegments(projectVideo.segments),
+          ...fitCutsToFrameCount(projectVideo, video.frameCount),
           placementAnchor:
             projectVideo.placementAnchor !== null && loadedIds.has(projectVideo.placementAnchor.videoId) ? { ...projectVideo.placementAnchor } : null,
         },
@@ -51,20 +47,17 @@ export function createProjectVideoEdits(videos, projectVideos) {
 }
 
 /**
- * Restores the manual sync workspace. When its video was skipped as a missing
- * source, its landmarks go with it and the first loaded video is selected.
- * Landmarks are checked against the probed video before the project replaces the session.
- * @param {Array<object>} videos Probed video entities with their saved IDs.
+ * Restores the manual sync workspace. When its video was removed at load (an older
+ * project's missing video), its landmarks go with it and the first loaded video is
+ * selected. A found file shorter than the saved video keeps the landmarks inside it.
+ * @param {Array<object>} videos Loaded video entities with their saved IDs.
  * @param {object} manual Saved manual sync workspace.
  * @returns {object} Manual sync workspace.
  */
 export function createProjectManualVideoSync(videos, manual) {
   const video = videos.find((candidate) => candidate.id === manual.videoId)
   if (!video) return { ...manual, videoId: videos[0]?.id ?? null, landmarks: [] }
-  if (manual.landmarks.some((landmark) => landmark.videoSecond > video.durationSeconds)) {
-    throw new Error('Manual video sync landmark videoSecond must be within the imported video duration')
-  }
-  return manual
+  return { ...manual, landmarks: manual.landmarks.filter((landmark) => landmark.videoSecond <= video.durationSeconds) }
 }
 
 /**

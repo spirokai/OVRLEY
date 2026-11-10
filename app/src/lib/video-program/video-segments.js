@@ -40,6 +40,22 @@ export function cloneVideoSegments(segments) {
 }
 
 /**
+ * Fits a video's cuts to a source file of `frameCount` frames: cuts at or past its
+ * end are dropped with the edits of the segments they start.
+ * @param {{cuts: Array<{id: string, frame: number}>, segments: object}} edits Video edits.
+ * @param {number} frameCount Frames of the source file.
+ * @returns {{cuts: Array<{id: string, frame: number}>, segments: object}} Independent copies of the cuts and segment edits that fit.
+ */
+export function fitCutsToFrameCount({ cuts, segments }, frameCount) {
+  const kept = cuts.filter((cut) => cut.frame < frameCount)
+  const keys = new Set([FIRST_SEGMENT_KEY, ...kept.map((cut) => cut.id)])
+  return {
+    cuts: kept.map((cut) => ({ id: cut.id, frame: cut.frame })),
+    segments: cloneVideoSegments(Object.fromEntries(Object.entries(segments).filter(([key]) => keys.has(key)))),
+  }
+}
+
+/**
  * Returns the key of the join into a segment.
  * @param {string} videoId Video of the segment.
  * @param {string} segmentKey Segment key.

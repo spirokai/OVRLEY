@@ -55,10 +55,20 @@ export function resolvePreviewTarget(program, second) {
 }
 
 /**
+ * Resolves the clock that plays a piece: the video, or the timeline for a piece
+ * of a missing video, which has no file to play.
+ * @param {{missing: boolean}} piece Program piece.
+ * @returns {'video'|'timeline'} Playback clock.
+ */
+export function pieceClock(piece) {
+  return piece.missing ? 'timeline' : 'video'
+}
+
+/**
  * Resolves where playback starts and which clock drives it. Inside a piece the
- * video plays; inside a gap or an excluded segment between pieces playback skips to
- * the next piece. Before the first and after the last piece the timeline clock
- * plays the activity.
+ * video plays (the timeline clock plays a missing video's piece); inside a gap or an
+ * excluded segment between pieces playback skips to the next piece. Before the
+ * first and after the last piece the timeline clock plays the activity.
  * @param {{pieces: Array<object>, joins: Array<object>}} program Built program.
  * @param {number} second Requested timeline second.
  * @returns {{source: 'video'|'timeline', second: number}} Playback start.
@@ -68,9 +78,9 @@ export function resolvePlaybackStart(program, second) {
   switch (position.kind) {
     case 'piece':
     case 'transition':
-      return { source: 'video', second }
+      return { source: pieceClock(position.piece), second }
     case 'gap':
-      return { source: 'video', second: position.nextPiece.timelineStartSecond }
+      return { source: pieceClock(position.nextPiece), second: position.nextPiece.timelineStartSecond }
     default:
       return { source: 'timeline', second }
   }

@@ -3,6 +3,7 @@ import { createProjectDirtyState, createProjectSnapshot } from '@/features/proje
 import { createPathLocator } from '@/features/projects/utils/projectPaths'
 import { VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
 import { createRenderEffectiveConfig } from '@/features/render-video/utils/renderConfig'
+import { createVideoMetadataSnapshot } from '@/lib/video-program/imported-video'
 import useStore from '@/store/useStore'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
@@ -47,6 +48,20 @@ describe('project snapshot contract', () => {
           cuts: [],
           segments: { start: { excluded: false, transitionIn: null } },
           placementAnchor: null,
+          metadata: {
+            frameCount: 3000,
+            fps: { num: 30, den: 1 },
+            resolution: { width: 1920, height: 1080 },
+            rotationDegrees: 0,
+            hasAudio: true,
+            codecName: 'h264',
+            codecLongName: null,
+            bitRate: null,
+            cameraType: null,
+            cameraModel: null,
+            creationTime: null,
+            timeSource: null,
+          },
         },
       ],
     })
@@ -68,7 +83,7 @@ describe('project snapshot contract', () => {
       'importedVideos',
       'videoEdits',
       'http://127.0.0.1',
-      'frameCount',
+      'thumbnailUrl',
       'importOrder',
       'isVideoMuted',
       'selectedWidgetIds',
@@ -246,6 +261,7 @@ describe('project snapshot contract', () => {
         cuts: [],
         segments: { start: { excluded: false, transitionIn: null } },
         placementAnchor: null,
+        metadata: createVideoMetadataSnapshot(earlier),
       },
       {
         id: 'video-2',
@@ -254,6 +270,7 @@ describe('project snapshot contract', () => {
         cuts: [cut],
         segments,
         placementAnchor: { videoId: 'video-1', side: 'after' },
+        metadata: createVideoMetadataSnapshot(later),
       },
     ])
     expect(project.sources.videos[1].cuts[0]).not.toBe(cut)

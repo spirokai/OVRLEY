@@ -4,6 +4,10 @@
  * An entity is created from probed metadata once, at import ingress. It is
  * registered with the preview server only when it joins the collection, so an
  * entity under review in the import dialog has no `preview` yet.
+ *
+ * A project video whose file cannot be found is `missing`: it is created from the
+ * metadata saved with the project, keeps its place and edits, and has no preview
+ * and no thumbnail until the user locates the file.
  */
 
 import { frameCountForDuration } from './frame-grid'
@@ -74,10 +78,11 @@ function createVideoId() {
  * @param {object} options Entity identity.
  * @param {number} options.importOrder Monotonic import order within the session.
  * @param {Array<string>} options.previewWarnings Warnings of the preview probe.
+ * @param {string|null} options.thumbnailUrl Card thumbnail (`data:` URL), or null when no frame could be decoded.
  * @param {string} [options.id] Stable entity ID; generated when absent.
  * @returns {object} Imported video entity with `preview: null` and pending telemetry.
  */
-export function createImportedVideo(metadata, { importOrder, previewWarnings, id = createVideoId() }) {
+export function createImportedVideo(metadata, { importOrder, previewWarnings, thumbnailUrl, id = createVideoId() }) {
   if (typeof metadata.path !== 'string' || metadata.path.length === 0) {
     throw new Error('Imported video metadata must include a path')
   }
@@ -90,6 +95,7 @@ export function createImportedVideo(metadata, { importOrder, previewWarnings, id
     throw new Error('Imported video metadata must report audio presence')
   }
   if (!Array.isArray(previewWarnings)) throw new Error('Imported video requires its preview warnings')
+  if (thumbnailUrl !== null && typeof thumbnailUrl !== 'string') throw new Error('Imported video thumbnail must be a URL or null')
 
   const divisor = greatestCommonDivisor(metadata.fpsNum, metadata.fpsDen)
   const fps = { num: metadata.fpsNum / divisor, den: metadata.fpsDen / divisor }
@@ -117,9 +123,72 @@ export function createImportedVideo(metadata, { importOrder, previewWarnings, id
     detectedCreationTime: metadata.creationTime ?? null,
     detectedTimeSource: metadata.timeSource ?? null,
     previewWarnings: [...previewWarnings],
+    missing: false,
+    thumbnailUrl,
     preview: null,
     syncWarning: null,
     telemetry: { status: 'pending', activity: null },
+  }
+}
+
+/**
+ * Creates the entity of a project video whose file cannot be found, from the
+ * metadata saved with the project (validated at the native project boundary).
+ * It has no preview and no thumbnail, and no embedded telemetry can be read.
+ * @param {object} metadata Saved metadata (`createVideoMetadataSnapshot`).
+ * @param {{id: string, path: string, importOrder: number}} identity Saved identity and last known path.
+ * @returns {object} Missing video entity.
+ */
+export function createMissingVideo(metadata, { id, path, importOrder }) {
+  const fps = { ...metadata.fps }
+  return {
+    id,
+    path,
+    importOrder,
+    durationSeconds: (metadata.frameCount * fps.den) / fps.num,
+    frameCount: metadata.frameCount,
+    fps,
+    resolution: { ...metadata.resolution },
+    rotationDegrees: metadata.rotationDegrees,
+    hasAudio: metadata.hasAudio,
+    codecName: metadata.codecName,
+    codecLongName: metadata.codecLongName,
+    bitRate: metadata.bitRate,
+    cameraType: metadata.cameraType,
+    cameraModel: metadata.cameraModel,
+    creationTime: metadata.creationTime,
+    timeSource: metadata.timeSource,
+    detectedCreationTime: metadata.creationTime,
+    detectedTimeSource: metadata.timeSource,
+    previewWarnings: [],
+    missing: true,
+    thumbnailUrl: null,
+    preview: null,
+    syncWarning: null,
+    telemetry: { status: 'failed', activity: null },
+  }
+}
+
+/**
+ * Describes a video as saved with the project, so that it can be shown and kept on
+ * the timeline when its file cannot be found (`createMissingVideo`).
+ * @param {object} video Imported video entity.
+ * @returns {object} Saved metadata.
+ */
+export function createVideoMetadataSnapshot(video) {
+  return {
+    frameCount: video.frameCount,
+    fps: { ...video.fps },
+    resolution: { ...video.resolution },
+    rotationDegrees: video.rotationDegrees,
+    hasAudio: video.hasAudio,
+    codecName: video.codecName,
+    codecLongName: video.codecLongName,
+    bitRate: video.bitRate,
+    cameraType: video.cameraType,
+    cameraModel: video.cameraModel,
+    creationTime: video.detectedCreationTime,
+    timeSource: video.detectedTimeSource,
   }
 }
 

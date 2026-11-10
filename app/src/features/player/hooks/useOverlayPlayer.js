@@ -2,7 +2,7 @@
  * Top-level player orchestration hook for the presentational overlay player components.
  */
 
-import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { hasOpenOverlay, isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
@@ -78,8 +78,10 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
   const joinModels = useJoinTransitionModels(displayedTimeline)
   const videoIdentity = useMemo(() => timeline.clips.map((clip) => `${clip.id}:${clip.durationSeconds}`).join('|'), [timeline.clips])
 
-  // Timeline selection - a clip, and on a video clip the segment under the pointer (null when selected from the keyboard).
-  const [selectedClip, setSelectedClip] = useState(null)
+  // Clip selection - a clip, and on a video clip the segment under the pointer (null when selected from the keyboard).
+  // The store owns it, so the video panel and the video drawer show the same selection.
+  const selectedClip = useStore((state) => state.selectedClip)
+  const selectClip = useStore((state) => state.selectClip)
 
   // Media flags - downstream hooks need explicit availability booleans, not inferred path/summary checks.
   const hasVideo = timeline.clips.length > 0
@@ -121,18 +123,15 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
   })
   const { getExportMarkerProps, updateTimelineMetrics } = gestures
 
-  // Selection is scoped to the current media and ends when the user clicks elsewhere.
-  useEffect(() => {
-    setSelectedClip(null)
-  }, [playerStore.activitySummary, videoIdentity])
-
+  // Selection ends when the user clicks outside the timeline, its toolbar, the video panel, and the video drawer;
+  // the store ends it when its clip leaves the timeline.
   useEffect(() => {
     const clearClipSelection = (event) => {
-      if (!event.target.closest?.('[data-keeps-clip-selection]')) setSelectedClip(null)
+      if (useStore.getState().selectedClip !== null && !event.target.closest?.('[data-keeps-clip-selection]')) selectClip(null)
     }
     window.addEventListener('pointerdown', clearClipSelection, true)
     return () => window.removeEventListener('pointerdown', clearClipSelection, true)
-  }, [])
+  }, [selectClip])
 
   // Clip drag - owns horizontal drag gestures and keyboard nudges for clip offsets.
   const clipDrag = useClipDrag({
@@ -365,7 +364,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     overlaps: displayedTimeline.program.overlaps,
     program: videoSyncMode ? null : displayedTimeline.program,
     selectedClip,
-    setSelectedClip,
+    setSelectedClip: selectClip,
     warnings: videoWarnings,
     viewEnd: viewport.viewport.viewEnd,
     viewStart: viewport.viewport.viewStart,

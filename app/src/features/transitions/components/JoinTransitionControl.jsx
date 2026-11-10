@@ -18,6 +18,7 @@ export function JoinTransitionControl({ model, id }) {
           label={model.typeLabel}
           previewType={model.previewType}
           defaultLabel={model.defaultLabel}
+          size="sm"
           onSelect={model.onSelect}
         />
         {model.durationSeconds !== null ? (
@@ -27,7 +28,7 @@ export function JoinTransitionControl({ model, id }) {
             mode="duration"
             display="seconds"
             onCommit={model.commitDuration}
-            className="h-7 text-xs"
+            className="h-8 text-xs"
             aria-label={t('transitions.duration', 'Transition duration')}
           />
         ) : null}

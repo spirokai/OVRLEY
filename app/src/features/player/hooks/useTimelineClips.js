@@ -4,11 +4,11 @@
  */
 
 import { useCallback, useId, useMemo, useState } from 'react'
-import { Video } from 'lucide-react'
+import { AlertTriangle, Video } from 'lucide-react'
 import { filenameFromSelectedPath } from '@/lib/file-dialog'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatClockDuration } from '@/lib/time-format'
-import { getClipGeometry, getExportRangeHighlightGeometry, secondsToViewPx } from '../utils/timelineGeometry'
+import { ACTIVITY_LANE_ID, getClipGeometry, getExportRangeHighlightGeometry, secondsToViewPx, videoLaneId } from '../utils/timelineGeometry'
 import { getActivityAttributeLabel } from '@/lib/widget/widget-presentation'
 import { framesToSeconds } from '@/lib/video-program/frame-grid'
 import { sortVideosByTimeline } from '@/lib/video-program/video-collection'
@@ -42,6 +42,7 @@ function segmentModels(clip, selectedSegmentKey) {
   return segments.map((segment, index) => ({
     key: segment.key,
     excluded: segment.excluded,
+    missing: clip.missing,
     hasSeamBefore: index > 0,
     hasSeamAfter: index < segments.length - 1,
     isSelected: segment.key === selectedSegmentKey,
@@ -133,8 +134,8 @@ export default function useTimelineClips({
         clip,
         durationSeconds: clip.durationSeconds,
         formatLabel: 'MP4',
-        icon: Video,
-        id: `video:${clip.id}`,
+        icon: clip.missing ? AlertTriangle : Video,
+        id: videoLaneId(clip.id),
         isVideo: true,
         label: filenameFromSelectedPath(clip.path),
         startSecond: clip.offsetSeconds,
@@ -153,7 +154,7 @@ export default function useTimelineClips({
         durationSeconds: activityDurationSeconds,
         formatLabel: activitySummary.fileFormat?.toUpperCase() || 'DATA',
         icon: null,
-        id: 'activity',
+        id: ACTIVITY_LANE_ID,
         isVideo: false,
         label: activityFilename || activitySummary?.fileName || 'Activity',
         startSecond: 0,

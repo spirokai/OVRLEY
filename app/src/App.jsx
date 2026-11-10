@@ -16,6 +16,7 @@ import {
   ToolbarDrawerLayout,
   useToolbarDrawer,
   VideoDrawerContent,
+  VideoPanel,
   useVideoSyncControls,
 } from '@/features/toolbar'
 import { VideoSyncDrawerContent, useVideoSyncWorkspace } from '@/features/video-sync'
@@ -125,9 +126,10 @@ function App() {
     } else if (toolbarDrawer.activeTool === VIDEO_TOOL) {
       drawerContent = (
         <VideoDrawerContent
+          hasVideos={videoControls.hasVideos}
           onBrowseVideo={videoControls.handleImportVideo}
-          onDeleteVideo={videoControls.clearImportedVideos}
           onRemoveVideo={videoControls.removeVideo}
+          onLocateVideo={videoControls.locateVideo}
           onDropVideoFiles={videoControls.handleVideoFilesDrop}
           videoSync={videoSync}
         />
@@ -170,6 +172,7 @@ function App() {
         <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />
         <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
         <ProjectNoticeDialog {...projectLifecycle.noticeDialog} />
+        <ProjectNoticeDialog {...renderWorkflow.missingVideosDialog} />
         <CutRemovalDialog {...cutRemovalDialog} />
         <VideoImportDialog {...videoControls.importDialog} />
         <KeyboardShortcutsDialog
@@ -240,7 +243,9 @@ function App() {
             </>
           }
           controlPanel={
-            videoSyncWorkspace.videoSyncMode ? null : (
+            videoSyncWorkspace.videoSyncMode ? null : toolbarDrawer.visible && toolbarDrawer.activeTool === VIDEO_TOOL ? (
+              <VideoPanel onDeleteVideo={videoControls.clearImportedVideos} onRemoveVideo={videoControls.removeVideo} videoSync={videoSync} />
+            ) : (
               <div
                 className="w-106 min-w-106 max-w-106 shrink-0 overflow-y-auto bg-card/60"
                 onFocusCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}

@@ -1,16 +1,14 @@
 import { Fragment } from 'react'
-import { AlertTriangle, Blend, Film, Scissors, Trash2 } from 'lucide-react'
+import { AlertTriangle, Film, FolderSearch, Scissors, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { SecondsInput } from '@/components/ui/seconds-input'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { Switch } from '@/components/ui/switch'
-import { JoinTransitionControl, TransitionSelect } from '@/features/transitions'
+import { JoinTransitionControl } from '@/features/transitions'
 import { cn } from '@/lib/utils'
-import { VideoSyncControls } from '@/features/video-sync'
 import { useFileDropZone } from '../hooks/useFileDropZone'
-import { useTransitionDefaultsSection } from '../hooks/useTransitionDefaultsSection'
-import { useVideoClipRows } from '../hooks/useVideoClipRows'
+import { useSelectedVideoRow } from '../hooks/useSelectedVideoRow'
 import { FileDragCursor, FileDropZone } from './FileDropZone'
 import { useTranslation } from 'react-i18next'
 
@@ -123,56 +121,7 @@ function SegmentList({ segments, exits, clipId, filename }) {
   )
 }
 
-function TransitionDefaultsSection() {
-  const { t } = useTranslation()
-  const section = useTransitionDefaultsSection()
-  return (
-    <section className="space-y-3" aria-label={t('toolbar.transitionDefaults', 'Default transitions')}>
-      <SectionHeading icon={Blend} title={t('toolbar.transitionDefaults', 'Default transitions')} variant="drawer" />
-      <p className="px-2 text-[0.7rem] text-muted-foreground">
-        {t(
-          'toolbar.transitionDefaultsHint',
-          "Used at every join you have not set yourself. Separate videos closer together than the continuity threshold, such as a camera's split recording, are joined without a transition.",
-        )}
-      </p>
-      <div className="grid grid-cols-2 items-center gap-x-4 gap-y-2 px-2">
-        <Label htmlFor="transition-defaults-type" className="text-xs font-bold text-muted-foreground">
-          {t('video-preview.transitionType', 'Transition')}
-        </Label>
-        <TransitionSelect
-          id="transition-defaults-type"
-          value={section.type}
-          label={section.typeLabel}
-          previewType={section.previewType}
-          onSelect={section.onTypeChange}
-        />
-        <Label htmlFor="transition-defaults-duration" className="text-xs font-bold text-muted-foreground">
-          {t('video-preview.transitionDuration', 'Duration')}
-        </Label>
-        <SecondsInput
-          id="transition-defaults-duration"
-          value={section.durationSeconds}
-          fps={section.durationFps}
-          mode="duration"
-          onCommit={section.onDurationCommit}
-          className="h-7 text-xs"
-        />
-        <Label htmlFor="transition-defaults-threshold" className="text-xs font-bold text-muted-foreground">
-          {t('video-preview.continuityThreshold', 'Continuity threshold')}
-        </Label>
-        <SecondsInput
-          id="transition-defaults-threshold"
-          value={section.thresholdSeconds}
-          fps={null}
-          onCommit={section.onThresholdCommit}
-          className="h-7 text-xs"
-        />
-      </div>
-    </section>
-  )
-}
-
-function VideoClipRow({ row }) {
+function SelectedVideoDetails({ row }) {
   const { t } = useTranslation()
   const offsetInputId = `video-offset-${row.id}`
 
@@ -204,6 +153,17 @@ function VideoClipRow({ row }) {
           ))}
         </ul>
       )}
+      {row.onLocate !== null ? (
+        <div className="space-y-2 px-2">
+          <p className="text-[0.7rem] text-muted-foreground">
+            {t('toolbar.lastKnownLocation', 'Last location:')} <span className="break-all select-text">{row.path}</span>
+          </p>
+          <Button type="button" className="h-8 w-full gap-2" onClick={row.onLocate}>
+            <FolderSearch className="h-4 w-4" />
+            {t('toolbar.locateVideo', 'Locate video…')}
+          </Button>
+        </div>
+      ) : null}
       <div className="grid grid-cols-2 items-start gap-4 px-2">
         <Label htmlFor={offsetInputId} className="flex min-h-8 items-center text-xs font-bold text-muted-foreground">
           {t('toolbar.videoStart', 'Start on timeline')}
@@ -248,27 +208,30 @@ function VideoClipRow({ row }) {
 }
 
 /**
- * Renders the video import controls, one row per imported clip, and the session sync settings.
+ * Renders the video import controls and the details of the video selected in the
+ * video panel; the panel holds the video list and the project's video settings.
  *
  * @param {object} props - Component props.
+ * @param {boolean} props.hasVideos - Whether the project has videos.
  * @param {() => void} props.onBrowseVideo - Opens the video file picker.
- * @param {() => void} props.onDeleteVideo - Removes every imported video.
  * @param {(videoId: string) => void} props.onRemoveVideo - Removes one imported video.
+ * @param {(videoId: string) => void} props.onLocateVideo - Asks for the file of a missing video.
  * @param {(selections: Array<File|string>) => void} props.onDropVideoFiles - Imports dropped video files or native paths.
- * @param {object} props.videoSync - Video sync state and handlers.
+ * @param {{timezone: string|null, videoSyncTimezoneMode: 'local'|'utc'|null}} props.videoSync - Timezone used to show recording times.
  * @returns {JSX.Element} Rendered drawer content.
  */
-export function VideoDrawerContent({ onBrowseVideo, onDeleteVideo, onRemoveVideo, onDropVideoFiles, videoSync }) {
+export function VideoDrawerContent({ hasVideos, onBrowseVideo, onRemoveVideo, onLocateVideo, onDropVideoFiles, videoSync }) {
   const { t } = useTranslation()
   const { dragPosition, dropZoneProps, dropZoneRef, isDraggingFile, isOverDropZone } = useFileDropZone(onDropVideoFiles)
-  const rows = useVideoClipRows({
+  const row = useSelectedVideoRow({
     timezone: videoSync.timezone,
     videoSyncTimezoneMode: videoSync.videoSyncTimezoneMode,
     onRemoveVideo,
+    onLocateVideo,
   })
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-4 thin-scrollbar">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-4 thin-scrollbar" data-keeps-clip-selection>
       <FileDragCursor position={isDraggingFile ? dragPosition : null} />
 
       <Button type="button" className="h-9 w-full gap-2" onClick={onBrowseVideo} aria-keyshortcuts="Mod+I">
@@ -284,26 +247,15 @@ export function VideoDrawerContent({ onBrowseVideo, onDeleteVideo, onRemoveVideo
         sublabel="MP4, MOV, MKV"
       />
 
-      {rows.length > 0 ? (
-        <div className="mt-10 space-y-8 border-t border-border/80 pt-2">
-          <div className="flex justify-end pt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:bg-surface-accent-soft hover:text-primary"
-              onClick={onDeleteVideo}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {t('toolbar.deleteVideo', 'Remove all videos')}
-            </Button>
-          </div>
-          {videoSync.activitySummary ? <VideoSyncControls {...videoSync} /> : null}
-
-          {rows.map((row) => (
-            <VideoClipRow key={row.id} row={row} />
-          ))}
-
-          <TransitionDefaultsSection />
+      {hasVideos ? (
+        <div className="mt-10 border-t border-border/80 pt-2">
+          {row !== null ? (
+            <SelectedVideoDetails row={row} />
+          ) : (
+            <p className="px-2 pt-4 text-center text-xs text-muted-foreground">
+              {t('toolbar.selectVideoHint', 'Select a video to see its details.')}
+            </p>
+          )}
         </div>
       ) : null}
     </div>

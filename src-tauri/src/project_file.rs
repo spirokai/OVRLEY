@@ -5,7 +5,7 @@
 //! archive and platform-path details do not leak into application state.
 
 use crate::raster_resources::RasterResources;
-use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use crate::video_thumbnail::{generate_thumbnail, png_data_url, MAX_THUMBNAIL_SIZE};
 use chrono::DateTime;
 use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, EncoderId};
 use ovrley_core::encode::ffmpeg::transitions::{
@@ -24,7 +24,6 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::sync::Arc;
 use tauri::Manager;
 use uuid::Uuid;
@@ -52,10 +51,7 @@ const PROJECT_JSON_ENTRY: &str = "project.json";
 const THUMBNAIL_ENTRY: &str = "thumbnail.png";
 const RASTER_ASSET_NAMESPACE: &str = "rasters/";
 const MAX_PROJECT_JSON_SIZE: u64 = 4 * 1024 * 1024;
-const MAX_THUMBNAIL_SIZE: u64 = 2 * 1024 * 1024;
 const MAX_ARCHIVE_SIZE: u64 = 40 * 1024 * 1024;
-const THUMBNAIL_FILTER: &str =
-    "scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2:color=black@0";
 
 #[tauri::command]
 pub(crate) fn default_project_directory(app: tauri::AppHandle) -> Result<String, String> {
@@ -86,10 +82,7 @@ fn read_thumbnail_data_url(path: &Path) -> Option<String> {
     }
     let mut bytes = Vec::with_capacity(entry.size() as usize);
     entry.read_to_end(&mut bytes).ok()?;
-    Some(format!(
-        "data:image/png;base64,{}",
-        BASE64_STANDARD.encode(bytes)
-    ))
+    Some(png_data_url(&bytes))
 }
 
 #[tauri::command]
@@ -276,6 +269,52 @@ struct ProjectVideo {
     /// Places a video whose time cannot be determined next to another video.
     #[serde(deserialize_with = "deserialize_required_option")]
     placement_anchor: Option<ProjectPlacementAnchor>,
+    /// The video as last loaded. Required in version 6; `None` only for a video
+    /// migrated from an older version, which did not store it.
+    #[serde(deserialize_with = "deserialize_present")]
+    metadata: Option<ProjectVideoMetadata>,
+}
+
+/// What a video was when it was last loaded, so a file that cannot be found keeps
+/// its place, length, and details. A found file's probe replaces it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectVideoMetadata {
+    frame_count: u64,
+    fps: ProjectFrameRate,
+    /// Display-oriented dimensions.
+    resolution: ProjectResolution,
+    rotation_degrees: u16,
+    has_audio: bool,
+    #[serde(deserialize_with = "deserialize_required_option")]
+    codec_name: Option<String>,
+    #[serde(deserialize_with = "deserialize_required_option")]
+    codec_long_name: Option<String>,
+    #[serde(deserialize_with = "deserialize_required_option")]
+    bit_rate: Option<String>,
+    #[serde(deserialize_with = "deserialize_required_option")]
+    camera_type: Option<String>,
+    #[serde(deserialize_with = "deserialize_required_option")]
+    camera_model: Option<String>,
+    /// Detected recording time, before any change made in the editor.
+    #[serde(deserialize_with = "deserialize_required_option")]
+    creation_time: Option<String>,
+    #[serde(deserialize_with = "deserialize_required_option")]
+    time_source: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProjectFrameRate {
+    num: u32,
+    den: u32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProjectResolution {
+    width: u32,
+    height: u32,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -432,6 +471,16 @@ where
     T: Deserialize<'de>,
 {
     Option::<T>::deserialize(deserializer)
+}
+
+/// Deserializes a field the current version requires (present and not null) into
+/// the `Option` that migration from older versions leaves `None`.
+fn deserialize_present<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -800,6 +849,11 @@ fn validate_cuts_and_segments(video: &ProjectVideo) -> Result<(), String> {
         }
         previous_frame = cut.frame;
     }
+    if let Some(metadata) = &video.metadata {
+        if previous_frame >= metadata.frame_count {
+            return Err("sources.videos cuts must lie inside the video".into());
+        }
+    }
     let keys: HashSet<&str> = video.segments.keys().map(String::as_str).collect();
     if keys != expected_keys {
         return Err(format!(
@@ -816,8 +870,24 @@ fn validate_cuts_and_segments(video: &ProjectVideo) -> Result<(), String> {
     Ok(())
 }
 
-/// Validates the video collection. Bounds that need the probed frame count
-/// (cuts, landmarks) are checked by the frontend after import.
+fn validate_video_metadata(metadata: &ProjectVideoMetadata) -> Result<(), String> {
+    if metadata.frame_count == 0 {
+        return Err("sources.videos metadata frameCount must be positive".into());
+    }
+    if metadata.fps.num == 0 || metadata.fps.den == 0 {
+        return Err("sources.videos metadata fps must be positive".into());
+    }
+    if metadata.resolution.width == 0 || metadata.resolution.height == 0 {
+        return Err("sources.videos metadata resolution must be positive".into());
+    }
+    if ![0, 90, 180, 270].contains(&metadata.rotation_degrees) {
+        return Err("sources.videos metadata rotationDegrees must be 0, 90, 180 or 270".into());
+    }
+    Ok(())
+}
+
+/// Validates the video collection. Cuts are checked against the saved frame count;
+/// the frontend checks the saved edits again against the probe of a found file.
 fn validate_videos(videos: &[ProjectVideo]) -> Result<(), String> {
     let mut video_ids = HashSet::new();
     for video in videos {
@@ -830,6 +900,9 @@ fn validate_videos(videos: &[ProjectVideo]) -> Result<(), String> {
         validate_locator(&video.path)?;
         if !video.offset_seconds.is_finite() {
             return Err("sources.videos offsetSeconds must be finite".into());
+        }
+        if let Some(metadata) = &video.metadata {
+            validate_video_metadata(metadata)?;
         }
         validate_cuts_and_segments(video)?;
     }
@@ -1141,7 +1214,8 @@ fn insert_lap_selection(value: &mut Value) -> Result<(), String> {
 
 /// Versions 1 to 5 store at most one video. It becomes a one-clip collection at its
 /// saved offset that owns the manual sync landmarks, with no cuts,
-/// transitions following the defaults, and the hard transition defaults.
+/// transitions following the defaults, and the hard transition defaults. Its
+/// metadata is unknown until the file is probed.
 /// A project without a video that rendered a video folder keeps rendering
 /// separate files to the same output folder; the folder itself is handed to the
 /// frontend to import. Older versions saved the render dialog's target tab, so a
@@ -1176,6 +1250,7 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
             },
         )]),
         placement_anchor: None,
+        metadata: None,
     });
     let manual = project.sync.manual;
     let document = ProjectDocument {
@@ -1577,37 +1652,6 @@ fn write_archive_entry(
         .map_err(|error| error.to_string().into())
 }
 
-fn generate_thumbnail(ffmpeg: &Path, video_path: &Path) -> Option<Vec<u8>> {
-    let mut command = Command::new(ffmpeg);
-    ovrley_core::encode::ffmpeg::binary::configure_ffmpeg_command(&mut command);
-    let output = command
-        .arg("-hide_banner")
-        .arg("-loglevel")
-        .arg("error")
-        .arg("-i")
-        .arg(video_path)
-        .arg("-frames:v")
-        .arg("1")
-        .arg("-vf")
-        .arg(THUMBNAIL_FILTER)
-        .arg("-f")
-        .arg("image2pipe")
-        .arg("-vcodec")
-        .arg("png")
-        .arg("pipe:1")
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .output()
-        .ok()?;
-    if !output.status.success()
-        || output.stdout.is_empty()
-        || output.stdout.len() as u64 > MAX_THUMBNAIL_SIZE
-    {
-        return None;
-    }
-    Some(output.stdout)
-}
-
 #[cfg(windows)]
 fn atomic_replace(source: &Path, target: &Path) -> Result<(), String> {
     use std::os::windows::ffi::OsStrExt;
@@ -1775,14 +1819,16 @@ fn write_project_file_sync(
         .parent()
         .ok_or_else(|| "Project target has no parent directory".to_string())?;
     fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-    // The thumbnail shows the first video on the timeline.
-    let thumbnail = project
-        .sources
-        .videos
-        .iter()
-        .min_by(|left, right| left.offset_seconds.total_cmp(&right.offset_seconds))
-        .and_then(|video| resolve_locator(&target, &video.path).ok())
-        .and_then(|video_path| ffmpeg.and_then(|ffmpeg| generate_thumbnail(ffmpeg, &video_path)));
+    // The thumbnail shows the first video on the timeline whose file gives a frame,
+    // so a missing first video does not leave the project without one.
+    let mut videos: Vec<&ProjectVideo> = project.sources.videos.iter().collect();
+    videos.sort_by(|left, right| left.offset_seconds.total_cmp(&right.offset_seconds));
+    let thumbnail = ffmpeg.and_then(|ffmpeg| {
+        videos.into_iter().find_map(|video| {
+            let video_path = resolve_locator(&target, &video.path).ok()?;
+            generate_thumbnail(ffmpeg, &video_path)
+        })
+    });
     let temporary = PendingArchive::new(parent);
     write_archive(
         temporary.path(),
@@ -1825,6 +1871,7 @@ pub(crate) async fn write_project_file(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
     use ovrley_core::raster::RasterResourceResolver;
 
     fn valid_project_json() -> String {
@@ -2072,7 +2119,21 @@ mod tests {
             "offsetSource": "auto",
             "cuts": [],
             "segments": { "start": { "excluded": false, "transitionIn": null } },
-            "placementAnchor": null
+            "placementAnchor": null,
+            "metadata": {
+                "frameCount": 1800,
+                "fps": { "num": 30, "den": 1 },
+                "resolution": { "width": 1920, "height": 1080 },
+                "rotationDegrees": 0,
+                "hasAudio": true,
+                "codecName": "h264",
+                "codecLongName": null,
+                "bitRate": null,
+                "cameraType": null,
+                "cameraModel": null,
+                "creationTime": "2026-08-27T12:00:00Z",
+                "timeSource": "ffprobe"
+            }
         })
     }
 
@@ -2808,6 +2869,7 @@ mod tests {
         let start = &video.segments[FIRST_SEGMENT_KEY];
         assert!(!start.excluded && start.transition_in.is_none());
         assert!(video.placement_anchor.is_none());
+        assert!(video.metadata.is_none());
         assert_eq!(
             parsed.sync.manual.video_id.as_deref(),
             Some(video.id.as_str())
@@ -2833,7 +2895,7 @@ mod tests {
 
     #[test]
     fn rejects_malformed_v4_video_collection_contracts() {
-        let cases: [(&str, fn(&mut Value)); 33] = [
+        let cases: [(&str, fn(&mut Value)); 37] = [
             ("missing placementAnchor", |project| {
                 project["sources"]["videos"][0]
                     .as_object_mut()
@@ -2964,6 +3026,21 @@ mod tests {
             }),
             ("negative split gap threshold", |project| {
                 project["transitionDefaults"]["splitGapThresholdSeconds"] = Value::from(-0.1);
+            }),
+            ("missing metadata", |project| {
+                project["sources"]["videos"][0]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("metadata");
+            }),
+            ("null metadata", |project| {
+                project["sources"]["videos"][0]["metadata"] = Value::Null
+            }),
+            ("no frames", |project| {
+                project["sources"]["videos"][0]["metadata"]["frameCount"] = Value::from(0)
+            }),
+            ("cut after the last frame", |project| {
+                project["sources"]["videos"][1]["cuts"][1]["frame"] = Value::from(1800)
             }),
         ];
         assert!(parse_project(&multi_video_project_json().to_string()).is_ok());

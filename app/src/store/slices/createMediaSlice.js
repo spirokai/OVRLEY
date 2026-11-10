@@ -3,6 +3,7 @@
  */
 
 import { DEFAULT_RENDER_PROGRESS } from '../store-utils'
+import { ACTIVITY_LANE_ID } from '@/features/player/utils/timelineGeometry'
 import { createActivitySummary } from '@/lib/activity/activity-summary'
 
 /**
@@ -110,6 +111,7 @@ export function createMediaSlice(set, get) {
         state.activitySummary = createActivitySummary(activity)
         // Lap IDs belong to one activity; any replacement purges the selection.
         state.disabledLaps = []
+        if (state.selectedClip?.laneId === ACTIVITY_LANE_ID) state.selectedClip = null
       })
       get().clearVideoSyncForActivity()
       get().computeVideoSync()
@@ -126,6 +128,7 @@ export function createMediaSlice(set, get) {
         state.parsedActivity = null
         state.activitySummary = null
         state.disabledLaps = []
+        if (state.selectedClip?.laneId === ACTIVITY_LANE_ID) state.selectedClip = null
       })
       get().clearVideoSyncForActivity()
       get().computeVideoSync()

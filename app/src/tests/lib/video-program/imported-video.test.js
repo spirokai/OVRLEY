@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vite-plus/test'
-import { createImportedVideo, requireTelemetry } from '@/lib/video-program/imported-video'
+import { createImportedVideo, createMissingVideo, createVideoMetadataSnapshot, requireTelemetry } from '@/lib/video-program/imported-video'
 
 function metadata(overrides = {}) {
   return { path: '/videos/ride.mp4', duration: 60, fpsNum: 30, fpsDen: 1, resolution: { width: 1920, height: 1080 }, hasAudio: true, ...overrides }
@@ -11,6 +11,7 @@ describe('createImportedVideo ingress', () => {
       id: 'v',
       importOrder: 3,
       previewWarnings: ['slow seeking'],
+      thumbnailUrl: 'data:image/png;base64,AA==',
     })
     expect(video.fps).toEqual({ num: 30000, den: 1001 })
     // 300.09 frames: the partial last frame counts, as in the native renderer.
@@ -34,12 +35,12 @@ describe('createImportedVideo ingress', () => {
     ['a fractional FPS denominator', { fpsDen: 1.5 }, 'invalid frame rate denominator'],
     ['unknown audio presence', { hasAudio: undefined }, 'audio presence'],
   ])('rejects %s', (_label, overrides, message) => {
-    expect(() => createImportedVideo(metadata(overrides), { importOrder: 0, previewWarnings: [] })).toThrow(message)
+    expect(() => createImportedVideo(metadata(overrides), { importOrder: 0, previewWarnings: [], thumbnailUrl: null })).toThrow(message)
   })
 
   test('counts frames like the native renderer, snapping container jitter to the frame boundary', () => {
     const frames = (duration, fpsNum = 30, fpsDen = 1) =>
-      createImportedVideo(metadata({ duration, fpsNum, fpsDen }), { importOrder: 0, previewWarnings: [] }).frameCount
+      createImportedVideo(metadata({ duration, fpsNum, fpsDen }), { importOrder: 0, previewWarnings: [], thumbnailUrl: null }).frameCount
     expect(frames(10)).toBe(300)
     expect(frames(10.000001)).toBe(300)
     expect(frames(10.01)).toBe(301)
@@ -51,5 +52,40 @@ describe('createImportedVideo ingress', () => {
     expect(() => requireTelemetry({ status: 'ready', activity: {} })).not.toThrow()
     expect(() => requireTelemetry({ status: 'absent', activity: {} })).toThrow('Only ready video telemetry carries an activity')
     expect(() => requireTelemetry({ status: 'done', activity: null })).toThrow('Invalid video telemetry status')
+  })
+})
+
+describe('missing videos', () => {
+  test('keep the timing, format, and detected time of the video as saved, without a preview or thumbnail', () => {
+    const found = createImportedVideo(
+      metadata({ duration: 10.0103, fpsNum: 60000, fpsDen: 2002, rotationDegrees: 90, creationTime: '2026-07-18T07:20:03Z', timeSource: 'gps' }),
+      { id: 'v', importOrder: 3, previewWarnings: ['slow seeking'], thumbnailUrl: 'data:image/png;base64,AA==' },
+    )
+    // An editor change to the recording time is not saved; the detected one is.
+    const saved = createVideoMetadataSnapshot({ ...found, creationTime: '2026-07-18T08:00:00Z', timeSource: 'filename' })
+
+    const missing = createMissingVideo(saved, { id: 'v', path: found.path, importOrder: 3 })
+
+    const timing = ({ durationSeconds, frameCount, fps, resolution, rotationDegrees, hasAudio }) => ({
+      durationSeconds,
+      frameCount,
+      fps,
+      resolution,
+      rotationDegrees,
+      hasAudio,
+    })
+    expect(timing(missing)).toEqual(timing(found))
+    expect(missing).toMatchObject({
+      id: 'v',
+      path: '/videos/ride.mp4',
+      importOrder: 3,
+      creationTime: '2026-07-18T07:20:03Z',
+      timeSource: 'gps',
+      missing: true,
+      preview: null,
+      thumbnailUrl: null,
+      previewWarnings: [],
+    })
+    expect(createVideoMetadataSnapshot(missing)).toEqual(saved)
   })
 })

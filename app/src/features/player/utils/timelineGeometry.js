@@ -135,6 +135,19 @@ export function snapClipDelta({ proposedDelta, movingEdges, fixedEdges, viewStar
   return { delta, guidelineSecond }
 }
 
+/** Timeline lane id of the external activity. */
+export const ACTIVITY_LANE_ID = 'activity'
+
+/**
+ * Returns the timeline lane id of an imported video's clip.
+ *
+ * @param {string} videoId Video id.
+ * @returns {string} Lane id `video:<videoId>`.
+ */
+export function videoLaneId(videoId) {
+  return `video:${videoId}`
+}
+
 /**
  * Returns the imported video addressed by a timeline lane, or null for the activity lane.
  *
@@ -142,7 +155,7 @@ export function snapClipDelta({ proposedDelta, movingEdges, fixedEdges, viewStar
  * @returns {string|null} Video id.
  */
 export function videoIdFromLaneId(laneId) {
-  return laneId === 'activity' ? null : laneId.slice('video:'.length)
+  return laneId === ACTIVITY_LANE_ID ? null : laneId.slice(videoLaneId('').length)
 }
 
 /**

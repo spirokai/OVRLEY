@@ -191,7 +191,17 @@ describe('useRenderWorkflow', () => {
     expect(result.current.renderSettingsDraft.exportMode).toBe('transparent')
   })
 
-  test('opens targeting the current video and stays open while a batch is running', async () => {
+  test('reopens a multi-video project with its chosen output mode and stays open while a batch is running', async () => {
+    // One file per video is a choice only with more than one video.
+    useStore.setState(
+      videoStoreState(
+        [
+          createTestVideo({ id: 'clip-a', path: 'C:\\a.mp4', durationSeconds: 12 }),
+          createTestVideo({ id: 'clip-b', path: 'C:\\b.mp4', durationSeconds: 12, importOrder: 1 }),
+        ],
+        { 'clip-b': 20 },
+      ),
+    )
     const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
 
     await act(async () => result.current.openRenderDialog())

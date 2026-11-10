@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 
 vi.mock('@/features/toolbar/hooks/useFileDropZone', () => ({
@@ -12,6 +12,7 @@ vi.mock('@/features/toolbar/hooks/useFileDropZone', () => ({
 }))
 
 import { VideoDrawerContent } from '@/features/toolbar'
+import { createMissingVideo, createVideoMetadataSnapshot } from '@/lib/video-program/imported-video'
 import useStore from '@/store/useStore'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
@@ -28,33 +29,30 @@ const ride = {
   cameraModel: 'GoPro Hero 12',
 }
 
-const videoSync = {
-  activitySummary: { timezone: 'Europe/Zurich', syncTime: '2026-07-18T07:20:03.000Z' },
-  canResetCreationTime: false,
-  filenameCreationTimeAvailable: true,
-  sharedOffsetSeconds: 0,
-  sharedOffsetFps: { num: 30, den: 1 },
-  timezone: 'Europe/Zurich',
-  timezoneDisabled: false,
-  videoSyncTimezoneMode: 'local',
-  videoSyncWarning: null,
-  computeVideoSync: vi.fn(),
-  commitSharedOffset: vi.fn(() => null),
-  resetVideoCreationTimes: vi.fn(),
-  setVideoCreationTimesFromFilenames: vi.fn(),
-  setVideoSyncTimezoneMode: vi.fn(),
+const videoSync = { timezone: 'Europe/Zurich', videoSyncTimezoneMode: 'local' }
+
+function renderDrawer(props = {}) {
+  return render(
+    <VideoDrawerContent
+      hasVideos
+      onBrowseVideo={vi.fn()}
+      onRemoveVideo={vi.fn()}
+      onLocateVideo={vi.fn()}
+      onDropVideoFiles={vi.fn()}
+      videoSync={videoSync}
+      {...props}
+    />,
+  )
 }
 
 describe('VideoDrawerContent', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
-    useStore.setState(videoStoreState([ride, createTestVideo({ id: 'video-2', path: '/videos/climb.mp4', durationSeconds: 65, importOrder: 1 })]))
   })
 
   test('offers browse and drop import controls', () => {
-    useStore.setState(videoStoreState([]))
     const onBrowseVideo = vi.fn()
-    render(<VideoDrawerContent onBrowseVideo={onBrowseVideo} onDeleteVideo={vi.fn()} onDropVideoFiles={vi.fn()} videoSync={videoSync} />)
+    renderDrawer({ hasVideos: false, onBrowseVideo })
 
     fireEvent.click(screen.getByRole('button', { name: 'Load videos' }))
 
@@ -63,36 +61,34 @@ describe('VideoDrawerContent', () => {
     expect(screen.queryByText('Details')).not.toBeInTheDocument()
   })
 
-  test('renders imported video metadata and sync controls', () => {
-    useStore.setState(videoStoreState([ride]))
-    const onDeleteVideo = vi.fn()
-    render(<VideoDrawerContent onBrowseVideo={vi.fn()} onDeleteVideo={onDeleteVideo} onDropVideoFiles={vi.fn()} videoSync={videoSync} />)
+  test('shows the details of the selected video clip', () => {
+    useStore.setState(videoStoreState([ride, createTestVideo({ id: 'video-2', path: '/videos/climb.mp4', durationSeconds: 65, importOrder: 1 })]))
+    renderDrawer()
+    expect(screen.getByText('Select a video to see its details.')).toBeInTheDocument()
+
+    // A selected segment selects its video as well.
+    act(() => useStore.getState().selectClip({ laneId: 'video:video-1', segmentKey: 'start' }))
 
     expect(screen.getByText('ride.mp4')).toBeInTheDocument()
+    expect(screen.queryByText('climb.mp4')).not.toBeInTheDocument()
     expect(screen.getByText('1:02:03')).toBeInTheDocument()
     expect(screen.getByText('59.94 fps')).toBeInTheDocument()
     expect(screen.getByText('1920×1080')).toBeInTheDocument()
     expect(screen.getByText('GoPro Hero 12')).toBeInTheDocument()
     expect(screen.getByText('Available')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Sync Doctor' })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Remove all videos' }))
-    expect(onDeleteVideo).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: 'Locate video…' })).not.toBeInTheDocument()
   })
 
-  test('offers manual sync when automatic sync cannot find an offset', () => {
-    const openManualVideoSync = vi.fn()
-    render(
-      <VideoDrawerContent
-        onBrowseVideo={vi.fn()}
-        onDeleteVideo={vi.fn()}
-        onDropVideoFiles={vi.fn()}
-        videoSync={{ ...videoSync, openManualVideoSync, videoSyncWarning: 'Video could not be synced with activity' }}
-      />,
-    )
+  test('offers to locate the file of a selected missing video', () => {
+    const missing = createMissingVideo(createVideoMetadataSnapshot(ride), { id: 'video-1', path: '/videos/ride.mp4', importOrder: 0 })
+    useStore.setState({ ...videoStoreState([missing]), selectedClip: { laneId: 'video:video-1', segmentKey: null } })
+    const onLocateVideo = vi.fn()
+    renderDrawer({ onLocateVideo })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Manual Sync' }))
+    expect(screen.getByText('Video file not found. Locate it or remove the video.')).toBeInTheDocument()
+    expect(screen.getByText('/videos/ride.mp4')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Locate video…' }))
 
-    expect(openManualVideoSync).toHaveBeenCalledOnce()
+    expect(onLocateVideo).toHaveBeenCalledExactlyOnceWith('video-1')
   })
 })

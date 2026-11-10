@@ -442,6 +442,16 @@
             { "key": "delete", "modifiers": [] },
             { "key": "backspace", "modifiers": [] }
           ]
+        },
+        {
+          "id": "videoCard.remove",
+          "display": false,
+          "scope": "video-card",
+          "descriptionKey": "keyboard-shortcuts.timelineClipRemove",
+          "bindings": [
+            { "key": "delete", "modifiers": [] },
+            { "key": "backspace", "modifiers": [] }
+          ]
         }
       ]
     },

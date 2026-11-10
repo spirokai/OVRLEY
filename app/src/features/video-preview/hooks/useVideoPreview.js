@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { openHevcSupport } from '@/api/backend'
 import { useTransitionProxyJobs, useVideoTimeline } from '@/hooks/useVideoTimeline'
 import { framesToSeconds } from '@/lib/video-program/frame-grid'
-import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
+import { pieceClock, resolvePreviewTarget } from '@/lib/video-program/playback-target'
 import { assignPreviewSlots, EMPTY_PREVIEW_SLOTS } from '@/lib/video-program/preview-slots'
 import { listShownTransitionJoinKeys, resolveContinuation, resolveTransitionWindow } from '@/lib/video-program/transition-proxies'
 import useStore from '@/store/useStore'
@@ -30,7 +30,7 @@ function previewSourceOf(clip) {
  *
  * @param {Array<React.RefObject<HTMLVideoElement>>} slotRefs - Refs to the two video elements.
  * @param {boolean} isActive - Whether the imported video preview is currently visible.
- * @returns {{ slots: Array<{src: string, isActive: boolean}>, videoSrc: string, importId: string|null, isOutOfRange: boolean, isExcluded: boolean, isInOverlap: boolean, transition: {proxyStatus: 'queued'|'rendering'|'ready'|'failed', proxyUrl: string|null, elapsedSeconds: number, isPlaying: boolean}|null, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
+ * @returns {{ slots: Array<{src: string, isActive: boolean}>, videoSrc: string, importId: string|null, isMissing: boolean, isOutOfRange: boolean, isExcluded: boolean, isInOverlap: boolean, transition: {proxyStatus: 'queued'|'rendering'|'ready'|'failed', proxyUrl: string|null, elapsedSeconds: number, isPlaying: boolean}|null, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
  *   Inside a transition window `transition` describes its proxy, shown over the outgoing piece once ready.
  */
 export function useVideoPreview(slotRefs, isActive = true) {
@@ -48,21 +48,23 @@ export function useVideoPreview(slotRefs, isActive = true) {
   const transitionProxyJobs = useTransitionProxyJobs()
 
   // Derived state - the clip at the playhead (or the upcoming/last clip outside clips) owns the video element.
+  // A missing video's clip has no file: the element stays empty and the surface says the file was not found.
   const target = resolvePreviewTarget(program, selectedSecond)
   const activeClip = target === null ? null : clips.find((clip) => clip.id === target.videoId)
+  const isMissing = activeClip?.missing ?? false
   const videoOffsetSeconds = activeClip?.offsetSeconds ?? 0
   const desiredVideoSecond = target?.sourceSecond ?? 0
   const playingPieceId = target?.isInside ? target.piece.id : null
   const pieceEndSourceSecond = target?.isInside ? target.piece.sourceEndSecond : null
-  const activePath = activeClip?.path ?? null
-  const activePreviewUrl = activeClip?.preview.url ?? null
+  const activePath = activeClip === null || isMissing ? null : activeClip.path
+  const activePreviewUrl = activePath === null ? null : activeClip.preview.url
   const isVideoPlaybackMode = isActive && previewPlaybackState === 'playing' && previewPlaybackSource === 'video' && !isDragPreview
   const videoSrc = activePath === null ? '' : resolveVideoPreviewSource({ importedVideoPath: activePath, importedVideoPreviewUrl: activePreviewUrl })
 
   // Element slots - the active element shows the target piece; the parked one waits on the piece after it.
   const shownJoinKeys = listShownTransitionJoinKeys(transitionProxyJobs, transitionProxies)
   const continuation = target === null || target.isExcluded ? null : resolveContinuation(program, target.piece.id, shownJoinKeys)
-  const preloadPiece = continuation?.piece ?? null
+  const preloadPiece = continuation === null || continuation.piece.missing ? null : continuation.piece
   const preloadClip = preloadPiece === null ? null : clips.find((clip) => clip.id === preloadPiece.videoId)
   const [previousSlots, setPreviousSlots] = useState(EMPTY_PREVIEW_SLOTS)
   const slotState = assignPreviewSlots(previousSlots, {
@@ -100,7 +102,7 @@ export function useVideoPreview(slotRefs, isActive = true) {
     const playingPiece = program.pieces.find((piece) => piece.id === playingPieceId)
     const next = resolveContinuation(program, playingPieceId, shownJoinKeys)
     if (next !== null) {
-      startPreviewPlayback({ source: 'video', second: next.second })
+      startPreviewPlayback({ source: pieceClock(next.piece), second: next.second })
       return
     }
     const video = videoRef.current
@@ -294,12 +296,13 @@ export function useVideoPreview(slotRefs, isActive = true) {
     }
   }, [parkedRef, parkedSecond, parkedSlot])
 
-  // Transition window - its proxy (once rendered) covers the end of the outgoing piece.
+  // Transition window - its proxy (once rendered) covers the end of the outgoing piece. A join with a
+  // missing video has no proxy.
   const transitionWindow = isDragPreview ? null : resolveTransitionWindow(program, selectedSecond)
-  const transitionJob = transitionWindow === null ? null : transitionProxyJobs.find((job) => job.joinKey === transitionWindow.join.key)
-  const transitionProxy = transitionJob === undefined || transitionJob === null ? null : (transitionProxies[transitionJob.key] ?? null)
+  const transitionJob = transitionWindow === null ? undefined : transitionProxyJobs.find((job) => job.joinKey === transitionWindow.join.key)
+  const transitionProxy = transitionJob === undefined ? null : (transitionProxies[transitionJob.key] ?? null)
   const transition =
-    transitionWindow === null
+    transitionJob === undefined
       ? null
       : {
           proxyStatus: transitionProxy?.status ?? 'queued',
@@ -323,7 +326,8 @@ export function useVideoPreview(slotRefs, isActive = true) {
   return {
     slots: slotState.slots.map((slot, index) => ({ src: slot?.src ?? '', isActive: index === slotState.activeIndex })),
     videoSrc,
-    importId: activeClip?.preview.importId ?? null,
+    importId: activePath === null ? null : activeClip.preview.importId,
+    isMissing,
     isOutOfRange,
     isExcluded: target?.isExcluded ?? false,
     isInOverlap,

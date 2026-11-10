@@ -1,5 +1,6 @@
 import { detectCodecs } from '@/api/backend'
 import { getTimelineMinimum, getTotalPlaybackDuration } from '@/features/player/utils/playerTiming'
+import { videoIdFromLaneId, videoLaneId } from '@/features/player/utils/timelineGeometry'
 import { createCachedPromise } from '@/lib/cached-promise'
 import { clamp } from '@/lib/utils'
 import {
@@ -22,6 +23,7 @@ import {
 import { requireTelemetry } from '@/lib/video-program/imported-video'
 import { DEFAULT_TRANSITION_SETTINGS, requireTransitionDefaults } from '@/lib/video-program/transition-catalog'
 import { getVideosTimelineBounds, joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
+import { fitCutsToFrameCount } from '@/lib/video-program/video-segments'
 import { applyCoursePlotDimensions } from '../store-utils'
 
 let fetchCodecsOnce = null
@@ -46,15 +48,17 @@ export const createVideoImportSlice = (set, get) => ({
   videoSyncTimezoneMode: null, // session "Apply Timezone" selection: "local" | "utc"; null requests automatic inference
   transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
   availableCodecs: null,
+  selectedClip: null, // { laneId, segmentKey } of the clip selected on the timeline or in the video panel; the video drawer shows its video
 
   /**
-   * Replaces the collection with registered video entities and their edits (a reviewed
-   * import or a loaded project). A manual-sync selection of a video no longer in the
-   * collection moves to the first clip; the playhead stays on the timeline.
+   * Replaces the collection with video entities and their edits (a reviewed import or
+   * a loaded project). Every video but a missing one is registered for preview. A
+   * manual-sync selection of a video no longer in the collection moves to the first
+   * clip; the playhead stays on the timeline.
    * @param {{importedVideos: Array<object>, videoEdits: object, videoSyncTimezoneMode: 'utc'|'local'|null}} collection Collection to commit.
    */
   commitVideoCollection: ({ importedVideos, videoEdits, videoSyncTimezoneMode }) => {
-    if (importedVideos.some((video) => video.preview === null)) throw new Error('Committed videos must be registered for preview')
+    if (importedVideos.some((video) => !video.missing && video.preview === null)) throw new Error('Committed videos must be registered for preview')
     set((draft) => {
       draft.importedVideos = importedVideos
       draft.videoEdits = videoEdits
@@ -62,6 +66,8 @@ export const createVideoImportSlice = (set, get) => ({
       draft.importedBackgroundImagePath = null
       draft.videoDragPreview = null
       draft.cutRemovalRequest = null
+      const selectedVideoId = draft.selectedClip === null ? null : videoIdFromLaneId(draft.selectedClip.laneId)
+      if (selectedVideoId !== null && !importedVideos.some((video) => video.id === selectedVideoId)) draft.selectedClip = null
       clampPlayheadToVideos(draft, 0)
     })
     const { manualVideoSync } = get()
@@ -69,6 +75,43 @@ export const createVideoImportSlice = (set, get) => ({
       const [first] = sortVideosByTimeline(joinVideoEdits(importedVideos, videoEdits))
       get().selectVideoSyncVideo(first?.id ?? null)
     }
+  },
+
+  /**
+   * Replaces a missing video with the entity probed from the file the user located,
+   * keeping the video's edits. Cuts and manual-sync landmarks past the end of a
+   * shorter file are dropped.
+   * @param {object} video Registered entity with the missing video's ID.
+   */
+  relinkVideo: (video) => {
+    if (video.missing || video.preview === null) throw new Error('A relinked video must be registered for preview')
+    set((draft) => {
+      const index = draft.importedVideos.findIndex((candidate) => candidate.id === video.id)
+      if (index === -1 || !draft.importedVideos[index].missing) throw new Error(`Video is not missing: ${video.id}`)
+      draft.importedVideos[index] = video
+      const edits = draft.videoEdits[video.id]
+      Object.assign(edits, fitCutsToFrameCount(edits, video.frameCount))
+      if (draft.manualVideoSync.videoId === video.id) {
+        draft.manualVideoSync.landmarks = draft.manualVideoSync.landmarks.filter((landmark) => landmark.videoSecond <= video.durationSeconds)
+      }
+      const selection = draft.selectedClip
+      if (selection?.laneId === videoLaneId(video.id) && selection.segmentKey !== null && edits.segments[selection.segmentKey] === undefined) {
+        selection.segmentKey = null
+      }
+      draft.videoDragPreview = null
+      clampPlayheadToVideos(draft, 0)
+    })
+  },
+
+  /**
+   * Selects a timeline clip, and on a video clip the segment under the pointer, or
+   * nothing. The timeline, the video panel, and the video drawer share this selection.
+   * @param {{laneId: string, segmentKey: string|null}|null} selection Lane of the clip and segment key (null for the whole clip).
+   */
+  selectClip: (selection) => {
+    const videoId = selection === null ? null : videoIdFromLaneId(selection.laneId)
+    if (videoId !== null) findVideo(get(), videoId)
+    set({ selectedClip: selection })
   },
 
   setImportedBackgroundImage: (path) => {
@@ -79,6 +122,7 @@ export const createVideoImportSlice = (set, get) => ({
       videoDragPreview: null,
       videoSyncTimezoneMode: null,
       cutRemovalRequest: null,
+      selectedClip: null,
     })
     get().selectVideoSyncVideo(null)
   },
@@ -91,6 +135,7 @@ export const createVideoImportSlice = (set, get) => ({
       videoDragPreview: null,
       videoSyncTimezoneMode: null,
       cutRemovalRequest: null,
+      selectedClip: null,
     })
     get().selectVideoSyncVideo(null)
   },
@@ -105,6 +150,7 @@ export const createVideoImportSlice = (set, get) => ({
       removeVideo(draft, videoId)
       draft.videoDragPreview = null
       if (draft.cutRemovalRequest?.videoId === videoId) draft.cutRemovalRequest = null
+      if (draft.selectedClip?.laneId === videoLaneId(videoId)) draft.selectedClip = null
       clampPlayheadToVideos(draft, 0)
     })
     if (get().manualVideoSync.videoId === videoId) {

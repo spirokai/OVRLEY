@@ -25,16 +25,33 @@ export function isVideoPath(path) {
   return VIDEO_EXTENSIONS.has(path.split('.').pop()?.toLowerCase() ?? '')
 }
 
+// Each thumbnail decodes a frame in its own FFmpeg process; a large import runs a few at a time.
+const THUMBNAIL_CONCURRENCY = 4
+let runningThumbnails = 0
+const queuedThumbnails = []
+
+async function renderThumbnail(path) {
+  if (runningThumbnails >= THUMBNAIL_CONCURRENCY) await new Promise((resolve) => queuedThumbnails.push(resolve))
+  runningThumbnails += 1
+  try {
+    return await backend.getVideoThumbnail(path)
+  } finally {
+    runningThumbnails -= 1
+    queuedThumbnails.shift()?.()
+  }
+}
+
 /**
- * Probes one video file and creates its entity, without a preview registration.
+ * Probes one video file and renders its thumbnail, then creates its entity
+ * without a preview registration.
  * @param {string} path Absolute video path.
  * @param {{importOrder: number, id?: string}} identity Entity identity.
  * @returns {Promise<object>} Imported video entity.
  */
 export async function probeVideo(path, identity) {
   if (!isVideoPath(path)) throw new Error(i18next.t('video-preview.unsupportedVideoFile', 'Not a supported video file (MP4, MOV, MKV).'))
-  const prepared = await backend.preparePreviewVideo(path)
-  return createImportedVideo(prepared.metadata, { ...identity, previewWarnings: prepared.warnings })
+  const [prepared, thumbnailUrl] = await Promise.all([backend.preparePreviewVideo(path), renderThumbnail(path)])
+  return createImportedVideo(prepared.metadata, { ...identity, previewWarnings: prepared.warnings, thumbnailUrl })
 }
 
 /**
@@ -55,10 +72,11 @@ export async function registerVideoPreviews(videos) {
 
 /**
  * Removes the preview registrations of videos that left (or never joined) the collection.
- * @param {Array<object>} videos Registered entities.
+ * Missing videos have no registration.
+ * @param {Array<object>} videos Registered or missing entities.
  */
 export async function releaseVideoPreviews(videos) {
-  for (const video of videos) await backend.removePreviewVideo(video.preview.importId)
+  for (const video of videos) if (!video.missing) await backend.removePreviewVideo(video.preview.importId)
 }
 
 /** Removes every preview registration, transition proxies included, and forgets the proxies. */
@@ -112,6 +130,28 @@ function adoptVideoFormat(format) {
 }
 
 /**
+ * Relinks a missing video to the file the user located: probes the file under the
+ * video's identity, registers its preview, and replaces the missing entity, keeping
+ * its edits (cuts past the end of a shorter file are dropped). The video's earlier
+ * edits leave the undo history, and its telemetry is read in the background.
+ * @param {string} videoId Missing video.
+ * @param {string} path Located file.
+ * @returns {Promise<void>} Completion of the relink.
+ */
+export async function locateMissingVideo(videoId, path) {
+  const missing = useStore.getState().importedVideos.find((video) => video.id === videoId)
+  if (missing === undefined || !missing.missing) throw new Error(`Video is not missing: ${videoId}`)
+  const [video] = await registerVideoPreviews([await probeVideo(path, { id: videoId, importOrder: missing.importOrder })])
+  try {
+    changeVideoCollection(useStore, () => useStore.getState().relinkVideo(video), { replacedVideoIds: [videoId] })
+  } catch (error) {
+    await releaseVideoPreviews([video])
+    throw error
+  }
+  void queueTelemetryExtraction([video])
+}
+
+/**
  * Commits a reviewed import: registers the previews of its new videos, replaces the
  * collection and the transition defaults in one change, releases the previews of
  * videos removed from the project, and queues telemetry of the new videos.
@@ -122,7 +162,7 @@ function adoptVideoFormat(format) {
  * @returns {Promise<Array<object>>} The new videos as committed.
  */
 export async function commitReviewedImport(collection, transitionDefaults, adoptedFormat) {
-  const added = await registerVideoPreviews(collection.importedVideos.filter((video) => video.preview === null))
+  const added = await registerVideoPreviews(collection.importedVideos.filter((video) => !video.missing && video.preview === null))
   const addedById = new Map(added.map((video) => [video.id, video]))
   const keptIds = new Set(collection.importedVideos.map((video) => video.id))
   const removed = useStore.getState().importedVideos.filter((video) => !keptIds.has(video.id))

@@ -1,4 +1,5 @@
 import { createDurableEditorState } from '@/lib/template/template-state'
+import { createVideoMetadataSnapshot } from '@/lib/video-program/imported-video'
 import { cloneVideoSegments } from '@/lib/video-program/video-segments'
 import { createPathLocator } from './projectPaths'
 
@@ -7,8 +8,9 @@ export const PROJECT_VERSION = 6
 export const LAST_PROJECT_DIRECTORY_KEY = 'last-project-dir'
 
 /**
- * Projects the video collection in import order: identity, source locator, and user edits.
- * A segment whose `transitionIn` is `null` follows the project transition defaults.
+ * Projects the video collection in import order: identity, source locator, user
+ * edits, and the metadata that keeps a video on the timeline when its file cannot
+ * be found. A segment whose `transitionIn` is `null` follows the project transition defaults.
  */
 function projectVideos(state, projectPath) {
   return [...state.importedVideos]
@@ -23,6 +25,7 @@ function projectVideos(state, projectPath) {
         cuts: edits.cuts.map((cut) => ({ id: cut.id, frame: cut.frame })),
         segments: cloneVideoSegments(edits.segments),
         placementAnchor: edits.placementAnchor === null ? null : { ...edits.placementAnchor },
+        metadata: createVideoMetadataSnapshot(video),
       }
     })
 }

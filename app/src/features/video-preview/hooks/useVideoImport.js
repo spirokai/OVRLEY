@@ -4,15 +4,14 @@
  */
 
 import { useMemo } from 'react'
-import { removePreviewVideo } from '@/api/backend'
 import { changeVideoCollection } from '@/features/undo-redo/undoHistory'
-import { openMultiplePaths } from '@/lib/file-dialog'
+import { openMultiplePaths, openSinglePath } from '@/lib/file-dialog'
 import { filenameFromSelectedPath } from '@/lib/file-dialog'
 import { joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import useStore from '@/store/useStore'
 import i18next from 'i18next'
 import useVideoImportReview from './useVideoImportReview'
-import { clearVideoPreviews } from '../videoImportOperations'
+import { clearVideoPreviews, locateMissingVideo, releaseVideoPreviews } from '../videoImportOperations'
 
 const DEBUG_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
 
@@ -105,15 +104,35 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   const removeVideo = async (videoId) => {
     try {
       const state = useStore.getState()
-      const { importId } = state.importedVideos.find((video) => video.id === videoId)?.preview ?? {}
+      const video = state.importedVideos.find((candidate) => candidate.id === videoId)
       // Playback stops before the clip leaves; the removal clamps the playhead.
       if (state.previewPlaybackState === 'playing') state.pausePreviewPlayback(state.selectedSecond)
       changeVideoCollection(useStore, () => useStore.getState().removeImportedVideo(videoId))
-      await removePreviewVideo(importId)
+      await releaseVideoPreviews([video])
       if (useStore.getState().importedVideos.length === 0) onSetBackgroundMode?.('checker')
     } catch (err) {
       console.error('Failed to remove video:', err)
       setErrorMessage(`Removing the video failed: ${err.message}`)
+    }
+  }
+
+  /**
+   * Asks for the file of a missing video and relinks the video to it.
+   * @param {string} videoId Missing video.
+   */
+  const locateVideo = async (videoId) => {
+    try {
+      const path = await openSinglePath([{ name: 'Video', extensions: ['mp4', 'mov', 'mkv'] }], { lastDirectoryKey: 'last-video-import-dir' })
+      if (!path) return
+      setImportingVideo(true)
+      try {
+        await locateMissingVideo(videoId, path)
+      } finally {
+        setImportingVideo(false)
+      }
+    } catch (err) {
+      console.error('Failed to locate video:', err)
+      setErrorMessage(`Locating the video failed: ${err.message}`)
     }
   }
 
@@ -139,6 +158,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
     handleImportVideo,
     handleVideoFilesDrop,
     importDialog: review.dialog,
+    locateVideo,
     removeVideo,
   }
 }

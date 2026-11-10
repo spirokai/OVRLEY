@@ -567,6 +567,15 @@ export async function preparePreviewVideo(path) {
 }
 
 /**
+ * Renders the card thumbnail of a video: its first frame as a small PNG.
+ * @param {string} path Absolute source video path.
+ * @returns {Promise<string|null>} `data:` URL, or null when no frame could be decoded.
+ */
+export async function getVideoThumbnail(path) {
+  return invokeCommand('backend_video_thumbnail', { path })
+}
+
+/**
  * Opens a fresh configuration inspection; it owns no editor preview or render.
  * @returns {Promise<{inspectionId: string}>} Opaque backend session identity.
  */

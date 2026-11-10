@@ -24,6 +24,8 @@ export default function useRenderWorkflow({ backendStatus }) {
   const [outputPathError, setOutputPathError] = useState(null)
   // An output file that exists awaits confirmation, with the batch review it was submitted with.
   const [pendingOverwrite, setPendingOverwrite] = useState(null)
+  // Export is refused while videos are missing; this counts them for the notice.
+  const [missingVideoCount, setMissingVideoCount] = useState(0)
   const opening = useRef(false)
   const hasParsedActivity = activitySummary !== null || hasVideoTelemetry
   const renderDisabled = config === null || !hasParsedActivity || rendererBusy || backendStatus !== 'connected'
@@ -52,6 +54,11 @@ export default function useRenderWorkflow({ backendStatus }) {
 
   const openRenderDialog = useCallback(async () => {
     if (renderDisabled || opening.current || isRendererBusy(useStore.getState())) return
+    const missingCount = useStore.getState().importedVideos.filter((video) => video.missing).length
+    if (missingCount > 0) {
+      setMissingVideoCount(missingCount)
+      return
+    }
     opening.current = true
     try {
       const draft = createRenderSettingsDraft(useStore.getState())
@@ -140,6 +147,15 @@ export default function useRenderWorkflow({ backendStatus }) {
   return {
     cancelRender: execution.cancel,
     closeRenderDialog,
+    missingVideosDialog: {
+      open: missingVideoCount > 0,
+      title: t('render-video.videosMissingTitle', 'Videos missing'),
+      description: t('render-video.videosMissingDescription', {
+        count: missingVideoCount,
+        defaultValue: '{{count}} videos could not be found. Locate them or remove them from the project before exporting.',
+      }),
+      onClose: () => setMissingVideoCount(0),
+    },
     handleRenderPreviewFrame,
     handleRenderVideoConfirm,
     handleOverwriteCancel,

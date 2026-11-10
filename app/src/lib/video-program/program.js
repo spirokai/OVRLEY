@@ -40,6 +40,8 @@ function createPiece(video, startFrame, endFrame, segmentKey) {
   return {
     id: `${video.id}:${startFrame}`,
     videoId: video.id,
+    // A piece of a missing video keeps its place; the preview shows that the file was not found.
+    missing: video.missing,
     importOrder: video.importOrder,
     fps: video.fps,
     sourceStartFrame: startFrame,

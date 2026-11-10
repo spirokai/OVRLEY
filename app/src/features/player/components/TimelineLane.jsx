@@ -85,12 +85,12 @@ function CutMarker({ marker }) {
   )
 }
 
-/** One segment of a video clip: a block between cuts, dimmed when excluded from export. */
+/** One segment of a video clip: a block between cuts, dimmed when excluded from export, red when the video's file is missing. */
 function TimelineSegment({ segment }) {
   return (
     <div
       data-segment-key={segment.key}
-      className={`absolute inset-y-0 border-background bg-accent/70 ${segment.hasSeamBefore ? 'border-l' : ''} ${segment.hasSeamAfter ? 'border-r' : ''}`}
+      className={`absolute inset-y-0 border-background ${segment.missing ? 'bg-destructive/60' : 'bg-accent/70'} ${segment.hasSeamBefore ? 'border-l' : ''} ${segment.hasSeamAfter ? 'border-r' : ''}`}
       style={segment.style}
     >
       {segment.excluded ? (

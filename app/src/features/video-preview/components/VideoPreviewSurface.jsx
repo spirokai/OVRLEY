@@ -58,6 +58,21 @@ function HevcPlaybackPlaceholder({ displayScale, importId, openVideoPreviewHelp,
   )
 }
 
+/** Stands in for a missing video's frames; the overlay is still drawn on top. */
+function MissingVideoPlaceholder({ displayScale }) {
+  const { t } = useTranslation()
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black">
+      <div className="flex flex-col items-center gap-3 p-8 text-center" style={{ transform: `scale(${0.5 + 0.5 / displayScale})` }}>
+        <AlertTriangle className="h-10 w-10 text-destructive" aria-hidden="true" />
+        <p role="status" className="text-base font-semibold text-white">
+          {t('video-preview.videoNotFound', 'Video not found')}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 /**
  * Renders the shared video preview surface used by the editor and video-sync workspace.
  *
@@ -79,6 +94,7 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
     slots,
     videoSrc,
     importId,
+    isMissing,
     isOutOfRange,
     isExcluded,
     isInOverlap,
@@ -125,6 +141,7 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
           muted={isVideoMuted}
         />
       ) : null}
+      {isMissing ? <MissingVideoPlaceholder displayScale={displayScale} /> : null}
       {children}
       {transition !== null && !showsProxy && transition.proxyStatus !== 'failed' ? (
         <div className="pointer-events-none absolute right-0 top-0 z-30 p-4">

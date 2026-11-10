@@ -24,6 +24,7 @@ export function createTestVideo({
   codecName = 'h264',
   importOrder = 0,
   previewWarnings = [],
+  thumbnailUrl = null,
   telemetry = { status: 'pending', activity: null },
   registered = true,
 } = {}) {
@@ -41,7 +42,7 @@ export function createTestVideo({
       timeSource,
       codecName,
     },
-    { id, importOrder, previewWarnings },
+    { id, importOrder, previewWarnings, thumbnailUrl },
   )
   const withTelemetry = { ...video, telemetry }
   return registered

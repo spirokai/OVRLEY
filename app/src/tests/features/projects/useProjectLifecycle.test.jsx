@@ -14,6 +14,7 @@ const boundaries = vi.hoisted(() => ({
   clearPreviewVideos: vi.fn(),
   extractVideoTelemetry: vi.fn(),
   getDefaultProjectDirectory: vi.fn(),
+  getVideoThumbnail: vi.fn(),
   preparePreviewVideo: vi.fn(),
   openSinglePath: vi.fn(),
   readProjectFile: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock('@/api/backend', async (importOriginal) => ({
   clearPreviewVideos: boundaries.clearPreviewVideos,
   extractVideoTelemetry: boundaries.extractVideoTelemetry,
   getDefaultProjectDirectory: boundaries.getDefaultProjectDirectory,
+  getVideoThumbnail: boundaries.getVideoThumbnail,
   preparePreviewVideo: boundaries.preparePreviewVideo,
   readProjectFile: boundaries.readProjectFile,
   registerPreviewVideo: boundaries.registerPreviewVideo,
@@ -60,6 +62,21 @@ function projectVideo(id, path, offsetSeconds = 0) {
     cuts: [],
     segments: { start: { excluded: false, transitionIn: null } },
     placementAnchor: null,
+    // Saved as the probe of `preparedVideo` describes it.
+    metadata: {
+      frameCount: 1200,
+      fps: { num: 30, den: 1 },
+      resolution: { width: 1920, height: 1080 },
+      rotationDegrees: 0,
+      hasAudio: true,
+      codecName: null,
+      codecLongName: null,
+      bitRate: null,
+      cameraType: null,
+      cameraModel: null,
+      creationTime: null,
+      timeSource: null,
+    },
   }
 }
 
@@ -72,6 +89,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.removePreviewVideo.mockResolvedValue(null)
     boundaries.registerPreviewVideo.mockResolvedValue({ importId: 'owner-import-id', previewUrl: 'http://preview/video' })
     boundaries.preparePreviewVideo.mockImplementation(async (path) => preparedVideo(path))
+    boundaries.getVideoThumbnail.mockImplementation(async (path) => `thumbnail:${path}`)
     boundaries.extractVideoTelemetry.mockResolvedValue(null)
   })
 
@@ -693,7 +711,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
 
   const multiVideoPaths = ['C:\\Events\\a.mp4', 'C:\\Events\\missing.mp4', 'C:\\Events\\c.mp4']
 
-  test('opens every project video, skips a missing one after Load Anyway, and then releases the previous previews', async () => {
+  test('opens a multi-video project without asking about a missing video, which keeps its place and edits, then releases the previous previews', async () => {
     const project = multiVideoProject()
     useStore.setState(videoStoreState([createTestVideo({ id: 'previous', path: 'C:\\Previous\\a.mp4' })]))
     boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
@@ -710,72 +728,68 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       useProjectLifecycle({ clearImportedVideos: vi.fn(), prepareActivityPath: vi.fn(), onSetBackgroundMode: vi.fn() }),
     )
 
-    let openPromise
-    act(() => {
-      openPromise = result.current.handleOpenProject()
-    })
-    await waitFor(() => expect(result.current.missingSourceDialog.open).toBe(true))
-    expect(result.current.missingSourceDialog).toMatchObject({ sourceRole: 'video', fileName: 'missing.mp4' })
-    act(() => result.current.missingSourceDialog.onLoadAnyway())
-    await act(async () => openPromise)
+    await act(() => result.current.handleOpenProject())
 
+    expect(result.current.missingSourceDialog.open).toBe(false)
     expect(boundaries.preparePreviewVideo.mock.calls.map(([path]) => path)).toEqual(['C:\\Events\\a.mp4', 'C:\\Events\\c.mp4'])
+    expect(boundaries.registerPreviewVideo.mock.calls.map(([path]) => path)).toEqual(['C:\\Events\\a.mp4', 'C:\\Events\\c.mp4'])
     const state = useStore.getState()
-    expect(state.importedVideos.map((video) => [video.id, video.importOrder, video.path])).toEqual([
-      ['clip-a', 0, 'C:\\Events\\a.mp4'],
-      ['clip-c', 2, 'C:\\Events\\c.mp4'],
+    expect(
+      state.importedVideos.map((video) => [
+        video.id,
+        video.importOrder,
+        video.path,
+        video.missing,
+        video.thumbnailUrl,
+        video.preview?.importId ?? null,
+      ]),
+    ).toEqual([
+      ['clip-a', 0, 'C:\\Events\\a.mp4', false, 'thumbnail:C:\\Events\\a.mp4', 'import:C:\\Events\\a.mp4'],
+      ['clip-missing', 1, 'C:\\Events\\missing.mp4', true, null, null],
+      ['clip-c', 2, 'C:\\Events\\c.mp4', false, 'thumbnail:C:\\Events\\c.mp4', 'import:C:\\Events\\c.mp4'],
     ])
-    expect(state.importedVideos.map((video) => video.preview.importId)).toEqual(['import:C:\\Events\\a.mp4', 'import:C:\\Events\\c.mp4'])
-    expect(state.videoEdits).toEqual({
-      'clip-a': {
-        offsetSeconds: -5,
-        offsetSource: 'auto',
-        cuts: [],
-        segments: { start: { excluded: false, transitionIn: null } },
-        placementAnchor: null,
+    expect(state.importedVideos[1].durationSeconds).toBe(40)
+    expect(state.videoEdits['clip-missing']).toMatchObject({ offsetSeconds: 50 })
+    expect(state.videoEdits['clip-c']).toEqual({
+      offsetSeconds: 100,
+      offsetSource: 'auto',
+      cuts: [{ id: 'cut-1', frame: 150 }],
+      segments: {
+        start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 } },
+        'cut-1': { excluded: true, transitionIn: null },
       },
-      'clip-c': {
-        offsetSeconds: 100,
-        offsetSource: 'auto',
-        cuts: [{ id: 'cut-1', frame: 150 }],
-        segments: {
-          start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 } },
-          'cut-1': { excluded: true, transitionIn: null },
-        },
-        placementAnchor: null,
-      },
+      placementAnchor: { videoId: 'clip-missing', side: 'after' },
     })
     expect(state.manualVideoSync.videoId).toBe('clip-c')
     expect(state.transitionDefaults).toEqual(project.transitionDefaults)
     expect(boundaries.removePreviewVideo).toHaveBeenCalledExactlyOnceWith('import-previous')
-    expect(result.current.status).toBe('Modified')
+    expect(result.current.status).toBe('Saved')
   })
 
-  test('keeps the current session and its previews when a located video is shorter than its saved edits', async () => {
+  test('a found file shorter than its saved edits loads with the cuts inside it, and the project is modified', async () => {
     const project = multiVideoProject()
-    const previous = createTestVideo({ id: 'previous', path: 'C:\\Previous\\a.mp4' })
-    useStore.setState({ ...videoStoreState([previous]), activitySource: { kind: 'file', path: 'C:\\Current\\ride.fit' } })
+    boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
+    boundaries.openSinglePath.mockResolvedValue('C:\\Events\\Session.oly')
     boundaries.readProjectFile.mockResolvedValue({
       project,
       resolvedSources: { activityPath: null, videoPaths: multiVideoPaths },
       rasterLoadResults: {},
       legacyBatchVideoFolder: null,
     })
-    // The file located for clip-c ends before its cut (at 5 s).
+    boundaries.selectedPathIsFile.mockResolvedValue(true)
+    // The file found for clip-c ends before its cut (at 5 s).
     boundaries.preparePreviewVideo.mockImplementation(async (path) => preparedVideo(path, path.endsWith('c.mp4') ? 3 : 40))
+    const { result } = renderHook(() =>
+      useProjectLifecycle({ clearImportedVideos: vi.fn(), prepareActivityPath: vi.fn(), onSetBackgroundMode: vi.fn() }),
+    )
 
-    await expect(
-      loadProject({
-        path: 'C:\\Events\\Session.oly',
-        resolveProjectSources: vi.fn().mockResolvedValue({ activityPath: null, videoPaths: multiVideoPaths }),
-        prepareActivityPath: vi.fn(),
-      }),
-    ).rejects.toThrow('Video cuts must lie inside the imported video')
+    await act(() => result.current.handleOpenProject())
 
-    expect(boundaries.registerPreviewVideo).not.toHaveBeenCalled()
-    expect(boundaries.removePreviewVideo).not.toHaveBeenCalled()
-    expect(useStore.getState().importedVideos).toEqual([previous])
-    expect(useStore.getState().activitySource.path).toBe('C:\\Current\\ride.fit')
+    expect(useStore.getState().videoEdits['clip-c']).toMatchObject({
+      cuts: [],
+      segments: { start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 } } },
+    })
+    expect(result.current.status).toBe('Modified')
   })
 
   test('tells the user that the video folder of a version 3 batch project is no longer imported', async () => {

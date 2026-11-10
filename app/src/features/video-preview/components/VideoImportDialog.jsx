@@ -173,6 +173,7 @@ function TransitionSection({ transition }) {
           value={transition.type}
           label={transition.typeLabel}
           previewType={transition.previewType}
+          size="sm"
           onSelect={transition.onTypeChange}
         />
         <Label htmlFor="import-transition-duration" className="text-xs font-bold text-muted-foreground">
@@ -184,7 +185,7 @@ function TransitionSection({ transition }) {
           fps={transition.durationFps}
           mode="duration"
           onCommit={transition.onDurationCommit}
-          className="h-7 text-xs"
+          className="h-8 text-xs"
         />
       </div>
     </section>

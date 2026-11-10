@@ -74,7 +74,9 @@ export function listShownTransitionJoinKeys(jobs, proxies) {
 }
 
 /**
- * Lists the proxies the program needs: one per join with an `xfade` transition.
+ * Lists the proxies the program needs: one per join with an `xfade` transition
+ * between two videos whose files are present. The preview cuts hard at a join with a
+ * missing video.
  * @param {{pieces: Array<object>, joins: Array<object>}} program Built program.
  * @param {Array<object>} clips Timeline clips of the program.
  * @returns {Array<{key: string, joinKey: string, windowStartSecond: number, request: object}>} Proxy jobs; `key` identifies the content.
@@ -83,7 +85,7 @@ export function listTransitionProxyJobs(program, clips) {
   const piecesById = new Map(program.pieces.map((piece) => [piece.id, piece]))
   const clipsById = new Map(clips.map((clip) => [clip.id, clip]))
   return program.joins
-    .filter((join) => join.transition.type !== NO_TRANSITION)
+    .filter((join) => join.transition.type !== NO_TRANSITION && !piecesById.get(join.fromPieceId).missing && !piecesById.get(join.toPieceId).missing)
     .map((join) => {
       const outgoingPiece = piecesById.get(join.fromPieceId)
       const incomingPiece = piecesById.get(join.toPieceId)

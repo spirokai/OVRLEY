@@ -173,19 +173,31 @@ test('the landmarks of a skipped sync video are dropped', () => {
   expect(createProjectManualVideoSync([], manual)).toMatchObject({ videoId: null, landmarks: [] })
 })
 
-test('saved edits outside the probed video duration are rejected before the project replaces the session', () => {
+test('a found file shorter than the saved video keeps only the cuts and landmarks inside it', () => {
+  // 30 seconds at 30 fps: 900 frames.
   const videos = [createTestVideo({ id: 'clip-a', durationSeconds: 30 })]
-  expect(() => createProjectManualVideoSync(videos, { videoId: 'clip-a', landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 31 }] })).toThrow(
-    /within the imported video duration/,
-  )
-  expect(() =>
+  const landmarks = [
+    { id: 'stop-1', type: 'stop', videoSecond: 12 },
+    { id: 'stop-2', type: 'stop', videoSecond: 31 },
+  ]
+  expect(createProjectManualVideoSync(videos, { videoId: 'clip-a', landmarks }).landmarks).toEqual([landmarks[0]])
+  const [edits] = Object.values(
     createProjectVideoEdits(videos, [
       projectVideo('clip-a', 0, {
-        cuts: [{ id: 'cut-1', frame: 900 }],
-        segments: { start: { excluded: false, transitionIn: null }, 'cut-1': { excluded: false, transitionIn: null } },
+        cuts: [
+          { id: 'cut-1', frame: 450 },
+          { id: 'cut-2', frame: 900 },
+        ],
+        segments: {
+          start: { excluded: false, transitionIn: null },
+          'cut-1': { excluded: true, transitionIn: null },
+          'cut-2': { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 } },
+        },
       }),
     ]),
-  ).toThrow(/Video cuts must lie inside/)
+  )
+  expect(edits.cuts).toEqual([{ id: 'cut-1', frame: 450 }])
+  expect(edits.segments).toEqual({ start: { excluded: false, transitionIn: null }, 'cut-1': { excluded: true, transitionIn: null } })
   expect(() => createProjectVideoEdits(videos, [projectVideo('other', 0)])).toThrow(/not part of the project/)
 })
 

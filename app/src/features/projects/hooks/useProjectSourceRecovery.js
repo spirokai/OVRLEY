@@ -64,8 +64,10 @@ export default function useProjectSourceRecovery() {
   )
 
   /**
-   * Resolves the activity and every video in order. A skipped video resolves to
-   * null; cancelling any source cancels the whole load.
+   * Resolves the activity and every video. A missing activity, or the video of a
+   * single-video project, asks to be located, skipped, or the load cancelled. The
+   * missing videos of a multi-video project resolve to null without asking: they
+   * load as missing and can be located from the video panel.
    */
   const resolveProjectSources = useCallback(
     async ({ activityPath, videoPaths }) => {
@@ -75,6 +77,9 @@ export default function useProjectSourceRecovery() {
       ])
       const resolvedActivityPath = await resolveSource('activity', activityPath, activityExists)
       if (resolvedActivityPath === undefined) return null
+      if (videoPaths.length > 1) {
+        return { activityPath: resolvedActivityPath, videoPaths: videoPaths.map((videoPath, index) => (videosExist[index] ? videoPath : null)) }
+      }
       const resolvedVideoPaths = []
       for (const [index, videoPath] of videoPaths.entries()) {
         const resolvedVideoPath = await resolveSource('video', videoPath, videosExist[index])

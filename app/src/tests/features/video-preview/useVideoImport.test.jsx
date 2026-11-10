@@ -1,11 +1,15 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import useVideoImport from '@/features/video-preview/hooks/useVideoImport'
+import { createMissingVideo, createVideoEdits, createVideoMetadataSnapshot } from '@/lib/video-program/imported-video'
 import useStore from '@/store/useStore'
+import { createTestVideo, cutEdits } from '@/tests/helpers/videoFixtures'
 
 const boundaries = vi.hoisted(() => ({
   extractVideoTelemetry: vi.fn(),
+  getVideoThumbnail: vi.fn(),
   openMultiplePaths: vi.fn(),
+  openSinglePath: vi.fn(),
   preparePreviewVideo: vi.fn(),
   registerPreviewVideo: vi.fn(),
   removePreviewVideo: vi.fn(),
@@ -14,6 +18,7 @@ const boundaries = vi.hoisted(() => ({
 vi.mock('@/api/backend', async (importOriginal) => ({
   ...(await importOriginal()),
   extractVideoTelemetry: boundaries.extractVideoTelemetry,
+  getVideoThumbnail: boundaries.getVideoThumbnail,
   preparePreviewVideo: boundaries.preparePreviewVideo,
   registerPreviewVideo: boundaries.registerPreviewVideo,
   removePreviewVideo: boundaries.removePreviewVideo,
@@ -22,6 +27,7 @@ vi.mock('@/api/backend', async (importOriginal) => ({
 vi.mock('@/lib/file-dialog', async (importOriginal) => ({
   ...(await importOriginal()),
   openMultiplePaths: boundaries.openMultiplePaths,
+  openSinglePath: boundaries.openSinglePath,
 }))
 
 const formats = {
@@ -85,6 +91,7 @@ beforeEach(() => {
     if (!probes[path]) throw new Error(`probe failed: ${path}`)
     return { metadata: probes[path], warnings: [] }
   })
+  boundaries.getVideoThumbnail.mockImplementation(async (path) => `thumbnail:${path}`)
   boundaries.registerPreviewVideo.mockImplementation(async (path) => ({ importId: `import:${path}`, previewUrl: `http://preview/${path}` }))
   boundaries.removePreviewVideo.mockResolvedValue(null)
   boundaries.extractVideoTelemetry.mockResolvedValue({ parsed_activity: null })
@@ -266,5 +273,41 @@ describe('the video collection outside the dialog', () => {
 
     await act(() => result.current.removeVideo(second.id))
     expect(useStore.getState().errorMessage).toBe(`Removing the video failed: Unknown imported video: ${second.id}`)
+  })
+
+  test('locating a missing video relinks it to the chosen file, keeping its edits and dropping cuts past the end of a shorter file', async () => {
+    const saved = createVideoMetadataSnapshot(createTestVideo({ id: 'clip', path: '/old/ride.mp4', durationSeconds: 60 }))
+    useStore.setState({
+      importedVideos: [createMissingVideo(saved, { id: 'clip', path: '/old/ride.mp4', importOrder: 0 })],
+      videoEdits: {
+        clip: {
+          ...createVideoEdits(),
+          offsetSeconds: 12,
+          ...cutEdits([
+            { id: 'early', frame: 300 },
+            { id: 'late', frame: 1200, excluded: true },
+          ]),
+        },
+      },
+    })
+    // 30 seconds at 30 fps: 900 frames, so the cut at frame 1200 no longer fits.
+    probe('/new/ride.mp4')
+    boundaries.openSinglePath.mockResolvedValueOnce('/new/ride.mp4')
+    const { result } = renderImport()
+
+    await act(() => result.current.locateVideo('clip'))
+
+    expect(useStore.getState().importedVideos).toEqual([
+      expect.objectContaining({
+        id: 'clip',
+        path: '/new/ride.mp4',
+        missing: false,
+        thumbnailUrl: 'thumbnail:/new/ride.mp4',
+        preview: { importId: 'import:/new/ride.mp4', url: 'http://preview//new/ride.mp4' },
+      }),
+    ])
+    const edits = useStore.getState().videoEdits.clip
+    expect(edits).toMatchObject({ offsetSeconds: 12, cuts: [{ id: 'early', frame: 300 }] })
+    expect(Object.keys(edits.segments)).toEqual(['start', 'early'])
   })
 })
