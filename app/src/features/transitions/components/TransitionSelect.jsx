@@ -32,7 +32,7 @@ export function TransitionSelect({ value, label, previewType, defaultLabel = nul
           type="button"
           variant="outline"
           disabled={disabled}
-          className="h-7 w-full min-w-0 justify-between gap-2 px-2 text-xs font-normal"
+          className="h-7 w-full min-w-0 justify-between gap-2 border-border/70 bg-transparent px-2 text-xs font-normal hover:border-accent-border hover:bg-surface-highlight-soft"
         >
           <span className="flex min-w-0 items-center gap-2">
             {previewType !== null ? (

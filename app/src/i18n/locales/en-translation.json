@@ -94,6 +94,7 @@
     "secondsInvalid": "Enter a time like 05:30, a number of seconds, or a sum like 05:30+10",
     "secondsNotNegative": "Enter a time of 0 seconds or more",
     "secondsPreview": "= {{clock}} ({{seconds}} s)",
+    "secondsUnit": "s",
     "system": "System"
   },
   "overlay-editor": {
@@ -425,10 +426,12 @@
     "includeInExport": "Include in export",
     "videoParts": "Parts",
     "goToPart": "Go to part",
+    "partLength": "{{seconds}} s",
     "removeCutAt": "Remove the cut at {{time}}",
     "transitionIn": "Transition in",
+    "transitionTo": "Transition to {{name}}",
     "transitionDefaults": "Default transitions",
-    "transitionDefaultsHint": "Used at every join you have not set yourself. Videos and parts closer together than the continuity threshold are joined without a transition.",
+    "transitionDefaultsHint": "Used at every join you have not set yourself. Separate videos closer together than the continuity threshold, such as a camera's split recording, are joined without a transition.",
     "telemetry": "Telemetry",
     "telemetryAbsent": "None",
     "telemetryFailed": "Could not be read",
@@ -484,6 +487,9 @@
   },
   "transitions": {
     "none": "No transition",
+    "partBefore": "the part before",
+    "partAfter": "the part after",
+    "skippedDefault": "Default transition skipped: {{part}} this join has room for {{room}} s of transition, not {{seconds}} s.",
     "withDuration": "{{type}}, {{seconds}} s",
     "default": "Default",
     "defaultIs": "Default ({{transition}})",

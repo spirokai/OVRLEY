@@ -2,9 +2,28 @@ import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { JoinTransitionPanel } from '@/features/transitions'
 
 const stopPropagation = (event) => event.stopPropagation()
+
+/** A join whose default transition did not fit: disabled, with the reason in a tooltip. Drawn outside the clip mask. */
+function SkippedJoinMarker({ marker }) {
+  return (
+    <div className="absolute -top-1.5 z-30 flex -translate-x-1/2 focus-within:z-50 hover:z-50" style={marker.style}>
+      <SimpleTooltip content={marker.disabledReason} contentClassName="w-64 whitespace-normal">
+        <button
+          type="button"
+          aria-disabled="true"
+          aria-label={marker.disabledReason}
+          className="h-3 w-3 rotate-45 cursor-not-allowed rounded-[2px] border border-dashed border-foreground/80 bg-background/70 outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+          onPointerDown={stopPropagation}
+          onDoubleClick={stopPropagation}
+        />
+      </SimpleTooltip>
+    </div>
+  )
+}
 
 function JoinMarker({ marker }) {
   return (
@@ -195,6 +214,9 @@ function TimelineLane({ lane }) {
         ))}
         {lane.joinMarkers.map((marker) => (marker.isVisible ? <JoinMarker key={marker.key} marker={marker} /> : null))}
       </div>
+      {lane.skippedJoinMarkers.map((marker) => (
+        <SkippedJoinMarker key={marker.key} marker={marker} />
+      ))}
       {lane.clips.map((clip) => (clip.tooltip.isVisible && clip.label ? <TimelineClipTooltip key={clip.id} clip={clip} /> : null))}
     </div>
   )

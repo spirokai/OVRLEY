@@ -16,6 +16,7 @@ import { formatVideoWarning } from '@/lib/video-program/video-warnings'
 import { segmentBeforeCut } from '@/lib/video-program/collection-edits'
 import { listVideoSegments } from '@/lib/video-program/video-segments'
 import i18next from 'i18next'
+import { skippedDefaultLabel } from '@/features/transitions'
 
 const TEXT_HIDE_THRESHOLD_REM = 3
 const CLIP_SOURCE_COLUMN_WIDTH = '3rem'
@@ -313,11 +314,14 @@ export default function useTimelineClips({
           bandStyle: band?.isVisible ? percentStyle(band, widthPx) : null,
           isInvalid: control.error !== null,
           hasTransition: windowSeconds > 0,
+          disabledReason: join.skippedDefault === null ? null : skippedDefaultLabel(join.skippedDefault, i18next.t),
           label: i18next.t('player.joinTransition', { defaultValue: 'Join: {{transition}}', transition: control.label }),
           control,
         }
       })
       .filter((marker) => marker.isVisible || marker.bandStyle !== null)
+    // A join whose default transition did not fit is drawn outside the clip mask, so its tooltip is not clipped.
+    const skippedJoinMarkers = joinMarkers.filter((marker) => marker.disabledReason !== null)
 
     // Cut markers - a hit area per cut of a clip, in the editing workspace: click to remove, drag to move.
     const cutMarkers = (program === null || program === undefined ? [] : sortVideosByTimeline(clips))
@@ -350,7 +354,8 @@ export default function useTimelineClips({
               clips: videoClips,
               conflictBands,
               cutMarkers,
-              joinMarkers,
+              joinMarkers: joinMarkers.filter((marker) => marker.disabledReason === null),
+              skippedJoinMarkers,
             },
           ]
         : []),
@@ -364,6 +369,7 @@ export default function useTimelineClips({
               conflictBands: [],
               cutMarkers: [],
               joinMarkers: [],
+              skippedJoinMarkers: [],
             },
           ]
         : []),

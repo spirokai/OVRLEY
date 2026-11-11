@@ -12,11 +12,12 @@ import { sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import { formatVideoWarning } from '@/lib/video-program/video-warnings'
 import useStore from '@/store/useStore'
 import { buildVideoDrawerViewModel } from '../utils/videoDrawerUtils'
-import { buildVideoSegmentRows } from '../utils/videoSegmentRows'
+import { buildVideoSegmentRows, groupVideoJoins } from '../utils/videoSegmentRows'
 
 /**
  * Returns one row per clip in timeline order: details, its own timeline offset,
- * warnings, its parts with their export state and transitions, and removal.
+ * warnings, its parts with their export state and transitions, its transitions into the next
+ * video (shown at its end, where the timeline draws them), and removal.
  * Editing a row's offset moves only that clip.
  *
  * @param {object} options Row inputs.
@@ -42,6 +43,8 @@ export function useVideoClipRows({ timezone, videoSyncTimezoneMode, onRemoveVide
 
   return useMemo(() => {
     const commands = { setVideoSegmentExcluded, requestCutRemoval, seek: commitPreviewScrub }
+    const { partJoinKeys, exitJoinsByVideoId } = groupVideoJoins(program)
+    const filenamesById = new Map(clips.map((clip) => [clip.id, filenameFromSelectedPath(clip.path)]))
     return sortVideosByTimeline(clips).map((clip) => ({
       id: clip.id,
       filename: filenameFromSelectedPath(clip.path),
@@ -54,13 +57,20 @@ export function useVideoClipRows({ timezone, videoSyncTimezoneMode, onRemoveVide
       onOffsetCommit: (seconds) => setVideoOffset(clip.id, seconds),
       onOffsetReset: () => resetVideoOffset(clip.id),
       onRemove: () => onRemoveVideo(clip.id),
-      segments: buildVideoSegmentRows({ clip, joinModels, commands }),
+      segments: buildVideoSegmentRows({ clip, joinModels, partJoinKeys, commands }),
+      // A video without a join into another video has no exits.
+      exits: (exitJoinsByVideoId.get(clip.id) ?? []).map((join) => ({
+        key: join.key,
+        label: t('toolbar.transitionTo', { defaultValue: 'Transition to {{name}}', name: filenamesById.get(join.videoId) }),
+        transition: joinModels.get(join.key),
+      })),
     }))
   }, [
     clips,
     commitPreviewScrub,
     joinModels,
     onRemoveVideo,
+    program,
     requestCutRemoval,
     resetVideoOffset,
     setVideoOffset,

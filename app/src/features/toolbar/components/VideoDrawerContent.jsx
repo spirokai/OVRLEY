@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { AlertTriangle, Blend, Film, Scissors, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -5,6 +6,7 @@ import { SecondsInput } from '@/components/ui/seconds-input'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { Switch } from '@/components/ui/switch'
 import { JoinTransitionControl, TransitionSelect } from '@/features/transitions'
+import { cn } from '@/lib/utils'
 import { VideoSyncControls } from '@/features/video-sync'
 import { useFileDropZone } from '../hooks/useFileDropZone'
 import { useTransitionDefaultsSection } from '../hooks/useTransitionDefaultsSection'
@@ -12,36 +14,11 @@ import { useVideoClipRows } from '../hooks/useVideoClipRows'
 import { FileDragCursor, FileDropZone } from './FileDropZone'
 import { useTranslation } from 'react-i18next'
 
-function VideoSegmentRow({ segment, clipId, filename, showRange }) {
+function SingleSegmentRow({ segment, exits, filename }) {
   const { t } = useTranslation()
   const includedLabel = t('toolbar.includeInExport', 'Include in export')
-  const transitionId = `video-segment-transition-${clipId}-${segment.key}`
   return (
-    <li className={`space-y-2 ${showRange ? 'rounded-xs border border-border/50 p-2' : ''}`}>
-      {showRange ? (
-        <div className="flex items-center justify-between gap-2 text-xs font-bold tabular-nums text-muted-foreground">
-          <button
-            type="button"
-            className="underline-offset-2 hover:text-foreground hover:underline"
-            title={t('toolbar.goToPart', 'Go to part')}
-            onClick={segment.onSeek}
-          >
-            {segment.startLabel} – {segment.endLabel}
-          </button>
-          {segment.onRemoveCut !== null ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 shrink-0 text-muted-foreground hover:bg-surface-accent-soft hover:text-primary"
-              onClick={segment.onRemoveCut}
-              aria-label={t('toolbar.removeCutAt', { defaultValue: 'Remove the cut at {{time}}', time: segment.startLabel })}
-            >
-              <Scissors className="h-3 w-3" />
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
+    <div className="space-y-2 px-2">
       <div className="grid grid-cols-2 items-center gap-4">
         <span className="text-xs font-bold text-muted-foreground">{includedLabel}</span>
         <Switch
@@ -50,15 +27,99 @@ function VideoSegmentRow({ segment, clipId, filename, showRange }) {
           onCheckedChange={segment.onIncludedChange}
         />
       </div>
-      {segment.transition !== null ? (
-        <div className="space-y-1">
-          <Label htmlFor={transitionId} className="text-xs font-bold text-muted-foreground">
-            {t('toolbar.transitionIn', 'Transition in')}
+      {exits.map((exit) => (
+        <div key={exit.key} className="space-y-1">
+          <Label htmlFor={`video-transition-${exit.key}`} className="text-xs font-bold text-muted-foreground">
+            {exit.label}
           </Label>
-          <JoinTransitionControl id={transitionId} model={segment.transition} />
+          <JoinTransitionControl id={`video-transition-${exit.key}`} model={exit.transition} />
         </div>
-      ) : null}
+      ))}
+    </div>
+  )
+}
+
+/** Text of a part switched off for export, keyed to its card's `data-included`. */
+const EXCLUDED_PART_TEXT =
+  'group-data-[included=false]:text-muted-foreground group-data-[included=false]:opacity-35 group-data-[included=false]:line-through'
+
+/** A transition between a part and what follows it, on a dashed line; the label shows only for a transition into another video. */
+function SegmentJoin({ transition, id, label, showLabel }) {
+  return (
+    <li className="relative min-w-0 pt-3 pb-2 pl-7 before:absolute before:top-1 before:bottom-0 before:left-3 before:border-l before:border-dashed before:border-foreground">
+      <Label htmlFor={id} className={cn('mb-1 block truncate text-[0.7rem] font-bold text-muted-foreground', !showLabel && 'sr-only')}>
+        {label}
+      </Label>
+      <JoinTransitionControl id={id} model={transition} />
     </li>
+  )
+}
+
+function SegmentCard({ segment, filename }) {
+  const { t } = useTranslation()
+  const includedLabel = t('toolbar.includeInExport', 'Include in export')
+  const removeCutLabel = t('toolbar.removeCutAt', { defaultValue: 'Remove the cut at {{time}}', time: segment.startLabel })
+  return (
+    <li
+      data-included={segment.included}
+      className="group mt-1 flex min-w-0 items-center gap-2 rounded-sm bg-foreground/6 py-1.5 pl-2.5 pr-2 first:mt-0 data-[included=false]:bg-foreground/3"
+    >
+      <button
+        type="button"
+        className={cn('text-xs font-bold tabular-nums text-foreground underline-offset-2 hover:underline', EXCLUDED_PART_TEXT)}
+        title={t('toolbar.goToPart', 'Go to part')}
+        onClick={segment.onSeek}
+      >
+        {segment.startLabel} – {segment.endLabel}
+      </button>
+      <span className={cn('ml-auto text-[0.7rem] tabular-nums text-muted-foreground', EXCLUDED_PART_TEXT)}>
+        {t('toolbar.partLength', { defaultValue: '{{seconds}} s', seconds: segment.lengthSeconds })}
+      </span>
+      <span className="w-6 shrink-0">
+        {segment.onRemoveCut !== null ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground opacity-0 transition-opacity hover:bg-surface-accent-soft hover:text-primary focus-visible:opacity-100 group-hover:opacity-100"
+            onClick={segment.onRemoveCut}
+            aria-label={removeCutLabel}
+            title={removeCutLabel}
+          >
+            <Scissors className="h-3 w-3" />
+          </Button>
+        ) : null}
+      </span>
+      <Switch
+        aria-label={`${includedLabel}: ${filename} ${segment.startLabel}`}
+        checked={segment.included}
+        onCheckedChange={segment.onIncludedChange}
+      />
+    </li>
+  )
+}
+
+function SegmentList({ segments, exits, clipId, filename }) {
+  const { t } = useTranslation()
+  return (
+    <ul className="px-2">
+      {segments.map((segment) => (
+        <Fragment key={segment.key}>
+          {segment.transition !== null ? (
+            <SegmentJoin
+              transition={segment.transition}
+              id={`video-segment-transition-${clipId}-${segment.key}`}
+              label={t('toolbar.transitionIn', 'Transition in')}
+              showLabel={false}
+            />
+          ) : null}
+          <SegmentCard segment={segment} filename={filename} />
+        </Fragment>
+      ))}
+      {exits.map((exit) => (
+        <SegmentJoin key={exit.key} transition={exit.transition} id={`video-transition-${exit.key}`} label={exit.label} showLabel />
+      ))}
+    </ul>
   )
 }
 
@@ -71,7 +132,7 @@ function TransitionDefaultsSection() {
       <p className="px-2 text-[0.7rem] text-muted-foreground">
         {t(
           'toolbar.transitionDefaultsHint',
-          'Used at every join you have not set yourself. Videos and parts closer together than the continuity threshold are joined without a transition.',
+          "Used at every join you have not set yourself. Separate videos closer together than the continuity threshold, such as a camera's split recording, are joined without a transition.",
         )}
       </p>
       <div className="grid grid-cols-2 items-center gap-x-4 gap-y-2 px-2">
@@ -163,12 +224,14 @@ function VideoClipRow({ row }) {
           className="h-8 text-xs"
         />
       </div>
-      {row.segments.length > 1 ? <SectionHeading icon={Scissors} title={t('toolbar.videoParts', 'Parts')} variant="drawer" /> : null}
-      <ul className="space-y-2 px-2">
-        {row.segments.map((segment) => (
-          <VideoSegmentRow key={segment.key} segment={segment} clipId={row.id} filename={row.filename} showRange={row.segments.length > 1} />
-        ))}
-      </ul>
+      {row.segments.length > 1 ? (
+        <>
+          <SectionHeading icon={Scissors} title={t('toolbar.videoParts', 'Parts')} variant="drawer" />
+          <SegmentList segments={row.segments} exits={row.exits} clipId={row.id} filename={row.filename} />
+        </>
+      ) : (
+        <SingleSegmentRow segment={row.segments[0]} exits={row.exits} filename={row.filename} />
+      )}
       <SectionHeading icon={Film} title={t('toolbar.details', 'Details')} variant="drawer" />
       <dl className="grid grid-cols-2 gap-x-4.5 gap-y-1.5 px-2 text-xs">
         {row.metadataRows.map((metadataRow) => (

@@ -65,9 +65,9 @@ describe('buildProgram joins and default transitions', () => {
     },
     {
       name: 'default that does not fit a short piece falls back to a hard cut',
-      videos: [video('a'), video('b', { offsetSeconds: 70, durationSeconds: 4, importOrder: 1 })],
+      videos: [video('a'), video('b', { offsetSeconds: 70, durationSeconds: 2, importOrder: 1 })],
       transition: HARD_CUT,
-      duration: 64,
+      duration: 62,
     },
   ])('$name', ({ videos, defaults, transition, duration }) => {
     const result = program(videos, { transitionDefaults: defaults })

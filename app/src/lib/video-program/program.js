@@ -14,7 +14,9 @@
  * A join connects consecutive pieces and belongs to the incoming piece's segment:
  * its `transitionIn` is the join's transition. A stored transition of `null` means
  * the join follows the project transition defaults, snapped to the frames of the
- * pieces it joins.
+ * pieces it joins. Where the default does not fit, the join is a hard cut and its
+ * `skippedDefault` is `{side, durationSeconds, roomSeconds}`: the piece it does not
+ * fit (`previous` or `next`) and the seconds that piece has room for; otherwise null.
  */
 
 import { framesToSeconds, secondsToFrames, snapDurationToFrames } from './frame-grid'
@@ -113,32 +115,67 @@ function leavesUntouchedFrame(piece, incomingSeconds, outgoingSeconds) {
   return incomingSeconds + outgoingSeconds + framesToSeconds(1, piece.fps) <= piece.durationSeconds + TIME_EPSILON_SECONDS
 }
 
-/** A default transition is kept only where it would fit with the same transition at the piece's other end. */
-function defaultTransition(previous, next, gapSeconds, transitionDefaults) {
-  if (gapSeconds <= transitionDefaults.splitGapThresholdSeconds + TIME_EPSILON_SECONDS) return HARD_CUT
-  if (transitionDefaults.type === NO_TRANSITION) return HARD_CUT
+function transitionOverride(piece, videosById) {
+  return videosById.get(piece.videoId).segments[piece.segmentKey].transitionIn
+}
+
+/** Seconds a piece leaves for a transition at one end, keeping one untouched frame beside the transition at its other end. */
+function roomSeconds(piece, otherEndSeconds) {
+  return piece.durationSeconds - otherEndSeconds - framesToSeconds(1, piece.fps)
+}
+
+/**
+ * Resolves the transition of a join. A stored override wins. Otherwise separate videos closer
+ * together than the continuity threshold (a camera's split recording) are joined with a hard
+ * cut, and every other join gets the project default where it fits both pieces beside the
+ * transitions they already have: the previous piece's resolved incoming join and the next
+ * piece's outgoing override. Earlier defaults win over later ones.
+ */
+function resolveJoinTransition({ override, previous, next, gapSeconds, previousIncomingSeconds, nextOutgoingSeconds, transitionDefaults }) {
+  if (override !== null) return { transition: override, skippedDefault: null }
+  const isCameraSplit = previous.videoId !== next.videoId && gapSeconds <= transitionDefaults.splitGapThresholdSeconds + TIME_EPSILON_SECONDS
+  if (isCameraSplit || transitionDefaults.type === NO_TRANSITION) return { transition: HARD_CUT, skippedDefault: null }
+
   const durationSeconds = snapDurationToFrames(transitionDefaults.durationSeconds, previous.fps)
-  const fits = (piece) => leavesUntouchedFrame(piece, durationSeconds, durationSeconds)
-  if (!fits(previous) || !fits(next)) return HARD_CUT
-  return { type: transitionDefaults.type, durationSeconds }
+  const sides = [
+    { side: 'previous', roomSeconds: roomSeconds(previous, previousIncomingSeconds) },
+    { side: 'next', roomSeconds: roomSeconds(next, nextOutgoingSeconds) },
+  ]
+  const tooShort = sides.find((candidate) => durationSeconds > candidate.roomSeconds + TIME_EPSILON_SECONDS)
+  if (tooShort !== undefined) return { transition: HARD_CUT, skippedDefault: { ...tooShort, durationSeconds } }
+  return { transition: { type: transitionDefaults.type, durationSeconds }, skippedDefault: null }
 }
 
 function buildJoins(pieces, videosById, transitionDefaults) {
-  return pieces.slice(1).map((next, index) => {
-    const previous = pieces[index]
-    const override = videosById.get(next.videoId).segments[next.segmentKey].transitionIn
+  const joins = []
+  for (let index = 1; index < pieces.length; index += 1) {
+    const previous = pieces[index - 1]
+    const next = pieces[index]
+    const following = pieces[index + 1]
+    const override = transitionOverride(next, videosById)
     const gapSeconds = Math.max(0, next.timelineStartSecond - previous.timelineEndSecond)
-    return {
+    const { transition, skippedDefault } = resolveJoinTransition({
+      override,
+      previous,
+      next,
+      gapSeconds,
+      previousIncomingSeconds: joins.at(-1)?.transition.durationSeconds ?? 0,
+      nextOutgoingSeconds: following === undefined ? 0 : (transitionOverride(following, videosById)?.durationSeconds ?? 0),
+      transitionDefaults,
+    })
+    joins.push({
       key: segmentJoinKey(next.videoId, next.segmentKey),
       videoId: next.videoId,
       segmentKey: next.segmentKey,
       fromPieceId: previous.id,
       toPieceId: next.id,
       gapSeconds,
-      transition: override ?? defaultTransition(previous, next, gapSeconds, transitionDefaults),
+      transition,
       isDefault: override === null,
-    }
-  })
+      skippedDefault,
+    })
+  }
+  return joins
 }
 
 /**

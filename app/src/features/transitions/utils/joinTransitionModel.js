@@ -20,6 +20,26 @@ export function transitionLabel(transition, t) {
     : t('transitions.withDuration', { defaultValue: '{{type}}, {{seconds}} s', type: transition.type, seconds: transition.durationSeconds })
 }
 
+const SKIPPED_DEFAULT_PARTS = {
+  previous: ['transitions.partBefore', 'the part before'],
+  next: ['transitions.partAfter', 'the part after'],
+}
+
+/**
+ * Explains why a join that follows the defaults is a hard cut: the default transition does not fit a piece it joins.
+ * @param {{side: 'previous'|'next', durationSeconds: number, roomSeconds: number}} skippedDefault Program join's `skippedDefault`.
+ * @param {function} t Translation function.
+ * @returns {string} Explanation.
+ */
+export function skippedDefaultLabel({ side, durationSeconds, roomSeconds }, t) {
+  return t('transitions.skippedDefault', {
+    defaultValue: 'Default transition skipped: {{part}} this join has room for {{room}} s of transition, not {{seconds}} s.',
+    part: t(...SKIPPED_DEFAULT_PARTS[side]),
+    room: Math.max(0, Math.floor(roomSeconds * 10) / 10),
+    seconds: Number(durationSeconds.toFixed(1)),
+  })
+}
+
 /**
  * Returns the stored override of a join: `transitionIn` of the segment it leads into.
  * @param {{videoId: string, segmentKey: string}} join Program join.
@@ -46,14 +66,16 @@ export function joinOverride(join, clips) {
 export function buildJoinTransitionModel({ join, fps, override, transitionDefaults, isInvalid, setJoinTransition, t }) {
   const isXfade = override !== null && override.type !== NO_TRANSITION
   const effective = join.transition
+  const isCut = effective.type === NO_TRANSITION
   return {
     value: override === null ? DEFAULT_TRANSITION_OPTION : override.type,
     label: transitionLabel(effective, t),
+    typeLabel: isCut ? t('transitions.none', 'No transition') : effective.type,
     defaultLabel: join.isDefault
       ? t('transitions.defaultIs', { defaultValue: 'Default ({{transition}})', transition: transitionLabel(join.transition, t) })
       : t('transitions.default', 'Default'),
-    previewType: effective.type !== NO_TRANSITION ? effective.type : null,
-    durationSeconds: isXfade ? override.durationSeconds : null,
+    previewType: isCut ? null : effective.type,
+    durationSeconds: isCut ? null : effective.durationSeconds,
     durationFps: fps,
     error: isInvalid ? t('transitions.tooLong', 'Too long for the video pieces it joins') : null,
     onSelect: (value) => {
@@ -66,7 +88,7 @@ export function buildJoinTransitionModel({ join, fps, override, transitionDefaul
         })
       }
     },
-    /** Stores a duration typed into the override (already snapped to `durationFps`). */
-    commitDuration: (durationSeconds) => setJoinTransition(join, { type: override.type, durationSeconds }),
+    /** Stores a typed duration (already snapped to `durationFps`) as an override of the effective transition. */
+    commitDuration: (durationSeconds) => setJoinTransition(join, { type: effective.type, durationSeconds }),
   }
 }

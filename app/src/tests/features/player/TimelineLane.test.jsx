@@ -39,6 +39,7 @@ function createLane(clipOverrides = {}, laneOverrides = {}) {
     conflictBands: [],
     cutMarkers: [],
     joinMarkers: [],
+    skippedJoinMarkers: [],
     ...laneOverrides,
   }
 }

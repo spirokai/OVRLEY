@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next'
  * @param {(seconds: number) => string|null|undefined} props.onCommit - Stores a snapped value; returns a message when it is rejected.
  * @param {{num: number, den: number}|null} props.fps - Frame grid the value snaps to, or null.
  * @param {'time'|'duration'} [props.mode='time'] - A duration is above 0 and at least one frame.
+ * @param {'clock'|'seconds'} [props.display='clock'] - Shows the value as a clock or as plain seconds with an `s` unit.
  * @param {boolean} [props.signed=false] - Whether negative values are allowed.
  * @param {number|null} [props.step=null] - Seconds the step buttons add or remove; null hides them.
  * @param {{isManual: boolean, onReset: function, label: string, manualHint: string, autoHint: string}|null} [props.reset=null] - Placement
@@ -28,11 +29,32 @@ import { useTranslation } from 'react-i18next'
  * @param {string} [props.className] - Classes of the input element.
  * @returns {JSX.Element} Rendered input.
  */
-export function SecondsInput({ value, onCommit, fps, mode = 'time', signed = false, step = null, reset = null, className, ...props }) {
+export function SecondsInput({
+  value,
+  onCommit,
+  fps,
+  mode = 'time',
+  display = 'clock',
+  signed = false,
+  step = null,
+  reset = null,
+  className,
+  ...props
+}) {
   const { t } = useTranslation()
   const messageId = useId()
-  const field = useSecondsInput({ value, onCommit, fps, mode, signed, step, onReset: reset !== null && reset.isManual ? reset.onReset : null })
+  const field = useSecondsInput({
+    value,
+    onCommit,
+    fps,
+    mode,
+    signed,
+    step,
+    display,
+    onReset: reset !== null && reset.isManual ? reset.onReset : null,
+  })
   const slotPosition = field.onStep === null ? 'right-1' : 'right-7'
+  const showUnit = display === 'seconds' && field.onStep === null && reset === null
   return (
     <div className="space-y-1">
       <div className="relative">
@@ -50,8 +72,14 @@ export function SecondsInput({ value, onCommit, fps, mode = 'time', signed = fal
             'border-border/70 tabular-nums transition-colors',
             className,
             field.onStep !== null && reset !== null ? 'pr-13' : (field.onStep !== null || reset !== null) && 'pr-7',
+            showUnit && 'pr-6',
           )}
         />
+        {showUnit ? (
+          <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-muted-foreground">
+            {t('components.secondsUnit', 's')}
+          </span>
+        ) : null}
         {field.onStep !== null ? (
           <div className="absolute inset-y-1 right-1 flex w-5 flex-col overflow-hidden rounded bg-surface-strong">
             <button

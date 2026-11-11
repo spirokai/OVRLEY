@@ -22,11 +22,13 @@ import { formatSecondsClock } from '@/lib/time-format'
  * @param {'time'|'duration'} options.mode A time snaps to the nearest frame; a duration is above 0 and at least one frame.
  * @param {boolean} options.signed Whether negative values are allowed.
  * @param {number|null} options.step Seconds the step buttons add or remove, or null without step buttons.
+ * @param {'clock'|'seconds'} options.display Shows the value as a clock (`00:01.500`) or as plain seconds (`1.5`).
  * @param {(() => void)|null} options.onReset Resets the stored value, or null without a reset button. A reset discards the draft.
  * @returns {{text: string, preview: string|null, error: string|null, onChange: function, onBlur: function, onKeyDown: function,
  *   onKeyUp: function, onStep: function|null, onReset: function|null}} Field model.
  */
-export function useSecondsInput({ value, onCommit, fps, mode, signed, step, onReset }) {
+export function useSecondsInput({ value, onCommit, fps, mode, signed, step, display, onReset }) {
+  const formatValue = display === 'seconds' ? formatSecondsText : formatSecondsClock
   const { t } = useTranslation()
   const [draft, setDraft] = useState(null)
   const [error, setError] = useState(null)
@@ -64,13 +66,13 @@ export function useSecondsInput({ value, onCommit, fps, mode, signed, step, onRe
     const next = (draftSeconds ?? value) + seconds
     const rejection = rejectionOf(next)
     setError(rejection)
-    if (rejection === null) setDraft(formatSecondsClock(snapSeconds(next, fps, mode)))
+    if (rejection === null) setDraft(formatValue(snapSeconds(next, fps, mode)))
   }
 
   return {
-    text: draft ?? formatSecondsClock(value),
+    text: draft ?? formatValue(value),
     preview:
-      draftSeconds === null || steppingKey !== null
+      draftSeconds === null || steppingKey !== null || display === 'seconds'
         ? null
         : t('components.secondsPreview', {
             defaultValue: '= {{clock}} ({{seconds}} s)',
