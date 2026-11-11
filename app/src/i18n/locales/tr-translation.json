@@ -491,7 +491,6 @@
     "setLocationInMap": "Konumu ayarla"
   },
   "video-preview": {
-    "aborterror": "AbortError",
     "errors": {
       "decodeFailed": "Sistem video oynatıcısı videonun kodunu çözemedi. Bu durum bazı HEVC, 10 bit veya 4:2:2 dosyalarda meydana gelebilir.",
       "fileUnavailable": "Yerel önizleme sunucusu video dosyasını okuyamadı. Dosya taşınmış, silinmiş veya kullanılamıyor olabilir.",

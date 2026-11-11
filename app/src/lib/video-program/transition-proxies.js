@@ -24,23 +24,32 @@ function proxySize(resolution) {
 }
 
 /**
- * Resolves the transition window at a timeline second.
+ * Resolves the transition the piece at a timeline second ends with, as the preview shows it: the state of
+ * its proxy, and whether (and how far) the second lies inside its window. The preview loads the proxy while
+ * the piece plays, so that the window starts on a decoded frame.
  * @param {{pieces: Array<object>, joins: Array<object>}} program Built program.
+ * @param {Array<object>} jobs Proxy jobs (`listTransitionProxyJobs`).
+ * @param {Object<string, object>} proxies Known proxies keyed by content key.
  * @param {number} second Timeline second.
- * @returns {{join: object, outgoingPiece: object, incomingPiece: object, progress: number, elapsedSeconds: number, incomingSecond: number}|null}
- *   The window (`incomingSecond` is the timeline second the incoming overlay shows), or null outside every window.
+ * @returns {{proxyStatus: 'queued'|'rendering'|'ready'|'failed', proxyUrl: string|null, isInWindow: boolean, elapsedSeconds: number}|null}
+ *   The transition, or null outside every piece and for a piece that ends without a proxied transition.
  */
-export function resolveTransitionWindow(program, second) {
+export function resolveUpcomingTransition(program, jobs, proxies, second) {
   const position = resolveProgramPosition(program, second)
-  if (position.kind !== 'transition') return null
-  const elapsedSeconds = position.progress * position.join.transition.durationSeconds
+  if (position.kind !== 'piece' && position.kind !== 'transition') return null
+  if (position.join === null) return null
+
+  // Hard cuts and joins with a missing video have no proxy job.
+  const job = jobs.find((candidate) => candidate.joinKey === position.join.key)
+  if (job === undefined) return null
+
+  const proxy = proxies[job.key]
+  const isInWindow = position.kind === 'transition'
   return {
-    join: position.join,
-    outgoingPiece: position.piece,
-    incomingPiece: position.nextPiece,
-    progress: position.progress,
-    elapsedSeconds,
-    incomingSecond: position.nextPiece.timelineStartSecond + elapsedSeconds,
+    proxyStatus: proxy?.status ?? 'queued',
+    proxyUrl: proxy?.status === 'ready' ? proxy.url : null,
+    isInWindow,
+    elapsedSeconds: isInWindow ? position.progress * position.join.transition.durationSeconds : 0,
   }
 }
 

@@ -491,7 +491,6 @@
     "setLocationInMap": "Nastavit polohu"
   },
   "video-preview": {
-    "aborterror": "AbortError",
     "errors": {
       "decodeFailed": "Systémový přehrávač nedokázal video dekódovat. Může k tomu dojít u některých videí HEVC, 10bitových videí nebo videí ve formátu 4:2:2.",
       "fileUnavailable": "Místní server náhledu nemohl načíst soubor videa. Soubor mohl být přesunut, smazán nebo je momentálně nedostupný.",

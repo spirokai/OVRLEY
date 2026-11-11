@@ -491,7 +491,6 @@
     "setLocationInMap": "위치 설정"
   },
   "video-preview": {
-    "aborterror": "AbortError",
     "errors": {
       "decodeFailed": "시스템 동영상 플레이어에서 동영상을 디코딩할 수 없습니다. 일부 HEVC, 10-bit, 또는 4:2:2 파일에서 발생할 수 있습니다.",
       "fileUnavailable": "로컬 미리보기 서버에서 동영상 파일을 읽을 수 없습니다. 파일이 이동되었거나, 삭제되었거나, 사용할 수 없게 되었을 수 있습니다.",

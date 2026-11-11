@@ -491,7 +491,6 @@
     "setLocationInMap": "Definir local"
   },
   "video-preview": {
-    "aborterror": "AbortError",
     "errors": {
       "decodeFailed": "O vídeo não pôde ser decodificado pelo player de vídeo do sistema. Isso pode ocorrer com alguns arquivos HEVC, de 10 bits ou 4:2:2.",
       "fileUnavailable": "O servidor local de pré-visualização não pôde ler o arquivo de vídeo. O arquivo pode ter sido movido, excluído ou ter ficado indisponível.",

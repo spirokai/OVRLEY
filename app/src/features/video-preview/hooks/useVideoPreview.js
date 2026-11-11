@@ -11,7 +11,7 @@ import { useTransitionProxyJobs, useVideoTimeline } from '@/hooks/useVideoTimeli
 import { framesToSeconds } from '@/lib/video-program/frame-grid'
 import { pieceClock, resolvePreviewTarget } from '@/lib/video-program/playback-target'
 import { assignPreviewSlots, EMPTY_PREVIEW_SLOTS } from '@/lib/video-program/preview-slots'
-import { listShownTransitionJoinKeys, resolveContinuation, resolveTransitionWindow } from '@/lib/video-program/transition-proxies'
+import { listShownTransitionJoinKeys, resolveContinuation, resolveUpcomingTransition } from '@/lib/video-program/transition-proxies'
 import useStore from '@/store/useStore'
 import { useVideoPlaybackClock } from './useVideoPlaybackClock'
 import { useVideoPreviewWarnings } from './useVideoPreviewWarnings'
@@ -19,7 +19,6 @@ import { SCRUB_SEEK_EPSILON_SECONDS, SCRUB_SEEK_INTERVAL_MS } from '../data/vide
 import { primeVideoFirstFrame, syncVideoCurrentTime } from '../utils/videoPreviewPlayback'
 import { createVideoPreviewScrubScheduler } from '../utils/videoPreviewScrubScheduler'
 import { resolveVideoPreviewSource } from '../utils/videoPreviewSource'
-import i18next from 'i18next'
 
 function previewSourceOf(clip) {
   return resolveVideoPreviewSource({ importedVideoPath: clip.path, importedVideoPreviewUrl: clip.preview.url })
@@ -30,8 +29,9 @@ function previewSourceOf(clip) {
  *
  * @param {Array<React.RefObject<HTMLVideoElement>>} slotRefs - Refs to the two video elements.
  * @param {boolean} isActive - Whether the imported video preview is currently visible.
- * @returns {{ slots: Array<{src: string, isActive: boolean}>, videoSrc: string, importId: string|null, isMissing: boolean, isOutOfRange: boolean, isExcluded: boolean, isInOverlap: boolean, transition: {proxyStatus: 'queued'|'rendering'|'ready'|'failed', proxyUrl: string|null, elapsedSeconds: number, isPlaying: boolean}|null, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
- *   Inside a transition window `transition` describes its proxy, shown over the outgoing piece once ready.
+ * @returns {{ slots: Array<{src: string, isActive: boolean}>, videoSrc: string, importId: string|null, isMissing: boolean, isOutOfRange: boolean, isExcluded: boolean, isInOverlap: boolean, transition: {proxyStatus: 'queued'|'rendering'|'ready'|'failed', proxyUrl: string|null, isInWindow: boolean, elapsedSeconds: number, isPlaying: boolean}|null, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
+ *   `transition` is the transition the playing piece ends with (`resolveUpcomingTransition`); its proxy covers the
+ *   outgoing piece inside the window.
  */
 export function useVideoPreview(slotRefs, isActive = true) {
   // Store selectors - subscribes to the displayed clips, playhead position, playback mode, and drag state.
@@ -185,11 +185,13 @@ export function useVideoPreview(slotRefs, isActive = true) {
         const isCurrentVideoPlayback =
           videoRef.current === video && currentState.previewPlaybackState === 'playing' && currentState.previewPlaybackSource === 'video'
 
-        if (!isCurrentVideoPlayback) {
+        // A play request superseded by a pause, seek or new source rejects with AbortError (WebKit does so
+        // more readily than Chromium); whatever superseded it owns playback now.
+        if (!isCurrentVideoPlayback || error?.name === 'AbortError') {
           return
         }
 
-        if (error?.name !== i18next.t('video-preview.aborterror', 'AbortError') && error?.name !== 'NotAllowedError') {
+        if (error?.name !== 'NotAllowedError') {
           console.error('[useVideoPreview] Failed to start playback', error)
         }
 
@@ -296,20 +298,9 @@ export function useVideoPreview(slotRefs, isActive = true) {
     }
   }, [parkedRef, parkedSecond, parkedSlot])
 
-  // Transition window - its proxy (once rendered) covers the end of the outgoing piece. A join with a
-  // missing video has no proxy.
-  const transitionWindow = isDragPreview ? null : resolveTransitionWindow(program, selectedSecond)
-  const transitionJob = transitionWindow === null ? undefined : transitionProxyJobs.find((job) => job.joinKey === transitionWindow.join.key)
-  const transitionProxy = transitionJob === undefined ? null : (transitionProxies[transitionJob.key] ?? null)
-  const transition =
-    transitionJob === undefined
-      ? null
-      : {
-          proxyStatus: transitionProxy?.status ?? 'queued',
-          proxyUrl: transitionProxy?.status === 'ready' ? transitionProxy.url : null,
-          elapsedSeconds: transitionWindow.elapsedSeconds,
-          isPlaying: isVideoPlaybackMode,
-        }
+  // Upcoming transition - its proxy loads while the piece plays and covers the end of the piece in the window.
+  const upcomingTransition = isDragPreview ? null : resolveUpcomingTransition(program, transitionProxyJobs, transitionProxies, selectedSecond)
+  const transition = upcomingTransition === null ? null : { ...upcomingTransition, isPlaying: isVideoPlaybackMode }
 
   // Derived return values - aggregate imported-video warnings with local preview messages.
   const isOutOfRange = target === null || !target.isInside

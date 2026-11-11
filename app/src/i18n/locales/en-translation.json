@@ -575,7 +575,6 @@
     "setLocationInMap": "Set location"
   },
   "video-preview": {
-    "aborterror": "AbortError",
     "errors": {
       "decodeFailed": "The video could not be decoded by the system video player. This may happen with some HEVC, 10-bit, or 4:2:2 files.",
       "fileUnavailable": "The local preview server could not read the video file. The file may have been moved, deleted, or become unavailable.",

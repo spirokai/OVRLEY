@@ -491,7 +491,6 @@
     "setLocationInMap": "Imposta posizione"
   },
   "video-preview": {
-    "aborterror": "AbortError",
     "errors": {
       "decodeFailed": "Il lettore video di sistema non ha potuto decodificare il video. Può accadere con alcuni file HEVC, 10 bit o 4:2:2.",
       "fileUnavailable": "Il server locale di anteprima non ha potuto leggere il file video. Il file potrebbe essere stato spostato, eliminato o essere diventato non disponibile.",

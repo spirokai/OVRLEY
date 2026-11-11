@@ -491,7 +491,6 @@
     "setLocationInMap": "Locatie instellen"
   },
   "video-preview": {
-    "aborterror": "AbortError",
     "errors": {
       "decodeFailed": "De systeemspeler kon de video niet decoderen. Dit kan gebeuren bij sommige HEVC-, 10-bits- of 4:2:2-bestanden.",
       "fileUnavailable": "De lokale voorvertoningsserver kon het videobestand niet lezen. Het bestand is mogelijk verplaatst, verwijderd of niet beschikbaar.",

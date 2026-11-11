@@ -491,7 +491,6 @@
     "setLocationInMap": "Ange plats"
   },
   "video-preview": {
-    "aborterror": "AbortError",
     "errors": {
       "decodeFailed": "Systemets videospelare kunde inte avkoda videon. Detta kan hända med vissa HEVC-, 10-bitars- eller 4:2:2-filer.",
       "fileUnavailable": "Den lokala förhandsgranskningsservern kunde inte läsa videofilen. Filen kan ha flyttats, tagits bort eller blivit otillgänglig.",

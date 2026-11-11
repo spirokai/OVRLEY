@@ -491,7 +491,6 @@
     "setLocationInMap": "Ustaw lokalizację"
   },
   "video-preview": {
-    "aborterror": "AbortError",
     "errors": {
       "decodeFailed": "Systemowy odtwarzacz wideo nie może zdekodować wideo. Może się tak zdarzyć w przypadku niektórych plików HEVC, 10-bitowych lub 4:2:2.",
       "fileUnavailable": "Lokalny serwer podglądu nie może odczytać pliku wideo. Plik mógł zostać przeniesiony, usunięty lub stał się niedostępny.",

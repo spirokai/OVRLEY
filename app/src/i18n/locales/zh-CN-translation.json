@@ -491,7 +491,6 @@
     "setLocationInMap": "设置位置"
   },
   "video-preview": {
-    "aborterror": "AbortError",
     "errors": {
       "decodeFailed": "系统视频播放器无法解码该视频。某些 HEVC、10-bit 或 4:2:2 文件可能会出现此问题。",
       "fileUnavailable": "本地预览服务器无法读取视频文件。文件可能已被移动、删除或变得不可用。",

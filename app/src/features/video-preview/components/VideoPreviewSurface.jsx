@@ -104,10 +104,11 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
     videoPreviewHelpAvailable,
   } = useVideoPreview(slotRefs, isActive)
   useTransitionProxyQueue()
-  useTransitionProxyPlayback(proxyVideoRef, transition)
+  const isProxyFrameReady = useTransitionProxyPlayback(proxyVideoRef, transition)
   const hasHevcPlaybackError = Boolean(hevcPlaybackWarning)
-  // Inside a transition window the proxy shows the blend and plays its crossfaded audio.
-  const showsProxy = transition?.proxyUrl != null
+  // Inside the window the proxy shows the blend and plays its crossfaded audio, once it has a frame to show.
+  const isInTransitionWindow = transition?.isInWindow ?? false
+  const showsProxy = isInTransitionWindow && isProxyFrameReady
 
   return (
     <>
@@ -130,20 +131,22 @@ export default function VideoPreviewSurface({ children, displayScale, isActive }
           />
         ) : null,
       )}
-      {showsProxy ? (
+      {/* Mounted ahead of its window, invisible and silent, so the transition starts on a decoded frame. */}
+      {transition?.proxyUrl ? (
         <video
+          key={transition.proxyUrl}
           ref={proxyVideoRef}
           src={transition.proxyUrl}
           data-slot="transition"
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+          className={cn('pointer-events-none absolute inset-0 h-full w-full object-cover', !showsProxy && 'opacity-0')}
           preload="auto"
           playsInline
-          muted={isVideoMuted}
+          muted={!showsProxy || isVideoMuted}
         />
       ) : null}
       {isMissing ? <MissingVideoPlaceholder displayScale={displayScale} /> : null}
       {children}
-      {transition !== null && !showsProxy && transition.proxyStatus !== 'failed' ? (
+      {isInTransitionWindow && !showsProxy && transition.proxyStatus !== 'failed' ? (
         <div className="pointer-events-none absolute right-0 top-0 z-30 p-4">
           <div role="status" className="flex items-center gap-2 rounded-sm bg-black/70 px-3 py-1.5 text-xs font-semibold text-white">
             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />

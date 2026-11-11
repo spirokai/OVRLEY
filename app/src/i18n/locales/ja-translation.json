@@ -491,7 +491,6 @@
     "setLocationInMap": "位置を設定"
   },
   "video-preview": {
-    "aborterror": "AbortError",
     "errors": {
       "decodeFailed": "システムの動画プレーヤーで動画をデコードできませんでした。一部のHEVC、10ビット、または4:2:2ファイルで発生することがあります。",
       "fileUnavailable": "ローカルプレビューサーバーで動画ファイルを読み込めませんでした。ファイルが移動、削除されたか、利用できなくなった可能性があります。",
