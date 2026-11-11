@@ -145,6 +145,10 @@ pub fn transition_proxy_args(request: &TransitionProxyRequest, output: &Path) ->
             "ultrafast",
             "-crf",
             "26",
+            // `xfade` can negotiate 4:4:4, which libx264 then encodes as High 4:4:4:
+            // the webview's decoders (GStreamer hardware decoders on Linux) show it as garbage.
+            "-pix_fmt",
+            "yuv420p",
             "-g",
         ]
         .map(String::from),
@@ -264,5 +268,15 @@ mod tests {
             assert!(invalid.validate().is_err(), "{invalid:?}");
         }
         assert!(request(false).validate().is_ok());
+    }
+
+    #[test]
+    fn proxies_are_encoded_as_4_2_0() {
+        let args = transition_proxy_args(&request(true), Path::new("/tmp/proxy.mp4"));
+        let pix_fmt = args
+            .iter()
+            .position(|arg| arg == "-pix_fmt")
+            .map(|index| args[index + 1].as_str());
+        assert_eq!(pix_fmt, Some("yuv420p"));
     }
 }
