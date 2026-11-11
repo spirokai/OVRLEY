@@ -14,6 +14,7 @@ import {
   setVideosTimezoneMode,
   setVideoTimezoneMode,
   shiftVideoOffsets,
+  syncVideos,
 } from '@/lib/video-program/collection-edits'
 import { createTestVideo } from '@/tests/helpers/videoFixtures'
 
@@ -224,6 +225,14 @@ describe('starts set by hand', () => {
 
     state = apply(state, setVideosTimezoneMode, 'utc')
     expect(offsets(state)).toEqual({ first: 10, second: 75 })
+  })
+
+  test('syncing every clip places the ones set by hand by detected time again', () => {
+    let state = apply(synced(), setVideoOffset, 'second', 70)
+    state = apply(state, shiftVideoOffsets, 5)
+    state = apply(state, syncVideos)
+    expect(offsets(state)).toEqual({ first: 10, second: 40 })
+    expect(state.videoEdits.second.offsetSource).toBe('auto')
   })
 
   test('reset returns an undeterminable clip next to its anchor', () => {

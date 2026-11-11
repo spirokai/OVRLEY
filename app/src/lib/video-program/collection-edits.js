@@ -243,6 +243,12 @@ function placeVideoIfAutomatic(draft, videoId) {
   if (draft.videoEdits[videoId].offsetSource === 'auto') placeVideo(draft, videoId)
 }
 
+/** Places every clip by its detected recording time again, also the ones set by hand. */
+export function syncVideos(draft) {
+  for (const video of draft.importedVideos) draft.videoEdits[video.id].offsetSource = 'auto'
+  placeAutomaticVideos(draft)
+}
+
 /** Shifts every clip by the same amount, keeping their relative placement. */
 export function shiftVideoOffsets(draft, deltaSeconds) {
   requireFiniteOffset(deltaSeconds, 'Video offset shift')

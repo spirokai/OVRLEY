@@ -21,6 +21,7 @@ import {
   setVideosTimezoneMode,
   setVideoTimezoneMode,
   shiftVideoOffsets,
+  syncVideos,
   trimVideo,
 } from '@/lib/video-program/collection-edits'
 import { requireTelemetry } from '@/lib/video-program/imported-video'
@@ -166,6 +167,11 @@ export const createVideoImportSlice = (set, get) => ({
   /** Places every automatic clip by detected time (see `placeAutomaticVideos`). */
   computeVideoSync: () => {
     set((draft) => placeAutomaticVideos(draft))
+  },
+
+  /** Places every clip by its detected recording time again (see `syncVideos`). */
+  syncAllVideos: () => {
+    set((draft) => syncVideos(draft))
   },
 
   /** Sets one clip's start by hand (see `setVideoOffset`). */

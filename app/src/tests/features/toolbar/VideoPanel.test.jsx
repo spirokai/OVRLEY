@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import { VideoPanel } from '@/features/toolbar'
 import { createMissingVideo, createVideoMetadataSnapshot } from '@/lib/video-program/imported-video'
@@ -33,6 +33,33 @@ describe('VideoPanel', () => {
     fireEvent.keyDown(rideCard, { key: 'Delete' })
     fireEvent.click(screen.getByRole('button', { name: 'Remove climb.mp4 from project' }))
     expect(onRemoveVideo.mock.calls).toEqual([['ride'], ['climb']])
+  })
+
+  test('syncs every video at once: their start, automatic sync and timezone', () => {
+    const camera = { creationTime: '2026-07-18T08:00:30Z', timeSource: 'ffprobe', durationSeconds: 20 }
+    useStore.setState({
+      ...videoStoreState(
+        [
+          { ...ride, ...camera },
+          { ...climb, ...camera, creationTime: '2026-07-18T08:01:00Z' },
+        ],
+        { ride: 30, climb: 60 },
+      ),
+      parsedActivity: { metadata: { timezone: 'Europe/Sofia' } },
+      activitySummary: { timezone: 'Europe/Sofia', syncTime: '2026-07-18T08:00:00Z', endTime: '2026-07-18T08:02:00Z' },
+    })
+    render(<VideoPanel onDeleteVideo={vi.fn()} onRemoveVideo={vi.fn()} />)
+    expect(screen.getByRole('heading', { name: 'Sync all videos' })).toBeInTheDocument()
+
+    act(() => useStore.getState().setVideoOffset('ride', 500))
+    fireEvent.click(screen.getByRole('switch', { name: 'Apply Timezone' }))
+    expect(Object.values(useStore.getState().videoEdits).map((edits) => edits.timezoneMode)).toEqual(['utc', 'utc'])
+    // The video set by hand keeps its start until every video is synced.
+    expect(useStore.getState().videoEdits.ride.offsetSeconds).toBe(500)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sync all videos' }))
+    expect(useStore.getState().videoEdits.ride).toMatchObject({ offsetSeconds: 30, offsetSource: 'auto' })
+    expect(useStore.getState().videoEdits.climb.offsetSeconds).toBe(60)
   })
 
   test('a missing video says that its file was not found instead of showing a thumbnail', () => {

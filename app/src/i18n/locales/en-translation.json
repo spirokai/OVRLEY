@@ -453,6 +453,7 @@
     "videoStart": "Start on timeline",
     "videoStartAutoHint": "Placed automatically. Type a time to set it by hand.",
     "syncTheVideo": "Sync the video",
+    "syncAllVideos": "Sync all videos",
     "distance": "Distance",
     "dropActivityFile": "Drop activity file",
     "dropVideoFile": "Drop video files",

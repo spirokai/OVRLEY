@@ -1,14 +1,17 @@
-import { AlertTriangle, Blend, Film, ImageOff, Trash2 } from 'lucide-react'
+import { AlertTriangle, Blend, Clock3, Film, ImageOff, RefreshCw, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { SecondsInput } from '@/components/ui/seconds-input'
 import { SectionHeading } from '@/components/ui/section-heading'
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TransitionSelect } from '@/features/transitions'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { cn } from '@/lib/utils'
 import { useTransitionDefaultsSection } from '../hooks/useTransitionDefaultsSection'
 import { useVideoCards } from '../hooks/useVideoCards'
+import { useVideoSyncControls } from '../hooks/useVideoSyncControls'
 
 function LabeledField({ id, label, children }) {
   return (
@@ -18,6 +21,53 @@ function LabeledField({ id, label, children }) {
       </Label>
       {children}
     </div>
+  )
+}
+
+/** Sync of every video at once; the video drawer holds the same settings for one video. */
+function SyncAllVideosSection() {
+  const { t } = useTranslation()
+  const sync = useVideoSyncControls()
+  // Rows like the video drawer's sync section: the label on the left, its control on the right.
+  const rowLabel = 'flex min-h-8 items-center pl-0 text-xs font-bold text-muted-foreground'
+  return (
+    <section className="space-y-3" aria-label={t('toolbar.syncAllVideos', 'Sync all videos')}>
+      <SectionHeading icon={Clock3} title={t('toolbar.syncAllVideos', 'Sync all videos')} variant="drawer" />
+      <div className="grid grid-cols-2 items-start gap-x-4.5 gap-y-3 px-2">
+        <Button type="button" variant="secondary" className="col-span-2 w-full gap-2" onClick={sync.syncAllVideos}>
+          <RefreshCw className="size-4" /> {t('toolbar.syncAllVideos', 'Sync all videos')}
+        </Button>
+        <span className={rowLabel}>{t('toolbar.creationTime', 'Creation Time')}</span>
+        <Tabs
+          value={sync.canResetCreationTime ? 'filename' : 'detected'}
+          onValueChange={(value) => (value === 'filename' ? sync.setVideoCreationTimesFromFilenames() : sync.resetVideoCreationTimes())}
+        >
+          <TabsList variant="toolbar" className="grid h-8 w-full grid-cols-2 p-0.5">
+            <TabsTrigger variant="toolbar" value="detected" className="h-full px-2 text-[0.7rem]">
+              {t('toolbar.detected', 'Detected')}
+            </TabsTrigger>
+            <TabsTrigger variant="toolbar" value="filename" className="h-full px-2 text-[0.7rem]" disabled={!sync.filenameCreationTimeAvailable}>
+              {t('toolbar.filename', 'Filename')}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        {sync.timezone !== null ? (
+          <>
+            <Label htmlFor="videos-timezone" className={rowLabel}>
+              {t('toolbar.applyTimezone', 'Apply Timezone')}
+            </Label>
+            <div className="flex min-h-8 items-center">
+              <Switch
+                id="videos-timezone"
+                checked={sync.videoSyncTimezoneMode === 'utc'}
+                disabled={sync.timezoneDisabled}
+                onCheckedChange={(checked) => sync.setVideoSyncTimezoneMode(checked ? 'utc' : 'local')}
+              />
+            </div>
+          </>
+        ) : null}
+      </div>
+    </section>
   )
 }
 
@@ -141,7 +191,7 @@ function VideoCard({ card }) {
 
 /**
  * The video tab's companion panel, in place of (and as wide as) the widget sidebar:
- * the default transitions above a two-column grid of video cards in timeline order.
+ * the sync of every video and the default transitions above a two-column grid of video cards in timeline order.
  *
  * @param {object} props - Component props.
  * @param {() => void} props.onDeleteVideo - Removes every imported video.
@@ -159,6 +209,7 @@ export function VideoPanel({ onDeleteVideo, onRemoveVideo }) {
     >
       {cards.length > 0 ? (
         <div className="space-y-8 py-4">
+          <SyncAllVideosSection />
           <TransitionDefaultsSection />
           <section className="space-y-3" aria-label={t('toolbar.importedVideos', 'Imported videos')}>
             <SectionHeading

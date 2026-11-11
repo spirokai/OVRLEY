@@ -33,6 +33,7 @@ export function useVideoSyncControls() {
       setVideoCreationTimesFromFilenames: state.setVideoCreationTimesFromFilenames,
       setVideoSyncTimezoneMode: state.setVideoSyncTimezoneMode,
       shiftVideoOffsets: state.shiftVideoOffsets,
+      syncAllVideos: state.syncAllVideos,
     })),
   )
   const controls = useMemo(() => deriveVideoSyncControls(collection), [collection])
