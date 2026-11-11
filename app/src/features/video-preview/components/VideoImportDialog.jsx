@@ -189,6 +189,7 @@ function TransitionSection({ transition }) {
           value={transition.durationSeconds}
           fps={transition.durationFps}
           mode="duration"
+          display="seconds"
           onCommit={transition.onDurationCommit}
           className="h-8 text-xs"
         />

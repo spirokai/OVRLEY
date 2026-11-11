@@ -94,7 +94,7 @@
     "secondsInvalid": "Enter a time like 05:30, a number of seconds, or a sum like 05:30+10",
     "secondsNotNegative": "Enter a time of 0 seconds or more",
     "secondsPreview": "= {{clock}} ({{seconds}} s)",
-    "secondsUnit": "s",
+    "secondsUnit": "SEC",
     "system": "System"
   },
   "overlay-editor": {

@@ -71,6 +71,15 @@ export function formatSecondsText(seconds) {
 }
 
 /**
+ * Formats a duration as seconds with exactly one decimal (`1.0`), as transition durations are shown.
+ * @param {number} seconds Value.
+ * @returns {string} Seconds text.
+ */
+export function formatDurationSeconds(seconds) {
+  return seconds.toFixed(1)
+}
+
+/**
  * Resolves a `secondsInput.step` shortcut binding to the seconds it moves a value.
  * @param {{seconds?: number, frames?: number}} binding Manifest binding, declaring either seconds or frames.
  * @param {{num: number, den: number}|null} fps Frame grid of the value, or null.

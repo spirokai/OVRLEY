@@ -101,6 +101,7 @@ function TransitionDefaultsSection() {
             value={section.durationSeconds}
             fps={section.durationFps}
             mode="duration"
+            display="seconds"
             onCommit={section.onDurationCommit}
             className="h-9 text-xs"
           />

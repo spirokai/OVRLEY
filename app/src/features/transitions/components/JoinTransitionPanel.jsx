@@ -25,6 +25,7 @@ export function JoinTransitionPanel({ model }) {
             value={model.durationSeconds}
             fps={model.durationFps}
             mode="duration"
+            display="seconds"
             onCommit={model.commitDuration}
             className="h-7 w-24 text-xs"
             aria-label={t('transitions.duration', 'Transition duration')}

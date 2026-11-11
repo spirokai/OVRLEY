@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vite-plus/test'
-import { normalizeSecondsDraft, parseSecondsDraft, snapSeconds } from '@/lib/seconds-input'
+import { formatDurationSeconds, normalizeSecondsDraft, parseSecondsDraft, snapSeconds } from '@/lib/seconds-input'
 
 const PAL = { num: 25, den: 1 }
 const NTSC = { num: 30000, den: 1001 }
@@ -42,6 +42,10 @@ describe('seconds input helpers', () => {
     expect(parseSecondsDraft('10-30')).toBe(-20)
     expect(parseSecondsDraft('1:00 ')).toBe(60)
     for (const draft of ['5+', '5-', '5+-3', '5--3', '5+5:75']) expect(parseSecondsDraft(draft)).toBeNull()
+  })
+
+  test('format a duration with exactly one decimal', () => {
+    expect([2, 1.5, 1.0333, 0.04, 12.96].map(formatDurationSeconds)).toEqual(['2.0', '1.5', '1.0', '0.0', '13.0'])
   })
 
   test('snap times to the nearest frame and durations to at least one frame', () => {

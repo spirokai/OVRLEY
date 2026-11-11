@@ -5,7 +5,14 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
-import { bindingStepSeconds, formatSecondsText, normalizeSecondsDraft, parseSecondsDraft, snapSeconds } from '@/lib/seconds-input'
+import {
+  bindingStepSeconds,
+  formatDurationSeconds,
+  formatSecondsText,
+  normalizeSecondsDraft,
+  parseSecondsDraft,
+  snapSeconds,
+} from '@/lib/seconds-input'
 import { formatSecondsClock } from '@/lib/time-format'
 
 /**
@@ -22,13 +29,13 @@ import { formatSecondsClock } from '@/lib/time-format'
  * @param {'time'|'duration'} options.mode A time snaps to the nearest frame; a duration is above 0 and at least one frame.
  * @param {boolean} options.signed Whether negative values are allowed.
  * @param {number|null} options.step Seconds the step buttons add or remove, or null without step buttons.
- * @param {'clock'|'seconds'} options.display Shows the value as a clock (`00:01.500`) or as plain seconds (`1.5`).
+ * @param {'clock'|'seconds'} options.display Shows the value as a clock (`00:01.500`) or as seconds with one decimal (`1.5`).
  * @param {(() => void)|null} options.onReset Resets the stored value, or null without a reset button. A reset discards the draft.
  * @returns {{text: string, preview: string|null, error: string|null, onChange: function, onBlur: function, onKeyDown: function,
  *   onKeyUp: function, onStep: function|null, onReset: function|null}} Field model.
  */
 export function useSecondsInput({ value, onCommit, fps, mode, signed, step, display, onReset }) {
-  const formatValue = display === 'seconds' ? formatSecondsText : formatSecondsClock
+  const formatValue = display === 'seconds' ? formatDurationSeconds : formatSecondsClock
   const { t } = useTranslation()
   const [draft, setDraft] = useState(null)
   const [error, setError] = useState(null)
