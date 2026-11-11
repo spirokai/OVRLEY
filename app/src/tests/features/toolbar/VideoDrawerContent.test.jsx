@@ -14,7 +14,7 @@ vi.mock('@/features/toolbar/hooks/useFileDropZone', () => ({
 import { VideoDrawerContent } from '@/features/toolbar'
 import { createMissingVideo, createVideoMetadataSnapshot } from '@/lib/video-program/imported-video'
 import useStore from '@/store/useStore'
-import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
+import { createTestVideo, cutEdits, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 const ride = {
   ...createTestVideo({
@@ -77,6 +77,22 @@ describe('VideoDrawerContent', () => {
     expect(screen.getByText('GoPro Hero 12')).toBeInTheDocument()
     expect(screen.getByText('Available')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Locate video…' })).not.toBeInTheDocument()
+  })
+
+  test('shows a video without cuts as one part card, without a removable cut', () => {
+    useStore.setState({ ...videoStoreState([ride]), selectedClip: { laneId: 'video:video-1', segmentKey: null } })
+    renderDrawer()
+
+    expect(screen.getByText('Parts')).toBeInTheDocument()
+    expect(screen.getAllByRole('switch', { name: /^Include in export: ride\.mp4/ })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: /^Remove the cut at/ })).not.toBeInTheDocument()
+
+    act(() =>
+      useStore.setState((state) => ({ videoEdits: { 'video-1': { ...state.videoEdits['video-1'], ...cutEdits([{ id: 'cut-1', frame: 600 }]) } } })),
+    )
+
+    expect(screen.getAllByRole('switch', { name: /^Include in export: ride\.mp4/ })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: /^Remove the cut at/ })).toHaveLength(1)
   })
 
   test('offers to locate the file of a selected missing video', () => {

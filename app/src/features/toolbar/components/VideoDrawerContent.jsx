@@ -13,40 +13,15 @@ import { useSelectedVideoRow } from '../hooks/useSelectedVideoRow'
 import { FileDragCursor, FileDropZone } from './FileDropZone'
 import { useTranslation } from 'react-i18next'
 
-function SingleSegmentRow({ segment, exits, filename }) {
-  const { t } = useTranslation()
-  const includedLabel = t('toolbar.includeInExport', 'Include in export')
-  return (
-    <div className="space-y-2 px-2">
-      <div className="grid grid-cols-2 items-center gap-4">
-        <span className="text-xs font-bold text-muted-foreground">{includedLabel}</span>
-        <Switch
-          aria-label={`${includedLabel}: ${filename} ${segment.startLabel}`}
-          checked={segment.included}
-          onCheckedChange={segment.onIncludedChange}
-        />
-      </div>
-      {exits.map((exit) => (
-        <div key={exit.key} className="space-y-1">
-          <Label htmlFor={`video-transition-${exit.key}`} className="text-xs font-bold text-muted-foreground">
-            {exit.label}
-          </Label>
-          <JoinTransitionControl id={`video-transition-${exit.key}`} model={exit.transition} />
-        </div>
-      ))}
-    </div>
-  )
-}
-
 /** Text of a part switched off for export, keyed to its card's `data-included`. */
 const EXCLUDED_PART_TEXT =
   'group-data-[included=false]:text-muted-foreground group-data-[included=false]:opacity-35 group-data-[included=false]:line-through'
 
-/** A transition between a part and what follows it, on a dashed line; the label shows only for a transition into another video. */
-function SegmentJoin({ transition, id, label, showLabel }) {
+/** A transition between a part and what follows it, on a dashed line; its label is for screen readers only. */
+function SegmentJoin({ transition, id, label }) {
   return (
     <li className="relative min-w-0 pt-3 pb-2 pl-7 before:absolute before:top-1 before:bottom-0 before:left-3 before:border-l before:border-dashed before:border-foreground">
-      <Label htmlFor={id} className={cn('mb-1 block truncate text-[0.7rem] font-bold text-muted-foreground', !showLabel && 'sr-only')}>
+      <Label htmlFor={id} className="sr-only">
         {label}
       </Label>
       <JoinTransitionControl id={id} model={transition} />
@@ -85,7 +60,7 @@ function SegmentCard({ segment, filename }) {
             aria-label={removeCutLabel}
             title={removeCutLabel}
           >
-            <Scissors className="h-3 w-3" />
+            <Trash2 className="h-3 w-3" />
           </Button>
         ) : null}
       </span>
@@ -101,7 +76,7 @@ function SegmentCard({ segment, filename }) {
 function SegmentList({ segments, exits, clipId, filename }) {
   const { t } = useTranslation()
   return (
-    <ul className="px-2">
+    <ul>
       {segments.map((segment) => (
         <Fragment key={segment.key}>
           {segment.transition !== null ? (
@@ -109,14 +84,13 @@ function SegmentList({ segments, exits, clipId, filename }) {
               transition={segment.transition}
               id={`video-segment-transition-${clipId}-${segment.key}`}
               label={t('toolbar.transitionIn', 'Transition in')}
-              showLabel={false}
             />
           ) : null}
           <SegmentCard segment={segment} filename={filename} />
         </Fragment>
       ))}
       {exits.map((exit) => (
-        <SegmentJoin key={exit.key} transition={exit.transition} id={`video-transition-${exit.key}`} label={exit.label} showLabel />
+        <SegmentJoin key={exit.key} transition={exit.transition} id={`video-transition-${exit.key}`} label={exit.label} />
       ))}
     </ul>
   )
@@ -185,14 +159,6 @@ function SelectedVideoDetails({ row }) {
           className="h-8 text-xs"
         />
       </div>
-      {row.segments.length > 1 ? (
-        <>
-          <SectionHeading icon={Scissors} title={t('toolbar.videoParts', 'Parts')} variant="drawer" />
-          <SegmentList segments={row.segments} exits={row.exits} clipId={row.id} filename={row.filename} />
-        </>
-      ) : (
-        <SingleSegmentRow segment={row.segments[0]} exits={row.exits} filename={row.filename} />
-      )}
       <SectionHeading icon={Film} title={t('toolbar.details', 'Details')} variant="drawer" />
       <dl className="grid grid-cols-2 gap-x-4.5 gap-y-1.5 px-2 text-xs">
         {row.metadataRows.map((metadataRow) => (
@@ -204,6 +170,9 @@ function SelectedVideoDetails({ row }) {
           </div>
         ))}
       </dl>
+      {/* A video without cuts is one part: the same card, without a removable cut. */}
+      <SectionHeading icon={Scissors} title={t('toolbar.videoParts', 'Parts')} variant="drawer" />
+      <SegmentList segments={row.segments} exits={row.exits} clipId={row.id} filename={row.filename} />
     </section>
   )
 }
