@@ -25,6 +25,7 @@ function projectVideos(state, projectPath) {
         cuts: edits.cuts.map((cut) => ({ id: cut.id, frame: cut.frame })),
         segments: cloneVideoSegments(edits.segments),
         placementAnchor: edits.placementAnchor === null ? null : { ...edits.placementAnchor },
+        timezoneMode: edits.timezoneMode,
         metadata: createVideoMetadataSnapshot(video),
       }
     })
@@ -50,7 +51,6 @@ export function createProjectContentSnapshot(state, projectPath) {
       videos: projectVideos(state, projectPath),
     },
     sync: {
-      videoTimezoneMode: state.videoSyncTimezoneMode,
       manual: { videoId, landmarks, detectedLocationSecond, speedThresholdKmh, turnThresholdDegrees },
     },
     laps: {

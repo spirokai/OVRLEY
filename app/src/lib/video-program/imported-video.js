@@ -221,6 +221,8 @@ export function createVideoEdits() {
     cuts: [],
     segments: { [FIRST_SEGMENT_KEY]: { excluded: false, transitionIn: null } },
     placementAnchor: null,
+    // Apply Timezone of the clip's camera clock; null until it is inferred or chosen.
+    timezoneMode: null,
   }
 }
 

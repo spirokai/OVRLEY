@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vite-plus/test'
-import { placeVideosByCreationTime, resolveVideoSync, resolveVideosSync } from '@/lib/video-sync'
+import { placeVideosByCreationTime, resolveVideoSync } from '@/lib/video-sync'
 import { createTestVideo } from '../helpers/videoFixtures'
 
 // 5:47:13 activity ending 17:29 Sofia time (UTC+3).
@@ -21,34 +21,28 @@ describe('resolveVideoSync with an explicit timezone mode', () => {
   })
 })
 
-describe('resolveVideosSync session timezone inference', () => {
+describe('per-video timezone mode', () => {
   const summary = { syncTime: '2026-07-18T08:00:00Z', endTime: '2026-07-18T08:02:00Z', timezone: 'Europe/Sofia' }
 
-  test('each ambiguous clip infers its own interpretation and the session adopts an agreed one', () => {
+  test('each ambiguous clip infers its own interpretation', () => {
     // 08:00:30Z only overlaps when read as UTC; 11:00:30 only when read as Sofia local clock text.
     const utcClip = createTestVideo({ id: 'utc', creationTime: '2026-07-18T08:00:30Z', timeSource: 'ffprobe', durationSeconds: 20 })
     const localClip = createTestVideo({ id: 'local', creationTime: '2026-07-18T11:00:30Z', timeSource: 'ffprobe', durationSeconds: 20 })
 
-    const both = resolveVideosSync([utcClip, localClip], summary, null)
-    expect(both.placements).toEqual([
-      { offsetSeconds: 30, determined: true, syncWarning: null },
-      { offsetSeconds: 30, determined: true, syncWarning: null },
-    ])
-    // A sole local match stays automatic, so the clips do not agree on an explicit interpretation.
-    expect(both.timezoneMode).toBeNull()
-    expect(resolveVideosSync([utcClip], summary, null).timezoneMode).toBe('utc')
-    expect(resolveVideosSync([localClip], summary, null).timezoneMode).toBeNull()
+    expect(resolveVideoSync(utcClip, summary, null)).toEqual({ offsetSeconds: 30, determined: true, syncWarning: null, timezoneMode: 'utc' })
+    // A sole local match stays automatic.
+    expect(resolveVideoSync(localClip, summary, null)).toEqual({ offsetSeconds: 30, determined: true, syncWarning: null, timezoneMode: null })
   })
 
-  test('an explicit session mode applies to every clip', () => {
-    const first = createTestVideo({ id: 'a', creationTime: '2026-07-18T08:00:30Z', timeSource: 'ffprobe', durationSeconds: 20 })
-    const second = createTestVideo({ id: 'b', creationTime: '2026-07-18T08:01:00Z', timeSource: 'ffprobe', durationSeconds: 20 })
-    const result = resolveVideosSync([first, second], summary, 'utc')
-    expect(result.placements.map(({ offsetSeconds }) => offsetSeconds)).toEqual([30, 60])
-    expect(resolveVideosSync([createTestVideo({ creationTime: null })], summary, 'utc').placements).toEqual([
-      { offsetSeconds: 0, determined: false, syncWarning: 'Could not determine video creation time' },
-    ])
-    expect(result.timezoneMode).toBe('utc')
+  test("a clip's explicit mode is kept", () => {
+    const clip = createTestVideo({ id: 'a', creationTime: '2026-07-18T08:00:30Z', timeSource: 'ffprobe', durationSeconds: 20 })
+    expect(resolveVideoSync(clip, summary, 'utc')).toMatchObject({ offsetSeconds: 30, timezoneMode: 'utc' })
+    expect(resolveVideoSync(createTestVideo({ creationTime: null }), summary, 'utc')).toEqual({
+      offsetSeconds: 0,
+      determined: false,
+      syncWarning: 'Could not determine video creation time',
+      timezoneMode: null,
+    })
   })
 })
 

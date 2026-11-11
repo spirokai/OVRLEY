@@ -269,6 +269,10 @@ struct ProjectVideo {
     /// Places a video whose time cannot be determined next to another video.
     #[serde(deserialize_with = "deserialize_required_option")]
     placement_anchor: Option<ProjectPlacementAnchor>,
+    /// How the video's camera clock time is read against the activity: local time
+    /// or UTC; `None` until it is inferred or chosen.
+    #[serde(deserialize_with = "deserialize_required_option")]
+    timezone_mode: Option<VideoTimezoneMode>,
     /// The video as last loaded. Required in version 6; `None` only for a video
     /// migrated from an older version, which did not store it.
     #[serde(deserialize_with = "deserialize_present")]
@@ -388,7 +392,6 @@ impl Default for ProjectTransitionDefaults {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectSync {
-    video_timezone_mode: Option<VideoTimezoneMode>,
     manual: ProjectManualVideoSync,
 }
 
@@ -1250,6 +1253,7 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
             },
         )]),
         placement_anchor: None,
+        timezone_mode: project.sync.video_timezone_mode,
         metadata: None,
     });
     let manual = project.sync.manual;
@@ -1259,7 +1263,6 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
         saved_at: project.saved_at,
         editor: project.editor,
         sync: ProjectSync {
-            video_timezone_mode: project.sync.video_timezone_mode,
             manual: ProjectManualVideoSync {
                 video_id: video.as_ref().map(|video| video.id.clone()),
                 landmarks: manual.landmarks,
@@ -1894,7 +1897,6 @@ mod tests {
                 "videos": []
             },
             "sync": {
-                "videoTimezoneMode": null,
                 "manual": {
                     "videoId": null,
                     "landmarks": [],
@@ -2120,6 +2122,7 @@ mod tests {
             "cuts": [],
             "segments": { "start": { "excluded": false, "transitionIn": null } },
             "placementAnchor": null,
+            "timezoneMode": null,
             "metadata": {
                 "frameCount": 1800,
                 "fps": { "num": 30, "den": 1 },
@@ -2869,16 +2872,13 @@ mod tests {
         let start = &video.segments[FIRST_SEGMENT_KEY];
         assert!(!start.excluded && start.transition_in.is_none());
         assert!(video.placement_anchor.is_none());
+        assert!(matches!(video.timezone_mode, Some(VideoTimezoneMode::Utc)));
         assert!(video.metadata.is_none());
         assert_eq!(
             parsed.sync.manual.video_id.as_deref(),
             Some(video.id.as_str())
         );
         assert_eq!(parsed.sync.manual.landmarks.len(), 1);
-        assert!(matches!(
-            parsed.sync.video_timezone_mode,
-            Some(VideoTimezoneMode::Utc)
-        ));
         let serialized = serde_json::to_value(&parsed).unwrap();
         assert_eq!(
             serialized["transitionDefaults"],
@@ -2895,7 +2895,16 @@ mod tests {
 
     #[test]
     fn rejects_malformed_v4_video_collection_contracts() {
-        let cases: [(&str, fn(&mut Value)); 37] = [
+        let cases: [(&str, fn(&mut Value)); 39] = [
+            ("missing timezoneMode", |project| {
+                project["sources"]["videos"][0]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("timezoneMode");
+            }),
+            ("unknown timezoneMode", |project| {
+                project["sources"]["videos"][0]["timezoneMode"] = Value::from("gmt");
+            }),
             ("missing placementAnchor", |project| {
                 project["sources"]["videos"][0]
                     .as_object_mut()

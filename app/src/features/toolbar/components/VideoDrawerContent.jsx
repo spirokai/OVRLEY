@@ -1,12 +1,12 @@
 import { Fragment } from 'react'
-import { AlertTriangle, Film, FolderSearch, Scissors, Trash2 } from 'lucide-react'
+import { AlertTriangle, Clock3, Film, FolderSearch, RefreshCw, Scissors, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { SecondsInput } from '@/components/ui/seconds-input'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { JoinTransitionControl } from '@/features/transitions'
-import { VideoSyncControls } from '@/features/video-sync'
 import { cn } from '@/lib/utils'
 import { useFileDropZone } from '../hooks/useFileDropZone'
 import { useSelectedVideoRow } from '../hooks/useSelectedVideoRow'
@@ -96,9 +96,58 @@ function SegmentList({ segments, exits, clipId, filename }) {
   )
 }
 
-function SelectedVideoDetails({ row }) {
+/** Field label of the drawer's two-column rows; `pl-0` drops the label primitive's padding so every label starts at the grid's edge. */
+const FIELD_LABEL = 'flex min-h-8 items-center pl-0 text-xs font-bold text-muted-foreground'
+
+/** Sync of one video: its start on the timeline, automatic sync, and how its recording time is read. */
+function VideoSyncSection({ row }) {
   const { t } = useTranslation()
   const offsetInputId = `video-offset-${row.id}`
+  const timezoneInputId = `video-timezone-${row.id}`
+  return (
+    <section className="space-y-3" aria-label={t('toolbar.syncTheVideo', 'Sync the video')}>
+      <SectionHeading icon={Clock3} title={t('toolbar.syncTheVideo', 'Sync the video')} variant="drawer" />
+      <div className="grid grid-cols-2 items-start gap-x-4.5 gap-y-3 px-2">
+        <Label htmlFor={offsetInputId} className={FIELD_LABEL}>
+          {t('toolbar.videoStart', 'Start on timeline')}
+        </Label>
+        <SecondsInput id={offsetInputId} value={row.offsetSeconds} fps={row.offsetFps} signed onCommit={row.onOffsetCommit} className="h-8 text-xs" />
+        <span className={FIELD_LABEL}>{t('toolbar.creationTime', 'Creation Time')}</span>
+        <Tabs value={row.creationTimeSource} onValueChange={row.onCreationTimeSourceChange}>
+          <TabsList variant="toolbar" className="grid h-8 w-full grid-cols-2 p-0.5">
+            <TabsTrigger variant="toolbar" value="detected" className="h-full px-2 text-[0.7rem]">
+              {t('toolbar.detected', 'Detected')}
+            </TabsTrigger>
+            <TabsTrigger variant="toolbar" value="filename" className="h-full px-2 text-[0.7rem]" disabled={!row.filenameCreationTimeAvailable}>
+              {t('toolbar.filename', 'Filename')}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        {row.timezone !== null ? (
+          <>
+            <Label htmlFor={timezoneInputId} className={FIELD_LABEL}>
+              {t('toolbar.applyTimezone', 'Apply Timezone')}
+            </Label>
+            <div className="flex min-h-8 items-center">
+              <Switch
+                id={timezoneInputId}
+                checked={row.appliesTimezone}
+                disabled={row.timezoneDisabled}
+                onCheckedChange={row.onAppliesTimezoneChange}
+              />
+            </div>
+          </>
+        ) : null}
+        <Button type="button" variant="secondary" className="col-span-2 w-full gap-2" onClick={row.onSync}>
+          <RefreshCw className="size-4" /> {t('toolbar.syncTheVideo', 'Sync the video')}
+        </Button>
+      </div>
+    </section>
+  )
+}
+
+function SelectedVideoDetails({ row }) {
+  const { t } = useTranslation()
 
   return (
     <section className="space-y-4" aria-label={row.filename}>
@@ -139,26 +188,7 @@ function SelectedVideoDetails({ row }) {
           </Button>
         </div>
       ) : null}
-      <div className="grid grid-cols-2 items-start gap-4 px-2">
-        <Label htmlFor={offsetInputId} className="flex min-h-8 items-center text-xs font-bold text-muted-foreground">
-          {t('toolbar.videoStart', 'Start on timeline')}
-        </Label>
-        <SecondsInput
-          id={offsetInputId}
-          value={row.offsetSeconds}
-          fps={row.offsetFps}
-          signed
-          onCommit={row.onOffsetCommit}
-          reset={{
-            isManual: row.offsetIsManual,
-            onReset: row.onOffsetReset,
-            label: t('toolbar.resetVideoStart', { defaultValue: 'Place {{name}} automatically again', name: row.filename }),
-            manualHint: t('toolbar.resetVideoStartHint', 'Set by hand. Click to place it by its recording time again.'),
-            autoHint: t('toolbar.videoStartAutoHint', 'Placed automatically. Type a time to set it by hand.'),
-          }}
-          className="h-8 text-xs"
-        />
-      </div>
+      <VideoSyncSection row={row} />
       <SectionHeading icon={Film} title={t('toolbar.details', 'Details')} variant="drawer" />
       <dl className="grid grid-cols-2 gap-x-4.5 gap-y-1.5 px-2 text-xs">
         {row.metadataRows.map((metadataRow) => (
@@ -178,9 +208,8 @@ function SelectedVideoDetails({ row }) {
 }
 
 /**
- * Renders the video import controls, the session's video sync settings, and the
- * details of the selected video clip; the video panel holds the video list and the
- * default transitions.
+ * Renders the video import controls and the details of the selected video clip,
+ * including its sync; the video panel holds the video list and the default transitions.
  *
  * @param {object} props - Component props.
  * @param {boolean} props.hasVideos - Whether the project has videos.
@@ -188,18 +217,12 @@ function SelectedVideoDetails({ row }) {
  * @param {(videoId: string) => void} props.onRemoveVideo - Removes one imported video.
  * @param {(videoId: string) => void} props.onLocateVideo - Asks for the file of a missing video.
  * @param {(selections: Array<File|string>) => void} props.onDropVideoFiles - Imports dropped video files or native paths.
- * @param {object} props.videoSync - Video sync state and handlers; its timezone also shows recording times.
  * @returns {JSX.Element} Rendered drawer content.
  */
-export function VideoDrawerContent({ hasVideos, onBrowseVideo, onRemoveVideo, onLocateVideo, onDropVideoFiles, videoSync }) {
+export function VideoDrawerContent({ hasVideos, onBrowseVideo, onRemoveVideo, onLocateVideo, onDropVideoFiles }) {
   const { t } = useTranslation()
   const { dragPosition, dropZoneProps, dropZoneRef, isDraggingFile, isOverDropZone } = useFileDropZone(onDropVideoFiles)
-  const row = useSelectedVideoRow({
-    timezone: videoSync.timezone,
-    videoSyncTimezoneMode: videoSync.videoSyncTimezoneMode,
-    onRemoveVideo,
-    onLocateVideo,
-  })
+  const row = useSelectedVideoRow({ onRemoveVideo, onLocateVideo })
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-4 thin-scrollbar" data-keeps-clip-selection>
@@ -220,7 +243,6 @@ export function VideoDrawerContent({ hasVideos, onBrowseVideo, onRemoveVideo, on
 
       {hasVideos ? (
         <div className="mt-10 space-y-8 border-t border-border/80 pt-6">
-          {videoSync.activitySummary ? <VideoSyncControls {...videoSync} /> : null}
           {row !== null ? (
             <SelectedVideoDetails row={row} />
           ) : (

@@ -21,7 +21,6 @@ export function useVideoSyncControls() {
     useShallow((state) => ({
       importedVideos: state.importedVideos,
       videoEdits: state.videoEdits,
-      videoSyncTimezoneMode: state.videoSyncTimezoneMode,
       parsedActivity: state.parsedActivity,
       activitySummary: state.activitySummary,
     })),

@@ -7,6 +7,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import { videoIdFromLaneId } from '@/features/player/utils/timelineGeometry'
+import { parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { useJoinTransitionModels } from '@/features/transitions'
 import { useVideoTimeline, useVideoWarnings } from '@/hooks/useVideoTimeline'
 import { filenameFromSelectedPath } from '@/lib/file-dialog'
@@ -16,28 +17,40 @@ import { buildVideoDrawerViewModel } from '../utils/videoDrawerUtils'
 import { buildVideoSegmentRows, groupVideoJoins } from '../utils/videoSegmentRows'
 
 /**
- * Returns the selected clip's row: details, its own timeline offset, warnings, its
- * parts with their export state and transitions, its transitions into the next video
- * (shown at its end, where the timeline draws them), removal, and for a missing video
- * the command that locates its file. Editing the offset moves only that clip.
+ * Returns the selected clip's row: details, warnings, its sync (timeline offset, automatic
+ * sync, where its recording time comes from, and how its camera clock is read), its parts
+ * with their export state and transitions, its transitions into the next video (shown at
+ * its end, where the timeline draws them), removal, and for a missing video the command
+ * that locates its file. Every command acts on that clip only.
  *
  * @param {object} options Row inputs.
- * @param {string|null} options.timezone Activity timezone used to display creation times.
- * @param {'local'|'utc'|null} options.videoSyncTimezoneMode Session timezone interpretation.
  * @param {(videoId: string) => void} options.onRemoveVideo Removes one clip from the project.
  * @param {(videoId: string) => void} options.onLocateVideo Asks for the file of a missing video.
  * @returns {object|null} Presentational row, or null when no video is selected.
  */
-export function useSelectedVideoRow({ timezone, videoSyncTimezoneMode, onRemoveVideo, onLocateVideo }) {
+export function useSelectedVideoRow({ onRemoveVideo, onLocateVideo }) {
   const { t } = useTranslation()
   const warnings = useVideoWarnings()
   const { clips, program } = useVideoTimeline()
   const joinModels = useJoinTransitionModels({ clips, program })
-  const { selectedVideoId, setVideoOffset, resetVideoOffset, setVideoSegmentExcluded, requestCutRemoval, commitPreviewScrub } = useStore(
+  const {
+    selectedVideoId,
+    timezone,
+    setVideoOffset,
+    resetVideoOffset,
+    setVideoCreationTimeSource,
+    setVideoTimezoneMode,
+    setVideoSegmentExcluded,
+    requestCutRemoval,
+    commitPreviewScrub,
+  } = useStore(
     useShallow((state) => ({
       selectedVideoId: state.selectedClip === null ? null : videoIdFromLaneId(state.selectedClip.laneId),
+      timezone: state.parsedActivity?.metadata?.timezone ?? null,
       setVideoOffset: state.setVideoOffset,
       resetVideoOffset: state.resetVideoOffset,
+      setVideoCreationTimeSource: state.setVideoCreationTimeSource,
+      setVideoTimezoneMode: state.setVideoTimezoneMode,
       setVideoSegmentExcluded: state.setVideoSegmentExcluded,
       requestCutRemoval: state.requestCutRemoval,
       commitPreviewScrub: state.commitPreviewScrub,
@@ -55,14 +68,22 @@ export function useSelectedVideoRow({ timezone, videoSyncTimezoneMode, onRemoveV
       filename: filenameFromSelectedPath(clip.path),
       path: clip.path,
       missing: clip.missing,
-      metadataRows: buildVideoDrawerViewModel(clip, timezone, videoSyncTimezoneMode, t).metadataRows,
+      metadataRows: buildVideoDrawerViewModel(clip, timezone, clip.timezoneMode, t).metadataRows,
       // The start snaps to the clip's own frames.
       offsetSeconds: clip.offsetSeconds,
       offsetFps: clip.fps,
-      offsetIsManual: clip.offsetSource === 'manual',
       warnings: warnings.get(clip.id).map((warning) => formatVideoWarning(warning, t)),
       onOffsetCommit: (seconds) => setVideoOffset(clip.id, seconds),
-      onOffsetReset: () => resetVideoOffset(clip.id),
+      // Syncing places the clip by its detected recording time again, also after it was set by hand.
+      onSync: () => resetVideoOffset(clip.id),
+      creationTimeSource: clip.timeSource === 'filename' ? 'filename' : 'detected',
+      filenameCreationTimeAvailable: parseVideoFilenameCreationTime(clip.path) !== null,
+      onCreationTimeSourceChange: (source) => setVideoCreationTimeSource(clip.id, source),
+      // Apply Timezone needs the activity's timezone; a filename timestamp is always local time.
+      timezone,
+      appliesTimezone: clip.timezoneMode === 'utc',
+      timezoneDisabled: clip.timeSource === 'filename',
+      onAppliesTimezoneChange: (applies) => setVideoTimezoneMode(clip.id, applies ? 'utc' : 'local'),
       onRemove: () => onRemoveVideo(clip.id),
       onLocate: clip.missing ? () => onLocateVideo(clip.id) : null,
       segments: buildVideoSegmentRows({ clip, joinModels, partJoinKeys, commands }),
@@ -83,11 +104,12 @@ export function useSelectedVideoRow({ timezone, videoSyncTimezoneMode, onRemoveV
     requestCutRemoval,
     resetVideoOffset,
     selectedVideoId,
+    setVideoCreationTimeSource,
     setVideoOffset,
     setVideoSegmentExcluded,
+    setVideoTimezoneMode,
     t,
     timezone,
-    videoSyncTimezoneMode,
     warnings,
   ])
 }

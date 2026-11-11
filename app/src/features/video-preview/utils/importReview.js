@@ -12,7 +12,7 @@ import {
   findUndeterminedVideoIds,
   moveVideoNextTo,
   removeVideo,
-  setVideoSyncTimezoneMode,
+  setVideosTimezoneMode,
 } from '@/lib/video-program/collection-edits'
 import { findCombinedExportIssues } from '@/lib/video-program/combined-export'
 import { buildProgram } from '@/lib/video-program/program'
@@ -255,7 +255,7 @@ export function chooseTimezoneMode(collection) {
     })
     return clips.filter((clip) => !undeterminedIds.has(clip.id) && !farIds.has(clip.id)).length
   }
-  const [local, utc] = ['local', 'utc'].map((mode) => produce(collection, (draft) => setVideoSyncTimezoneMode(draft, mode)))
+  const [local, utc] = ['local', 'utc'].map((mode) => produce(collection, (draft) => setVideosTimezoneMode(draft, mode)))
   const [localCount, utcCount] = [nearCount(local), nearCount(utc)]
   if (localCount === utcCount) return collection
   return localCount > utcCount ? local : utc

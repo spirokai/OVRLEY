@@ -100,20 +100,20 @@ function isAmbiguousTimeSource(timeSource) {
  * A clip outside the activity keeps its signed offset and reports that it has no activity coverage.
  * @param {object} video Imported video entity.
  * @param {object} activitySummary External activity summary.
- * @param {'utc'|'local'|null} sessionMode Explicit Apply Timezone selection, or null to infer.
+ * @param {'utc'|'local'|null} timezoneMode The clip's Apply Timezone selection, or null to infer it.
  * @returns {{offsetSeconds: number, determined: boolean, syncWarning: string|null, timezoneMode: 'utc'|'local'|null}} Clip sync
  *   result; `determined` is false when the clip's time could not be resolved against the activity.
  */
-export function resolveVideoSync(video, activitySummary, sessionMode) {
-  const mode = captureVideoSyncTimezoneMode(sessionMode)
+export function resolveVideoSync(video, activitySummary, timezoneMode) {
+  const mode = captureVideoSyncTimezoneMode(timezoneMode)
   const ambiguous = isAmbiguousTimeSource(video.timeSource)
-  const inferMode = ambiguous && sessionMode === null
+  const inferMode = ambiguous && timezoneMode === null
   const modes = inferMode ? ['local', 'utc'] : [mode]
   try {
-    const candidates = modes.map((timezoneMode) => {
-      const { automaticOffsetSeconds, activityDurationSeconds } = calculateAutomaticVideoOffset(video, activitySummary, timezoneMode)
+    const candidates = modes.map((candidateMode) => {
+      const { automaticOffsetSeconds, activityDurationSeconds } = calculateAutomaticVideoOffset(video, activitySummary, candidateMode)
       return {
-        timezoneMode,
+        timezoneMode: candidateMode,
         automaticOffsetSeconds,
         overlaps: videoOverlapsActivity({
           videoStart: automaticOffsetSeconds,
@@ -139,29 +139,6 @@ export function resolveVideoSync(video, activitySummary, sessionMode) {
       syncWarning: i18next.t(error.translationKey, error.message),
       timezoneMode: null,
     }
-  }
-}
-
-/**
- * Resolves automatic synchronization for every clip against one external activity.
- * An explicit session mode applies to all clips. Without one, each ambiguous clip
- * infers its own interpretation; the session adopts one only when every ambiguous
- * clip settled on the same explicit interpretation (a sole local match stays automatic).
- * @param {Array<object>} videos Imported video entities.
- * @param {object} activitySummary External activity summary.
- * @param {'utc'|'local'|null} sessionMode Explicit Apply Timezone selection, or null to infer.
- * @returns {{placements: Array<{offsetSeconds: number, determined: boolean, syncWarning: string|null}>, timezoneMode: 'utc'|'local'|null}}
- *   Placements in input order and the resulting session mode.
- */
-export function resolveVideosSync(videos, activitySummary, sessionMode) {
-  const results = videos.map((video) => resolveVideoSync(video, activitySummary, sessionMode))
-  const ambiguousModes = results.filter((_, index) => isAmbiguousTimeSource(videos[index].timeSource)).map(({ timezoneMode }) => timezoneMode)
-  let timezoneMode = null
-  if (sessionMode !== null) timezoneMode = ambiguousModes.length > 0 ? sessionMode : null
-  else if (ambiguousModes.length > 0 && ambiguousModes.every((mode) => mode !== null && mode === ambiguousModes[0])) timezoneMode = ambiguousModes[0]
-  return {
-    placements: results.map(({ offsetSeconds, determined, syncWarning }) => ({ offsetSeconds, determined, syncWarning })),
-    timezoneMode,
   }
 }
 

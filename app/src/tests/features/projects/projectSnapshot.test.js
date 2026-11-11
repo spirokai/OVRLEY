@@ -48,6 +48,7 @@ describe('project snapshot contract', () => {
           cuts: [],
           segments: { start: { excluded: false, transitionIn: null } },
           placementAnchor: null,
+          timezoneMode: null,
           metadata: {
             frameCount: 3000,
             fps: { num: 30, den: 1 },

@@ -30,7 +30,6 @@ export default function useProjectDocumentState() {
       rendererBusy: isRendererBusy(state),
       transitionDefaults: state.transitionDefaults,
       videoEdits: state.videoEdits,
-      videoSyncTimezoneMode: state.videoSyncTimezoneMode,
       manualVideoSync: state.manualVideoSync,
     })),
   )

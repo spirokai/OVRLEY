@@ -30,7 +30,6 @@ test('project restoration changes only project-owned settings', () => {
       },
       sources: { activity: null, videos: [projectVideo('canonical-video', 20)] },
       sync: {
-        videoTimezoneMode: 'utc',
         manual: { videoId: 'canonical-video', landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
@@ -86,6 +85,7 @@ function projectVideo(id, offsetSeconds, edits = {}) {
     cuts: [],
     segments: { start: { excluded: false, transitionIn: null } },
     placementAnchor: null,
+    timezoneMode: null,
     ...edits,
   }
 }
@@ -98,7 +98,6 @@ function createProject({ videos, manual = {}, timeline = { playheadSecond: 0, vi
     },
     sources: { activity: null, videos },
     sync: {
-      videoTimezoneMode: null,
       manual: {
         videoId: videos[0]?.id ?? null,
         landmarks: [],
@@ -138,6 +137,7 @@ test('saved edits of every loaded video are restored and checked against the pro
       cuts: [cut],
       segments,
       placementAnchor: { videoId: 'clip-a', side: 'after' },
+      timezoneMode: 'utc',
     }),
   ]
 
@@ -149,6 +149,7 @@ test('saved edits of every loaded video are restored and checked against the pro
       cuts: [],
       segments: { start: { excluded: false, transitionIn: null } },
       placementAnchor: null,
+      timezoneMode: null,
     },
     'clip-b': {
       offsetSeconds: 70,
@@ -156,6 +157,7 @@ test('saved edits of every loaded video are restored and checked against the pro
       cuts: [cut],
       segments,
       placementAnchor: { videoId: 'clip-a', side: 'after' },
+      timezoneMode: 'utc',
     },
   })
   expect(edits['clip-b'].cuts[0]).not.toBe(cut)
@@ -219,7 +221,7 @@ test('a loaded project keeps its saved placements although the activity is activ
 
   applyPreparedProjectState(useStore, project, {
     activity: { source: { path: 'C:\\ride.fit' }, parsedActivity: activity },
-    collection: { importedVideos: [video], videoEdits: createProjectVideoEdits([video], project.sources.videos), videoSyncTimezoneMode: null },
+    collection: { importedVideos: [video], videoEdits: createProjectVideoEdits([video], project.sources.videos) },
     manualVideoSync: createProjectManualVideoSync([video], project.sync.manual),
   })
 

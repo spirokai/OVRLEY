@@ -1,7 +1,6 @@
 import { getActivityDurationSeconds } from '@/lib/activity/activity-summary'
 import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
 import { selectVideoTimeline } from '@/lib/video-program/timeline'
-import { captureVideoSyncTimezoneMode } from '@/lib/video-sync'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { clamp } from '@/lib/utils'
 import { validateRenderSettings } from '@/store/slices/createRenderSettingsSlice'
@@ -85,7 +84,7 @@ export function captureBatchSync(editorSnapshot) {
   const hasExternalActivity = editorSnapshot.parsedActivity !== null
   const activitySummary = hasExternalActivity ? editorSnapshot.activitySummary : null
   if (hasExternalActivity && activitySummary === null) throw new Error('External activity summary is required for batch synchronization')
-  return { activitySummary, timezoneMode: captureVideoSyncTimezoneMode(editorSnapshot.videoSyncTimezoneMode) }
+  return { activitySummary }
 }
 
 /**

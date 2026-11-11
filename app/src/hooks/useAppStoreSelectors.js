@@ -179,7 +179,6 @@ export function useBatchSyncInputs() {
       parsedActivity: state.parsedActivity,
       importedVideos: state.importedVideos,
       videoEdits: state.videoEdits,
-      videoSyncTimezoneMode: state.videoSyncTimezoneMode,
       transitionDefaults: state.transitionDefaults,
       availableCodecs: state.availableCodecs,
     })),

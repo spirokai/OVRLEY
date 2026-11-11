@@ -9,8 +9,10 @@ import {
   placeAutomaticVideos,
   removeVideo,
   resetVideoOffset,
+  setVideoCreationTimeSource,
   setVideoOffset,
-  setVideoSyncTimezoneMode,
+  setVideosTimezoneMode,
+  setVideoTimezoneMode,
   shiftVideoOffsets,
 } from '@/lib/video-program/collection-edits'
 import { createTestVideo } from '@/tests/helpers/videoFixtures'
@@ -31,7 +33,6 @@ function collection(activity = null) {
   return {
     importedVideos: [],
     videoEdits: {},
-    videoSyncTimezoneMode: null,
     parsedActivity: activity,
     activitySummary: activity === null ? null : createActivitySummary(activity),
   }
@@ -70,20 +71,57 @@ describe('placement', () => {
     expect(warnings(state)).toEqual({ inside: null, before: 'Video is outside the activity' })
   })
 
-  test('ambiguous camera clocks infer a timezone and an explicit selection places every clip again', () => {
-    // Moscow (UTC+3): 10:51 clock text fits as local and as UTC.
-    const wideActivity = {
-      ...activityFile,
-      sync_time: '2026-07-18T07:20:03.000Z',
-      metadata: { ...activityFile.metadata, end_time: '2026-07-18T11:20:03.000Z', timezone: 'Europe/Moscow' },
-    }
-    let state = apply(collection(wideActivity), addVideos, [clip('video', { creationTime: '2026-07-18T10:51:00.000000Z', timeSource: 'ffprobe' })])
-    expect(offsets(state)).toEqual({ video: 1857 })
-    expect(state.videoSyncTimezoneMode).toBe('local')
+  // Moscow (UTC+3): 10:51 clock text fits as local and as UTC.
+  const wideActivity = {
+    ...activityFile,
+    sync_time: '2026-07-18T07:20:03.000Z',
+    metadata: { ...activityFile.metadata, end_time: '2026-07-18T11:20:03.000Z', timezone: 'Europe/Moscow' },
+  }
+  const cameraClock = { creationTime: '2026-07-18T10:51:00.000000Z', timeSource: 'ffprobe' }
 
-    state = apply(state, setVideoSyncTimezoneMode, 'utc')
+  test('ambiguous camera clocks infer a timezone and selecting one for every clip places them again', () => {
+    let state = apply(collection(wideActivity), addVideos, [clip('video', cameraClock)])
+    expect(offsets(state)).toEqual({ video: 1857 })
+    expect(state.videoEdits.video.timezoneMode).toBe('local')
+
+    state = apply(state, setVideosTimezoneMode, 'utc')
     expect(offsets(state)).toEqual({ video: 12657 })
-    expect(state.videoSyncTimezoneMode).toBe('utc')
+    expect(state.videoEdits.video.timezoneMode).toBe('utc')
+  })
+
+  test("one clip's timezone mode places only that clip again", () => {
+    let state = apply(collection(wideActivity), addVideos, [clip('first', cameraClock), clip('second', { ...cameraClock, importOrder: 1 })])
+    state = apply(state, setVideoTimezoneMode, 'second', 'utc')
+    expect(offsets(state)).toEqual({ first: 1857, second: 12657 })
+    expect(state.videoEdits.first.timezoneMode).toBe('local')
+    expect(state.videoEdits.second.timezoneMode).toBe('utc')
+  })
+
+  test("one clip's recording time comes from its filename, read as local time, or from detection", () => {
+    const named = clip('named', { ...cameraClock, path: '/videos/GX_20260718_090000.mp4' })
+    let state = apply(collection(wideActivity), addVideos, [named, clip('other', { ...cameraClock, importOrder: 1 })])
+    state = apply(state, setVideoTimezoneMode, 'named', 'utc')
+
+    state = apply(state, setVideoCreationTimeSource, 'named', 'filename')
+    expect(state.importedVideos[0]).toMatchObject({ timeSource: 'filename' })
+    expect(state.videoEdits.named.timezoneMode).toBe('local')
+    // 09:00 Moscow time is 06:00Z, before the activity starts at 07:20:03Z.
+    expect(offsets(state)).toEqual({ named: -4803, other: 1857 })
+
+    state = apply(state, setVideoCreationTimeSource, 'named', 'detected')
+    expect(state.importedVideos[0]).toMatchObject({ creationTime: cameraClock.creationTime, timeSource: 'ffprobe' })
+    expect(offsets(state)).toEqual({ named: 1857, other: 1857 })
+    expect(() => apply(state, setVideoCreationTimeSource, 'other', 'filename')).toThrow('no valid YYYYMMDD_HHMMSS timestamp')
+  })
+
+  test('a clip placed by hand keeps its start when its recording time changes, until it is synced', () => {
+    let state = apply(collection(wideActivity), addVideos, [clip('video', cameraClock)])
+    state = apply(state, setVideoOffset, 'video', 100)
+    state = apply(state, setVideoTimezoneMode, 'video', 'utc')
+    expect(offsets(state)).toEqual({ video: 100 })
+
+    state = apply(state, resetVideoOffset, 'video')
+    expect(offsets(state)).toEqual({ video: 12657 })
   })
 })
 
@@ -184,7 +222,7 @@ describe('starts set by hand', () => {
     state = apply(state, shiftVideoOffsets, 5)
     expect(offsets(state)).toEqual({ first: 15, second: 75 })
 
-    state = apply(state, setVideoSyncTimezoneMode, 'utc')
+    state = apply(state, setVideosTimezoneMode, 'utc')
     expect(offsets(state)).toEqual({ first: 10, second: 75 })
   })
 

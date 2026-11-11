@@ -31,8 +31,8 @@ function offsets() {
 
 /** Imports videos the way the import dialog does: placed in a draft of the collection, then committed. */
 function importVideos(videos) {
-  const { importedVideos, videoEdits, videoSyncTimezoneMode, parsedActivity, activitySummary } = useStore.getState()
-  const draft = produce({ importedVideos, videoEdits, videoSyncTimezoneMode, parsedActivity, activitySummary }, (collection) => {
+  const { importedVideos, videoEdits, parsedActivity, activitySummary } = useStore.getState()
+  const draft = produce({ importedVideos, videoEdits, parsedActivity, activitySummary }, (collection) => {
     addVideos(collection, videos)
   })
   useStore.getState().commitVideoCollection(draft)

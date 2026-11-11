@@ -131,7 +131,6 @@ function App() {
           onRemoveVideo={videoControls.removeVideo}
           onLocateVideo={videoControls.locateVideo}
           onDropVideoFiles={videoControls.handleVideoFilesDrop}
-          videoSync={videoSync}
         />
       )
     } else if (toolbarDrawer.activeTool === VIDEO_SYNC_TOOL) {

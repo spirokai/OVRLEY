@@ -113,7 +113,7 @@ function formatCreationLabels(clip, sync, locale) {
       clip.creationTime,
       clip.timeSource,
       sync.activitySummary?.timezone ?? null,
-      sync.timezoneMode,
+      clip.timezoneMode,
       locale,
     ).split(/(?=\d{2}:\d{2}:\d{2}$)/)
     return { creationDateLabel: creationDateLabel.trimEnd(), creationTimeLabel }
@@ -130,7 +130,7 @@ function formatCreationLabels(clip, sync, locale) {
  * @param {Map<string, Array<object>>} piecesByVideo Program pieces of each video after the export range.
  * @param {Object<string, boolean>} skipOverlay Video IDs that render without activity widgets.
  * @param {object|null} inspection Current native descriptors keyed by path.
- * @param {object} sync Activity summary and display timezone mode.
+ * @param {object} sync Activity summary.
  * @param {string} locale Display language.
  * @returns {object[]} Reviewed rows keyed by video ID.
  */

@@ -141,7 +141,6 @@ function editorState() {
       'videoDragPreview',
       'selectedSecond',
       'timelineViewport',
-      'videoSyncTimezoneMode',
       'manualVideoSync',
       'startSecond',
       'endSecond',
@@ -179,7 +178,6 @@ beforeEach(() => {
     parsedActivity: { sample_elapsed_seconds: [0, 3600] },
     activitySummary: { syncTime: '2026-10-05T12:00:00Z', endTime: '2026-10-05T13:00:00Z', timezone: 'UTC', durationSeconds: 3600 },
     videoDragPreview: { videoId: 'reference', deltaSeconds: 123 },
-    videoSyncTimezoneMode: 'utc',
     selectedSecond: 27,
     timelineViewport: { viewStart: 20, viewEnd: 40 },
     availableCodecs: { libx264: true },
@@ -363,7 +361,6 @@ describe('native batch workflow', () => {
     )
     act(() => {
       setOffset('reference', -8)
-      useStore.setState({ videoSyncTimezoneMode: 'local' })
     })
     expect(result.current.batchReady).toBe(false)
     await act(async () => result.current.runBatch())
@@ -372,11 +369,10 @@ describe('native batch workflow', () => {
     await waitFor(() => expect(result.current.batchReady).toBe(true))
     const added = createTestVideo({ id: 'added', path: `${folder}/added.mp4`, durationSeconds: 60, importOrder: 3 })
     act(() => {
-      const { importedVideos, videoEdits, videoSyncTimezoneMode } = useStore.getState()
+      const { importedVideos, videoEdits } = useStore.getState()
       useStore.getState().commitVideoCollection({
         importedVideos: [...importedVideos, added],
         videoEdits: { ...videoEdits, added: createVideoEdits() },
-        videoSyncTimezoneMode,
       })
     })
     await waitFor(() => expect(result.current.batchReady).toBe(true))

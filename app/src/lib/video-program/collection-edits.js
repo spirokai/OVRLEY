@@ -1,19 +1,20 @@
 /**
  * Edits of the imported-video collection, shared by the store and the import
  * dialog's draft. Each recipe mutates an Immer draft of the collection
- * `{ importedVideos, videoEdits, videoSyncTimezoneMode, parsedActivity, activitySummary }`.
+ * `{ importedVideos, videoEdits, parsedActivity, activitySummary }`.
  *
  * Placement: an `auto` clip follows its detected recording time (against the
  * external activity, otherwise relative to the earliest clip) plus the shared
  * correction of the collection; a clip whose time cannot be determined sits next
- * to its placement anchor. A `manual` clip keeps the start set by hand when times
+ * to its placement anchor. Each clip has its own Apply Timezone mode (`timezoneMode`
+ * of its edits): how its camera clock is read against the activity. A `manual` clip keeps the start set by hand when times
  * are detected again. Shifts move every clip and keep their relative placement.
  *
  * Cuts and segments: see `video-segments`.
  */
 
 import { parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
-import { placeVideosByCreationTime, resolveVideosSync } from '@/lib/video-sync'
+import { placeVideosByCreationTime, resolveVideoSync } from '@/lib/video-sync'
 import { createVideoEdits } from './imported-video'
 import { requireTransition } from './transition-catalog'
 import { joinVideoEdits, sortVideosByTimeline } from './video-collection'
@@ -45,13 +46,21 @@ function requireFiniteOffset(seconds, label) {
 
 /**
  * Detects the placement of every given clip: against the external activity when
- * one is loaded, otherwise at detected real time relative to the earliest clip.
- * @returns {{placements: Array<{offsetSeconds: number, determined: boolean, syncWarning: string|null}>, timezoneMode: 'utc'|'local'|null}}
- *   Placements in input order and the resulting session timezone mode.
+ * one is loaded (each clip read in its own timezone mode), otherwise at detected
+ * real time relative to the earliest clip.
+ * @returns {Array<{offsetSeconds: number, determined: boolean, syncWarning: string|null, timezoneMode: 'utc'|'local'|null}>}
+ *   Placements in input order, each with the timezone mode its clip settles on.
  */
 function detectVideoPlacements(collection, videos) {
-  if (collection.parsedActivity === null) return { placements: placeVideosByCreationTime(videos), timezoneMode: null }
-  return resolveVideosSync(videos, collection.activitySummary, collection.videoSyncTimezoneMode)
+  if (collection.parsedActivity === null) return placeVideosByCreationTime(videos).map((placement) => ({ ...placement, timezoneMode: null }))
+  return videos.map((video) => resolveVideoSync(video, collection.activitySummary, collection.videoEdits[video.id].timezoneMode))
+}
+
+/** Moves a clip to its detected placement, which also settles its timezone mode. */
+function applyPlacement(draft, videoId, placement, offsetSeconds) {
+  findVideo(draft, videoId).syncWarning = placement.syncWarning
+  draft.videoEdits[videoId].offsetSeconds = offsetSeconds
+  if (placement.determined) draft.videoEdits[videoId].timezoneMode = placement.timezoneMode
 }
 
 /**
@@ -60,7 +69,7 @@ function detectVideoPlacements(collection, videos) {
  * @returns {Set<string>} Video IDs.
  */
 export function findUndeterminedVideoIds(collection) {
-  const { placements } = detectVideoPlacements(collection, collection.importedVideos)
+  const placements = detectVideoPlacements(collection, collection.importedVideos)
   return new Set(collection.importedVideos.filter((_, index) => !placements[index].determined).map((video) => video.id))
 }
 
@@ -91,7 +100,7 @@ function placeAtAnchors(draft, videoIds, follows = (videoId) => draft.videoEdits
  * @returns {Array<string>} IDs of the placed clips whose time could not be determined, in input order.
  */
 function placeLikeTheCollection(draft, videoIds) {
-  const { placements, timezoneMode } = detectVideoPlacements(draft, draft.importedVideos)
+  const placements = detectVideoPlacements(draft, draft.importedVideos)
   const placementsById = new Map(draft.importedVideos.map((video, index) => [video.id, placements[index]]))
   const placed = new Set(videoIds)
   const references = sortVideosByTimeline(joinVideoEdits(draft.importedVideos, draft.videoEdits)).filter(
@@ -101,10 +110,8 @@ function placeLikeTheCollection(draft, videoIds) {
   const correctionSeconds = reference ? reference.offsetSeconds - placementsById.get(reference.id).offsetSeconds : 0
   for (const videoId of videoIds) {
     const placement = placementsById.get(videoId)
-    findVideo(draft, videoId).syncWarning = placement.syncWarning
-    draft.videoEdits[videoId].offsetSeconds = placement.determined ? placement.offsetSeconds + correctionSeconds : placement.offsetSeconds
+    applyPlacement(draft, videoId, placement, placement.determined ? placement.offsetSeconds + correctionSeconds : placement.offsetSeconds)
   }
-  draft.videoSyncTimezoneMode = timezoneMode
   return videoIds.filter((videoId) => !placementsById.get(videoId).determined)
 }
 
@@ -188,7 +195,7 @@ export function moveVideoNextTo(draft, videoId, anchorVideoId, side) {
  */
 export function placeAutomaticVideos(draft) {
   if (draft.importedVideos.length === 0) return
-  const { placements, timezoneMode } = detectVideoPlacements(draft, draft.importedVideos)
+  const placements = detectVideoPlacements(draft, draft.importedVideos)
   const anchored = new Set()
   draft.importedVideos.forEach((video, index) => {
     const edits = draft.videoEdits[video.id]
@@ -197,15 +204,13 @@ export function placeAutomaticVideos(draft) {
       if (edits.placementAnchor !== null) anchored.add(video.id)
       return
     }
-    edits.offsetSeconds = placements[index].offsetSeconds
-    video.syncWarning = placements[index].syncWarning
+    applyPlacement(draft, video.id, placements[index], placements[index].offsetSeconds)
   })
   // Anchored clips are placed from the ones anchored to placed clips (anchors never form cycles).
   const roots = [...anchored].filter((videoId) => !anchored.has(draft.videoEdits[videoId].placementAnchor.videoId))
   const placed = placeAtAnchors(draft, roots, (videoId) => anchored.has(videoId))
   if (placed.length !== anchored.size) throw new Error('Video placement anchors must reference imported videos')
   for (const videoId of placed) findVideo(draft, videoId).syncWarning = null
-  draft.videoSyncTimezoneMode = timezoneMode
 }
 
 /** Sets one clip's start by hand; detecting times again keeps it. */
@@ -220,13 +225,22 @@ export function setVideoOffset(draft, videoId, seconds) {
 /** Returns a clip set by hand to automatic placement: next to its anchor, or by detected time like the collection. */
 export function resetVideoOffset(draft, videoId) {
   findVideo(draft, videoId)
-  const edits = draft.videoEdits[videoId]
-  edits.offsetSource = 'auto'
+  draft.videoEdits[videoId].offsetSource = 'auto'
+  placeVideo(draft, videoId)
+}
+
+/** Places one automatic clip by detected time like the collection, or next to its anchor when its time cannot be determined. */
+function placeVideo(draft, videoId) {
   const [undetermined] = placeLikeTheCollection(draft, [videoId])
-  if (undetermined !== undefined && edits.placementAnchor !== null) {
+  if (undetermined !== undefined && draft.videoEdits[videoId].placementAnchor !== null) {
     findVideo(draft, videoId).syncWarning = null
     placeAtAnchors(draft, [videoId])
   }
+}
+
+/** Places one clip again after its recording time changed; a clip placed by hand keeps its start. */
+function placeVideoIfAutomatic(draft, videoId) {
+  if (draft.videoEdits[videoId].offsetSource === 'auto') placeVideo(draft, videoId)
 }
 
 /** Shifts every clip by the same amount, keeping their relative placement. */
@@ -360,11 +374,57 @@ export function setSegmentTransition(draft, videoId, segmentKey, transition) {
   requireSegment(draft, videoId, segmentKey).transitionIn = requireTransition(transition)
 }
 
-/** Interprets ambiguous camera clock times in local time or UTC, then detects times again. */
-export function setVideoSyncTimezoneMode(draft, mode) {
+function requireTimezoneMode(mode) {
   if (mode !== 'local' && mode !== 'utc') throw new Error('Video sync timezone mode must be local or utc')
-  draft.videoSyncTimezoneMode = mode
+}
+
+/** Reads one clip's ambiguous camera clock in local time or UTC, then places it again. */
+export function setVideoTimezoneMode(draft, videoId, mode) {
+  findVideo(draft, videoId)
+  requireTimezoneMode(mode)
+  draft.videoEdits[videoId].timezoneMode = mode
+  placeVideoIfAutomatic(draft, videoId)
+}
+
+/** Reads every clip's ambiguous camera clock in local time or UTC, then detects times again. */
+export function setVideosTimezoneMode(draft, mode) {
+  requireTimezoneMode(mode)
+  for (const video of draft.importedVideos) draft.videoEdits[video.id].timezoneMode = mode
   placeAutomaticVideos(draft)
+}
+
+/** Uses a clip's `YYYYMMDD_HHMMSS` filename timestamp, which is local time. */
+function applyFilenameCreationTime(draft, video, creationTime) {
+  video.creationTime = creationTime
+  video.timeSource = 'filename'
+  draft.videoEdits[video.id].timezoneMode = 'local'
+}
+
+/** Returns a clip to its detected creation time, whose timezone mode is inferred again. */
+function resetCreationTime(draft, video) {
+  video.creationTime = video.detectedCreationTime
+  video.timeSource = video.detectedTimeSource
+  draft.videoEdits[video.id].timezoneMode = null
+}
+
+/**
+ * Sets where one clip's recording time comes from, then places it again.
+ * @param {object} draft Collection draft.
+ * @param {string} videoId Video ID.
+ * @param {'detected'|'filename'} source The detected time, or the filename timestamp.
+ */
+export function setVideoCreationTimeSource(draft, videoId, source) {
+  const video = findVideo(draft, videoId)
+  if (source === 'filename') {
+    const creationTime = parseVideoFilenameCreationTime(video.path)
+    if (creationTime === null) throw new Error('The video filename contains no valid YYYYMMDD_HHMMSS timestamp')
+    applyFilenameCreationTime(draft, video, creationTime)
+  } else if (source === 'detected') {
+    resetCreationTime(draft, video)
+  } else {
+    throw new Error(`Unknown creation time source: ${source}`)
+  }
+  placeVideoIfAutomatic(draft, videoId)
 }
 
 /** Uses the `YYYYMMDD_HHMMSS` filename timestamp of every clip that has one, then detects times again. */
@@ -374,20 +434,13 @@ export function applyFilenameCreationTimes(draft) {
     throw new Error('No video filename contains a valid YYYYMMDD_HHMMSS timestamp')
   }
   draft.importedVideos.forEach((video, index) => {
-    if (filenameTimes[index] === null) return
-    video.creationTime = filenameTimes[index]
-    video.timeSource = 'filename'
+    if (filenameTimes[index] !== null) applyFilenameCreationTime(draft, video, filenameTimes[index])
   })
-  draft.videoSyncTimezoneMode = 'local'
   placeAutomaticVideos(draft)
 }
 
 /** Returns every clip to its detected creation time, then detects times again. */
 export function resetCreationTimes(draft) {
-  for (const video of draft.importedVideos) {
-    video.creationTime = video.detectedCreationTime
-    video.timeSource = video.detectedTimeSource
-  }
-  draft.videoSyncTimezoneMode = null
+  for (const video of draft.importedVideos) resetCreationTime(draft, video)
   placeAutomaticVideos(draft)
 }

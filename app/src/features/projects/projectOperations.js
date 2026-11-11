@@ -74,7 +74,7 @@ export async function loadProject({ path, resolveProjectSources, prepareActivity
   const registered = await registerVideoPreviews(loadedVideos.filter((video) => !video.missing))
   const registeredById = new Map(registered.map((video) => [video.id, video]))
   const videos = loadedVideos.map((video) => registeredById.get(video.id) ?? video)
-  const collection = { importedVideos: videos, videoEdits, videoSyncTimezoneMode: project.sync.videoTimezoneMode }
+  const collection = { importedVideos: videos, videoEdits }
   try {
     replaceEditorDocument(useStore, () => applyPreparedProjectState(useStore, hydratedProject, { activity, collection, manualVideoSync }))
   } catch (error) {

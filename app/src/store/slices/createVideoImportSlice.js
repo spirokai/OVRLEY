@@ -16,8 +16,10 @@ import {
   segmentBeforeCut,
   setSegmentExcluded,
   setSegmentTransition,
+  setVideoCreationTimeSource,
   setVideoOffset,
-  setVideoSyncTimezoneMode,
+  setVideosTimezoneMode,
+  setVideoTimezoneMode,
   shiftVideoOffsets,
   trimVideo,
 } from '@/lib/video-program/collection-edits'
@@ -46,7 +48,6 @@ export const createVideoImportSlice = (set, get) => ({
   importedBackgroundImagePath: null, // absolute path from Tauri file dialog
   videoDragPreview: null, // { videoId: string|null, deltaSeconds } while one clip (or, with null, every clip) is dragged
   cutRemovalRequest: null, // { videoId, cutId } while the user chooses the state of the merged segment
-  videoSyncTimezoneMode: null, // session "Apply Timezone" selection: "local" | "utc"; null requests automatic inference
   transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
   availableCodecs: null,
   selectedClip: null, // { laneId, segmentKey } of the clip selected on the timeline or in the video panel; the video drawer shows its video
@@ -56,14 +57,13 @@ export const createVideoImportSlice = (set, get) => ({
    * a loaded project). Every video but a missing one is registered for preview. A
    * manual-sync selection of a video no longer in the collection moves to the first
    * clip; the playhead stays on the timeline.
-   * @param {{importedVideos: Array<object>, videoEdits: object, videoSyncTimezoneMode: 'utc'|'local'|null}} collection Collection to commit.
+   * @param {{importedVideos: Array<object>, videoEdits: object}} collection Collection to commit.
    */
-  commitVideoCollection: ({ importedVideos, videoEdits, videoSyncTimezoneMode }) => {
+  commitVideoCollection: ({ importedVideos, videoEdits }) => {
     if (importedVideos.some((video) => !video.missing && video.preview === null)) throw new Error('Committed videos must be registered for preview')
     set((draft) => {
       draft.importedVideos = importedVideos
       draft.videoEdits = videoEdits
-      draft.videoSyncTimezoneMode = videoSyncTimezoneMode
       draft.importedBackgroundImagePath = null
       draft.videoDragPreview = null
       draft.cutRemovalRequest = null
@@ -121,7 +121,6 @@ export const createVideoImportSlice = (set, get) => ({
       videoEdits: {},
       importedBackgroundImagePath: path || null,
       videoDragPreview: null,
-      videoSyncTimezoneMode: null,
       cutRemovalRequest: null,
       selectedClip: null,
     })
@@ -134,7 +133,6 @@ export const createVideoImportSlice = (set, get) => ({
       videoEdits: {},
       importedBackgroundImagePath: null,
       videoDragPreview: null,
-      videoSyncTimezoneMode: null,
       cutRemovalRequest: null,
       selectedClip: null,
     })
@@ -272,8 +270,19 @@ export const createVideoImportSlice = (set, get) => ({
     set({ videoDragPreview: dragPreview })
   },
 
+  /** Reads every clip's ambiguous camera clock in local time or UTC (see `setVideosTimezoneMode`). */
   setVideoSyncTimezoneMode: (mode) => {
-    set((draft) => setVideoSyncTimezoneMode(draft, mode))
+    set((draft) => setVideosTimezoneMode(draft, mode))
+  },
+
+  /** Reads one clip's ambiguous camera clock in local time or UTC (see `setVideoTimezoneMode`). */
+  setVideoTimezoneMode: (videoId, mode) => {
+    set((draft) => setVideoTimezoneMode(draft, videoId, mode))
+  },
+
+  /** Takes one clip's recording time from its detected time or its filename (see `setVideoCreationTimeSource`). */
+  setVideoCreationTimeSource: (videoId, source) => {
+    set((draft) => setVideoCreationTimeSource(draft, videoId, source))
   },
 
   /** Uses the `YYYYMMDD_HHMMSS` filename timestamp of every clip that has one. */

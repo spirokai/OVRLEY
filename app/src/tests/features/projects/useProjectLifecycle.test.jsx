@@ -62,6 +62,7 @@ function projectVideo(id, path, offsetSeconds = 0) {
     cuts: [],
     segments: { start: { excluded: false, transitionIn: null } },
     placementAnchor: null,
+    timezoneMode: null,
     // Saved as the probe of `preparedVideo` describes it.
     metadata: {
       frameCount: 1200,
@@ -110,7 +111,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       editor,
       sources: { activity: null, videos: [] },
       sync: {
-        videoTimezoneMode: null,
         manual: { videoId: null, landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
@@ -150,10 +150,9 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       }),
       sources: {
         activity: { path: { kind: 'project-relative', value: 'ride.fit' } },
-        videos: [projectVideo('ride-video', 'ride.mp4', 12)],
+        videos: [{ ...projectVideo('ride-video', 'ride.mp4', 12), timezoneMode: 'utc' }],
       },
       sync: {
-        videoTimezoneMode: 'utc',
         manual: { videoId: 'ride-video', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
@@ -269,7 +268,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(boundaries.extractVideoTelemetry).toHaveBeenCalledWith(videoPath)
     expect(state.videoEdits[video.id].offsetSeconds).toBe(12)
     expect(state.manualVideoSync.videoId).toBe(video.id)
-    expect(state.videoSyncTimezoneMode).toBe('utc')
+    expect(state.videoEdits[video.id].timezoneMode).toBe('utc')
     const { batchOutputFolder, ...renderSettings } = project.render
     expect(state.renderSettings).toEqual(renderSettings)
     expect(state.batchOutputFolder).toBe(batchOutputFolder)
@@ -490,7 +489,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videos: [],
       },
       sync: {
-        videoTimezoneMode: null,
         manual: { videoId: null, landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
@@ -550,7 +548,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videos: [projectVideo('ride-video', 'ride.mp4')],
       },
       sync: {
-        videoTimezoneMode: null,
         manual: { videoId: 'ride-video', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
@@ -600,7 +597,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
       sources: { activity: null, videos: [] },
       sync: {
-        videoTimezoneMode: null,
         manual: { videoId: null, landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
@@ -699,7 +695,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         ],
       },
       sync: {
-        videoTimezoneMode: null,
         manual: { videoId: 'clip-c', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
@@ -759,6 +754,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         'cut-1': { excluded: true, transitionIn: null },
       },
       placementAnchor: { videoId: 'clip-missing', side: 'after' },
+      timezoneMode: null,
     })
     expect(state.manualVideoSync.videoId).toBe('clip-c')
     expect(state.transitionDefaults).toEqual(project.transitionDefaults)

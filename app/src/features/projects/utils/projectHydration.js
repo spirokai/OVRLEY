@@ -40,6 +40,7 @@ export function createProjectVideoEdits(videos, projectVideos) {
           ...fitCutsToFrameCount(projectVideo, video.frameCount),
           placementAnchor:
             projectVideo.placementAnchor !== null && loadedIds.has(projectVideo.placementAnchor.videoId) ? { ...projectVideo.placementAnchor } : null,
+          timezoneMode: projectVideo.timezoneMode,
         },
       ]
     }),
@@ -86,7 +87,6 @@ export function applyNewProjectState(store, { templateSource, templateState }) {
     draft.previewPlaybackState = 'paused'
     draft.previewPlaybackSource = 'timeline'
     draft.videoDragPreview = null
-    draft.videoSyncTimezoneMode = null
     draft.transitionDefaults = { ...DEFAULT_TRANSITION_SETTINGS }
     draft.renderSettings = {
       ...DEFAULT_RENDER_SETTINGS,
@@ -157,7 +157,7 @@ export function applyProjectOwnedState(store, project, manualVideoSync) {
  * never moves the saved placements.
  * @param {object} store Zustand application store.
  * @param {object} project Validated project payload.
- * @param {{activity: object|null, collection: {importedVideos: Array<object>, videoEdits: object, videoSyncTimezoneMode: 'utc'|'local'|null}, manualVideoSync: object}} prepared
+ * @param {{activity: object|null, collection: {importedVideos: Array<object>, videoEdits: object}, manualVideoSync: object}} prepared
  *   Prepared activity, registered video collection with its validated edits, and the manual sync workspace.
  */
 export function applyPreparedProjectState(store, project, { activity, collection, manualVideoSync }) {

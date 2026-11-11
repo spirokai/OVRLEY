@@ -155,7 +155,7 @@ export async function locateMissingVideo(videoId, path) {
  * Commits a reviewed import: registers the previews of its new videos, replaces the
  * collection and the transition defaults in one change, releases the previews of
  * videos removed from the project, and queues telemetry of the new videos.
- * @param {{importedVideos: Array<object>, videoEdits: object, videoSyncTimezoneMode: 'utc'|'local'|null}} collection Reviewed
+ * @param {{importedVideos: Array<object>, videoEdits: object}} collection Reviewed
  *   collection; its new videos have no preview yet.
  * @param {{type: string, durationSeconds: number, splitGapThresholdSeconds: number}} transitionDefaults Reviewed defaults.
  * @param {{resolution: object, fps: object}|null} adoptedFormat Format the scene adopts (the first import), or null.

@@ -452,6 +452,7 @@
     "telemetryReady": "Available",
     "videoStart": "Start on timeline",
     "videoStartAutoHint": "Placed automatically. Type a time to set it by hand.",
+    "syncTheVideo": "Sync the video",
     "distance": "Distance",
     "dropActivityFile": "Drop activity file",
     "dropVideoFile": "Drop video files",

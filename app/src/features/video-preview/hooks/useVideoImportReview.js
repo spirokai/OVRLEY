@@ -19,7 +19,7 @@ import {
   resetCreationTimes,
   resetVideoOffset,
   setVideoOffset,
-  setVideoSyncTimezoneMode,
+  setVideosTimezoneMode,
   shiftVideoOffsets,
   applyFilenameCreationTimes,
 } from '@/lib/video-program/collection-edits'
@@ -37,8 +37,8 @@ function errorMessage(error) {
 }
 
 function snapshotCollection(state) {
-  const { importedVideos, videoEdits, videoSyncTimezoneMode, parsedActivity, activitySummary } = state
-  return { importedVideos, videoEdits, videoSyncTimezoneMode, parsedActivity, activitySummary }
+  const { importedVideos, videoEdits, parsedActivity, activitySummary } = state
+  return { importedVideos, videoEdits, parsedActivity, activitySummary }
 }
 
 /**
@@ -116,8 +116,8 @@ export default function useVideoImportReview({ onImported }) {
     const adoptedFormat = current.adoptsFormat ? deriveCompatibility(reviewed.importedVideos).reference : null
     setReview({ ...current, phase: 'importing', error: null })
     try {
-      const { importedVideos, videoEdits, videoSyncTimezoneMode } = reviewed
-      const added = await commitReviewedImport({ importedVideos, videoEdits, videoSyncTimezoneMode }, current.transitionDefaults, adoptedFormat)
+      const { importedVideos, videoEdits } = reviewed
+      const added = await commitReviewedImport({ importedVideos, videoEdits }, current.transitionDefaults, adoptedFormat)
       setReview(null)
       onImported(added)
     } catch (error) {
@@ -246,7 +246,7 @@ export default function useVideoImportReview({ onImported }) {
         commitSharedOffset: (seconds) => edit(shiftVideoOffsets, seconds - sharedOffsetControls.sharedOffsetSeconds),
         resetVideoCreationTimes: () => edit(resetCreationTimes),
         setVideoCreationTimesFromFilenames: () => edit(applyFilenameCreationTimes),
-        setVideoSyncTimezoneMode: (mode) => edit(setVideoSyncTimezoneMode, mode),
+        setVideoSyncTimezoneMode: (mode) => edit(setVideosTimezoneMode, mode),
       },
       transition: {
         type,

@@ -29,19 +29,9 @@ const ride = {
   cameraModel: 'GoPro Hero 12',
 }
 
-const videoSync = { timezone: 'Europe/Zurich', videoSyncTimezoneMode: 'local' }
-
 function renderDrawer(props = {}) {
   return render(
-    <VideoDrawerContent
-      hasVideos
-      onBrowseVideo={vi.fn()}
-      onRemoveVideo={vi.fn()}
-      onLocateVideo={vi.fn()}
-      onDropVideoFiles={vi.fn()}
-      videoSync={videoSync}
-      {...props}
-    />,
+    <VideoDrawerContent hasVideos onBrowseVideo={vi.fn()} onRemoveVideo={vi.fn()} onLocateVideo={vi.fn()} onDropVideoFiles={vi.fn()} {...props} />,
   )
 }
 
@@ -108,31 +98,29 @@ describe('VideoDrawerContent', () => {
     expect(onLocateVideo).toHaveBeenCalledExactlyOnceWith('video-1')
   })
 
-  test('holds the video sync settings and offers manual sync when automatic sync cannot find an offset', () => {
-    useStore.setState(videoStoreState([ride]))
-    const openManualVideoSync = vi.fn()
-    renderDrawer({
-      videoSync: {
-        ...videoSync,
-        activitySummary: { timezone: 'Europe/Zurich', syncTime: '2026-07-18T07:20:03.000Z' },
-        canResetCreationTime: false,
-        filenameCreationTimeAvailable: true,
-        sharedOffsetSeconds: 0,
-        sharedOffsetFps: { num: 30, den: 1 },
-        timezoneDisabled: false,
-        videoSyncWarning: 'Video could not be synced with activity',
-        openManualVideoSync,
-        computeVideoSync: vi.fn(),
-        commitSharedOffset: vi.fn(() => null),
-        resetVideoCreationTimes: vi.fn(),
-        setVideoCreationTimesFromFilenames: vi.fn(),
-        setVideoSyncTimezoneMode: vi.fn(),
-      },
+  test('syncs only the selected video: its start, automatic sync, creation time and timezone', () => {
+    const climb = createTestVideo({ id: 'video-2', path: '/videos/climb.mp4', durationSeconds: 65, importOrder: 1 })
+    useStore.setState({
+      ...videoStoreState([ride, climb]),
+      parsedActivity: { metadata: { timezone: 'Europe/Zurich' } },
+      activitySummary: { timezone: 'Europe/Zurich', syncTime: '2026-07-18T07:20:03.000Z', endTime: '2026-07-18T09:20:03.000Z' },
+      selectedClip: { laneId: 'video:video-1', segmentKey: null },
     })
+    renderDrawer()
 
-    expect(screen.getByRole('heading', { name: 'Sync Doctor' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Open Manual Sync' }))
+    expect(screen.getByRole('heading', { name: 'Sync the video' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Place ride.mp4 automatically again' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Filename' })).toBeDisabled()
 
-    expect(openManualVideoSync).toHaveBeenCalledOnce()
+    act(() => useStore.getState().setVideoOffset('video-1', 100))
+    fireEvent.click(screen.getByRole('button', { name: 'Sync the video' }))
+    expect(useStore.getState().videoEdits['video-1'].offsetSource).toBe('auto')
+
+    // Syncing inferred the camera clock's reading; the switch sets the other one, on this video only.
+    const { 'video-1': inferred, 'video-2': other } = useStore.getState().videoEdits
+    expect(inferred.timezoneMode).toBe('utc')
+    fireEvent.click(screen.getByRole('switch', { name: 'Apply Timezone' }))
+    expect(useStore.getState().videoEdits['video-1'].timezoneMode).toBe('local')
+    expect(useStore.getState().videoEdits['video-2'].timezoneMode).toBe(other.timezoneMode)
   })
 })
