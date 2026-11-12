@@ -29,6 +29,7 @@
     "blackBackground": "黑色背景",
     "checkeredBackground": "棋盘格背景",
     "close": "关闭",
+    "copyError": "复制错误",
     "errorRenderingVideo": "视频渲染错误",
     "file": "文件",
     "fileMenu": "文件菜单",

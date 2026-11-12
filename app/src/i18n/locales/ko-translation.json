@@ -29,6 +29,7 @@
     "blackBackground": "검은색 배경",
     "checkeredBackground": "체크무늬 배경",
     "close": "닫기",
+    "copyError": "오류 복사",
     "errorRenderingVideo": "동영상 렌더링 오류",
     "file": "파일",
     "fileMenu": "파일 메뉴",

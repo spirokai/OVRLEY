@@ -29,6 +29,7 @@
     "blackBackground": "Чёрный фон",
     "checkeredBackground": "Шахматный фон",
     "close": "Закрыть",
+    "copyError": "Копировать ошибку",
     "errorRenderingVideo": "Ошибка рендеринга видео",
     "file": "Файл",
     "fileMenu": "Меню «Файл»",

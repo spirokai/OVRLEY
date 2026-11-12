@@ -29,6 +29,7 @@
     "blackBackground": "Fondo negro",
     "checkeredBackground": "Fondo a cuadros",
     "close": "Cerrar",
+    "copyError": "Copiar error",
     "errorRenderingVideo": "Error al renderizar el vídeo",
     "file": "Archivo",
     "fileMenu": "Menú Archivo",
