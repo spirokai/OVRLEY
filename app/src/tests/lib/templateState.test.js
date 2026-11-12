@@ -60,9 +60,9 @@ describe('normalizeGlobalDefaults', () => {
 
     expect(result.border_color).toBe('#111111')
     expect(result.border_thickness).toBe(3)
-    expect(result.shadow_color).toBe('#000000')
-    expect(result.shadow_strength).toBe(0)
-    expect(result.shadow_distance).toBe(0)
+    expect(result.shadow_color).toBe(DEFAULT_GLOBAL_DEFAULTS.shadow_color)
+    expect(result.shadow_strength).toBe(DEFAULT_GLOBAL_DEFAULTS.shadow_strength)
+    expect(result.shadow_distance).toBe(DEFAULT_GLOBAL_DEFAULTS.shadow_distance)
   })
 })
 

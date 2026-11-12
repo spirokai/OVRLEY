@@ -728,7 +728,7 @@ fn batch_wire_accepts_frontend_template_and_rejects_redundant_fields() {
         frontend_request,
     )
     .unwrap();
-    assert_eq!(plan.config().scene.presentation.width, 1920);
+    assert_eq!(plan.config().scene.presentation.width, 3840);
     let request = fixture.request(&["1-first.mp4"], false);
     let wire = serde_json::to_value(request).unwrap();
     serde_json::from_value::<BatchRenderRequest>(wire.clone()).unwrap();

@@ -1,14 +1,13 @@
 {
   "scene": {
-    "width": 1920,
-    "height": 1080,
-    "font": "Arial.ttf",
+    "width": 3840,
+    "height": 2160,
     "font_size": 30,
     "opacity": 1,
     "scale": 1,
-    "shadow_color": "#000000",
-    "shadow_strength": 0,
-    "shadow_distance": 0,
+    "shadow_color": "#3b3b3b",
+    "shadow_strength": 3,
+    "shadow_distance": 2,
     "border_color": "#000000",
     "border_thickness": 0,
     "fixed_width_digits": true

@@ -105,9 +105,12 @@ describe('config/timeline synchronization', () => {
   })
 
   test('dirty tracking recalculates across mixed config replacement and timeline edits', () => {
-    useStore.getState().setLastRenderedConfig(cloneSerializable(DEFAULT_CONFIG))
+    // Activity import writes scene timing before anything can be rendered.
+    const renderedConfig = cloneSerializable(DEFAULT_CONFIG)
+    renderedConfig.scene.start = 0
+    useStore.getState().setLastRenderedConfig(renderedConfig)
 
-    const changedConfig = cloneSerializable(DEFAULT_CONFIG)
+    const changedConfig = cloneSerializable(renderedConfig)
     changedConfig.scene.start = 4
     useStore.getState().setConfig(changedConfig)
 

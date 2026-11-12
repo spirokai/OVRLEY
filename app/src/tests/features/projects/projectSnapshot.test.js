@@ -4,6 +4,7 @@ import { createPathLocator } from '@/features/projects/utils/projectPaths'
 import { VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
 import { createRenderEffectiveConfig } from '@/features/render-video/utils/renderConfig'
 import useStore from '@/store/useStore'
+import { DEFAULT_SCENE } from '@/lib/template/template-constants'
 
 describe('project snapshot contract', () => {
   test('projects only sources and project-owned settings', () => {
@@ -35,7 +36,9 @@ describe('project snapshot contract', () => {
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
 
     expect(project).not.toHaveProperty('template')
-    expect(project.editor.config).toEqual(expect.objectContaining({ scene: expect.objectContaining({ width: 1920, height: 1080 }) }))
+    expect(project.editor.config).toEqual(
+      expect.objectContaining({ scene: expect.objectContaining({ width: DEFAULT_SCENE.width, height: DEFAULT_SCENE.height }) }),
+    )
     expect(project.editor.config.scene.fps).toBe(project.render.fps)
     expect(project.editor.config.scene.updateRate).toBe(project.render.widgetUpdateRate)
     expect(project.editor.globalDefaults).toEqual(useStore.getState().globalDefaults)

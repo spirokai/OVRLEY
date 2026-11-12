@@ -523,7 +523,7 @@ describe('OverlayEditor selection flow', () => {
     const badgeRow = getByTestId('canvas-status-badges')
     const toolbar = getByTestId('canvas-editor-toolbar')
 
-    expect(within(badgeRow).getByText(/1920 .* 1080/)).toBeTruthy()
+    expect(within(badgeRow).getByText(/3840 .* 2160/)).toBeTruthy()
     expect(within(badgeRow).getByText('Modified')).toBeTruthy()
     expect(within(toolbar).getByText('100%')).toBeTruthy()
     expect(toolbar.className).toContain('left-1/2')
