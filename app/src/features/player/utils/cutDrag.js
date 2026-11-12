@@ -90,10 +90,18 @@ function applyEdgeDraft(clip, side, { cutId, frame }) {
     return {
       ...clip,
       cuts: [{ id: cutId, frame }, ...clip.cuts],
-      segments: { ...clip.segments, [FIRST_SEGMENT_KEY]: { excluded: true, transitionIn: null }, [cutId]: clip.segments[FIRST_SEGMENT_KEY] },
+      segments: {
+        ...clip.segments,
+        [FIRST_SEGMENT_KEY]: { ...clip.segments[FIRST_SEGMENT_KEY], excluded: true, transitionIn: null },
+        [cutId]: clip.segments[FIRST_SEGMENT_KEY],
+      },
     }
   }
-  return { ...clip, cuts: [...clip.cuts, { id: cutId, frame }], segments: { ...clip.segments, [cutId]: { excluded: true, transitionIn: null } } }
+  return {
+    ...clip,
+    cuts: [...clip.cuts, { id: cutId, frame }],
+    segments: { ...clip.segments, [cutId]: { ...clip.segments[clip.cuts.at(-1)?.id ?? FIRST_SEGMENT_KEY], excluded: true, transitionIn: null } },
+  }
 }
 
 /**

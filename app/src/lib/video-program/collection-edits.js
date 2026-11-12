@@ -271,8 +271,8 @@ export function removeVideo(draft, videoId) {
 }
 
 /**
- * Splits a video at a frame. The new segment starts out in the same export state
- * as the segment it comes from, and follows the transition defaults.
+ * Splits a video at a frame. The new segment starts out in the same export and
+ * overlay state as the segment it comes from, and follows the transition defaults.
  * @param {object} draft Collection draft.
  * @param {string} videoId Video ID.
  * @param {number} frame Integer frame strictly inside the video and not on a cut.
@@ -285,7 +285,8 @@ export function cutVideo(draft, videoId, frame) {
   if (edits.cuts.some((cut) => cut.frame === frame)) throw new Error(`The video is already cut at frame ${frame}`)
   const id = globalThis.crypto.randomUUID()
   const previous = edits.cuts.filter((cut) => cut.frame < frame).at(-1)
-  edits.segments[id] = { excluded: edits.segments[previous?.id ?? FIRST_SEGMENT_KEY].excluded, transitionIn: null }
+  const { excluded, skipOverlay } = edits.segments[previous?.id ?? FIRST_SEGMENT_KEY]
+  edits.segments[id] = { excluded, transitionIn: null, skipOverlay }
   edits.cuts.splice(previous === undefined ? 0 : edits.cuts.indexOf(previous) + 1, 0, { id, frame })
   return id
 }
@@ -309,7 +310,7 @@ export function trimVideo(draft, videoId, side, frame) {
   const id = cutVideo(draft, videoId, frame)
   if (side === 'start') {
     segments[id].transitionIn = segments[FIRST_SEGMENT_KEY].transitionIn
-    segments[FIRST_SEGMENT_KEY] = { excluded: true, transitionIn: null }
+    segments[FIRST_SEGMENT_KEY] = { excluded: true, transitionIn: null, skipOverlay: segments[FIRST_SEGMENT_KEY].skipOverlay }
   } else {
     segments[id].excluded = true
   }
@@ -373,6 +374,12 @@ function requireSegment(draft, videoId, segmentKey) {
 /** Excludes a segment from export or includes it again. */
 export function setSegmentExcluded(draft, videoId, segmentKey, excluded) {
   requireSegment(draft, videoId, segmentKey).excluded = excluded
+}
+
+/** Hides or shows the activity widgets over a segment, in the preview and the render. */
+export function setSegmentSkipOverlay(draft, videoId, segmentKey, skipOverlay) {
+  if (typeof skipOverlay !== 'boolean') throw new Error('Activity overlay suppression must be boolean')
+  requireSegment(draft, videoId, segmentKey).skipOverlay = skipOverlay
 }
 
 /** Overrides the transition into a segment, or with `null` returns it to the defaults. */

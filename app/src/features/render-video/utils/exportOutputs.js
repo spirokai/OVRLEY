@@ -16,14 +16,14 @@ import { isQsvFullCodec } from './codecUtils'
 import { reviewBatchQueue } from './renderPresentation'
 
 /** Native output of a program: its pieces and the transitions of its joins. */
-function nativeOutput(id, program, sourceIds, skipOverlay, exportMode) {
+function nativeOutput(id, program, sourceIds, exportMode) {
   return {
     id,
     pieces: program.pieces.map((piece) => ({
       sourceId: sourceIds.get(piece.videoId),
       startFrame: piece.sourceStartFrame,
       endFrame: piece.sourceEndFrame,
-      skipOverlay: skipOverlay[piece.videoId] === true,
+      skipOverlay: piece.skipOverlay,
     })),
     transitions: program.joins.map((join) => (exportMode === 'transparent' ? { ...HARD_CUT } : { ...join.transition })),
   }
@@ -87,7 +87,6 @@ function combinedBlockers({ program, clips, rows, exportMode, codec, t }) {
  * @param {Array<object>} options.clips Timeline clips in timeline order.
  * @param {{type: 'all'|'custom', from: number, to: number}} options.exportRange Export range in timeline seconds.
  * @param {object} options.transitionDefaults Project transition defaults.
- * @param {Object<string, boolean>} options.skipOverlay Video IDs that render without activity widgets.
  * @param {object|null} options.inspection Current native descriptors keyed by path.
  * @param {object} options.sync Activity summary and display timezone mode.
  * @param {string} options.locale Display language.
@@ -96,19 +95,7 @@ function combinedBlockers({ program, clips, rows, exportMode, codec, t }) {
  *   Reviewed video rows, reasons combined export is unavailable, native outputs once every video is
  *   reviewed and nothing blocks them, and the committed offsets of their sources.
  */
-export function reviewExport({
-  outputMode,
-  exportMode,
-  codec,
-  clips,
-  exportRange,
-  transitionDefaults,
-  skipOverlay,
-  inspection,
-  sync,
-  locale,
-  outputPath,
-}) {
+export function reviewExport({ outputMode, exportMode, codec, clips, exportRange, transitionDefaults, inspection, sync, locale, outputPath }) {
   const t = i18next.getFixedT(locale)
   const programOf = (videos) => buildProgram({ videos, exportRange, transitionDefaults })
   const programs = outputMode === 'separate' ? new Map(clips.map((clip) => [clip.id, programOf([clip])])) : null
@@ -116,7 +103,7 @@ export function reviewExport({
   const piecesByVideo = new Map(
     clips.map((clip) => [clip.id, (programs?.get(clip.id) ?? program).pieces.filter((piece) => piece.videoId === clip.id)]),
   )
-  const rows = reviewBatchQueue(clips, piecesByVideo, skipOverlay, inspection, sync, locale).map((row) =>
+  const rows = reviewBatchQueue(clips, piecesByVideo, inspection, sync, locale).map((row) =>
     outputMode === 'separate' && exportMode === 'composite' && row.status === 'pending' && findInvalidTransitions(programs.get(row.id)).length > 0
       ? { ...row, status: 'blocked', error: t('render-video.invalidTransitions', 'A transition is longer than the video pieces it joins') }
       : row,
@@ -129,8 +116,8 @@ export function reviewExport({
   if (settled && blockers.length === 0) {
     outputs =
       outputMode === 'separate'
-        ? pending.map((row) => nativeOutput(row.path, programs.get(row.id), sourceIds, skipOverlay, exportMode))
-        : [nativeOutput(outputPath, program, sourceIds, skipOverlay, exportMode)]
+        ? pending.map((row) => nativeOutput(row.path, programs.get(row.id), sourceIds, exportMode))
+        : [nativeOutput(outputPath, program, sourceIds, exportMode)]
   }
   const usedVideoIds = new Set((outputs ?? []).flatMap((output) => output.pieces.map((piece) => piece.sourceId)))
   const offsets = Object.fromEntries(

@@ -128,13 +128,12 @@ function formatCreationLabels(clip, sync, locale) {
  * committed timeline offset; frames outside the activity show raster widgets only.
  * @param {object[]} clips Timeline clips in timeline order.
  * @param {Map<string, Array<object>>} piecesByVideo Program pieces of each video after the export range.
- * @param {Object<string, boolean>} skipOverlay Video IDs that render without activity widgets.
  * @param {object|null} inspection Current native descriptors keyed by path.
  * @param {object} sync Activity summary.
  * @param {string} locale Display language.
  * @returns {object[]} Reviewed rows keyed by video ID.
  */
-export function reviewBatchQueue(clips, piecesByVideo, skipOverlay, inspection, sync, locale) {
+export function reviewBatchQueue(clips, piecesByVideo, inspection, sync, locale) {
   return clips.map((clip) => {
     const item = {
       id: clip.id,
@@ -142,7 +141,6 @@ export function reviewBatchQueue(clips, piecesByVideo, skipOverlay, inspection, 
       filename: clip.path.split(/[/\\]/).at(-1),
       offsetSeconds: clip.offsetSeconds,
       pieces: piecesByVideo.get(clip.id) ?? [],
-      skipOverlay: skipOverlay[clip.id] === true,
     }
     if (item.pieces.length === 0 && isVideoExcluded(clip))
       return { ...item, status: 'blocked', error: i18next.getFixedT(locale)('render-video.excludedFromExport', 'Excluded from export') }

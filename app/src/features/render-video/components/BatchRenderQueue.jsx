@@ -1,5 +1,5 @@
 /**
- * Imported videos of an export, with overlay toggles, the reasons a combined file
+ * Imported videos of an export, the reasons a combined file
  * cannot be rendered, and render progress.
  * Pure presentational - inspection and execution are owned by their hooks.
  */
@@ -25,7 +25,6 @@ import { useTranslation } from 'react-i18next'
  * @param {boolean} props.showBatchProgress - Whether rendering or finished results are being shown.
  * @param {string|null} props.batchActiveItemId - Queue item currently rendering.
  * @param {object} props.currentItemProgress - Frontend progress for the active item.
- * @param {function} props.setBatchItemSkipOverlay - Toggles the activity overlay for an item.
  * @param {string[]} props.combinedBlockers - Reasons the combined file cannot be rendered.
  * @returns {JSX.Element} Rendered component output.
  */
@@ -38,7 +37,6 @@ export default function BatchRenderQueue({
   showBatchProgress,
   batchActiveItemId,
   currentItemProgress,
-  setBatchItemSkipOverlay,
   batchReviewError,
   batchInspecting,
   refreshInspection,
@@ -98,7 +96,6 @@ export default function BatchRenderQueue({
               batchRunning={batchRunning}
               showBatchProgress={showBatchProgress}
               currentItemProgress={item.id === batchActiveItemId ? currentItemProgress : null}
-              setBatchItemSkipOverlay={setBatchItemSkipOverlay}
             />
           ))
         )}

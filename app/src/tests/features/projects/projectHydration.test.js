@@ -17,7 +17,6 @@ test('project restoration changes only project-owned settings', () => {
     parsedActivity,
     ...videoStoreState([video]),
   })
-  useStore.getState().setBatchItemSkipOverlay('canonical-video', true)
   useStore.setState({ batchSnapshot: { batchId: 'old-batch', rendererBusy: false } })
 
   const manual = { videoId: 'canonical-video', landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 90 }
@@ -68,7 +67,6 @@ test('project restoration changes only project-owned settings', () => {
   expect(state.renderSettings).toMatchObject({ fps: 60, codec: 'libx264', qualityType: 'bitrate', qualityValue: 20 })
   expect(state.renderSettings.outputMode).toBe('separate')
   expect(state.batchOutputFolder).toBe('C:\\renders')
-  expect(state.batchSkipOverlay).toEqual({})
   expect(state.batchSnapshot).toBeNull()
   expect(state.renderSettings).not.toHaveProperty('batchOutputFolder')
   expect(state.selectedSecond).toBe(50)

@@ -350,15 +350,16 @@ struct ProjectCut {
     frame: u64,
 }
 
-/// One virtual clip: whether it is exported, and the transition of the join into
-/// it. A `null` transition follows the project transition defaults; a present one
-/// is a user override.
+/// One virtual clip: whether it is exported, the transition of the join into it,
+/// and whether its activity widgets are hidden. A `null` transition follows the
+/// project transition defaults; a present one is a user override.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectSegment {
     excluded: bool,
     #[serde(deserialize_with = "deserialize_required_option")]
     transition_in: Option<ProjectTransition>,
+    skip_overlay: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1250,6 +1251,7 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
             ProjectSegment {
                 excluded: false,
                 transition_in: None,
+                skip_overlay: false,
             },
         )]),
         placement_anchor: None,
@@ -2120,7 +2122,7 @@ mod tests {
             "offsetSeconds": offset_seconds,
             "offsetSource": "auto",
             "cuts": [],
-            "segments": { "start": { "excluded": false, "transitionIn": null } },
+            "segments": { "start": { "excluded": false, "transitionIn": null, "skipOverlay": false } },
             "placementAnchor": null,
             "timezoneMode": null,
             "metadata": {
@@ -2149,10 +2151,12 @@ mod tests {
         ]);
         second["segments"] = serde_json::json!({
             "start": { "excluded": false,
-                       "transitionIn": { "type": "none", "durationSeconds": 0.0 } },
-            "cut-1": { "excluded": true, "transitionIn": null },
+                       "transitionIn": { "type": "none", "durationSeconds": 0.0 },
+                       "skipOverlay": false },
+            "cut-1": { "excluded": true, "transitionIn": null, "skipOverlay": true },
             "cut-2": { "excluded": false,
-                       "transitionIn": { "type": "dissolve", "durationSeconds": 1.5 } }
+                       "transitionIn": { "type": "dissolve", "durationSeconds": 1.5 },
+                       "skipOverlay": false }
         });
         second["placementAnchor"] = serde_json::json!({ "videoId": "clip-a", "side": "after" });
         project["sources"]["videos"] =
@@ -2895,7 +2899,7 @@ mod tests {
 
     #[test]
     fn rejects_malformed_v4_video_collection_contracts() {
-        let cases: [(&str, fn(&mut Value)); 39] = [
+        let cases: [(&str, fn(&mut Value)); 40] = [
             ("missing timezoneMode", |project| {
                 project["sources"]["videos"][0]
                     .as_object_mut()
@@ -2972,6 +2976,12 @@ mod tests {
                     .unwrap()
                     .remove("excluded");
             }),
+            ("missing skip overlay", |project| {
+                project["sources"]["videos"][1]["segments"]["cut-1"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("skipOverlay");
+            }),
             ("empty cut id", |project| {
                 project["sources"]["videos"][1]["cuts"][0]["id"] = Value::from("")
             }),
@@ -3004,7 +3014,7 @@ mod tests {
             }),
             ("segment without a cut", |project| {
                 project["sources"]["videos"][1]["segments"]["other"] =
-                    serde_json::json!({ "excluded": false, "transitionIn": null });
+                    serde_json::json!({ "excluded": false, "transitionIn": null, "skipOverlay": false });
             }),
             ("missing first segment", |project| {
                 project["sources"]["videos"][1]["segments"]

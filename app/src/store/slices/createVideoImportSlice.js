@@ -15,6 +15,7 @@ import {
   resetVideoOffset,
   segmentBeforeCut,
   setSegmentExcluded,
+  setSegmentSkipOverlay,
   setSegmentTransition,
   setVideoCreationTimeSource,
   setVideoOffset,
@@ -264,6 +265,11 @@ export const createVideoImportSlice = (set, get) => ({
   /** Excludes a segment from export or includes it again. */
   setVideoSegmentExcluded: (videoId, segmentKey, excluded) => {
     set((draft) => setSegmentExcluded(draft, videoId, segmentKey, excluded))
+  },
+
+  /** Hides or shows the activity widgets over a segment, in the preview and the render. */
+  setVideoSegmentSkipOverlay: (videoId, segmentKey, skipOverlay) => {
+    set((draft) => setSegmentSkipOverlay(draft, videoId, segmentKey, skipOverlay))
   },
 
   /**

@@ -28,7 +28,6 @@ describe('project snapshot contract', () => {
       timelineViewport: { viewStart: 10, viewEnd: 30 },
     }))
     useStore.getState().setBatchOutputFolder('C:\\Events\\batch-renders')
-    useStore.getState().setBatchItemSkipOverlay('runtime-video', true)
 
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
 
@@ -46,7 +45,7 @@ describe('project snapshot contract', () => {
           offsetSeconds: 7.5,
           offsetSource: 'auto',
           cuts: [],
-          segments: { start: { excluded: false, transitionIn: null } },
+          segments: { start: { excluded: false, transitionIn: null, skipOverlay: false } },
           placementAnchor: null,
           timezoneMode: null,
           metadata: {
@@ -93,7 +92,6 @@ describe('project snapshot contract', () => {
       'batchVideoFolder',
       'batchActiveItemId',
       'batchRunning',
-      'skipOverlay',
       'blocked.mp4',
       'Sync failed',
     ]) {
@@ -235,13 +233,18 @@ describe('project snapshot contract', () => {
     const earlier = createTestVideo({ id: 'video-1', path: 'D:\\a.mp4' })
     const cut = { id: 'cut-1', frame: 150 }
     const segments = {
-      start: { excluded: false, transitionIn: { type: 'none', durationSeconds: 0 } },
-      'cut-1': { excluded: true, transitionIn: { type: 'dissolve', durationSeconds: 1.5 } },
+      start: { excluded: false, transitionIn: { type: 'none', durationSeconds: 0 }, skipOverlay: false },
+      'cut-1': { excluded: true, transitionIn: { type: 'dissolve', durationSeconds: 1.5 }, skipOverlay: false },
     }
     useStore.setState({
       importedVideos: [later, earlier],
       videoEdits: {
-        'video-1': { offsetSeconds: -12.5, cuts: [], segments: { start: { excluded: false, transitionIn: null } }, placementAnchor: null },
+        'video-1': {
+          offsetSeconds: -12.5,
+          cuts: [],
+          segments: { start: { excluded: false, transitionIn: null, skipOverlay: false } },
+          placementAnchor: null,
+        },
         'video-2': {
           offsetSeconds: 70,
           cuts: [cut],
@@ -260,7 +263,7 @@ describe('project snapshot contract', () => {
         path: { kind: 'absolute', value: 'D:\\a.mp4' },
         offsetSeconds: -12.5,
         cuts: [],
-        segments: { start: { excluded: false, transitionIn: null } },
+        segments: { start: { excluded: false, transitionIn: null, skipOverlay: false } },
         placementAnchor: null,
         metadata: createVideoMetadataSnapshot(earlier),
       },

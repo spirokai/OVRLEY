@@ -48,13 +48,12 @@ export default function useBatchInspection({ phase, settings }) {
             clips,
             exportRange: settings.range,
             transitionDefaults: inputs.transitionDefaults,
-            skipOverlay: store.batchSkipOverlay,
             inspection: current,
             sync,
             locale: i18n.resolvedLanguage,
             outputPath,
           }),
-    [clips, current, i18n.resolvedLanguage, inputs.transitionDefaults, outputMode, outputPath, settings, store.batchSkipOverlay, sync],
+    [clips, current, i18n.resolvedLanguage, inputs.transitionDefaults, outputMode, outputPath, settings, sync],
   )
   // Review the destination without replacing an existing combined file; submission asks first.
   const destination = useMemo(

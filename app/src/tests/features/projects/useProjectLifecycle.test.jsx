@@ -60,7 +60,7 @@ function projectVideo(id, path, offsetSeconds = 0) {
     offsetSeconds,
     offsetSource: 'auto',
     cuts: [],
-    segments: { start: { excluded: false, transitionIn: null } },
+    segments: { start: { excluded: false, transitionIn: null, skipOverlay: false } },
     placementAnchor: null,
     timezoneMode: null,
     // Saved as the probe of `preparedVideo` describes it.
@@ -302,8 +302,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(result.current.status).toBe('Modified')
     act(() => useStore.getState().setBatchOutputFolder(null))
     expect(result.current.status).toBe('Saved')
-    act(() => useStore.getState().setBatchItemSkipOverlay('ride-video', true))
-    expect(result.current.status).toBe('Saved')
 
     act(() => useStore.getState().setVideoSyncDetectedLocation(20))
     expect(result.current.status).toBe('Modified')
@@ -357,7 +355,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       selectedSecond: 45,
       timelineViewport: { viewStart: 30, viewEnd: 60 },
       batchOutputFolder: 'C:\\batch-renders',
-      batchSkipOverlay: { 'video-1': true },
       renderSettings: {
         ...DEFAULT_RENDER_SETTINGS,
         outputMode: 'separate',
@@ -396,7 +393,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(state.transitionDefaults).toEqual(DEFAULT_TRANSITION_SETTINGS)
     expect(state.renderSettings).toEqual(DEFAULT_RENDER_SETTINGS)
     expect(state.batchOutputFolder).toBeNull()
-    expect(state.batchSkipOverlay).toEqual({})
     expect(state.selectedSecond).toBe(0)
     expect(state.timelineViewport).toEqual({ viewStart: 0, viewEnd: 73 })
     expect(result.current.loadedProjectPath).toBeNull()
@@ -687,8 +683,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
             ...projectVideo('clip-c', 'c.mp4', 100),
             cuts: [{ id: 'cut-1', frame: 150 }],
             segments: {
-              start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 } },
-              'cut-1': { excluded: true, transitionIn: null },
+              start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 }, skipOverlay: false },
+              'cut-1': { excluded: true, transitionIn: null, skipOverlay: false },
             },
             placementAnchor: { videoId: 'clip-missing', side: 'after' },
           },
@@ -750,8 +746,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       offsetSource: 'auto',
       cuts: [{ id: 'cut-1', frame: 150 }],
       segments: {
-        start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 } },
-        'cut-1': { excluded: true, transitionIn: null },
+        start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 }, skipOverlay: false },
+        'cut-1': { excluded: true, transitionIn: null, skipOverlay: false },
       },
       placementAnchor: { videoId: 'clip-missing', side: 'after' },
       timezoneMode: null,
@@ -783,7 +779,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
 
     expect(useStore.getState().videoEdits['clip-c']).toMatchObject({
       cuts: [],
-      segments: { start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 } } },
+      segments: { start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 }, skipOverlay: false } },
     })
     expect(result.current.status).toBe('Modified')
   })

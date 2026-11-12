@@ -94,7 +94,6 @@ export function applyNewProjectState(store, { templateSource, templateState }) {
     }
     draft.errorMessage = null
     draft.batchOutputFolder = null
-    draft.batchSkipOverlay = {}
     draft.batchSnapshot = null
   })
   state.resetVideoSyncState()
@@ -141,7 +140,6 @@ export function applyProjectOwnedState(store, project, manualVideoSync) {
     draft.cutRemovalRequest = null
     draft.renderSettings = { ...renderSettings, range }
     draft.batchOutputFolder = batchOutputFolder
-    draft.batchSkipOverlay = {}
     draft.batchSnapshot = null
     draft.selectedSecond = clamp(project.timeline.playheadSecond, timelineMinimum, timelineEnd)
     draft.timelineViewport = timelineViewport

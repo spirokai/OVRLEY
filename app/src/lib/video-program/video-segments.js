@@ -1,8 +1,9 @@
 /**
  * Pure helpers for the virtual clips of a video. Cuts `{ id, frame }` split a video
  * at integer frames (strictly increasing, inside the video). Each resulting segment
- * has edits `{ excluded, transitionIn }` in `segments`, keyed by the cut it starts
- * at, or `FIRST_SEGMENT_KEY` for the first one. A video without cuts is one segment,
+ * has edits `{ excluded, transitionIn, skipOverlay }` in `segments`, keyed by the cut it
+ * starts at, or `FIRST_SEGMENT_KEY` for the first one. `skipOverlay` hides the activity
+ * widgets over the segment, in the preview and the render. A video without cuts is one segment,
  * so excluding a whole video and excluding a virtual clip are the same operation.
  */
 
@@ -13,7 +14,7 @@ export const FIRST_SEGMENT_KEY = 'start'
 /**
  * Lists a video's segments in source order.
  * @param {{cuts: Array<{id: string, frame: number}>, segments: object, frameCount: number}} video Timeline clip.
- * @returns {Array<{key: string, startFrame: number, endFrame: number, excluded: boolean, transitionIn: object|null}>} Segments.
+ * @returns {Array<{key: string, startFrame: number, endFrame: number, excluded: boolean, transitionIn: object|null, skipOverlay: boolean}>} Segments.
  */
 export function listVideoSegments(video) {
   const starts = [{ key: FIRST_SEGMENT_KEY, frame: 0 }, ...video.cuts.map((cut) => ({ key: cut.id, frame: cut.frame }))]
@@ -27,14 +28,18 @@ export function listVideoSegments(video) {
 
 /**
  * Copies the segment edits of a video (see the module description).
- * @param {Object<string, {excluded: boolean, transitionIn: {type: string, durationSeconds: number}|null}>} segments Segment edits.
- * @returns {Object<string, {excluded: boolean, transitionIn: {type: string, durationSeconds: number}|null}>} Independent copy.
+ * @param {Object<string, {excluded: boolean, transitionIn: {type: string, durationSeconds: number}|null, skipOverlay: boolean}>} segments Segment edits.
+ * @returns {Object<string, {excluded: boolean, transitionIn: {type: string, durationSeconds: number}|null, skipOverlay: boolean}>} Independent copy.
  */
 export function cloneVideoSegments(segments) {
   return Object.fromEntries(
-    Object.entries(segments).map(([key, { excluded, transitionIn }]) => [
+    Object.entries(segments).map(([key, { excluded, transitionIn, skipOverlay }]) => [
       key,
-      { excluded, transitionIn: transitionIn === null ? null : { type: transitionIn.type, durationSeconds: transitionIn.durationSeconds } },
+      {
+        excluded,
+        transitionIn: transitionIn === null ? null : { type: transitionIn.type, durationSeconds: transitionIn.durationSeconds },
+        skipOverlay,
+      },
     ]),
   )
 }

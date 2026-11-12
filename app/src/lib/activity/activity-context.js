@@ -45,7 +45,8 @@ export function resolveActivityContext({ parsedActivity, activitySummary, clip }
  * Whether activity data covers a timeline second. With an external activity the
  * second must lie inside it; without one, inside the embedded telemetry of the
  * clip playing there. Frames without coverage show raster widgets only. Without
- * any activity or clip (template design) everything counts as covered.
+ * any activity or clip (template design) everything counts as covered. A video part
+ * whose overlay is switched off (`skipOverlay`) is never covered, as in the render.
  * @param {object} options Coverage inputs.
  * @param {object|null} options.parsedActivity External activity.
  * @param {object|null} options.activitySummary External activity summary.
@@ -55,9 +56,10 @@ export function resolveActivityContext({ parsedActivity, activitySummary, clip }
  * @returns {boolean} Whether non-raster widgets are shown.
  */
 export function hasActivityCoverage({ parsedActivity, activitySummary, program, clips, second }) {
+  const target = clips.length === 0 ? null : resolvePreviewTarget(program, second)
+  if (target !== null && (target.isInside || target.isExcluded) && target.piece.skipOverlay) return false
   if (parsedActivity !== null) return second >= 0 && second <= activitySummary.durationSeconds
   if (clips.length === 0) return true
-  const target = resolvePreviewTarget(program, second)
   if (target === null || !target.isInside) return false
   const clip = clips.find((candidate) => candidate.id === target.videoId)
   const activity = clip.telemetry.activity

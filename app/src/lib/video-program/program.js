@@ -34,7 +34,7 @@ function exportWindowFrames(video, exportRange) {
   }
 }
 
-function createPiece(video, startFrame, endFrame, segmentKey) {
+function createPiece(video, startFrame, endFrame, segment) {
   const sourceStartSecond = framesToSeconds(startFrame, video.fps)
   const sourceEndSecond = framesToSeconds(endFrame, video.fps)
   return {
@@ -51,7 +51,8 @@ function createPiece(video, startFrame, endFrame, segmentKey) {
     timelineStartSecond: video.offsetSeconds + sourceStartSecond,
     timelineEndSecond: video.offsetSeconds + sourceEndSecond,
     durationSeconds: sourceEndSecond - sourceStartSecond,
-    segmentKey,
+    segmentKey: segment.key,
+    skipOverlay: segment.skipOverlay,
   }
 }
 
@@ -62,7 +63,7 @@ function collectPieces(videos, exportRange) {
     for (const segment of listVideoSegments(video)) {
       const startFrame = Math.max(segment.startFrame, window.startFrame)
       const endFrame = Math.min(segment.endFrame, window.endFrame)
-      if (!segment.excluded && endFrame > startFrame) pieces.push(createPiece(video, startFrame, endFrame, segment.key))
+      if (!segment.excluded && endFrame > startFrame) pieces.push(createPiece(video, startFrame, endFrame, segment))
     }
   }
   return pieces.sort(
@@ -75,7 +76,7 @@ function collectExcludedSegments(videos) {
   return videos.flatMap((video) =>
     listVideoSegments(video)
       .filter((segment) => segment.excluded)
-      .map((segment) => createPiece(video, segment.startFrame, segment.endFrame, segment.key)),
+      .map((segment) => createPiece(video, segment.startFrame, segment.endFrame, segment)),
   )
 }
 
@@ -102,7 +103,12 @@ function resolveOverlaps(sortedPieces, videosById) {
     })
     const trimmedStartFrame = piece.sourceStartFrame + Math.ceil((overlapSeconds * piece.fps.num) / piece.fps.den - TIME_EPSILON_SECONDS)
     if (trimmedStartFrame < piece.sourceEndFrame) {
-      pieces.push(createPiece(videosById.get(piece.videoId), trimmedStartFrame, piece.sourceEndFrame, piece.segmentKey))
+      pieces.push(
+        createPiece(videosById.get(piece.videoId), trimmedStartFrame, piece.sourceEndFrame, {
+          key: piece.segmentKey,
+          skipOverlay: piece.skipOverlay,
+        }),
+      )
     }
     if (piece.timelineEndSecond > runningEndSecond) {
       runningEndSecond = piece.timelineEndSecond

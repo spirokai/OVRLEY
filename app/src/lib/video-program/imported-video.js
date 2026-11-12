@@ -219,7 +219,7 @@ export function createVideoEdits() {
     offsetSeconds: 0,
     offsetSource: 'auto',
     cuts: [],
-    segments: { [FIRST_SEGMENT_KEY]: { excluded: false, transitionIn: null } },
+    segments: { [FIRST_SEGMENT_KEY]: { excluded: false, transitionIn: null, skipOverlay: false } },
     placementAnchor: null,
     // Apply Timezone of the clip's camera clock; null until it is inferred or chosen.
     timezoneMode: null,

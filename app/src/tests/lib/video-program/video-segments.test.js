@@ -13,7 +13,9 @@ function clip(cuts = [], start = {}) {
 
 describe('segments of a video', () => {
   test('a video without cuts is one segment', () => {
-    expect(listVideoSegments(clip())).toEqual([{ key: 'start', startFrame: 0, endFrame: 300, excluded: false, transitionIn: null }])
+    expect(listVideoSegments(clip())).toEqual([
+      { key: 'start', startFrame: 0, endFrame: 300, excluded: false, transitionIn: null, skipOverlay: false },
+    ])
     expect(isVideoExcluded(clip())).toBe(false)
     expect(isVideoExcluded(clip([], { excluded: true }))).toBe(true)
   })
@@ -62,7 +64,7 @@ describe('cut edits', () => {
   test('a new segment keeps the state of the segment it comes from and follows the defaults', () => {
     const draft = collection()
     const fade = { type: 'fade', durationSeconds: 1 }
-    draft.videoEdits.ride.segments.start = { excluded: true, transitionIn: fade }
+    draft.videoEdits.ride.segments.start = { excluded: true, transitionIn: fade, skipOverlay: true }
     const later = cutVideo(draft, 'ride', 200)
     const earlier = cutVideo(draft, 'ride', 100)
     expect(draft.videoEdits.ride.cuts).toEqual([
@@ -70,9 +72,9 @@ describe('cut edits', () => {
       { id: later, frame: 200 },
     ])
     expect(draft.videoEdits.ride.segments).toEqual({
-      start: { excluded: true, transitionIn: fade },
-      [earlier]: { excluded: true, transitionIn: null },
-      [later]: { excluded: true, transitionIn: null },
+      start: { excluded: true, transitionIn: fade, skipOverlay: true },
+      [earlier]: { excluded: true, transitionIn: null, skipOverlay: true },
+      [later]: { excluded: true, transitionIn: null, skipOverlay: true },
     })
   })
 
@@ -99,7 +101,7 @@ describe('cut edits', () => {
 
     removeCut(draft, 'ride', second, true)
     expect(draft.videoEdits.ride.cuts).toEqual([{ id: first, frame: 100 }])
-    expect(draft.videoEdits.ride.segments[first]).toEqual({ excluded: true, transitionIn: fade })
+    expect(draft.videoEdits.ride.segments[first]).toEqual({ excluded: true, transitionIn: fade, skipOverlay: false })
     expect(draft.videoEdits.ride.segments[second]).toBeUndefined()
     expect(() => removeCut(draft, 'ride', 'missing', false)).toThrow(/Unknown cut/)
   })

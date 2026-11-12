@@ -45,7 +45,7 @@ describe('edge cuts', () => {
       { id: 'cut', frame: 150 },
     ])
     expect(shown.segments).toEqual({
-      start: { excluded: true, transitionIn: null },
+      start: { excluded: true, transitionIn: null, skipOverlay: false },
       'edge-start': clip.segments.start,
       cut: clip.segments.cut,
     })

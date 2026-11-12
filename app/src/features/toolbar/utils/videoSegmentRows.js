@@ -37,7 +37,8 @@ export function groupVideoJoins(program) {
  * @param {object} options.clip Timeline clip (video joined with its edits).
  * @param {Map<string, object>} options.joinModels Transition controls keyed by join key (`useJoinTransitionModels`).
  * @param {Set<string>} options.partJoinKeys Keys of joins between two parts of one video (`groupVideoJoins`).
- * @param {{setVideoSegmentExcluded: function, requestCutRemoval: function, seek: function}} options.commands Store commands and playhead seek.
+ * @param {{setVideoSegmentExcluded: function, setVideoSegmentSkipOverlay: function, requestCutRemoval: function, seek: function}} options.commands
+ *   Store commands and playhead seek.
  * @returns {Array<object>} Presentational rows.
  */
 export function buildVideoSegmentRows({ clip, joinModels, partJoinKeys, commands }) {
@@ -49,10 +50,11 @@ export function buildVideoSegmentRows({ clip, joinModels, partJoinKeys, commands
       key: segment.key,
       startLabel: formatClockDuration(startSecond),
       endLabel: formatClockDuration(endSecond),
-      lengthSeconds: Math.round((endSecond - startSecond) * 10) / 10,
       included: !segment.excluded,
       transition: partJoinKeys.has(joinKey) ? joinModels.get(joinKey) : null,
       onIncludedChange: (included) => commands.setVideoSegmentExcluded(clip.id, segment.key, !included),
+      showsOverlay: !segment.skipOverlay,
+      onShowsOverlayChange: (shows) => commands.setVideoSegmentSkipOverlay(clip.id, segment.key, !shows),
       onSeek: () => commands.seek(clip.offsetSeconds + startSecond),
       onRemoveCut: index === 0 ? null : () => commands.requestCutRemoval(clip.id, segment.key),
     }

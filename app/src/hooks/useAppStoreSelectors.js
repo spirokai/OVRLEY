@@ -160,12 +160,10 @@ export function useBatchRenderStore() {
   return useStore(
     useShallow((state) => ({
       batchOutputFolder: state.batchOutputFolder,
-      batchSkipOverlay: state.batchSkipOverlay,
       hasBatchResults: state.batchSnapshot !== null,
       batchRunning: state.batchSnapshot?.rendererBusy ?? false,
       batchSubmissionPending: state.renderSubmissionTarget === 'batch',
       setBatchOutputFolder: state.setBatchOutputFolder,
-      setBatchItemSkipOverlay: state.setBatchItemSkipOverlay,
       setErrorMessage: state.setErrorMessage,
     })),
   )

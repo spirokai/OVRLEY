@@ -38,6 +38,21 @@ describe('hasActivityCoverage', () => {
     expect(covered(35)).toBe(false) // gap
     expect(covered(50)).toBe(false) // clip without telemetry
   })
+
+  test('a part with its overlay switched off is never covered, also by an external activity', () => {
+    const video = createTestVideo({ durationSeconds: 60, telemetry: { status: 'ready', activity: telemetry } })
+    const { importedVideos, videoEdits } = videoStoreState([video], { 'video-1': 10 })
+    videoEdits['video-1'].segments.start.skipOverlay = true
+    const { clips, program } = buildTimelineProgram({
+      videos: importedVideos,
+      videoEdits,
+      dragPreview: null,
+      transitionDefaults: DEFAULT_TRANSITION_SETTINGS,
+    })
+    const external = (second) => hasActivityCoverage({ parsedActivity: {}, activitySummary: { durationSeconds: 100 }, program, clips, second })
+    const embedded = (second) => hasActivityCoverage({ parsedActivity: null, activitySummary: null, program, clips, second })
+    expect([external(5), external(20), embedded(20)]).toEqual([true, false, false]) // the gap before the part stays covered
+  })
 })
 
 function clipTelemetry(attributes = ['speed']) {

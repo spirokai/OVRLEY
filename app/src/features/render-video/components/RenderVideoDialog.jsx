@@ -49,7 +49,7 @@ export default function RenderVideoDialog(props) {
     >
       <DialogContent
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
-        className={`w-full rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50 ${ctx.hasMultipleVideos ? 'max-w-6xl' : 'max-w-xl'}`}
+        className="w-full max-w-xl rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50"
         aria-describedby={undefined}
         onEscapeKeyDown={(event) => {
           if (ctx.isProgress || ctx.submissionPending || ctx.batchRunning) {
@@ -109,7 +109,7 @@ export default function RenderVideoDialog(props) {
             </div>
           </div>
         ) : (
-          <div className={`grid gap-12 ${ctx.hasMultipleVideos ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
+          <div className="grid grid-cols-1 gap-12">
             <div className={ctx.showBatchProgress ? 'min-w-0 md:flex md:h-150 md:flex-col md:justify-center md:overflow-y-auto' : 'min-w-0'}>
               {ctx.showBatchProgress ? (
                 <>
@@ -128,12 +128,14 @@ export default function RenderVideoDialog(props) {
 
             {ctx.hasImportedVideo && (
               <>
+                {/* The video list is hidden until we decide whether batch export stays; each part's overlay is switched in the video drawer. */}
                 {ctx.hasMultipleVideos ? (
-                  <BatchRenderQueue {...ctx} />
-                ) : ctx.showBatchProgress ? null : (
-                  <BatchReviewAlerts combinedBlockers={ctx.combinedBlockers} batchReviewError={ctx.batchReviewError} />
-                )}
-                <div className={`flex items-center justify-end gap-3 ${ctx.hasMultipleVideos ? 'md:col-span-2' : ''}`}>
+                  <div className="hidden">
+                    <BatchRenderQueue {...ctx} />
+                  </div>
+                ) : null}
+                {ctx.showBatchProgress ? null : <BatchReviewAlerts combinedBlockers={ctx.combinedBlockers} batchReviewError={ctx.batchReviewError} />}
+                <div className="flex items-center justify-end gap-3">
                   <div className="flex items-center gap-3">
                     <Button
                       type="button"

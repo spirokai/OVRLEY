@@ -34,7 +34,6 @@ function review(overrides) {
     codec: 'libx264',
     exportRange: all,
     transitionDefaults: defaults,
-    skipOverlay: {},
     inspection: inspected(clips),
     sync,
     locale: 'en',
@@ -47,9 +46,11 @@ const ride = createTestVideo({ id: 'ride', path: '/videos/ride.mp4', durationSec
 const climb = createTestVideo({ id: 'climb', path: '/videos/climb.mp4', durationSeconds: 30, importOrder: 1 })
 
 describe('reviewExport', () => {
-  test('combines the program into one output joined by its transitions', () => {
-    const clips = clipsOf([ride, climb], { ride: 0, climb: 70 })
-    const { outputs, offsets, blockers } = review({ clips, skipOverlay: { climb: true } })
+  test('combines the program into one output joined by its transitions, each piece keeping its overlay switch', () => {
+    const clips = clipsOf([ride, climb], { ride: 0, climb: 70 }).map((clip) =>
+      clip.id === 'climb' ? { ...clip, segments: { start: { ...clip.segments.start, skipOverlay: true } } } : clip,
+    )
+    const { outputs, offsets, blockers } = review({ clips })
     expect(blockers).toEqual([])
     expect(outputs).toEqual([
       {

@@ -33,7 +33,7 @@ describe('video edits in the store', () => {
     useStore.getState().requestCutRemoval('ride', cutId)
     expect(useStore.getState().cutRemovalRequest).toBeNull()
     expect(edits().cuts).toEqual([])
-    expect(edits().segments).toEqual({ start: { excluded: false, transitionIn: null } })
+    expect(edits().segments).toEqual({ start: { excluded: false, transitionIn: null, skipOverlay: false } })
   })
 
   test.each([
@@ -61,8 +61,8 @@ describe('video edits in the store', () => {
     const [trim] = edits().cuts
     expect(trim.frame).toBe(30)
     // The video's incoming transition moves to the part that now starts it.
-    expect(edits().segments.start).toEqual({ excluded: true, transitionIn: null })
-    expect(edits().segments[trim.id]).toEqual({ excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 } })
+    expect(edits().segments.start).toEqual({ excluded: true, transitionIn: null, skipOverlay: false })
+    expect(edits().segments[trim.id]).toEqual({ excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 }, skipOverlay: false })
     useStore.getState().trimVideo('ride', 'end', 270)
     expect(edits().cuts.map((cut) => cut.frame)).toEqual([30, 150, 270])
     expect(edits().segments[edits().cuts[2].id].excluded).toBe(true)
@@ -71,7 +71,7 @@ describe('video edits in the store', () => {
     useStore.temporal.getState().undo()
     useStore.temporal.getState().undo()
     expect(edits().cuts).toEqual([{ id: cutId, frame: 150 }])
-    expect(edits().segments.start).toEqual({ excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 } })
+    expect(edits().segments.start).toEqual({ excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 }, skipOverlay: false })
     expect(() => useStore.getState().trimVideo('ride', 'end', 100)).toThrow('cannot pass a cut')
   })
 

@@ -281,7 +281,8 @@ describe('native batch workflow', () => {
     await act(async () => finish())
     await waitFor(() => expect(result.current.batchReady).toBe(true))
   })
-  test('submits once with committed offsets and overlay choices; keeps the editor and history through mixed results and unmount', async () => {
+  test('submits once with committed offsets and the overlay switch of each part; keeps the editor and history through mixed results and unmount', async () => {
+    useStore.getState().setVideoSegmentSkipOverlay('next', 'start', true)
     const before = editorState()
     const history = useStore.temporal.getState().pastStates
     const { result, unmount } = renderHook(() => ({
@@ -291,8 +292,6 @@ describe('native batch workflow', () => {
     }))
     await waitFor(() => expect(result.current.batch.batchReady).toBe(true))
     expect(result.current.batch.batchQueue.find((row) => row.path === blocked).status).toBe('pending')
-    act(() => result.current.batch.setBatchItemSkipOverlay('next', true))
-    await waitFor(() => expect(result.current.batch.batchReady).toBe(true))
     await act(async () => result.current.batch.runBatch())
     expect(backend.submitBatchRender).toHaveBeenCalledOnce()
     expect(backend.subscribeBatchRenderProgress.mock.invocationCallOrder[0]).toBeLessThan(backend.submitBatchRender.mock.invocationCallOrder[0])
@@ -395,7 +394,7 @@ describe('native batch workflow', () => {
     expect(result.current.batchQueue.find((row) => row.path === next).status).toBe('blocked')
     await act(async () => result.current.runBatch())
     expect(backend.submitBatchRender).toHaveBeenCalledOnce()
-    act(() => result.current.setBatchItemSkipOverlay('reference', true))
+    act(() => useStore.getState().setVideoSegmentSkipOverlay('reference', 'start', true))
     expect(result.current.batchReady).toBe(false)
     act(() => result.current.refreshInspection())
     await waitFor(() => expect(result.current.batchReady).toBe(true))

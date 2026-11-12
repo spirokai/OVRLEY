@@ -1,11 +1,13 @@
 import { Fragment } from 'react'
-import { AlertTriangle, Clock3, Film, FolderSearch, RefreshCw, Scissors, Trash2 } from 'lucide-react'
+import { AlertTriangle, Clock3, Film, FolderSearch, Gauge, RefreshCw, Scissors, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { SecondsInput } from '@/components/ui/seconds-input'
 import { SectionHeading } from '@/components/ui/section-heading'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Toggle } from '@/components/ui/toggle'
 import { JoinTransitionControl } from '@/features/transitions'
 import { cn } from '@/lib/utils'
 import { useFileDropZone } from '../hooks/useFileDropZone'
@@ -29,46 +31,73 @@ function SegmentJoin({ transition, id, label }) {
   )
 }
 
+/**
+ * One part of a video. The switch includes the part in the export and leads the row; the icon toggle
+ * before it shows the activity widgets over the part, in the preview and the render.
+ */
 function SegmentCard({ segment, filename }) {
   const { t } = useTranslation()
   const includedLabel = t('toolbar.includeInExport', 'Include in export')
+  const overlayLabel = t('toolbar.showOverlay', 'Show overlay')
+  const hideOverlayLabel = t('toolbar.hideOverlay', 'Hide overlay')
   const removeCutLabel = t('toolbar.removeCutAt', { defaultValue: 'Remove the cut at {{time}}', time: segment.startLabel })
   return (
     <li
       data-included={segment.included}
       className="group mt-1 flex min-w-0 items-center gap-2 rounded-sm bg-foreground/6 py-1.5 pl-2.5 pr-2 first:mt-0 data-[included=false]:bg-foreground/3"
     >
-      <button
-        type="button"
-        className={cn('text-xs font-bold tabular-nums text-foreground underline-offset-2 hover:underline', EXCLUDED_PART_TEXT)}
-        title={t('toolbar.goToPart', 'Go to part')}
-        onClick={segment.onSeek}
-      >
-        {segment.startLabel} – {segment.endLabel}
-      </button>
-      <span className={cn('ml-auto text-[0.7rem] tabular-nums text-muted-foreground', EXCLUDED_PART_TEXT)}>
-        {t('toolbar.partLength', { defaultValue: '{{seconds}} s', seconds: segment.lengthSeconds })}
-      </span>
-      <span className="w-6 shrink-0">
-        {segment.onRemoveCut !== null ? (
+      <SimpleTooltip content={t('toolbar.goToPart', 'Go to part')}>
+        <button
+          type="button"
+          className={cn('text-xs font-bold tabular-nums text-foreground underline-offset-2 hover:underline', EXCLUDED_PART_TEXT)}
+          onClick={segment.onSeek}
+        >
+          {segment.startLabel} – {segment.endLabel}
+        </button>
+      </SimpleTooltip>
+      {segment.onRemoveCut !== null ? (
+        <SimpleTooltip content={removeCutLabel}>
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground opacity-0 transition-opacity hover:bg-surface-accent-soft hover:text-primary focus-visible:opacity-100 group-hover:opacity-100"
+            className="h-7 w-7 text-muted-foreground/60 transition-colors hover:bg-surface-accent-soft hover:text-primary"
             onClick={segment.onRemoveCut}
             aria-label={removeCutLabel}
-            title={removeCutLabel}
           >
-            <Trash2 className="h-3 w-3" />
+            <Trash2 className="size-4" />
           </Button>
-        ) : null}
-      </span>
+        </SimpleTooltip>
+      ) : null}
+      <SimpleTooltip content={segment.showsOverlay ? hideOverlayLabel : overlayLabel} className="ml-auto">
+        <Toggle
+          size="sm"
+          className="h-7 min-w-7 cursor-pointer rounded-sm bg-foreground/10 px-0 text-muted-foreground hover:bg-foreground/15 hover:text-foreground data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary/90 data-[state=on]:hover:text-primary-foreground"
+          pressed={segment.showsOverlay}
+          onPressedChange={segment.onShowsOverlayChange}
+          aria-label={`${overlayLabel}: ${filename} ${segment.startLabel}`}
+        >
+          <Gauge className="size-4.5" />
+        </Toggle>
+      </SimpleTooltip>
       <Switch
         aria-label={`${includedLabel}: ${filename} ${segment.startLabel}`}
         checked={segment.included}
         onCheckedChange={segment.onIncludedChange}
       />
+    </li>
+  )
+}
+
+/** Where the last transition leads: the video that follows this one on the timeline. */
+function NextClipCard({ filename }) {
+  const { t } = useTranslation()
+  return (
+    <li className="flex min-w-0 items-center gap-2 rounded-sm border border-dashed border-foreground/15 py-1.5 pl-2.5 pr-2">
+      <span className="shrink-0 text-[0.7rem] font-bold uppercase tracking-wide text-muted-foreground/70">{t('toolbar.nextClip', 'Next clip')}</span>
+      <SimpleTooltip content={filename} className="min-w-0" align="start" wrapText>
+        <span className="min-w-0 truncate text-xs text-muted-foreground">{filename}</span>
+      </SimpleTooltip>
     </li>
   )
 }
@@ -90,7 +119,10 @@ function SegmentList({ segments, exits, clipId, filename }) {
         </Fragment>
       ))}
       {exits.map((exit) => (
-        <SegmentJoin key={exit.key} transition={exit.transition} id={`video-transition-${exit.key}`} label={exit.label} />
+        <Fragment key={exit.key}>
+          <SegmentJoin transition={exit.transition} id={`video-transition-${exit.key}`} label={exit.label} />
+          <NextClipCard filename={exit.nextFilename} />
+        </Fragment>
       ))}
     </ul>
   )
@@ -152,9 +184,9 @@ function SelectedVideoDetails({ row }) {
   return (
     <section className="space-y-4" aria-label={row.filename}>
       <div className="flex min-w-0 items-center gap-2 pb-2 pl-1 pt-4 text-sm font-extrabold text-foreground">
-        <span className="min-w-0 flex-1 truncate" title={row.filename}>
-          {row.filename}
-        </span>
+        <SimpleTooltip content={row.filename} className="min-w-0 flex-1" wrapText>
+          <span className="min-w-0 truncate">{row.filename}</span>
+        </SimpleTooltip>
         <Button
           type="button"
           variant="ghost"
@@ -194,9 +226,7 @@ function SelectedVideoDetails({ row }) {
         {row.metadataRows.map((metadataRow) => (
           <div key={metadataRow.label} className="contents">
             <dt className="font-bold text-muted-foreground">{metadataRow.label}</dt>
-            <dd className="min-w-0 wrap-break-words text-left font-medium text-foreground/90" title={metadataRow.value}>
-              {metadataRow.value}
-            </dd>
+            <dd className="min-w-0 wrap-break-words text-left font-medium text-foreground/90">{metadataRow.value}</dd>
           </div>
         ))}
       </dl>

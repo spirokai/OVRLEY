@@ -41,6 +41,7 @@ export function useSelectedVideoRow({ onRemoveVideo, onLocateVideo }) {
     setVideoCreationTimeSource,
     setVideoTimezoneMode,
     setVideoSegmentExcluded,
+    setVideoSegmentSkipOverlay,
     requestCutRemoval,
     commitPreviewScrub,
   } = useStore(
@@ -52,6 +53,7 @@ export function useSelectedVideoRow({ onRemoveVideo, onLocateVideo }) {
       setVideoCreationTimeSource: state.setVideoCreationTimeSource,
       setVideoTimezoneMode: state.setVideoTimezoneMode,
       setVideoSegmentExcluded: state.setVideoSegmentExcluded,
+      setVideoSegmentSkipOverlay: state.setVideoSegmentSkipOverlay,
       requestCutRemoval: state.requestCutRemoval,
       commitPreviewScrub: state.commitPreviewScrub,
     })),
@@ -60,7 +62,7 @@ export function useSelectedVideoRow({ onRemoveVideo, onLocateVideo }) {
   return useMemo(() => {
     const clip = clips.find((candidate) => candidate.id === selectedVideoId)
     if (clip === undefined) return null
-    const commands = { setVideoSegmentExcluded, requestCutRemoval, seek: commitPreviewScrub }
+    const commands = { setVideoSegmentExcluded, setVideoSegmentSkipOverlay, requestCutRemoval, seek: commitPreviewScrub }
     const { partJoinKeys, exitJoinsByVideoId } = groupVideoJoins(program)
     const filenamesById = new Map(clips.map((candidate) => [candidate.id, filenameFromSelectedPath(candidate.path)]))
     return {
@@ -91,6 +93,7 @@ export function useSelectedVideoRow({ onRemoveVideo, onLocateVideo }) {
       exits: (exitJoinsByVideoId.get(clip.id) ?? []).map((join) => ({
         key: join.key,
         label: t('toolbar.transitionTo', { defaultValue: 'Transition to {{name}}', name: filenamesById.get(join.videoId) }),
+        nextFilename: filenamesById.get(join.videoId),
         transition: joinModels.get(join.key),
       })),
     }
@@ -107,6 +110,7 @@ export function useSelectedVideoRow({ onRemoveVideo, onLocateVideo }) {
     setVideoCreationTimeSource,
     setVideoOffset,
     setVideoSegmentExcluded,
+    setVideoSegmentSkipOverlay,
     setVideoTimezoneMode,
     t,
     timezone,

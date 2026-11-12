@@ -191,7 +191,10 @@ describe('useOverlayPlayer', () => {
     expect(result.current.toolbar.videoEdit.canCut).toBe(false)
 
     press('x')
-    expect(edits().segments).toEqual({ start: { excluded: false, transitionIn: null }, [cut.id]: { excluded: true, transitionIn: null } })
+    expect(edits().segments).toEqual({
+      start: { excluded: false, transitionIn: null, skipOverlay: false },
+      [cut.id]: { excluded: true, transitionIn: null, skipOverlay: false },
+    })
     expect(result.current.toolbar.videoEdit.excluded).toBe(true)
     expect(
       findLane(result, 'video:video-1')

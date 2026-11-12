@@ -52,16 +52,18 @@ export function createTestVideo({
 
 /**
  * Video edits that split a video.
- * @param {Array<{id: string, frame: number, excluded?: boolean, transitionIn?: object|null}>} [cuts] Cuts with the edits of the segment each starts.
- * @param {{excluded?: boolean, transitionIn?: object|null}} [start] Edits of the first segment.
+ * @param {Array<{id: string, frame: number, excluded?: boolean, transitionIn?: object|null, skipOverlay?: boolean}>} [cuts] Cuts with the edits of the segment each starts.
+ * @param {{excluded?: boolean, transitionIn?: object|null, skipOverlay?: boolean}} [start] Edits of the first segment.
  * @returns {{cuts: Array<object>, segments: object}} Edits fields.
  */
 export function cutEdits(cuts = [], start = {}) {
   return {
     cuts: cuts.map(({ id, frame }) => ({ id, frame })),
     segments: {
-      start: { excluded: false, transitionIn: null, ...start },
-      ...Object.fromEntries(cuts.map(({ id, excluded = false, transitionIn = null }) => [id, { excluded, transitionIn }])),
+      start: { excluded: false, transitionIn: null, skipOverlay: false, ...start },
+      ...Object.fromEntries(
+        cuts.map(({ id, excluded = false, transitionIn = null, skipOverlay = false }) => [id, { excluded, transitionIn, skipOverlay }]),
+      ),
     },
   }
 }
