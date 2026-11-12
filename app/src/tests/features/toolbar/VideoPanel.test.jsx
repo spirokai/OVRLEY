@@ -22,7 +22,7 @@ describe('VideoPanel', () => {
     const onRemoveVideo = vi.fn()
     render(<VideoPanel onDeleteVideo={vi.fn()} onRemoveVideo={onRemoveVideo} />)
 
-    expect(cards().map((card) => within(card).getByTitle(/\.mp4$/).textContent)).toEqual(['climb.mp4', 'ride.mp4'])
+    expect(cards().map((card) => within(card).getByText(/\.mp4$/).textContent)).toEqual(['climb.mp4', 'ride.mp4'])
     expect(cards()[1].querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,AA==')
 
     const rideCard = within(cards()[1]).getByRole('button', { pressed: false })

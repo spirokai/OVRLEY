@@ -11,6 +11,7 @@ import FontSelectField from '@/components/ui/font-select-field'
 import { useAvailableFonts, useLabelTypography } from '@/hooks/useFonts'
 import { getThemeColor } from '@/lib/color-utils'
 import { useTranslation } from 'react-i18next'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 /**
  * Renders the position section component.
@@ -135,15 +136,16 @@ export function FontSection({
         trailing={
           widget.category === 'labels' ? (
             <ToggleGroup size="compact" type="multiple" value={typography.italic ? ['italic'] : []} onValueChange={typography.changeItalic}>
-              <ToggleGroupItem
-                value="italic"
-                size="compact"
-                disabled={!typography.italicSupported}
-                aria-label={t('widget-editor.italic', 'Italic')}
-                title={t('widget-editor.italic', 'Italic')}
-              >
-                <Italic />
-              </ToggleGroupItem>
+              <SimpleTooltip content={t('widget-editor.italic', 'Italic')}>
+                <ToggleGroupItem
+                  value="italic"
+                  size="compact"
+                  disabled={!typography.italicSupported}
+                  aria-label={t('widget-editor.italic', 'Italic')}
+                >
+                  <Italic />
+                </ToggleGroupItem>
+              </SimpleTooltip>
             </ToggleGroup>
           ) : showContentAlignment ? (
             <ContentAlignmentControl

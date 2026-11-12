@@ -20,6 +20,7 @@ import { TransitionSelect } from '@/features/transitions'
 import { VideoSyncControls } from '@/features/video-sync'
 import { formatSecondsClock } from '@/lib/time-format'
 import { cn } from '@/lib/utils'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 const ICON_BUTTON_CLASS =
   'h-8 w-8 shrink-0 text-muted-foreground hover:bg-surface-accent-soft hover:text-primary disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-muted-foreground'
@@ -83,16 +84,16 @@ function VideoImportRow({ row, windowKind, resolutionLabel }) {
         />
       </div>
       <div className={cn('min-w-0 space-y-0.5', !row.isIncluded && 'opacity-60')}>
-        <p className="flex min-w-0 items-center gap-2 text-xs font-medium text-foreground">
-          <span className="truncate" title={row.path}>
-            {row.filename}
-          </span>
+        <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-foreground">
+          <SimpleTooltip content={row.path} className="min-w-0" align="start" wrapText>
+            <span className="min-w-0 truncate">{row.filename}</span>
+          </SimpleTooltip>
           {row.isNew ? (
             <Badge variant="secondary" className="shrink-0 rounded-xs px-1.5 py-0 text-[0.6rem]">
               {t('video-preview.importNew', 'New')}
             </Badge>
           ) : null}
-        </p>
+        </div>
         <p
           className={cn(
             'text-[0.7rem] tabular-nums',
@@ -270,9 +271,9 @@ export function VideoImportDialog(props) {
                   ))}
                   {props.failures.map((failure) => (
                     <li key={failure.key} aria-label={failure.name} className="space-y-0.5 rounded-sm px-2 py-2 opacity-60">
-                      <p className="truncate text-xs font-medium text-foreground" title={failure.key}>
-                        {failure.name}
-                      </p>
+                      <SimpleTooltip content={failure.key} className="flex min-w-0" align="start" wrapText>
+                        <p className="min-w-0 truncate text-xs font-medium text-foreground">{failure.name}</p>
+                      </SimpleTooltip>
                       <p className="text-[0.7rem] leading-tight text-red-700">
                         {t('video-preview.importFailed', { defaultValue: 'Not imported: {{message}}', message: failure.message })}
                       </p>

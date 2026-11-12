@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { useTransitionDefaultsSection } from '../hooks/useTransitionDefaultsSection'
 import { useVideoCards } from '../hooks/useVideoCards'
 import { useVideoSyncControls } from '../hooks/useVideoSyncControls'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 function LabeledField({ id, label, children }) {
   return (
@@ -172,9 +173,9 @@ function VideoCard({ card }) {
             {card.durationLabel}
           </span>
         </span>
-        <span className="truncate px-2 py-1.5 text-xs font-bold text-foreground" title={card.filename}>
-          {card.filename}
-        </span>
+        <SimpleTooltip content={card.filename} className="flex min-w-0 px-2 py-1.5" align="start" wrapText>
+          <span className="min-w-0 truncate text-xs font-bold text-foreground">{card.filename}</span>
+        </SimpleTooltip>
       </button>
       <Button
         type="button"

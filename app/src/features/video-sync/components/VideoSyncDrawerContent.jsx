@@ -8,6 +8,7 @@ import { VIDEO_SYNC_MATCH_SCOPES, VIDEO_SYNC_SPEED_THRESHOLD_RANGE_KMH, VIDEO_SY
 import { VideoSyncCandidateList } from './VideoSyncCandidateList'
 import { VideoSyncControls } from './VideoSyncControls'
 import { VideoSyncLandmarkList } from './VideoSyncLandmarkList'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 /**
  * Renders the dedicated manual video-sync drawer.
@@ -107,40 +108,44 @@ export function VideoSyncDrawerContent({
                     role="list"
                   >
                     <div
-                      className="flex items-center justify-center gap-1 text-video-sync-turn"
+                      className="flex items-center justify-center text-video-sync-turn"
                       role="listitem"
                       aria-label={`${detectionCounts.leftTurns} ${t('videoSync.leftTurns', 'Left Turns')}`}
-                      title={t('videoSync.leftTurns', 'Left Turns')}
                     >
-                      <span className="font-semibold tabular-nums pt-0.5">{detectionCounts.leftTurns}</span>
-                      <CornerUpLeft className="size-4" strokeWidth={2.5} aria-hidden="true" />
+                      <SimpleTooltip content={t('videoSync.leftTurns', 'Left Turns')} className="items-center gap-1">
+                        <span className="font-semibold tabular-nums pt-0.5">{detectionCounts.leftTurns}</span>
+                        <CornerUpLeft className="size-4" strokeWidth={2.5} aria-hidden="true" />
+                      </SimpleTooltip>
                     </div>
                     <div
-                      className="flex items-center justify-center gap-1 text-video-sync-stop"
+                      className="flex items-center justify-center text-video-sync-stop"
                       role="listitem"
                       aria-label={`${detectionCounts.stops} ${t('videoSync.stops', 'Stops')}`}
-                      title={t('videoSync.stops', 'Stops')}
                     >
-                      <span className="font-semibold tabular-nums pt-0.5">{detectionCounts.stops}</span>
-                      <OctagonMinus className="size-4" strokeWidth={2.5} aria-hidden="true" />
+                      <SimpleTooltip content={t('videoSync.stops', 'Stops')} className="items-center gap-1">
+                        <span className="font-semibold tabular-nums pt-0.5">{detectionCounts.stops}</span>
+                        <OctagonMinus className="size-4" strokeWidth={2.5} aria-hidden="true" />
+                      </SimpleTooltip>
                     </div>
                     <div
-                      className="flex items-center justify-center gap-1 text-video-sync-turn"
+                      className="flex items-center justify-center text-video-sync-turn"
                       role="listitem"
                       aria-label={`${detectionCounts.rightTurns} ${t('videoSync.rightTurns', 'Right Turns')}`}
-                      title={t('videoSync.rightTurns', 'Right Turns')}
                     >
-                      <span className="font-semibold tabular-nums pt-0.5">{detectionCounts.rightTurns}</span>
-                      <CornerUpRight className="size-4" strokeWidth={2.5} aria-hidden="true" />
+                      <SimpleTooltip content={t('videoSync.rightTurns', 'Right Turns')} className="items-center gap-1">
+                        <span className="font-semibold tabular-nums pt-0.5">{detectionCounts.rightTurns}</span>
+                        <CornerUpRight className="size-4" strokeWidth={2.5} aria-hidden="true" />
+                      </SimpleTooltip>
                     </div>
                     <div
-                      className="flex items-center justify-center gap-1 text-video-sync-location"
+                      className="flex items-center justify-center text-video-sync-location"
                       role="listitem"
                       aria-label={`${detectionCounts.locations} ${t('videoSync.locations', 'Locations')}`}
-                      title={t('videoSync.locations', 'Locations')}
                     >
-                      <span className="font-semibold tabular-nums pt-0.5">{detectionCounts.locations}</span>
-                      <MapPin className="size-3.5" strokeWidth={2.5} aria-hidden="true" />
+                      <SimpleTooltip content={t('videoSync.locations', 'Locations')} className="items-center gap-1">
+                        <span className="font-semibold tabular-nums pt-0.5">{detectionCounts.locations}</span>
+                        <MapPin className="size-3.5" strokeWidth={2.5} aria-hidden="true" />
+                      </SimpleTooltip>
                     </div>
                   </div>
 

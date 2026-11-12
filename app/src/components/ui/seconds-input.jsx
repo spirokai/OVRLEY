@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { useSecondsInput } from '@/hooks/useSecondsInput'
 import { cn } from '@/lib/utils'
 import { useTranslation } from 'react-i18next'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 /**
  * Renders a seconds input. Typed text is kept until Enter or leaving the field,
@@ -106,33 +107,28 @@ export function SecondsInput({
           </div>
         ) : null}
         {field.onReset !== null ? (
-          <button
-            type="button"
-            className={cn(
-              'absolute inset-y-1 flex w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50',
-              slotPosition,
-            )}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={field.onReset}
-            disabled={props.disabled}
-            aria-label={reset.label}
-            title={reset.manualHint}
-          >
-            <RotateCcw className="h-3 w-3" />
-          </button>
+          <SimpleTooltip content={reset.manualHint} className={cn('absolute inset-y-1 w-5', slotPosition)}>
+            <button
+              type="button"
+              className="flex w-full items-center justify-center rounded text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={field.onReset}
+              disabled={props.disabled}
+              aria-label={reset.label}
+            >
+              <RotateCcw className="h-3 w-3" />
+            </button>
+          </SimpleTooltip>
         ) : reset !== null ? (
-          <span
-            role="img"
-            className={cn(
-              'absolute inset-y-1 flex w-5 items-center justify-center text-muted-foreground/50',
-              slotPosition,
-              props.disabled && 'opacity-50',
-            )}
-            aria-label={reset.autoHint}
-            title={reset.autoHint}
-          >
-            <Clock className="h-3 w-3" />
-          </span>
+          <SimpleTooltip content={reset.autoHint} className={cn('absolute inset-y-1 w-5', slotPosition)}>
+            <span
+              role="img"
+              className={cn('flex w-full items-center justify-center text-muted-foreground/50', props.disabled && 'opacity-50')}
+              aria-label={reset.autoHint}
+            >
+              <Clock className="h-3 w-3" />
+            </span>
+          </SimpleTooltip>
         ) : null}
       </div>
       {field.error !== null ? (

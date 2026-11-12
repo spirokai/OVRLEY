@@ -7,6 +7,7 @@ import { buildActivityDrawerViewModel, buildLapRows } from '../utils/activityDra
 import { ActivityLapTable } from './ActivityLapTable'
 import { FileDragCursor, FileDropZone } from './FileDropZone'
 import { useTranslation } from 'react-i18next'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 function MetricGrid({ metrics, emptyLabel }) {
   if (metrics.length === 0) return <p className="text-[0.7rem] text-muted-foreground/90 px-2">{emptyLabel}</p>
@@ -75,9 +76,9 @@ export function ActivityDrawerContent({
           <section className="space-y-4">
             <div className="flex items-center justify-between pb-2 pl-1 pt-4 text-sm font-extrabold text-foreground">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="min-w-0 truncate" title={displayFilename}>
-                  {displayFilename}
-                </span>
+                <SimpleTooltip content={displayFilename} className="min-w-0" align="start" wrapText>
+                  <span className="min-w-0 truncate">{displayFilename}</span>
+                </SimpleTooltip>
               </div>
               {onDeleteActivity ? (
                 <Button
@@ -106,9 +107,7 @@ export function ActivityDrawerContent({
               {drawerViewModel.metadataRows.map((row) => (
                 <div key={row.label} className="contents">
                   <dt className="font-bold text-muted-foreground">{row.label}</dt>
-                  <dd className="min-w-0 wrap-break-words text-left font-medium text-foreground/90" title={row.value}>
-                    {row.value}
-                  </dd>
+                  <dd className="min-w-0 wrap-break-words text-left font-medium text-foreground/90">{row.value}</dd>
                 </div>
               ))}
             </dl>

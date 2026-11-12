@@ -18,6 +18,7 @@ import HexColorPicker from '@/components/ui/hex-color-picker'
 import { cn } from '@/lib/utils'
 import { AlignCenter, AlignLeft, AlignRight, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 export const TIME_FORMATS = [
   { value: 'date-dd-mm-yyyy', labelKey: 'widget-editor.dateFormatDdMmYyyy', defaultLabel: 'Date only (DD-MM-YYYY)' },
@@ -88,9 +89,11 @@ export function ContentAlignmentControl({ value, onValueChange }) {
           const Icon = option.icon
           const label = t(option.labelKey, option.defaultLabel)
           return (
-            <ToggleGroupItem key={option.value} value={option.value} size="compact" aria-label={label} title={label}>
-              <Icon />
-            </ToggleGroupItem>
+            <SimpleTooltip key={option.value} content={label}>
+              <ToggleGroupItem value={option.value} size="compact" aria-label={label}>
+                <Icon />
+              </ToggleGroupItem>
+            </SimpleTooltip>
           )
         })}
       </ToggleGroup>

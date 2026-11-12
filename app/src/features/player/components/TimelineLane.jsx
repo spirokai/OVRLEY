@@ -28,23 +28,25 @@ function SkippedJoinMarker({ marker }) {
 function JoinMarker({ marker }) {
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label={marker.label}
-          title={marker.label}
-          className={`absolute top-1.5 z-30 h-3 w-3 -translate-x-1/2 rotate-45 rounded-[2px] border shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
-            marker.isInvalid
-              ? 'border-destructive bg-destructive'
-              : marker.hasTransition
-                ? 'border-foreground/70 bg-primary'
-                : 'border-foreground/60 bg-background'
-          }`}
-          style={marker.style}
-          onPointerDown={stopPropagation}
-          onDoubleClick={stopPropagation}
-        />
-      </PopoverTrigger>
+      <div className="absolute top-1.5 z-30 flex -translate-x-1/2 focus-within:z-50 hover:z-50" style={marker.style}>
+        <SimpleTooltip content={marker.label}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label={marker.label}
+              className={`h-3 w-3 rotate-45 rounded-[2px] border shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
+                marker.isInvalid
+                  ? 'border-destructive bg-destructive'
+                  : marker.hasTransition
+                    ? 'border-foreground/70 bg-primary'
+                    : 'border-foreground/60 bg-background'
+              }`}
+              onPointerDown={stopPropagation}
+              onDoubleClick={stopPropagation}
+            />
+          </PopoverTrigger>
+        </SimpleTooltip>
+      </div>
       <PopoverContent side="top" className="w-104 p-3">
         <JoinTransitionPanel model={marker.control} />
       </PopoverContent>
@@ -69,9 +71,7 @@ function CutMarker({ marker }) {
     <button
       type="button"
       aria-label={marker.label}
-      title={marker.label}
-      className={`group/cut absolute top-3 bottom-1 z-20 w-3 cursor-ew-resize touch-none bg-transparent outline-none ${align.area}`}
-      style={marker.style}
+      className="group/cut h-full w-full cursor-ew-resize touch-none bg-transparent outline-none"
       onDoubleClick={stopPropagation}
       data-keeps-clip-selection
       {...marker.dragProps}
@@ -84,10 +84,18 @@ function CutMarker({ marker }) {
       />
     </button>
   )
-  if (marker.onRemove === null) return hitArea
+  // The positioned box holds the tooltip, so the hit area keeps its place on the timeline while the tooltip wraps it.
+  const placed = (trigger) => (
+    <div className={`absolute top-3 bottom-1 z-20 w-3 hover:z-50 ${align.area}`} style={marker.style}>
+      <SimpleTooltip content={marker.label} className="h-full w-full">
+        {trigger}
+      </SimpleTooltip>
+    </div>
+  )
+  if (marker.onRemove === null) return placed(hitArea)
   return (
     <Popover>
-      <PopoverTrigger asChild>{hitArea}</PopoverTrigger>
+      {placed(<PopoverTrigger asChild>{hitArea}</PopoverTrigger>)}
       <PopoverContent side="top" className="w-56 space-y-2 p-3">
         <p className="text-xs font-semibold">{marker.label}</p>
         <Button type="button" variant="secondary" className="h-7 w-full text-xs" onClick={marker.onRemove}>

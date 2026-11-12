@@ -13,12 +13,22 @@ import { cn } from '@/lib/utils'
  * @param {*} props.children - Nested React children.
  * @param {*} props.side - Value for side.
  * @param {'start'|'center'|'end'} props.align - Alignment along the tooltip side.
- * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.className - Class names merged into the wrapper (e.g. `block min-w-0` to keep a truncating child's layout).
  * @param {string} props.contentClassName - Additional class names for the tooltip bubble.
  * @param {number} [props.delayMs=500] - Delay before the fade-in starts, in milliseconds.
+ * @param {boolean} [props.wrapText=false] - Wraps long content such as a file path instead of keeping it on one line.
  * @returns {JSX.Element} Rendered component output.
  */
-export function SimpleTooltip({ content, children, side = 'top', align = 'center', className = '', contentClassName = '', delayMs = 400 }) {
+export function SimpleTooltip({
+  content,
+  children,
+  side = 'top',
+  align = 'center',
+  className = '',
+  contentClassName = '',
+  delayMs = 400,
+  wrapText = false,
+}) {
   const [show, setShow] = useState(false)
 
   if (!content) return children
@@ -54,12 +64,13 @@ export function SimpleTooltip({ content, children, side = 'top', align = 'center
   }[side]
 
   return (
-    <div className={`relative inline-flex ${className}`} onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+    <div className={cn('relative inline-flex', className)} onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
       {children}
       {show && (
         <div
           className={cn(
             `absolute ${sideClasses} ${alignment.content} z-1000 whitespace-nowrap rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-xs text-foreground shadow-2xl pointer-events-none animate-in fade-in duration-100 fill-mode-both ease-out`,
+            wrapText && 'w-max max-w-80 whitespace-normal break-all',
             contentClassName,
           )}
           style={{ animationDelay: `${delayMs}ms` }}
