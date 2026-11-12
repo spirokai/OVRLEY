@@ -1,4 +1,4 @@
-import { Activity, Blocks, Film, FolderKanban, RotateCwClock } from 'lucide-react'
+import { Activity, Blocks, Film, FolderKanban, RotateCwClock, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { useTranslation } from 'react-i18next'
@@ -24,10 +24,12 @@ const TOOL_DEFINITIONS = [
  * @param {boolean} props.drawerVisible - Whether the shared drawer is visible.
  * @param {string} props.width - Toolbar width allocated by the shell layout.
  * @param {(tool: string) => void} props.onSelectTool - Selects a toolbar tool.
+ * @param {() => void} props.onOpenSettings - Opens the app settings dialog.
  * @returns {JSX.Element} Rendered toolbar.
  */
-export function VerticalToolbar({ activeTool, drawerVisible, width, onSelectTool }) {
+export function VerticalToolbar({ activeTool, drawerVisible, width, onSelectTool, onOpenSettings }) {
   const { t } = useTranslation()
+  const settingsLabel = t('app-shell.settings')
 
   return (
     <div className="z-70 flex h-full shrink-0 flex-col items-center border-r border-border bg-card py-4 gap-2" style={{ width }}>
@@ -51,6 +53,13 @@ export function VerticalToolbar({ activeTool, drawerVisible, width, onSelectTool
           </SimpleTooltip>
         )
       })}
+      <div className="mt-auto">
+        <SimpleTooltip side="right" content={settingsLabel}>
+          <Button type="button" variant="ghost" size="icon" className="h-9 w-9" aria-label={settingsLabel} onClick={onOpenSettings}>
+            <Settings className="size-4" />
+          </Button>
+        </SimpleTooltip>
+      </div>
     </div>
   )
 }

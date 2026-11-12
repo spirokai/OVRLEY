@@ -5,7 +5,7 @@
 
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
-import { CircleHelp, FolderOpen, ImageDown, Play } from 'lucide-react'
+import { FolderOpen, ImageDown, Play } from 'lucide-react'
 import WindowControls from './WindowControls'
 import { useTranslation } from 'react-i18next'
 
@@ -21,7 +21,6 @@ import { useTranslation } from 'react-i18next'
  * @param {boolean} props.renderingVideo - Whether a render is in progress.
  * @param {string} props.backendStatus - Current backend connection status.
  * @param {function} props.onOpenOutputDirectory - Opens the render output folder.
- * @param {function} props.onOpenKeyboardShortcuts - Opens the keyboard shortcuts dialog.
  * @returns {JSX.Element} Rendered component.
  */
 export default function ActionButtons({
@@ -33,22 +32,11 @@ export default function ActionButtons({
   renderingVideo,
   backendStatus,
   onOpenOutputDirectory,
-  onOpenKeyboardShortcuts,
 }) {
   const { t } = useTranslation()
   return (
     <div className="flex min-w-fit items-center justify-end gap-3">
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="toolbar-icon"
-          className="h-9 w-9 bg-background text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
-          onClick={onOpenKeyboardShortcuts}
-          aria-label={t('app-shell.keyboardShortcuts', 'Keyboard shortcuts')}
-        >
-          <CircleHelp className="size-4.5" />
-        </Button>
-
         <SimpleTooltip side="bottom" content={backendStatus !== 'connected' ? t('app-shell.backendOffline', 'Backend offline') : null}>
           <Button
             variant="outline"

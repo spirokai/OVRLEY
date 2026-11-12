@@ -15,6 +15,7 @@
 
 import { clamp } from '@/lib/utils'
 import { useState } from 'react'
+import { SETTINGS_SECTION } from '../data/settingsSections'
 
 // Enable debug controls during local development.
 const DEBUG_MODE_ENABLED = true
@@ -33,7 +34,7 @@ const DEBUG_MODE_ENABLED = true
  *
  * @returns {{
  *   activeKeyboardWorkspace: string,
- *   closeKeyboardShortcuts: Function,
+ *   closeSettings: Function,
  *   decreaseZoom: Function,
  *   debugModeEnabled: boolean,
  *   editorBackgroundMode: string,
@@ -41,14 +42,16 @@ const DEBUG_MODE_ENABLED = true
  *   editorSnapToGrid: boolean,
  *   editorZoomLevel: number,
  *   increaseZoom: Function,
- *   keyboardShortcutsOpen: boolean,
- *   openKeyboardShortcuts: Function,
+ *   openSettings: Function,
  *   resetZoom: Function,
  *   setActiveKeyboardWorkspace: Function,
  *   setEditorBackgroundMode: Function,
  *   setEditorGridVisible: Function,
  *   setEditorSnapToGrid: Function,
  *   setEditorZoomLevel: Function,
+ *   setSettingsSection: Function,
+ *   settingsOpen: boolean,
+ *   settingsSection: string,
  * }}
  */
 export default function useEditorShellState() {
@@ -58,7 +61,8 @@ export default function useEditorShellState() {
   const [editorBackgroundMode, setEditorBackgroundMode] = useState('checker')
   const [editorGridVisible, setEditorGridVisible] = useState(false)
   const [editorSnapToGrid, setEditorSnapToGrid] = useState(false)
-  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsSection, setSettingsSection] = useState(SETTINGS_SECTION)
   const [activeKeyboardWorkspace, setActiveKeyboardWorkspace] = useState('editor')
   const debugModeEnabled = import.meta.env.DEV && DEBUG_MODE_ENABLED
 
@@ -76,17 +80,17 @@ export default function useEditorShellState() {
     setEditorZoomLevel(1)
   }
 
-  const openKeyboardShortcuts = () => {
-    setKeyboardShortcutsOpen(true)
+  const openSettings = () => {
+    setSettingsOpen(true)
   }
 
-  const closeKeyboardShortcuts = () => {
-    setKeyboardShortcutsOpen(false)
+  const closeSettings = () => {
+    setSettingsOpen(false)
   }
 
   return {
     activeKeyboardWorkspace,
-    closeKeyboardShortcuts,
+    closeSettings,
     decreaseZoom,
     debugModeEnabled,
     editorBackgroundMode,
@@ -94,13 +98,15 @@ export default function useEditorShellState() {
     editorSnapToGrid,
     editorZoomLevel,
     increaseZoom,
-    keyboardShortcutsOpen,
-    openKeyboardShortcuts,
+    openSettings,
     resetZoom,
     setActiveKeyboardWorkspace,
     setEditorBackgroundMode,
     setEditorGridVisible,
     setEditorSnapToGrid,
     setEditorZoomLevel,
+    setSettingsSection,
+    settingsOpen,
+    settingsSection,
   }
 }

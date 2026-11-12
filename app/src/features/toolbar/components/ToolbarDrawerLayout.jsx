@@ -20,6 +20,7 @@ const TOOLBAR_WIDTH = '3rem'
  * @param {() => void} props.dismissOverlay - Dismisses a temporary drawer.
  * @param {(tool: string) => void} props.selectTool - Selects a toolbar tool.
  * @param {(pinned: boolean) => void} props.setPinned - Changes drawer mode.
+ * @param {() => void} props.onOpenSettings - Opens the app settings dialog.
  * @param {(event: React.TransitionEvent) => void} props.handleAllocationTransitionEnd - Completes pinned allocation movement.
  * @param {(event: React.TransitionEvent) => void} props.handleDrawerTransitionEnd - Completes the drawer exit lifecycle.
  * @returns {JSX.Element} Rendered shell row.
@@ -35,6 +36,7 @@ export function ToolbarDrawerLayout({
   dismissOverlay,
   selectTool,
   setPinned,
+  onOpenSettings,
   handleAllocationTransitionEnd,
   handleDrawerTransitionEnd,
 }) {
@@ -49,7 +51,13 @@ export function ToolbarDrawerLayout({
       style={{ gridTemplateColumns: `${TOOLBAR_WIDTH} ${pinned ? DRAWER_WIDTH : '0rem'} minmax(0, 1fr) auto` }}
       onTransitionEnd={handleAllocationTransitionEnd}
     >
-      <VerticalToolbar activeTool={activeTool} drawerVisible={visible} width={TOOLBAR_WIDTH} onSelectTool={selectTool} />
+      <VerticalToolbar
+        activeTool={activeTool}
+        drawerVisible={visible}
+        width={TOOLBAR_WIDTH}
+        onSelectTool={selectTool}
+        onOpenSettings={onOpenSettings}
+      />
       <div className="relative h-full min-w-0">
         <div
           className={`absolute inset-y-0 left-0 z-60 flex flex-col overflow-hidden border-r border-border bg-card shadow-lg shadow-black/80 transition-[translate,visibility] duration-300 ease-in-out ${
