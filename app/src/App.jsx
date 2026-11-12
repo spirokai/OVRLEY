@@ -223,7 +223,7 @@ function App() {
                   importedVideoFilename={videoControls.importedVideoFilename}
                   editorShell={editorShell}
                   undoRedoControls={undoRedoControls}
-                  showProjectStatus={projectLifecycle.status !== 'Saved'}
+                  showProjectStatus={projectLifecycle.hasUnsavedChanges}
                   projectStatus={projectLifecycle.status}
                   videoSyncMode={videoSyncWorkspace.videoSyncMode}
                   videoSyncMarkControls={videoSyncWorkspace.markControls}

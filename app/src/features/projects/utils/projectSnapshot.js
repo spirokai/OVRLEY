@@ -8,11 +8,12 @@ export const LAST_PROJECT_DIRECTORY_KEY = 'last-project-dir'
 /**
  * Builds the project content that participates in dirty-state comparison.
  * @param {object} state Complete application state.
- * @param {string} projectPath Absolute destination path.
+ * @param {string|null} projectPath Absolute destination path, or null for a never-saved project whose sources stay absolute.
  * @returns {object} Persisted project content excluding timeline state.
  */
 export function createProjectContentSnapshot(state, projectPath) {
-  const source = (path) => (path ? { path: createPathLocator(path, projectPath) } : null)
+  const locate = (path) => (projectPath ? createPathLocator(path, projectPath) : { kind: 'absolute', value: path })
+  const source = (path) => (path ? { path: locate(path) } : null)
   const editor = createDurableEditorState({ config: state.config, globalDefaults: state.globalDefaults })
   editor.config.scene.fps = state.renderSettings.fps
   editor.config.scene.updateRate = state.renderSettings.widgetUpdateRate
@@ -49,7 +50,7 @@ export function createProjectContentSnapshot(state, projectPath) {
 /**
  * Explicitly projects only project-owned durable state.
  * @param {object} state Complete application state.
- * @param {string} projectPath Absolute destination project path.
+ * @param {string|null} projectPath Absolute destination project path, or null for a never-saved project.
  * @returns {object} Canonical version 5 payload.
  */
 export function createProjectSnapshot(state, projectPath) {
