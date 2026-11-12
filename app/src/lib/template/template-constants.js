@@ -33,5 +33,8 @@ export const SCENE_RENDER_TIME_ONLY_KEYS = [...standardTemplateManifest.renderTi
 /** Native scene presentation fields, independent of source timing and widget defaults. */
 export const SCENE_PRESENTATION_KEYS = [...standardTemplateManifest.scenePresentationKeys]
 
+/** Default durable scene config for a new template. */
+export const DEFAULT_SCENE = Object.freeze({ ...standardTemplateManifest.scene })
+
 /** Durable keys persisted on the scene config. */
-export const SCENE_DURABLE_KEYS = ['width', 'height', 'fps', 'updateRate']
+export const SCENE_DURABLE_KEYS = Object.keys(standardTemplateManifest.scene)

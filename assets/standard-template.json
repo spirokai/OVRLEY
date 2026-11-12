@@ -2,9 +2,9 @@
   "globals": {
     "border_color": "#000000",
     "border_thickness": 0,
-    "shadow_color": "#000000",
-    "shadow_strength": 0,
-    "shadow_distance": 0,
+    "shadow_color": "#3b3b3b",
+    "shadow_strength": 3,
+    "shadow_distance": 2,
     "font_values": "Oxanium.ttf",
     "font_text": "Oxanium.ttf",
     "color_values": "#ffffff",
@@ -15,6 +15,12 @@
     "opacity": 1,
     "scale": 1,
     "fixed_width_digits": true
+  },
+  "scene": {
+    "width": 3840,
+    "height": 2160,
+    "fps": 30,
+    "updateRate": 1
   },
   "fileFormat": "ovrley-template",
   "fileVersion": 3,
