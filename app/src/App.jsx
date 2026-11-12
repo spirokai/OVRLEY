@@ -35,9 +35,10 @@ import * as backend from './api/backend'
 import { useTranslation } from 'react-i18next'
 import { changeLanguagePreference } from '@/i18n/language-preference'
 
+/** Right-click opens DevTools in development builds only. */
 function useRightClickDevtools() {
   useEffect(() => {
-    if (!backend.hasTauriRuntime()) {
+    if (!import.meta.env.DEV || !backend.hasTauriRuntime()) {
       return undefined
     }
 
