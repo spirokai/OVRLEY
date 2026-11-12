@@ -111,7 +111,10 @@ function CutMarker({ marker }) {
   )
 }
 
-/** One segment of a video clip: a block between cuts, dimmed when excluded from export, red when the video's file is missing. */
+/**
+ * One segment of a video clip: a block between cuts showing the visible tiles of the video's filmstrip, dimmed when
+ * excluded from export, red when the video's file is missing.
+ */
 function TimelineSegment({ segment }) {
   return (
     <div
@@ -119,10 +122,31 @@ function TimelineSegment({ segment }) {
       className={`absolute inset-y-0 border-background ${segment.missing ? 'bg-destructive/60' : 'bg-accent/70'} ${segment.hasSeamBefore ? 'border-l' : ''} ${segment.hasSeamAfter ? 'border-r' : ''}`}
       style={segment.style}
     >
+      {segment.tiles.length > 0 ? (
+        <div data-testid="timeline-filmstrip" aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+          {segment.tiles.map((tile) => (
+            <div key={tile.key} className="absolute inset-y-0 bg-no-repeat" style={tile.style} />
+          ))}
+        </div>
+      ) : null}
       {segment.excluded ? (
         <div data-testid="timeline-excluded-segment" aria-hidden="true" className={`pointer-events-none absolute inset-0 z-10 ${EXCLUDED_STRIPES}`} />
       ) : null}
       {segment.isSelected ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 ring-2 ring-foreground" /> : null}
+    </div>
+  )
+}
+
+/** A video clip's icon, name and duration in a badge over its filmstrip, at the left edge of the clip's visible part. */
+function TimelineClipBadge({ clip }) {
+  const Icon = clip.icon
+  return (
+    <div className="pointer-events-none absolute top-0 z-20 flex p-1" style={clip.badgeStyle}>
+      <span className="flex min-w-0 items-center gap-1 rounded-sm bg-background/80 px-1.5 py-0.5 text-[0.65rem] font-bold uppercase leading-none text-foreground shadow-sm">
+        <Icon className="h-3 w-3 shrink-0" strokeWidth={3} aria-hidden="true" />
+        <span className="min-w-0 truncate">{clip.label}</span>
+        <span className="shrink-0 tabular-nums text-muted-foreground">{clip.durationLabel}</span>
+      </span>
     </div>
   )
 }
@@ -153,7 +177,8 @@ function TimelineClip({ clip }) {
             style={mask.style}
           />
         ))}
-        {clip.showText && (
+        {clip.showText && clip.isVideo ? <TimelineClipBadge clip={clip} /> : null}
+        {clip.showText && !clip.isVideo && (
           <div
             className={`pointer-events-none absolute inset-y-0 z-20 grid items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${clip.textClassName}`}
             style={{ ...clip.textStyle, gridTemplateColumns: `${clip.sourceColumnWidth} minmax(0, 1fr) auto` }}
@@ -214,7 +239,7 @@ function TimelineClipTooltip({ clip }) {
 function TimelineLane({ lane }) {
   const { t } = useTranslation()
   return (
-    <div aria-label={lane.ariaLabel} className={`relative w-full ${lane.isVideo ? 'h-6 border-b-0' : 'h-6'}`}>
+    <div aria-label={lane.ariaLabel} className={`relative w-full ${lane.isVideo ? 'h-12 border-b-0' : 'h-6'}`}>
       <div data-testid="timeline-lane-clip-mask" className="absolute inset-x-0 -top-3 -bottom-1 overflow-hidden">
         {lane.clips.map((clip) => (clip.isVisible ? <TimelineClip key={clip.id} clip={clip} /> : null))}
         {lane.conflictBands.map((band) => (

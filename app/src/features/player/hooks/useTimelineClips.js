@@ -9,6 +9,7 @@ import { filenameFromSelectedPath } from '@/lib/file-dialog'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatClockDuration } from '@/lib/time-format'
 import { edgeCutSide, listEdgeCuts } from '../utils/cutDrag'
+import { listFilmstripTiles } from '../utils/filmstripTiles'
 import { ACTIVITY_LANE_ID, getClipGeometry, secondsToViewPx, videoLaneId } from '../utils/timelineGeometry'
 import { getActivityAttributeLabel } from '@/lib/widget/widget-presentation'
 import { framesToSeconds } from '@/lib/video-program/frame-grid'
@@ -20,6 +21,8 @@ import i18next from 'i18next'
 import { skippedDefaultLabel } from '@/features/transitions'
 
 const TEXT_HIDE_THRESHOLD_REM = 3
+/** Height of a video clip: the video lane's `h-12`. Filmstrip tiles are this tall. */
+const VIDEO_CLIP_HEIGHT_REM = 3
 const EDGE_CUT_MIN_CLIP_REM = 3
 const CLIP_SOURCE_COLUMN_WIDTH = '3rem'
 const CLIP_CONTENT_OFFSET_CLASS = 'translate-y-[0.04rem]'
@@ -38,18 +41,53 @@ function clipRangeStyle(fromSecond, toSecond, durationSeconds) {
   return { left: `${(fromSecond / durationSeconds) * 100}%`, width: `${((toSecond - fromSecond) / durationSeconds) * 100}%` }
 }
 
-/** Segment blocks of a clip, positioned within it, with a seam at each cut. */
-function segmentModels(clip, selectedSegmentKey) {
+/**
+ * Segment blocks of a clip, positioned within it, with a seam at each cut and the visible tiles of the clip's filmstrip.
+ *
+ * @param {object} clip Displayed video clip.
+ * @param {string|null} selectedSegmentKey Selected segment of the clip.
+ * @param {{filmstrip: object, clipLeftPx: number, pxPerSecond: number, tileWidthPx: number, widthPx: number}|null} filmstripView
+ *   The clip's ready filmstrip and its placement in the viewport, or null when the clip shows no filmstrip.
+ */
+function segmentModels(clip, selectedSegmentKey, filmstripView) {
   const segments = listVideoSegments(clip)
-  return segments.map((segment, index) => ({
-    key: segment.key,
-    excluded: segment.excluded,
-    missing: clip.missing,
-    hasSeamBefore: index > 0,
-    hasSeamAfter: index < segments.length - 1,
-    isSelected: segment.key === selectedSegmentKey,
-    style: clipRangeStyle(framesToSeconds(segment.startFrame, clip.fps), framesToSeconds(segment.endFrame, clip.fps), clip.durationSeconds),
-  }))
+  return segments.map((segment, index) => {
+    const sourceStartSecond = framesToSeconds(segment.startFrame, clip.fps)
+    const sourceEndSecond = framesToSeconds(segment.endFrame, clip.fps)
+    return {
+      key: segment.key,
+      excluded: segment.excluded,
+      missing: clip.missing,
+      hasSeamBefore: index > 0,
+      hasSeamAfter: index < segments.length - 1,
+      isSelected: segment.key === selectedSegmentKey,
+      style: clipRangeStyle(sourceStartSecond, sourceEndSecond, clip.durationSeconds),
+      tiles:
+        filmstripView === null
+          ? []
+          : listFilmstripTiles({
+              filmstrip: filmstripView.filmstrip,
+              sourceStartSecond,
+              sourceEndSecond,
+              leftPx: filmstripView.clipLeftPx + sourceStartSecond * filmstripView.pxPerSecond,
+              pxPerSecond: filmstripView.pxPerSecond,
+              tileWidthPx: filmstripView.tileWidthPx,
+              widthPx: filmstripView.widthPx,
+            }),
+    }
+  })
+}
+
+/** Filmstrip placement of a video clip, or null when its filmstrip is not ready or the clip is off screen. */
+function clipFilmstripView(clip, filmstrip, geometry, { viewStart, viewEnd, widthPx }) {
+  if (filmstrip?.status !== 'ready' || !geometry.isVisible) return null
+  return {
+    filmstrip,
+    clipLeftPx: geometry.x,
+    pxPerSecond: widthPx / (viewEnd - viewStart),
+    tileWidthPx: Math.round((VIDEO_CLIP_HEIGHT_REM * getRootRemPx() * clip.resolution.width) / clip.resolution.height),
+    widthPx,
+  }
 }
 
 /**
@@ -96,6 +134,7 @@ function percentStyle(geometry, widthPx) {
  * @param {Array<object>} options.clips Displayed timeline clips.
  * @param {function} options.commitClipNudge Callback to commit a keyboard sync adjustment.
  * @param {{videoId: string, cutId: string, frame: number}|null} options.draggedCut Cut being dragged, edge cuts included (`useCutDrag`), or null.
+ * @param {Object<string, object>} options.filmstrips Timeline filmstrips keyed by video path (`videoFilmstrips` in the store).
  * @param {function} options.getCutDragProps Cut marker drag handler factory from useCutDrag (edge cuts included).
  * @param {function} options.getLaneDragProps Per-lane drag handler factory from useClipDrag.
  * @param {boolean} options.hasActivity Whether the external activity lane should be present.
@@ -121,6 +160,7 @@ export default function useTimelineClips({
   clips,
   commitClipNudge,
   draggedCut,
+  filmstrips,
   getCutDragProps,
   getLaneDragProps,
   hasActivity,
@@ -214,9 +254,15 @@ export default function useTimelineClips({
       // Presentational lane model - TimelineLane renders these values without owning calculations.
       return {
         ...lane,
-        segments: lane.isVideo ? segmentModels(lane.clip, selectedSegmentKey) : [],
+        segments: lane.isVideo
+          ? segmentModels(
+              lane.clip,
+              selectedSegmentKey,
+              clipFilmstripView(lane.clip, filmstrips[lane.clip.path], geometry, { viewStart, viewEnd, widthPx }),
+            )
+          : [],
         trimMasks: lane.isVideo || activityTrim === null ? [] : activityTrimMasks(activityTrim.window, lane.durationSeconds, viewStart, viewEnd),
-        clipClassName: lane.isVideo ? (lane.warnings.length > 0 ? 'outline outline-1 -outline-offset-1 outline-destructive' : '') : 'bg-primary/80',
+        clipClassName: lane.isVideo ? (lane.warnings.length > 0 ? 'outline outline-1 -outline-offset-1 outline-destructive' : '') : 'bg-accent/70',
         clipContentClassName: CLIP_CONTENT_OFFSET_CLASS,
         clipProps: {
           ...dragProps,
@@ -270,6 +316,8 @@ export default function useTimelineClips({
           lane.durationSeconds > 0
             ? clipRangeStyle(textWindow.startSecond, textWindow.endSecond, lane.durationSeconds)
             : { left: '0%', width: '100%' },
+        // A video clip's name sits in a badge at the left edge of the clip's visible part, over its filmstrip.
+        badgeStyle: lane.isVideo ? { left: `${visibleStartPx - geometry.x}px`, maxWidth: `${visibleEndPx - visibleStartPx}px` } : null,
         durationLabel: formatClockDuration(lane.durationSeconds),
         isVisible: geometry.isVisible,
         // The whole clip shows as selected unless one of its segments is; then the segment alone carries the outline.
@@ -277,7 +325,7 @@ export default function useTimelineClips({
         hasSelectedSegment: isSelected && selectedSegmentKey !== null,
         showText: geometry.isVisible && textWidthPx >= TEXT_HIDE_THRESHOLD_REM * getRootRemPx(),
         sourceColumnWidth: CLIP_SOURCE_COLUMN_WIDTH,
-        textClassName: lane.isVideo ? 'text-accent-foreground' : 'text-background',
+        textClassName: 'text-accent-foreground',
         tooltip: {
           id: `${tooltipBaseId}-${lane.id}`,
           isVisible: showTooltip,
@@ -447,6 +495,7 @@ export default function useTimelineClips({
     clips,
     commitClipNudge,
     draggedCut,
+    filmstrips,
     getCutDragProps,
     getLaneDragProps,
     hasActivity,

@@ -12,6 +12,7 @@ import { createRenderSettingsSlice } from './slices/createRenderSettingsSlice'
 import { createBatchRenderSlice } from './slices/createBatchRenderSlice'
 import { createManualVideoSyncSlice } from './slices/createManualVideoSyncSlice'
 import { createTransitionProxySlice } from './slices/createTransitionProxySlice'
+import { createVideoFilmstripSlice } from './slices/createVideoFilmstripSlice'
 import { withEditorHistory } from '@/features/undo-redo/undoHistory'
 import { releaseUnreferencedPreviewActivities } from './store-utils'
 
@@ -22,6 +23,7 @@ function createStoreState(set, get) {
     ...createMediaSlice(set, get),
     ...createVideoImportSlice(set, get),
     ...createTransitionProxySlice(set),
+    ...createVideoFilmstripSlice(set),
     ...createRenderSettingsSlice(set, get),
     ...createBatchRenderSlice(set),
     ...createManualVideoSyncSlice(set, get),

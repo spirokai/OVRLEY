@@ -576,6 +576,18 @@ export async function getVideoThumbnail(path) {
 }
 
 /**
+ * Renders the timeline filmstrip of a video: `sampleCount` keyframes `intervalSeconds` apart, in one sprite sheet.
+ * @param {{path: string, intervalSeconds: number, sampleCount: number, frameWidth: number, frameHeight: number, hwaccel: string|null}} request
+ *   Absolute source path, sampling, frame size in pixels, and the hardware decoder (`cuda`, `vaapi`, `d3d11va`,
+ *   `videotoolbox`) or null for software decoding.
+ * @returns {Promise<{spriteJpegBase64: string, columns: number, rows: number}|null>} Sprite sheet (base64 JPEG, sample `i`
+ *   at column `i % columns`, row `i / columns`), or null when no frame could be decoded.
+ */
+export async function getVideoFilmstrip(request) {
+  return invokeCommand('backend_video_filmstrip', request)
+}
+
+/**
  * Opens a fresh configuration inspection; it owns no editor preview or render.
  * @returns {Promise<{inspectionId: string}>} Opaque backend session identity.
  */

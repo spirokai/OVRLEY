@@ -43,6 +43,7 @@ mod project_file;
 mod raster_resources;
 mod runtime_paths;
 mod tauri_commands;
+mod video_filmstrip;
 mod video_thumbnail;
 mod widget_preview;
 
@@ -118,6 +119,7 @@ pub fn run() {
             tauri_commands::backend_clear_preview_videos,
             tauri_commands::backend_get_preview_videos,
             video_thumbnail::backend_video_thumbnail,
+            video_filmstrip::backend_video_filmstrip,
             tauri_commands::backend_get_map_style_url_template,
             tauri_commands::backend_detect_codecs,
             tauri_commands::backend_build_elevation_geometry,

@@ -67,6 +67,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       selectedWidgetIds: state.selectedWidgetIds,
       updatePreviewScrub: state.updatePreviewScrub,
       updateRate: state.renderSettings.widgetUpdateRate,
+      videoFilmstrips: state.videoFilmstrips,
     })),
   )
   const timeline = useVideoTimeline()
@@ -380,6 +381,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     commitClipNudge,
     getCutDragProps: cutDrag.getCutDragProps,
     draggedCut: cutDrag.draft,
+    filmstrips: playerStore.videoFilmstrips,
     activityTrim: videoSyncMode ? null : activityTrim,
     getLaneDragProps,
     hasActivity: hasActivityData && playback.hasActivity,

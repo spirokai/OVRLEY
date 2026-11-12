@@ -33,6 +33,8 @@ tauri-plugin-store = "2"
 tauri-plugin-process = "=2.2.0"
 tauri-plugin-updater = "=2.9.0"
 base64 = "0.22"
+# Timeline filmstrip sprite sheets; the version ovrley_core pins.
+image = { version = "=0.25.5", default-features = false, features = ["jpeg"] }
 open = "5"
 ovrley_core = { path = "ovrley_core" }
 ovrley_widgets = { path = "ovrley_widgets" }

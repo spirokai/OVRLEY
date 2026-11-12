@@ -101,6 +101,7 @@ dependencies = [
  "chrono",
  "http",
  "http-cache-semantics",
+ "image",
  "log",
  "open",
  "ovrley_core",
