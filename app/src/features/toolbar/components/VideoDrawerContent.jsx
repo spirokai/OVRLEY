@@ -81,6 +81,7 @@ function SegmentCard({ segment, filename }) {
         </Toggle>
       </SimpleTooltip>
       <Switch
+        className="ml-1"
         aria-label={`${includedLabel}: ${filename} ${segment.startLabel}`}
         checked={segment.included}
         onCheckedChange={segment.onIncludedChange}
