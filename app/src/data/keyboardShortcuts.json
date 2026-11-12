@@ -289,38 +289,38 @@
           "bindings": [{ "key": "m", "modifiers": [] }]
         },
         {
-          "id": "export.setIn",
+          "id": "trim.start",
           "display": true,
           "scope": "player",
-          "descriptionKey": "keyboard-shortcuts.exportSetIn",
+          "descriptionKey": "keyboard-shortcuts.trimBeforePlayhead",
           "bindings": [{ "key": "i", "modifiers": [] }]
         },
         {
-          "id": "export.setOut",
+          "id": "trim.end",
           "display": true,
           "scope": "player",
-          "descriptionKey": "keyboard-shortcuts.exportSetOut",
+          "descriptionKey": "keyboard-shortcuts.trimAfterPlayhead",
           "bindings": [{ "key": "o", "modifiers": [] }]
         },
         {
-          "id": "export.clear",
+          "id": "activityTrim.reset",
           "display": true,
           "scope": "player",
-          "descriptionKey": "keyboard-shortcuts.exportClear",
+          "descriptionKey": "keyboard-shortcuts.activityTrimReset",
           "bindings": [{ "key": "x", "modifiers": ["mod"] }]
         },
         {
-          "id": "export.goToIn",
+          "id": "activityTrim.goToStart",
           "display": true,
           "scope": "player",
-          "descriptionKey": "keyboard-shortcuts.exportGoToIn",
+          "descriptionKey": "keyboard-shortcuts.activityTrimGoToStart",
           "bindings": [{ "key": "i", "modifiers": ["alt"] }]
         },
         {
-          "id": "export.goToOut",
+          "id": "activityTrim.goToEnd",
           "display": true,
           "scope": "player",
-          "descriptionKey": "keyboard-shortcuts.exportGoToOut",
+          "descriptionKey": "keyboard-shortcuts.activityTrimGoToEnd",
           "bindings": [{ "key": "o", "modifiers": ["alt"] }]
         },
         {

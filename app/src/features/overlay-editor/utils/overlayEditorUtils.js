@@ -3,6 +3,7 @@
  */
 
 import { getEffectiveWidgetData } from '@/lib/template/template-state'
+import { clamp } from '@/lib/utils'
 import { isFramedWidget } from '@/lib/widget/widget-catalog'
 import { VIDEO_SYNC_PREVIEW_SCREEN_GAP } from '@/features/video-sync'
 import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
@@ -79,21 +80,27 @@ export function getSceneSize(config) {
 }
 
 /**
- * The export range in the activity time widgets read: the custom range shifted by
- * the activity origin; without one, the telemetry clip's own duration, or the
- * interval covered by the videos.
- * @param {object} options Range inputs.
- * @param {{type: 'all'|'custom', from: number, to: number}} options.exportRange Timeline export range.
- * @param {number} options.activityOriginSecond Timeline second of activity second 0.
+ * The activity window widgets read in the preview: the telemetry clip's own
+ * duration, the interval covered by the videos, or, without videos, the
+ * activity trim. The window is clamped to the activity; one outside it scopes nothing.
+ * @param {object} options Window inputs.
+ * @param {number} options.activityDurationSeconds Duration of the previewed activity.
+ * @param {{startSecond: number, endSecond: number}|null} options.activityTrim Trim of the external activity.
  * @param {number|null} options.activityClipDurationSeconds Duration of the clip supplying embedded telemetry, or null with an external activity.
  * @param {{startSecond: number, endSecond: number}|null} options.videoBounds Interval covered by the videos.
- * @returns {{type: 'all'|'custom', from: number, to: number}} Preview export range.
+ * @returns {{exportStartSecond: number, startSecond: number, endSecond: number, isScoped: boolean}} Preview activity window.
  */
-export function resolvePreviewExportRange({ exportRange, activityOriginSecond, activityClipDurationSeconds, videoBounds }) {
-  if (exportRange.type === 'custom') {
-    return { ...exportRange, from: exportRange.from - activityOriginSecond, to: exportRange.to - activityOriginSecond }
-  }
-  if (activityClipDurationSeconds !== null) return { type: 'custom', from: 0, to: activityClipDurationSeconds }
-  if (videoBounds === null) return exportRange
-  return { type: 'custom', from: videoBounds.startSecond, to: videoBounds.endSecond }
+export function resolvePreviewWindow({ activityDurationSeconds, activityTrim, activityClipDurationSeconds, videoBounds }) {
+  const range =
+    activityClipDurationSeconds !== null
+      ? { startSecond: 0, endSecond: activityClipDurationSeconds }
+      : videoBounds !== null
+        ? videoBounds
+        : activityTrim
+  const whole = { startSecond: 0, endSecond: activityDurationSeconds, isScoped: false }
+  if (range === null) return { exportStartSecond: 0, ...whole }
+  const startSecond = clamp(range.startSecond, 0, activityDurationSeconds)
+  const endSecond = clamp(range.endSecond, 0, activityDurationSeconds)
+  if (!(endSecond > startSecond)) return { exportStartSecond: range.startSecond, ...whole }
+  return { exportStartSecond: range.startSecond, startSecond, endSecond, isScoped: true }
 }

@@ -56,6 +56,7 @@ export function createProjectContentSnapshot(state, projectPath) {
     laps: {
       disabled: state.disabledLaps,
     },
+    activityTrim: state.activityTrim === null ? null : { ...state.activityTrim },
     transitionDefaults: { ...state.transitionDefaults },
     render: {
       outputMode: state.renderSettings.outputMode,
@@ -66,7 +67,6 @@ export function createProjectContentSnapshot(state, projectPath) {
       codec: state.renderSettings.codec,
       qualityType: state.renderSettings.qualityType,
       qualityValue: state.renderSettings.qualityValue,
-      range: { ...state.renderSettings.range },
     },
   }
 }
@@ -104,6 +104,7 @@ export function createProjectDirtyState(project) {
       sources: project.sources,
       sync: project.sync,
       laps: project.laps,
+      activityTrim: project.activityTrim,
       transitionDefaults: project.transitionDefaults,
       render: project.render,
     },

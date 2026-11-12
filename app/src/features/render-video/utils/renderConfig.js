@@ -3,13 +3,12 @@
  *
  * This module starts from committed template state, materializes the
  * editor-effective template config, and then layers on render-only scene
- * fields such as codec defaults, export-range scoping, and optional
+ * fields such as codec defaults, the activity window, and optional
  * imported-video composite metadata.
  */
 
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { SCENE_PRESENTATION_KEYS } from '@/lib/template/template-constants'
-import { clamp } from '@/lib/utils'
 import { isMp4Codec, isQsvFullCodec } from './codecUtils'
 
 function renderValues(values) {
@@ -87,67 +86,19 @@ function applyCompositeSceneFields(scene, options) {
 }
 
 /**
- * Applies the custom export-range window to the render-effective scene config.
- *
- * Transparent exports narrow the activity window directly. Composite exports
- * translate the activity-timeline range into a video-local trim and duration.
+ * Applies the rendered activity window. Durable template state strips activity
+ * timing, but the renderer requires an explicit scene window. A trimmed
+ * activity also scopes the plotted route to the window; a composite always
+ * scopes it, so a video outside the activity renders raster widgets only.
  *
  * @param {object} scene - Render-effective scene config.
- * @param {object|null|undefined} exportRange - Requested export-range settings.
+ * @param {{startSecond: number, endSecond: number, isTrimmed: boolean}} activityWindow - Rendered activity window.
  * @param {boolean} isComposite - Whether an imported video is composited.
  */
-function applyCustomExportRange(scene, exportRange, isComposite) {
-  scene.custom_export_range_active = isComposite
-
-  if (exportRange.type !== 'custom') {
-    return
-  }
-
-  const start = exportRange.from
-  const end = exportRange.to
-
-  if (end <= start) {
-    throw new Error('Custom export range end must be after its start.')
-  }
-
-  if (!isComposite) {
-    scene.start = start
-    scene.end = end
-    scene.custom_export_range_active = true
-    return
-  }
-
-  const videoStart = scene.composite_sync_offset
-  const videoEnd = videoStart + scene.composite_video_duration
-  const clampedStart = clamp(start, videoStart, videoEnd)
-  const clampedEnd = clamp(end, videoStart, videoEnd)
-  if (clampedEnd <= clampedStart) {
-    throw new Error('Custom export range must overlap the imported video range when exporting a composite video.')
-  }
-
-  scene.start = clampedStart
-  scene.end = clampedEnd
-  scene.custom_export_range_active = true
-  scene.composite_video_trim_start = clampedStart - videoStart
-  scene.composite_render_duration = clampedEnd - clampedStart
-  scene.composite_sync_offset = clampedStart
-}
-
-/**
- * Applies the captured editor timeline, which owns activity-specific timing.
- *
- * Durable template state strips activity-specific timing, but the renderer
- * still requires an explicit scene window. The editor timeline remains the
- * source of truth for that session window, so render preparation restores it
- * here before any export-range overrides are applied.
- *
- * @param {object} scene - Render-effective scene config.
- * @param {number} timelineStart - Active editor timeline start second.
- * @param {number} timelineEnd - Active editor timeline end second.
- */
-function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
-  scene.start = timelineStart
-  scene.end = timelineEnd
+function applyActivityWindow(scene, activityWindow, isComposite) {
+  scene.start = activityWindow.startSecond
+  scene.end = activityWindow.endSecond
+  scene.custom_export_range_active = isComposite || activityWindow.isTrimmed
 }
 
 /**
@@ -160,12 +111,10 @@ function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
  * @param {'quality'|'bitrate'} options.qualityType - Composite rate control mode.
  * @param {number} options.qualityValue - CRF value (1–51) or bitrate in Mbps.
  * @param {'transparent'|'composite'} options.exportMode - Active export pipeline selection.
- * @param {object} options.range - Validated export range settings.
  * @param {object|null|undefined} options.globalDefaults - Template global defaults.
  * @param {{path: string, durationSeconds: number, fps: {num: number, den: number}, resolution: {width: number, height: number}}|null} options.video - Composited video, if any.
  * @param {number} options.videoOffsetSeconds - Activity second where the composited video starts.
- * @param {number} options.timelineStart - Active editor timeline start second.
- * @param {number} options.timelineEnd - Active editor timeline end second.
+ * @param {{startSecond: number, endSecond: number, isTrimmed: boolean}} options.activityWindow - Rendered activity window.
  * @param {number[]} options.disabledLaps - Activity lap IDs excluded from lap widgets.
  * @param {number} options.fps - Validated overlay FPS.
  * @param {number} options.widgetUpdateRate - Validated widget update-rate divisor.
@@ -173,21 +122,7 @@ function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
  * @returns {object} Render-effective config.
  */
 export function createRenderEffectiveConfig(options) {
-  const {
-    availableCodecs,
-    config,
-    codec,
-    exportMode,
-    range,
-    globalDefaults,
-    video,
-    disabledLaps,
-    timelineStart,
-    timelineEnd,
-    widgetUpdateRate,
-    fps,
-    language,
-  } = options
+  const { availableCodecs, config, codec, exportMode, activityWindow, globalDefaults, video, disabledLaps, widgetUpdateRate, fps, language } = options
 
   if (!config?.scene) {
     throw new Error('No valid config available')
@@ -219,11 +154,9 @@ export function createRenderEffectiveConfig(options) {
     applyCompositeSceneFields(scene, options)
   }
 
-  applyTimelineSceneFields(scene, timelineStart, timelineEnd)
+  applyActivityWindow(scene, activityWindow, shouldComposite)
   scene.disabled_laps = disabledLaps
   applyCodecDefaults(scene, codec)
-  // A video outside the activity renders with raster widgets only (native coverage).
-  applyCustomExportRange(scene, range, shouldComposite)
 
   return {
     ...nextConfig,

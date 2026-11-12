@@ -12,7 +12,7 @@ import { DEFAULT_GLOBAL_DEFAULTS } from '../../lib/template/template-constants'
 import { syncGlobalDefaultsToConfig } from '../../lib/template/template-state'
 import { normalizeGlobalDefaults } from '../../lib/template/template-normalization'
 import { scaleWidgetPositions } from '../../lib/widget/widget-config'
-import { cloneSerializable, DEFAULT_CONFIG, syncSceneTimingFromConfig, updateConfigPersistence } from '../store-utils'
+import { cloneSerializable, DEFAULT_CONFIG, updateConfigPersistence } from '../store-utils'
 
 const initialGlobalDefaults = { ...DEFAULT_GLOBAL_DEFAULTS }
 const initialAspectRatio = '16:9'
@@ -88,7 +88,6 @@ export function createTemplateSlice(set, get) {
         state.aspectRatio = nextAspectRatio
         state.loadedTemplateSource = null
         state.lastSavedTemplateState = null
-        syncSceneTimingFromConfig(state, nextConfig, { resetSelectedSecond: true })
         updateConfigPersistence(state)
       })
     },
@@ -124,7 +123,6 @@ export function createTemplateSlice(set, get) {
         state.aspectRatio = nextAspectRatio
         state.loadedTemplateSource = source
 
-        syncSceneTimingFromConfig(state, nextConfig, { resetSelectedSecond: true })
         updateConfigPersistence(state)
       })
     },

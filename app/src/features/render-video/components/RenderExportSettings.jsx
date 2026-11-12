@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSepa
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTranslation } from 'react-i18next'
 import { BatchFolderPicker } from './BatchRenderQueue'
-import ExportRangeSettings from './ExportRangeSettings'
 import { QUALITY_SLIDER_RANGE } from '../data/qualityDefaults'
 
 /**
@@ -248,10 +247,6 @@ export default function RenderExportSettings(ctx) {
               disabled={ctx.settingsLocked}
             />
           </div>
-        )}
-
-        {ctx.showExportRangeSettings && (
-          <ExportRangeSettings range={ctx.settings.range} fps={ctx.settings.fps} onExportRangeChange={(range) => ctx.onSettingsChange({ range })} />
         )}
 
         {/* One column of the settings grid, so the switch sits beside its label rather than across the panel. */}

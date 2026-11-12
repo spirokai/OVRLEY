@@ -33,7 +33,6 @@ describe('resolvePreviewTarget', () => {
     Object.assign(videoEdits.first, edits)
     return buildProgram({
       videos: importedVideos.map((video) => ({ ...video, ...videoEdits[video.id] })),
-      exportRange: { type: 'all', from: 0, to: 0 },
       transitionDefaults: DEFAULT_TRANSITION_SETTINGS,
     })
   }

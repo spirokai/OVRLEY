@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'vite-plus/test'
 import { cutVideo, removeCut, segmentBeforeCut, setSegmentExcluded, setSegmentTransition } from '@/lib/video-program/collection-edits'
-import { findSegmentAt, isVideoExcluded, listVideoSegments, resolveCutFrame, resolveEditClip } from '@/lib/video-program/video-segments'
+import {
+  findSegmentAt,
+  isVideoExcluded,
+  listVideoSegments,
+  planVideoTrim,
+  resolveCutFrame,
+  resolveEditClip,
+} from '@/lib/video-program/video-segments'
 import { createTestVideo, cutEdits, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 function collection(durationSeconds = 10) {
@@ -115,5 +122,39 @@ describe('cut edits', () => {
     setSegmentTransition(draft, 'ride', 'start', { type: 'fade', durationSeconds: 1 })
     setSegmentTransition(draft, 'ride', 'start', null)
     expect(draft.videoEdits.ride.segments.start.transitionIn).toBeNull()
+  })
+})
+
+describe('trimming a video end at a frame', () => {
+  test('an end that is not trimmed yet gets a new trim, up to the nearest cut', () => {
+    expect(planVideoTrim(clip(), 'start', 90)).toEqual({ kind: 'trim' })
+    expect(planVideoTrim(clip(), 'end', 90)).toEqual({ kind: 'trim' })
+    const cut = clip([{ id: 'c1', frame: 150 }])
+    expect(planVideoTrim(cut, 'start', 149)).toEqual({ kind: 'trim' })
+    expect(planVideoTrim(cut, 'start', 200)).toBeNull()
+    expect(planVideoTrim(cut, 'end', 100)).toBeNull()
+  })
+
+  test('an end already trimmed moves its trim cut, in or out, without passing the next cut', () => {
+    const trimmed = clip(
+      [
+        { id: 'trim', frame: 30 },
+        { id: 'c1', frame: 150 },
+        { id: 'tail', frame: 270, excluded: true },
+      ],
+      { excluded: true },
+    )
+    expect(planVideoTrim(trimmed, 'start', 10)).toEqual({ kind: 'move', cutId: 'trim' })
+    expect(planVideoTrim(trimmed, 'start', 120)).toEqual({ kind: 'move', cutId: 'trim' })
+    expect(planVideoTrim(trimmed, 'start', 150)).toBeNull()
+    expect(planVideoTrim(trimmed, 'start', 30)).toBeNull()
+    expect(planVideoTrim(trimmed, 'end', 200)).toEqual({ kind: 'move', cutId: 'tail' })
+    expect(planVideoTrim(trimmed, 'end', 100)).toBeNull()
+  })
+
+  test('a frame on the video edge or a wholly excluded video trims nothing', () => {
+    expect(planVideoTrim(clip(), 'start', 0)).toBeNull()
+    expect(planVideoTrim(clip(), 'end', 300)).toBeNull()
+    expect(planVideoTrim(clip([], { excluded: true }), 'start', 90)).toBeNull()
   })
 })

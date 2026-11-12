@@ -30,10 +30,8 @@ function storeActions() {
     activateActivityFile: vi.fn(),
     clearActivitySummary: vi.fn(),
     setActivitySource: vi.fn(),
-    setEndSecond: vi.fn(),
     setFallbackDurationSeconds: vi.fn(),
     setSelectedSecond: vi.fn(),
-    setStartSecond: vi.fn(),
   }
 }
 
@@ -137,7 +135,7 @@ describe('import-activity store boundary', () => {
         duration_seconds: 12.8,
       },
     })
-    expect(store.setEndSecond).toHaveBeenCalledWith(12)
+    expect(store.setFallbackDurationSeconds).toHaveBeenCalledWith(12)
   })
 
   test('imports a native TCX path and activates the Rust-finalized activity', async () => {
@@ -187,6 +185,6 @@ describe('import-activity store boundary', () => {
         duration_seconds: 4.2,
       },
     })
-    expect(store.setEndSecond).toHaveBeenCalledWith(4)
+    expect(store.setFallbackDurationSeconds).toHaveBeenCalledWith(4)
   })
 })

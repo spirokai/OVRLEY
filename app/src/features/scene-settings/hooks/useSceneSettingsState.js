@@ -64,27 +64,23 @@ function getDefaultResolutionPreset(aspectRatio) {
 
 export default function useSceneSettingsState({ config, onConfigChange, widgetLiveEdits }) {
   const {
-    hasActivity,
     aspectRatio,
     globalDefaults,
     importedVideos,
     setAspectRatioPreset,
     setCustomAspectRatio,
     renderSettings,
-    setRenderRange,
     setGlobalDefault,
     setRenderFpsAndUpdateRate,
     setRenderWidgetUpdateRate,
   } = useStore(
     useShallow((state) => ({
-      hasActivity: state.activitySummary !== null,
       aspectRatio: state.aspectRatio,
       globalDefaults: state.globalDefaults,
       importedVideos: state.importedVideos,
       setAspectRatioPreset: state.setAspectRatioPreset,
       setCustomAspectRatio: state.setCustomAspectRatio,
       renderSettings: state.renderSettings,
-      setRenderRange: state.setRenderRange,
       setGlobalDefault: state.setGlobalDefault,
       setRenderFpsAndUpdateRate: state.setRenderFpsAndUpdateRate,
       setRenderWidgetUpdateRate: state.setRenderWidgetUpdateRate,
@@ -93,7 +89,6 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
   const videoFormat = useMemo(() => deriveCompatibility(importedVideos).reference, [importedVideos])
   const importedVideoFps = videoFormat === null ? null : videoFormat.fps.num / videoFormat.fps.den
   const importedVideoResolution = videoFormat?.resolution ?? null
-  const hasTimelineMedia = hasActivity || importedVideos.length > 0
 
   const availableFonts = useAvailableFonts()
   const prepareFontEdit = useFontPreparation()
@@ -180,10 +175,7 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
 
   return {
     overlaySettings: {
-      hasTimelineMedia,
       aspectRatio,
-      exportRange: renderSettings.range,
-      renderFps: renderSettings.fps,
       fpsMode,
       importedVideoFps,
       importedVideoResolution,
@@ -201,7 +193,6 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
       availableFonts,
     },
     handlers,
-    setExportRange: setRenderRange,
     setUpdateRate: setRenderWidgetUpdateRate,
   }
 }

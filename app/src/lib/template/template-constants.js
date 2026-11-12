@@ -17,9 +17,6 @@ export const TEMPLATE_FILE_FORMAT = standardTemplateManifest.fileFormat
 /** Current template file format version. */
 export const TEMPLATE_FILE_VERSION = standardTemplateManifest.fileVersion
 
-/** Default export range when no custom range has been configured. */
-export const DEFAULT_EXPORT_RANGE = Object.freeze({ ...standardTemplateManifest.exportRange })
-
 /** Default values for global scene/template settings. */
 export const DEFAULT_GLOBAL_DEFAULTS = Object.freeze({ ...standardTemplateManifest.globals })
 

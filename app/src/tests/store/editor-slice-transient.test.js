@@ -5,8 +5,6 @@ describe('setSelectedSecond', () => {
   beforeEach(() => {
     useStore.setState({
       selectedSecond: 0,
-      startSecond: 0,
-      endSecond: 73,
     })
   })
 

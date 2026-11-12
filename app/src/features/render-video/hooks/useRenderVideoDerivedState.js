@@ -20,27 +20,10 @@ import {
 } from '../utils/codecUtils'
 import { getContainerFps, getUpdateRateOptions } from '@/lib/update-rate'
 import { getDefaultBitrate } from '../data/bitrateDefaults'
-import { useRenderDialogInputs, useRenderRangeActivity } from '@/hooks/useAppStoreSelectors'
-import { getCustomExportRangeDefault, resolveActivityDuration, setExportRangeBoundary } from '@/lib/export-range'
+import { useRenderDialogInputs } from '@/hooks/useAppStoreSelectors'
+import { getActivityDurationSeconds } from '@/lib/activity/activity-summary'
+import { resolveActivityWindow } from '@/lib/activity/activity-trim'
 import { createBatchItemProgress, createBatchProgress, isBatchFinished } from '../utils/renderPresentation'
-
-/**
- * @param {object} options Editable range, render frame rate and commit callback; the boundaries snap to the render frames.
- * @returns {object} Shared range control presentation and input handlers.
- */
-export function useExportRangeSettings({ range, fps, onExportRangeChange }) {
-  const activity = useRenderRangeActivity()
-  return {
-    isCustom: range.type === 'custom',
-    fromSecond: range.from,
-    toSecond: range.to,
-    rangeFps: { num: fps, den: 1 },
-    handleCustomChange: (checked) =>
-      onExportRangeChange(checked ? getCustomExportRangeDefault(range, resolveActivityDuration(activity)) : { ...range, type: 'all' }),
-    handleFromCommit: (second) => onExportRangeChange(setExportRangeBoundary(range, 'from', second)),
-    handleToCommit: (second) => onExportRangeChange(setExportRangeBoundary(range, 'to', second)),
-  }
-}
 
 export default function useRenderVideoDerivedState({ settings }) {
   const {
@@ -56,6 +39,8 @@ export default function useRenderVideoDerivedState({ settings }) {
     renderSettings,
     renderSubmissionTarget,
     isCancelling,
+    parsedActivity,
+    activityTrim,
   } = useRenderDialogInputs()
   // A closed dialog has no draft; its hidden controls read committed settings.
   const displaySettings = settings === null ? renderSettings : settings
@@ -64,6 +49,12 @@ export default function useRenderVideoDerivedState({ settings }) {
   const hasMultipleVideos = importedVideos.length > 1
   const videoFormat = useMemo(() => deriveCompatibility(importedVideos).reference, [importedVideos])
   const videoBounds = useMemo(() => getVideosTimelineBounds(joinVideoEdits(importedVideos, videoEdits)), [importedVideos, videoEdits])
+  // The trim decides the overlay only without videos; the full activity switch ignores it.
+  const activityDurationSeconds = getActivityDurationSeconds(parsedActivity)
+  const trimmedActivityWindow = useMemo(
+    () => resolveActivityWindow(activityDurationSeconds, hasImportedVideo ? null : activityTrim),
+    [activityDurationSeconds, activityTrim, hasImportedVideo],
+  )
   const importedVideoFps = videoFormat === null ? null : videoFormat.fps.num / videoFormat.fps.den
   const importedVideoResolution = videoFormat?.resolution ?? null
   const isSeparate = displaySettings.outputMode === 'separate'
@@ -107,6 +98,7 @@ export default function useRenderVideoDerivedState({ settings }) {
   )
 
   return {
+    activityDurationSeconds,
     availableCodecs,
     batchSnapshot,
     batchFinished: isBatchFinished(batchSnapshot),
@@ -136,6 +128,7 @@ export default function useRenderVideoDerivedState({ settings }) {
     selectedExportCodecAvailable,
     selectedOutputFormatValue,
     updateRateFps,
+    trimmedActivityWindow,
     updateRateOptions,
     videoBounds,
   }

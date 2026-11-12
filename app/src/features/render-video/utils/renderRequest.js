@@ -1,4 +1,5 @@
 import { getActivityDurationSeconds } from '@/lib/activity/activity-summary'
+import { resolveActivityWindow } from '@/lib/activity/activity-trim'
 import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
 import { selectVideoTimeline } from '@/lib/video-program/timeline'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
@@ -27,29 +28,30 @@ export function renderTransport(state, settings = null) {
  * the activity overlay without videos, or a preview frame of the clip the
  * preview shows at the playhead. With an external activity the clip keeps its
  * committed offset; without one the clip's own telemetry drives the overlay in
- * video-local time.
+ * video-local time. The activity trim decides the window only without videos.
  * @param {object} state Editor snapshot.
- * @returns {{clip: object|null, activity: object|null, originSecond: number, timelineStart: number, timelineEnd: number}} Render inputs.
+ * @returns {{clip: object|null, activity: object|null, originSecond: number, window: {startSecond: number, endSecond: number, isTrimmed: boolean}}} Render inputs.
  */
 function resolveSingleRenderInputs(state) {
   const { clips, program } = selectVideoTimeline(state)
   const target = resolvePreviewTarget(program, state.selectedSecond)
   const clip = target === null ? null : clips.find((candidate) => candidate.id === target.videoId)
   if (state.parsedActivity !== null || clip === null) {
-    return { clip, activity: state.parsedActivity, originSecond: 0, timelineStart: state.startSecond, timelineEnd: state.endSecond }
+    const trim = state.importedVideos.length === 0 ? state.activityTrim : null
+    return {
+      clip,
+      activity: state.parsedActivity,
+      originSecond: 0,
+      window: resolveActivityWindow(getActivityDurationSeconds(state.parsedActivity), trim),
+    }
   }
   const activity = clip.telemetry.activity
   return {
     clip,
     activity,
     originSecond: clip.offsetSeconds,
-    timelineStart: 0,
-    timelineEnd: activity === null ? 0 : getActivityDurationSeconds(activity),
+    window: resolveActivityWindow(activity === null ? 0 : getActivityDurationSeconds(activity), null),
   }
-}
-
-function shiftRange(range, originSecond) {
-  return { ...range, from: range.from - originSecond, to: range.to - originSecond }
 }
 
 function freezeRequest(value) {
@@ -73,7 +75,6 @@ export function createRenderSettingsDraft(state) {
     fps,
     widgetUpdateRate: normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate),
     exportMode: renderSettings.outputMode === 'separate' || importedVideos.length > 0 ? renderSettings.exportMode : 'transparent',
-    range: { ...renderSettings.range },
     // Rendering the whole activity overrides the video parts; an export follows them unless asked.
     renderFullActivity: false,
   }
@@ -130,7 +131,7 @@ export function createBatchRenderRequest({ editorSnapshot, settings, language, i
   )
 }
 
-function createSingleRenderConfig(state, { clip, originSecond, timelineStart, timelineEnd }, settings, language) {
+function createSingleRenderConfig(state, { clip, originSecond, window }, settings, language) {
   return createRenderEffectiveConfig({
     language,
     config: state.config,
@@ -142,13 +143,11 @@ function createSingleRenderConfig(state, { clip, originSecond, timelineStart, ti
     exportMode: settings.exportMode,
     qualityType: settings.qualityType,
     qualityValue: settings.qualityValue,
-    range: shiftRange(settings.range, originSecond),
     video: clip,
     videoOffsetSeconds: clip === null ? 0 : clip.offsetSeconds - originSecond,
     // Embedded telemetry carries no editor lap selection.
     disabledLaps: state.parsedActivity === null ? [] : state.disabledLaps,
-    timelineStart,
-    timelineEnd,
+    activityWindow: window,
   })
 }
 
@@ -161,8 +160,8 @@ function createSingleRenderConfig(state, { clip, originSecond, timelineStart, ti
  */
 export function createRenderRequest({ editorSnapshot, settings, language, batchReview, overwrite = false }) {
   validateRenderSettings(settings)
-  const { outputPath, outputMode, fps, widgetUpdateRate, exportMode, codec, qualityType, qualityValue, range } = settings
-  const acceptedSettings = { outputMode, fps, widgetUpdateRate, exportMode, codec, qualityType, qualityValue, range: { ...range } }
+  const { outputPath, outputMode, fps, widgetUpdateRate, exportMode, codec, qualityType, qualityValue } = settings
+  const acceptedSettings = { outputMode, fps, widgetUpdateRate, exportMode, codec, qualityType, qualityValue }
   const target = renderTransport(editorSnapshot, settings)
   if (target === 'batch') {
     const destination = createExportDestination({ outputMode, outputPath, outputDirectory: editorSnapshot.batchOutputFolder, overwrite })
@@ -174,19 +173,17 @@ export function createRenderRequest({ editorSnapshot, settings, language, batchR
       settings: acceptedSettings,
     }
   }
-  // The whole activity renders without a clip and past any export range, whatever the videos cover.
+  // The whole activity renders without a clip and untrimmed, whatever the videos cover.
   const inputs = settings.renderFullActivity
     ? {
         clip: null,
         activity: editorSnapshot.parsedActivity,
         originSecond: 0,
-        timelineStart: editorSnapshot.startSecond,
-        timelineEnd: editorSnapshot.endSecond,
+        window: resolveActivityWindow(getActivityDurationSeconds(editorSnapshot.parsedActivity), null),
       }
     : resolveSingleRenderInputs(editorSnapshot)
-  const singleSettings = settings.renderFullActivity ? { ...settings, range: { ...settings.range, type: 'all' } } : settings
   const payload = {
-    config: createSingleRenderConfig(editorSnapshot, inputs, singleSettings, language),
+    config: createSingleRenderConfig(editorSnapshot, inputs, settings, language),
     parsedActivity: inputs.activity,
     outputPath,
     overwrite,

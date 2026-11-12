@@ -4,7 +4,6 @@ import { joinVideoEdits } from '@/lib/video-program/video-collection'
 import { createTestVideo, cutEdits, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 const defaults = { type: 'wipeleft', durationSeconds: 1, splitGapThresholdSeconds: 2 }
-const all = { type: 'all', from: 0, to: 0 }
 const sync = { activitySummary: null, timezoneMode: 'utc', error: null }
 
 function clipsOf(videos, offsets, edit = () => {}) {
@@ -32,7 +31,6 @@ function review(overrides) {
     outputMode: 'combined',
     exportMode: 'composite',
     codec: 'libx264',
-    exportRange: all,
     transitionDefaults: defaults,
     inspection: inspected(clips),
     sync,
@@ -92,8 +90,6 @@ describe('reviewExport', () => {
       },
       { id: '/videos/climb.mp4', pieces: [{ sourceId: 'source-climb', startFrame: 0, endFrame: 900, skipOverlay: false }], transitions: [] },
     ])
-    const ranged = review({ clips, outputMode: 'separate', exportRange: { type: 'custom', from: 15, to: 50 } }).outputs
-    expect(ranged.map(({ pieces }) => pieces.map(({ startFrame, endFrame }) => [startFrame, endFrame]))).toEqual([[[600, 1500]], [[0, 600]]])
   })
 
   test('an encoder that keeps the display rotation joins only videos of one rotation', () => {
@@ -126,9 +122,15 @@ describe('reviewExport', () => {
       'Videos differ in resolution or frame rate (wide.mp4). Remove them or export separate files.',
       'Some videos cannot be exported (climb.mp4).',
     ])
-    expect(review({ clips: clipsOf([ride], { ride: 0 }), exportRange: { type: 'custom', from: 100, to: 120 } }).blockers).toEqual([
-      'No video lies inside the export range.',
-    ])
+    const excluded = clipsOf([ride], { ride: 0 }, (edits) => {
+      edits.ride.segments.start.excluded = true
+    })
+    expect(review({ clips: excluded }).blockers).toEqual(['Every video part is excluded from export.'])
+  })
+
+  test('a video wholly behind an earlier overlapping video has nothing of its own to render', () => {
+    const { rows } = review({ clips: clipsOf([ride, climb], { ride: 0, climb: 10 }) })
+    expect(rows.find((row) => row.id === 'climb')).toMatchObject({ status: 'blocked', error: 'Hidden behind an overlapping video' })
   })
 
   test('blocks transitions longer than the pieces they join', () => {

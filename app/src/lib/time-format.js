@@ -34,22 +34,6 @@ export function timeToSeconds(timeStr) {
 }
 
 /**
- * Converts a numeric second value to HH:MM:SS.
- *
- * @param {number} seconds Whole or fractional second value.
- * @returns {string} Zero-padded HH:MM:SS string.
- */
-export function formatExportRangeTime(seconds) {
-  const sign = seconds < 0 ? '-' : ''
-  const wholeSeconds = Math.trunc(Math.abs(seconds))
-  const hours = Math.floor(wholeSeconds / 3600)
-  const minutes = Math.floor((wholeSeconds % 3600) / 60)
-  const remainingSeconds = wholeSeconds % 60
-
-  return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`
-}
-
-/**
  * Formats seconds as a clock duration in mm:ss or h:mm:ss form.
  *
  * @param {number} seconds - Duration in seconds.

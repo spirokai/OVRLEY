@@ -138,10 +138,21 @@ pub(crate) struct ProjectDocument {
     sources: ProjectSources,
     sync: ProjectSync,
     laps: ProjectLaps,
+    /// Trimmed part of the activity, or null for the whole activity.
+    #[serde(deserialize_with = "deserialize_required_option")]
+    activity_trim: Option<ProjectActivityTrim>,
     transition_defaults: ProjectTransitionDefaults,
     render: ProjectRender,
     timeline: ProjectTimeline,
     raster_assets: BTreeMap<String, String>,
+}
+
+/// The part of the activity an overlay renders when no video decides it, in activity seconds.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectActivityTrim {
+    start_second: f64,
+    end_second: f64,
 }
 
 /// The activity's lap selection; stale IDs never survive an activity change in the editor.
@@ -507,7 +518,6 @@ struct ProjectRender {
     codec: String,
     quality_type: QualityType,
     quality_value: f64,
-    range: ProjectRange,
 }
 
 /// Versions 3 to 5 rendered batches from a video folder.
@@ -734,8 +744,6 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
     }
     for (label, value) in [
         ("render.fps", project.render.fps),
-        ("render.range.from", project.render.range.from),
-        ("render.range.to", project.render.range.to),
         ("timeline.playheadSecond", project.timeline.playhead_second),
         ("timeline.viewStart", project.timeline.view_start),
         ("timeline.viewEnd", project.timeline.view_end),
@@ -758,10 +766,16 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
     {
         return Err("Composite export mode requires a video source".into());
     }
-    if matches!(project.render.range.range_type, RangeType::Custom)
-        && project.render.range.from >= project.render.range.to
-    {
-        return Err("Custom render range requires from < to".into());
+    if let Some(trim) = &project.activity_trim {
+        if !trim.start_second.is_finite() || !trim.end_second.is_finite() {
+            return Err("activityTrim bounds must be finite".into());
+        }
+        if trim.start_second < 0.0 || trim.start_second >= trim.end_second {
+            return Err("activityTrim requires 0 <= startSecond < endSecond".into());
+        }
+        if project.sources.activity.is_none() {
+            return Err("activityTrim requires an activity source".into());
+        }
     }
     if project.timeline.view_start >= project.timeline.view_end {
         return Err("Timeline viewport requires viewStart < viewEnd".into());
@@ -1259,6 +1273,7 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
         metadata: None,
     });
     let manual = project.sync.manual;
+    let activity_trim = migrate_render_range(&render.range, project.sources.activity.is_some());
     let document = ProjectDocument {
         format: project.format,
         version: PROJECT_VERSION,
@@ -1278,6 +1293,7 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
             videos: video.into_iter().collect(),
         },
         laps: project.laps,
+        activity_trim,
         transition_defaults: ProjectTransitionDefaults::default(),
         render: ProjectRender {
             output_mode: if renders_video_folder {
@@ -1292,7 +1308,6 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
             codec: render.codec,
             quality_type: render.quality_type,
             quality_value: render.quality_value,
-            range: render.range,
         },
         timeline: project.timeline,
         raster_assets: project.raster_assets,
@@ -1301,6 +1316,22 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
         document,
         legacy_batch_video_folder,
     })
+}
+
+/// Versions 1 to 5 saved a custom export range in timeline seconds, which are
+/// activity seconds; it becomes the activity trim. The editor fits it to the
+/// loaded activity, and a range without an activity is dropped.
+fn migrate_render_range(range: &ProjectRange, has_activity: bool) -> Option<ProjectActivityTrim> {
+    let start_second = range.from.max(0.0);
+    (matches!(range.range_type, RangeType::Custom)
+        && has_activity
+        && range.from.is_finite()
+        && range.to.is_finite()
+        && start_second < range.to)
+        .then_some(ProjectActivityTrim {
+            start_second,
+            end_second: range.to,
+        })
 }
 
 fn migrate_legacy_render(render: LegacyProjectRender) -> Result<ProjectRenderV5, String> {
@@ -1908,13 +1939,14 @@ mod tests {
                 }
             },
             "laps": { "disabled": [] },
+            "activityTrim": null,
             "transitionDefaults": {
                 "type": "wipeleft", "durationSeconds": 2.0, "splitGapThresholdSeconds": 2.0
             },
             "render": {
                 "outputMode": "combined", "batchOutputFolder": null,
                 "fps": 30.0, "widgetUpdateRate": 1, "exportMode": "transparent", "codec": "prores_ks",
-                "qualityType": "quality", "qualityValue": 18, "range": { "type": "all", "from": 0.0, "to": 0.0 }
+                "qualityType": "quality", "qualityValue": 18
             },
             "timeline": { "playheadSecond": 0.0, "viewStart": 0.0, "viewEnd": 73.0 },
             "rasterAssets": {}
@@ -1935,6 +1967,8 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .remove("transitionDefaults");
+        project.as_object_mut().unwrap().remove("activityTrim");
+        project["render"]["range"] = serde_json::json!({ "type": "all", "from": 0.0, "to": 0.0 });
         let sources = project["sources"].as_object_mut().unwrap();
         sources.remove("videos");
         sources.insert("video".into(), Value::Null);
@@ -2555,6 +2589,49 @@ mod tests {
             assert!(serialized["render"].get("batchVideoFolder").is_none());
             assert!(serialized["render"]["batchOutputFolder"].is_null());
         }
+    }
+
+    #[test]
+    fn legacy_custom_export_range_becomes_the_activity_trim() {
+        let mut custom: Value = serde_json::from_str(&valid_v5_project_json()).unwrap();
+        custom["render"]["range"] =
+            serde_json::json!({ "type": "custom", "from": -4.0, "to": 30.5 });
+        let parsed =
+            serde_json::to_value(parse_project(&custom.to_string()).unwrap().document).unwrap();
+        assert_eq!(
+            parsed["activityTrim"],
+            serde_json::json!({ "startSecond": 0.0, "endSecond": 30.5 })
+        );
+        assert!(parsed["render"].get("range").is_none());
+
+        let mut without_activity = custom.clone();
+        without_activity["sources"]["activity"] = Value::Null;
+        let parsed = parse_project(&without_activity.to_string())
+            .unwrap()
+            .document;
+        assert!(parsed.activity_trim.is_none());
+
+        let parsed = parse_project(&valid_v5_project_json()).unwrap().document;
+        assert!(parsed.activity_trim.is_none());
+    }
+
+    #[test]
+    fn activity_trim_is_validated() {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["activityTrim"] = serde_json::json!({ "startSecond": 5.0, "endSecond": 20.0 });
+        assert!(parse_project(&project.to_string()).is_ok());
+        for trim in [
+            serde_json::json!({ "startSecond": 20.0, "endSecond": 5.0 }),
+            serde_json::json!({ "startSecond": -1.0, "endSecond": 5.0 }),
+        ] {
+            project["activityTrim"] = trim;
+            assert!(parse_project(&project.to_string()).is_err());
+        }
+        project["activityTrim"] = serde_json::json!({ "startSecond": 5.0, "endSecond": 20.0 });
+        project["sources"]["activity"] = Value::Null;
+        assert!(parse_project(&project.to_string()).is_err());
+        project.as_object_mut().unwrap().remove("activityTrim");
+        assert!(parse_project(&project.to_string()).is_err());
     }
 
     #[test]

@@ -11,7 +11,8 @@ function createClip(overrides = {}) {
     segments: [],
     durationLabel: '00:20',
     formatLabel: 'FIT',
-    highlightStyle: null,
+    trimMasks: [],
+    textStyle: { left: '0%', width: '100%' },
     icon: null,
     id: 'activity',
     isVideo: false,
@@ -55,6 +56,12 @@ describe('TimelineLane', () => {
     expect(screen.getByText('FIT')).toBeInTheDocument()
     expect(screen.getByText('ride.fit')).toBeInTheDocument()
     expect(screen.getByText('00:20')).toBeInTheDocument()
+  })
+
+  test('shades the trimmed-off parts of the activity', () => {
+    renderLane({ trimMasks: [{ key: 'start', style: { left: '0%', width: '10%' } }] })
+
+    expect(screen.getByTestId('timeline-activity-trim-mask')).toHaveStyle({ left: '0%', width: '10%' })
   })
 
   test('hides text inside clips when the lane model says text is not visible', () => {

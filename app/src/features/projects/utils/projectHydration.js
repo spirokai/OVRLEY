@@ -3,6 +3,7 @@ import { clampToView } from '@/features/player/utils/timelineViewport'
 import { getTimelineMinimum } from '@/features/player/utils/playerTiming'
 import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlice'
 import { activateParsedActivity } from '@/lib/activity/import-activity'
+import { MIN_ACTIVITY_TRIM_SECONDS, trimActivityEdge } from '@/lib/activity/activity-trim'
 import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
 import { getVideosTimelineBounds, joinVideoEdits } from '@/lib/video-program/video-collection'
 import { fitCutsToFrameCount } from '@/lib/video-program/video-segments'
@@ -80,23 +81,30 @@ export function applyNewProjectState(store, { templateSource, templateState }) {
     draft.parsedActivity = null
     draft.activitySummary = null
     draft.fallbackDurationSeconds = 73
-    draft.startSecond = 0
-    draft.endSecond = 73
     draft.selectedSecond = 0
     draft.timelineViewport = { viewStart: 0, viewEnd: 73 }
     draft.previewPlaybackState = 'paused'
     draft.previewPlaybackSource = 'timeline'
     draft.videoDragPreview = null
     draft.transitionDefaults = { ...DEFAULT_TRANSITION_SETTINGS }
-    draft.renderSettings = {
-      ...DEFAULT_RENDER_SETTINGS,
-      range: { ...DEFAULT_RENDER_SETTINGS.range },
-    }
+    draft.renderSettings = { ...DEFAULT_RENDER_SETTINGS }
     draft.errorMessage = null
     draft.batchOutputFolder = null
     draft.batchSnapshot = null
   })
   state.resetVideoSyncState()
+}
+
+/**
+ * A saved trim of the activity loaded with the project, kept inside it and at least
+ * the minimum length apart; a trim of an activity that is gone, or that covers it whole, is dropped.
+ * @param {{startSecond: number, endSecond: number}|null} trim Saved trim.
+ * @param {number} activityDuration Duration of the loaded activity, 0 without one.
+ * @returns {{startSecond: number, endSecond: number}|null} Trim to restore.
+ */
+function resolveActivityTrim(trim, activityDuration) {
+  if (trim === null || activityDuration <= MIN_ACTIVITY_TRIM_SECONDS) return null
+  return trimActivityEdge(trimActivityEdge(null, activityDuration, 'end', trim.endSecond), activityDuration, 'start', trim.startSecond)
 }
 
 /**
@@ -117,17 +125,8 @@ export function applyProjectOwnedState(store, project, manualVideoSync) {
   const videoEnd = videoBounds?.endSecond ?? 0
   const timelineEnd = Math.max(activityDuration, videoEnd, timelineMinimum + 0.001)
   const timelineViewport = clampToView(project.timeline.viewStart, project.timeline.viewEnd, timelineEnd, timelineMinimum)
-  const range = { ...project.render.range }
   const { batchOutputFolder, ...renderSettings } = project.render
-
-  if (range.type === 'custom') {
-    range.from = clamp(range.from, timelineMinimum, timelineEnd)
-    range.to = clamp(range.to, timelineMinimum, timelineEnd)
-    if (range.from >= range.to) {
-      range.from = timelineMinimum
-      range.to = timelineEnd
-    }
-  }
+  const activityTrim = resolveActivityTrim(project.activityTrim, activityDuration)
 
   state.setConfig(project.editor.config)
   store.setState((draft) => {
@@ -138,7 +137,8 @@ export function applyProjectOwnedState(store, project, manualVideoSync) {
     draft.transitionDefaults = { ...project.transitionDefaults }
     draft.videoDragPreview = null
     draft.cutRemovalRequest = null
-    draft.renderSettings = { ...renderSettings, range }
+    draft.renderSettings = renderSettings
+    draft.activityTrim = activityTrim
     draft.batchOutputFolder = batchOutputFolder
     draft.batchSnapshot = null
     draft.selectedSecond = clamp(project.timeline.playheadSecond, timelineMinimum, timelineEnd)

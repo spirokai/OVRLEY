@@ -1,6 +1,6 @@
 /**
  * Renders overlay video settings including aspect ratio, resolution, framerate,
- * widget update rate, and export range controls.
+ * and widget update rate.
  * Pure presentational — all data comes from props.
  *
  * @param {object} props
@@ -17,10 +17,6 @@
  * @param {number} props.updateRate - Current update rate divisor.
  * @param {number[]} props.updateRateOptions - Available update rate divisors.
  * @param {function} props.onUpdateRateChange - Callback for update rate change.
- * @param {boolean} props.hasTimelineMedia - Whether an activity or videos define the timeline.
- * @param {object} props.exportRange - Export range state.
- * @param {number} props.renderFps - Render frame rate the export range snaps to.
- * @param {function} props.onExportRangeChange - Callback for export range change.
  * @returns {JSX.Element} Rendered overlay settings section.
  */
 
@@ -29,7 +25,6 @@ import { CONTROL_CLASS, FieldBlock, NumberField, SelectField } from '@/features/
 import { Separator } from '@/components/ui/separator'
 import { Video, Gauge, Bell } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ExportRangeSettings } from '@/features/render-video'
 import { ASPECT_RATIOS, RESOLUTIONS } from '../data/sceneSettingsConstants'
 import { useTranslation } from 'react-i18next'
 
@@ -47,10 +42,6 @@ export default function OverlaySettingsSection({
   updateRate,
   updateRateOptions,
   onUpdateRateChange,
-  hasTimelineMedia,
-  exportRange,
-  renderFps,
-  onExportRangeChange,
   videoResolutionMismatch,
 }) {
   const { t } = useTranslation()
@@ -148,12 +139,6 @@ export default function OverlaySettingsSection({
           </TabsList>
         </Tabs>
       </div>
-
-      {hasTimelineMedia ? (
-        <div className="space-y-3 rounded-xs border-none bg-surface-accent-soft/70 p-4">
-          <ExportRangeSettings range={exportRange} fps={renderFps} onExportRangeChange={onExportRangeChange} />
-        </div>
-      ) : null}
     </>
   )
 }

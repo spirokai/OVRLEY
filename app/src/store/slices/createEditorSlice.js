@@ -5,7 +5,7 @@
  * model shared between the canvas and widget sidebar.
  */
 
-import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, syncSceneTimingFromConfig, syncSceneTimingToConfig } from '../store-utils'
+import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged } from '../store-utils'
 import { ensureWidgetIdsInConfig, replaceWidgetInConfig } from '../../lib/widget/widget-config'
 import { buildConfigWidgets } from '../../lib/widget/widget-presentation'
 import { getPrimarySelectionId, normalizeSelectionIds } from '@/lib/widget/widget-config'
@@ -95,8 +95,6 @@ export function createEditorSlice(set, get) {
     hasUnrenderedChanges: false,
     lastRenderedConfig: null,
     fallbackDurationSeconds: 73,
-    startSecond: 0,
-    endSecond: 73,
     selectedSecond: 0,
     timelineViewport: { viewStart: 0, viewEnd: 73 },
     skipNextTimelineViewportReset: false,
@@ -136,7 +134,6 @@ export function createEditorSlice(set, get) {
         state.config = normalizedConfig
         state.selectedWidgetIds = nextSelectionState.selectedWidgetIds
         state.selectedWidgetId = nextSelectionState.selectedWidgetId
-        syncSceneTimingFromConfig(state, normalizedConfig, { previousConfig: currentState.config })
         state.hasUnrenderedChanges = isDifferent
       })
     },
@@ -160,26 +157,6 @@ export function createEditorSlice(set, get) {
       set((state) => {
         state.fallbackDurationSeconds = duration
       }),
-
-    setStartSecond: (second) => {
-      const state = get()
-      if (state.startSecond === second) return
-
-      set((draft) => {
-        draft.startSecond = second
-        syncSceneTimingToConfig(draft, { startSecond: second })
-      })
-    },
-
-    setEndSecond: (second) => {
-      const state = get()
-      if (state.endSecond === second) return
-
-      set((draft) => {
-        draft.endSecond = second
-        syncSceneTimingToConfig(draft, { endSecond: second })
-      })
-    },
 
     setSelectedSecond: (second) => {
       const safeSecond = normalizePreviewSecond(second)

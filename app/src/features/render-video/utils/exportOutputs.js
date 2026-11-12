@@ -63,7 +63,7 @@ function combinedBlockers({ program, clips, rows, exportMode, codec, t }) {
   const names = (ids) => clips.filter((clip) => ids.has(clip.id)).map((clip) => filenameFromSelectedPath(clip.path))
   const included = clips.filter((clip) => program.pieces.some((piece) => piece.videoId === clip.id))
   const blockers = []
-  if (program.pieces.length === 0) blockers.push(t('render-video.nothingInExportRange', 'No video lies inside the export range.'))
+  if (program.pieces.length === 0) blockers.push(t('render-video.nothingToExport', 'Every video part is excluded from export.'))
   // QSV full overlay keeps the source's display rotation, one per file.
   const keepsRotation = exportMode === 'composite' && isQsvFullCodec(codec)
   for (const issue of findCombinedExportIssues(program, included, { keepsRotation })) blockers.push(formatCombinedExportIssue(issue, clips, t))
@@ -85,7 +85,6 @@ function combinedBlockers({ program, clips, rows, exportMode, codec, t }) {
  * @param {'composite'|'transparent'} options.exportMode Export mode.
  * @param {string} options.codec Export codec.
  * @param {Array<object>} options.clips Timeline clips in timeline order.
- * @param {{type: 'all'|'custom', from: number, to: number}} options.exportRange Export range in timeline seconds.
  * @param {object} options.transitionDefaults Project transition defaults.
  * @param {object|null} options.inspection Current native descriptors keyed by path.
  * @param {object} options.sync Activity summary and display timezone mode.
@@ -95,9 +94,9 @@ function combinedBlockers({ program, clips, rows, exportMode, codec, t }) {
  *   Reviewed video rows, reasons combined export is unavailable, native outputs once every video is
  *   reviewed and nothing blocks them, and the committed offsets of their sources.
  */
-export function reviewExport({ outputMode, exportMode, codec, clips, exportRange, transitionDefaults, inspection, sync, locale, outputPath }) {
+export function reviewExport({ outputMode, exportMode, codec, clips, transitionDefaults, inspection, sync, locale, outputPath }) {
   const t = i18next.getFixedT(locale)
-  const programOf = (videos) => buildProgram({ videos, exportRange, transitionDefaults })
+  const programOf = (videos) => buildProgram({ videos, transitionDefaults })
   const programs = outputMode === 'separate' ? new Map(clips.map((clip) => [clip.id, programOf([clip])])) : null
   const program = outputMode === 'combined' ? programOf(clips) : null
   const piecesByVideo = new Map(

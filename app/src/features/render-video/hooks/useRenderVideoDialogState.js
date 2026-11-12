@@ -309,8 +309,6 @@ export default function useRenderVideoDialogState({
     showBatchProgress: hasImportedVideo && (batch.batchRunning || batchFinished),
     showContainerFps: !isSeparate || exportMode !== 'composite',
     showExportModeOverride: hasImportedVideo,
-    // The export range is set in the dialog only for the activity alone; with videos their parts decide what renders.
-    showExportRangeSettings: !hasImportedVideo && exportMode !== 'composite',
     showRenderFullActivity: hasImportedVideo && hasExternalActivity && exportMode === 'transparent' && !isSeparate,
     showVideoImportedBadge: hasImportedVideo && !isSeparate,
     showVideoRequiredBadge: !hasImportedVideo,

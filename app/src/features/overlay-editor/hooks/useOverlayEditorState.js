@@ -16,13 +16,14 @@ import {
   getWidgetMap,
   getWidgetResizeOptions,
   materializeWidgets,
-  resolvePreviewExportRange,
+  resolvePreviewWindow,
 } from '../utils/overlayEditorUtils'
 import useWidgetSelection from './useWidgetSelection'
 import { useEditorViewport } from './useEditorViewport'
 import { useEditorKeyboard } from './useEditorKeyboard'
 import { useOverlayPreviewStore, useVideoSyncPreviewSecond } from '@/hooks/useAppStoreSelectors'
 import { useActivityContext, usePlayheadActivityCoverage, useVideoTimeline } from '@/hooks/useVideoTimeline'
+import { getActivityDurationSeconds } from '@/lib/activity/activity-summary'
 import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
 import { applyWidgetDrafts } from '@/lib/widget/widget-resolver'
@@ -60,7 +61,7 @@ export default function useOverlayEditorState({
   videoSyncMarkControls = null,
 }) {
   const videoSyncPreviewSecond = useVideoSyncPreviewSecond(videoSyncMode)
-  const { exportRange, disabledLaps, importedBackgroundImagePath, fallbackDurationSeconds } = useOverlayPreviewStore()
+  const { activityTrim, disabledLaps, importedBackgroundImagePath, fallbackDurationSeconds } = useOverlayPreviewStore()
   // Widgets read activity time: timeline seconds shifted by the activity origin. Without an
   // external activity the clip at the playhead supplies its own telemetry from its start.
   const activityContext = useActivityContext()
@@ -88,9 +89,10 @@ export default function useOverlayEditorState({
   const orderedWidgetIds = useMemo(() => getOrderedWidgetIds(rawWidgets), [rawWidgets])
   const widgetRefCallbacks = useMemo(() => getWidgetRefCallbacks(widgetLiveEdits, orderedWidgetIds), [orderedWidgetIds, widgetLiveEdits])
   const sceneSize = useMemo(() => getSceneSize(config), [config])
-  const previewExportRange = useMemo(
-    () => resolvePreviewExportRange({ exportRange, activityOriginSecond, activityClipDurationSeconds, videoBounds }),
-    [activityClipDurationSeconds, activityOriginSecond, exportRange, videoBounds],
+  const activityDurationSeconds = Math.max(getActivityDurationSeconds(activity), 0)
+  const previewWindow = useMemo(
+    () => resolvePreviewWindow({ activityDurationSeconds, activityTrim, activityClipDurationSeconds, videoBounds }),
+    [activityClipDurationSeconds, activityDurationSeconds, activityTrim, videoBounds],
   )
   const commitUpdate = useCallback((widgetId, updates) => commitWidgetUpdate(config, onConfigChange, widgetId, updates), [config, onConfigChange])
   const commitUpdates = useCallback((updatesById) => commitWidgetUpdates(config, onConfigChange, updatesById), [config, onConfigChange])
@@ -141,12 +143,11 @@ export default function useOverlayEditorState({
       buildWasmScene({
         globalDefaults,
         sceneSize,
-        exportRange: previewExportRange,
-        activity,
+        window: previewWindow,
         fallbackDurationSeconds,
         previewRasterScale,
       }),
-    [globalDefaults, sceneSize, previewExportRange, activity, fallbackDurationSeconds, previewRasterScale],
+    [globalDefaults, sceneSize, previewWindow, fallbackDurationSeconds, previewRasterScale],
   )
   const markControls = resolveVideoSyncMarkControls(videoSyncMarkControls, videoSyncPreviewSecond, videoSyncMode)
   if (videoSyncMode && markControls === null) throw new Error('Video sync editor requires mark controls')

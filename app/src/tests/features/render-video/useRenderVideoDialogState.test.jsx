@@ -10,7 +10,6 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import useRenderVideoDialogState from '@/features/render-video/hooks/useRenderVideoDialogState'
-import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG, DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
@@ -48,7 +47,6 @@ describe('useRenderVideoDialogState', () => {
       qualityType: 'quality',
       qualityValue: 18,
       exportAcceleration: 'cpu',
-      range: { ...DEFAULT_EXPORT_RANGE },
     }
 
     const { result, rerender } = renderHook(
@@ -75,20 +73,12 @@ describe('useRenderVideoDialogState', () => {
 
     expect(result.current.fpsMode).toBe('custom')
 
-    rerender({
-      settings: {
-        ...initialSettings,
-        range: {
-          ...initialSettings.range,
-          type: 'custom',
-        },
-      },
-    })
+    rerender({ settings: { ...initialSettings, widgetUpdateRate: 2 } })
 
     expect(result.current.fpsMode).toBe('custom')
   })
 
-  test('switches imported-video dialogs between composite and transparent defaults while preserving later range edits', async () => {
+  test('switches imported-video dialogs between composite and transparent defaults', async () => {
     useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12 })], { clip: 5 }))
 
     const { result } = renderHook(() => {
@@ -101,7 +91,6 @@ describe('useRenderVideoDialogState', () => {
         qualityType: 'quality',
         qualityValue: 18,
         exportAcceleration: 'cpu',
-        range: { ...DEFAULT_EXPORT_RANGE },
       })
 
       return useRenderVideoDialogState({
@@ -132,9 +121,6 @@ describe('useRenderVideoDialogState', () => {
       expect(result.current.settings.codec).toBe('prores_ks')
     })
     expect(result.current.exportMode).toBe('transparent')
-    // The video parts decide what renders, so the range is left as it was.
-    expect(result.current.settings.range).toEqual({ ...DEFAULT_EXPORT_RANGE })
-    expect(result.current.showExportRangeSettings).toBe(false)
   })
 
   test('renders the whole activity in one transparent render only when asked, and turns it off for composite export', async () => {
@@ -153,7 +139,6 @@ describe('useRenderVideoDialogState', () => {
         qualityType: 'quality',
         qualityValue: 18,
         exportAcceleration: 'cpu',
-        range: { ...DEFAULT_EXPORT_RANGE },
         renderFullActivity: false,
         outputPath: 'C:\\renders\\overlay.mov',
       })

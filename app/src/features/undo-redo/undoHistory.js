@@ -20,8 +20,7 @@ function partializeUndoableState(state) {
     aspectRatio: state.aspectRatio,
     renderSettings: state.renderSettings,
     videoEdits: state.videoEdits,
-    startSecond: state.startSecond,
-    endSecond: state.endSecond,
+    activityTrim: state.activityTrim,
   }
 }
 

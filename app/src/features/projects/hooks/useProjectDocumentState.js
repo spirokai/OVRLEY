@@ -19,6 +19,7 @@ export default function useProjectDocumentState() {
   const projectOwnedState = useStore(
     useShallow((state) => ({
       activitySource: state.activitySource,
+      activityTrim: state.activityTrim,
       batchOutputFolder: state.batchOutputFolder,
       config: state.config,
       disabledLaps: state.disabledLaps,

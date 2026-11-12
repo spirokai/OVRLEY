@@ -25,11 +25,8 @@ function createEvent(overrides = {}) {
 
 function renderGestures() {
   const commands = {
-    cancelMarkerPreview: vi.fn(),
     cancelScrub: vi.fn(),
-    commitMarker: vi.fn(),
     commitScrub: vi.fn(),
-    previewMarker: vi.fn(),
     scrubTo: vi.fn(),
   }
   const result = renderHook((props) => useTimelineGestures(props), {
@@ -94,27 +91,5 @@ describe('useTimelineGestures', () => {
     })
 
     expect(panBy).toHaveBeenCalledWith(10)
-  })
-
-  test('previews, commits, and cancels export marker drags', () => {
-    const { commands, result } = renderGestures()
-    const markerProps = result.current.getExportMarkerProps('from')
-
-    act(() => {
-      markerProps.onPointerDown(createEvent({ clientX: 10 }))
-      markerProps.onPointerMove(createEvent({ clientX: 15 }))
-      markerProps.onPointerUp(createEvent({ clientX: 20 }))
-    })
-
-    expect(commands.previewMarker).toHaveBeenNthCalledWith(1, 'from', 10)
-    expect(commands.previewMarker).toHaveBeenNthCalledWith(2, 'from', 15)
-    expect(commands.commitMarker).toHaveBeenCalledWith('from', 20)
-
-    act(() => {
-      markerProps.onPointerDown(createEvent({ clientX: 10 }))
-      markerProps.onPointerCancel(createEvent({ clientX: 10 }))
-    })
-
-    expect(commands.cancelMarkerPreview).toHaveBeenCalled()
   })
 })

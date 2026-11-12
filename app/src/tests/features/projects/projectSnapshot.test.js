@@ -74,6 +74,8 @@ describe('project snapshot contract', () => {
     })
     expect(project.render).toMatchObject({ qualityType: 'bitrate', qualityValue: 35 })
     expect(project.render).not.toHaveProperty('bitrateMbps')
+    expect(project.render).not.toHaveProperty('range')
+    expect(project.activityTrim).toBeNull()
     expect(project.timeline).toEqual({ playheadSecond: 12.5, viewStart: 10, viewEnd: 30 })
 
     const serialized = JSON.stringify(project)
@@ -133,6 +135,8 @@ describe('project snapshot contract', () => {
     expect(project.rasterAssets).toEqual({})
     expect(project.render).toMatchObject({ qualityType, qualityValue })
     expect(project.render).not.toHaveProperty('bitrateMbps')
+    expect(project.render).not.toHaveProperty('range')
+    expect(project.activityTrim).toBeNull()
     expect(project.editor.config.scene).not.toHaveProperty('qualityType')
     expect(project.editor.config.scene).not.toHaveProperty('qualityValue')
 
@@ -141,15 +145,13 @@ describe('project snapshot contract', () => {
       globalDefaults: state.globalDefaults,
       fps: state.renderSettings.fps,
       widgetUpdateRate: state.renderSettings.widgetUpdateRate,
-      range: state.renderSettings.range,
+      activityWindow: { startSecond: 0, endSecond: 30, isTrimmed: false },
       exportMode: 'composite',
       codec: state.renderSettings.codec,
       qualityType,
       qualityValue,
       video: state.importedVideos[0],
       videoOffsetSeconds: state.videoEdits[state.importedVideos[0].id].offsetSeconds,
-      timelineStart: 0,
-      timelineEnd: 30,
     })
     expect(renderConfig.rasters).toEqual([{ ...raster, resourceId }])
     expect(renderConfig.scene).toMatchObject({ qualityType, qualityValue, ffmpeg: { codec: 'libx265' } })

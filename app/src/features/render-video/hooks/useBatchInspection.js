@@ -46,7 +46,6 @@ export default function useBatchInspection({ phase, settings }) {
             exportMode: settings.exportMode,
             codec: settings.codec,
             clips,
-            exportRange: settings.range,
             transitionDefaults: inputs.transitionDefaults,
             inspection: current,
             sync,

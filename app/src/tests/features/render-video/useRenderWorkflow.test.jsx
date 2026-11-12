@@ -92,8 +92,7 @@ describe('useRenderWorkflow', () => {
     useStore.setState(useStore.getInitialState(), true)
     useStore.setState({
       activitySummary: { durationSeconds: 73 },
-      parsedActivity: { sample_elapsed_seconds: [0, 73] },
-      endSecond: 73,
+      parsedActivity: { sample_elapsed_seconds: [0, 73], trim_end_seconds: 73 },
       config: {
         ...DEFAULT_CONFIG,
         scene: {
@@ -143,7 +142,8 @@ describe('useRenderWorkflow', () => {
     expect(renderCount).toBe(initialRenderCount)
   })
 
-  test('renders the activity overlay without videos and persists its settings', async () => {
+  test('renders the trimmed activity overlay without videos and persists its settings', async () => {
+    useStore.setState({ activityTrim: { startSecond: 5.25, endSecond: 15.75 } })
     const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
 
     await act(async () => {
@@ -152,11 +152,6 @@ describe('useRenderWorkflow', () => {
         exportMode: 'transparent',
         codec: 'prores_ks',
         exportAcceleration: 'cpu',
-        range: {
-          type: 'custom',
-          from: 5.25,
-          to: 15.75,
-        },
       })
     })
 
@@ -174,7 +169,6 @@ describe('useRenderWorkflow', () => {
     expect(useStore.getState().renderSettings).toMatchObject({
       exportMode: 'transparent',
       codec: 'prores_ks',
-      range: { type: 'custom', from: 5.25, to: 15.75 },
     })
   })
 
@@ -282,7 +276,7 @@ describe('useRenderWorkflow', () => {
 
   test('enables an MP4-only render from ready clip telemetry and renders it with its embedded telemetry', async () => {
     const telemetryActivity = { sample_elapsed_seconds: [0, 12], trim_end_seconds: 12 }
-    useStore.setState({ activitySummary: null, parsedActivity: null, startSecond: 0, endSecond: 0 })
+    useStore.setState({ activitySummary: null, parsedActivity: null })
     importVideo({ offsetSeconds: 40, telemetry: { status: 'absent', activity: null } })
     const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
 

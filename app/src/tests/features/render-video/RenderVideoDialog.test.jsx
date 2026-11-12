@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import RenderVideoDialog from '@/features/render-video/components/RenderVideoDialog'
-import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG, DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
@@ -63,7 +62,6 @@ describe('RenderVideoDialog', () => {
           exportAcceleration: 'cpu',
           qualityType: 'quality',
           qualityValue: 18,
-          range: { ...DEFAULT_EXPORT_RANGE },
         }}
       />,
     )
@@ -84,8 +82,7 @@ describe('RenderVideoDialog', () => {
     await user.click(screen.getByRole('tab', { name: 'Transparent' }))
 
     expect(screen.getByText('Export Settings')).toBeInTheDocument()
-    // With videos the export follows their parts: no range inputs, and no whole-activity render without an external activity.
-    expect(screen.queryByText('Custom Export Range')).not.toBeInTheDocument()
+    // With videos the export follows their parts: no whole-activity render without an external activity.
     expect(screen.queryByRole('switch', { name: 'Render full activity' })).not.toBeInTheDocument()
   })
 
@@ -107,7 +104,6 @@ describe('RenderVideoDialog', () => {
           exportAcceleration: 'cpu',
           qualityType: 'quality',
           qualityValue: 18,
-          range: { ...DEFAULT_EXPORT_RANGE },
           renderFullActivity: false,
         }}
       />,
@@ -133,7 +129,6 @@ describe('RenderVideoDialog', () => {
           exportMode: 'transparent',
           codec: 'prores_ks',
           exportAcceleration: 'cpu',
-          range: { ...DEFAULT_EXPORT_RANGE },
           outputPath: 'C:\\renders\\previous.mov',
         }}
       />,
@@ -227,7 +222,6 @@ function transparentSettings() {
     exportMode: 'transparent',
     codec: 'prores_ks',
     exportAcceleration: 'cpu',
-    range: { ...DEFAULT_EXPORT_RANGE },
     outputPath: 'C:\\renders\\overlay.mov',
   }
 }

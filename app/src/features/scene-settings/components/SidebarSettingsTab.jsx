@@ -39,10 +39,6 @@ export default function SidebarSettingsTab({ config, onConfigChange, widgetLiveE
           updateRate={overlaySettings.updateRate}
           updateRateOptions={overlaySettings.updateRateOptions}
           onUpdateRateChange={handlers.handleUpdateRateChange}
-          hasTimelineMedia={overlaySettings.hasTimelineMedia}
-          exportRange={overlaySettings.exportRange}
-          renderFps={overlaySettings.renderFps}
-          onExportRangeChange={state.setExportRange}
           videoResolutionMismatch={overlaySettings.videoResolutionMismatch}
         />
       </div>

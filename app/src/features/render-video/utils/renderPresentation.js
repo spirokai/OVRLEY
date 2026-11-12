@@ -122,7 +122,7 @@ function formatCreationLabels(clip, sync, locale) {
  * Reviews every imported video for separate-file export. A video renders at its
  * committed timeline offset; frames outside the activity show raster widgets only.
  * @param {object[]} clips Timeline clips in timeline order.
- * @param {Map<string, Array<object>>} piecesByVideo Program pieces of each video after the export range.
+ * @param {Map<string, Array<object>>} piecesByVideo Program pieces of each video.
  * @param {object|null} inspection Current native descriptors keyed by path.
  * @param {object} sync Activity summary.
  * @param {string} locale Display language.
@@ -140,7 +140,7 @@ export function reviewBatchQueue(clips, piecesByVideo, inspection, sync, locale)
     if (item.pieces.length === 0 && isVideoExcluded(clip))
       return { ...item, status: 'blocked', error: i18next.getFixedT(locale)('render-video.excludedFromExport', 'Excluded from export') }
     if (item.pieces.length === 0)
-      return { ...item, status: 'blocked', error: i18next.getFixedT(locale)('render-video.outsideExportRange', 'Outside the export range') }
+      return { ...item, status: 'blocked', error: i18next.getFixedT(locale)('render-video.hiddenByOverlap', 'Hidden behind an overlapping video') }
     if (inspection?.error && inspection.error.message !== 'reinspectionRequired')
       return { ...item, status: 'blocked', error: formatRenderPathError(inspection.error, i18next.getFixedT(locale)) }
     const result = inspection?.sources.get(clip.path)
@@ -189,15 +189,14 @@ export function getRenderSummaryItems(ctx, t) {
   const accelerationLabel = ctx.selectedAccelerationOptions.find(
     (option) => option.value === ctx.selectedAccelerationValue && option.available && option.value !== 'cpu',
   )?.label
-  const durationSeconds = isCompositeExport
-    ? ctx.videoBounds === null
-      ? null
-      : ctx.videoBounds.endSecond - ctx.videoBounds.startSecond
-    : ctx.settings.range?.type === 'custom'
-      ? ctx.settings.range.to - ctx.settings.range.from
-      : ctx.config?.scene?.start !== undefined && ctx.config?.scene?.end !== undefined
-        ? ctx.config.scene.end - ctx.config.scene.start
-        : null
+  // Videos decide the length unless the whole activity renders regardless of them.
+  const durationSeconds = ctx.settings.renderFullActivity
+    ? ctx.activityDurationSeconds
+    : ctx.videoBounds !== null
+      ? ctx.videoBounds.endSecond - ctx.videoBounds.startSecond
+      : isCompositeExport
+        ? null
+        : ctx.trimmedActivityWindow.endSecond - ctx.trimmedActivityWindow.startSecond
   const renderSummaryItems = [
     ctx.config?.scene?.width && ctx.config?.scene?.height ? `${ctx.config.scene.width}x${ctx.config.scene.height}` : null,
     `${fps} fps`,

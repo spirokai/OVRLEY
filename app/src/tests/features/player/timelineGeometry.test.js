@@ -1,8 +1,6 @@
 import { describe, expect, test } from 'vite-plus/test'
 import {
-  clampExportRangeMarkerSecond,
   getClipGeometry,
-  getExportRangeHighlightGeometry,
   pointerToSecond,
   roundToDevicePixel,
   secondsToViewPx,
@@ -19,7 +17,7 @@ describe('timelineGeometry utilities', () => {
     expect(pointerToSecond({ clientX: 999, rect: { left: 0 }, viewStart: 0, viewEnd: 100, widthPx: 500, totalDuration: 100 })).toBe(100)
   })
 
-  test('maps pointers and export markers to a negative timeline minimum', () => {
+  test('maps pointers to a negative timeline minimum', () => {
     expect(
       pointerToSecond({
         clientX: 0,
@@ -27,16 +25,6 @@ describe('timelineGeometry utilities', () => {
         viewStart: -5,
         viewEnd: 25,
         widthPx: 400,
-        timelineMinimum: -5,
-        totalDuration: 25,
-      }),
-    ).toBe(-5)
-    expect(
-      clampExportRangeMarkerSecond({
-        marker: 'from',
-        second: -20,
-        fromSecond: -5,
-        toSecond: 25,
         timelineMinimum: -5,
         totalDuration: 25,
       }),
@@ -55,28 +43,6 @@ describe('timelineGeometry utilities', () => {
       x: 50,
     })
     expect(getClipGeometry({ startSecond: 110, durationSeconds: 20, viewStart: 0, viewEnd: 100, widthPx: 500 }).isVisible).toBe(false)
-  })
-
-  test('constrains export markers to a one-second minimum gap', () => {
-    const base = { fromSecond: 10, toSecond: 20, totalDuration: 60 }
-
-    expect(clampExportRangeMarkerSecond({ ...base, marker: 'from', second: 19.9 })).toBe(19)
-    expect(clampExportRangeMarkerSecond({ ...base, marker: 'to', second: 10.2 })).toBe(11)
-  })
-
-  test('computes export range highlight geometry inside a clip', () => {
-    expect(
-      getExportRangeHighlightGeometry({
-        durationSeconds: 40,
-        exportFromSecond: 20,
-        exportToSecond: 35,
-        startSecond: 10,
-      }),
-    ).toEqual({
-      isVisible: true,
-      leftPercent: 25,
-      widthPercent: 37.5,
-    })
   })
 
   test('rounds to the active device pixel grid', () => {

@@ -94,8 +94,34 @@ describe('useOverlayPlayer', () => {
     expect(useStore.getState().previewPlaybackState).toBe('paused')
   })
 
-  test('routes playback, export, mute, and synchronization shortcuts', () => {
-    const { unmount } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
+  test('trims the video at the playhead with [ ] and I/O when videos are loaded', () => {
+    useStore.setState({ selectedSecond: 15 })
+    const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
+    const edits = () => useStore.getState().videoEdits['video-1']
+    expect(result.current.toolbar.trim).toMatchObject({ isVisible: true, target: 'video', canTrimStart: true, canTrimEnd: true })
+
+    act(() => result.current.toolbar.trim.trimStart())
+    expect(edits().cuts.map((cut) => cut.frame)).toEqual([150])
+    expect(edits().segments.start.excluded).toBe(true)
+
+    // A second trim of the same end moves its trim cut.
+    act(() => useStore.setState({ selectedSecond: 12 }))
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i' })))
+    expect(edits().cuts.map((cut) => cut.frame)).toEqual([60])
+    expect(useStore.getState().activityTrim).toBeNull()
+
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'o' })))
+    expect(edits().cuts.map((cut) => cut.frame)).toEqual([60])
+    act(() => useStore.setState({ selectedSecond: 25 }))
+    act(() => result.current.toolbar.trim.trimEnd())
+    expect(edits().cuts.map((cut) => cut.frame)).toEqual([60, 450])
+    expect(edits().segments[edits().cuts[1].id].excluded).toBe(true)
+  })
+
+  test('routes playback, activity trim, mute, and synchronization shortcuts', () => {
+    resetStore({ videos: [], offsets: {} })
+    const { result, unmount } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
+    expect(result.current.toolbar.trim).toMatchObject({ isVisible: true, target: 'activity', canTrimStart: true, canTrimEnd: true })
 
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
@@ -103,14 +129,27 @@ describe('useOverlayPlayer', () => {
     expect(useStore.getState().selectedSecond).toBe(1)
 
     act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i' }))
+    })
+    expect(useStore.getState().activityTrim).toEqual({ startSecond: 1, endSecond: 100 })
+
+    act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home' }))
     })
     expect(useStore.getState().selectedSecond).toBe(0)
 
     act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i' }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i', altKey: true }))
     })
-    expect(useStore.getState().renderSettings.range).toMatchObject({ from: 0, type: 'custom' })
+    expect(useStore.getState().selectedSecond).toBe(1)
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', ctrlKey: true }))
+    })
+    expect(useStore.getState().activityTrim).toBeNull()
+
+    // Mute and synchronization need a video.
+    act(() => useStore.setState(videoStoreState([createTestVideo({ path: 'C:\\clips\\ride.mp4', durationSeconds: 20 })], { 'video-1': 10 })))
 
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' }))
@@ -162,17 +201,23 @@ describe('useOverlayPlayer', () => {
     expect(result.current.timeline.playhead.style.transform).toBe('translateX(244px)')
   })
 
-  test('hides the complete export-range presentation in video-sync mode', () => {
-    const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black', videoSyncMode: true }))
+  test('shows the activity trim with handles on the activity lane, and leaves it alone in video-sync mode', () => {
+    useStore.setState({ activityTrim: { startSecond: 20, endSecond: 60 } })
+    const activityLane = (result) => result.current.timeline.lanes.find((lane) => lane.id === 'activity')
+    const { result, unmount } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
+    act(() => result.current.timeline.containerProps.ref(createTimelineElement(500)))
+    expect(activityLane(result).clips[0].trimMasks.map((mask) => mask.key)).toEqual(['start', 'end'])
+    expect(activityLane(result).cutMarkers.map((marker) => marker.key)).toEqual(['activity:start', 'activity:end'])
+    unmount()
 
+    const sync = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black', videoSyncMode: true }))
     act(() => {
-      result.current.timeline.containerProps.ref(createTimelineElement(500))
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i' }))
+      sync.result.current.timeline.containerProps.ref(createTimelineElement(500))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', ctrlKey: true }))
     })
-
-    expect(result.current.toolbar.exportRange.isCustom).toBe(true)
-    expect(result.current.timeline.exportMarkers).toEqual([])
-    expect(timelineClips(result).every((clip) => clip.highlightStyle === null)).toBe(true)
+    expect(activityLane(sync.result).clips[0].trimMasks).toEqual([])
+    expect(activityLane(sync.result).cutMarkers).toEqual([])
+    expect(useStore.getState().activityTrim).toEqual({ startSecond: 20, endSecond: 60 })
   })
 
   test('cuts and excludes at the playhead with C and X', () => {

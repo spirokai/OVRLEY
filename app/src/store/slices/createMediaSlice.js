@@ -24,6 +24,8 @@ export function createMediaSlice(set, get) {
     parsedActivity: null, // external activity file; embedded video telemetry stays on each imported video
     // Strictly increasing lap IDs of parsedActivity excluded from lap widgets.
     disabledLaps: [],
+    // Trimmed part of parsedActivity, {startSecond, endSecond}, or null for the whole activity.
+    activityTrim: null,
     activeRenderId: null,
     activeRenderOutputPath: null,
     renderProgress: { ...DEFAULT_RENDER_PROGRESS },
@@ -95,6 +97,11 @@ export function createMediaSlice(set, get) {
         state.disabledLaps = disabledLaps.sort((left, right) => left - right)
       }),
 
+    setActivityTrim: (trim) =>
+      set((state) => {
+        state.activityTrim = trim
+      }),
+
     setActivitySource: (source) => {
       set((state) => {
         state.activitySource = source
@@ -109,8 +116,9 @@ export function createMediaSlice(set, get) {
       set((state) => {
         state.parsedActivity = activity
         state.activitySummary = createActivitySummary(activity)
-        // Lap IDs belong to one activity; any replacement purges the selection.
+        // Lap IDs and the trim belong to one activity; any replacement purges them.
         state.disabledLaps = []
+        state.activityTrim = null
         if (state.selectedClip?.laneId === ACTIVITY_LANE_ID) state.selectedClip = null
       })
       get().clearVideoSyncForActivity()
@@ -128,6 +136,7 @@ export function createMediaSlice(set, get) {
         state.parsedActivity = null
         state.activitySummary = null
         state.disabledLaps = []
+        state.activityTrim = null
         if (state.selectedClip?.laneId === ACTIVITY_LANE_ID) state.selectedClip = null
       })
       get().clearVideoSyncForActivity()
@@ -139,8 +148,6 @@ export function createMediaSlice(set, get) {
         const demoDuration = 7946
         state.activitySource = null
         state.fallbackDurationSeconds = demoDuration
-        state.startSecond = 0
-        state.endSecond = demoDuration
         state.selectedSecond = 0
       }),
   }

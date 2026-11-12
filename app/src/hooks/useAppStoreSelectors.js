@@ -6,7 +6,7 @@ import { clamp } from '@/lib/utils'
 
 function selectOverlayPreview(state) {
   return {
-    exportRange: state.renderSettings.range,
+    activityTrim: state.activityTrim,
     disabledLaps: state.disabledLaps,
     importedBackgroundImagePath: state.importedBackgroundImagePath,
     fallbackDurationSeconds: state.fallbackDurationSeconds,
@@ -130,11 +130,6 @@ export function useRenderStore() {
   )
 }
 
-/** @returns {object|null} External activity used to initialize an editable export range. */
-export function useRenderRangeActivity() {
-  return useStore((state) => state.parsedActivity)
-}
-
 /** @returns {object} Renderer availability and inputs for dialog presentation. */
 export function useRenderDialogInputs() {
   return useStore(
@@ -151,6 +146,8 @@ export function useRenderDialogInputs() {
       renderProgress: state.renderProgress,
       batchSnapshot: state.batchSnapshot,
       renderSettings: state.renderSettings,
+      parsedActivity: state.parsedActivity,
+      activityTrim: state.activityTrim,
     })),
   )
 }

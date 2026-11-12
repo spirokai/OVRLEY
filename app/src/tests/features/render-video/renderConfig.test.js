@@ -6,19 +6,16 @@
  */
 
 import { describe, expect, test } from 'vite-plus/test'
-import { DEFAULT_EXPORT_RANGE } from '@/lib/template/template-constants'
 import { createBatchRenderTemplate, createRenderEffectiveConfig } from '@/features/render-video/utils/renderConfig'
 import { createTestVideo } from '@/tests/helpers/videoFixtures'
 
 describe('render config preparation', () => {
-  test('materializes render-effective config without changing durable template semantics', () => {
+  test('renders the trimmed activity window and scopes the route to it', () => {
     const config = {
       scene: {
         width: 1920,
         height: 1080,
         fps: 60,
-        start: 0,
-        end: 50,
       },
       labels: [],
       values: [{ id: 'value-1', value: 'speed', display_type: 'text', x: 10, y: 20, content_alignment: 'right' }],
@@ -28,18 +25,11 @@ describe('render config preparation', () => {
       config,
       fps: 60,
       exportMode: 'transparent',
-      timelineStart: 0,
-      timelineEnd: 50,
       globalDefaults: {
         color_values: '#ffffff',
       },
       widgetUpdateRate: 6,
-      range: {
-        ...DEFAULT_EXPORT_RANGE,
-        type: 'custom',
-        from: 5.25,
-        to: 15.75,
-      },
+      activityWindow: { startSecond: 5.25, endSecond: 15.75, isTrimmed: true },
       codec: 'prores_ks',
       video: null,
       videoOffsetSeconds: 0,
@@ -53,6 +43,25 @@ describe('render config preparation', () => {
     expect(renderConfig.scene.custom_export_range_active).toBe(true)
     expect(renderConfig.values[0].color).toBe('#ffffff')
     expect(renderConfig.values[0].content_alignment).toBe('right')
+  })
+
+  test('renders the whole untrimmed activity without scoping the route', () => {
+    const renderConfig = createRenderEffectiveConfig({
+      config: { scene: { width: 1920, height: 1080, fps: 30 }, labels: [], values: [], plots: [] },
+      fps: 30,
+      exportMode: 'transparent',
+      globalDefaults: {},
+      widgetUpdateRate: 1,
+      activityWindow: { startSecond: 0, endSecond: 73.4, isTrimmed: false },
+      codec: 'prores_ks',
+      video: null,
+      videoOffsetSeconds: 0,
+      availableCodecs: null,
+    })
+
+    expect(renderConfig.scene.start).toBe(0)
+    expect(renderConfig.scene.end).toBe(73.4)
+    expect(renderConfig.scene.custom_export_range_active).toBe(false)
   })
 
   test('sends the canonical lean-angle diameter config to the backend', () => {
@@ -89,11 +98,9 @@ describe('render config preparation', () => {
       config,
       fps: 60,
       exportMode: 'transparent',
-      timelineStart: 0,
-      timelineEnd: 50,
       globalDefaults: {},
       widgetUpdateRate: 1,
-      range: { ...DEFAULT_EXPORT_RANGE },
+      activityWindow: { startSecond: 0, endSecond: 50, isTrimmed: false },
       codec: 'prores_ks',
       video: null,
       videoOffsetSeconds: 0,
@@ -114,7 +121,7 @@ describe('render config preparation', () => {
     expect(config).toEqual(captured)
   })
 
-  test('rehydrates scene start/end from editor timeline when durable template config omits them', () => {
+  test('takes scene start/end from the activity window when the durable template omits them', () => {
     const config = {
       scene: {
         width: 1920,
@@ -132,11 +139,9 @@ describe('render config preparation', () => {
       exportMode: 'composite',
       globalDefaults: {},
       widgetUpdateRate: 1,
-      range: { ...DEFAULT_EXPORT_RANGE },
+      activityWindow: { startSecond: 3, endSecond: 21, isTrimmed: false },
       codec: 'libx264',
       video: createTestVideo({ path: 'C:\\clip.mp4', durationSeconds: 24 }),
-      timelineStart: 3,
-      timelineEnd: 21,
       videoOffsetSeconds: 0,
       availableCodecs: null,
     })
@@ -163,18 +168,11 @@ describe('render config preparation', () => {
       fps: 60,
       globalDefaults: {},
       widgetUpdateRate: 1,
-      range: {
-        ...DEFAULT_EXPORT_RANGE,
-        type: 'custom',
-        from: 5.25,
-        to: 15.75,
-      },
+      activityWindow: { startSecond: 5.25, endSecond: 15.75, isTrimmed: true },
       exportMode: 'transparent',
       codec: 'prores_ks',
       video: createTestVideo({ path: 'C:\\clip.mp4', durationSeconds: 24 }),
       videoOffsetSeconds: 0,
-      timelineStart: 3,
-      timelineEnd: 21,
       availableCodecs: null,
     })
 
@@ -198,11 +196,9 @@ describe('render config preparation', () => {
       fps: 60,
       exportMode: 'composite',
       widgetUpdateRate: 1,
-      range: { ...DEFAULT_EXPORT_RANGE },
+      activityWindow: { startSecond: 0, endSecond: 25, isTrimmed: false },
       codec: 'libx264',
       video: createTestVideo({ path: 'C:\\clip.mp4', durationSeconds: 30 }),
-      timelineStart: 0,
-      timelineEnd: 25,
       videoOffsetSeconds: -5,
       availableCodecs: null,
     })
@@ -221,14 +217,12 @@ describe('render config preparation', () => {
       fps: 60,
       exportMode: 'composite',
       widgetUpdateRate: 2,
-      range: { ...DEFAULT_EXPORT_RANGE },
+      activityWindow: { startSecond: 0, endSecond: 40, isTrimmed: false },
       codec: 'libx264',
       qualityType: 'quality',
       qualityValue: 18,
       video,
       videoOffsetSeconds: 4,
-      timelineStart: 0,
-      timelineEnd: 40,
       availableCodecs: null,
     })
 
@@ -256,12 +250,10 @@ describe('render config preparation', () => {
         fps: 60,
         exportMode: 'composite',
         widgetUpdateRate: 1,
-        range: { ...DEFAULT_EXPORT_RANGE },
+        activityWindow: { startSecond: 0, endSecond: 25, isTrimmed: false },
         codec: 'libx264',
         video: null,
         videoOffsetSeconds: 0,
-        timelineStart: 0,
-        timelineEnd: 25,
         availableCodecs: null,
       }),
     ).toThrow('Imported video is required for composite export')
@@ -274,11 +266,9 @@ describe('render config preparation', () => {
       fps: 60,
       exportMode: 'composite',
       widgetUpdateRate: 1,
-      range: { ...DEFAULT_EXPORT_RANGE },
+      activityWindow: { startSecond: 0, endSecond: 25, isTrimmed: false },
       codec: 'libx264',
       video: createTestVideo({ path: 'C:\\clip.mp4', durationSeconds: 10 }),
-      timelineStart: 0,
-      timelineEnd: 25,
       videoOffsetSeconds: -10,
       availableCodecs: null,
     })

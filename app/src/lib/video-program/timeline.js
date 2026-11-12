@@ -1,11 +1,9 @@
 /**
- * The editor timeline program: every imported video, unrestricted by the export range.
+ * The editor timeline program of the imported videos.
  */
 
 import { buildProgram } from './program'
 import { applyVideoDragPreview, getVideosTimelineBounds, joinVideoEdits } from './video-collection'
-
-export const FULL_EXPORT_RANGE = Object.freeze({ type: 'all', from: 0, to: 0 })
 
 /**
  * Builds the clips and program shown on the editor timeline, including a transient clip drag.
@@ -20,7 +18,7 @@ export function buildTimelineProgram({ videos, videoEdits, dragPreview, transiti
   const clips = applyVideoDragPreview(joinVideoEdits(videos, videoEdits), dragPreview)
   return {
     clips,
-    program: buildProgram({ videos: clips, exportRange: FULL_EXPORT_RANGE, transitionDefaults }),
+    program: buildProgram({ videos: clips, transitionDefaults }),
     bounds: getVideosTimelineBounds(clips),
   }
 }

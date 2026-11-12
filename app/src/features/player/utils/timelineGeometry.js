@@ -1,10 +1,9 @@
 /**
- * Pure timeline geometry helpers for pointer, clip, playhead, and export marker math.
+ * Pure timeline geometry helpers for pointer, clip, and playhead math.
  */
 
 import { clamp } from '@/lib/utils'
 
-export const EXPORT_RANGE_MIN_GAP_SECONDS = 1
 export const SNAP_THRESHOLD_PX = 5
 
 /**
@@ -87,23 +86,6 @@ export function getClipGeometry({ startSecond, durationSeconds, viewStart, viewE
 }
 
 /**
- * Clamps a dragged export marker to the legal export window.
- *
- * @param {{ marker: 'from'|'to', second: number, fromSecond: number, toSecond: number, timelineMinimum?: number, totalDuration: number }} options
- * @returns {number} Clamped marker second.
- */
-export function clampExportRangeMarkerSecond({ marker, second, fromSecond, toSecond, timelineMinimum = 0, totalDuration }) {
-  const from = clamp(fromSecond, timelineMinimum, totalDuration)
-  const to = clamp(toSecond, timelineMinimum, totalDuration)
-
-  if (marker === 'from') {
-    return clamp(second, timelineMinimum, Math.max(timelineMinimum, to - EXPORT_RANGE_MIN_GAP_SECONDS))
-  }
-
-  return clamp(second, Math.min(totalDuration, from + EXPORT_RANGE_MIN_GAP_SECONDS), totalDuration)
-}
-
-/**
  * Snaps a proposed clip shift so that one moving clip edge lands on a fixed edge.
  *
  * The threshold is expressed in pixels, matching react-moveable's default
@@ -156,28 +138,4 @@ export function videoLaneId(videoId) {
  */
 export function videoIdFromLaneId(laneId) {
   return laneId === ACTIVITY_LANE_ID ? null : laneId.slice(videoLaneId('').length)
-}
-
-/**
- * Computes the clip-local overlay used to highlight the active export range.
- *
- * @param {{ startSecond: number, durationSeconds: number, exportFromSecond: number, exportToSecond: number }} options
- * @returns {{ isVisible: boolean, leftPercent: number, widthPercent: number }}
- */
-export function getExportRangeHighlightGeometry({ startSecond, durationSeconds, exportFromSecond, exportToSecond }) {
-  if (durationSeconds <= 0) return { isVisible: false, leftPercent: 0, widthPercent: 0 }
-
-  const clipEnd = startSecond + durationSeconds
-  const highlightStart = Math.max(startSecond, exportFromSecond)
-  const highlightEnd = Math.min(clipEnd, exportToSecond)
-
-  if (!(highlightEnd > highlightStart)) {
-    return { isVisible: false, leftPercent: 0, widthPercent: 0 }
-  }
-
-  return {
-    isVisible: true,
-    leftPercent: ((highlightStart - startSecond) / durationSeconds) * 100,
-    widthPercent: ((highlightEnd - highlightStart) / durationSeconds) * 100,
-  }
 }

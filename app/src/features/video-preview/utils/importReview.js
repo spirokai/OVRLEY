@@ -17,7 +17,6 @@ import {
 import { findCombinedExportIssues } from '@/lib/video-program/combined-export'
 import { buildProgram } from '@/lib/video-program/program'
 import { startsOutsideWindow } from '@/lib/video-program/start-window'
-import { FULL_EXPORT_RANGE } from '@/lib/video-program/timeline'
 import { joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
 import { produce } from 'immer'
 
@@ -312,7 +311,7 @@ export function buildImportReview({ collection, newIds, includedIds, undetermine
   const clips = sortVideosByTimeline(joinVideoEdits(collection.importedVideos, collection.videoEdits))
   const activityDurationSeconds = activityDurationOf(collection)
   const { kind, farIds } = findFarVideos({ clips, newIds, includedIds, unplacedIds, activityDurationSeconds })
-  const program = buildProgram({ videos: includedClips, exportRange: FULL_EXPORT_RANGE, transitionDefaults })
+  const program = buildProgram({ videos: includedClips, transitionDefaults })
   const names = new Map(clips.map((clip) => [clip.id, filenameFromSelectedPath(clip.path)]))
   const overlapsOf = (videoId) =>
     program.overlaps

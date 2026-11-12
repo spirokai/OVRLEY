@@ -92,6 +92,29 @@ export function resolveCutFrame(video, sourceSecond) {
 }
 
 /**
+ * Plans trimming one end of a video at a frame. An end that is not trimmed yet gets
+ * a new trim (`trimVideo`); an end that already is moves its trim cut, the first cut
+ * for the start or the last for the end (`moveCut`). A trim never passes another cut.
+ * @param {object} video Timeline clip.
+ * @param {'start'|'end'} side Trimmed end.
+ * @param {number} frame Integer frame of the trim.
+ * @returns {{kind: 'trim'}|{kind: 'move', cutId: string}|null} Edit, or null when the end cannot be trimmed there.
+ */
+export function planVideoTrim(video, side, frame) {
+  const { cuts, segments, frameCount } = video
+  if (frame <= 0 || frame >= frameCount) return null
+  const outer = side === 'start' ? FIRST_SEGMENT_KEY : (cuts.at(-1)?.id ?? FIRST_SEGMENT_KEY)
+  if (!segments[outer].excluded) {
+    const inside = side === 'start' ? frame < (cuts[0]?.frame ?? frameCount) : frame > (cuts.at(-1)?.frame ?? 0)
+    return inside ? { kind: 'trim' } : null
+  }
+  if (cuts.length === 0) return null
+  const trimCut = side === 'start' ? cuts[0] : cuts.at(-1)
+  const inside = side === 'start' ? frame < (cuts[1]?.frame ?? frameCount) : frame > (cuts.at(-2)?.frame ?? 0)
+  return inside && frame !== trimCut.frame ? { kind: 'move', cutId: trimCut.id } : null
+}
+
+/**
  * Returns the segment showing at a source second. A second at the video's end
  * belongs to its last segment.
  * @param {object} video Timeline clip.

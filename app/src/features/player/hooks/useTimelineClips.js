@@ -9,7 +9,7 @@ import { filenameFromSelectedPath } from '@/lib/file-dialog'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatClockDuration } from '@/lib/time-format'
 import { edgeCutSide, listEdgeCuts } from '../utils/cutDrag'
-import { ACTIVITY_LANE_ID, getClipGeometry, getExportRangeHighlightGeometry, secondsToViewPx, videoLaneId } from '../utils/timelineGeometry'
+import { ACTIVITY_LANE_ID, getClipGeometry, secondsToViewPx, videoLaneId } from '../utils/timelineGeometry'
 import { getActivityAttributeLabel } from '@/lib/widget/widget-presentation'
 import { framesToSeconds } from '@/lib/video-program/frame-grid'
 import { sortVideosByTimeline } from '@/lib/video-program/video-collection'
@@ -52,6 +52,26 @@ function segmentModels(clip, selectedSegmentKey) {
   }))
 }
 
+/**
+ * Striped masks over the visible parts of the activity outside its trim, positioned within the activity clip.
+ * Each is cut to the viewport: zoomed in, the clip is far wider than the screen, and a striped element that
+ * wide is not drawn.
+ */
+function activityTrimMasks(window, durationSeconds, viewStart, viewEnd) {
+  if (!window.isTrimmed || durationSeconds <= 0) return []
+  return [
+    { key: 'start', fromSecond: 0, toSecond: window.startSecond },
+    { key: 'end', fromSecond: window.endSecond, toSecond: durationSeconds },
+  ]
+    .map((mask) => ({ ...mask, fromSecond: Math.max(mask.fromSecond, viewStart), toSecond: Math.min(mask.toSecond, viewEnd) }))
+    .filter((mask) => mask.toSecond > mask.fromSecond)
+    .map((mask) => ({ key: mask.key, style: clipRangeStyle(mask.fromSecond, mask.toSecond, durationSeconds) }))
+}
+
+function activityGeometryWidthPx(durationSeconds, viewStart, viewEnd, widthPx) {
+  return getClipGeometry({ startSecond: 0, durationSeconds, viewStart, viewEnd, widthPx }).width
+}
+
 /** Segment under a pointer event on a video clip, or null for a keyboard press on the clip itself. */
 function segmentKeyFromEvent(event) {
   return event.target.closest?.('[data-segment-key]')?.dataset.segmentKey ?? null
@@ -65,16 +85,17 @@ function percentStyle(geometry, widthPx) {
 }
 
 /**
- * Owns lane and clip view models, tooltip state, clip geometry, overlap bands, and export highlights.
+ * Owns lane and clip view models, tooltip state, clip geometry, overlap bands, and the activity trim.
  *
  * @param {object} options Clip timeline inputs.
  * @param {string|null} options.activityFilename Imported activity filename.
  * @param {object|null} options.activitySummary External activity summary metadata.
+ * @param {{window: {startSecond: number, endSecond: number, isTrimmed: boolean}, draggedEdge: 'start'|'end'|null, getEdgeDragProps: function}|null} options.activityTrim
+ *   Displayed activity trim with its edge handle props (`useActivityTrim`), or null where the trim is not edited.
  * @param {boolean} options.canSelect Whether clips can be selected for keyboard nudges.
  * @param {Array<object>} options.clips Displayed timeline clips.
  * @param {function} options.commitClipNudge Callback to commit a keyboard sync adjustment.
  * @param {{videoId: string, cutId: string, frame: number}|null} options.draggedCut Cut being dragged, edge cuts included (`useCutDrag`), or null.
- * @param {{ fromSecond: number, toSecond: number }|null} options.exportHighlightRange Active export highlight range.
  * @param {function} options.getCutDragProps Cut marker drag handler factory from useCutDrag (edge cuts included).
  * @param {function} options.getLaneDragProps Per-lane drag handler factory from useClipDrag.
  * @param {boolean} options.hasActivity Whether the external activity lane should be present.
@@ -95,11 +116,11 @@ function percentStyle(geometry, widthPx) {
 export default function useTimelineClips({
   activityFilename,
   activitySummary,
+  activityTrim,
   canSelect,
   clips,
   commitClipNudge,
   draggedCut,
-  exportHighlightRange,
   getCutDragProps,
   getLaneDragProps,
   hasActivity,
@@ -174,14 +195,6 @@ export default function useTimelineClips({
         viewEnd,
         widthPx,
       })
-      const highlight = exportHighlightRange
-        ? getExportRangeHighlightGeometry({
-            startSecond: lane.startSecond,
-            durationSeconds: lane.durationSeconds,
-            exportFromSecond: exportHighlightRange.fromSecond,
-            exportToSecond: exportHighlightRange.toSecond,
-          })
-        : null
 
       // Tooltip position - anchor to the visible portion of partially clipped lanes.
       const visibleStartPx = geometry.isVisible ? clampPx(geometry.x, 0, widthPx) : 0
@@ -190,12 +203,19 @@ export default function useTimelineClips({
       const showTooltip = hoveredLaneId === lane.id && Boolean(lane.label)
       const isSelected = selectedClip?.laneId === lane.id
       const selectedSegmentKey = isSelected ? selectedClip.segmentKey : null
+      // Text span - the clip's text sits over the untrimmed part of a trimmed activity.
+      const textWindow =
+        !lane.isVideo && activityTrim?.window.isTrimmed === true && lane.durationSeconds > 0
+          ? { startSecond: activityTrim.window.startSecond, endSecond: activityTrim.window.endSecond }
+          : { startSecond: 0, endSecond: lane.durationSeconds }
+      const textWidthPx = lane.durationSeconds > 0 ? (geometry.width * (textWindow.endSecond - textWindow.startSecond)) / lane.durationSeconds : 0
       const select = (event) => setSelectedClip({ laneId: lane.id, segmentKey: lane.isVideo ? segmentKeyFromEvent(event) : null })
 
       // Presentational lane model - TimelineLane renders these values without owning calculations.
       return {
         ...lane,
         segments: lane.isVideo ? segmentModels(lane.clip, selectedSegmentKey) : [],
+        trimMasks: lane.isVideo || activityTrim === null ? [] : activityTrimMasks(activityTrim.window, lane.durationSeconds, viewStart, viewEnd),
         clipClassName: lane.isVideo ? (lane.warnings.length > 0 ? 'outline outline-1 -outline-offset-1 outline-destructive' : '') : 'bg-primary/80',
         clipContentClassName: CLIP_CONTENT_OFFSET_CLASS,
         clipProps: {
@@ -246,19 +266,16 @@ export default function useTimelineClips({
           },
         },
         clipStyle: percentStyle(geometry, widthPx),
+        textStyle:
+          lane.durationSeconds > 0
+            ? clipRangeStyle(textWindow.startSecond, textWindow.endSecond, lane.durationSeconds)
+            : { left: '0%', width: '100%' },
         durationLabel: formatClockDuration(lane.durationSeconds),
-        highlightStyle:
-          highlight?.isVisible === true
-            ? {
-                left: `${highlight.leftPercent}%`,
-                width: `${highlight.widthPercent}%`,
-              }
-            : null,
         isVisible: geometry.isVisible,
         // The whole clip shows as selected unless one of its segments is; then the segment alone carries the outline.
         isSelected: isSelected && selectedSegmentKey === null,
         hasSelectedSegment: isSelected && selectedSegmentKey !== null,
-        showText: geometry.isVisible && geometry.width >= TEXT_HIDE_THRESHOLD_REM * getRootRemPx(),
+        showText: geometry.isVisible && textWidthPx >= TEXT_HIDE_THRESHOLD_REM * getRootRemPx(),
         sourceColumnWidth: CLIP_SOURCE_COLUMN_WIDTH,
         textClassName: lane.isVideo ? 'text-accent-foreground' : 'text-background',
         tooltip: {
@@ -367,6 +384,29 @@ export default function useTimelineClips({
       })
       .filter((marker) => marker.isVisible)
 
+    // Activity trim handles - one per edge of the activity, inside the clip at its edge; dragging one in trims that end.
+    const activityTrimMarkers =
+      activityTrim === null || !hasActivity || activityGeometryWidthPx(activityDurationSeconds, viewStart, viewEnd, widthPx) < minEdgeCutClipPx
+        ? []
+        : ['start', 'end']
+            .map((edge) => {
+              const second = edge === 'start' ? activityTrim.window.startSecond : activityTrim.window.endSecond
+              return {
+                key: `activity:${edge}`,
+                isVisible: second >= viewStart && second <= viewEnd,
+                align: second <= 0 ? 'start' : second >= activityDurationSeconds ? 'end' : 'center',
+                style: { left: widthPx > 0 ? `${(secondsToViewPx({ second, viewStart, viewEnd, widthPx }) / widthPx) * 100}%` : '0%' },
+                label:
+                  edge === 'start'
+                    ? i18next.t('player.trimActivityStart', 'Drag to trim the start of the activity')
+                    : i18next.t('player.trimActivityEnd', 'Drag to trim the end of the activity'),
+                onRemove: null,
+                isDragging: activityTrim.draggedEdge === edge,
+                dragProps: activityTrim.getEdgeDragProps(edge),
+              }
+            })
+            .filter((marker) => marker.isVisible)
+
     const videoClips = clipModels.filter((clip) => clip.isVideo)
     const activityClips = clipModels.filter((clip) => !clip.isVideo)
     return [
@@ -392,7 +432,7 @@ export default function useTimelineClips({
               isVideo: false,
               clips: activityClips,
               conflictBands: [],
-              cutMarkers: [],
+              cutMarkers: activityTrimMarkers,
               joinMarkers: [],
               skippedJoinMarkers: [],
             },
@@ -402,11 +442,11 @@ export default function useTimelineClips({
   }, [
     activityFilename,
     activitySummary,
+    activityTrim,
     canSelect,
     clips,
     commitClipNudge,
     draggedCut,
-    exportHighlightRange,
     getCutDragProps,
     getLaneDragProps,
     hasActivity,

@@ -7,6 +7,10 @@ import { JoinTransitionPanel } from '@/features/transitions'
 
 const stopPropagation = (event) => event.stopPropagation()
 
+/** Striped shade over a part left out of the export: an excluded video segment or the trimmed-off activity. */
+const EXCLUDED_STRIPES =
+  'bg-background/90 bg-[repeating-linear-gradient(45deg,transparent_0,transparent_3px,rgb(255_255_255/0.08)_3px,rgb(255_255_255/0.08)_6px)]'
+
 /** A join whose default transition did not fit: disabled, with the reason in a tooltip. Drawn outside the clip mask. */
 function SkippedJoinMarker({ marker }) {
   return (
@@ -71,7 +75,7 @@ function CutMarker({ marker }) {
     <button
       type="button"
       aria-label={marker.label}
-      className="group/cut h-full w-full cursor-ew-resize touch-none bg-transparent outline-none"
+      className="group/cut relative h-full w-full cursor-ew-resize touch-none bg-transparent outline-none"
       onDoubleClick={stopPropagation}
       data-keeps-clip-selection
       {...marker.dragProps}
@@ -85,9 +89,10 @@ function CutMarker({ marker }) {
     </button>
   )
   // The positioned box holds the tooltip, so the hit area keeps its place on the timeline while the tooltip wraps it.
+  // The wrapper is a block flex box: an inline one would sit on the text baseline, below the top of the clip.
   const placed = (trigger) => (
     <div className={`absolute top-3 bottom-1 z-20 w-3 hover:z-50 ${align.area}`} style={marker.style}>
-      <SimpleTooltip content={marker.label} className="h-full w-full">
+      <SimpleTooltip content={marker.label} className="flex h-full w-full">
         {trigger}
       </SimpleTooltip>
     </div>
@@ -115,11 +120,7 @@ function TimelineSegment({ segment }) {
       style={segment.style}
     >
       {segment.excluded ? (
-        <div
-          data-testid="timeline-excluded-segment"
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-10 bg-background/90 bg-[repeating-linear-gradient(45deg,transparent_0,transparent_3px,rgb(255_255_255/0.08)_3px,rgb(255_255_255/0.08)_6px)]"
-        />
+        <div data-testid="timeline-excluded-segment" aria-hidden="true" className={`pointer-events-none absolute inset-0 z-10 ${EXCLUDED_STRIPES}`} />
       ) : null}
       {segment.isSelected ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 ring-2 ring-foreground" /> : null}
     </div>
@@ -140,16 +141,22 @@ function TimelineClip({ clip }) {
       <div
         className={`absolute inset-0 overflow-visible ${clip.hasSelectedSegment ? '' : 'group-focus-visible:ring-2 group-focus-visible:ring-foreground'} ${clip.isSelected ? 'ring-2 ring-foreground' : ''} ${clip.clipClassName}`}
       >
-        {clip.highlightStyle && (
-          <div aria-hidden="true" className="pointer-events-none absolute -top-3 -bottom-1 bg-success/20" style={clip.highlightStyle} />
-        )}
         {clip.segments.map((segment) => (
           <TimelineSegment key={segment.key} segment={segment} />
         ))}
+        {clip.trimMasks.map((mask) => (
+          <div
+            key={mask.key}
+            data-testid="timeline-activity-trim-mask"
+            aria-hidden="true"
+            className={`pointer-events-none absolute inset-y-0 z-10 ${EXCLUDED_STRIPES}`}
+            style={mask.style}
+          />
+        ))}
         {clip.showText && (
           <div
-            className={`pointer-events-none relative grid h-full items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${clip.textClassName}`}
-            style={{ gridTemplateColumns: `${clip.sourceColumnWidth} minmax(0, 1fr) auto` }}
+            className={`pointer-events-none absolute inset-y-0 z-20 grid items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${clip.textClassName}`}
+            style={{ ...clip.textStyle, gridTemplateColumns: `${clip.sourceColumnWidth} minmax(0, 1fr) auto` }}
           >
             <span className={`flex min-w-0 items-center justify-left pl-2 ${clip.clipContentClassName}`}>
               {Icon ? (

@@ -7,7 +7,7 @@ import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 describe('render request preparation', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
-    useStore.setState({ parsedActivity: { sample_elapsed_seconds: [0, 10, 20] }, endSecond: 20 })
+    useStore.setState({ parsedActivity: { sample_elapsed_seconds: [0, 10, 20], trim_end_seconds: 20 } })
   })
 
   test.each([
@@ -22,8 +22,9 @@ describe('render request preparation', () => {
     expect(request.parsedActivity).toBe(useStore.getState().parsedActivity)
   })
 
-  test('prepares a render-effective payload from committed template state', () => {
+  test('prepares a render-effective payload of the trimmed activity from committed template state', () => {
     useStore.setState({
+      activityTrim: { startSecond: 5.25, endSecond: 15.75 },
       config: {
         ...DEFAULT_CONFIG,
         scene: { ...DEFAULT_CONFIG.scene, fps: 60 },
@@ -38,7 +39,6 @@ describe('render request preparation', () => {
         fps: 60,
         widgetUpdateRate: 6,
         exportMode: 'transparent',
-        range: { type: 'custom', from: 5.25, to: 15.75 },
         outputPath: 'C:/renders/overlay.mov',
       },
     })
@@ -55,24 +55,22 @@ describe('render request preparation', () => {
         },
         values: [expect.objectContaining({ id: 'value-1', color: '#abcdef' })],
       },
-      parsedActivity: { sample_elapsed_seconds: [0, 10, 20] },
+      parsedActivity: { sample_elapsed_seconds: [0, 10, 20], trim_end_seconds: 20 },
       outputPath: 'C:/renders/overlay.mov',
       overwrite: false,
     })
     expect(request.payload.config.scene).not.toHaveProperty('updateRate')
   })
 
-  test('uses editor timeline bounds when hydrated template config omitted scene timing', () => {
+  test('renders the whole untrimmed activity', () => {
     useStore.setState({
       config: { ...DEFAULT_CONFIG, scene: { width: DEFAULT_CONFIG.scene.width, height: DEFAULT_CONFIG.scene.height, fps: 30 } },
-      startSecond: 8,
-      endSecond: 42,
     })
     const request = createRenderRequest({
       editorSnapshot: useStore.getState(),
       settings: { ...useStore.getState().renderSettings, exportMode: 'transparent', outputPath: 'C:/renders/overlay.mov' },
     })
-    expect(request.payload.config.scene).toMatchObject({ start: 8, end: 42 })
+    expect(request.payload.config.scene).toMatchObject({ start: 0, end: 20, custom_export_range_active: false })
     expect(request.payload).toMatchObject({ outputPath: 'C:/renders/overlay.mov', overwrite: false })
   })
 
@@ -111,22 +109,33 @@ describe('render request preparation', () => {
     })
   })
 
-  test('renders the whole activity as one overlay regardless of the videos and the export range when asked', () => {
-    useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:/clip.mp4', durationSeconds: 5 })], { clip: 10 }))
+  test('renders the whole activity as one overlay regardless of the videos and the activity trim when asked', () => {
+    useStore.setState({
+      ...videoStoreState([createTestVideo({ id: 'clip', path: 'C:/clip.mp4', durationSeconds: 5 })], { clip: 10 }),
+      activityTrim: { startSecond: 10, endSecond: 15 },
+    })
     const request = createRenderRequest({
       editorSnapshot: useStore.getState(),
       settings: {
         ...useStore.getState().renderSettings,
         exportMode: 'transparent',
-        range: { type: 'custom', from: 10, to: 15 },
         renderFullActivity: true,
         outputPath: 'C:/renders/overlay.mov',
       },
     })
     expect(request.target).toBe('single')
-    expect(request.payload.config.scene).toMatchObject({ start: 0, end: 20 })
+    expect(request.payload.config.scene).toMatchObject({ start: 0, end: 20, custom_export_range_active: false })
     expect(request.payload.config.scene).not.toHaveProperty('video_path')
     expect(request.settings).not.toHaveProperty('renderFullActivity')
+  })
+
+  test('the activity trim decides only without videos, so a preview frame between videos ignores it', () => {
+    useStore.setState({ activityTrim: { startSecond: 5, endSecond: 8 }, selectedSecond: 10 })
+    // Held inside the trim: the last frame before its end.
+    expect(createPreviewRenderRequest(useStore.getState()).config.scene).toMatchObject({ start: 8 - 1 / 30, end: 8 })
+
+    useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:/clip.mp4', durationSeconds: 2 })], { clip: 15 }))
+    expect(createPreviewRenderRequest(useStore.getState()).config.scene.start).toBe(10)
   })
 
   test('previews the frame of the clip the preview shows, against its own telemetry in clip-local time', () => {

@@ -32,6 +32,7 @@ test('project restoration changes only project-owned settings', () => {
         manual: { videoId: 'canonical-video', landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
+      activityTrim: { startSecond: 10, endSecond: 80 },
       transitionDefaults: { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 4 },
       render: {
         outputMode: 'separate',
@@ -42,7 +43,6 @@ test('project restoration changes only project-owned settings', () => {
         codec: 'libx264',
         qualityType: 'bitrate',
         qualityValue: 20,
-        range: { type: 'custom', from: 10, to: 80 },
       },
       timeline: { playheadSecond: 50, viewStart: 25, viewEnd: 75 },
     },
@@ -72,6 +72,20 @@ test('project restoration changes only project-owned settings', () => {
   expect(state.selectedSecond).toBe(50)
   expect(state.timelineViewport).toEqual({ viewStart: 25, viewEnd: 75 })
   expect(state.previewPlaybackState).toBe('paused')
+  expect(state.activityTrim).toEqual({ startSecond: 10, endSecond: 80 })
+})
+
+test('a saved activity trim is fitted to the loaded activity, and dropped when nothing of it remains to trim', () => {
+  const restore = (activityTrim, activitySummary) => {
+    useStore.setState(useStore.getInitialState(), true)
+    useStore.setState({ activitySummary })
+    applyProjectOwnedState(useStore, { ...createProject({ videos: [] }), activityTrim }, createProject({ videos: [] }).sync.manual)
+    return useStore.getState().activityTrim
+  }
+
+  expect(restore({ startSecond: 10, endSecond: 80 }, { durationSeconds: 50 })).toEqual({ startSecond: 10, endSecond: 50 })
+  expect(restore({ startSecond: 0, endSecond: 80 }, { durationSeconds: 50 })).toBeNull()
+  expect(restore({ startSecond: 10, endSecond: 80 }, null)).toBeNull()
 })
 
 function projectVideo(id, offsetSeconds, edits = {}) {
@@ -106,6 +120,7 @@ function createProject({ videos, manual = {}, timeline = { playheadSecond: 0, vi
       },
     },
     laps: { disabled: [] },
+    activityTrim: null,
     transitionDefaults: { type: 'wipeleft', durationSeconds: 2, splitGapThresholdSeconds: 2 },
     render: {
       outputMode: 'combined',
@@ -116,7 +131,6 @@ function createProject({ videos, manual = {}, timeline = { playheadSecond: 0, vi
       codec: 'libx264',
       qualityType: 'quality',
       qualityValue: 18,
-      range: { type: 'all', from: 0, to: 0 },
     },
     timeline,
   }

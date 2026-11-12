@@ -6,7 +6,6 @@ import { cutEdits } from '@/tests/helpers/videoFixtures'
 
 const FPS = { num: 30, den: 1 }
 const NTSC = { num: 30000, den: 1001 }
-const ALL = { type: 'all', from: 0, to: 0 }
 const WIPE = { type: 'wipeleft', durationSeconds: 2 }
 const WIPE_DEFAULTS = { ...DEFAULT_TRANSITION_SETTINGS, ...WIPE }
 
@@ -15,8 +14,8 @@ function video(id, { offsetSeconds = 0, durationSeconds = 60, importOrder = 0, c
   return { id, offsetSeconds, durationSeconds: (frameCount * fps.den) / fps.num, frameCount, fps, importOrder, ...cutEdits(cuts, start) }
 }
 
-function program(videos, { exportRange = ALL, transitionDefaults = WIPE_DEFAULTS } = {}) {
-  return buildProgram({ videos, exportRange, transitionDefaults })
+function program(videos, { transitionDefaults = WIPE_DEFAULTS } = {}) {
+  return buildProgram({ videos, transitionDefaults })
 }
 
 function pieceSpans(result) {
@@ -158,17 +157,6 @@ describe('buildProgram cuts and excluded segments', () => {
     expect(result.pieces.map(({ videoId }) => videoId)).toEqual(['b', 'a', 'b'])
     expect(result.joins.map(({ key }) => key)).toEqual(['a:start', 'b:c2'])
     expect(result.overlaps).toEqual([])
-  })
-})
-
-describe('buildProgram export range', () => {
-  test('a custom range trims pieces and its boundaries never create joins', () => {
-    const result = program([video('a'), video('b', { offsetSeconds: 60, importOrder: 1 })], { exportRange: { type: 'custom', from: 30, to: 90 } })
-    expect(pieceSpans(result)).toEqual([
-      ['a', 30, 60, 30, 60],
-      ['b', 0, 30, 60, 90],
-    ])
-    expect(result.joins.map(({ key }) => key)).toEqual(['b:start'])
   })
 })
 

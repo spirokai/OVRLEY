@@ -21,7 +21,7 @@ function renderClipsProps(overrides = {}) {
       fileFormat: 'fit',
       fileName: 'activity.fit',
     },
-    exportHighlightRange: { fromSecond: 10, toSecond: 20 },
+    activityTrim: null,
     clips: createClips([createTestVideo({ path: 'C:\\clips\\ride.mp4', durationSeconds: 20 })], { 'video-1': 5 }),
     draggedCut: null,
     getCutDragProps: () => ({}),
@@ -43,16 +43,63 @@ function clipModel(result, clipId) {
 }
 
 describe('useTimelineClips', () => {
-  test('computes clip visibility, text visibility, and export highlight styles', () => {
+  test('computes clip visibility and text visibility', () => {
     const { result } = renderClips()
     const clip = clipModel(result, 'video:video-1')
 
     expect(clip.isVisible).toBe(true)
     expect(clip.showText).toBe(true)
-    expect(clip.highlightStyle).toEqual({
-      left: '25%',
-      width: '50%',
+  })
+
+  test('shades the trimmed-off activity and puts a trim handle on each edge of its trim', () => {
+    const getEdgeDragProps = vi.fn((edge) => ({ 'data-edge': edge }))
+    const { result } = renderClips({
+      activityTrim: { window: { startSecond: 10, endSecond: 80, isTrimmed: true }, draggedEdge: 'end', getEdgeDragProps },
     })
+    const activityLane = result.current.find((lane) => lane.id === 'activity')
+
+    expect(activityLane.clips[0].trimMasks).toEqual([
+      { key: 'start', style: { left: '0%', width: '10%' } },
+      { key: 'end', style: { left: '80%', width: '20%' } },
+    ])
+    // The activity's text sits over its untrimmed part.
+    expect(activityLane.clips[0].textStyle).toEqual({ left: '10%', width: '70%' })
+    expect(
+      activityLane.cutMarkers.map(({ key, align, isDragging, dragProps, onRemove }) => ({ key, align, isDragging, dragProps, onRemove })),
+    ).toEqual([
+      { key: 'activity:start', align: 'center', isDragging: false, dragProps: { 'data-edge': 'start' }, onRemove: null },
+      { key: 'activity:end', align: 'center', isDragging: true, dragProps: { 'data-edge': 'end' }, onRemove: null },
+    ])
+  })
+
+  test('zoomed in, the shade covers only the visible part of the trimmed-off activity', () => {
+    const { result } = renderClips({
+      activityTrim: { window: { startSecond: 10, endSecond: 80, isTrimmed: true }, draggedEdge: null, getEdgeDragProps: () => ({}) },
+      viewStart: 5,
+      viewEnd: 15,
+    })
+    const activityLane = result.current.find((lane) => lane.id === 'activity')
+
+    expect(activityLane.clips[0].trimMasks).toEqual([{ key: 'start', style: { left: '5%', width: '5%' } }])
+  })
+
+  test('an untrimmed activity has no shade and its handles sit inside its edges', () => {
+    const { result } = renderClips({
+      activityTrim: { window: { startSecond: 0, endSecond: 100, isTrimmed: false }, draggedEdge: null, getEdgeDragProps: () => ({}) },
+    })
+    const activityLane = result.current.find((lane) => lane.id === 'activity')
+
+    expect(activityLane.clips[0].trimMasks).toEqual([])
+    expect(activityLane.cutMarkers.map((marker) => marker.align)).toEqual(['start', 'end'])
+    expect(activityLane.clips[0].textStyle).toEqual({ left: '0%', width: '100%' })
+  })
+
+  test('the trim is not edited without its handle model, as in video sync', () => {
+    const { result } = renderClips()
+    const activityLane = result.current.find((lane) => lane.id === 'activity')
+
+    expect(activityLane.clips[0].trimMasks).toEqual([])
+    expect(activityLane.cutMarkers).toEqual([])
   })
 
   test('nudges a selected clip by one second with Shift+Arrow', () => {

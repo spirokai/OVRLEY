@@ -19,20 +19,12 @@
  * fit (`previous` or `next`) and the seconds that piece has room for; otherwise null.
  */
 
-import { framesToSeconds, secondsToFrames, snapDurationToFrames } from './frame-grid'
+import { framesToSeconds, snapDurationToFrames } from './frame-grid'
 import { HARD_CUT, NO_TRANSITION } from './transition-catalog'
 import { sortVideosByTimeline } from './video-collection'
 import { listVideoSegments, segmentJoinKey } from './video-segments'
 
 const TIME_EPSILON_SECONDS = 1e-6
-
-function exportWindowFrames(video, exportRange) {
-  if (exportRange.type !== 'custom') return { startFrame: 0, endFrame: video.frameCount }
-  return {
-    startFrame: secondsToFrames(exportRange.from - video.offsetSeconds, video.fps),
-    endFrame: secondsToFrames(exportRange.to - video.offsetSeconds, video.fps),
-  }
-}
 
 function createPiece(video, startFrame, endFrame, segment) {
   const sourceStartSecond = framesToSeconds(startFrame, video.fps)
@@ -56,14 +48,11 @@ function createPiece(video, startFrame, endFrame, segment) {
   }
 }
 
-function collectPieces(videos, exportRange) {
+function collectPieces(videos) {
   const pieces = []
   for (const video of videos) {
-    const window = exportWindowFrames(video, exportRange)
     for (const segment of listVideoSegments(video)) {
-      const startFrame = Math.max(segment.startFrame, window.startFrame)
-      const endFrame = Math.min(segment.endFrame, window.endFrame)
-      if (!segment.excluded && endFrame > startFrame) pieces.push(createPiece(video, startFrame, endFrame, segment))
+      if (!segment.excluded && segment.endFrame > segment.startFrame) pieces.push(createPiece(video, segment.startFrame, segment.endFrame, segment))
     }
   }
   return pieces.sort(
@@ -190,13 +179,12 @@ function buildJoins(pieces, videosById, transitionDefaults) {
  * Builds the output program for the imported-video collection.
  * @param {object} options Program inputs.
  * @param {Array<object>} options.videos Imported videos.
- * @param {{type: 'all'|'custom', from: number, to: number}} options.exportRange Export range in timeline seconds.
  * @param {{type: string, durationSeconds: number, splitGapThresholdSeconds: number}} options.transitionDefaults Project transition defaults.
  * @returns {{pieces: Array<object>, joins: Array<object>, overlaps: Array<object>, excludedSegments: Array<object>, durationSeconds: number}} Program in playback order.
  */
-export function buildProgram({ videos, exportRange, transitionDefaults }) {
+export function buildProgram({ videos, transitionDefaults }) {
   const videosById = new Map(videos.map((video) => [video.id, video]))
-  const { pieces, overlaps } = resolveOverlaps(collectPieces(sortVideosByTimeline(videos), exportRange), videosById)
+  const { pieces, overlaps } = resolveOverlaps(collectPieces(sortVideosByTimeline(videos)), videosById)
   const joins = buildJoins(pieces, videosById, transitionDefaults)
   const piecesSeconds = pieces.reduce((total, piece) => total + piece.durationSeconds, 0)
   const transitionSeconds = joins.reduce((total, join) => total + join.transition.durationSeconds, 0)

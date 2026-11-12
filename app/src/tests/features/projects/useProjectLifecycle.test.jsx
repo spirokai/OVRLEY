@@ -114,8 +114,9 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         manual: { videoId: null, landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
+      activityTrim: null,
       transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
-      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     boundaries.readProjectFile.mockResolvedValue({
@@ -156,6 +157,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         manual: { videoId: 'ride-video', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
+      activityTrim: { startSecond: 10, endSecond: 80 },
       transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
       render: {
         outputMode: 'combined',
@@ -166,7 +168,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         codec: 'libx264',
         qualityType: 'bitrate',
         qualityValue: 20,
-        range: { type: 'custom', from: 10, to: 80 },
       },
       timeline: { playheadSecond: 30, viewStart: 20, viewEnd: 60 },
     }
@@ -359,7 +360,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         ...DEFAULT_RENDER_SETTINGS,
         outputMode: 'separate',
         fps: 60,
-        range: { type: 'custom', from: 10, to: 80 },
       },
     })
 
@@ -488,8 +488,9 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         manual: { videoId: null, landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
+      activityTrim: null,
       transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
-      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     useStore.setState({
@@ -547,8 +548,9 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         manual: { videoId: 'ride-video', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
+      activityTrim: null,
       transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
-      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     useStore.setState({
@@ -596,12 +598,12 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         manual: { videoId: null, landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
+      activityTrim: null,
       transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
       render: {
         ...DEFAULT_RENDER_SETTINGS,
         batchOutputFolder: null,
         exportMode: 'transparent',
-        range: { ...DEFAULT_RENDER_SETTINGS.range },
       },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
@@ -694,8 +696,9 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         manual: { videoId: 'clip-c', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
+      activityTrim: null,
       transitionDefaults: { type: 'none', durationSeconds: 2, splitGapThresholdSeconds: 3 },
-      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null },
       timeline: { playheadSecond: 0, viewStart: -5, viewEnd: 140 },
     }
   }
