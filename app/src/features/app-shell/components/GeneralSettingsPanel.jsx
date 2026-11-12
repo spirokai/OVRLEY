@@ -1,6 +1,8 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { locales } from '@/i18n/locales'
 import { useTranslation } from 'react-i18next'
+import useMapTileCache from '../hooks/useMapTileCache'
+import MapTileCacheSettings from './MapTileCacheSettings'
 
 /**
  * Renders the general app settings.
@@ -13,6 +15,7 @@ import { useTranslation } from 'react-i18next'
 export default function GeneralSettingsPanel({ locale, onLocaleChange }) {
   const { t } = useTranslation()
   const languageLabel = t('app-shell.language', 'Language')
+  const mapTileCache = useMapTileCache()
 
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4 thin-scrollbar">
@@ -31,6 +34,16 @@ export default function GeneralSettingsPanel({ locale, onLocaleChange }) {
           </SelectContent>
         </Select>
       </div>
+      {mapTileCache.usage ? (
+        <MapTileCacheSettings
+          usage={mapTileCache.usage}
+          limitBytes={mapTileCache.limitBytes}
+          pending={mapTileCache.pending}
+          onLimitDraft={mapTileCache.setDraftLimitBytes}
+          onLimitCommit={mapTileCache.commitLimit}
+          onClear={mapTileCache.clear}
+        />
+      ) : null}
     </div>
   )
 }

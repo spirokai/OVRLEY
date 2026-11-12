@@ -13,7 +13,9 @@
 //!       from any shell module).
 
 use crate::distribution::DistributionKind;
+use crate::map_cache_settings;
 use crate::map_styles::MapData;
+use crate::map_tile_service::TileCacheUsage;
 use crate::preview_import::{content_type_for_path, preview_warnings_for_metadata};
 use crate::runtime_paths;
 use crate::video_server::VideoServerHandle;
@@ -669,6 +671,43 @@ pub(crate) async fn backend_list_map_styles(
     map_data: tauri::State<'_, MapData>,
 ) -> Result<MapStyleCatalog, String> {
     Ok(map_data.registry().catalog().clone())
+}
+
+/// The map tile cache's current size and limit.
+#[tauri::command]
+pub(crate) async fn backend_get_map_tile_cache(
+    map_data: tauri::State<'_, MapData>,
+) -> Result<TileCacheUsage, String> {
+    map_data.tiles().usage()
+}
+
+/// Saves and applies a new map tile cache limit, evicting down to it.
+#[tauri::command]
+pub(crate) async fn backend_set_map_tile_cache_limit(
+    app: AppHandle,
+    map_data: tauri::State<'_, MapData>,
+    limit_bytes: u64,
+) -> Result<TileCacheUsage, String> {
+    let tiles = map_data.tiles().clone();
+    let usage = tauri::async_runtime::spawn_blocking(move || tiles.set_limit(limit_bytes))
+        .await
+        .map_err(|error| error.to_string())??;
+    map_cache_settings::persist_tile_cache_limit(&app, limit_bytes)?;
+    Ok(usage)
+}
+
+/// Deletes every cached map tile.
+#[tauri::command]
+pub(crate) async fn backend_clear_map_tile_cache(
+    map_data: tauri::State<'_, MapData>,
+) -> Result<TileCacheUsage, String> {
+    let tiles = map_data.tiles().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        tiles.clear()?;
+        tiles.usage()
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 /// Detects available ffmpeg encoders and hardware acceleration paths.

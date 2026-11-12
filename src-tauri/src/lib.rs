@@ -27,6 +27,7 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub mod video_server; // test seam
 
+mod map_cache_settings;
 mod map_styles;
 mod map_tile_service;
 
@@ -127,6 +128,9 @@ pub fn run() {
             tauri_commands::backend_get_video_state,
             tauri_commands::backend_get_map_style_url_template,
             tauri_commands::backend_list_map_styles,
+            tauri_commands::backend_get_map_tile_cache,
+            tauri_commands::backend_set_map_tile_cache_limit,
+            tauri_commands::backend_clear_map_tile_cache,
             tauri_commands::backend_detect_codecs,
             tauri_commands::backend_build_elevation_geometry,
             tauri_commands::backend_build_route_geometry,
@@ -171,6 +175,7 @@ pub fn run() {
                     app.path()
                         .app_cache_dir()
                         .map_err(|error| error.to_string())?,
+                    map_cache_settings::persisted_tile_cache_limit(app.handle())?,
                 )?,
                 Arc::new(GlyphService::open(&runtime_paths::map_font_dir(
                     app.handle(),

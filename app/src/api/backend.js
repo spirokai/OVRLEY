@@ -348,6 +348,36 @@ export function listMapStyles() {
 }
 
 /**
+ * The map tile cache's size and limit, in bytes. Every cache command returns this shape.
+ * @typedef {{usedBytes: number, limitBytes: number, minLimitBytes: number, maxLimitBytes: number, limitStepBytes: number}} MapTileCacheUsage
+ */
+
+/**
+ * Reads the map tile cache usage. The cache only exists in the desktop runtime.
+ * @returns {Promise<MapTileCacheUsage>} Current usage and limit bounds.
+ */
+export function getMapTileCache() {
+  return invokeCommand('backend_get_map_tile_cache')
+}
+
+/**
+ * Saves and applies a new map tile cache limit; least recently used tiles are evicted down to it.
+ * @param {number} limitBytes - New limit in bytes, on a reported step within the reported bounds.
+ * @returns {Promise<MapTileCacheUsage>} Usage after eviction.
+ */
+export function setMapTileCacheLimit(limitBytes) {
+  return invokeCommand('backend_set_map_tile_cache_limit', { limitBytes })
+}
+
+/**
+ * Deletes every cached map tile.
+ * @returns {Promise<MapTileCacheUsage>} Usage after clearing.
+ */
+export function clearMapTileCache() {
+  return invokeCommand('backend_clear_map_tile_cache')
+}
+
+/**
  * Returns the Rust-owned loopback URL template for the installed map styles.
  * The null browser result is intentional: the map service only exists in the
  * desktop runtime.
