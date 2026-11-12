@@ -41,6 +41,11 @@
     "keyboardShortcuts": "Tangentbordsgenvägar",
     "keyboardShortcutsDescription": "Följande tangentbordsgenvägar kan effektivisera ditt arbetsflöde:",
     "language": "Språk",
+    "unitSystem": "Enheter",
+    "unitSystems": {
+      "metric": "Metriska",
+      "imperial": "Brittiska"
+    },
     "loadingEditorData": "Läser in redigeringsdata...",
     "loadProject": "Öppna projekt",
     "mapTileCache": "Cache för kartrutor",

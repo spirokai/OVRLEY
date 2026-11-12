@@ -41,6 +41,11 @@
     "keyboardShortcuts": "Sneltoetsen",
     "keyboardShortcutsDescription": "Gebruik de volgende sneltoetsen om sneller te werken:",
     "language": "Taal",
+    "unitSystem": "Eenheden",
+    "unitSystems": {
+      "metric": "Metrisch",
+      "imperial": "Imperiaal"
+    },
     "loadingEditorData": "Editorgegevens laden...",
     "loadProject": "Project laden",
     "mapTileCache": "Kaarttegelcache",

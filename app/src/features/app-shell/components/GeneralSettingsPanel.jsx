@@ -1,5 +1,8 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { locales } from '@/i18n/locales'
+import { useUnitSystem } from '@/hooks/useAppStoreSelectors'
+import { changeUnitSystemPreference } from '@/lib/unit-system-preference'
+import { UNIT_SYSTEMS } from '@/lib/widget/unit-system'
 import { useTranslation } from 'react-i18next'
 import useMapTileCache from '../hooks/useMapTileCache'
 import MapTileCacheSettings from './MapTileCacheSettings'
@@ -15,6 +18,8 @@ import MapTileCacheSettings from './MapTileCacheSettings'
 export default function GeneralSettingsPanel({ locale, onLocaleChange }) {
   const { t } = useTranslation()
   const languageLabel = t('app-shell.language', 'Language')
+  const unitSystemLabel = t('app-shell.unitSystem', 'Units')
+  const unitSystem = useUnitSystem()
   const mapTileCache = useMapTileCache()
 
   return (
@@ -29,6 +34,21 @@ export default function GeneralSettingsPanel({ locale, onLocaleChange }) {
             {locales.map(({ value, label }) => (
               <SelectItem key={value} value={value}>
                 {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex items-center justify-between gap-6">
+        <span className="text-sm text-foreground">{unitSystemLabel}</span>
+        <Select value={unitSystem} onValueChange={changeUnitSystemPreference}>
+          <SelectTrigger className="h-8 w-44 shrink-0 bg-surface text-xs" aria-label={unitSystemLabel}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end">
+            {UNIT_SYSTEMS.map((system) => (
+              <SelectItem key={system} value={system}>
+                {t(`app-shell.unitSystems.${system}`)}
               </SelectItem>
             ))}
           </SelectContent>

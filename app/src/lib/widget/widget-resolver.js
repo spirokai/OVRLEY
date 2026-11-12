@@ -2,6 +2,7 @@
 
 import { pickDefined } from '@/lib/utils'
 import { DISPLAY_TYPE_DEFINITIONS, requireDisplayMode } from './widget-catalog'
+import { convertUnits } from './unit-system'
 
 /** @param {object|undefined} data Current data or an absent draft. @param {object} updates Partial data. @returns {object} Data with variants merged by display type. */
 export function mergeWidgetData(data, updates) {
@@ -28,13 +29,14 @@ export function resolveActiveWidgetData(data) {
  * @param {object} data Widget data.
  * @param {string} displayType Display to initialize.
  * @param {object|null} frameFallback Document geometry; null uses manifest geometry.
+ * @param {string} unitSystem System the manifest defaults are read in; document ingress keeps them metric.
  * @returns {object} Data with the initialized variant.
  */
-export function initDisplayVariant(data, displayType, frameFallback = data) {
+export function initDisplayVariant(data, displayType, frameFallback = data, unitSystem = 'metric') {
   const definition = DISPLAY_TYPE_DEFINITIONS[displayType]
   if (definition.layoutMode === 'intrinsic') return data
   const variant = {
-    ...definition.variantDefaults,
+    ...convertUnits(definition.variantDefaults, unitSystem),
     ...pickDefined(frameFallback, definition.geometryKeys),
     ...data.display_variants?.[displayType],
   }
@@ -61,14 +63,19 @@ export function buildFrameGeometryUpdate(data, geometry) {
   }
 }
 
-/** @param {object} data Widget data. @param {string} displayType Selected display. @returns {object} Display patch restoring its geometry and shared defaults. */
-export function buildDisplayTypeChangeUpdate(data, displayType) {
+/**
+ * @param {object} data Widget data.
+ * @param {string} displayType Selected display.
+ * @param {string} unitSystem System the display's manifest defaults are read in.
+ * @returns {object} Display patch restoring its geometry and shared defaults.
+ */
+export function buildDisplayTypeChangeUpdate(data, displayType, unitSystem) {
   const definition = DISPLAY_TYPE_DEFINITIONS[displayType]
-  const initialized = initDisplayVariant(data, displayType, null)
+  const initialized = initDisplayVariant(data, displayType, null, unitSystem)
   return {
     display_type: displayType,
     display_variants: initialized.display_variants,
-    ...definition.defaults,
+    ...convertUnits(definition.defaults, unitSystem),
     ...pickDefined(initialized.display_variants?.[displayType], definition.geometryFields),
   }
 }

@@ -11,6 +11,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import './i18n/index.js'
 import { hydrateLanguagePreference } from './i18n/language-preference.js'
+import { hydrateUnitSystemPreference } from './lib/unit-system-preference.js'
 import './index.css'
 import App from './App.jsx'
 
@@ -22,7 +23,7 @@ setWorkerUrl(workerUrl)
 const root = createRoot(document.getElementById('root'))
 
 async function mountApp() {
-  await hydrateLanguagePreference()
+  await Promise.all([hydrateLanguagePreference(), hydrateUnitSystemPreference()])
 
   root.render(
     <StrictMode>

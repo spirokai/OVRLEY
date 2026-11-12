@@ -678,6 +678,26 @@
       }
     }
   },
+  "unitFields": ["display_unit", "split_unit", "vertical_speed_unit", "starting_altitude_unit"],
+  "unitToggles": [
+    ["show_elevation_metric", "show_elevation_imperial"],
+    ["show_depth_metric", "show_depth_imperial"]
+  ],
+  "unitConversions": [
+    ["km", "mi"],
+    ["m", "ft"],
+    ["cm", "in"],
+    ["kmh", "mph"],
+    ["min_per_km", "min_per_mi"],
+    ["celsius", "fahrenheit"],
+    ["hpa", "inhg"],
+    ["mbar", "inhg"],
+    ["mmhg", "inhg"],
+    ["mps", "ftmin"],
+    ["mps", "ftps"],
+    ["mps", "ftph"],
+    ["mph_vertical", "ftph"]
+  ],
   "definitions": [
     {
       "type": "depth",

@@ -41,6 +41,11 @@
     "keyboardShortcuts": "키보드 단축키",
     "keyboardShortcutsDescription": "다음 키보드 단축키를 사용하여 작업 효율을 높일 수 있습니다:",
     "language": "언어",
+    "unitSystem": "단위",
+    "unitSystems": {
+      "metric": "미터법",
+      "imperial": "야드파운드법"
+    },
     "loadingEditorData": "편집기 데이터 로드 중...",
     "loadProject": "프로젝트 열기",
     "mapTileCache": "지도 타일 캐시",

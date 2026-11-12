@@ -41,6 +41,11 @@
     "keyboardShortcuts": "Keyboard Shortcuts",
     "keyboardShortcutsDescription": "You can use the following keyboard shortcuts to improve your workflow:",
     "language": "Language",
+    "unitSystem": "Units",
+    "unitSystems": {
+      "metric": "Metric",
+      "imperial": "Imperial"
+    },
     "loadingEditorData": "Loading editor data...",
     "loadProject": "Load Project",
     "mapTileCache": "Map tile cache",

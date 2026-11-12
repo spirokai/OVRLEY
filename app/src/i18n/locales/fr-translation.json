@@ -41,6 +41,11 @@
     "keyboardShortcuts": "Raccourcis clavier",
     "keyboardShortcutsDescription": "Vous pouvez utiliser les raccourcis clavier suivants pour améliorer votre flux de travail :",
     "language": "Langue",
+    "unitSystem": "Unités",
+    "unitSystems": {
+      "metric": "Métrique",
+      "imperial": "Impérial"
+    },
     "loadingEditorData": "Chargement des données de l’éditeur...",
     "loadProject": "Ouvrir le projet",
     "mapTileCache": "Cache des tuiles de carte",

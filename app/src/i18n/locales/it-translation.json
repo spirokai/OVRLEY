@@ -41,6 +41,11 @@
     "keyboardShortcuts": "Scorciatoie da tastiera",
     "keyboardShortcutsDescription": "Puoi usare le seguenti scorciatoie da tastiera per migliorare il flusso di lavoro:",
     "language": "Lingua",
+    "unitSystem": "Unità",
+    "unitSystems": {
+      "metric": "Metrico",
+      "imperial": "Imperiale"
+    },
     "loadingEditorData": "Caricamento dati editor...",
     "loadProject": "Carica progetto",
     "mapTileCache": "Cache dei riquadri mappa",

@@ -41,6 +41,11 @@
     "keyboardShortcuts": "Klavye kısayolları",
     "keyboardShortcutsDescription": "İş akışınızı iyileştirmek için aşağıdaki klavye kısayollarını kullanabilirsiniz:",
     "language": "Dil",
+    "unitSystem": "Birimler",
+    "unitSystems": {
+      "metric": "Metrik",
+      "imperial": "İngiliz"
+    },
     "loadingEditorData": "Düzenleyici verileri yükleniyor...",
     "loadProject": "Proje yükle",
     "mapTileCache": "Harita döşemesi önbelleği",

@@ -3,6 +3,7 @@
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 import { DISPLAY_TYPE_DEFINITIONS, requireWidgetTypeDefinition } from './widget-catalog'
 import { buildDisplayModeUpdate, initDisplayVariant } from './widget-resolver'
+import { convertUnits } from './unit-system'
 
 function applyGlobalBindings(data, bindings, globals) {
   for (const { path, source } of bindings) {
@@ -26,10 +27,14 @@ const INITIALIZERS = { courseSizing: initializeCourseSize, pointLabelFontSize: i
  * @param {{type: string, displayType?: string, preset?: object}} selection Drawer selection, including any display-owned mode selection.
  *   A drawer group's option may preset some of the widget's own fields; the catalog checks they exist.
  * @param {object} globalDefaults Canonical editor defaults; omitted to use application defaults.
- * @param {{coursePoints?: number[][], sceneFontSize?: number}} options Activity and scene creation inputs.
+ * @param {{coursePoints?: number[][], sceneFontSize?: number, unitSystem?: string}} options Activity, scene, and unit system creation inputs; units default to the manifest's metric.
  * @returns {object} New canonical widget data, before document identity assignment.
  */
 export function createWidgetDefaults(selection, globalDefaults = DEFAULT_GLOBAL_DEFAULTS, options = {}) {
+  return convertUnits(createManifestDefaults(selection, globalDefaults, options), options.unitSystem ?? 'metric')
+}
+
+function createManifestDefaults(selection, globalDefaults, options) {
   const definition = requireWidgetTypeDefinition(selection.type)
   const { displayType = definition.defaults.display_type } = selection
   if (displayType !== definition.defaults.display_type && !definition.displayTypes.includes(displayType))

@@ -41,6 +41,11 @@
     "keyboardShortcuts": "Atajos de teclado",
     "keyboardShortcutsDescription": "Puedes usar los siguientes atajos de teclado para mejorar tu flujo de trabajo:",
     "language": "Idioma",
+    "unitSystem": "Unidades",
+    "unitSystems": {
+      "metric": "Métrico",
+      "imperial": "Imperial"
+    },
     "loadingEditorData": "Cargando datos del editor...",
     "loadProject": "Cargar proyecto",
     "mapTileCache": "Caché de teselas del mapa",

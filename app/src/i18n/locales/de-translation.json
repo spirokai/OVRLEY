@@ -41,6 +41,11 @@
     "keyboardShortcuts": "Tastaturkürzel",
     "keyboardShortcutsDescription": "Mit den folgenden Tastaturkürzeln können Sie Ihren Arbeitsablauf verbessern:",
     "language": "Sprache",
+    "unitSystem": "Einheiten",
+    "unitSystems": {
+      "metric": "Metrisch",
+      "imperial": "Imperial"
+    },
     "loadingEditorData": "Editor-Daten werden geladen...",
     "loadProject": "Projekt laden",
     "mapTileCache": "Kartenkachel-Cache",

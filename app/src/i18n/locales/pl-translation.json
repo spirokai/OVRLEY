@@ -41,6 +41,11 @@
     "keyboardShortcuts": "Skróty klawiaturowe",
     "keyboardShortcutsDescription": "Możesz użyć następujących skrótów klawiaturowych, aby usprawnić pracę:",
     "language": "Język",
+    "unitSystem": "Jednostki",
+    "unitSystems": {
+      "metric": "Metryczne",
+      "imperial": "Imperialne"
+    },
     "loadingEditorData": "Wczytywanie danych edytora...",
     "loadProject": "Wczytaj projekt",
     "mapTileCache": "Pamięć podręczna kafelków mapy",

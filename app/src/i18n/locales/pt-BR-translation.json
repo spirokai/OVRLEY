@@ -41,6 +41,11 @@
     "keyboardShortcuts": "Atalhos de teclado",
     "keyboardShortcutsDescription": "Você pode usar os seguintes atalhos de teclado para melhorar seu fluxo de trabalho:",
     "language": "Idioma",
+    "unitSystem": "Unidades",
+    "unitSystems": {
+      "metric": "Métrico",
+      "imperial": "Imperial"
+    },
     "loadingEditorData": "Carregando dados do editor...",
     "loadProject": "Abrir projeto",
     "mapTileCache": "Cache de blocos do mapa",

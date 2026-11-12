@@ -17,6 +17,11 @@ function selectOverlayPreview(state) {
   }
 }
 
+/** @returns {string} Unit system new widgets start in. */
+export function useUnitSystem() {
+  return useStore((state) => state.unitSystem)
+}
+
 /** @returns {object} Source data and canonical timing for the overlay preview. The playhead is excluded so playback frames skip the editor. */
 export function useOverlayPreviewStore() {
   return useStore(useShallow(selectOverlayPreview))

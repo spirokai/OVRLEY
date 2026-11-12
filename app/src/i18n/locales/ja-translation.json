@@ -41,6 +41,11 @@
     "keyboardShortcuts": "キーボードショートカット",
     "keyboardShortcutsDescription": "次のキーボードショートカットを使うと作業を効率化できます:",
     "language": "言語",
+    "unitSystem": "単位",
+    "unitSystems": {
+      "metric": "メートル法",
+      "imperial": "ヤード・ポンド法"
+    },
     "loadingEditorData": "エディターのデータを読み込んでいます...",
     "loadProject": "プロジェクトを読み込む",
     "mapTileCache": "地図タイルキャッシュ",

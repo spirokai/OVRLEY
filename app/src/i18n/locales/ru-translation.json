@@ -41,6 +41,11 @@
     "keyboardShortcuts": "Клавиатурные сокращения",
     "keyboardShortcutsDescription": "Используйте следующие клавиатурные сокращения для удобства работы:",
     "language": "Язык",
+    "unitSystem": "Единицы",
+    "unitSystems": {
+      "metric": "Метрические",
+      "imperial": "Имперские"
+    },
     "loadingEditorData": "Загрузка данных редактора...",
     "loadProject": "Открыть проект",
     "mapTileCache": "Кэш тайлов карты",

@@ -41,6 +41,11 @@
     "keyboardShortcuts": "Klávesové zkratky",
     "keyboardShortcutsDescription": "Následující klávesové zkratky vám usnadní práci:",
     "language": "Jazyk",
+    "unitSystem": "Jednotky",
+    "unitSystems": {
+      "metric": "Metrické",
+      "imperial": "Imperiální"
+    },
     "loadingEditorData": "Načítání dat editoru...",
     "loadProject": "Otevřít projekt",
     "mapTileCache": "Mezipaměť mapových dlaždic",

@@ -41,6 +41,11 @@
     "keyboardShortcuts": "键盘快捷键",
     "keyboardShortcutsDescription": "您可以使用以下键盘快捷键来提高工作效率:",
     "language": "语言",
+    "unitSystem": "单位",
+    "unitSystems": {
+      "metric": "公制",
+      "imperial": "英制"
+    },
     "loadingEditorData": "正在加载编辑器数据...",
     "loadProject": "加载项目",
     "mapTileCache": "地图瓦片缓存",

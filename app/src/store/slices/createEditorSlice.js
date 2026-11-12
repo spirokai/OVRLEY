@@ -9,6 +9,7 @@ import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, syncSceneTim
 import { ensureWidgetIdsInConfig, replaceWidgetInConfig } from '../../lib/widget/widget-config'
 import { buildConfigWidgets } from '../../lib/widget/widget-presentation'
 import { getPrimarySelectionId, normalizeSelectionIds } from '@/lib/widget/widget-config'
+import { convertConfigUnits } from '@/lib/widget/unit-system'
 
 /**
  * Reconciles selection after a config replacement.
@@ -109,6 +110,8 @@ export function createEditorSlice(set, get) {
     isVideoMuted: false,
     config: cloneSerializable(DEFAULT_CONFIG),
     autoRender: false,
+    /** Unit system new widgets start in; not part of the document or its undo history. */
+    unitSystem: 'metric',
 
     setRasterImage: (widgetId, path, image) => {
       const state = get()
@@ -142,6 +145,21 @@ export function createEditorSlice(set, get) {
         state.selectedWidgetId = nextSelectionState.selectedWidgetId
         syncSceneTimingFromConfig(state, normalizedConfig, { previousConfig: currentState.config })
         state.hasUnrenderedChanges = isDifferent
+      })
+    },
+
+    /** @param {string} system Validated persisted preference, applied without touching the loaded document. */
+    initializeUnitSystem: (system) =>
+      set((state) => {
+        state.unitSystem = system
+      }),
+
+    /** @param {string} system Validated unit system; the open overlay is converted as one undoable step. */
+    setUnitSystem: (system) => {
+      const state = get()
+      state.setConfig(convertConfigUnits(state.config, system))
+      set((draft) => {
+        draft.unitSystem = system
       })
     },
 
