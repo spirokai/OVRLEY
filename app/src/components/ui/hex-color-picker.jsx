@@ -127,7 +127,7 @@ export default function HexColorPicker({
             <button
               type="button"
               className={cn(
-                'flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border border-border/70 bg-transparent px-2 text-left shadow-xs transition-colors hover:border-accent-border hover:bg-surface-highlight-soft',
+                'flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border-0 bg-transparent field-lift px-2 text-left shadow-xs transition-colors hover:bg-surface-highlight-soft',
                 triggerClassName,
               )}
             >

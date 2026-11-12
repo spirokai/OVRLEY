@@ -86,6 +86,7 @@
   --surface-highlight: color-mix(in srgb, var(--theme-color-background) 76%, var(--theme-color-aqua) 24%);
   --surface-highlight-soft: color-mix(in srgb, var(--theme-color-background) 88%, var(--theme-color-aqua) 12%);
   --surface-darken: color-mix(in srgb, var(--theme-color-background) 70%, black 30%);
+  --field-lift: color-mix(in srgb, var(--theme-color-ice) 4%, transparent);
   --accent-border: color-mix(in srgb, var(--theme-color-background) 48%, var(--theme-color-accent) 52%);
   --highlight: var(--theme-color-aqua);
   --highlight-foreground: var(--theme-color-background);

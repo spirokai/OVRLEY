@@ -73,3 +73,8 @@
   --scrollbar-thumb-border: 0;
   --scrollbar-thumb-background-clip: border-box;
 }
+
+/* Borderless form fields: a faint light wash layered over whatever background colour the field sets */
+.field-lift {
+  background-image: linear-gradient(var(--field-lift), var(--field-lift));
+}
