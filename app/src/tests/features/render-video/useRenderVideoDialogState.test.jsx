@@ -132,90 +132,49 @@ describe('useRenderVideoDialogState', () => {
       expect(result.current.settings.codec).toBe('prores_ks')
     })
     expect(result.current.exportMode).toBe('transparent')
-    expect(result.current.settings.range).toEqual({
-      ...DEFAULT_EXPORT_RANGE,
-      type: 'custom',
-      from: 5,
-      to: 17,
-    })
+    // The video parts decide what renders, so the range is left as it was.
+    expect(result.current.settings.range).toEqual({ ...DEFAULT_EXPORT_RANGE })
+    expect(result.current.showExportRangeSettings).toBe(false)
+  })
 
-    act(() => {
-      result.current.onSettingsChange({
-        range: {
-          ...result.current.settings.range,
-          from: 6.25,
-          to: 15.75,
-        },
+  test('renders the whole activity in one transparent render only when asked, and turns it off for composite export', async () => {
+    useStore.setState({
+      ...videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12 })], { clip: 5 }),
+      parsedActivity: { metadata: {} },
+    })
+    const onConfirm = vi.fn()
+    const { result } = renderHook(() => {
+      const [settings, setSettings] = useState({
+        outputMode: 'combined',
+        exportMode: 'transparent',
+        fps: 30,
+        widgetUpdateRate: 1,
+        codec: 'prores_ks',
+        qualityType: 'quality',
+        qualityValue: 18,
+        exportAcceleration: 'cpu',
+        range: { ...DEFAULT_EXPORT_RANGE },
+        renderFullActivity: false,
+        outputPath: 'C:\\renders\\overlay.mov',
+      })
+      return useRenderVideoDialogState({
+        phase: 'confirm',
+        settings,
+        onSettingsChange: (updates) => setSettings((current) => ({ ...current, ...updates })),
+        onClose: vi.fn(),
+        onConfirm,
       })
     })
 
-    act(() => {
-      result.current.handleExportModeChange('composite')
-    })
+    expect(result.current.showRenderFullActivity).toBe(true)
+    expect(result.current.renderFullActivity).toBe(false)
+    act(() => result.current.handleRenderFullActivityChange(true))
+    expect(result.current.renderFullActivity).toBe(true)
+    await act(async () => result.current.onConfirm())
+    expect(onConfirm).toHaveBeenCalledWith(null)
 
-    await waitFor(() => {
-      expect(result.current.settings.codec).toBe('libx264')
-    })
-    expect(result.current.exportMode).toBe('composite')
-
-    act(() => {
-      result.current.handleExportModeChange('transparent')
-    })
-
-    await waitFor(() => {
-      expect(result.current.settings.codec).toBe('prores_ks')
-    })
-    expect(result.current.settings.range).toEqual({
-      ...DEFAULT_EXPORT_RANGE,
-      type: 'custom',
-      from: 6.25,
-      to: 15.75,
-    })
-
-    act(() => {
-      result.current.handleApplyImportedVideoRange()
-    })
-
-    expect(result.current.settings.range).toEqual({
-      ...DEFAULT_EXPORT_RANGE,
-      type: 'custom',
-      from: 5,
-      to: 17,
-    })
-  })
-
-  test('applies the committed interval covered by every imported clip as the video range', () => {
-    useStore.setState(
-      videoStoreState(
-        [
-          createTestVideo({ id: 'late', path: 'C:\\late.mp4', durationSeconds: 10, importOrder: 0 }),
-          createTestVideo({ id: 'early', path: 'C:\\early.mp4', durationSeconds: 12, importOrder: 1 }),
-        ],
-        { late: 30, early: 5 },
-      ),
-    )
-    const onSettingsChange = vi.fn()
-    const transparent = {
-      outputMode: 'combined',
-      exportMode: 'transparent',
-      fps: 30,
-      widgetUpdateRate: 1,
-      codec: 'prores_ks',
-      qualityType: 'quality',
-      qualityValue: 18,
-      exportAcceleration: 'cpu',
-      range: { ...DEFAULT_EXPORT_RANGE },
-    }
-    const { result, rerender } = renderHook(
-      ({ settings }) => useRenderVideoDialogState({ phase: 'confirm', settings, onSettingsChange, onClose: vi.fn(), onConfirm: vi.fn() }),
-      { initialProps: { settings: transparent } },
-    )
-
-    expect(result.current.videoBounds).toEqual({ startSecond: 5, endSecond: 40 })
-    act(() => result.current.handleApplyImportedVideoRange())
-    expect(onSettingsChange).toHaveBeenLastCalledWith({ range: { type: 'custom', from: 5, to: 40 } })
-
-    rerender({ settings: { ...transparent, exportMode: 'composite', codec: 'libx264' } })
-    expect(result.current.renderSummaryItems).toContain('35 sec')
+    act(() => result.current.handleExportModeChange('composite'))
+    expect(result.current.renderFullActivity).toBe(false)
+    expect(result.current.showRenderFullActivity).toBe(false)
   })
 })

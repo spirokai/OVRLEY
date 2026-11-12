@@ -84,15 +84,16 @@ describe('RenderVideoDialog', () => {
     await user.click(screen.getByRole('tab', { name: 'Transparent' }))
 
     expect(screen.getByText('Export Settings')).toBeInTheDocument()
-    expect(screen.getByText('Custom Export Range')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /use video range/i })).toBeInTheDocument()
-    expect(screen.getByLabelText('From')).toHaveValue('00:05')
-    expect(screen.getByLabelText('To')).toHaveValue('00:17')
+    // With videos the export follows their parts: no range inputs, and no whole-activity render without an external activity.
+    expect(screen.queryByText('Custom Export Range')).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'Render full activity' })).not.toBeInTheDocument()
   })
 
-  test('preserves export markers when switching an imported-video dialog to transparent export', async () => {
-    useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12 })], { clip: 5 }))
-
+  test('offers the whole-activity render, off by default, for a transparent video export with an external activity', async () => {
+    useStore.setState({
+      ...videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12 })], { clip: 5 }),
+      parsedActivity: { metadata: {} },
+    })
     const user = userEvent.setup()
 
     render(
@@ -106,20 +107,18 @@ describe('RenderVideoDialog', () => {
           exportAcceleration: 'cpu',
           qualityType: 'quality',
           qualityValue: 18,
-          range: {
-            ...DEFAULT_EXPORT_RANGE,
-            type: 'custom',
-            from: 2,
-            to: 8,
-          },
+          range: { ...DEFAULT_EXPORT_RANGE },
+          renderFullActivity: false,
         }}
       />,
     )
 
+    expect(screen.queryByRole('switch', { name: 'Render full activity' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('tab', { name: 'Transparent' }))
-
-    expect(screen.getByLabelText('From')).toHaveValue('00:02')
-    expect(screen.getByLabelText('To')).toHaveValue('00:08')
+    const fullActivity = screen.getByRole('switch', { name: 'Render full activity' })
+    expect(fullActivity).not.toBeChecked()
+    await user.click(fullActivity)
+    expect(fullActivity).toBeChecked()
   })
 
   test('commits the edited output path instead of the previous draft value', async () => {

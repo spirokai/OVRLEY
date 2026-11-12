@@ -5,11 +5,6 @@ import { isVideoExcluded } from '@/lib/video-program/video-segments'
 import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { captureBatchSync } from './renderRequest'
 
-/** @param {{startSecond: number, endSecond: number}} videoBounds Committed interval covered by videos. @returns {object} Activity-timeline export range. */
-export function getImportedVideoExportRange(videoBounds) {
-  return { type: 'custom', from: videoBounds.startSecond, to: videoBounds.endSecond }
-}
-
 /** @param {'transparent'|'composite'} exportMode Render mode. @returns {string} Native container extension. */
 export function getRenderOutputExtension(exportMode) {
   return exportMode === 'composite' ? 'mp4' : 'mov'

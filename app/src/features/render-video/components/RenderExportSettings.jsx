@@ -5,6 +5,7 @@ import { DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTranslation } from 'react-i18next'
@@ -250,17 +251,28 @@ export default function RenderExportSettings(ctx) {
         )}
 
         {ctx.showExportRangeSettings && (
-          <ExportRangeSettings
-            range={ctx.settings.range}
-            fps={ctx.settings.fps}
-            onExportRangeChange={(range) => ctx.onSettingsChange({ range })}
-            showUseVideoRangeAction={ctx.hasImportedVideo}
-            onUseVideoRange={ctx.handleApplyImportedVideoRange}
-          />
+          <ExportRangeSettings range={ctx.settings.range} fps={ctx.settings.fps} onExportRangeChange={(range) => ctx.onSettingsChange({ range })} />
+        )}
+
+        {/* One column of the settings grid, so the switch sits beside its label rather than across the panel. */}
+        {ctx.showRenderFullActivity && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <Label htmlFor="render-full-activity" className="text-xs font-medium">
+                {t('render-video.renderFullActivity', 'Render full activity')}
+              </Label>
+              <Switch
+                id="render-full-activity"
+                checked={ctx.renderFullActivity}
+                onCheckedChange={ctx.handleRenderFullActivityChange}
+                disabled={ctx.settingsLocked}
+              />
+            </div>
+          </div>
         )}
 
         {ctx.hasImportedVideo && ctx.isSeparate ? (
-          <div className="space-y-2 pt-4">
+          <div className="space-y-2">
             <BatchFolderPicker
               label={t('render-video.outputFolder', 'Output folder')}
               folder={ctx.batchOutputFolder}
@@ -274,7 +286,7 @@ export default function RenderExportSettings(ctx) {
             )}
           </div>
         ) : (
-          <div className="space-y-2 pt-4">
+          <div className="space-y-2">
             <Label className="text-[0.741rem] font-bold uppercase tracking-widest text-muted-foreground">
               {t('render-video.outputFile', 'Output file')}
             </Label>

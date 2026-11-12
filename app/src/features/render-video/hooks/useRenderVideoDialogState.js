@@ -11,10 +11,11 @@
  * @returns {object} State and handlers for RenderVideoDialog.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { useFpsMode } from '@/hooks/useFpsMode'
 import { saveSinglePath } from '@/lib/file-dialog'
+import useStore from '@/store/useStore'
 import { OUTPUT_FORMATS, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
 import {
   getExportCodecForSelection,
@@ -25,7 +26,7 @@ import {
   getDefaultQuality,
   invertQualityValue,
 } from '../utils/codecUtils'
-import { batchResultQueue, getImportedVideoExportRange, getRenderOutputExtension, getRenderSummaryItems } from '../utils/renderPresentation'
+import { batchResultQueue, getRenderOutputExtension, getRenderSummaryItems } from '../utils/renderPresentation'
 import { useTranslation } from 'react-i18next'
 import useRenderVideoDerivedState from './useRenderVideoDerivedState'
 import useBatchInspection from './useBatchInspection'
@@ -48,8 +49,8 @@ export default function useRenderVideoDialogState({
   const batch = useBatchInspection({ phase, settings })
   const [showAllBatchVideos, setShowAllBatchVideos] = useState(true)
   const outputPath = settings?.outputPath
-  const range = settings?.range
-  const importedVideoRangePrefilledRef = useRef(false)
+  // Only an external activity has a timeline of its own to render whole; embedded telemetry belongs to its clip.
+  const hasExternalActivity = useStore((state) => state.parsedActivity !== null)
   const {
     availableCodecs,
     batchSnapshot,
@@ -96,12 +97,6 @@ export default function useRenderVideoDialogState({
   })
 
   useEffect(() => {
-    if (phase !== 'confirm') {
-      importedVideoRangePrefilledRef.current = false
-    }
-  }, [phase])
-
-  useEffect(() => {
     if (!settings) {
       return
     }
@@ -146,34 +141,19 @@ export default function useRenderVideoDialogState({
 
   const isProgress = phase === 'progress'
 
-  const handleApplyImportedVideoRange = useCallback(() => {
-    if (!hasImportedVideo) {
-      return
-    }
-
-    importedVideoRangePrefilledRef.current = true
-    onSettingsChange({
-      range: getImportedVideoExportRange(videoBounds),
-    })
-  }, [hasImportedVideo, onSettingsChange, videoBounds])
-
-  const handleOutputModeChange = useCallback((outputMode) => onSettingsChange({ outputMode }), [onSettingsChange])
-
-  const handleExportModeChange = useCallback(
-    (exportMode) => {
-      if (exportMode !== 'transparent' || isSeparate || !hasImportedVideo || importedVideoRangePrefilledRef.current || range?.type === 'custom') {
-        onSettingsChange({ exportMode })
-        return
-      }
-
-      importedVideoRangePrefilledRef.current = true
-      onSettingsChange({
-        exportMode,
-        range: getImportedVideoExportRange(videoBounds),
-      })
-    },
-    [range, hasImportedVideo, isSeparate, onSettingsChange, videoBounds],
+  // The whole activity renders as one transparent file, so composite export and separate files turn it off.
+  const handleOutputModeChange = useCallback(
+    (outputMode) => onSettingsChange(outputMode === 'separate' ? { outputMode, renderFullActivity: false } : { outputMode }),
+    [onSettingsChange],
   )
+  const handleExportModeChange = useCallback(
+    (exportMode) => onSettingsChange(exportMode === 'composite' ? { exportMode, renderFullActivity: false } : { exportMode }),
+    [onSettingsChange],
+  )
+  const handleRenderFullActivityChange = useCallback((renderFullActivity) => onSettingsChange({ renderFullActivity }), [onSettingsChange])
+  // With videos an export follows their parts; rendering the whole activity overrides them with one overlay render.
+  const renderFullActivity = hasImportedVideo && settings?.renderFullActivity === true
+  const rendersVideoParts = hasImportedVideo && !renderFullActivity
 
   const handleOutputPathCommit = useCallback(
     (nextOutputPath = outputPath) => onSettingsChange({ outputPath: nextOutputPath }),
@@ -244,18 +224,20 @@ export default function useRenderVideoDialogState({
     () => (showAllBatchVideos ? batchQueue : batchQueue.filter((item) => item.status !== 'blocked')),
     [batchQueue, showAllBatchVideos],
   )
-  const batchStartDisabled = renderStartDisabled || !batch.batchReady
-  // With videos the batch service renders the reviewed outputs; without videos a single render.
+  const batchStartDisabled = rendersVideoParts
+    ? renderStartDisabled || !batch.batchReady
+    : renderStartDisabled || submissionPending || !settings?.outputPath
+  // Video parts render through the batch service; the activity alone (without videos, or whole) through a single render.
   const handleConfirm = useCallback(async () => {
-    if (hasImportedVideo && !batch.batchReady) return
+    if (rendersVideoParts && !batch.batchReady) return
     try {
-      await onConfirm(hasImportedVideo ? batch.request : null)
+      await onConfirm(rendersVideoParts ? batch.request : null)
     } catch (error) {
       if (error.code === 'reinspectionRequired') batch.reject(error)
       else throw error
     }
-  }, [batch, hasImportedVideo, onConfirm])
-  const handleCancel = useCallback(() => onCancel(hasImportedVideo ? 'batch' : 'single'), [hasImportedVideo, onCancel])
+  }, [batch, rendersVideoParts, onConfirm])
+  const handleCancel = useCallback(() => onCancel(rendersVideoParts ? 'batch' : 'single'), [rendersVideoParts, onCancel])
 
   return {
     ...batch,
@@ -275,7 +257,8 @@ export default function useRenderVideoDialogState({
     fpsLocked: exportMode === 'composite' && (isSeparate || Boolean(lockedVideoFps)),
     fpsMode,
     handleAccelerationChange,
-    handleApplyImportedVideoRange,
+    handleRenderFullActivityChange,
+    renderFullActivity,
     handleCancel,
     isCancelling,
     handleCustomFpsChange,
@@ -326,7 +309,9 @@ export default function useRenderVideoDialogState({
     showBatchProgress: hasImportedVideo && (batch.batchRunning || batchFinished),
     showContainerFps: !isSeparate || exportMode !== 'composite',
     showExportModeOverride: hasImportedVideo,
-    showExportRangeSettings: exportMode !== 'composite' && !isSeparate,
+    // The export range is set in the dialog only for the activity alone; with videos their parts decide what renders.
+    showExportRangeSettings: !hasImportedVideo && exportMode !== 'composite',
+    showRenderFullActivity: hasImportedVideo && hasExternalActivity && exportMode === 'transparent' && !isSeparate,
     showVideoImportedBadge: hasImportedVideo && !isSeparate,
     showVideoRequiredBadge: !hasImportedVideo,
     updateRateOptions,

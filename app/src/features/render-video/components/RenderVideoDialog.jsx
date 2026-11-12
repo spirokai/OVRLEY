@@ -37,6 +37,8 @@ export default function RenderVideoDialog(props) {
   }
 
   const hasBlockingResolutionMismatch = ctx.hasImportedVideo && ctx.resolutionMismatch
+  // The video list stays hidden while settings are chosen and opens beside the progress while videos render.
+  const showsVideoList = ctx.hasMultipleVideos && ctx.showBatchProgress
 
   return (
     <Dialog
@@ -49,7 +51,7 @@ export default function RenderVideoDialog(props) {
     >
       <DialogContent
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
-        className="w-full max-w-xl rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50"
+        className={`w-full rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50 ${showsVideoList ? 'max-w-6xl' : 'max-w-xl'}`}
         aria-describedby={undefined}
         onEscapeKeyDown={(event) => {
           if (ctx.isProgress || ctx.submissionPending || ctx.batchRunning) {
@@ -109,7 +111,7 @@ export default function RenderVideoDialog(props) {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-12">
+          <div className={`grid gap-12 ${showsVideoList ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
             <div className={ctx.showBatchProgress ? 'min-w-0 md:flex md:h-150 md:flex-col md:justify-center md:overflow-y-auto' : 'min-w-0'}>
               {ctx.showBatchProgress ? (
                 <>
@@ -128,14 +130,17 @@ export default function RenderVideoDialog(props) {
 
             {ctx.hasImportedVideo && (
               <>
-                {/* The video list is hidden until we decide whether batch export stays; each part's overlay is switched in the video drawer. */}
+                {/* Until we decide whether batch export stays, the list shows only render progress; each part's overlay is switched in the video drawer. */}
                 {ctx.hasMultipleVideos ? (
-                  <div className="hidden">
+                  <div className={showsVideoList ? 'grid min-w-0' : 'hidden'}>
                     <BatchRenderQueue {...ctx} />
                   </div>
                 ) : null}
-                {ctx.showBatchProgress ? null : <BatchReviewAlerts combinedBlockers={ctx.combinedBlockers} batchReviewError={ctx.batchReviewError} />}
-                <div className="flex items-center justify-end gap-3">
+                {/* Rendering the whole activity skips the videos, so their review problems do not apply. */}
+                {ctx.showBatchProgress || ctx.renderFullActivity ? null : (
+                  <BatchReviewAlerts combinedBlockers={ctx.combinedBlockers} batchReviewError={ctx.batchReviewError} />
+                )}
+                <div className={`flex items-center justify-end gap-3 ${showsVideoList ? 'md:col-span-2' : ''}`}>
                   <div className="flex items-center gap-3">
                     <Button
                       type="button"

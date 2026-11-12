@@ -2,7 +2,6 @@
  * Renders shared custom export range controls.
  */
 
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { SecondsInput } from '@/components/ui/seconds-input'
 import { Switch } from '@/components/ui/switch'
@@ -16,11 +15,9 @@ import { useTranslation } from 'react-i18next'
  * @param {*} props.range - Export range state object.
  * @param {number} props.fps - Render frame rate the boundaries snap to.
  * @param {*} props.onExportRangeChange - Callback invoked when range changes.
- * @param {boolean} [props.showUseVideoRangeAction=false] - Whether to show the imported-video range action.
- * @param {function} [props.onUseVideoRange] - Callback invoked when the imported-video range action is selected.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function ExportRangeSettings({ range, fps, onExportRangeChange, showUseVideoRangeAction = false, onUseVideoRange }) {
+export default function ExportRangeSettings({ range, fps, onExportRangeChange }) {
   const { t } = useTranslation()
   const ctx = useExportRangeSettings({ range, fps, onExportRangeChange })
 
@@ -34,7 +31,7 @@ export default function ExportRangeSettings({ range, fps, onExportRangeChange, s
       </div>
 
       {ctx.isCustom ? (
-        <div className={`grid gap-4 ${showUseVideoRangeAction ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]' : 'grid-cols-2'}`}>
+        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-[0.741rem] text-muted-foreground uppercase font-bold">{t('render-video.from', 'From')}</Label>
             <SecondsInput
@@ -58,20 +55,6 @@ export default function ExportRangeSettings({ range, fps, onExportRangeChange, s
               aria-label={t('render-video.to', 'To')}
             />
           </div>
-
-          {showUseVideoRangeAction ? (
-            <div className="flex items-end">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-9 border-border/80 bg-surface-elevated px-2 text-[0.741rem] font-semibold text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
-                onClick={onUseVideoRange}
-              >
-                {t('render-video.useVideoRange', 'Use Video Range')}
-              </Button>
-            </div>
-          ) : null}
         </div>
       ) : null}
     </div>

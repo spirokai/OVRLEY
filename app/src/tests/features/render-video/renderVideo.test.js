@@ -111,6 +111,24 @@ describe('render request preparation', () => {
     })
   })
 
+  test('renders the whole activity as one overlay regardless of the videos and the export range when asked', () => {
+    useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:/clip.mp4', durationSeconds: 5 })], { clip: 10 }))
+    const request = createRenderRequest({
+      editorSnapshot: useStore.getState(),
+      settings: {
+        ...useStore.getState().renderSettings,
+        exportMode: 'transparent',
+        range: { type: 'custom', from: 10, to: 15 },
+        renderFullActivity: true,
+        outputPath: 'C:/renders/overlay.mov',
+      },
+    })
+    expect(request.target).toBe('single')
+    expect(request.payload.config.scene).toMatchObject({ start: 0, end: 20 })
+    expect(request.payload.config.scene).not.toHaveProperty('video_path')
+    expect(request.settings).not.toHaveProperty('renderFullActivity')
+  })
+
   test('previews the frame of the clip the preview shows, against its own telemetry in clip-local time', () => {
     const telemetryActivity = { sample_elapsed_seconds: [0, 15, 30], trim_end_seconds: 30 }
     const video = createTestVideo({

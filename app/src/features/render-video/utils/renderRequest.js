@@ -12,9 +12,14 @@ export function isRendererBusy(state) {
   return state.renderingVideo || (state.batchSnapshot?.rendererBusy ?? false) || state.renderSubmissionTarget !== null
 }
 
-/** @param {object} state Editor snapshot. @returns {'single'|'batch'} Native transport: videos render through the batch service. */
-export function renderTransport(state) {
-  return state.importedVideos.length > 0 ? 'batch' : 'single'
+/**
+ * @param {object} state Editor snapshot.
+ * @param {{renderFullActivity?: boolean}|null} [settings] Render settings draft, when one is open.
+ * @returns {'single'|'batch'} Native transport: videos render through the batch service, unless the whole
+ *   activity is rendered as one overlay regardless of them.
+ */
+export function renderTransport(state, settings = null) {
+  return state.importedVideos.length > 0 && settings?.renderFullActivity !== true ? 'batch' : 'single'
 }
 
 /**
@@ -69,6 +74,8 @@ export function createRenderSettingsDraft(state) {
     widgetUpdateRate: normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate),
     exportMode: renderSettings.outputMode === 'separate' || importedVideos.length > 0 ? renderSettings.exportMode : 'transparent',
     range: { ...renderSettings.range },
+    // Rendering the whole activity overrides the video parts; an export follows them unless asked.
+    renderFullActivity: false,
   }
 }
 
@@ -156,7 +163,7 @@ export function createRenderRequest({ editorSnapshot, settings, language, batchR
   validateRenderSettings(settings)
   const { outputPath, outputMode, fps, widgetUpdateRate, exportMode, codec, qualityType, qualityValue, range } = settings
   const acceptedSettings = { outputMode, fps, widgetUpdateRate, exportMode, codec, qualityType, qualityValue, range: { ...range } }
-  const target = renderTransport(editorSnapshot)
+  const target = renderTransport(editorSnapshot, settings)
   if (target === 'batch') {
     const destination = createExportDestination({ outputMode, outputPath, outputDirectory: editorSnapshot.batchOutputFolder, overwrite })
     if (destination === null) throw new Error('Render output target is required')
@@ -167,9 +174,19 @@ export function createRenderRequest({ editorSnapshot, settings, language, batchR
       settings: acceptedSettings,
     }
   }
-  const inputs = resolveSingleRenderInputs(editorSnapshot)
+  // The whole activity renders without a clip and past any export range, whatever the videos cover.
+  const inputs = settings.renderFullActivity
+    ? {
+        clip: null,
+        activity: editorSnapshot.parsedActivity,
+        originSecond: 0,
+        timelineStart: editorSnapshot.startSecond,
+        timelineEnd: editorSnapshot.endSecond,
+      }
+    : resolveSingleRenderInputs(editorSnapshot)
+  const singleSettings = settings.renderFullActivity ? { ...settings, range: { ...settings.range, type: 'all' } } : settings
   const payload = {
-    config: createSingleRenderConfig(editorSnapshot, inputs, settings, language),
+    config: createSingleRenderConfig(editorSnapshot, inputs, singleSettings, language),
     parsedActivity: inputs.activity,
     outputPath,
     overwrite,

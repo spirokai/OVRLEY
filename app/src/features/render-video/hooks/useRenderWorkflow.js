@@ -18,7 +18,7 @@ export default function useRenderWorkflow({ backendStatus }) {
   const { t } = useTranslation()
   const [renderDialogPhase, setRenderDialogPhase] = useState('closed')
   const [renderSettingsDraft, setRenderSettingsDraft] = useState(null)
-  const transport = useStore((state) => renderTransport(state))
+  const transport = useStore(useCallback((state) => renderTransport(state, renderSettingsDraft), [renderSettingsDraft]))
   const execution = useRenderExecution({ reviewTarget: renderDialogPhase === 'confirm' ? transport : null })
   const { activitySummary, config, hasVideoTelemetry, renderStatus, renderingVideo, rendererBusy, setErrorMessage } = execution
   const [outputPathError, setOutputPathError] = useState(null)
@@ -101,7 +101,7 @@ export default function useRenderWorkflow({ backendStatus }) {
   const submitRender = useCallback(
     async (batchReview, overwrite = false, expectedPath = null) => {
       if (renderSettingsDraft === null || isRendererBusy(useStore.getState()) || backendStatus !== 'connected') return
-      const target = renderTransport(useStore.getState())
+      const target = renderTransport(useStore.getState(), renderSettingsDraft)
       if (target === 'batch' && batchReview === null) return
       // A single render and a combined export write one chosen file.
       const writesOutputFile = target === 'single' || renderSettingsDraft.outputMode === 'combined'

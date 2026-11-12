@@ -231,6 +231,7 @@
     "codecOutputFormat": "Codec / Output Format",
     "custom": "Custom",
     "customExportRange": "Custom Export Range",
+    "renderFullActivity": "Render full activity",
     "customFps": "Custom FPS",
     "encodingOutputFile": "Encoding output file...",
     "encodingValVal2Frames": "Encoding: {{val}} / {{val2}} frames",
