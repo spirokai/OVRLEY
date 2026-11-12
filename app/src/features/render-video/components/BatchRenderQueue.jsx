@@ -55,10 +55,11 @@ export default function BatchRenderQueue({
               <Files className="h-4 w-4 shrink-0 text-primary" />
               <div className="flex min-w-0 items-center gap-1">
                 <h2 className="truncate text-sm font-semibold text-foreground">{t('render-video.videos', 'Videos')}</h2>
-                <HelpTooltip className="-mt-0.5 self-start" content={t('render-video.batchAutoSyncRequirement')} />
+                <HelpTooltip className="hidden -mt-0.5 self-start" content={t('render-video.batchAutoSyncRequirement')} />
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-3">
+            {/* Hidden until we decide whether batch export stays: these served batch export, not one export of the timeline. */}
+            <div className="hidden shrink-0 items-center gap-3">
               <Button
                 type="button"
                 variant="ghost"

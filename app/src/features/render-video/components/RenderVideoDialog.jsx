@@ -133,7 +133,7 @@ export default function RenderVideoDialog(props) {
                 ) : ctx.showBatchProgress ? null : (
                   <BatchReviewAlerts combinedBlockers={ctx.combinedBlockers} batchReviewError={ctx.batchReviewError} />
                 )}
-                <div className="flex items-center justify-end gap-3 md:col-span-2">
+                <div className={`flex items-center justify-end gap-3 ${ctx.hasMultipleVideos ? 'md:col-span-2' : ''}`}>
                   <div className="flex items-center gap-3">
                     <Button
                       type="button"
