@@ -84,7 +84,8 @@ export default function useRenderVideoDerivedState({ settings }) {
   )
   const selectedCodecIsMp4 = isMp4Codec(displaySettings.codec)
   const selectedExportCodecAvailable = selectedAccelerationOptions.some((option) => option.value === selectedAccelerationValue && option.available)
-  const resolutionMismatch = !isBatchTarget && resolutionsMismatch(config?.scene, importedVideoResolution)
+  // The current video probes the batch folder too: its videos likely share its resolution.
+  const resolutionMismatch = hasImportedVideo && resolutionsMismatch(config?.scene, importedVideoResolution)
   const renderStartDisabled =
     rendererBusy ||
     resolutionMismatch ||
